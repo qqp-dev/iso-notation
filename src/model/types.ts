@@ -88,14 +88,14 @@ export interface QuantizedGridScore {
   handCrossings?: HandCrossingEvent[];
 }
 
-export type JankoRowIndex = 1 | 2 | 3 | 4;
+export type JankoRowIndex = 0 | 1;
 
 export interface JankoKey {
   row: JankoRowIndex;
   column: number; // Whole-tone key column
   pitch: PitchCoordinate;
   linearIndex: number;
-  wholeToneSet: 0 | 1; // 0 = WT-A (Rows 1 & 3), 1 = WT-B (Rows 2 & 4)
+  wholeToneSet: 0 | 1; // 0 = Row 0 (Even: 0, 2, 4, 6, 8, 10), 1 = Row 1 (Odd: 1, 3, 5, 7, 9, 11)
   x: number; // Normalized horizontal position in key units
   y: number; // Normalized vertical position (row index)
 }

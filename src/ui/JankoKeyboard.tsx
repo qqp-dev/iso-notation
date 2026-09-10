@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { PitchCoordinate } from '../model/types';
-import { linearIndex, pitchClassLabel, pitchLabel } from '../model/pitch';
+import { linearIndex } from '../model/pitch';
 import { buildJankoLayout } from '../render/janko-model';
 import { getJankoKeyColor } from '../render/colors';
 import { ColorMode } from '../render/types';
@@ -11,22 +11,20 @@ interface JankoKeyboardProps {
   colorMode: ColorMode;
   minOctave?: number;
   maxOctave?: number;
-  showHandShape?: boolean;
   onKeyClick?: (pitch: PitchCoordinate) => void;
 }
 
 export const JankoKeyboard: React.FC<JankoKeyboardProps> = ({
   activePitches,
   colorMode,
-  minOctave = 2,
-  maxOctave = 6,
-  showHandShape = true,
+  minOctave = 1,
+  maxOctave = 7,
   onKeyClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const layout = useMemo(() => {
-    return buildJankoLayout(minOctave, maxOctave, 40, 46, 5);
+    return buildJankoLayout(minOctave, maxOctave, 38, 44, 4);
   }, [minOctave, maxOctave]);
 
   const activeLinearSet = useMemo(() => {
@@ -40,63 +38,37 @@ export const JankoKeyboard: React.FC<JankoKeyboardProps> = ({
     }
   };
 
-  // Compute hand shape polygon points among active keys
-  const polygonPoints = useMemo(() => {
-    if (!showHandShape || activeLinearSet.size < 2) return null;
-
-    const matchedKeys = layout.keys.filter(k => activeLinearSet.has(k.linearIndex));
-    if (matchedKeys.length < 2) return null;
-
-    // Sort keys by x coordinate
-    matchedKeys.sort((a, b) => a.x - b.x);
-    return matchedKeys.map(k => `${k.x + 19},${k.y + 22}`).join(' ');
-  }, [layout, activeLinearSet, showHandShape]);
-
-  const svgWidth = layout.totalColumns * layout.keyWidth + 50;
-  const svgHeight = 4 * (layout.keyHeight + layout.rowGap) + 10;
+  const svgWidth = (layout.totalColumns + 1) * layout.keyWidth + 24;
+  const svgHeight = 2 * (layout.keyHeight + layout.rowGap) + 8;
 
   return (
-    <div className="w-full bg-slate-900 border-t border-slate-800 p-2 select-none overflow-x-auto" ref={containerRef}>
-      <div className="flex items-center justify-between mb-1 px-2 text-xs text-slate-400">
+    <div className="w-full bg-black border-t border-neutral-800 p-2 select-none overflow-x-auto" ref={containerRef}>
+      <div className="flex items-center justify-between mb-1.5 px-2 text-[11px] font-mono text-neutral-400">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-200">4-Row Jánko Isomorphic Keyboard</span>
-          <span className="text-slate-500">|</span>
+          <span className="font-semibold text-neutral-200">2-Row Jánko Keyboard</span>
+          <span className="text-neutral-700">|</span>
           <span>Octaves {minOctave}–{maxOctave}</span>
-          <span className="text-slate-500">|</span>
-          <span className="text-emerald-400 font-mono">{activeLinearSet.size} active sounding</span>
+          <span className="text-neutral-700">|</span>
+          <span className="text-amber-400">{activeLinearSet.size} active</span>
         </div>
-        <div className="flex items-center gap-3 text-slate-400">
+        <div className="flex items-center gap-3 text-[10px] text-neutral-400">
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
-            Row 1 & 3: WT-A (C, D, E, F#, G#, A#)
+            <span className="w-2 h-2 rounded-full bg-sky-500 inline-block"></span>
+            <span>Row 0: Even (0, 2, 4, 6, 8, 10)</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
-            Row 2 & 4: WT-B (C#, D#, F, G, A, B)
+            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+            <span>Row 1: Odd (1, 3, 5, 7, 9, 11)</span>
           </span>
         </div>
       </div>
 
       <div className="relative min-w-max pb-1">
         <svg width={svgWidth} height={svgHeight} className="overflow-visible">
-          {/* Hand-shape isomorphism polygon connecting sounding chord notes */}
-          {polygonPoints && (
-            <g className="transition-all duration-150">
-              <polygon
-                points={polygonPoints}
-                fill="rgba(250, 204, 21, 0.18)"
-                stroke="#FACC15"
-                strokeWidth={2}
-                strokeDasharray="4 2"
-              />
-            </g>
-          )}
-
-          {/* Keys */}
           {layout.keys.map((k, idx) => {
             const isActive = activeLinearSet.has(k.linearIndex);
             const colors = getJankoKeyColor(k.pitch, k.row, colorMode, isActive);
-            const isOctaveC = k.pitch.pitchClass === 0;
+            const isOctave0 = k.pitch.pitchClass === 0;
 
             return (
               <g
@@ -108,31 +80,31 @@ export const JankoKeyboard: React.FC<JankoKeyboardProps> = ({
                 <rect
                   width={layout.keyWidth - 2}
                   height={layout.keyHeight}
-                  rx={6}
+                  rx={4}
                   fill={colors.fill}
-                  stroke={isActive ? '#FACC15' : isOctaveC ? '#60A5FA' : colors.border}
-                  strokeWidth={isActive ? 2.5 : isOctaveC ? 2 : 1}
+                  stroke={isActive ? '#FACC15' : isOctave0 ? '#38BDF8' : colors.border}
+                  strokeWidth={isActive ? 2 : isOctave0 ? 1.5 : 1}
                 />
-                {/* Note Label */}
+                {/* Strictly numerical pitch class (0..11) */}
                 <text
                   x={(layout.keyWidth - 2) / 2}
-                  y={layout.keyHeight / 2 - 3}
+                  y={layout.keyHeight / 2 - 4}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fill={colors.text}
                   fontSize={11}
-                  fontWeight={isActive || isOctaveC ? 'bold' : 'normal'}
-                  fontFamily="sans-serif"
+                  fontWeight={isActive || isOctave0 ? 'bold' : 'normal'}
+                  fontFamily="monospace"
                 >
-                  {pitchClassLabel(k.pitch.pitchClass, 'sharp')}
+                  {k.pitch.pitchClass}
                 </text>
-                {/* Octave Subscript */}
+                {/* Octave subscript */}
                 <text
                   x={(layout.keyWidth - 2) / 2}
                   y={layout.keyHeight / 2 + 10}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill={isActive ? '#1E293B' : '#64748B'}
+                  fill={isActive ? '#000000' : '#777777'}
                   fontSize={9}
                   fontFamily="monospace"
                 >

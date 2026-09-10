@@ -68,27 +68,26 @@ test('Acoustic frequency calculations', () => {
 });
 
 test('Whole-tone parity and Janko row assignments', () => {
-  // WT-A (Even: C, D, E, F#, G#, A#) -> Rows 1 & 3
-  const wtAPitches = [0, 2, 4, 6, 8, 10];
-  wtAPitches.forEach((pc) => {
+  // Row 0 (Even: 0, 2, 4, 6, 8, 10) -> Row 0
+  const wtEvenPitches = [0, 2, 4, 6, 8, 10];
+  wtEvenPitches.forEach((pc) => {
     assert.equal(wholeToneParity({ pitchClass: pc, octave: 4 }), 0);
-    assert.deepEqual(jankoRowsForPitch({ pitchClass: pc, octave: 4 }), [1, 3]);
+    assert.deepEqual(jankoRowsForPitch({ pitchClass: pc, octave: 4 }), [0]);
   });
 
-  // WT-B (Odd: C#, D#, F, G, A, B) -> Rows 2 & 4
-  const wtBPitches = [1, 3, 5, 7, 9, 11];
-  wtBPitches.forEach((pc) => {
+  // Row 1 (Odd: 1, 3, 5, 7, 9, 11) -> Row 1
+  const wtOddPitches = [1, 3, 5, 7, 9, 11];
+  wtOddPitches.forEach((pc) => {
     assert.equal(wholeToneParity({ pitchClass: pc, octave: 4 }), 1);
-    assert.deepEqual(jankoRowsForPitch({ pitchClass: pc, octave: 4 }), [2, 4]);
+    assert.deepEqual(jankoRowsForPitch({ pitchClass: pc, octave: 4 }), [1]);
   });
 });
 
 test('Pitch labels formatting', () => {
-  assert.equal(pitchClassLabel(0, 'sharp'), 'C');
-  assert.equal(pitchClassLabel(1, 'sharp'), 'C#');
-  assert.equal(pitchClassLabel(1, 'flat'), 'Db');
-  assert.equal(pitchClassLabel(1, 'numeric'), '1');
-  assert.equal(pitchLabel({ pitchClass: 0, octave: 4 }, 'sharp'), 'C4');
-  assert.equal(pitchLabel({ pitchClass: 1, octave: 5 }, 'flat'), 'Db5');
-  assert.equal(pitchLabel({ pitchClass: 6, octave: 3 }, 'numeric'), '6:3');
+  assert.equal(pitchClassLabel(0), '0');
+  assert.equal(pitchClassLabel(1), '1');
+  assert.equal(pitchClassLabel(11), '11');
+  assert.equal(pitchLabel({ pitchClass: 0, octave: 4 }), '0:4');
+  assert.equal(pitchLabel({ pitchClass: 1, octave: 5 }), '1:5');
+  assert.equal(pitchLabel({ pitchClass: 6, octave: 3 }), '6:3');
 });

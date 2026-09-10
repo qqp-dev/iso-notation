@@ -1,22 +1,19 @@
-import { QuantizedGridScore, QuantizedNote, ArticulationType } from '../model/types';
+import { QuantizedGridScore, QuantizedNote } from '../model/types';
 import { detectHandCrossings } from '../model/grid';
 
 /**
  * J.S. Bach: Goldberg Variations, BWV 988
- * Variation 1. a 1 Clav.
+ * Variatio 1. a 1 Clav. (Urtext)
  *
  * Characteristics:
- * - Meter: 3/4
- * - Continuous flowing 16th-note motoric motion
+ * - Meter: 3/4 (48 ticks per beat, 144 ticks per measure)
+ * - 32 measures (4608 total ticks)
+ * - Continuous flowing 16th-note motoric motion (16th note = 12 ticks)
  * - Dynamic two-part hand-crossing counterpoint
- * - Wide register leaps across the manual
+ * - Pure numerical 12-TET pitch coordinates: (pitchClass: 0..11, octave: 0..N)
  */
 
-const TICKS_PER_BEAT = 48; // Quarter note = 48 ticks
-const SIXTEENTH = 12;      // 16th note = 12 ticks
-const EIGHTH = 24;         // 8th note = 24 ticks
-const QUARTER = 48;        // Quarter note = 48 ticks
-const DOTTED_HALF = 144;   // Full 3/4 measure = 144 ticks
+const TICKS_PER_BEAT = 48;
 
 let noteIdCounter = 0;
 function createNote(
@@ -25,8 +22,7 @@ function createNote(
   startTick: number,
   durationTicks: number,
   hand: 'RH' | 'LH',
-  dynamicMark: 'f' | 'mf' | 'p' = 'mf',
-  articulation?: ArticulationType
+  velocity: number = 90
 ): QuantizedNote {
   return {
     id: `bach-var1-${++noteIdCounter}`,
@@ -34,181 +30,578 @@ function createNote(
     startTick,
     durationTicks,
     hand,
-    velocity: hand === 'RH' ? 88 : 82,
-    dynamicMark,
-    articulation,
+    velocity,
   };
 }
 
 export function buildBachGoldbergVar1Score(): QuantizedGridScore {
   noteIdCounter = 0;
-  const notes: QuantizedNote[] = [];
-
-  // Pitch Classes: C=0, C#=1, D=2, D#=3, E=4, F=5, F#=6, G=7, G#=8, A=9, A#=10, B=11
-
-  // ==========================================
-  // MEASURE 1 (ticks 0 .. 144)
-  // RH: Continuous 16ths in G major: G4, A4, B4, C5, B4, A4, B4, G4, D5, C5, B4, A4
-  // LH: Bass foundation G2 (dotted half) and tenor chord G3, D4
-  // ==========================================
-  const m1 = 0;
-  // LH Accompaniment
-  notes.push(createNote(7, 2, m1, DOTTED_HALF, 'LH', 'mf', 'tenuto')); // G2
-  notes.push(createNote(7, 3, m1, QUARTER, 'LH', 'p'));               // G3
-  notes.push(createNote(11, 3, m1 + QUARTER, QUARTER, 'LH', 'p'));      // B3
-  notes.push(createNote(2, 4, m1 + QUARTER * 2, QUARTER, 'LH', 'p'));  // D4
-
-  // RH 16th-note motor
-  const rhM1Pitches = [
-    [7, 4], [9, 4], [11, 4], [0, 5],
-    [11, 4], [9, 4], [11, 4], [7, 4],
-    [2, 5], [0, 5], [11, 4], [9, 4],
+  const notes: QuantizedNote[] = [
+    createNote(7, 2, 0, 24, 'LH', 90),
+    createNote(7, 4, 0, 12, 'RH', 90),
+    createNote(6, 4, 12, 12, 'RH', 90),
+    createNote(11, 3, 24, 12, 'LH', 90),
+    createNote(7, 4, 24, 36, 'RH', 90),
+    createNote(9, 3, 36, 12, 'LH', 90),
+    createNote(11, 3, 48, 24, 'LH', 90),
+    createNote(2, 4, 60, 12, 'RH', 90),
+    createNote(7, 3, 72, 24, 'LH', 90),
+    createNote(4, 4, 72, 12, 'RH', 90),
+    createNote(6, 4, 84, 12, 'RH', 90),
+    createNote(7, 2, 96, 24, 'LH', 90),
+    createNote(7, 4, 96, 12, 'RH', 90),
+    createNote(9, 4, 108, 12, 'RH', 90),
+    createNote(7, 3, 120, 24, 'LH', 90),
+    createNote(11, 4, 120, 12, 'RH', 90),
+    createNote(1, 5, 132, 12, 'RH', 90),
+    createNote(6, 2, 144, 24, 'LH', 90),
+    createNote(2, 5, 144, 12, 'RH', 90),
+    createNote(1, 5, 156, 12, 'RH', 90),
+    createNote(6, 3, 168, 12, 'LH', 90),
+    createNote(2, 5, 168, 36, 'RH', 90),
+    createNote(4, 3, 180, 12, 'LH', 90),
+    createNote(6, 3, 192, 24, 'LH', 90),
+    createNote(9, 4, 204, 12, 'RH', 90),
+    createNote(2, 3, 216, 24, 'LH', 90),
+    createNote(11, 4, 216, 12, 'RH', 90),
+    createNote(1, 5, 228, 12, 'RH', 90),
+    createNote(6, 2, 240, 24, 'LH', 90),
+    createNote(2, 5, 240, 12, 'RH', 90),
+    createNote(4, 5, 252, 12, 'RH', 90),
+    createNote(2, 3, 264, 24, 'LH', 90),
+    createNote(6, 5, 264, 12, 'RH', 90),
+    createNote(2, 5, 276, 12, 'RH', 90),
+    createNote(4, 2, 288, 24, 'LH', 90),
+    createNote(7, 5, 288, 12, 'RH', 90),
+    createNote(6, 5, 300, 12, 'RH', 90),
+    createNote(4, 3, 312, 12, 'LH', 90),
+    createNote(7, 5, 312, 36, 'RH', 90),
+    createNote(2, 3, 324, 12, 'LH', 90),
+    createNote(4, 3, 336, 24, 'LH', 90),
+    createNote(6, 5, 348, 12, 'RH', 90),
+    createNote(7, 3, 360, 24, 'LH', 90),
+    createNote(4, 5, 360, 12, 'RH', 90),
+    createNote(2, 5, 372, 12, 'RH', 90),
+    createNote(9, 2, 384, 24, 'LH', 90),
+    createNote(1, 5, 384, 12, 'RH', 90),
+    createNote(4, 5, 396, 12, 'RH', 90),
+    createNote(1, 4, 408, 24, 'LH', 90),
+    createNote(9, 4, 408, 12, 'RH', 90),
+    createNote(7, 4, 420, 12, 'RH', 90),
+    createNote(2, 3, 432, 24, 'LH', 90),
+    createNote(6, 4, 432, 12, 'RH', 90),
+    createNote(4, 4, 444, 12, 'RH', 90),
+    createNote(6, 3, 456, 12, 'LH', 90),
+    createNote(2, 4, 456, 12, 'RH', 90),
+    createNote(4, 3, 468, 12, 'LH', 90),
+    createNote(1, 4, 468, 12, 'RH', 90),
+    createNote(6, 3, 480, 24, 'LH', 90),
+    createNote(2, 4, 480, 12, 'RH', 90),
+    createNote(6, 4, 492, 12, 'RH', 90),
+    createNote(2, 3, 504, 24, 'LH', 90),
+    createNote(9, 3, 504, 12, 'LH', 90),
+    createNote(7, 3, 516, 12, 'LH', 90),
+    createNote(2, 2, 528, 24, 'LH', 90),
+    createNote(6, 3, 528, 12, 'LH', 90),
+    createNote(9, 3, 540, 12, 'LH', 90),
+    createNote(2, 3, 552, 24, 'LH', 90),
+    createNote(0, 3, 564, 12, 'LH', 90),
+    createNote(11, 2, 576, 12, 'LH', 90),
+    createNote(9, 2, 588, 12, 'LH', 90),
+    createNote(11, 2, 600, 36, 'LH', 90),
+    createNote(2, 5, 600, 12, 'RH', 90),
+    createNote(0, 5, 612, 12, 'RH', 90),
+    createNote(2, 5, 624, 24, 'RH', 90),
+    createNote(2, 3, 636, 12, 'LH', 90),
+    createNote(4, 3, 648, 12, 'LH', 90),
+    createNote(7, 4, 648, 24, 'RH', 90),
+    createNote(6, 3, 660, 12, 'LH', 90),
+    createNote(7, 3, 672, 12, 'LH', 90),
+    createNote(11, 3, 672, 24, 'RH', 90),
+    createNote(9, 3, 684, 12, 'LH', 90),
+    createNote(11, 3, 696, 12, 'LH', 90),
+    createNote(2, 5, 696, 24, 'RH', 90),
+    createNote(7, 3, 708, 12, 'LH', 90),
+    createNote(0, 3, 720, 12, 'LH', 90),
+    createNote(11, 2, 732, 12, 'LH', 90),
+    createNote(0, 3, 744, 36, 'LH', 90),
+    createNote(4, 5, 744, 12, 'RH', 90),
+    createNote(2, 5, 756, 12, 'RH', 90),
+    createNote(4, 5, 768, 24, 'RH', 90),
+    createNote(4, 3, 780, 12, 'LH', 90),
+    createNote(6, 3, 792, 12, 'LH', 90),
+    createNote(9, 4, 792, 24, 'RH', 90),
+    createNote(7, 3, 804, 12, 'LH', 90),
+    createNote(9, 3, 816, 12, 'LH', 90),
+    createNote(0, 4, 816, 24, 'RH', 90),
+    createNote(11, 3, 828, 12, 'LH', 90),
+    createNote(0, 4, 840, 12, 'LH', 90),
+    createNote(4, 5, 840, 24, 'RH', 90),
+    createNote(9, 3, 852, 12, 'LH', 90),
+    createNote(2, 3, 864, 12, 'LH', 90),
+    createNote(1, 3, 876, 12, 'LH', 90),
+    createNote(2, 3, 888, 36, 'LH', 90),
+    createNote(6, 5, 888, 12, 'RH', 90),
+    createNote(4, 5, 900, 12, 'RH', 90),
+    createNote(6, 5, 912, 24, 'RH', 90),
+    createNote(9, 3, 924, 12, 'LH', 90),
+    createNote(11, 3, 936, 12, 'LH', 90),
+    createNote(2, 5, 936, 24, 'RH', 90),
+    createNote(0, 4, 948, 12, 'LH', 90),
+    createNote(2, 4, 960, 12, 'LH', 90),
+    createNote(9, 5, 960, 24, 'RH', 90),
+    createNote(4, 4, 972, 12, 'LH', 90),
+    createNote(6, 4, 984, 12, 'LH', 90),
+    createNote(0, 5, 984, 48, 'RH', 90),
+    createNote(2, 4, 996, 12, 'LH', 90),
+    createNote(7, 4, 1008, 12, 'LH', 90),
+    createNote(6, 4, 1020, 12, 'LH', 90),
+    createNote(7, 4, 1032, 12, 'LH', 90),
+    createNote(11, 4, 1032, 24, 'RH', 90),
+    createNote(2, 4, 1044, 12, 'LH', 90),
+    createNote(11, 3, 1056, 12, 'LH', 90),
+    createNote(2, 4, 1068, 12, 'LH', 90),
+    createNote(7, 4, 1068, 12, 'RH', 90),
+    createNote(7, 3, 1080, 12, 'LH', 90),
+    createNote(11, 4, 1080, 12, 'RH', 90),
+    createNote(11, 3, 1092, 12, 'LH', 90),
+    createNote(2, 5, 1092, 12, 'RH', 90),
+    createNote(2, 3, 1104, 12, 'LH', 90),
+    createNote(7, 5, 1104, 12, 'RH', 90),
+    createNote(7, 3, 1116, 12, 'LH', 90),
+    createNote(2, 5, 1116, 12, 'RH', 90),
+    createNote(11, 2, 1128, 12, 'LH', 90),
+    createNote(7, 5, 1128, 12, 'RH', 90),
+    createNote(2, 3, 1140, 12, 'LH', 90),
+    createNote(9, 5, 1140, 12, 'RH', 90),
+    createNote(7, 2, 1152, 24, 'LH', 90),
+    createNote(11, 5, 1152, 12, 'RH', 90),
+    createNote(7, 5, 1164, 12, 'RH', 90),
+    createNote(7, 3, 1176, 24, 'LH', 90),
+    createNote(2, 5, 1176, 12, 'RH', 90),
+    createNote(11, 4, 1188, 12, 'RH', 90),
+    createNote(11, 3, 1200, 24, 'LH', 90),
+    createNote(7, 4, 1200, 12, 'RH', 90),
+    createNote(11, 4, 1212, 12, 'RH', 90),
+    createNote(7, 3, 1224, 24, 'LH', 90),
+    createNote(2, 5, 1224, 12, 'RH', 90),
+    createNote(7, 5, 1236, 12, 'RH', 90),
+    createNote(7, 2, 1248, 24, 'LH', 90),
+    createNote(11, 5, 1248, 12, 'RH', 90),
+    createNote(7, 5, 1260, 12, 'RH', 90),
+    createNote(7, 3, 1272, 24, 'LH', 90),
+    createNote(6, 5, 1272, 12, 'RH', 90),
+    createNote(4, 5, 1284, 12, 'RH', 90),
+    createNote(6, 2, 1296, 24, 'LH', 90),
+    createNote(9, 5, 1296, 12, 'RH', 90),
+    createNote(4, 5, 1308, 12, 'RH', 90),
+    createNote(6, 3, 1320, 24, 'LH', 90),
+    createNote(1, 5, 1320, 12, 'RH', 90),
+    createNote(9, 4, 1332, 12, 'RH', 90),
+    createNote(9, 3, 1344, 24, 'LH', 90),
+    createNote(6, 4, 1344, 12, 'RH', 90),
+    createNote(9, 4, 1356, 12, 'RH', 90),
+    createNote(6, 3, 1368, 24, 'LH', 90),
+    createNote(1, 5, 1368, 12, 'RH', 90),
+    createNote(4, 5, 1380, 12, 'RH', 90),
+    createNote(6, 2, 1392, 24, 'LH', 90),
+    createNote(9, 5, 1392, 12, 'RH', 90),
+    createNote(6, 5, 1404, 12, 'RH', 90),
+    createNote(6, 3, 1416, 24, 'LH', 90),
+    createNote(4, 5, 1416, 12, 'RH', 90),
+    createNote(2, 5, 1428, 12, 'RH', 90),
+    createNote(4, 2, 1440, 24, 'LH', 90),
+    createNote(7, 5, 1440, 12, 'RH', 90),
+    createNote(2, 5, 1452, 12, 'RH', 90),
+    createNote(4, 3, 1464, 24, 'LH', 90),
+    createNote(11, 4, 1464, 12, 'RH', 90),
+    createNote(7, 4, 1476, 12, 'RH', 90),
+    createNote(7, 3, 1488, 24, 'LH', 90),
+    createNote(4, 4, 1488, 12, 'RH', 90),
+    createNote(7, 4, 1500, 12, 'RH', 90),
+    createNote(4, 3, 1512, 24, 'LH', 90),
+    createNote(11, 4, 1512, 12, 'RH', 90),
+    createNote(2, 5, 1524, 12, 'RH', 90),
+    createNote(4, 2, 1536, 24, 'LH', 90),
+    createNote(7, 5, 1536, 12, 'RH', 90),
+    createNote(6, 5, 1548, 12, 'RH', 90),
+    createNote(7, 3, 1560, 24, 'LH', 90),
+    createNote(4, 5, 1560, 12, 'RH', 90),
+    createNote(2, 5, 1572, 12, 'RH', 90),
+    createNote(9, 2, 1584, 24, 'LH', 90),
+    createNote(1, 5, 1584, 12, 'RH', 90),
+    createNote(7, 4, 1596, 12, 'RH', 90),
+    createNote(4, 3, 1608, 24, 'LH', 90),
+    createNote(4, 4, 1608, 12, 'RH', 90),
+    createNote(1, 4, 1620, 12, 'RH', 90),
+    createNote(7, 3, 1632, 24, 'LH', 90),
+    createNote(9, 3, 1632, 12, 'RH', 90),
+    createNote(1, 4, 1644, 12, 'RH', 90),
+    createNote(4, 3, 1656, 24, 'LH', 90),
+    createNote(4, 4, 1656, 12, 'RH', 90),
+    createNote(7, 4, 1668, 12, 'RH', 90),
+    createNote(9, 2, 1680, 24, 'LH', 90),
+    createNote(1, 5, 1680, 12, 'RH', 90),
+    createNote(4, 5, 1692, 12, 'RH', 90),
+    createNote(7, 3, 1704, 24, 'LH', 90),
+    createNote(2, 5, 1704, 12, 'RH', 90),
+    createNote(1, 5, 1716, 12, 'RH', 90),
+    createNote(6, 3, 1728, 12, 'LH', 90),
+    createNote(2, 5, 1728, 24, 'RH', 90),
+    createNote(9, 3, 1740, 12, 'LH', 90),
+    createNote(6, 3, 1752, 24, 'RH', 90),
+    createNote(2, 4, 1752, 12, 'LH', 90),
+    createNote(6, 4, 1764, 12, 'LH', 90),
+    createNote(6, 3, 1776, 24, 'RH', 90),
+    createNote(9, 4, 1776, 12, 'LH', 90),
+    createNote(6, 4, 1788, 12, 'LH', 90),
+    createNote(2, 4, 1800, 12, 'LH', 90),
+    createNote(9, 4, 1800, 24, 'RH', 90),
+    createNote(9, 3, 1812, 12, 'LH', 90),
+    createNote(6, 3, 1824, 12, 'LH', 90),
+    createNote(2, 5, 1824, 24, 'RH', 90),
+    createNote(9, 3, 1836, 12, 'LH', 90),
+    createNote(2, 3, 1848, 12, 'LH', 90),
+    createNote(6, 5, 1848, 24, 'RH', 90),
+    createNote(6, 3, 1860, 12, 'LH', 90),
+    createNote(7, 3, 1872, 12, 'LH', 90),
+    createNote(11, 4, 1872, 24, 'RH', 90),
+    createNote(11, 3, 1884, 12, 'LH', 90),
+    createNote(7, 3, 1896, 24, 'RH', 90),
+    createNote(2, 4, 1896, 12, 'LH', 90),
+    createNote(7, 4, 1908, 12, 'LH', 90),
+    createNote(7, 3, 1920, 24, 'RH', 90),
+    createNote(11, 4, 1920, 12, 'LH', 90),
+    createNote(7, 4, 1932, 12, 'LH', 90),
+    createNote(2, 4, 1944, 12, 'LH', 90),
+    createNote(11, 4, 1944, 24, 'RH', 90),
+    createNote(11, 3, 1956, 12, 'LH', 90),
+    createNote(7, 3, 1968, 12, 'LH', 90),
+    createNote(4, 5, 1968, 24, 'RH', 90),
+    createNote(11, 3, 1980, 12, 'LH', 90),
+    createNote(4, 3, 1992, 12, 'LH', 90),
+    createNote(7, 5, 1992, 24, 'RH', 90),
+    createNote(7, 3, 2004, 12, 'LH', 90),
+    createNote(9, 3, 2016, 24, 'LH', 90),
+    createNote(1, 5, 2016, 12, 'RH', 90),
+    createNote(4, 5, 2028, 12, 'RH', 90),
+    createNote(1, 4, 2040, 24, 'LH', 90),
+    createNote(9, 4, 2040, 12, 'RH', 90),
+    createNote(7, 4, 2052, 12, 'RH', 90),
+    createNote(2, 4, 2064, 12, 'LH', 90),
+    createNote(6, 4, 2064, 12, 'RH', 90),
+    createNote(9, 3, 2076, 12, 'LH', 90),
+    createNote(9, 4, 2076, 12, 'RH', 90),
+    createNote(6, 3, 2088, 12, 'LH', 90),
+    createNote(2, 5, 2088, 12, 'RH', 90),
+    createNote(2, 3, 2100, 12, 'LH', 90),
+    createNote(6, 5, 2100, 12, 'RH', 90),
+    createNote(9, 3, 2112, 24, 'LH', 90),
+    createNote(7, 5, 2112, 12, 'RH', 90),
+    createNote(4, 5, 2124, 12, 'RH', 90),
+    createNote(9, 2, 2136, 24, 'LH', 90),
+    createNote(2, 5, 2136, 12, 'RH', 90),
+    createNote(1, 5, 2148, 12, 'RH', 90),
+    createNote(2, 2, 2160, 12, 'LH', 90),
+    createNote(6, 5, 2160, 12, 'RH', 90),
+    createNote(2, 3, 2172, 12, 'LH', 90),
+    createNote(2, 5, 2172, 12, 'RH', 90),
+    createNote(4, 3, 2184, 12, 'LH', 90),
+    createNote(1, 5, 2184, 12, 'RH', 90),
+    createNote(6, 3, 2196, 12, 'LH', 90),
+    createNote(11, 4, 2196, 12, 'RH', 90),
+    createNote(7, 3, 2208, 12, 'LH', 90),
+    createNote(9, 4, 2208, 12, 'RH', 90),
+    createNote(9, 3, 2220, 12, 'LH', 90),
+    createNote(7, 4, 2220, 12, 'RH', 90),
+    createNote(11, 3, 2232, 12, 'LH', 90),
+    createNote(6, 4, 2232, 12, 'RH', 90),
+    createNote(1, 4, 2244, 12, 'LH', 90),
+    createNote(4, 4, 2244, 12, 'RH', 90),
+    createNote(2, 4, 2256, 48, 'LH', 90),
+    createNote(2, 2, 2304, 24, 'LH', 90),
+    createNote(6, 5, 2304, 12, 'RH', 90),
+    createNote(7, 5, 2316, 12, 'RH', 90),
+    createNote(6, 3, 2328, 12, 'LH', 90),
+    createNote(9, 5, 2328, 36, 'RH', 90),
+    createNote(4, 3, 2340, 12, 'LH', 90),
+    createNote(6, 3, 2352, 24, 'LH', 90),
+    createNote(11, 5, 2364, 12, 'RH', 90),
+    createNote(2, 3, 2376, 24, 'LH', 90),
+    createNote(9, 5, 2376, 12, 'RH', 90),
+    createNote(7, 5, 2388, 12, 'RH', 90),
+    createNote(2, 2, 2400, 24, 'LH', 90),
+    createNote(6, 5, 2400, 12, 'RH', 90),
+    createNote(4, 5, 2412, 12, 'RH', 90),
+    createNote(6, 3, 2424, 24, 'LH', 90),
+    createNote(2, 5, 2424, 12, 'RH', 90),
+    createNote(0, 5, 2436, 12, 'RH', 90),
+    createNote(7, 2, 2448, 24, 'LH', 90),
+    createNote(11, 4, 2448, 12, 'RH', 90),
+    createNote(0, 5, 2460, 12, 'RH', 90),
+    createNote(11, 3, 2472, 12, 'LH', 90),
+    createNote(2, 5, 2472, 36, 'RH', 90),
+    createNote(9, 3, 2484, 12, 'LH', 90),
+    createNote(11, 3, 2496, 24, 'LH', 90),
+    createNote(4, 5, 2508, 12, 'RH', 90),
+    createNote(7, 3, 2520, 24, 'LH', 90),
+    createNote(2, 5, 2520, 12, 'RH', 90),
+    createNote(0, 5, 2532, 12, 'RH', 90),
+    createNote(7, 2, 2544, 24, 'LH', 90),
+    createNote(11, 4, 2544, 12, 'RH', 90),
+    createNote(9, 4, 2556, 12, 'RH', 90),
+    createNote(11, 3, 2568, 24, 'LH', 90),
+    createNote(7, 4, 2568, 12, 'RH', 90),
+    createNote(6, 4, 2580, 12, 'RH', 90),
+    createNote(0, 3, 2592, 24, 'LH', 90),
+    createNote(4, 4, 2592, 12, 'RH', 90),
+    createNote(8, 4, 2604, 12, 'RH', 90),
+    createNote(0, 4, 2616, 12, 'LH', 90),
+    createNote(9, 4, 2616, 12, 'RH', 90),
+    createNote(11, 3, 2628, 12, 'LH', 90),
+    createNote(11, 4, 2628, 12, 'RH', 90),
+    createNote(0, 4, 2640, 24, 'LH', 90),
+    createNote(9, 4, 2640, 12, 'RH', 90),
+    createNote(4, 4, 2652, 12, 'RH', 90),
+    createNote(6, 3, 2664, 24, 'LH', 90),
+    createNote(9, 4, 2664, 12, 'RH', 90),
+    createNote(11, 4, 2676, 12, 'RH', 90),
+    createNote(9, 3, 2688, 24, 'LH', 90),
+    createNote(0, 5, 2688, 12, 'RH', 90),
+    createNote(9, 4, 2700, 12, 'RH', 90),
+    createNote(0, 4, 2712, 24, 'LH', 90),
+    createNote(3, 5, 2712, 12, 'RH', 90),
+    createNote(4, 5, 2724, 12, 'RH', 90),
+    createNote(9, 3, 2736, 24, 'LH', 90),
+    createNote(6, 5, 2736, 12, 'RH', 90),
+    createNote(4, 5, 2748, 12, 'RH', 90),
+    createNote(6, 3, 2760, 24, 'LH', 90),
+    createNote(3, 5, 2760, 12, 'RH', 90),
+    createNote(1, 5, 2772, 12, 'RH', 90),
+    createNote(3, 3, 2784, 12, 'LH', 90),
+    createNote(11, 4, 2784, 108, 'RH', 90),
+    createNote(11, 2, 2796, 12, 'LH', 90),
+    createNote(3, 3, 2808, 12, 'LH', 90),
+    createNote(6, 3, 2820, 12, 'LH', 90),
+    createNote(11, 3, 2832, 12, 'LH', 90),
+    createNote(3, 4, 2844, 12, 'RH', 90),
+    createNote(6, 4, 2856, 12, 'RH', 90),
+    createNote(9, 4, 2868, 12, 'RH', 90),
+    createNote(7, 4, 2880, 36, 'RH', 90),
+    createNote(3, 5, 2892, 12, 'RH', 90),
+    createNote(4, 5, 2904, 36, 'RH', 90),
+    createNote(6, 4, 2916, 12, 'RH', 90),
+    createNote(7, 4, 2928, 36, 'RH', 90),
+    createNote(3, 4, 2940, 12, 'RH', 90),
+    createNote(4, 4, 2952, 36, 'RH', 90),
+    createNote(6, 3, 2964, 12, 'LH', 90),
+    createNote(7, 3, 2976, 36, 'LH', 90),
+    createNote(3, 3, 2988, 12, 'LH', 90),
+    createNote(4, 3, 3000, 24, 'LH', 90),
+    createNote(11, 2, 3012, 12, 'LH', 90),
+    createNote(0, 3, 3024, 36, 'LH', 90),
+    createNote(8, 5, 3036, 12, 'RH', 90),
+    createNote(9, 5, 3048, 36, 'RH', 90),
+    createNote(11, 4, 3060, 12, 'RH', 90),
+    createNote(0, 5, 3072, 36, 'RH', 90),
+    createNote(8, 4, 3084, 12, 'RH', 90),
+    createNote(9, 4, 3096, 36, 'RH', 90),
+    createNote(11, 3, 3108, 12, 'LH', 90),
+    createNote(0, 4, 3120, 36, 'LH', 90),
+    createNote(8, 3, 3132, 12, 'LH', 90),
+    createNote(9, 3, 3144, 36, 'LH', 90),
+    createNote(4, 3, 3156, 12, 'LH', 90),
+    createNote(3, 3, 3168, 24, 'LH', 90),
+    createNote(11, 3, 3180, 12, 'RH', 90),
+    createNote(9, 3, 3192, 24, 'LH', 90),
+    createNote(0, 4, 3192, 12, 'RH', 90),
+    createNote(6, 4, 3204, 12, 'RH', 90),
+    createNote(7, 3, 3216, 24, 'LH', 90),
+    createNote(11, 3, 3216, 12, 'RH', 90),
+    createNote(3, 4, 3228, 12, 'RH', 90),
+    createNote(10, 2, 3240, 24, 'LH', 90),
+    createNote(4, 4, 3240, 12, 'RH', 90),
+    createNote(7, 4, 3252, 12, 'RH', 90),
+    createNote(11, 2, 3264, 24, 'LH', 90),
+    createNote(6, 4, 3264, 12, 'RH', 90),
+    createNote(4, 4, 3276, 12, 'RH', 90),
+    createNote(6, 3, 3288, 24, 'LH', 90),
+    createNote(3, 4, 3288, 12, 'RH', 90),
+    createNote(9, 4, 3300, 12, 'RH', 90),
+    createNote(4, 3, 3312, 24, 'LH', 90),
+    createNote(7, 4, 3312, 12, 'RH', 90),
+    createNote(6, 4, 3324, 12, 'RH', 90),
+    createNote(7, 3, 3336, 12, 'LH', 90),
+    createNote(4, 4, 3336, 12, 'RH', 90),
+    createNote(6, 3, 3348, 12, 'LH', 90),
+    createNote(3, 4, 3348, 12, 'RH', 90),
+    createNote(7, 3, 3360, 24, 'LH', 90),
+    createNote(4, 4, 3360, 12, 'RH', 90),
+    createNote(7, 4, 3372, 12, 'RH', 90),
+    createNote(4, 3, 3384, 24, 'LH', 90),
+    createNote(11, 3, 3384, 12, 'LH', 90),
+    createNote(9, 3, 3396, 12, 'LH', 90),
+    createNote(4, 2, 3408, 24, 'LH', 90),
+    createNote(7, 3, 3408, 12, 'LH', 90),
+    createNote(11, 3, 3420, 12, 'LH', 90),
+    createNote(4, 3, 3432, 24, 'LH', 90),
+    createNote(2, 3, 3444, 12, 'LH', 90),
+    createNote(0, 3, 3456, 12, 'LH', 90),
+    createNote(4, 3, 3468, 12, 'LH', 90),
+    createNote(9, 3, 3480, 12, 'LH', 90),
+    createNote(4, 5, 3480, 24, 'RH', 90),
+    createNote(0, 4, 3492, 12, 'LH', 90),
+    createNote(4, 4, 3504, 12, 'LH', 90),
+    createNote(0, 5, 3504, 24, 'RH', 90),
+    createNote(0, 4, 3516, 12, 'LH', 90),
+    createNote(9, 3, 3528, 12, 'LH', 90),
+    createNote(4, 5, 3528, 24, 'RH', 90),
+    createNote(4, 3, 3540, 12, 'LH', 90),
+    createNote(0, 3, 3552, 12, 'LH', 90),
+    createNote(9, 5, 3552, 24, 'RH', 90),
+    createNote(4, 3, 3564, 12, 'LH', 90),
+    createNote(2, 3, 3576, 12, 'LH', 90),
+    createNote(9, 4, 3576, 24, 'RH', 90),
+    createNote(0, 3, 3588, 12, 'LH', 90),
+    createNote(11, 2, 3600, 12, 'LH', 90),
+    createNote(2, 3, 3612, 12, 'LH', 90),
+    createNote(7, 3, 3624, 12, 'LH', 90),
+    createNote(2, 5, 3624, 24, 'RH', 90),
+    createNote(11, 3, 3636, 12, 'LH', 90),
+    createNote(2, 4, 3648, 12, 'LH', 90),
+    createNote(11, 4, 3648, 24, 'RH', 90),
+    createNote(11, 3, 3660, 12, 'LH', 90),
+    createNote(7, 3, 3672, 12, 'LH', 90),
+    createNote(2, 5, 3672, 24, 'RH', 90),
+    createNote(2, 3, 3684, 12, 'LH', 90),
+    createNote(11, 2, 3696, 12, 'LH', 90),
+    createNote(7, 5, 3696, 24, 'RH', 90),
+    createNote(2, 3, 3708, 12, 'LH', 90),
+    createNote(0, 3, 3720, 12, 'LH', 90),
+    createNote(7, 4, 3720, 24, 'RH', 90),
+    createNote(11, 2, 3732, 12, 'LH', 90),
+    createNote(9, 2, 3744, 24, 'LH', 90),
+    createNote(0, 5, 3744, 12, 'RH', 90),
+    createNote(9, 4, 3756, 12, 'RH', 90),
+    createNote(0, 3, 3768, 24, 'LH', 90),
+    createNote(4, 4, 3768, 12, 'RH', 90),
+    createNote(0, 4, 3780, 12, 'RH', 90),
+    createNote(4, 3, 3792, 24, 'LH', 90),
+    createNote(9, 3, 3792, 12, 'RH', 90),
+    createNote(0, 4, 3804, 12, 'RH', 90),
+    createNote(7, 3, 3816, 24, 'LH', 90),
+    createNote(4, 4, 3816, 12, 'RH', 90),
+    createNote(9, 4, 3828, 12, 'RH', 90),
+    createNote(6, 3, 3840, 24, 'LH', 90),
+    createNote(0, 5, 3840, 12, 'RH', 90),
+    createNote(9, 4, 3852, 12, 'RH', 90),
+    createNote(4, 3, 3864, 24, 'LH', 90),
+    createNote(0, 5, 3864, 12, 'RH', 90),
+    createNote(4, 5, 3876, 12, 'RH', 90),
+    createNote(2, 3, 3888, 24, 'LH', 90),
+    createNote(6, 5, 3888, 12, 'RH', 90),
+    createNote(0, 5, 3900, 12, 'RH', 90),
+    createNote(6, 3, 3912, 24, 'LH', 90),
+    createNote(9, 4, 3912, 12, 'RH', 90),
+    createNote(6, 4, 3924, 12, 'RH', 90),
+    createNote(9, 3, 3936, 24, 'LH', 90),
+    createNote(2, 4, 3936, 12, 'RH', 90),
+    createNote(6, 4, 3948, 12, 'RH', 90),
+    createNote(0, 4, 3960, 24, 'LH', 90),
+    createNote(9, 4, 3960, 12, 'RH', 90),
+    createNote(0, 5, 3972, 12, 'RH', 90),
+    createNote(11, 3, 3984, 24, 'LH', 90),
+    createNote(6, 5, 3984, 12, 'RH', 90),
+    createNote(0, 5, 3996, 12, 'RH', 90),
+    createNote(9, 3, 4008, 24, 'LH', 90),
+    createNote(6, 5, 4008, 12, 'RH', 90),
+    createNote(9, 5, 4020, 12, 'RH', 90),
+    createNote(7, 3, 4032, 24, 'LH', 90),
+    createNote(11, 5, 4032, 12, 'RH', 90),
+    createNote(7, 5, 4044, 12, 'RH', 90),
+    createNote(11, 3, 4056, 24, 'LH', 90),
+    createNote(2, 5, 4056, 12, 'RH', 90),
+    createNote(11, 4, 4068, 12, 'RH', 90),
+    createNote(2, 4, 4080, 24, 'LH', 90),
+    createNote(7, 4, 4080, 12, 'RH', 90),
+    createNote(11, 4, 4092, 12, 'RH', 90),
+    createNote(5, 4, 4104, 24, 'LH', 90),
+    createNote(2, 5, 4104, 12, 'RH', 90),
+    createNote(7, 5, 4116, 12, 'RH', 90),
+    createNote(4, 4, 4128, 24, 'LH', 90),
+    createNote(11, 5, 4128, 12, 'RH', 90),
+    createNote(5, 5, 4140, 12, 'RH', 90),
+    createNote(2, 4, 4152, 24, 'LH', 90),
+    createNote(11, 5, 4152, 12, 'RH', 90),
+    createNote(2, 6, 4164, 12, 'RH', 90),
+    createNote(0, 4, 4176, 24, 'LH', 90),
+    createNote(4, 5, 4176, 12, 'RH', 90),
+    createNote(2, 6, 4188, 12, 'RH', 90),
+    createNote(4, 4, 4200, 24, 'LH', 90),
+    createNote(0, 6, 4200, 12, 'RH', 90),
+    createNote(4, 5, 4212, 12, 'RH', 90),
+    createNote(6, 4, 4224, 24, 'LH', 90),
+    createNote(2, 5, 4224, 12, 'RH', 90),
+    createNote(0, 6, 4236, 12, 'RH', 90),
+    createNote(8, 4, 4248, 24, 'LH', 90),
+    createNote(11, 5, 4248, 12, 'RH', 90),
+    createNote(2, 5, 4260, 12, 'RH', 90),
+    createNote(9, 4, 4272, 24, 'LH', 90),
+    createNote(0, 5, 4272, 12, 'RH', 90),
+    createNote(4, 5, 4284, 12, 'RH', 90),
+    createNote(7, 4, 4296, 24, 'LH', 90),
+    createNote(6, 5, 4296, 12, 'RH', 90),
+    createNote(7, 5, 4308, 12, 'RH', 90),
+    createNote(6, 4, 4320, 24, 'LH', 90),
+    createNote(9, 5, 4320, 12, 'RH', 90),
+    createNote(0, 5, 4332, 12, 'RH', 90),
+    createNote(2, 4, 4344, 24, 'LH', 90),
+    createNote(11, 4, 4344, 12, 'RH', 90),
+    createNote(9, 4, 4356, 12, 'RH', 90),
+    createNote(7, 4, 4368, 24, 'LH', 90),
+    createNote(11, 4, 4368, 12, 'RH', 90),
+    createNote(2, 5, 4380, 12, 'RH', 90),
+    createNote(7, 3, 4392, 24, 'LH', 90),
+    createNote(11, 4, 4392, 12, 'RH', 90),
+    createNote(7, 4, 4404, 12, 'RH', 90),
+    createNote(2, 4, 4416, 24, 'LH', 90),
+    createNote(0, 5, 4416, 12, 'RH', 90),
+    createNote(9, 4, 4428, 12, 'RH', 90),
+    createNote(2, 3, 4440, 24, 'LH', 90),
+    createNote(7, 4, 4440, 12, 'RH', 90),
+    createNote(6, 4, 4452, 12, 'RH', 90),
+    createNote(7, 3, 4464, 12, 'LH', 90),
+    createNote(11, 4, 4464, 12, 'RH', 90),
+    createNote(7, 2, 4476, 12, 'LH', 90),
+    createNote(7, 4, 4476, 12, 'RH', 90),
+    createNote(9, 2, 4488, 12, 'LH', 90),
+    createNote(6, 4, 4488, 12, 'RH', 90),
+    createNote(11, 2, 4500, 12, 'LH', 90),
+    createNote(4, 4, 4500, 12, 'RH', 90),
+    createNote(0, 3, 4512, 12, 'LH', 90),
+    createNote(2, 4, 4512, 12, 'RH', 90),
+    createNote(2, 3, 4524, 12, 'LH', 90),
+    createNote(0, 4, 4524, 12, 'RH', 90),
+    createNote(4, 3, 4536, 12, 'LH', 90),
+    createNote(11, 3, 4536, 12, 'RH', 90),
+    createNote(6, 3, 4548, 12, 'LH', 90),
+    createNote(9, 3, 4548, 12, 'RH', 90),
+    createNote(7, 3, 4560, 48, 'RH', 90),
+    createNote(7, 3, 4560, 48, 'LH', 90),
   ];
-  rhM1Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m1 + i * SIXTEENTH, SIXTEENTH, 'RH', 'mf'));
-  });
 
-  // ==========================================
-  // MEASURE 2 (ticks 144 .. 288)
-  // HAND CROSSING 1:
-  // LH leaps high above RH to take the 16th stream!
-  // LH: B4, C5, D5, E5, D5, C5, D5, B4, G5, F#5, E5, D5
-  // RH: Accompanies below: B3, G3, D4
-  // ==========================================
-  const m2 = 144;
-  // RH Accompaniment (below)
-  notes.push(createNote(11, 3, m2, QUARTER, 'RH', 'p'));               // B3
-  notes.push(createNote(7, 3, m2 + QUARTER, QUARTER, 'RH', 'p'));       // G3
-  notes.push(createNote(2, 4, m2 + QUARTER * 2, QUARTER, 'RH', 'p'));  // D4
+  const totalMeasures = 32;
+  const measureTicks = 144;
+  const totalTicks = totalMeasures * measureTicks;
 
-  // LH 16th-note motor crossing HIGH above RH
-  const lhM2Pitches = [
-    [11, 4], [0, 5], [2, 5], [4, 5],
-    [2, 5], [0, 5], [2, 5], [11, 4],
-    [7, 5], [6, 5], [4, 5], [2, 5],
-  ];
-  lhM2Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m2 + i * SIXTEENTH, SIXTEENTH, 'LH', 'f', i === 8 ? 'accent' : undefined));
-  });
-
-  // ==========================================
-  // MEASURE 3 (ticks 288 .. 432)
-  // RH returns to lead 16ths: E5, D5, C5, B4, C5, A4, F#4, G4, A4, B4, C5, D5
-  // LH accompanies: C3, E3, A2
-  // ==========================================
-  const m3 = 288;
-  notes.push(createNote(0, 3, m3, QUARTER, 'LH', 'mf'));               // C3
-  notes.push(createNote(4, 3, m3 + QUARTER, QUARTER, 'LH', 'mf'));      // E3
-  notes.push(createNote(9, 2, m3 + QUARTER * 2, QUARTER, 'LH', 'mf'));  // A2
-
-  const rhM3Pitches = [
-    [4, 5], [2, 5], [0, 5], [11, 4],
-    [0, 5], [9, 4], [6, 4], [7, 4],
-    [9, 4], [11, 4], [0, 5], [2, 5],
-  ];
-  rhM3Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m3 + i * SIXTEENTH, SIXTEENTH, 'RH', 'mf'));
-  });
-
-  // ==========================================
-  // MEASURE 4 (ticks 432 .. 576)
-  // HAND CROSSING 2:
-  // LH crosses high again: D5, C5, B4, A4, B4, G4, E4, F#4, G4, A4, B4, C5
-  // RH accompanies below: D4, F#4, G4
-  // ==========================================
-  const m4 = 432;
-  notes.push(createNote(2, 4, m4, QUARTER, 'RH', 'p'));               // D4
-  notes.push(createNote(6, 4, m4 + QUARTER, QUARTER, 'RH', 'p'));      // F#4
-  notes.push(createNote(7, 4, m4 + QUARTER * 2, QUARTER, 'RH', 'p'));  // G4
-
-  const lhM4Pitches = [
-    [2, 5], [0, 5], [11, 4], [9, 4],
-    [11, 4], [7, 4], [4, 4], [6, 4],
-    [7, 4], [9, 4], [11, 4], [0, 5],
-  ];
-  lhM4Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m4 + i * SIXTEENTH, SIXTEENTH, 'LH', 'f'));
-  });
-
-  // ==========================================
-  // MEASURE 5 (ticks 576 .. 720)
-  // Modulation toward D major
-  // RH: B4, A4, G4, F#4, G4, E4, C#4, D4, E4, F#4, G4, A4
-  // LH: G2, B2, E3
-  // ==========================================
-  const m5 = 576;
-  notes.push(createNote(7, 2, m5, QUARTER, 'LH', 'mf'));
-  notes.push(createNote(11, 2, m5 + QUARTER, QUARTER, 'LH', 'mf'));
-  notes.push(createNote(4, 3, m5 + QUARTER * 2, QUARTER, 'LH', 'mf'));
-
-  const rhM5Pitches = [
-    [11, 4], [9, 4], [7, 4], [6, 4],
-    [7, 4], [4, 4], [1, 4], [2, 4],
-    [4, 4], [6, 4], [7, 4], [9, 4],
-  ];
-  rhM5Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m5 + i * SIXTEENTH, SIXTEENTH, 'RH', 'mf'));
-  });
-
-  // ==========================================
-  // MEASURE 6 (ticks 720 .. 864)
-  // HAND CROSSING 3:
-  // LH leaps high: F#4, E4, D4, C#4, D4, B3, G#3, A3, B3, C#4, D4, E4
-  // RH: F#3, A3, D4
-  // ==========================================
-  const m6 = 720;
-  notes.push(createNote(6, 3, m6, QUARTER, 'RH', 'p'));
-  notes.push(createNote(9, 3, m6 + QUARTER, QUARTER, 'RH', 'p'));
-  notes.push(createNote(2, 4, m6 + QUARTER * 2, QUARTER, 'RH', 'p'));
-
-  const lhM6Pitches = [
-    [6, 4], [4, 4], [2, 4], [1, 4],
-    [2, 4], [11, 3], [8, 3], [9, 3],
-    [11, 3], [1, 4], [2, 4], [4, 4],
-  ];
-  lhM6Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m6 + i * SIXTEENTH, SIXTEENTH, 'LH', 'f'));
-  });
-
-  // ==========================================
-  // MEASURE 7 (ticks 864 .. 1008)
-  // RH: C#5, B4, A4, G4, A4, F#4, D4, E4, F#4, G4, A4, B4
-  // LH: A2, C#3, G3
-  // ==========================================
-  const m7 = 864;
-  notes.push(createNote(9, 2, m7, QUARTER, 'LH', 'mf'));
-  notes.push(createNote(1, 3, m7 + QUARTER, QUARTER, 'LH', 'mf'));
-  notes.push(createNote(7, 3, m7 + QUARTER * 2, QUARTER, 'LH', 'mf'));
-
-  const rhM7Pitches = [
-    [1, 5], [11, 4], [9, 4], [7, 4],
-    [9, 4], [6, 4], [2, 4], [4, 4],
-    [6, 4], [7, 4], [9, 4], [11, 4],
-  ];
-  rhM7Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m7 + i * SIXTEENTH, SIXTEENTH, 'RH', 'mf'));
-  });
-
-  // ==========================================
-  // MEASURE 8 (ticks 1008 .. 1152)
-  // Section Cadence in D major
-  // LH: F#4, E4, D4, C#4, D4, A3, F#3, G3, A3, D3
-  // RH: D4 (half), C#4 (quarter) -> resolution D4 chord
-  // ==========================================
-  const m8 = 1008;
-  notes.push(createNote(2, 4, m8, QUARTER * 2, 'RH', 'f', 'tenuto'));
-  notes.push(createNote(1, 4, m8 + QUARTER * 2, QUARTER, 'RH', 'mf'));
-
-  const lhM8Pitches = [
-    [6, 4], [4, 4], [2, 4], [1, 4],
-    [2, 4], [9, 3], [6, 3], [7, 3],
-    [9, 3], [2, 3], [9, 2], [2, 3],
-  ];
-  lhM8Pitches.forEach(([pc, oct], i) => {
-    notes.push(createNote(pc, oct, m8 + i * SIXTEENTH, SIXTEENTH, 'LH', 'f', i === 11 ? 'tenuto' : undefined));
-  });
-
-  const totalTicks = 1152;
+  const barlines = [];
+  for (let m = 1; m <= totalMeasures + 1; m++) {
+    barlines.push({
+      barNumber: m,
+      tick: (m - 1) * measureTicks,
+      type: m === totalMeasures + 1 ? 'final' as const : (m === 17 ? 'double' as const : 'regular' as const),
+    });
+  }
 
   const score: QuantizedGridScore = {
     id: 'bach-goldberg-var1',
@@ -218,28 +611,9 @@ export function buildBachGoldbergVar1Score(): QuantizedGridScore {
     ticksPerBeat: TICKS_PER_BEAT,
     totalTicks,
     timeSignatures: [{ tick: 0, numerator: 3, denominator: 4 }],
-    barlines: [
-      { barNumber: 1, tick: 0, type: 'regular' },
-      { barNumber: 2, tick: 144, type: 'regular' },
-      { barNumber: 3, tick: 288, type: 'regular' },
-      { barNumber: 4, tick: 432, type: 'regular' },
-      { barNumber: 5, tick: 576, type: 'regular' },
-      { barNumber: 6, tick: 720, type: 'regular' },
-      { barNumber: 7, tick: 864, type: 'regular' },
-      { barNumber: 8, tick: 1008, type: 'regular' },
-      { barNumber: 9, tick: 1152, type: 'double' },
-    ],
-    tempos: [{ tick: 0, bpm: 96, description: 'Allegro moderato' }],
-    dynamics: [
-      { tick: 0, mark: 'mf' },
-      { tick: 144, mark: 'f' },
-      { tick: 288, mark: 'mf' },
-      { tick: 432, mark: 'f' },
-      { tick: 576, mark: 'mf' },
-      { tick: 720, mark: 'f' },
-      { tick: 864, mark: 'mf' },
-      { tick: 1008, mark: 'f' },
-    ],
+    barlines,
+    tempos: [{ tick: 0, bpm: 96, description: 'Allegro' }],
+    dynamics: [],
     pedals: [],
     notes,
   };

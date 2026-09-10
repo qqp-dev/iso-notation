@@ -1,9 +1,5 @@
 import { PitchCoordinate, JankoRowIndex } from './types';
 
-const PITCH_CLASS_NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
-const PITCH_CLASS_NAMES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'] as const;
-const PITCH_CLASS_NAMES_BOTH = ['C', 'C#/Db', 'D', 'D#/Eb', 'E', 'F', 'F#/Gb', 'G', 'G#/Ab', 'A', 'A#/Bb', 'B'] as const;
-
 /**
  * Computes linear index: octave * 12 + pitchClass
  * For Octave 0:
@@ -55,8 +51,8 @@ export function toFrequency(pitch: PitchCoordinate): number {
 
 /**
  * Determines whole-tone parity:
- * 0 = Whole-Tone Set A (C, D, E, F#, G#, A#) -> Janko Rows 1 & 3
- * 1 = Whole-Tone Set B (C#, D#, F, G, A, B)   -> Janko Rows 2 & 4
+ * 0 = Whole-Tone Row 0 (Even: 0, 2, 4, 6, 8, 10)
+ * 1 = Whole-Tone Row 1 (Odd: 1, 3, 5, 7, 9, 11)
  */
 export function wholeToneParity(input: PitchCoordinate | number): 0 | 1 {
   const pc = typeof input === 'number' ? ((input % 12) + 12) % 12 : input.pitchClass;
@@ -64,39 +60,42 @@ export function wholeToneParity(input: PitchCoordinate | number): 0 | 1 {
 }
 
 /**
- * Human-readable label for a pitch class (0..11)
+ * Human-readable label for a pitch class (0..11).
+ * Strictly numerical in iso-notation.
  */
 export function pitchClassLabel(
   pitchClass: number,
-  format: 'sharp' | 'flat' | 'numeric' | 'both' = 'sharp'
+  _format: 'numeric' | 'sharp' | 'flat' | 'both' = 'numeric'
 ): string {
   const pc = ((pitchClass % 12) + 12) % 12;
-  if (format === 'numeric') return String(pc);
-  if (format === 'flat') return PITCH_CLASS_NAMES_FLAT[pc];
-  if (format === 'both') return PITCH_CLASS_NAMES_BOTH[pc];
-  return PITCH_CLASS_NAMES_SHARP[pc];
+  return String(pc);
 }
 
 /**
- * Full scientific pitch name (e.g. "C4", "G#3", "0:4")
+ * Full pitch name as pure (pitchClass:octave), e.g. "0:4", "1:5".
+ * Strictly numerical and spatial.
  */
 export function pitchLabel(
   pitch: PitchCoordinate,
-  format: 'sharp' | 'flat' | 'numeric' = 'sharp'
+  _format: 'numeric' | 'sharp' | 'flat' = 'numeric'
 ): string {
-  if (format === 'numeric') {
-    return `${pitch.pitchClass}:${pitch.octave}`;
-  }
-  return `${pitchClassLabel(pitch.pitchClass, format)}${pitch.octave}`;
+  return `${pitch.pitchClass}:${pitch.octave}`;
 }
 
 /**
- * Returns available Janko rows for a given pitch.
- * Even pitch classes (WT-A) -> rows 1 and 3.
- * Odd pitch classes (WT-B) -> rows 2 and 4.
+ * Returns the Janko row for a given pitch on the strict 2-row layout:
+ * Even pitch classes -> Row 0
+ * Odd pitch classes  -> Row 1
  */
-export function jankoRowsForPitch(pitch: PitchCoordinate): [JankoRowIndex, JankoRowIndex] {
-  return wholeToneParity(pitch) === 0 ? [1, 3] : [2, 4];
+export function jankoRowForPitch(pitch: PitchCoordinate | number): JankoRowIndex {
+  return wholeToneParity(pitch);
+}
+
+/**
+ * Returns available Janko row as array for compatibility.
+ */
+export function jankoRowsForPitch(pitch: PitchCoordinate): [JankoRowIndex] {
+  return [jankoRowForPitch(pitch)];
 }
 
 /**

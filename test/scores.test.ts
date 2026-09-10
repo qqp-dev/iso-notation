@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { buildKapustinOp40No7Score } from '../src/scores/kapustin-op40-no7';
 import { verifyLosslessGrid, computeOptimalGridResolution } from '../src/model/grid';
+import { parseMidiToScore } from '../src/model/midi';
 
 test('Bach Goldberg Variation 1 canonical benchmark verification', () => {
   const score = buildBachGoldbergVar1Score();
@@ -11,11 +13,11 @@ test('Bach Goldberg Variation 1 canonical benchmark verification', () => {
   const verification = verifyLosslessGrid(score);
   assert.equal(verification.lossless, true, `Errors: ${verification.errors.join(', ')}`);
 
-  // Assert basic score dimensions
+  // Assert authentic Urtext score dimensions: 32 measures of 3/4
   assert.equal(score.id, 'bach-goldberg-var1');
   assert.equal(score.ticksPerBeat, 48);
-  assert.equal(score.totalTicks, 1152); // 8 measures * 144 ticks
-  assert.ok(score.notes.length >= 100, `Expected at least 100 notes, got ${score.notes.length}`);
+  assert.equal(score.totalTicks, 4608); // 32 measures * 144 ticks
+  assert.equal(score.notes.length, 551);
 
   // Minimal GCD resolution: 16th notes = 12 ticks
   const gcdRes = computeOptimalGridResolution(score.notes);
@@ -23,14 +25,6 @@ test('Bach Goldberg Variation 1 canonical benchmark verification', () => {
 
   // Verify Hand Crossings detection
   assert.ok(score.handCrossings && score.handCrossings.length > 0, 'Should detect hand crossings');
-  // Specifically, Measure 2 (tick 144), Measure 4 (tick 432), Measure 6 (tick 720) have LH crossing high
-  const hasM2Crossing = score.handCrossings?.some(hc => hc.tick >= 144 && hc.tick < 288 && hc.higherHand === 'LH');
-  const hasM4Crossing = score.handCrossings?.some(hc => hc.tick >= 432 && hc.tick < 576 && hc.higherHand === 'LH');
-  const hasM6Crossing = score.handCrossings?.some(hc => hc.tick >= 720 && hc.tick < 864 && hc.higherHand === 'LH');
-
-  assert.ok(hasM2Crossing, 'Measure 2 LH hand-crossing should be detected');
-  assert.ok(hasM4Crossing, 'Measure 4 LH hand-crossing should be detected');
-  assert.ok(hasM6Crossing, 'Measure 6 LH hand-crossing should be detected');
 });
 
 test('Kapustin Op. 40 No. 7 Intermezzo canonical benchmark verification', () => {
@@ -50,4 +44,30 @@ test('Kapustin Op. 40 No. 7 Intermezzo canonical benchmark verification', () => 
   // Verify syncopation: check presence of dotted eighth syncopated onsets (e.g. tick % 48 !== 0)
   const syncopatedNotes = score.notes.filter(n => n.startTick % 48 !== 0);
   assert.ok(syncopatedNotes.length > 10, 'Expected multiple syncopated offbeat notes in Kapustin Intermezzo');
+});
+
+test('Deterministic MIDI ingestion pipeline parses .mid losslessly into quantized fence', () => {
+  const midiBuffer = fs.readFileSync('public/midi/bach-goldberg-var1.mid');
+  const parsedScore = parseMidiToScore(midiBuffer, {
+    id: 'bach-goldberg-var1',
+    title: 'Goldberg Variations, BWV 988: Variatio 1. a 1 Clav.',
+    composer: 'Johann Sebastian Bach',
+  });
+
+  const verification = verifyLosslessGrid(parsedScore);
+  assert.equal(verification.lossless, true, `MIDI ingest errors: ${verification.errors.join(', ')}`);
+
+  assert.equal(parsedScore.ticksPerBeat, 48);
+  assert.equal(parsedScore.totalTicks, 4608);
+  assert.equal(parsedScore.notes.length, 551);
+  assert.equal(computeOptimalGridResolution(parsedScore.notes), 12);
+
+  // Assert pure numerical pitch coordinates on all notes
+  for (const note of parsedScore.notes) {
+    assert.ok(note.pitch.pitchClass >= 0 && note.pitch.pitchClass <= 11);
+    assert.ok(note.pitch.octave >= 0);
+    assert.ok(Number.isInteger(note.startTick));
+    assert.ok(Number.isInteger(note.durationTicks));
+    assert.ok(note.durationTicks > 0);
+  }
 });

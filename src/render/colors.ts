@@ -2,20 +2,20 @@ import { PitchCoordinate, Hand } from '../model/types';
 import { wholeToneParity } from '../model/pitch';
 import { ColorMode } from './types';
 
-// 12-TET Circular Color Wheel (C=Red, D=Orange, E=Yellow, F#=Cyan, A=Indigo, B=Magenta)
+// 12-TET Circular Color Spectrum
 const PITCH_CLASS_COLORS = [
-  '#EF4444', // 0: C  (Red)
-  '#F97316', // 1: C# (Orange-Red)
-  '#F59E0B', // 2: D  (Amber)
-  '#EAB308', // 3: D# (Yellow)
-  '#84CC16', // 4: E  (Lime)
-  '#10B981', // 5: F  (Emerald)
-  '#06B6D4', // 6: F# (Cyan)
-  '#3B82F6', // 7: G  (Blue)
-  '#6366F1', // 8: G# (Indigo)
-  '#8B5CF6', // 9: A  (Violet)
-  '#A855F7', // 10: A# (Purple)
-  '#EC4899', // 11: B  (Pink)
+  '#EF4444', // 0
+  '#F97316', // 1
+  '#F59E0B', // 2
+  '#EAB308', // 3
+  '#84CC16', // 4
+  '#10B981', // 5
+  '#06B6D4', // 6
+  '#3B82F6', // 7
+  '#6366F1', // 8
+  '#8B5CF6', // 9
+  '#A855F7', // 10
+  '#EC4899', // 11
 ];
 
 export function getNoteColor(
@@ -33,7 +33,7 @@ export function getNoteColor(
       return PITCH_CLASS_COLORS[pitch.pitchClass];
 
     case 'wholetone-duality':
-      // WT-A (Even): Blue / WT-B (Odd): Coral Orange
+      // Row 0 (Even): Cyan-Blue / Row 1 (Odd): Coral Orange
       return wholeToneParity(pitch) === 0 ? '#38BDF8' : '#FB923C';
 
     case 'voice-hand':
@@ -42,13 +42,13 @@ export function getNoteColor(
 
     case 'monochrome':
     default:
-      return '#E2E8F0';
+      return '#FFFFFF';
   }
 }
 
 export function getJankoKeyColor(
   pitch: PitchCoordinate,
-  row: number,
+  _row: number,
   mode: ColorMode,
   isActive: boolean = false
 ): { fill: string; border: string; text: string } {
@@ -58,7 +58,7 @@ export function getJankoKeyColor(
     return {
       fill: '#FACC15',
       border: '#EAB308',
-      text: '#1E293B',
+      text: '#000000',
     };
   }
 
@@ -66,7 +66,7 @@ export function getJankoKeyColor(
     case 'pitch-class-wheel': {
       const base = PITCH_CLASS_COLORS[pitch.pitchClass];
       return {
-        fill: `${base}33`,
+        fill: `${base}22`,
         border: base,
         text: base,
       };
@@ -75,7 +75,7 @@ export function getJankoKeyColor(
     case 'wholetone-duality': {
       const base = isEven ? '#38BDF8' : '#FB923C';
       return {
-        fill: isEven ? '#0C4A6E' : '#7C2D12',
+        fill: isEven ? '#082f49' : '#451a03',
         border: base,
         text: base,
       };
@@ -84,18 +84,17 @@ export function getJankoKeyColor(
     case 'voice-hand':
     case 'monochrome':
     default: {
-      // Row 1 & 3: White keys style (dark theme) / Row 2 & 4: Subtly tinted
       if (isEven) {
         return {
-          fill: '#1E293B',
-          border: '#475569',
-          text: '#F1F5F9',
+          fill: '#141414',
+          border: '#333333',
+          text: '#FFFFFF',
         };
       } else {
         return {
-          fill: '#0F172A',
-          border: '#334155',
-          text: '#94A3B8',
+          fill: '#080808',
+          border: '#222222',
+          text: '#888888',
         };
       }
     }
