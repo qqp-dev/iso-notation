@@ -1,0 +1,94 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  linearIndex,
+  fromLinearIndex,
+  toMidi,
+  fromMidi,
+  toFrequency,
+  wholeToneParity,
+  jankoRowsForPitch,
+  pitchClassLabel,
+  pitchLabel,
+} from '../src/model/pitch';
+
+test('linear pitch coordinates for standard 88-key piano', () => {
+  // Octave 0 lowest notes: A0, Bb0, B0
+  assert.equal(linearIndex({ pitchClass: 9, octave: 0 }), 9);
+  assert.equal(linearIndex({ pitchClass: 10, octave: 0 }), 10);
+  assert.equal(linearIndex({ pitchClass: 11, octave: 0 }), 11);
+
+  // C1 starts Octave 1
+  assert.equal(linearIndex({ pitchClass: 0, octave: 1 }), 12);
+
+  // Middle C (C4)
+  assert.equal(linearIndex({ pitchClass: 0, octave: 4 }), 48);
+
+  // Concert A4 (440 Hz)
+  assert.equal(linearIndex({ pitchClass: 9, octave: 4 }), 57);
+
+  // C8 (highest key on 88-key piano)
+  assert.equal(linearIndex({ pitchClass: 0, octave: 8 }), 96);
+});
+
+test('bijective recovery from linear index', () => {
+  for (let l = 0; l <= 127; l++) {
+    const coord = fromLinearIndex(l);
+    assert.equal(linearIndex(coord), l);
+    assert.ok(coord.pitchClass >= 0 && coord.pitchClass <= 11);
+  }
+});
+
+test('MIDI conversion alignment', () => {
+  // A0 is MIDI 21 -> linear 9
+  assert.equal(toMidi({ pitchClass: 9, octave: 0 }), 21);
+  assert.deepEqual(fromMidi(21), { pitchClass: 9, octave: 0 });
+
+  // Middle C is MIDI 60 -> linear 48
+  assert.equal(toMidi({ pitchClass: 0, octave: 4 }), 60);
+  assert.deepEqual(fromMidi(60), { pitchClass: 0, octave: 4 });
+
+  // Concert A4 is MIDI 69 -> linear 57
+  assert.equal(toMidi({ pitchClass: 9, octave: 4 }), 69);
+  assert.deepEqual(fromMidi(69), { pitchClass: 9, octave: 4 });
+});
+
+test('Acoustic frequency calculations', () => {
+  // A4 = 440 Hz
+  const fA4 = toFrequency({ pitchClass: 9, octave: 4 });
+  assert.ok(Math.abs(fA4 - 440.0) < 0.001);
+
+  // A0 = 27.5 Hz
+  const fA0 = toFrequency({ pitchClass: 9, octave: 0 });
+  assert.ok(Math.abs(fA0 - 27.5) < 0.001);
+
+  // Middle C (C4) ~ 261.63 Hz
+  const fC4 = toFrequency({ pitchClass: 0, octave: 4 });
+  assert.ok(Math.abs(fC4 - 261.625) < 0.01);
+});
+
+test('Whole-tone parity and Janko row assignments', () => {
+  // WT-A (Even: C, D, E, F#, G#, A#) -> Rows 1 & 3
+  const wtAPitches = [0, 2, 4, 6, 8, 10];
+  wtAPitches.forEach((pc) => {
+    assert.equal(wholeToneParity({ pitchClass: pc, octave: 4 }), 0);
+    assert.deepEqual(jankoRowsForPitch({ pitchClass: pc, octave: 4 }), [1, 3]);
+  });
+
+  // WT-B (Odd: C#, D#, F, G, A, B) -> Rows 2 & 4
+  const wtBPitches = [1, 3, 5, 7, 9, 11];
+  wtBPitches.forEach((pc) => {
+    assert.equal(wholeToneParity({ pitchClass: pc, octave: 4 }), 1);
+    assert.deepEqual(jankoRowsForPitch({ pitchClass: pc, octave: 4 }), [2, 4]);
+  });
+});
+
+test('Pitch labels formatting', () => {
+  assert.equal(pitchClassLabel(0, 'sharp'), 'C');
+  assert.equal(pitchClassLabel(1, 'sharp'), 'C#');
+  assert.equal(pitchClassLabel(1, 'flat'), 'Db');
+  assert.equal(pitchClassLabel(1, 'numeric'), '1');
+  assert.equal(pitchLabel({ pitchClass: 0, octave: 4 }, 'sharp'), 'C4');
+  assert.equal(pitchLabel({ pitchClass: 1, octave: 5 }, 'flat'), 'Db5');
+  assert.equal(pitchLabel({ pitchClass: 6, octave: 3 }, 'numeric'), '6:3');
+});
