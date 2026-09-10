@@ -42,28 +42,8 @@ export const JankoKeyboard: React.FC<JankoKeyboardProps> = ({
   const svgHeight = 2 * (layout.keyHeight + layout.rowGap) + 8;
 
   return (
-    <div className="w-full bg-black border-t border-neutral-800 p-2 select-none overflow-x-auto" ref={containerRef}>
-      <div className="flex items-center justify-between mb-1.5 px-2 text-[11px] font-mono text-neutral-400">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-neutral-200">2-Row Jánko Keyboard</span>
-          <span className="text-neutral-700">|</span>
-          <span>Octaves {minOctave}–{maxOctave}</span>
-          <span className="text-neutral-700">|</span>
-          <span className="text-amber-400">{activeLinearSet.size} active</span>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] text-neutral-400">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-sky-500 inline-block"></span>
-            <span>Row 0: Even (0, 2, 4, 6, 8, 10)</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
-            <span>Row 1: Odd (1, 3, 5, 7, 9, 11)</span>
-          </span>
-        </div>
-      </div>
-
-      <div className="relative min-w-max pb-1">
+    <div className="w-full shrink-0 bg-black border-t border-neutral-900 px-2 py-1 select-none overflow-x-auto" ref={containerRef}>
+      <div className="relative min-w-max">
         <svg width={svgWidth} height={svgHeight} className="overflow-visible">
           {layout.keys.map((k, idx) => {
             const isActive = activeLinearSet.has(k.linearIndex);

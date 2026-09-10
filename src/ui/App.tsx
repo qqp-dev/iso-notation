@@ -207,7 +207,7 @@ export const App: React.FC = () => {
   const { measure, beat, tickInBeat } = tickToMeasureBeat(Math.floor(currentTick), score);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-black text-neutral-100 overflow-hidden font-sans select-none relative">
+    <div className="fixed inset-0 h-[100dvh] w-screen flex flex-col bg-black text-neutral-100 overflow-hidden font-sans select-none">
       {/* Drag & Drop Visual Indicator Overlay */}
       {isDraggingFile && (
         <div className="absolute inset-0 z-50 bg-black/90 border-2 border-dashed border-amber-400 flex flex-col items-center justify-center pointer-events-none">
@@ -298,8 +298,8 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Workbench Layout */}
-      <div className="flex-1 flex overflow-hidden relative">
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex min-h-0 overflow-hidden relative">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           {/* Timeline Scrub Header */}
           <div className="h-9 bg-black border-b border-neutral-800 px-3 flex items-center justify-between text-xs text-neutral-400 shrink-0">
             <div className="flex items-center gap-2 font-mono">

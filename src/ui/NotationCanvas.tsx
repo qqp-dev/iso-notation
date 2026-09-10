@@ -110,7 +110,7 @@ export const NotationCanvas: React.FC<NotationCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="flex-1 w-full h-full overflow-auto bg-slate-950 relative select-none touch-pan-x touch-pan-y"
+      className="flex-1 min-h-0 w-full overflow-auto bg-black relative select-none touch-pan-x touch-pan-y"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
     >
