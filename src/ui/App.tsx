@@ -38,7 +38,7 @@ export const App: React.FC = () => {
     noteheadStyle: 'numerical',
     colorMode: 'monochrome',
     zoom: 1.0,
-    pixelsPerTick: 0.35,
+    pixelsPerTick: 2.0,
     pixelsPerSemitone: 14,
     showHandCrossings: true,
     showBarlines: true,

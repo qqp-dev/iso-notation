@@ -41,8 +41,8 @@ export function calculateScoreDimensions(
 
   if (options.orientation === 'horizontal') {
     return {
-      width: Math.max(800, timeLength + 120),
-      height: Math.max(350, pitchBreadth + 80),
+      width: Math.max(800, Math.ceil(timeLength + 140)),
+      height: Math.max(350, Math.ceil(pitchBreadth + 80)),
       minPitch,
       maxPitch,
       totalTicks: score.totalTicks,
@@ -50,8 +50,8 @@ export function calculateScoreDimensions(
   } else {
     // Vertical timeline: Pitch is horizontal, Time is vertical
     return {
-      width: Math.max(600, pitchBreadth + 100),
-      height: Math.max(800, timeLength + 140),
+      width: Math.max(600, Math.ceil(pitchBreadth + 100)),
+      height: Math.max(800, Math.ceil(timeLength + 140)),
       minPitch,
       maxPitch,
       totalTicks: score.totalTicks,
@@ -300,7 +300,7 @@ export function renderScoreToCanvas(
 
     if (isHoriz) {
       const { x, y } = getCoords(note.startTick, lPitch);
-      const spanWidth = Math.max(8, note.durationTicks * options.pixelsPerTick - 2);
+      const spanWidth = Math.max(10, note.durationTicks * options.pixelsPerTick - 2);
       const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
 
       // Duration ribbon
@@ -309,8 +309,9 @@ export function renderScoreToCanvas(
       ctx.roundRect(x, y - noteHeight / 2, spanWidth, noteHeight, 3);
       ctx.fill();
 
-      // Onset anchor coordinates
-      const cx = x + Math.min(spanWidth / 2, 7);
+      // Onset anchor coordinates: anchored at onset with proportional offset
+      const anchorOffset = Math.min(spanWidth / 2, Math.max(8, noteHeight * 0.65));
+      const cx = x + anchorOffset;
       const cy = y;
 
       // Render notehead morphology with line knockout
@@ -341,7 +342,7 @@ export function renderScoreToCanvas(
     } else {
       // Vertical timeline
       const { x, y } = getCoords(note.startTick, lPitch);
-      const spanHeight = Math.max(8, note.durationTicks * options.pixelsPerTick - 2);
+      const spanHeight = Math.max(10, note.durationTicks * options.pixelsPerTick - 2);
       const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
 
       // Duration ribbon
@@ -350,8 +351,9 @@ export function renderScoreToCanvas(
       ctx.roundRect(x - noteWidth / 2, y, noteWidth, spanHeight, 3);
       ctx.fill();
 
+      const anchorOffset = Math.min(spanHeight / 2, Math.max(8, noteWidth * 0.65));
       const cx = x;
-      const cy = y + Math.min(spanHeight / 2, 7);
+      const cy = y + anchorOffset;
 
       renderNotehead(
         ctx,

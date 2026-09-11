@@ -290,7 +290,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                 const z = parseFloat(e.target.value);
                 onOptionsChange({
                   zoom: z,
-                  pixelsPerTick: 0.35 * z,
+                  pixelsPerTick: 2.0 * z,
                   pixelsPerSemitone: 14 * z,
                 });
               }}

@@ -59,6 +59,30 @@ export const NotationCanvas: React.FC<NotationCanvasProps> = ({
     ctx.restore();
   }, [score, options, dimensions.width, dimensions.height]);
 
+  // Keep playhead comfortably visible during playback or scrubbing
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const isHoriz = options.orientation === 'horizontal';
+    const paddingStart = 60;
+    const playheadPos = paddingStart + options.currentTick * options.pixelsPerTick;
+
+    if (isHoriz) {
+      const scrollLeft = container.scrollLeft;
+      const clientWidth = container.clientWidth;
+      if (clientWidth > 0 && (playheadPos > scrollLeft + clientWidth * 0.85 || playheadPos < scrollLeft)) {
+        container.scrollLeft = Math.max(0, playheadPos - clientWidth * 0.2);
+      }
+    } else {
+      const scrollTop = container.scrollTop;
+      const clientHeight = container.clientHeight;
+      if (clientHeight > 0 && (playheadPos > scrollTop + clientHeight * 0.85 || playheadPos < scrollTop)) {
+        container.scrollTop = Math.max(0, playheadPos - clientHeight * 0.2);
+      }
+    }
+  }, [options.currentTick, options.pixelsPerTick, options.orientation]);
+
   // Handle click to seek or select note
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;

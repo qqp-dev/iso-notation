@@ -243,7 +243,7 @@ test('Monochrome margin labels: pure grayscale with zero blue or pink tints', ()
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'monochrome',
     zoom: 1.0,
-    pixelsPerTick: 0.35,
+    pixelsPerTick: 2.0,
     pixelsPerSemitone: 14,
     showHandCrossings: false,
     showBarlines: false,
@@ -309,7 +309,7 @@ test('Solid Row-Parity Shapes Invariant: white noteheads with knockout, yellow h
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'monochrome',
     zoom: 1.0,
-    pixelsPerTick: 0.35,
+    pixelsPerTick: 2.0,
     pixelsPerSemitone: 14,
     showHandCrossings: false,
     showBarlines: false,
@@ -324,6 +324,86 @@ test('Solid Row-Parity Shapes Invariant: white noteheads with knockout, yellow h
   // Yellow highlight for actively sounding note
   assert.ok(fills.includes('#FDE047'), 'Yellow highlight #FDE047 must be used for active note');
   assert.ok(strokes.includes('#FACC15'), 'Yellow stroke #FACC15 must be used for active note');
+});
+
+test('Horizontal Note Spacing Invariant: 16th notes breathing room and measure dimensions at default scale', () => {
+  const score = buildBachGoldbergVar1Score();
+  const options: RenderOptions = {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'monochrome',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: true,
+    showBarlines: true,
+    showGridLines: true,
+    currentTick: 0,
+  };
+
+  // 1. Invariant: Default pixelsPerTick >= 2.0
+  assert.ok(options.pixelsPerTick >= 2.0, 'Default pixelsPerTick must be >= 2.0');
+
+  // 2. Invariant: 16th notes (12 ticks) have at least 24px between onsets (and >= 20px)
+  const sixteenthNoteTicks = 12;
+  const sixteenthSpacing = sixteenthNoteTicks * options.pixelsPerTick;
+  assert.ok(
+    sixteenthSpacing >= 24,
+    `16th notes onset distance (${sixteenthSpacing}px) must be >= 24px`
+  );
+  assert.ok(
+    sixteenthSpacing >= 20,
+    `16th notes onset distance (${sixteenthSpacing}px) must be >= 20px`
+  );
+
+  // 3. Invariant: 3/4 measure of Bach (144 ticks) spans at least 288px
+  const measureTicks = 144;
+  const measureWidth = measureTicks * options.pixelsPerTick;
+  assert.ok(
+    measureWidth >= 288,
+    `3/4 measure width (${measureWidth}px) must span at least 288px`
+  );
+
+  // 4. Invariant: Score dimensions accommodate expanded timeline
+  const dims = calculateScoreDimensions(score, options);
+  const expectedMinScoreLength = score.totalTicks * options.pixelsPerTick;
+  assert.ok(
+    dims.width >= expectedMinScoreLength,
+    `Canvas width (${dims.width}px) must comfortably accommodate entire score length (${expectedMinScoreLength}px)`
+  );
+
+  // 5. Invariant: Consecutive 16th notes in Goldberg Var 1 have clear visual separation
+  const rhNotes = score.notes
+    .filter((n) => n.hand === 'RH')
+    .sort((a, b) => a.startTick - b.startTick);
+
+  for (let i = 0; i < rhNotes.length - 1; i++) {
+    const cur = rhNotes[i];
+    const nxt = rhNotes[i + 1];
+    const deltaTicks = nxt.startTick - cur.startTick;
+    if (deltaTicks === 12) {
+      const deltaPx = deltaTicks * options.pixelsPerTick;
+      assert.ok(
+        deltaPx >= 20,
+        `Consecutive 16th notes onset spacing (${deltaPx}px) must be at least 20px`
+      );
+
+      // Verify noteheads do not collide
+      const curSpan = Math.max(10, cur.durationTicks * options.pixelsPerTick - 2);
+      const nxtSpan = Math.max(10, nxt.durationTicks * options.pixelsPerTick - 2);
+      const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
+      const curAnchor = Math.min(curSpan / 2, Math.max(8, noteHeight * 0.65));
+      const nxtAnchor = Math.min(nxtSpan / 2, Math.max(8, noteHeight * 0.65));
+      const curCenterX = cur.startTick * options.pixelsPerTick + curAnchor;
+      const nxtCenterX = nxt.startTick * options.pixelsPerTick + nxtAnchor;
+      const centerDist = nxtCenterX - curCenterX;
+      assert.ok(
+        centerDist >= 20,
+        `Notehead centers distance (${centerDist}px) must be >= 20px`
+      );
+    }
+  }
 });
 
 test('Full canvas rendering matrix executes across all variations without error', () => {
@@ -367,7 +447,7 @@ test('Full canvas rendering matrix executes across all variations without error'
           noteheadMorphology,
           colorMode: 'wholetone-duality',
           zoom: 1.0,
-          pixelsPerTick: 0.35,
+          pixelsPerTick: 2.0,
           pixelsPerSemitone: 14,
           showHandCrossings: true,
           showBarlines: true,
