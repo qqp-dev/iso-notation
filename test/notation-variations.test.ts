@@ -1351,7 +1351,7 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   );
 });
 
-test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for All Colored Notes with Staff-Line Knockout', () => {
+test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for All Colored Notes with Continuous Uninterrupted Reference Lines', () => {
   const score = buildBachGoldbergVar1Score();
 
   type DottedTrail = {
@@ -1430,8 +1430,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
       stroke: () => {
         if (
           currentDash.length === 2 &&
-          currentDash[0] === 2 &&
-          currentDash[1] === 3 &&
+          currentDash[0] === 0 &&
+          currentDash[1] === 4 &&
           pathStart &&
           pathEnd
         ) {
@@ -1525,18 +1525,17 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
     'Must render exactly 165 faint dotted trails for all colored notes in vertical orientation'
   );
 
-  // Knockout lines rendered behind notes that fall on staff lines (38 notes on staff lines)
+  // Continuous Uninterrupted Reference Staff Lines: zero knockout lines behind hold trails
   assert.equal(
     verticalKnockouts.length,
-    38,
-    'Must render exactly 38 staff-line knockout lines in vertical orientation'
+    0,
+    'Must render exactly 0 staff-line knockout lines in vertical orientation'
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
-  assert.ok(vTrail, 'Must find trail for 108t pedal note');
-  assert.deepEqual(vTrail.dash, [2, 3], 'Trail dash pattern must be [2, 3]');
-  assert.equal(vTrail.lineWidth, 0.8, 'Trail stroke width must be 0.8px');
-  assert.equal(vTrail.alpha, 0.50, 'Trail opacity must be 0.50');
+  assert.deepEqual(vTrail.dash, [0, 4], 'Trail dash pattern must be [0, 4]');
+  assert.equal(vTrail.lineWidth, 1.1, 'Trail stroke width must be 1.1px');
+  assert.equal(vTrail.alpha, 0.75, 'Trail opacity must be 0.75');
   assert.equal(vTrail.stroke, '#F43F5E', 'Trail stroke color must match duration class (#F43F5E for 108t)');
 
   // Coordinates:
@@ -1591,8 +1590,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   );
   assert.equal(
     horizontalKnockouts.length,
-    38,
-    'Must render exactly 38 horizontal staff-line knockout lines'
+    0,
+    'Must render exactly 0 horizontal staff-line knockout lines'
   );
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;

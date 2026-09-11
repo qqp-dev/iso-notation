@@ -628,8 +628,6 @@ export function renderPageToSvg(
       if (note.durationTicks > tauRef) {
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const lPitch = displayPitchMap.get(note.id)!;
-        const geom = getStaffLineGeometry(lPitch, normStaffStyle);
-        const isOnStaffLine = geom.isLine;
 
         const isEven = wholeToneParity(lPitch) === 0;
         const noteHeight = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
@@ -639,11 +637,7 @@ export function renderPageToSvg(
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
         if (trailEndY > trailStartY) {
-          if (isOnStaffLine) {
-            const knockoutWidth = geom.isBold ? 2.5 : 1.8;
-            svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="#FFFFFF" stroke-width="${knockoutWidth}" stroke-linecap="butt"/>`);
-          }
-          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-dasharray="2,3" opacity="0.50"/>`);
+          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="0, 3.5" opacity="0.75"/>`);
         }
       }
     }

@@ -195,11 +195,10 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   assert.match(fullScoreSvg, /fill="#D97706"/, 'Must render quarter notes in Amber/Gold (#D97706)');
   assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke="#D97706"[^>]*stroke-width="1\.2"/, 'Must not render quarter note hold ribbons');
 
-  // Verify SVG print layout renders faint dotted continuation line (stroke-dasharray="2,3") for long notes (d > ticksPerBeat, e.g. 108t note in Bar 20)
   assert.match(
     fullScoreSvg,
-    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="0\.8" stroke-dasharray="2,3" opacity="0\.50"\/>/,
-    'Must render faint dotted continuation line (stroke-dasharray="2,3") for long notes'
+    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="1\.1" stroke-linecap="round" stroke-dasharray="0, 3\.5" opacity="0\.75"\/>/,
+    'Must render faint dotted continuation line (stroke-linecap="round") for long notes'
   );
 
   // Verify renderColumnarScoreToSvg helper
@@ -228,15 +227,15 @@ test('Pure Noteheads for 16th Notes and Faint Dotted Continuation Lines for All 
   assert.equal(coloredNotes.length, 165, 'Must have exactly 165 colored notes in Goldberg Var 1');
 
   const dottedRegex =
-    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-dasharray="2,3" opacity="0\.50"\/>/g;
+    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="1\.1" stroke-linecap="round" stroke-dasharray="0, 3\.5" opacity="0\.75"\/>/g;
   const allDotted = Array.from(fullScoreSvg.matchAll(dottedRegex));
   assert.equal(allDotted.length, 165, 'Must render exactly 165 faint dotted continuation lines across full score (1 for each colored note)');
 
-  // 4. Staff Line Replacement (knockout underlay for notes on staff lines: 38 line notes)
+  // 4. Continuous Uninterrupted Reference Staff Lines (zero white knockout underlays for holds)
   const knockoutRegex =
     /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="#FFFFFF" stroke-width="(2\.5|1\.8)" stroke-linecap="butt"\/>/g;
   const allKnockouts = Array.from(fullScoreSvg.matchAll(knockoutRegex));
-  assert.equal(allKnockouts.length, 38, 'Must render exactly 38 white staff-line knockouts across full score');
+  assert.equal(allKnockouts.length, 0, 'Must render zero white staff-line knockouts across full score');
 
   // 5. Clean termination without explicit stop ticks or release crossbars
   assert.doesNotMatch(fullScoreSvg, /class="stop-tick"/, 'Must have zero explicit stop ticks');

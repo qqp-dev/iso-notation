@@ -810,8 +810,6 @@ export function renderScoreToCanvas(
     const pc = note.pitch.pitchClass;
     const ticksPerBeat = score.ticksPerBeat || 48;
     const showDottedTrail = note.durationTicks > tauRef;
-    const geom = getStaffLineGeometry(lPitch, normStaffStyle);
-    const isOnStaffLine = geom.isLine;
 
     if (isPianoRoll) {
       const isSounding =
@@ -866,25 +864,16 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for colored notes with staff-line knockout
+      // Faint dotted continuation trail for colored notes
       if (showDottedTrail) {
         const trailStartX = cx + noteWidth / 2 + 2;
         const trailEndX = cx + note.durationTicks * options.pixelsPerTick;
         if (trailEndX > trailStartX) {
-          if (isOnStaffLine) {
-            ctx.save();
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = geom.isBold ? 3.0 : 2.0;
-            ctx.beginPath();
-            ctx.moveTo(trailStartX, cy);
-            ctx.lineTo(trailEndX, cy);
-            ctx.stroke();
-            ctx.restore();
-          }
           ctx.save();
-          ctx.setLineDash([2, 3]);
-          ctx.lineWidth = 0.8;
-          ctx.globalAlpha = 0.50;
+          ctx.lineCap = 'round';
+          ctx.setLineDash([0, 4]);
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.75;
           ctx.strokeStyle = noteColor;
           ctx.beginPath();
           ctx.moveTo(trailStartX, cy);
@@ -931,25 +920,16 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for colored notes with staff-line knockout
+      // Faint dotted continuation trail for colored notes
       if (showDottedTrail) {
         const trailStartY = cy + noteHeight / 2 + 2;
         const trailEndY = cy + note.durationTicks * options.pixelsPerTick;
         if (trailEndY > trailStartY) {
-          if (isOnStaffLine) {
-            ctx.save();
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = geom.isBold ? 3.0 : 2.0;
-            ctx.beginPath();
-            ctx.moveTo(cx, trailStartY);
-            ctx.lineTo(cx, trailEndY);
-            ctx.stroke();
-            ctx.restore();
-          }
           ctx.save();
-          ctx.setLineDash([2, 3]);
-          ctx.lineWidth = 0.8;
-          ctx.globalAlpha = 0.50;
+          ctx.lineCap = 'round';
+          ctx.setLineDash([0, 4]);
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.75;
           ctx.strokeStyle = noteColor;
           ctx.beginPath();
           ctx.moveTo(cx, trailStartY);
