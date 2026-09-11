@@ -160,10 +160,10 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     assert.match(svg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must render Klavar lateral stems');
 
     // 4. Solid row-parity noteheads with white halo knockout and duration colors
-    // - Discs on lines (Row 0): circle with r="3.2", stroke="#FFFFFF" and stroke-width="2"
-    assert.match(svg, /<circle[^>]*r="3\.2"[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 0 discs with 3.2pt radius and white halo knockout');
-    // - Diamonds in spaces (Row 1): polygon with stroke="#FFFFFF" and stroke-width="2"
-    assert.match(svg, /<polygon[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 1 diamonds with white halo knockout');
+    // - Discs on lines (Row 0): squished horizontal ellipse rx="3.60" ry="2.20" with stroke="#FFFFFF" and stroke-width="1.8"
+    assert.match(svg, /<ellipse[^>]*rx="3\.60"[^>]*ry="2\.20"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 0 squished ovals with 3.60pt/2.20pt radii and white halo knockout');
+    // - Diamonds in spaces (Row 1): flattened lozenge polygon with stroke="#FFFFFF" and stroke-width="1.8"
+    assert.match(svg, /<polygon[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 1 flattened lozenges with white halo knockout');
 
     // 5. Color Palette Invariant in Print Engine & Hold Ribbons
     // - 16th notes (d <= 12t): unextended noteheads in dark slate/graphite (#1E293B)
@@ -188,11 +188,12 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
   const layout = computeColumnarLayout(score);
   const svg = renderPageToSvg(layout, 0);
 
-  // Optical Notehead Sizing Invariant:
-  // Circle radius r = 3.2, Diamond half-diagonal d = 4.0
-  assert.match(svg, /<circle[^>]*r="3\.2"/, 'Circle radius must be 3.2pt');
+  // Optical Notehead Sizing Invariant (Time-Axis Compressed):
+  // Oval: rx = 3.6, ry = 2.2
+  // Diamond: dx = 4.5, dy = 2.7
+  assert.match(svg, /<ellipse[^>]*rx="3\.60"[^>]*ry="2\.20"/, 'Squished oval rx must be 3.60pt and ry must be 2.20pt');
 
-  // Verify diamond coordinates: top ny - 4.0 and bottom ny + 4.0
+  // Verify diamond coordinates: top ny - 2.7 and bottom ny + 2.7
   const diamondMatches = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g));
   assert.ok(diamondMatches.length > 0, 'Must have rendered diamond noteheads in SVG');
 
@@ -201,16 +202,18 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
     assert.equal(pts.length, 4, 'Diamond must have 4 points');
     const [top, right, bottom, left] = pts;
     const verticalHeight = Math.round((bottom[1] - top[1]) * 100) / 100;
-    assert.equal(verticalHeight, 8.0, 'Diamond total vertical height must equal 2 * d = 8.0pt (d = 4.0)');
+    assert.equal(verticalHeight, 5.4, 'Diamond total vertical height must equal 2 * dy = 5.4pt (dy = 2.7)');
+    const horizontalWidth = Math.round((right[0] - left[0]) * 100) / 100;
+    assert.equal(horizontalWidth, 9.0, 'Diamond total horizontal width must equal 2 * dx = 9.0pt (dx = 4.5)');
   }
 
   // Optical area balance invariant (< 5% difference)
-  const circleArea = Math.PI * 3.2 * 3.2;
-  const diamondArea = 2 * 4.0 * 4.0;
-  const areaRatio = circleArea / diamondArea;
+  const ellipseArea = Math.PI * 3.6 * 2.2;
+  const diamondArea = 2 * 4.5 * 2.7;
+  const areaRatio = ellipseArea / diamondArea;
   assert.ok(
     Math.abs(areaRatio - 1.0) < 0.05,
-    `Circle area (${circleArea.toFixed(2)}) and diamond area (${diamondArea.toFixed(2)}) must match within 5%`
+    `Ellipse area (${ellipseArea.toFixed(2)}) and diamond area (${diamondArea.toFixed(2)}) must match within 5%`
   );
 
   // Klavar Lateral Stems Invariant:

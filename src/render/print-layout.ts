@@ -486,20 +486,34 @@ export function renderPageToSvg(
         // Lowercase syllable text
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 2.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle">${syllable}</text>`);
       } else {
-        // Optical Notehead Balance Invariant:
-        // Diamond d = 4.0pt, Circle r = 3.2pt
-        // Circle area: pi * 3.2^2 ≈ 32.17 pt^2
-        // Diamond area: 2 * 4.0^2 = 32.00 pt^2 (matched within 0.5%)
-        const r = 3.2;
-        const d = 4.0;
+        // Optical Notehead Balance Invariant with Time-Axis Squish:
+        // In vertical columnar notation, time runs vertically (Y-axis).
+        // Vertically squishing noteheads into horizontal ovals and wide lozenges
+        // adds substantial breathing room (air) between rapid 16th notes.
+        //
+        // Row 0 (Lines, Even PC): Horizontal Ellipse / Oval
+        //   rx = 3.6 pt, ry = 2.2 pt (vertical height 4.4 pt vs old 6.4 pt)
+        // Row 1 (Spaces, Odd PC): Horizontal Diamond / Lozenge
+        //   dx = 4.5 pt, dy = 2.7 pt (vertical height 5.4 pt vs old 8.0 pt)
+        //
+        // Optical Area Balance:
+        //   Ellipse area: pi * 3.6 * 2.2 ≈ 24.88 pt^2
+        //   Diamond area: 2 * 4.5 * 2.7 = 24.30 pt^2 (matched within 2.4%)
+        // Vertical compression ratio:
+        //   ry / rx = 2.2 / 3.6 ≈ 0.61
+        //   dy / dx = 2.7 / 4.5 = 0.60
+        const rx = 3.6;
+        const ry = 2.2;
+        const dx = 4.5;
+        const dy = 2.7;
 
         if (isEven) {
-          // Row 0 (Lines): Solid Disc with White Halo Knockout
-          svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
+          // Row 0 (Lines): Solid Squished Oval with White Halo Knockout
+          svgParts.push(`    <ellipse cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
         } else {
-          // Row 1 (Spaces): Solid Diamond with White Halo Knockout
-          const pts = `${nx.toFixed(2)},${(ny - d).toFixed(2)} ${(nx + d).toFixed(2)},${ny.toFixed(2)} ${nx.toFixed(2)},${(ny + d).toFixed(2)} ${(nx - d).toFixed(2)},${ny.toFixed(2)}`;
-          svgParts.push(`    <polygon points="${pts}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
+          // Row 1 (Spaces): Solid Flattened Diamond Lozenge with White Halo Knockout
+          const pts = `${nx.toFixed(2)},${(ny - dy).toFixed(2)} ${(nx + dx).toFixed(2)},${ny.toFixed(2)} ${nx.toFixed(2)},${(ny + dy).toFixed(2)} ${(nx - dx).toFixed(2)},${ny.toFixed(2)}`;
+          svgParts.push(`    <polygon points="${pts}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
         }
       }
 

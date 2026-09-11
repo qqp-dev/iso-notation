@@ -493,31 +493,39 @@ function renderNotehead(
 
     case 'row-parity-shape': {
       const parityShape = getParityShape(pitchClass);
-      // Optical balance: Circle radius r = baseSize * 0.40, Diamond half-diagonal d = baseSize * 0.50
-      // Optical areas: pi * r^2 = 0.503 * baseSize^2, 2 * d^2 = 0.500 * baseSize^2 (matched within 0.5%)
-      const r = Math.max(4.0, baseSize * 0.40);
-      const d = Math.max(5.0, baseSize * 0.50);
+      // Optical balance with time-axis compression:
+      // In vertical timeline notation (time is Y, pitch is X):
+      // Noteheads are horizontally wide along pitch lines/spaces, and vertically compressed
+      // along the time axis (ratio ~0.60) to eliminate vertical crowding on rapid 16th notes.
+      // Optical areas: pi * rx * ry ≈ 0.382 * baseSize^2, 2 * rw * rh = 0.381 * baseSize^2 (matched within 0.3%)
+      const pitchRadius = Math.max(4.5, baseSize * 0.45);
+      const timeRadius = Math.max(2.7, baseSize * 0.27);
+      const rx = isVertical ? pitchRadius : timeRadius;
+      const ry = isVertical ? timeRadius : pitchRadius;
+
+      const pitchDiamond = Math.max(5.6, baseSize * 0.56);
+      const timeDiamond = Math.max(3.4, baseSize * 0.34);
+      const rw = isVertical ? pitchDiamond : timeDiamond;
+      const rh = isVertical ? timeDiamond : pitchDiamond;
 
       if (parityShape === 'disc') {
-        // Row 0: Even pitch classes on lines -> Disc / Oval
+        // Row 0: Even pitch classes on lines -> Squished Oval / Disc
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.arc(cx, cy, r + 2.5, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy, rx + 2.5, ry + 2.0, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = headColor;
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.2;
         ctx.stroke();
       } else {
-        // Row 1: Odd pitch classes in spaces -> Diamond / Lozenge
-        const rh = d;
-        const rw = d;
+        // Row 1: Odd pitch classes in spaces -> Flattened Diamond / Lozenge
         const kw = rw + 2.5;
-        const kh = rh + 2.5;
+        const kh = rh + 2.0;
 
         // Knockout diamond
         ctx.fillStyle = '#000000';
@@ -606,19 +614,20 @@ function renderNotehead(
     }
 
     case 'minimal-dot': {
-      // Crisp, uncluttered circular dot with line knockout
-      const r = Math.max(3.5, baseSize * 0.36);
+      // Crisp dot with line knockout, time-axis compressed when vertical
+      const rx = isVertical ? Math.max(3.8, baseSize * 0.40) : Math.max(2.4, baseSize * 0.25);
+      const ry = isVertical ? Math.max(2.4, baseSize * 0.25) : Math.max(3.8, baseSize * 0.40);
 
       // Knockout
       ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.arc(cx, cy, r + 2.5, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, rx + 2.5, ry + 2.0, 0, 0, Math.PI * 2);
       ctx.fill();
 
       // Dot fill
       ctx.fillStyle = headColor;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 1.0;

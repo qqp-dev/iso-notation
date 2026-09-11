@@ -1134,7 +1134,9 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
     arc: (x: number, y: number) => {
       arcCenters.push({ x, y });
     },
-    ellipse: () => {},
+    ellipse: (x: number, y: number) => {
+      arcCenters.push({ x, y });
+    },
     roundRect: (x: number, y: number, w: number, h: number) => {
       ribbons.push({ x, y, w, h });
     },

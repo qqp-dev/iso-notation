@@ -44,7 +44,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                 <span>Print Sheet Music (A4 Columnar Engraving)</span>
               </h2>
               <p className="text-xs text-neutral-400 font-mono mt-0.5">
-                {score.title} — {score.composer} • 2-Page Spread • Section A (mm. 1–16) / Section B (mm. 17–32)
+                {score.title} — {score.composer} • {layout.pages.length}-Page Urtext Spread • Section A (mm. 1–16) / Section B (mm. 17–32)
               </p>
             </div>
 
