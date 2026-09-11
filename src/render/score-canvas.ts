@@ -894,11 +894,14 @@ export function renderScoreToCanvas(
             ctx.setLineDash([]);
 
             if (isOnStaffLine) {
+              const knockoutX1 = (Math.abs(segX1 - trailStartX) < 0.1)
+                ? (cx + noteWidth / 2)
+                : segX1;
               ctx.lineCap = 'butt';
               ctx.lineWidth = isBold ? 2.5 : 1.8;
               ctx.strokeStyle = '#000000';
               ctx.beginPath();
-              ctx.moveTo(segX1, cy);
+              ctx.moveTo(knockoutX1, cy);
               ctx.lineTo(segX2, cy);
               ctx.stroke();
 
@@ -985,12 +988,17 @@ export function renderScoreToCanvas(
             ctx.setLineDash([]);
 
             if (isOnStaffLine) {
-              // Knockout line replacing the staff line
+              // Knockout line replacing the staff line starting from notehead bottom (cy + noteHeight / 2)
+              // for the first segment so the small gap between notehead and hold line is a clean void,
+              // preventing the staff line from showing through in the gap!
+              const knockoutY1 = (Math.abs(segY1 - trailStartY) < 0.1)
+                ? (cy + noteHeight / 2)
+                : segY1;
               ctx.lineCap = 'butt';
               ctx.lineWidth = isBold ? 2.5 : 1.8;
               ctx.strokeStyle = '#000000';
               ctx.beginPath();
-              ctx.moveTo(cx, segY1);
+              ctx.moveTo(cx, knockoutY1);
               ctx.lineTo(cx, segY2);
               ctx.stroke();
 
@@ -1185,12 +1193,22 @@ export function renderNotehead(
       ctx.stroke();
     } else {
       // Row 1: Hollow directional pentagon with void black interior
+      // Inset by strokeWidth / 2 (0.9px) so outer bounding box after 1.8px stroke matches solid notehead exactly
+      const strokeW = 1.8;
+      const halfStroke = strokeW / 2;
+      const hbx = bx + halfStroke;
+      const hby = by + halfStroke;
+      const hsw = sw - strokeW;
+      const hsh = sh - strokeW;
+      const hrx = Math.max(0.5, rx - halfStroke);
       ctx.fillStyle = '#000000';
       ctx.beginPath();
       drawBakedCanvasPath(ctx, bx, by, sw, sh, cy, handException, tip, rx);
       ctx.fill();
+      ctx.beginPath();
+      drawBakedCanvasPath(ctx, hbx, hby, hsw, hsh, cy, handException, tip, hrx);
       ctx.strokeStyle = headColor;
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = strokeW;
       ctx.stroke();
     }
     return;
@@ -1394,13 +1412,22 @@ export function renderNotehead(
       } else {
         // Row 1: Empty (Hollow) squished square
         // 100% VOID / transparent (pure black interior on canvas)
+        // Inset by strokeWidth / 2 (0.9px) so outer bounding box after 1.8px stroke matches solid notehead exactly
+        const strokeW = 1.8;
+        const halfStroke = strokeW / 2;
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
+        ctx.roundRect(
+          cx - sw / 2 + halfStroke,
+          cy - sh / 2 + halfStroke,
+          sw - strokeW,
+          sh - strokeW,
+          Math.max(0.5, 1.5 - halfStroke)
+        );
         ctx.fill();
 
         ctx.strokeStyle = headColor;
-        ctx.lineWidth = 1.8;
+        ctx.lineWidth = strokeW;
         ctx.stroke();
       }
       break;
