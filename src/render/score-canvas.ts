@@ -158,7 +158,7 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with m${oct - 1} at octave boundaries (0-indexed piano octaves)
+      // Pitch Coordinate label on left margin: 1-based (noteNum:octave), with m${oct - 1} at octave boundaries
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
@@ -167,8 +167,9 @@ export function renderScoreToCanvas(
       ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      const displayOct = Math.max(0, oct - 1);
-      const label = isOctave0 ? `m${displayOct}` : `${pc}:${displayOct}`;
+      const isAfterC = pc >= 9;
+      const displayOct = isAfterC ? oct : Math.max(0, oct - 1);
+      const label = isOctave0 ? `m${displayOct}` : `${pc + 1}:${displayOct}`;
       ctx.fillText(label, paddingStart - 8, y);
     } else {
       // Vertical timeline
@@ -198,7 +199,7 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch class label along top margin: m${oct - 1} at octave boundaries (0-indexed piano octaves), pitch class number elsewhere
+      // Pitch class label along top margin: m${oct - 1} at octave boundaries (0-indexed piano octaves), 1-based note number elsewhere
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
@@ -208,7 +209,7 @@ export function renderScoreToCanvas(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       const displayOct = Math.max(0, oct - 1);
-      const label = isOctave0 ? `m${displayOct}` : String(pc);
+      const label = isOctave0 ? `m${displayOct}` : String(pc + 1);
       ctx.fillText(label, x, paddingStart - 6);
     }
   }
@@ -581,8 +582,9 @@ function renderNotehead(
     }
 
     case 'numerical': {
-      // Pitch-class integers 0..11
-      const isTwoDigit = pitchClass >= 10;
+      // 1-based note numbers 1..12
+      const noteNum = pitchClass + 1;
+      const isTwoDigit = noteNum >= 10;
       const pw = isTwoDigit ? 18 : 14;
       const ph = Math.max(12, baseSize + 1);
 
@@ -606,7 +608,7 @@ function renderNotehead(
       ctx.font = 'bold 9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(String(pitchClass), cx, cy);
+      ctx.fillText(String(noteNum), cx, cy);
       break;
     }
 

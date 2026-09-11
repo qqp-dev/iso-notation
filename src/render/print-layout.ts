@@ -327,12 +327,12 @@ export function renderPageToSvg(
   );
   svgParts.push(`  <defs>`);
   svgParts.push(`    <style>`);
-  svgParts.push(`      .title { font-family: system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 10.5pt; fill: #000000; }
-      .subtitle { font-family: system-ui, -apple-system, sans-serif; font-size: 8pt; fill: #444444; }`);
-  svgParts.push(`      .meta { font-family: system-ui, -apple-system, monospace; font-size: 7.5pt; fill: #666666; }`);
-  svgParts.push(`      .measure-num { font-family: monospace; font-weight: bold; font-size: 7pt; fill: #444444; text-anchor: end; }`);
-  svgParts.push(`      .pitch-label { font-family: monospace; font-size: 6.5pt; fill: #555555; text-anchor: middle; }`);
-  svgParts.push(`      .cross-label { font-family: monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
+  svgParts.push(`      .title { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 10.5pt; fill: #000000; }
+      .subtitle { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-size: 8pt; fill: #444444; }
+      .meta { font-family: "DejaVu Sans Mono", "Liberation Mono", system-ui, -apple-system, monospace; font-size: 7.5pt; fill: #666666; }
+      .measure-num { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-weight: bold; font-size: 7pt; fill: #444444; text-anchor: end; }
+      .pitch-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6.5pt; fill: #555555; text-anchor: middle; }
+      .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
   svgParts.push(`    </style>`);
   svgParts.push(`  </defs>`);
 
@@ -374,7 +374,7 @@ export function renderPageToSvg(
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
       } else if (pc === 4 && normStaffStyle === 'tritone-split') {
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5|7</text>`);
+        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#555555" stroke-width="0.6" stroke-dasharray="12,4"/>`);
       }
     }
@@ -382,11 +382,10 @@ export function renderPageToSvg(
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
 
-    // Staff Lines (5/7 Staff Topography)
-    // PC 0: bold octave (1.5pt)
-    // PC 4: 5/7 Demarcation thin long line (0.6pt, Klavarscribo-style [12, 4])
-    // PC 2, 6, 8, 10: hairlines (0.5pt)
-    // Odd PCs: spaces
+    // Staff Lines (5/7 Staff Topography - Decluttered)
+    // PC 0: bold octave (1.0pt)
+    // PC 4: Landmark 5 demarcation thin long line (0.6pt, Klavar-style [12, 4])
+    // Zero hairlines for clean, uncluttered layout
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
@@ -396,11 +395,8 @@ export function renderPageToSvg(
           // Refined octave boundary (clean 1.0pt, distinct without excessive thickness)
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
         } else if (pc === 4) {
-          // 5/7 Demarcation thin long Klavar-style line
+          // Landmark 5 demarcation thin long line
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#333333" stroke-width="0.6" stroke-dasharray="12,4"/>`);
-        } else if (pc === 2 || pc === 6 || pc === 8 || pc === 10) {
-          // Hairlines
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#888888" stroke-width="0.5"/>`);
         }
       } else {
         // Fallback whole-tone uniform

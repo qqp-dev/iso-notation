@@ -64,7 +64,7 @@ import { getCanonicalSyllable } from './phonetics';
 
 /**
  * Human-readable label for a pitch class (0..11).
- * Supports numeric ('0') or canonical phonetic solfege ('ma').
+ * Supports 1-based numeric ('1'..'12') or canonical phonetic solfege ('ma').
  */
 export function pitchClassLabel(
   pitchClass: number,
@@ -74,23 +74,25 @@ export function pitchClassLabel(
   if (format === 'phonetic') {
     return getCanonicalSyllable(pc);
   }
-  return String(pc);
+  return String(pc + 1);
 }
 
 /**
- * Full pitch name as pure (pitchClass:octave), e.g. "0:3", "1:4", or phonetic "ma3".
- * Uses 0-indexed piano octaves: m0 is lowest C (C1), m3 is Middle C (C4),
- * and notes before m0 (A0, Bb0, B0) are also octave 0.
+ * Full pitch name as 1-based (pitchNumber:displayOctave), e.g. "1:3", "2:4", or phonetic "ma3".
+ * Octave system: b0 ... m0, next b1, but m still marks the octaves.
+ * For A..B (pc >= 9), octave is pitch.octave (A0 -> b0/bi0, A1 -> b1/bi1, A4 -> b4/bi4).
+ * For C..G# (pc < 9), octave is Math.max(0, pitch.octave - 1) (C1 -> m0/ma0, C4 -> m3/ma3).
  */
 export function pitchLabel(
   pitch: PitchCoordinate,
   format: 'numeric' | 'phonetic' | 'sharp' | 'flat' = 'numeric'
 ): string {
-  const displayOct = Math.max(0, pitch.octave - 1);
+  const isAfterC = pitch.pitchClass >= 9;
+  const displayOct = isAfterC ? pitch.octave : Math.max(0, pitch.octave - 1);
   if (format === 'phonetic') {
     return `${getCanonicalSyllable(pitch.pitchClass)}${displayOct}`;
   }
-  return `${pitch.pitchClass}:${displayOct}`;
+  return `${pitch.pitchClass + 1}:${displayOct}`;
 }
 
 /**

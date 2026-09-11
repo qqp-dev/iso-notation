@@ -84,14 +84,15 @@ test('Whole-tone parity and Janko row assignments', () => {
 });
 
 test('Pitch labels formatting', () => {
-  assert.equal(pitchClassLabel(0), '0');
-  assert.equal(pitchClassLabel(1), '1');
-  assert.equal(pitchClassLabel(11), '11');
-  assert.equal(pitchLabel({ pitchClass: 0, octave: 4 }), '0:3');
-  assert.equal(pitchLabel({ pitchClass: 1, octave: 5 }), '1:4');
-  assert.equal(pitchLabel({ pitchClass: 6, octave: 3 }), '6:2');
+  // 1-based note numbers (1..12)
+  assert.equal(pitchClassLabel(0), '1');
+  assert.equal(pitchClassLabel(1), '2');
+  assert.equal(pitchClassLabel(11), '12');
+  assert.equal(pitchLabel({ pitchClass: 0, octave: 4 }), '1:3');
+  assert.equal(pitchLabel({ pitchClass: 1, octave: 5 }), '2:4');
+  assert.equal(pitchLabel({ pitchClass: 6, octave: 3 }), '7:2');
 
-  // Phonetic format (strictly lowercase, 0-indexed octaves where Middle C is 3)
+  // Phonetic format (strictly lowercase, b0 ... m0, next b1, m marks octaves)
   assert.equal(pitchClassLabel(0, 'phonetic'), 'ma');
   assert.equal(pitchClassLabel(1, 'phonetic'), 'di');
   assert.equal(pitchClassLabel(7, 'phonetic'), 'ti');
@@ -99,15 +100,28 @@ test('Pitch labels formatting', () => {
   assert.equal(pitchLabel({ pitchClass: 1, octave: 5 }, 'phonetic'), 'di4');
   assert.equal(pitchLabel({ pitchClass: 6, octave: 3 }, 'phonetic'), 'na2');
 
-  // First C on piano (C1) is octave 0 (m0)
-  assert.equal(pitchLabel({ pitchClass: 0, octave: 1 }), '0:0');
+  // Octave system: b0 ... m0, next b1
+  // First notes on piano: A0 is b0 (bi0), Bb0 is sa0, B0 is ki0
+  assert.equal(pitchLabel({ pitchClass: 9, octave: 0 }), '10:0');
+  assert.equal(pitchLabel({ pitchClass: 9, octave: 0 }, 'phonetic'), 'bi0');
+  assert.equal(pitchLabel({ pitchClass: 10, octave: 0 }), '11:0');
+  assert.equal(pitchLabel({ pitchClass: 10, octave: 0 }, 'phonetic'), 'sa0');
+  assert.equal(pitchLabel({ pitchClass: 11, octave: 0 }), '12:0');
+  assert.equal(pitchLabel({ pitchClass: 11, octave: 0 }, 'phonetic'), 'ki0');
+
+  // First C on piano (C1) is octave 0 (m0 -> ma0)
+  assert.equal(pitchLabel({ pitchClass: 0, octave: 1 }), '1:0');
   assert.equal(pitchLabel({ pitchClass: 0, octave: 1 }, 'phonetic'), 'ma0');
 
-  // Notes before m0 (A0, Bb0, B0) are also octave 0
-  assert.equal(pitchLabel({ pitchClass: 9, octave: 0 }), '9:0');
-  assert.equal(pitchLabel({ pitchClass: 9, octave: 0 }, 'phonetic'), 'bi0');
-  assert.equal(pitchLabel({ pitchClass: 10, octave: 0 }), '10:0');
-  assert.equal(pitchLabel({ pitchClass: 10, octave: 0 }, 'phonetic'), 'sa0');
-  assert.equal(pitchLabel({ pitchClass: 11, octave: 0 }), '11:0');
-  assert.equal(pitchLabel({ pitchClass: 11, octave: 0 }, 'phonetic'), 'ki0');
+  // Next A on piano (A1) is b1 (bi1)
+  assert.equal(pitchLabel({ pitchClass: 9, octave: 1 }), '10:1');
+  assert.equal(pitchLabel({ pitchClass: 9, octave: 1 }, 'phonetic'), 'bi1');
+
+  // Next C on piano (C2) is m1 (ma1)
+  assert.equal(pitchLabel({ pitchClass: 0, octave: 2 }), '1:1');
+  assert.equal(pitchLabel({ pitchClass: 0, octave: 2 }, 'phonetic'), 'ma1');
+
+  // Concert A4 (440 Hz) is b4 (bi4)
+  assert.equal(pitchLabel({ pitchClass: 9, octave: 4 }), '10:4');
+  assert.equal(pitchLabel({ pitchClass: 9, octave: 4 }, 'phonetic'), 'bi4');
 });

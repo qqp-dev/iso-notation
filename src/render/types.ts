@@ -128,8 +128,8 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
   },
   {
     id: 'numerical-digits-preset',
-    name: 'Numerical Digits (0..11)',
-    description: 'Uniform whole-tone staff with pitch-class integer noteheads',
+    name: 'Numerical Digits (1..12)',
+    description: 'Uniform whole-tone staff with 1-based pitch-class integer noteheads',
     staffStyle: 'wholetone-uniform',
     noteheadMorphology: 'numerical',
     colorMode: 'wholetone-duality',
@@ -254,11 +254,11 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'tritone-split') {
-    // 5/7 Staff Topography (Klavarscribo-style continuous demarcation):
-    // 6 whole-tone lines partitioned into two 3-line groups by the 5/7 boundary demarcation at PC 4 (E):
-    // 5-group: PC 0 (bold octave), PC 2 (hairline), PC 4 (5/7 continuous demarcation line)
-    // 7-group: PC 6, 8, 10 (hairlines)
-    // Odd integer PCs: spaces.
+    // 5/7 Staff Topography ("less lines"):
+    // Decluttered staff with exactly 2 landmark lines per octave:
+    // - PC 0: bold octave boundary line ('m')
+    // - PC 4: continuous/dashed demarcation line for the 5-group boundary ('5')
+    // Intermediate hairlines (PC 2, 6, 8, 10) are eliminated to remove visual clutter.
     if (pc === 0) {
       return {
         isLine: true,
@@ -281,17 +281,6 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isOctaveBoundary: false,
         lineWidth: 0.7,
         color: 'rgba(255, 255, 255, 0.55)',
-      };
-    }
-    if (pc === 2 || pc === 6 || pc === 8 || pc === 10) {
-      return {
-        isLine: true,
-        isBold: false,
-        isDashed: false,
-        isTritone: false,
-        isOctaveBoundary: false,
-        lineWidth: 0.6,
-        color: 'rgba(255, 255, 255, 0.16)',
       };
     }
     return {

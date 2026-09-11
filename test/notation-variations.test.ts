@@ -48,12 +48,11 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
   for (const style of styles) {
     assert.equal(normalizeStaffStyle(style), 'tritone-split');
 
-    // 5/7 Staff Topography Invariant:
+    // 5/7 Staff Topography Invariant (Decluttered / "Less Lines"):
     // PC 0 (C) is bold octave line.
-    // Demarcation line is placed at PC 4 (E), the boundary of the 5-group (C, D, E),
-    // replacing the old tritone line and unaligned PC 4.5 line.
-    // PC 4 is a crisp dotted demarcation line (1.0px / 0.9pt, dashArray: [1.5, 3], isDemarcation: true, isDashed: true).
-    // PC 2, 6, 8, 10 are rendered as subtle hairlines (0.6px).
+    // Demarcation line is placed at PC 4 (E, Landmark 5), the boundary of the 5-group (C, D, E).
+    // PC 4 is a crisp demarcation line (lineWidth 0.7, dashArray: [14, 4], isDemarcation: true, isDashed: true).
+    // PC 2, 6, 8, 10 hairlines are eliminated for clean, decluttered reading.
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
@@ -74,21 +73,10 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     const geom45 = getStaffLineGeometry(4.5, style);
     assert.equal(geom45.isLine, false, 'Non-integer 4.5 must not be a staff line');
 
-    // PC 6 is rendered as a regular hairline
-    const geom6 = getStaffLineGeometry(6, style);
-    assert.equal(geom6.isLine, true, 'PC 6 must be a line');
-    assert.equal(geom6.isBold, false, 'PC 6 must not be bold');
-    assert.equal(geom6.isDashed, false, 'PC 6 must not be dashed');
-    assert.equal(geom6.lineWidth, 0.6, 'PC 6 must be a 0.6 hairline');
-
-    // Hairlines across 5-group and 7-group (2, 6, 8, 10)
+    // Hairlines across 2, 6, 8, 10 eliminated for clean decluttering ("less lines")
     [2, 6, 8, 10].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
-      assert.equal(g.isLine, true, `PC ${pc} must be a hairline`);
-      assert.equal(g.isBold, false);
-      assert.equal(g.isDashed, false);
-      assert.equal(g.lineWidth, 0.6);
-      assert.equal(g.color, 'rgba(255, 255, 255, 0.16)');
+      assert.equal(g.isLine, false, `PC ${pc} must not be a line (decluttered)`);
     });
 
     // Spaces on odd pitch classes (1, 3, 5, 7, 9, 11)
@@ -97,11 +85,12 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
       assert.equal(g.isLine, false, `PC ${pc} must be a space`);
     });
 
-    // Subitizability verification: exactly 3 lines in 5-group (0, 2, 4) and 3 lines in 7-group (6, 8, 10)
-    const cluster5 = [0, 2, 4].filter((pc) => getStaffLineGeometry(pc, style).isLine);
-    const cluster7 = [6, 8, 10].filter((pc) => getStaffLineGeometry(pc, style).isLine);
-    assert.equal(cluster5.length, 3, '5-group (C, D, E) must contain exactly 3 staff lines');
-    assert.equal(cluster7.length, 3, '7-group (F#, G#, A#) must contain exactly 3 staff lines');
+    // Exactly 2 landmark lines per octave: PC 0 (m) and PC 4 (5)
+    let lineCount = 0;
+    for (let pc = 0; pc < 12; pc++) {
+      if (getStaffLineGeometry(pc, style).isLine) lineCount++;
+    }
+    assert.equal(lineCount, 2, 'Decluttered 5/7 staff must contain exactly 2 landmark lines per octave (m and 5)');
   }
 });
 
@@ -228,13 +217,14 @@ test('Notehead Morphology: Canvas rendering of phonetic tokens uses strictly low
   }
 });
 
-test('Notehead Morphology: numerical-digits strictly pitch-class integers 0..11', () => {
+test('Notehead Morphology: numerical-digits strictly 1-based note numbers 1..12', () => {
   assert.equal(normalizeNoteheadMorphology('numerical-digits'), 'numerical');
   assert.equal(normalizeNoteheadMorphology('numerical'), 'numerical');
 
   for (let pc = 0; pc < 12; pc++) {
-    const str = String(pc);
-    assert.match(str, /^(1[0-1]|[0-9])$/, 'Must be pitch class integer 0..11');
+    const noteNum = pc + 1;
+    const str = String(noteNum);
+    assert.match(str, /^([1-9]|1[0-2])$/, 'Must be 1-based note number 1..12');
     assert.doesNotMatch(str, /[A-Ga-g#b]/, 'Zero letter names permitted');
   }
 });

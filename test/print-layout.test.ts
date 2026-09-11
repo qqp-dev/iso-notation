@@ -145,13 +145,13 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // 1. Pure white background for paper savings & laser printing
     assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
 
-    // 2. 5/7 Staff Topography lines
+    // 2. 5/7 Staff Topography lines (Decluttered)
     // - Refined octave line (PC 0, 1.0pt)
     assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.0"/, 'Must contain refined 1.0pt octave line');
-    // - Thin long 5/7 demarcation line at PC 4 (0.6pt, dasharray 12,4)
-    assert.match(svg, /stroke="#333333"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="12,4"/, 'Must contain thin 0.6pt 5/7 demarcation line');
-    // - Hairlines (PC 2, 6, 8, 10, 0.5pt)
-    assert.match(svg, /stroke="#888888"[^>]*stroke-width="0\.5"/, 'Must contain 0.5pt hairlines');
+    // - Thin long 5 demarcation line at PC 4 (0.6pt, dasharray 12,4)
+    assert.match(svg, /stroke="#333333"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="12,4"/, 'Must contain thin 0.6pt 5 demarcation line');
+    // - Zero clunky hairlines (PC 2, 6, 8, 10 eliminated)
+    assert.doesNotMatch(svg, /stroke="#888888"[^>]*stroke-width="0\.5"/, 'Hairlines must be eliminated for decluttered staff');
     // - Zero old 3,3 dashes
     assert.doesNotMatch(svg, /stroke-dasharray="3,3"/, 'Old 3,3 dashes must not be present');
 
@@ -303,6 +303,10 @@ test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
     // 2. Zero diatonic C octave labels
     assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
     assert.doesNotMatch(svg, />C\d+</, 'Must not contain any diatonic C${oct} markers');
+
+    // 3. Landmark 5 is present, 5|7 is absent
+    assert.match(svg, />5</, 'Must contain landmark 5');
+    assert.doesNotMatch(svg, />5\|7</, 'Must not contain 5|7');
   }
 });
 
