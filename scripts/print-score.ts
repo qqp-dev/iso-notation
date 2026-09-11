@@ -13,6 +13,8 @@ import { execSync, spawn } from 'node:child_process';
 import { BENCHMARK_SCORES } from '../src/scores';
 import { computeColumnarLayout, renderPageToSvg, renderAllPagesToSvg } from '../src/render/print-layout';
 
+import { NoteheadMorphology, normalizeNoteheadMorphology } from '../src/render/types';
+
 interface PrintOptions {
   scoreId: string;
   relayHost: string;
@@ -24,6 +26,8 @@ interface PrintOptions {
   pjl: boolean;
   pageIndex?: number;
   paperSize: 'letter' | 'A4';
+  morphology: NoteheadMorphology;
+  colorMode: 'color' | 'mono';
 }
 
 function parseArgs(args: string[]): PrintOptions {
@@ -36,6 +40,8 @@ function parseArgs(args: string[]): PrintOptions {
     direct: false,
     pjl: true,
     paperSize: 'letter',
+    morphology: 'rectangle-square',
+    colorMode: 'color',
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -62,6 +68,12 @@ function parseArgs(args: string[]): PrintOptions {
       options.pageIndex = parseInt(args[++i], 10);
     } else if (arg === '--paper' && i + 1 < args.length) {
       options.paperSize = args[++i].toLowerCase() === 'a4' ? 'A4' : 'letter';
+    } else if (arg === '--morphology' && i + 1 < args.length) {
+      options.morphology = normalizeNoteheadMorphology(args[++i]);
+    } else if (arg === '--mono' || arg === '--monochrome') {
+      options.colorMode = 'mono';
+    } else if (arg === '--color') {
+      options.colorMode = 'color';
     } else if (arg === '--help' || arg === '-h') {
       printUsage();
       process.exit(0);
@@ -81,6 +93,8 @@ Options:
   --port <port>        Printer RAW port (default: 9100)
   --relay <user@host>  SSH relay host (default: 'nacho@100.118.214.29')
   --paper <letter|a4>  Paper format (default: 'letter' for US printer tray)
+  --morphology <type>  Notehead style: 'rectangle-square' | 'duodecimal' | 'row-parity-shape' | 'phonetic'
+  --mono               Force pure monochrome Black toner only (disengages CMY color drums)
   --direct             Stream directly over TCP without SSH relay
   --output <path>      Save output PostScript file to path
   --page <num>         Print only specific 0-indexed page (default: all)
@@ -94,14 +108,16 @@ Options:
 export function wrapInPjl(
   postscriptData: Buffer,
   jobName: string = 'Isomorphic Score',
-  paperSize: 'letter' | 'A4' = 'letter'
+  paperSize: 'letter' | 'A4' = 'letter',
+  colorMode: 'color' | 'mono' = 'color'
 ): Buffer {
+  const isMono = colorMode === 'mono';
   const pjlHeader = Buffer.from(
     `\x1b%-12345X@PJL\r\n` +
     `@PJL JOB NAME = "${jobName}"\r\n` +
     `@PJL SET PAPER = ${paperSize === 'A4' ? 'A4' : 'LETTER'}\r\n` +
-    `@PJL SET RENDERMODE = COLOR\r\n` +
-    `@PJL SET COLORMODE = COLOR\r\n` +
+    `@PJL SET RENDERMODE = ${isMono ? 'GRAYSCALE' : 'COLOR'}\r\n` +
+    `@PJL SET COLORMODE = ${isMono ? 'MONO' : 'COLOR'}\r\n` +
     `@PJL ENTER LANGUAGE = POSTSCRIPT\r\n`,
     'binary'
   );
@@ -116,7 +132,9 @@ export function wrapInPjl(
 export async function generateScorePostscript(
   scoreId: string,
   pageIndex?: number,
-  paperSize: 'letter' | 'A4' = 'letter'
+  paperSize: 'letter' | 'A4' = 'letter',
+  morphology: NoteheadMorphology = 'rectangle-square',
+  colorMode: 'color' | 'mono' = 'color'
 ): Promise<{ psBuffer: Buffer; svgPaths: string[]; layout: ReturnType<typeof computeColumnarLayout> }> {
   const scoreBuilder = BENCHMARK_SCORES[scoreId];
   if (!scoreBuilder) {
@@ -127,7 +145,7 @@ export async function generateScorePostscript(
   const layout = computeColumnarLayout(score, {
     paperSize,
     staffStyle: 'tritone-split',
-    noteheadMorphology: 'rectangle-square',
+    noteheadMorphology: morphology,
   });
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'iso-print-'));
@@ -138,7 +156,14 @@ export async function generateScorePostscript(
     : layout.pages.map((_, idx) => idx);
 
   for (const pIdx of pagesToRender) {
-    const svg = renderPageToSvg(layout, pIdx);
+    let svg = renderPageToSvg(layout, pIdx);
+    if (colorMode === 'mono') {
+      svg = svg
+        .replace(/#1D4ED8/g, '#111827')
+        .replace(/#D97706/g, '#111827')
+        .replace(/#BE123C/g, '#111827')
+        .replace(/#1E293B/g, '#000000');
+    }
     const svgPath = path.join(tmpDir, `page-${pIdx + 1}.svg`);
     fs.writeFileSync(svgPath, svg, 'utf-8');
     svgPaths.push(svgPath);
@@ -169,6 +194,8 @@ async function main(): Promise<void> {
   console.log(`• Target Printer:   Brother HL-L3300CDW (${options.printerIp}:${options.printerPort})`);
   console.log(`• Network Relay:    ${options.direct ? 'DIRECT (No relay)' : options.relayHost}`);
   console.log(`• Paper Format:     ${options.paperSize.toUpperCase()} (${options.paperSize === 'letter' ? '8.5 × 11 in' : '210 × 297 mm'})`);
+  console.log(`• Morphology:       ${options.morphology}`);
+  console.log(`• Color Mode:       ${options.colorMode.toUpperCase()}`);
   console.log(`• Layout:           4 Measures/Column, 2 Columns/Page (Luxurious Urtext)`);
   console.log(`• Mode:             ${options.dryRun ? 'DRY-RUN (Simulated)' : 'PRODUCTION PRINT'}\n`);
 
@@ -176,7 +203,9 @@ async function main(): Promise<void> {
   const { psBuffer, svgPaths, layout } = await generateScorePostscript(
     options.scoreId,
     options.pageIndex,
-    options.paperSize
+    options.paperSize,
+    options.morphology,
+    options.colorMode
   );
 
   console.log(`   ✓ Total measures:  ${layout.totalMeasures} mm`);
@@ -196,7 +225,8 @@ async function main(): Promise<void> {
     payload = wrapInPjl(
       psBuffer,
       `${layout.score.title} - ${layout.score.composer}`,
-      options.paperSize
+      options.paperSize,
+      options.colorMode
     );
     console.log(`   ✓ Wrapped in PJL container (${(payload.length / 1024).toFixed(1)} KB)`);
   }
