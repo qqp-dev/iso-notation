@@ -149,8 +149,8 @@ async function main(): Promise<void> {
   console.log(`• Score:            ${options.scoreId}`);
   console.log(`• Target Printer:   Brother HL-L3300CDW (${options.printerIp}:${options.printerPort})`);
   console.log(`• Network Relay:    ${options.direct ? 'DIRECT (No relay)' : options.relayHost}`);
-  console.log(`• Paper Format:     A4 Portrait (210 × 297 mm, 2-Page Spread)`);
-  console.log(`• Layout:           8 Measures/Column, 2 Columns/Page (Zero Page Turns)`);
+  console.log(`• Paper Format:     A4 Portrait (210 × 297 mm)`);
+  console.log(`• Layout:           4 Measures/Column, 2 Columns/Page (Luxurious Urtext)`);
   console.log(`• Mode:             ${options.dryRun ? 'DRY-RUN (Simulated)' : 'PRODUCTION PRINT'}\n`);
 
   console.log('1. Computing columnar engraving layout...');

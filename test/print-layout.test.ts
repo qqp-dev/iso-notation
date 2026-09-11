@@ -137,7 +137,7 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  assert.equal(svgs.length, 2, 'Must produce SVGs for both Page 1 and Page 2');
+  assert.equal(svgs.length, 4, 'Must produce SVGs for all 4 pages in the luxurious Urtext layout');
 
   for (let pIdx = 0; pIdx < svgs.length; pIdx++) {
     const svg = svgs[pIdx];
@@ -170,9 +170,11 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     assert.match(svg, /fill="#1E293B"/, 'Must render 16th notes in dark slate/graphite (#1E293B)');
     // - 8th notes (d = 24t): Royal Blue (#1D4ED8) with hold ribbon
     assert.match(svg, /<rect[^>]*width="4\.00"[^>]*fill="#1D4ED8"/, 'Must render 8th note hold ribbons in Royal Blue (#1D4ED8)');
-    // - Quarter notes (d = 48t): Amber/Gold (#D97706) with hold ribbon
-    assert.match(svg, /<rect[^>]*width="4\.00"[^>]*fill="#D97706"/, 'Must render quarter note hold ribbons in Amber/Gold (#D97706)');
   }
+
+  // Across the full document, verify quarter note hold ribbons in Amber/Gold (#D97706)
+  const fullScoreSvg = svgs.join('\n');
+  assert.match(fullScoreSvg, /<rect[^>]*width="4\.00"[^>]*fill="#D97706"/, 'Must render quarter note hold ribbons in Amber/Gold (#D97706)');
 
   // Verify renderColumnarScoreToSvg helper
   const page0Svg = renderColumnarScoreToSvg(score, 0);
@@ -269,9 +271,9 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
   const psText = psBuffer.toString('binary', 0, 1000);
   assert.match(psText, /%!PS-Adobe/);
 
-  // Check multi-page emission (%%Pages: 2)
+  // Check multi-page emission (%%Pages: 4)
   const fullPs = psBuffer.toString('binary');
-  assert.match(fullPs, /%%Pages:\s*2/);
+  assert.match(fullPs, /%%Pages:\s*4/);
 
   // Test PJL wrapper
   const wrapped = wrapInPjl(psBuffer, 'Bach Goldberg Var 1');
@@ -290,7 +292,7 @@ test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  assert.equal(svgs.length, 2);
+  assert.equal(svgs.length, 4);
   for (const svg of svgs) {
     // 1. Lowercase m octave markers (m2, m3, m4) with Middle C at m3
     assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct - 1} pitch labels');
@@ -311,7 +313,7 @@ test('Phonetic Notehead Morphology in SVG: strictly lowercase syllables', () => 
   });
   const svgs = renderAllPagesToSvg(layout);
 
-  assert.equal(svgs.length, 2);
+  assert.equal(svgs.length, 4);
   const uppercaseSyllables = ['Ma', 'Di', 'Va', 'Pi', 'La', 'Ri', 'Na', 'Ti', 'Fa', 'Bi', 'Sa', 'Ki'];
 
   for (const svg of svgs) {

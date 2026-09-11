@@ -71,10 +71,14 @@ export interface ColumnarScoreLayout {
   ptPerTick: number;
 }
 
+const HEADER_HEIGHT_PT = 44;
+const FOOTER_HEIGHT_PT = 32;
+const COL_HEADER_HEIGHT_PT = 16;
+
 const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   paperSize: 'A4',
   orientation: 'portrait',
-  measuresPerColumn: 8,
+  measuresPerColumn: 4,
   columnsPerPage: 2,
   pageMarginMm: 10,
   columnGapMm: 8,
@@ -157,8 +161,8 @@ export function computeColumnarLayout(
   const printableHeightPt = heightPt - 2 * marginPt;
 
   // Header and footer reservations
-  const headerHeightPt = 42;
-  const footerHeightPt = 22;
+  const headerHeightPt = 44;
+  const footerHeightPt = 32;
   const bodyHeightPt = printableHeightPt - headerHeightPt - footerHeightPt;
 
   const colsPerPage = Math.max(1, options.columnsPerPage);
@@ -219,9 +223,21 @@ export function computeColumnarLayout(
     const sMeasure = firstCol ? firstCol.startMeasure : 1;
     const eMeasure = lastCol ? lastCol.endMeasure : totalMeasures;
 
-    // Designate sections (e.g. Page 1: Section A mm. 1–16, Page 2: Section B mm. 17–32)
-    const sectionLetter = String.fromCharCode(65 + p); // 'A', 'B', etc.
-    const sectionName = `Section ${sectionLetter} (mm. ${sMeasure}–${eMeasure})`;
+    // Designate sections (e.g. Page 1: Section A · Part 1 mm. 1–8, Page 2: Section A · Part 2 mm. 9–16)
+    let sectionName: string;
+    if (totalPages === 4 && totalMeasures >= 24) {
+      const half = Math.ceil(totalMeasures / 2);
+      const isPart2 = sMeasure > half;
+      const secLetter = isPart2 ? 'B' : 'A';
+      const partNum = (p % 2) + 1;
+      sectionName = `Section ${secLetter} · Part ${partNum} (mm. ${sMeasure}–${eMeasure})`;
+    } else if (totalPages === 2) {
+      const secLetter = p === 0 ? 'A' : 'B';
+      sectionName = `Section ${secLetter} (mm. ${sMeasure}–${eMeasure})`;
+    } else {
+      const sectionLetter = String.fromCharCode(65 + (p % 26));
+      sectionName = `Section ${sectionLetter} (mm. ${sMeasure}–${eMeasure})`;
+    }
 
     pages.push({
       pageIndex: p,
@@ -311,8 +327,8 @@ export function renderPageToSvg(
   );
   svgParts.push(`  <defs>`);
   svgParts.push(`    <style>`);
-  svgParts.push(`      .title { font-family: system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 13pt; fill: #000000; }`);
-  svgParts.push(`      .subtitle { font-family: system-ui, -apple-system, sans-serif; font-size: 8.5pt; fill: #444444; }`);
+  svgParts.push(`      .title { font-family: system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 10.5pt; fill: #000000; }
+      .subtitle { font-family: system-ui, -apple-system, sans-serif; font-size: 8pt; fill: #444444; }`);
   svgParts.push(`      .meta { font-family: system-ui, -apple-system, monospace; font-size: 7.5pt; fill: #666666; }`);
   svgParts.push(`      .measure-num { font-family: monospace; font-weight: bold; font-size: 7pt; fill: #444444; text-anchor: end; }`);
   svgParts.push(`      .pitch-label { font-family: monospace; font-size: 6.5pt; fill: #555555; text-anchor: middle; }`);
@@ -330,9 +346,8 @@ export function renderPageToSvg(
   svgParts.push(`  <!-- Page Header -->`);
   svgParts.push(`  <g id="page-header">`);
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="title">${escapeXml(title)}</text>`);
-  svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle">${escapeXml(composer)} — <tspan font-weight="bold" fill="#000000">${escapeXml(page.sectionName)}</tspan></text>`);
-  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="meta" text-anchor="end">Vertical Isomorphic Notation</text>`);
-  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="meta" text-anchor="end">5/7 Demarcated Staff • Klavar Lateral Stems</text>`);
+  svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle">${escapeXml(composer)}</text>`);
+  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle" text-anchor="end" font-weight="bold" fill="#000000">${escapeXml(page.sectionName)}</text>`);
   svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(marginPt + 34).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(marginPt + 34).toFixed(2)}" stroke="#CCCCCC" stroke-width="0.75"/>`);
   svgParts.push(`  </g>`);
 
@@ -434,7 +449,8 @@ export function renderPageToSvg(
         const lPitch = linearIndex(note.pitch);
         const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
         const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
-        const ribbonHeight = note.durationTicks * ptPerTick;
+        const rawRibbonHeight = note.durationTicks * ptPerTick;
+        const ribbonHeight = Math.max(2, Math.min(rawRibbonHeight, staffEndY - ny));
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
         svgParts.push(`    <rect x="${(nx - holdRibbonWidth / 2).toFixed(2)}" y="${ny.toFixed(2)}" width="${holdRibbonWidth.toFixed(2)}" height="${ribbonHeight.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
@@ -501,8 +517,8 @@ export function renderPageToSvg(
   // 4. Page Footer
   svgParts.push(`  <!-- Page Footer -->`);
   svgParts.push(`  <g id="page-footer">`);
-  svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(heightPt - marginPt - 14).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(heightPt - marginPt - 14).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.75"/>`);
-  svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta">Pure 12-TET Columnar Engraving • Zero Page Turns Across Sections</text>`);
+  svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(heightPt - marginPt - 16).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(heightPt - marginPt - 16).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.75"/>`);
+  svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta">Pure 12-TET Columnar Engraving</text>`);
   svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta" text-anchor="end" font-weight="bold">Page ${page.pageNumber} of ${page.totalPages}</text>`);
   svgParts.push(`  </g>`);
 
