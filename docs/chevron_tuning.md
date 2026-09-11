@@ -89,13 +89,13 @@ In Measure 4, the right hand crosses downward into the bass register with the `>
 
 ---
 
-## 6. Definitive Adoption: Variant 2 (Sculpted French Guillemet)
+## 6. Definitive Adoption: Sculpted French Guillemet (`«`, `»`)
 
-Following visual evaluation in full score context, **Variant 2: Sculpted French Guillemet (`«`, `»`)** was selected as the **definitive handedness indicator** for `iso-notation`:
-1. **Flawless Symmetry**: Unlike the asymmetrical stroke modulation of the broad-nib burin, the French guillemet possesses perfect top-bottom symmetry across the horizontal pitch axis, preserving spatial equilibrium next to notehead digits.
-2. **Literary Bookwork Refinement**: The subtle concave sweep and optical waist swelling ($0.55\text{pt}$) frame the URW Gothic numerals with the quiet elegance of fine French punch-cutting (Didot/Grandjean).
-3. **Zero Visual Noise & Compact Semitone Nestling**:
-   - **Compact Envelope**: Scaled to width $1.4\text{pt}$ and height $2.4\text{pt}$ with baseline offset $2.2\text{pt}$ from notehead center, keeping the chevron entirely within the single-semitone space.
+Following visual evaluation in full score context, the **Sculpted French Guillemet (`«`, `»`)** was selected as the **definitive handedness indicator** for `iso-notation`:
+1. **Flawless Symmetry**: Unlike asymmetrical stroke modulations, the French guillemet possesses perfect top-bottom symmetry across the horizontal pitch axis, preserving spatial equilibrium next to notehead digits.
+2. **Literary Bookwork Refinement**: The subtle concave sweep and optical waist swelling ($0.80\text{pt}$) frame the URW Gothic numerals with the quiet elegance of fine French punch-cutting (Didot/Grandjean).
+3. **Full Restored Scale & Zero Visual Noise**:
+   - **Full-Size Guillemet**: Restored to full, authoritative scale ($h = 2.8\text{pt} / 5.6\text{px}$, $w = 1.7\text{pt} / 3.4\text{px}$, thickness $0.80\text{pt} / 1.6\text{px}$) offset $1.0\text{pt}$ ($2.0\text{px}$) clear of the circular notehead knockout.
    - **Elimination of Halo Knockouts**: Rendered as a pure vector fill without a thick white stroke outline, eliminating the "triple-layer bite" when notes neighbor thick octave lines.
-   - **Continuous Staff Lines**: Hold lines and chevrons never overwrite permanent black staff lines; notes sitting on staff lines display a balanced $\sim 2.5\text{pt}$ protective white halo around the notehead while the line remains continuous.
+   - **Sensible Continuous Staff Line Holds**: On staff lines, hold lines color the staff line continuously in the note's duration color (matching the staff line width with `stroke-linecap="butt"`) from the notehead knockout down to release; adjacent pitch obstacles never chop or stutter the line.
 

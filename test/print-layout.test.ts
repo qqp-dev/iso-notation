@@ -248,13 +248,12 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   assert.equal(allKnockouts.length, 0, 'Zero staff-line knockouts (staff lines remain continuous)');
 
   // Verify Bar 6 note bach-var1-88 (tick 744, dur 36, blue) on staff line o2 (pitch 36):
-  // Staff line remains continuous black without blue hold line or white knockout overwriting it
+  // Staff line is colored continuously in Royal Blue (#1D4ED8) without white knockout cuts or stutter
   const note88 = score.notes.find((n) => n.id === 'bach-var1-88')!;
   const col88 = layout.columns.find((c) => c.notes.some((n) => n.id === note88.id))!;
-  const staffOriginY = 10 * (72 / 25.4) + 42 + 16;
+  const staffOriginY = 10 * (72 / 25.4) + 42 + 36;
   const note88Ny = staffOriginY + (note88.startTick - col88.startTick) * layout.ptPerTick;
-  const note88Height = 6.0;
-  const note88StartY = note88Ny + note88Height / 2 + 2;
+  const note88StartY = note88Ny - 0.55 + 4.80;
   const note88ReleaseY = note88Ny + note88.durationTicks * layout.ptPerTick;
   const colLeftPt88 = 10 * (72 / 25.4) + col88.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
   const note88X = colLeftPt88 + 22 + (36 - layout.minPitch) * layout.ptPerSemitone;
@@ -266,11 +265,11 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
     new RegExp(`<line x1="${note88X.toFixed(2)}" [^>]*stroke="#FFFFFF"`),
     'Bar 6 note bach-var1-88 must not have white knockout underlay'
   );
-  // Verify zero colored hold line overwriting the staff line
-  assert.doesNotMatch(
+  // Verify sensible continuous Royal Blue hold line on staff line o2
+  assert.match(
     pSvg88,
-    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}"`),
-    'Bar 6 note bach-var1-88 on line o2 must not overwrite black vertical staff line'
+    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#1D4ED8" stroke-width="0.65" stroke-linecap="butt"/>`),
+    'Bar 6 note bach-var1-88 on line o2 must render continuous sensible hold line in Royal Blue'
   );
 
   // 5. Clean termination without explicit stop ticks or release crossbars
@@ -853,7 +852,7 @@ test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for 
   assert.equal(dashedMatches.length, 2, 'Page 4 must render exactly 2 dashed outlier line segments at pitch 76 (for mm. 29 and 30)');
 
   // Verify the vertical bounds correspond to mm. 29 and 30
-  const staffOriginY = marginPt + 42 + 16;
+  const staffOriginY = marginPt + 42 + 36;
   const m29StartY = (staffOriginY + 0 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
   const m29EndY = (staffOriginY + 1 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
   const m30StartY = (staffOriginY + 1 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
@@ -913,7 +912,7 @@ test('A4 Columnar Layout & Geometry Invariants: 22pt left clearance, measure num
   assert.ok(page0Svg.includes(`x2="${rightStaffBound.toFixed(2)}" y2="`));
 
   // Measure number rendered in left margin clear of m1 and column boundary
-  const staffOriginY = marginPt + 42 + 16;
+  const staffOriginY = marginPt + 42 + 36;
   const expectedMeasureNumX = col0LeftPt + colMarginLeftPt / 2;
   assert.match(
     page0Svg,
@@ -933,5 +932,83 @@ test('A4 Columnar Layout & Geometry Invariants: 22pt left clearance, measure num
 
   // SVG DOES contain horizontal dashed pulse lines for beat subdivisions (stroke-dasharray="2,3")
   assert.match(page0Svg, /stroke-dasharray="2,3"/);
+});
+
+test('Classical Grand Staff Accolade, Incipit Position of Honor, and Sensible Continuous Hold Lines Invariant', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score, {
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'duodecimal',
+  });
+  const page0Svg = renderPageToSvg(layout, 0);
+
+  // 1. Classical Urtext System Accolade (Curly Brace) tying o1 to o5 across the 4-octave register
+  assert.match(
+    page0Svg,
+    /<!-- Classical Urtext System Accolade \(Curly Brace\) tying o1 to o5 -->\s*<path d="M [\d\.]+ [\d\.]+ C [^"]+ Z" fill="#111827"\/>/,
+    'Must render classical Urtext accolade tying o1 to o5 at column top'
+  );
+
+  // 2. Position of Honor for opening sound(s) of the composition (tick 0 in Measure 1):
+  // Noble concentric halo ring (r = 6.20) framing the circular knockout
+  const openingRingMatches = Array.from(
+    page0Svg.matchAll(/<circle cx="[\d\.]+" cy="[\d\.]+" r="6\.20" fill="none" stroke="[^"]+" stroke-width="0\.75"\/>/g)
+  );
+  assert.ok(openingRingMatches.length >= 2, 'Must render noble concentric halo rings (r=6.20) for opening sounds at tick 0');
+
+  // 3. Classical Time Signature 3/4 engraved in left margin for Measure 1
+  assert.match(
+    page0Svg,
+    /<text x="[\d\.]+" y="[\d\.]+" class="time-sig"[^>]*>3<\/text>/,
+    'Must render time signature numerator 3 in left margin'
+  );
+  assert.match(
+    page0Svg,
+    /<text x="[\d\.]+" y="[\d\.]+" class="time-sig"[^>]*>4<\/text>/,
+    'Must render time signature denominator 4 in left margin'
+  );
+
+  // 4. Zero horizontal barline across m = 0 bisecting opening sounds
+  const col0 = layout.pages[0].columns[0];
+  const marginPt = layout.options.pageMarginMm * (72 / 25.4);
+  const staffOriginY = marginPt + 42 + 36;
+  const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
+  const col0StaffLeftPt = col0LeftPt + 22;
+  const rightStaffBound = col0StaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
+  assert.doesNotMatch(
+    page0Svg,
+    new RegExp(`<line x1="${col0StaffLeftPt.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${staffOriginY.toFixed(2)}"`),
+    'Must not render an arbitrary horizontal barline across m = 0 bisecting the opening notes'
+  );
+
+  // 5. Bar 6 Middle C note bach-var1-97 (tick 816, dur 24, pitch 48) on center spine o3:
+  // Must render continuous Royal Blue hold line without white voids or blue-black-blue-black stutter
+  const note97 = score.notes.find((n) => n.id === 'bach-var1-97')!;
+  const col97 = layout.columns.find((c) => c.notes.some((n) => n.id === note97.id))!;
+  const col97LeftPt = marginPt + col97.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
+  const col97StaffLeftPt = col97LeftPt + 22;
+  const note97X = col97StaffLeftPt + (48 - layout.minPitch) * layout.ptPerSemitone;
+  const note97Ny = staffOriginY + (note97.startTick - col97.startTick) * layout.ptPerTick;
+  const note97StartY = note97Ny - 0.55 + 4.80;
+  const note97ReleaseY = note97Ny + note97.durationTicks * layout.ptPerTick;
+
+  assert.match(
+    page0Svg,
+    new RegExp(`<line x1="${note97X.toFixed(2)}" y1="${note97StartY.toFixed(2)}" x2="${note97X.toFixed(2)}" y2="${note97ReleaseY.toFixed(2)}" stroke="#1D4ED8" stroke-width="1.35" stroke-linecap="butt"\/>`),
+    'Middle C note 97 on spine o3 must render continuous sensible hold line in Royal Blue matching spine width (1.35pt)'
+  );
+
+  // 6. Restored full-size French guillemet chevrons without white halo stroke outline
+  assert.doesNotMatch(
+    page0Svg,
+    /<path d="M [^"]+" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1\.4"/,
+    'Chevrons must not have white halo stroke outline causing triple-layer bites'
+  );
+  // Full-size chevron path: height 2.8pt (ny - 1.40 to ny + 1.40)
+  assert.match(
+    page0Svg,
+    /<path d="M [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Z" fill="[^"]+"\/>/,
+    'Must render full-size French guillemet chevrons'
+  );
 });
 

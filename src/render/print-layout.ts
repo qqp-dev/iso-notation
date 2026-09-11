@@ -79,6 +79,32 @@ export function getBakedPath(
   }
 }
 
+/**
+ * Generates an SVG path string for a classical Urtext Grand Staff Accolade (curly brace)
+ * spanning horizontally from x1 (o1) across Middle C (o3) to x2 (o5).
+ */
+export function getClassicalAccoladePath(
+  x1: number,
+  x2: number,
+  y: number,
+  h: number = 4.2,
+  thick: number = 1.25
+): string {
+  const xm = (x1 + x2) / 2;
+  const hw = (x2 - x1) / 2;
+  return [
+    `M ${x1.toFixed(2)} ${(y + 3).toFixed(2)}`,
+    `C ${(x1 + 4).toFixed(2)} ${(y + 0.5).toFixed(2)}, ${(x1 + hw * 0.35).toFixed(2)} ${y.toFixed(2)}, ${(xm - hw * 0.25).toFixed(2)} ${y.toFixed(2)}`,
+    `C ${(xm - hw * 0.08).toFixed(2)} ${y.toFixed(2)}, ${(xm - 2).toFixed(2)} ${(y - 0.5).toFixed(2)}, ${xm.toFixed(2)} ${(y - h).toFixed(2)}`,
+    `C ${(xm + 2).toFixed(2)} ${(y - 0.5).toFixed(2)}, ${(xm + hw * 0.08).toFixed(2)} ${y.toFixed(2)}, ${(xm + hw * 0.25).toFixed(2)} ${y.toFixed(2)}`,
+    `C ${(x2 - hw * 0.35).toFixed(2)} ${y.toFixed(2)}, ${(x2 - 4).toFixed(2)} ${(y + 0.5).toFixed(2)}, ${x2.toFixed(2)} ${(y + 3).toFixed(2)}`,
+    `C ${(x2 - 4).toFixed(2)} ${(y + 0.5 + thick * 0.4).toFixed(2)}, ${(x2 - hw * 0.35).toFixed(2)} ${(y + thick).toFixed(2)}, ${(xm + hw * 0.25).toFixed(2)} ${(y + thick * 0.9).toFixed(2)}`,
+    `C ${(xm + hw * 0.08).toFixed(2)} ${(y + thick * 0.6).toFixed(2)}, ${(xm + 1.8).toFixed(2)} ${(y - 0.5 + thick * 0.3).toFixed(2)}, ${xm.toFixed(2)} ${(y - h + 0.6).toFixed(2)}`,
+    `C ${(xm - 1.8).toFixed(2)} ${(y - 0.5 + thick * 0.3).toFixed(2)}, ${(xm - hw * 0.08).toFixed(2)} ${(y + thick * 0.6).toFixed(2)}, ${(xm - hw * 0.25).toFixed(2)} ${(y + thick * 0.9).toFixed(2)}`,
+    `C ${(x1 + hw * 0.35).toFixed(2)} ${(y + thick).toFixed(2)}, ${(x1 + 4).toFixed(2)} ${(y + 0.5 + thick * 0.4).toFixed(2)}, ${x1.toFixed(2)} ${(y + 3).toFixed(2)}`,
+    `Z`
+  ].join(' ');
+}
 
 export interface PrintLayoutOptions {
   paperSize?: 'A4' | 'A3' | 'letter';
@@ -233,17 +259,18 @@ export function computeColumnarLayout(
   const printableWidthPt = widthPt - 2 * marginPt;
   const printableHeightPt = heightPt - 2 * marginPt;
 
-  // Header and footer reservations
-  const headerHeightPt = 44;
-  const footerHeightPt = 32;
+  // Header and footer reservations:
+  // Reclaimed unused vertical space from page bottom to give breathing room at top
+  const headerHeightPt = 42;
+  const footerHeightPt = 18;
   const bodyHeightPt = printableHeightPt - headerHeightPt - footerHeightPt;
 
   const colsPerPage = Math.max(1, options.columnsPerPage);
   const totalGaps = colsPerPage - 1;
   const columnWidthPt = (printableWidthPt - totalGaps * columnGapPt) / colsPerPage;
 
-  // Column internal geometry
-  const colHeaderHeightPt = 16;
+  // Column internal geometry: generous 28pt top clearance for classical accolade & octave badges
+  const colHeaderHeightPt = 36;
   const contentHeightPt = bodyHeightPt - colHeaderHeightPt;
 
   // Slicing into columns
@@ -381,8 +408,8 @@ export function renderPageToSvg(
   const colWidthPt = layout.columnDimensions.widthPt;
 
   const headerHeightPt = 42;
-  const footerHeightPt = 22;
-  const colHeaderHeightPt = 16;
+  const footerHeightPt = 18;
+  const colHeaderHeightPt = 36;
   const colTopPt = marginPt + headerHeightPt;
 
   const colMarginLeftPt = 22;
@@ -450,13 +477,20 @@ export function renderPageToSvg(
           // Tasteful center anchor badge for o3
           svgParts.push(`    <rect x="${(px - 9.5).toFixed(2)}" y="${(colTopPt + 2.5).toFixed(2)}" width="19" height="9.5" rx="2" fill="#111827"/>`);
           svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 9.5).toFixed(2)}" font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>`);
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#111827" stroke-width="1.25"/>`);
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + 19).toFixed(2)}" stroke="#111827" stroke-width="1.25"/>`);
         } else {
           svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">o${displayOct}</text>`);
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#888888" stroke-width="0.6"/>`);
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + 22).toFixed(2)}" stroke="#888888" stroke-width="0.6"/>`);
         }
       }
     }
+
+    // Classical Urtext System Accolade (Curly Brace) tying o1 to o5 across the 4-octave register
+    const xO1 = colStaffLeftPt + (24 - minPitch) * ptPerSemitone;
+    const xO5 = colStaffLeftPt + (72 - minPitch) * ptPerSemitone;
+    const accoladeY = colTopPt + 23;
+    svgParts.push(`    <!-- Classical Urtext System Accolade (Curly Brace) tying o1 to o5 -->`);
+    svgParts.push(`    <path d="${getClassicalAccoladePath(xO1, xO5, accoladeY, 4.2, 1.25)}" fill="#111827"/>`);
 
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
@@ -561,13 +595,24 @@ export function renderPageToSvg(
     for (let m = 0; m <= numMeasuresInCol; m++) {
       const barY = staffOriginY + m * ticksPerMeasure * ptPerTick;
 
-      // Barline across staff
-      svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
+      // Barline across staff: only between measures (m > 0).
+      // m === 0 is anchored by the classical system accolade and must not bisect the opening sounds!
+      if (m > 0) {
+        svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
+      }
 
       // Measure number label: only for the first bar of each column, centered in left margin clear of m1 and column boundary
       if (m === 0) {
         const measureNumX = colLeftPt + colMarginLeftPt / 2;
         svgParts.push(`    <text x="${measureNumX.toFixed(2)}" y="${(staffOriginY + 12).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
+
+        // If this is the start of the piece (Measure 1 in Column 1), engrave the classical time signature!
+        if (col.startMeasure === 1) {
+          const numBeats = score.timeSignatures?.[0]?.numerator || 3;
+          const beatUnit = score.timeSignatures?.[0]?.denominator || 4;
+          svgParts.push(`    <text x="${measureNumX.toFixed(2)}" y="${(staffOriginY + 22).toFixed(2)}" class="time-sig" font-family='${URTEXT_SERIF}' font-weight="bold" font-size="9pt" fill="#111827" text-anchor="middle">${numBeats}</text>`);
+          svgParts.push(`    <text x="${measureNumX.toFixed(2)}" y="${(staffOriginY + 31).toFixed(2)}" class="time-sig" font-family='${URTEXT_SERIF}' font-weight="bold" font-size="9pt" fill="#111827" text-anchor="middle">${beatUnit}</text>`);
+        }
       }
     }
 
@@ -757,32 +802,46 @@ export function renderPageToSvg(
 
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const isEven = wholeToneParity(lPitch) === 0;
+        const cyOpt = ny - 0.55;
+        const rKnockout = 4.80;
+        const baseGeom = getStaffLineGeometry(lPitch, normStaffStyle);
+        const isOnStaffLine = baseGeom.isLine;
+        const isBold = isOnStaffLine && (lPitch === 48);
         const nh = morph === 'phonetic' ? 8.5 : morph === 'duodecimal' ? 8.4 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
-        const trailStartY = ny + nh / 2 + 2;
+
+        const trailStartY = isOnStaffLine ? (cyOpt + rKnockout) : (ny + nh / 2 + 2);
         const rawReleaseY = ny + note.durationTicks * ptPerTick;
         const trailEndY = Math.min(rawReleaseY, staffEndY);
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
-        const baseGeom = getStaffLineGeometry(lPitch, normStaffStyle);
-        const isOnStaffLine = baseGeom.isLine;
-        const isBold = isOnStaffLine && (lPitch === 48);
-
-        let intervals: [number, number][] = [[trailStartY, trailEndY]];
-
-        for (const obs of obstacles) {
-          if (obs.noteId !== note.id) {
-            if (nx >= obs.x1 && nx <= obs.x2) {
+        if (isOnStaffLine) {
+          // On staff lines, the hold line colors the staff line continuously for the note's duration.
+          // It starts flush with the circular knockout of the notehead and continues until release or the next note on the same pitch.
+          let endHoldY = trailEndY;
+          const subsequentNote = col.notes.find(
+            n => displayPitchMap.get(n.id) === lPitch && n.startTick > note.startTick && n.startTick < note.startTick + note.durationTicks
+          );
+          if (subsequentNote) {
+            const subCoord = noteCoordMap.get(subsequentNote.id);
+            if (subCoord) {
+              endHoldY = Math.min(endHoldY, subCoord.ny);
+            }
+          }
+          if (endHoldY - trailStartY >= 1.5) {
+            const strokeW = isBold ? '1.35' : '0.65';
+            svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${endHoldY.toFixed(2)}" stroke="${noteColor}" stroke-width="${strokeW}" stroke-linecap="butt"/>`);
+          }
+        } else {
+          // In open space:
+          let intervals: [number, number][] = [[trailStartY, trailEndY]];
+          for (const obs of obstacles) {
+            if (obs.noteId !== note.id && nx >= obs.x1 && nx <= obs.x2) {
               intervals = subtractInterval(intervals, obs.y1, obs.y2);
             }
           }
-        }
-
-        for (let i = 0; i < intervals.length; i++) {
-          const [segY1, segY2] = intervals[i];
-          if (segY2 - segY1 >= 1.5) {
-            // Staff lines are permanent, continuous reference lines and must NEVER be overwritten or interrupted by hold lines.
-            // Hold lines are rendered only in open space (when not on a staff line).
-            if (!isOnStaffLine) {
+          for (let i = 0; i < intervals.length; i++) {
+            const [segY1, segY2] = intervals[i];
+            if (segY2 - segY1 >= 1.5) {
               svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
             }
           }
@@ -833,6 +892,12 @@ export function renderPageToSvg(
         const r = 4.80;
         const cyOpt = ny - 0.55;
 
+        // Position of Honor for opening sound(s) of the composition (tick 0 in Measure 1)
+        const isOpeningSound = note.startTick === 0;
+        if (isOpeningSound) {
+          svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${cyOpt.toFixed(2)}" r="6.20" fill="none" stroke="${noteColor}" stroke-width="0.75"/>`);
+        }
+
         // White circular line knockout so staff and beat lines do not cut through the digit.
         // Optically centered at cyOpt with r = 4.80 to ensure a consistent, balanced ~2.5pt protective halo above and below.
         svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${cyOpt.toFixed(2)}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`);
@@ -843,19 +908,21 @@ export function renderPageToSvg(
 
         // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
         if (isHandException) {
-          const gw = 1.4;
-          const gh = 2.4;
-          const gThick = 0.55;
+          const h = 2.8;
+          const w = 1.7;
+          const clr = 1.0;
+          const thick = 0.80;
           const gCy = ny - 0.55;
-          let bx = hand === 'LH' ? nx - 2.2 : nx + 2.2;
-          let ax = hand === 'LH' ? bx - gw : bx + gw;
-          let ctrlX = hand === 'LH' ? bx - gw * 0.30 : bx + gw * 0.30;
-          const ty = gCy - gh / 2;
-          const by = gCy + gh / 2;
-          const inAx = hand === 'LH' ? ax + gThick : ax - gThick;
-          const inCtrlX = hand === 'LH' ? ctrlX + gThick * 0.45 : ctrlX - gThick * 0.45;
 
-          const path = `M ${bx.toFixed(2)} ${ty.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(gCy - gh * 0.22).toFixed(2)} ${ax.toFixed(2)} ${gCy.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(gCy + gh * 0.22).toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(gCy + gh * 0.16).toFixed(2)} ${inAx.toFixed(2)} ${gCy.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(gCy - gh * 0.16).toFixed(2)} ${bx.toFixed(2)} ${ty.toFixed(2)} Z`;
+          let bx = hand === 'LH' ? nx - r - clr : nx + r + clr;
+          let ax = hand === 'LH' ? bx - w : bx + w;
+          let ctrlX = hand === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
+          const ty = gCy - h / 2;
+          const by = gCy + h / 2;
+          const inAx = hand === 'LH' ? ax + thick : ax - thick;
+          const inCtrlX = hand === 'LH' ? ctrlX + thick * 0.45 : ctrlX - thick * 0.45;
+
+          const path = `M ${bx.toFixed(2)} ${ty.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(gCy - h * 0.22).toFixed(2)} ${ax.toFixed(2)} ${gCy.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(gCy + h * 0.22).toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(gCy + h * 0.16).toFixed(2)} ${inAx.toFixed(2)} ${gCy.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(gCy - h * 0.16).toFixed(2)} ${bx.toFixed(2)} ${ty.toFixed(2)} Z`;
 
           // Clean sculpted French guillemet without noisy white halo
           svgParts.push(`    <path d="${path}" fill="${noteColor}"/>`);
@@ -964,7 +1031,7 @@ export function renderPageToSvg(
   // 4. Page Footer
   svgParts.push(`  <!-- Page Footer -->`);
   svgParts.push(`  <g id="page-footer">`);
-  svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(heightPt - marginPt - 16).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(heightPt - marginPt - 16).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.75"/>`);
+  svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(heightPt - marginPt - 14).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(heightPt - marginPt - 14).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.75"/>`);
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta">Pure 12-TET Columnar Engraving</text>`);
   svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta" text-anchor="end" font-weight="bold">Page ${page.pageNumber} of ${page.totalPages}</text>`);
   svgParts.push(`  </g>`);

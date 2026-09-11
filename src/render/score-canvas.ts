@@ -889,14 +889,22 @@ export function renderScoreToCanvas(
           }
         }
 
-        for (const [segX1, segX2] of intervals) {
-          if (segX2 - segX1 >= 1.5) {
-            ctx.save();
-            ctx.setLineDash([]);
-
-            // Staff lines are permanent reference lines and must NEVER be overwritten or interrupted by hold lines.
-            // Hold lines are rendered only in open space (when not on a staff line).
-            if (!isOnStaffLine) {
+        if (isOnStaffLine) {
+          ctx.save();
+          ctx.setLineDash([]);
+          ctx.lineCap = 'butt';
+          ctx.lineWidth = isBold ? 2.0 : 0.9;
+          ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+          ctx.beginPath();
+          ctx.moveTo(trailStartX, cy);
+          ctx.lineTo(trailEndX, cy);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          for (const [segX1, segX2] of intervals) {
+            if (segX2 - segX1 >= 1.5) {
+              ctx.save();
+              ctx.setLineDash([]);
               ctx.lineCap = 'round';
               ctx.lineWidth = 0.8;
               ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
@@ -904,9 +912,8 @@ export function renderScoreToCanvas(
               ctx.moveTo(segX1, cy);
               ctx.lineTo(segX2, cy);
               ctx.stroke();
+              ctx.restore();
             }
-
-            ctx.restore();
           }
         }
       }
@@ -970,14 +977,22 @@ export function renderScoreToCanvas(
           }
         }
 
-        for (const [segY1, segY2] of intervals) {
-          if (segY2 - segY1 >= 1.5) {
-            ctx.save();
-            ctx.setLineDash([]);
-
-            // Staff lines are permanent reference lines and must NEVER be overwritten or interrupted by hold lines.
-            // Hold lines are rendered only in open space (when not on a staff line).
-            if (!isOnStaffLine) {
+        if (isOnStaffLine) {
+          ctx.save();
+          ctx.setLineDash([]);
+          ctx.lineCap = 'butt';
+          ctx.lineWidth = isBold ? 2.0 : 0.9;
+          ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+          ctx.beginPath();
+          ctx.moveTo(cx, trailStartY);
+          ctx.lineTo(cx, trailEndY);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          for (const [segY1, segY2] of intervals) {
+            if (segY2 - segY1 >= 1.5) {
+              ctx.save();
+              ctx.setLineDash([]);
               ctx.lineCap = 'round';
               ctx.lineWidth = 0.8;
               ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
@@ -985,15 +1000,25 @@ export function renderScoreToCanvas(
               ctx.moveTo(cx, segY1);
               ctx.lineTo(cx, segY2);
               ctx.stroke();
+              ctx.restore();
             }
-
-            ctx.restore();
           }
         }
       }
 
       const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
       const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+
+      // Position of Honor for opening sound(s) of the piece (tick 0)
+      if (note.startTick === 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy - 0.8, 8.8, 0, Math.PI * 2);
+        ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+      }
 
       renderNotehead(
         ctx,
@@ -1357,12 +1382,12 @@ export function renderNotehead(
 
       // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
       if (handException !== null) {
-        const h = 4.4;
-        const w = 2.4;
-        const clr = 3.6;
-        const thick = 0.9;
+        const h = 5.6;
+        const w = 3.4;
+        const clr = 2.0;
+        const thick = 1.6;
 
-        let bx = handException === 'LH' ? cx - clr : cx + clr;
+        let bx = handException === 'LH' ? cx - r - clr : cx + r + clr;
         let ax = handException === 'LH' ? bx - w : bx + w;
         let ctrlX = handException === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
         const ty = cyOpt - h / 2;

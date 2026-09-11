@@ -130,22 +130,31 @@ The user has selected the definitive combination:
    - Loaded locally in the web client via bundled `@font-face` (`public/fonts/URWGothic-Book.otf` and `URWGothic-Demi.otf`).
 2. **Tokens**: Strictly **lowercase** `a` and `b` (`0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b`).
 3. **Handedness Indicator**: **Sculpted French Guillemet (`«`, `»`)**.
-   - Elegant, perfectly symmetric quadratic concave flanks with optical waist swelling ($0.65\text{pt}$ / $1.3\text{px}$) tapering cleanly to delicate needle finials.
+   - Elegant, perfectly symmetric quadratic concave flanks with optical waist swelling ($0.80\text{pt}$ / $1.6\text{px}$) tapering cleanly to delicate needle finials.
    - For LH (`«`): opens toward the notehead on the left.
    - For RH (`»`): opens toward the notehead on the right.
-   - Features a clean underlay knockout preventing staff and grid line interference.
+   - Rendered as pure vector fill without noisy white stroke halo outline, preventing triple-layer cuts into neighboring staff lines.
+4. **Classical System Accolade & Incipit Position of Honor**:
+   - Copperplate Urtext curly brace spanning horizontally across o1–o5 at the top of each column.
+   - Noble concentric halo ring framing the opening sounds at tick 0 in Measure 1.
+   - Classical $\mathbf{3}\atop\mathbf{4}$ time signature engraved in the left margin.
+5. **Sensible Continuous Staff Line Holds**:
+   - Hold lines on staff lines continuously color the line in duration hue without white voids or blue-black stutter.
 
 ---
 
 ## 7. Definitive Score Renders
 
-### Measure 1–2 (Opening Theme):
+### Measure 1–2 (Accolade, Time Signature 3/4, Opening Position of Honor):
 ![Definitive mm. 1-2](img/definitive_m1_m2.png)
 
-### Measure 4 (RH Crossing Note `9 >`):
+### Measure 4 (RH Crossing Note Sequence `9 ›`, `7 ›`, `6 ›`, `9 ›`, `0 ›`):
 ![Definitive m. 4](img/definitive_m4.png)
 
-### Measure 30 (LH Rapid Crossing Arpeggio with `< 2` and `b`):
+### Measure 6 (Sensible Continuous Hold Lines on Middle C and o4 Staff Lines):
+![Definitive m. 6](img/definitive_m6.png)
+
+### Measure 30 (LH Rapid Crossing Arpeggio with `‹ 2` and `b`):
 ![Definitive m. 30](img/definitive_m30.png)
 
 ---
