@@ -35,6 +35,49 @@ export function subtractInterval(
   return result;
 }
 
+/**
+ * Generates an SVG path string for a directional baked notehead pentagon.
+ * For LH: pointer tip extends to the left (x_apex = bx - tip), flat back on right.
+ * For RH: pointer tip extends to the right (x_apex = bx + nw + tip), flat back on left.
+ */
+export function getBakedPath(
+  bx: number,
+  by: number,
+  nw: number,
+  nh: number,
+  ny: number,
+  hand: 'RH' | 'LH',
+  tip: number = 2.4,
+  rx: number = 1.2
+): string {
+  if (hand === 'LH') {
+    // Pointing left: flat back on right (bx + nw)
+    const rightX = bx + nw;
+    const apexX = bx - tip;
+    return `M ${(rightX - rx).toFixed(2)} ${by.toFixed(2)} ` +
+      `L ${bx.toFixed(2)} ${by.toFixed(2)} ` +
+      `L ${apexX.toFixed(2)} ${ny.toFixed(2)} ` +
+      `L ${bx.toFixed(2)} ${(by + nh).toFixed(2)} ` +
+      `L ${(rightX - rx).toFixed(2)} ${(by + nh).toFixed(2)} ` +
+      `A ${rx} ${rx} 0 0 0 ${rightX.toFixed(2)} ${(by + nh - rx).toFixed(2)} ` +
+      `L ${rightX.toFixed(2)} ${(by + rx).toFixed(2)} ` +
+      `A ${rx} ${rx} 0 0 0 ${(rightX - rx).toFixed(2)} ${by.toFixed(2)} Z`;
+  } else {
+    // Pointing right: flat back on left (bx)
+    const rightX = bx + nw;
+    const apexX = rightX + tip;
+    return `M ${(bx + rx).toFixed(2)} ${by.toFixed(2)} ` +
+      `L ${rightX.toFixed(2)} ${by.toFixed(2)} ` +
+      `L ${apexX.toFixed(2)} ${ny.toFixed(2)} ` +
+      `L ${rightX.toFixed(2)} ${(by + nh).toFixed(2)} ` +
+      `L ${(bx + rx).toFixed(2)} ${(by + nh).toFixed(2)} ` +
+      `A ${rx} ${rx} 0 0 1 ${bx.toFixed(2)} ${(by + nh - rx).toFixed(2)} ` +
+      `L ${bx.toFixed(2)} ${(by + rx).toFixed(2)} ` +
+      `A ${rx} ${rx} 0 0 1 ${(bx + rx).toFixed(2)} ${by.toFixed(2)} Z`;
+  }
+}
+
+
 export interface PrintLayoutOptions {
   paperSize?: 'A4' | 'A3';
   orientation?: 'portrait' | 'landscape';
@@ -643,7 +686,7 @@ export function renderPageToSvg(
       noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
     }
 
-    // Collect all obstacles in the column (noteheads and handedness chevrons)
+    // Collect all obstacles in the column (noteheads incorporating baked pointer tips)
     interface PrintObstacle {
       noteId: string;
       x1: number;
@@ -657,6 +700,9 @@ export function renderPageToSvg(
       const lPitch = displayPitchMap.get(note.id)!;
       const rawLPitch = linearIndex(note.pitch);
       const isEven = wholeToneParity(lPitch) === 0;
+
+      const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
+      const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
 
       let nw: number;
       let nh: number;
@@ -675,43 +721,26 @@ export function renderPageToSvg(
         nh = isEven ? 6.0 : 5.8;
       }
 
-      // 1. Notehead obstacle:
-      // X span [nx - nw / 2 - 1.0, nx + nw / 2 + 1.0], Y span [ny - nh / 2 - 2.0, ny + nh / 2 + 2.0]
+      const bx = nx - nw / 2;
+      const tip = 2.4;
+
+      let x1 = bx - 1.0;
+      let x2 = bx + nw + 1.0;
+      if (isHandException) {
+        if (hand === 'LH') {
+          x1 = bx - tip - 2.0;
+        } else {
+          x2 = bx + nw + tip + 2.0;
+        }
+      }
+
       obstacles.push({
         noteId: note.id,
-        x1: nx - nw / 2 - 1.0,
-        x2: nx + nw / 2 + 1.0,
+        x1,
+        x2,
         y1: ny - nh / 2 - 2.0,
         y2: ny + nh / 2 + 2.0,
       });
-
-      // 2. Handedness chevron obstacle:
-      const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
-      const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
-      if (isHandException) {
-        const halfW = nw / 2;
-        const w = 3.2;
-        const h = 5.2;
-        const clearance = 1.5;
-
-        let apexX: number;
-        let baseX: number;
-        if (hand === 'LH') {
-          apexX = nx - halfW - clearance - w;
-          baseX = nx - halfW - clearance;
-        } else {
-          apexX = nx + halfW + clearance + w;
-          baseX = nx + halfW + clearance;
-        }
-
-        obstacles.push({
-          noteId: note.id,
-          x1: Math.min(baseX, apexX) - 1.5,
-          x2: Math.max(baseX, apexX) + 1.5,
-          y1: ny - h / 2 - 2.5,
-          y2: ny + h / 2 + 2.5,
-        });
-      }
     }
 
     // Notes: Solid Thin Hold Lines with Obstacle Interruption (durationTicks > tauRef)
@@ -763,47 +792,25 @@ export function renderPageToSvg(
       const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
       const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
 
-      // Handedness indicators: Tasteful chevrons (< for LH, > for RH)
-      // Middle C (m3, linear pitch 48) is neutral (no indicator).
       if (isHandException) {
-        let nw: number;
-        if (morph === 'phonetic') {
-          nw = 15.0;
-        } else if (
-          morph === 'rectangle-square' ||
-          morph === 'square-ellipse' ||
-          morph === 'square-triangle'
-        ) {
-          nw = 7.5;
+        const nw = 7.5;
+        const nh = 5.6;
+        const bx = nx - nw / 2;
+        const by = ny - nh / 2;
+        const tip = 2.4;
+        const bakedPath = getBakedPath(bx, by, nw, nh, ny, hand, tip, 1.2);
+        const isRow0 = isEven;
+
+        // White knockout path
+        svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>`);
+        if (isRow0) {
+          // Row 0: Solid directional pentagon
+          svgParts.push(`    <path d="${bakedPath}" fill="${noteColor}" stroke="${noteColor}" stroke-width="0.5" stroke-linejoin="round"/>`);
         } else {
-          nw = isEven ? 10.4 : 8.6;
+          // Row 1: Hollow directional pentagon
+          svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3" stroke-linejoin="round"/>`);
         }
-
-        const halfW = nw / 2;
-        const w = 3.2;
-        const h = 5.2;
-        const clearance = 1.5;
-
-        let apexX: number;
-        let baseX: number;
-        if (hand === 'LH') {
-          apexX = nx - halfW - clearance - w;
-          baseX = nx - halfW - clearance;
-        } else {
-          apexX = nx + halfW + clearance + w;
-          baseX = nx + halfW + clearance;
-        }
-        const topY = ny - h / 2;
-        const botY = ny + h / 2;
-        const apexY = ny;
-
-        // White halo knockout underlay
-        svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`);
-        // Colored chevron
-        svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>`);
-      }
-
-      if (morph === 'phonetic') {
+      } else if (morph === 'phonetic') {
         const pc = ((lPitch % 12) + 12) % 12;
         const syllable = getCanonicalSyllable(pc);
         const pw = 15.0;
@@ -831,14 +838,7 @@ export function renderPageToSvg(
           svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
         } else {
           // Row 1: Empty (Hollow) squished square (in whole-tone spaces)
-          const isRedNote = (note.durationTicks / tauRef) >= 8.0;
-          if (isRedNote) {
-            // Red note (d >= 96t / ratio >= 8.0): faint tint fill (~18% opacity) inside hollow notehead
-            svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}" fill-opacity="0.18" stroke="${noteColor}" stroke-width="1.3"/>`);
-          } else {
-            // Notes with d < 96t (covering 16ths, 8ths, dotted 8ths, quarters): 100% void / transparent interior
-            svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
-          }
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
         }
       } else {
         const rx = 5.2;
