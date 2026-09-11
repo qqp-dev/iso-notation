@@ -294,11 +294,12 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
     `Ellipse area (${ellipseArea.toFixed(2)}) and brick area (${brickArea.toFixed(2)}) must match within 5%`
   );
 
-  // Klavar Lateral Stems Invariant:
-  // RH notes have stems pointing right (x2 > x1), LH notes have stems pointing left (x2 < x1)
-  // Lateral stems are center-aligned with notehead (y1 === ny and y2 === ny) with length >= 16pt
+  // Klavar Lateral Stems Invariant (Handedness symmetry around m3):
+  // Default territory (RH >= 60, LH < 60) renders NO stem (clean noteheads).
+  // Exceptions render lateral stems: RH < 60 points right (x2 > x1), LH >= 60 points left (x2 < x1).
+  // Lateral stems are center-aligned with notehead (y1 === ny and y2 === ny) with length >= 16pt.
   const stemMatches = Array.from(svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="0\.6" stroke-linecap="round"/g));
-  assert.ok(stemMatches.length > 0, 'Must find lateral stems in SVG');
+  assert.ok(stemMatches.length > 0, 'Must find lateral stems in SVG for crossing exceptions');
 
   stemMatches.forEach((m) => {
     const len = Math.abs(Number(m[3]) - Number(m[1]));
@@ -307,6 +308,7 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
   });
 
   // Verify center alignment with notehead center coordinate (y1 === ny)
+  // First note with stem on Page 0 is note 1 (RH at tick 0, linear 55 < 60)
   const firstNote = layout.columns[0].notes[0];
   const firstNoteStaffOriginY = 10 * (72 / 25.4) + 42 + 16;
   const firstNoteExpectedNy = firstNoteStaffOriginY + (firstNote.startTick - layout.columns[0].startTick) * layout.ptPerTick;
@@ -316,8 +318,38 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
   const rhStems = stemMatches.filter((m) => Number(m[3]) > Number(m[1]));
   const lhStems = stemMatches.filter((m) => Number(m[3]) < Number(m[1]));
 
-  assert.ok(rhStems.length > 0, 'SVG must contain right-pointing lateral stems for RH notes');
-  assert.ok(lhStems.length > 0, 'SVG must contain left-pointing lateral stems for LH notes');
+  assert.ok(rhStems.length > 0, 'SVG must contain right-pointing lateral stems for RH notes in bass');
+  assert.equal(lhStems.length, 0, 'SVG must contain zero LH stems in Var 1 as LH never crosses above m3');
+
+  // Verify SVG print engine with explicit hand crossings in both directions:
+  const handednessTestScore: QuantizedGridScore = {
+    id: 'handedness-svg-test',
+    title: 'Handedness SVG Test',
+    composer: 'Test',
+    ticksPerBeat: 48,
+    gridResolution: 12,
+    totalTicks: 48,
+    timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes: [
+      { id: 'rh-default', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 60 >= 60 -> default, no stem
+      { id: 'lh-default', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 < 60 -> default, no stem
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 < 60 -> exception, right stem
+      { id: 'lh-exception', pitch: { pitchClass: 5, octave: 5 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 65 >= 60 -> exception, left stem
+    ],
+  };
+
+  const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0);
+  const testStems = Array.from(testSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="0\.6" stroke-linecap="round"/g));
+  assert.equal(testStems.length, 2, 'SVG must render lateral stems strictly for the 2 exception notes');
+
+  const testRh = testStems.filter((m) => Number(m[3]) > Number(m[1]));
+  const testLh = testStems.filter((m) => Number(m[3]) < Number(m[1]));
+  assert.equal(testRh.length, 1, 'RH exception (< 60) must render right-pointing lateral stem in SVG');
+  assert.equal(testLh.length, 1, 'LH exception (>= 60) must render left-pointing lateral stem in SVG');
 });
 
 test('A4 Print Dimensions & Page Margins Invariant', () => {
@@ -495,8 +527,11 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   // Full Squished Squares for Row 0 (width="7.50" height="5.60" fill!=#FFFFFF)
   assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="(?!#FFFFFF)/, 'Must render full solid squished square noteheads for Row 0');
 
-  // Empty Squished Squares for Row 1 (width="7.50" height="5.60" fill="#FFFFFF" with stroke)
-  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke=/, 'Must render empty hollow squished square noteheads for Row 1');
+  // Empty Squished Squares for Row 1 (width="7.50" height="5.60" fill="#FFFFFF" with stroke for 16th notes)
+  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke=/, 'Must render empty hollow squished square noteheads for Row 1 16th notes');
+
+  // Colored Hollow Squished Squares for Row 1 (fill-opacity="0.18" faint tint)
+  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill-opacity="0\.18"[^>]*stroke=/, 'Must render faint tint wash (fill-opacity="0.18") inside colored hollow noteheads for Row 1');
 
   // Zero ellipses
   assert.doesNotMatch(svg, /<ellipse/, 'Zero ellipses should be rendered when using rectangle-square morphology');

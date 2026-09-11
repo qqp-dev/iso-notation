@@ -634,9 +634,18 @@ export function renderPageToSvg(
       noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
     }
 
-    // Notes: Faint Dotted Continuation Trails for Long Notes (d > ticksPerBeat)
+    // Notes: Faint Dotted Continuation Trails for Long Notes (d >= ticksPerBeat with concurrent onsets)
     for (const note of col.notes) {
-      if (note.durationTicks > ticksPerBeat) {
+      const showTrail =
+        note.durationTicks >= ticksPerBeat &&
+        score.notes.some(
+          other =>
+            other.id !== note.id &&
+            other.startTick > note.startTick &&
+            other.startTick < note.startTick + note.durationTicks
+        );
+
+      if (showTrail) {
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const lPitch = displayPitchMap.get(note.id)!;
         const isEven = wholeToneParity(lPitch) === 0;
@@ -711,11 +720,14 @@ export function renderPageToSvg(
       const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (rawLPitch >= 60 ? 'RH' : 'LH');
+      const isStemException = (hand === 'RH' && rawLPitch < 60) || (hand === 'LH' && rawLPitch >= 60);
 
-      // Klavar lateral stem (flush to beam rail if clustered, standard length otherwise)
-      const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
-      const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
-      svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
+      // Klavar lateral stem: symmetry around m3 (indicate only exceptions)
+      if (isStemException) {
+        const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
+        const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
+        svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
+      }
 
       if (morph === 'phonetic') {
         const pc = ((lPitch % 12) + 12) % 12;
@@ -745,7 +757,13 @@ export function renderPageToSvg(
           svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
         } else {
           // Row 1: Empty (Hollow) squished square (in whole-tone spaces)
-          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
+          if (note.durationTicks > tauRef) {
+            // Colored note: faint wash (~18% opacity) inside hollow notehead
+            svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}" fill-opacity="0.18" stroke="${noteColor}" stroke-width="1.3"/>`);
+          } else {
+            // 16th note (d <= tauRef): 100% void / transparent interior
+            svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
+          }
         }
       } else {
         const rx = 5.2;

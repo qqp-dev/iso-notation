@@ -14,7 +14,7 @@ import {
   getLogarithmicDurationColor,
   RenderOptions,
 } from '../src/render/types';
-import { QuantizedNote } from '../src/model/types';
+import { QuantizedNote, QuantizedGridScore } from '../src/model/types';
 import { wholeToneParity } from '../src/model/pitch';
 import { computeBeamClusters } from '../src/model/grid';
 import { getNoteColor } from '../src/render/colors';
@@ -505,17 +505,20 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
     currentTick: 0,
   });
 
-  // Filter horizontal lateral stems (y1 === y2 and x1 !== x2)
-  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20);
-  assert.ok(lateralStems.length > 0, 'Must have rendered Klavar lateral stems for notes');
+  // Filter horizontal lateral stems (y1 === y2, x1 !== x2, within lateral stem length range)
+  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
 
-  // Verify that notes with RH have right-pointing stems (x2 > x1)
-  // and notes with LH have left-pointing stems (x2 < x1)
+  // In Bach Goldberg Var 1, keyboard symmetry around m3 means:
+  // - 412 notes in default territory (RH >= 60, LH < 60) have ZERO lateral stems (clean noteheads)
+  // - Exactly 139 notes where RH crosses into bass (< 60) have right-pointing lateral stems (x2 > x1)
+  assert.equal(lateralStems.length, 139, 'Must render lateral stems ONLY for exceptions (139 in Goldberg Var 1)');
+
   const rhStems = lateralStems.filter((s) => s.x2 > s.x1);
   const lhStems = lateralStems.filter((s) => s.x2 < s.x1);
 
-  assert.ok(rhStems.length > 0, 'Must have right-pointing lateral stems for Right Hand (RH)');
-  assert.ok(lhStems.length > 0, 'Must have left-pointing lateral stems for Left Hand (LH)');
+  assert.equal(rhStems.length, 139, 'All 139 crossing notes must have right-pointing stems for RH in bass');
+  assert.equal(lhStems.length, 0, 'Zero LH stems in Goldberg Var 1 as LH never crosses above m3');
+
   lateralStems.forEach((s) => {
     assert.ok(Math.abs(s.x2 - s.x1) >= 20, 'Stem must extend at least 20px from note center');
   });
@@ -524,6 +527,84 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   const firstStem = lateralStems[0];
   const paddingStart = 60;
   assert.equal(firstStem.y1, paddingStart, 'Stem must be center-aligned at cy === y');
+
+  // Verify full m3 symmetry exception logic with both RH (<60) and LH (>=60) crossings:
+  const symmetryTestScore: QuantizedGridScore = {
+    id: 'handedness-symmetry-test',
+    title: 'Handedness Symmetry Test',
+    composer: 'Test',
+    ticksPerBeat: 48,
+    gridResolution: 12,
+    totalTicks: 48,
+    timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes: [
+      { id: 'rh-default', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 60 >= 60 -> default, no stem
+      { id: 'lh-default', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 < 60 -> default, no stem
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 < 60 -> exception, right stem
+      { id: 'lh-exception', pitch: { pitchClass: 5, octave: 5 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 65 >= 60 -> exception, left stem
+    ],
+  };
+
+  const symmetryLines: { x1: number; y1: number; x2: number; y2: number; stroke: string }[] = [];
+  const symCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      (symCtx as any)._startX = x;
+      (symCtx as any)._startY = y;
+    },
+    lineTo: (x: number, y: number) => {
+      symmetryLines.push({
+        x1: (symCtx as any)._startX,
+        y1: (symCtx as any)._startY,
+        x2: x,
+        y2: y,
+        stroke: String(symCtx.strokeStyle),
+      });
+    },
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(symCtx, symmetryTestScore, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: false,
+    currentTick: 0,
+  });
+
+  const symStems = symmetryLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
+  assert.equal(symStems.length, 2, 'Exactly 2 stems must be rendered for the 2 exception notes');
+
+  const symRh = symStems.filter((s) => s.x2 > s.x1);
+  const symLh = symStems.filter((s) => s.x2 < s.x1);
+  assert.equal(symRh.length, 1, 'RH exception (< 60) must render right-pointing stem');
+  assert.equal(symLh.length, 1, 'LH exception (>= 60) must render left-pointing stem');
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
@@ -1148,8 +1229,8 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
     },
     stroke: () => {
       if (currentPathStart && currentPathEnd) {
-        // Horizontal line for lateral stems: y1 === y2 and length > 0
-        if (currentPathStart.y === currentPathEnd.y && currentPathStart.x !== currentPathEnd.x) {
+        // Horizontal line for lateral stems: y1 === y2 and length > 0 (excluding full-width playhead)
+        if (currentPathStart.y === currentPathEnd.y && currentPathStart.x !== currentPathEnd.x && Math.abs(currentPathEnd.x - currentPathStart.x) < 100) {
           lateralStems.push({
             x1: currentPathStart.x,
             y1: currentPathStart.y,
@@ -1228,8 +1309,10 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   // Quarter notes (Amber #F59E0B)
   assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
 
-  // Klavar lateral stems rendered for all notes
-  assert.ok(lateralStems.length >= regularNotes.length, 'Every note must have a lateral stem');
+  // Handedness stems: symmetry around m3 (indicate only exceptions)
+  // In Goldberg Var 1, 412 notes in default territory (RH >= 60, LH < 60) have zero stems,
+  // while the 139 notes where RH crosses into bass (< 60) have right-pointing lateral stems.
+  assert.equal(lateralStems.length, 139, 'Only hand crossing exception notes (139 in Var 1) render lateral stems');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1253,10 +1336,10 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   );
 });
 
-test('Unified Euclidean Duration Lattice: Faint Dotted Long-Note Trails Invariant (d > ticksPerBeat)', () => {
+test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails Invariant (d >= ticksPerBeat with concurrent onsets)', () => {
   const score = buildBachGoldbergVar1Score();
 
-  interface DottedTrail {
+  type DottedTrail = {
     x1: number;
     y1: number;
     x2: number;
@@ -1265,7 +1348,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Long-Note Trails Invarian
     lineWidth: number;
     alpha: number;
     dash: number[];
-  }
+  };
 
   const createMock = (
     dottedTrails: DottedTrail[],
@@ -1366,9 +1449,18 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Long-Note Trails Invarian
   const paddingPitch = 40;
 
   const ticksPerBeat = score.ticksPerBeat || 48;
-  const longNotes = score.notes.filter((n) => n.durationTicks > ticksPerBeat);
-  assert.equal(longNotes.length, 1, 'Goldberg Var 1 must contain exactly 1 long note (Bar 20 sustain)');
-  const longNote = longNotes[0];
+  const polyLongNotes = score.notes.filter(
+    (n) =>
+      n.durationTicks >= ticksPerBeat &&
+      score.notes.some(
+        (other) =>
+          other.id !== n.id &&
+          other.startTick > n.startTick &&
+          other.startTick < n.startTick + n.durationTicks
+      )
+  );
+  assert.equal(polyLongNotes.length, 2, 'Goldberg Var 1 contains exactly 2 notes with d >= ticksPerBeat and concurrent onsets');
+  const longNote = score.notes.find((n) => n.durationTicks === 108)!;
 
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
   let minPitch = Math.min(...indices) - 2;
@@ -1396,14 +1488,16 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Long-Note Trails Invarian
   // Zero hold ribbon rects
   assert.equal(verticalRibbons.length, 0, 'Vertical hold ribbons must be 0');
 
-  // Dotted continuation trail rendered strictly for the long note
+  // Dotted continuation trail rendered strictly for the notes with concurrent onsets
+  // (bach-var1-116 and bach-var1-343), while cadence quarter notes (282, 550, 551) have zero trails
   assert.equal(
     verticalDottedTrails.length,
-    1,
-    'Must render exactly 1 faint dotted trail for the 108t long note'
+    2,
+    'Must render exactly 2 faint dotted trails for notes with d >= ticksPerBeat and concurrent onsets'
   );
 
-  const vTrail = verticalDottedTrails[0];
+  const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
+  assert.ok(vTrail, 'Must find trail for 108t pedal note');
   assert.deepEqual(vTrail.dash, [2, 3], 'Trail dash pattern must be [2, 3]');
   assert.equal(vTrail.lineWidth, 0.8, 'Trail stroke width must be 0.8px');
   assert.equal(vTrail.alpha, 0.45, 'Trail opacity must be 0.45');
@@ -1453,9 +1547,10 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Long-Note Trails Invarian
   });
 
   assert.equal(horizontalRibbons.length, 0, 'Horizontal hold ribbons must be 0');
-  assert.equal(horizontalDottedTrails.length, 1, 'Must render exactly 1 horizontal dotted trail');
+  assert.equal(horizontalDottedTrails.length, 2, 'Must render exactly 2 horizontal dotted trails');
 
-  const hTrail = horizontalDottedTrails[0];
+  const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
+  assert.ok(hTrail, 'Must find horizontal trail for 108t pedal note');
   const hExpectedCx = paddingStart + longNote.startTick * pixelsPerTick;
   const hNoteWidth = Math.max(8, pixelsPerSemitone - 3);
   const expectedTrailStartX = hExpectedCx + hNoteWidth / 2 + 2;
@@ -1578,16 +1673,30 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
 
   let currentFill = '';
   let currentLineWidth = 1;
+  let currentAlpha = 1.0;
+  const alphaStack: number[] = [];
+  let tintFillCount = 0;
+  let voidFillCount = 0;
 
   const mockCtx = {
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
+    get globalAlpha() {
+      return currentAlpha;
+    },
+    set globalAlpha(v: number) {
+      currentAlpha = v;
+    },
     font: '',
     textAlign: '',
     textBaseline: '',
-    save: () => {},
-    restore: () => {},
+    save: () => {
+      alphaStack.push(currentAlpha);
+    },
+    restore: () => {
+      currentAlpha = alphaStack.pop() ?? 1.0;
+    },
     beginPath: () => {},
     closePath: () => {},
     moveTo: () => {},
@@ -1601,6 +1710,11 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
     },
     fill: () => {
       currentFill = mockCtx.fillStyle as string;
+      if (Math.abs(currentAlpha - 0.18) < 0.01) {
+        tintFillCount++;
+      } else if (mockCtx.fillStyle === '#000000') {
+        voidFillCount++;
+      }
     },
     fillRect: () => {},
     arc: () => {},
@@ -1633,6 +1747,8 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
   assert.ok(squareCount > 0, 'Must render squished square noteheads');
   assert.ok(fullSquareCount > 0, 'Must render full squares for Row 0 notes');
   assert.ok(emptySquareCount > 0, 'Must render empty squares for Row 1 notes');
+  assert.ok(tintFillCount > 0, 'Must render faint tint (globalAlpha = 0.18) inside colored hollow noteheads');
+  assert.ok(voidFillCount > 0, 'Must render pure void black inside 16th note hollow noteheads');
   assert.equal(ellipseCount, 0, 'Must render zero ellipses');
 });
 
