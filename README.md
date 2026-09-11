@@ -47,9 +47,8 @@ On a 4-row Jánko keyboard:
      - **Horizontal vs. Vertical Timelines** (Vertical timeline aligns directly with horizontal Jánko keys!)
    - **Synchronized 4-Row Jánko Keyboard Component**: Real-time vector visualization of active keys and hand-shape polygons verifying physical hand-shape isomorphism across transpositions.
    - **Polyphonic Web Audio Synthesizer**: Audition pitches and hear score playback in real time.
-3. **Canonical Benchmark Excerpts**:
+3. **Canonical Benchmark Excerpt**:
    - **J.S. Bach**: *Goldberg Variations*, BWV 988 — **Variation 1** (dynamic two-part hand-crossing counterpoint, wide register leaps, motoric 16th notes).
-   - **Nikolai Kapustin**: *Eight Concert Études*, Op. 40, No. 7 "Intermezzo" (subtle jazz syncopations, chromatic substitutions, extended jazz chords).
 4. **Tailscale-Accessible Mobile Workbench**:
    - Touch-friendly interface with pinch-to-zoom, panning, and collapsible controls drawer for mobile devices.
    - Configured for Tailscale access at `http://100.102.70.49:5173`.
@@ -93,8 +92,8 @@ When running, the workbench is available locally at `http://localhost:5173` and 
 
 - [x] **Phase 1: Foundations & Core Model** (Ticket `f229e347`)
   - Pure 12-TET lossless quantized grid score core
-  - 4-row Jánko keyboard vector model and hand-shape isomorphism engine
-  - Canonical Bach & Kapustin benchmarks
+  - 2-row Jánko keyboard vector model and hand-shape isomorphism engine
+  - Canonical Bach Goldberg Variations benchmark
   - Interactive mobile workbench with multi-perspective vector renderers
 - [ ] **Phase 2: MIDI & MusicXML Lossless Ingestion Pipeline**
   - High-precision GCD quantizer for standard MIDI and MusicXML files
@@ -104,5 +103,4 @@ When running, the workbench is available locally at `http://localhost:5173` and 
   - Real-time performance recording, sight-reading trainer, and tempo tracking
 - [ ] **Phase 4: Multi-Movement Classical Library & Export Engine**
   - Complete Bach *Goldberg Variations* and *Well-Tempered Clavier*
-  - Complete Kapustin Op. 40 Concert Études
   - Vector PDF / SVG export for physical high-resolution sheet music printing

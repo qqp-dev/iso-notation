@@ -12,7 +12,7 @@ Traditional Western music notation and the conventional piano keyboard evolved c
 
 ### 1.2 Motor Asymmetry on the Conventional Keyboard
 - **The 7+5 Keyboard Topography**: The conventional piano layout features 7 wide white keys in front and 5 narrow black keys recessed above. Because of this irregularity, a simple musical gesture (e.g., a major triad or a major scale) requires **12 completely distinct physical fingerings and hand postures** depending on the starting pitch.
-- **Cognitive Bottleneck in Classical Literature**: When performing intricate counterpoint such as J.S. Bach's *Goldberg Variations* or rapid syncopated chromaticism like Nikolai Kapustin's *Concert Études*, the pianist's working memory is consumed by key-signature cross-referencing and arbitrary motor patterns rather than structural voice leading, balance, and artistic expression.
+- **Cognitive Bottleneck in Classical Literature**: When performing intricate counterpoint such as J.S. Bach's *Goldberg Variations*, the pianist's working memory is consumed by key-signature cross-referencing and arbitrary motor patterns rather than structural voice leading, balance, and artistic expression.
 
 ---
 
@@ -73,12 +73,8 @@ An isomorphic keyboard requires an isomorphic notation system. Reading tradition
 
 ---
 
-## 4. Application to Classical & Jazz Performance
-
+## 4. Application to Classical Polyphony & Performance
+ 
 ### 4.1 J.S. Bach: Goldberg Variations, BWV 988 (Variation 1)
 - **Problem in Traditional Notation**: The two hands cross continuously. In traditional notation, clefs must be swapped back and forth, or lines cross confusingly on the grand staff with ledger lines cluttering the space between staves.
 - **Solution in Isomorphic Notation**: Voice paths are rendered in continuous physical pitch space. The hand crossing is visually unmistakable: the right-hand vector path clearly plunges below the left-hand vector path, while the left-hand leaps high above. The physical collisions and hand-clearance requirements on the Jánko keyboard can be anticipated directly from the score.
-
-### 4.2 Nikolai Kapustin: Eight Concert Études, Op. 40, No. 7 ("Intermezzo")
-- **Problem in Traditional Notation**: Highly dense jazz harmony with rapid alterations ($D\flat\text{maj9}$, $E\flat9$, $A\flat13$, chromatic passing chords) generates thick forests of double flats, sharps, and naturals, obscuring the underlying voice leading and symmetrical jazz chord shapes.
-- **Solution in Isomorphic Notation**: Extended chords appear as clean, recognizable geometric shapes. The symmetrical voice-leading motions (such as tritone substitutions and parallel chromatic shifts) translate to simple parallel visual vectors and identical physical hand shapes on the Jánko keyboard.

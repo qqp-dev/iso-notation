@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { buildKapustinOp40No7Score } from '../src/scores/kapustin-op40-no7';
 import { verifyLosslessGrid, computeOptimalGridResolution } from '../src/model/grid';
 import { parseMidiToScore } from '../src/model/midi';
 
@@ -25,25 +24,6 @@ test('Bach Goldberg Variation 1 canonical benchmark verification', () => {
 
   // Verify Hand Crossings detection
   assert.ok(score.handCrossings && score.handCrossings.length > 0, 'Should detect hand crossings');
-});
-
-test('Kapustin Op. 40 No. 7 Intermezzo canonical benchmark verification', () => {
-  const score = buildKapustinOp40No7Score();
-
-  const verification = verifyLosslessGrid(score);
-  assert.equal(verification.lossless, true, `Errors: ${verification.errors.join(', ')}`);
-
-  assert.equal(score.id, 'kapustin-op40-no7');
-  assert.equal(score.ticksPerBeat, 48);
-  assert.equal(score.totalTicks, 1152); // 6 measures * 192 ticks
-  assert.ok(score.notes.length >= 50, `Expected at least 50 notes, got ${score.notes.length}`);
-
-  // Pedaling overlays exist
-  assert.ok(score.pedals.length >= 6, 'Expected sustain pedaling markings');
-
-  // Verify syncopation: check presence of dotted eighth syncopated onsets (e.g. tick % 48 !== 0)
-  const syncopatedNotes = score.notes.filter(n => n.startTick % 48 !== 0);
-  assert.ok(syncopatedNotes.length > 10, 'Expected multiple syncopated offbeat notes in Kapustin Intermezzo');
 });
 
 test('Deterministic MIDI ingestion pipeline parses .mid losslessly into quantized fence', () => {
