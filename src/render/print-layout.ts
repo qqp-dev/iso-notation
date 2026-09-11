@@ -1,7 +1,7 @@
 import { QuantizedGridScore, QuantizedNote, HandCrossingEvent } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { detectHandCrossings } from '../model/grid';
-import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology } from './types';
+import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor } from './types';
 
 export const A4_WIDTH_PT = 595.28; // 210mm in PostScript points (72 pt/inch)
 export const A4_HEIGHT_PT = 841.89; // 297mm in PostScript points
@@ -331,7 +331,7 @@ export function renderPageToSvg(
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="title">${escapeXml(title)}</text>`);
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle">${escapeXml(composer)} — <tspan font-weight="bold" fill="#000000">${escapeXml(page.sectionName)}</tspan></text>`);
   svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="meta" text-anchor="end">Vertical Isomorphic Notation</text>`);
-  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="meta" text-anchor="end">3+3 Tritone-Split Staff • Parity Shapes</text>`);
+  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="meta" text-anchor="end">5/7 Demarcated Staff • Klavar Lateral Stems</text>`);
   svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(marginPt + 34).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(marginPt + 34).toFixed(2)}" stroke="#CCCCCC" stroke-width="0.75"/>`);
   svgParts.push(`  </g>`);
 
@@ -356,19 +356,30 @@ export function renderPageToSvg(
       if (pc === 0) {
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">C${oct}</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
-      } else if (pc === 6) {
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label">F#${oct}</text>`);
-        svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#666666" stroke-width="0.75" stroke-dasharray="2,2"/>`);
+      }
+    }
+
+    // 5/7 Boundary Demarcation header ticks
+    if (normStaffStyle === 'tritone-split') {
+      const minOct = Math.floor(minPitch / 12);
+      const maxOct = Math.ceil(maxPitch / 12);
+      for (let oct = minOct; oct <= maxOct; oct++) {
+        const pDemarc = oct * 12 + 4.5;
+        if (pDemarc >= minPitch && pDemarc <= maxPitch) {
+          const px = colStaffLeftPt + (pDemarc - minPitch) * ptPerSemitone;
+          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5|7</text>`);
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#666666" stroke-width="0.75" stroke-dasharray="2,2"/>`);
+        }
       }
     }
 
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
 
-    // Staff Lines (Monochrome 3+3)
+    // Staff Lines (5/7 Staff Topography)
     // PC 0: bold octave (1.5pt)
-    // PC 6: dashed tritone (1.0pt, dash 3 3)
-    // PC 2, 4, 8, 10: hairlines (0.5pt)
+    // 5/7 Demarcation: dashed line (1.0pt, dash 3 3) between PC 4 and PC 5 (E/F seam)
+    // PC 2, 4, 6, 8, 10: hairlines (0.5pt)
     // Odd PCs: spaces
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
@@ -378,10 +389,7 @@ export function renderPageToSvg(
         if (pc === 0) {
           // Bold octave boundary
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.5"/>`);
-        } else if (pc === 6) {
-          // Dashed tritone line
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#333333" stroke-width="1.0" stroke-dasharray="3,3"/>`);
-        } else if (pc === 2 || pc === 4 || pc === 8 || pc === 10) {
+        } else if (pc === 2 || pc === 4 || pc === 6 || pc === 8 || pc === 10) {
           // Hairlines
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#888888" stroke-width="0.5"/>`);
         }
@@ -390,6 +398,19 @@ export function renderPageToSvg(
         if (pc % 2 === 0) {
           const isOct = pc === 0;
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${isOct ? '1.5' : '0.6'}"/>`);
+        }
+      }
+    }
+
+    // 5/7 Demarcation Staff Lines
+    if (normStaffStyle === 'tritone-split') {
+      const minOct = Math.floor(minPitch / 12);
+      const maxOct = Math.ceil(maxPitch / 12);
+      for (let oct = minOct; oct <= maxOct; oct++) {
+        const pDemarc = oct * 12 + 4.5;
+        if (pDemarc >= minPitch && pDemarc <= maxPitch) {
+          const px = colStaffLeftPt + (pDemarc - minPitch) * ptPerSemitone;
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#333333" stroke-width="1.0" stroke-dasharray="3,3"/>`);
         }
       }
     }
@@ -433,33 +454,48 @@ export function renderPageToSvg(
         const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
         const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
         const ribbonHeight = note.durationTicks * ptPerTick;
+        const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
-        svgParts.push(`    <rect x="${(nx - holdRibbonWidth / 2).toFixed(2)}" y="${ny.toFixed(2)}" width="${holdRibbonWidth.toFixed(2)}" height="${ribbonHeight.toFixed(2)}" rx="2" fill="#000000"/>`);
+        svgParts.push(`    <rect x="${(nx - holdRibbonWidth / 2).toFixed(2)}" y="${ny.toFixed(2)}" width="${holdRibbonWidth.toFixed(2)}" height="${ribbonHeight.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
       }
     }
 
-    // Notes: Second Solid Row-Parity Noteheads with White Halo Knockout
+    // Notes: Klavar Lateral Stems & Solid Row-Parity Noteheads with White Halo Knockout
     for (const note of col.notes) {
       const lPitch = linearIndex(note.pitch);
       const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
       const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
       const isEven = wholeToneParity(note.pitch) === 0;
+      const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
+      const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
+
+      // Klavar lateral stem:
+      // Right Hand (RH) -> horizontal stem pointing Right
+      // Left Hand (LH) -> horizontal stem pointing Left
+      const stemLength = 8.0;
+      const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
+      svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="1.2" stroke-linecap="round"/>`);
+
+      // Geometric Diamond Alignment Invariant:
+      // Circle radius r = 3.5
+      // Diamond vertical half-height d = r = 3.5 (equal vertical extent: [ny - 3.5, ny + 3.5])
+      const r = 3.5;
+      const d = r;
 
       if (isEven) {
         // Row 0 (Lines): Solid Disc with White Halo Knockout
-        svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="3.5" fill="#000000" stroke="#FFFFFF" stroke-width="2"/>`);
+        svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
       } else {
         // Row 1 (Spaces): Solid Diamond with White Halo Knockout
-        const d = 4.2;
         const pts = `${nx.toFixed(2)},${(ny - d).toFixed(2)} ${(nx + d).toFixed(2)},${ny.toFixed(2)} ${nx.toFixed(2)},${(ny + d).toFixed(2)} ${(nx - d).toFixed(2)},${ny.toFixed(2)}`;
-        svgParts.push(`    <polygon points="${pts}" fill="#000000" stroke="#FFFFFF" stroke-width="2"/>`);
+        svgParts.push(`    <polygon points="${pts}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
       }
 
       // Articulations
       if (note.articulation === 'staccato') {
-        svgParts.push(`    <circle cx="${(nx + 6).toFixed(2)}" cy="${ny.toFixed(2)}" r="1.5" fill="#000000"/>`);
+        svgParts.push(`    <circle cx="${(nx + 6).toFixed(2)}" cy="${ny.toFixed(2)}" r="1.5" fill="${noteColor}"/>`);
       } else if (note.articulation === 'accent') {
-        svgParts.push(`    <text x="${(nx + 6).toFixed(2)}" y="${(ny + 3).toFixed(2)}" font-family="sans-serif" font-weight="bold" font-size="7pt" fill="#000000">&gt;</text>`);
+        svgParts.push(`    <text x="${(nx + 6).toFixed(2)}" y="${(ny + 3).toFixed(2)}" font-family="sans-serif" font-weight="bold" font-size="7pt" fill="${noteColor}">&gt;</text>`);
       }
     }
 

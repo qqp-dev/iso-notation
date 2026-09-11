@@ -145,24 +145,32 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // 1. Pure white background for paper savings & laser printing
     assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
 
-    // 2. Monochrome 3+3 staff lines
+    // 2. 5/7 Staff Topography lines
     // - Bold octave (PC 0, 1.5pt)
     assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.5"/, 'Must contain bold 1.5pt octave line');
-    // - Dashed tritone (PC 6, 1.0pt, dash 3 3)
-    assert.match(svg, /stroke-dasharray="3,3"/, 'Must contain dashed tritone line (dash 3 3)');
-    assert.match(svg, /stroke-width="1\.0"/, 'Must contain 1.0pt stroke width for tritone');
-    // - Hairlines (PC 2, 4, 8, 10, 0.5pt)
+    // - Dashed 5/7 demarcation line (1.0pt, dash 3 3)
+    assert.match(svg, /stroke-dasharray="3,3"/, 'Must contain dashed 5/7 demarcation line (dash 3 3)');
+    assert.match(svg, /stroke-width="1\.0"/, 'Must contain 1.0pt stroke width for demarcation');
+    // - Hairlines (PC 2, 4, 6, 8, 10, 0.5pt)
     assert.match(svg, /stroke-width="0\.5"/, 'Must contain 0.5pt hairlines');
 
-    // 3. Solid row-parity noteheads with white halo knockout
-    // - Discs on lines (Row 0): circle with fill="#000000" and stroke="#FFFFFF"
-    assert.match(svg, /<circle[^>]*fill="#000000"[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 0 discs with white halo knockout');
-    // - Diamonds in spaces (Row 1): polygon with fill="#000000" and stroke="#FFFFFF"
-    assert.match(svg, /<polygon[^>]*fill="#000000"[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 1 diamonds with white halo knockout');
+    // 3. Klavar Lateral Stems Invariant
+    // - Horizontal lateral stems for hand assignment with stroke-width 1.2pt
+    assert.match(svg, /<line[^>]*stroke-width="1\.2"[^>]*stroke-linecap="round"/, 'Must render Klavar lateral stems');
 
-    // 4. Unified Euclidean duration lattice
-    // - Sleek hold ribbons (4pt wide) for notes with durationTicks > 12t
-    assert.match(svg, /<rect[^>]*width="4\.00"[^>]*fill="#000000"/, 'Must render 4pt wide hold ribbons for notes longer than 16th notes');
+    // 4. Solid row-parity noteheads with white halo knockout and duration colors
+    // - Discs on lines (Row 0): circle with stroke="#FFFFFF" and stroke-width="2"
+    assert.match(svg, /<circle[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 0 discs with white halo knockout');
+    // - Diamonds in spaces (Row 1): polygon with stroke="#FFFFFF" and stroke-width="2"
+    assert.match(svg, /<polygon[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 1 diamonds with white halo knockout');
+
+    // 5. Color Palette Invariant in Print Engine & Hold Ribbons
+    // - 16th notes (d <= 12t): unextended noteheads in dark slate/graphite (#1E293B)
+    assert.match(svg, /fill="#1E293B"/, 'Must render 16th notes in dark slate/graphite (#1E293B)');
+    // - 8th notes (d = 24t): Royal Blue (#1D4ED8) with hold ribbon
+    assert.match(svg, /<rect[^>]*width="4\.00"[^>]*fill="#1D4ED8"/, 'Must render 8th note hold ribbons in Royal Blue (#1D4ED8)');
+    // - Quarter notes (d = 48t): Amber/Gold (#D97706) with hold ribbon
+    assert.match(svg, /<rect[^>]*width="4\.00"[^>]*fill="#D97706"/, 'Must render quarter note hold ribbons in Amber/Gold (#D97706)');
   }
 
   // Verify renderColumnarScoreToSvg helper
@@ -170,6 +178,39 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   assert.equal(page0Svg, svgs[0]);
   const defaultSvg = renderColumnarScoreToSvg(score);
   assert.equal(defaultSvg, svgs[0]);
+});
+
+test('Klavar Lateral Stems & Geometric Diamond Alignment in SVG Print Engine', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const svg = renderPageToSvg(layout, 0);
+
+  // Geometric Diamond Alignment Invariant:
+  // Circle radius r = 3.5, Diamond vertical half-height d = r = 3.5
+  assert.match(svg, /<circle[^>]*r="3\.5"/, 'Circle radius must be 3.5pt');
+
+  // Verify diamond coordinates: top ny - 3.5 and bottom ny + 3.5 match circle vertical extent
+  const diamondMatches = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g));
+  assert.ok(diamondMatches.length > 0, 'Must have rendered diamond noteheads in SVG');
+
+  for (const match of diamondMatches) {
+    const pts = match[1].split(' ').map((p) => p.split(',').map(Number));
+    assert.equal(pts.length, 4, 'Diamond must have 4 points');
+    const [top, right, bottom, left] = pts;
+    const verticalHeight = Math.round((bottom[1] - top[1]) * 100) / 100;
+    assert.equal(verticalHeight, 7.0, 'Diamond total vertical height must exactly equal 2 * r = 7.0pt (d = r = 3.5)');
+  }
+
+  // Klavar Lateral Stems Invariant:
+  // RH notes have stems pointing right (x2 > x1), LH notes have stems pointing left (x2 < x1)
+  const stemMatches = Array.from(svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="1\.2"/g));
+  assert.ok(stemMatches.length > 0, 'Must find lateral stems in SVG');
+
+  const rhStems = stemMatches.filter((m) => Number(m[3]) > Number(m[1]));
+  const lhStems = stemMatches.filter((m) => Number(m[3]) < Number(m[1]));
+
+  assert.ok(rhStems.length > 0, 'SVG must contain right-pointing lateral stems for RH notes');
+  assert.ok(lhStems.length > 0, 'SVG must contain left-pointing lateral stems for LH notes');
 });
 
 test('A4 Print Dimensions & Page Margins Invariant', () => {
@@ -216,10 +257,12 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
 
   // Test PJL wrapper
   const wrapped = wrapInPjl(psBuffer, 'Bach Goldberg Var 1');
-  const wrappedHead = wrapped.toString('binary', 0, 200);
+  const wrappedHead = wrapped.toString('binary', 0, 300);
   const wrappedTail = wrapped.toString('binary', wrapped.length - 100);
 
   assert.match(wrappedHead, /@PJL JOB NAME = "Bach Goldberg Var 1"/);
+  assert.match(wrappedHead, /@PJL SET RENDERMODE = COLOR/);
+  assert.match(wrappedHead, /@PJL SET COLORMODE = COLOR/);
   assert.match(wrappedHead, /@PJL ENTER LANGUAGE = POSTSCRIPT/);
   assert.match(wrappedTail, /@PJL EOJ/);
 });

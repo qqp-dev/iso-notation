@@ -162,10 +162,9 @@ export function renderScoreToCanvas(
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
-      else if (pc === 6) textColor = '#AAAAAA';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctave0 || (pc === 6 && normStaffStyle === 'tritone-split') ? 'bold 11px monospace' : '10px monospace';
+      ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillText(`${pc}:${oct}`, paddingStart - 8, y);
@@ -201,14 +200,58 @@ export function renderScoreToCanvas(
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
-      else if (pc === 6) textColor = '#AAAAAA';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctave0 || (pc === 6 && normStaffStyle === 'tritone-split') ? 'bold 10px monospace' : '9px monospace';
+      ctx.font = isOctave0 ? 'bold 10px monospace' : '9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(String(pc), x, paddingStart - 6);
     }
+  }
+
+  // 2c. 5/7 Boundary Demarcation Lines (between PC 4 and PC 5, E/F seam)
+  if (normStaffStyle === 'tritone-split') {
+    const minOct = Math.floor(minPitch / 12);
+    const maxOct = Math.ceil(maxPitch / 12);
+    const demGeom = getStaffLineGeometry(4.5, normStaffStyle);
+
+    for (let oct = minOct; oct <= maxOct; oct++) {
+      const pBoundary = oct * 12 + 4.5;
+      if (pBoundary >= minPitch && pBoundary <= maxPitch) {
+        if (isHoriz) {
+          const y = height - paddingPitch - (pBoundary - minPitch) * options.pixelsPerSemitone;
+          ctx.beginPath();
+          ctx.strokeStyle = demGeom.color;
+          ctx.lineWidth = demGeom.lineWidth;
+          ctx.setLineDash(demGeom.dashArray || [5, 4]);
+          ctx.moveTo(paddingStart, y);
+          ctx.lineTo(dims.width, y);
+          ctx.stroke();
+
+          ctx.fillStyle = '#888888';
+          ctx.font = '8px monospace';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('5|7', paddingStart - 8, y);
+        } else {
+          const x = paddingPitch + (pBoundary - minPitch) * options.pixelsPerSemitone;
+          ctx.beginPath();
+          ctx.strokeStyle = demGeom.color;
+          ctx.lineWidth = demGeom.lineWidth;
+          ctx.setLineDash(demGeom.dashArray || [5, 4]);
+          ctx.moveTo(x, paddingStart);
+          ctx.lineTo(x, dims.height);
+          ctx.stroke();
+
+          ctx.fillStyle = '#888888';
+          ctx.font = '8px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('5|7', x, paddingStart - 6);
+        }
+      }
+    }
+    ctx.setLineDash([]);
   }
   ctx.restore();
 
@@ -370,6 +413,20 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
+      // Klavar lateral stems for hand assignment:
+      // Right Hand (RH) -> horizontal stem pointing Right (->)
+      // Left Hand (LH) -> horizontal stem pointing Left (<-)
+      const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
+      const stemLength = Math.max(9, options.pixelsPerSemitone * 0.75);
+      const stemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
+
+      ctx.beginPath();
+      ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+      ctx.lineWidth = 1.6;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(stemEndX, cy);
+      ctx.stroke();
+
       renderNotehead(
         ctx,
         normNoteheadMorph,
@@ -476,9 +533,10 @@ function renderNotehead(
 
     case 'row-parity-shape': {
       const parityShape = getParityShape(pitchClass);
+      const r = Math.max(4.5, baseSize * 0.48);
+
       if (parityShape === 'disc') {
         // Row 0: Even pitch classes on lines -> Disc / Oval
-        const r = Math.max(4.5, baseSize * 0.48);
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.arc(cx, cy, r + 2.5, 0, Math.PI * 2);
@@ -493,10 +551,11 @@ function renderNotehead(
         ctx.stroke();
       } else {
         // Row 1: Odd pitch classes in spaces -> Diamond / Lozenge
-        const rw = Math.max(5.5, baseSize * 0.58);
-        const rh = Math.max(5.5, baseSize * 0.58);
-        const kw = rw + 3;
-        const kh = rh + 3;
+        // Geometric Diamond Alignment Invariant: vertical half-height rh matches circle radius r (d = r)
+        const rh = r;
+        const rw = r;
+        const kw = rw + 2.5;
+        const kh = rh + 2.5;
 
         // Knockout diamond
         ctx.fillStyle = '#000000';

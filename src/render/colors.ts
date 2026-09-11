@@ -97,6 +97,38 @@ export function getLogarithmicDurationColor(
 }
 
 /**
+ * Unified Euclidean Duration Lattice Print Color Engine:
+ * Logarithmic duration palette for white-paper print engraving and high-contrast previews:
+ * - 16th notes (d <= 12t): unextended pure noteheads in dark slate/graphite (#1E293B)
+ * - 8th notes (d = 24t): Royal Blue (#1D4ED8)
+ * - Quarter notes (d = 48t): Amber/Gold (#D97706)
+ * - Half notes+ (d >= 96t): Crimson/Rose (#BE123C)
+ */
+export function getPrintDurationColor(
+  durationTicks: number,
+  tauRef: number = 12
+): string {
+  const tau = tauRef > 0 ? tauRef : 12;
+  const ratio = durationTicks / tau;
+
+  if (ratio <= 1.0) {
+    return '#1E293B'; // Dark slate/graphite (16th notes: d <= 12t)
+  }
+
+  const k = Math.floor(Math.log2(ratio));
+  if (k <= 0) {
+    return '#1E293B'; // Dark slate/graphite (1x)
+  }
+  if (k === 1) {
+    return '#1D4ED8'; // Royal Blue (2x, 3x / 8th notes)
+  }
+  if (k === 2) {
+    return '#D97706'; // Amber/Gold (4x..7x / Quarter notes)
+  }
+  return '#BE123C'; // Crimson/Rose (>= 8x / Half notes+)
+}
+
+/**
  * Duration-Class Color Engine:
  * Colors encode the rhythmic note value / duration of each note relative to ticksPerBeat (48 ticks in standard 4/4 or 3/4):
  * Delegates to the Unified Euclidean Duration Lattice logarithmic color palette with tauRef = ticksPerBeat / 4.

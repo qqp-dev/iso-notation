@@ -11,7 +11,9 @@ export type StaffStyle =
   | 'wholetone-uniform-6'
   | 'tritone-split-3plus3'
   | 'augmented-triad-3line'
-  | 'chromatic-grid';
+  | 'chromatic-grid'
+  | '5-7-split'
+  | 'five-seven-split';
 
 export type NoteheadMorphology =
   | 'classic-oval'
@@ -157,7 +159,12 @@ export function normalizeStaffStyle(
   if (style === 'wholetone-uniform' || style === 'wholetone-uniform-6' || style === 'wholetone-staff') {
     return 'wholetone-uniform';
   }
-  if (style === 'tritone-split' || style === 'tritone-split-3plus3') {
+  if (
+    style === 'tritone-split' ||
+    style === 'tritone-split-3plus3' ||
+    style === '5-7-split' ||
+    style === 'five-seven-split'
+  ) {
     return 'tritone-split';
   }
   if (style === 'augmented-3line' || style === 'augmented-triad-3line') {
@@ -190,6 +197,7 @@ export interface StaffLineGeometry {
   isDashed?: boolean;
   dashArray?: number[];
   isTritone?: boolean;
+  isDemarcation?: boolean;
   isOctaveBoundary?: boolean;
   lineWidth: number;
   color: string;
@@ -246,9 +254,12 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'tritone-split') {
-    // 6 lines partitioned into two 3-line triplets:
-    // PC 0: bold, PC 6: dashed/tritone, PC 2,4,8,10: hairlines.
-    // Odd PCs: spaces.
+    // 5/7 Staff Topography:
+    // 6 whole-tone lines partitioned into two 3-line groups by the 5/7 boundary demarcation:
+    // 5-group: PC 0 (bold octave), PC 2, 4 (hairlines)
+    // 5/7 Demarcation: PC 4.5 (dashed line at E/F seam)
+    // 7-group: PC 6, 8, 10 (hairlines)
+    // Odd integer PCs: spaces.
     if (pc === 0) {
       return {
         isLine: true,
@@ -260,19 +271,20 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         color: 'rgba(255, 255, 255, 0.9)',
       };
     }
-    if (pc === 6) {
+    if (pc === 4.5) {
       return {
         isLine: true,
         isBold: false,
         isDashed: true,
         dashArray: [5, 4],
-        isTritone: true,
+        isTritone: false,
+        isDemarcation: true,
         isOctaveBoundary: false,
         lineWidth: 1.0,
         color: 'rgba(255, 255, 255, 0.5)',
       };
     }
-    if (pc === 2 || pc === 4 || pc === 8 || pc === 10) {
+    if (pc === 2 || pc === 4 || pc === 6 || pc === 8 || pc === 10) {
       return {
         isLine: true,
         isBold: false,
@@ -325,4 +337,4 @@ export function getParityShape(pitchClass: number): 'disc' | 'diamond' {
   return pc % 2 === 0 ? 'disc' : 'diamond';
 }
 
-export { getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor } from './colors';
+export { getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor, getPrintDurationColor } from './colors';

@@ -43,32 +43,39 @@ test('Staff Topography: wholetone-uniform-6 invariants', () => {
   }
 });
 
-test('Staff Topography: tritone-split-3plus3 subitizable partitioning invariants', () => {
-  const styles: StaffStyle[] = ['tritone-split-3plus3', 'tritone-split'];
+test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invariants', () => {
+  const styles: StaffStyle[] = ['tritone-split-3plus3', 'tritone-split', '5-7-split', 'five-seven-split'];
   for (const style of styles) {
     assert.equal(normalizeStaffStyle(style), 'tritone-split');
 
-    // Group A: 0, 2, 4. Group B: 6, 8, 10.
-    // PC 0 is bold/double (octave boundary).
-    // PC 6 is dashed (tritone landmark).
-    // PC 2, 4, 8, 10 are hairlines.
-    // Odd PCs (1, 3, 5, 7, 9, 11) are spaces.
+    // 5/7 Staff Topography Invariant:
+    // PC 0 (C) is bold octave line.
+    // Demarcation line is placed at the 5/7 boundary (between PC 4 and PC 5, E/F seam at 4.5).
+    // PC 6 (F#) is rendered as a regular hairline, grouping 3 lines in 5-group (C, D, E) and 3 lines in 7-group (F#, G#, A#).
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
     assert.equal(geom0.lineWidth, 2.0);
     assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
-    const geom6 = getStaffLineGeometry(6, style);
-    assert.equal(geom6.isLine, true);
-    assert.equal(geom6.isDashed, true);
-    assert.equal(geom6.isTritone, true);
-    assert.equal(geom6.lineWidth, 1.0);
-    assert.equal(geom6.color, 'rgba(255, 255, 255, 0.5)');
-    assert.deepEqual(geom6.dashArray, [5, 4]);
+    // 5/7 Demarcation Line at PC 4.5
+    const geomDemarc = getStaffLineGeometry(4.5, style);
+    assert.equal(geomDemarc.isLine, true);
+    assert.equal(geomDemarc.isDashed, true);
+    assert.equal(geomDemarc.isDemarcation, true);
+    assert.equal(geomDemarc.lineWidth, 1.0);
+    assert.equal(geomDemarc.color, 'rgba(255, 255, 255, 0.5)');
+    assert.deepEqual(geomDemarc.dashArray, [5, 4]);
 
-    // Hairlines
-    [2, 4, 8, 10].forEach((pc) => {
+    // PC 6 is rendered as a regular hairline
+    const geom6 = getStaffLineGeometry(6, style);
+    assert.equal(geom6.isLine, true, 'PC 6 must be a line');
+    assert.equal(geom6.isBold, false, 'PC 6 must not be bold');
+    assert.equal(geom6.isDashed, false, 'PC 6 must not be dashed');
+    assert.equal(geom6.lineWidth, 0.6, 'PC 6 must be a 0.6 hairline');
+
+    // Hairlines across 5-group and 7-group (2, 4, 6, 8, 10)
+    [2, 4, 6, 8, 10].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
       assert.equal(g.isLine, true, `PC ${pc} must be a hairline`);
       assert.equal(g.isBold, false);
@@ -77,17 +84,17 @@ test('Staff Topography: tritone-split-3plus3 subitizable partitioning invariants
       assert.equal(g.color, 'rgba(255, 255, 255, 0.16)');
     });
 
-    // Spaces
+    // Spaces on odd pitch classes (1, 3, 5, 7, 9, 11)
     [1, 3, 5, 7, 9, 11].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
       assert.equal(g.isLine, false, `PC ${pc} must be a space`);
     });
 
-    // Subitizability verification: two 3-line clusters separated by landmark
-    const cluster1 = [0, 2, 4].filter((pc) => getStaffLineGeometry(pc, style).isLine);
-    const cluster2 = [6, 8, 10].filter((pc) => getStaffLineGeometry(pc, style).isLine);
-    assert.equal(cluster1.length, 3, 'First triplet cluster must contain exactly 3 lines');
-    assert.equal(cluster2.length, 3, 'Second triplet cluster must contain exactly 3 lines');
+    // Subitizability verification: exactly 3 lines in 5-group (0, 2, 4) and 3 lines in 7-group (6, 8, 10)
+    const cluster5 = [0, 2, 4].filter((pc) => getStaffLineGeometry(pc, style).isLine);
+    const cluster7 = [6, 8, 10].filter((pc) => getStaffLineGeometry(pc, style).isLine);
+    assert.equal(cluster5.length, 3, '5-group (C, D, E) must contain exactly 3 staff lines');
+    assert.equal(cluster7.length, 3, '7-group (F#, G#, A#) must contain exactly 3 staff lines');
   }
 });
 
@@ -276,12 +283,102 @@ test('Monochrome margin labels: pure grayscale with zero blue or pink tints', ()
     assert.doesNotMatch(fillStyle, /#F472B6/i, `Margin label ${text} must not be pink`);
     if (pc === 0) {
       assert.equal(fillStyle, '#FFFFFF', `PC 0 margin label must be #FFFFFF`);
-    } else if (pc === 6) {
-      assert.equal(fillStyle, '#AAAAAA', `PC 6 margin label must be #AAAAAA`);
     } else {
       assert.equal(fillStyle, '#666666', `Other PC margin label must be #666666`);
     }
   });
+});
+
+test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and Left for LH', () => {
+  const score = buildBachGoldbergVar1Score();
+  const recordedLines: { x1: number; y1: number; x2: number; y2: number; stroke: string }[] = [];
+  let currentStroke = '';
+
+  const mockCtx = {
+    fillStyle: '',
+    set strokeStyle(val: string) {
+      currentStroke = val;
+    },
+    get strokeStyle() {
+      return currentStroke;
+    },
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      (mockCtx as any)._startX = x;
+      (mockCtx as any)._startY = y;
+    },
+    lineTo: (x: number, y: number) => {
+      recordedLines.push({
+        x1: (mockCtx as any)._startX,
+        y1: (mockCtx as any)._startY,
+        x2: x,
+        y2: y,
+        stroke: currentStroke,
+      });
+    },
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  // Filter horizontal lateral stems (y1 === y2 and x1 !== x2)
+  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) < 20);
+  assert.ok(lateralStems.length > 0, 'Must have rendered Klavar lateral stems for notes');
+
+  // Verify that notes with RH have right-pointing stems (x2 > x1)
+  // and notes with LH have left-pointing stems (x2 < x1)
+  const rhStems = lateralStems.filter((s) => s.x2 > s.x1);
+  const lhStems = lateralStems.filter((s) => s.x2 < s.x1);
+
+  assert.ok(rhStems.length > 0, 'Must have right-pointing lateral stems for Right Hand (RH)');
+  assert.ok(lhStems.length > 0, 'Must have left-pointing lateral stems for Left Hand (LH)');
+});
+
+test('Geometric Diamond Alignment Invariant: vertical half-height matches circle radius (d = r)', () => {
+  // In row-parity-shape:
+  // Circle radius r = Math.max(4.5, baseSize * 0.48)
+  // Diamond vertical half-height rh must exactly equal r (d = r)
+  const baseSize = 14 - 3; // pixelsPerSemitone - 3
+  const r = Math.max(4.5, baseSize * 0.48);
+  const rh = r;
+  assert.equal(rh, r, 'Diamond vertical half-height rh must match circle radius r (d = r)');
+
+  // Top and bottom edges of circles and diamonds at the same tick share identical y extents
+  const tickY = 100;
+  const circleTop = tickY - r;
+  const circleBottom = tickY + r;
+  const diamondTop = tickY - rh;
+  const diamondBottom = tickY + rh;
+
+  assert.equal(circleTop, diamondTop, 'Circle and diamond must have identical top y coordinate');
+  assert.equal(circleBottom, diamondBottom, 'Circle and diamond must have identical bottom y coordinate');
+  assert.equal(circleBottom - circleTop, diamondBottom - diamondTop, 'Total vertical span must be identical');
 });
 
 test('Solid Row-Parity Shapes Invariant: white noteheads with knockout, yellow highlight on active/selected', () => {

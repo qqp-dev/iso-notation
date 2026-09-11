@@ -31,7 +31,7 @@ function parseArgs(args: string[]): PrintOptions {
     relayHost: 'nacho@100.118.214.29',
     printerIp: '192.168.4.62',
     printerPort: 9100,
-    dryRun: false,
+    dryRun: true,
     direct: false,
     pjl: true,
   };
@@ -40,6 +40,8 @@ function parseArgs(args: string[]): PrintOptions {
     const arg = args[i];
     if (arg === '--dry-run') {
       options.dryRun = true;
+    } else if (arg === '--send' || arg === '--no-dry-run') {
+      options.dryRun = false;
     } else if (arg === '--direct') {
       options.direct = true;
     } else if (arg === '--no-pjl') {
@@ -78,7 +80,8 @@ Options:
   --output <path>      Save output PostScript file to path
   --page <num>         Print only specific 0-indexed page (default: all)
   --no-pjl             Do not wrap PostScript in PJL headers
-  --dry-run            Generate vector SVGs & PostScript without sending to printer
+  --send               Transmit payload to network printer (default: dry-run)
+  --dry-run            Generate vector SVGs & PostScript without sending to printer (default)
   -h, --help           Show this help message
 `);
 }
@@ -88,6 +91,8 @@ export function wrapInPjl(postscriptData: Buffer, jobName: string = 'Isomorphic 
     `\x1b%-12345X@PJL\r\n` +
     `@PJL JOB NAME = "${jobName}"\r\n` +
     `@PJL SET PAPER = A4\r\n` +
+    `@PJL SET RENDERMODE = COLOR\r\n` +
+    `@PJL SET COLORMODE = COLOR\r\n` +
     `@PJL ENTER LANGUAGE = POSTSCRIPT\r\n`,
     'binary'
   );
