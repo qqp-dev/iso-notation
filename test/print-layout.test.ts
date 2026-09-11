@@ -10,6 +10,7 @@ import {
   A4_WIDTH_PT,
   A4_HEIGHT_PT,
   MM_TO_PT,
+  URTEXT_SERIF,
 } from '../src/render/print-layout';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
@@ -218,7 +219,7 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
 
   // Klavar Lateral Stems Invariant:
   // RH notes have stems pointing right (x2 > x1), LH notes have stems pointing left (x2 < x1)
-  // Lateral stems are top-aligned with notehead (stemY === ny - nh / 2 < ny) with length >= 16pt
+  // Lateral stems are center-aligned with notehead (y1 === ny and y2 === ny) with length >= 16pt
   const stemMatches = Array.from(svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="0\.6" stroke-linecap="round"/g));
   assert.ok(stemMatches.length > 0, 'Must find lateral stems in SVG');
 
@@ -227,6 +228,13 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
     assert.ok(Math.round(len * 10) / 10 >= 16.0, 'Lateral stem length must be >= 16pt');
     assert.equal(Number(m[2]), Number(m[4]), 'Lateral stem must be horizontal (y1 === y2)');
   });
+
+  // Verify center alignment with notehead center coordinate (y1 === ny)
+  const firstNote = layout.columns[0].notes[0];
+  const firstNoteStaffOriginY = 10 * (72 / 25.4) + 42 + 16;
+  const firstNoteExpectedNy = firstNoteStaffOriginY + (firstNote.startTick - layout.columns[0].startTick) * layout.ptPerTick;
+  const firstStem = stemMatches[0];
+  assert.equal(Number(firstStem[2]), Number(firstNoteExpectedNy.toFixed(2)), 'Lateral stem must originate at center ny');
 
   const rhStems = stemMatches.filter((m) => Number(m[3]) > Number(m[1]));
   const lhStems = stemMatches.filter((m) => Number(m[3]) < Number(m[1]));
@@ -486,5 +494,125 @@ test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', 
   const expectedM5X = colStaffLeftPt + (72 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
   assert.ok(expectedD6X > expectedM5X, 'D6 coordinate must be to the right of m5 line');
   assert.ok(page4SvgDefault.includes(expectedD6X.toFixed(2)), 'Must render D6 note in right buffer margin at true pitch');
+});
+
+test('Zero Barline & Beat Grid Overhang Invariant: flush with outer octave lines [colStaffLeftPt, rightStaffBound]', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score, { showBeatGrid: true });
+  const page4Svg = renderPageToSvg(layout, 3);
+
+  for (let c = 0; c < layout.pages[3].columns.length; c++) {
+    const col = layout.pages[3].columns[c];
+    const marginPt = layout.options.pageMarginMm * (72 / 25.4);
+    const gapPt = layout.options.columnGapMm * (72 / 25.4);
+    const colLeftPt = marginPt + col.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
+    const colStaffLeftPt = colLeftPt + 16 + 15;
+    const rightStaffBound = colStaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
+
+    const staffLeftStr = colStaffLeftPt.toFixed(2);
+    const staffRightStr = rightStaffBound.toFixed(2);
+    const overhungLeftStr = (colStaffLeftPt - 4).toFixed(2);
+    const overhungRightStr = (rightStaffBound + 4).toFixed(2);
+
+    // Verify flush barline strings exist
+    assert.ok(
+      page4Svg.includes(`x1="${staffLeftStr}"`) && page4Svg.includes(`x2="${staffRightStr}"`),
+      `Page 4 Col ${c} must contain barlines flush to staff bounds [${staffLeftStr}, ${staffRightStr}]`
+    );
+
+    // Verify overhung bounds are strictly absent
+    assert.ok(
+      !page4Svg.includes(`x1="${overhungLeftStr}"`),
+      `Page 4 Col ${c} must NOT contain overhung x1="${overhungLeftStr}"`
+    );
+    assert.ok(
+      !page4Svg.includes(`x2="${overhungRightStr}"`),
+      `Page 4 Col ${c} must NOT contain overhung x2="${overhungRightStr}"`
+    );
+  }
+});
+
+test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for mm. 29-30 on Page 4 and absent on Pages 1-3', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+
+  // Pages 1 to 3 (measures 1-24) do not have notes beyond C6 (pitch 72)
+  const marginPt = layout.options.pageMarginMm * (72 / 25.4);
+  const gapPt = layout.options.columnGapMm * (72 / 25.4);
+
+  for (let pIndex = 0; pIndex < 3; pIndex++) {
+    const pageSvg = renderPageToSvg(layout, pIndex);
+    for (const col of layout.pages[pIndex].columns) {
+      const colLeftPt = marginPt + col.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
+      const colStaffLeftPt = colLeftPt + 16 + 15;
+      const line76X = (colStaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
+      assert.ok(
+        !pageSvg.includes(`x1="${line76X}"`),
+        `Page ${pIndex + 1} Col ${col.columnIndex} must NOT contain any dashed outlier staff line at pitch 76 (x1="${line76X}")`
+      );
+    }
+  }
+
+  // Page 4 contains measures 25-32. Specifically mm. 29-30 contain D6 (pitch 74), which triggers Landmark 5 (pitch 76).
+  const page4Svg = renderPageToSvg(layout, 3);
+  const col0 = layout.pages[3].columns[0]; // mm 25-28
+  const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
+  const col0StaffLeftPt = col0LeftPt + 16 + 15;
+  const col0Line76X = (col0StaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
+  assert.ok(
+    !page4Svg.includes(`x1="${col0Line76X}"`),
+    `Page 4 Col 0 (mm. 25-28) must NOT contain any dashed outlier staff line at pitch 76`
+  );
+
+  const col1 = layout.pages[3].columns[1]; // mm 29-32
+  const colLeftPt = marginPt + col1.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
+  const colStaffLeftPt = colLeftPt + 16 + 15;
+  const line76X = (colStaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
+
+  // Must contain dashed line at pitch 76
+  const dashedMatches = Array.from(
+    page4Svg.matchAll(
+      new RegExp(
+        `<line x1="${line76X}" y1="([\\d\\.]+)" x2="${line76X}" y2="([\\d\\.]+)" stroke="#444444" stroke-width="0\\.6" stroke-dasharray="5,2\\.5"\\/>`,
+        'g'
+      )
+    )
+  );
+  assert.equal(dashedMatches.length, 2, 'Page 4 must render exactly 2 dashed outlier line segments at pitch 76 (for mm. 29 and 30)');
+
+  // Verify the vertical bounds correspond to mm. 29 and 30
+  const staffOriginY = marginPt + 42 + 16;
+  const m29StartY = (staffOriginY + 0 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
+  const m29EndY = (staffOriginY + 1 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
+  const m30StartY = (staffOriginY + 1 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
+  const m30EndY = (staffOriginY + 2 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
+
+  assert.equal(dashedMatches[0][1], m29StartY, 'First segment must start at m29 start');
+  assert.equal(dashedMatches[0][2], m29EndY, 'First segment must end at m29 end');
+  assert.equal(dashedMatches[1][1], m30StartY, 'Second segment must start at m30 start');
+  assert.equal(dashedMatches[1][2], m30EndY, 'Second segment must end at m30 end');
+});
+
+test('Urtext Classical Serif Typography Invariant: refined font stack and italic styling', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const page1Svg = renderPageToSvg(layout, 0);
+
+  // Verify font stack constant
+  assert.ok(URTEXT_SERIF.includes('Century Schoolbook'), 'URTEXT_SERIF contains Century Schoolbook');
+  assert.ok(URTEXT_SERIF.includes('Baskerville'), 'URTEXT_SERIF contains Baskerville');
+  assert.ok(URTEXT_SERIF.includes('Liberation Serif'), 'URTEXT_SERIF contains Liberation Serif');
+
+  // Verify <style> block includes URTEXT_SERIF for classes
+  assert.ok(page1Svg.includes(`.title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }`));
+  assert.ok(page1Svg.includes(`.subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }`));
+  assert.ok(page1Svg.includes(`.meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
+  assert.ok(page1Svg.includes(`.section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
+  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: normal; font-size: 7.5pt; fill: #444444; text-anchor: end; }`));
+  assert.ok(page1Svg.includes(`.beat-counter { font-family: ${URTEXT_SERIF}; font-style: normal; font-size: 6.5pt; fill: #6B7280; text-anchor: end; }`));
+  assert.ok(page1Svg.includes(`.pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }`));
+
+  // Verify Middle C m3 header badge uses URTEXT_SERIF with italic
+  assert.ok(page1Svg.includes(`font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">m3</text>`));
 });
 

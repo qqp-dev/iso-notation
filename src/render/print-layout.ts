@@ -2,7 +2,9 @@ import { QuantizedGridScore, QuantizedNote, HandCrossingEvent } from '../model/t
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { getCanonicalSyllable } from '../model/phonetics';
 import { detectHandCrossings, computeBeamClusters } from '../model/grid';
-import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor } from './types';
+import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor, getStaffLineGeometry } from './types';
+
+export const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif';
 
 export const A4_WIDTH_PT = 595.28; // 210mm in PostScript points (72 pt/inch)
 export const A4_HEIGHT_PT = 841.89; // 297mm in PostScript points
@@ -330,12 +332,13 @@ export function renderPageToSvg(
   );
   svgParts.push(`  <defs>`);
   svgParts.push(`    <style>`);
-  svgParts.push(`      .title { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 9.5pt; fill: #000000; }
-      .subtitle { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-size: 8pt; fill: #444444; }
-      .meta { font-family: "DejaVu Sans Mono", "Liberation Mono", system-ui, -apple-system, monospace; font-size: 7.5pt; fill: #666666; }
-      .measure-num { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-weight: bold; font-size: 7pt; fill: #444444; text-anchor: end; }
-      .beat-counter { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; text-anchor: end; }
-      .pitch-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6.5pt; fill: #555555; text-anchor: middle; }
+  svgParts.push(`      .title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }
+      .subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }
+      .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
+      .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
+      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: normal; font-size: 7.5pt; fill: #444444; text-anchor: end; }
+      .beat-counter { font-family: ${URTEXT_SERIF}; font-style: normal; font-size: 6.5pt; fill: #6B7280; text-anchor: end; }
+      .pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }
       .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
   svgParts.push(`    </style>`);
   svgParts.push(`  </defs>`);
@@ -351,7 +354,7 @@ export function renderPageToSvg(
   svgParts.push(`  <g id="page-header">`);
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="title">${escapeXml(title)}</text>`);
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle">${escapeXml(composer)}</text>`);
-  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle" text-anchor="end" font-weight="bold" fill="#000000">${escapeXml(page.sectionName)}</text>`);
+  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="section-header" text-anchor="end">${escapeXml(page.sectionName)}</text>`);
   svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(marginPt + 34).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(marginPt + 34).toFixed(2)}" stroke="#CCCCCC" stroke-width="0.75"/>`);
   svgParts.push(`  </g>`);
 
@@ -382,7 +385,7 @@ export function renderPageToSvg(
         if (isCenter) {
           // Tasteful center anchor badge for m3
           svgParts.push(`    <rect x="${(px - 9.5).toFixed(2)}" y="${(colTopPt + 2.5).toFixed(2)}" width="19" height="9.5" rx="2" fill="#111827"/>`);
-          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 9.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="6pt" fill="#FFFFFF" text-anchor="middle">m3</text>`);
+          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 9.5).toFixed(2)}" font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">m3</text>`);
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#111827" stroke-width="1.25"/>`);
         } else {
           svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
@@ -432,15 +435,72 @@ export function renderPageToSvg(
       }
     }
 
-    // Barlines and Measure Numbers
     const numMeasuresInCol = col.endMeasure - col.startMeasure + 1;
+
+    // Local Dashed Outlier Staff Lines for notes extending past octave boundaries
+    for (let m = 0; m < numMeasuresInCol; m++) {
+      const mStartTick = (col.startMeasure - 1 + m) * ticksPerMeasure;
+      const mEndTick = mStartTick + ticksPerMeasure;
+      const measureStartY = staffOriginY + m * ticksPerMeasure * ptPerTick;
+      const measureEndY = staffOriginY + (m + 1) * ticksPerMeasure * ptPerTick;
+
+      const measureNotes = col.notes.filter(
+        n => n.startTick >= mStartTick && n.startTick < mEndTick
+      );
+
+      const outlierNotesHigh = measureNotes.filter(
+        n => linearIndex(n.pitch) > maxPitch
+      );
+      if (outlierNotesHigh.length > 0) {
+        const maxOutlierPitch = Math.max(...outlierNotesHigh.map(n => linearIndex(n.pitch)));
+        for (let p = maxPitch + 1; ; p++) {
+          const pc = ((p % 12) + 12) % 12;
+          const geom = getStaffLineGeometry(p, normStaffStyle);
+          if (geom.isLine) {
+            const lineX = (colStaffLeftPt + (p - minPitch) * ptPerSemitone).toFixed(2);
+            if (geom.isDashed && geom.dashArray) {
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="${geom.dashArray.join(',')}"/>`);
+            } else if (pc === 0) {
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
+            } else {
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#555555" stroke-width="0.6"/>`);
+            }
+            if (p >= maxOutlierPitch) break;
+          }
+        }
+      }
+
+      const outlierNotesLow = measureNotes.filter(
+        n => linearIndex(n.pitch) < minPitch
+      );
+      if (outlierNotesLow.length > 0) {
+        const minOutlierPitch = Math.min(...outlierNotesLow.map(n => linearIndex(n.pitch)));
+        for (let p = minPitch - 1; ; p--) {
+          const pc = ((p % 12) + 12) % 12;
+          const geom = getStaffLineGeometry(p, normStaffStyle);
+          if (geom.isLine) {
+            const lineX = (colStaffLeftPt + (p - minPitch) * ptPerSemitone).toFixed(2);
+            if (geom.isDashed && geom.dashArray) {
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="${geom.dashArray.join(',')}"/>`);
+            } else if (pc === 0) {
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
+            } else {
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#555555" stroke-width="0.6"/>`);
+            }
+            if (p <= minOutlierPitch) break;
+          }
+        }
+      }
+    }
+
+    // Barlines and Measure Numbers
     const rightStaffBound = colStaffLeftPt + (maxPitch - minPitch) * ptPerSemitone;
 
     for (let m = 0; m <= numMeasuresInCol; m++) {
       const barY = staffOriginY + m * ticksPerMeasure * ptPerTick;
 
       // Barline across staff
-      svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${barY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
+      svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
 
       // Measure number label: only for the first bar of each column, plain number in gutter
       if (m === 0) {
@@ -467,7 +527,7 @@ export function renderPageToSvg(
           if (bTick >= col.startTick && bTick < col.endTick) {
             const beatY = staffOriginY + (bTick - col.startTick) * ptPerTick;
             svgParts.push(`    <!-- Klavarskribo Beat Grid (Beat ${b + 1}) -->`);
-            svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#9CA3AF" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
+            svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#9CA3AF" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
             svgParts.push(`    <!-- Klavarskribo Beat Counter (Beat ${b + 1}) -->`);
             svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(beatY + 2.5).toFixed(2)}" class="beat-counter">${b + 1}</text>`);
           }
@@ -672,14 +732,13 @@ export function renderPageToSvg(
       const lPitch = displayPitchMap.get(note.id)!;
       const isEven = wholeToneParity(lPitch) === 0;
       const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
-      const stemY = ny - nh / 2;
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (rawLPitch >= 60 ? 'RH' : 'LH');
 
       // Klavar lateral stem (flush to beam rail if clustered, standard length otherwise)
       const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
       const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
-      svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${stemY.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${stemY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
+      svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
 
       if (morph === 'phonetic') {
         const pc = ((lPitch % 12) + 12) % 12;
