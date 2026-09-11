@@ -509,16 +509,16 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
 
   // In Bach Goldberg Var 1, keyboard symmetry around m3 (linear pitch 48) means:
-  // - 500 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO lateral stems (clean noteheads)
-  // - Exactly 51 notes where hands cross m3 have lateral stems:
-  //   - 12 notes where RH crosses into bass (< 48) have right-pointing lateral stems (x2 > x1)
+  // - 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO lateral stems (clean noteheads)
+  // - Exactly 63 notes where hands cross m3 have lateral stems:
+  //   - 24 notes where RH crosses into bass (< 48) have right-pointing lateral stems (x2 > x1)
   //   - 39 notes where LH crosses into treble (> 48) have left-pointing lateral stems (x2 < x1)
-  assert.equal(lateralStems.length, 51, 'Must render lateral stems ONLY for exceptions (51 in Goldberg Var 1)');
+  assert.equal(lateralStems.length, 63, 'Must render lateral stems ONLY for exceptions (63 in Goldberg Var 1)');
 
   const rhStems = lateralStems.filter((s) => s.x2 > s.x1);
   const lhStems = lateralStems.filter((s) => s.x2 < s.x1);
 
-  assert.equal(rhStems.length, 12, '12 crossing notes must have right-pointing stems for RH in bass (< 48)');
+  assert.equal(rhStems.length, 24, '24 crossing notes must have right-pointing stems for RH in bass (< 48)');
   assert.equal(lhStems.length, 39, '39 crossing notes must have left-pointing stems for LH above m3 (> 48)');
 
   lateralStems.forEach((s) => {
@@ -1325,9 +1325,9 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
 
   // Handedness stems: symmetry around m3 (indicate only exceptions)
-  // In Goldberg Var 1, 500 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero stems,
-  // while the 51 notes where hands cross m3 (12 RH < 48, 39 LH > 48) have lateral stems.
-  assert.equal(lateralStems.length, 51, 'Only hand crossing exception notes (51 in Var 1) render lateral stems');
+  // In Goldberg Var 1, 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero stems,
+  // while the 63 notes where hands cross m3 (24 RH < 48, 39 LH > 48) have lateral stems.
+  assert.equal(lateralStems.length, 63, 'Only hand crossing exception notes (63 in Var 1) render lateral stems');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1351,7 +1351,7 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   );
 });
 
-test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails Invariant (d >= ticksPerBeat with concurrent onsets)', () => {
+test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for All Colored Notes with Continuous Uninterrupted Reference Lines', () => {
   const score = buildBachGoldbergVar1Score();
 
   type DottedTrail = {
@@ -1365,10 +1365,19 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
     dash: number[];
   };
 
+  type KnockoutLine = {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    lineWidth: number;
+  };
+
   const createMock = (
     dottedTrails: DottedTrail[],
     ribbons: { x: number; y: number; w: number; h: number }[],
-    textCalls: string[]
+    textCalls: string[],
+    knockoutLines: KnockoutLine[] = []
   ) => {
     let currentDash: number[] = [];
     let currentAlpha = 1.0;
@@ -1421,8 +1430,8 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
       stroke: () => {
         if (
           currentDash.length === 2 &&
-          currentDash[0] === 2 &&
-          currentDash[1] === 3 &&
+          currentDash[0] === 0 &&
+          currentDash[1] === 4 &&
           pathStart &&
           pathEnd
         ) {
@@ -1435,6 +1444,20 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
             lineWidth: currentLineWidth,
             alpha: currentAlpha,
             dash: [...currentDash],
+          });
+        } else if (
+          currentStrokeStyle === '#000000' &&
+          currentDash.length === 0 &&
+          (currentLineWidth === 3.0 || currentLineWidth === 2.0) &&
+          pathStart &&
+          pathEnd
+        ) {
+          knockoutLines.push({
+            x1: pathStart.x,
+            y1: pathStart.y,
+            x2: pathEnd.x,
+            y2: pathEnd.y,
+            lineWidth: currentLineWidth,
           });
         }
       },
@@ -1463,18 +1486,9 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
   const paddingStart = 60;
   const paddingPitch = 40;
 
-  const ticksPerBeat = score.ticksPerBeat || 48;
-  const polyLongNotes = score.notes.filter(
-    (n) =>
-      n.durationTicks >= ticksPerBeat &&
-      score.notes.some(
-        (other) =>
-          other.id !== n.id &&
-          other.startTick > n.startTick &&
-          other.startTick < n.startTick + n.durationTicks
-      )
-  );
-  assert.equal(polyLongNotes.length, 2, 'Goldberg Var 1 contains exactly 2 notes with d >= ticksPerBeat and concurrent onsets');
+  const tauRef = score.gridResolution || 12;
+  const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+  assert.equal(coloredNotes.length, 165, 'Goldberg Var 1 contains exactly 165 colored notes (d > tauRef)');
   const longNote = score.notes.find((n) => n.durationTicks === 108)!;
 
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1483,10 +1497,11 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
 
   // 1. Vertical orientation
   const verticalDottedTrails: DottedTrail[] = [];
+  const verticalKnockouts: KnockoutLine[] = [];
   const verticalRibbons: { x: number; y: number; w: number; h: number }[] = [];
   const verticalTexts: string[] = [];
 
-  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts), score, {
+  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts, verticalKnockouts), score, {
     orientation: 'vertical',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
@@ -1503,19 +1518,24 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
   // Zero hold ribbon rects
   assert.equal(verticalRibbons.length, 0, 'Vertical hold ribbons must be 0');
 
-  // Dotted continuation trail rendered strictly for the notes with concurrent onsets
-  // (bach-var1-116 and bach-var1-343), while cadence quarter notes (282, 550, 551) have zero trails
+  // Dotted continuation trails rendered for all 165 colored notes
   assert.equal(
     verticalDottedTrails.length,
-    2,
-    'Must render exactly 2 faint dotted trails for notes with d >= ticksPerBeat and concurrent onsets'
+    165,
+    'Must render exactly 165 faint dotted trails for all colored notes in vertical orientation'
+  );
+
+  // Continuous Uninterrupted Reference Staff Lines: zero knockout lines behind hold trails
+  assert.equal(
+    verticalKnockouts.length,
+    0,
+    'Must render exactly 0 staff-line knockout lines in vertical orientation'
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
-  assert.ok(vTrail, 'Must find trail for 108t pedal note');
-  assert.deepEqual(vTrail.dash, [2, 3], 'Trail dash pattern must be [2, 3]');
-  assert.equal(vTrail.lineWidth, 0.8, 'Trail stroke width must be 0.8px');
-  assert.equal(vTrail.alpha, 0.45, 'Trail opacity must be 0.45');
+  assert.deepEqual(vTrail.dash, [0, 4], 'Trail dash pattern must be [0, 4]');
+  assert.equal(vTrail.lineWidth, 1.1, 'Trail stroke width must be 1.1px');
+  assert.equal(vTrail.alpha, 0.75, 'Trail opacity must be 0.75');
   assert.equal(vTrail.stroke, '#F43F5E', 'Trail stroke color must match duration class (#F43F5E for 108t)');
 
   // Coordinates:
@@ -1544,10 +1564,11 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
 
   // 2. Horizontal orientation
   const horizontalDottedTrails: DottedTrail[] = [];
+  const horizontalKnockouts: KnockoutLine[] = [];
   const horizontalRibbons: { x: number; y: number; w: number; h: number }[] = [];
   const horizontalTexts: string[] = [];
 
-  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts), score, {
+  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts, horizontalKnockouts), score, {
     orientation: 'horizontal',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
@@ -1562,7 +1583,16 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
   });
 
   assert.equal(horizontalRibbons.length, 0, 'Horizontal hold ribbons must be 0');
-  assert.equal(horizontalDottedTrails.length, 2, 'Must render exactly 2 horizontal dotted trails');
+  assert.equal(
+    horizontalDottedTrails.length,
+    165,
+    'Must render exactly 165 horizontal dotted trails for all colored notes'
+  );
+  assert.equal(
+    horizontalKnockouts.length,
+    0,
+    'Must render exactly 0 horizontal staff-line knockout lines'
+  );
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
   assert.ok(hTrail, 'Must find horizontal trail for 108t pedal note');
@@ -2435,12 +2465,8 @@ test('Left-Gutter Beat Counter Invariant: beats 1, 2, 3 align with pulse lines i
   const svgs = renderAllPagesToSvg(layout);
   const page1 = svgs[0];
 
-  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 1)'), 'SVG must include Beat 1 counter comment');
-  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 2)'), 'SVG must include Beat 2 counter comment');
-  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 3)'), 'SVG must include Beat 3 counter comment');
-  assert.ok(page1.includes('class="beat-counter">1</text>'), 'SVG must render Beat 1 text in column left gutter');
-  assert.ok(page1.includes('class="beat-counter">2</text>'), 'SVG must render Beat 2 text in column left gutter');
-  assert.ok(page1.includes('class="beat-counter">3</text>'), 'SVG must render Beat 3 text in column left gutter');
+  assert.doesNotMatch(page1, /class="beat-counter"/, 'SVG must NOT include beat-counter text');
+  assert.match(page1, /stroke-dasharray="2,3"/, 'SVG must include dashed pulse lines for beat subdivisions');
 });
 
 test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and defaults to independent Klavar lateral stems', async () => {

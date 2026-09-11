@@ -809,14 +809,7 @@ export function renderScoreToCanvas(
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
     const ticksPerBeat = score.ticksPerBeat || 48;
-    const showDottedTrail =
-      note.durationTicks >= ticksPerBeat &&
-      score.notes.some(
-        other =>
-          other.id !== note.id &&
-          other.startTick > note.startTick &&
-          other.startTick < note.startTick + note.durationTicks
-      );
+    const showDottedTrail = note.durationTicks > tauRef;
 
     if (isPianoRoll) {
       const isSounding =
@@ -871,15 +864,16 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for long notes with polyphonic overlap
+      // Faint dotted continuation trail for colored notes
       if (showDottedTrail) {
         const trailStartX = cx + noteWidth / 2 + 2;
         const trailEndX = cx + note.durationTicks * options.pixelsPerTick;
         if (trailEndX > trailStartX) {
           ctx.save();
-          ctx.setLineDash([2, 3]);
-          ctx.lineWidth = 0.8;
-          ctx.globalAlpha = 0.45;
+          ctx.lineCap = 'round';
+          ctx.setLineDash([0, 4]);
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.75;
           ctx.strokeStyle = noteColor;
           ctx.beginPath();
           ctx.moveTo(trailStartX, cy);
@@ -926,15 +920,16 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for long notes with polyphonic overlap
+      // Faint dotted continuation trail for colored notes
       if (showDottedTrail) {
         const trailStartY = cy + noteHeight / 2 + 2;
         const trailEndY = cy + note.durationTicks * options.pixelsPerTick;
         if (trailEndY > trailStartY) {
           ctx.save();
-          ctx.setLineDash([2, 3]);
-          ctx.lineWidth = 0.8;
-          ctx.globalAlpha = 0.45;
+          ctx.lineCap = 'round';
+          ctx.setLineDash([0, 4]);
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.75;
           ctx.strokeStyle = noteColor;
           ctx.beginPath();
           ctx.moveTo(cx, trailStartY);
