@@ -50,22 +50,29 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
 
     // 5/7 Staff Topography Invariant:
     // PC 0 (C) is bold octave line.
-    // Demarcation line is placed at the 5/7 boundary (between PC 4 and PC 5, E/F seam at 4.5).
-    // PC 6 (F#) is rendered as a regular hairline, grouping 3 lines in 5-group (C, D, E) and 3 lines in 7-group (F#, G#, A#).
+    // Demarcation line is placed at PC 4 (E), the boundary of the 5-group (C, D, E),
+    // replacing the old tritone line and unaligned PC 4.5 line.
+    // PC 4 is a crisp dotted demarcation line (1.0px / 0.9pt, dashArray: [1.5, 3], isDemarcation: true, isDashed: true).
+    // PC 2, 6, 8, 10 are rendered as subtle hairlines (0.6px).
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
     assert.equal(geom0.lineWidth, 2.0);
     assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
-    // 5/7 Demarcation Line at PC 4.5
-    const geomDemarc = getStaffLineGeometry(4.5, style);
+    // 5/7 Demarcation Line at PC 4 (E)
+    const geomDemarc = getStaffLineGeometry(4, style);
     assert.equal(geomDemarc.isLine, true);
+    assert.equal(geomDemarc.isBold, false);
     assert.equal(geomDemarc.isDashed, true);
+    assert.deepEqual(geomDemarc.dashArray, [1.5, 3]);
     assert.equal(geomDemarc.isDemarcation, true);
     assert.equal(geomDemarc.lineWidth, 1.0);
-    assert.equal(geomDemarc.color, 'rgba(255, 255, 255, 0.5)');
-    assert.deepEqual(geomDemarc.dashArray, [5, 4]);
+    assert.equal(geomDemarc.color, 'rgba(255, 255, 255, 0.55)');
+
+    // Zero lines at non-integer pitch coordinates (no 4.5 floating line)
+    const geom45 = getStaffLineGeometry(4.5, style);
+    assert.equal(geom45.isLine, false, 'Non-integer 4.5 must not be a staff line');
 
     // PC 6 is rendered as a regular hairline
     const geom6 = getStaffLineGeometry(6, style);
@@ -74,8 +81,8 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     assert.equal(geom6.isDashed, false, 'PC 6 must not be dashed');
     assert.equal(geom6.lineWidth, 0.6, 'PC 6 must be a 0.6 hairline');
 
-    // Hairlines across 5-group and 7-group (2, 4, 6, 8, 10)
-    [2, 4, 6, 8, 10].forEach((pc) => {
+    // Hairlines across 5-group and 7-group (2, 6, 8, 10)
+    [2, 6, 8, 10].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
       assert.equal(g.isLine, true, `PC ${pc} must be a hairline`);
       assert.equal(g.isBold, false);
@@ -362,10 +369,10 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
 
 test('Geometric Diamond Alignment Invariant: vertical half-height matches circle radius (d = r)', () => {
   // In row-parity-shape:
-  // Circle radius r = Math.max(4.5, baseSize * 0.48)
+  // Circle radius r = Math.max(5.5, baseSize * 0.58) (scaled up ~20%)
   // Diamond vertical half-height rh must exactly equal r (d = r)
   const baseSize = 14 - 3; // pixelsPerSemitone - 3
-  const r = Math.max(4.5, baseSize * 0.48);
+  const r = Math.max(5.5, baseSize * 0.58);
   const rh = r;
   assert.equal(rh, r, 'Diamond vertical half-height rh must match circle radius r (d = r)');
 

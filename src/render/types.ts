@@ -254,10 +254,9 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'tritone-split') {
-    // 5/7 Staff Topography:
-    // 6 whole-tone lines partitioned into two 3-line groups by the 5/7 boundary demarcation:
-    // 5-group: PC 0 (bold octave), PC 2, 4 (hairlines)
-    // 5/7 Demarcation: PC 4.5 (dashed line at E/F seam)
+    // 5/7 Staff Topography (Klavarscribo-style continuous demarcation):
+    // 6 whole-tone lines partitioned into two 3-line groups by the 5/7 boundary demarcation at PC 4 (E):
+    // 5-group: PC 0 (bold octave), PC 2 (hairline), PC 4 (5/7 continuous demarcation line)
     // 7-group: PC 6, 8, 10 (hairlines)
     // Odd integer PCs: spaces.
     if (pc === 0) {
@@ -271,20 +270,20 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         color: 'rgba(255, 255, 255, 0.9)',
       };
     }
-    if (pc === 4.5) {
+    if (pc === 4) {
       return {
         isLine: true,
         isBold: false,
         isDashed: true,
-        dashArray: [5, 4],
+        dashArray: [1.5, 3],
         isTritone: false,
         isDemarcation: true,
         isOctaveBoundary: false,
         lineWidth: 1.0,
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: 'rgba(255, 255, 255, 0.55)',
       };
     }
-    if (pc === 2 || pc === 4 || pc === 6 || pc === 8 || pc === 10) {
+    if (pc === 2 || pc === 6 || pc === 8 || pc === 10) {
       return {
         isLine: true,
         isBold: false,

@@ -208,51 +208,7 @@ export function renderScoreToCanvas(
       ctx.fillText(String(pc), x, paddingStart - 6);
     }
   }
-
-  // 2c. 5/7 Boundary Demarcation Lines (between PC 4 and PC 5, E/F seam)
-  if (normStaffStyle === 'tritone-split') {
-    const minOct = Math.floor(minPitch / 12);
-    const maxOct = Math.ceil(maxPitch / 12);
-    const demGeom = getStaffLineGeometry(4.5, normStaffStyle);
-
-    for (let oct = minOct; oct <= maxOct; oct++) {
-      const pBoundary = oct * 12 + 4.5;
-      if (pBoundary >= minPitch && pBoundary <= maxPitch) {
-        if (isHoriz) {
-          const y = height - paddingPitch - (pBoundary - minPitch) * options.pixelsPerSemitone;
-          ctx.beginPath();
-          ctx.strokeStyle = demGeom.color;
-          ctx.lineWidth = demGeom.lineWidth;
-          ctx.setLineDash(demGeom.dashArray || [5, 4]);
-          ctx.moveTo(paddingStart, y);
-          ctx.lineTo(dims.width, y);
-          ctx.stroke();
-
-          ctx.fillStyle = '#888888';
-          ctx.font = '8px monospace';
-          ctx.textAlign = 'right';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('5|7', paddingStart - 8, y);
-        } else {
-          const x = paddingPitch + (pBoundary - minPitch) * options.pixelsPerSemitone;
-          ctx.beginPath();
-          ctx.strokeStyle = demGeom.color;
-          ctx.lineWidth = demGeom.lineWidth;
-          ctx.setLineDash(demGeom.dashArray || [5, 4]);
-          ctx.moveTo(x, paddingStart);
-          ctx.lineTo(x, dims.height);
-          ctx.stroke();
-
-          ctx.fillStyle = '#888888';
-          ctx.font = '8px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText('5|7', x, paddingStart - 6);
-        }
-      }
-    }
-    ctx.setLineDash([]);
-  }
+  ctx.setLineDash([]);
   ctx.restore();
 
   // 3. Barlines & Measure Numbers
@@ -533,7 +489,7 @@ function renderNotehead(
 
     case 'row-parity-shape': {
       const parityShape = getParityShape(pitchClass);
-      const r = Math.max(4.5, baseSize * 0.48);
+      const r = Math.max(5.5, baseSize * 0.58);
 
       if (parityShape === 'disc') {
         // Row 0: Even pitch classes on lines -> Disc / Oval

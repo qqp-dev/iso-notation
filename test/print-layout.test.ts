@@ -148,19 +148,20 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // 2. 5/7 Staff Topography lines
     // - Bold octave (PC 0, 1.5pt)
     assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.5"/, 'Must contain bold 1.5pt octave line');
-    // - Dashed 5/7 demarcation line (1.0pt, dash 3 3)
-    assert.match(svg, /stroke-dasharray="3,3"/, 'Must contain dashed 5/7 demarcation line (dash 3 3)');
-    assert.match(svg, /stroke-width="1\.0"/, 'Must contain 1.0pt stroke width for demarcation');
-    // - Hairlines (PC 2, 4, 6, 8, 10, 0.5pt)
-    assert.match(svg, /stroke-width="0\.5"/, 'Must contain 0.5pt hairlines');
+    // - Dotted 5/7 demarcation line at PC 4 (0.9pt, dasharray 1.5,3)
+    assert.match(svg, /stroke="#333333"[^>]*stroke-width="0\.9"[^>]*stroke-dasharray="1\.5,3"/, 'Must contain dotted 0.9pt 5/7 demarcation line');
+    // - Hairlines (PC 2, 6, 8, 10, 0.5pt)
+    assert.match(svg, /stroke="#888888"[^>]*stroke-width="0\.5"/, 'Must contain 0.5pt hairlines');
+    // - Zero old 3,3 dashes
+    assert.doesNotMatch(svg, /stroke-dasharray="3,3"/, 'Old 3,3 dashes must not be present');
 
     // 3. Klavar Lateral Stems Invariant
     // - Horizontal lateral stems for hand assignment with stroke-width 1.2pt
     assert.match(svg, /<line[^>]*stroke-width="1\.2"[^>]*stroke-linecap="round"/, 'Must render Klavar lateral stems');
 
     // 4. Solid row-parity noteheads with white halo knockout and duration colors
-    // - Discs on lines (Row 0): circle with stroke="#FFFFFF" and stroke-width="2"
-    assert.match(svg, /<circle[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 0 discs with white halo knockout');
+    // - Discs on lines (Row 0): circle with r="4.2", stroke="#FFFFFF" and stroke-width="2"
+    assert.match(svg, /<circle[^>]*r="4\.2"[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 0 discs with 4.2pt radius and white halo knockout');
     // - Diamonds in spaces (Row 1): polygon with stroke="#FFFFFF" and stroke-width="2"
     assert.match(svg, /<polygon[^>]*stroke="#FFFFFF"[^>]*stroke-width="2"/, 'Must render Row 1 diamonds with white halo knockout');
 
@@ -186,10 +187,10 @@ test('Klavar Lateral Stems & Geometric Diamond Alignment in SVG Print Engine', (
   const svg = renderPageToSvg(layout, 0);
 
   // Geometric Diamond Alignment Invariant:
-  // Circle radius r = 3.5, Diamond vertical half-height d = r = 3.5
-  assert.match(svg, /<circle[^>]*r="3\.5"/, 'Circle radius must be 3.5pt');
+  // Circle radius r = 4.2, Diamond vertical half-height d = r = 4.2
+  assert.match(svg, /<circle[^>]*r="4\.2"/, 'Circle radius must be 4.2pt');
 
-  // Verify diamond coordinates: top ny - 3.5 and bottom ny + 3.5 match circle vertical extent
+  // Verify diamond coordinates: top ny - 4.2 and bottom ny + 4.2 match circle vertical extent
   const diamondMatches = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g));
   assert.ok(diamondMatches.length > 0, 'Must have rendered diamond noteheads in SVG');
 
@@ -198,7 +199,7 @@ test('Klavar Lateral Stems & Geometric Diamond Alignment in SVG Print Engine', (
     assert.equal(pts.length, 4, 'Diamond must have 4 points');
     const [top, right, bottom, left] = pts;
     const verticalHeight = Math.round((bottom[1] - top[1]) * 100) / 100;
-    assert.equal(verticalHeight, 7.0, 'Diamond total vertical height must exactly equal 2 * r = 7.0pt (d = r = 3.5)');
+    assert.equal(verticalHeight, 8.4, 'Diamond total vertical height must exactly equal 2 * r = 8.4pt (d = r = 4.2)');
   }
 
   // Klavar Lateral Stems Invariant:
