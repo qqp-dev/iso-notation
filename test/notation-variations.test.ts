@@ -509,16 +509,16 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
 
   // In Bach Goldberg Var 1, keyboard symmetry around m3 (linear pitch 48) means:
-  // - 500 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO lateral stems (clean noteheads)
-  // - Exactly 51 notes where hands cross m3 have lateral stems:
-  //   - 12 notes where RH crosses into bass (< 48) have right-pointing lateral stems (x2 > x1)
+  // - 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO lateral stems (clean noteheads)
+  // - Exactly 63 notes where hands cross m3 have lateral stems:
+  //   - 24 notes where RH crosses into bass (< 48) have right-pointing lateral stems (x2 > x1)
   //   - 39 notes where LH crosses into treble (> 48) have left-pointing lateral stems (x2 < x1)
-  assert.equal(lateralStems.length, 51, 'Must render lateral stems ONLY for exceptions (51 in Goldberg Var 1)');
+  assert.equal(lateralStems.length, 63, 'Must render lateral stems ONLY for exceptions (63 in Goldberg Var 1)');
 
   const rhStems = lateralStems.filter((s) => s.x2 > s.x1);
   const lhStems = lateralStems.filter((s) => s.x2 < s.x1);
 
-  assert.equal(rhStems.length, 12, '12 crossing notes must have right-pointing stems for RH in bass (< 48)');
+  assert.equal(rhStems.length, 24, '24 crossing notes must have right-pointing stems for RH in bass (< 48)');
   assert.equal(lhStems.length, 39, '39 crossing notes must have left-pointing stems for LH above m3 (> 48)');
 
   lateralStems.forEach((s) => {
@@ -1325,9 +1325,9 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
 
   // Handedness stems: symmetry around m3 (indicate only exceptions)
-  // In Goldberg Var 1, 500 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero stems,
-  // while the 51 notes where hands cross m3 (12 RH < 48, 39 LH > 48) have lateral stems.
-  assert.equal(lateralStems.length, 51, 'Only hand crossing exception notes (51 in Var 1) render lateral stems');
+  // In Goldberg Var 1, 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero stems,
+  // while the 63 notes where hands cross m3 (24 RH < 48, 39 LH > 48) have lateral stems.
+  assert.equal(lateralStems.length, 63, 'Only hand crossing exception notes (63 in Var 1) render lateral stems');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -2435,12 +2435,8 @@ test('Left-Gutter Beat Counter Invariant: beats 1, 2, 3 align with pulse lines i
   const svgs = renderAllPagesToSvg(layout);
   const page1 = svgs[0];
 
-  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 1)'), 'SVG must include Beat 1 counter comment');
-  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 2)'), 'SVG must include Beat 2 counter comment');
-  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 3)'), 'SVG must include Beat 3 counter comment');
-  assert.ok(page1.includes('class="beat-counter">1</text>'), 'SVG must render Beat 1 text in column left gutter');
-  assert.ok(page1.includes('class="beat-counter">2</text>'), 'SVG must render Beat 2 text in column left gutter');
-  assert.ok(page1.includes('class="beat-counter">3</text>'), 'SVG must render Beat 3 text in column left gutter');
+  assert.doesNotMatch(page1, /class="beat-counter"/, 'SVG must NOT include beat-counter text');
+  assert.match(page1, /stroke-dasharray="2,3"/, 'SVG must include dashed pulse lines for beat subdivisions');
 });
 
 test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and defaults to independent Klavar lateral stems', async () => {

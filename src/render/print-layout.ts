@@ -254,9 +254,9 @@ export function computeColumnarLayout(
   }
 
   // Calculate scales
-  const columnMarginLeftPt = 16; // Gutter for measure number labels
-  const bufferMarginPt = 15; // Symmetrical margin buffer for extra notes left of m1 and right of m5
-  const usablePitchWidthPt = Math.max(50, columnWidthPt - columnMarginLeftPt - 2 * bufferMarginPt);
+  const colMarginLeftPt = 14; // Left clearance before m1 (5mm)
+  const rightBufferMarginPt = 22; // Right buffer after m5 (7.8mm)
+  const usablePitchWidthPt = Math.max(50, columnWidthPt - colMarginLeftPt - rightBufferMarginPt);
 
   const ptPerSemitone = options.pixelsPerSemitone > 0
     ? options.pixelsPerSemitone
@@ -317,8 +317,7 @@ export function renderPageToSvg(
   const colHeaderHeightPt = 16;
   const colTopPt = marginPt + headerHeightPt;
 
-  const colMarginLeftPt = 16;
-  const bufferMarginPt = 15;
+  const colMarginLeftPt = 14;
 
   const normStaffStyle = normalizeStaffStyle(options.staffStyle);
   const tauRef = score.gridResolution || 12;
@@ -336,8 +335,7 @@ export function renderPageToSvg(
       .subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }
       .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
       .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
-      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: normal; font-size: 7.5pt; fill: #444444; text-anchor: end; }
-      .beat-counter { font-family: ${URTEXT_SERIF}; font-style: normal; font-size: 6.5pt; fill: #6B7280; text-anchor: end; }
+      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #333333; text-anchor: start; }
       .pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }
       .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
   svgParts.push(`    </style>`);
@@ -361,7 +359,7 @@ export function renderPageToSvg(
   // 3. Render Columns
   for (const col of page.columns) {
     const colLeftPt = marginPt + col.columnOnPageIndex * (colWidthPt + columnGapPt);
-    const colStaffLeftPt = colLeftPt + colMarginLeftPt + bufferMarginPt;
+    const colStaffLeftPt = colLeftPt + colMarginLeftPt;
     const colTicks = (col.endMeasure - col.startMeasure + 1) * ticksPerMeasure;
     const colStaffHeightPt = colTicks * ptPerTick;
 
@@ -502,34 +500,25 @@ export function renderPageToSvg(
       // Barline across staff
       svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
 
-      // Measure number label: only for the first bar of each column, plain number in gutter
+      // Measure number label: only for the first bar of each column, placed at top of column above m1
       if (m === 0) {
-        svgParts.push(`    <text x="${(colStaffLeftPt - bufferMarginPt - 4).toFixed(2)}" y="${(barY + 9).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
+        svgParts.push(`    <text x="${colStaffLeftPt.toFixed(2)}" y="${(staffOriginY - 4).toFixed(2)}" class="measure-num" text-anchor="start">${col.startMeasure}</text>`);
       }
     }
 
-    // Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc. and left gutter beat counter)
+    // Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc.)
     if (layout.options.showBeatGrid) {
       const numBeats = score.timeSignatures?.[0]?.numerator || 3;
       for (let m = 0; m < numMeasuresInCol; m++) {
         const mStartTick = (col.startMeasure - 1 + m) * ticksPerMeasure;
 
-        // Beat 1 Left-Gutter Beat Counter (aligned with solid barline)
-        if (mStartTick >= col.startTick && mStartTick < col.endTick) {
-          const barY = staffOriginY + (mStartTick - col.startTick) * ptPerTick;
-          svgParts.push(`    <!-- Klavarskribo Beat Counter (Beat 1) -->`);
-          svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(barY + 2.5).toFixed(2)}" class="beat-counter">1</text>`);
-        }
-
-        // Beats 2, 3... pulse lines and beat counters
+        // Beats 2, 3... pulse lines
         for (let b = 1; b < numBeats; b++) {
           const bTick = mStartTick + b * ticksPerBeat;
           if (bTick >= col.startTick && bTick < col.endTick) {
             const beatY = staffOriginY + (bTick - col.startTick) * ptPerTick;
             svgParts.push(`    <!-- Klavarskribo Beat Grid (Beat ${b + 1}) -->`);
             svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#9CA3AF" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
-            svgParts.push(`    <!-- Klavarskribo Beat Counter (Beat ${b + 1}) -->`);
-            svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(beatY + 2.5).toFixed(2)}" class="beat-counter">${b + 1}</text>`);
           }
         }
       }
