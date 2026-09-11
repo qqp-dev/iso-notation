@@ -1,7 +1,6 @@
 import { QuantizedGridScore } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { getCanonicalSyllable } from '../model/phonetics';
-import { computeBeamClusters } from '../model/grid';
 import {
   RenderOptions,
   normalizeStaffStyle,
@@ -730,58 +729,55 @@ export function renderScoreToCanvas(
   ctx.save();
   const tauRef = score.gridResolution || 12;
 
-  // Elaine Gould Angled Beam Engraving for Vertical Timeline
-  const stemEndMap = new Map<string, number>();
-  if (!isHoriz && !isPianoRoll && options.showBeamGrouping === true) {
-    const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
-    const MAX_SLANT = Math.max(16, options.pixelsPerSemitone * 1.5);
-    const clusters = computeBeamClusters(score.notes, score.ticksPerBeat, tauRef, 7);
+  // Pre-collect lateral stems for collision truncation
+  interface LateralStem {
+    id: string;
+    y: number;
+    x1: number;
+    x2: number;
+  }
+  const lateralStems: LateralStem[] = [];
+  if (!isHoriz && !isPianoRoll) {
+    const stemLength = Math.max(32, options.pixelsPerSemitone * 2.5);
+    for (const note of score.notes) {
+      const lPitch = linearIndex(note.pitch);
+      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
+      const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+      if (isStemException) {
+        const { x, y } = getCoords(note.startTick, lPitch);
+        const stemEndX = hand === 'RH' ? x + stemLength : x - stemLength;
+        lateralStems.push({
+          id: note.id,
+          y,
+          x1: Math.min(x, stemEndX),
+          x2: Math.max(x, stemEndX),
+        });
+      }
+    }
+  }
 
-    for (const cluster of clusters) {
-      if (cluster.notes.length >= 2 && cluster.endTick > cluster.startTick) {
-        const cNotes = cluster.notes;
-        const nxArr = cNotes.map(n => getCoords(n.startTick, linearIndex(n.pitch)).x);
-        const nyArr = cNotes.map(n => getCoords(n.startTick, 0).y);
-
-        const y1 = nyArr[0];
-        const yK = nyArr[nyArr.length - 1];
-        const totalDy = yK - y1;
-
-        const rawDx = nxArr[nxArr.length - 1] - nxArr[0];
-        const slantSign = Math.sign(rawDx);
-        const rawSlantMagnitude = Math.abs(rawDx) * 0.65;
-        const cappedSlant = slantSign * Math.min(rawSlantMagnitude, MAX_SLANT);
-        const slope = cappedSlant / totalDy;
-
-        let X0: number;
-        if (cluster.hand === 'RH') {
-          const maxReq = Math.max(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
-          X0 = maxReq + stemLength;
-        } else {
-          const minReq = Math.min(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
-          X0 = minReq - stemLength;
-        }
-
-        const isClusterActive = cluster.notes.some(n =>
-          (options.currentTick >= n.startTick && options.currentTick < n.startTick + n.durationTicks) ||
-          options.selectedNoteId === n.id
-        );
-
-        const beamX1 = X0;
-        const beamXK = X0 + slope * totalDy;
-
-        ctx.beginPath();
-        ctx.strokeStyle = isClusterActive ? '#FACC15' : 'rgba(255, 255, 255, 0.9)';
-        ctx.lineWidth = isClusterActive ? 2.4 : 2.0;
-        ctx.moveTo(beamX1, y1);
-        ctx.lineTo(beamXK, yK);
-        ctx.stroke();
-
-        for (let i = 0; i < cNotes.length; i++) {
-          const note = cNotes[i];
-          const endX = X0 + slope * (nyArr[i] - y1);
-          stemEndMap.set(note.id, endX);
-        }
+  interface HorizLateralStem {
+    id: string;
+    x: number;
+    y1: number;
+    y2: number;
+  }
+  const horizLateralStems: HorizLateralStem[] = [];
+  if (isHoriz && !isPianoRoll) {
+    const stemLength = Math.max(32, options.pixelsPerSemitone * 2.5);
+    for (const note of score.notes) {
+      const lPitch = linearIndex(note.pitch);
+      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
+      const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+      if (isStemException) {
+        const { x, y } = getCoords(note.startTick, lPitch);
+        const stemEndY = hand === 'RH' ? y + stemLength : y - stemLength;
+        horizLateralStems.push({
+          id: note.id,
+          x,
+          y1: Math.min(y, stemEndY),
+          y2: Math.max(y, stemEndY),
+        });
       }
     }
   }
@@ -864,16 +860,25 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for colored notes
+      // Solid thin hold lines for colored notes
       if (showDottedTrail) {
         const trailStartX = cx + noteWidth / 2 + 2;
-        const trailEndX = cx + note.durationTicks * options.pixelsPerTick;
+        let trailEndX = cx + note.durationTicks * options.pixelsPerTick;
+        for (const stem of horizLateralStems) {
+          if (stem.id !== note.id) {
+            if (cy >= stem.y1 - 0.5 && cy <= stem.y2 + 0.5) {
+              if (stem.x > trailStartX && stem.x <= trailEndX) {
+                trailEndX = Math.min(trailEndX, stem.x - 2.5);
+              }
+            }
+          }
+        }
         if (trailEndX > trailStartX) {
           ctx.save();
           ctx.lineCap = 'round';
-          ctx.setLineDash([0, 4]);
-          ctx.lineWidth = 1.1;
-          ctx.globalAlpha = 0.75;
+          ctx.setLineDash([]);
+          ctx.lineWidth = 0.8;
+          ctx.globalAlpha = 1.0;
           ctx.strokeStyle = noteColor;
           ctx.beginPath();
           ctx.moveTo(trailStartX, cy);
@@ -920,16 +925,25 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for colored notes
+      // Solid thin hold lines for colored notes with collision truncation
       if (showDottedTrail) {
         const trailStartY = cy + noteHeight / 2 + 2;
-        const trailEndY = cy + note.durationTicks * options.pixelsPerTick;
+        let trailEndY = cy + note.durationTicks * options.pixelsPerTick;
+        for (const stem of lateralStems) {
+          if (stem.id !== note.id) {
+            if (cx >= stem.x1 - 0.5 && cx <= stem.x2 + 0.5) {
+              if (stem.y > trailStartY && stem.y <= trailEndY) {
+                trailEndY = Math.min(trailEndY, stem.y - 2.5);
+              }
+            }
+          }
+        }
         if (trailEndY > trailStartY) {
           ctx.save();
           ctx.lineCap = 'round';
-          ctx.setLineDash([0, 4]);
-          ctx.lineWidth = 1.1;
-          ctx.globalAlpha = 0.75;
+          ctx.setLineDash([]);
+          ctx.lineWidth = 0.8;
+          ctx.globalAlpha = 1.0;
           ctx.strokeStyle = noteColor;
           ctx.beginPath();
           ctx.moveTo(cx, trailStartY);
@@ -947,9 +961,8 @@ export function renderScoreToCanvas(
       const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
 
       if (isStemException) {
-        const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
-        const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
-        const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
+        const stemLength = Math.max(32, options.pixelsPerSemitone * 2.5);
+        const stemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
 
         ctx.beginPath();
         ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;

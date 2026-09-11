@@ -197,8 +197,8 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
 
   assert.match(
     fullScoreSvg,
-    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="1\.1" stroke-linecap="round" stroke-dasharray="0, 3\.5" opacity="0\.75"\/>/,
-    'Must render faint dotted continuation line (stroke-linecap="round") for long notes'
+    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="0\.8" stroke-linecap="round"\/>/,
+    'Must render solid thin hold line (stroke-linecap="round") for long notes'
   );
 
   // Verify renderColumnarScoreToSvg helper
@@ -208,7 +208,7 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   assert.equal(defaultSvg, svgs[0]);
 });
 
-test('Pure Noteheads for 16th Notes and Faint Dotted Continuation Lines for All Colored Notes Invariant', () => {
+test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored Notes Invariant', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = layout.pages.map((_, p) => renderPageToSvg(layout, p));
@@ -221,15 +221,15 @@ test('Pure Noteheads for 16th Notes and Faint Dotted Continuation Lines for All 
   // 2. Zero hold ribbon lines for 16th notes (stroke-width="1.2")
   assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2")');
 
-  // 3. Faint dotted continuation line for all colored notes (d > tauRef, 165 notes total in Goldberg Var 1)
+  // 3. Solid thin hold line for all colored notes (d > tauRef, 165 notes total in Goldberg Var 1)
   const tauRef = score.gridResolution || 12;
   const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
   assert.equal(coloredNotes.length, 165, 'Must have exactly 165 colored notes in Goldberg Var 1');
 
-  const dottedRegex =
-    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="1\.1" stroke-linecap="round" stroke-dasharray="0, 3\.5" opacity="0\.75"\/>/g;
-  const allDotted = Array.from(fullScoreSvg.matchAll(dottedRegex));
-  assert.equal(allDotted.length, 165, 'Must render exactly 165 faint dotted continuation lines across full score (1 for each colored note)');
+  const holdLineRegex =
+    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round"\/>/g;
+  const allHoldLines = Array.from(fullScoreSvg.matchAll(holdLineRegex));
+  assert.equal(allHoldLines.length, 165, 'Must render exactly 165 solid thin hold lines across full score (1 for each colored note)');
 
   // 4. Continuous Uninterrupted Reference Staff Lines (zero white knockout underlays for holds)
   const knockoutRegex =
@@ -248,9 +248,9 @@ test('Pure Noteheads for 16th Notes and Faint Dotted Continuation Lines for All 
 
   const longNoteColumn = layout.columns.find((c) => c.notes.some((n) => n.id === longNote.id))!;
   const pageSvg = svgs[longNoteColumn.pageIndex];
-  const pageDottedMatches = Array.from(pageSvg.matchAll(dottedRegex));
-  const longNoteMatch = pageDottedMatches.find((m) => m[5] === '#BE123C');
-  assert.ok(longNoteMatch, 'Must find dotted continuation line for the Bar 20 sustain');
+  const pageHoldMatches = Array.from(pageSvg.matchAll(holdLineRegex));
+  const longNoteMatch = pageHoldMatches.find((m) => m[5] === '#BE123C');
+  assert.ok(longNoteMatch, 'Must find solid thin hold line for the Bar 20 sustain');
 
   const x1 = parseFloat(longNoteMatch[1]);
   const y1 = parseFloat(longNoteMatch[2]);
@@ -284,6 +284,30 @@ test('Pure Noteheads for 16th Notes and Faint Dotted Continuation Lines for All 
     `trailStartY (${y1}) must match noteNy + noteHeight / 2 + 2 (${expectedTrailStartY})`
   );
   assert.ok(y1 > noteNy, 'trailStartY must be strictly below notehead center at noteNy');
+
+  // 7. Tasteful Collision Truncation Before Handedness Lateral Stems (Measure 4)
+  // bach-var1-68 (tick 552, pitch 38, duration 24) must truncate early before bach-var1-69 lateral stem (tick 564)
+  const note68 = score.notes.find((n) => n.id === 'bach-var1-68')!;
+  const note69 = score.notes.find((n) => n.id === 'bach-var1-69')!;
+  const col4 = layout.columns.find((c) => c.notes.some((n) => n.id === note68.id))!;
+  const note68Ny = staffOriginY + (note68.startTick - col4.startTick) * layout.ptPerTick;
+  const note69Ny = staffOriginY + (note69.startTick - col4.startTick) * layout.ptPerTick;
+  const note68Height = 6.0; // Parity 0 (even) notehead height
+  const note68StartY = note68Ny + note68Height / 2 + 2;
+  const expectedTruncatedEndY = note69Ny - 2.5;
+
+  const n68HoldLine = allHoldLines.find(
+    (m) => Math.abs(parseFloat(m[2]) - note68StartY) < 0.05
+  );
+  assert.ok(n68HoldLine, 'Must find hold line for bach-var1-68 in Measure 4');
+  assert.ok(
+    Math.abs(parseFloat(n68HoldLine[4]) - expectedTruncatedEndY) < 0.05,
+    `bach-var1-68 hold line must terminate early at note69Ny - 2.5 (${expectedTruncatedEndY.toFixed(2)}), got ${n68HoldLine[4]}`
+  );
+  assert.ok(
+    parseFloat(n68HoldLine[4]) < note68Ny + note68.durationTicks * layout.ptPerTick,
+    'Truncated end must be strictly shorter than full sustain release'
+  );
 });
 
 test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {

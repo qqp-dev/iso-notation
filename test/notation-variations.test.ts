@@ -16,7 +16,6 @@ import {
 } from '../src/render/types';
 import { QuantizedNote, QuantizedGridScore } from '../src/model/types';
 import { wholeToneParity, linearIndex } from '../src/model/pitch';
-import { computeBeamClusters } from '../src/model/grid';
 import { getNoteColor } from '../src/render/colors';
 import { getCanonicalSyllable } from '../src/model/phonetics';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
@@ -1377,7 +1376,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
     dottedTrails: DottedTrail[],
     ribbons: { x: number; y: number; w: number; h: number }[],
     textCalls: string[],
-    knockoutLines: KnockoutLine[] = []
+    knockoutLines: KnockoutLine[] = [],
+    isVertical: boolean = true
   ) => {
     let currentDash: number[] = [];
     let currentAlpha = 1.0;
@@ -1429,11 +1429,13 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
       },
       stroke: () => {
         if (
-          currentDash.length === 2 &&
-          currentDash[0] === 0 &&
-          currentDash[1] === 4 &&
+          currentDash.length === 0 &&
+          currentLineWidth === 0.8 &&
           pathStart &&
-          pathEnd
+          pathEnd &&
+          (isVertical
+            ? (pathStart.x === pathEnd.x && pathStart.y !== pathEnd.y)
+            : (pathStart.y === pathEnd.y && pathStart.x !== pathEnd.x))
         ) {
           dottedTrails.push({
             x1: pathStart.x,
@@ -1501,7 +1503,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   const verticalRibbons: { x: number; y: number; w: number; h: number }[] = [];
   const verticalTexts: string[] = [];
 
-  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts, verticalKnockouts), score, {
+  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts, verticalKnockouts, true), score, {
     orientation: 'vertical',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
@@ -1518,14 +1520,14 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   // Zero hold ribbon rects
   assert.equal(verticalRibbons.length, 0, 'Vertical hold ribbons must be 0');
 
-  // Dotted continuation trails rendered for all 165 colored notes
+  // Solid thin hold lines rendered for all 165 colored notes
   assert.equal(
     verticalDottedTrails.length,
     165,
-    'Must render exactly 165 faint dotted trails for all colored notes in vertical orientation'
+    'Must render exactly 165 solid thin hold lines for all colored notes in vertical orientation'
   );
 
-  // Continuous Uninterrupted Reference Staff Lines: zero knockout lines behind hold trails
+  // Continuous Uninterrupted Reference Staff Lines: zero knockout lines behind hold lines
   assert.equal(
     verticalKnockouts.length,
     0,
@@ -1533,10 +1535,10 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
-  assert.deepEqual(vTrail.dash, [0, 4], 'Trail dash pattern must be [0, 4]');
-  assert.equal(vTrail.lineWidth, 1.1, 'Trail stroke width must be 1.1px');
-  assert.equal(vTrail.alpha, 0.75, 'Trail opacity must be 0.75');
-  assert.equal(vTrail.stroke, '#F43F5E', 'Trail stroke color must match duration class (#F43F5E for 108t)');
+  assert.deepEqual(vTrail.dash, [], 'Hold line dash pattern must be empty (solid)');
+  assert.equal(vTrail.lineWidth, 0.8, 'Hold line stroke width must be 0.8px');
+  assert.equal(vTrail.alpha, 1.0, 'Hold line opacity must be 1.0');
+  assert.equal(vTrail.stroke, '#F43F5E', 'Hold line stroke color must match duration class (#F43F5E for 108t)');
 
   // Coordinates:
   const lPitch = longNote.pitch.octave * 12 + longNote.pitch.pitchClass;
@@ -1556,6 +1558,30 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   );
   assert.equal(vTrail.y1 - expectedCy, noteHeight / 2 + 2, 'Optical gap must be exactly noteHeight / 2 + 2');
 
+  // Tasteful Truncation Before Handedness Lateral Stems (Measure 4)
+  // bach-var1-68 (tick 552, pitch 38, duration 24) must truncate early before bach-var1-69 lateral stem (tick 564)
+  const note68 = score.notes.find((n) => n.id === 'bach-var1-68')!;
+  const note68LPitch = note68.pitch.octave * 12 + note68.pitch.pitchClass;
+  const note68ExpectedCx = paddingPitch + (note68LPitch - minPitch) * pixelsPerSemitone;
+  const note68ExpectedCy = paddingStart + note68.startTick * pixelsPerTick;
+  const note68ExpectedStartY = note68ExpectedCy + noteHeight / 2 + 2;
+  const stemY = paddingStart + 564 * pixelsPerTick;
+  const expectedTruncatedEndY = stemY - 2.5;
+
+  const n68Trail = verticalDottedTrails.find(
+    (t) => Math.abs(t.x1 - note68ExpectedCx) < 0.1 && Math.abs(t.y1 - note68ExpectedStartY) < 0.1
+  );
+  assert.ok(n68Trail, 'Must find hold line for bach-var1-68');
+  assert.equal(
+    n68Trail.y2,
+    expectedTruncatedEndY,
+    `bach-var1-68 hold line must terminate early at stemY - 2.5 (${expectedTruncatedEndY}), before tick 564 lateral stem`
+  );
+  assert.ok(
+    n68Trail.y2 < note68ExpectedCy + note68.durationTicks * pixelsPerTick,
+    'Truncated end must be strictly shorter than full sustain release'
+  );
+
   // Hand-crossing text eliminated
   assert.ok(
     !verticalTexts.some((t) => t.includes('Cross')),
@@ -1568,7 +1594,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   const horizontalRibbons: { x: number; y: number; w: number; h: number }[] = [];
   const horizontalTexts: string[] = [];
 
-  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts, horizontalKnockouts), score, {
+  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts, horizontalKnockouts, false), score, {
     orientation: 'horizontal',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
@@ -1586,7 +1612,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   assert.equal(
     horizontalDottedTrails.length,
     165,
-    'Must render exactly 165 horizontal dotted trails for all colored notes'
+    'Must render exactly 165 horizontal hold lines for all colored notes'
   );
   assert.equal(
     horizontalKnockouts.length,
@@ -1596,6 +1622,9 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
   assert.ok(hTrail, 'Must find horizontal trail for 108t pedal note');
+  assert.deepEqual(hTrail.dash, [], 'Horizontal trail dash pattern must be empty');
+  assert.equal(hTrail.lineWidth, 0.8, 'Horizontal trail stroke width must be 0.8px');
+  assert.equal(hTrail.alpha, 1.0, 'Horizontal trail opacity must be 1.0');
   const hExpectedCx = paddingStart + longNote.startTick * pixelsPerTick;
   const hNoteWidth = Math.max(8, pixelsPerSemitone - 3);
   const expectedTrailStartX = hExpectedCx + hNoteWidth / 2 + 2;
@@ -1921,142 +1950,6 @@ test('Piano Roll View: 1:1 Geometric Equivalence & Chromatic DAW Alignment', () 
   assert.ok(filledRects >= score.notes.length * 2, 'Every note must be rendered as a fast fillRect duration block');
 });
 
-test('Metric Beam Rails: computeBeamClusters partitions by hand and beat cleanly', () => {
-  const notes: QuantizedNote[] = [
-    // Beat 0: 4 sixteenth notes in RH (moving by step)
-    { id: 'rh-1', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 },
-    { id: 'rh-2', pitch: { pitchClass: 2, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'RH', velocity: 90 },
-    { id: 'rh-3', pitch: { pitchClass: 4, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 },
-    { id: 'rh-4', pitch: { pitchClass: 5, octave: 4 }, startTick: 36, durationTicks: 12, hand: 'RH', velocity: 90 },
-    // Beat 0: 2 eighth notes in LH
-    { id: 'lh-1', pitch: { pitchClass: 0, octave: 3 }, startTick: 0, durationTicks: 24, hand: 'LH', velocity: 90 },
-    { id: 'lh-2', pitch: { pitchClass: 4, octave: 3 }, startTick: 24, durationTicks: 24, hand: 'LH', velocity: 90 },
-  ];
-
-  const clusters = computeBeamClusters(notes, 48, 12, 7);
-
-  const rhClusters = clusters.filter(c => c.hand === 'RH');
-  const lhClusters = clusters.filter(c => c.hand === 'LH');
-
-  assert.equal(rhClusters.length, 1, 'RH should have exactly 1 beam cluster in Beat 0');
-  assert.equal(rhClusters[0].notes.length, 4, 'RH cluster should contain all 4 sixteenth notes');
-  assert.equal(rhClusters[0].startTick, 0);
-  assert.equal(rhClusters[0].endTick, 36);
-
-  assert.equal(lhClusters.length, 1, 'LH should have exactly 1 beam cluster in Beat 0');
-  assert.equal(lhClusters[0].notes.length, 2, 'LH cluster should contain both eighth notes');
-  assert.equal(lhClusters[0].startTick, 0);
-  assert.equal(lhClusters[0].endTick, 24);
-});
-
-test('Metric Beam Rails: register leaps > 7 semitones split into separate clusters', () => {
-  const notes: QuantizedNote[] = [
-    // Beat 0: Low bass G2 (pitch 43), followed by B3 (pitch 59) - delta = 16 semitones
-    { id: 'lh-bass', pitch: { pitchClass: 7, octave: 2 }, startTick: 0, durationTicks: 24, hand: 'LH', velocity: 90 },
-    { id: 'lh-tenor-1', pitch: { pitchClass: 11, octave: 3 }, startTick: 24, durationTicks: 12, hand: 'LH', velocity: 90 },
-    { id: 'lh-tenor-2', pitch: { pitchClass: 9, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 },
-  ];
-
-  const clusters = computeBeamClusters(notes, 48, 12, 7);
-
-  assert.equal(clusters.length, 2, 'Register leap must split into 2 clusters');
-  assert.equal(clusters[0].notes.length, 1, 'Low bass note must be in an isolated cluster');
-  assert.equal(clusters[0].notes[0].id, 'lh-bass');
-
-  assert.equal(clusters[1].notes.length, 2, 'Tenor notes must form their own beam cluster');
-  assert.equal(clusters[1].startTick, 24);
-  assert.equal(clusters[1].endTick, 36);
-});
-
-test('Metric Beam Rails: SVG print engine renders Elaine Gould angled beams', () => {
-  const score = buildBachGoldbergVar1Score();
-
-  // 1. With beam grouping enabled (default)
-  const svgWithBeams = renderColumnarScoreToSvg(score, { showBeamGrouping: true });
-  assert.match(svgWithBeams, /<!-- Elaine Gould Angled Beam/);
-  assert.match(svgWithBeams, /<line x1="[^"]+" y1="[^"]+" x2="[^"]+" y2="[^"]+" stroke="#111827" stroke-width="2\.0" stroke-linecap="round"\/>/);
-
-  // 2. With beam grouping disabled
-  const svgWithoutBeams = renderColumnarScoreToSvg(score, { showBeamGrouping: false });
-  assert.doesNotMatch(svgWithoutBeams, /<!-- Elaine Gould Angled Beam/);
-});
-
-test('Metric Beam Rails: Score canvas renders Elaine Gould angled beams and responds to playback glow', () => {
-  const score = buildBachGoldbergVar1Score();
-  const recordedLines: { x1: number; y1: number; x2: number; y2: number; stroke: string; width: number }[] = [];
-  let currentStroke = '';
-  let currentWidth = 1;
-
-  const mockCtx = {
-    fillStyle: '',
-    set strokeStyle(val: string) {
-      currentStroke = val;
-    },
-    get strokeStyle() {
-      return currentStroke;
-    },
-    set lineWidth(val: number) {
-      currentWidth = val;
-    },
-    get lineWidth() {
-      return currentWidth;
-    },
-    font: '',
-    textAlign: '',
-    textBaseline: '',
-    save: () => {},
-    restore: () => {},
-    beginPath: () => {},
-    closePath: () => {},
-    moveTo: (x: number, y: number) => {
-      (mockCtx as any)._startX = x;
-      (mockCtx as any)._startY = y;
-    },
-    lineTo: (x: number, y: number) => {
-      recordedLines.push({
-        x1: (mockCtx as any)._startX,
-        y1: (mockCtx as any)._startY,
-        x2: x,
-        y2: y,
-        stroke: currentStroke,
-        width: currentWidth,
-      });
-    },
-    stroke: () => {},
-    fill: () => {},
-    fillRect: () => {},
-    arc: () => {},
-    ellipse: () => {},
-    roundRect: () => {},
-    fillText: () => {},
-    setLineDash: () => {},
-  } as unknown as CanvasRenderingContext2D;
-
-  renderScoreToCanvas(mockCtx, score, {
-    orientation: 'vertical',
-    staffStyle: 'tritone-split',
-    noteheadMorphology: 'rectangle-square',
-    colorMode: 'duration-class',
-    zoom: 1.0,
-    pixelsPerTick: 2.0,
-    pixelsPerSemitone: 14,
-    showHandCrossings: false,
-    showBarlines: false,
-    showGridLines: true,
-    showBeamGrouping: true,
-    currentTick: 0,
-  });
-
-  // Angled beams have y1 !== y2 and width 2.0 or 2.4 (when active)
-  const beams = recordedLines.filter(
-    l => Math.abs(l.y1 - l.y2) > 0 && (l.width === 2.0 || l.width === 2.4)
-  );
-
-  assert.ok(beams.length > 0, 'Canvas must render angled beams for metric clusters');
-
-  const activeBeams = beams.filter(r => r.stroke === '#FACC15' && r.width === 2.4);
-  assert.ok(activeBeams.length > 0, 'Active beam at tick 0 must glow with gold #FACC15');
-});
 
 test('Option 1: Klavarskribo Beat Grid renders horizontal pulse lines in canvas and SVG', () => {
   const score = buildBachGoldbergVar1Score();
@@ -2065,7 +1958,6 @@ test('Option 1: Klavarskribo Beat Grid renders horizontal pulse lines in canvas 
   const layout = computeColumnarLayout(score, {
     showBeatGrid: true,
     showGutterBrackets: false,
-    showBeamGrouping: false,
   });
   const svgs = renderAllPagesToSvg(layout);
   const page1 = svgs[0];
@@ -2128,7 +2020,6 @@ test('Option 1: Klavarskribo Beat Grid renders horizontal pulse lines in canvas 
     showBarlines: true,
     showGridLines: true,
     showBeatGrid: true,
-    showBeamGrouping: false,
     currentTick: 0,
   });
 
@@ -2145,7 +2036,6 @@ test('Option 2: Gutter Beat Brackets renders margin brackets in canvas and SVG w
   const layout = computeColumnarLayout(score, {
     showBeatGrid: false,
     showGutterBrackets: true,
-    showBeamGrouping: false,
   });
   const svgs = renderAllPagesToSvg(layout);
   const page1 = svgs[0];
@@ -2197,7 +2087,6 @@ test('Option 2: Gutter Beat Brackets renders margin brackets in canvas and SVG w
     showGridLines: true,
     showBeatGrid: false,
     showGutterBrackets: true,
-    showBeamGrouping: false,
     currentTick: 0,
   });
 
@@ -2212,40 +2101,35 @@ test('Option 2: Gutter Beat Brackets renders margin brackets in canvas and SVG w
   assert.ok(activeLabels.length > 0, 'Active beat label must glow with gold #FACC15');
 });
 
-test('Comparative Combinations: Beams, Beat Grid, and Gutter Brackets toggle independently', () => {
+test('Comparative Combinations: Beat Grid and Gutter Brackets toggle independently', () => {
   const score = buildBachGoldbergVar1Score();
 
-  // All 3 enabled simultaneously
-  const layoutAll = computeColumnarLayout(score, {
-    showBeamGrouping: true,
+  // Both enabled simultaneously
+  const layoutBoth = computeColumnarLayout(score, {
     showBeatGrid: true,
     showGutterBrackets: true,
   });
-  const svgAll = renderAllPagesToSvg(layoutAll)[0];
-  assert.ok(svgAll.includes('Elaine Gould Angled Beam'), 'Beams present when enabled');
-  assert.ok(svgAll.includes('Klavarskribo Beat Grid'), 'Beat Grid present when enabled');
-  assert.ok(svgAll.includes('Gutter Bracket'), 'Brackets present when enabled');
+  const svgBoth = renderAllPagesToSvg(layoutBoth)[0];
+  assert.ok(svgBoth.includes('Klavarskribo Beat Grid'), 'Beat Grid present when enabled');
+  assert.ok(svgBoth.includes('Gutter Bracket'), 'Brackets present when enabled');
 
   // Only Beat Grid (pure Klavarskribo philosophy)
   const layoutKlavarOnly = computeColumnarLayout(score, {
-    showBeamGrouping: false,
     showBeatGrid: true,
     showGutterBrackets: false,
   });
   const svgKlavar = renderAllPagesToSvg(layoutKlavarOnly)[0];
-  assert.ok(!svgKlavar.includes('Elaine Gould Angled Beam'), 'Beams absent when disabled');
   assert.ok(svgKlavar.includes('Klavarskribo Beat Grid'), 'Beat Grid present');
   assert.ok(!svgKlavar.includes('Gutter Bracket'), 'Brackets absent');
 
   // Only Gutter Brackets (pure pitch space)
   const layoutBracketsOnly = computeColumnarLayout(score, {
-    showBeamGrouping: false,
     showBeatGrid: false,
     showGutterBrackets: true,
   });
   const svgBrackets = renderAllPagesToSvg(layoutBracketsOnly)[0];
-  assert.ok(!svgBrackets.includes('Elaine Gould Angled Beam'), 'Beams absent');
   assert.ok(!svgBrackets.includes('Klavarskribo Beat Grid'), 'Beat Grid absent');
+  assert.ok(svgBrackets.includes('Gutter Bracket'), 'Brackets present');
 });
 
 test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin, staffMax] with zero overhang and authoritative contrast', () => {
@@ -2317,7 +2201,6 @@ test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin, staffMa
     showBarlines: true,
     showGridLines: true,
     showBeatGrid: false,
-    showBeamGrouping: false,
     currentTick: 0,
   };
 
@@ -2364,7 +2247,6 @@ test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin, staffMa
     showBarlines: true,
     showGridLines: true,
     showBeatGrid: false,
-    showBeamGrouping: false,
     currentTick: 0,
   });
 
@@ -2440,7 +2322,6 @@ test('Left-Gutter Beat Counter Invariant: beats 1, 2, 3 align with pulse lines i
     showBarlines: true,
     showGridLines: true,
     showBeatGrid: true,
-    showBeamGrouping: false,
     currentTick: 0,
   });
 
@@ -2460,7 +2341,6 @@ test('Left-Gutter Beat Counter Invariant: beats 1, 2, 3 align with pulse lines i
   const layout = computeColumnarLayout(score, {
     showBeatGrid: true,
     showGutterBrackets: false,
-    showBeamGrouping: false,
   });
   const svgs = renderAllPagesToSvg(layout);
   const page1 = svgs[0];
@@ -2484,11 +2364,11 @@ test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and def
   const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
   assert.ok(!drawerSrc.includes('Elaine Gould Beams'), 'ControlsDrawer.tsx must not have Elaine Gould Beams checkbox');
 
-  // Default option verification
+  // Default option verification: showBeamGrouping completely removed
   const { computeColumnarLayout } = await import('../src/render/print-layout');
   const score = buildBachGoldbergVar1Score();
   const defaultLayout = computeColumnarLayout(score);
-  assert.equal(defaultLayout.options.showBeamGrouping, false, 'Default showBeamGrouping must be false');
+  assert.ok(!('showBeamGrouping' in defaultLayout.options), 'showBeamGrouping must be completely removed from options');
 });
 
 test('No-Toggle Clean UI Invariant: UI excludes rhythmic toggles, showGutterBrackets removed, and showBeatGrid defaults to true', async () => {
@@ -2605,7 +2485,6 @@ test('Canvas Local Dashed Outlier Lines and Urtext Typography Invariants', () =>
     showBarlines: true,
     showGridLines: true,
     showBeatGrid: false,
-    showBeamGrouping: false,
     currentTick: 0,
   };
 
