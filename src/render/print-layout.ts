@@ -543,7 +543,7 @@ export function renderPageToSvg(
 
       for (const n of col.notes) {
         const bIdx = Math.floor(n.startTick / ticksPerBeat);
-        const hand = n.hand ?? (linearIndex(n.pitch) >= 60 ? 'RH' : 'LH');
+        const hand = n.hand ?? (linearIndex(n.pitch) >= 48 ? 'RH' : 'LH');
         if (hand === 'RH') {
           rhBeats.add(bIdx);
         } else {
@@ -719,10 +719,11 @@ export function renderPageToSvg(
       const isEven = wholeToneParity(lPitch) === 0;
       const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
-      const hand = note.hand ?? (rawLPitch >= 60 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && rawLPitch < 60) || (hand === 'LH' && rawLPitch >= 60);
+      const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
+      const isStemException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
 
       // Klavar lateral stem: symmetry around m3 (indicate only exceptions)
+      // Middle C (m3, linear pitch 48) is stemless for both hands.
       if (isStemException) {
         const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
         const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
@@ -757,11 +758,12 @@ export function renderPageToSvg(
           svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
         } else {
           // Row 1: Empty (Hollow) squished square (in whole-tone spaces)
-          if (note.durationTicks > tauRef) {
-            // Colored note: faint wash (~18% opacity) inside hollow notehead
+          const isRedNote = (note.durationTicks / tauRef) >= 8.0;
+          if (isRedNote) {
+            // Red note (d >= 96t / ratio >= 8.0): faint tint fill (~18% opacity) inside hollow notehead
             svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}" fill-opacity="0.18" stroke="${noteColor}" stroke-width="1.3"/>`);
           } else {
-            // 16th note (d <= tauRef): 100% void / transparent interior
+            // Notes with d < 96t (covering 16ths, 8ths, dotted 8ths, quarters): 100% void / transparent interior
             svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
           }
         }
