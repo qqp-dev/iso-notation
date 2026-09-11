@@ -1,71 +1,86 @@
-# Ticket: Notation Refinements: 1-Based Note Numbers, Landmark 5, b0..m0 Octave System & Decluttered Lines
+# Ticket: Center-Aligned Stems, Flush Barlines, Local Dashed Outlier Lines, and Quality Urtext Typography
 
 ## Kind
 
-bounded — notation refinement across print layout, score canvas, pitch models, and test invariants.
+bounded
 
 ## Problem
 
-The operator specified four essential notation refinements:
-1. **Header demarcation label**: `5 | 7` should just be the number `5` (at pitch class 4 / $E$).
-2. **1-based note numbers**: Note numbers are 1-based throughout ($1 \dots 12$ where $C=1, C\sharp=2, D=3, D\sharp=4, E=5, F=6, F\sharp=7, G=8, G\sharp=9, A=10, A\sharp=11, B=12$), confirming why the $E$ line is note `5`. All numeric pitch displays (`pitchClassLabel`, `pitchLabel`, numerical noteheads, canvas margin indicators) must use 1-based indexing.
-3. **Octave system ($b0 \dots m0$, next $b1$ but $m$ still marks the octaves)**:
-   - The lowest notes on an 88-key piano start at $A_0$, which is `b0` (phonetic `bi0`). $Blat_0$ is `sa0`, $B_0$ is `ki0`.
-   - The first $C$ on the piano ($C_1$) is `m0` (phonetic `ma0`).
-   - The next $A$ ($A_1$) is `b1` (phonetic `bi1`).
-   - The next $C$ ($C_2$) is `m1` (phonetic `ma1`).
-   - Subsequent octaves continue: $b2, m2, b3, m3$ (Middle $C$), $b4$ (Concert $A$ 440 Hz), $m4, b5, m5, b6, m6, b7, m7$ ($C_8$).
-   - Octave lines on the score/staff remain strictly marked by $m$ ($m0, m1, m2, m3 \dots$) at $C$.
-4. **Decluttered staff lines ("less lines, too clunky")**:
-   - The previous staff topography rendered 6 lines per octave (PC 0, 2, 4, 6, 8, 10), creating a dense 24+ line barcode grid across 4 octaves that overpowered the music.
-   - We eliminate the intermediate hairlines (PC 2, 6, 8, 10) in `tritone-split` / `5-7-split`, leaving only the 2 primary structural landmark lines per octave:
-     - PC 0: bold continuous line for octave boundary ($m0, m1, m2 \dots$).
-     - PC 4: clean demarcation line for the 5-group boundary ($5$).
-   - This reduces staff line density by 67%, restoring breathing room and visual clarity to the score while preserving Jánko row parity shapes (ovals on even PCs, bricks on odd PCs).
+Following authentic player legibility and engraving evaluation:
+1. **Lateral Handedness Stems Vertical Alignment**: Top-alignment (`ny - nh / 2` / `cy - noteHeight / 2`) was tested and rejected. Stems must originate from the **center** of the notehead (`cy` in canvas, `ny` in print layout). The longer stem length ($\ge 20\text{px}$ / $16\text{pt}$) is approved and must be kept.
+2. **Barline Overhang (Measure Lines Sticking Out)**: The measure lines (and beat grid pulse lines) still stick out over the octave boundary lines by 4 units (`staffMin - 4` to `staffMax + 4`). They must be strictly flush with the outer octave lines (`m1` on the left/bottom to `m5` on the right/top) with zero overshoot.
+3. **Outlier Reference Staff Lines**: When a note is placed past an octave boundary line (e.g. D6 at pitch 74 in Bach Goldberg Var 1, which sits beyond the `m5` / C6 = 72 line), it currently floats in blank margin space without an upper reference. As a general rule, when notes extend past an octave boundary, the appropriate staff lines must be added **for the specific bars (measures) containing those notes**. In `tritone-split`, the next line above m5 is Landmark 5 (pitch 76, E6), which is a **dashed line** (`stroke-dasharray="5,2.5"` / `[5, 2.5]`). This dashed line must be drawn in measures 29 and 30 so D6 is cleanly contextualized between solid m5 (72) and dashed 5 (76).
+4. **Urtext Typography & Engraving Quality**: Current score elements rely on crude monospace and generic sans-serif fonts (`DejaVu Sans Mono`, `system-ui`, `monospace`). Authentic Urtext editions (Henle, Bärenreiter) achieve timeless distinction through refined classical serif typography, italicized measure numbers, and elegant title/composer typography.
 
-## Testing plan
+## Solution
 
-1. **Header Demarcation & 1-Based Note Numbers Invariant**:
-   - Staff header label at PC 4 ($E$) strictly renders `5` (zero `5|7` text in SVG or canvas).
-   - `pitchClassLabel(pc, 'numeric')` returns 1-based string `String(pc + 1)` ($1 \dots 12$).
-   - Numerical notehead morphology renders digits $1 \dots 12$.
-   - Canvas margin indicators display 1-based note numbers.
-2. **Piano Octave Invariant ($b0 \dots m0$, next $b1$, $m$ marks octaves)**:
-   - $A_0$ (MIDI 21, PC 9, oct 0) -> `b0` / `bi0`.
-   - $C_1$ (MIDI 24, PC 0, oct 1) -> `m0` / `ma0`.
-   - $A_1$ (MIDI 33, PC 9, oct 1) -> `b1` / `bi1`.
-   - $C_2$ (MIDI 36, PC 0, oct 2) -> `m1` / `ma1`.
-   - Concert $A_4$ (MIDI 69, PC 9, oct 4) -> `b4` / `bi4`.
-   - Middle $C_4$ (MIDI 60, PC 0, oct 4) -> `m3` / `ma3`.
-   - Staff octave lines remain strictly aligned at $C$ with labels $m0, m1, m2 \dots$
-3. **Decluttered Staff Lines Invariant ("Less Lines")**:
-   - `getStaffLineGeometry` for `tritone-split` / `5-7-split` returns `isLine: true` ONLY for PC 0 (octave boundary $m$) and PC 4 (demarcation $5$).
-   - PCs 2, 6, 8, 10 have `isLine: false` (zero hairlines).
-   - SVG print layout and canvas render exactly 2 staff lines per octave in `tritone-split`.
-4. **Verification**:
-   - Full test suite passes cleanly with updated invariants (`npm test`).
-   - Production bundle builds without errors (`npm run build`).
+1. **Center-Aligned Longer Lateral Stems**:
+   - In vertical canvas (`src/render/score-canvas.ts`):
+     - Draw lateral stems at `cy` (vertical center of notehead):
+       `ctx.moveTo(cx, cy); ctx.lineTo(stemEndX, cy);`
+     - Keep longer stem length: `Math.max(20, options.pixelsPerSemitone * 1.45)`.
+   - In SVG print layout (`src/render/print-layout.ts`):
+     - Draw lateral stems at `ny` (vertical center of notehead):
+       `svgParts.push(<line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>);`
+     - Keep longer stem length: `16.0pt`.
+   - Stems continue to point Right for RH and Left for LH.
 
-## [bounded]
+2. **Staff-Flush Barlines & Pulse Lines (Zero Overhang)**:
+   - In `src/render/score-canvas.ts`:
+     - Vertical timeline: Barlines span strictly from `staffMinX` to `staffMaxX`:
+       `ctx.moveTo(staffMinX, y); ctx.lineTo(staffMaxX, y);`
+     - Horizontal timeline: Barlines span strictly from `staffMinY` to `staffMaxY`:
+       `ctx.moveTo(x, staffMinY); ctx.lineTo(x, staffMaxY);`
+   - In `src/render/print-layout.ts`:
+     - Barlines span strictly from `colStaffLeftPt` to `rightStaffBound`:
+       `svgParts.push(<line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>);`
+     - Beat grid pulse lines also terminate strictly flush with `colStaffLeftPt` and `rightStaffBound`:
+       `x1="${colStaffLeftPt.toFixed(2)}" ... x2="${rightStaffBound.toFixed(2)}"`
 
-### Budget
+3. **Local Dashed Staff Lines for Outlier Notes in Appropriate Bars**:
+   - In `src/render/print-layout.ts` and `src/render/score-canvas.ts`:
+     - Detect notes in each bar/measure that extend beyond `maxPitch` (or below `minPitch`).
+     - For Bach Goldberg Var 1 (and general spillover notes):
+       - High D6 is pitch 74.
+       - In `tritone-split`, the landmark line in octave 6 above C6 (72) is Landmark 5 at pitch 76 (E6, PC 4).
+       - In `getStaffLineGeometry`, PC 4 is a **dashed line** (`dashArray: [5, 2.5]`, `0.6pt`, `#444444` in SVG / `rgba(255, 255, 255, 0.4)` in canvas).
+       - For every bar that contains notes exceeding `maxPitch`:
+         - Determine the required staff line(s) above `maxPitch` up to the note pitch (e.g. for pitch 74, the line at pitch 76).
+         - Draw this dashed staff line segment strictly for the vertical span of that measure (from the start of that measure to the end of that measure).
+         - In SVG print layout: For measures 29 and 30 (page 4, column 2), render `<line x1="${lineX}" y1="${measureStartY}" x2="${lineX}" y2="${measureEndY}" stroke="#444444" stroke-width="0.6" stroke-dasharray="5,2.5"/>`.
+         - In canvas: Render the dashed line at pitch 76 across the tick span of those measures.
+       - Measures without outlier notes do NOT render this line.
 
-1 iteration.
+4. **Authentic Urtext Typography & Aesthetic Quality**:
+   - Define a classical Urtext serif typographic stack across print SVG and canvas:
+     `const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif';`
+   - In `src/render/print-layout.ts`:
+     - `.title`: `font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111;`
+     - `.subtitle`: `font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333;`
+     - `.meta` & section header: `font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222;`
+     - `.measure-num`: `font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: normal; font-size: 7.5pt; fill: #444444; text-anchor: end;`
+     - `.beat-counter`: `font-family: ${URTEXT_SERIF}; font-style: normal; font-size: 6.5pt; fill: #6B7280; text-anchor: end;`
+     - `.pitch-label` (`m1`, `m5`): `font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle;`
+     - Middle C (`m3`) header badge: refined classical badge with `font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 6.5pt; fill: #FFFFFF;`
+   - In `src/render/score-canvas.ts`:
+     - Octave markers (`m1`, `m3`, `m5`): `'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif'`
+     - Measure numbers: `'italic 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif'` with subtle fill.
 
-### Solution
+## Testing Plan
 
-1. In `src/model/pitch.ts`:
-   - Update `pitchClassLabel(pc, 'numeric')` to return `String(pc + 1)`.
-   - Update `pitchLabel`:
-     - If pitchClass >= 9 ($A, Blat, B$): display octave is `pitch.octave` ($A_0 	o b0$, $A_1 	o b1$, $A_4 	o b4$).
-     - If pitchClass < 9 ($C \dots G\sharp$): display octave is `Math.max(0, pitch.octave - 1)` ($C_1 	o m0$, $C_4 	o m3$).
-     - Numeric format uses 1-based note numbers: `${pitch.pitchClass + 1}:${displayOct}`.
-2. In `src/render/types.ts`:
-   - In `getStaffLineGeometry`: For `tritone-split` / `5-7-split`, only PC 0 (bold $m$) and PC 4 (demarcation $5$) are lines. PCs 2, 6, 8, 10 return `isLine: false`.
-3. In `src/render/print-layout.ts`:
-   - Replace header text `5|7` with `5`.
-   - In staff lines loop: only emit lines for PC 0 (1.0pt) and PC 4 (0.6pt). Remove PC 2, 6, 8, 10 hairlines.
-4. In `src/render/score-canvas.ts`:
-   - Update margin note number labels to 1-based: `String(pc + 1)`.
-   - Update numerical notehead text to `String(pitchClass + 1)`.
-5. Update tests in `test/notation-variations.test.ts`, `test/pitch.test.ts`, and `test/print-layout.test.ts`.
+1. **Center-Aligned Stems Invariant**:
+   - Verify SVG print tests assert `y1 === ny` and `y2 === ny` for lateral stems, with `stemLength >= 16pt`.
+   - Verify canvas tests assert stem is at `cy`.
+2. **Zero Barline Overhang Invariant**:
+   - Verify SVG barlines use `x1="${colStaffLeftPt.toFixed(2)}"` and `x2="${rightStaffBound.toFixed(2)}"`, with no `±4` overhang.
+   - Verify canvas barlines strictly span `[staffMinX, staffMaxX]`.
+3. **Local Dashed Outlier Staff Line Invariant**:
+   - Verify that on Page 4 (measures 29–30 where D6 pitch 74 occurs), a dashed line at pitch 76 (`stroke-dasharray="5,2.5"`) is rendered.
+   - Verify that Pages 1–3 (measures 1–24) do NOT contain any dashed line at pitch 76.
+4. **Urtext Typography Invariant**:
+   - Verify SVG `<style>` block includes the classical serif font stack for `.title`, `.subtitle`, `.measure-num`, and `.beat-counter`.
+   - Verify measure numbers are set with `font-style: italic`.
+5. **Regression & Build Verification**:
+   - `npm test` passes cleanly.
+   - `npm run build` succeeds cleanly.
+
