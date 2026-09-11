@@ -1,7 +1,7 @@
 import { QuantizedGridScore, QuantizedNote, HandCrossingEvent } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { getCanonicalSyllable } from '../model/phonetics';
-import { detectHandCrossings } from '../model/grid';
+import { detectHandCrossings, computeBeamClusters } from '../model/grid';
 import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor } from './types';
 
 export const A4_WIDTH_PT = 595.28; // 210mm in PostScript points (72 pt/inch)
@@ -24,6 +24,9 @@ export interface PrintLayoutOptions {
   pixelsPerTick?: number; // optional scale overrides
   pixelsPerSemitone?: number;
   octaveExtensionMode?: 'badge' | 'spillover' | 'auto';
+  showBeamGrouping?: boolean; // default: true
+  showBeatGrid?: boolean; // default: false
+  showGutterBrackets?: boolean; // default: false
 }
 
 export interface ColumnSlice {
@@ -91,6 +94,9 @@ const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   pixelsPerTick: 0,
   pixelsPerSemitone: 0,
   octaveExtensionMode: 'badge',
+  showBeamGrouping: true,
+  showBeatGrid: false,
+  showGutterBrackets: false,
 };
 
 /**
@@ -298,7 +304,7 @@ export function renderPageToSvg(
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layout.pageDimensions.widthPt} ${layout.pageDimensions.heightPt}"><rect width="100%" height="100%" fill="#FFFFFF"/></svg>`;
   }
 
-  const { score, options, minPitch, maxPitch, ptPerSemitone, ptPerTick, ticksPerMeasure } = layout;
+  const { score, options, minPitch, maxPitch, ptPerSemitone, ptPerTick, ticksPerMeasure, ticksPerBeat } = layout;
   const { widthPt, heightPt, widthMm, heightMm } = layout.pageDimensions;
   const marginPt = options.pageMarginMm * MM_TO_PT;
   const columnGapPt = options.columnGapMm * MM_TO_PT;
@@ -438,6 +444,74 @@ export function renderPageToSvg(
       }
     }
 
+    // Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc.)
+    if (layout.options.showBeatGrid) {
+      const numBeats = score.timeSignatures?.[0]?.numerator || 3;
+      for (let m = 0; m < numMeasuresInCol; m++) {
+        const mStartTick = (col.startMeasure - 1 + m) * ticksPerMeasure;
+        for (let b = 1; b < numBeats; b++) {
+          const bTick = mStartTick + b * ticksPerBeat;
+          if (bTick >= col.startTick && bTick < col.endTick) {
+            const beatY = staffOriginY + (bTick - col.startTick) * ptPerTick;
+            svgParts.push(`    <!-- Klavarskribo Beat Grid (Beat ${b + 1}) -->`);
+            svgParts.push(`    <line x1="${(colStaffLeftPt - 2).toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${(rightStaffBound + 2).toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#888888" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
+          }
+        }
+      }
+    }
+
+    // Option 2: Gutter Beat Brackets (Outer margin beat grouping framing)
+    if (layout.options.showGutterBrackets) {
+      const numBeats = score.timeSignatures?.[0]?.numerator || 3;
+      const lhBeats = new Set<number>();
+      const rhBeats = new Set<number>();
+
+      for (const n of col.notes) {
+        const bIdx = Math.floor(n.startTick / ticksPerBeat);
+        const hand = n.hand ?? (linearIndex(n.pitch) >= 60 ? 'RH' : 'LH');
+        if (hand === 'RH') {
+          rhBeats.add(bIdx);
+        } else {
+          lhBeats.add(bIdx);
+        }
+      }
+
+      const startBIdx = Math.floor(col.startTick / ticksPerBeat);
+      const endBIdx = Math.ceil(col.endTick / ticksPerBeat);
+
+      for (let bIdx = startBIdx; bIdx < endBIdx; bIdx++) {
+        const bStart = bIdx * ticksPerBeat;
+        const bEnd = bStart + ticksPerBeat;
+        if (bStart >= col.endTick || bEnd <= col.startTick) continue;
+
+        const effectiveStart = Math.max(col.startTick, bStart);
+        const effectiveEnd = Math.min(col.endTick, bEnd);
+        const y1 = staffOriginY + (effectiveStart - col.startTick) * ptPerTick + 1.2;
+        const y2 = staffOriginY + (effectiveEnd - col.startTick) * ptPerTick - 1.2;
+        if (y2 <= y1) continue;
+
+        const beatNum = (bIdx % numBeats) + 1;
+
+        // LH Gutter Bracket (Left margin)
+        if (lhBeats.has(bIdx)) {
+          const lhRailX = colStaffLeftPt - 8;
+          const capLen = 3.5;
+          svgParts.push(`    <!-- LH Gutter Bracket (Beat ${beatNum}) -->`);
+          svgParts.push(`    <path d="M ${(lhRailX - capLen).toFixed(2)} ${y1.toFixed(2)} L ${lhRailX.toFixed(2)} ${y1.toFixed(2)} L ${lhRailX.toFixed(2)} ${y2.toFixed(2)} L ${(lhRailX - capLen).toFixed(2)} ${y2.toFixed(2)}" fill="none" stroke="#6B7280" stroke-width="0.8" stroke-linecap="round"/>`);
+          svgParts.push(`    <text x="${(lhRailX - capLen - 2).toFixed(2)}" y="${(y1 + 6.5).toFixed(2)}" text-anchor="end" font-family="monospace" font-size="7" font-weight="bold" fill="#6B7280">${beatNum}</text>`);
+        }
+
+        // RH Gutter Bracket (Right margin)
+        if (rhBeats.has(bIdx)) {
+          const rhRailX = rightStaffBound + 8;
+          const capLen = 3.5;
+          svgParts.push(`    <!-- RH Gutter Bracket (Beat ${beatNum}) -->`);
+          svgParts.push(`    <path d="M ${(rhRailX + capLen).toFixed(2)} ${y1.toFixed(2)} L ${rhRailX.toFixed(2)} ${y1.toFixed(2)} L ${rhRailX.toFixed(2)} ${y2.toFixed(2)} L ${(rhRailX + capLen).toFixed(2)} ${y2.toFixed(2)}" fill="none" stroke="#6B7280" stroke-width="0.8" stroke-linecap="round"/>`);
+          svgParts.push(`    <text x="${(rhRailX + capLen + 2).toFixed(2)}" y="${(y1 + 6.5).toFixed(2)}" text-anchor="start" font-family="monospace" font-size="7" font-weight="bold" fill="#6B7280">${beatNum}</text>`);
+        }
+      }
+    }
+
     // Hand Crossings Overlay in Column
     for (const hc of col.handCrossings) {
       const hcStartTick = Math.max(col.startTick, hc.tick);
@@ -481,6 +555,12 @@ export function renderPageToSvg(
 
     // Notes: Klavar Lateral Stems & Noteheads with White Halo Knockout & Octave Indicator Badges
     const morph = normalizeNoteheadMorphology(layout.options.noteheadMorphology);
+    const stemLength = 12.0;
+
+    // Precalculate display pitches and coordinates for all notes in this column
+    const displayPitchMap = new Map<string, number>();
+    const noteCoordMap = new Map<string, { nx: number; ny: number; badgeText: string | null; badgeDirection: 'up' | 'down' | null }>();
+
     for (const note of col.notes) {
       const rawLPitch = linearIndex(note.pitch);
       let lPitch = rawLPitch;
@@ -514,17 +594,74 @@ export function renderPageToSvg(
         }
       }
 
+      displayPitchMap.set(note.id, lPitch);
       const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
       const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
+      noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
+    }
+
+    // Elaine Gould Angled Beam Engraving & Uniform Lateral Stems
+    const stemEndMap = new Map<string, number>();
+
+    if (layout.options.showBeamGrouping !== false) {
+      const clusters = computeBeamClusters(col.notes, ticksPerBeat, tauRef, 7);
+      const MAX_SLANT_PT = 16.0;
+
+      for (const cluster of clusters) {
+        if (cluster.notes.length >= 2 && cluster.endTick > cluster.startTick) {
+          const cNotes = cluster.notes;
+          const nxArr = cNotes.map(n => noteCoordMap.get(n.id)!.nx);
+          const nyArr = cNotes.map(n => noteCoordMap.get(n.id)!.ny);
+
+          const y1 = nyArr[0];
+          const yK = nyArr[nyArr.length - 1];
+          const totalDy = yK - y1;
+
+          // Raw pitch delta from first to last note
+          const rawDx = nxArr[nxArr.length - 1] - nxArr[0];
+
+          // Gould slope capping: slant follows rawDx with capped magnitude
+          const slantSign = Math.sign(rawDx);
+          const rawSlantMagnitude = Math.abs(rawDx) * 0.65;
+          const cappedSlant = slantSign * Math.min(rawSlantMagnitude, MAX_SLANT_PT);
+          const slope = cappedSlant / totalDy;
+
+          // Anchor beam so that minimum stem length is exactly stemLength (12pt)
+          let X0: number;
+          if (cluster.hand === 'RH') {
+            const maxReq = Math.max(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
+            X0 = maxReq + stemLength;
+          } else {
+            const minReq = Math.min(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
+            X0 = minReq - stemLength;
+          }
+
+          const beamX1 = X0;
+          const beamXK = X0 + slope * totalDy;
+
+          svgParts.push(`    <!-- Elaine Gould Angled Beam (${cluster.hand}, beat ${cluster.beatIndex + 1}) -->`);
+          svgParts.push(`    <line x1="${beamX1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${beamXK.toFixed(2)}" y2="${yK.toFixed(2)}" stroke="#111827" stroke-width="2.0" stroke-linecap="round"/>`);
+
+          for (let i = 0; i < cNotes.length; i++) {
+            const note = cNotes[i];
+            const endX = X0 + slope * (nyArr[i] - y1);
+            stemEndMap.set(note.id, endX);
+          }
+        }
+      }
+    }
+
+    for (const note of col.notes) {
+      const rawLPitch = linearIndex(note.pitch);
+      const { nx, ny, badgeText, badgeDirection } = noteCoordMap.get(note.id)!;
+      const lPitch = displayPitchMap.get(note.id)!;
       const isEven = wholeToneParity(lPitch) === 0;
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (rawLPitch >= 60 ? 'RH' : 'LH');
 
-      // Klavar lateral stem:
-      // Right Hand (RH) -> horizontal stem pointing Right
-      // Left Hand (LH) -> horizontal stem pointing Left
-      const stemLength = 12.0;
-      const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
+      // Klavar lateral stem (flush to beam rail if clustered, standard length otherwise)
+      const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
+      const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
       svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
 
       if (morph === 'phonetic') {

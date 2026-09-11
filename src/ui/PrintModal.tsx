@@ -22,8 +22,19 @@ export const PrintModal: React.FC<PrintModalProps> = ({
         staffStyle: renderOptions?.staffStyle ?? 'tritone-split',
         noteheadMorphology: renderOptions?.noteheadMorphology ?? 'rectangle-square',
         octaveExtensionMode: renderOptions?.octaveExtensionMode ?? 'badge',
+        showBeamGrouping: renderOptions?.showBeamGrouping,
+        showBeatGrid: renderOptions?.showBeatGrid,
+        showGutterBrackets: renderOptions?.showGutterBrackets,
       }),
-    [score, renderOptions?.staffStyle, renderOptions?.noteheadMorphology, renderOptions?.octaveExtensionMode]
+    [
+      score,
+      renderOptions?.staffStyle,
+      renderOptions?.noteheadMorphology,
+      renderOptions?.octaveExtensionMode,
+      renderOptions?.showBeamGrouping,
+      renderOptions?.showBeatGrid,
+      renderOptions?.showGutterBrackets,
+    ]
   );
   const pageSvgs = useMemo(() => renderAllPagesToSvg(layout), [layout]);
 
