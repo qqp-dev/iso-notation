@@ -1392,61 +1392,45 @@ export function renderNotehead(
       ctx.textBaseline = 'middle';
       ctx.fillText(digit, cx, cy);
 
-      // Tasteful broad-nib calligraphic chevron for hand-crossing exceptions (< for LH, > for RH)
+      // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
       if (handException !== null) {
-        const h = 5.2;
-        const w = 3.2;
-        const clearance = 2.0;
+        const h = 5.6;
+        const w = 3.4;
+        const clr = 2.0;
+        const thick = 1.6;
 
-        let apexX: number;
-        let baseX: number;
-        if (handException === 'LH') {
-          baseX = cx - r - clearance;
-          apexX = baseX - w;
-        } else {
-          baseX = cx + r + clearance;
-          apexX = baseX + w;
-        }
-        const topY = cy - h / 2;
-        const botY = cy + h / 2;
-        const apexY = cy;
-
-        // Authentic broad-nib calligraphy stroke contrast (35° italic pen angle)
-        // For LH (<): top hairline (1.0px), bottom downstroke (2.3px)
-        // For RH (>): top downstroke (2.3px), bottom hairline (1.0px)
-        const upperW = handException === 'RH' ? 2.3 : 1.0;
-        const lowerW = handException === 'RH' ? 1.0 : 2.3;
+        let bx = handException === 'LH' ? cx - r - clr : cx + r + clr;
+        let ax = handException === 'LH' ? bx - w : bx + w;
+        let ctrlX = handException === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
+        const ty = cy - h / 2;
+        const by = cy + h / 2;
+        const inAx = handException === 'LH' ? ax + thick : ax - thick;
+        const inCtrlX = handException === 'LH' ? ctrlX + thick * 0.45 : ctrlX - thick * 0.45;
 
         ctx.save();
-        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(bx, ty);
+        ctx.quadraticCurveTo(ctrlX, cy - h * 0.22, ax, cy);
+        ctx.quadraticCurveTo(ctrlX, cy + h * 0.22, bx, by);
+        ctx.quadraticCurveTo(inCtrlX, cy + h * 0.16, inAx, cy);
+        ctx.quadraticCurveTo(inCtrlX, cy - h * 0.16, bx, ty);
+        ctx.closePath();
 
         // Knockout halo underlay
+        ctx.fillStyle = '#000000';
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = upperW + 2.4;
-        ctx.beginPath();
-        ctx.moveTo(baseX, topY);
-        ctx.lineTo(apexX, apexY);
+        ctx.lineWidth = 2.4;
+        ctx.lineJoin = 'round';
         ctx.stroke();
+        ctx.fill();
 
-        ctx.lineWidth = lowerW + 2.4;
-        ctx.beginPath();
-        ctx.moveTo(apexX, apexY);
-        ctx.lineTo(baseX, botY);
-        ctx.stroke();
-
-        // Colored calligraphic strokes
+        // Colored guillemet
+        ctx.fillStyle = headColor;
         ctx.strokeStyle = headColor;
-        ctx.lineWidth = upperW;
-        ctx.beginPath();
-        ctx.moveTo(baseX, topY);
-        ctx.lineTo(apexX, apexY);
+        ctx.lineWidth = 0.5;
+        ctx.lineJoin = 'round';
         ctx.stroke();
-
-        ctx.lineWidth = lowerW;
-        ctx.beginPath();
-        ctx.moveTo(apexX, apexY);
-        ctx.lineTo(baseX, botY);
-        ctx.stroke();
+        ctx.fill();
 
         ctx.restore();
       }

@@ -123,7 +123,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                       : 'text-neutral-400 hover:text-neutral-200'
                   }`}
                 >
-                  Phonetics Lab
+                  Solfège Guide
                 </button>
               </div>
             </div>
@@ -161,32 +161,33 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               </div>
             </div>
 
-            {/* Transport Buttons */}
+            {/* Transport controls */}
             <div className="flex items-center gap-2">
               <button
                 onClick={onTogglePlay}
-                className={`flex-1 py-2 font-bold rounded text-xs font-mono transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 rounded font-mono text-xs font-bold transition flex items-center justify-center gap-2 ${
                   isPlaying
                     ? 'bg-amber-500 hover:bg-amber-400 text-black'
-                    : 'bg-white hover:bg-neutral-200 text-black'
+                    : 'bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700'
                 }`}
               >
-                <span>{isPlaying ? '⏸ Pause' : '▶ Play'}</span>
+                <span>{isPlaying ? '⏸' : '▶'}</span>
+                <span>{isPlaying ? 'Pause' : 'Play'}</span>
               </button>
 
               <button
                 onClick={() => onSeek(0)}
-                className="p-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded text-xs border border-neutral-700"
+                className="px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 rounded border border-neutral-800 font-mono text-xs"
                 title="Rewind to start"
               >
                 ⏮
               </button>
             </div>
 
-            {/* Tempo Multiplier */}
-            <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 pt-1 border-t border-neutral-900">
-              <span>Tempo: {bpm} BPM</span>
-              <div className="flex gap-1">
+            {/* Tempo multiplier pills */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[10px] text-neutral-500 font-mono">Speed</span>
+              <div className="flex items-center gap-1">
                 {[0.5, 0.75, 1.0, 1.5].map((speed) => (
                   <button
                     key={speed}
@@ -194,7 +195,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                     className={`px-1.5 py-0.5 rounded text-[10px] ${
                       tempoMultiplier === speed
                         ? 'bg-amber-500 text-black font-bold'
-                        : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400'
+                        : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
                     }`}
                   >
                     {speed}x
@@ -217,11 +218,15 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-amber-400 font-mono text-xs">•</span>
+                <span><strong className="text-neutral-200 font-mono">Duodecimal Solfège:</strong> <span className="font-mono text-amber-300">o, wa, tu, ti, fo, fa, si, se, e, na, a, bi</span>. Natural phonetic reduction of numbers with 100% row-parity alignment.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-amber-400 font-mono text-xs">•</span>
                 <span><strong className="text-neutral-200 font-mono">2-Line Landmark Staff:</strong> Bold solid octave line (0 / C) and dashed demarcation line (4 / E). Line 8 dropped to lighten page.</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-amber-400 font-mono text-xs">•</span>
-                <span><strong className="text-neutral-200 font-mono">Broad-Nib Calligraphic Chevrons:</strong> Authentic copperplate burin pen-angle stroke contrast for crossing notes (&lt; for LH in treble, &gt; for RH in bass).</span>
+                <span><strong className="text-neutral-200 font-mono">Sculpted French Guillemets:</strong> Symmetric curved concave flanks (« for LH in treble, » for RH in bass).</span>
               </div>
             </div>
           </div>

@@ -846,38 +846,27 @@ export function renderPageToSvg(
         const weight = isRow0 ? '800' : '700';
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" class="duo-digit" font-weight="${weight}" font-size="6.8pt" fill="${noteColor}">${digit}</text>`);
 
-        // Tasteful broad-nib calligraphic chevron for hand-crossing exceptions (< for LH, > for RH)
+        // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
         if (isHandException) {
-          const h = 2.6;
-          const w = 1.6;
-          const clearance = 1.0;
+          const h = 2.8;
+          const w = 1.7;
+          const clr = 1.0;
+          const thick = 0.80;
 
-          let apexX: number;
-          let baseX: number;
-          if (hand === 'LH') {
-            baseX = nx - r - clearance;
-            apexX = baseX - w;
-          } else {
-            baseX = nx + r + clearance;
-            apexX = baseX + w;
-          }
-          const topY = ny - h / 2;
-          const botY = ny + h / 2;
-          const apexY = ny;
+          let bx = hand === 'LH' ? nx - r - clr : nx + r + clr;
+          let ax = hand === 'LH' ? bx - w : bx + w;
+          let ctrlX = hand === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
+          const ty = ny - h / 2;
+          const by = ny + h / 2;
+          const inAx = hand === 'LH' ? ax + thick : ax - thick;
+          const inCtrlX = hand === 'LH' ? ctrlX + thick * 0.45 : ctrlX - thick * 0.45;
 
-          // Authentic broad-nib calligraphy stroke contrast (35° italic pen angle)
-          // For LH (<): upper arm is thin hairline (0.50pt), lower arm is bold downstroke (1.15pt)
-          // For RH (>): upper arm is bold downstroke (1.15pt), lower arm is thin hairline (0.50pt)
-          const upperW = hand === 'RH' ? 1.15 : 0.50;
-          const lowerW = hand === 'RH' ? 0.50 : 1.15;
+          const path = `M ${bx.toFixed(2)} ${ty.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(ny - h * 0.22).toFixed(2)} ${ax.toFixed(2)} ${ny.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(ny + h * 0.22).toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(ny + h * 0.16).toFixed(2)} ${inAx.toFixed(2)} ${ny.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(ny - h * 0.16).toFixed(2)} ${bx.toFixed(2)} ${ty.toFixed(2)} Z`;
 
-          // White halo knockout underlays
-          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="${(upperW + 1.2).toFixed(2)}" stroke-linecap="round"/>`);
-          svgParts.push(`    <path d="M ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="${(lowerW + 1.2).toFixed(2)}" stroke-linecap="round"/>`);
-
-          // Colored calligraphic strokes
-          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="${upperW.toFixed(2)}" stroke-linecap="round"/>`);
-          svgParts.push(`    <path d="M ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="${lowerW.toFixed(2)}" stroke-linecap="round"/>`);
+          // White halo knockout underlay
+          svgParts.push(`    <path d="${path}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/>`);
+          // Colored sculpted French guillemet
+          svgParts.push(`    <path d="${path}" fill="${noteColor}" stroke="${noteColor}" stroke-width="0.3" stroke-linejoin="round"/>`);
         }
       } else if (isHandException) {
         const nw = 7.5;

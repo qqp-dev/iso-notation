@@ -155,8 +155,8 @@ test('Notehead Morphology: row-parity-shapes dual-coded geometry', () => {
 
 test('Notehead Morphology: phonetic-tokens 12-TET monosyllabic tokens', () => {
   const expectedSyllables = [
-    'ma', 'di', 'va', 'pi', 'la', 'ri',
-    'na', 'ti', 'fa', 'bi', 'sa', 'ki'
+    'o', 'wa', 'tu', 'ti', 'fo', 'fa',
+    'si', 'se', 'e', 'na', 'a', 'bi'
   ];
 
   assert.equal(normalizeNoteheadMorphology('phonetic-tokens'), 'phonetic');
@@ -214,12 +214,12 @@ test('Notehead Morphology: Canvas rendering of phonetic tokens uses strictly low
     currentTick: 0,
   });
 
-  const validLowerSyllables = new Set(['ma', 'di', 'va', 'pi', 'la', 'ri', 'na', 'ti', 'fa', 'bi', 'sa', 'ki']);
+  const validLowerSyllables = new Set(['o', 'wa', 'tu', 'ti', 'fo', 'fa', 'si', 'se', 'e', 'na', 'a', 'bi']);
   const renderedSyllables = fills.filter((f) => validLowerSyllables.has(f.text));
   assert.ok(renderedSyllables.length > 0, 'Must render phonetic tokens for notes');
 
   // Verify zero uppercase syllables rendered anywhere
-  const uppercaseSyllables = ['Ma', 'Di', 'Va', 'Pi', 'La', 'Ri', 'Na', 'Ti', 'Fa', 'Bi', 'Sa', 'Ki'];
+  const uppercaseSyllables = ['O', 'Wa', 'Tu', 'Ti', 'Fo', 'Fa', 'Si', 'Se', 'E', 'Na', 'A', 'Bi'];
   for (const upper of uppercaseSyllables) {
     assert.ok(
       !fills.some((f) => f.text === upper),
@@ -287,30 +287,20 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.20" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
   assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
 
-  // Broad-nib calligraphic chevrons for hand-crossing exceptions:
-  // Measure 4 has RH crossing into bass (< 48) -> bold downstroke (1.15pt) upper arm and hairline (0.50pt) lower arm pointing right
-  const rhUpperRegex = /<path d="M ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+)" fill="none" stroke="([^"]+)" stroke-width="1\.15" stroke-linecap="round"\/>/g;
-  const rhLowerRegex = /<path d="M ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.50" stroke-linecap="round"\/>/g;
-  const rhUpperMatches = Array.from(svg.matchAll(rhUpperRegex));
-  const rhLowerMatches = Array.from(svg.matchAll(rhLowerRegex));
-  assert.ok(rhUpperMatches.length > 0, 'Must render broad-nib calligraphic upper downstroke (1.15pt) for RH');
-  assert.ok(rhLowerMatches.length > 0, 'Must render broad-nib calligraphic lower hairline (0.50pt) for RH');
+  // Sculpted French Guillemets for hand-crossing exceptions:
+  // Measure 4 has RH crossing into bass (< 48) -> curved symmetric flanks pointing right (ax > bx)
+  const guillemetRegex = /<path d="M ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) \1 \2 Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="0\.3" stroke-linejoin="round"\/>/g;
+  const rhMatches = Array.from(svg.matchAll(guillemetRegex));
+  assert.ok(rhMatches.length > 0, 'Must render Sculpted French Guillemets in SVG for duodecimal RH crossing exceptions');
 
-  const rhChevrons = rhUpperMatches.filter((m) => parseFloat(m[3]) > parseFloat(m[1]));
+  const rhChevrons = rhMatches.filter((m) => parseFloat(m[5]) > parseFloat(m[1]));
   assert.ok(rhChevrons.length > 0, 'RH crossing exceptions must have apex pointing right (apexX > baseX)');
-  rhChevrons.forEach((m) => {
-    const baseX = parseFloat(m[1]);
-    const apexX = parseFloat(m[3]);
-    assert.ok(apexX > baseX, 'RH chevron must point right');
-  });
 
-  // Page 4 contains measure 30 with LH crossing into treble (> 48) -> hairline (0.50pt) upper arm and bold downstroke (1.15pt) lower arm pointing left
+  // Page 4 contains measure 30 with LH crossing into treble (> 48) -> curved symmetric flanks pointing left (ax < bx)
   const page4Svg = renderColumnarScoreToSvg(score, 3, { noteheadMorphology: 'duodecimal' });
-  const lhUpperMatches = Array.from(page4Svg.matchAll(rhLowerRegex)); // 0.50pt is upper arm for LH
-  const lhLowerMatches = Array.from(page4Svg.matchAll(rhUpperRegex)); // 1.15pt is lower arm for LH
-  const lhChevrons = lhUpperMatches.filter((m) => parseFloat(m[3]) < parseFloat(m[1]));
+  const p4Matches = Array.from(page4Svg.matchAll(guillemetRegex));
+  const lhChevrons = p4Matches.filter((m) => parseFloat(m[5]) < parseFloat(m[1]));
   assert.ok(lhChevrons.length > 0, 'LH crossing exceptions must have apex pointing left (apexX < baseX)');
-  assert.ok(lhLowerMatches.length > 0, 'LH must have bold lower downstroke (1.15pt)');
 });
 
 test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {

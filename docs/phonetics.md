@@ -1,100 +1,76 @@
-# 12-TET Monosyllabic Solfège Specification for Isomorphic Keyboards
+# Definitive Duodecimal Solfège System for 12-TET Iso-Notation
 
-> **A mathematically optimized, key-agnostic, monosyllabic phonetic notation for 12-TET equal temperament on 2-row Jánko keyboards.**
-
----
-
-## 1. Core Principles & Motivation
-
-Traditional solfège (*Do-Re-Mi-Fa-Sol-La-Ti*) and conventional pitch names (*C, C♯, D...*) suffer from two major flaws when applied to 12-TET isomorphic keyboards:
-1. **Diatonic Bias & Variable Syllable Length**: Numbered pitch classes ("seven", "eleven") are multisyllabic, preventing real-time mental recitation at fast tempos (120–160+ BPM). Chromatic solfège systems (*Do-Di-Re-Ri...*) encode accidentals as second-class modifications of diatonic white keys.
-2. **Motor Disconnection from Hardware**: Physical Jánko keyboards are organized into **two interleaved whole-tone rows**:
-   - **Row 0 (Even pitches: $0, 2, 4, 6, 8, 10$)**
-   - **Row 1 (Odd pitches: $1, 3, 5, 7, 9, 11$)**
-
-The **`iso-notation` Phonetic System** establishes a 1-to-1 bijection between the 12 chromatic pitch classes and 12 distinct monosyllables, designed around four structural pillars:
-1. **Jánko Row Rhyme**: Every note on Row 0 rhymes on open, flowing **`-a`**; every note on Row 1 rhymes on crisp, bright **`-i`**.
-2. **Consonant Uniqueness**: 12 distinct consonants $\{ \text{B, D, F, K, L, M, N, P, R, S, T, V} \}$. Replacing velar *Ga* with retroflex *Ra* eliminates the velar twin confusion with *Ka*.
-3. **Tritone Polar Twin Invariant ($\Delta = \pm 6$)**: Acoustically similar "twin" consonants are separated across the midpoint of the octave.
-4. **Biomechanical Motor Alternation**: Chromatic steps and harmonic fifths alternate vocal tract muscle groups to prevent tongue fatigue at high recitation speeds.
+> **An intuitive, monosyllabic phonetic notation for 12-TET equal temperament, derived directly from the duodecimal numerals (0..9, a, b) and Jánko keyboard whole-tone row parities.**
 
 ---
 
-## 2. Canonical 12-TET Syllable Mapping
+## 1. The Duodecimal Breakthrough
 
-```
-Row 0 (-a):   0: Ma     2: Va     4: La     6: Na     8: Fa    10: Sa
-Row 1 (-i):   1: Di     3: Pi     5: Ri     7: Ti     9: Bi    11: Ki
-```
+Traditional solfège (*Do-Re-Mi-Fa-Sol-La-Ti*) was created for 7-note diatonic church modes in the 11th century. When extended to modern 12-TET music, it breaks down:
+- It requires arbitrary multisyllabic names ("seven", "eleven") or convoluted accidental modifiers (*Di, Ri, Fi, Si, Li*).
+- It forces musicians to memorize arbitrary abstract syllables that have no relation to the physical notes on an isomorphic keyboard.
 
-### Full Reference Matrix
+In duodecimal iso-notation, notes are represented directly by their base-12 pitch-class numerals:
+$$\mathbf{0,\; 1,\; 2,\; 3,\; 4,\; 5,\; 6,\; 7,\; 8,\; 9,\; a,\; b}$$
 
-| Pitch Class | Jánko Row | Consonant | Vowel | Syllable | Anatomical Organ | Manner & Voicing | Structural Twin ($\Delta = 6$) |
-| :---: | :---: | :---: | :---: | :---: | :--- | :--- | :---: |
-| **0** | Row 0 | `M` | `a` | **Ma** | Lips (Bilabial) | Nasal continuant, Voiced | **Na** (6) |
-| **1** | Row 1 | `D` | `i` | **Di** | Alveolar Ridge | Dental stop, Voiced | **Ti** (7) |
-| **2** | Row 0 | `V` | `a` | **Va** | Teeth/Lip (Labiodental) | Fricative, Voiced | **Fa** (8) |
-| **3** | Row 1 | `P` | `i` | **Pi** | Lips (Bilabial) | Stop pop, Voiceless | **Bi** (9) |
-| **4** | Row 0 | `L` | `a` | **La** | Alveolar Ridge | Lateral liquid, Voiced | **Sa** (10) |
-| **5** | Row 1 | `R` | `i` | **Ri** | Mid-Palate | Retroflex liquid, Voiced | **Ki** (11) |
-| **6** | Row 0 | `N` | `a` | **Na** | Alveolar Ridge | Nasal continuant, Voiced | **Ma** (0) |
-| **7** | Row 1 | `T` | `i` | **Ti** | Alveolar Ridge | Dental strike, Voiceless | **Di** (1) |
-| **8** | Row 0 | `F` | `a` | **Fa** | Teeth/Lip (Labiodental) | Fricative, Voiceless | **Va** (2) |
-| **9** | Row 1 | `B` | `i` | **Bi** | Lips (Bilabial) | Stop burst, Voiced | **Pi** (3) |
-| **10** | Row 0 | `S` | `a` | **Sa** | Teeth/Alveolar Ridge | Sibilant hiss, Voiceless | **La** (4) |
-| **11** | Row 1 | `K` | `i` | **Ki** | Soft Palate / Velum | Velar click, Voiceless | **Ri** (5) |
+The **Definitive Duodecimal Solfège System** creates an instantaneous, 1-to-1 phonetic shorthand for each numeral. Each syllable is a natural, monosyllabic reduction of the word used to pronounce the symbol itself:
 
----
-
-## 3. Structural & Mathematical Properties
-
-### 3.1 The Tritone Polar Invariant ($\pm 6$)
-The tritone is the most musically distant interval and always stays on the same Jánko keyboard row. All six acoustic pairs are placed at exact polar opposition ($\Delta = 6$):
-- **Ma $\leftrightarrow$ Na** (The two nasals: Lips vs. Ridge)
-- **Di $\leftrightarrow$ Ti** (The two alveolar stops: Voiced vs. Voiceless)
-- **Va $\leftrightarrow$ Fa** (The two labiodentals: Voiced vs. Voiceless)
-- **Pi $\leftrightarrow$ Bi** (The two bilabial stops: Voiceless vs. Voiced)
-- **La $\leftrightarrow$ Sa** (The two ridge continuants: Liquid vs. Sibilant)
-- **Ri $\leftrightarrow$ Ki** (Mid-palatal liquid vs. velar click)
-
-### 3.2 Augmented Triad Voicing Coherence ($\pm 4$)
-On Row 1, major-third leaps ($+4$) form two independent equilateral triangles:
-- **Voiced Triangle $\{1, 5, 9\}$**: **`Di - Ri - Bi`** (100% Voiced)
-- **Voiceless Triangle $\{3, 7, 11\}$**: **`Pi - Ti - Ki`** (100% Voiceless)
-
-When playing triad arpeggios, the vocal folds remain in a stable, consistent vibrational state.
-
-### 3.3 The Pigeonhole Bottleneck Proof (Why 91.7% is Optimal)
-A combinatorial search over all $6! \times 6! = 518,400$ permutations proves that:
-> **Zero semitone place collisions ($\pm 1$) and strict tritone pairing ($\pm 6$) are mathematically mutually exclusive.**
-
-**Proof**:
-1. Row 0 contains **3 alveolar ridge consonants**: `La`, `Sa`, `Na` (50% of the row).
-2. Row 1 contains **2 alveolar ridge consonants**: `Di`, `Ti`.
-3. If `Di` and `Ti` are tritone opposites at positions $z$ and $z+6$, their chromatic neighbors in Row 0 occupy $\{z-1, z+1, z+5, z+7\}$ (4 of Row 0's 6 slots).
-4. Only **2 slots** in Row 0 do not border `Di` or `Ti`.
-5. By the **Pigeonhole Principle**, placing 3 ridge consonants into 2 non-neighboring slots is impossible. At least one ridge consonant must touch `Di` or `Ti`.
-
-The **Prime Canonical Order achieves the theoretical minimum bound of exactly 1 collision** (11/12 distinct = **91.7% diversity**). The solitary collision (`Na` 6 $\to$ `Ti` 7) pairs a smooth nasal hum with a crisp percussive release—differing in mechanical manner, completely avoiding tongue tangling.
-
-### 3.4 Harmonic Cadences & Circle of Fifths ($\pm 7$)
-Because the Circle of Fifths ($+7 \pmod{12}$) alternates whole-tone rows on every step:
-$$\text{Ma} \to \text{Ti} \to \text{Va} \to \text{Bi} \to \text{La} \to \text{Ki} \to \text{Na} \to \text{Di} \to \text{Fa} \to \text{Pi} \to \text{Sa} \to \text{Ri}$$
-- Every harmonic authentic cadence ($V \to I$) across all 12 keys automatically alternates vowels: **`-a` $\leftrightarrow$ `-i`**.
-- Consecutive fifths achieve 91.7% muscle diversity (only 1 collision across all 12 transitions: `Na` $\to$ `Di`).
+| Pitch Class | Numeral | Word / Origin | Definitive Syllable | Jánko Row | Description |
+| :---: | :---: | :---: | :---: | :---: | :--- |
+| **0** | `0` | *oh / zero* | **o** | **Row 0** (Even) | Clean open vowel grounding root of Row 0 |
+| **1** | `1` | *one* | **wa** | **Row 1** (Odd) | Gliding semi-vowel onset of Row 1 |
+| **2** | `2` | *two* | **tu** | **Row 0** (Even) | Crisp dental strike on Row 0 |
+| **3** | `3` | *three* | **ti** | **Row 1** (Odd) | High dental continuant on Row 1 |
+| **4** | `4` | *four* | **fo** | **Row 0** (Even) | Labiodental fricative on Row 0 (5th landmark) |
+| **5** | `5` | *five* | **fa** | **Row 1** (Odd) | Open labiodental release on Row 1 |
+| **6** | `6` | *six* | **si** | **Row 0** (Even) | Sibilant tritone landmark on Row 0 |
+| **7** | `7` | *seven* | **se** | **Row 1** (Odd) | Mid-vowel sibilant fifth landmark on Row 1 |
+| **8** | `8` | *eight* | **e** | **Row 0** (Even) | Bright mid-front vowel on Row 0 |
+| **9** | `9` | *nine* | **na** | **Row 1** (Odd) | Alveolar nasal resonance on Row 1 |
+| **10** | `a` | *ten / a* | **a** | **Row 0** (Even) | Low open central vowel on Row 0 |
+| **11** | `b` | *eleven / b* | **bi** | **Row 1** (Odd) | Voiced bilabial pop leading into octave on Row 1 |
 
 ---
 
-## 4. Benchmark Recitation: Bach Goldberg Variations (Var. 1)
+## 2. Structural & Biomechanical Invariants
+
+### 2.1 Direct Numeral Isomorphism
+Because every syllable is the natural phonetic pronunciation of the symbol on the page:
+- **Zero Translation Latency**: There is no secondary lookup table or mnemonic cipher. When a musician reads `7`, they instinctively say **`se`**. When they read `b`, they say **`bi`**.
+- **Intuitive Acquisition**: New readers master all 12 syllables in minutes rather than weeks.
+
+### 2.2 Whole-Tone Row Parity Invariant
+Physical Jánko keyboards and iso-notation score matrices are organized into two alternating whole-tone rows separated by semitones:
+- **Whole-Tone Row 0 (Evens)**: $\{0, 2, 4, 6, 8, a\} \longrightarrow \{\mathbf{o, tu, fo, si, e, a}\}$
+- **Whole-Tone Row 1 (Odds)**: $\{1, 3, 5, 7, 9, b\} \longrightarrow \{\mathbf{wa, ti, fa, se, na, bi}\}$
+
+Odd and even numbers partition the notes between physical keyboard rows with mathematical precision. Sight-singing or reciting the syllables immediately informs the player of the physical hand position and keyboard tier.
+
+### 2.3 Interval Geometry & Mental Tracking
+- **Semitone Steps ($\Delta = \pm 1$)**: Strictly alternate row parity:
+  $$\text{Even} \longleftrightarrow \text{Odd}$$
+  Example: $\mathbf{o \to wa \to tu \to ti \to fo \to fa \to si \to se \to e \to na \to a \to bi \to o}$
+- **Whole-Tone Steps ($\Delta = \pm 2$)**: Strictly preserve row parity:
+  $$\text{Row 0:}\; \mathbf{o \to tu \to fo \to si \to e \to a \to o}$$
+  $$\text{Row 1:}\; \mathbf{wa \to ti \to fa \to se \to na \to bi \to wa}$$
+- **Tritone Symmetry ($\Delta = 6$)**: Always lands on the same row with identical parity:
+  - $0 \leftrightarrow 6$: **`o`** $\leftrightarrow$ **`si`** (Row 0)
+  - $1 \leftrightarrow 7$: **`wa`** $\leftrightarrow$ **`se`** (Row 1)
+  - $2 \leftrightarrow 8$: **`tu`** $\leftrightarrow$ **`e`** (Row 0)
+  - $4 \leftrightarrow a$: **`fo`** $\leftrightarrow$ **`a`** (Row 0)
+
+---
+
+## 3. Benchmark Recitation: Bach Goldberg Variations (Var. 1)
 
 Theme mm. 1–2 (Right Hand running 16th notes):
-- **Pitches**: `7 - 6 - 7 - 2 - 4 - 6 - 7 - 9 - 11 - 13 - 14 - 13 - 14`
-- **Canonical Solfège**:
-  $$\mathbf{Ti - Na - Ti - Va - La - Na - Ti - Bi - Ki - Di - Va - Di - Va}$$
+- **Numerals**: `7 - 6 - 7 - 2 - 4 - 6 - 7 - 9 - b - 1 - 2 - 1 - 2`
+- **Definitive Solfège**:
+  $$\mathbf{se - si - se - tu - fo - si - se - na - bi - wa - tu - wa - tu}$$
 
-Notice the flowing, percussive alternation:
-- `Ti - Na - Ti - Va`: Strike $\to$ Resonance $\to$ Strike $\to$ Buzz
-- `La - Na - Ti - Bi`: Liquid $\to$ Resonance $\to$ Strike $\to$ Burst
-- `Ki - Di - Va - Di - Va`: Click $\to$ Tap $\to$ Buzz $\to$ Tap $\to$ Buzz
+### Rapid Recitation Dynamics
+1. **`se - si - se`**: High-speed sibilant alternation between Row 1 and Row 0 ($7 \to 6 \to 7$).
+2. **`tu - fo - si - se`**: Crisp dental-labial whole-tone ascent across Row 0 ($2 \to 4 \to 6$) terminating in Row 1 ($7$).
+3. **`na - bi - wa - tu - wa - tu`**: Resonant nasal-bilabial drive reaching the upper octave ($9 \to b \to 1 \to 2$).
 
-The syllables roll naturally off the tongue like an Italian coloratura aria at 120–160+ BPM.
+The syllables roll off the tongue effortlessly at allegro tempos (120–160 BPM), with immediate, transparent feedback of both pitch-class value and physical hand coordinates.

@@ -86,3 +86,13 @@ In Measure 4, the right hand crosses downward into the bass register with the `>
 - **Top Calligraphic Pick**: **Variant 3 (Broad-Nib Burin)** for timeless Urtext engraving authenticity.
 - **Top Micro-Legibility Pick**: **Variant 4 (Chiseled Diamond Pip)** for unshakeable punch clarity at reading distance.
 - **Top Typographic Harmony Pick**: **Variant 6 (Serifed Accolade)** if pairing with **Century Schoolbook** notehead numerals.
+
+---
+
+## 6. Definitive Adoption: Variant 2 (Sculpted French Guillemet)
+
+Following visual evaluation in full score context, **Variant 2: Sculpted French Guillemet (`«`, `»`)** was selected as the **definitive handedness indicator** for `iso-notation`:
+1. **Flawless Symmetry**: Unlike the asymmetrical stroke modulation of the broad-nib burin, the French guillemet possesses perfect top-bottom symmetry across the horizontal pitch axis, preserving spatial equilibrium next to notehead digits.
+2. **Literary Bookwork Refinement**: The subtle concave sweep and optical waist swelling ($0.65\text{pt}$) frame the URW Gothic numerals with the quiet elegance of fine French punch-cutting (Didot/Grandjean).
+3. **Zero Visual Noise**: It provides an unmistakable directional cue without calling unnecessary attention to itself, keeping the performer's focus firmly on the mathematical pitch numbers and the lightened 2-line staff.
+

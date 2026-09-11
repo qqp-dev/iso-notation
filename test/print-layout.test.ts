@@ -589,11 +589,11 @@ test('Phonetic Notehead Morphology in SVG: strictly lowercase syllables', () => 
   const svgs = renderAllPagesToSvg(layout);
 
   assert.equal(svgs.length, 4);
-  const uppercaseSyllables = ['Ma', 'Di', 'Va', 'Pi', 'La', 'Ri', 'Na', 'Ti', 'Fa', 'Bi', 'Sa', 'Ki'];
+  const uppercaseSyllables = ['O', 'Wa', 'Tu', 'Ti', 'Fo', 'Fa', 'Si', 'Se', 'E', 'Na', 'A', 'Bi'];
 
   for (const svg of svgs) {
     // Must contain lowercase phonetic text elements
-    assert.match(svg, /<text[^>]*font-family="monospace"[^>]*>(?:ma|di|va|pi|la|ri|na|ti|fa|bi|sa|ki)<\/text>/);
+    assert.match(svg, /<text[^>]*font-family="monospace"[^>]*>(?:o|wa|tu|ti|fo|fa|si|se|e|na|a|bi)<\/text>/);
 
     // Must NOT contain any uppercase syllables in note text elements
     for (const upper of uppercaseSyllables) {

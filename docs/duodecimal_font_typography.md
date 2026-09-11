@@ -129,10 +129,11 @@ The user has selected the definitive combination:
    - Geometric Swiss modernism with pure circular counters (`0, 6, 8, 9, b`) resonating with the circular 12-TET pitch-class geometry ($Z_{12}$).
    - Loaded locally in the web client via bundled `@font-face` (`public/fonts/URWGothic-Book.otf` and `URWGothic-Demi.otf`).
 2. **Tokens**: Strictly **lowercase** `a` and `b` (`0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b`).
-3. **Handedness Indicator**: **Broad-Nib Calligraphy (Urtext Burin)**.
-   - $35^\circ$ italic pen angle producing an authoritative $1.15\text{pt}$ ($2.3\text{px}$) downstroke and a delicate $0.50\text{pt}$ ($1.0\text{px}$) hairline upstroke.
-   - For LH (`<`): top hairline, bottom downstroke.
-   - For RH (`>`): top downstroke, bottom hairline.
+3. **Handedness Indicator**: **Sculpted French Guillemet (`«`, `»`)**.
+   - Elegant, perfectly symmetric quadratic concave flanks with optical waist swelling ($0.65\text{pt}$ / $1.3\text{px}$) tapering cleanly to delicate needle finials.
+   - For LH (`«`): opens toward the notehead on the left.
+   - For RH (`»`): opens toward the notehead on the right.
+   - Features a clean underlay knockout preventing staff and grid line interference.
 
 ---
 

@@ -7,7 +7,7 @@ import { parseMidiToScore } from '../model/midi';
 import { synth } from '../audio/synth';
 import { NotationCanvas } from './NotationCanvas';
 import { ControlsDrawer } from './ControlsDrawer';
-import { PhoneticSandbox } from './PhoneticSandbox';
+import { SolfegeGuide } from './SolfegeGuide';
 import { PrintModal } from './PrintModal';
 import { CompressionModal } from './CompressionModal';
 
@@ -275,20 +275,12 @@ export const App: React.FC = () => {
 
       {currentView === 'phonetics' ? (
         <div className="relative w-full h-full flex flex-col no-print">
-          {/* Floating Return Button */}
-          <div className="fixed top-3 right-3 z-50">
-            <button
-              onClick={() => {
-                synth.stopAll();
-                setCurrentView('score');
-              }}
-              className="px-3 py-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white text-xs font-mono border border-neutral-700 shadow-xl flex items-center gap-1.5 transition"
-            >
-              <span>←</span>
-              <span>Back to Score</span>
-            </button>
-          </div>
-          <PhoneticSandbox />
+          <SolfegeGuide
+            onClose={() => {
+              synth.stopAll();
+              setCurrentView('score');
+            }}
+          />
         </div>
       ) : (
         <div className="fixed inset-0 h-[100dvh] w-screen flex flex-col overflow-hidden bg-black no-print">
