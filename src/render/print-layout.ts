@@ -123,16 +123,16 @@ export function computeColumnarLayout(
     const indices = score.notes.map(n => linearIndex(n.pitch));
     const dataMin = Math.min(...indices);
     const dataMax = Math.max(...indices);
-    minPitch = Math.floor((dataMin - 2) / 2) * 2; // snap to whole tone
-    maxPitch = Math.ceil((dataMax + 2) / 2) * 2;
+    minPitch = 9 + Math.floor((dataMin - 2 - 9) / 2) * 2; // snap to whole tone aligned with A
+    maxPitch = 9 + Math.ceil((dataMax + 2 - 9) / 2) * 2;
   } else if (minPitch >= maxPitch) {
-    minPitch = 36; // C2
-    maxPitch = 76; // E5
+    minPitch = 33; // A2
+    maxPitch = 81; // A6
   }
 
-  // Ensure whole-tone alignment for clean staff presentation
-  minPitch = Math.floor(minPitch / 2) * 2;
-  maxPitch = Math.ceil(maxPitch / 2) * 2;
+  // Ensure whole-tone alignment for clean staff presentation aligned with A
+  minPitch = 9 + Math.floor((minPitch - 9) / 2) * 2;
+  maxPitch = 9 + Math.ceil((maxPitch - 9) / 2) * 2;
   const pitchSpan = Math.max(12, maxPitch - minPitch + 1);
 
   // Physical page dimensions
@@ -351,13 +351,13 @@ export function renderPageToSvg(
 
     // Pitch Header Labels at column top (anchored on A: b0..b7)
     for (let p = minPitch; p <= maxPitch; p++) {
-      const pc = ((p % 12) + 12) % 12;
+      const relA = ((p - 9) % 12 + 12) % 12;
       const aOct = Math.max(0, Math.floor((p - 9) / 12));
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
-      if (pc === 9) {
+      if (relA === 0) {
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">b${aOct}</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
-      } else if (pc === 4 && normStaffStyle === 'tritone-split') {
+      } else if (relA === 4 && normStaffStyle === 'tritone-split') {
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5|7</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#555555" stroke-width="0.6" stroke-dasharray="12,4"/>`);
       }
@@ -366,30 +366,30 @@ export function renderPageToSvg(
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
 
-    // Staff Lines (5/7 Staff Topography)
-    // PC 0: bold octave (1.5pt)
-    // PC 4: 5/7 Demarcation thin long line (0.6pt, Klavarscribo-style [12, 4])
-    // PC 2, 6, 8, 10: hairlines (0.5pt)
-    // Odd PCs: spaces
+    // Staff Lines (5/7 Staff Topography anchored on A)
+    // relA 0 (A): bold octave boundary (1.5pt)
+    // relA 4 (C#): 5/7 Demarcation thin long line (0.6pt, Klavarscribo-style [12, 4])
+    // relA 2, 6, 8, 10 (B, D#, F, G): hairlines (0.5pt)
+    // Odd relAs (A#, C, D, E, F#, G#): spaces
     for (let p = minPitch; p <= maxPitch; p++) {
-      const pc = ((p % 12) + 12) % 12;
+      const relA = ((p - 9) % 12 + 12) % 12;
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
 
       if (normStaffStyle === 'tritone-split') {
-        if (pc === 0) {
-          // Bold octave boundary
+        if (relA === 0) {
+          // Bold octave boundary on A
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.5"/>`);
-        } else if (pc === 4) {
-          // 5/7 Demarcation thin long Klavar-style line
+        } else if (relA === 4) {
+          // 5/7 Demarcation thin long Klavar-style line on C#
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#333333" stroke-width="0.6" stroke-dasharray="12,4"/>`);
-        } else if (pc === 2 || pc === 6 || pc === 8 || pc === 10) {
+        } else if (relA === 2 || relA === 6 || relA === 8 || relA === 10) {
           // Hairlines
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#888888" stroke-width="0.5"/>`);
         }
       } else {
-        // Fallback whole-tone uniform
-        if (pc % 2 === 0) {
-          const isOct = pc === 0;
+        // Fallback whole-tone uniform aligned with A
+        if (relA % 2 === 0) {
+          const isOct = relA === 0;
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${isOct ? '1.5' : '0.6'}"/>`);
         }
       }
@@ -446,7 +446,8 @@ export function renderPageToSvg(
       const lPitch = linearIndex(note.pitch);
       const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
       const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
-      const isEven = wholeToneParity(note.pitch) === 0;
+      const relA = ((note.pitch.pitchClass - 9) % 12 + 12) % 12;
+      const isLine = relA % 2 === 0;
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
 
@@ -476,8 +477,8 @@ export function renderPageToSvg(
         const r = 3.2;
         const d = 4.0;
 
-        if (isEven) {
-          // Row 0 (Lines): Solid Disc with White Halo Knockout
+        if (isLine) {
+          // Lines: Solid Disc with White Halo Knockout
           svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
         } else {
           // Row 1 (Spaces): Solid Diamond with White Halo Knockout

@@ -31,9 +31,9 @@ export function calculateScoreDimensions(
     maxPitch = Math.max(...indices) + 2;
   }
 
-  // Ensure whole-tone boundary
-  minPitch = Math.floor(minPitch / 2) * 2;
-  maxPitch = Math.ceil(maxPitch / 2) * 2;
+  // Ensure whole-tone boundary aligned with A
+  minPitch = 9 + Math.floor((minPitch - 9) / 2) * 2;
+  maxPitch = 9 + Math.ceil((maxPitch - 9) / 2) * 2;
 
   const pitchSpan = maxPitch - minPitch + 1;
   const timeLength = score.totalTicks * options.pixelsPerTick;
@@ -101,20 +101,20 @@ export function renderScoreToCanvas(
 
   // 2a. Octave Ribbons Shading (if octave-ribbons)
   if (normStaffStyle === 'octave-ribbons') {
-    const minOct = Math.floor(minPitch / 12);
-    const maxOct = Math.floor(maxPitch / 12);
+    const minOct = Math.floor((minPitch - 9) / 12);
+    const maxOct = Math.floor((maxPitch - 9) / 12);
     for (let oct = minOct; oct <= maxOct; oct++) {
       if (Math.abs(oct) % 2 === 0) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
         if (isHoriz) {
-          const pBottom = oct * 12 - 0.5;
-          const pTop = (oct + 1) * 12 - 0.5;
+          const pBottom = 9 + oct * 12 - 0.5;
+          const pTop = 9 + (oct + 1) * 12 - 0.5;
           const yBottom = height - paddingPitch - (pBottom - minPitch) * options.pixelsPerSemitone;
           const yTop = height - paddingPitch - (pTop - minPitch) * options.pixelsPerSemitone;
           ctx.fillRect(paddingStart, yTop, dims.width - paddingStart, yBottom - yTop);
         } else {
-          const pLeft = oct * 12 - 0.5;
-          const pRight = (oct + 1) * 12 - 0.5;
+          const pLeft = 9 + oct * 12 - 0.5;
+          const pRight = 9 + (oct + 1) * 12 - 0.5;
           const xLeft = paddingPitch + (pLeft - minPitch) * options.pixelsPerSemitone;
           const xRight = paddingPitch + (pRight - minPitch) * options.pixelsPerSemitone;
           ctx.fillRect(xLeft, paddingStart, xRight - xLeft, dims.height - paddingStart);
@@ -126,8 +126,8 @@ export function renderScoreToCanvas(
   // 2b. Pitch Lines & Labels
   for (let p = minPitch; p <= maxPitch; p++) {
     const pc = ((p % 12) + 12) % 12;
-    const oct = Math.floor(p / 12);
-    const parity = wholeToneParity(p);
+    const relA = ((p - 9) % 12 + 12) % 12;
+    const isLine = relA % 2 === 0;
     const lineGeom = getStaffLineGeometry(pc, normStaffStyle);
 
     if (isHoriz) {
@@ -135,7 +135,7 @@ export function renderScoreToCanvas(
 
       // Band shading in chromatic grid mode
       if (normStaffStyle === 'chromatic-grid') {
-        ctx.fillStyle = parity === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
+        ctx.fillStyle = isLine ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
         ctx.fillRect(
           paddingStart,
           y - options.pixelsPerSemitone / 2,
@@ -175,7 +175,7 @@ export function renderScoreToCanvas(
       const x = paddingPitch + (p - minPitch) * options.pixelsPerSemitone;
 
       if (normStaffStyle === 'chromatic-grid') {
-        ctx.fillStyle = parity === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
+        ctx.fillStyle = isLine ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
         ctx.fillRect(
           x - options.pixelsPerSemitone / 2,
           paddingStart,

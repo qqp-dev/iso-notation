@@ -345,3 +345,38 @@ test('0-Indexed Piano Octaves Invariant (b0..b7) for 88-key range', () => {
     assert.equal(`b${aOct}`, expectedLabels[idx], `A at linear index ${p} must format as ${expectedLabels[idx]}`);
   }
 });
+
+test('Unified Octave Topography: Staff lines and octave labels aligned on A', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const svg = renderPageToSvg(layout, 0);
+
+  // Find all b\d+ labels and their x coordinates
+  const labelRegex = /<text x="([\d\.]+)"[^>]*class="pitch-label"[^>]*font-weight="bold">(b\d+)<\/text>/g;
+  const labels: { x: string; label: string }[] = [];
+  let match;
+  while ((match = labelRegex.exec(svg)) !== null) {
+    labels.push({ x: match[1], label: match[2] });
+  }
+  assert.ok(labels.length > 0, 'Must have b octave labels');
+
+  // Verify that for every b label at x, there is a bold 1.5pt octave line at the exact same x
+  for (const { x, label } of labels) {
+    const boldLineRegex = new RegExp(`<line x1="${x}" y1="[\\d\\.]+" x2="${x}" y2="[\\d\\.]+" stroke="#000000" stroke-width="1\\.5"\\/>`);
+    assert.match(svg, boldLineRegex, `Octave label ${label} at x=${x} must align with a bold 1.5pt staff line`);
+  }
+
+  // Find all 5|7 demarcation labels and their x coordinates
+  const demarcLabelRegex = /<text x="([\d\.]+)"[^>]*class="pitch-label"[^>]*>5\|7<\/text>/g;
+  const demarcLabels: string[] = [];
+  while ((match = demarcLabelRegex.exec(svg)) !== null) {
+    demarcLabels.push(match[1]);
+  }
+  assert.ok(demarcLabels.length > 0, 'Must have 5|7 demarcation labels');
+
+  // Verify that for every 5|7 label at x, there is a 0.6pt demarcation line with dasharray 12,4 at the exact same x
+  for (const x of demarcLabels) {
+    const demarcLineRegex = new RegExp(`<line x1="${x}" y1="[\\d\\.]+" x2="${x}" y2="[\\d\\.]+" stroke="#333333" stroke-width="0\\.6" stroke-dasharray="12,4"\\/>`);
+    assert.match(svg, demarcLineRegex, `Demarcation label 5|7 at x=${x} must align with a 12,4 dashed demarcation staff line`);
+  }
+});
