@@ -34,3 +34,56 @@ body, html {
 ::-webkit-scrollbar-thumb:hover {
   background: #333333;
 }
+
+/* Printable Columnar Score & A4 Pagination */
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@media print {
+  body, html {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .print-page {
+    width: 100% !important;
+    height: 100% !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+    box-sizing: border-box !important;
+    background: #FFFFFF !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .print-page svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+}
+

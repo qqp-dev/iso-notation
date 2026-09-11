@@ -8,6 +8,7 @@ import { synth } from '../audio/synth';
 import { NotationCanvas } from './NotationCanvas';
 import { ControlsDrawer } from './ControlsDrawer';
 import { PhoneticSandbox } from './PhoneticSandbox';
+import { PrintModal } from './PrintModal';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('score');
@@ -19,6 +20,7 @@ export const App: React.FC = () => {
   const [tempoMultiplier, setTempoMultiplier] = useState<number>(1.0);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -204,7 +206,7 @@ export const App: React.FC = () => {
     <div className="fixed inset-0 h-[100dvh] w-screen flex flex-col bg-black text-neutral-100 overflow-hidden font-sans select-none">
       {/* Drag & Drop Visual Indicator Overlay */}
       {isDraggingFile && (
-        <div className="absolute inset-0 z-50 bg-black/90 border-2 border-dashed border-amber-400 flex flex-col items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 z-50 bg-black/90 border-2 border-dashed border-amber-400 flex flex-col items-center justify-center pointer-events-none no-print">
           <span className="text-4xl mb-3">📥</span>
           <span className="font-mono text-base text-amber-300 font-bold">
             Drop .mid file to ingest into quantized fence
@@ -226,7 +228,7 @@ export const App: React.FC = () => {
       />
 
       {currentView === 'phonetics' ? (
-        <div className="relative w-full h-full flex flex-col">
+        <div className="relative w-full h-full flex flex-col no-print">
           {/* Floating Return Button */}
           <div className="fixed top-3 right-3 z-50">
             <button
@@ -243,7 +245,7 @@ export const App: React.FC = () => {
           <PhoneticSandbox />
         </div>
       ) : (
-        <div className="fixed inset-0 h-[100dvh] w-screen flex flex-col overflow-hidden bg-black">
+        <div className="fixed inset-0 h-[100dvh] w-screen flex flex-col overflow-hidden bg-black no-print">
           {/* Full-Viewport Score Canvas */}
           <NotationCanvas
             score={score}
@@ -322,9 +324,17 @@ export const App: React.FC = () => {
                 setIsDrawerOpen(false);
               }
             }}
+            onOpenPrintModal={() => setIsPrintModalOpen(true)}
           />
         </div>
       )}
+
+      {/* Printable Sheet Music Engine & Modal */}
+      <PrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        score={score}
+      />
     </div>
   );
 };

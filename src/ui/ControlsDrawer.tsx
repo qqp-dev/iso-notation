@@ -31,6 +31,7 @@ interface ControlsDrawerProps {
   score?: QuantizedGridScore;
   currentView?: 'score' | 'phonetics';
   onViewChange?: (view: 'score' | 'phonetics') => void;
+  onOpenPrintModal?: () => void;
 }
 
 export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
@@ -51,6 +52,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
   score,
   currentView = 'score',
   onViewChange,
+  onOpenPrintModal,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,14 +74,14 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition-opacity"
+          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition-opacity no-print"
           onClick={onClose}
         />
       )}
 
       {/* Drawer Container - Slide-out overlay on all viewports */}
       <aside
-        className={`fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-black border-l border-neutral-800 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-black border-l border-neutral-800 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out no-print ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -410,6 +412,24 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                 className="accent-amber-500 w-4 h-4 rounded"
               />
             </label>
+          </div>
+
+          {/* Printable Sheet Music Section */}
+          <div className="border-t border-neutral-800 pt-3">
+            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+              Sheet Music & Print
+            </label>
+            <button
+              onClick={() => {
+                onOpenPrintModal?.();
+                onClose();
+              }}
+              className="w-full py-2.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-amber-400 hover:text-amber-300 border border-neutral-700 hover:border-amber-500/50 rounded font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+              title="Open printable 2-page columnar score layout for A4/A3 paper"
+            >
+              <span>🖨️</span>
+              <span className="font-bold">Print Sheet Music (A4)</span>
+            </button>
           </div>
 
           {/* Score Selector */}
