@@ -13,6 +13,8 @@ import {
   getDurationClassColor,
   getLogarithmicDurationColor,
   RenderOptions,
+  DUODECIMAL_DIGITS,
+  getDuodecimalDigit,
 } from '../src/render/types';
 import { QuantizedNote, QuantizedGridScore } from '../src/model/types';
 import { wholeToneParity, linearIndex } from '../src/model/pitch';
@@ -240,6 +242,49 @@ test('Notehead Morphology: numerical-digits strictly 1-based note numbers 1..12'
     assert.match(str, /^([1-9]|1[0-2])$/, 'Must be 1-based note number 1..12');
     assert.doesNotMatch(str, /[A-Ga-g#b]/, 'Zero letter names permitted');
   }
+});
+
+test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', () => {
+  assert.equal(normalizeNoteheadMorphology('duodecimal'), 'duodecimal');
+  assert.equal(normalizeNoteheadMorphology('duodecimal-digits'), 'duodecimal');
+  assert.equal(normalizeNoteheadMorphology('duodecimal-tile'), 'duodecimal');
+  assert.equal(normalizeNoteheadMorphology('base-12'), 'duodecimal');
+
+  assert.equal(DUODECIMAL_DIGITS.length, 12);
+  assert.deepEqual([...DUODECIMAL_DIGITS], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']);
+
+  for (let pc = 0; pc < 12; pc++) {
+    const digit = getDuodecimalDigit(pc);
+    assert.equal(digit, DUODECIMAL_DIGITS[pc]);
+    assert.equal(digit.length, 1, 'Strictly 1 character per pitch class');
+    const isEven = pc % 2 === 0;
+    if (isEven) {
+      assert.match(digit, /^[02468a]$/, 'Row 0 must be even duodecimal digits');
+    } else {
+      assert.match(digit, /^[13579b]$/, 'Row 1 must be odd duodecimal digits');
+    }
+  }
+
+  // Interval arithmetic invariant: (P2 - P1) mod 12
+  const getInterval = (p1: number, p2: number) => ((p2 - p1) % 12 + 12) % 12;
+  assert.equal(getInterval(0, 7), 7, 'C to G is Perfect 5th (7 st)');
+  assert.equal(getInterval(0, 4), 4, 'C to E is Major 3rd (4 st)');
+  assert.equal(getInterval(7, 11), 4, 'G (7) to B (b) is Major 3rd (4 st)');
+  assert.equal(getInterval(4, 7), 3, 'E (4) to G (7) is Minor 3rd (3 st)');
+  assert.equal(getInterval(0, 6), 6, 'C (0) to F# (6) is Tritone (6 st)');
+  assert.equal(getInterval(6, 7), 1, 'F# (6) to G (7) is Minor 2nd (1 st)');
+  assert.equal(getInterval(2, 4), 2, 'D (2) to E (4) is Major 2nd (2 st)');
+
+  // SVG rendering test: duodecimal tokens in print layout
+  const score = buildBachGoldbergVar1Score();
+  const svg = renderColumnarScoreToSvg(score, 0, { noteheadMorphology: 'duodecimal' });
+  assert.match(svg, />[0-9ab]<\/text>/, 'SVG must render duodecimal text tokens');
+  // Check specifically for digits 7, 6, 2, 4, 9, b from mm. 1-4
+  assert.match(svg, />7<\/text>/, 'Must render G as 7');
+  assert.match(svg, />6<\/text>/, 'Must render F# as 6');
+  assert.match(svg, />b<\/text>/, 'Must render B as b');
+  assert.match(svg, />2<\/text>/, 'Must render D as 2');
+  assert.match(svg, />4<\/text>/, 'Must render E as 4');
 });
 
 test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {

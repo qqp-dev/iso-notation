@@ -20,6 +20,7 @@ export type NoteheadMorphology =
   | 'row-parity-shape'
   | 'phonetic'
   | 'numerical'
+  | 'duodecimal'
   | 'minimal-dot'
   | 'rectangle-square'
   | 'square-ellipse'
@@ -28,6 +29,10 @@ export type NoteheadMorphology =
   | 'row-parity-shapes'
   | 'phonetic-tokens'
   | 'numerical-digits'
+  | 'duodecimal-digits'
+  | 'duodecimal-tile'
+  | 'duodecimal-naked'
+  | 'base-12'
   | 'minimal-dots'
   | 'rectangles'
   | 'rectangle-squares'
@@ -157,6 +162,14 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
     colorMode: 'wholetone-duality',
   },
   {
+    id: 'duodecimal-digits-preset',
+    name: 'Duodecimal Digits (0–9, a, b)',
+    description: '1-5-9 staff with base-12 pitch-class tokens exposing direct interval arithmetic',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'duodecimal',
+    colorMode: 'duration-class',
+  },
+  {
     id: 'octave-ribbons-dots-preset',
     name: 'Octave Ribbons + Minimal Dots',
     description: 'Alternating octave register luminance ribbons with clean circular dots',
@@ -201,14 +214,30 @@ export function normalizeStaffStyle(
   return 'wholetone-uniform';
 }
 
+export const DUODECIMAL_DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b'] as const;
+
+export function getDuodecimalDigit(pitchClass: number): string {
+  const pc = ((pitchClass % 12) + 12) % 12;
+  return DUODECIMAL_DIGITS[pc];
+}
+
 export function normalizeNoteheadMorphology(
   morph?: NoteheadMorphology | string
-): 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle' {
+): 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'duodecimal' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle' {
   if (!morph) return 'rectangle-square';
   if (morph === 'classic-oval') return 'classic-oval';
   if (morph === 'row-parity-shape' || morph === 'row-parity-shapes') return 'row-parity-shape';
   if (morph === 'phonetic' || morph === 'phonetic-tokens') return 'phonetic';
   if (morph === 'numerical' || morph === 'numerical-digits') return 'numerical';
+  if (
+    morph === 'duodecimal' ||
+    morph === 'duodecimal-digits' ||
+    morph === 'duodecimal-tile' ||
+    morph === 'duodecimal-naked' ||
+    morph === 'base-12'
+  ) {
+    return 'duodecimal';
+  }
   if (morph === 'minimal-dot' || morph === 'minimal-dots') return 'minimal-dot';
   if (
     morph === 'rectangle-square' ||

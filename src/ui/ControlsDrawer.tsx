@@ -296,7 +296,8 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                 { id: 'row-parity-shape' as NoteheadMorphology, label: 'Row Parity Shapes', desc: 'Ovals on lines (Row 0), Bricks in spaces (Row 1)' },
                 { id: 'classic-oval' as NoteheadMorphology, label: 'Classic Oval', desc: 'Tilted elliptical notehead with line knockout' },
                 { id: 'phonetic' as NoteheadMorphology, label: '12-TET Phonetics', desc: 'Monosyllabic tokens (ma, di, va, pi, la, ri...)' },
-                { id: 'numerical' as NoteheadMorphology, label: 'Numerical Digits', desc: 'Pitch-class integers 0..11' },
+                { id: 'numerical' as NoteheadMorphology, label: 'Numerical Digits', desc: 'Pitch-class integers 1..12' },
+                { id: 'duodecimal' as NoteheadMorphology, label: 'Duodecimal (0–9, a, b)', desc: 'Base-12 integers exposing direct interval arithmetic' },
                 { id: 'minimal-dot' as NoteheadMorphology, label: 'Minimal Dots', desc: 'Uncluttered circular dots with line knockout' },
               ].map((nh) => {
                 const isSelected =

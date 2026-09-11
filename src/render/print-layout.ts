@@ -2,7 +2,7 @@ import { QuantizedGridScore, QuantizedNote, HandCrossingEvent } from '../model/t
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { getCanonicalSyllable } from '../model/phonetics';
 import { detectHandCrossings } from '../model/grid';
-import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor, getStaffLineGeometry } from './types';
+import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor, getStaffLineGeometry, DUODECIMAL_DIGITS } from './types';
 
 export const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif';
 
@@ -710,6 +710,9 @@ export function renderPageToSvg(
       if (morph === 'phonetic') {
         nw = 15.0;
         nh = 8.5;
+      } else if (morph === 'duodecimal') {
+        nw = 8.5;
+        nh = 6.8;
       } else if (
         morph === 'rectangle-square' ||
         morph === 'square-ellipse' ||
@@ -755,7 +758,7 @@ export function renderPageToSvg(
 
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const isEven = wholeToneParity(lPitch) === 0;
-        const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
+        const nh = morph === 'phonetic' ? 8.5 : morph === 'duodecimal' ? 6.8 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
         const trailStartY = ny + nh / 2 + 2;
         const rawReleaseY = ny + note.durationTicks * ptPerTick;
         const trailEndY = Math.min(rawReleaseY, staffEndY);
@@ -870,6 +873,25 @@ export function renderPageToSvg(
         svgParts.push(`    <rect x="${(nx - pw / 2).toFixed(2)}" y="${(ny - ph / 2).toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
         // Lowercase syllable text
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 2.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle">${syllable}</text>`);
+      } else if (morph === 'duodecimal') {
+        const pc = ((lPitch % 12) + 12) % 12;
+        const digit = DUODECIMAL_DIGITS[pc];
+        const isRow0 = isEven;
+        const nw = 8.5;
+        const nh = 6.8;
+        const bx = nx - nw / 2;
+        const by = ny - nh / 2;
+        // White knockout
+        svgParts.push(`    <rect x="${(bx - 0.5).toFixed(2)}" y="${(by - 0.5).toFixed(2)}" width="${(nw + 1.0).toFixed(2)}" height="${(nh + 1.0).toFixed(2)}" rx="1.5" fill="#FFFFFF"/>`);
+        if (isRow0) {
+          // Row 0 (Even digits 0, 2, 4, 6, 8, a): Solid dark tile with white numeral
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
+          svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">${digit}</text>`);
+        } else {
+          // Row 1 (Odd digits 1, 3, 5, 7, 9, b): Hollow white tile with dark numeral and colored stroke
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.1"/>`);
+          svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="${noteColor}" text-anchor="middle" dominant-baseline="central">${digit}</text>`);
+        }
       } else if (
         morph === 'rectangle-square' ||
         morph === 'square-ellipse' ||

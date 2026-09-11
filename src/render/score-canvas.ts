@@ -7,6 +7,7 @@ import {
   normalizeNoteheadMorphology,
   getStaffLineGeometry,
   getParityShape,
+  DUODECIMAL_DIGITS,
 } from './types';
 import { getNoteColor, getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor } from './colors';
 import { subtractInterval } from './print-layout';
@@ -1148,7 +1149,7 @@ export function drawBakedCanvasPath(
 
 export function renderNotehead(
   ctx: CanvasRenderingContext2D,
-  morphology: 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle',
+  morphology: 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'duodecimal' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle',
   pitchClass: number,
   cx: number,
   cy: number,
@@ -1363,6 +1364,50 @@ export function renderNotehead(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(noteNum), cx, cy);
+      break;
+    }
+
+    case 'duodecimal': {
+      const pc = ((pitchClass % 12) + 12) % 12;
+      const digit = DUODECIMAL_DIGITS[pc];
+      const isEven = pc % 2 === 0;
+      const pw = 14;
+      const ph = Math.max(12, baseSize + 1);
+
+      // Knockout
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.roundRect(cx - (pw + 2) / 2, cy - (ph + 2) / 2, pw + 2, ph + 2, 3);
+      ctx.fill();
+
+      if (isEven) {
+        // Row 0 (Even digits 0, 2, 4, 6, 8, a): Solid tile with white numeral
+        ctx.fillStyle = headColor;
+        ctx.beginPath();
+        ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, 2.5);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(digit, cx, cy);
+      } else {
+        // Row 1 (Odd digits 1, 3, 5, 7, 9, b): Hollow tile with dark numeral
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, 2.5);
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.fillStyle = headColor;
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(digit, cx, cy);
+      }
       break;
     }
 
