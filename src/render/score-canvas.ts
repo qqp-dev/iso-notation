@@ -616,7 +616,7 @@ export function renderScoreToCanvas(
     const rhBeats = new Set<number>();
     for (const n of score.notes) {
       const bIdx = Math.floor(n.startTick / ticksPerBeat);
-      const hand = n.hand ?? (linearIndex(n.pitch) >= 60 ? 'RH' : 'LH');
+      const hand = n.hand ?? (linearIndex(n.pitch) >= 48 ? 'RH' : 'LH');
       if (hand === 'RH') {
         rhBeats.add(bIdx);
       } else {
@@ -822,7 +822,7 @@ export function renderScoreToCanvas(
       const isSounding =
         options.currentTick >= note.startTick &&
         options.currentTick < note.startTick + note.durationTicks;
-      const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
+      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
 
       let blockFill = hand === 'RH' ? '#D97706' : '#2563EB';
       let headerFill = hand === 'RH' ? '#FBBF24' : '#60A5FA';
@@ -890,6 +890,7 @@ export function renderScoreToCanvas(
       }
 
       // Render notehead morphology with line knockout
+      const isRedNote = (note.durationTicks / tauRef) >= 8.0;
       renderNotehead(
         ctx,
         normNoteheadMorph,
@@ -901,7 +902,7 @@ export function renderScoreToCanvas(
         isHighlighted,
         strokeColor,
         false,
-        note.durationTicks > tauRef
+        isRedNote
       );
 
       // Articulation marker
@@ -944,10 +945,11 @@ export function renderScoreToCanvas(
       }
 
       // Klavar lateral stems: symmetry around m3 (indicate only exceptions)
-      // Middle C (m3, linear pitch 60) is the natural keyboard symmetry axis.
-      // Default territory (RH >= 60 or LH < 60) renders NO stem.
-      const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && lPitch < 60) || (hand === 'LH' && lPitch >= 60);
+      // Middle C (m3, linear pitch 48) is the natural keyboard symmetry axis.
+      // On m3 itself (lPitch === 48), no stems are drawn for either hand.
+      // Default territory (RH >= 48, LH <= 48, and both hands on 48) renders NO stem.
+      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
+      const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
 
       if (isStemException) {
         const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
@@ -962,6 +964,7 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
+      const isRedNote = (note.durationTicks / tauRef) >= 8.0;
       renderNotehead(
         ctx,
         normNoteheadMorph,
@@ -973,7 +976,7 @@ export function renderScoreToCanvas(
         isHighlighted,
         strokeColor,
         true,
-        note.durationTicks > tauRef
+        isRedNote
       );
 
       if (note.articulation === 'staccato') {
@@ -1038,7 +1041,7 @@ function renderNotehead(
   isActive: boolean,
   strokeColor: string,
   isVertical: boolean,
-  isColored: boolean = false
+  isRedNote: boolean = false
 ): void {
   const headColor = isActive
     ? (fillColor === '#FEF08A' || fillColor === '#FFFFFF' ? fillColor : '#FDE047')
@@ -1241,14 +1244,14 @@ function renderNotehead(
         ctx.stroke();
       } else {
         // Row 1: Empty (Hollow) squished square
-        // 100% VOID / transparent (pure black interior on canvas) for 16th notes (d <= tau_ref)
-        // Faint wash inside hollow notehead (~18% opacity) for colored notes (d > tau_ref)
+        // 100% VOID / transparent (pure black interior on canvas) for notes with d < 96t (ratio < 8.0)
+        // Faint wash inside hollow notehead (~18% opacity) strictly for Red notes (d >= 96t / ratio >= 8.0)
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
         ctx.fill();
 
-        if (isColored) {
+        if (isRedNote) {
           ctx.save();
           ctx.globalAlpha = 0.18;
           ctx.fillStyle = headColor;

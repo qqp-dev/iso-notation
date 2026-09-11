@@ -250,7 +250,7 @@ export function computeBeamClusters(
 
   for (const hand of ['RH', 'LH'] as const) {
     const handNotes = sorted.filter(n => {
-      const nHand = n.hand ?? (linearIndex(n.pitch) >= 60 ? 'RH' : 'LH');
+      const nHand = n.hand ?? (linearIndex(n.pitch) >= 48 ? 'RH' : 'LH');
       return nHand === hand;
     });
 

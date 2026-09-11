@@ -15,7 +15,7 @@ import {
   RenderOptions,
 } from '../src/render/types';
 import { QuantizedNote, QuantizedGridScore } from '../src/model/types';
-import { wholeToneParity } from '../src/model/pitch';
+import { wholeToneParity, linearIndex } from '../src/model/pitch';
 import { computeBeamClusters } from '../src/model/grid';
 import { getNoteColor } from '../src/render/colors';
 import { getCanonicalSyllable } from '../src/model/phonetics';
@@ -508,44 +508,59 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   // Filter horizontal lateral stems (y1 === y2, x1 !== x2, within lateral stem length range)
   const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
 
-  // In Bach Goldberg Var 1, keyboard symmetry around m3 means:
-  // - 412 notes in default territory (RH >= 60, LH < 60) have ZERO lateral stems (clean noteheads)
-  // - Exactly 139 notes where RH crosses into bass (< 60) have right-pointing lateral stems (x2 > x1)
-  assert.equal(lateralStems.length, 139, 'Must render lateral stems ONLY for exceptions (139 in Goldberg Var 1)');
+  // In Bach Goldberg Var 1, keyboard symmetry around m3 (linear pitch 48) means:
+  // - 500 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO lateral stems (clean noteheads)
+  // - Exactly 51 notes where hands cross m3 have lateral stems:
+  //   - 12 notes where RH crosses into bass (< 48) have right-pointing lateral stems (x2 > x1)
+  //   - 39 notes where LH crosses into treble (> 48) have left-pointing lateral stems (x2 < x1)
+  assert.equal(lateralStems.length, 51, 'Must render lateral stems ONLY for exceptions (51 in Goldberg Var 1)');
 
   const rhStems = lateralStems.filter((s) => s.x2 > s.x1);
   const lhStems = lateralStems.filter((s) => s.x2 < s.x1);
 
-  assert.equal(rhStems.length, 139, 'All 139 crossing notes must have right-pointing stems for RH in bass');
-  assert.equal(lhStems.length, 0, 'Zero LH stems in Goldberg Var 1 as LH never crosses above m3');
+  assert.equal(rhStems.length, 12, '12 crossing notes must have right-pointing stems for RH in bass (< 48)');
+  assert.equal(lhStems.length, 39, '39 crossing notes must have left-pointing stems for LH above m3 (> 48)');
 
   lateralStems.forEach((s) => {
     assert.ok(Math.abs(s.x2 - s.x1) >= 20, 'Stem must extend at least 20px from note center');
   });
 
-  // Verify center alignment: stem is at cy === y (paddingStart)
+  // Verify center alignment: stem is at cy === y (paddingStart + startTick * pixelsPerTick)
+  const firstExNote = score.notes.find((n) => (n.hand === 'RH' && linearIndex(n.pitch) < 48) || (n.hand === 'LH' && linearIndex(n.pitch) > 48))!;
   const firstStem = lateralStems[0];
   const paddingStart = 60;
-  assert.equal(firstStem.y1, paddingStart, 'Stem must be center-aligned at cy === y');
+  const expectedY = paddingStart + firstExNote.startTick * 2.0;
+  assert.equal(firstStem.y1, expectedY, 'Stem must be center-aligned at cy === y');
 
-  // Verify full m3 symmetry exception logic with both RH (<60) and LH (>=60) crossings:
+  // Assert notes on Middle C (lPitch === 48) have zero stems for both RH and LH
+  const m3Notes = score.notes.filter((n) => linearIndex(n.pitch) === 48);
+  assert.ok(m3Notes.length > 0, 'Score must contain notes on Middle C');
+  m3Notes.forEach((m3) => {
+    const yCoord = paddingStart + m3.startTick * 2.0;
+    const hasStem = lateralStems.some((s) => s.y1 === yCoord);
+    assert.ok(!hasStem, `Note on Middle C (${m3.id}, hand: ${m3.hand}) must have zero stems`);
+  });
+
+  // Verify full m3 symmetry exception logic with both RH (<48) and LH (>48) crossings, and stemless Middle C (48):
   const symmetryTestScore: QuantizedGridScore = {
     id: 'handedness-symmetry-test',
     title: 'Handedness Symmetry Test',
     composer: 'Test',
     ticksPerBeat: 48,
     gridResolution: 12,
-    totalTicks: 48,
+    totalTicks: 72,
     timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
     barlines: [],
     tempos: [],
     dynamics: [],
     pedals: [],
     notes: [
-      { id: 'rh-default', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 60 >= 60 -> default, no stem
-      { id: 'lh-default', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 < 60 -> default, no stem
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 < 60 -> exception, right stem
-      { id: 'lh-exception', pitch: { pitchClass: 5, octave: 5 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 65 >= 60 -> exception, left stem
+      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> stemless
+      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> stemless
+      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no stem
+      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no stem
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right stem
+      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left stem
     ],
   };
 
@@ -603,8 +618,8 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
 
   const symRh = symStems.filter((s) => s.x2 > s.x1);
   const symLh = symStems.filter((s) => s.x2 < s.x1);
-  assert.equal(symRh.length, 1, 'RH exception (< 60) must render right-pointing stem');
-  assert.equal(symLh.length, 1, 'LH exception (>= 60) must render left-pointing stem');
+  assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing stem');
+  assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing stem');
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
@@ -1310,9 +1325,9 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
 
   // Handedness stems: symmetry around m3 (indicate only exceptions)
-  // In Goldberg Var 1, 412 notes in default territory (RH >= 60, LH < 60) have zero stems,
-  // while the 139 notes where RH crosses into bass (< 60) have right-pointing lateral stems.
-  assert.equal(lateralStems.length, 139, 'Only hand crossing exception notes (139 in Var 1) render lateral stems');
+  // In Goldberg Var 1, 500 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero stems,
+  // while the 51 notes where hands cross m3 (12 RH < 48, 39 LH > 48) have lateral stems.
+  assert.equal(lateralStems.length, 51, 'Only hand crossing exception notes (51 in Var 1) render lateral stems');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1747,9 +1762,84 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
   assert.ok(squareCount > 0, 'Must render squished square noteheads');
   assert.ok(fullSquareCount > 0, 'Must render full squares for Row 0 notes');
   assert.ok(emptySquareCount > 0, 'Must render empty squares for Row 1 notes');
-  assert.ok(tintFillCount > 0, 'Must render faint tint (globalAlpha = 0.18) inside colored hollow noteheads');
+  assert.equal(tintFillCount, 1, 'Must render faint tint (globalAlpha = 0.18) strictly for the Red note on Row 1 (bach-var1-343)');
   assert.ok(voidFillCount > 0, 'Must render pure void black inside 16th note hollow noteheads');
   assert.equal(ellipseCount, 0, 'Must render zero ellipses');
+
+  // Explicitly assert duration-class color behavior on Canvas: Blue (8th) & Orange (quarter) void vs Red (half note) tint
+  const canvasDurationScore: QuantizedGridScore = {
+    id: 'canvas-duration-test',
+    title: 'Canvas Duration Test',
+    composer: 'Test',
+    ticksPerBeat: 48,
+    gridResolution: 12,
+    totalTicks: 192,
+    timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes: [
+      { id: 'c-8th', pitch: { pitchClass: 1, octave: 4 }, startTick: 0, durationTicks: 24, hand: 'RH', velocity: 90 }, // Blue 8th -> void
+      { id: 'c-quarter', pitch: { pitchClass: 1, octave: 4 }, startTick: 48, durationTicks: 48, hand: 'RH', velocity: 90 }, // Orange Quarter -> void
+      { id: 'c-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 96, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> faint tint 0.18
+    ],
+  };
+
+  const alphaAtFill: number[] = [];
+  let cAlpha = 1.0;
+  const cStack: number[] = [];
+  const cCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    get globalAlpha() {
+      return cAlpha;
+    },
+    set globalAlpha(v: number) {
+      cAlpha = v;
+    },
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {
+      cStack.push(cAlpha);
+    },
+    restore: () => {
+      cAlpha = cStack.pop() ?? 1.0;
+    },
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {
+      alphaAtFill.push(cAlpha);
+    },
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(cCtx, canvasDurationScore, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 11,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: false,
+    currentTick: 0,
+  });
+
+  const tintFills = alphaAtFill.filter((a) => Math.abs(a - 0.18) < 0.01);
+  assert.equal(tintFills.length, 1, 'Canvas must render faint tint (globalAlpha = 0.18) strictly for Red notes (d >= 96t)');
 });
 
 test('Piano Roll View: 1:1 Geometric Equivalence & Chromatic DAW Alignment', () => {

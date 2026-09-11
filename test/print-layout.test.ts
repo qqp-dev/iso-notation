@@ -254,21 +254,22 @@ test('Pure Noteheads for Regular Notes and Faint Dotted Continuation Line for Lo
   assert.ok(y2 > y1, 'Termination y2 must be below start y1');
 
   // Optical stem clearance: trailStartY must start below notehead bottom
-  // Find lateral stem for the long note at x1
+  // The long note (B4, linear pitch 59 >= 48) is in default RH territory and must have zero lateral stems
   const stemRegex = new RegExp(
     `<line x1="${x1.toFixed(2)}" y1="([\\d\\.]+)" x2="[\\d\\.]+" y2="([\\d\\.]+)" stroke="${stroke}" stroke-width="0\\.6"`
   );
   const stemMatch = pageSvg.match(stemRegex);
-  assert.ok(stemMatch, 'Must find lateral stem for the long note');
-  const stemY = parseFloat(stemMatch[1]);
+  assert.ok(!stemMatch, 'Long note in default RH territory (B4 >= 48) must have zero lateral stems');
 
   // Notehead height for brick (Row 1 odd pc 11) is 5.8pt, half is 2.9pt, +2 = 4.9pt
-  const expectedTrailStartY = stemY + 5.8 / 2 + 2;
+  const staffOriginY = 10 * (72 / 25.4) + 42 + 16;
+  const noteNy = staffOriginY + (longNote.startTick - longNoteColumn.startTick) * layout.ptPerTick;
+  const expectedTrailStartY = noteNy + 5.8 / 2 + 2;
   assert.ok(
     Math.abs(y1 - expectedTrailStartY) < 0.05,
-    `trailStartY (${y1}) must match stemY + noteHeight / 2 + 2 (${expectedTrailStartY})`
+    `trailStartY (${y1}) must match noteNy + noteHeight / 2 + 2 (${expectedTrailStartY})`
   );
-  assert.ok(y1 > stemY, 'trailStartY must be strictly below lateral stem at stemY');
+  assert.ok(y1 > noteNy, 'trailStartY must be strictly below notehead center at noteNy');
 });
 
 test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
@@ -308,37 +309,39 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
   });
 
   // Verify center alignment with notehead center coordinate (y1 === ny)
-  // First note with stem on Page 0 is note 1 (RH at tick 0, linear 55 < 60)
-  const firstNote = layout.columns[0].notes[0];
+  // First note with stem on Page 0 is bach-var1-49 (LH at tick 408, linear 49 > 48)
+  const firstStemNote = layout.pages[0].columns[0].notes.find(n => n.id === 'bach-var1-49')!;
   const firstNoteStaffOriginY = 10 * (72 / 25.4) + 42 + 16;
-  const firstNoteExpectedNy = firstNoteStaffOriginY + (firstNote.startTick - layout.columns[0].startTick) * layout.ptPerTick;
+  const firstNoteExpectedNy = firstNoteStaffOriginY + (firstStemNote.startTick - layout.pages[0].columns[0].startTick) * layout.ptPerTick;
   const firstStem = stemMatches[0];
   assert.equal(Number(firstStem[2]), Number(firstNoteExpectedNy.toFixed(2)), 'Lateral stem must originate at center ny');
 
   const rhStems = stemMatches.filter((m) => Number(m[3]) > Number(m[1]));
   const lhStems = stemMatches.filter((m) => Number(m[3]) < Number(m[1]));
 
-  assert.ok(rhStems.length > 0, 'SVG must contain right-pointing lateral stems for RH notes in bass');
-  assert.equal(lhStems.length, 0, 'SVG must contain zero LH stems in Var 1 as LH never crosses above m3');
+  assert.ok(rhStems.length > 0, 'SVG must contain right-pointing lateral stems for RH notes in bass (< 48)');
+  assert.ok(lhStems.length > 0, 'SVG must contain left-pointing lateral stems for LH notes in treble (> 48)');
 
-  // Verify SVG print engine with explicit hand crossings in both directions:
+  // Verify SVG print engine with explicit hand crossings in both directions, and stemless Middle C (48):
   const handednessTestScore: QuantizedGridScore = {
     id: 'handedness-svg-test',
     title: 'Handedness SVG Test',
     composer: 'Test',
     ticksPerBeat: 48,
     gridResolution: 12,
-    totalTicks: 48,
+    totalTicks: 72,
     timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
     barlines: [],
     tempos: [],
     dynamics: [],
     pedals: [],
     notes: [
-      { id: 'rh-default', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 60 >= 60 -> default, no stem
-      { id: 'lh-default', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 < 60 -> default, no stem
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 < 60 -> exception, right stem
-      { id: 'lh-exception', pitch: { pitchClass: 5, octave: 5 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 65 >= 60 -> exception, left stem
+      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> stemless
+      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> stemless
+      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no stem
+      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no stem
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right stem
+      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left stem
     ],
   };
 
@@ -348,8 +351,8 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
 
   const testRh = testStems.filter((m) => Number(m[3]) > Number(m[1]));
   const testLh = testStems.filter((m) => Number(m[3]) < Number(m[1]));
-  assert.equal(testRh.length, 1, 'RH exception (< 60) must render right-pointing lateral stem in SVG');
-  assert.equal(testLh.length, 1, 'LH exception (>= 60) must render left-pointing lateral stem in SVG');
+  assert.equal(testRh.length, 1, 'RH exception (< 48) must render right-pointing lateral stem in SVG');
+  assert.equal(testLh.length, 1, 'LH exception (> 48) must render left-pointing lateral stem in SVG');
 });
 
 test('A4 Print Dimensions & Page Margins Invariant', () => {
@@ -527,11 +530,47 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   // Full Squished Squares for Row 0 (width="7.50" height="5.60" fill!=#FFFFFF)
   assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="(?!#FFFFFF)/, 'Must render full solid squished square noteheads for Row 0');
 
-  // Empty Squished Squares for Row 1 (width="7.50" height="5.60" fill="#FFFFFF" with stroke for 16th notes)
-  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke=/, 'Must render empty hollow squished square noteheads for Row 1 16th notes');
+  // Empty Squished Squares for Row 1 (width="7.50" height="5.60" fill="#FFFFFF" with stroke for 16th, 8th, and quarter notes)
+  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke=/, 'Must render empty hollow squished square noteheads for Row 1');
 
-  // Colored Hollow Squished Squares for Row 1 (fill-opacity="0.18" faint tint)
-  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill-opacity="0\.18"[^>]*stroke=/, 'Must render faint tint wash (fill-opacity="0.18") inside colored hollow noteheads for Row 1');
+  // Blue (8th) and Orange (quarter) hollow noteheads have void fills (zero fill-opacity on Page 0)
+  assert.doesNotMatch(svg, /fill-opacity="0\.18"/, 'Blue and Orange hollow noteheads must have void fills (zero fill-opacity)');
+
+  // Red Hollow Squished Squares for Row 1 (d >= 96t): faint tint wash (fill-opacity="0.18") on Page 2
+  const svgPage2 = renderColumnarScoreToSvg(score, 2, {
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+  });
+  assert.match(svgPage2, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#BE123C"[^>]*fill-opacity="0\.18"[^>]*stroke=/, 'Must render faint tint wash (fill-opacity="0.18") strictly for Red notes (d >= 96t) on Row 1');
+
+  // Explicitly assert duration-class color behavior with synthetic score:
+  const durationColorScore: QuantizedGridScore = {
+    id: 'duration-color-svg-test',
+    title: 'Duration Color SVG Test',
+    composer: 'Test',
+    ticksPerBeat: 48,
+    gridResolution: 12,
+    totalTicks: 192,
+    timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes: [
+      { id: 'hollow-8th', pitch: { pitchClass: 1, octave: 4 }, startTick: 0, durationTicks: 24, hand: 'RH', velocity: 90 }, // Blue 8th -> void fill (#FFFFFF)
+      { id: 'hollow-quarter', pitch: { pitchClass: 1, octave: 4 }, startTick: 24, durationTicks: 48, hand: 'RH', velocity: 90 }, // Amber/Orange Quarter -> void fill (#FFFFFF)
+      { id: 'hollow-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 72, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> faint tint fill-opacity="0.18"
+    ],
+  };
+  const durationTestSvg = renderColumnarScoreToSvg(durationColorScore, 0, {
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+  });
+  // Blue and Orange hollow noteheads must have void fills (#FFFFFF) and NO fill-opacity="0.18":
+  assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#1D4ED8"/, 'Blue (8th) hollow notehead must have void fill (#FFFFFF)');
+  assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#D97706"/, 'Orange (quarter) hollow notehead must have void fill (#FFFFFF)');
+  // Red hollow notehead must have faint tint fill (fill-opacity="0.18"):
+  assert.match(durationTestSvg, /<rect[^>]*fill="#BE123C"[^>]*fill-opacity="0\.18"[^>]*stroke="#BE123C"/, 'Red (half note d >= 96t) hollow notehead must have faint tint fill (fill-opacity="0.18")');
 
   // Zero ellipses
   assert.doesNotMatch(svg, /<ellipse/, 'Zero ellipses should be rendered when using rectangle-square morphology');
