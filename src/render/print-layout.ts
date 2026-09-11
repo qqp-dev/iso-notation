@@ -431,9 +431,6 @@ export function renderPageToSvg(
     svgParts.push(`  <!-- Column ${col.columnIndex} (mm. ${col.startMeasure}–${col.endMeasure}) -->`);
     svgParts.push(`  <g id="column-${col.columnIndex}">`);
 
-    // Subtle column frame separator
-    svgParts.push(`    <line x1="${colLeftPt.toFixed(2)}" y1="${colTopPt.toFixed(2)}" x2="${colLeftPt.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt + colStaffHeightPt).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.5"/>`);
-
     // Pitch Header Labels at column top: m1..m5 (strictly anchored to 4 octaves)
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
@@ -840,10 +837,10 @@ export function renderPageToSvg(
         const isRow0 = isEven;
 
         if (isRow0) {
-          // Row 0: Solid directional pentagon
+          // Row 0: Solid directional pentagon (exact outer envelope match with Row 1 hollow note)
           const bakedPath = getBakedPath(bx, by, nw, nh, ny, hand, tip, 1.2);
-          svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>`);
-          svgParts.push(`    <path d="${bakedPath}" fill="${noteColor}" stroke="${noteColor}" stroke-width="0.5" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.0" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path d="${bakedPath}" fill="${noteColor}"/>`);
         } else {
           // Row 1: Hollow directional pentagon
           // Inset by strokeWidth / 2 (0.65pt) so outer bounding box after 1.3pt stroke matches solid notehead exactly!
