@@ -9,6 +9,7 @@ import {
   getParityShape,
 } from './types';
 import { getNoteColor, getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor } from './colors';
+import { subtractInterval } from './print-layout';
 
 export interface ScoreDimensions {
   width: number;
@@ -729,56 +730,76 @@ export function renderScoreToCanvas(
   ctx.save();
   const tauRef = score.gridResolution || 12;
 
-  // Pre-collect lateral stems for collision truncation
-  interface LateralStem {
-    id: string;
-    y: number;
+  // Pre-collect obstacles for collision truncation & interruption
+  interface CanvasObstacle {
+    noteId: string;
     x1: number;
     x2: number;
+    y1: number;
+    y2: number;
   }
-  const lateralStems: LateralStem[] = [];
+  const canvasObstacles: CanvasObstacle[] = [];
+  const horizCanvasObstacles: CanvasObstacle[] = [];
+
   if (!isHoriz && !isPianoRoll) {
-    const stemLength = Math.max(32, options.pixelsPerSemitone * 2.5);
     for (const note of score.notes) {
       const lPitch = linearIndex(note.pitch);
+      const { x: nx, y: ny } = getCoords(note.startTick, lPitch);
+      const noteWidth = Math.max(10, options.pixelsPerSemitone);
+      const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
+
+      // Notehead obstacle
+      canvasObstacles.push({
+        noteId: note.id,
+        x1: nx - noteWidth / 2 - 1.0,
+        x2: nx + noteWidth / 2 + 1.0,
+        y1: ny - noteHeight / 2 - 2.0,
+        y2: ny + noteHeight / 2 + 2.0,
+      });
+
       const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
-      if (isStemException) {
-        const { x, y } = getCoords(note.startTick, lPitch);
-        const stemEndX = hand === 'RH' ? x + stemLength : x - stemLength;
-        lateralStems.push({
-          id: note.id,
-          y,
-          x1: Math.min(x, stemEndX),
-          x2: Math.max(x, stemEndX),
+      const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+      if (isHandException) {
+        const halfW = noteWidth / 2;
+        const w = 3.2;
+        const h = 5.2;
+        const clearance = 1.5;
+
+        let apexX: number;
+        let baseX: number;
+        if (hand === 'LH') {
+          apexX = nx - halfW - clearance - w;
+          baseX = nx - halfW - clearance;
+        } else {
+          apexX = nx + halfW + clearance + w;
+          baseX = nx + halfW + clearance;
+        }
+
+        canvasObstacles.push({
+          noteId: note.id,
+          x1: Math.min(baseX, apexX) - 1.5,
+          x2: Math.max(baseX, apexX) + 1.5,
+          y1: ny - h / 2 - 2.5,
+          y2: ny + h / 2 + 2.5,
         });
       }
     }
   }
 
-  interface HorizLateralStem {
-    id: string;
-    x: number;
-    y1: number;
-    y2: number;
-  }
-  const horizLateralStems: HorizLateralStem[] = [];
   if (isHoriz && !isPianoRoll) {
-    const stemLength = Math.max(32, options.pixelsPerSemitone * 2.5);
     for (const note of score.notes) {
       const lPitch = linearIndex(note.pitch);
-      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
-      if (isStemException) {
-        const { x, y } = getCoords(note.startTick, lPitch);
-        const stemEndY = hand === 'RH' ? y + stemLength : y - stemLength;
-        horizLateralStems.push({
-          id: note.id,
-          x,
-          y1: Math.min(y, stemEndY),
-          y2: Math.max(y, stemEndY),
-        });
-      }
+      const { x: cx, y: cy } = getCoords(note.startTick, lPitch);
+      const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
+      const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
+
+      horizCanvasObstacles.push({
+        noteId: note.id,
+        x1: cx - noteWidth / 2 - 2.0,
+        x2: cx + noteWidth / 2 + 2.0,
+        y1: cy - noteHeight / 2 - 1.0,
+        y2: cy + noteHeight / 2 + 1.0,
+      });
     }
   }
 
@@ -860,31 +881,59 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Solid thin hold lines for colored notes
+      // Solid thin hold lines for colored notes with obstacle interruption
       if (showDottedTrail) {
         const trailStartX = cx + noteWidth / 2 + 2;
-        let trailEndX = cx + note.durationTicks * options.pixelsPerTick;
-        for (const stem of horizLateralStems) {
-          if (stem.id !== note.id) {
-            if (cy >= stem.y1 - 0.5 && cy <= stem.y2 + 0.5) {
-              if (stem.x > trailStartX && stem.x <= trailEndX) {
-                trailEndX = Math.min(trailEndX, stem.x - 2.5);
-              }
+        const rawReleaseX = cx + note.durationTicks * options.pixelsPerTick;
+        const trailEndX = rawReleaseX;
+
+        const baseGeom = getStaffLineGeometry(lPitch, normStaffStyle);
+        const isOnStaffLine = baseGeom.isLine;
+        const isBold = isOnStaffLine && (lPitch === 48);
+
+        let intervals: [number, number][] = [[trailStartX, trailEndX]];
+
+        for (const obs of horizCanvasObstacles) {
+          if (obs.noteId !== note.id) {
+            if (cy >= obs.y1 && cy <= obs.y2) {
+              intervals = subtractInterval(intervals, obs.x1, obs.x2);
             }
           }
         }
-        if (trailEndX > trailStartX) {
-          ctx.save();
-          ctx.lineCap = 'round';
-          ctx.setLineDash([]);
-          ctx.lineWidth = 0.8;
-          ctx.globalAlpha = 1.0;
-          ctx.strokeStyle = noteColor;
-          ctx.beginPath();
-          ctx.moveTo(trailStartX, cy);
-          ctx.lineTo(trailEndX, cy);
-          ctx.stroke();
-          ctx.restore();
+
+        for (const [segX1, segX2] of intervals) {
+          if (segX2 - segX1 >= 1.5) {
+            ctx.save();
+            ctx.setLineDash([]);
+
+            if (isOnStaffLine) {
+              ctx.lineCap = 'butt';
+              ctx.lineWidth = isBold ? 2.5 : 1.8;
+              ctx.strokeStyle = '#000000';
+              ctx.beginPath();
+              ctx.moveTo(segX1, cy);
+              ctx.lineTo(segX2, cy);
+              ctx.stroke();
+
+              ctx.lineCap = 'round';
+              ctx.lineWidth = isBold ? 1.35 : 1.0;
+              ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+              ctx.beginPath();
+              ctx.moveTo(segX1, cy);
+              ctx.lineTo(segX2, cy);
+              ctx.stroke();
+            } else {
+              ctx.lineCap = 'round';
+              ctx.lineWidth = 0.8;
+              ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+              ctx.beginPath();
+              ctx.moveTo(segX1, cy);
+              ctx.lineTo(segX2, cy);
+              ctx.stroke();
+            }
+
+            ctx.restore();
+          }
         }
       }
 
@@ -925,51 +974,111 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Solid thin hold lines for colored notes with collision truncation
+      // Solid thin hold lines for colored notes with obstacle interruption
       if (showDottedTrail) {
         const trailStartY = cy + noteHeight / 2 + 2;
-        let trailEndY = cy + note.durationTicks * options.pixelsPerTick;
-        for (const stem of lateralStems) {
-          if (stem.id !== note.id) {
-            if (cx >= stem.x1 - 0.5 && cx <= stem.x2 + 0.5) {
-              if (stem.y > trailStartY && stem.y <= trailEndY) {
-                trailEndY = Math.min(trailEndY, stem.y - 2.5);
-              }
+        const rawReleaseY = cy + note.durationTicks * options.pixelsPerTick;
+        const trailEndY = rawReleaseY;
+
+        const baseGeom = getStaffLineGeometry(lPitch, normStaffStyle);
+        const isOnStaffLine = baseGeom.isLine;
+        const isBold = isOnStaffLine && (lPitch === 48);
+
+        let intervals: [number, number][] = [[trailStartY, trailEndY]];
+
+        for (const obs of canvasObstacles) {
+          if (obs.noteId !== note.id) {
+            if (cx >= obs.x1 && cx <= obs.x2) {
+              intervals = subtractInterval(intervals, obs.y1, obs.y2);
             }
           }
         }
-        if (trailEndY > trailStartY) {
-          ctx.save();
-          ctx.lineCap = 'round';
-          ctx.setLineDash([]);
-          ctx.lineWidth = 0.8;
-          ctx.globalAlpha = 1.0;
-          ctx.strokeStyle = noteColor;
-          ctx.beginPath();
-          ctx.moveTo(cx, trailStartY);
-          ctx.lineTo(cx, trailEndY);
-          ctx.stroke();
-          ctx.restore();
+
+        for (const [segY1, segY2] of intervals) {
+          if (segY2 - segY1 >= 1.5) {
+            ctx.save();
+            ctx.setLineDash([]);
+
+            if (isOnStaffLine) {
+              // Knockout line replacing the staff line
+              ctx.lineCap = 'butt';
+              ctx.lineWidth = isBold ? 2.5 : 1.8;
+              ctx.strokeStyle = '#000000';
+              ctx.beginPath();
+              ctx.moveTo(cx, segY1);
+              ctx.lineTo(cx, segY2);
+              ctx.stroke();
+
+              // Colored hold line
+              ctx.lineCap = 'round';
+              ctx.lineWidth = isBold ? 1.35 : 1.0;
+              ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+              ctx.beginPath();
+              ctx.moveTo(cx, segY1);
+              ctx.lineTo(cx, segY2);
+              ctx.stroke();
+            } else {
+              ctx.lineCap = 'round';
+              ctx.lineWidth = 0.8;
+              ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+              ctx.beginPath();
+              ctx.moveTo(cx, segY1);
+              ctx.lineTo(cx, segY2);
+              ctx.stroke();
+            }
+
+            ctx.restore();
+          }
         }
       }
 
-      // Klavar lateral stems: symmetry around m3 (indicate only exceptions)
-      // Middle C (m3, linear pitch 48) is the natural keyboard symmetry axis.
-      // On m3 itself (lPitch === 48), no stems are drawn for either hand.
-      // Default territory (RH >= 48, LH <= 48, and both hands on 48) renders NO stem.
+      // Tasteful < and > chevrons for hand-crossing exceptions
+      // Middle C (m3, linear pitch 48) is neutral (no indicator).
       const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+      const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
 
-      if (isStemException) {
-        const stemLength = Math.max(32, options.pixelsPerSemitone * 2.5);
-        const stemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
+      if (isHandException) {
+        const halfW = noteWidth / 2;
+        const w = 3.2;
+        const h = 5.2;
+        const clearance = 1.5;
 
+        let apexX: number;
+        let baseX: number;
+        if (hand === 'LH') {
+          apexX = cx - halfW - clearance - w;
+          baseX = cx - halfW - clearance;
+        } else {
+          apexX = cx + halfW + clearance + w;
+          baseX = cx + halfW + clearance;
+        }
+        const topY = cy - h / 2;
+        const botY = cy + h / 2;
+        const apexY = cy;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Knockout halo underlay
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.2;
         ctx.beginPath();
+        ctx.moveTo(baseX, topY);
+        ctx.lineTo(apexX, apexY);
+        ctx.lineTo(baseX, botY);
+        ctx.stroke();
+
+        // Colored chevron
         ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
         ctx.lineWidth = 0.8;
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(stemEndX, cy);
+        ctx.beginPath();
+        ctx.moveTo(baseX, topY);
+        ctx.lineTo(apexX, apexY);
+        ctx.lineTo(baseX, botY);
         ctx.stroke();
+
+        ctx.restore();
       }
 
       const isRedNote = (note.durationTicks / tauRef) >= 8.0;

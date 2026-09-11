@@ -11,6 +11,30 @@ export const A4_HEIGHT_PT = 841.89; // 297mm in PostScript points
 export const MM_TO_PT = 72 / 25.4; // 2.834645669...
 export const PT_TO_MM = 25.4 / 72;
 
+/**
+ * Subtracts interval [sub1, sub2] from an array of disjoint intervals.
+ */
+export function subtractInterval(
+  intervals: [number, number][],
+  sub1: number,
+  sub2: number
+): [number, number][] {
+  const result: [number, number][] = [];
+  for (const [start, end] of intervals) {
+    if (sub2 <= start || sub1 >= end) {
+      result.push([start, end]);
+    } else {
+      if (sub1 > start) {
+        result.push([start, sub1]);
+      }
+      if (sub2 < end) {
+        result.push([sub2, end]);
+      }
+    }
+  }
+  return result;
+}
+
 export interface PrintLayoutOptions {
   paperSize?: 'A4' | 'A3';
   orientation?: 'portrait' | 'landscape';
@@ -576,8 +600,6 @@ export function renderPageToSvg(
 
     const octaveMode = layout.options.octaveExtensionMode || 'spillover';
     const morph = normalizeNoteheadMorphology(layout.options.noteheadMorphology);
-    const stemLength = 16.0;
-
     // Precalculate display pitches and coordinates for all notes in this column
     const displayPitchMap = new Map<string, number>();
     const noteCoordMap = new Map<string, { nx: number; ny: number; badgeText: string | null; badgeDirection: 'up' | 'down' | null }>();
@@ -621,55 +643,112 @@ export function renderPageToSvg(
       noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
     }
 
-    // Collect all lateral stems in the column
-    interface LateralStem {
-      id: string;
-      y: number;
+    // Collect all obstacles in the column (noteheads and handedness chevrons)
+    interface PrintObstacle {
+      noteId: string;
       x1: number;
       x2: number;
+      y1: number;
+      y2: number;
     }
-    const lateralStems: LateralStem[] = [];
+    const obstacles: PrintObstacle[] = [];
     for (const note of col.notes) {
+      const { nx, ny } = noteCoordMap.get(note.id)!;
+      const lPitch = displayPitchMap.get(note.id)!;
       const rawLPitch = linearIndex(note.pitch);
+      const isEven = wholeToneParity(lPitch) === 0;
+
+      let nw: number;
+      let nh: number;
+      if (morph === 'phonetic') {
+        nw = 15.0;
+        nh = 8.5;
+      } else if (
+        morph === 'rectangle-square' ||
+        morph === 'square-ellipse' ||
+        morph === 'square-triangle'
+      ) {
+        nw = 7.5;
+        nh = 5.6;
+      } else {
+        nw = isEven ? 10.4 : 8.6;
+        nh = isEven ? 6.0 : 5.8;
+      }
+
+      // 1. Notehead obstacle:
+      // X span [nx - nw / 2 - 1.0, nx + nw / 2 + 1.0], Y span [ny - nh / 2 - 2.0, ny + nh / 2 + 2.0]
+      obstacles.push({
+        noteId: note.id,
+        x1: nx - nw / 2 - 1.0,
+        x2: nx + nw / 2 + 1.0,
+        y1: ny - nh / 2 - 2.0,
+        y2: ny + nh / 2 + 2.0,
+      });
+
+      // 2. Handedness chevron obstacle:
       const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
-      if (isStemException) {
-        const { nx, ny } = noteCoordMap.get(note.id)!;
-        const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
-        lateralStems.push({
-          id: note.id,
-          y: ny,
-          x1: Math.min(nx, stemEndX),
-          x2: Math.max(nx, stemEndX),
+      const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
+      if (isHandException) {
+        const halfW = nw / 2;
+        const w = 3.2;
+        const h = 5.2;
+        const clearance = 1.5;
+
+        let apexX: number;
+        let baseX: number;
+        if (hand === 'LH') {
+          apexX = nx - halfW - clearance - w;
+          baseX = nx - halfW - clearance;
+        } else {
+          apexX = nx + halfW + clearance + w;
+          baseX = nx + halfW + clearance;
+        }
+
+        obstacles.push({
+          noteId: note.id,
+          x1: Math.min(baseX, apexX) - 1.5,
+          x2: Math.max(baseX, apexX) + 1.5,
+          y1: ny - h / 2 - 2.5,
+          y2: ny + h / 2 + 2.5,
         });
       }
     }
 
-    // Notes: Solid Thin Hold Lines with Collision Truncation (durationTicks > tauRef)
+    // Notes: Solid Thin Hold Lines with Obstacle Interruption (durationTicks > tauRef)
     for (const note of col.notes) {
       if (note.durationTicks > tauRef) {
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const lPitch = displayPitchMap.get(note.id)!;
-
         const isEven = wholeToneParity(lPitch) === 0;
-        const noteHeight = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
-        const trailStartY = ny + noteHeight / 2 + 2;
+        const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
+        const trailStartY = ny + nh / 2 + 2;
         const rawReleaseY = ny + note.durationTicks * ptPerTick;
-        let trailEndY = Math.min(rawReleaseY, staffEndY);
+        const trailEndY = Math.min(rawReleaseY, staffEndY);
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
-        for (const stem of lateralStems) {
-          if (stem.id !== note.id) {
-            if (nx >= stem.x1 - 0.5 && nx <= stem.x2 + 0.5) {
-              if (stem.y > trailStartY && stem.y <= trailEndY) {
-                trailEndY = Math.min(trailEndY, stem.y - 2.5);
-              }
+        const baseGeom = getStaffLineGeometry(lPitch, normStaffStyle);
+        const isOnStaffLine = baseGeom.isLine;
+        const isBold = isOnStaffLine && (lPitch === 48);
+
+        let intervals: [number, number][] = [[trailStartY, trailEndY]];
+
+        for (const obs of obstacles) {
+          if (obs.noteId !== note.id) {
+            if (nx >= obs.x1 && nx <= obs.x2) {
+              intervals = subtractInterval(intervals, obs.y1, obs.y2);
             }
           }
         }
 
-        if (trailEndY > trailStartY) {
-          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
+        for (const [segY1, segY2] of intervals) {
+          if (segY2 - segY1 >= 1.5) {
+            if (isOnStaffLine) {
+              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="#FFFFFF" stroke-width="${isBold ? '2.5' : '1.8'}" stroke-linecap="butt"/>`);
+              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="${isBold ? '1.35' : '1.0'}" stroke-linecap="round"/>`);
+            } else {
+              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
+            }
+          }
         }
       }
     }
@@ -682,13 +761,46 @@ export function renderPageToSvg(
       const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
-      const isStemException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
+      const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
 
-      // Klavar lateral stem: symmetry around m3 (indicate only exceptions)
-      // Middle C (m3, linear pitch 48) is stemless for both hands.
-      if (isStemException) {
-        const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
-        svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
+      // Handedness indicators: Tasteful chevrons (< for LH, > for RH)
+      // Middle C (m3, linear pitch 48) is neutral (no indicator).
+      if (isHandException) {
+        let nw: number;
+        if (morph === 'phonetic') {
+          nw = 15.0;
+        } else if (
+          morph === 'rectangle-square' ||
+          morph === 'square-ellipse' ||
+          morph === 'square-triangle'
+        ) {
+          nw = 7.5;
+        } else {
+          nw = isEven ? 10.4 : 8.6;
+        }
+
+        const halfW = nw / 2;
+        const w = 3.2;
+        const h = 5.2;
+        const clearance = 1.5;
+
+        let apexX: number;
+        let baseX: number;
+        if (hand === 'LH') {
+          apexX = nx - halfW - clearance - w;
+          baseX = nx - halfW - clearance;
+        } else {
+          apexX = nx + halfW + clearance + w;
+          baseX = nx + halfW + clearance;
+        }
+        const topY = ny - h / 2;
+        const botY = ny + h / 2;
+        const apexY = ny;
+
+        // White halo knockout underlay
+        svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`);
+        // Colored chevron
+        svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>`);
       }
 
       if (morph === 'phonetic') {
