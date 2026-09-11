@@ -322,7 +322,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   if (normStyle === 'tritone-split') {
     // Definitive 2-Line Landmark Staff Topography:
     // 2 landmark lines per octave:
-    // - PC 0 (Note 0): bold octave boundary line ('m', 1.2px)
+    // - PC 0 (Note 0): refined octave boundary line ('o', 0.9px; center o3 is bold 1.8px)
     // - PC 4 (Note 4 / 5th pitch): dashed demarcation line ('4', 0.6px, small dashes [5, 2.5])
     // Line 8 (Note 8 / 9th pitch, solid line opposite dashed) is dropped per definitive design
     // to lighten the page, as informationally dense duodecimal digits communicate relative position cleanly.
@@ -333,7 +333,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isDashed: false,
         isTritone: false,
         isOctaveBoundary: true,
-        lineWidth: 1.2,
+        lineWidth: 0.9,
         color: 'rgba(255, 255, 255, 0.9)',
       };
     }

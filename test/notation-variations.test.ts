@@ -60,7 +60,7 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
-    assert.equal(geom0.lineWidth, 1.2);
+    assert.equal(geom0.lineWidth, 0.9);
     assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
     // No Line at PC 2 (D, Landmark 3 dropped for symmetry)
@@ -283,13 +283,13 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.match(svg, />4<\/text>/, 'Must render E as 4');
 
   // Standalone naked digits invariant:
-  // Must render circular knockouts (r="4.20") and zero enclosing background tile rectangles
-  assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.20" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
+  // Must render circular knockouts (r="4.80") and zero enclosing background tile rectangles
+  assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.80" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
   assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
 
   // Sculpted French Guillemets for hand-crossing exceptions:
   // Measure 4 has RH crossing into bass (< 48) -> curved symmetric flanks pointing right (ax > bx)
-  const guillemetRegex = /<path d="M ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) \1 \2 Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="0\.3" stroke-linejoin="round"\/>/g;
+  const guillemetRegex = /<path d="M ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) \1 \2 Z" fill="([^"]+)"\/>/g;
   const rhMatches = Array.from(svg.matchAll(guillemetRegex));
   assert.ok(rhMatches.length > 0, 'Must render Sculpted French Guillemets in SVG for duodecimal RH crossing exceptions');
 
@@ -421,7 +421,7 @@ test('Monochrome margin labels: pure grayscale with zero blue or pink tints', ()
   });
 });
 
-test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', () => {
+test('Lowercase \'o\' Octave Marker Invariant: score canvas margin indicators', () => {
   const score = buildBachGoldbergVar1Score();
 
   const createMockCtx = () => {
@@ -474,10 +474,10 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
   });
 
   const horizTexts = horizFills.map((f) => f.text);
-  const horizMOctaves = horizTexts.filter((t) => /^m\d+$/.test(t));
-  assert.ok(horizMOctaves.length > 0, 'Must render m${oct - 1} octave markers in horizontal orientation');
-  assert.ok(horizMOctaves.includes('m2'), 'Should include m2 (C3)');
-  assert.ok(horizMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
+  const horizOOctaves = horizTexts.filter((t) => /^o\d+$/.test(t));
+  assert.ok(horizOOctaves.length > 0, 'Must render o${oct - 1} octave markers in horizontal orientation');
+  assert.ok(horizOOctaves.includes('o2'), 'Should include o2 (C3)');
+  assert.ok(horizOOctaves.includes('o3'), 'Should include o3 (Middle C, C4)');
   assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
   assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
 
@@ -498,11 +498,11 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
   });
 
   const vertTexts = vertFills.map((f) => f.text);
-  const vertMOctaves = vertTexts.filter((t) => /^m\d+$/.test(t));
-  assert.ok(vertMOctaves.length > 0, 'Must render m${oct - 1} octave markers in vertical orientation');
-  assert.ok(!vertMOctaves.includes('m2'), 'Must NOT include m2 (dropped)');
-  assert.ok(vertMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
-  assert.ok(!vertMOctaves.includes('m4'), 'Must NOT include m4 (dropped)');
+  const vertOOctaves = vertTexts.filter((t) => /^o\d+$/.test(t));
+  assert.ok(vertOOctaves.length > 0, 'Must render o${oct - 1} octave markers in vertical orientation');
+  assert.ok(!vertOOctaves.includes('o2'), 'Must NOT include o2 (dropped)');
+  assert.ok(vertOOctaves.includes('o3'), 'Should include o3 (Middle C, C4)');
+  assert.ok(!vertOOctaves.includes('o4'), 'Must NOT include o4 (dropped)');
   assert.ok(!vertTexts.includes('0'), 'Must not render bare 0 at octave boundary in vertical orientation');
   assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
 });
@@ -1669,18 +1669,18 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   // Zero hold ribbon rects
   assert.equal(verticalRibbons.length, 0, 'Vertical hold ribbons must be 0');
 
-  // Solid thin hold lines rendered for all 165 colored notes
+  // Solid thin hold lines rendered for all 128 colored notes in open spaces (37 notes on staff lines leave staff lines continuous)
   assert.equal(
     verticalDottedTrails.length,
-    165,
-    'Must render exactly 165 solid thin hold lines for all colored notes in vertical orientation'
+    128,
+    'Must render exactly 128 solid thin hold lines for colored notes in open space'
   );
 
-  // Staff-line replacement knockout underlays for notes on staff lines
+  // Staff lines are continuous reference lines: zero staff-line knockout lines
   assert.equal(
     verticalKnockouts.length,
-    37,
-    'Must render exactly 37 staff-line knockout lines in vertical orientation (line 8 dropped to lighten page)'
+    0,
+    'Must render 0 staff-line knockout lines in vertical orientation (staff lines remain continuous)'
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
@@ -1707,7 +1707,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   );
   assert.equal(vTrail.y1 - expectedCy, noteHeight / 2 + 2, 'Optical gap must be exactly noteHeight / 2 + 2');
 
-  // Clean staff-line replacement in Bar 6 (bach-var1-88, pitch 36, m2)
+  // Continuous staff line in Bar 6 (bach-var1-88, pitch 36, o2)
   const note88 = score.notes.find((n) => n.id === 'bach-var1-88')!;
   const note88LPitch = note88.pitch.octave * 12 + note88.pitch.pitchClass;
   const note88ExpectedCx = paddingPitch + (note88LPitch - minPitch) * pixelsPerSemitone;
@@ -1715,18 +1715,25 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   const note88Trail = verticalDottedTrails.find(
     (t) => Math.abs(t.x1 - note88ExpectedCx) < 0.1 && Math.abs(t.y1 - (note88ExpectedCy + noteHeight / 2 + 2)) < 0.1
   );
-  assert.ok(note88Trail, 'Must find hold line for bach-var1-88');
-  assert.equal(note88Trail.lineWidth, 1.0, 'Bar 6 bach-var1-88 on m2 staff line must stroke at full staff-line width 1.0px');
-  assert.equal(note88Trail.y2, note88ExpectedCy + note88.durationTicks * pixelsPerTick, 'bach-var1-88 must terminate cleanly at release');
+  assert.ok(!note88Trail, 'Bar 6 bach-var1-88 on o2 staff line must NOT have hold line overwriting staff line');
   const note88Knockout = verticalKnockouts.find(
     (k) => Math.abs(k.x1 - note88ExpectedCx) < 0.1 && Math.abs(k.y1 - (note88ExpectedCy + noteHeight / 2)) < 0.1
   );
-  assert.ok(note88Knockout, 'Must find staff-line knockout line for bach-var1-88');
-  assert.equal(note88Knockout.lineWidth, 1.8, 'Bar 6 bach-var1-88 on m2 staff line must have 1.8px knockout underlay');
+  assert.ok(!note88Knockout, 'Bar 6 bach-var1-88 on o2 staff line must NOT have staff-line knockout line');
 
-  // Measure 30 notes must cleanly terminate without extending past note release
-  const m30Ids = ['bach-var1-501', 'bach-var1-504', 'bach-var1-507', 'bach-var1-510', 'bach-var1-513'];
-  for (const nId of m30Ids) {
+  // Measure 30 note bach-var1-501 sits on staff line 4 (dashed demarcation) so staff line remains continuous
+  const n501 = score.notes.find((x) => x.id === 'bach-var1-501')!;
+  const n501LPitch = n501.pitch.octave * 12 + n501.pitch.pitchClass;
+  const n501Cx = paddingPitch + (n501LPitch - minPitch) * pixelsPerSemitone;
+  const n501Cy = paddingStart + n501.startTick * pixelsPerTick;
+  const n501Trail = verticalDottedTrails.find(
+    (t) => Math.abs(t.x1 - n501Cx) < 0.1 && Math.abs(t.y1 - (n501Cy + noteHeight / 2 + 2)) < 0.1
+  );
+  assert.ok(!n501Trail, 'bach-var1-501 on staff line 4 must NOT have hold line overwriting staff line');
+
+  // Measure 30 open space notes must cleanly terminate without extending past note release
+  const m30SpaceIds = ['bach-var1-504', 'bach-var1-507', 'bach-var1-510', 'bach-var1-513'];
+  for (const nId of m30SpaceIds) {
     const n = score.notes.find((x) => x.id === nId)!;
     const nLPitch = n.pitch.octave * 12 + n.pitch.pitchClass;
     const nCx = paddingPitch + (nLPitch - minPitch) * pixelsPerSemitone;
@@ -1768,13 +1775,13 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   assert.equal(horizontalRibbons.length, 0, 'Horizontal hold ribbons must be 0');
   assert.equal(
     horizontalDottedTrails.length,
-    165,
-    'Must render exactly 165 horizontal hold lines for all colored notes'
+    128,
+    'Must render exactly 128 horizontal hold lines for open space colored notes'
   );
   assert.equal(
     horizontalKnockouts.length,
-    37,
-    'Must render exactly 37 horizontal staff-line knockout lines (line 8 dropped to lighten page)'
+    0,
+    'Must render 0 horizontal staff-line knockout lines (staff lines remain continuous)'
   );
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
@@ -2675,16 +2682,16 @@ test('Canvas Local Dashed Outlier Lines and Urtext Typography Invariants', () =>
   assert.equal(earlyLines76.length, 0, 'No outlier staff lines should be rendered before m. 29');
 
   // 2. Urtext Typography Invariant:
-  // Octave markers (m1, m3, m5)
-  const m1Label = recordedTexts.find((t) => t.text === 'm1');
-  const m3Label = recordedTexts.find((t) => t.text === 'm3');
-  const m5Label = recordedTexts.find((t) => t.text === 'm5');
-  assert.ok(m1Label, 'm1 label must be rendered');
-  assert.ok(m3Label, 'm3 label must be rendered');
-  assert.ok(m5Label, 'm5 label must be rendered');
-  assert.equal(m1Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
-  assert.equal(m3Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
-  assert.equal(m5Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+  // Octave markers (o1, o3, o5)
+  const o1Label = recordedTexts.find((t) => t.text === 'o1');
+  const o3Label = recordedTexts.find((t) => t.text === 'o3');
+  const o5Label = recordedTexts.find((t) => t.text === 'o5');
+  assert.ok(o1Label, 'o1 label must be rendered');
+  assert.ok(o3Label, 'o3 label must be rendered');
+  assert.ok(o5Label, 'o5 label must be rendered');
+  assert.equal(o1Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+  assert.equal(o3Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+  assert.equal(o5Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
 
   // Measure numbers (e.g. 1, 5, 9, etc.)
   const measureLabels = recordedTexts.filter((t) => /^\d+$/.test(t.text) && t.x === 14);

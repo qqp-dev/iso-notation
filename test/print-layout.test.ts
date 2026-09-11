@@ -230,48 +230,47 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   // 2. Zero hold ribbon lines for 16th notes (stroke-width="1.2")
   assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2")');
 
-  // 3. Solid thin hold lines and Clean Staff-Line Replacement (Bar 6 Blue)
+  // 3. Solid thin hold lines and Continuous Staff Lines (Bar 6 Blue)
   const tauRef = score.gridResolution || 12;
   const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
   assert.equal(coloredNotes.length, 165, 'Must have exactly 165 colored notes in Goldberg Var 1');
 
-  // Space notes render thin solid lines (stroke-width="0.8") without knockout
+  // Space notes render thin solid lines (stroke-width="0.8")
   const spaceHoldLines = Array.from(
     fullScoreSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round"\/>/g)
   );
   assert.ok(spaceHoldLines.length > 0, 'Must render thin solid hold lines for space notes');
 
-  // Staff-line replacement knockout underlays
+  // Staff lines are permanent, continuous reference lines: zero staff-line knockouts
   const knockoutRegex =
     /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="#FFFFFF" stroke-width="(2\.5|1\.8)" stroke-linecap="butt"\/>/g;
   const allKnockouts = Array.from(fullScoreSvg.matchAll(knockoutRegex));
-  assert.ok(allKnockouts.length > 0, 'Must render white staff-line knockouts for held notes on staff lines');
+  assert.equal(allKnockouts.length, 0, 'Zero staff-line knockouts (staff lines remain continuous)');
 
-  // Verify Bar 6 note bach-var1-88 (tick 744, dur 36, blue) on staff line m2 (pitch 36):
-  // Cleanly draws over / replaces staff line with 1.8 white knockout and 1.0 colored stroke (#1D4ED8)
+  // Verify Bar 6 note bach-var1-88 (tick 744, dur 36, blue) on staff line o2 (pitch 36):
+  // Staff line remains continuous black without blue hold line or white knockout overwriting it
   const note88 = score.notes.find((n) => n.id === 'bach-var1-88')!;
   const col88 = layout.columns.find((c) => c.notes.some((n) => n.id === note88.id))!;
   const staffOriginY = 10 * (72 / 25.4) + 42 + 16;
   const note88Ny = staffOriginY + (note88.startTick - col88.startTick) * layout.ptPerTick;
   const note88Height = 6.0;
-  const note88KnockoutY = note88Ny + note88Height / 2;
   const note88StartY = note88Ny + note88Height / 2 + 2;
   const note88ReleaseY = note88Ny + note88.durationTicks * layout.ptPerTick;
   const colLeftPt88 = 10 * (72 / 25.4) + col88.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
   const note88X = colLeftPt88 + 22 + (36 - layout.minPitch) * layout.ptPerSemitone;
 
   const pSvg88 = svgs[col88.pageIndex];
-  // Verify white knockout underlay at note88 extends from notehead bottom to prevent underlying line showing through gap
-  assert.match(
+  // Verify zero white knockout underlay at note88
+  assert.doesNotMatch(
     pSvg88,
-    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88KnockoutY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#FFFFFF" stroke-width="1\\.8" stroke-linecap="butt"\\/>`),
-    'Bar 6 note bach-var1-88 on line m2 must have white knockout underlay starting from notehead bottom with stroke-width="1.8"'
+    new RegExp(`<line x1="${note88X.toFixed(2)}" [^>]*stroke="#FFFFFF"`),
+    'Bar 6 note bach-var1-88 must not have white knockout underlay'
   );
-  // Verify colored hold line at full octave staff line width (1.0pt)
-  assert.match(
+  // Verify zero colored hold line overwriting the staff line
+  assert.doesNotMatch(
     pSvg88,
-    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#1D4ED8" stroke-width="1\\.0" stroke-linecap="round"\\/>`),
-    'Bar 6 note bach-var1-88 on line m2 must stroke at full staff-line width 1.0pt replacing black vertical line'
+    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}"`),
+    'Bar 6 note bach-var1-88 on line o2 must not overwrite black vertical staff line'
   );
 
   // 5. Clean termination without explicit stop ticks or release crossbars
@@ -497,7 +496,7 @@ test('Web Print CSS & @media print Invariants', () => {
   assert.match(css, /\.print-preview-card\s*svg\s*\{[^}]*width:\s*100%\s*!important/);
 });
 
-test('Responsive SVG Scaling & Unclipped m5 Margin Invariant', () => {
+test('Responsive SVG Scaling & Unclipped o5 Margin Invariant', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score, { staffStyle: 'tritone-split' });
   const svg = renderPageToSvg(layout, 0);
@@ -505,22 +504,22 @@ test('Responsive SVG Scaling & Unclipped m5 Margin Invariant', () => {
   // SVG root must have responsive style attribute
   assert.match(svg, /<svg[^>]*style="[^"]*width:\s*100%[^"]*height:\s*auto[^"]*"/);
 
-  // m5 text and staff line must exist in Column 1 (right column)
-  const m5TextMatches = Array.from(svg.matchAll(/<text[^>]*>m5<\/text>/g));
-  assert.equal(m5TextMatches.length, 2, 'm5 must appear in both columns (mm. 1-4 and mm. 5-8)');
+  // o5 text and staff line must exist in Column 1 (right column)
+  const o5TextMatches = Array.from(svg.matchAll(/<text[^>]*>o5<\/text>/g));
+  assert.equal(o5TextMatches.length, 2, 'o5 must appear in both columns (mm. 1-4 and mm. 5-8)');
 
-  // Rightmost m5 line must have >= 10mm (28.35pt) buffer from page right edge
+  // Rightmost o5 line must have >= 10mm (28.35pt) buffer from page right edge
   const col1 = layout.pages[0].columns[1];
   const marginPt = layout.options.pageMarginMm * MM_TO_PT;
   const gapPt = layout.options.columnGapMm * MM_TO_PT;
   const colLeftPt = marginPt + col1.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
   const colStaffLeftPt = colLeftPt + 14;
-  const m5RightColX = colStaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
+  const o5RightColX = colStaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
   const pageWidthPt = layout.pageDimensions.widthPt;
-  const rightMarginDistance = pageWidthPt - m5RightColX;
+  const rightMarginDistance = pageWidthPt - o5RightColX;
   assert.ok(
     rightMarginDistance >= 28.35,
-    `Rightmost m5 must sit comfortably within the page (distance: ${rightMarginDistance.toFixed(2)}pt >= 28.35pt)`
+    `Rightmost o5 must sit comfortably within the page (distance: ${rightMarginDistance.toFixed(2)}pt >= 28.35pt)`
   );
 });
 
@@ -556,20 +555,20 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
   assert.match(wrappedTail, /@PJL EOJ/);
 });
 
-test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
+test('Lowercase \'o\' Octave Marker Invariant: SVG pitch header labels', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
   assert.equal(svgs.length, 4);
   for (const svg of svgs) {
-    // 1. Lowercase m octave markers (m1, m3, m5) with Middle C at m3, dropping m2 and m4
-    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct - 1} pitch labels');
-    assert.match(svg, />m1</, 'Must render m1 bottom octave label');
-    assert.doesNotMatch(svg, />m2</, 'Must NOT render m2 label');
-    assert.match(svg, />m3</, 'Must render m3 label (Middle C)');
-    assert.doesNotMatch(svg, />m4</, 'Must NOT render m4 label');
-    assert.match(svg, />m5</, 'Must render m5 top octave label');
+    // 1. Lowercase o octave markers (o1, o3, o5) with Middle C at o3, dropping o2 and o4
+    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">o\d+<\/text>/, 'Must render bold o${oct - 1} pitch labels');
+    assert.match(svg, />o1</, 'Must render o1 bottom octave label');
+    assert.doesNotMatch(svg, />o2</, 'Must NOT render o2 label');
+    assert.match(svg, />o3</, 'Must render o3 label (Middle C)');
+    assert.doesNotMatch(svg, />o4</, 'Must NOT render o4 label');
+    assert.match(svg, />o5</, 'Must render o5 top octave label');
 
     // 2. Zero diatonic C octave labels
     assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
@@ -602,24 +601,24 @@ test('Phonetic Notehead Morphology in SVG: strictly lowercase syllables', () => 
   }
 });
 
-test('0-Indexed Piano Octaves Invariant (m0..m7) for 88-key range', () => {
+test('0-Indexed Piano Octaves Invariant (o0..o7) for 88-key range', () => {
   // 88-key piano spans A0 (MIDI 21) to C8 (MIDI 108)
-  // Lowest C is C1 (MIDI 24, oct = 1) -> m0
-  // Middle C is C4 (MIDI 60, oct = 4) -> m3
-  // Highest C is C8 (MIDI 108, oct = 8) -> m7
+  // Lowest C is C1 (MIDI 24, oct = 1) -> o0
+  // Middle C is C4 (MIDI 60, oct = 4) -> o3
+  // Highest C is C8 (MIDI 108, oct = 8) -> o7
   const expectedOctaveLabels: Record<number, string> = {
-    1: 'm0', // C1 (lowest piano C)
-    2: 'm1', // C2
-    3: 'm2', // C3
-    4: 'm3', // C4 (Middle C)
-    5: 'm4', // C5
-    6: 'm5', // C6
-    7: 'm6', // C7
-    8: 'm7', // C8
+    1: 'o0', // C1 (lowest piano C)
+    2: 'o1', // C2
+    3: 'o2', // C3
+    4: 'o3', // C4 (Middle C)
+    5: 'o4', // C5
+    6: 'o5', // C6
+    7: 'o6', // C7
+    8: 'o7', // C8
   };
 
   for (let oct = 1; oct <= 8; oct++) {
-    const label = `m${oct - 1}`;
+    const label = `o${oct - 1}`;
     assert.equal(label, expectedOctaveLabels[oct], `Octave ${oct} must format as ${expectedOctaveLabels[oct]}`);
   }
 });
@@ -631,11 +630,11 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
     noteheadMorphology: 'rectangle-square',
   });
 
-  // 1. Staff Lines: Definitive 2-Line Staff with m3 Spine Hierarchy
-  // PC 0 (m3): authoritative bold 1.35pt solid line
-  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.35"/, 'Must contain bold 1.35pt central spine line (m3)');
-  // PC 0 (m1, m2, m4, m5): uniform 1.0pt octave lines
-  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.0"/, 'Must contain uniform 1.0pt octave lines for m1, m2, m4, m5');
+  // 1. Staff Lines: Definitive 2-Line Staff with o3 Spine Hierarchy
+  // PC 0 (o3): authoritative bold 1.35pt solid line
+  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.35"/, 'Must contain bold 1.35pt central spine line (o3)');
+  // PC 0 (o1, o2, o4, o5): uniform 0.65pt octave lines
+  assert.match(svg, /stroke="#000000"[^>]*stroke-width="0\.65"/, 'Must contain uniform 0.65pt octave lines for o1, o2, o4, o5');
   // PC 4: small dashes 5,2.5
   assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain small dashed line for 5');
   // PC 8: thin straight solid line dropped
@@ -702,27 +701,27 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   assert.equal(polyMatches.length, 0, 'Zero polygon triangles should be rendered when using rectangle-square morphology');
 });
 
-test('4-Octave Core Staff (m1 to m5) & Clean Termination at m5', () => {
+test('4-Octave Core Staff (o1 to o5) & Clean Termination at o5', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
 
-  // Core staff spans exactly 4 octaves (48 semitones): m1 (24) to m5 (72)
-  assert.equal(layout.minPitch, 24, 'Staff minPitch must anchor to m1 (linearIndex 24)');
-  assert.equal(layout.maxPitch, 72, 'Staff maxPitch must anchor to m5 (linearIndex 72)');
+  // Core staff spans exactly 4 octaves (48 semitones): o1 (24) to o5 (72)
+  assert.equal(layout.minPitch, 24, 'Staff minPitch must anchor to o1 (linearIndex 24)');
+  assert.equal(layout.maxPitch, 72, 'Staff maxPitch must anchor to o5 (linearIndex 72)');
   assert.equal(layout.pitchSpan, 48, 'Staff span must be exactly 48 semitones (4 octaves)');
 
   const svg = renderPageToSvg(layout, 0);
 
-  // Octave labels: m1, m3, m5 present, m2 and m4 dropped
-  assert.match(svg, />m1</, 'Must render m1 header label');
-  assert.doesNotMatch(svg, />m2</, 'Must NOT render m2 header label');
-  assert.match(svg, />m3</, 'Must render m3 header label (Middle C)');
-  assert.doesNotMatch(svg, />m4</, 'Must NOT render m4 header label');
-  assert.match(svg, />m5</, 'Must render m5 header label');
+  // Octave labels: o1, o3, o5 present, o2 and o4 dropped
+  assert.match(svg, />o1</, 'Must render o1 header label');
+  assert.doesNotMatch(svg, />o2</, 'Must NOT render o2 header label');
+  assert.match(svg, />o3</, 'Must render o3 header label (Middle C)');
+  assert.doesNotMatch(svg, />o4</, 'Must NOT render o4 header label');
+  assert.match(svg, />o5</, 'Must render o5 header label');
 
-  // No labels above m5
-  assert.doesNotMatch(svg, />m6</, 'Must NOT render m6 header label');
-  assert.doesNotMatch(svg, />m7</, 'Must NOT render m7 header label');
+  // No labels above o5
+  assert.doesNotMatch(svg, />o6</, 'Must NOT render o6 header label');
+  assert.doesNotMatch(svg, />o7</, 'Must NOT render o7 header label');
 });
 
 test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', () => {
@@ -757,15 +756,15 @@ test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', 
   assert.doesNotMatch(page4SvgDefault, />↑8<\/text>/, 'Must NOT render ↑8 badge in default spillover mode');
   assert.doesNotMatch(page4SvgDefault, /Option 4 Notehead Octave Badge/, 'Must NOT render octave badge rect in default spillover mode');
 
-  // Verify D6 note renders with pitch coordinate > 72 in right buffer margin past m5 line
+  // Verify D6 note renders with pitch coordinate > 72 in right buffer margin past o5 line
   const col = defaultLayout.pages[3].columns[1];
   const marginPt = defaultLayout.options.pageMarginMm * (72 / 25.4);
   const gapPt = defaultLayout.options.columnGapMm * (72 / 25.4);
   const colLeftPt = marginPt + col.columnOnPageIndex * (defaultLayout.columnDimensions.widthPt + gapPt);
   const colStaffLeftPt = colLeftPt + 22;
   const expectedD6X = colStaffLeftPt + (74 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
-  const expectedM5X = colStaffLeftPt + (72 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
-  assert.ok(expectedD6X > expectedM5X, 'D6 coordinate must be to the right of m5 line');
+  const expectedO5X = colStaffLeftPt + (72 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
+  assert.ok(expectedD6X > expectedO5X, 'D6 coordinate must be to the right of o5 line');
   assert.ok(page4SvgDefault.includes(expectedD6X.toFixed(2)), 'Must render D6 note in right buffer margin at true pitch');
 });
 
@@ -885,8 +884,8 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(!page1Svg.includes('.beat-counter'), 'Must not include .beat-counter style');
   assert.ok(page1Svg.includes(`.pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }`));
 
-  // Verify Middle C m3 header badge uses URTEXT_SERIF with italic
-  assert.ok(page1Svg.includes(`font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">m3</text>`));
+  // Verify Middle C o3 header badge uses URTEXT_SERIF with italic
+  assert.ok(page1Svg.includes(`font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>`));
 });
 
 test('A4 Columnar Layout & Geometry Invariants: 22pt left clearance, measure number in margin clear of m1, zero beat counter', () => {

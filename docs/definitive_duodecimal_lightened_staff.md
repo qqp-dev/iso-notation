@@ -11,8 +11,8 @@ The thin solid line at **Pitch Class 8** (the 9th note, opposite the dashed 5th 
 
 ### The Definitive 2-Line Landmark Staff
 Each octave register now contains strictly **2 landmark lines**:
-1. **Pitch Class 0 (C / Note 1)**: Bold solid octave boundary line (`1.0pt`, with authoritative `1.35pt` spine for central $m3$).
-2. **Pitch Class 4 (E / Note 5)**: Subtle dashed demarcation line (`0.6pt`, `stroke-dasharray="5,2.5"`).
+1. **Pitch Class 0 (C / Note 0 / 'o')**: Refined solid octave boundary line (`0.65pt` for `o1, o2, o4, o5`, with authoritative `1.35pt` spine for central $o3$).
+2. **Pitch Class 4 (E / Note 4 / 'fo')**: Subtle dashed demarcation line (`0.6pt`, `stroke-dasharray="5,2.5"`).
 3. **Pitches 1, 2, 3, 5, 6, 7, 8, 9, 10, 11**: Clean, open white space. The standalone digits stand purely on their own.
 
 Dropping line 8 immediately reduces staff ink density by **33%**, eliminates visual clutter on the right side of every octave, and lets the score breathe with open whitespace.

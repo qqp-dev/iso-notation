@@ -168,7 +168,7 @@ export function renderScoreToCanvas(
     }
     ctx.stroke();
 
-    // 2d. Middle C (C4 / m3) prominent amber axis
+    // 2d. Middle C (C4 / o3) prominent amber axis
     if (minPitch <= 48 && maxPitch >= 48) {
       ctx.strokeStyle = 'rgba(245, 158, 11, 0.85)';
       ctx.lineWidth = 1.5;
@@ -350,7 +350,7 @@ export function renderScoreToCanvas(
       ctx.textBaseline = 'middle';
       const isAfterC = pc >= 9;
       const displayOct = isAfterC ? oct : Math.max(0, oct - 1);
-      const label = isOctave0 ? `m${displayOct}` : `${pc + 1}:${displayOct}`;
+      const label = isOctave0 ? `o${displayOct}` : `${pc + 1}:${displayOct}`;
       ctx.fillText(label, paddingStart - 8, y);
     } else {
       // Vertical timeline
@@ -367,10 +367,10 @@ export function renderScoreToCanvas(
       }
 
       if (lineGeom.isLine) {
-        const isCenterM3 = pc === 0 && Math.max(0, oct - 1) === 3;
+        const isCenterO3 = pc === 0 && Math.max(0, oct - 1) === 3;
         ctx.beginPath();
-        ctx.strokeStyle = isCenterM3 ? 'rgba(255, 255, 255, 0.95)' : lineGeom.color;
-        ctx.lineWidth = isCenterM3 ? Math.max(1.8, lineGeom.lineWidth * 1.5) : lineGeom.lineWidth;
+        ctx.strokeStyle = isCenterO3 ? 'rgba(255, 255, 255, 0.95)' : lineGeom.color;
+        ctx.lineWidth = isCenterO3 ? 2.0 : (pc === 0 ? 0.9 : lineGeom.lineWidth);
         if (lineGeom.isDashed && lineGeom.dashArray) {
           ctx.setLineDash(lineGeom.dashArray);
         } else {
@@ -381,19 +381,19 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch class label along top margin: strictly octave markers m${oct - 1} in tritone-split, zero 5 and 9 at top
+      // Pitch class label along top margin: strictly octave markers o${oct - 1} in tritone-split, zero 5 and 9 at top
       const isOctave0 = pc === 0;
       if (isOctave0) {
         const displayOct = Math.max(0, oct - 1);
         if (displayOct === 2 || displayOct === 4) {
-          // Drop m2 and m4 to declutter header landmarks
+          // Drop o2 and o4 to declutter header landmarks
         } else {
-          const isCenterM3 = displayOct === 3;
-          ctx.fillStyle = isCenterM3 ? '#F59E0B' : '#FFFFFF';
+          const isCenterO3 = displayOct === 3;
+          ctx.fillStyle = isCenterO3 ? '#F59E0B' : '#FFFFFF';
           ctx.font = 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
-          ctx.fillText(`m${displayOct}`, x, paddingStart - 6);
+          ctx.fillText(`o${displayOct}`, x, paddingStart - 6);
         }
       } else if (normStaffStyle !== 'tritone-split') {
         ctx.fillStyle = '#666666';
@@ -894,26 +894,9 @@ export function renderScoreToCanvas(
             ctx.save();
             ctx.setLineDash([]);
 
-            if (isOnStaffLine) {
-              const knockoutX1 = (Math.abs(segX1 - trailStartX) < 0.1)
-                ? (cx + noteWidth / 2)
-                : segX1;
-              ctx.lineCap = 'butt';
-              ctx.lineWidth = isBold ? 2.5 : 1.8;
-              ctx.strokeStyle = '#000000';
-              ctx.beginPath();
-              ctx.moveTo(knockoutX1, cy);
-              ctx.lineTo(segX2, cy);
-              ctx.stroke();
-
-              ctx.lineCap = 'round';
-              ctx.lineWidth = isBold ? 1.35 : 1.0;
-              ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
-              ctx.beginPath();
-              ctx.moveTo(segX1, cy);
-              ctx.lineTo(segX2, cy);
-              ctx.stroke();
-            } else {
+            // Staff lines are permanent reference lines and must NEVER be overwritten or interrupted by hold lines.
+            // Hold lines are rendered only in open space (when not on a staff line).
+            if (!isOnStaffLine) {
               ctx.lineCap = 'round';
               ctx.lineWidth = 0.8;
               ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
@@ -992,30 +975,9 @@ export function renderScoreToCanvas(
             ctx.save();
             ctx.setLineDash([]);
 
-            if (isOnStaffLine) {
-              // Knockout line replacing the staff line starting from notehead bottom (cy + noteHeight / 2)
-              // for the first segment so the small gap between notehead and hold line is a clean void,
-              // preventing the staff line from showing through in the gap!
-              const knockoutY1 = (Math.abs(segY1 - trailStartY) < 0.1)
-                ? (cy + noteHeight / 2)
-                : segY1;
-              ctx.lineCap = 'butt';
-              ctx.lineWidth = isBold ? 2.5 : 1.8;
-              ctx.strokeStyle = '#000000';
-              ctx.beginPath();
-              ctx.moveTo(cx, knockoutY1);
-              ctx.lineTo(cx, segY2);
-              ctx.stroke();
-
-              // Colored hold line
-              ctx.lineCap = 'round';
-              ctx.lineWidth = isBold ? 1.35 : 1.0;
-              ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
-              ctx.beginPath();
-              ctx.moveTo(cx, segY1);
-              ctx.lineTo(cx, segY2);
-              ctx.stroke();
-            } else {
+            // Staff lines are permanent reference lines and must NEVER be overwritten or interrupted by hold lines.
+            // Hold lines are rendered only in open space (when not on a staff line).
+            if (!isOnStaffLine) {
               ctx.lineCap = 'round';
               ctx.lineWidth = 0.8;
               ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
@@ -1375,12 +1337,13 @@ export function renderNotehead(
       const pc = ((pitchClass % 12) + 12) % 12;
       const digit = DUODECIMAL_DIGITS[pc];
       const isEven = pc % 2 === 0;
-      const r = 6.0;
+      const r = 6.8;
+      const cyOpt = cy - 0.8;
 
-      // Crisp circular line-knockout
+      // Crisp circular line-knockout centered at optical center
       ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.arc(cx, cyOpt, r, 0, Math.PI * 2);
       ctx.fill();
 
       // Standalone naked digit in URW Gothic
@@ -1394,44 +1357,31 @@ export function renderNotehead(
 
       // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
       if (handException !== null) {
-        const h = 5.6;
-        const w = 3.4;
-        const clr = 2.0;
-        const thick = 1.6;
+        const h = 4.4;
+        const w = 2.4;
+        const clr = 3.6;
+        const thick = 0.9;
 
-        let bx = handException === 'LH' ? cx - r - clr : cx + r + clr;
+        let bx = handException === 'LH' ? cx - clr : cx + clr;
         let ax = handException === 'LH' ? bx - w : bx + w;
         let ctrlX = handException === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
-        const ty = cy - h / 2;
-        const by = cy + h / 2;
+        const ty = cyOpt - h / 2;
+        const by = cyOpt + h / 2;
         const inAx = handException === 'LH' ? ax + thick : ax - thick;
         const inCtrlX = handException === 'LH' ? ctrlX + thick * 0.45 : ctrlX - thick * 0.45;
 
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(bx, ty);
-        ctx.quadraticCurveTo(ctrlX, cy - h * 0.22, ax, cy);
-        ctx.quadraticCurveTo(ctrlX, cy + h * 0.22, bx, by);
-        ctx.quadraticCurveTo(inCtrlX, cy + h * 0.16, inAx, cy);
-        ctx.quadraticCurveTo(inCtrlX, cy - h * 0.16, bx, ty);
+        ctx.quadraticCurveTo(ctrlX, cyOpt - h * 0.22, ax, cyOpt);
+        ctx.quadraticCurveTo(ctrlX, cyOpt + h * 0.22, bx, by);
+        ctx.quadraticCurveTo(inCtrlX, cyOpt + h * 0.16, inAx, cyOpt);
+        ctx.quadraticCurveTo(inCtrlX, cyOpt - h * 0.16, bx, ty);
         ctx.closePath();
 
-        // Knockout halo underlay
-        ctx.fillStyle = '#000000';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2.4;
-        ctx.lineJoin = 'round';
-        ctx.stroke();
-        ctx.fill();
-
-        // Colored guillemet
+        // Direct solid fill without stroke halo knockout
         ctx.fillStyle = headColor;
-        ctx.strokeStyle = headColor;
-        ctx.lineWidth = 0.5;
-        ctx.lineJoin = 'round';
-        ctx.stroke();
         ctx.fill();
-
         ctx.restore();
       }
       break;

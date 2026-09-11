@@ -197,7 +197,7 @@ export function computeColumnarLayout(
     : 1;
 
   // Pitch range bounding: Anchored around the middle of keyboard to 4 octaves:
-  // m1 (24, C2) to m5 (72, C6), with Middle C (m3, 48) dead-center.
+  // o1 (24, C2) to o5 (72, C6), with Middle C (o3, 48) dead-center.
   let minPitch = options.minPitch > 0 ? options.minPitch : 24;
   let maxPitch = options.maxPitch < 127 ? options.maxPitch : 72;
 
@@ -447,12 +447,12 @@ export function renderPageToSvg(
         }
         const isCenter = displayOct === 3;
         if (isCenter) {
-          // Tasteful center anchor badge for m3
+          // Tasteful center anchor badge for o3
           svgParts.push(`    <rect x="${(px - 9.5).toFixed(2)}" y="${(colTopPt + 2.5).toFixed(2)}" width="19" height="9.5" rx="2" fill="#111827"/>`);
-          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 9.5).toFixed(2)}" font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">m3</text>`);
+          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 9.5).toFixed(2)}" font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>`);
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#111827" stroke-width="1.25"/>`);
         } else {
-          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
+          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">o${displayOct}</text>`);
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#888888" stroke-width="0.6"/>`);
         }
       }
@@ -461,11 +461,11 @@ export function renderPageToSvg(
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
 
-    // Staff Lines (1-5-9 Symmetric 3-Line Topography with m3 Center Spine)
-    // - m3 (Center Axis, Middle C): authoritative bold central spine (1.35pt, #000000)
-    // - m1, m2, m4, m5 (Octave Boundaries): same uniform thickness (1.0pt, #000000), visibly thicker than line 9
-    // - Landmark 5 (PC 4): small dashes (0.6pt, #444444, [5, 2.5])
-    // - Landmark 9 (PC 8): thin straight solid line (0.6pt, #555555)
+    // Staff Lines (Definitive 2-Line Landmark Topography with o3 Center Spine)
+    // - o3 (Center Axis, Middle C): authoritative bold central spine (1.35pt, #000000)
+    // - o1, o2, o4, o5 (Octave Boundaries): refined uniform thickness (0.65pt, #000000), less aggressive
+    // - Landmark 4 (PC 4): small dashes (0.6pt, #444444, [5, 2.5])
+    // - Note 8 (PC 8): dropped per definitive design to lighten the page
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
@@ -475,23 +475,23 @@ export function renderPageToSvg(
       if (normStaffStyle === 'tritone-split') {
         if (pc === 0) {
           if (displayOct === 3) {
-            // m3: authoritative central spine (1.35pt)
+            // o3: authoritative central spine (1.35pt)
             svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.35"/>`);
           } else {
-            // m1, m2, m4, m5: uniform octave line (1.0pt), visibly thicker than line 9 (0.6pt)
-            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
+            // o1, o2, o4, o5: refined uniform octave line (0.65pt)
+            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="0.65"/>`);
           }
         } else if (pc === 4) {
           // Landmark 4 small dashes (fifth note)
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="5,2.5"/>`);
         }
-        // pc === 8 (thin straight solid line) dropped per definitive design to lighten the page
+        // pc === 8 dropped per definitive design to lighten the page
       } else {
         // Fallback whole-tone uniform
         if (pc % 2 === 0) {
           const isOct = pc === 0;
           const isCenter = isOct && displayOct === 3;
-          const strokeW = isCenter ? '1.35' : isOct ? '1.0' : '0.6';
+          const strokeW = isCenter ? '1.35' : isOct ? '0.65' : '0.6';
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${strokeW}"/>`);
         }
       }
@@ -523,7 +523,7 @@ export function renderPageToSvg(
             if (geom.isDashed && geom.dashArray) {
               svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="${geom.dashArray.join(',')}"/>`);
             } else if (pc === 0) {
-              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#000000" stroke-width="0.65"/>`);
             } else {
               svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#555555" stroke-width="0.6"/>`);
             }
@@ -545,7 +545,7 @@ export function renderPageToSvg(
             if (geom.isDashed && geom.dashArray) {
               svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="${geom.dashArray.join(',')}"/>`);
             } else if (pc === 0) {
-              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
+              svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#000000" stroke-width="0.65"/>`);
             } else {
               svgParts.push(`    <line x1="${lineX}" y1="${measureStartY.toFixed(2)}" x2="${lineX}" y2="${measureEndY.toFixed(2)}" stroke="#555555" stroke-width="0.6"/>`);
             }
@@ -780,16 +780,9 @@ export function renderPageToSvg(
         for (let i = 0; i < intervals.length; i++) {
           const [segY1, segY2] = intervals[i];
           if (segY2 - segY1 >= 1.5) {
-            if (isOnStaffLine) {
-              // Knock out the underlying staff line starting from the notehead bottom (ny + nh / 2)
-              // for the first segment so the small gap between notehead and hold line is a clean white gap,
-              // preventing the black staff line from showing through in the gap!
-              const knockoutY1 = (i === 0 && Math.abs(segY1 - trailStartY) < 0.1)
-                ? (ny + nh / 2)
-                : segY1;
-              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${knockoutY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="#FFFFFF" stroke-width="${isBold ? '2.5' : '1.8'}" stroke-linecap="butt"/>`);
-              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="${isBold ? '1.35' : '1.0'}" stroke-linecap="round"/>`);
-            } else {
+            // Staff lines are permanent, continuous reference lines and must NEVER be overwritten or interrupted by hold lines.
+            // Hold lines are rendered only in open space (when not on a staff line).
+            if (!isOnStaffLine) {
               svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
             }
           }
@@ -837,10 +830,12 @@ export function renderPageToSvg(
         const pc = ((lPitch % 12) + 12) % 12;
         const digit = DUODECIMAL_DIGITS[pc];
         const isRow0 = isEven;
-        const r = 4.2;
+        const r = 4.80;
+        const cyOpt = ny - 0.55;
 
-        // White circular line knockout so staff and beat lines do not cut through the digit
-        svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`);
+        // White circular line knockout so staff and beat lines do not cut through the digit.
+        // Optically centered at cyOpt with r = 4.80 to ensure a consistent, balanced ~2.5pt protective halo above and below.
+        svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${cyOpt.toFixed(2)}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`);
 
         // Standalone naked digit
         const weight = isRow0 ? '800' : '700';
@@ -848,25 +843,22 @@ export function renderPageToSvg(
 
         // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
         if (isHandException) {
-          const h = 2.8;
-          const w = 1.7;
-          const clr = 1.0;
-          const thick = 0.80;
+          const gw = 1.4;
+          const gh = 2.4;
+          const gThick = 0.55;
+          const gCy = ny - 0.55;
+          let bx = hand === 'LH' ? nx - 2.2 : nx + 2.2;
+          let ax = hand === 'LH' ? bx - gw : bx + gw;
+          let ctrlX = hand === 'LH' ? bx - gw * 0.30 : bx + gw * 0.30;
+          const ty = gCy - gh / 2;
+          const by = gCy + gh / 2;
+          const inAx = hand === 'LH' ? ax + gThick : ax - gThick;
+          const inCtrlX = hand === 'LH' ? ctrlX + gThick * 0.45 : ctrlX - gThick * 0.45;
 
-          let bx = hand === 'LH' ? nx - r - clr : nx + r + clr;
-          let ax = hand === 'LH' ? bx - w : bx + w;
-          let ctrlX = hand === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
-          const ty = ny - h / 2;
-          const by = ny + h / 2;
-          const inAx = hand === 'LH' ? ax + thick : ax - thick;
-          const inCtrlX = hand === 'LH' ? ctrlX + thick * 0.45 : ctrlX - thick * 0.45;
+          const path = `M ${bx.toFixed(2)} ${ty.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(gCy - gh * 0.22).toFixed(2)} ${ax.toFixed(2)} ${gCy.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(gCy + gh * 0.22).toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(gCy + gh * 0.16).toFixed(2)} ${inAx.toFixed(2)} ${gCy.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(gCy - gh * 0.16).toFixed(2)} ${bx.toFixed(2)} ${ty.toFixed(2)} Z`;
 
-          const path = `M ${bx.toFixed(2)} ${ty.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(ny - h * 0.22).toFixed(2)} ${ax.toFixed(2)} ${ny.toFixed(2)} Q ${ctrlX.toFixed(2)} ${(ny + h * 0.22).toFixed(2)} ${bx.toFixed(2)} ${by.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(ny + h * 0.16).toFixed(2)} ${inAx.toFixed(2)} ${ny.toFixed(2)} Q ${inCtrlX.toFixed(2)} ${(ny - h * 0.16).toFixed(2)} ${bx.toFixed(2)} ${ty.toFixed(2)} Z`;
-
-          // White halo knockout underlay
-          svgParts.push(`    <path d="${path}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/>`);
-          // Colored sculpted French guillemet
-          svgParts.push(`    <path d="${path}" fill="${noteColor}" stroke="${noteColor}" stroke-width="0.3" stroke-linejoin="round"/>`);
+          // Clean sculpted French guillemet without noisy white halo
+          svgParts.push(`    <path d="${path}" fill="${noteColor}"/>`);
         }
       } else if (isHandException) {
         const nw = 7.5;
