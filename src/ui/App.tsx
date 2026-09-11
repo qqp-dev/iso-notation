@@ -9,6 +9,7 @@ import { NotationCanvas } from './NotationCanvas';
 import { ControlsDrawer } from './ControlsDrawer';
 import { PhoneticSandbox } from './PhoneticSandbox';
 import { PrintModal } from './PrintModal';
+import { CompressionModal } from './CompressionModal';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('score');
@@ -21,6 +22,7 @@ export const App: React.FC = () => {
 
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isCompressionModalOpen, setIsCompressionModalOpen] = useState<boolean>(false);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -286,6 +288,16 @@ export const App: React.FC = () => {
               <span>B{beat}</span>
             </button>
 
+            {/* Compression Analysis Button */}
+            <button
+              onClick={() => setIsCompressionModalOpen(true)}
+              className="px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-[11px] cursor-pointer transition flex items-center gap-1.5"
+              title="View 6-Lane vs 12-Lane Horizontal Compression Analysis"
+            >
+              <span>📐</span>
+              <span className="hidden sm:inline">6-Lane vs 12-Lane</span>
+            </button>
+
             {/* Sidebar Toggle Button */}
             <button
               onClick={() => setIsDrawerOpen((prev) => !prev)}
@@ -325,6 +337,7 @@ export const App: React.FC = () => {
               }
             }}
             onOpenPrintModal={() => setIsPrintModalOpen(true)}
+            onOpenCompressionModal={() => setIsCompressionModalOpen(true)}
           />
         </div>
       )}
@@ -334,6 +347,12 @@ export const App: React.FC = () => {
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         score={score}
+      />
+
+      {/* 6-Lane vs 12-Lane Compression Modal */}
+      <CompressionModal
+        isOpen={isCompressionModalOpen}
+        onClose={() => setIsCompressionModalOpen(false)}
       />
     </div>
   );

@@ -32,6 +32,7 @@ interface ControlsDrawerProps {
   currentView?: 'score' | 'phonetics';
   onViewChange?: (view: 'score' | 'phonetics') => void;
   onOpenPrintModal?: () => void;
+  onOpenCompressionModal?: () => void;
 }
 
 export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
@@ -53,6 +54,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
   currentView = 'score',
   onViewChange,
   onOpenPrintModal,
+  onOpenCompressionModal,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -429,6 +431,18 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             >
               <span>🖨️</span>
               <span className="font-bold">Print Sheet Music (A4)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenCompressionModal?.();
+                onClose();
+              }}
+              className="w-full mt-2 py-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-emerald-400 hover:text-emerald-300 border border-neutral-700 hover:border-emerald-500/50 rounded font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+              title="Compare 12-Lane Isometric vs 6-Lane Folded layout"
+            >
+              <span>📐</span>
+              <span className="font-bold">6-Lane vs 12-Lane Analysis</span>
             </button>
           </div>
 
