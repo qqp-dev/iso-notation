@@ -520,11 +520,10 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
     assert.ok(Math.abs(s.x2 - s.x1) >= 20, 'Stem must extend at least 20px from note center');
   });
 
-  // Verify top alignment: stemY === y - noteHeight / 2
-  const noteHeight = Math.max(8, 14 - 3); // 11
+  // Verify center alignment: stem is at cy === y (paddingStart)
   const firstStem = lateralStems[0];
   const paddingStart = 60;
-  assert.equal(firstStem.y1, paddingStart - noteHeight / 2, 'Stem must be top-aligned at stemY === y - noteHeight / 2');
+  assert.equal(firstStem.y1, paddingStart, 'Stem must be center-aligned at cy === y');
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
@@ -1860,7 +1859,7 @@ test('Comparative Combinations: Beams, Beat Grid, and Gutter Brackets toggle ind
   assert.ok(!svgBrackets.includes('Klavarskribo Beat Grid'), 'Beat Grid absent');
 });
 
-test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin - 4, staffMax + 4] with authoritative contrast', () => {
+test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin, staffMax] with zero overhang and authoritative contrast', () => {
   const score = buildBachGoldbergVar1Score();
   const recordedLines: { x1: number; y1: number; x2: number; y2: number; stroke: string; width: number }[] = [];
   const recordedTexts: { text: string; x: number; y: number }[] = [];
@@ -1946,10 +1945,10 @@ test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin - 4, sta
 
   assert.ok(barlines.length >= 32, 'Must render at least 32 barlines for Goldberg Var 1');
 
-  // Verify bounded coordinates: x1 === staffMinX - 4 and x2 === staffMaxX + 4
+  // Verify bounded coordinates: x1 === staffMinX and x2 === staffMaxX (zero overhang)
   for (const bar of barlines) {
-    assert.equal(bar.x1, staffMinX - 4, `Barline x1 must strictly equal staffMinX - 4 (${staffMinX - 4})`);
-    assert.equal(bar.x2, staffMaxX + 4, `Barline x2 must strictly equal staffMaxX + 4 (${staffMaxX + 4})`);
+    assert.equal(bar.x1, staffMinX, `Barline x1 must strictly equal staffMinX (${staffMinX})`);
+    assert.equal(bar.x2, staffMaxX, `Barline x2 must strictly equal staffMaxX (${staffMaxX})`);
   }
 
   // Verify zero lines spill to margins 15 or width - 15
@@ -2002,8 +2001,8 @@ test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin - 4, sta
   );
   assert.ok(horizBarlines.length >= 32, 'Must render at least 32 barlines in horizontal orientation');
   for (const bar of horizBarlines) {
-    assert.equal(bar.y1, staffMinY - 4, 'Horizontal barline y1 must strictly equal staffMinY - 4');
-    assert.equal(bar.y2, staffMaxY + 4, 'Horizontal barline y2 must strictly equal staffMaxY + 4');
+    assert.equal(bar.y1, staffMinY, `Horizontal barline y1 must strictly equal staffMinY (${staffMinY})`);
+    assert.equal(bar.y2, staffMaxY, `Horizontal barline y2 must strictly equal staffMaxY (${staffMaxY})`);
   }
 });
 
@@ -2131,6 +2130,149 @@ test('No-Toggle Clean UI Invariant: UI excludes rhythmic toggles, showGutterBrac
   assert.equal(defaultLayout.options.showBeatGrid, true, 'Default showBeatGrid must be true');
   assert.equal(defaultLayout.options.showGutterBrackets, false, 'Default showGutterBrackets must be false');
   assert.equal(defaultLayout.options.octaveExtensionMode, 'spillover', 'Default octaveExtensionMode must be spillover');
+});
+
+test('Canvas Local Dashed Outlier Lines and Urtext Typography Invariants', () => {
+  const score = buildBachGoldbergVar1Score();
+  const recordedLines: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    stroke: string;
+    width: number;
+    dash: number[];
+  }[] = [];
+  const recordedTexts: { text: string; x: number; y: number; font: string }[] = [];
+
+  let currentStroke = '';
+  let currentWidth = 1;
+  let currentDash: number[] = [];
+  let currentFont = '';
+
+  const mockCtx = {
+    fillStyle: '',
+    set strokeStyle(val: string) {
+      currentStroke = val;
+    },
+    get strokeStyle() {
+      return currentStroke;
+    },
+    set lineWidth(val: number) {
+      currentWidth = val;
+    },
+    get lineWidth() {
+      return currentWidth;
+    },
+    set font(val: string) {
+      currentFont = val;
+    },
+    get font() {
+      return currentFont;
+    },
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      (mockCtx as any)._startX = x;
+      (mockCtx as any)._startY = y;
+    },
+    lineTo: (x: number, y: number) => {
+      recordedLines.push({
+        x1: (mockCtx as any)._startX,
+        y1: (mockCtx as any)._startY,
+        x2: x,
+        y2: y,
+        stroke: currentStroke,
+        width: currentWidth,
+        dash: [...currentDash],
+      });
+    },
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string, x: number, y: number) => {
+      recordedTexts.push({ text: String(text), x, y, font: currentFont });
+    },
+    setLineDash: (segments: number[]) => {
+      currentDash = [...segments];
+    },
+  } as unknown as CanvasRenderingContext2D;
+
+  const paddingPitch = 40;
+  const pixelsPerSemitone = 14;
+
+  const renderOpts = {
+    orientation: 'vertical' as const,
+    staffStyle: 'tritone-split' as const,
+    noteheadMorphology: 'rectangle-square' as const,
+    colorMode: 'duration-class' as const,
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone,
+    showHandCrossings: false,
+    showBarlines: true,
+    showGridLines: true,
+    showBeatGrid: false,
+    showBeamGrouping: false,
+    currentTick: 0,
+  };
+
+  const vertDims = calculateScoreDimensions(score, renderOpts);
+  assert.equal(vertDims.minPitch, 24, 'minPitch must be 24 (m1)');
+  assert.equal(vertDims.maxPitch, 72, 'maxPitch must be 72 (m5)');
+
+  renderScoreToCanvas(mockCtx, score, renderOpts);
+
+  // 1. Local Dashed Outlier Line Invariant:
+  // Landmark 5 at pitch 76 (E6): x = 40 + (76 - 24) * 14 = 768.
+  const pitch76X = paddingPitch + (76 - vertDims.minPitch) * pixelsPerSemitone;
+  const outlierLines76 = recordedLines.filter((l) => l.x1 === pitch76X && l.x2 === pitch76X);
+
+  // Must render for mm. 29 and 30 (2 segments), and zero for mm. 1-28
+  assert.equal(outlierLines76.length, 2, 'Must render exactly 2 segments for mm. 29 and 30 at pitch 76');
+
+  // Verify dashed pattern [5, 2.5]
+  for (const seg of outlierLines76) {
+    assert.deepEqual(seg.dash, [5, 2.5], 'Outlier Landmark 5 line must be dashed with [5, 2.5]');
+  }
+
+  // Ticks for mm. 29 and 30
+  // m29: tick 4032..4176, y: 60 + 4032*2 = 8124 to 60 + 4176*2 = 8412
+  // m30: tick 4176..4320, y: 60 + 4176*2 = 8412 to 60 + 4320*2 = 8700
+  assert.equal(outlierLines76[0].y1, 60 + 4032 * 2);
+  assert.equal(outlierLines76[0].y2, 60 + 4176 * 2);
+  assert.equal(outlierLines76[1].y1, 60 + 4176 * 2);
+  assert.equal(outlierLines76[1].y2, 60 + 4320 * 2);
+
+  // Verify mm. 1-28 have ZERO lines at pitch 76
+  const earlyLines76 = outlierLines76.filter((l) => l.y1 < 60 + 4032 * 2);
+  assert.equal(earlyLines76.length, 0, 'No outlier staff lines should be rendered before m. 29');
+
+  // 2. Urtext Typography Invariant:
+  // Octave markers (m1, m3, m5)
+  const m1Label = recordedTexts.find((t) => t.text === 'm1');
+  const m3Label = recordedTexts.find((t) => t.text === 'm3');
+  const m5Label = recordedTexts.find((t) => t.text === 'm5');
+  assert.ok(m1Label, 'm1 label must be rendered');
+  assert.ok(m3Label, 'm3 label must be rendered');
+  assert.ok(m5Label, 'm5 label must be rendered');
+  assert.equal(m1Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+  assert.equal(m3Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+  assert.equal(m5Label.font, 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+
+  // Measure numbers (e.g. 1, 5, 9, etc.)
+  const measureLabels = recordedTexts.filter((t) => /^\d+$/.test(t.text) && t.x === 14);
+  assert.ok(measureLabels.length > 0, 'Discrete measure numbers must be rendered');
+  for (const mLabel of measureLabels) {
+    assert.equal(mLabel.font, 'italic 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif');
+  }
 });
 
 

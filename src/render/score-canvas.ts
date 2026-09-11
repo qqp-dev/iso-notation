@@ -23,13 +23,19 @@ export function calculateScoreDimensions(
   score: QuantizedGridScore,
   options: RenderOptions
 ): ScoreDimensions {
-  let minPitch = 48; // Default 0:4
-  let maxPitch = 72; // Default 0:6
+  let minPitch = 24; // Default m1 (C2)
+  let maxPitch = 72; // Default m5 (C6)
 
   if (score.notes.length > 0) {
     const indices = score.notes.map(n => linearIndex(n.pitch));
-    minPitch = Math.min(...indices) - 2;
-    maxPitch = Math.max(...indices) + 2;
+    const minNote = Math.min(...indices);
+    const maxNote = Math.max(...indices);
+    if (minNote < minPitch) {
+      minPitch = Math.floor((minNote - 2) / 12) * 12;
+    }
+    if (maxNote > maxPitch + 4) {
+      maxPitch = Math.ceil((maxNote + 2) / 12) * 12;
+    }
   }
 
   // Ensure whole-tone boundary
@@ -338,7 +344,7 @@ export function renderScoreToCanvas(
       if (isOctave0) textColor = '#FFFFFF';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
+      ctx.font = isOctave0 ? 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       const isAfterC = pc >= 9;
@@ -383,7 +389,7 @@ export function renderScoreToCanvas(
         } else {
           const isCenterM3 = displayOct === 3;
           ctx.fillStyle = isCenterM3 ? '#F59E0B' : '#FFFFFF';
-          ctx.font = isCenterM3 ? 'bold 12px monospace' : 'bold 10px monospace';
+          ctx.font = 'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillText(`m${displayOct}`, x, paddingStart - 6);
@@ -400,6 +406,93 @@ export function renderScoreToCanvas(
   }
   ctx.setLineDash([]);
   ctx.restore();
+
+  // 2c. Local Dashed Outlier Staff Lines for notes extending past octave boundaries
+  const ticksPerBeat = score.ticksPerBeat || 48;
+  const numBeats = score.timeSignatures?.[0]?.numerator || 3;
+  const ticksPerMeasure = ticksPerBeat * numBeats;
+  const totalMeasures = score.barlines.length > 0
+    ? score.barlines.length
+    : Math.max(1, Math.ceil(score.totalTicks / ticksPerMeasure));
+
+  for (let i = 0; i < totalMeasures; i++) {
+    const mStartTick = score.barlines[i] ? score.barlines[i].tick : i * ticksPerMeasure;
+    const mEndTick = score.barlines[i + 1] ? score.barlines[i + 1].tick : (mStartTick + ticksPerMeasure);
+
+    const measureNotes = score.notes.filter(
+      n => n.startTick >= mStartTick && n.startTick < mEndTick
+    );
+
+    const outlierHigh = measureNotes.filter(n => linearIndex(n.pitch) > maxPitch);
+    if (outlierHigh.length > 0) {
+      const maxOutlierPitch = Math.max(...outlierHigh.map(n => linearIndex(n.pitch)));
+      for (let p = maxPitch + 1; ; p++) {
+        const geom = getStaffLineGeometry(p, normStaffStyle);
+        if (geom.isLine) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.strokeStyle = geom.color;
+          ctx.lineWidth = geom.lineWidth;
+          if (geom.isDashed && geom.dashArray) {
+            ctx.setLineDash(geom.dashArray);
+          } else {
+            ctx.setLineDash([]);
+          }
+          if (isHoriz) {
+            const y = height - paddingPitch - (p - minPitch) * options.pixelsPerSemitone;
+            const x1 = paddingStart + mStartTick * options.pixelsPerTick;
+            const x2 = paddingStart + mEndTick * options.pixelsPerTick;
+            ctx.moveTo(x1, y);
+            ctx.lineTo(x2, y);
+          } else {
+            const x = paddingPitch + (p - minPitch) * options.pixelsPerSemitone;
+            const y1 = paddingStart + mStartTick * options.pixelsPerTick;
+            const y2 = paddingStart + mEndTick * options.pixelsPerTick;
+            ctx.moveTo(x, y1);
+            ctx.lineTo(x, y2);
+          }
+          ctx.stroke();
+          ctx.restore();
+          if (p >= maxOutlierPitch) break;
+        }
+      }
+    }
+
+    const outlierLow = measureNotes.filter(n => linearIndex(n.pitch) < minPitch);
+    if (outlierLow.length > 0) {
+      const minOutlierPitch = Math.min(...outlierLow.map(n => linearIndex(n.pitch)));
+      for (let p = minPitch - 1; ; p--) {
+        const geom = getStaffLineGeometry(p, normStaffStyle);
+        if (geom.isLine) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.strokeStyle = geom.color;
+          ctx.lineWidth = geom.lineWidth;
+          if (geom.isDashed && geom.dashArray) {
+            ctx.setLineDash(geom.dashArray);
+          } else {
+            ctx.setLineDash([]);
+          }
+          if (isHoriz) {
+            const y = height - paddingPitch - (p - minPitch) * options.pixelsPerSemitone;
+            const x1 = paddingStart + mStartTick * options.pixelsPerTick;
+            const x2 = paddingStart + mEndTick * options.pixelsPerTick;
+            ctx.moveTo(x1, y);
+            ctx.lineTo(x2, y);
+          } else {
+            const x = paddingPitch + (p - minPitch) * options.pixelsPerSemitone;
+            const y1 = paddingStart + mStartTick * options.pixelsPerTick;
+            const y2 = paddingStart + mEndTick * options.pixelsPerTick;
+            ctx.moveTo(x, y1);
+            ctx.lineTo(x, y2);
+          }
+          ctx.stroke();
+          ctx.restore();
+          if (p <= minOutlierPitch) break;
+        }
+      }
+    }
+  }
 
   const staffMinX = paddingPitch;
   const staffMaxX = paddingPitch + (maxPitch - minPitch) * options.pixelsPerSemitone;
@@ -419,26 +512,26 @@ export function renderScoreToCanvas(
 
       if (isHoriz) {
         const x = paddingStart + bar.tick * options.pixelsPerTick;
-        ctx.moveTo(x, staffMinY - 4);
-        ctx.lineTo(x, staffMaxY + 4);
+        ctx.moveTo(x, staffMinY);
+        ctx.lineTo(x, staffMaxY);
         ctx.stroke();
 
         if (bar.barNumber === 1 || (bar.barNumber - 1) % 4 === 0) {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
-          ctx.font = 'bold 10px monospace';
+          ctx.font = 'italic 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'bottom';
           ctx.fillText(String(bar.barNumber), x + 4, staffMinY - 6);
         }
       } else {
         const y = paddingStart + bar.tick * options.pixelsPerTick;
-        ctx.moveTo(staffMinX - 4, y);
-        ctx.lineTo(staffMaxX + 4, y);
+        ctx.moveTo(staffMinX, y);
+        ctx.lineTo(staffMaxX, y);
         ctx.stroke();
 
         if (bar.barNumber === 1 || (bar.barNumber - 1) % 4 === 0) {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
-          ctx.font = 'bold 10px monospace';
+          ctx.font = 'italic 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'bottom';
           ctx.fillText(String(bar.barNumber), 14, y - 4);
@@ -451,9 +544,6 @@ export function renderScoreToCanvas(
   // 3b. Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc.)
   if (options.showBeatGrid) {
     ctx.save();
-    const ticksPerBeat = score.ticksPerBeat || 48;
-    const numBeats = score.timeSignatures?.[0]?.numerator || 3;
-    const ticksPerMeasure = ticksPerBeat * numBeats;
     const totalTicks = score.totalTicks;
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
@@ -472,14 +562,14 @@ export function renderScoreToCanvas(
         if (isHoriz) {
           const x = paddingStart + bTick * options.pixelsPerTick;
           ctx.beginPath();
-          ctx.moveTo(x, staffMinY - 4);
-          ctx.lineTo(x, staffMaxY + 4);
+          ctx.moveTo(x, staffMinY);
+          ctx.lineTo(x, staffMaxY);
           ctx.stroke();
         } else {
           const y = paddingStart + bTick * options.pixelsPerTick;
           ctx.beginPath();
-          ctx.moveTo(staffMinX - 4, y);
-          ctx.lineTo(staffMaxX + 4, y);
+          ctx.moveTo(staffMinX, y);
+          ctx.lineTo(staffMaxX, y);
           ctx.stroke();
         }
       }
@@ -864,12 +954,11 @@ export function renderScoreToCanvas(
       const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
       const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
 
-      const stemY = cy - noteHeight / 2;
       ctx.beginPath();
       ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
       ctx.lineWidth = 0.8;
-      ctx.moveTo(cx, stemY);
-      ctx.lineTo(stemEndX, stemY);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(stemEndX, cy);
       ctx.stroke();
 
       renderNotehead(
