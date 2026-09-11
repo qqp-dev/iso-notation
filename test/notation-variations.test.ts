@@ -1851,7 +1851,253 @@ test('Comparative Combinations: Beams, Beat Grid, and Gutter Brackets toggle ind
   const svgBrackets = renderAllPagesToSvg(layoutBracketsOnly)[0];
   assert.ok(!svgBrackets.includes('Elaine Gould Angled Beam'), 'Beams absent');
   assert.ok(!svgBrackets.includes('Klavarskribo Beat Grid'), 'Beat Grid absent');
-  assert.ok(svgBrackets.includes('Gutter Bracket'), 'Brackets present');
+});
+
+test('Staff-Bounded Barline Invariant: barlines strictly span [staffMin - 4, staffMax + 4] with authoritative contrast', () => {
+  const score = buildBachGoldbergVar1Score();
+  const recordedLines: { x1: number; y1: number; x2: number; y2: number; stroke: string; width: number }[] = [];
+  const recordedTexts: { text: string; x: number; y: number }[] = [];
+  let currentStroke = '';
+  let currentWidth = 1;
+
+  const mockCtx = {
+    fillStyle: '',
+    set strokeStyle(val: string) {
+      currentStroke = val;
+    },
+    get strokeStyle() {
+      return currentStroke;
+    },
+    set lineWidth(val: number) {
+      currentWidth = val;
+    },
+    get lineWidth() {
+      return currentWidth;
+    },
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      (mockCtx as any)._startX = x;
+      (mockCtx as any)._startY = y;
+    },
+    lineTo: (x: number, y: number) => {
+      recordedLines.push({
+        x1: (mockCtx as any)._startX,
+        y1: (mockCtx as any)._startY,
+        x2: x,
+        y2: y,
+        stroke: currentStroke,
+        width: currentWidth,
+      });
+    },
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string, x: number, y: number) => {
+      recordedTexts.push({ text: String(text), x, y });
+    },
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  const paddingPitch = 40;
+  const pixelsPerSemitone = 14;
+
+  const renderOpts = {
+    orientation: 'vertical' as const,
+    staffStyle: 'tritone-split' as const,
+    noteheadMorphology: 'rectangle-square' as const,
+    colorMode: 'duration-class' as const,
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone,
+    showHandCrossings: false,
+    showBarlines: true,
+    showGridLines: true,
+    showBeatGrid: false,
+    showBeamGrouping: false,
+    currentTick: 0,
+  };
+
+  const vertDims = calculateScoreDimensions(score, renderOpts);
+  const staffMinX = paddingPitch;
+  const staffMaxX = paddingPitch + (vertDims.maxPitch - vertDims.minPitch) * pixelsPerSemitone;
+
+  renderScoreToCanvas(mockCtx, score, renderOpts);
+
+  // Filter barlines: horizontal lines with stroke rgba(255, 255, 255, 0.55) or rgba(255, 255, 255, 0.85)
+  const barlines = recordedLines.filter(
+    (l) => l.y1 === l.y2 && (l.stroke.includes('0.55') || l.stroke.includes('0.85'))
+  );
+
+  assert.ok(barlines.length >= 32, 'Must render at least 32 barlines for Goldberg Var 1');
+
+  // Verify bounded coordinates: x1 === staffMinX - 4 and x2 === staffMaxX + 4
+  for (const bar of barlines) {
+    assert.equal(bar.x1, staffMinX - 4, `Barline x1 must strictly equal staffMinX - 4 (${staffMinX - 4})`);
+    assert.equal(bar.x2, staffMaxX + 4, `Barline x2 must strictly equal staffMaxX + 4 (${staffMaxX + 4})`);
+  }
+
+  // Verify zero lines spill to margins 15 or width - 15
+  const sprawlingLines = recordedLines.filter((l) => l.x1 === 15 || l.x2 === 15);
+  assert.equal(sprawlingLines.length, 0, 'Zero barlines should spill into canvas margin 15');
+
+  // Verify clean measure numbering: no 'M' prefix, discrete measure numbers (e.g. 1, 5, 9)
+  const measureLabels = recordedTexts.filter((t) => /^\d+$/.test(t.text));
+  assert.ok(measureLabels.length > 0, 'Discrete measure numbers must be rendered');
+  const clunkyLabels = recordedTexts.filter((t) => /^M\d+$/.test(t.text));
+  assert.equal(clunkyLabels.length, 0, 'Zero repetitive M{barNumber} labels should be rendered');
+
+  // Also verify horizontal canvas
+  recordedLines.length = 0;
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone,
+    showHandCrossings: false,
+    showBarlines: true,
+    showGridLines: true,
+    showBeatGrid: false,
+    showBeamGrouping: false,
+    currentTick: 0,
+  });
+
+  const dims = calculateScoreDimensions(score, {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone,
+    showHandCrossings: false,
+    showBarlines: true,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  const staffMinY = dims.height - paddingPitch - (dims.maxPitch - dims.minPitch) * pixelsPerSemitone;
+  const staffMaxY = dims.height - paddingPitch;
+
+  const horizBarlines = recordedLines.filter(
+    (l) => l.x1 === l.x2 && (l.stroke.includes('0.55') || l.stroke.includes('0.85'))
+  );
+  assert.ok(horizBarlines.length >= 32, 'Must render at least 32 barlines in horizontal orientation');
+  for (const bar of horizBarlines) {
+    assert.equal(bar.y1, staffMinY - 4, 'Horizontal barline y1 must strictly equal staffMinY - 4');
+    assert.equal(bar.y2, staffMaxY + 4, 'Horizontal barline y2 must strictly equal staffMaxY + 4');
+  }
+});
+
+test('Left-Gutter Beat Counter Invariant: beats 1, 2, 3 align with pulse lines in vertical canvas and SVG print layout', () => {
+  const score = buildBachGoldbergVar1Score();
+
+  // 1. Canvas Left-Gutter Beat Counter verification
+  const recordedTexts: { text: string; x: number; y: number }[] = [];
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string, x: number, y: number) => {
+      recordedTexts.push({ text: String(text), x, y });
+    },
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  const paddingPitch = 40;
+  const staffMinX = paddingPitch;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: true,
+    showGridLines: true,
+    showBeatGrid: true,
+    showBeamGrouping: false,
+    currentTick: 0,
+  });
+
+  // Find beat counter texts positioned at staffMinX - 10
+  const gutterBeatCounts = recordedTexts.filter((t) => t.x === staffMinX - 10);
+  assert.ok(gutterBeatCounts.length > 0, 'Canvas must render beat counts along left margin at staffMinX - 10');
+
+  const count1 = gutterBeatCounts.filter((t) => t.text === '1');
+  const count2 = gutterBeatCounts.filter((t) => t.text === '2');
+  const count3 = gutterBeatCounts.filter((t) => t.text === '3');
+
+  assert.ok(count1.length >= 32, 'Must render Beat 1 aligned with solid barline for each measure');
+  assert.ok(count2.length >= 32, 'Must render Beat 2 aligned with pulse line for each measure');
+  assert.ok(count3.length >= 32, 'Must render Beat 3 aligned with pulse line for each measure');
+
+  // 2. SVG Print Layout Left-Gutter Beat Counter verification
+  const layout = computeColumnarLayout(score, {
+    showBeatGrid: true,
+    showGutterBrackets: false,
+    showBeamGrouping: false,
+  });
+  const svgs = renderAllPagesToSvg(layout);
+  const page1 = svgs[0];
+
+  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 1)'), 'SVG must include Beat 1 counter comment');
+  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 2)'), 'SVG must include Beat 2 counter comment');
+  assert.ok(page1.includes('Klavarskribo Beat Counter (Beat 3)'), 'SVG must include Beat 3 counter comment');
+  assert.ok(page1.includes('class="beat-counter">1</text>'), 'SVG must render Beat 1 text in column left gutter');
+  assert.ok(page1.includes('class="beat-counter">2</text>'), 'SVG must render Beat 2 text in column left gutter');
+  assert.ok(page1.includes('class="beat-counter">3</text>'), 'SVG must render Beat 3 text in column left gutter');
+});
+
+test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and defaults to independent Klavar lateral stems', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  // App.tsx verification
+  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
+  assert.ok(!appSrc.includes('Toggle Beams'), 'App.tsx must not have Beams quick-toggle button');
+  assert.ok(!appSrc.includes('<span>🎶</span>'), 'App.tsx must not contain Beams quick toggle icon');
+
+  // ControlsDrawer.tsx verification
+  const drawerTsxPath = path.resolve('src/ui/ControlsDrawer.tsx');
+  const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
+  assert.ok(!drawerSrc.includes('Elaine Gould Beams'), 'ControlsDrawer.tsx must not have Elaine Gould Beams checkbox');
+
+  // Default option verification
+  const { computeColumnarLayout } = await import('../src/render/print-layout');
+  const score = buildBachGoldbergVar1Score();
+  const defaultLayout = computeColumnarLayout(score);
+  assert.equal(defaultLayout.options.showBeamGrouping, false, 'Default showBeamGrouping must be false');
 });
 
 

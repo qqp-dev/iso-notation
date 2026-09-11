@@ -397,6 +397,11 @@ export function renderScoreToCanvas(
   ctx.setLineDash([]);
   ctx.restore();
 
+  const staffMinX = paddingPitch;
+  const staffMaxX = paddingPitch + (maxPitch - minPitch) * options.pixelsPerSemitone;
+  const staffMinY = height - paddingPitch - (maxPitch - minPitch) * options.pixelsPerSemitone;
+  const staffMaxY = height - paddingPitch;
+
   // 3. Barlines & Measure Numbers
   if (options.showBarlines) {
     ctx.save();
@@ -404,32 +409,36 @@ export function renderScoreToCanvas(
       ctx.beginPath();
       ctx.strokeStyle =
         bar.type === 'double' || bar.type === 'final'
-          ? 'rgba(255, 255, 255, 0.7)'
-          : 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = bar.type === 'double' ? 2 : 1;
+          ? 'rgba(255, 255, 255, 0.85)'
+          : 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = bar.type === 'double' || bar.type === 'final' ? 2 : 1;
 
       if (isHoriz) {
         const x = paddingStart + bar.tick * options.pixelsPerTick;
-        ctx.moveTo(x, 15);
-        ctx.lineTo(x, height - 15);
+        ctx.moveTo(x, staffMinY - 4);
+        ctx.lineTo(x, staffMaxY + 4);
         ctx.stroke();
 
-        ctx.fillStyle = '#888888';
-        ctx.font = 'bold 10px monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(`M${bar.barNumber}`, x + 4, 18);
+        if (bar.barNumber === 1 || (bar.barNumber - 1) % 4 === 0) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(bar.barNumber), x + 4, staffMinY - 6);
+        }
       } else {
         const y = paddingStart + bar.tick * options.pixelsPerTick;
-        ctx.moveTo(15, y);
-        ctx.lineTo(width - 15, y);
+        ctx.moveTo(staffMinX - 4, y);
+        ctx.lineTo(staffMaxX + 4, y);
         ctx.stroke();
 
-        ctx.fillStyle = '#888888';
-        ctx.font = 'bold 10px monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(`M${bar.barNumber}`, 18, y - 4);
+        if (bar.barNumber === 1 || (bar.barNumber - 1) % 4 === 0) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(bar.barNumber), 14, y - 4);
+        }
       }
     }
     ctx.restore();
@@ -447,11 +456,6 @@ export function renderScoreToCanvas(
     ctx.lineWidth = 0.6;
     ctx.setLineDash([2, 3]);
 
-    const staffMinX = paddingPitch;
-    const staffMaxX = paddingPitch + (maxPitch - minPitch) * options.pixelsPerSemitone;
-    const staffMinY = height - paddingPitch - (maxPitch - minPitch) * options.pixelsPerSemitone;
-    const staffMaxY = height - paddingPitch;
-
     for (let i = 0; i < score.barlines.length; i++) {
       const bar = score.barlines[i];
       const nextBar = score.barlines[i + 1];
@@ -464,19 +468,46 @@ export function renderScoreToCanvas(
         if (isHoriz) {
           const x = paddingStart + bTick * options.pixelsPerTick;
           ctx.beginPath();
-          ctx.moveTo(x, staffMinY);
-          ctx.lineTo(x, staffMaxY);
+          ctx.moveTo(x, staffMinY - 4);
+          ctx.lineTo(x, staffMaxY + 4);
           ctx.stroke();
         } else {
           const y = paddingStart + bTick * options.pixelsPerTick;
           ctx.beginPath();
-          ctx.moveTo(staffMinX, y);
-          ctx.lineTo(staffMaxX, y);
+          ctx.moveTo(staffMinX - 4, y);
+          ctx.lineTo(staffMaxX + 4, y);
           ctx.stroke();
         }
       }
     }
     ctx.setLineDash([]);
+
+    // Left-Gutter Beat Counter Column (1 · 2 · 3) in vertical canvas
+    if (!isHoriz) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i < score.barlines.length; i++) {
+        const bar = score.barlines[i];
+        const nextBar = score.barlines[i + 1];
+        const barEndTick = nextBar ? nextBar.tick : bar.tick + ticksPerMeasure;
+        const barY = paddingStart + bar.tick * options.pixelsPerTick;
+
+        // Subtle beat count number 1 at Beat 1 (aligned with the solid barline)
+        ctx.fillText('1', staffMinX - 10, barY);
+
+        // Subtle beat count numbers 2, 3... aligned with the dotted pulse lines
+        for (let b = 1; b < numBeats; b++) {
+          const bTick = bar.tick + b * ticksPerBeat;
+          if (bTick >= barEndTick || bTick >= totalTicks) break;
+          const beatY = paddingStart + bTick * options.pixelsPerTick;
+          ctx.fillText(String(b + 1), staffMinX - 10, beatY);
+        }
+      }
+    }
+
     ctx.restore();
   }
 
@@ -636,7 +667,7 @@ export function renderScoreToCanvas(
 
   // Elaine Gould Angled Beam Engraving for Vertical Timeline
   const stemEndMap = new Map<string, number>();
-  if (!isHoriz && !isPianoRoll && options.showBeamGrouping !== false) {
+  if (!isHoriz && !isPianoRoll && options.showBeamGrouping === true) {
     const stemLength = Math.max(14, options.pixelsPerSemitone * 1.0);
     const MAX_SLANT = Math.max(16, options.pixelsPerSemitone * 1.5);
     const clusters = computeBeamClusters(score.notes, score.ticksPerBeat, tauRef, 7);
@@ -824,7 +855,7 @@ export function renderScoreToCanvas(
       // Right Hand (RH) -> horizontal stem pointing Right (->)
       // Left Hand (LH) -> horizontal stem pointing Left (<-)
       const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
-      const stemLength = Math.max(14, options.pixelsPerSemitone * 1.0);
+      const stemLength = Math.max(16, options.pixelsPerSemitone * 1.1);
       const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
       const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
 

@@ -448,16 +448,6 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             </label>
 
             <label className="flex items-center justify-between p-1.5 rounded hover:bg-neutral-900 cursor-pointer font-mono text-[11px]">
-              <span>🎶 Elaine Gould Beams</span>
-              <input
-                type="checkbox"
-                checked={options.showBeamGrouping !== false}
-                onChange={(e) => onOptionsChange({ showBeamGrouping: e.target.checked })}
-                className="accent-amber-500 w-4 h-4 rounded"
-              />
-            </label>
-
-            <label className="flex items-center justify-between p-1.5 rounded hover:bg-neutral-900 cursor-pointer font-mono text-[11px]">
               <span>📏 Option 1: Klavar Beat Grid</span>
               <input
                 type="checkbox"

@@ -41,7 +41,7 @@ export const App: React.FC = () => {
     showHandCrossings: true,
     showBarlines: true,
     showGridLines: true,
-    showBeamGrouping: true,
+    showBeamGrouping: false,
     showBeatGrid: true,
     showGutterBrackets: true,
     currentTick: 0,
@@ -317,25 +317,6 @@ export const App: React.FC = () => {
 
             {/* Quick Metric & Rhythmic Legibility Toggles */}
             <div className="flex items-center gap-1 bg-neutral-900/90 p-0.5 rounded-full border border-neutral-800 text-[11px]">
-              <button
-                onClick={() =>
-                  setRenderOptions((prev) => ({
-                    ...prev,
-                    showBeamGrouping: prev.showBeamGrouping === false,
-                  }))
-                }
-                className={`px-2 py-1 rounded-full cursor-pointer transition flex items-center gap-1 ${
-                  renderOptions.showBeamGrouping !== false
-                    ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 shadow-sm'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-                title="Toggle Elaine Gould Angled Beams"
-                aria-label="Toggle Beams"
-              >
-                <span>🎶</span>
-                <span className="hidden sm:inline">Beams</span>
-              </button>
-
               <button
                 onClick={() =>
                   setRenderOptions((prev) => ({

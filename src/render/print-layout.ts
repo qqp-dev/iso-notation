@@ -24,7 +24,7 @@ export interface PrintLayoutOptions {
   pixelsPerTick?: number; // optional scale overrides
   pixelsPerSemitone?: number;
   octaveExtensionMode?: 'badge' | 'spillover' | 'auto';
-  showBeamGrouping?: boolean; // default: true
+  showBeamGrouping?: boolean; // default: false
   showBeatGrid?: boolean; // default: false
   showGutterBrackets?: boolean; // default: false
 }
@@ -94,7 +94,7 @@ const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   pixelsPerTick: 0,
   pixelsPerSemitone: 0,
   octaveExtensionMode: 'badge',
-  showBeamGrouping: true,
+  showBeamGrouping: false,
   showBeatGrid: false,
   showGutterBrackets: false,
 };
@@ -334,6 +334,7 @@ export function renderPageToSvg(
       .subtitle { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-size: 8pt; fill: #444444; }
       .meta { font-family: "DejaVu Sans Mono", "Liberation Mono", system-ui, -apple-system, monospace; font-size: 7.5pt; fill: #666666; }
       .measure-num { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-weight: bold; font-size: 7pt; fill: #444444; text-anchor: end; }
+      .beat-counter { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; text-anchor: end; }
       .pitch-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6.5pt; fill: #555555; text-anchor: middle; }
       .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
   svgParts.push(`    </style>`);
@@ -444,17 +445,28 @@ export function renderPageToSvg(
       }
     }
 
-    // Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc.)
+    // Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc. and left gutter beat counter)
     if (layout.options.showBeatGrid) {
       const numBeats = score.timeSignatures?.[0]?.numerator || 3;
       for (let m = 0; m < numMeasuresInCol; m++) {
         const mStartTick = (col.startMeasure - 1 + m) * ticksPerMeasure;
+
+        // Beat 1 Left-Gutter Beat Counter (aligned with solid barline)
+        if (mStartTick >= col.startTick && mStartTick < col.endTick) {
+          const barY = staffOriginY + (mStartTick - col.startTick) * ptPerTick;
+          svgParts.push(`    <!-- Klavarskribo Beat Counter (Beat 1) -->`);
+          svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(barY + 2.5).toFixed(2)}" class="beat-counter">1</text>`);
+        }
+
+        // Beats 2, 3... pulse lines and beat counters
         for (let b = 1; b < numBeats; b++) {
           const bTick = mStartTick + b * ticksPerBeat;
           if (bTick >= col.startTick && bTick < col.endTick) {
             const beatY = staffOriginY + (bTick - col.startTick) * ptPerTick;
             svgParts.push(`    <!-- Klavarskribo Beat Grid (Beat ${b + 1}) -->`);
-            svgParts.push(`    <line x1="${(colStaffLeftPt - 2).toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${(rightStaffBound + 2).toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#888888" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
+            svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#888888" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
+            svgParts.push(`    <!-- Klavarskribo Beat Counter (Beat ${b + 1}) -->`);
+            svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(beatY + 2.5).toFixed(2)}" class="beat-counter">${b + 1}</text>`);
           }
         }
       }
@@ -603,7 +615,7 @@ export function renderPageToSvg(
     // Elaine Gould Angled Beam Engraving & Uniform Lateral Stems
     const stemEndMap = new Map<string, number>();
 
-    if (layout.options.showBeamGrouping !== false) {
+    if (layout.options.showBeamGrouping === true) {
       const clusters = computeBeamClusters(col.notes, ticksPerBeat, tauRef, 7);
       const MAX_SLANT_PT = 16.0;
 
