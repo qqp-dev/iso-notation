@@ -36,7 +36,7 @@ export const App: React.FC = () => {
     noteheadMorphology: 'row-parity-shape',
     notationStyle: 'wholetone-staff',
     noteheadStyle: 'numerical',
-    colorMode: 'wholetone-duality',
+    colorMode: 'monochrome',
     zoom: 1.0,
     pixelsPerTick: 0.35,
     pixelsPerSemitone: 14,

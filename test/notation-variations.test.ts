@@ -51,13 +51,16 @@ test('Staff Topography: tritone-split-3plus3 subitizable partitioning invariants
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
-    assert.ok(geom0.lineWidth >= 1.8);
+    assert.equal(geom0.lineWidth, 2.0);
+    assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
     const geom6 = getStaffLineGeometry(6, style);
     assert.equal(geom6.isLine, true);
     assert.equal(geom6.isDashed, true);
     assert.equal(geom6.isTritone, true);
-    assert.ok(Array.isArray(geom6.dashArray) && geom6.dashArray.length > 0);
+    assert.equal(geom6.lineWidth, 1.0);
+    assert.equal(geom6.color, 'rgba(255, 255, 255, 0.5)');
+    assert.deepEqual(geom6.dashArray, [5, 4]);
 
     // Hairlines
     [2, 4, 8, 10].forEach((pc) => {
@@ -65,7 +68,8 @@ test('Staff Topography: tritone-split-3plus3 subitizable partitioning invariants
       assert.equal(g.isLine, true, `PC ${pc} must be a hairline`);
       assert.equal(g.isBold, false);
       assert.equal(g.isDashed, false);
-      assert.ok(g.lineWidth <= 0.8);
+      assert.equal(g.lineWidth, 0.6);
+      assert.equal(g.color, 'rgba(255, 255, 255, 0.16)');
     });
 
     // Spaces
@@ -167,6 +171,11 @@ test('Curated Design Presets catalog completeness and integrity', () => {
   assert.ok(presetIds.includes('clean-minimalist-oval'));
   assert.ok(presetIds.includes('analytical-phonetic'));
 
+  const primaryPreset = DESIGN_PRESETS.find((p) => p.id === 'subitizable-3plus3-parity')!;
+  assert.equal(primaryPreset.staffStyle, 'tritone-split');
+  assert.equal(primaryPreset.noteheadMorphology, 'row-parity-shape');
+  assert.equal(primaryPreset.colorMode, 'monochrome');
+
   const names = DESIGN_PRESETS.map((p) => p.name);
   assert.ok(names.includes('Subitizable 3+3 + Parity Shapes'));
   assert.ok(names.includes('Clean Minimalist Oval'));
@@ -176,6 +185,145 @@ test('Curated Design Presets catalog completeness and integrity', () => {
     assert.ok(normalizeStaffStyle(p.staffStyle), `Preset ${p.id} has valid staffStyle`);
     assert.ok(normalizeNoteheadMorphology(p.noteheadMorphology), `Preset ${p.id} has valid noteheadMorphology`);
   });
+});
+
+test('Monochrome Staff Hierarchy: zero blue or pink tints across all staff styles', () => {
+  const allStyles: StaffStyle[] = [
+    'tritone-split',
+    'wholetone-uniform',
+    'augmented-3line',
+    'octave-ribbons',
+    'chromatic-grid',
+  ];
+  for (const style of allStyles) {
+    for (let pc = 0; pc < 12; pc++) {
+      const geom = getStaffLineGeometry(pc, style);
+      if (geom.isLine) {
+        assert.doesNotMatch(geom.color, /96,\s*165,\s*250/, `PC ${pc} in ${style} must not have blue tint`);
+        assert.doesNotMatch(geom.color, /244,\s*114,\s*182/, `PC ${pc} in ${style} must not have pink tint`);
+        assert.doesNotMatch(geom.color, /#60A5FA/i, `PC ${pc} in ${style} must not have blue tint`);
+        assert.doesNotMatch(geom.color, /#F472B6/i, `PC ${pc} in ${style} must not have pink tint`);
+      }
+    }
+  }
+});
+
+test('Monochrome margin labels: pure grayscale with zero blue or pink tints', () => {
+  const score = buildBachGoldbergVar1Score();
+  const recordedFills: { text: string; fillStyle: string }[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string) => {
+      recordedFills.push({ text, fillStyle: String(mockCtx.fillStyle) });
+    },
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'monochrome',
+    zoom: 1.0,
+    pixelsPerTick: 0.35,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  // Verify pitch coordinate labels (e.g. "0:4", "6:4", "2:4")
+  const marginLabels = recordedFills.filter((r) => /^\d+:\d+$/.test(r.text));
+  assert.ok(marginLabels.length > 0, 'Must have rendered margin labels');
+
+  marginLabels.forEach(({ text, fillStyle }) => {
+    const pc = parseInt(text.split(':')[0], 10);
+    assert.doesNotMatch(fillStyle, /#60A5FA/i, `Margin label ${text} must not be blue`);
+    assert.doesNotMatch(fillStyle, /#F472B6/i, `Margin label ${text} must not be pink`);
+    if (pc === 0) {
+      assert.equal(fillStyle, '#FFFFFF', `PC 0 margin label must be #FFFFFF`);
+    } else if (pc === 6) {
+      assert.equal(fillStyle, '#AAAAAA', `PC 6 margin label must be #AAAAAA`);
+    } else {
+      assert.equal(fillStyle, '#666666', `Other PC margin label must be #666666`);
+    }
+  });
+});
+
+test('Solid Row-Parity Shapes Invariant: white noteheads with knockout, yellow highlight on active/selected', () => {
+  const score = buildBachGoldbergVar1Score();
+  const fills: string[] = [];
+  const strokes: string[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {
+      strokes.push(String(mockCtx.strokeStyle));
+    },
+    fill: () => {
+      fills.push(String(mockCtx.fillStyle));
+    },
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  // Render at tick 0 where the first note is active
+  const firstNote = score.notes[0];
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'monochrome',
+    zoom: 1.0,
+    pixelsPerTick: 0.35,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: firstNote.startTick,
+  });
+
+  // Black knockout fills must be present
+  assert.ok(fills.includes('#000000'), 'Line knockout #000000 must be used');
+  // Solid white noteheads for inactive notes in monochrome
+  assert.ok(fills.includes('#FFFFFF'), 'Solid white #FFFFFF notehead fill must be present');
+  // Yellow highlight for actively sounding note
+  assert.ok(fills.includes('#FDE047'), 'Yellow highlight #FDE047 must be used for active note');
+  assert.ok(strokes.includes('#FACC15'), 'Yellow stroke #FACC15 must be used for active note');
 });
 
 test('Full canvas rendering matrix executes across all variations without error', () => {

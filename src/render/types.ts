@@ -71,7 +71,7 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
     description: '3+3 partitioned staff with dual-coded discs on lines and diamonds in spaces',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
-    colorMode: 'wholetone-duality',
+    colorMode: 'monochrome',
   },
   {
     id: 'clean-minimalist-oval',
@@ -171,7 +171,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
       isBold: isOctave,
       isOctaveBoundary: isOctave,
       lineWidth: isOctave ? 1.5 : 0.6,
-      color: isOctave ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.1)',
+      color: isOctave ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.1)',
     };
   }
 
@@ -185,7 +185,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isTritone: false,
         isOctaveBoundary: true,
         lineWidth: 1.8,
-        color: 'rgba(96, 165, 250, 0.85)',
+        color: 'rgba(255, 255, 255, 0.9)',
       };
     }
     if (pc === 4 || pc === 8) {
@@ -221,8 +221,8 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isDashed: false,
         isTritone: false,
         isOctaveBoundary: true,
-        lineWidth: 2.2,
-        color: 'rgba(96, 165, 250, 0.9)',
+        lineWidth: 2.0,
+        color: 'rgba(255, 255, 255, 0.9)',
       };
     }
     if (pc === 6) {
@@ -233,8 +233,8 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         dashArray: [5, 4],
         isTritone: true,
         isOctaveBoundary: false,
-        lineWidth: 1.2,
-        color: 'rgba(244, 114, 182, 0.8)',
+        lineWidth: 1.0,
+        color: 'rgba(255, 255, 255, 0.5)',
       };
     }
     if (pc === 2 || pc === 4 || pc === 8 || pc === 10) {
@@ -281,7 +281,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
     isTritone: false,
     isOctaveBoundary: isOctave,
     lineWidth: isOctave ? 1.5 : 0.8,
-    color: isOctave ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.18)',
+    color: isOctave ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.18)',
   };
 }
 

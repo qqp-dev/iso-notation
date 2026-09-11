@@ -160,10 +160,9 @@ export function renderScoreToCanvas(
 
       // Pitch Coordinate label on left margin: pure (pitchClass:octave), zero letters
       const isOctave0 = pc === 0;
-      let textColor = '#555555';
-      if (isOctave0) textColor = '#60A5FA';
-      else if (pc === 6 && normStaffStyle === 'tritone-split') textColor = '#F472B6';
-      else if (lineGeom.isLine) textColor = '#CCCCCC';
+      let textColor = '#666666';
+      if (isOctave0) textColor = '#FFFFFF';
+      else if (pc === 6) textColor = '#AAAAAA';
 
       ctx.fillStyle = textColor;
       ctx.font = isOctave0 || (pc === 6 && normStaffStyle === 'tritone-split') ? 'bold 11px monospace' : '10px monospace';
@@ -200,10 +199,9 @@ export function renderScoreToCanvas(
 
       // Pitch class label along top margin
       const isOctave0 = pc === 0;
-      let textColor = '#555555';
-      if (isOctave0) textColor = '#60A5FA';
-      else if (pc === 6 && normStaffStyle === 'tritone-split') textColor = '#F472B6';
-      else if (lineGeom.isLine) textColor = '#CCCCCC';
+      let textColor = '#666666';
+      if (isOctave0) textColor = '#FFFFFF';
+      else if (pc === 6) textColor = '#AAAAAA';
 
       ctx.fillStyle = textColor;
       ctx.font = isOctave0 || (pc === 6 && normStaffStyle === 'tritone-split') ? 'bold 10px monospace' : '9px monospace';
@@ -290,13 +288,14 @@ export function renderScoreToCanvas(
       options.currentTick >= note.startTick &&
       options.currentTick < note.startTick + note.durationTicks;
     const isSelected = options.selectedNoteId === note.id;
+    const isHighlighted = isActive || isSelected;
     const noteColor = getNoteColor(
       note.pitch,
       note.hand,
       options.colorMode,
-      isActive || isSelected
+      isHighlighted
     );
-    const strokeColor = isActive ? '#FACC15' : '#000000';
+    const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
 
     if (isHoriz) {
@@ -323,7 +322,7 @@ export function renderScoreToCanvas(
         cy,
         noteHeight,
         noteColor,
-        isActive,
+        isHighlighted,
         strokeColor,
         false
       );
@@ -362,7 +361,7 @@ export function renderScoreToCanvas(
         cy,
         noteWidth,
         noteColor,
-        isActive,
+        isHighlighted,
         strokeColor,
         true
       );
@@ -430,7 +429,7 @@ function renderNotehead(
   strokeColor: string,
   isVertical: boolean
 ): void {
-  const headColor = isActive ? '#FFFFFF' : fillColor;
+  const headColor = isActive ? '#FDE047' : fillColor;
 
   switch (morphology) {
     case 'classic-oval': {
