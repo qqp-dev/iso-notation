@@ -488,30 +488,34 @@ export function renderPageToSvg(
         // Optical Notehead Balance Invariant with Crisp Parity Contrast:
         // In vertical columnar notation, time runs vertically (Y-axis).
         // Row 0 (Lines, Even PC): Horizontal Ellipse / Oval
-        //   rx = 3.60 pt, ry = 2.20 pt (vertical height 4.40 pt)
+        //   rx = 5.20 pt (overlaps into adjacent spaces), ry = 3.00 pt (height 6.00 pt = 2.12mm)
         // Row 1 (Spaces, Odd PC): Crisp Rectangular Brick with Flat Top/Bottom
-        //   bw = 6.20 pt, bh = 4.00 pt (vertical height 4.00 pt, rx="1")
+        //   bw = 8.60 pt (fills the 8.53pt whole-tone slot line-to-line!), bh = 5.80 pt (height 5.80 pt = 2.05mm)
         //
-        // Maximum Parity Contrast:
-        //   Lines: continuous smooth curvature, zero straight edges
-        //   Spaces: flat horizontal edges parallel to staff lines, four 90° corners
+        // Midpoint Height (Taller noteheads):
+        //   Midpoint between initial 8pt circle and 4pt squished -> 6.0pt tall!
+        //   Leaves > 3.0mm of clean vertical breathing room between consecutive 16th notes!
+        //
+        // Zero Disruptive Shield:
+        //   Zero white halo knockout stroke around noteheads. Staff lines and bar lines
+        //   remain continuous and unbroken, without artificial white notches bitten out.
         //
         // Optical Area Balance:
-        //   Ellipse area: pi * 3.60 * 2.20 ≈ 24.88 pt^2
-        //   Brick area: 6.20 * 4.00 = 24.80 pt^2 (matched within 0.32%!)
-        const rx = 3.6;
-        const ry = 2.2;
-        const bw = 6.2;
-        const bh = 4.0;
+        //   Ellipse area: pi * 5.20 * 3.00 ≈ 49.01 pt^2
+        //   Brick area: 8.60 * 5.80 = 49.88 pt^2 (matched within 1.8%!)
+        const rx = 5.2;
+        const ry = 3.0;
+        const bw = 8.6;
+        const bh = 5.8;
 
         if (isEven) {
-          // Row 0 (Lines): Solid Squished Oval with White Halo Knockout
-          svgParts.push(`    <ellipse cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
+          // Row 0 (Lines): Solid Oval extending into adjacent spaces, cleanly sitting on staff line
+          svgParts.push(`    <ellipse cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${noteColor}"/>`);
         } else {
-          // Row 1 (Spaces): Solid Crisp Brick with White Halo Knockout
+          // Row 1 (Spaces): Solid Crisp Brick completely filling the whole-tone slot line-to-line
           const bx = nx - bw / 2;
           const by = ny - bh / 2;
-          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" rx="1" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" rx="1.2" fill="${noteColor}"/>`);
         }
       }
 

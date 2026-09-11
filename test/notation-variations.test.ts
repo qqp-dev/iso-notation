@@ -518,12 +518,12 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
   const baseSize = 14 - 3; // pixelsPerSemitone - 3 = 11
-  const pitchRadius = Math.max(4.5, baseSize * 0.45);
-  const timeRadius = Math.max(2.7, baseSize * 0.27);
+  const pitchRadius = Math.max(6.5, baseSize * 0.65);
+  const timeRadius = Math.max(4.2, baseSize * 0.42);
   const ovalArea = Math.PI * pitchRadius * timeRadius;
 
-  const pitchBrick = Math.max(7.8, baseSize * 0.78);
-  const timeBrick = Math.max(4.9, baseSize * 0.49);
+  const pitchBrick = Math.max(11.0, baseSize * 1.10);
+  const timeBrick = Math.max(7.8, baseSize * 0.78);
   const brickArea = pitchBrick * timeBrick;
   const areaRatio = ovalArea / brickArea;
 

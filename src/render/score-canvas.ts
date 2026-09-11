@@ -498,31 +498,31 @@ function renderNotehead(
       // Row 1 (Spaces, Odd PC): Crisp rectangular brick (four 90° corners, flat edges parallel to lines)
       //
       // In vertical mode (time is Y, pitch is X):
-      // - Oval: rx = Math.max(4.5, baseSize * 0.45), ry = Math.max(2.7, baseSize * 0.27)
-      // - Brick: width = Math.max(7.8, baseSize * 0.78), height = Math.max(4.9, baseSize * 0.49)
+      // - Oval: rx = Math.max(6.5, baseSize * 0.65), ry = Math.max(4.2, baseSize * 0.42)
+      // - Brick: width = Math.max(11.0, baseSize * 1.10), height = Math.max(7.8, baseSize * 0.78)
       //
       // In horizontal mode (time is X, pitch is Y):
-      // - Oval: rx = Math.max(2.7, baseSize * 0.27), ry = Math.max(4.5, baseSize * 0.45)
-      // - Brick: width = Math.max(4.9, baseSize * 0.49), height = Math.max(7.8, baseSize * 0.78)
+      // - Oval: rx = Math.max(4.2, baseSize * 0.42), ry = Math.max(6.5, baseSize * 0.65)
+      // - Brick: width = Math.max(7.8, baseSize * 0.78), height = Math.max(11.0, baseSize * 1.10)
       //
-      // Optical areas match within 0.13%:
-      //   Oval area: pi * 0.45 * 0.27 * baseSize^2 ≈ 0.3817 * baseSize^2
-      //   Brick area: 0.78 * 0.49 * baseSize^2 ≈ 0.3822 * baseSize^2
-      const pitchRadius = Math.max(4.5, baseSize * 0.45);
-      const timeRadius = Math.max(2.7, baseSize * 0.27);
+      // Optical areas match within 0.05%:
+      //   Oval area: pi * 0.65 * 0.42 * baseSize^2 ≈ 0.8576 * baseSize^2
+      //   Brick area: 1.10 * 0.78 * baseSize^2 ≈ 0.8580 * baseSize^2
+      const pitchRadius = Math.max(6.5, baseSize * 0.65);
+      const timeRadius = Math.max(4.2, baseSize * 0.42);
       const rx = isVertical ? pitchRadius : timeRadius;
       const ry = isVertical ? timeRadius : pitchRadius;
 
-      const pitchBrick = Math.max(7.8, baseSize * 0.78);
-      const timeBrick = Math.max(4.9, baseSize * 0.49);
+      const pitchBrick = Math.max(11.0, baseSize * 1.10);
+      const timeBrick = Math.max(7.8, baseSize * 0.78);
       const bw = isVertical ? pitchBrick : timeBrick;
       const bh = isVertical ? timeBrick : pitchBrick;
 
       if (parityShape === 'disc') {
-        // Row 0: Even pitch classes on lines -> Squished Oval / Disc
+        // Row 0: Even pitch classes on lines -> Oval sitting cleanly on staff line (zero external shield)
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.ellipse(cx, cy, rx + 2.5, ry + 2.0, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = headColor;
@@ -533,17 +533,12 @@ function renderNotehead(
         ctx.lineWidth = 1.2;
         ctx.stroke();
       } else {
-        // Row 1: Odd pitch classes in spaces -> Crisp Rectangular Brick
-        const kw = bw + 4.0;
-        const kh = bh + 3.0;
-
-        // Knockout box
+        // Row 1: Odd pitch classes in spaces -> Crisp Rectangular Brick filling the slot
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.roundRect(cx - kw / 2, cy - kh / 2, kw, kh, 2);
+        ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 1.2);
         ctx.fill();
 
-        // Brick notehead
         ctx.fillStyle = headColor;
         ctx.beginPath();
         ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 1.2);

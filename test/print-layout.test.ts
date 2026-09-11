@@ -159,11 +159,14 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // - Horizontal lateral stems for hand assignment with stroke-width 0.6pt
     assert.match(svg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must render Klavar lateral stems');
 
-    // 4. Solid row-parity noteheads with white halo knockout and duration colors
-    // - Discs on lines (Row 0): squished horizontal ellipse rx="3.60" ry="2.20" with stroke="#FFFFFF" and stroke-width="1.8"
-    assert.match(svg, /<ellipse[^>]*rx="3\.60"[^>]*ry="2\.20"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 0 squished ovals with 3.60pt/2.20pt radii and white halo knockout');
-    // - Bricks in spaces (Row 1): crisp rectangular brick with width="6.20" height="4.00" rx="1" stroke="#FFFFFF" and stroke-width="1.8"
-    assert.match(svg, /<rect[^>]*width="6\.20"[^>]*height="4\.00"[^>]*rx="1"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 1 crisp bricks with white halo knockout');
+    // 4. Solid row-parity noteheads with zero disruptive shield and duration colors
+    // - Ovals on lines (Row 0): horizontal ellipse rx="5.20" ry="3.00" sitting cleanly on line
+    assert.match(svg, /<ellipse[^>]*rx="5\.20"[^>]*ry="3\.00"/, 'Must render Row 0 ovals with 5.20pt/3.00pt radii');
+    // - Bricks in spaces (Row 1): crisp rectangular brick with width="8.60" height="5.80" rx="1.2" filling the slot
+    assert.match(svg, /<rect[^>]*width="8\.60"[^>]*height="5\.80"[^>]*rx="1\.2"/, 'Must render Row 1 crisp bricks filling whole slot');
+    // - Zero disruptive white halo shield
+    assert.doesNotMatch(svg, /<ellipse[^>]*stroke="#FFFFFF"/, 'Must not have disruptive white shield on ovals');
+    assert.doesNotMatch(svg, /<rect[^>]*stroke="#FFFFFF"/, 'Must not have disruptive white shield on bricks');
 
     // 5. Color Palette Invariant in Print Engine & Thin Hold Lines
     // - 16th notes (d <= 12t): unextended noteheads in dark slate/graphite (#1E293B)
@@ -192,18 +195,18 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
   const layout = computeColumnarLayout(score);
   const svg = renderPageToSvg(layout, 0);
 
-  // Optical Notehead Sizing Invariant (Time-Axis Compressed):
-  // Oval on lines: rx = 3.6, ry = 2.2
-  // Brick in spaces: width = 6.2, height = 4.0
-  assert.match(svg, /<ellipse[^>]*rx="3\.60"[^>]*ry="2\.20"/, 'Squished oval rx must be 3.60pt and ry must be 2.20pt');
+  // Optical Notehead Sizing Invariant (Midpoint Taller Noteheads):
+  // Oval on lines: rx = 5.2, ry = 3.0
+  // Brick in spaces: width = 8.6, height = 5.8
+  assert.match(svg, /<ellipse[^>]*rx="5\.20"[^>]*ry="3\.00"/, 'Squished oval rx must be 5.20pt and ry must be 3.00pt');
 
-  // Verify brick noteheads: width 6.20 and height 4.00
-  const brickMatches = Array.from(svg.matchAll(/<rect[^>]*width="6\.20"[^>]*height="4\.00"[^>]*rx="1"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/g));
+  // Verify brick noteheads: width 8.60 and height 5.80
+  const brickMatches = Array.from(svg.matchAll(/<rect[^>]*width="8\.60"[^>]*height="5\.80"[^>]*rx="1\.2"/g));
   assert.ok(brickMatches.length > 0, 'Must have rendered crisp brick noteheads in SVG');
 
   // Optical area balance invariant (< 5% difference)
-  const ellipseArea = Math.PI * 3.6 * 2.2;
-  const brickArea = 6.2 * 4.0;
+  const ellipseArea = Math.PI * 5.2 * 3.0;
+  const brickArea = 8.6 * 5.8;
   const areaRatio = ellipseArea / brickArea;
   assert.ok(
     Math.abs(areaRatio - 1.0) < 0.05,
