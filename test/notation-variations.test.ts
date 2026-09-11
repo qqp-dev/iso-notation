@@ -57,7 +57,7 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
-    assert.equal(geom0.lineWidth, 2.0);
+    assert.equal(geom0.lineWidth, 1.2);
     assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
     // 5/7 Demarcation Line at PC 4 (E)
@@ -145,9 +145,9 @@ test('Notehead Morphology: row-parity-shapes dual-coded geometry', () => {
       assert.equal(wholeToneParity(pc), 0);
     });
 
-    // Row 1 (Odd: 1, 3, 5, 7, 9, 11) must strictly map to diamond/lozenge
+    // Row 1 (Odd: 1, 3, 5, 7, 9, 11) must strictly map to brick
     [1, 3, 5, 7, 9, 11].forEach((pc) => {
-      assert.equal(getParityShape(pc), 'diamond', `PC ${pc} (Row 1) must be a diamond`);
+      assert.equal(getParityShape(pc), 'brick', `PC ${pc} (Row 1) must be a brick`);
       assert.equal(wholeToneParity(pc), 1);
     });
   }
@@ -516,26 +516,21 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   });
 });
 
-test('Optical Notehead Sizing & Area Balance Invariant: circles shrunk to optically match diamonds', () => {
-  // Optical mass balance invariant:
-  // Circles shrunk to match diamonds visually:
-  // Circle radius r = baseSize * 0.40, Diamond half-diagonal d = baseSize * 0.50
-  // Area(circle) = pi * r^2
-  // Area(diamond) = 2 * d^2
-  // Ratio Area(circle) / Area(diamond) within 5%
+test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
   const baseSize = 14 - 3; // pixelsPerSemitone - 3 = 11
-  const r = Math.max(4.0, baseSize * 0.40); // 4.4
-  const d = Math.max(5.0, baseSize * 0.50); // 5.5
+  const pitchRadius = Math.max(4.5, baseSize * 0.45);
+  const timeRadius = Math.max(2.7, baseSize * 0.27);
+  const ovalArea = Math.PI * pitchRadius * timeRadius;
 
-  const circleArea = Math.PI * r * r;
-  const diamondArea = 2 * d * d;
-  const areaRatio = circleArea / diamondArea;
+  const pitchBrick = Math.max(7.8, baseSize * 0.78);
+  const timeBrick = Math.max(4.9, baseSize * 0.49);
+  const brickArea = pitchBrick * timeBrick;
+  const areaRatio = ovalArea / brickArea;
 
   assert.ok(
     Math.abs(areaRatio - 1.0) < 0.05,
-    `Circle area (${circleArea.toFixed(2)}) and diamond area (${diamondArea.toFixed(2)}) must match within 5% (ratio: ${areaRatio.toFixed(3)})`
+    `Oval area (${ovalArea.toFixed(2)}) and brick area (${brickArea.toFixed(2)}) must match within 5% (ratio: ${areaRatio.toFixed(3)})`
   );
-  assert.ok(r < d, 'Circle radius r must be smaller than diamond diagonal half-extent d for equal optical mass');
 });
 
 test('Solid Row-Parity Shapes Invariant: white noteheads with knockout, yellow highlight on active/selected', () => {
@@ -1138,7 +1133,10 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
       arcCenters.push({ x, y });
     },
     roundRect: (x: number, y: number, w: number, h: number) => {
-      ribbons.push({ x, y, w, h });
+      // Hold tails are thin (1.5px), notehead shapes are wider (> 4px)
+      if (w <= 2.0 || h <= 2.0) {
+        ribbons.push({ x, y, w, h });
+      }
     },
     fillText: () => {},
     setLineDash: () => {},
@@ -1177,9 +1175,9 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
     `Ribbon count (${ribbons.length}) must equal sustained notes count (${sustainedNotes.length}), zero for 16th notes`
   );
 
-  // Each hold ribbon must have ribbon width = 5
+  // Each hold ribbon must have ribbon width = 1.5
   ribbons.forEach((r) => {
-    assert.equal(r.w, 5, 'Hold ribbon width in vertical orientation must be 5px');
+    assert.equal(r.w, 1.5, 'Hold ribbon width in vertical orientation must be 1.5px');
   });
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
@@ -1224,7 +1222,10 @@ test('Unified Euclidean Duration Lattice: Proportional Hold Ribbon Invariant (d 
       arc: noop,
       ellipse: noop,
       roundRect: (x: number, y: number, w: number, h: number) => {
-        ribbonList.push({ x, y, w, h });
+        // Hold tails are thin (1.5px), notehead shapes are wider (> 4px)
+        if (w <= 2.0 || h <= 2.0) {
+          ribbonList.push({ x, y, w, h });
+        }
       },
       fillText: noop,
       setLineDash: noop,
@@ -1274,15 +1275,15 @@ test('Unified Euclidean Duration Lattice: Proportional Hold Ribbon Invariant (d 
     const note = sustainedNotes[i];
     const expectedHeight = note.durationTicks * pixelsPerTick;
     assert.equal(r.h, expectedHeight, `Vertical ribbon height for note ${note.id} must be ${expectedHeight}`);
-    assert.equal(r.w, 5, 'Vertical ribbon width must be 5px');
+    assert.equal(r.w, 1.5, 'Vertical ribbon width must be 1.5px');
   });
 
-  // In horizontal orientation: width = durationTicks * pixelsPerTick, height = 5
+  // In horizontal orientation: width = durationTicks * pixelsPerTick, height = 1.5
   horizontalRibbons.forEach((r, i) => {
     const note = sustainedNotes[i];
     const expectedWidth = note.durationTicks * pixelsPerTick;
     assert.equal(r.w, expectedWidth, `Horizontal ribbon width for note ${note.id} must be ${expectedWidth}`);
-    assert.equal(r.h, 5, 'Horizontal ribbon height must be 5px');
+    assert.equal(r.h, 1.5, 'Horizontal ribbon height must be 1.5px');
   });
 
   // Proportionality check: dotted 8th note (36t) vs 8th note (24t)

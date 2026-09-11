@@ -393,8 +393,8 @@ export function renderPageToSvg(
 
       if (normStaffStyle === 'tritone-split') {
         if (pc === 0) {
-          // Bold octave boundary
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.5"/>`);
+          // Refined octave boundary (clean 1.0pt, distinct without excessive thickness)
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
         } else if (pc === 4) {
           // 5/7 Demarcation thin long Klavar-style line
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#333333" stroke-width="0.6" stroke-dasharray="12,4"/>`);
@@ -406,7 +406,7 @@ export function renderPageToSvg(
         // Fallback whole-tone uniform
         if (pc % 2 === 0) {
           const isOct = pc === 0;
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${isOct ? '1.5' : '0.6'}"/>`);
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${isOct ? '1.0' : '0.6'}"/>`);
         }
       }
     }
@@ -417,14 +417,13 @@ export function renderPageToSvg(
 
     for (let m = 0; m <= numMeasuresInCol; m++) {
       const barY = staffOriginY + m * ticksPerMeasure * ptPerTick;
-      const currentMNum = col.startMeasure + m;
 
       // Barline across staff
       svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${barY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
 
-      // Measure number label (only for measures starting inside column)
-      if (m < numMeasuresInCol) {
-        svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(barY + 9).toFixed(2)}" class="measure-num">M${currentMNum}</text>`);
+      // Measure number label: only for the first bar of each column, plain number (no 'M' prefix)
+      if (m === 0) {
+        svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(barY + 9).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
       }
     }
 
@@ -453,7 +452,7 @@ export function renderPageToSvg(
         const ribbonHeight = Math.max(2, Math.min(rawRibbonHeight, staffEndY - ny));
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
-        svgParts.push(`    <rect x="${(nx - holdRibbonWidth / 2).toFixed(2)}" y="${ny.toFixed(2)}" width="${holdRibbonWidth.toFixed(2)}" height="${ribbonHeight.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
+        svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${(ny + ribbonHeight).toFixed(2)}" stroke="${noteColor}" stroke-width="1.2" stroke-linecap="round"/>`);
       }
     }
 
@@ -486,34 +485,33 @@ export function renderPageToSvg(
         // Lowercase syllable text
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 2.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle">${syllable}</text>`);
       } else {
-        // Optical Notehead Balance Invariant with Time-Axis Squish:
+        // Optical Notehead Balance Invariant with Crisp Parity Contrast:
         // In vertical columnar notation, time runs vertically (Y-axis).
-        // Vertically squishing noteheads into horizontal ovals and wide lozenges
-        // adds substantial breathing room (air) between rapid 16th notes.
-        //
         // Row 0 (Lines, Even PC): Horizontal Ellipse / Oval
-        //   rx = 3.6 pt, ry = 2.2 pt (vertical height 4.4 pt vs old 6.4 pt)
-        // Row 1 (Spaces, Odd PC): Horizontal Diamond / Lozenge
-        //   dx = 4.5 pt, dy = 2.7 pt (vertical height 5.4 pt vs old 8.0 pt)
+        //   rx = 3.60 pt, ry = 2.20 pt (vertical height 4.40 pt)
+        // Row 1 (Spaces, Odd PC): Crisp Rectangular Brick with Flat Top/Bottom
+        //   bw = 6.20 pt, bh = 4.00 pt (vertical height 4.00 pt, rx="1")
+        //
+        // Maximum Parity Contrast:
+        //   Lines: continuous smooth curvature, zero straight edges
+        //   Spaces: flat horizontal edges parallel to staff lines, four 90° corners
         //
         // Optical Area Balance:
-        //   Ellipse area: pi * 3.6 * 2.2 ≈ 24.88 pt^2
-        //   Diamond area: 2 * 4.5 * 2.7 = 24.30 pt^2 (matched within 2.4%)
-        // Vertical compression ratio:
-        //   ry / rx = 2.2 / 3.6 ≈ 0.61
-        //   dy / dx = 2.7 / 4.5 = 0.60
+        //   Ellipse area: pi * 3.60 * 2.20 ≈ 24.88 pt^2
+        //   Brick area: 6.20 * 4.00 = 24.80 pt^2 (matched within 0.32%!)
         const rx = 3.6;
         const ry = 2.2;
-        const dx = 4.5;
-        const dy = 2.7;
+        const bw = 6.2;
+        const bh = 4.0;
 
         if (isEven) {
           // Row 0 (Lines): Solid Squished Oval with White Halo Knockout
           svgParts.push(`    <ellipse cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
         } else {
-          // Row 1 (Spaces): Solid Flattened Diamond Lozenge with White Halo Knockout
-          const pts = `${nx.toFixed(2)},${(ny - dy).toFixed(2)} ${(nx + dx).toFixed(2)},${ny.toFixed(2)} ${nx.toFixed(2)},${(ny + dy).toFixed(2)} ${(nx - dx).toFixed(2)},${ny.toFixed(2)}`;
-          svgParts.push(`    <polygon points="${pts}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
+          // Row 1 (Spaces): Solid Crisp Brick with White Halo Knockout
+          const bx = nx - bw / 2;
+          const by = ny - bh / 2;
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" rx="1" fill="${noteColor}" stroke="#FFFFFF" stroke-width="1.8"/>`);
         }
       }
 

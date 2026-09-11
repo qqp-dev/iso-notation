@@ -104,7 +104,7 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
   {
     id: 'subitizable-3plus3-parity',
     name: 'Subitizable 3+3 + Parity Shapes',
-    description: '3+3 partitioned staff with dual-coded discs on lines and diamonds in spaces',
+    description: '3+3 partitioned staff with dual-coded ovals on lines and crisp bricks in spaces',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'monochrome',
@@ -266,7 +266,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isDashed: false,
         isTritone: false,
         isOctaveBoundary: true,
-        lineWidth: 2.0,
+        lineWidth: 1.2,
         color: 'rgba(255, 255, 255, 0.9)',
       };
     }
@@ -331,9 +331,9 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   };
 }
 
-export function getParityShape(pitchClass: number): 'disc' | 'diamond' {
+export function getParityShape(pitchClass: number): 'disc' | 'brick' {
   const pc = ((pitchClass % 12) + 12) % 12;
-  return pc % 2 === 0 ? 'disc' : 'diamond';
+  return pc % 2 === 0 ? 'disc' : 'brick';
 }
 
 export { getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor, getPrintDurationColor } from './colors';

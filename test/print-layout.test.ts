@@ -146,8 +146,8 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
 
     // 2. 5/7 Staff Topography lines
-    // - Bold octave (PC 0, 1.5pt)
-    assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.5"/, 'Must contain bold 1.5pt octave line');
+    // - Refined octave line (PC 0, 1.0pt)
+    assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.0"/, 'Must contain refined 1.0pt octave line');
     // - Thin long 5/7 demarcation line at PC 4 (0.6pt, dasharray 12,4)
     assert.match(svg, /stroke="#333333"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="12,4"/, 'Must contain thin 0.6pt 5/7 demarcation line');
     // - Hairlines (PC 2, 6, 8, 10, 0.5pt)
@@ -162,19 +162,23 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // 4. Solid row-parity noteheads with white halo knockout and duration colors
     // - Discs on lines (Row 0): squished horizontal ellipse rx="3.60" ry="2.20" with stroke="#FFFFFF" and stroke-width="1.8"
     assert.match(svg, /<ellipse[^>]*rx="3\.60"[^>]*ry="2\.20"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 0 squished ovals with 3.60pt/2.20pt radii and white halo knockout');
-    // - Diamonds in spaces (Row 1): flattened lozenge polygon with stroke="#FFFFFF" and stroke-width="1.8"
-    assert.match(svg, /<polygon[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 1 flattened lozenges with white halo knockout');
+    // - Bricks in spaces (Row 1): crisp rectangular brick with width="6.20" height="4.00" rx="1" stroke="#FFFFFF" and stroke-width="1.8"
+    assert.match(svg, /<rect[^>]*width="6\.20"[^>]*height="4\.00"[^>]*rx="1"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/, 'Must render Row 1 crisp bricks with white halo knockout');
 
-    // 5. Color Palette Invariant in Print Engine & Hold Ribbons
+    // 5. Color Palette Invariant in Print Engine & Thin Hold Lines
     // - 16th notes (d <= 12t): unextended noteheads in dark slate/graphite (#1E293B)
     assert.match(svg, /fill="#1E293B"/, 'Must render 16th notes in dark slate/graphite (#1E293B)');
-    // - 8th notes (d = 24t): Royal Blue (#1D4ED8) with hold ribbon
-    assert.match(svg, /<rect[^>]*width="4\.00"[^>]*fill="#1D4ED8"/, 'Must render 8th note hold ribbons in Royal Blue (#1D4ED8)');
+    // - 8th notes (d = 24t): Royal Blue (#1D4ED8) with thin hold line
+    assert.match(svg, /<line[^>]*stroke="#1D4ED8"[^>]*stroke-width="1\.2"/, 'Must render 8th note thin hold lines in Royal Blue (#1D4ED8)');
+
+    // 6. Measure numbers: plain number on first bar of column, zero 'M' prefixes
+    assert.match(svg, /class="measure-num">\d+<\/text>/, 'Must render measure number on first bar of column');
+    assert.doesNotMatch(svg, /class="measure-num">M/, 'Must not prefix measure numbers with M');
   }
 
-  // Across the full document, verify quarter note hold ribbons in Amber/Gold (#D97706)
+  // Across the full document, verify quarter note thin hold lines in Amber/Gold (#D97706)
   const fullScoreSvg = svgs.join('\n');
-  assert.match(fullScoreSvg, /<rect[^>]*width="4\.00"[^>]*fill="#D97706"/, 'Must render quarter note hold ribbons in Amber/Gold (#D97706)');
+  assert.match(fullScoreSvg, /<line[^>]*stroke="#D97706"[^>]*stroke-width="1\.2"/, 'Must render quarter note thin hold lines in Amber/Gold (#D97706)');
 
   // Verify renderColumnarScoreToSvg helper
   const page0Svg = renderColumnarScoreToSvg(score, 0);
@@ -189,31 +193,21 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
   const svg = renderPageToSvg(layout, 0);
 
   // Optical Notehead Sizing Invariant (Time-Axis Compressed):
-  // Oval: rx = 3.6, ry = 2.2
-  // Diamond: dx = 4.5, dy = 2.7
+  // Oval on lines: rx = 3.6, ry = 2.2
+  // Brick in spaces: width = 6.2, height = 4.0
   assert.match(svg, /<ellipse[^>]*rx="3\.60"[^>]*ry="2\.20"/, 'Squished oval rx must be 3.60pt and ry must be 2.20pt');
 
-  // Verify diamond coordinates: top ny - 2.7 and bottom ny + 2.7
-  const diamondMatches = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g));
-  assert.ok(diamondMatches.length > 0, 'Must have rendered diamond noteheads in SVG');
-
-  for (const match of diamondMatches) {
-    const pts = match[1].split(' ').map((p) => p.split(',').map(Number));
-    assert.equal(pts.length, 4, 'Diamond must have 4 points');
-    const [top, right, bottom, left] = pts;
-    const verticalHeight = Math.round((bottom[1] - top[1]) * 100) / 100;
-    assert.equal(verticalHeight, 5.4, 'Diamond total vertical height must equal 2 * dy = 5.4pt (dy = 2.7)');
-    const horizontalWidth = Math.round((right[0] - left[0]) * 100) / 100;
-    assert.equal(horizontalWidth, 9.0, 'Diamond total horizontal width must equal 2 * dx = 9.0pt (dx = 4.5)');
-  }
+  // Verify brick noteheads: width 6.20 and height 4.00
+  const brickMatches = Array.from(svg.matchAll(/<rect[^>]*width="6\.20"[^>]*height="4\.00"[^>]*rx="1"[^>]*stroke="#FFFFFF"[^>]*stroke-width="1\.8"/g));
+  assert.ok(brickMatches.length > 0, 'Must have rendered crisp brick noteheads in SVG');
 
   // Optical area balance invariant (< 5% difference)
   const ellipseArea = Math.PI * 3.6 * 2.2;
-  const diamondArea = 2 * 4.5 * 2.7;
-  const areaRatio = ellipseArea / diamondArea;
+  const brickArea = 6.2 * 4.0;
+  const areaRatio = ellipseArea / brickArea;
   assert.ok(
     Math.abs(areaRatio - 1.0) < 0.05,
-    `Ellipse area (${ellipseArea.toFixed(2)}) and diamond area (${diamondArea.toFixed(2)}) must match within 5%`
+    `Ellipse area (${ellipseArea.toFixed(2)}) and brick area (${brickArea.toFixed(2)}) must match within 5%`
   );
 
   // Klavar Lateral Stems Invariant:

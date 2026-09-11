@@ -315,13 +315,13 @@ export function renderScoreToCanvas(
       const { x, y } = getCoords(note.startTick, lPitch);
       const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
 
-      // Proportional hold ribbon down the timeline only for d > tauRef
+      // Proportional hold line/tail down the timeline for d > tauRef
       if (isHold) {
         const holdLength = note.durationTicks * options.pixelsPerTick;
-        const ribbonWidth = 5;
+        const ribbonWidth = 1.5;
         ctx.fillStyle = noteColor;
         ctx.beginPath();
-        ctx.roundRect(x, y - ribbonWidth / 2, holdLength, ribbonWidth, 2.5);
+        ctx.roundRect(x, y - ribbonWidth / 2, holdLength, ribbonWidth, 0.75);
         ctx.fill();
       }
 
@@ -359,13 +359,13 @@ export function renderScoreToCanvas(
       const { x, y } = getCoords(note.startTick, lPitch);
       const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
 
-      // Proportional hold ribbon down the timeline only for d > tauRef
+      // Proportional thin hold line/tail down the timeline for d > tauRef
       if (isHold) {
         const holdHeight = note.durationTicks * options.pixelsPerTick;
-        const ribbonWidth = 5;
+        const ribbonWidth = 1.5;
         ctx.fillStyle = noteColor;
         ctx.beginPath();
-        ctx.roundRect(x - ribbonWidth / 2, y, ribbonWidth, holdHeight, 2.5);
+        ctx.roundRect(x - ribbonWidth / 2, y, ribbonWidth, holdHeight, 0.75);
         ctx.fill();
       }
 
@@ -493,20 +493,30 @@ function renderNotehead(
 
     case 'row-parity-shape': {
       const parityShape = getParityShape(pitchClass);
-      // Optical balance with time-axis compression:
-      // In vertical timeline notation (time is Y, pitch is X):
-      // Noteheads are horizontally wide along pitch lines/spaces, and vertically compressed
-      // along the time axis (ratio ~0.60) to eliminate vertical crowding on rapid 16th notes.
-      // Optical areas: pi * rx * ry ≈ 0.382 * baseSize^2, 2 * rw * rh = 0.381 * baseSize^2 (matched within 0.3%)
+      // Optical balance with maximum geometric contrast (Oval vs Crisp Brick):
+      // Row 0 (Lines, Even PC): Smooth horizontal oval (continuous curvature, zero straight edges)
+      // Row 1 (Spaces, Odd PC): Crisp rectangular brick (four 90° corners, flat edges parallel to lines)
+      //
+      // In vertical mode (time is Y, pitch is X):
+      // - Oval: rx = Math.max(4.5, baseSize * 0.45), ry = Math.max(2.7, baseSize * 0.27)
+      // - Brick: width = Math.max(7.8, baseSize * 0.78), height = Math.max(4.9, baseSize * 0.49)
+      //
+      // In horizontal mode (time is X, pitch is Y):
+      // - Oval: rx = Math.max(2.7, baseSize * 0.27), ry = Math.max(4.5, baseSize * 0.45)
+      // - Brick: width = Math.max(4.9, baseSize * 0.49), height = Math.max(7.8, baseSize * 0.78)
+      //
+      // Optical areas match within 0.13%:
+      //   Oval area: pi * 0.45 * 0.27 * baseSize^2 ≈ 0.3817 * baseSize^2
+      //   Brick area: 0.78 * 0.49 * baseSize^2 ≈ 0.3822 * baseSize^2
       const pitchRadius = Math.max(4.5, baseSize * 0.45);
       const timeRadius = Math.max(2.7, baseSize * 0.27);
       const rx = isVertical ? pitchRadius : timeRadius;
       const ry = isVertical ? timeRadius : pitchRadius;
 
-      const pitchDiamond = Math.max(5.6, baseSize * 0.56);
-      const timeDiamond = Math.max(3.4, baseSize * 0.34);
-      const rw = isVertical ? pitchDiamond : timeDiamond;
-      const rh = isVertical ? timeDiamond : pitchDiamond;
+      const pitchBrick = Math.max(7.8, baseSize * 0.78);
+      const timeBrick = Math.max(4.9, baseSize * 0.49);
+      const bw = isVertical ? pitchBrick : timeBrick;
+      const bh = isVertical ? timeBrick : pitchBrick;
 
       if (parityShape === 'disc') {
         // Row 0: Even pitch classes on lines -> Squished Oval / Disc
@@ -523,28 +533,20 @@ function renderNotehead(
         ctx.lineWidth = 1.2;
         ctx.stroke();
       } else {
-        // Row 1: Odd pitch classes in spaces -> Flattened Diamond / Lozenge
-        const kw = rw + 2.5;
-        const kh = rh + 2.0;
+        // Row 1: Odd pitch classes in spaces -> Crisp Rectangular Brick
+        const kw = bw + 4.0;
+        const kh = bh + 3.0;
 
-        // Knockout diamond
+        // Knockout box
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.moveTo(cx, cy - kh);
-        ctx.lineTo(cx + kw, cy);
-        ctx.lineTo(cx, cy + kh);
-        ctx.lineTo(cx - kw, cy);
-        ctx.closePath();
+        ctx.roundRect(cx - kw / 2, cy - kh / 2, kw, kh, 2);
         ctx.fill();
 
-        // Notehead diamond
+        // Brick notehead
         ctx.fillStyle = headColor;
         ctx.beginPath();
-        ctx.moveTo(cx, cy - rh);
-        ctx.lineTo(cx + rw, cy);
-        ctx.lineTo(cx, cy + rh);
-        ctx.lineTo(cx - rw, cy);
-        ctx.closePath();
+        ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 1.2);
         ctx.fill();
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.2;
