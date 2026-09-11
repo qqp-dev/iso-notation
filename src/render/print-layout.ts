@@ -384,13 +384,11 @@ export function renderPageToSvg(
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
 
-    // Staff Lines (Approach 1: Weight Hierarchy with m3 Central Spine)
-    // - m3 (Center Axis, Middle C): authoritative bold central spine (1.25pt, #000000)
-    // - m1 & m5 (Staff Borders): clean outer bounding frame (0.85pt, #000000)
-    // - m2 & m4 (Interior Sub-Octaves): demoted secondary guides (0.55pt, #444444)
-    // - Landmark 5 (PC 4): small dashes (0.55pt, #555555, [5, 2.5])
-    // - Landmark 9 (PC 8): thin straight solid line (0.55pt, #666666)
-    // Total stroke ink decreases by 19% (net-negative visual noise) while establishing an unambiguous center axis.
+    // Staff Lines (1-5-9 Symmetric 3-Line Topography with m3 Center Spine)
+    // - m3 (Center Axis, Middle C): authoritative bold central spine (1.35pt, #000000)
+    // - m1, m2, m4, m5 (Octave Boundaries): same uniform thickness (1.0pt, #000000), visibly thicker than line 9
+    // - Landmark 5 (PC 4): small dashes (0.6pt, #444444, [5, 2.5])
+    // - Landmark 9 (PC 8): thin straight solid line (0.6pt, #555555)
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
@@ -400,14 +398,11 @@ export function renderPageToSvg(
       if (normStaffStyle === 'tritone-split') {
         if (pc === 0) {
           if (displayOct === 3) {
-            // m3: authoritative central spine (1.25pt)
-            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.25"/>`);
-          } else if (displayOct === 1 || displayOct === 5) {
-            // m1 & m5: clean boundary frame (0.85pt)
-            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="0.85"/>`);
+            // m3: authoritative central spine (1.35pt)
+            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.35"/>`);
           } else {
-            // m2 & m4: demoted secondary guides (0.55pt, deep charcoal)
-            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#444444" stroke-width="0.55"/>`);
+            // m1, m2, m4, m5: uniform octave line (1.0pt), visibly thicker than line 9 (0.6pt)
+            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
           }
         } else if (pc === 4) {
           // Landmark 5 small dashes
@@ -421,7 +416,7 @@ export function renderPageToSvg(
         if (pc % 2 === 0) {
           const isOct = pc === 0;
           const isCenter = isOct && displayOct === 3;
-          const strokeW = isCenter ? '1.25' : isOct ? '0.85' : '0.55';
+          const strokeW = isCenter ? '1.35' : isOct ? '1.0' : '0.6';
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${strokeW}"/>`);
         }
       }

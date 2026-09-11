@@ -364,8 +364,10 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   });
 
   // 1. Staff Lines: 1, 5, 9 (Symmetric 3-Line Staff with m3 Spine Hierarchy)
-  // PC 0 (m3): authoritative bold 1.25pt solid line
-  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.25"/, 'Must contain bold 1.25pt central spine line (m3)');
+  // PC 0 (m3): authoritative bold 1.35pt solid line
+  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.35"/, 'Must contain bold 1.35pt central spine line (m3)');
+  // PC 0 (m1, m2, m4, m5): uniform 1.0pt octave lines, visibly thicker than line 9
+  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.0"/, 'Must contain uniform 1.0pt octave lines for m1, m2, m4, m5');
   // PC 4: small dashes 5,2.5
   assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain small dashed line for 5');
   // PC 8: thin straight solid line
