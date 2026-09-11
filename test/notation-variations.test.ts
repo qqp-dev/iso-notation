@@ -357,7 +357,7 @@ test('Monochrome margin labels: pure grayscale with zero blue or pink tints', ()
   });
 });
 
-test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', () => {
+test('Lowercase \'b\' Octave Marker Invariant: score canvas margin indicators', () => {
   const score = buildBachGoldbergVar1Score();
 
   const createMockCtx = () => {
@@ -410,12 +410,14 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
   });
 
   const horizTexts = horizFills.map((f) => f.text);
-  const horizMOctaves = horizTexts.filter((t) => /^m\d+$/.test(t));
-  assert.ok(horizMOctaves.length > 0, 'Must render m${oct - 1} octave markers in horizontal orientation');
-  assert.ok(horizMOctaves.includes('m2'), 'Should include m2 (C3)');
-  assert.ok(horizMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
+  const horizBOctaves = horizTexts.filter((t) => /^b\d+$/.test(t));
+  assert.ok(horizBOctaves.length > 0, 'Must render b${aOct} octave markers in horizontal orientation');
+  assert.ok(horizBOctaves.includes('b2'), 'Should include b2 (A2)');
+  assert.ok(horizBOctaves.includes('b3'), 'Should include b3 (A3)');
+  assert.ok(horizBOctaves.includes('b4'), 'Should include b4 (Concert A4)');
   assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
-  assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
+  assert.ok(!horizTexts.some((t) => /^m\d+$/.test(t)), 'Must not render m${oct} labels');
+  assert.ok(!horizTexts.some((t) => /^9:\d+$/.test(t)), 'Must not render 9:${oct} labels');
 
   // 2. Vertical orientation
   const { ctx: vertCtx, fills: vertFills } = createMockCtx();
@@ -434,12 +436,14 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
   });
 
   const vertTexts = vertFills.map((f) => f.text);
-  const vertMOctaves = vertTexts.filter((t) => /^m\d+$/.test(t));
-  assert.ok(vertMOctaves.length > 0, 'Must render m${oct - 1} octave markers in vertical orientation');
-  assert.ok(vertMOctaves.includes('m2'), 'Should include m2 (C3)');
-  assert.ok(vertMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
-  assert.ok(!vertTexts.includes('0'), 'Must not render bare 0 at octave boundary in vertical orientation');
+  const vertBOctaves = vertTexts.filter((t) => /^b\d+$/.test(t));
+  assert.ok(vertBOctaves.length > 0, 'Must render b${aOct} octave markers in vertical orientation');
+  assert.ok(vertBOctaves.includes('b2'), 'Should include b2 (A2)');
+  assert.ok(vertBOctaves.includes('b3'), 'Should include b3 (A3)');
+  assert.ok(vertBOctaves.includes('b4'), 'Should include b4 (Concert A4)');
+  assert.ok(!vertTexts.includes('9'), 'Must not render bare 9 at A octave boundary in vertical orientation');
   assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
+  assert.ok(!vertTexts.some((t) => /^m\d+$/.test(t)), 'Must not render m${oct} labels');
 });
 
 test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and Left for LH', () => {

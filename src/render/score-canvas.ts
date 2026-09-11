@@ -158,17 +158,17 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with m${oct - 1} at octave boundaries (0-indexed piano octaves)
-      const isOctave0 = pc === 0;
+      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with b${aOct} at A octave boundaries (0-indexed starting at A0)
+      const aOct = Math.max(0, Math.floor((p - 9) / 12));
+      const isOctaveA = pc === 9;
       let textColor = '#666666';
-      if (isOctave0) textColor = '#FFFFFF';
+      if (isOctaveA) textColor = '#FFFFFF';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
+      ctx.font = isOctaveA ? 'bold 11px monospace' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      const displayOct = Math.max(0, oct - 1);
-      const label = isOctave0 ? `m${displayOct}` : `${pc}:${displayOct}`;
+      const label = isOctaveA ? `b${aOct}` : `${pc}:${aOct}`;
       ctx.fillText(label, paddingStart - 8, y);
     } else {
       // Vertical timeline
@@ -198,17 +198,17 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch class label along top margin: m${oct - 1} at octave boundaries (0-indexed piano octaves), pitch class number elsewhere
-      const isOctave0 = pc === 0;
+      // Pitch class label along top margin: b${aOct} at A octave boundaries (0-indexed starting at A0), pitch class number elsewhere
+      const aOct = Math.max(0, Math.floor((p - 9) / 12));
+      const isOctaveA = pc === 9;
       let textColor = '#666666';
-      if (isOctave0) textColor = '#FFFFFF';
+      if (isOctaveA) textColor = '#FFFFFF';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctave0 ? 'bold 10px monospace' : '9px monospace';
+      ctx.font = isOctaveA ? 'bold 10px monospace' : '9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      const displayOct = Math.max(0, oct - 1);
-      const label = isOctave0 ? `m${displayOct}` : String(pc);
+      const label = isOctaveA ? `b${aOct}` : String(pc);
       ctx.fillText(label, x, paddingStart - 6);
     }
   }

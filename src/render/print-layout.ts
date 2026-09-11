@@ -349,14 +349,13 @@ export function renderPageToSvg(
     // Subtle column frame separator
     svgParts.push(`    <line x1="${colLeftPt.toFixed(2)}" y1="${colTopPt.toFixed(2)}" x2="${colLeftPt.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt + colStaffHeightPt).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.5"/>`);
 
-    // Pitch Header Labels at column top
+    // Pitch Header Labels at column top (anchored on A: b0..b7)
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
-      const oct = Math.floor(p / 12);
+      const aOct = Math.max(0, Math.floor((p - 9) / 12));
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
-      if (pc === 0) {
-        const displayOct = Math.max(0, oct - 1);
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
+      if (pc === 9) {
+        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">b${aOct}</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
       } else if (pc === 4 && normStaffStyle === 'tritone-split') {
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5|7</text>`);
