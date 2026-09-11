@@ -8,6 +8,8 @@ export const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Se
 
 export const A4_WIDTH_PT = 595.28; // 210mm in PostScript points (72 pt/inch)
 export const A4_HEIGHT_PT = 841.89; // 297mm in PostScript points
+export const LETTER_WIDTH_PT = 612.0; // 8.5 in * 72 pt/in (US Letter)
+export const LETTER_HEIGHT_PT = 792.0; // 11.0 in * 72 pt/in (US Letter)
 export const MM_TO_PT = 72 / 25.4; // 2.834645669...
 export const PT_TO_MM = 25.4 / 72;
 
@@ -79,7 +81,7 @@ export function getBakedPath(
 
 
 export interface PrintLayoutOptions {
-  paperSize?: 'A4' | 'A3';
+  paperSize?: 'A4' | 'A3' | 'letter';
   orientation?: 'portrait' | 'landscape';
   measuresPerColumn?: number; // default: 8
   columnsPerPage?: number; // default: 2
@@ -211,9 +213,10 @@ export function computeColumnarLayout(
 
   // Physical page dimensions
   const isA3 = options.paperSize === 'A3';
+  const isLetter = options.paperSize === 'letter';
   const isLandscape = options.orientation === 'landscape';
-  let baseWidthPt = isA3 ? A4_HEIGHT_PT * Math.SQRT2 : A4_WIDTH_PT;
-  let baseHeightPt = isA3 ? A4_WIDTH_PT * 2 : A4_HEIGHT_PT;
+  let baseWidthPt = isA3 ? A4_HEIGHT_PT * Math.SQRT2 : isLetter ? LETTER_WIDTH_PT : A4_WIDTH_PT;
+  let baseHeightPt = isA3 ? A4_WIDTH_PT * 2 : isLetter ? LETTER_HEIGHT_PT : A4_HEIGHT_PT;
   if (isLandscape) {
     const tmp = baseWidthPt;
     baseWidthPt = baseHeightPt;
@@ -392,7 +395,7 @@ export function renderPageToSvg(
 
   // 1. Root SVG with pure white paper background
   svgParts.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${widthPt.toFixed(2)} ${heightPt.toFixed(2)}" width="${widthMm.toFixed(1)}mm" height="${heightMm.toFixed(1)}mm" style="display: block; width: 100%; height: auto;">`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${widthPt.toFixed(2)} ${heightPt.toFixed(2)}" width="${widthPt.toFixed(2)}pt" height="${heightPt.toFixed(2)}pt" style="display: block; width: 100%; height: auto;">`
   );
   svgParts.push(`  <defs>`);
   svgParts.push(`    <style>`);
@@ -581,7 +584,7 @@ export function renderPageToSvg(
           if (bTick >= col.startTick && bTick < col.endTick) {
             const beatY = staffOriginY + (bTick - col.startTick) * ptPerTick;
             svgParts.push(`    <!-- Klavarskribo Beat Grid (Beat ${b + 1}) -->`);
-            svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#9CA3AF" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
+            svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="2,3"/>`);
           }
         }
       }

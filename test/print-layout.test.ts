@@ -522,8 +522,11 @@ test('Responsive SVG Scaling & Unclipped m5 Margin Invariant', () => {
 
 
 test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', async () => {
-  // Test generating vector PostScript from benchmark score
+  // Test generating vector PostScript from benchmark score (defaulting to Letter for US printer tray)
   const { psBuffer, layout } = await generateScorePostscript('bach-goldberg-var1');
+
+  assert.equal(layout.pageDimensions.widthPt, 612, 'Letter width must be 612 pt');
+  assert.equal(layout.pageDimensions.heightPt, 792, 'Letter height must be 792 pt');
 
   assert.ok(psBuffer.length > 10000, 'PostScript buffer must be generated and non-trivial');
   const psText = psBuffer.toString('binary', 0, 1000);
@@ -533,12 +536,16 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
   const fullPs = psBuffer.toString('binary');
   assert.match(fullPs, /%%Pages:\s*4/);
 
-  // Test PJL wrapper
-  const wrapped = wrapInPjl(psBuffer, 'Bach Goldberg Var 1');
+  // Strictly enforce 100% vector output: zero raster image operator calls
+  assert.doesNotMatch(fullPs, /\nimage\n/, 'PostScript must contain zero raster bitmap calls');
+
+  // Test PJL wrapper with Letter paper setting
+  const wrapped = wrapInPjl(psBuffer, 'Bach Goldberg Var 1', 'letter');
   const wrappedHead = wrapped.toString('binary', 0, 300);
   const wrappedTail = wrapped.toString('binary', wrapped.length - 100);
 
   assert.match(wrappedHead, /@PJL JOB NAME = "Bach Goldberg Var 1"/);
+  assert.match(wrappedHead, /@PJL SET PAPER = LETTER/);
   assert.match(wrappedHead, /@PJL SET RENDERMODE = COLOR/);
   assert.match(wrappedHead, /@PJL SET COLORMODE = COLOR/);
   assert.match(wrappedHead, /@PJL ENTER LANGUAGE = POSTSCRIPT/);
