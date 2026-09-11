@@ -446,10 +446,12 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
   assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
 });
 
-test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and Left for LH', () => {
+test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for RH and Left for LH', () => {
   const score = buildBachGoldbergVar1Score();
   const recordedLines: { x1: number; y1: number; x2: number; y2: number; stroke: string }[] = [];
   let currentStroke = '';
+  let currentPath: { x: number; y: number }[] = [];
+  const chevrons: { baseX: number; apexX: number; topY: number; botY: number; apexY: number; stroke: string; hand: 'RH' | 'LH' }[] = [];
 
   const mockCtx = {
     fillStyle: '',
@@ -460,16 +462,21 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
       return currentStroke;
     },
     lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
     font: '',
     textAlign: '',
     textBaseline: '',
     save: () => {},
     restore: () => {},
-    beginPath: () => {},
+    beginPath: () => {
+      currentPath = [];
+    },
     closePath: () => {},
     moveTo: (x: number, y: number) => {
       (mockCtx as any)._startX = x;
       (mockCtx as any)._startY = y;
+      currentPath = [{ x, y }];
     },
     lineTo: (x: number, y: number) => {
       recordedLines.push({
@@ -479,8 +486,27 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
         y2: y,
         stroke: currentStroke,
       });
+      (mockCtx as any)._startX = x;
+      (mockCtx as any)._startY = y;
+      currentPath.push({ x, y });
     },
-    stroke: () => {},
+    stroke: () => {
+      if (currentPath.length === 3 && currentStroke !== '#000000') {
+        const [p0, p1, p2] = currentPath;
+        if (p0.x === p2.x && p1.x !== p0.x) {
+          const hand = p1.x > p0.x ? 'RH' : 'LH';
+          chevrons.push({
+            baseX: p0.x,
+            apexX: p1.x,
+            topY: p0.y,
+            apexY: p1.y,
+            botY: p2.y,
+            stroke: currentStroke,
+            hand,
+          });
+        }
+      }
+    },
     fill: () => {},
     fillRect: () => {},
     arc: () => {},
@@ -504,43 +530,41 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
     currentTick: 0,
   });
 
-  // Filter horizontal lateral stems (y1 === y2, x1 !== x2, within lateral stem length range)
+  // Zero straight lateral stems (y1 === y2, x1 !== x2, length >= 20)
   const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
+  assert.equal(lateralStems.length, 0, 'Zero straight lateral stem lines rendered');
 
   // In Bach Goldberg Var 1, keyboard symmetry around m3 (linear pitch 48) means:
-  // - 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO lateral stems (clean noteheads)
-  // - Exactly 63 notes where hands cross m3 have lateral stems:
-  //   - 24 notes where RH crosses into bass (< 48) have right-pointing lateral stems (x2 > x1)
-  //   - 39 notes where LH crosses into treble (> 48) have left-pointing lateral stems (x2 < x1)
-  assert.equal(lateralStems.length, 63, 'Must render lateral stems ONLY for exceptions (63 in Goldberg Var 1)');
+  // - 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO chevrons (clean noteheads)
+  // - Exactly 63 notes where hands cross m3 have chevrons:
+  //   - 24 notes where RH crosses into bass (< 48) have right-pointing chevrons (apexX > baseX)
+  //   - 39 notes where LH crosses into treble (> 48) have left-pointing chevrons (apexX < baseX)
+  assert.equal(chevrons.length, 63, 'Must render chevrons ONLY for exceptions (63 in Goldberg Var 1)');
 
-  const rhStems = lateralStems.filter((s) => s.x2 > s.x1);
-  const lhStems = lateralStems.filter((s) => s.x2 < s.x1);
+  const rhChevrons = chevrons.filter((s) => s.hand === 'RH');
+  const lhChevrons = chevrons.filter((s) => s.hand === 'LH');
 
-  assert.equal(rhStems.length, 24, '24 crossing notes must have right-pointing stems for RH in bass (< 48)');
-  assert.equal(lhStems.length, 39, '39 crossing notes must have left-pointing stems for LH above m3 (> 48)');
+  assert.equal(rhChevrons.length, 24, '24 crossing notes must have right-pointing chevrons for RH in bass (< 48)');
+  assert.equal(lhChevrons.length, 39, '39 crossing notes must have left-pointing chevrons for LH above m3 (> 48)');
 
-  lateralStems.forEach((s) => {
-    assert.ok(Math.abs(s.x2 - s.x1) >= 20, 'Stem must extend at least 20px from note center');
-  });
-
-  // Verify center alignment: stem is at cy === y (paddingStart + startTick * pixelsPerTick)
+  // Verify center alignment: chevron apex is at cy === y (paddingStart + startTick * pixelsPerTick)
   const firstExNote = score.notes.find((n) => (n.hand === 'RH' && linearIndex(n.pitch) < 48) || (n.hand === 'LH' && linearIndex(n.pitch) > 48))!;
-  const firstStem = lateralStems[0];
+  const firstChevron = chevrons[0];
   const paddingStart = 60;
   const expectedY = paddingStart + firstExNote.startTick * 2.0;
-  assert.equal(firstStem.y1, expectedY, 'Stem must be center-aligned at cy === y');
+  assert.equal(firstChevron.apexY, expectedY, 'Chevron must be center-aligned at cy === y');
+  assert.ok(Math.abs(firstChevron.apexY - (firstChevron.topY + firstChevron.botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
 
-  // Assert notes on Middle C (lPitch === 48) have zero stems for both RH and LH
+  // Assert notes on Middle C (lPitch === 48) have zero chevrons for both RH and LH
   const m3Notes = score.notes.filter((n) => linearIndex(n.pitch) === 48);
   assert.ok(m3Notes.length > 0, 'Score must contain notes on Middle C');
   m3Notes.forEach((m3) => {
     const yCoord = paddingStart + m3.startTick * 2.0;
-    const hasStem = lateralStems.some((s) => s.y1 === yCoord);
-    assert.ok(!hasStem, `Note on Middle C (${m3.id}, hand: ${m3.hand}) must have zero stems`);
+    const hasChevron = chevrons.some((s) => s.apexY === yCoord);
+    assert.ok(!hasChevron, `Note on Middle C (${m3.id}, hand: ${m3.hand}) must have zero chevrons`);
   });
 
-  // Verify full m3 symmetry exception logic with both RH (<48) and LH (>48) crossings, and stemless Middle C (48):
+  // Verify full m3 symmetry exception logic with both RH (<48) and LH (>48) crossings, and neutral Middle C (48):
   const symmetryTestScore: QuantizedGridScore = {
     id: 'handedness-symmetry-test',
     title: 'Handedness Symmetry Test',
@@ -554,16 +578,17 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
     dynamics: [],
     pedals: [],
     notes: [
-      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> stemless
-      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> stemless
-      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no stem
-      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no stem
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right stem
-      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left stem
+      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> neutral
+      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> neutral
+      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no chevron
+      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no chevron
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right chevron
+      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left chevron
     ],
   };
 
-  const symmetryLines: { x1: number; y1: number; x2: number; y2: number; stroke: string }[] = [];
+  let symPath: { x: number; y: number }[] = [];
+  const symChevrons: { baseX: number; apexX: number; hand: 'RH' | 'LH' }[] = [];
   const symCtx = {
     fillStyle: '',
     strokeStyle: '',
@@ -573,22 +598,28 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
     textBaseline: '',
     save: () => {},
     restore: () => {},
-    beginPath: () => {},
+    beginPath: () => {
+      symPath = [];
+    },
     closePath: () => {},
     moveTo: (x: number, y: number) => {
-      (symCtx as any)._startX = x;
-      (symCtx as any)._startY = y;
+      symPath = [{ x, y }];
     },
     lineTo: (x: number, y: number) => {
-      symmetryLines.push({
-        x1: (symCtx as any)._startX,
-        y1: (symCtx as any)._startY,
-        x2: x,
-        y2: y,
-        stroke: String(symCtx.strokeStyle),
-      });
+      symPath.push({ x, y });
     },
-    stroke: () => {},
+    stroke: () => {
+      if (symPath.length === 3 && String(symCtx.strokeStyle) !== '#000000') {
+        const [p0, p1, p2] = symPath;
+        if (p0.x === p2.x && p1.x !== p0.x) {
+          symChevrons.push({
+            baseX: p0.x,
+            apexX: p1.x,
+            hand: p1.x > p0.x ? 'RH' : 'LH',
+          });
+        }
+      }
+    },
     fill: () => {},
     fillRect: () => {},
     arc: () => {},
@@ -612,13 +643,12 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
     currentTick: 0,
   });
 
-  const symStems = symmetryLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
-  assert.equal(symStems.length, 2, 'Exactly 2 stems must be rendered for the 2 exception notes');
+  assert.equal(symChevrons.length, 2, 'Exactly 2 chevrons must be rendered for the 2 exception notes');
 
-  const symRh = symStems.filter((s) => s.x2 > s.x1);
-  const symLh = symStems.filter((s) => s.x2 < s.x1);
-  assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing stem');
-  assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing stem');
+  const symRh = symChevrons.filter((s) => s.hand === 'RH');
+  const symLh = symChevrons.filter((s) => s.hand === 'LH');
+  assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing chevron');
+  assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing chevron');
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
@@ -1215,41 +1245,39 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   const ribbons: { x: number; y: number; w: number; h: number }[] = [];
   const arcCenters: { x: number; y: number }[] = [];
   const fills: string[] = [];
-  const lateralStems: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const chevrons: { baseX: number; apexX: number; hand: 'RH' | 'LH' }[] = [];
 
-  let currentPathStart: { x: number; y: number } | null = null;
-  let currentPathEnd: { x: number; y: number } | null = null;
+  let currentPath: { x: number; y: number }[] = [];
 
   const mockCtx = {
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
     font: '',
     textAlign: '',
     textBaseline: '',
     save: () => {},
     restore: () => {},
     beginPath: () => {
-      currentPathStart = null;
-      currentPathEnd = null;
+      currentPath = [];
     },
     closePath: () => {},
     moveTo: (x: number, y: number) => {
-      currentPathStart = { x, y };
-      currentPathEnd = { x, y };
+      currentPath = [{ x, y }];
     },
     lineTo: (x: number, y: number) => {
-      currentPathEnd = { x, y };
+      currentPath.push({ x, y });
     },
     stroke: () => {
-      if (currentPathStart && currentPathEnd) {
-        // Horizontal line for lateral stems: y1 === y2 and length > 0 (excluding full-width playhead)
-        if (currentPathStart.y === currentPathEnd.y && currentPathStart.x !== currentPathEnd.x && Math.abs(currentPathEnd.x - currentPathStart.x) < 100) {
-          lateralStems.push({
-            x1: currentPathStart.x,
-            y1: currentPathStart.y,
-            x2: currentPathEnd.x,
-            y2: currentPathEnd.y,
+      if (currentPath.length === 3 && mockCtx.strokeStyle !== '#000000') {
+        const [p0, p1, p2] = currentPath;
+        if (p0.x === p2.x && p1.x !== p0.x) {
+          chevrons.push({
+            baseX: p0.x,
+            apexX: p1.x,
+            hand: p1.x > p0.x ? 'RH' : 'LH',
           });
         }
       }
@@ -1323,10 +1351,10 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   // Quarter notes (Amber #F59E0B)
   assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
 
-  // Handedness stems: symmetry around m3 (indicate only exceptions)
-  // In Goldberg Var 1, 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero stems,
-  // while the 63 notes where hands cross m3 (24 RH < 48, 39 LH > 48) have lateral stems.
-  assert.equal(lateralStems.length, 63, 'Only hand crossing exception notes (63 in Var 1) render lateral stems');
+  // Handedness indicators: tasteful chevrons (< for LH, > for RH)
+  // In Goldberg Var 1, 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero chevrons,
+  // while the 63 notes where hands cross m3 (24 RH < 48, 39 LH > 48) have chevrons.
+  assert.equal(chevrons.length, 63, 'Only hand crossing exception notes (63 in Var 1) render chevrons');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1379,12 +1407,11 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
     knockoutLines: KnockoutLine[] = [],
     isVertical: boolean = true
   ) => {
+    let pathPoints: { x: number; y: number }[] = [];
     let currentDash: number[] = [];
     let currentAlpha = 1.0;
     let currentStrokeStyle = '';
     let currentLineWidth = 1.0;
-    let pathStart: { x: number; y: number } | null = null;
-    let pathEnd: { x: number; y: number } | null = null;
 
     const noop = () => {};
     const mock = {
@@ -1416,51 +1443,51 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
         currentAlpha = 1.0;
       },
       beginPath: () => {
-        pathStart = null;
-        pathEnd = null;
+        pathPoints = [];
       },
       closePath: noop,
       moveTo: (x: number, y: number) => {
-        pathStart = { x, y };
-        pathEnd = { x, y };
+        pathPoints = [{ x, y }];
       },
       lineTo: (x: number, y: number) => {
-        pathEnd = { x, y };
+        pathPoints.push({ x, y });
       },
       stroke: () => {
-        if (
-          currentDash.length === 0 &&
-          currentLineWidth === 0.8 &&
-          pathStart &&
-          pathEnd &&
-          (isVertical
-            ? (pathStart.x === pathEnd.x && pathStart.y !== pathEnd.y)
-            : (pathStart.y === pathEnd.y && pathStart.x !== pathEnd.x))
-        ) {
-          dottedTrails.push({
-            x1: pathStart.x,
-            y1: pathStart.y,
-            x2: pathEnd.x,
-            y2: pathEnd.y,
-            stroke: currentStrokeStyle,
-            lineWidth: currentLineWidth,
-            alpha: currentAlpha,
-            dash: [...currentDash],
-          });
-        } else if (
-          currentStrokeStyle === '#000000' &&
-          currentDash.length === 0 &&
-          (currentLineWidth === 3.0 || currentLineWidth === 2.0) &&
-          pathStart &&
-          pathEnd
-        ) {
-          knockoutLines.push({
-            x1: pathStart.x,
-            y1: pathStart.y,
-            x2: pathEnd.x,
-            y2: pathEnd.y,
-            lineWidth: currentLineWidth,
-          });
+        if (pathPoints.length === 2) {
+          const [p1, p2] = pathPoints;
+          const isAligned = isVertical
+            ? (p1.x === p2.x && p1.y !== p2.y)
+            : (p1.y === p2.y && p1.x !== p2.x);
+          if (
+            isAligned &&
+            currentDash.length === 0 &&
+            (currentLineWidth === 0.8 || currentLineWidth === 1.0 || currentLineWidth === 1.35) &&
+            currentStrokeStyle !== '#000000'
+          ) {
+            dottedTrails.push({
+              x1: p1.x,
+              y1: p1.y,
+              x2: p2.x,
+              y2: p2.y,
+              stroke: currentStrokeStyle,
+              lineWidth: currentLineWidth,
+              alpha: currentAlpha,
+              dash: [...currentDash],
+            });
+          } else if (
+            isAligned &&
+            currentStrokeStyle === '#000000' &&
+            currentDash.length === 0 &&
+            (currentLineWidth === 1.8 || currentLineWidth === 2.5)
+          ) {
+            knockoutLines.push({
+              x1: p1.x,
+              y1: p1.y,
+              x2: p2.x,
+              y2: p2.y,
+              lineWidth: currentLineWidth,
+            });
+          }
         }
       },
       fill: noop,
@@ -1527,16 +1554,16 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
     'Must render exactly 165 solid thin hold lines for all colored notes in vertical orientation'
   );
 
-  // Continuous Uninterrupted Reference Staff Lines: zero knockout lines behind hold lines
+  // Staff-line replacement knockout underlays for notes on staff lines
   assert.equal(
     verticalKnockouts.length,
-    0,
-    'Must render exactly 0 staff-line knockout lines in vertical orientation'
+    38,
+    'Must render exactly 38 staff-line knockout lines in vertical orientation (32 for 1.0 lines, 6 for Middle C)'
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
   assert.deepEqual(vTrail.dash, [], 'Hold line dash pattern must be empty (solid)');
-  assert.equal(vTrail.lineWidth, 0.8, 'Hold line stroke width must be 0.8px');
+  assert.equal(vTrail.lineWidth, 0.8, 'Hold line stroke width must be 0.8px for space notes');
   assert.equal(vTrail.alpha, 1.0, 'Hold line opacity must be 1.0');
   assert.equal(vTrail.stroke, '#F43F5E', 'Hold line stroke color must match duration class (#F43F5E for 108t)');
 
@@ -1554,33 +1581,41 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   assert.equal(vTrail.y2, expectedTrailEndY, 'Trail must cleanly terminate at release coordinate');
   assert.ok(
     vTrail.y1 > expectedCy,
-    'Trail must start strictly below the center-aligned Klavar lateral stem at expectedCy'
+    'Trail must start strictly below notehead center at expectedCy'
   );
   assert.equal(vTrail.y1 - expectedCy, noteHeight / 2 + 2, 'Optical gap must be exactly noteHeight / 2 + 2');
 
-  // Tasteful Truncation Before Handedness Lateral Stems (Measure 4)
-  // bach-var1-68 (tick 552, pitch 38, duration 24) must truncate early before bach-var1-69 lateral stem (tick 564)
-  const note68 = score.notes.find((n) => n.id === 'bach-var1-68')!;
-  const note68LPitch = note68.pitch.octave * 12 + note68.pitch.pitchClass;
-  const note68ExpectedCx = paddingPitch + (note68LPitch - minPitch) * pixelsPerSemitone;
-  const note68ExpectedCy = paddingStart + note68.startTick * pixelsPerTick;
-  const note68ExpectedStartY = note68ExpectedCy + noteHeight / 2 + 2;
-  const stemY = paddingStart + 564 * pixelsPerTick;
-  const expectedTruncatedEndY = stemY - 2.5;
+  // Clean staff-line replacement in Bar 6 (bach-var1-88, pitch 36, m2)
+  const note88 = score.notes.find((n) => n.id === 'bach-var1-88')!;
+  const note88LPitch = note88.pitch.octave * 12 + note88.pitch.pitchClass;
+  const note88ExpectedCx = paddingPitch + (note88LPitch - minPitch) * pixelsPerSemitone;
+  const note88ExpectedCy = paddingStart + note88.startTick * pixelsPerTick;
+  const note88Trail = verticalDottedTrails.find(
+    (t) => Math.abs(t.x1 - note88ExpectedCx) < 0.1 && Math.abs(t.y1 - (note88ExpectedCy + noteHeight / 2 + 2)) < 0.1
+  );
+  assert.ok(note88Trail, 'Must find hold line for bach-var1-88');
+  assert.equal(note88Trail.lineWidth, 1.0, 'Bar 6 bach-var1-88 on m2 staff line must stroke at full staff-line width 1.0px');
+  assert.equal(note88Trail.y2, note88ExpectedCy + note88.durationTicks * pixelsPerTick, 'bach-var1-88 must terminate cleanly at release');
+  const note88Knockout = verticalKnockouts.find(
+    (k) => Math.abs(k.x1 - note88ExpectedCx) < 0.1 && Math.abs(k.y1 - (note88ExpectedCy + noteHeight / 2 + 2)) < 0.1
+  );
+  assert.ok(note88Knockout, 'Must find staff-line knockout line for bach-var1-88');
+  assert.equal(note88Knockout.lineWidth, 1.8, 'Bar 6 bach-var1-88 on m2 staff line must have 1.8px knockout underlay');
 
-  const n68Trail = verticalDottedTrails.find(
-    (t) => Math.abs(t.x1 - note68ExpectedCx) < 0.1 && Math.abs(t.y1 - note68ExpectedStartY) < 0.1
-  );
-  assert.ok(n68Trail, 'Must find hold line for bach-var1-68');
-  assert.equal(
-    n68Trail.y2,
-    expectedTruncatedEndY,
-    `bach-var1-68 hold line must terminate early at stemY - 2.5 (${expectedTruncatedEndY}), before tick 564 lateral stem`
-  );
-  assert.ok(
-    n68Trail.y2 < note68ExpectedCy + note68.durationTicks * pixelsPerTick,
-    'Truncated end must be strictly shorter than full sustain release'
-  );
+  // Measure 30 notes must cleanly terminate without extending past note release
+  const m30Ids = ['bach-var1-501', 'bach-var1-504', 'bach-var1-507', 'bach-var1-510', 'bach-var1-513'];
+  for (const nId of m30Ids) {
+    const n = score.notes.find((x) => x.id === nId)!;
+    const nLPitch = n.pitch.octave * 12 + n.pitch.pitchClass;
+    const nCx = paddingPitch + (nLPitch - minPitch) * pixelsPerSemitone;
+    const nCy = paddingStart + n.startTick * pixelsPerTick;
+    const nReleaseY = nCy + n.durationTicks * pixelsPerTick;
+    const nTrail = verticalDottedTrails.find(
+      (t) => Math.abs(t.x1 - nCx) < 0.1 && Math.abs(t.y1 - (nCy + noteHeight / 2 + 2)) < 0.1
+    );
+    assert.ok(nTrail, `Must find hold line for ${nId}`);
+    assert.ok(nTrail.y2 <= nReleaseY + 0.01, `${nId} hold line must not extend past release coordinate`);
+  }
 
   // Hand-crossing text eliminated
   assert.ok(
@@ -1616,8 +1651,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   );
   assert.equal(
     horizontalKnockouts.length,
-    0,
-    'Must render exactly 0 horizontal staff-line knockout lines'
+    38,
+    'Must render exactly 38 horizontal staff-line knockout lines'
   );
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;

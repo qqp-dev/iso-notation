@@ -14,6 +14,7 @@ import {
 } from '../src/render/print-layout';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
+import { linearIndex } from '../src/model/pitch';
 import { wrapInPjl, generateScorePostscript } from '../scripts/print-score';
 
 test('Columnar Engraving Geometry Invariant: 32-measure score with 48 ticks/measure', () => {
@@ -159,9 +160,11 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // - Zero old 3,3 dashes
     assert.doesNotMatch(svg, /stroke-dasharray="3,3"/, 'Old 3,3 dashes must not be present');
 
-    // 3. Klavar Lateral Stems Invariant
-    // - Horizontal lateral stems for hand assignment with stroke-width 0.6pt
-    assert.match(svg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must render Klavar lateral stems');
+    // 3. Tasteful Handedness Chevrons Invariant
+    // - Zero straight lateral stem lines (stroke-width 0.6pt)
+    assert.doesNotMatch(svg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must have zero straight lateral stem lines');
+    // - Open chevrons with stroke-width 0.8pt and rounded caps/joins
+    assert.match(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none" stroke="[^"]+" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/, 'Must render tasteful handedness chevrons');
 
     // 4. Solid row-parity noteheads with zero disruptive shield and duration colors
     // - Ovals on lines (Row 0): horizontal ellipse rx="5.20" ry="3.00" sitting cleanly on line
@@ -221,21 +224,48 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   // 2. Zero hold ribbon lines for 16th notes (stroke-width="1.2")
   assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2")');
 
-  // 3. Solid thin hold line for all colored notes (d > tauRef, 165 notes total in Goldberg Var 1)
+  // 3. Solid thin hold lines and Clean Staff-Line Replacement (Bar 6 Blue)
   const tauRef = score.gridResolution || 12;
   const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
   assert.equal(coloredNotes.length, 165, 'Must have exactly 165 colored notes in Goldberg Var 1');
 
-  const holdLineRegex =
-    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round"\/>/g;
-  const allHoldLines = Array.from(fullScoreSvg.matchAll(holdLineRegex));
-  assert.equal(allHoldLines.length, 165, 'Must render exactly 165 solid thin hold lines across full score (1 for each colored note)');
+  // Space notes render thin solid lines (stroke-width="0.8") without knockout
+  const spaceHoldLines = Array.from(
+    fullScoreSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round"\/>/g)
+  );
+  assert.ok(spaceHoldLines.length > 0, 'Must render thin solid hold lines for space notes');
 
-  // 4. Continuous Uninterrupted Reference Staff Lines (zero white knockout underlays for holds)
+  // Staff-line replacement knockout underlays
   const knockoutRegex =
     /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="#FFFFFF" stroke-width="(2\.5|1\.8)" stroke-linecap="butt"\/>/g;
   const allKnockouts = Array.from(fullScoreSvg.matchAll(knockoutRegex));
-  assert.equal(allKnockouts.length, 0, 'Must render zero white staff-line knockouts across full score');
+  assert.ok(allKnockouts.length > 0, 'Must render white staff-line knockouts for held notes on staff lines');
+
+  // Verify Bar 6 note bach-var1-88 (tick 744, dur 36, blue) on staff line m2 (pitch 36):
+  // Cleanly draws over / replaces staff line with 1.8 white knockout and 1.0 colored stroke (#1D4ED8)
+  const note88 = score.notes.find((n) => n.id === 'bach-var1-88')!;
+  const col88 = layout.columns.find((c) => c.notes.some((n) => n.id === note88.id))!;
+  const staffOriginY = 10 * (72 / 25.4) + 42 + 16;
+  const note88Ny = staffOriginY + (note88.startTick - col88.startTick) * layout.ptPerTick;
+  const note88Height = 6.0;
+  const note88StartY = note88Ny + note88Height / 2 + 2;
+  const note88ReleaseY = note88Ny + note88.durationTicks * layout.ptPerTick;
+  const colLeftPt88 = 10 * (72 / 25.4) + col88.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
+  const note88X = colLeftPt88 + 14 + (36 - layout.minPitch) * layout.ptPerSemitone;
+
+  const pSvg88 = svgs[col88.pageIndex];
+  // Verify white knockout underlay at note88
+  assert.match(
+    pSvg88,
+    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#FFFFFF" stroke-width="1\\.8" stroke-linecap="butt"\\/>`),
+    'Bar 6 note bach-var1-88 on line m2 must have white knockout underlay with stroke-width="1.8"'
+  );
+  // Verify colored hold line at full octave staff line width (1.0pt)
+  assert.match(
+    pSvg88,
+    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#1D4ED8" stroke-width="1\\.0" stroke-linecap="round"\\/>`),
+    'Bar 6 note bach-var1-88 on line m2 must stroke at full staff-line width 1.0pt replacing black vertical line'
+  );
 
   // 5. Clean termination without explicit stop ticks or release crossbars
   assert.doesNotMatch(fullScoreSvg, /class="stop-tick"/, 'Must have zero explicit stop ticks');
@@ -248,8 +278,8 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
 
   const longNoteColumn = layout.columns.find((c) => c.notes.some((n) => n.id === longNote.id))!;
   const pageSvg = svgs[longNoteColumn.pageIndex];
-  const pageHoldMatches = Array.from(pageSvg.matchAll(holdLineRegex));
-  const longNoteMatch = pageHoldMatches.find((m) => m[5] === '#BE123C');
+  const allHoldLinesOnPage = Array.from(pageSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g));
+  const longNoteMatch = allHoldLinesOnPage.find((m) => m[5] === '#BE123C');
   assert.ok(longNoteMatch, 'Must find solid thin hold line for the Bar 20 sustain');
 
   const x1 = parseFloat(longNoteMatch[1]);
@@ -267,16 +297,10 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   // Release coordinate check: y2 terminates cleanly at note release coordinate clamped to column bounds
   assert.ok(y2 > y1, 'Termination y2 must be below start y1');
 
-  // Optical stem clearance: trailStartY must start below notehead bottom
-  // The long note (B4, linear pitch 59 >= 48) is in default RH territory and must have zero lateral stems
-  const stemRegex = new RegExp(
-    `<line x1="${x1.toFixed(2)}" y1="([\\d\\.]+)" x2="[\\d\\.]+" y2="([\\d\\.]+)" stroke="${stroke}" stroke-width="0\\.6"`
-  );
-  const stemMatch = pageSvg.match(stemRegex);
-  assert.ok(!stemMatch, 'Long note in default RH territory (B4 >= 48) must have zero lateral stems');
+  // The long note (B4, linear pitch 59 >= 48) is in default RH territory and must have zero lateral stems or chevrons
+  assert.doesNotMatch(pageSvg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must have zero lateral stems');
 
   // Notehead height for brick (Row 1 odd pc 11) is 5.8pt, half is 2.9pt, +2 = 4.9pt
-  const staffOriginY = 10 * (72 / 25.4) + 42 + 16;
   const noteNy = staffOriginY + (longNote.startTick - longNoteColumn.startTick) * layout.ptPerTick;
   const expectedTrailStartY = noteNy + 5.8 / 2 + 2;
   assert.ok(
@@ -285,8 +309,11 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   );
   assert.ok(y1 > noteNy, 'trailStartY must be strictly below notehead center at noteNy');
 
-  // 7. Tasteful Collision Truncation Before Handedness Lateral Stems (Measure 4)
-  // bach-var1-68 (tick 552, pitch 38, duration 24) must truncate early before bach-var1-69 lateral stem (tick 564)
+  // 7. Obstacle Interruption ("Interrupt for the Obstacle then Finish") in Measure 4
+  // bach-var1-68 (tick 552, pitch 38, duration 24) intersects bach-var1-69 (tick 564, pitch 36 with RH crossing)
+  // Must render two disjoint line segments:
+  // - Segment 1: from onset start to before tick 564
+  // - Segment 2: resuming after tick 564 and finishing at note release (~tick 576)
   const note68 = score.notes.find((n) => n.id === 'bach-var1-68')!;
   const note69 = score.notes.find((n) => n.id === 'bach-var1-69')!;
   const col4 = layout.columns.find((c) => c.notes.some((n) => n.id === note68.id))!;
@@ -294,23 +321,53 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   const note69Ny = staffOriginY + (note69.startTick - col4.startTick) * layout.ptPerTick;
   const note68Height = 6.0; // Parity 0 (even) notehead height
   const note68StartY = note68Ny + note68Height / 2 + 2;
-  const expectedTruncatedEndY = note69Ny - 2.5;
+  const note68ReleaseY = note68Ny + note68.durationTicks * layout.ptPerTick;
+  const chevronHalfH = 5.2 / 2;
+  const expectedObsY1 = note69Ny - chevronHalfH - 2.5;
+  const expectedObsY2 = note69Ny + chevronHalfH + 2.5;
 
-  const n68HoldLine = allHoldLines.find(
-    (m) => Math.abs(parseFloat(m[2]) - note68StartY) < 0.05
+  const col4Svg = svgs[col4.pageIndex];
+  const col4LeftPt = 10 * (72 / 25.4) + col4.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
+  const note68X = col4LeftPt + 14 + (38 - layout.minPitch) * layout.ptPerSemitone;
+
+  const note68Segments = Array.from(
+    col4Svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g)
+  ).filter(
+    (m) => Math.abs(parseFloat(m[1]) - note68X) < 0.1 &&
+           parseFloat(m[2]) >= note68StartY - 0.1 &&
+           parseFloat(m[4]) <= note68ReleaseY + 0.1
   );
-  assert.ok(n68HoldLine, 'Must find hold line for bach-var1-68 in Measure 4');
-  assert.ok(
-    Math.abs(parseFloat(n68HoldLine[4]) - expectedTruncatedEndY) < 0.05,
-    `bach-var1-68 hold line must terminate early at note69Ny - 2.5 (${expectedTruncatedEndY.toFixed(2)}), got ${n68HoldLine[4]}`
-  );
-  assert.ok(
-    parseFloat(n68HoldLine[4]) < note68Ny + note68.durationTicks * layout.ptPerTick,
-    'Truncated end must be strictly shorter than full sustain release'
-  );
+  assert.equal(note68Segments.length, 2, 'bach-var1-68 must render exactly 2 disjoint line segments (obstacle interruption)');
+  assert.ok(Math.abs(parseFloat(note68Segments[0][2]) - note68StartY) < 0.1, 'Segment 1 must start at note68StartY');
+  assert.ok(Math.abs(parseFloat(note68Segments[0][4]) - expectedObsY1) < 0.1, 'Segment 1 must terminate before obstacle');
+  assert.ok(Math.abs(parseFloat(note68Segments[1][2]) - expectedObsY2) < 0.1, 'Segment 2 must resume after obstacle');
+  assert.ok(Math.abs(parseFloat(note68Segments[1][4]) - note68ReleaseY) < 0.1, 'Segment 2 must finish at note release');
+
+  // 8. Robust Truncation & Segmentation in Measure 30
+  // Successive LH eighth notes (bach-var1-501, 504, 507, 510, 513) cleanly stop before subsequent obstacles
+  const m30NoteIds = ['bach-var1-501', 'bach-var1-504', 'bach-var1-507', 'bach-var1-510', 'bach-var1-513'];
+  for (const nId of m30NoteIds) {
+    const n = score.notes.find((x) => x.id === nId)!;
+    const col = layout.columns.find((c) => c.notes.some((x) => x.id === n.id))!;
+    const colLeftPt = 10 * (72 / 25.4) + col.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
+    const nNy = staffOriginY + (n.startTick - col.startTick) * layout.ptPerTick;
+    const nReleaseY = nNy + n.durationTicks * layout.ptPerTick;
+    const nx = colLeftPt + 14 + (linearIndex(n.pitch) - layout.minPitch) * layout.ptPerSemitone;
+    const pSvg = svgs[col.pageIndex];
+    const nLines = Array.from(
+      pSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g)
+    ).filter(
+      (m) => Math.abs(parseFloat(m[1]) - nx) < 0.1 &&
+             parseFloat(m[2]) >= nNy - 0.1 &&
+             parseFloat(m[2]) <= nReleaseY + 0.1
+    );
+    for (const seg of nLines) {
+      assert.ok(parseFloat(seg[4]) <= nReleaseY + 0.1, `${nId} hold line must never extend past note release coordinate`);
+    }
+  }
 });
 
-test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
+test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svg = renderPageToSvg(layout, 0);
@@ -333,32 +390,40 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
     `Ellipse area (${ellipseArea.toFixed(2)}) and brick area (${brickArea.toFixed(2)}) must match within 5%`
   );
 
-  // Klavar Lateral Stems Invariant (Handedness symmetry around m3):
-  // Default territory (RH >= 60, LH < 60) renders NO stem (clean noteheads).
-  // Exceptions render lateral stems: RH < 60 points right (x2 > x1), LH >= 60 points left (x2 < x1).
-  // Lateral stems are center-aligned with notehead (y1 === ny and y2 === ny) with length >= 16pt.
-  const stemMatches = Array.from(svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="0\.6" stroke-linecap="round"/g));
-  assert.ok(stemMatches.length > 0, 'Must find lateral stems in SVG for crossing exceptions');
+  // Zero straight lateral stems:
+  const stemMatches = Array.from(svg.matchAll(/<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/g));
+  assert.equal(stemMatches.length, 0, 'Zero straight lateral stem lines');
 
-  stemMatches.forEach((m) => {
-    const len = Math.abs(Number(m[3]) - Number(m[1]));
-    assert.ok(Math.round(len * 10) / 10 >= 16.0, 'Lateral stem length must be >= 16pt');
-    assert.equal(Number(m[2]), Number(m[4]), 'Lateral stem must be horizontal (y1 === y2)');
+  // Tasteful Handedness Chevrons Invariant (< for LH, > for RH):
+  const chevronMatches = Array.from(
+    svg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/g)
+  );
+  assert.ok(chevronMatches.length > 0, 'Must find chevrons in SVG for crossing exceptions');
+
+  chevronMatches.forEach((m) => {
+    const baseX1 = Number(m[1]);
+    const topY = Number(m[2]);
+    const apexX = Number(m[3]);
+    const apexY = Number(m[4]);
+    const baseX2 = Number(m[5]);
+    const botY = Number(m[6]);
+    assert.equal(baseX1, baseX2, 'Chevron base X coordinates must match');
+    assert.ok(apexX !== baseX1, 'Chevron apex must have horizontal clearance from base');
+    assert.ok(Math.abs(apexY - (topY + botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
   });
 
-  // Verify center alignment with notehead center coordinate (y1 === ny)
-  // First note with stem on Page 0 is bach-var1-49 (LH at tick 408, linear 49 > 48)
-  const firstStemNote = layout.pages[0].columns[0].notes.find(n => n.id === 'bach-var1-49')!;
-  const firstNoteStaffOriginY = 10 * (72 / 25.4) + 42 + 16;
-  const firstNoteExpectedNy = firstNoteStaffOriginY + (firstStemNote.startTick - layout.pages[0].columns[0].startTick) * layout.ptPerTick;
-  const firstStem = stemMatches[0];
-  assert.equal(Number(firstStem[2]), Number(firstNoteExpectedNy.toFixed(2)), 'Lateral stem must originate at center ny');
+  // Verify full score chevrons count and directions:
+  const allSvgs = renderAllPagesToSvg(layout);
+  const fullScoreSvg = allSvgs.join('\n');
+  const allChevrons = Array.from(
+    fullScoreSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/g)
+  );
+  assert.equal(allChevrons.length, 63, 'Must render chevrons ONLY for exceptions (63 in Goldberg Var 1)');
 
-  const rhStems = stemMatches.filter((m) => Number(m[3]) > Number(m[1]));
-  const lhStems = stemMatches.filter((m) => Number(m[3]) < Number(m[1]));
-
-  assert.ok(rhStems.length > 0, 'SVG must contain right-pointing lateral stems for RH notes in bass (< 48)');
-  assert.ok(lhStems.length > 0, 'SVG must contain left-pointing lateral stems for LH notes in treble (> 48)');
+  const rhChevrons = allChevrons.filter((m) => Number(m[3]) > Number(m[1]));
+  const lhChevrons = allChevrons.filter((m) => Number(m[3]) < Number(m[1]));
+  assert.equal(rhChevrons.length, 24, '24 crossing notes must have right-pointing chevrons for RH in bass (< 48)');
+  assert.equal(lhChevrons.length, 39, '39 crossing notes must have left-pointing chevrons for LH above m3 (> 48)');
 
   // Verify SVG print engine with explicit hand crossings in both directions, and stemless Middle C (48):
   const handednessTestScore: QuantizedGridScore = {
@@ -374,23 +439,25 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
     dynamics: [],
     pedals: [],
     notes: [
-      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> stemless
-      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> stemless
-      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no stem
-      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no stem
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right stem
-      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left stem
+      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> neutral
+      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> neutral
+      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no chevron
+      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no chevron
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right chevron
+      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left chevron
     ],
   };
 
   const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0);
-  const testStems = Array.from(testSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="0\.6" stroke-linecap="round"/g));
-  assert.equal(testStems.length, 2, 'SVG must render lateral stems strictly for the 2 exception notes');
+  const testChevrons = Array.from(
+    testSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/g)
+  );
+  assert.equal(testChevrons.length, 2, 'SVG must render chevrons strictly for the 2 exception notes');
 
-  const testRh = testStems.filter((m) => Number(m[3]) > Number(m[1]));
-  const testLh = testStems.filter((m) => Number(m[3]) < Number(m[1]));
-  assert.equal(testRh.length, 1, 'RH exception (< 48) must render right-pointing lateral stem in SVG');
-  assert.equal(testLh.length, 1, 'LH exception (> 48) must render left-pointing lateral stem in SVG');
+  const testRh = testChevrons.filter((m) => Number(m[3]) > Number(m[1]));
+  const testLh = testChevrons.filter((m) => Number(m[3]) < Number(m[1]));
+  assert.equal(testRh.length, 1, 'RH exception (< 48) must render right-pointing chevron in SVG');
+  assert.equal(testLh.length, 1, 'LH exception (> 48) must render left-pointing chevron in SVG');
 });
 
 test('A4 Print Dimensions & Page Margins Invariant', () => {
