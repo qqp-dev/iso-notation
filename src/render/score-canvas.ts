@@ -1164,7 +1164,7 @@ export function renderNotehead(
     ? (fillColor === '#FEF08A' || fillColor === '#FFFFFF' ? fillColor : '#FDE047')
     : fillColor;
 
-  if (handException !== null) {
+  if (handException !== null && morphology !== 'duodecimal') {
     const isRow0 = pitchClass % 2 === 0;
     const nw = Math.max(11.0, baseSize);
     const nh = Math.max(8.2, baseSize * 0.75);
@@ -1371,42 +1371,63 @@ export function renderNotehead(
       const pc = ((pitchClass % 12) + 12) % 12;
       const digit = DUODECIMAL_DIGITS[pc];
       const isEven = pc % 2 === 0;
-      const pw = 14;
-      const ph = Math.max(12, baseSize + 1);
+      const r = 6.0;
 
-      // Knockout
+      // Crisp circular line-knockout
       ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.roundRect(cx - (pw + 2) / 2, cy - (ph + 2) / 2, pw + 2, ph + 2, 3);
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
 
-      if (isEven) {
-        // Row 0 (Even digits 0, 2, 4, 6, 8, a): Solid tile with white numeral
-        ctx.fillStyle = headColor;
-        ctx.beginPath();
-        ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, 2.5);
-        ctx.fill();
+      // Standalone naked digit
+      ctx.fillStyle = headColor;
+      ctx.font = isEven ? 'bold 10px monospace' : '600 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(digit, cx, cy);
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(digit, cx, cy);
-      } else {
-        // Row 1 (Odd digits 1, 3, 5, 7, 9, b): Hollow tile with dark numeral
-        ctx.fillStyle = '#FFFFFF';
+      // Tasteful abstract chevron for hand-crossing exceptions (< for LH, > for RH)
+      if (handException !== null) {
+        const h = 5.0;
+        const w = 3.2;
+        const clearance = 2.0;
+
+        let apexX: number;
+        let baseX: number;
+        if (handException === 'LH') {
+          baseX = cx - r - clearance;
+          apexX = baseX - w;
+        } else {
+          baseX = cx + r + clearance;
+          apexX = baseX + w;
+        }
+        const topY = cy - h / 2;
+        const botY = cy + h / 2;
+        const apexY = cy;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Knockout halo underlay
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.6;
         ctx.beginPath();
-        ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, 2.5);
-        ctx.fill();
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1.2;
+        ctx.moveTo(baseX, topY);
+        ctx.lineTo(apexX, apexY);
+        ctx.lineTo(baseX, botY);
         ctx.stroke();
 
-        ctx.fillStyle = headColor;
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(digit, cx, cy);
+        // Colored chevron
+        ctx.strokeStyle = headColor;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(baseX, topY);
+        ctx.lineTo(apexX, apexY);
+        ctx.lineTo(baseX, botY);
+        ctx.stroke();
+
+        ctx.restore();
       }
       break;
     }

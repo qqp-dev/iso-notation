@@ -285,6 +285,40 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.match(svg, />b<\/text>/, 'Must render B as b');
   assert.match(svg, />2<\/text>/, 'Must render D as 2');
   assert.match(svg, />4<\/text>/, 'Must render E as 4');
+
+  // Standalone naked digits invariant:
+  // Must render circular knockouts (r="4.20") and zero enclosing background tile rectangles
+  assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.20" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
+  assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
+
+  // Abstract tasteful chevrons for hand-crossing exceptions:
+  // Measure 4 has RH crossing into bass (< 48) -> open chevron > pointing right (apexX > baseX)
+  const chevronRegex = /<path d="M ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.70" stroke-linecap="round" stroke-linejoin="round"\/>/g;
+  const chevronMatches = Array.from(svg.matchAll(chevronRegex));
+  assert.ok(chevronMatches.length > 0, 'Must render tasteful chevrons in SVG for duodecimal hand exceptions');
+
+  const rhChevrons = chevronMatches.filter((m) => parseFloat(m[3]) > parseFloat(m[1]));
+  assert.ok(rhChevrons.length > 0, 'RH crossing exceptions must have > pointing right');
+  rhChevrons.forEach((m) => {
+    const topY = parseFloat(m[2]);
+    const apexY = parseFloat(m[4]);
+    const botY = parseFloat(m[6]);
+    assert.ok(Math.abs(apexY - (topY + botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
+    assert.ok(Math.abs((botY - topY) - 2.4) < 0.05, 'Chevron height must be 2.4pt (Option 2)');
+  });
+
+  // Page 4 contains measure 30 with LH crossing into treble (> 48) -> open chevron < pointing left (apexX < baseX)
+  const page4Svg = renderColumnarScoreToSvg(score, 3, { noteheadMorphology: 'duodecimal' });
+  const p4Chevrons = Array.from(page4Svg.matchAll(chevronRegex));
+  const lhChevrons = p4Chevrons.filter((m) => parseFloat(m[3]) < parseFloat(m[1]));
+  assert.ok(lhChevrons.length > 0, 'LH crossing exceptions must have < pointing left');
+  lhChevrons.forEach((m) => {
+    const topY = parseFloat(m[2]);
+    const apexY = parseFloat(m[4]);
+    const botY = parseFloat(m[6]);
+    assert.ok(Math.abs(apexY - (topY + botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
+    assert.ok(Math.abs((botY - topY) - 2.4) < 0.05, 'Chevron height must be 2.4pt (Option 2)');
+  });
 });
 
 test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {

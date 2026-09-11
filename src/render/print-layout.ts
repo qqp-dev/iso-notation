@@ -405,7 +405,8 @@ export function renderPageToSvg(
       .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
       .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: middle; }
       .pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }
-      .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
+      .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }
+      .duo-digit { font-family: "JetBrains Mono", "SF Mono", "DejaVu Sans Mono", "Liberation Mono", monospace; text-anchor: middle; dominant-baseline: central; }`);
   svgParts.push(`    </style>`);
   svgParts.push(`  </defs>`);
 
@@ -712,7 +713,7 @@ export function renderPageToSvg(
         nh = 8.5;
       } else if (morph === 'duodecimal') {
         nw = 8.5;
-        nh = 6.8;
+        nh = 8.4;
       } else if (
         morph === 'rectangle-square' ||
         morph === 'square-ellipse' ||
@@ -758,7 +759,7 @@ export function renderPageToSvg(
 
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const isEven = wholeToneParity(lPitch) === 0;
-        const nh = morph === 'phonetic' ? 8.5 : morph === 'duodecimal' ? 6.8 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
+        const nh = morph === 'phonetic' ? 8.5 : morph === 'duodecimal' ? 8.4 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
         const trailStartY = ny + nh / 2 + 2;
         const rawReleaseY = ny + note.durationTicks * ptPerTick;
         const trailEndY = Math.min(rawReleaseY, staffEndY);
@@ -834,7 +835,45 @@ export function renderPageToSvg(
       }
       renderedNoteheadKeys.add(unisonKey);
 
-      if (isHandException) {
+      if (morph === 'duodecimal') {
+        const pc = ((lPitch % 12) + 12) % 12;
+        const digit = DUODECIMAL_DIGITS[pc];
+        const isRow0 = isEven;
+        const r = 4.2;
+
+        // White circular line knockout so staff and beat lines do not cut through the digit
+        svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`);
+
+        // Standalone naked digit
+        const weight = isRow0 ? '800' : '700';
+        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" class="duo-digit" font-weight="${weight}" font-size="6.8pt" fill="${noteColor}">${digit}</text>`);
+
+        // Tasteful abstract chevron for hand-crossing exceptions (< for LH, > for RH)
+        if (isHandException) {
+          const h = 2.4;
+          const w = 1.5;
+          const clearance = 1.0;
+          const strokeW = 0.7;
+
+          let apexX: number;
+          let baseX: number;
+          if (hand === 'LH') {
+            baseX = nx - r - clearance;
+            apexX = baseX - w;
+          } else {
+            baseX = nx + r + clearance;
+            apexX = baseX + w;
+          }
+          const topY = ny - h / 2;
+          const botY = ny + h / 2;
+          const apexY = ny;
+
+          // White halo knockout underlay
+          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="${(strokeW + 1.2).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
+          // Colored chevron
+          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="${strokeW.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
+        }
+      } else if (isHandException) {
         const nw = 7.5;
         const nh = 5.6;
         const bx = nx - nw / 2;
@@ -873,25 +912,6 @@ export function renderPageToSvg(
         svgParts.push(`    <rect x="${(nx - pw / 2).toFixed(2)}" y="${(ny - ph / 2).toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
         // Lowercase syllable text
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 2.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle">${syllable}</text>`);
-      } else if (morph === 'duodecimal') {
-        const pc = ((lPitch % 12) + 12) % 12;
-        const digit = DUODECIMAL_DIGITS[pc];
-        const isRow0 = isEven;
-        const nw = 8.5;
-        const nh = 6.8;
-        const bx = nx - nw / 2;
-        const by = ny - nh / 2;
-        // White knockout
-        svgParts.push(`    <rect x="${(bx - 0.5).toFixed(2)}" y="${(by - 0.5).toFixed(2)}" width="${(nw + 1.0).toFixed(2)}" height="${(nh + 1.0).toFixed(2)}" rx="1.5" fill="#FFFFFF"/>`);
-        if (isRow0) {
-          // Row 0 (Even digits 0, 2, 4, 6, 8, a): Solid dark tile with white numeral
-          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
-          svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">${digit}</text>`);
-        } else {
-          // Row 1 (Odd digits 1, 3, 5, 7, 9, b): Hollow white tile with dark numeral and colored stroke
-          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.1"/>`);
-          svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="${noteColor}" text-anchor="middle" dominant-baseline="central">${digit}</text>`);
-        }
       } else if (
         morph === 'rectangle-square' ||
         morph === 'square-ellipse' ||
