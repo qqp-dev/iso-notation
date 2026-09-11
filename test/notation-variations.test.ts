@@ -440,8 +440,9 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
   const vertTexts = vertFills.map((f) => f.text);
   const vertMOctaves = vertTexts.filter((t) => /^m\d+$/.test(t));
   assert.ok(vertMOctaves.length > 0, 'Must render m${oct - 1} octave markers in vertical orientation');
-  assert.ok(vertMOctaves.includes('m2'), 'Should include m2 (C3)');
+  assert.ok(!vertMOctaves.includes('m2'), 'Must NOT include m2 (dropped)');
   assert.ok(vertMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
+  assert.ok(!vertMOctaves.includes('m4'), 'Must NOT include m4 (dropped)');
   assert.ok(!vertTexts.includes('0'), 'Must not render bare 0 at octave boundary in vertical orientation');
   assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
 });
@@ -505,7 +506,7 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   });
 
   // Filter horizontal lateral stems (y1 === y2 and x1 !== x2)
-  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 16);
+  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20);
   assert.ok(lateralStems.length > 0, 'Must have rendered Klavar lateral stems for notes');
 
   // Verify that notes with RH have right-pointing stems (x2 > x1)
@@ -516,8 +517,14 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   assert.ok(rhStems.length > 0, 'Must have right-pointing lateral stems for Right Hand (RH)');
   assert.ok(lhStems.length > 0, 'Must have left-pointing lateral stems for Left Hand (LH)');
   lateralStems.forEach((s) => {
-    assert.ok(Math.abs(s.x2 - s.x1) >= 16, 'Stem must extend at least 16px from note center');
+    assert.ok(Math.abs(s.x2 - s.x1) >= 20, 'Stem must extend at least 20px from note center');
   });
+
+  // Verify top alignment: stemY === y - noteHeight / 2
+  const noteHeight = Math.max(8, 14 - 3); // 11
+  const firstStem = lateralStems[0];
+  const paddingStart = 60;
+  assert.equal(firstStem.y1, paddingStart - noteHeight / 2, 'Stem must be top-aligned at stemY === y - noteHeight / 2');
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
@@ -2098,6 +2105,32 @@ test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and def
   const score = buildBachGoldbergVar1Score();
   const defaultLayout = computeColumnarLayout(score);
   assert.equal(defaultLayout.options.showBeamGrouping, false, 'Default showBeamGrouping must be false');
+});
+
+test('No-Toggle Clean UI Invariant: UI excludes rhythmic toggles, showGutterBrackets removed, and showBeatGrid defaults to true', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  // App.tsx verification: floating toolbar renders without the rhythmic toggle buttons
+  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
+  assert.ok(!appSrc.includes('Toggle Beat Grid'), 'App.tsx must not have Beat Grid quick-toggle button');
+  assert.ok(!appSrc.includes('Toggle Gutter Brackets'), 'App.tsx must not have Gutter Brackets quick-toggle button');
+  assert.ok(!appSrc.includes('Quick Metric & Rhythmic Legibility Toggles'), 'App.tsx must not contain metric toggle group in floating toolbar');
+  assert.ok(appSrc.includes('showBeatGrid: true'), 'App.tsx must default showBeatGrid to true');
+
+  // ControlsDrawer.tsx verification: showGutterBrackets checkbox removed
+  const drawerTsxPath = path.resolve('src/ui/ControlsDrawer.tsx');
+  const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
+  assert.ok(!drawerSrc.includes('showGutterBrackets'), 'ControlsDrawer.tsx must not have showGutterBrackets checkbox');
+
+  // Default layout options
+  const { computeColumnarLayout } = await import('../src/render/print-layout');
+  const score = buildBachGoldbergVar1Score();
+  const defaultLayout = computeColumnarLayout(score);
+  assert.equal(defaultLayout.options.showBeatGrid, true, 'Default showBeatGrid must be true');
+  assert.equal(defaultLayout.options.showGutterBrackets, false, 'Default showGutterBrackets must be false');
+  assert.equal(defaultLayout.options.octaveExtensionMode, 'spillover', 'Default octaveExtensionMode must be spillover');
 });
 
 

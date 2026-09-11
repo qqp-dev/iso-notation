@@ -93,9 +93,9 @@ const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   maxPitch: 127,
   pixelsPerTick: 0,
   pixelsPerSemitone: 0,
-  octaveExtensionMode: 'badge',
+  octaveExtensionMode: 'spillover',
   showBeamGrouping: false,
-  showBeatGrid: false,
+  showBeatGrid: true,
   showGutterBrackets: false,
 };
 
@@ -375,6 +375,9 @@ export function renderPageToSvg(
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
       if (pc === 0) {
         const displayOct = Math.max(0, oct - 1);
+        if (displayOct === 2 || displayOct === 4) {
+          continue;
+        }
         const isCenter = displayOct === 3;
         if (isCenter) {
           // Tasteful center anchor badge for m3
@@ -464,7 +467,7 @@ export function renderPageToSvg(
           if (bTick >= col.startTick && bTick < col.endTick) {
             const beatY = staffOriginY + (bTick - col.startTick) * ptPerTick;
             svgParts.push(`    <!-- Klavarskribo Beat Grid (Beat ${b + 1}) -->`);
-            svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#888888" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
+            svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${beatY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${beatY.toFixed(2)}" stroke="#9CA3AF" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.45"/>`);
             svgParts.push(`    <!-- Klavarskribo Beat Counter (Beat ${b + 1}) -->`);
             svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(beatY + 2.5).toFixed(2)}" class="beat-counter">${b + 1}</text>`);
           }
@@ -539,7 +542,7 @@ export function renderPageToSvg(
       }
     }
 
-    const octaveMode = layout.options.octaveExtensionMode || 'badge';
+    const octaveMode = layout.options.octaveExtensionMode || 'spillover';
 
     // Notes: First Hold Ribbons (for d > tauRef)
     for (const note of col.notes) {
@@ -567,7 +570,7 @@ export function renderPageToSvg(
 
     // Notes: Klavar Lateral Stems & Noteheads with White Halo Knockout & Octave Indicator Badges
     const morph = normalizeNoteheadMorphology(layout.options.noteheadMorphology);
-    const stemLength = 12.0;
+    const stemLength = 16.0;
 
     // Precalculate display pitches and coordinates for all notes in this column
     const displayPitchMap = new Map<string, number>();
@@ -668,13 +671,15 @@ export function renderPageToSvg(
       const { nx, ny, badgeText, badgeDirection } = noteCoordMap.get(note.id)!;
       const lPitch = displayPitchMap.get(note.id)!;
       const isEven = wholeToneParity(lPitch) === 0;
+      const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
+      const stemY = ny - nh / 2;
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (rawLPitch >= 60 ? 'RH' : 'LH');
 
       // Klavar lateral stem (flush to beam rail if clustered, standard length otherwise)
       const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
       const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
-      svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
+      svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${stemY.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${stemY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
 
       if (morph === 'phonetic') {
         const pc = ((lPitch % 12) + 12) % 12;
@@ -723,15 +728,11 @@ export function renderPageToSvg(
         }
       }
 
-      // Option 4 Octave Indicator Badge (Pip)
+      // Clean Thin Vector Octave Indicator (delicate vector text, zero heavy black blob rectangle)
       if (badgeText) {
-        const badgeW = 10.5;
-        const badgeH = 6.0;
-        const badgeX = nx - badgeW / 2;
-        const badgeY = badgeDirection === 'up' ? ny - 4.5 - badgeH : ny + 4.5;
-        svgParts.push(`    <!-- Option 4 Notehead Octave Badge -->`);
-        svgParts.push(`    <rect x="${badgeX.toFixed(2)}" y="${badgeY.toFixed(2)}" width="${badgeW.toFixed(2)}" height="${badgeH.toFixed(2)}" rx="1.5" fill="#111827"/>`);
-        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(badgeY + 4.6).toFixed(2)}" font-family="system-ui, -apple-system, sans-serif" font-weight="bold" font-size="4.2pt" fill="#FFFFFF" text-anchor="middle">${badgeText}</text>`);
+        const badgeY = badgeDirection === 'up' ? ny - 5.0 : ny + 9.0;
+        svgParts.push(`    <!-- Thin Vector Octave Indicator -->`);
+        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${badgeY.toFixed(2)}" font-family="system-ui, -apple-system, sans-serif" font-weight="bold" font-size="6pt" fill="#111827" text-anchor="middle">${badgeText}</text>`);
       }
 
       // Articulations
