@@ -76,20 +76,16 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     assert.equal(geom5.isDemarcation, true);
     assert.equal(geom5.lineWidth, 0.6);
 
-    // Demarcation Line at PC 8 (G#, Landmark 9) - Thin Straight Line
+    // Demarcation Line at PC 8 (G#, Landmark 9) - DROPPED per definitive design
     const geom9 = getStaffLineGeometry(8, style);
-    assert.equal(geom9.isLine, true);
-    assert.equal(geom9.isBold, false);
-    assert.equal(geom9.isDashed, false);
-    assert.equal(geom9.isDemarcation, true);
-    assert.equal(geom9.lineWidth, 0.6);
+    assert.equal(geom9.isLine, false, 'Line 8 must be dropped per user direction to lighten page');
 
     // Zero lines at non-integer pitch coordinates (no 4.5 floating line)
     const geom45 = getStaffLineGeometry(4.5, style);
     assert.equal(geom45.isLine, false, 'Non-integer 4.5 must not be a staff line');
 
-    // Hairlines across 2, 6 and 10 eliminated
-    [2, 6, 10].forEach((pc) => {
+    // Hairlines and non-landmark lines across 2, 6, 8, 10 eliminated
+    [2, 6, 8, 10].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
       assert.equal(g.isLine, false, `PC ${pc} must not be a line`);
     });
@@ -100,12 +96,12 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
       assert.equal(g.isLine, false, `PC ${pc} must be a space`);
     });
 
-    // Exactly 3 landmark lines per octave: PC 0, 4, 8
+    // Exactly 2 landmark lines per octave: PC 0 (octave) and PC 4 (fifth note dashed)
     let lineCount = 0;
     for (let pc = 0; pc < 12; pc++) {
       if (getStaffLineGeometry(pc, style).isLine) lineCount++;
     }
-    assert.equal(lineCount, 3, '1-5-9 staff must contain exactly 3 landmark lines per octave (1, 5, 9)');
+    assert.equal(lineCount, 2, 'Definitive staff must contain exactly 2 landmark lines per octave (0 and 4)');
   }
 });
 
@@ -1697,8 +1693,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   // Staff-line replacement knockout underlays for notes on staff lines
   assert.equal(
     verticalKnockouts.length,
-    38,
-    'Must render exactly 38 staff-line knockout lines in vertical orientation (32 for 1.0 lines, 6 for Middle C)'
+    37,
+    'Must render exactly 37 staff-line knockout lines in vertical orientation (line 8 dropped to lighten page)'
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
@@ -1791,8 +1787,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   );
   assert.equal(
     horizontalKnockouts.length,
-    38,
-    'Must render exactly 38 horizontal staff-line knockout lines'
+    37,
+    'Must render exactly 37 horizontal staff-line knockout lines (line 8 dropped to lighten page)'
   );
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
@@ -1888,10 +1884,8 @@ test('Complete Sidebar Controls & Drawer Integration Invariants', async () => {
     'ControlsDrawer must include tempo multiplier controls'
   );
 
-  // Design Presets, Topography, Notehead Morphology, Timeline Orientation, Color Mode
-  assert.ok(drawerSrc.includes('Curated Design Presets'), 'Must contain presets section');
-  assert.ok(drawerSrc.includes('Staff Topography'), 'Must contain Staff Topography section');
-  assert.ok(drawerSrc.includes('Notehead Morphology'), 'Must contain Notehead Morphology section');
+  // Definitive Design Architecture, Timeline Orientation, Color Mode
+  assert.ok(drawerSrc.includes('Definitive Iso-Notation'), 'Must contain Definitive Iso-Notation section');
   assert.ok(drawerSrc.includes('Timeline Orientation'), 'Must contain Timeline Orientation toggle');
   assert.ok(drawerSrc.includes('Color Spectrum'), 'Must contain Color Mode dropdown');
 });

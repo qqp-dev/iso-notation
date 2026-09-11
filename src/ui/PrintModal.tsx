@@ -20,7 +20,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
     () =>
       computeColumnarLayout(score, {
         staffStyle: renderOptions?.staffStyle ?? 'tritone-split',
-        noteheadMorphology: renderOptions?.noteheadMorphology ?? 'rectangle-square',
+        noteheadMorphology: renderOptions?.noteheadMorphology ?? 'duodecimal',
         octaveExtensionMode: renderOptions?.octaveExtensionMode ?? 'spillover',
         showBeatGrid: renderOptions?.showBeatGrid ?? true,
         showGutterBrackets: false,

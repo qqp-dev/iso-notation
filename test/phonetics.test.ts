@@ -9,6 +9,12 @@ import {
   solfegeSequence,
   solfegeString,
   pitchClassFromSyllable,
+  DUODECIMAL_SOLFEGE,
+  getDuodecimalSolfege,
+  getDuodecimalSyllable,
+  duodecimalSolfegeSequence,
+  duodecimalSolfegeString,
+  pitchClassFromDuodecimalSyllable,
 } from '../src/model/phonetics';
 import { pitchClassLabel, pitchLabel } from '../src/model/pitch';
 
@@ -163,4 +169,37 @@ test('Pitch label integration with phonetic formatting', () => {
   assert.equal(pitchLabel({ pitchClass: 0, octave: 2 }, 'phonetic'), 'ma1');
   // Concert A4 (440 Hz) is b4 -> bi4
   assert.equal(pitchLabel({ pitchClass: 9, octave: 4 }, 'phonetic'), 'bi4');
+});
+
+test('Duodecimal Monosyllabic Solfege Invariants (0-9, a, b)', () => {
+  assert.equal(DUODECIMAL_SOLFEGE.length, 12);
+  const syllables = DUODECIMAL_SOLFEGE.map((e) => e.syllable);
+  assert.deepEqual(syllables, ['o', 'wa', 'tu', 'ti', 'fo', 'fa', 'si', 'se', 'e', 'na', 'a', 'bi']);
+
+  // Row parity: Evens are Row 0, Odds are Row 1
+  DUODECIMAL_SOLFEGE.forEach((entry) => {
+    if (entry.pitchClass % 2 === 0) {
+      assert.equal(entry.row, 0, `Even PC ${entry.pitchClass} must belong to Row 0`);
+    } else {
+      assert.equal(entry.row, 1, `Odd PC ${entry.pitchClass} must belong to Row 1`);
+    }
+  });
+
+  // String formatting
+  assert.equal(duodecimalSolfegeString([0, 4, 7]), 'o-fo-se');
+  assert.equal(duodecimalSolfegeString([7, 6, 7, 2, 4]), 'se-si-se-tu-fo');
+
+  // Reverse lookup
+  assert.equal(pitchClassFromDuodecimalSyllable('o'), 0);
+  assert.equal(pitchClassFromDuodecimalSyllable('wa'), 1);
+  assert.equal(pitchClassFromDuodecimalSyllable('tu'), 2);
+  assert.equal(pitchClassFromDuodecimalSyllable('ti'), 3);
+  assert.equal(pitchClassFromDuodecimalSyllable('fo'), 4);
+  assert.equal(pitchClassFromDuodecimalSyllable('fa'), 5);
+  assert.equal(pitchClassFromDuodecimalSyllable('si'), 6);
+  assert.equal(pitchClassFromDuodecimalSyllable('se'), 7);
+  assert.equal(pitchClassFromDuodecimalSyllable('e'), 8);
+  assert.equal(pitchClassFromDuodecimalSyllable('na'), 9);
+  assert.equal(pitchClassFromDuodecimalSyllable('a'), 10);
+  assert.equal(pitchClassFromDuodecimalSyllable('bi'), 11);
 });

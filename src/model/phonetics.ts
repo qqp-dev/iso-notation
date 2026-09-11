@@ -215,3 +215,75 @@ export function pitchClassFromSyllable(syllable: string): number | undefined {
   );
   return entry ? entry.pitchClass : undefined;
 }
+
+/**
+ * Duodecimal Monosyllabic Solfege for 12-TET Iso-Notation.
+ *
+ * Direct, zero-cognitive-overhead monosyllabic phonemes derived as natural
+ * simplifications of spoken number names (0-9, a, b):
+ *   0: o  (oh / zero)
+ *   1: wa (one)
+ *   2: tu (two)
+ *   3: ti (three)
+ *   4: fo (four)
+ *   5: fa (five)
+ *   6: si (six)
+ *   7: se (seven)
+ *   8: e  (eight)
+ *   9: na (nine)
+ *   a: a  (a / ten)
+ *   b: bi (b / eleven)
+ *
+ * Invariants:
+ * - Evens (0, 2, 4, 6, 8, 10): Row 0 (Whole-Tone Line Parity)
+ * - Odds (1, 3, 5, 7, 9, 11): Row 1 (Whole-Tone Space Parity)
+ * - Semitones strictly alternate parity (Even <-> Odd)
+ * - Whole tones preserve parity (Row 0 -> Row 0, Row 1 -> Row 1)
+ */
+export interface DuodecimalSolfegeDefinition {
+  pitchClass: number; // 0..11
+  row: JankoRowIndex; // 0 | 1
+  digit: string;      // '0'..'9', 'a', 'b'
+  syllable: string;
+  derivation: string;
+}
+
+export const DUODECIMAL_SOLFEGE: readonly DuodecimalSolfegeDefinition[] = [
+  { pitchClass: 0, row: 0, digit: '0', syllable: 'o', derivation: 'oh (0)' },
+  { pitchClass: 1, row: 1, digit: '1', syllable: 'wa', derivation: 'one (1)' },
+  { pitchClass: 2, row: 0, digit: '2', syllable: 'tu', derivation: 'two (2)' },
+  { pitchClass: 3, row: 1, digit: '3', syllable: 'ti', derivation: 'three (3)' },
+  { pitchClass: 4, row: 0, digit: '4', syllable: 'fo', derivation: 'four (4)' },
+  { pitchClass: 5, row: 1, digit: '5', syllable: 'fa', derivation: 'five (5)' },
+  { pitchClass: 6, row: 0, digit: '6', syllable: 'si', derivation: 'six (6)' },
+  { pitchClass: 7, row: 1, digit: '7', syllable: 'se', derivation: 'seven (7)' },
+  { pitchClass: 8, row: 0, digit: '8', syllable: 'e', derivation: 'eight (8)' },
+  { pitchClass: 9, row: 1, digit: '9', syllable: 'na', derivation: 'nine (9)' },
+  { pitchClass: 10, row: 0, digit: 'a', syllable: 'a', derivation: 'ten / a (10)' },
+  { pitchClass: 11, row: 1, digit: 'b', syllable: 'bi', derivation: 'eleven / b (11)' },
+] as const;
+
+export function getDuodecimalSolfege(pitchClass: number): DuodecimalSolfegeDefinition {
+  const pc = ((pitchClass % 12) + 12) % 12;
+  return DUODECIMAL_SOLFEGE[pc];
+}
+
+export function getDuodecimalSyllable(pitchClass: number): string {
+  return getDuodecimalSolfege(pitchClass).syllable;
+}
+
+export function duodecimalSolfegeSequence(pitches: readonly number[]): string[] {
+  return pitches.map((p) => getDuodecimalSyllable(p));
+}
+
+export function duodecimalSolfegeString(pitches: readonly number[], delimiter: string = '-'): string {
+  return duodecimalSolfegeSequence(pitches).join(delimiter);
+}
+
+export function pitchClassFromDuodecimalSyllable(syllable: string): number | undefined {
+  const normalized = syllable.trim().toLowerCase();
+  const entry = DUODECIMAL_SOLFEGE.find(
+    (e) => e.syllable === normalized || e.digit === normalized
+  );
+  return entry ? entry.pitchClass : undefined;
+}

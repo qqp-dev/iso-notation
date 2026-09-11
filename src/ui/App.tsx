@@ -11,6 +11,48 @@ import { PhoneticSandbox } from './PhoneticSandbox';
 import { PrintModal } from './PrintModal';
 import { CompressionModal } from './CompressionModal';
 
+const STORAGE_KEY = 'iso-notation-render-options-v2';
+
+const DEFINITIVE_RENDER_OPTIONS: RenderOptions = {
+  orientation: 'vertical',
+  staffStyle: 'tritone-split',
+  noteheadMorphology: 'duodecimal',
+  notationStyle: 'tritone-split',
+  noteheadStyle: 'duodecimal',
+  colorMode: 'duration-class',
+  zoom: 1.0,
+  pixelsPerTick: 2.0,
+  pixelsPerSemitone: 11,
+  showHandCrossings: false,
+  showBarlines: true,
+  showGridLines: true,
+  showBeatGrid: true,
+  showGutterBrackets: false,
+  octaveExtensionMode: 'spillover',
+  currentTick: 0,
+};
+
+function getInitialRenderOptions(): RenderOptions {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...DEFINITIVE_RENDER_OPTIONS,
+        ...parsed,
+        staffStyle: 'tritone-split',
+        noteheadMorphology: 'duodecimal',
+        notationStyle: 'tritone-split',
+        noteheadStyle: 'duodecimal',
+        currentTick: 0,
+      };
+    }
+  } catch (e) {
+    // Ignore storage parse errors
+  }
+  return DEFINITIVE_RENDER_OPTIONS;
+}
+
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('score');
   const [selectedScoreId, setSelectedScoreId] = useState<string>('bach-goldberg-var1');
@@ -27,25 +69,8 @@ export const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Render options state
-  const [renderOptions, setRenderOptions] = useState<RenderOptions>({
-    orientation: 'vertical',
-    staffStyle: 'tritone-split',
-    noteheadMorphology: 'rectangle-square',
-    notationStyle: 'wholetone-staff',
-    noteheadStyle: 'rectangle-square',
-    colorMode: 'duration-class',
-    zoom: 1.0,
-    pixelsPerTick: 2.0,
-    pixelsPerSemitone: 11,
-    showHandCrossings: false,
-    showBarlines: true,
-    showGridLines: true,
-    showBeatGrid: true,
-    showGutterBrackets: false,
-    octaveExtensionMode: 'spillover',
-    currentTick: 0,
-  });
+  // Render options state: always default to Definitive Duodecimal Iso-Notation
+  const [renderOptions, setRenderOptions] = useState<RenderOptions>(getInitialRenderOptions);
 
   // Keep renderOptions.currentTick in sync
   useEffect(() => {
@@ -65,7 +90,23 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateOptions = (newOpts: Partial<RenderOptions>) => {
-    setRenderOptions((prev) => ({ ...prev, ...newOpts }));
+    setRenderOptions((prev) => {
+      const updated = {
+        ...prev,
+        ...newOpts,
+        staffStyle: 'tritone-split' as const,
+        noteheadMorphology: 'duodecimal' as const,
+        notationStyle: 'tritone-split' as const,
+        noteheadStyle: 'duodecimal' as const,
+      };
+      try {
+        const { currentTick: _, ...toSave } = updated;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      } catch (e) {
+        // Ignore
+      }
+      return updated;
+    });
   };
 
   // MIDI File Ingestion

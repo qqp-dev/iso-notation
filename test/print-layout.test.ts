@@ -136,7 +136,7 @@ test('Columnar Engraving Geometry Invariant: Bach Goldberg Variation 1', () => {
 
 test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector SVG', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
+  const layout = computeColumnarLayout(score, { noteheadMorphology: 'row-parity-shape' });
   const svgs = renderAllPagesToSvg(layout);
 
   assert.equal(svgs.length, 4, 'Must produce SVGs for all 4 pages in the luxurious Urtext layout');
@@ -147,12 +147,12 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // 1. Pure white background for paper savings & laser printing
     assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
 
-    // 2. 1-5-9 Staff Topography lines (Symmetric 3-Line)
+    // 2. Definitive Staff Topography lines (2-Line Landmark Staff)
     // - Refined octave line (PC 0, 1.0pt)
     // - Thin 5 demarcation line at PC 4 (0.6pt, dasharray 5,2.5)
     assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain thin 0.6pt 5 demarcation line');
-    // - Thin straight 9 demarcation line at PC 8 (0.6pt)
-    assert.match(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must contain thin 0.6pt 9 demarcation line');
+    // - Line at PC 8 dropped per definitive design to lighten up page
+    assert.doesNotMatch(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must NOT contain line 8 (dropped to lighten up page)');
     // - Zero clunky hairlines (PC 2, 6, 8, 10 eliminated)
     assert.doesNotMatch(svg, /stroke="#888888"[^>]*stroke-width="0\.5"/, 'Hairlines must be eliminated for decluttered staff');
     // - Zero old 8,3.5 dashes
@@ -207,15 +207,19 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   );
 
   // Verify renderColumnarScoreToSvg helper
-  const page0Svg = renderColumnarScoreToSvg(score, 0);
+  const page0Svg = renderColumnarScoreToSvg(score, 0, { noteheadMorphology: 'row-parity-shape' });
   assert.equal(page0Svg, svgs[0]);
-  const defaultSvg = renderColumnarScoreToSvg(score);
+  const defaultSvg = renderColumnarScoreToSvg(score, { noteheadMorphology: 'row-parity-shape' });
   assert.equal(defaultSvg, svgs[0]);
+
+  // Default rendering must be duodecimal
+  const defaultDuoSvg = renderColumnarScoreToSvg(score);
+  assert.match(defaultDuoSvg, /class="duo-digit"/, 'Default score rendering must be duodecimal');
 });
 
 test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored Notes Invariant', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
+  const layout = computeColumnarLayout(score, { noteheadMorphology: 'row-parity-shape' });
   const svgs = layout.pages.map((_, p) => renderPageToSvg(layout, p));
   const fullScoreSvg = svgs.join('\n');
 
@@ -372,7 +376,7 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
 
 test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
+  const layout = computeColumnarLayout(score, { noteheadMorphology: 'row-parity-shape' });
   const svg = renderPageToSvg(layout, 0);
 
   // Optical Notehead Sizing Invariant (Midpoint Taller Noteheads):
@@ -449,7 +453,7 @@ test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine
     ],
   };
 
-  const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0);
+  const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0, { noteheadMorphology: 'row-parity-shape' });
   const testDirectional = Array.from(testSvg.matchAll(directionalRegex));
   assert.equal(testDirectional.length, 2, 'SVG must render directional noteheads strictly for the 2 exception notes');
 
@@ -627,15 +631,15 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
     noteheadMorphology: 'rectangle-square',
   });
 
-  // 1. Staff Lines: 1, 5, 9 (Symmetric 3-Line Staff with m3 Spine Hierarchy)
+  // 1. Staff Lines: Definitive 2-Line Staff with m3 Spine Hierarchy
   // PC 0 (m3): authoritative bold 1.35pt solid line
   assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.35"/, 'Must contain bold 1.35pt central spine line (m3)');
-  // PC 0 (m1, m2, m4, m5): uniform 1.0pt octave lines, visibly thicker than line 9
+  // PC 0 (m1, m2, m4, m5): uniform 1.0pt octave lines
   assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.0"/, 'Must contain uniform 1.0pt octave lines for m1, m2, m4, m5');
   // PC 4: small dashes 5,2.5
   assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain small dashed line for 5');
-  // PC 8: thin straight solid line
-  assert.match(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must contain thin straight solid line for 9');
+  // PC 8: thin straight solid line dropped
+  assert.doesNotMatch(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must NOT contain thin straight solid line for 9 (dropped)');
   
   // 5 and 9 dropped from top:
   assert.doesNotMatch(svg, /class="pitch-label"[^>]*>3<\/text>/, 'Must not render header label for 3');

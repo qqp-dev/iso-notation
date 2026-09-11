@@ -190,7 +190,7 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
 export function normalizeStaffStyle(
   style?: StaffStyle | string
 ): 'wholetone-uniform' | 'tritone-split' | 'augmented-3line' | 'octave-ribbons' | 'chromatic-grid' {
-  if (!style) return 'wholetone-uniform';
+  if (!style) return 'tritone-split';
   if (style === 'wholetone-uniform' || style === 'wholetone-uniform-6' || style === 'wholetone-staff') {
     return 'wholetone-uniform';
   }
@@ -211,7 +211,7 @@ export function normalizeStaffStyle(
   if (style === 'chromatic-grid') {
     return 'chromatic-grid';
   }
-  return 'wholetone-uniform';
+  return 'tritone-split';
 }
 
 export const DUODECIMAL_DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b'] as const;
@@ -224,11 +224,7 @@ export function getDuodecimalDigit(pitchClass: number): string {
 export function normalizeNoteheadMorphology(
   morph?: NoteheadMorphology | string
 ): 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'duodecimal' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle' {
-  if (!morph) return 'rectangle-square';
-  if (morph === 'classic-oval') return 'classic-oval';
-  if (morph === 'row-parity-shape' || morph === 'row-parity-shapes') return 'row-parity-shape';
-  if (morph === 'phonetic' || morph === 'phonetic-tokens') return 'phonetic';
-  if (morph === 'numerical' || morph === 'numerical-digits') return 'numerical';
+  if (!morph) return 'duodecimal';
   if (
     morph === 'duodecimal' ||
     morph === 'duodecimal-digits' ||
@@ -238,6 +234,10 @@ export function normalizeNoteheadMorphology(
   ) {
     return 'duodecimal';
   }
+  if (morph === 'classic-oval') return 'classic-oval';
+  if (morph === 'row-parity-shape' || morph === 'row-parity-shapes') return 'row-parity-shape';
+  if (morph === 'phonetic' || morph === 'phonetic-tokens') return 'phonetic';
+  if (morph === 'numerical' || morph === 'numerical-digits') return 'numerical';
   if (morph === 'minimal-dot' || morph === 'minimal-dots') return 'minimal-dot';
   if (
     morph === 'rectangle-square' ||
@@ -254,7 +254,7 @@ export function normalizeNoteheadMorphology(
   ) {
     return 'rectangle-square';
   }
-  return 'rectangle-square';
+  return 'duodecimal';
 }
 
 export interface StaffLineGeometry {
@@ -320,13 +320,12 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'tritone-split') {
-    // 1-5-9 Symmetric 3-Line Staff Topography:
-    // 3 landmark lines per octave (symmetrical 4-semitone / major-third spacing):
-    // - PC 0 (Note 1): bold octave boundary line ('m', 1.2px)
-    // - PC 4 (Note 5): dashed line ('5', 0.6px, small dashes [5, 2.5])
-    // - PC 8 (Note 9): thin straight solid line ('9', 0.6px, thinner than octave)
-    // Line 3 (PC 2) is dropped for symmetry.
-    // Row 0 notes (1, 3, 5, 7, 9, 11) are Full Squares; Row 1 notes (2, 4, 6, 8, 10, 12) are Empty Squares.
+    // Definitive 2-Line Landmark Staff Topography:
+    // 2 landmark lines per octave:
+    // - PC 0 (Note 0): bold octave boundary line ('m', 1.2px)
+    // - PC 4 (Note 4 / 5th pitch): dashed demarcation line ('4', 0.6px, small dashes [5, 2.5])
+    // Line 8 (Note 8 / 9th pitch, solid line opposite dashed) is dropped per definitive design
+    // to lighten the page, as informationally dense duodecimal digits communicate relative position cleanly.
     if (pc === 0) {
       return {
         isLine: true,
@@ -349,18 +348,6 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isOctaveBoundary: false,
         lineWidth: 0.6,
         color: 'rgba(255, 255, 255, 0.55)',
-      };
-    }
-    if (pc === 8) {
-      return {
-        isLine: true,
-        isBold: false,
-        isDashed: false,
-        isTritone: false,
-        isDemarcation: true,
-        isOctaveBoundary: false,
-        lineWidth: 0.6,
-        color: 'rgba(255, 255, 255, 0.45)',
       };
     }
     return {

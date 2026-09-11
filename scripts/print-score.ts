@@ -40,7 +40,7 @@ function parseArgs(args: string[]): PrintOptions {
     direct: false,
     pjl: true,
     paperSize: 'letter',
-    morphology: 'rectangle-square',
+    morphology: 'duodecimal',
     colorMode: 'color',
   };
 
@@ -133,7 +133,7 @@ export async function generateScorePostscript(
   scoreId: string,
   pageIndex?: number,
   paperSize: 'letter' | 'A4' = 'letter',
-  morphology: NoteheadMorphology = 'rectangle-square',
+  morphology: NoteheadMorphology = 'duodecimal',
   colorMode: 'color' | 'mono' = 'color'
 ): Promise<{ psBuffer: Buffer; svgPaths: string[]; layout: ReturnType<typeof computeColumnarLayout> }> {
   const scoreBuilder = BENCHMARK_SCORES[scoreId];

@@ -88,7 +88,7 @@ export interface PrintLayoutOptions {
   pageMarginMm?: number; // default: 10mm
   columnGapMm?: number; // default: 8mm
   staffStyle?: StaffStyle; // default: 'tritone-split'
-  noteheadMorphology?: NoteheadMorphology; // default: 'row-parity-shape'
+  noteheadMorphology?: NoteheadMorphology; // default: 'duodecimal'
   holdRibbonWidthPt?: number; // default: 4pt
   minPitch?: number; // optional manual pitch bounds
   maxPitch?: number;
@@ -157,7 +157,7 @@ const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   pageMarginMm: 10,
   columnGapMm: 8,
   staffStyle: 'tritone-split',
-  noteheadMorphology: 'row-parity-shape',
+  noteheadMorphology: 'duodecimal',
   holdRibbonWidthPt: 4,
   minPitch: 0,
   maxPitch: 127,
@@ -482,12 +482,10 @@ export function renderPageToSvg(
             svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
           }
         } else if (pc === 4) {
-          // Landmark 5 small dashes
+          // Landmark 4 small dashes (fifth note)
           svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="5,2.5"/>`);
-        } else if (pc === 8) {
-          // Landmark 9 thin straight line
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#555555" stroke-width="0.6"/>`);
         }
+        // pc === 8 (thin straight solid line) dropped per definitive design to lighten the page
       } else {
         // Fallback whole-tone uniform
         if (pc % 2 === 0) {
