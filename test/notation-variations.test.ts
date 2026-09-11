@@ -1351,7 +1351,7 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   );
 });
 
-test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails Invariant (d >= ticksPerBeat with concurrent onsets)', () => {
+test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for All Colored Notes with Staff-Line Knockout', () => {
   const score = buildBachGoldbergVar1Score();
 
   type DottedTrail = {
@@ -1365,10 +1365,19 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
     dash: number[];
   };
 
+  type KnockoutLine = {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    lineWidth: number;
+  };
+
   const createMock = (
     dottedTrails: DottedTrail[],
     ribbons: { x: number; y: number; w: number; h: number }[],
-    textCalls: string[]
+    textCalls: string[],
+    knockoutLines: KnockoutLine[] = []
   ) => {
     let currentDash: number[] = [];
     let currentAlpha = 1.0;
@@ -1436,6 +1445,20 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
             alpha: currentAlpha,
             dash: [...currentDash],
           });
+        } else if (
+          currentStrokeStyle === '#000000' &&
+          currentDash.length === 0 &&
+          (currentLineWidth === 3.0 || currentLineWidth === 2.0) &&
+          pathStart &&
+          pathEnd
+        ) {
+          knockoutLines.push({
+            x1: pathStart.x,
+            y1: pathStart.y,
+            x2: pathEnd.x,
+            y2: pathEnd.y,
+            lineWidth: currentLineWidth,
+          });
         }
       },
       fill: noop,
@@ -1463,18 +1486,9 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
   const paddingStart = 60;
   const paddingPitch = 40;
 
-  const ticksPerBeat = score.ticksPerBeat || 48;
-  const polyLongNotes = score.notes.filter(
-    (n) =>
-      n.durationTicks >= ticksPerBeat &&
-      score.notes.some(
-        (other) =>
-          other.id !== n.id &&
-          other.startTick > n.startTick &&
-          other.startTick < n.startTick + n.durationTicks
-      )
-  );
-  assert.equal(polyLongNotes.length, 2, 'Goldberg Var 1 contains exactly 2 notes with d >= ticksPerBeat and concurrent onsets');
+  const tauRef = score.gridResolution || 12;
+  const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+  assert.equal(coloredNotes.length, 165, 'Goldberg Var 1 contains exactly 165 colored notes (d > tauRef)');
   const longNote = score.notes.find((n) => n.durationTicks === 108)!;
 
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1483,10 +1497,11 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
 
   // 1. Vertical orientation
   const verticalDottedTrails: DottedTrail[] = [];
+  const verticalKnockouts: KnockoutLine[] = [];
   const verticalRibbons: { x: number; y: number; w: number; h: number }[] = [];
   const verticalTexts: string[] = [];
 
-  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts), score, {
+  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts, verticalKnockouts), score, {
     orientation: 'vertical',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
@@ -1503,19 +1518,25 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
   // Zero hold ribbon rects
   assert.equal(verticalRibbons.length, 0, 'Vertical hold ribbons must be 0');
 
-  // Dotted continuation trail rendered strictly for the notes with concurrent onsets
-  // (bach-var1-116 and bach-var1-343), while cadence quarter notes (282, 550, 551) have zero trails
+  // Dotted continuation trails rendered for all 165 colored notes
   assert.equal(
     verticalDottedTrails.length,
-    2,
-    'Must render exactly 2 faint dotted trails for notes with d >= ticksPerBeat and concurrent onsets'
+    165,
+    'Must render exactly 165 faint dotted trails for all colored notes in vertical orientation'
+  );
+
+  // Knockout lines rendered behind notes that fall on staff lines (38 notes on staff lines)
+  assert.equal(
+    verticalKnockouts.length,
+    38,
+    'Must render exactly 38 staff-line knockout lines in vertical orientation'
   );
 
   const vTrail = verticalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
   assert.ok(vTrail, 'Must find trail for 108t pedal note');
   assert.deepEqual(vTrail.dash, [2, 3], 'Trail dash pattern must be [2, 3]');
   assert.equal(vTrail.lineWidth, 0.8, 'Trail stroke width must be 0.8px');
-  assert.equal(vTrail.alpha, 0.45, 'Trail opacity must be 0.45');
+  assert.equal(vTrail.alpha, 0.50, 'Trail opacity must be 0.50');
   assert.equal(vTrail.stroke, '#F43F5E', 'Trail stroke color must match duration class (#F43F5E for 108t)');
 
   // Coordinates:
@@ -1544,10 +1565,11 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
 
   // 2. Horizontal orientation
   const horizontalDottedTrails: DottedTrail[] = [];
+  const horizontalKnockouts: KnockoutLine[] = [];
   const horizontalRibbons: { x: number; y: number; w: number; h: number }[] = [];
   const horizontalTexts: string[] = [];
 
-  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts), score, {
+  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts, horizontalKnockouts), score, {
     orientation: 'horizontal',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
@@ -1562,7 +1584,16 @@ test('Unified Euclidean Duration Lattice: Polyphonic Dotted Continuation Trails 
   });
 
   assert.equal(horizontalRibbons.length, 0, 'Horizontal hold ribbons must be 0');
-  assert.equal(horizontalDottedTrails.length, 2, 'Must render exactly 2 horizontal dotted trails');
+  assert.equal(
+    horizontalDottedTrails.length,
+    165,
+    'Must render exactly 165 horizontal dotted trails for all colored notes'
+  );
+  assert.equal(
+    horizontalKnockouts.length,
+    38,
+    'Must render exactly 38 horizontal staff-line knockout lines'
+  );
 
   const hTrail = horizontalDottedTrails.find((t) => t.stroke === '#F43F5E')!;
   assert.ok(hTrail, 'Must find horizontal trail for 108t pedal note');

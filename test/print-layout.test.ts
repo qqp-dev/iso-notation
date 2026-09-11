@@ -198,7 +198,7 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   // Verify SVG print layout renders faint dotted continuation line (stroke-dasharray="2,3") for long notes (d > ticksPerBeat, e.g. 108t note in Bar 20)
   assert.match(
     fullScoreSvg,
-    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="0\.75" stroke-dasharray="2,3" opacity="0\.45"\/>/,
+    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="0\.8" stroke-dasharray="2,3" opacity="0\.50"\/>/,
     'Must render faint dotted continuation line (stroke-dasharray="2,3") for long notes'
   );
 
@@ -209,7 +209,7 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
   assert.equal(defaultSvg, svgs[0]);
 });
 
-test('Pure Noteheads for Regular Notes and Faint Dotted Continuation Line for Long Notes Invariant', () => {
+test('Pure Noteheads for 16th Notes and Faint Dotted Continuation Lines for All Colored Notes Invariant', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = layout.pages.map((_, p) => renderPageToSvg(layout, p));
@@ -219,30 +219,45 @@ test('Pure Noteheads for Regular Notes and Faint Dotted Continuation Line for Lo
   assert.doesNotMatch(fullScoreSvg, /Hand Crossing Overlay/, 'Must contain zero Hand Crossing Overlay rects or comments');
   assert.doesNotMatch(fullScoreSvg, /LH\/RH Cross/, 'Must contain zero LH/RH Cross banners');
 
-  // 2. Zero hold ribbon lines for notes with d <= ticksPerBeat (12t, 24t, 36t, 48t)
-  assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2") for regular notes');
+  // 2. Zero hold ribbon lines for 16th notes (stroke-width="1.2")
+  assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2")');
 
-  // 3. Faint dotted continuation line for long notes (d > ticksPerBeat, e.g. 108t note in Bar 20)
+  // 3. Faint dotted continuation line for all colored notes (d > tauRef, 165 notes total in Goldberg Var 1)
+  const tauRef = score.gridResolution || 12;
+  const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+  assert.equal(coloredNotes.length, 165, 'Must have exactly 165 colored notes in Goldberg Var 1');
+
+  const dottedRegex =
+    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-dasharray="2,3" opacity="0\.50"\/>/g;
+  const allDotted = Array.from(fullScoreSvg.matchAll(dottedRegex));
+  assert.equal(allDotted.length, 165, 'Must render exactly 165 faint dotted continuation lines across full score (1 for each colored note)');
+
+  // 4. Staff Line Replacement (knockout underlay for notes on staff lines: 38 line notes)
+  const knockoutRegex =
+    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="#FFFFFF" stroke-width="(2\.5|1\.8)" stroke-linecap="butt"\/>/g;
+  const allKnockouts = Array.from(fullScoreSvg.matchAll(knockoutRegex));
+  assert.equal(allKnockouts.length, 38, 'Must render exactly 38 white staff-line knockouts across full score');
+
+  // 5. Clean termination without explicit stop ticks or release crossbars
+  assert.doesNotMatch(fullScoreSvg, /class="stop-tick"/, 'Must have zero explicit stop ticks');
+  assert.doesNotMatch(fullScoreSvg, /class="release-crossbar"/, 'Must have zero explicit release crossbars');
+
+  // 6. Check the 108t long note in Bar 20
   const longNote = score.notes.find((n) => n.durationTicks > 48);
   assert.ok(longNote, 'Must find 108t long note in Goldberg Var 1');
   assert.equal(longNote.durationTicks, 108);
 
-  // Check the dotted line rendered for the 108t note
   const longNoteColumn = layout.columns.find((c) => c.notes.some((n) => n.id === longNote.id))!;
   const pageSvg = svgs[longNoteColumn.pageIndex];
-  const dottedMatches = Array.from(
-    pageSvg.matchAll(
-      /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.75" stroke-dasharray="2,3" opacity="0\.45"\/>/g
-    )
-  );
-  assert.equal(dottedMatches.length, 1, 'Must contain exactly 1 faint dotted continuation line for the Bar 20 sustain');
+  const pageDottedMatches = Array.from(pageSvg.matchAll(dottedRegex));
+  const longNoteMatch = pageDottedMatches.find((m) => m[5] === '#BE123C');
+  assert.ok(longNoteMatch, 'Must find dotted continuation line for the Bar 20 sustain');
 
-  const match = dottedMatches[0];
-  const x1 = parseFloat(match[1]);
-  const y1 = parseFloat(match[2]);
-  const x2 = parseFloat(match[3]);
-  const y2 = parseFloat(match[4]);
-  const stroke = match[5];
+  const x1 = parseFloat(longNoteMatch[1]);
+  const y1 = parseFloat(longNoteMatch[2]);
+  const x2 = parseFloat(longNoteMatch[3]);
+  const y2 = parseFloat(longNoteMatch[4]);
+  const stroke = longNoteMatch[5];
 
   // Vertical line: x1 === x2
   assert.equal(x1, x2, 'Continuation line must be perfectly vertical');
@@ -764,7 +779,7 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(page1Svg.includes(`.subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }`));
   assert.ok(page1Svg.includes(`.meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
   assert.ok(page1Svg.includes(`.section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
-  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #333333; text-anchor: start; }`));
+  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: end; }`));
   assert.ok(!page1Svg.includes('.beat-counter'), 'Must not include .beat-counter style');
   assert.ok(page1Svg.includes(`.pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }`));
 
@@ -772,7 +787,7 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(page1Svg.includes(`font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">m3</text>`));
 });
 
-test('A4 Columnar Layout & Geometry Invariants: 14pt left clearance, measure number above m1, zero beat counter', () => {
+test('A4 Columnar Layout & Geometry Invariants: 14pt left clearance, measure number in margin clear of m1, zero beat counter', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const page0Svg = renderPageToSvg(layout, 0);
@@ -796,12 +811,20 @@ test('A4 Columnar Layout & Geometry Invariants: 14pt left clearance, measure num
   assert.ok(page0Svg.includes(`x1="${col0StaffLeftPt.toFixed(2)}" y1="`));
   assert.ok(page0Svg.includes(`x2="${rightStaffBound.toFixed(2)}" y2="`));
 
-  // Measure number rendered at the top of each column above m1 / start of staff
+  // Measure number rendered in left margin clear of m1
   const staffOriginY = marginPt + 42 + 16;
   assert.match(
     page0Svg,
-    new RegExp(`<text x="${col0StaffLeftPt.toFixed(2)}" y="${(staffOriginY - 4).toFixed(2)}" class="measure-num" text-anchor="start">${col0.startMeasure}</text>`)
+    new RegExp(`<text x="${(col0StaffLeftPt - 4).toFixed(2)}" y="${(staffOriginY + 8).toFixed(2)}" class="measure-num">${col0.startMeasure}</text>`)
   );
+
+  // Assert measure number coordinate does not overlap with m1 (which is at x = col0StaffLeftPt, y = colTopPt + 10)
+  const colTopPt = marginPt + 42;
+  const m1Y = colTopPt + 10;
+  const measureNumX = col0StaffLeftPt - 4;
+  const measureNumY = staffOriginY + 8;
+  assert.notEqual(measureNumX, col0StaffLeftPt, 'Measure number X must be shifted into left margin to clear m1');
+  assert.notEqual(measureNumY, m1Y, 'Measure number Y must not overlap with m1 header');
 
   // SVG does NOT contain <text class="beat-counter">
   assert.doesNotMatch(page0Svg, /<text[^>]*class="beat-counter"/);

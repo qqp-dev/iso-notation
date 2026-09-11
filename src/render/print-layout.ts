@@ -335,7 +335,7 @@ export function renderPageToSvg(
       .subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }
       .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
       .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
-      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #333333; text-anchor: start; }
+      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: end; }
       .pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }
       .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
   svgParts.push(`    </style>`);
@@ -500,9 +500,9 @@ export function renderPageToSvg(
       // Barline across staff
       svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
 
-      // Measure number label: only for the first bar of each column, placed at top of column above m1
+      // Measure number label: only for the first bar of each column, placed in left margin clear of m1
       if (m === 0) {
-        svgParts.push(`    <text x="${colStaffLeftPt.toFixed(2)}" y="${(staffOriginY - 4).toFixed(2)}" class="measure-num" text-anchor="start">${col.startMeasure}</text>`);
+        svgParts.push(`    <text x="${(colStaffLeftPt - 4).toFixed(2)}" y="${(staffOriginY + 8).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
       }
     }
 
@@ -623,20 +623,14 @@ export function renderPageToSvg(
       noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
     }
 
-    // Notes: Faint Dotted Continuation Trails for Long Notes (d >= ticksPerBeat with concurrent onsets)
+    // Notes: Faint Dotted Continuation Trails for All Colored Notes (durationTicks > tauRef)
     for (const note of col.notes) {
-      const showTrail =
-        note.durationTicks >= ticksPerBeat &&
-        score.notes.some(
-          other =>
-            other.id !== note.id &&
-            other.startTick > note.startTick &&
-            other.startTick < note.startTick + note.durationTicks
-        );
-
-      if (showTrail) {
+      if (note.durationTicks > tauRef) {
         const { nx, ny } = noteCoordMap.get(note.id)!;
         const lPitch = displayPitchMap.get(note.id)!;
+        const geom = getStaffLineGeometry(lPitch, normStaffStyle);
+        const isOnStaffLine = geom.isLine;
+
         const isEven = wholeToneParity(lPitch) === 0;
         const noteHeight = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
         const trailStartY = ny + noteHeight / 2 + 2;
@@ -645,7 +639,11 @@ export function renderPageToSvg(
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
         if (trailEndY > trailStartY) {
-          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.75" stroke-dasharray="2,3" opacity="0.45"/>`);
+          if (isOnStaffLine) {
+            const knockoutWidth = geom.isBold ? 2.5 : 1.8;
+            svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="#FFFFFF" stroke-width="${knockoutWidth}" stroke-linecap="butt"/>`);
+          }
+          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-dasharray="2,3" opacity="0.50"/>`);
         }
       }
     }
