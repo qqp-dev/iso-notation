@@ -1500,7 +1500,6 @@ test('Piano Roll View: 1:1 Geometric Equivalence & Chromatic DAW Alignment', () 
   assert.equal(isoDims.maxPitch, rollDims.maxPitch, 'Pitch bounds must be identical');
 
   // Verify Canvas renders piano roll note blocks and piano keyboard
-  let noteBlocksDrawn = 0;
   let filledRects = 0;
   const mockCtx = {
     save: () => {},
@@ -1513,15 +1512,15 @@ test('Piano Roll View: 1:1 Geometric Equivalence & Chromatic DAW Alignment', () 
     fill: () => {},
     fillRect: () => { filledRects++; },
     strokeRect: () => {},
-    roundRect: () => { noteBlocksDrawn++; },
+    roundRect: () => {},
     fillText: () => {},
     setLineDash: () => {},
   } as unknown as CanvasRenderingContext2D;
 
   renderScoreToCanvas(mockCtx, score, { ...options, viewMode: 'pianoroll' });
 
-  assert.ok(noteBlocksDrawn >= score.notes.length, 'Every note must be rendered as a piano roll duration block');
-  assert.ok(filledRects > 0, 'Must render chromatic lanes and piano keyboard header');
+  // Each note renders at least 2 fillRects (body + onset accent) plus keyboard and lanes
+  assert.ok(filledRects >= score.notes.length * 2, 'Every note must be rendered as a fast fillRect duration block');
 });
 
 

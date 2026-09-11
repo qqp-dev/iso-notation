@@ -105,44 +105,86 @@ export function renderScoreToCanvas(
     const isBlackKey = (pc: number) => [1, 3, 6, 8, 10].includes(pc);
     const semitoneWidth = options.pixelsPerSemitone;
 
-    // 2a. Chromatic Lane backgrounds & pitch separators
+    // 2a. Fill only black key lanes (white key lanes remain pitch-black canvas background)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
-      const black = isBlackKey(pc);
-
-      if (isHoriz) {
-        const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
-        ctx.fillStyle = black ? '#141416' : '#08080a';
-        ctx.fillRect(paddingStart, y - semitoneWidth / 2, dims.width - paddingStart, semitoneWidth);
-
-        ctx.strokeStyle = pc === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.07)';
-        ctx.lineWidth = pc === 0 ? (p === 48 ? 1.5 : 1.0) : 0.5;
-        if (p === 48) ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
-        ctx.beginPath();
-        ctx.moveTo(paddingStart, y - semitoneWidth / 2);
-        ctx.lineTo(dims.width, y - semitoneWidth / 2);
-        ctx.stroke();
-      } else {
-        const x = paddingPitch + (p - minPitch) * semitoneWidth;
-        ctx.fillStyle = black ? '#141416' : '#08080a';
-        ctx.fillRect(x - semitoneWidth / 2, paddingStart, semitoneWidth, dims.height - paddingStart);
-
-        ctx.strokeStyle = pc === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.07)';
-        ctx.lineWidth = pc === 0 ? (p === 48 ? 1.5 : 1.0) : 0.5;
-        if (p === 48) ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
-        ctx.beginPath();
-        ctx.moveTo(x - semitoneWidth / 2, paddingStart);
-        ctx.lineTo(x - semitoneWidth / 2, dims.height);
-        ctx.stroke();
+      if (isBlackKey(pc)) {
+        if (isHoriz) {
+          const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
+          ctx.fillRect(paddingStart, y - semitoneWidth / 2, dims.width - paddingStart, semitoneWidth);
+        } else {
+          const x = paddingPitch + (p - minPitch) * semitoneWidth;
+          ctx.fillRect(x - semitoneWidth / 2, paddingStart, semitoneWidth, dims.height - paddingStart);
+        }
       }
     }
 
-    // 2b. Piano Keyboard Header (with active sounding key lights)
-    const activePitchSet = new Set(
-      score.notes
-        .filter(n => options.currentTick >= n.startTick && options.currentTick < n.startTick + n.durationTicks)
-        .map(n => linearIndex(n.pitch))
-    );
+    // 2b. Batched chromatic lane separator lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let p = minPitch; p <= maxPitch; p++) {
+      const pc = ((p % 12) + 12) % 12;
+      if (pc !== 0) {
+        if (isHoriz) {
+          const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
+          ctx.moveTo(paddingStart, y - semitoneWidth / 2);
+          ctx.lineTo(dims.width, y - semitoneWidth / 2);
+        } else {
+          const x = paddingPitch + (p - minPitch) * semitoneWidth;
+          ctx.moveTo(x - semitoneWidth / 2, paddingStart);
+          ctx.lineTo(x - semitoneWidth / 2, dims.height);
+        }
+      }
+    }
+    ctx.stroke();
+
+    // 2c. Batched octave boundary lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    for (let p = minPitch; p <= maxPitch; p++) {
+      const pc = ((p % 12) + 12) % 12;
+      if (pc === 0 && p !== 48) {
+        if (isHoriz) {
+          const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
+          ctx.moveTo(paddingStart, y - semitoneWidth / 2);
+          ctx.lineTo(dims.width, y - semitoneWidth / 2);
+        } else {
+          const x = paddingPitch + (p - minPitch) * semitoneWidth;
+          ctx.moveTo(x - semitoneWidth / 2, paddingStart);
+          ctx.lineTo(x - semitoneWidth / 2, dims.height);
+        }
+      }
+    }
+    ctx.stroke();
+
+    // 2d. Middle C (C4 / m3) prominent amber axis
+    if (minPitch <= 48 && maxPitch >= 48) {
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (isHoriz) {
+        const y = height - paddingPitch - (48 - minPitch) * semitoneWidth;
+        ctx.moveTo(paddingStart, y - semitoneWidth / 2);
+        ctx.lineTo(dims.width, y - semitoneWidth / 2);
+      } else {
+        const x = paddingPitch + (48 - minPitch) * semitoneWidth;
+        ctx.moveTo(x - semitoneWidth / 2, paddingStart);
+        ctx.lineTo(x - semitoneWidth / 2, dims.height);
+      }
+      ctx.stroke();
+    }
+
+    // 2e. Piano Keyboard Header (pre-allocate active pitches efficiently)
+    const activePitchSet = new Set<number>();
+    for (let i = 0; i < score.notes.length; i++) {
+      const n = score.notes[i];
+      if (options.currentTick >= n.startTick && options.currentTick < n.startTick + n.durationTicks) {
+        activePitchSet.add(linearIndex(n.pitch));
+      }
+    }
 
     if (!isHoriz) {
       // Vertical timeline keyboard at top margin
@@ -474,13 +516,7 @@ export function renderScoreToCanvas(
         const by = y - blockH / 2;
 
         ctx.fillStyle = blockFill;
-        ctx.beginPath();
-        ctx.roundRect(bx, by, blockW, blockH, 1.5);
-        ctx.fill();
-
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 0.75;
-        ctx.stroke();
+        ctx.fillRect(bx, by, blockW, blockH);
 
         ctx.fillStyle = headerFill;
         ctx.fillRect(bx, by, Math.min(blockW, 3), blockH);
@@ -492,13 +528,7 @@ export function renderScoreToCanvas(
         const by = y;
 
         ctx.fillStyle = blockFill;
-        ctx.beginPath();
-        ctx.roundRect(bx, by, blockW, blockH, 1.5);
-        ctx.fill();
-
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 0.75;
-        ctx.stroke();
+        ctx.fillRect(bx, by, blockW, blockH);
 
         ctx.fillStyle = headerFill;
         ctx.fillRect(bx, by, blockW, Math.min(blockH, 3));

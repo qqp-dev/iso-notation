@@ -48,10 +48,15 @@ export const NotationCanvas: React.FC<NotationCanvasProps> = ({
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = dimensions.width * dpr;
-    canvas.height = dimensions.height * dpr;
-    canvas.style.width = `${dimensions.width}px`;
-    canvas.style.height = `${dimensions.height}px`;
+    const targetW = Math.round(dimensions.width * dpr);
+    const targetH = Math.round(dimensions.height * dpr);
+
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+      canvas.style.width = `${dimensions.width}px`;
+      canvas.style.height = `${dimensions.height}px`;
+    }
 
     ctx.save();
     ctx.scale(dpr, dpr);
