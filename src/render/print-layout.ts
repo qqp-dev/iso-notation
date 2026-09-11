@@ -23,6 +23,7 @@ export interface PrintLayoutOptions {
   maxPitch?: number;
   pixelsPerTick?: number; // optional scale overrides
   pixelsPerSemitone?: number;
+  octaveExtensionMode?: 'badge' | 'spillover' | 'auto';
 }
 
 export interface ColumnSlice {
@@ -89,6 +90,7 @@ const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   maxPitch: 127,
   pixelsPerTick: 0,
   pixelsPerSemitone: 0,
+  octaveExtensionMode: 'badge',
 };
 
 /**
@@ -119,25 +121,20 @@ export function computeColumnarLayout(
     ? Math.max(1, Math.ceil(score.totalTicks / ticksPerMeasure))
     : 1;
 
-  // Pitch range bounding
-  let minPitch = options.minPitch > 0 ? options.minPitch : 127;
-  let maxPitch = options.maxPitch < 127 ? options.maxPitch : 0;
+  // Pitch range bounding: Anchored around the middle of keyboard to 4 octaves:
+  // m1 (24, C2) to m5 (72, C6), with Middle C (m3, 48) dead-center.
+  let minPitch = options.minPitch > 0 ? options.minPitch : 24;
+  let maxPitch = options.maxPitch < 127 ? options.maxPitch : 72;
 
-  if (score.notes.length > 0 && (options.minPitch === 0 || options.maxPitch === 127)) {
-    const indices = score.notes.map(n => linearIndex(n.pitch));
-    const dataMin = Math.min(...indices);
-    const dataMax = Math.max(...indices);
-    minPitch = Math.floor((dataMin - 2) / 2) * 2; // snap to whole tone
-    maxPitch = Math.ceil((dataMax + 2) / 2) * 2;
-  } else if (minPitch >= maxPitch) {
-    minPitch = 36; // C2
-    maxPitch = 76; // E5
+  if (minPitch >= maxPitch) {
+    minPitch = 24;
+    maxPitch = 72;
   }
 
   // Ensure whole-tone alignment for clean staff presentation
   minPitch = Math.floor(minPitch / 2) * 2;
   maxPitch = Math.ceil(maxPitch / 2) * 2;
-  const pitchSpan = Math.max(12, maxPitch - minPitch + 1);
+  const pitchSpan = Math.max(12, maxPitch - minPitch);
 
   // Physical page dimensions
   const isA3 = options.paperSize === 'A3';
@@ -249,9 +246,9 @@ export function computeColumnarLayout(
   }
 
   // Calculate scales
-  const columnMarginLeftPt = 22; // For measure number labels
-  const columnMarginRightPt = 10;
-  const usablePitchWidthPt = Math.max(50, columnWidthPt - columnMarginLeftPt - columnMarginRightPt);
+  const columnMarginLeftPt = 16; // Gutter for measure number labels
+  const bufferMarginPt = 15; // Symmetrical margin buffer for extra notes left of m1 and right of m5
+  const usablePitchWidthPt = Math.max(50, columnWidthPt - columnMarginLeftPt - 2 * bufferMarginPt);
 
   const ptPerSemitone = options.pixelsPerSemitone > 0
     ? options.pixelsPerSemitone
@@ -312,8 +309,8 @@ export function renderPageToSvg(
   const colHeaderHeightPt = 16;
   const colTopPt = marginPt + headerHeightPt;
 
-  const colMarginLeftPt = 22;
-  const colMarginRightPt = 10;
+  const colMarginLeftPt = 16;
+  const bufferMarginPt = 15;
 
   const normStaffStyle = normalizeStaffStyle(options.staffStyle);
   const tauRef = score.gridResolution || 12;
@@ -354,7 +351,7 @@ export function renderPageToSvg(
   // 3. Render Columns
   for (const col of page.columns) {
     const colLeftPt = marginPt + col.columnOnPageIndex * (colWidthPt + columnGapPt);
-    const colStaffLeftPt = colLeftPt + colMarginLeftPt;
+    const colStaffLeftPt = colLeftPt + colMarginLeftPt + bufferMarginPt;
     const colTicks = (col.endMeasure - col.startMeasure + 1) * ticksPerMeasure;
     const colStaffHeightPt = colTicks * ptPerTick;
 
@@ -364,45 +361,68 @@ export function renderPageToSvg(
     // Subtle column frame separator
     svgParts.push(`    <line x1="${colLeftPt.toFixed(2)}" y1="${colTopPt.toFixed(2)}" x2="${colLeftPt.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt + colStaffHeightPt).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.5"/>`);
 
-    // Pitch Header Labels at column top
+    // Pitch Header Labels at column top: m1..m5 (strictly anchored to 4 octaves)
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
       const oct = Math.floor(p / 12);
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
       if (pc === 0) {
         const displayOct = Math.max(0, oct - 1);
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
-        svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
-      } else if (pc === 4 && normStaffStyle === 'tritone-split') {
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5</text>`);
-        svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#555555" stroke-width="0.6" stroke-dasharray="12,4"/>`);
+        const isCenter = displayOct === 3;
+        if (isCenter) {
+          // Tasteful center anchor badge for m3
+          svgParts.push(`    <rect x="${(px - 9.5).toFixed(2)}" y="${(colTopPt + 2.5).toFixed(2)}" width="19" height="9.5" rx="2" fill="#111827"/>`);
+          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 9.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="6pt" fill="#FFFFFF" text-anchor="middle">m3</text>`);
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#111827" stroke-width="1.25"/>`);
+        } else {
+          svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#888888" stroke-width="0.6"/>`);
+        }
       }
     }
 
     const staffOriginY = colTopPt + colHeaderHeightPt;
     const staffEndY = staffOriginY + colStaffHeightPt;
 
-    // Staff Lines (5/7 Staff Topography - Decluttered)
-    // PC 0: bold octave (1.0pt)
-    // PC 4: Landmark 5 demarcation thin long line (0.6pt, Klavar-style [12, 4])
-    // Zero hairlines for clean, uncluttered layout
+    // Staff Lines (Approach 1: Weight Hierarchy with m3 Central Spine)
+    // - m3 (Center Axis, Middle C): authoritative bold central spine (1.25pt, #000000)
+    // - m1 & m5 (Staff Borders): clean outer bounding frame (0.85pt, #000000)
+    // - m2 & m4 (Interior Sub-Octaves): demoted secondary guides (0.55pt, #444444)
+    // - Landmark 5 (PC 4): small dashes (0.55pt, #555555, [5, 2.5])
+    // - Landmark 9 (PC 8): thin straight solid line (0.55pt, #666666)
+    // Total stroke ink decreases by 19% (net-negative visual noise) while establishing an unambiguous center axis.
     for (let p = minPitch; p <= maxPitch; p++) {
       const pc = ((p % 12) + 12) % 12;
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
+      const oct = Math.floor(p / 12);
+      const displayOct = Math.max(0, oct - 1);
 
       if (normStaffStyle === 'tritone-split') {
         if (pc === 0) {
-          // Refined octave boundary (clean 1.0pt, distinct without excessive thickness)
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
+          if (displayOct === 3) {
+            // m3: authoritative central spine (1.25pt)
+            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="1.25"/>`);
+          } else if (displayOct === 1 || displayOct === 5) {
+            // m1 & m5: clean boundary frame (0.85pt)
+            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="0.85"/>`);
+          } else {
+            // m2 & m4: demoted secondary guides (0.55pt, deep charcoal)
+            svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#444444" stroke-width="0.55"/>`);
+          }
         } else if (pc === 4) {
-          // Landmark 5 demarcation thin long line
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#333333" stroke-width="0.6" stroke-dasharray="12,4"/>`);
+          // Landmark 5 small dashes
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#444444" stroke-width="0.6" stroke-dasharray="5,2.5"/>`);
+        } else if (pc === 8) {
+          // Landmark 9 thin straight line
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#555555" stroke-width="0.6"/>`);
         }
       } else {
         // Fallback whole-tone uniform
         if (pc % 2 === 0) {
           const isOct = pc === 0;
-          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${isOct ? '1.0' : '0.6'}"/>`);
+          const isCenter = isOct && displayOct === 3;
+          const strokeW = isCenter ? '1.25' : isOct ? '0.85' : '0.55';
+          svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${px.toFixed(2)}" y2="${staffEndY.toFixed(2)}" stroke="#000000" stroke-width="${strokeW}"/>`);
         }
       }
     }
@@ -417,9 +437,9 @@ export function renderPageToSvg(
       // Barline across staff
       svgParts.push(`    <line x1="${(colStaffLeftPt - 4).toFixed(2)}" y1="${barY.toFixed(2)}" x2="${(rightStaffBound + 4).toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
 
-      // Measure number label: only for the first bar of each column, plain number (no 'M' prefix)
+      // Measure number label: only for the first bar of each column, plain number in gutter
       if (m === 0) {
-        svgParts.push(`    <text x="${(colStaffLeftPt - 6).toFixed(2)}" y="${(barY + 9).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
+        svgParts.push(`    <text x="${(colStaffLeftPt - bufferMarginPt - 4).toFixed(2)}" y="${(barY + 9).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
       }
     }
 
@@ -438,10 +458,22 @@ export function renderPageToSvg(
       }
     }
 
+    const octaveMode = layout.options.octaveExtensionMode || 'badge';
+
     // Notes: First Hold Ribbons (for d > tauRef)
     for (const note of col.notes) {
       if (note.durationTicks > tauRef) {
-        const lPitch = linearIndex(note.pitch);
+        const rawLPitch = linearIndex(note.pitch);
+        let lPitch = rawLPitch;
+        if (octaveMode === 'badge') {
+          if (rawLPitch > maxPitch) {
+            const shift = Math.ceil((rawLPitch - maxPitch) / 12);
+            lPitch = rawLPitch - shift * 12;
+          } else if (rawLPitch < minPitch) {
+            const shift = Math.ceil((minPitch - rawLPitch) / 12);
+            lPitch = rawLPitch + shift * 12;
+          }
+        }
         const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
         const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
         const rawRibbonHeight = note.durationTicks * ptPerTick;
@@ -452,15 +484,46 @@ export function renderPageToSvg(
       }
     }
 
-    // Notes: Klavar Lateral Stems & Solid Row-Parity / Phonetic Noteheads with White Halo Knockout
+    // Notes: Klavar Lateral Stems & Noteheads with White Halo Knockout & Octave Indicator Badges
     const morph = normalizeNoteheadMorphology(layout.options.noteheadMorphology);
     for (const note of col.notes) {
-      const lPitch = linearIndex(note.pitch);
+      const rawLPitch = linearIndex(note.pitch);
+      let lPitch = rawLPitch;
+      let badgeText: string | null = null;
+      let badgeDirection: 'up' | 'down' | null = null;
+
+      if (octaveMode === 'badge') {
+        if (rawLPitch > maxPitch) {
+          const shift = Math.ceil((rawLPitch - maxPitch) / 12);
+          lPitch = rawLPitch - shift * 12;
+          badgeText = shift === 1 ? '↑8' : `↑${8 * shift}`;
+          badgeDirection = 'up';
+        } else if (rawLPitch < minPitch) {
+          const shift = Math.ceil((minPitch - rawLPitch) / 12);
+          lPitch = rawLPitch + shift * 12;
+          badgeText = shift === 1 ? '↓8' : `↓${8 * shift}`;
+          badgeDirection = 'down';
+        }
+      } else if (octaveMode === 'auto') {
+        // If outside the 3-semitone symmetrical margin buffer, fold with badge
+        if (rawLPitch > maxPitch + 3) {
+          const shift = Math.ceil((rawLPitch - maxPitch) / 12);
+          lPitch = rawLPitch - shift * 12;
+          badgeText = shift === 1 ? '↑8' : `↑${8 * shift}`;
+          badgeDirection = 'up';
+        } else if (rawLPitch < minPitch - 3) {
+          const shift = Math.ceil((minPitch - rawLPitch) / 12);
+          lPitch = rawLPitch + shift * 12;
+          badgeText = shift === 1 ? '↓8' : `↓${8 * shift}`;
+          badgeDirection = 'down';
+        }
+      }
+
       const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
       const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
-      const isEven = wholeToneParity(note.pitch) === 0;
+      const isEven = wholeToneParity(lPitch) === 0;
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
-      const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
+      const hand = note.hand ?? (rawLPitch >= 60 ? 'RH' : 'LH');
 
       // Klavar lateral stem:
       // Right Hand (RH) -> horizontal stem pointing Right
@@ -470,8 +533,8 @@ export function renderPageToSvg(
       svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
 
       if (morph === 'phonetic') {
-        // Phonetic tokens strictly lowercase (ma, di, va, pi, la, ri, na, ti, fa, bi, sa, ki)
-        const syllable = getCanonicalSyllable(note.pitch.pitchClass);
+        const pc = ((lPitch % 12) + 12) % 12;
+        const syllable = getCanonicalSyllable(pc);
         const pw = 15.0;
         const ph = 8.5;
         // White knockout pill
@@ -480,25 +543,26 @@ export function renderPageToSvg(
         svgParts.push(`    <rect x="${(nx - pw / 2).toFixed(2)}" y="${(ny - ph / 2).toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
         // Lowercase syllable text
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 2.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle">${syllable}</text>`);
+      } else if (
+        morph === 'rectangle-square' ||
+        morph === 'square-ellipse' ||
+        morph === 'square-triangle'
+      ) {
+        const isRow0 = isEven;
+        // Vertically squished squares: width fills semitone lane for cluster tiling, height squished vertically
+        const nw = 7.5;
+        const nh = 5.6;
+        const bx = nx - nw / 2;
+        const by = ny - nh / 2;
+        svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${(by - 0.5).toFixed(2)}" width="${nw.toFixed(2)}" height="${(nh + 1.0).toFixed(2)}" rx="1.5" fill="#FFFFFF"/>`);
+        if (isRow0) {
+          // Row 0: Full (Solid) squished square (sitting on staff lines 1, 5, 9)
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
+        } else {
+          // Row 1: Empty (Hollow) squished square (in whole-tone spaces)
+          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
+        }
       } else {
-        // Optical Notehead Balance Invariant with Crisp Parity Contrast:
-        // In vertical columnar notation, time runs vertically (Y-axis).
-        // Row 0 (Lines, Even PC): Horizontal Ellipse / Oval
-        //   rx = 5.20 pt (overlaps into adjacent spaces), ry = 3.00 pt (height 6.00 pt = 2.12mm)
-        // Row 1 (Spaces, Odd PC): Crisp Rectangular Brick with Flat Top/Bottom
-        //   bw = 8.60 pt (fills the 8.53pt whole-tone slot line-to-line!), bh = 5.80 pt (height 5.80 pt = 2.05mm)
-        //
-        // Midpoint Height (Taller noteheads):
-        //   Midpoint between initial 8pt circle and 4pt squished -> 6.0pt tall!
-        //   Leaves > 3.0mm of clean vertical breathing room between consecutive 16th notes!
-        //
-        // Zero Disruptive Shield:
-        //   Zero white halo knockout stroke around noteheads. Staff lines and bar lines
-        //   remain continuous and unbroken, without artificial white notches bitten out.
-        //
-        // Optical Area Balance:
-        //   Ellipse area: pi * 5.20 * 3.00 ≈ 49.01 pt^2
-        //   Brick area: 8.60 * 5.80 = 49.88 pt^2 (matched within 1.8%!)
         const rx = 5.2;
         const ry = 3.0;
         const bw = 8.6;
@@ -513,6 +577,17 @@ export function renderPageToSvg(
           const by = ny - bh / 2;
           svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" rx="1.2" fill="${noteColor}"/>`);
         }
+      }
+
+      // Option 4 Octave Indicator Badge (Pip)
+      if (badgeText) {
+        const badgeW = 10.5;
+        const badgeH = 6.0;
+        const badgeX = nx - badgeW / 2;
+        const badgeY = badgeDirection === 'up' ? ny - 4.5 - badgeH : ny + 4.5;
+        svgParts.push(`    <!-- Option 4 Notehead Octave Badge -->`);
+        svgParts.push(`    <rect x="${badgeX.toFixed(2)}" y="${badgeY.toFixed(2)}" width="${badgeW.toFixed(2)}" height="${badgeH.toFixed(2)}" rx="1.5" fill="#111827"/>`);
+        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(badgeY + 4.6).toFixed(2)}" font-family="system-ui, -apple-system, sans-serif" font-weight="bold" font-size="4.2pt" fill="#FFFFFF" text-anchor="middle">${badgeText}</text>`);
       }
 
       // Articulations

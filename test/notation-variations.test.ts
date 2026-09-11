@@ -48,35 +48,46 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
   for (const style of styles) {
     assert.equal(normalizeStaffStyle(style), 'tritone-split');
 
-    // 5/7 Staff Topography Invariant (Decluttered / "Less Lines"):
+    // 1-5-9 Symmetric Staff Topography Invariant:
     // PC 0 (C) is bold octave line.
-    // Demarcation line is placed at PC 4 (E, Landmark 5), the boundary of the 5-group (C, D, E).
-    // PC 4 is a crisp demarcation line (lineWidth 0.7, dashArray: [14, 4], isDemarcation: true, isDashed: true).
-    // PC 2, 6, 8, 10 hairlines are eliminated for clean, decluttered reading.
+    // PC 2 (D) is space (no line 3).
+    // PC 4 (E) is small dashes demarcation line for Landmark 5 ([5, 2.5]).
+    // PC 8 (G#) is thin straight solid line for Landmark 9 (0.6px).
     const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
     assert.equal(geom0.lineWidth, 1.2);
     assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
-    // 5/7 Demarcation Line at PC 4 (E)
-    const geomDemarc = getStaffLineGeometry(4, style);
-    assert.equal(geomDemarc.isLine, true);
-    assert.equal(geomDemarc.isBold, false);
-    assert.equal(geomDemarc.isDashed, true);
-    assert.deepEqual(geomDemarc.dashArray, [14, 4]);
-    assert.equal(geomDemarc.isDemarcation, true);
-    assert.equal(geomDemarc.lineWidth, 0.7);
-    assert.equal(geomDemarc.color, 'rgba(255, 255, 255, 0.55)');
+    // No Line at PC 2 (D, Landmark 3 dropped for symmetry)
+    const geom3 = getStaffLineGeometry(2, style);
+    assert.equal(geom3.isLine, false, 'Line 3 must be dropped for augmented-triad symmetry');
+
+    // Demarcation Line at PC 4 (E, Landmark 5) with small dashes [5, 2.5]
+    const geom5 = getStaffLineGeometry(4, style);
+    assert.equal(geom5.isLine, true);
+    assert.equal(geom5.isBold, false);
+    assert.equal(geom5.isDashed, true);
+    assert.deepEqual(geom5.dashArray, [5, 2.5]);
+    assert.equal(geom5.isDemarcation, true);
+    assert.equal(geom5.lineWidth, 0.6);
+
+    // Demarcation Line at PC 8 (G#, Landmark 9) - Thin Straight Line
+    const geom9 = getStaffLineGeometry(8, style);
+    assert.equal(geom9.isLine, true);
+    assert.equal(geom9.isBold, false);
+    assert.equal(geom9.isDashed, false);
+    assert.equal(geom9.isDemarcation, true);
+    assert.equal(geom9.lineWidth, 0.6);
 
     // Zero lines at non-integer pitch coordinates (no 4.5 floating line)
     const geom45 = getStaffLineGeometry(4.5, style);
     assert.equal(geom45.isLine, false, 'Non-integer 4.5 must not be a staff line');
 
-    // Hairlines across 2, 6, 8, 10 eliminated for clean decluttering ("less lines")
-    [2, 6, 8, 10].forEach((pc) => {
+    // Hairlines across 2, 6 and 10 eliminated
+    [2, 6, 10].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
-      assert.equal(g.isLine, false, `PC ${pc} must not be a line (decluttered)`);
+      assert.equal(g.isLine, false, `PC ${pc} must not be a line`);
     });
 
     // Spaces on odd pitch classes (1, 3, 5, 7, 9, 11)
@@ -85,12 +96,12 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
       assert.equal(g.isLine, false, `PC ${pc} must be a space`);
     });
 
-    // Exactly 2 landmark lines per octave: PC 0 (m) and PC 4 (5)
+    // Exactly 3 landmark lines per octave: PC 0, 4, 8
     let lineCount = 0;
     for (let pc = 0; pc < 12; pc++) {
       if (getStaffLineGeometry(pc, style).isLine) lineCount++;
     }
-    assert.equal(lineCount, 2, 'Decluttered 5/7 staff must contain exactly 2 landmark lines per octave (m and 5)');
+    assert.equal(lineCount, 3, '1-5-9 staff must contain exactly 3 landmark lines per octave (1, 5, 9)');
   }
 });
 
@@ -1377,6 +1388,90 @@ test('Complete Sidebar Controls & Drawer Integration Invariants', async () => {
   assert.ok(drawerSrc.includes('Notehead Morphology'), 'Must contain Notehead Morphology section');
   assert.ok(drawerSrc.includes('Timeline Orientation'), 'Must contain Timeline Orientation toggle');
   assert.ok(drawerSrc.includes('Color Spectrum'), 'Must contain Color Mode dropdown');
+});
+
+test('Notehead Morphology: rectangle-square morphology strictly encodes Row Parity (All Squares: Full Row 0, Empty Row 1)', () => {
+  assert.equal(normalizeNoteheadMorphology('rectangle-square'), 'rectangle-square');
+  assert.equal(normalizeNoteheadMorphology('rectangles'), 'rectangle-square');
+  assert.equal(normalizeNoteheadMorphology('squares'), 'rectangle-square');
+  assert.equal(normalizeNoteheadMorphology('full-empty-square'), 'rectangle-square');
+  assert.equal(normalizeNoteheadMorphology('solid-hollow-square'), 'rectangle-square');
+  assert.equal(normalizeNoteheadMorphology('square-parity'), 'rectangle-square');
+
+  // Verify row parity definition:
+  // Row 0 = even PCs (0, 2, 4, 6, 8, 10 -> notes 1, 3, 5, 7, 9, 11) -> Full Squares (solid)
+  // Row 1 = odd PCs (1, 3, 5, 7, 9, 11 -> notes 2, 4, 6, 8, 10, 12) -> Empty Squares (hollow)
+  for (let pc = 0; pc < 12; pc++) {
+    const isRow0 = pc % 2 === 0;
+    const parity = wholeToneParity(pc);
+    assert.equal(parity, isRow0 ? 0 : 1);
+  }
+
+  const score = buildBachGoldbergVar1Score();
+  let squareCount = 0;
+  let fullSquareCount = 0;
+  let emptySquareCount = 0;
+  let nonSquareCount = 0;
+  let ellipseCount = 0;
+
+  let currentFill = '';
+  let currentLineWidth = 1;
+
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {
+      if (mockCtx.lineWidth === 1.8) {
+        emptySquareCount++;
+      } else if (mockCtx.lineWidth === 1.2) {
+        fullSquareCount++;
+      }
+    },
+    fill: () => {
+      currentFill = mockCtx.fillStyle as string;
+    },
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {
+      ellipseCount++;
+    },
+    roundRect: (x: number, y: number, w: number, h: number) => {
+      if (w >= 10.0 && h >= 7.5) {
+        squareCount++;
+      }
+    },
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 11,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  assert.ok(squareCount > 0, 'Must render squished square noteheads');
+  assert.ok(fullSquareCount > 0, 'Must render full squares for Row 0 notes');
+  assert.ok(emptySquareCount > 0, 'Must render empty squares for Row 1 notes');
+  assert.equal(ellipseCount, 0, 'Must render zero ellipses');
 });
 
 

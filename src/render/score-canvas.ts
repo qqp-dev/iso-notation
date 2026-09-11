@@ -186,9 +186,10 @@ export function renderScoreToCanvas(
       }
 
       if (lineGeom.isLine) {
+        const isCenterM3 = pc === 0 && Math.max(0, oct - 1) === 3;
         ctx.beginPath();
-        ctx.strokeStyle = lineGeom.color;
-        ctx.lineWidth = lineGeom.lineWidth;
+        ctx.strokeStyle = isCenterM3 ? 'rgba(255, 255, 255, 0.95)' : lineGeom.color;
+        ctx.lineWidth = isCenterM3 ? Math.max(1.8, lineGeom.lineWidth * 1.5) : lineGeom.lineWidth;
         if (lineGeom.isDashed && lineGeom.dashArray) {
           ctx.setLineDash(lineGeom.dashArray);
         } else {
@@ -199,18 +200,23 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch class label along top margin: m${oct - 1} at octave boundaries (0-indexed piano octaves), 1-based note number elsewhere
+      // Pitch class label along top margin: strictly octave markers m${oct - 1} in tritone-split, zero 5 and 9 at top
       const isOctave0 = pc === 0;
-      let textColor = '#666666';
-      if (isOctave0) textColor = '#FFFFFF';
-
-      ctx.fillStyle = textColor;
-      ctx.font = isOctave0 ? 'bold 10px monospace' : '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      const displayOct = Math.max(0, oct - 1);
-      const label = isOctave0 ? `m${displayOct}` : String(pc + 1);
-      ctx.fillText(label, x, paddingStart - 6);
+      if (isOctave0) {
+        const displayOct = Math.max(0, oct - 1);
+        const isCenterM3 = displayOct === 3;
+        ctx.fillStyle = isCenterM3 ? '#F59E0B' : '#FFFFFF';
+        ctx.font = isCenterM3 ? 'bold 12px monospace' : 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`m${displayOct}`, x, paddingStart - 6);
+      } else if (normStaffStyle !== 'tritone-split') {
+        ctx.fillStyle = '#666666';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(String(pc + 1), x, paddingStart - 6);
+      }
     }
   }
   ctx.setLineDash([]);
@@ -358,7 +364,7 @@ export function renderScoreToCanvas(
     } else {
       // Vertical timeline
       const { x, y } = getCoords(note.startTick, lPitch);
-      const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
+      const noteWidth = Math.max(10, options.pixelsPerSemitone);
 
       // Proportional thin hold line/tail down the timeline for d > tauRef
       if (isHold) {
@@ -454,7 +460,7 @@ export function renderScoreToCanvas(
  */
 function renderNotehead(
   ctx: CanvasRenderingContext2D,
-  morphology: 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot',
+  morphology: 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle',
   pitchClass: number,
   cx: number,
   cy: number,
@@ -631,6 +637,48 @@ function renderNotehead(
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 1.0;
       ctx.stroke();
+      break;
+    }
+
+    case 'rectangle-square':
+    case 'square-ellipse':
+    case 'square-triangle': {
+      const isRow0 = (pitchClass % 2 === 0); // Row 0 = even PC = notes 1, 3, 5, 7, 9, 11
+      // Vertically squished square: width fills semitone lane for cluster tiling, height squished vertically
+      const nw = Math.max(11.0, baseSize);
+      const nh = Math.max(8.2, baseSize * 0.75);
+      const sw = isVertical ? nw : nh;
+      const sh = isVertical ? nh : nw;
+
+      // Knockout line-masking (along time axis without lateral bleed into cluster neighbors)
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      if (isVertical) {
+        ctx.roundRect(cx - sw / 2, cy - (sh + 2) / 2, sw, sh + 2, 1.0);
+      } else {
+        ctx.roundRect(cx - (sw + 2) / 2, cy - sh / 2, sw + 2, sh, 1.0);
+      }
+      ctx.fill();
+
+      if (isRow0) {
+        // Row 0: Full (Solid) squished square
+        ctx.fillStyle = headColor;
+        ctx.beginPath();
+        ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else {
+        // Row 1: Empty (Hollow) squished square
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
+        ctx.fill();
+        ctx.strokeStyle = headColor;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      }
       break;
     }
   }

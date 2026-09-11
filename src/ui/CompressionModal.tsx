@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface CompressionModalProps {
   isOpen: boolean;
@@ -9,6 +9,8 @@ export const CompressionModal: React.FC<CompressionModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [selectedOption, setSelectedOption] = useState<'active' | 'overview'>('active');
+
   if (!isOpen) return null;
 
   return (
@@ -19,80 +21,94 @@ export const CompressionModal: React.FC<CompressionModalProps> = ({
           <span className="text-xl">📐</span>
           <div>
             <h2 className="text-base font-bold font-mono text-white flex items-center gap-2">
-              Horizontal Compression Analysis
+              Staff Topography &amp; Notehead Morphology
             </h2>
             <p className="text-xs text-neutral-400 font-mono mt-0.5">
-              Current 12-Lane Isometric Layout vs. Hypothetical 6-Lane Folded Layout
+              Symmetric 1-5-9 Staff • Full Squares (Row 0) &amp; Empty Squares (Row 1)
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <a
-            href="/horizontal_compression_comparison.svg"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white font-mono text-xs rounded-full border border-neutral-700 transition"
-          >
-            Open Full SVG ↗
-          </a>
+        <div className="flex items-center gap-2">
+          {/* Tab Switcher */}
+          <div className="flex bg-neutral-900 p-0.5 rounded-full border border-neutral-700 font-mono text-xs">
+            <button
+              onClick={() => setSelectedOption('active')}
+              className={`px-3 py-1 rounded-full transition-all ${
+                selectedOption === 'active'
+                  ? 'bg-amber-500 text-black font-bold shadow-sm'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              1-5-9 Staff + Full/Empty Squares
+            </button>
+            <button
+              onClick={() => setSelectedOption('overview')}
+              className={`px-3 py-1 rounded-full transition-all ${
+                selectedOption === 'overview'
+                  ? 'bg-sky-500 text-black font-bold shadow-sm'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              12-Lane vs 6-Lane
+            </button>
+          </div>
+
           <button
             onClick={onClose}
-            className="p-2 text-neutral-400 hover:text-white rounded-full bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 transition cursor-pointer"
-            aria-label="Close modal"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors ml-2"
           >
             ✕
           </button>
         </div>
       </div>
 
-      {/* Modal Body */}
-      <div className="flex-1 p-6 md:p-10 flex flex-col items-center max-w-5xl mx-auto w-full space-y-8">
-        {/* Rendered Comparison Graphic */}
-        <div className="w-full bg-white rounded-lg p-4 shadow-2xl border border-neutral-700 flex justify-center">
-          <img
-            src="/horizontal_compression_comparison.svg"
-            alt="12-Lane vs 6-Lane Horizontal Compression Comparison"
-            className="w-full max-w-3xl h-auto object-contain"
-          />
-        </div>
-
-        {/* Technical Tradeoff Breakdown */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
-          <div className="p-4 rounded-lg bg-neutral-900/80 border border-neutral-800 space-y-2">
-            <div className="text-amber-400 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <span>●</span> CURRENT: 12-Lane Isometric
+      {/* Content Container */}
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
+        {selectedOption === 'active' && (
+          <div className="w-full space-y-4 flex flex-col items-center">
+            <div className="w-full bg-white rounded-lg p-4 shadow-2xl border border-neutral-700 flex flex-col items-center">
+              <img
+                src="/row_rectangles_squares.svg"
+                alt="Active Design: 1-5-9 Staff with Row 0 Full Squares and Row 1 Empty Squares"
+                className="w-full max-w-2xl h-auto object-contain"
+              />
             </div>
-            <ul className="space-y-1.5 text-neutral-300 list-disc list-inside">
-              <li><strong className="text-white">Width per Octave:</strong> 72 pt (12 dedicated semitone lanes)</li>
-              <li><strong className="text-white">Page Density:</strong> 2 columns per A4 portrait page</li>
-              <li><strong className="text-white">Interval Slope:</strong> 100% linear isometry (all semitones have equal Δx = 1)</li>
-              <li><strong className="text-white">Consecutive Pairs:</strong> Completely un-paired (notes 1 and 2 occupy independent coordinates)</li>
-            </ul>
-          </div>
-
-          <div className="p-4 rounded-lg bg-neutral-900/80 border border-emerald-900/50 space-y-2">
-            <div className="text-emerald-400 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <span>●</span> 6-LANE FOLDED (Hypothetical)
+            <div className="w-full p-4 rounded-lg bg-neutral-900/80 border border-neutral-800 font-mono text-xs text-neutral-300 space-y-2">
+              <div className="text-amber-400 font-bold uppercase tracking-wider text-[11px]">
+                Active Score Architecture
+              </div>
+              <ul className="space-y-1.5 list-disc list-inside text-neutral-300">
+                <li><strong className="text-white">Notehead Shapes (All Squares, Row Parity):</strong>
+                  <ul className="pl-5 space-y-1 list-circle text-neutral-400 mt-1">
+                    <li><strong className="text-amber-300">Row 0 (notes 1, 3, 5, 7, 9, 11):</strong> Full / Solid Squares (sitting on lines 1, 5, 9)</li>
+                    <li><strong className="text-sky-300">Row 1 (notes 2, 4, 6, 8, 10, 12):</strong> Empty / Hollow Squares (in whole-tone spaces)</li>
+                  </ul>
+                </li>
+                <li><strong className="text-white">Staff Lines (Symmetric 1-5-9 Topography):</strong>
+                  <ul className="pl-5 space-y-1 list-circle text-neutral-400 mt-1">
+                    <li><strong className="text-white">Line 1:</strong> Bold solid octave line (1.2pt) — marked <code className="text-amber-300 font-bold">m</code> at column top</li>
+                    <li><strong className="text-white">Line 5:</strong> Small dashes (5, 2.5, 0.6pt) — 5 dropped from top</li>
+                    <li><strong className="text-white">Line 9:</strong> Thin straight solid line (0.6pt, thinner than octave) — 9 dropped from top</li>
+                  </ul>
+                </li>
+                <li><strong className="text-white">Horizontal Compression:</strong> Pitch axis compressed to 11px / 5.0pt per semitone (~21% narrower).</li>
+              </ul>
             </div>
-            <ul className="space-y-1.5 text-neutral-300 list-disc list-inside">
-              <li><strong className="text-white">Width per Octave:</strong> 36 pt (6 whole-tone lanes) — <span className="text-emerald-400 font-bold">50% narrower!</span></li>
-              <li><strong className="text-white">Page Density:</strong> 4 columns per A4 portrait page</li>
-              <li><strong className="text-white">Interval Slope:</strong> Broken (semitones alternate between Δx = 0 and Δx = 1)</li>
-              <li><strong className="text-white">Consecutive Pairs:</strong> 1 & 2 share Lane 0, 3 & 4 share Lane 1 (re-introduces pairing)</li>
-            </ul>
           </div>
-        </div>
+        )}
 
-        {/* Summary Note */}
-        <div className="w-full p-4 rounded-lg bg-neutral-900/40 border border-neutral-800 text-xs text-neutral-400 space-y-2 leading-relaxed font-sans">
-          <p>
-            <strong className="text-neutral-200">Pitch Range Note:</strong> The layout does not reserve an 88-key piano span. In both modes, the bounding box tightly crops to the actual minimum and maximum notes played in the score (with a ±2 semitone margin).
-          </p>
-          <p>
-            The difference between the two layouts is purely in the <strong className="text-neutral-200">pitch-to-lane coordinate mapping</strong>: whether 12 pitch classes map 1:1 to 12 physical columns, or fold pairwise into 6 whole-tone columns distinguished by notehead shape (Oval vs. Brick).
-          </p>
-        </div>
+        {selectedOption === 'overview' && (
+          <div className="w-full space-y-4 flex flex-col items-center">
+            <div className="w-full bg-white rounded-lg p-4 shadow-2xl border border-neutral-700 flex justify-center">
+              <img
+                src="/horizontal_compression_comparison.svg"
+                alt="12-Lane vs 6-Lane Overview"
+                className="w-full max-w-3xl h-auto object-contain"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

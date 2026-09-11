@@ -31,13 +31,13 @@ export const App: React.FC = () => {
   const [renderOptions, setRenderOptions] = useState<RenderOptions>({
     orientation: 'vertical',
     staffStyle: 'tritone-split',
-    noteheadMorphology: 'row-parity-shape',
+    noteheadMorphology: 'rectangle-square',
     notationStyle: 'wholetone-staff',
-    noteheadStyle: 'row-parity-shape',
+    noteheadStyle: 'rectangle-square',
     colorMode: 'duration-class',
     zoom: 1.0,
     pixelsPerTick: 2.0,
-    pixelsPerSemitone: 14,
+    pixelsPerSemitone: 11,
     showHandCrossings: true,
     showBarlines: true,
     showGridLines: true,
@@ -298,6 +298,16 @@ export const App: React.FC = () => {
               <span className="hidden sm:inline">6-Lane vs 12-Lane</span>
             </button>
 
+            {/* Quick Print Button */}
+            <button
+              onClick={() => setIsPrintModalOpen(true)}
+              className="px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-amber-400 hover:text-amber-300 border border-neutral-800 text-[11px] cursor-pointer transition flex items-center gap-1.5"
+              title="Print Sheet Music (A4 Columnar Engraving)"
+            >
+              <span>🖨️</span>
+              <span className="hidden sm:inline">Print</span>
+            </button>
+
             {/* Sidebar Toggle Button */}
             <button
               onClick={() => setIsDrawerOpen((prev) => !prev)}
@@ -347,6 +357,7 @@ export const App: React.FC = () => {
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         score={score}
+        renderOptions={renderOptions}
       />
 
       {/* 6-Lane vs 12-Lane Compression Modal */}

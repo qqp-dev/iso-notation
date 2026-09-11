@@ -145,13 +145,16 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // 1. Pure white background for paper savings & laser printing
     assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
 
-    // 2. 5/7 Staff Topography lines (Decluttered)
+    // 2. 1-5-9 Staff Topography lines (Symmetric 3-Line)
     // - Refined octave line (PC 0, 1.0pt)
-    assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.0"/, 'Must contain refined 1.0pt octave line');
-    // - Thin long 5 demarcation line at PC 4 (0.6pt, dasharray 12,4)
-    assert.match(svg, /stroke="#333333"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="12,4"/, 'Must contain thin 0.6pt 5 demarcation line');
+    // - Thin 5 demarcation line at PC 4 (0.6pt, dasharray 5,2.5)
+    assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain thin 0.6pt 5 demarcation line');
+    // - Thin straight 9 demarcation line at PC 8 (0.6pt)
+    assert.match(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must contain thin 0.6pt 9 demarcation line');
     // - Zero clunky hairlines (PC 2, 6, 8, 10 eliminated)
     assert.doesNotMatch(svg, /stroke="#888888"[^>]*stroke-width="0\.5"/, 'Hairlines must be eliminated for decluttered staff');
+    // - Zero old 8,3.5 dashes
+    assert.doesNotMatch(svg, /stroke-dasharray="8,3\.5"/, 'Old 8,3.5 dashes must not be present');
     // - Zero old 3,3 dashes
     assert.doesNotMatch(svg, /stroke-dasharray="3,3"/, 'Old 3,3 dashes must not be present');
 
@@ -304,9 +307,9 @@ test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
     assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
     assert.doesNotMatch(svg, />C\d+</, 'Must not contain any diatonic C${oct} markers');
 
-    // 3. Landmark 5 is present, 5|7 is absent
-    assert.match(svg, />5</, 'Must contain landmark 5');
+    // 3. 5 and 9 dropped from column top, zero 5|7
     assert.doesNotMatch(svg, />5\|7</, 'Must not contain 5|7');
+    assert.doesNotMatch(svg, /class="pitch-label"[^>]*>5<\/text>/, 'Must not contain 5 at top of column');
   }
 });
 
@@ -352,3 +355,86 @@ test('0-Indexed Piano Octaves Invariant (m0..m7) for 88-key range', () => {
     assert.equal(label, expectedOctaveLabels[oct], `Octave ${oct} must format as ${expectedOctaveLabels[oct]}`);
   }
 });
+
+test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine', () => {
+  const score = buildBachGoldbergVar1Score();
+  const svg = renderColumnarScoreToSvg(score, 0, {
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+  });
+
+  // 1. Staff Lines: 1, 5, 9 (Symmetric 3-Line Staff with m3 Spine Hierarchy)
+  // PC 0 (m3): authoritative bold 1.25pt solid line
+  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.25"/, 'Must contain bold 1.25pt central spine line (m3)');
+  // PC 4: small dashes 5,2.5
+  assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain small dashed line for 5');
+  // PC 8: thin straight solid line
+  assert.match(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must contain thin straight solid line for 9');
+  
+  // 5 and 9 dropped from top:
+  assert.doesNotMatch(svg, /class="pitch-label"[^>]*>3<\/text>/, 'Must not render header label for 3');
+  assert.doesNotMatch(svg, /class="pitch-label"[^>]*>5<\/text>/, 'Must not render header label for 5 at top');
+  assert.doesNotMatch(svg, /class="pitch-label"[^>]*>9<\/text>/, 'Must not render header label for 9 at top');
+
+  // 2. Notehead morphology: Vertically squished squares, Row 0 Full, Row 1 Empty
+  // Full Squished Squares for Row 0 (width="7.50" height="5.60" fill!=#FFFFFF)
+  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="(?!#FFFFFF)/, 'Must render full solid squished square noteheads for Row 0');
+
+  // Empty Squished Squares for Row 1 (width="7.50" height="5.60" fill="#FFFFFF" with stroke)
+  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke=/, 'Must render empty hollow squished square noteheads for Row 1');
+
+  // Zero ellipses
+  assert.doesNotMatch(svg, /<ellipse/, 'Zero ellipses should be rendered when using rectangle-square morphology');
+
+  // Zero triangle polygons
+  const polyMatches = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g));
+  assert.equal(polyMatches.length, 0, 'Zero polygon triangles should be rendered when using rectangle-square morphology');
+});
+
+test('4-Octave Core Staff (m1 to m5) & Clean Termination at m5', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+
+  // Core staff spans exactly 4 octaves (48 semitones): m1 (24) to m5 (72)
+  assert.equal(layout.minPitch, 24, 'Staff minPitch must anchor to m1 (linearIndex 24)');
+  assert.equal(layout.maxPitch, 72, 'Staff maxPitch must anchor to m5 (linearIndex 72)');
+  assert.equal(layout.pitchSpan, 48, 'Staff span must be exactly 48 semitones (4 octaves)');
+
+  const svg = renderPageToSvg(layout, 0);
+
+  // Octave labels: m1, m2, m3, m4, m5 present
+  assert.match(svg, />m1</, 'Must render m1 header label');
+  assert.match(svg, />m2</, 'Must render m2 header label');
+  assert.match(svg, />m3</, 'Must render m3 header label (Middle C)');
+  assert.match(svg, />m4</, 'Must render m4 header label');
+  assert.match(svg, />m5</, 'Must render m5 header label');
+
+  // No labels above m5
+  assert.doesNotMatch(svg, />m6</, 'Must NOT render m6 header label');
+  assert.doesNotMatch(svg, />m7</, 'Must NOT render m7 header label');
+});
+
+test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', () => {
+  const score = buildBachGoldbergVar1Score();
+
+  // Test Option 4: Badges ('badge')
+  const badgeLayout = computeColumnarLayout(score, {
+    octaveExtensionMode: 'badge',
+  });
+  // Page 4 contains measures 29–30 where D6 (pitch 74) occurs
+  const page4SvgBadge = renderPageToSvg(badgeLayout, 3);
+
+  // Option 4 badge check: must render ↑8 badge for pitch 74 folded down to 62
+  assert.match(page4SvgBadge, /class="cross-label"|Notehead Octave Badge/, 'Must contain octave badges on page 4');
+  assert.match(page4SvgBadge, />↑8<\/text>/, 'Must render ↑8 badge for folded high outlier notes');
+
+  // Test Option 2: Spillover ('spillover')
+  const spilloverLayout = computeColumnarLayout(score, {
+    octaveExtensionMode: 'spillover',
+  });
+  const page4SvgSpillover = renderPageToSvg(spilloverLayout, 3);
+
+  // In spillover mode, no ↑8 badge is rendered
+  assert.doesNotMatch(page4SvgSpillover, />↑8<\/text>/, 'Must NOT render ↑8 badge in spillover mode');
+});
+

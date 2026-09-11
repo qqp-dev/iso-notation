@@ -114,7 +114,10 @@ export async function generateScorePostscript(
   }
 
   const score = scoreBuilder();
-  const layout = computeColumnarLayout(score);
+  const layout = computeColumnarLayout(score, {
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
+  });
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'iso-print-'));
   const svgPaths: string[] = [];

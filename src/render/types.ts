@@ -21,11 +21,18 @@ export type NoteheadMorphology =
   | 'phonetic'
   | 'numerical'
   | 'minimal-dot'
+  | 'rectangle-square'
+  | 'square-ellipse'
+  | 'square-triangle'
   // Testing & format aliases
   | 'row-parity-shapes'
   | 'phonetic-tokens'
   | 'numerical-digits'
-  | 'minimal-dots';
+  | 'minimal-dots'
+  | 'rectangles'
+  | 'rectangle-squares'
+  | 'square-ellipses'
+  | 'square-triangles';
 
 // Legacy aliases for backward compatibility
 export type NotationStyle = 'wholetone-staff' | 'chromatic-grid' | StaffStyle;
@@ -48,6 +55,7 @@ export interface RenderOptions {
   zoom: number; // 0.5 to 3.0
   pixelsPerTick: number; // calculated from zoom
   pixelsPerSemitone: number;
+  octaveExtensionMode?: 'badge' | 'spillover' | 'auto';
   showHandCrossings: boolean;
   showBarlines: boolean;
   showGridLines: boolean;
@@ -80,6 +88,15 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
     description: 'Vertical timeline with unextended reference noteheads, proportional hold ribbons, and logarithmic duration palette',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    orientation: 'vertical',
+  },
+  {
+    id: 'symmetric-159-rectangle-square',
+    name: '1-5-9 Symmetric Lines + Full/Empty Squares',
+    description: 'Compressed staff with 3 lines per octave (1=bold octave, 5=small dashes, 9=thin straight), Full Squares (Row 0) and Empty Squares (Row 1)',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'rectangle-square',
     colorMode: 'duration-class',
     orientation: 'vertical',
   },
@@ -181,14 +198,29 @@ export function normalizeStaffStyle(
 
 export function normalizeNoteheadMorphology(
   morph?: NoteheadMorphology | string
-): 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot' {
-  if (!morph) return 'numerical';
+): 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle' {
+  if (!morph) return 'rectangle-square';
   if (morph === 'classic-oval') return 'classic-oval';
   if (morph === 'row-parity-shape' || morph === 'row-parity-shapes') return 'row-parity-shape';
   if (morph === 'phonetic' || morph === 'phonetic-tokens') return 'phonetic';
   if (morph === 'numerical' || morph === 'numerical-digits') return 'numerical';
   if (morph === 'minimal-dot' || morph === 'minimal-dots') return 'minimal-dot';
-  return 'numerical';
+  if (
+    morph === 'rectangle-square' ||
+    morph === 'rectangle-squares' ||
+    morph === 'rectangles' ||
+    morph === 'square-ellipse' ||
+    morph === 'square-ellipses' ||
+    morph === 'square-triangle' ||
+    morph === 'square-triangles' ||
+    morph === 'full-empty-square' ||
+    morph === 'solid-hollow-square' ||
+    morph === 'square-parity' ||
+    morph === 'squares'
+  ) {
+    return 'rectangle-square';
+  }
+  return 'rectangle-square';
 }
 
 export interface StaffLineGeometry {
@@ -254,11 +286,13 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'tritone-split') {
-    // 5/7 Staff Topography ("less lines"):
-    // Decluttered staff with exactly 2 landmark lines per octave:
-    // - PC 0: bold octave boundary line ('m')
-    // - PC 4: continuous/dashed demarcation line for the 5-group boundary ('5')
-    // Intermediate hairlines (PC 2, 6, 8, 10) are eliminated to remove visual clutter.
+    // 1-5-9 Symmetric 3-Line Staff Topography:
+    // 3 landmark lines per octave (symmetrical 4-semitone / major-third spacing):
+    // - PC 0 (Note 1): bold octave boundary line ('m', 1.2px)
+    // - PC 4 (Note 5): dashed line ('5', 0.6px, small dashes [5, 2.5])
+    // - PC 8 (Note 9): thin straight solid line ('9', 0.6px, thinner than octave)
+    // Line 3 (PC 2) is dropped for symmetry.
+    // Row 0 notes (1, 3, 5, 7, 9, 11) are Full Squares; Row 1 notes (2, 4, 6, 8, 10, 12) are Empty Squares.
     if (pc === 0) {
       return {
         isLine: true,
@@ -275,12 +309,24 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isLine: true,
         isBold: false,
         isDashed: true,
-        dashArray: [14, 4],
+        dashArray: [5, 2.5],
         isTritone: false,
         isDemarcation: true,
         isOctaveBoundary: false,
-        lineWidth: 0.7,
+        lineWidth: 0.6,
         color: 'rgba(255, 255, 255, 0.55)',
+      };
+    }
+    if (pc === 8) {
+      return {
+        isLine: true,
+        isBold: false,
+        isDashed: false,
+        isTritone: false,
+        isDemarcation: true,
+        isOctaveBoundary: false,
+        lineWidth: 0.6,
+        color: 'rgba(255, 255, 255, 0.45)',
       };
     }
     return {

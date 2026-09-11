@@ -257,7 +257,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             </label>
             <div className="space-y-1 bg-neutral-950 p-1.5 rounded border border-neutral-800">
               {[
-                { id: 'tritone-split' as StaffStyle, label: 'Tritone Split (3+3)', desc: 'PC 0 bold, PC 6 dashed landmark' },
+                { id: 'tritone-split' as StaffStyle, label: '1-5-9 Symmetric (3-Line)', desc: '1 bold octave, 5 dashed, 9 thin straight' },
                 { id: 'wholetone-uniform' as StaffStyle, label: '6-6 Whole-Tone Uniform', desc: '6 lines on even PCs (0,2,4,6,8,10)' },
                 { id: 'augmented-3line' as StaffStyle, label: 'Augmented Triad (3-Line)', desc: '3 major-third lines (0, 4, 8)' },
                 { id: 'octave-ribbons' as StaffStyle, label: 'Octave Ribbons', desc: 'Alternating register luminance ribbons' },
@@ -292,6 +292,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             </label>
             <div className="space-y-1 bg-neutral-950 p-1.5 rounded border border-neutral-800">
               {[
+                { id: 'rectangle-square' as NoteheadMorphology, label: 'Squares (Solid/Empty Row Parity)', desc: 'All Squares: Row 0 Full (1, 3, 5, 7, 9, 11), Row 1 Empty (2, 4, 6, 8, 10, 12)' },
                 { id: 'row-parity-shape' as NoteheadMorphology, label: 'Row Parity Shapes', desc: 'Ovals on lines (Row 0), Bricks in spaces (Row 1)' },
                 { id: 'classic-oval' as NoteheadMorphology, label: 'Classic Oval', desc: 'Tilted elliptical notehead with line knockout' },
                 { id: 'phonetic' as NoteheadMorphology, label: '12-TET Phonetics', desc: 'Monosyllabic tokens (ma, di, va, pi, la, ri...)' },
@@ -341,6 +342,37 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                   {ori === 'horizontal' ? '↔ Horizontal' : '↕ Vertical'}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Out-of-Staff Octaves Handling */}
+          <div>
+            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+              Out-of-Staff Octaves (4-Oct Core m1–m5)
+            </label>
+            <div className="grid grid-cols-2 gap-1.5 bg-neutral-950 p-1 rounded border border-neutral-800">
+              <button
+                onClick={() => onOptionsChange({ octaveExtensionMode: 'badge' })}
+                className={`py-1.5 px-2 text-left rounded font-mono text-[10px] transition ${
+                  (options.octaveExtensionMode || 'badge') === 'badge'
+                    ? 'bg-neutral-800 text-white font-bold border border-neutral-700'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <div className="font-bold">Option 4: Badges</div>
+                <div className="text-[9px] text-neutral-500 font-sans">Fold with ↑8 / ↓8 pips</div>
+              </button>
+              <button
+                onClick={() => onOptionsChange({ octaveExtensionMode: 'spillover' })}
+                className={`py-1.5 px-2 text-left rounded font-mono text-[10px] transition ${
+                  options.octaveExtensionMode === 'spillover'
+                    ? 'bg-neutral-800 text-white font-bold border border-neutral-700'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <div className="font-bold">Option 2: Margins</div>
+                <div className="text-[9px] text-neutral-500 font-sans">15pt Symmetrical Margins</div>
+              </button>
             </div>
           </div>
 

@@ -1,19 +1,30 @@
 import React, { useMemo } from 'react';
 import { QuantizedGridScore } from '../model/types';
 import { computeColumnarLayout, renderAllPagesToSvg } from '../render/print-layout';
+import { RenderOptions } from '../render/types';
 
 interface PrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   score: QuantizedGridScore;
+  renderOptions?: Partial<RenderOptions>;
 }
 
 export const PrintModal: React.FC<PrintModalProps> = ({
   isOpen,
   onClose,
   score,
+  renderOptions,
 }) => {
-  const layout = useMemo(() => computeColumnarLayout(score), [score]);
+  const layout = useMemo(
+    () =>
+      computeColumnarLayout(score, {
+        staffStyle: renderOptions?.staffStyle ?? 'tritone-split',
+        noteheadMorphology: renderOptions?.noteheadMorphology ?? 'rectangle-square',
+        octaveExtensionMode: renderOptions?.octaveExtensionMode ?? 'badge',
+      }),
+    [score, renderOptions?.staffStyle, renderOptions?.noteheadMorphology, renderOptions?.octaveExtensionMode]
+  );
   const pageSvgs = useMemo(() => renderAllPagesToSvg(layout), [layout]);
 
   const handlePrint = () => {
