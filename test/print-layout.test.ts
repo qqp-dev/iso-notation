@@ -160,11 +160,13 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     // - Zero old 3,3 dashes
     assert.doesNotMatch(svg, /stroke-dasharray="3,3"/, 'Old 3,3 dashes must not be present');
 
-    // 3. Tasteful Handedness Chevrons Invariant
+    // 3. Baked Directional Noteheads Invariant
     // - Zero straight lateral stem lines (stroke-width 0.6pt)
     assert.doesNotMatch(svg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must have zero straight lateral stem lines');
-    // - Open chevrons with stroke-width 0.8pt and rounded caps/joins
-    assert.match(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none" stroke="[^"]+" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/, 'Must render tasteful handedness chevrons');
+    // - Zero standalone floating chevrons
+    assert.doesNotMatch(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none" stroke="[^"]+" stroke-width="0\.8"/, 'Must have zero standalone floating chevrons');
+    // - Baked directional pentagons for hand crossing exceptions
+    assert.match(svg, /<path d="M [^"]+ L [^"]+ L [^"]+ L [^"]+ L [^"]+ A [^"]+ Z"/, 'Must render baked directional noteheads');
 
     // 4. Solid row-parity noteheads with zero disruptive shield and duration colors
     // - Ovals on lines (Row 0): horizontal ellipse rx="5.20" ry="3.00" sitting cleanly on line
@@ -322,9 +324,9 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   const note68Height = 6.0; // Parity 0 (even) notehead height
   const note68StartY = note68Ny + note68Height / 2 + 2;
   const note68ReleaseY = note68Ny + note68.durationTicks * layout.ptPerTick;
-  const chevronHalfH = 5.2 / 2;
-  const expectedObsY1 = note69Ny - chevronHalfH - 2.5;
-  const expectedObsY2 = note69Ny + chevronHalfH + 2.5;
+  const note69Height = 6.0;
+  const expectedObsY1 = note69Ny - note69Height / 2 - 2.0;
+  const expectedObsY2 = note69Ny + note69Height / 2 + 2.0;
 
   const col4Svg = svgs[col4.pageIndex];
   const col4LeftPt = 10 * (72 / 25.4) + col4.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
@@ -394,38 +396,39 @@ test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine
   const stemMatches = Array.from(svg.matchAll(/<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/g));
   assert.equal(stemMatches.length, 0, 'Zero straight lateral stem lines');
 
-  // Tasteful Handedness Chevrons Invariant (< for LH, > for RH):
-  const chevronMatches = Array.from(
-    svg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/g)
-  );
-  assert.ok(chevronMatches.length > 0, 'Must find chevrons in SVG for crossing exceptions');
+  // Zero standalone floating chevrons:
+  assert.doesNotMatch(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none"/, 'Zero standalone floating chevrons');
 
-  chevronMatches.forEach((m) => {
-    const baseX1 = Number(m[1]);
-    const topY = Number(m[2]);
-    const apexX = Number(m[3]);
-    const apexY = Number(m[4]);
-    const baseX2 = Number(m[5]);
-    const botY = Number(m[6]);
-    assert.equal(baseX1, baseX2, 'Chevron base X coordinates must match');
-    assert.ok(apexX !== baseX1, 'Chevron apex must have horizontal clearance from base');
-    assert.ok(Math.abs(apexY - (topY + botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
+  // Baked Directional Noteheads Invariant (pointing Right for RH in bass, Left for LH in treble):
+  const directionalMatches = Array.from(
+    svg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="(0\.5|1\.3)" stroke-linejoin="round"\/>/g)
+  );
+  assert.ok(directionalMatches.length > 0, 'Must find baked directional noteheads in SVG for crossing exceptions');
+
+  directionalMatches.forEach((m) => {
+    const p1x = Number(m[3]);
+    const p1y = Number(m[4]);
+    const apexX = Number(m[5]);
+    const apexY = Number(m[6]);
+    const p3y = Number(m[8]);
+    assert.ok(apexX !== p1x, 'Notehead apex must have horizontal clearance from base');
+    assert.ok(Math.abs(apexY - (p1y + p3y) / 2) < 0.05, 'Notehead apex must be vertically centered');
   });
 
-  // Verify full score chevrons count and directions:
+  // Verify full score directional notehead count and directions:
   const allSvgs = renderAllPagesToSvg(layout);
   const fullScoreSvg = allSvgs.join('\n');
-  const allChevrons = Array.from(
-    fullScoreSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/g)
+  const allDirectional = Array.from(
+    fullScoreSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="(0\.5|1\.3)" stroke-linejoin="round"\/>/g)
   );
-  assert.equal(allChevrons.length, 63, 'Must render chevrons ONLY for exceptions (63 in Goldberg Var 1)');
+  assert.equal(allDirectional.length, 63, 'Must render directional noteheads ONLY for exceptions (63 in Goldberg Var 1)');
 
-  const rhChevrons = allChevrons.filter((m) => Number(m[3]) > Number(m[1]));
-  const lhChevrons = allChevrons.filter((m) => Number(m[3]) < Number(m[1]));
-  assert.equal(rhChevrons.length, 24, '24 crossing notes must have right-pointing chevrons for RH in bass (< 48)');
-  assert.equal(lhChevrons.length, 39, '39 crossing notes must have left-pointing chevrons for LH above m3 (> 48)');
+  const rhDirectional = allDirectional.filter((m) => Number(m[5]) > Number(m[3]));
+  const lhDirectional = allDirectional.filter((m) => Number(m[5]) < Number(m[3]));
+  assert.equal(rhDirectional.length, 24, '24 crossing notes must have right-pointing noteheads for RH in bass (< 48)');
+  assert.equal(lhDirectional.length, 39, '39 crossing notes must have left-pointing noteheads for LH above m3 (> 48)');
 
-  // Verify SVG print engine with explicit hand crossings in both directions, and stemless Middle C (48):
+  // Verify SVG print engine with explicit hand crossings in both directions, and neutral Middle C (48):
   const handednessTestScore: QuantizedGridScore = {
     id: 'handedness-svg-test',
     title: 'Handedness SVG Test',
@@ -441,23 +444,23 @@ test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine
     notes: [
       { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> neutral
       { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> neutral
-      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no chevron
-      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no chevron
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right chevron
-      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left chevron
+      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no directional tip
+      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no directional tip
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right tip
+      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left tip
     ],
   };
 
   const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0);
-  const testChevrons = Array.from(
-    testSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round" stroke-linejoin="round"\/>/g)
+  const testDirectional = Array.from(
+    testSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="(0\.5|1\.3)" stroke-linejoin="round"\/>/g)
   );
-  assert.equal(testChevrons.length, 2, 'SVG must render chevrons strictly for the 2 exception notes');
+  assert.equal(testDirectional.length, 2, 'SVG must render directional noteheads strictly for the 2 exception notes');
 
-  const testRh = testChevrons.filter((m) => Number(m[3]) > Number(m[1]));
-  const testLh = testChevrons.filter((m) => Number(m[3]) < Number(m[1]));
-  assert.equal(testRh.length, 1, 'RH exception (< 48) must render right-pointing chevron in SVG');
-  assert.equal(testLh.length, 1, 'LH exception (> 48) must render left-pointing chevron in SVG');
+  const testRh = testDirectional.filter((m) => Number(m[5]) > Number(m[3]));
+  const testLh = testDirectional.filter((m) => Number(m[5]) < Number(m[3]));
+  assert.equal(testRh.length, 1, 'RH exception (< 48) must render right-pointing notehead in SVG');
+  assert.equal(testLh.length, 1, 'LH exception (> 48) must render left-pointing notehead in SVG');
 });
 
 test('A4 Print Dimensions & Page Margins Invariant', () => {
@@ -646,12 +649,13 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   // Blue (8th) and Orange (quarter) hollow noteheads have void fills (zero fill-opacity on Page 0)
   assert.doesNotMatch(svg, /fill-opacity="0\.18"/, 'Blue and Orange hollow noteheads must have void fills (zero fill-opacity)');
 
-  // Red Hollow Squished Squares for Row 1 (d >= 96t): faint tint wash (fill-opacity="0.18") on Page 2
+  // Red Hollow Squished Squares for Row 1: clean white interior (#FFFFFF) on Page 2 (zero fill-opacity="0.18")
   const svgPage2 = renderColumnarScoreToSvg(score, 2, {
     staffStyle: 'tritone-split',
     noteheadMorphology: 'rectangle-square',
   });
-  assert.match(svgPage2, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#BE123C"[^>]*fill-opacity="0\.18"[^>]*stroke=/, 'Must render faint tint wash (fill-opacity="0.18") strictly for Red notes (d >= 96t) on Row 1');
+  assert.doesNotMatch(svgPage2, /fill-opacity="0\.18"/, 'Red notes on Row 1 must have zero fill-opacity="0.18"');
+  assert.match(svgPage2, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke="#BE123C"/, 'Red notes on Row 1 must maintain clean white interior (#FFFFFF)');
 
   // Explicitly assert duration-class color behavior with synthetic score:
   const durationColorScore: QuantizedGridScore = {
@@ -669,7 +673,7 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
     notes: [
       { id: 'hollow-8th', pitch: { pitchClass: 1, octave: 4 }, startTick: 0, durationTicks: 24, hand: 'RH', velocity: 90 }, // Blue 8th -> void fill (#FFFFFF)
       { id: 'hollow-quarter', pitch: { pitchClass: 1, octave: 4 }, startTick: 24, durationTicks: 48, hand: 'RH', velocity: 90 }, // Amber/Orange Quarter -> void fill (#FFFFFF)
-      { id: 'hollow-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 72, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> faint tint fill-opacity="0.18"
+      { id: 'hollow-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 72, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> clean white fill (#FFFFFF)
     ],
   };
   const durationTestSvg = renderColumnarScoreToSvg(durationColorScore, 0, {
@@ -679,8 +683,9 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   // Blue and Orange hollow noteheads must have void fills (#FFFFFF) and NO fill-opacity="0.18":
   assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#1D4ED8"/, 'Blue (8th) hollow notehead must have void fill (#FFFFFF)');
   assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#D97706"/, 'Orange (quarter) hollow notehead must have void fill (#FFFFFF)');
-  // Red hollow notehead must have faint tint fill (fill-opacity="0.18"):
-  assert.match(durationTestSvg, /<rect[^>]*fill="#BE123C"[^>]*fill-opacity="0\.18"[^>]*stroke="#BE123C"/, 'Red (half note d >= 96t) hollow notehead must have faint tint fill (fill-opacity="0.18")');
+  // Red hollow notehead must maintain clean white fill (#FFFFFF) and NO fill-opacity="0.18":
+  assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#BE123C"/, 'Red (half note d >= 96t) hollow notehead must have clean white fill (#FFFFFF)');
+  assert.doesNotMatch(durationTestSvg, /fill-opacity="0\.18"/, 'Zero fill-opacity="0.18" across all notes');
 
   // Zero ellipses
   assert.doesNotMatch(svg, /<ellipse/, 'Zero ellipses should be rendered when using rectangle-square morphology');

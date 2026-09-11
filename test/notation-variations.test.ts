@@ -452,6 +452,7 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
   let currentStroke = '';
   let currentPath: { x: number; y: number }[] = [];
   const chevrons: { baseX: number; apexX: number; topY: number; botY: number; apexY: number; stroke: string; hand: 'RH' | 'LH' }[] = [];
+  const directionalNoteheads: { baseX: number; apexX: number; topY: number; botY: number; apexY: number; stroke: string; hand: 'RH' | 'LH' }[] = [];
 
   const mockCtx = {
     fillStyle: '',
@@ -506,6 +507,23 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
           });
         }
       }
+      if (currentPath.length >= 5) {
+        const p1 = currentPath[1];
+        const p2 = currentPath[2];
+        const p3 = currentPath[3];
+        if (p1 && p2 && p3 && Math.abs(p1.x - p3.x) < 0.01 && p2.x !== p1.x) {
+          const hand = p2.x > p1.x ? 'RH' : 'LH';
+          directionalNoteheads.push({
+            baseX: p1.x,
+            apexX: p2.x,
+            topY: p1.y,
+            apexY: p2.y,
+            botY: p3.y,
+            stroke: currentStroke,
+            hand,
+          });
+        }
+      }
     },
     fill: () => {},
     fillRect: () => {},
@@ -534,34 +552,37 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
   const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 20 && Math.abs(l.x2 - l.x1) < 100);
   assert.equal(lateralStems.length, 0, 'Zero straight lateral stem lines rendered');
 
+  // Zero standalone floating chevrons
+  assert.equal(chevrons.length, 0, 'Zero standalone floating chevrons rendered');
+
   // In Bach Goldberg Var 1, keyboard symmetry around m3 (linear pitch 48) means:
-  // - 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have ZERO chevrons (clean noteheads)
-  // - Exactly 63 notes where hands cross m3 have chevrons:
-  //   - 24 notes where RH crosses into bass (< 48) have right-pointing chevrons (apexX > baseX)
-  //   - 39 notes where LH crosses into treble (> 48) have left-pointing chevrons (apexX < baseX)
-  assert.equal(chevrons.length, 63, 'Must render chevrons ONLY for exceptions (63 in Goldberg Var 1)');
+  // - 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have standard noteheads
+  // - Exactly 63 notes where hands cross m3 have directional noteheads:
+  //   - 24 notes where RH crosses into bass (< 48) have right-pointing noteheads (apexX > baseX)
+  //   - 39 notes where LH crosses into treble (> 48) have left-pointing noteheads (apexX < baseX)
+  assert.equal(directionalNoteheads.length, 63, 'Must render directional noteheads ONLY for exceptions (63 in Goldberg Var 1)');
 
-  const rhChevrons = chevrons.filter((s) => s.hand === 'RH');
-  const lhChevrons = chevrons.filter((s) => s.hand === 'LH');
+  const rhDirectional = directionalNoteheads.filter((s) => s.hand === 'RH');
+  const lhDirectional = directionalNoteheads.filter((s) => s.hand === 'LH');
 
-  assert.equal(rhChevrons.length, 24, '24 crossing notes must have right-pointing chevrons for RH in bass (< 48)');
-  assert.equal(lhChevrons.length, 39, '39 crossing notes must have left-pointing chevrons for LH above m3 (> 48)');
+  assert.equal(rhDirectional.length, 24, '24 crossing notes must have right-pointing noteheads for RH in bass (< 48)');
+  assert.equal(lhDirectional.length, 39, '39 crossing notes must have left-pointing noteheads for LH above m3 (> 48)');
 
-  // Verify center alignment: chevron apex is at cy === y (paddingStart + startTick * pixelsPerTick)
+  // Verify center alignment: notehead apex is at cy === y (paddingStart + startTick * pixelsPerTick)
   const firstExNote = score.notes.find((n) => (n.hand === 'RH' && linearIndex(n.pitch) < 48) || (n.hand === 'LH' && linearIndex(n.pitch) > 48))!;
-  const firstChevron = chevrons[0];
+  const firstDirectional = directionalNoteheads[0];
   const paddingStart = 60;
   const expectedY = paddingStart + firstExNote.startTick * 2.0;
-  assert.equal(firstChevron.apexY, expectedY, 'Chevron must be center-aligned at cy === y');
-  assert.ok(Math.abs(firstChevron.apexY - (firstChevron.topY + firstChevron.botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
+  assert.equal(firstDirectional.apexY, expectedY, 'Notehead apex must be center-aligned at cy === y');
+  assert.ok(Math.abs(firstDirectional.apexY - (firstDirectional.topY + firstDirectional.botY) / 2) < 0.05, 'Notehead apex must be vertically centered');
 
-  // Assert notes on Middle C (lPitch === 48) have zero chevrons for both RH and LH
+  // Assert notes on Middle C (lPitch === 48) have zero directional noteheads for both RH and LH
   const m3Notes = score.notes.filter((n) => linearIndex(n.pitch) === 48);
   assert.ok(m3Notes.length > 0, 'Score must contain notes on Middle C');
   m3Notes.forEach((m3) => {
     const yCoord = paddingStart + m3.startTick * 2.0;
-    const hasChevron = chevrons.some((s) => s.apexY === yCoord);
-    assert.ok(!hasChevron, `Note on Middle C (${m3.id}, hand: ${m3.hand}) must have zero chevrons`);
+    const hasDirectional = directionalNoteheads.some((s) => s.apexY === yCoord);
+    assert.ok(!hasDirectional, `Note on Middle C (${m3.id}, hand: ${m3.hand}) must have zero directional noteheads`);
   });
 
   // Verify full m3 symmetry exception logic with both RH (<48) and LH (>48) crossings, and neutral Middle C (48):
@@ -580,15 +601,16 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
     notes: [
       { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> neutral
       { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> neutral
-      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no chevron
-      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no chevron
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right chevron
-      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left chevron
+      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no directional tip
+      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no directional tip
+      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right tip
+      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left tip
     ],
   };
 
   let symPath: { x: number; y: number }[] = [];
   const symChevrons: { baseX: number; apexX: number; hand: 'RH' | 'LH' }[] = [];
+  const symDirectional: { baseX: number; apexX: number; hand: 'RH' | 'LH' }[] = [];
   const symCtx = {
     fillStyle: '',
     strokeStyle: '',
@@ -619,6 +641,18 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
           });
         }
       }
+      if (symPath.length >= 5) {
+        const p1 = symPath[1];
+        const p2 = symPath[2];
+        const p3 = symPath[3];
+        if (p1 && p2 && p3 && Math.abs(p1.x - p3.x) < 0.01 && p2.x !== p1.x) {
+          symDirectional.push({
+            baseX: p1.x,
+            apexX: p2.x,
+            hand: p2.x > p1.x ? 'RH' : 'LH',
+          });
+        }
+      }
     },
     fill: () => {},
     fillRect: () => {},
@@ -643,12 +677,13 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
     currentTick: 0,
   });
 
-  assert.equal(symChevrons.length, 2, 'Exactly 2 chevrons must be rendered for the 2 exception notes');
+  assert.equal(symChevrons.length, 0, 'Zero standalone floating chevrons in symmetry test');
+  assert.equal(symDirectional.length, 2, 'Exactly 2 directional noteheads must be rendered for the 2 exception notes');
 
-  const symRh = symChevrons.filter((s) => s.hand === 'RH');
-  const symLh = symChevrons.filter((s) => s.hand === 'LH');
-  assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing chevron');
-  assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing chevron');
+  const symRh = symDirectional.filter((s) => s.hand === 'RH');
+  const symLh = symDirectional.filter((s) => s.hand === 'LH');
+  assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing notehead');
+  assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing notehead');
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {
@@ -1246,6 +1281,7 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   const arcCenters: { x: number; y: number }[] = [];
   const fills: string[] = [];
   const chevrons: { baseX: number; apexX: number; hand: 'RH' | 'LH' }[] = [];
+  const directionalNoteheads: { baseX: number; apexX: number; topY: number; apexY: number; botY: number; hand: 'RH' | 'LH' }[] = [];
 
   let currentPath: { x: number; y: number }[] = [];
 
@@ -1278,6 +1314,21 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
             baseX: p0.x,
             apexX: p1.x,
             hand: p1.x > p0.x ? 'RH' : 'LH',
+          });
+        }
+      }
+      if (currentPath.length >= 5) {
+        const p1 = currentPath[1];
+        const p2 = currentPath[2];
+        const p3 = currentPath[3];
+        if (p1 && p2 && p3 && Math.abs(p1.x - p3.x) < 0.01 && p2.x !== p1.x) {
+          directionalNoteheads.push({
+            baseX: p1.x,
+            apexX: p2.x,
+            topY: p1.y,
+            apexY: p2.y,
+            botY: p3.y,
+            hand: p2.x > p1.x ? 'RH' : 'LH',
           });
         }
       }
@@ -1351,10 +1402,11 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
   // Quarter notes (Amber #F59E0B)
   assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
 
-  // Handedness indicators: tasteful chevrons (< for LH, > for RH)
-  // In Goldberg Var 1, 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have zero chevrons,
-  // while the 63 notes where hands cross m3 (24 RH < 48, 39 LH > 48) have chevrons.
-  assert.equal(chevrons.length, 63, 'Only hand crossing exception notes (63 in Var 1) render chevrons');
+  // Handedness indicators: baked directional noteheads (< for LH, > for RH)
+  // In Goldberg Var 1, 488 notes in default territory (RH >= 48, LH <= 48, and both hands on 48) have standard noteheads,
+  // while the 63 notes where hands cross m3 (24 RH < 48, 39 LH > 48) have directional noteheads.
+  assert.equal(chevrons.length, 0, 'Zero standalone chevrons rendered');
+  assert.equal(directionalNoteheads.length, 63, 'Only hand crossing exception notes (63 in Var 1) render directional noteheads');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1367,8 +1419,17 @@ test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular N
       const lPitch = n.pitch.octave * 12 + n.pitch.pitchClass;
       const expectedX = paddingPitch + (lPitch - minPitch) * pixelsPerSemitone;
       const expectedY = paddingStart + n.startTick * pixelsPerTick;
-      const found = arcCenters.some((c) => Math.abs(c.x - expectedX) < 0.1 && Math.abs(c.y - expectedY) < 0.1);
-      assert.ok(found, `Note ${n.id} (16th note) must be centered at exact onset coordinate (${expectedX}, ${expectedY})`);
+      const hand = n.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
+      const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+      if (isHandException) {
+        // Hand-crossing exception notehead is a baked directional pentagon
+        const found = directionalNoteheads.some((d) => Math.abs(d.apexY - expectedY) < 0.1 && d.hand === hand);
+        assert.ok(found, `Note ${n.id} (16th note exception) must be centered at exact onset coordinate (${expectedX}, ${expectedY})`);
+      } else {
+        // Regular notehead on Row 0 is a standard disc / ellipse
+        const found = arcCenters.some((c) => Math.abs(c.x - expectedX) < 0.1 && Math.abs(c.y - expectedY) < 0.1);
+        assert.ok(found, `Note ${n.id} (16th note) must be centered at exact onset coordinate (${expectedX}, ${expectedY})`);
+      }
     });
 
   // Verify canvas render executes cleanly with zero hand-crossing overlay fills
@@ -1856,11 +1917,11 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
   assert.ok(squareCount > 0, 'Must render squished square noteheads');
   assert.ok(fullSquareCount > 0, 'Must render full squares for Row 0 notes');
   assert.ok(emptySquareCount > 0, 'Must render empty squares for Row 1 notes');
-  assert.equal(tintFillCount, 1, 'Must render faint tint (globalAlpha = 0.18) strictly for the Red note on Row 1 (bach-var1-343)');
+  assert.equal(tintFillCount, 0, 'Must have zero faint tint (globalAlpha = 0.18) fills; all Row 1 hollow noteheads maintain pure void fill');
   assert.ok(voidFillCount > 0, 'Must render pure void black inside 16th note hollow noteheads');
   assert.equal(ellipseCount, 0, 'Must render zero ellipses');
 
-  // Explicitly assert duration-class color behavior on Canvas: Blue (8th) & Orange (quarter) void vs Red (half note) tint
+  // Explicitly assert duration-class color behavior on Canvas: Blue (8th), Orange (quarter), and Red (half note) all maintain void fill (zero tint)
   const canvasDurationScore: QuantizedGridScore = {
     id: 'canvas-duration-test',
     title: 'Canvas Duration Test',
@@ -1876,7 +1937,7 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
     notes: [
       { id: 'c-8th', pitch: { pitchClass: 1, octave: 4 }, startTick: 0, durationTicks: 24, hand: 'RH', velocity: 90 }, // Blue 8th -> void
       { id: 'c-quarter', pitch: { pitchClass: 1, octave: 4 }, startTick: 48, durationTicks: 48, hand: 'RH', velocity: 90 }, // Orange Quarter -> void
-      { id: 'c-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 96, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> faint tint 0.18
+      { id: 'c-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 96, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> void (no tint 0.18)
     ],
   };
 
@@ -1933,7 +1994,7 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
   });
 
   const tintFills = alphaAtFill.filter((a) => Math.abs(a - 0.18) < 0.01);
-  assert.equal(tintFills.length, 1, 'Canvas must render faint tint (globalAlpha = 0.18) strictly for Red notes (d >= 96t)');
+  assert.equal(tintFills.length, 0, 'Canvas must render zero faint tint (globalAlpha = 0.18); Red notes maintain pure void fill');
 });
 
 test('Piano Roll View: 1:1 Geometric Equivalence & Chromatic DAW Alignment', () => {

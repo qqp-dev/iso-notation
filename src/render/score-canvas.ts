@@ -748,41 +748,28 @@ export function renderScoreToCanvas(
       const noteWidth = Math.max(10, options.pixelsPerSemitone);
       const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
 
-      // Notehead obstacle
+      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
+      const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+      const halfW = noteWidth / 2;
+      const tip = 2.4;
+      let x1 = nx - halfW - 1.0;
+      let x2 = nx + halfW + 1.0;
+      if (isHandException) {
+        if (hand === 'LH') {
+          x1 = nx - halfW - tip - 2.0;
+        } else {
+          x2 = nx + halfW + tip + 2.0;
+        }
+      }
+
+      // Notehead obstacle incorporating baked pointer tip
       canvasObstacles.push({
         noteId: note.id,
-        x1: nx - noteWidth / 2 - 1.0,
-        x2: nx + noteWidth / 2 + 1.0,
+        x1,
+        x2,
         y1: ny - noteHeight / 2 - 2.0,
         y2: ny + noteHeight / 2 + 2.0,
       });
-
-      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
-      const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
-      if (isHandException) {
-        const halfW = noteWidth / 2;
-        const w = 3.2;
-        const h = 5.2;
-        const clearance = 1.5;
-
-        let apexX: number;
-        let baseX: number;
-        if (hand === 'LH') {
-          apexX = nx - halfW - clearance - w;
-          baseX = nx - halfW - clearance;
-        } else {
-          apexX = nx + halfW + clearance + w;
-          baseX = nx + halfW + clearance;
-        }
-
-        canvasObstacles.push({
-          noteId: note.id,
-          x1: Math.min(baseX, apexX) - 1.5,
-          x2: Math.max(baseX, apexX) + 1.5,
-          y1: ny - h / 2 - 2.5,
-          y2: ny + h / 2 + 2.5,
-        });
-      }
     }
   }
 
@@ -938,7 +925,6 @@ export function renderScoreToCanvas(
       }
 
       // Render notehead morphology with line knockout
-      const isRedNote = (note.durationTicks / tauRef) >= 8.0;
       renderNotehead(
         ctx,
         normNoteheadMorph,
@@ -949,8 +935,7 @@ export function renderScoreToCanvas(
         noteColor,
         isHighlighted,
         strokeColor,
-        false,
-        isRedNote
+        false
       );
 
       // Articulation marker
@@ -1032,56 +1017,9 @@ export function renderScoreToCanvas(
         }
       }
 
-      // Tasteful < and > chevrons for hand-crossing exceptions
-      // Middle C (m3, linear pitch 48) is neutral (no indicator).
       const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
       const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
 
-      if (isHandException) {
-        const halfW = noteWidth / 2;
-        const w = 3.2;
-        const h = 5.2;
-        const clearance = 1.5;
-
-        let apexX: number;
-        let baseX: number;
-        if (hand === 'LH') {
-          apexX = cx - halfW - clearance - w;
-          baseX = cx - halfW - clearance;
-        } else {
-          apexX = cx + halfW + clearance + w;
-          baseX = cx + halfW + clearance;
-        }
-        const topY = cy - h / 2;
-        const botY = cy + h / 2;
-        const apexY = cy;
-
-        ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // Knockout halo underlay
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        ctx.moveTo(baseX, topY);
-        ctx.lineTo(apexX, apexY);
-        ctx.lineTo(baseX, botY);
-        ctx.stroke();
-
-        // Colored chevron
-        ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(baseX, topY);
-        ctx.lineTo(apexX, apexY);
-        ctx.lineTo(baseX, botY);
-        ctx.stroke();
-
-        ctx.restore();
-      }
-
-      const isRedNote = (note.durationTicks / tauRef) >= 8.0;
       renderNotehead(
         ctx,
         normNoteheadMorph,
@@ -1093,7 +1031,7 @@ export function renderScoreToCanvas(
         isHighlighted,
         strokeColor,
         true,
-        isRedNote
+        isHandException ? hand : null
       );
 
       if (note.articulation === 'staccato') {
@@ -1147,7 +1085,60 @@ export function renderScoreToCanvas(
 /**
  * Renders individual notehead according to NoteheadMorphology with crisp line knockout.
  */
-function renderNotehead(
+/**
+ * Draws a directional baked notehead pentagon on a Canvas 2D context.
+ * For LH: pointer tip extends to the left (cx - halfW - tip), flat back on right.
+ * For RH: pointer tip extends to the right (cx + halfW + tip), flat back on left.
+ */
+export function drawBakedCanvasPath(
+  ctx: CanvasRenderingContext2D,
+  bx: number,
+  by: number,
+  nw: number,
+  nh: number,
+  cy: number,
+  hand: 'RH' | 'LH',
+  tip: number = 2.4,
+  rx: number = 1.2
+): void {
+  if (hand === 'LH') {
+    const rightX = bx + nw;
+    const apexX = bx - tip;
+    ctx.moveTo(rightX - rx, by);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(apexX, cy);
+    ctx.lineTo(bx, by + nh);
+    ctx.lineTo(rightX - rx, by + nh);
+    if (typeof ctx.arcTo === 'function') {
+      ctx.arcTo(rightX, by + nh, rightX, by + nh - rx, rx);
+      ctx.lineTo(rightX, by + rx);
+      ctx.arcTo(rightX, by, rightX - rx, by, rx);
+    } else {
+      ctx.lineTo(rightX, by + nh);
+      ctx.lineTo(rightX, by);
+    }
+    ctx.closePath();
+  } else {
+    const rightX = bx + nw;
+    const apexX = rightX + tip;
+    ctx.moveTo(bx + rx, by);
+    ctx.lineTo(rightX, by);
+    ctx.lineTo(apexX, cy);
+    ctx.lineTo(rightX, by + nh);
+    ctx.lineTo(bx + rx, by + nh);
+    if (typeof ctx.arcTo === 'function') {
+      ctx.arcTo(bx, by + nh, bx, by + nh - rx, rx);
+      ctx.lineTo(bx, by + rx);
+      ctx.arcTo(bx, by, bx + rx, by, rx);
+    } else {
+      ctx.lineTo(bx, by + nh);
+      ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+  }
+}
+
+export function renderNotehead(
   ctx: CanvasRenderingContext2D,
   morphology: 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot' | 'rectangle-square' | 'square-ellipse' | 'square-triangle',
   pitchClass: number,
@@ -1158,11 +1149,52 @@ function renderNotehead(
   isActive: boolean,
   strokeColor: string,
   isVertical: boolean,
-  isRedNote: boolean = false
+  handException: 'RH' | 'LH' | null = null
 ): void {
   const headColor = isActive
     ? (fillColor === '#FEF08A' || fillColor === '#FFFFFF' ? fillColor : '#FDE047')
     : fillColor;
+
+  if (handException !== null) {
+    const isRow0 = pitchClass % 2 === 0;
+    const nw = Math.max(11.0, baseSize);
+    const nh = Math.max(8.2, baseSize * 0.75);
+    const sw = isVertical ? nw : nh;
+    const sh = isVertical ? nh : nw;
+    const halfW = sw / 2;
+    const halfH = sh / 2;
+    const bx = cx - halfW;
+    const by = cy - halfH;
+    const tip = 2.4;
+    const rx = 1.2;
+
+    // Knockout line-masking (canvas background is black)
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    drawBakedCanvasPath(ctx, bx, by, sw, sh, cy, handException, tip, rx);
+    ctx.fill();
+
+    if (isRow0) {
+      // Row 0: Solid directional pentagon
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      drawBakedCanvasPath(ctx, bx, by, sw, sh, cy, handException, tip, rx);
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    } else {
+      // Row 1: Hollow directional pentagon with void black interior
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      drawBakedCanvasPath(ctx, bx, by, sw, sh, cy, handException, tip, rx);
+      ctx.fill();
+      ctx.strokeStyle = headColor;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    }
+    return;
+  }
 
   switch (morphology) {
     case 'classic-oval': {
@@ -1361,22 +1393,11 @@ function renderNotehead(
         ctx.stroke();
       } else {
         // Row 1: Empty (Hollow) squished square
-        // 100% VOID / transparent (pure black interior on canvas) for notes with d < 96t (ratio < 8.0)
-        // Faint wash inside hollow notehead (~18% opacity) strictly for Red notes (d >= 96t / ratio >= 8.0)
+        // 100% VOID / transparent (pure black interior on canvas)
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
         ctx.fill();
-
-        if (isRedNote) {
-          ctx.save();
-          ctx.globalAlpha = 0.18;
-          ctx.fillStyle = headColor;
-          ctx.beginPath();
-          ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
-          ctx.fill();
-          ctx.restore();
-        }
 
         ctx.strokeStyle = headColor;
         ctx.lineWidth = 1.8;
