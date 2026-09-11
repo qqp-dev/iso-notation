@@ -292,8 +292,8 @@ test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
 
   assert.equal(svgs.length, 2);
   for (const svg of svgs) {
-    // 1. Lowercase m octave markers (m2, m3, m4, m5)
-    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct} pitch labels');
+    // 1. Lowercase m octave markers (m2, m3, m4) with Middle C at m3
+    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct - 1} pitch labels');
     assert.match(svg, />m2</);
     assert.match(svg, />m3</);
     assert.match(svg, />m4</);
@@ -301,5 +301,48 @@ test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
     // 2. Zero diatonic C octave labels
     assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
     assert.doesNotMatch(svg, />C\d+</, 'Must not contain any diatonic C${oct} markers');
+  }
+});
+
+test('Phonetic Notehead Morphology in SVG: strictly lowercase syllables', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score, {
+    noteheadMorphology: 'phonetic',
+  });
+  const svgs = renderAllPagesToSvg(layout);
+
+  assert.equal(svgs.length, 2);
+  const uppercaseSyllables = ['Ma', 'Di', 'Va', 'Pi', 'La', 'Ri', 'Na', 'Ti', 'Fa', 'Bi', 'Sa', 'Ki'];
+
+  for (const svg of svgs) {
+    // Must contain lowercase phonetic text elements
+    assert.match(svg, /<text[^>]*font-family="monospace"[^>]*>(?:ma|di|va|pi|la|ri|na|ti|fa|bi|sa|ki)<\/text>/);
+
+    // Must NOT contain any uppercase syllables in note text elements
+    for (const upper of uppercaseSyllables) {
+      assert.doesNotMatch(svg, new RegExp(`>${upper}<`), `SVG must not contain uppercase syllable ${upper}`);
+    }
+  }
+});
+
+test('0-Indexed Piano Octaves Invariant (m0..m7) for 88-key range', () => {
+  // 88-key piano spans A0 (MIDI 21) to C8 (MIDI 108)
+  // Lowest C is C1 (MIDI 24, oct = 1) -> m0
+  // Middle C is C4 (MIDI 60, oct = 4) -> m3
+  // Highest C is C8 (MIDI 108, oct = 8) -> m7
+  const expectedOctaveLabels: Record<number, string> = {
+    1: 'm0', // C1 (lowest piano C)
+    2: 'm1', // C2
+    3: 'm2', // C3
+    4: 'm3', // C4 (Middle C)
+    5: 'm4', // C5
+    6: 'm5', // C6
+    7: 'm6', // C7
+    8: 'm7', // C8
+  };
+
+  for (let oct = 1; oct <= 8; oct++) {
+    const label = `m${oct - 1}`;
+    assert.equal(label, expectedOctaveLabels[oct], `Octave ${oct} must format as ${expectedOctaveLabels[oct]}`);
   }
 });

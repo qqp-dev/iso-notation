@@ -26,27 +26,27 @@ export const ALTERNATIVES: Record<string, AlternativePreset> = {
     shortName: 'Prime: 92% Optimal',
     fullName: 'Prime Candidate: Optimal Structural Order (Tritone Twins + Augmented Triads)',
     tagline: '100% Tritone Twins · 100% Row 1 Voiced/Voiceless Triangles · 91.7% Semitone Diversity · 91.7% Fifths Fluency',
-    sequencePreview: 'Ma → Di → Va → Pi → La → Ri → Na → Ti → Fa → Bi → Sa → Ki',
+    sequencePreview: 'ma → di → va → pi → la → ri → na → ti → fa → bi → sa → ki',
     justifications: [
-      '100% Tritone Twin Pairing (±6): Maximally separates acoustic cousins half an octave apart: Ma↔Na (nasals), Di↔Ti (dental stops), Va↔Fa (labiodental fricatives), Pi↔Bi (lip pops), La↔Sa (ridge flows/hisses), Ri↔Ki (palatal vs velar).',
-      '100% Augmented Triad Voicing (±4): Row 1 major-third triangle {1, 5, 9} is 100% voiced (Di-Ri-Bi); triangle {3, 7, 11} is 100% voiceless (Pi-Ti-Ki). Chord shapes maintain consistent vocal fold vibration state.',
-      '91.7% Motor Diversity (±1): 11 of 12 chromatic semitones alternate physical muscle groups. The single ridge transition (Na 6 → Ti 7) pairs a smooth nasal hum with a crisp percussive release, causing zero tongue tangling.',
-      '91.7% Harmonic Fifths Fluency (±7): Circle of Fifths alternates vowels (-a ↔ -i) and leaps smoothly across oral muscle groups with only 1 repeat (Na → Di).',
-      'Jánko Hardware Homomorphism: Row 0 keys (0, 2, 4, 6, 8, 10) rhyme on flowing -a (Ma, Va, La, Na, Fa, Sa); Row 1 keys (1, 3, 5, 7, 9, 11) rhyme on percussive/rolling -i (Di, Pi, Ri, Ti, Bi, Ki).',
+      '100% Tritone Twin Pairing (±6): Maximally separates acoustic cousins half an octave apart: ma↔na (nasals), di↔ti (dental stops), va↔fa (labiodental fricatives), pi↔bi (lip pops), la↔sa (ridge flows/hisses), ri↔ki (palatal vs velar).',
+      '100% Augmented Triad Voicing (±4): Row 1 major-third triangle {1, 5, 9} is 100% voiced (di-ri-bi); triangle {3, 7, 11} is 100% voiceless (pi-ti-ki). Chord shapes maintain consistent vocal fold vibration state.',
+      '91.7% Motor Diversity (±1): 11 of 12 chromatic semitones alternate physical muscle groups. The single ridge transition (na 6 → ti 7) pairs a smooth nasal hum with a crisp percussive release, causing zero tongue tangling.',
+      '91.7% Harmonic Fifths Fluency (±7): Circle of Fifths alternates vowels (-a ↔ -i) and leaps smoothly across oral muscle groups with only 1 repeat (na → di).',
+      'Jánko Hardware Homomorphism: Row 0 keys (0, 2, 4, 6, 8, 10) rhyme on flowing -a (ma, va, la, na, fa, sa); Row 1 keys (1, 3, 5, 7, 9, 11) rhyme on percussive/rolling -i (di, pi, ri, ti, bi, ki).',
     ],
     entries: [
-      { pitchClass: 0, row: 0, consonant: 'M', vowel: 'a', syllable: 'Ma', anatomicalRegion: 'Lips (Bilabial nasal flow)' },
-      { pitchClass: 1, row: 1, consonant: 'D', vowel: 'i', syllable: 'Di', anatomicalRegion: 'Ridge (Alveolar voiced tap)' },
-      { pitchClass: 2, row: 0, consonant: 'V', vowel: 'a', syllable: 'Va', anatomicalRegion: 'Teeth-Lip (Voiced buzz)' },
-      { pitchClass: 3, row: 1, consonant: 'P', vowel: 'i', syllable: 'Pi', anatomicalRegion: 'Lips (Bilabial voiceless pop)' },
-      { pitchClass: 4, row: 0, consonant: 'L', vowel: 'a', syllable: 'La', anatomicalRegion: 'Ridge (Lateral liquid flow)' },
-      { pitchClass: 5, row: 1, consonant: 'R', vowel: 'i', syllable: 'Ri', anatomicalRegion: 'Mid-Palate (Retroflex liquid)' },
-      { pitchClass: 6, row: 0, consonant: 'N', vowel: 'a', syllable: 'Na', anatomicalRegion: 'Ridge (Nasal resonance)' },
-      { pitchClass: 7, row: 1, consonant: 'T', vowel: 'i', syllable: 'Ti', anatomicalRegion: 'Ridge (Alveolar voiceless strike)' },
-      { pitchClass: 8, row: 0, consonant: 'F', vowel: 'a', syllable: 'Fa', anatomicalRegion: 'Teeth-Lip (Voiceless breath)' },
-      { pitchClass: 9, row: 1, consonant: 'B', vowel: 'i', syllable: 'Bi', anatomicalRegion: 'Lips (Bilabial voiced burst)' },
-      { pitchClass: 10, row: 0, consonant: 'S', vowel: 'a', syllable: 'Sa', anatomicalRegion: 'Teeth/Ridge (Sibilant hiss)' },
-      { pitchClass: 11, row: 1, consonant: 'K', vowel: 'i', syllable: 'Ki', anatomicalRegion: 'Soft Palate (Crisp velar click)' },
+      { pitchClass: 0, row: 0, consonant: 'm', vowel: 'a', syllable: 'ma', anatomicalRegion: 'Lips (Bilabial nasal flow)' },
+      { pitchClass: 1, row: 1, consonant: 'd', vowel: 'i', syllable: 'di', anatomicalRegion: 'Ridge (Alveolar voiced tap)' },
+      { pitchClass: 2, row: 0, consonant: 'v', vowel: 'a', syllable: 'va', anatomicalRegion: 'Teeth-Lip (Voiced buzz)' },
+      { pitchClass: 3, row: 1, consonant: 'p', vowel: 'i', syllable: 'pi', anatomicalRegion: 'Lips (Bilabial voiceless pop)' },
+      { pitchClass: 4, row: 0, consonant: 'l', vowel: 'a', syllable: 'la', anatomicalRegion: 'Ridge (Lateral liquid flow)' },
+      { pitchClass: 5, row: 1, consonant: 'r', vowel: 'i', syllable: 'ri', anatomicalRegion: 'Mid-Palate (Retroflex liquid)' },
+      { pitchClass: 6, row: 0, consonant: 'n', vowel: 'a', syllable: 'na', anatomicalRegion: 'Ridge (Nasal resonance)' },
+      { pitchClass: 7, row: 1, consonant: 't', vowel: 'i', syllable: 'ti', anatomicalRegion: 'Ridge (Alveolar voiceless strike)' },
+      { pitchClass: 8, row: 0, consonant: 'f', vowel: 'a', syllable: 'fa', anatomicalRegion: 'Teeth-Lip (Voiceless breath)' },
+      { pitchClass: 9, row: 1, consonant: 'b', vowel: 'i', syllable: 'bi', anatomicalRegion: 'Lips (Bilabial voiced burst)' },
+      { pitchClass: 10, row: 0, consonant: 's', vowel: 'a', syllable: 'sa', anatomicalRegion: 'Teeth/Ridge (Sibilant hiss)' },
+      { pitchClass: 11, row: 1, consonant: 'k', vowel: 'i', syllable: 'ki', anatomicalRegion: 'Soft Palate (Crisp velar click)' },
     ],
   },
   'alt-janko-dual': {
@@ -157,7 +157,7 @@ export const ALTERNATIVES: Record<string, AlternativePreset> = {
   },
 };
 
-const USER_12_CONSONANTS = ['B', 'D', 'F', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V'];
+const USER_12_CONSONANTS = ['b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v'];
 const COMMON_VOWELS = ['a', 'o', 'e', 'i', 'u'];
 
 interface DrillPattern {

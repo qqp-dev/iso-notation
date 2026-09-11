@@ -155,8 +155,8 @@ test('Notehead Morphology: row-parity-shapes dual-coded geometry', () => {
 
 test('Notehead Morphology: phonetic-tokens 12-TET monosyllabic tokens', () => {
   const expectedSyllables = [
-    'Ma', 'Di', 'Va', 'Pi', 'La', 'Ri',
-    'Na', 'Ti', 'Fa', 'Bi', 'Sa', 'Ki'
+    'ma', 'di', 'va', 'pi', 'la', 'ri',
+    'na', 'ti', 'fa', 'bi', 'sa', 'ki'
   ];
 
   assert.equal(normalizeNoteheadMorphology('phonetic-tokens'), 'phonetic');
@@ -164,7 +164,68 @@ test('Notehead Morphology: phonetic-tokens 12-TET monosyllabic tokens', () => {
 
   expectedSyllables.forEach((syl, pc) => {
     assert.equal(getCanonicalSyllable(pc), syl, `PC ${pc} must be ${syl}`);
+    assert.equal(syl, syl.toLowerCase(), `Syllable ${syl} must be strictly lowercase`);
   });
+});
+
+test('Notehead Morphology: Canvas rendering of phonetic tokens uses strictly lowercase syllables', () => {
+  const score = buildBachGoldbergVar1Score();
+  const fills: { text: string; fillStyle: string; font: string }[] = [];
+  let currentFillStyle = '';
+  let currentFont = '';
+  const mockCtx = {
+    set fillStyle(val: string) { currentFillStyle = val; },
+    get fillStyle() { return currentFillStyle; },
+    set font(val: string) { currentFont = val; },
+    get font() { return currentFont; },
+    strokeStyle: '',
+    lineWidth: 1,
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string) => {
+      fills.push({ text, fillStyle: currentFillStyle, font: currentFont });
+    },
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: '5-7-split',
+    noteheadMorphology: 'phonetic',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  const validLowerSyllables = new Set(['ma', 'di', 'va', 'pi', 'la', 'ri', 'na', 'ti', 'fa', 'bi', 'sa', 'ki']);
+  const renderedSyllables = fills.filter((f) => validLowerSyllables.has(f.text));
+  assert.ok(renderedSyllables.length > 0, 'Must render phonetic tokens for notes');
+
+  // Verify zero uppercase syllables rendered anywhere
+  const uppercaseSyllables = ['Ma', 'Di', 'Va', 'Pi', 'La', 'Ri', 'Na', 'Ti', 'Fa', 'Bi', 'Sa', 'Ki'];
+  for (const upper of uppercaseSyllables) {
+    assert.ok(
+      !fills.some((f) => f.text === upper),
+      `Must not render uppercase syllable ${upper}`
+    );
+  }
 });
 
 test('Notehead Morphology: numerical-digits strictly pitch-class integers 0..11', () => {
@@ -350,9 +411,9 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
 
   const horizTexts = horizFills.map((f) => f.text);
   const horizMOctaves = horizTexts.filter((t) => /^m\d+$/.test(t));
-  assert.ok(horizMOctaves.length > 0, 'Must render m${oct} octave markers in horizontal orientation');
-  assert.ok(horizMOctaves.includes('m3'), 'Should include m3');
-  assert.ok(horizMOctaves.includes('m4'), 'Should include m4');
+  assert.ok(horizMOctaves.length > 0, 'Must render m${oct - 1} octave markers in horizontal orientation');
+  assert.ok(horizMOctaves.includes('m2'), 'Should include m2 (C3)');
+  assert.ok(horizMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
   assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
   assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
 
@@ -374,9 +435,9 @@ test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', 
 
   const vertTexts = vertFills.map((f) => f.text);
   const vertMOctaves = vertTexts.filter((t) => /^m\d+$/.test(t));
-  assert.ok(vertMOctaves.length > 0, 'Must render m${oct} octave markers in vertical orientation');
-  assert.ok(vertMOctaves.includes('m3'), 'Should include m3');
-  assert.ok(vertMOctaves.includes('m4'), 'Should include m4');
+  assert.ok(vertMOctaves.length > 0, 'Must render m${oct - 1} octave markers in vertical orientation');
+  assert.ok(vertMOctaves.includes('m2'), 'Should include m2 (C3)');
+  assert.ok(vertMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
   assert.ok(!vertTexts.includes('0'), 'Must not render bare 0 at octave boundary in vertical orientation');
   assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
 });

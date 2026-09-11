@@ -1,5 +1,6 @@
 import { QuantizedGridScore, QuantizedNote, HandCrossingEvent } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
+import { getCanonicalSyllable } from '../model/phonetics';
 import { detectHandCrossings } from '../model/grid';
 import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor } from './types';
 
@@ -354,7 +355,8 @@ export function renderPageToSvg(
       const oct = Math.floor(p / 12);
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
       if (pc === 0) {
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${oct}</text>`);
+        const displayOct = Math.max(0, oct - 1);
+        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${displayOct}</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
       } else if (pc === 4 && normStaffStyle === 'tritone-split') {
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5|7</text>`);
@@ -439,7 +441,8 @@ export function renderPageToSvg(
       }
     }
 
-    // Notes: Klavar Lateral Stems & Solid Row-Parity Noteheads with White Halo Knockout
+    // Notes: Klavar Lateral Stems & Solid Row-Parity / Phonetic Noteheads with White Halo Knockout
+    const morph = normalizeNoteheadMorphology(layout.options.noteheadMorphology);
     for (const note of col.notes) {
       const lPitch = linearIndex(note.pitch);
       const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
@@ -455,20 +458,33 @@ export function renderPageToSvg(
       const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
       svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
 
-      // Optical Notehead Balance Invariant:
-      // Diamond d = 4.0pt, Circle r = 3.2pt
-      // Circle area: pi * 3.2^2 ≈ 32.17 pt^2
-      // Diamond area: 2 * 4.0^2 = 32.00 pt^2 (matched within 0.5%)
-      const r = 3.2;
-      const d = 4.0;
-
-      if (isEven) {
-        // Row 0 (Lines): Solid Disc with White Halo Knockout
-        svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
+      if (morph === 'phonetic') {
+        // Phonetic tokens strictly lowercase (ma, di, va, pi, la, ri, na, ti, fa, bi, sa, ki)
+        const syllable = getCanonicalSyllable(note.pitch.pitchClass);
+        const pw = 15.0;
+        const ph = 8.5;
+        // White knockout pill
+        svgParts.push(`    <rect x="${(nx - (pw + 2) / 2).toFixed(2)}" y="${(ny - (ph + 2) / 2).toFixed(2)}" width="${(pw + 2).toFixed(2)}" height="${(ph + 2).toFixed(2)}" rx="2.5" fill="#FFFFFF"/>`);
+        // Notehead pill
+        svgParts.push(`    <rect x="${(nx - pw / 2).toFixed(2)}" y="${(ny - ph / 2).toFixed(2)}" width="${pw.toFixed(2)}" height="${ph.toFixed(2)}" rx="2" fill="${noteColor}"/>`);
+        // Lowercase syllable text
+        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 2.5).toFixed(2)}" font-family="monospace" font-weight="bold" font-size="5.5pt" fill="#FFFFFF" text-anchor="middle">${syllable}</text>`);
       } else {
-        // Row 1 (Spaces): Solid Diamond with White Halo Knockout
-        const pts = `${nx.toFixed(2)},${(ny - d).toFixed(2)} ${(nx + d).toFixed(2)},${ny.toFixed(2)} ${nx.toFixed(2)},${(ny + d).toFixed(2)} ${(nx - d).toFixed(2)},${ny.toFixed(2)}`;
-        svgParts.push(`    <polygon points="${pts}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
+        // Optical Notehead Balance Invariant:
+        // Diamond d = 4.0pt, Circle r = 3.2pt
+        // Circle area: pi * 3.2^2 ≈ 32.17 pt^2
+        // Diamond area: 2 * 4.0^2 = 32.00 pt^2 (matched within 0.5%)
+        const r = 3.2;
+        const d = 4.0;
+
+        if (isEven) {
+          // Row 0 (Lines): Solid Disc with White Halo Knockout
+          svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
+        } else {
+          // Row 1 (Spaces): Solid Diamond with White Halo Knockout
+          const pts = `${nx.toFixed(2)},${(ny - d).toFixed(2)} ${(nx + d).toFixed(2)},${ny.toFixed(2)} ${nx.toFixed(2)},${(ny + d).toFixed(2)} ${(nx - d).toFixed(2)},${ny.toFixed(2)}`;
+          svgParts.push(`    <polygon points="${pts}" fill="${noteColor}" stroke="#FFFFFF" stroke-width="2"/>`);
+        }
       }
 
       // Articulations

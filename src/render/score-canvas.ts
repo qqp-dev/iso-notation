@@ -158,7 +158,7 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with m${oct} at octave boundaries
+      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with m${oct - 1} at octave boundaries (0-indexed piano octaves)
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
@@ -167,7 +167,8 @@ export function renderScoreToCanvas(
       ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      const label = isOctave0 ? `m${oct}` : `${pc}:${oct}`;
+      const displayOct = Math.max(0, oct - 1);
+      const label = isOctave0 ? `m${displayOct}` : `${pc}:${displayOct}`;
       ctx.fillText(label, paddingStart - 8, y);
     } else {
       // Vertical timeline
@@ -197,7 +198,7 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch class label along top margin: m${oct} at octave boundaries, pitch class number elsewhere
+      // Pitch class label along top margin: m${oct - 1} at octave boundaries (0-indexed piano octaves), pitch class number elsewhere
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
@@ -206,7 +207,8 @@ export function renderScoreToCanvas(
       ctx.font = isOctave0 ? 'bold 10px monospace' : '9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      const label = isOctave0 ? `m${oct}` : String(pc);
+      const displayOct = Math.max(0, oct - 1);
+      const label = isOctave0 ? `m${displayOct}` : String(pc);
       ctx.fillText(label, x, paddingStart - 6);
     }
   }

@@ -292,7 +292,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               {[
                 { id: 'row-parity-shape' as NoteheadMorphology, label: 'Row Parity Shapes', desc: 'Discs on lines (Row 0), Diamonds in spaces (Row 1)' },
                 { id: 'classic-oval' as NoteheadMorphology, label: 'Classic Oval', desc: 'Tilted elliptical notehead with line knockout' },
-                { id: 'phonetic' as NoteheadMorphology, label: '12-TET Phonetics', desc: 'Monosyllabic tokens (Ma, Di, Va, Pi, La, Ri...)' },
+                { id: 'phonetic' as NoteheadMorphology, label: '12-TET Phonetics', desc: 'Monosyllabic tokens (ma, di, va, pi, la, ri...)' },
                 { id: 'numerical' as NoteheadMorphology, label: 'Numerical Digits', desc: 'Pitch-class integers 0..11' },
                 { id: 'minimal-dot' as NoteheadMorphology, label: 'Minimal Dots', desc: 'Uncluttered circular dots with line knockout' },
               ].map((nh) => {
