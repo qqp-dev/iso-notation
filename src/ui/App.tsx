@@ -8,8 +8,10 @@ import { synth } from '../audio/synth';
 import { NotationCanvas } from './NotationCanvas';
 import { JankoKeyboard } from './JankoKeyboard';
 import { ControlsDrawer } from './ControlsDrawer';
+import { PhoneticSandbox } from './PhoneticSandbox';
 
 export const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('phonetics');
   const [selectedScoreId, setSelectedScoreId] = useState<string>('bach-goldberg-var1');
   const [score, setScore] = useState<QuantizedGridScore>(() => BENCHMARK_SCORES['bach-goldberg-var1']());
 
@@ -233,139 +235,186 @@ export const App: React.FC = () => {
 
       {/* Top Application Bar */}
       <header className="h-12 bg-black border-b border-neutral-800 px-3 flex items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <span className="font-mono font-bold tracking-tight text-white text-sm">
               iso-notation
             </span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900 text-[10px] text-neutral-400 border border-neutral-800 font-mono">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-neutral-900 border border-neutral-800 p-0.5 rounded font-mono text-xs">
+            <button
+              onClick={() => {
+                if (currentView !== 'score') {
+                  synth.stopAll();
+                  setCurrentView('score');
+                }
+              }}
+              className={`px-2.5 py-1 rounded transition ${
+                currentView === 'score'
+                  ? 'bg-neutral-800 text-white font-bold'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              Score
+            </button>
+            <button
+              onClick={() => {
+                if (currentView !== 'phonetics') {
+                  setIsPlaying(false);
+                  synth.stopAll();
+                  setCurrentView('phonetics');
+                }
+              }}
+              className={`px-2.5 py-1 rounded transition ${
+                currentView === 'phonetics'
+                  ? 'bg-amber-500 text-black font-bold'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              Phonetics
+            </button>
+          </div>
+
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded bg-neutral-900 text-[10px] text-neutral-400 border border-neutral-800 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             <span>100.102.70.49:5173</span>
           </div>
         </div>
 
-        {/* Score Selector & Quick Controls */}
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedScoreId}
-            onChange={(e) => handleSelectScore(e.target.value)}
-            className="bg-neutral-900 border border-neutral-700 rounded px-2.5 py-1 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 max-w-[160px] sm:max-w-xs truncate font-mono"
-          >
-            {selectedScoreId === 'custom' && (
-              <option value="custom">MIDI: {score.title}</option>
-            )}
-            {BENCHMARK_METADATA.map((bm) => (
-              <option key={bm.id} value={bm.id}>
-                {bm.composer}: {bm.title}
-              </option>
-            ))}
-          </select>
+        {/* Header Right Controls */}
+        {currentView === 'score' ? (
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedScoreId}
+              onChange={(e) => handleSelectScore(e.target.value)}
+              className="bg-neutral-900 border border-neutral-700 rounded px-2.5 py-1 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 max-w-[130px] sm:max-w-xs truncate font-mono"
+            >
+              {selectedScoreId === 'custom' && (
+                <option value="custom">MIDI: {score.title}</option>
+              )}
+              {BENCHMARK_METADATA.map((bm) => (
+                <option key={bm.id} value={bm.id}>
+                  {bm.composer}: {bm.title}
+                </option>
+              ))}
+            </select>
 
-          {/* Load .mid file button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded text-xs font-mono border border-neutral-700 transition flex items-center gap-1"
-            title="Load user-supplied MIDI file"
-          >
-            <span>📂</span>
-            <span className="hidden md:inline">Load .mid</span>
-          </button>
+            {/* Load .mid file button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded text-xs font-mono border border-neutral-700 transition flex items-center gap-1"
+              title="Load user-supplied MIDI file"
+            >
+              <span>📂</span>
+              <span className="hidden md:inline">Load .mid</span>
+            </button>
 
-          {/* Play/Pause Button */}
-          <button
-            onClick={handleTogglePlay}
-            className={`px-3 py-1 rounded text-xs font-mono font-bold transition flex items-center gap-1 ${
-              isPlaying
-                ? 'bg-amber-500 hover:bg-amber-400 text-black'
-                : 'bg-white hover:bg-neutral-200 text-black'
-            }`}
-          >
-            <span>{isPlaying ? '⏸' : '▶'}</span>
-            <span>{isPlaying ? 'Pause' : 'Play'}</span>
-          </button>
+            {/* Play/Pause Button */}
+            <button
+              onClick={handleTogglePlay}
+              className={`px-3 py-1 rounded text-xs font-mono font-bold transition flex items-center gap-1 ${
+                isPlaying
+                  ? 'bg-amber-500 hover:bg-amber-400 text-black'
+                  : 'bg-white hover:bg-neutral-200 text-black'
+              }`}
+            >
+              <span>{isPlaying ? '⏸' : '▶'}</span>
+              <span>{isPlaying ? 'Pause' : 'Play'}</span>
+            </button>
 
-          {/* Options Drawer Toggle */}
-          <button
-            onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-            className="p-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded text-xs flex items-center gap-1 border border-neutral-700 font-mono"
-            aria-label="Settings"
-          >
-            <span>⚙</span>
-          </button>
-        </div>
+            {/* Options Drawer Toggle */}
+            <button
+              onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+              className="p-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded text-xs flex items-center gap-1 border border-neutral-700 font-mono"
+              aria-label="Settings"
+            >
+              <span>⚙</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-neutral-500 hidden sm:inline">
+              12-TET Sound Mapping Lab
+            </span>
+          </div>
+        )}
       </header>
 
-      {/* Main Workbench Layout */}
-      <div className="flex-1 flex min-h-0 overflow-hidden relative">
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-          {/* Timeline Scrub Header */}
-          <div className="h-9 bg-black border-b border-neutral-800 px-3 flex items-center justify-between text-xs text-neutral-400 shrink-0">
-            <div className="flex items-center gap-2 font-mono">
-              <span className="text-amber-400 font-bold">M{measure}</span>
-              <span className="text-neutral-700">:</span>
-              <span>B{beat}</span>
-              <span className="text-neutral-700">:</span>
-              <span className="text-neutral-500">+{tickInBeat}t</span>
+      {/* Main Viewport */}
+      {currentView === 'phonetics' ? (
+        <PhoneticSandbox />
+      ) : (
+        <div className="flex-1 flex min-h-0 overflow-hidden relative">
+          <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+            {/* Timeline Scrub Header */}
+            <div className="h-9 bg-black border-b border-neutral-800 px-3 flex items-center justify-between text-xs text-neutral-400 shrink-0">
+              <div className="flex items-center gap-2 font-mono">
+                <span className="text-amber-400 font-bold">M{measure}</span>
+                <span className="text-neutral-700">:</span>
+                <span>B{beat}</span>
+                <span className="text-neutral-700">:</span>
+                <span className="text-neutral-500">+{tickInBeat}t</span>
+              </div>
+
+              {/* Scrub Slider */}
+              <div className="flex-1 max-w-md mx-3 flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0"
+                  max={score.totalTicks}
+                  value={currentTick}
+                  onChange={(e) => handleSeek(parseFloat(e.target.value))}
+                  className="w-full accent-amber-500 h-1 bg-neutral-800 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] font-mono text-neutral-400">
+                <span>{score.tempos[0]?.bpm} BPM</span>
+                <span className="text-neutral-700">|</span>
+                <span>{score.notes.length} notes</span>
+              </div>
             </div>
 
-            {/* Scrub Slider */}
-            <div className="flex-1 max-w-md mx-3 flex items-center gap-2">
-              <input
-                type="range"
-                min="0"
-                max={score.totalTicks}
-                value={currentTick}
-                onChange={(e) => handleSeek(parseFloat(e.target.value))}
-                className="w-full accent-amber-500 h-1 bg-neutral-800 rounded cursor-pointer"
-              />
-            </div>
+            {/* Notation Canvas Viewport */}
+            <NotationCanvas
+              score={score}
+              options={renderOptions}
+              onTickSeek={handleSeek}
+              onNoteSelect={(n) => {
+                handleSeek(n.startTick);
+                synth.playPitch(n.pitch, 0.5, n.velocity || 80);
+              }}
+            />
 
-            <div className="flex items-center gap-3 text-[11px] font-mono text-neutral-400">
-              <span>{score.tempos[0]?.bpm} BPM</span>
-              <span className="text-neutral-700">|</span>
-              <span>{score.notes.length} notes</span>
-            </div>
-          </div>
+            {/* Strict 2-Row Jánko Keyboard Component */}
+            <JankoKeyboard
+              activePitches={activePitches}
+              colorMode={renderOptions.colorMode}
+              minOctave={1}
+              maxOctave={7}
+            />
+          </main>
 
-          {/* Notation Canvas Viewport */}
-          <NotationCanvas
-            score={score}
+          {/* Controls Sidebar / Drawer */}
+          <ControlsDrawer
+            isOpen={isDrawerOpen}
+            onClose={() => setIsDrawerOpen(false)}
+            selectedScoreId={selectedScoreId}
+            onSelectScore={handleSelectScore}
             options={renderOptions}
-            onTickSeek={handleSeek}
-            onNoteSelect={(n) => {
-              handleSeek(n.startTick);
-              synth.playPitch(n.pitch, 0.5, n.velocity || 80);
-            }}
+            onOptionsChange={handleUpdateOptions}
+            isPlaying={isPlaying}
+            onTogglePlay={handleTogglePlay}
+            onSeek={handleSeek}
+            tempoMultiplier={tempoMultiplier}
+            onTempoMultiplierChange={setTempoMultiplier}
+            totalTicks={score.totalTicks}
+            onLoadMidiFile={processMidiFile}
           />
-
-          {/* Strict 2-Row Jánko Keyboard Component */}
-          <JankoKeyboard
-            activePitches={activePitches}
-            colorMode={renderOptions.colorMode}
-            minOctave={1}
-            maxOctave={7}
-          />
-        </main>
-
-        {/* Controls Sidebar / Drawer */}
-        <ControlsDrawer
-          isOpen={isDrawerOpen}
-          onClose={() => setIsDrawerOpen(false)}
-          selectedScoreId={selectedScoreId}
-          onSelectScore={handleSelectScore}
-          options={renderOptions}
-          onOptionsChange={handleUpdateOptions}
-          isPlaying={isPlaying}
-          onTogglePlay={handleTogglePlay}
-          onSeek={handleSeek}
-          tempoMultiplier={tempoMultiplier}
-          onTempoMultiplierChange={setTempoMultiplier}
-          totalTicks={score.totalTicks}
-          onLoadMidiFile={processMidiFile}
-        />
-      </div>
+        </div>
+      )}
     </div>
   );
 };

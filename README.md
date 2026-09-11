@@ -83,6 +83,7 @@ When running, the workbench is available locally at `http://localhost:5173` and 
 ## 4. Documentation Index
 
 - [Cognitive Foundations & Isomorphic Philosophy](docs/philosophy.md)
+- [12-TET Monosyllabic Solfège Specification](docs/phonetics.md)
 - [Quantized Grid ("Fence") Model Specification](docs/grid-model-spec.md)
 - [Classical Symbol Taxonomy & Isomorphic Catalog](docs/symbol-taxonomy.md)
 

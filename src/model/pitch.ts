@@ -59,26 +59,34 @@ export function wholeToneParity(input: PitchCoordinate | number): 0 | 1 {
   return (pc % 2) as 0 | 1;
 }
 
+export * from './phonetics';
+import { getCanonicalSyllable } from './phonetics';
+
 /**
  * Human-readable label for a pitch class (0..11).
- * Strictly numerical in iso-notation.
+ * Supports numeric ('0') or canonical phonetic solfege ('Ma').
  */
 export function pitchClassLabel(
   pitchClass: number,
-  _format: 'numeric' | 'sharp' | 'flat' | 'both' = 'numeric'
+  format: 'numeric' | 'phonetic' | 'sharp' | 'flat' | 'both' = 'numeric'
 ): string {
   const pc = ((pitchClass % 12) + 12) % 12;
+  if (format === 'phonetic') {
+    return getCanonicalSyllable(pc);
+  }
   return String(pc);
 }
 
 /**
- * Full pitch name as pure (pitchClass:octave), e.g. "0:4", "1:5".
- * Strictly numerical and spatial.
+ * Full pitch name as pure (pitchClass:octave), e.g. "0:4", "1:5", or phonetic "Ma4".
  */
 export function pitchLabel(
   pitch: PitchCoordinate,
-  _format: 'numeric' | 'sharp' | 'flat' = 'numeric'
+  format: 'numeric' | 'phonetic' | 'sharp' | 'flat' = 'numeric'
 ): string {
+  if (format === 'phonetic') {
+    return `${getCanonicalSyllable(pitch.pitchClass)}${pitch.octave}`;
+  }
   return `${pitch.pitchClass}:${pitch.octave}`;
 }
 
