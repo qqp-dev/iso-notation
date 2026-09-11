@@ -10,6 +10,8 @@ import {
   normalizeNoteheadMorphology,
 } from '../render/types';
 import { BENCHMARK_METADATA } from '../scores';
+import { QuantizedGridScore } from '../model/types';
+import { tickToMeasureBeat } from '../model/grid';
 
 interface ControlsDrawerProps {
   isOpen: boolean;
@@ -25,6 +27,10 @@ interface ControlsDrawerProps {
   onTempoMultiplierChange: (mult: number) => void;
   totalTicks: number;
   onLoadMidiFile: (file: File) => void;
+  currentTick?: number;
+  score?: QuantizedGridScore;
+  currentView?: 'score' | 'phonetics';
+  onViewChange?: (view: 'score' | 'phonetics') => void;
 }
 
 export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
@@ -39,7 +45,12 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
   onSeek,
   tempoMultiplier,
   onTempoMultiplierChange,
+  totalTicks,
   onLoadMidiFile,
+  currentTick,
+  score,
+  currentView = 'score',
+  onViewChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,30 +61,36 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
     }
   };
 
+  const effectiveTick = currentTick ?? options.currentTick ?? 0;
+  const { measure, beat, tickInBeat } = score
+    ? tickToMeasureBeat(Math.floor(effectiveTick), score)
+    : { measure: 1, beat: 1, tickInBeat: 0 };
+  const bpm = score?.tempos[0]?.bpm || 100;
+
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition-opacity"
           onClick={onClose}
         />
       )}
 
-      {/* Drawer Container */}
+      {/* Drawer Container - Slide-out overlay on all viewports */}
       <aside
-        className={`fixed md:static inset-y-0 right-0 w-80 max-w-[85vw] bg-black border-l border-neutral-800 z-50 flex flex-col transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+        className={`fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-black border-l border-neutral-800 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Drawer Header */}
-        <div className="flex items-center justify-between p-3.5 border-b border-neutral-800 bg-black">
+        <div className="flex items-center justify-between p-3.5 border-b border-neutral-800 bg-black shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-neutral-100 uppercase tracking-wider">Parameters</span>
+            <span className="text-sm font-bold text-neutral-100 uppercase tracking-wider font-mono">Parameters & Controls</span>
           </div>
           <button
             onClick={onClose}
-            className="md:hidden text-neutral-400 hover:text-neutral-200 text-lg p-1"
+            className="text-neutral-400 hover:text-neutral-200 text-base p-1 transition"
             aria-label="Close settings"
           >
             ✕
@@ -82,44 +99,109 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs text-neutral-300">
-          {/* Score Selector */}
-          <div>
-            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
-              Active Score
-            </label>
-            <div className="space-y-1.5">
-              {BENCHMARK_METADATA.map((bm) => (
+          {/* View Mode Toggle */}
+          {onViewChange && (
+            <div>
+              <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+                View Mode
+              </label>
+              <div className="grid grid-cols-2 gap-1 bg-neutral-950 p-1 rounded border border-neutral-800 font-mono">
                 <button
-                  key={bm.id}
-                  onClick={() => onSelectScore(bm.id)}
-                  className={`w-full text-left p-2.5 rounded border transition ${
-                    selectedScoreId === bm.id
-                      ? 'bg-neutral-900 border-amber-500 text-white shadow'
-                      : 'bg-black border-neutral-800 text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'
+                  onClick={() => onViewChange('score')}
+                  className={`py-1.5 rounded transition text-center ${
+                    currentView === 'score'
+                      ? 'bg-neutral-800 text-white font-bold'
+                      : 'text-neutral-400 hover:text-neutral-200'
                   }`}
                 >
-                  <div className="font-semibold text-xs text-neutral-100">{bm.title}</div>
-                  <div className="text-[11px] text-neutral-400 mt-0.5">{bm.composer}</div>
+                  Score
                 </button>
-              ))}
+                <button
+                  onClick={() => onViewChange('phonetics')}
+                  className={`py-1.5 rounded transition text-center ${
+                    currentView === 'phonetics'
+                      ? 'bg-amber-500 text-black font-bold'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  Phonetics Lab
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Playback Transport & Scrubbing */}
+          <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-neutral-400 font-semibold uppercase tracking-wider text-[10px]">
+                Playback Transport
+              </label>
+              <div className="flex items-center gap-1 font-mono text-[11px] text-amber-400 font-bold">
+                <span>M{measure}</span>
+                <span className="text-neutral-600">:</span>
+                <span>B{beat}</span>
+                <span className="text-neutral-600">:</span>
+                <span className="text-neutral-500 font-normal">+{tickInBeat}t</span>
+              </div>
             </div>
 
-            {/* Custom MIDI file upload */}
-            <div className="mt-2">
+            {/* Scrub Slider */}
+            <div className="space-y-1">
               <input
-                ref={fileInputRef}
-                type="file"
-                accept=".mid,.midi"
-                onChange={handleFileChange}
-                className="hidden"
+                type="range"
+                min="0"
+                max={totalTicks}
+                value={effectiveTick}
+                onChange={(e) => onSeek(parseFloat(e.target.value))}
+                className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded cursor-pointer"
+                aria-label="Timeline scrubber"
               />
+              <div className="flex items-center justify-between text-[10px] font-mono text-neutral-500">
+                <span>Tick {Math.floor(effectiveTick)}</span>
+                <span>{totalTicks}t ({score?.notes.length ?? 0} notes)</span>
+              </div>
+            </div>
+
+            {/* Transport Buttons */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-700 rounded text-center font-mono text-[11px] flex items-center justify-center gap-1.5 transition"
+                onClick={onTogglePlay}
+                className={`flex-1 py-2 font-bold rounded text-xs font-mono transition flex items-center justify-center gap-1.5 ${
+                  isPlaying
+                    ? 'bg-amber-500 hover:bg-amber-400 text-black'
+                    : 'bg-white hover:bg-neutral-200 text-black'
+                }`}
               >
-                <span>📂</span>
-                <span>Load Custom .mid File</span>
+                <span>{isPlaying ? '⏸ Pause' : '▶ Play'}</span>
               </button>
+
+              <button
+                onClick={() => onSeek(0)}
+                className="p-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded text-xs border border-neutral-700"
+                title="Rewind to start"
+              >
+                ⏮
+              </button>
+            </div>
+
+            {/* Tempo Multiplier */}
+            <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 pt-1 border-t border-neutral-900">
+              <span>Tempo: {bpm} BPM</span>
+              <div className="flex gap-1">
+                {[0.5, 0.75, 1.0, 1.5].map((speed) => (
+                  <button
+                    key={speed}
+                    onClick={() => onTempoMultiplierChange(speed)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] ${
+                      tempoMultiplier === speed
+                        ? 'bg-amber-500 text-black font-bold'
+                        : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400'
+                    }`}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -155,7 +237,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                   >
                     <div className="font-semibold text-xs text-neutral-100 flex items-center justify-between">
                       <span>{preset.name}</span>
-                      {isSelected && <span className="text-[10px] text-amber-400">ACTIVE</span>}
+                      {isSelected && <span className="text-[10px] text-amber-400 font-mono">ACTIVE</span>}
                     </div>
                     <div className="text-[10px] text-neutral-400 mt-0.5">{preset.description}</div>
                   </button>
@@ -329,10 +411,51 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               />
             </label>
           </div>
+
+          {/* Score Selector */}
+          <div className="border-t border-neutral-800 pt-3">
+            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+              Active Score
+            </label>
+            <div className="space-y-1.5">
+              {BENCHMARK_METADATA.map((bm) => (
+                <button
+                  key={bm.id}
+                  onClick={() => onSelectScore(bm.id)}
+                  className={`w-full text-left p-2.5 rounded border transition ${
+                    selectedScoreId === bm.id
+                      ? 'bg-neutral-900 border-amber-500 text-white shadow'
+                      : 'bg-black border-neutral-800 text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'
+                  }`}
+                >
+                  <div className="font-semibold text-xs text-neutral-100">{bm.title}</div>
+                  <div className="text-[11px] text-neutral-400 mt-0.5">{bm.composer}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Custom MIDI file upload */}
+            <div className="mt-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".mid,.midi"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-700 rounded text-center font-mono text-[11px] flex items-center justify-center gap-1.5 transition"
+              >
+                <span>📂</span>
+                <span>Load Custom .mid File</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Playback Controls Footer */}
-        <div className="p-3 border-t border-neutral-800 bg-black space-y-2">
+        <div className="p-3 border-t border-neutral-800 bg-black shrink-0">
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={onTogglePlay}
@@ -352,26 +475,6 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             >
               ⏮
             </button>
-          </div>
-
-          {/* Tempo Multiplier */}
-          <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 px-1">
-            <span>Tempo:</span>
-            <div className="flex gap-1">
-              {[0.5, 0.75, 1.0, 1.5].map((speed) => (
-                <button
-                  key={speed}
-                  onClick={() => onTempoMultiplierChange(speed)}
-                  className={`px-1.5 py-0.5 rounded text-[10px] ${
-                    tempoMultiplier === speed
-                      ? 'bg-amber-500 text-black font-bold'
-                      : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400'
-                  }`}
-                >
-                  {speed}x
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </aside>

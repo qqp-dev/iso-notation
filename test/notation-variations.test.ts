@@ -1048,3 +1048,88 @@ test('Unified Euclidean Duration Lattice: Proportional Hold Ribbon Invariant (d 
   );
 });
 
+test('Full-Viewport Score Canvas & Decluttered UI Invariants', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
+
+  // 1. Janko keyboard component is completely removed from main viewport
+  assert.ok(!appSrc.includes('<JankoKeyboard'), 'App.tsx must not render <JankoKeyboard />');
+  assert.ok(!appSrc.includes("import { JankoKeyboard } from './JankoKeyboard'"), 'App.tsx must not import JankoKeyboard');
+
+  // 2. Full viewport canvas container with zero static top or bottom bars
+  assert.ok(
+    appSrc.includes('fixed inset-0 h-[100dvh] w-screen'),
+    'Canvas container must span full viewport: fixed inset-0 h-[100dvh] w-screen'
+  );
+  assert.ok(!appSrc.includes('<header'), 'App.tsx must not have a static <header> banner');
+  assert.ok(!appSrc.includes('h-12 bg-black border-b'), 'App.tsx must not have static 48px header bar');
+  assert.ok(!appSrc.includes('h-9 bg-black border-b'), 'App.tsx must not have static 36px scrub header bar');
+  assert.ok(!appSrc.includes('h-8 bg-neutral-950 border-b'), 'App.tsx must not have static 32px preset toolbar');
+});
+
+test('Floating Action Trigger ("Floaty Thing") Invariants', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
+
+  // Floating trigger positioned over canvas
+  assert.ok(
+    appSrc.includes('fixed top-3 right-3 z-40'),
+    'Floating action trigger must be positioned at top-3 right-3 with z-40'
+  );
+
+  // Quick Play/Pause toggle
+  assert.ok(appSrc.includes('handleTogglePlay'), 'Floating trigger must include Play/Pause handler');
+  assert.ok(appSrc.includes("isPlaying ? '⏸' : '▶'"), 'Floating trigger must display Play/Pause icon');
+
+  // Measure and beat badge
+  assert.ok(appSrc.includes('M{measure}'), 'Floating trigger must display measure indicator M{measure}');
+  assert.ok(appSrc.includes('B{beat}'), 'Floating trigger must display beat indicator B{beat}');
+
+  // Sidebar controls trigger
+  assert.ok(appSrc.includes('setIsDrawerOpen'), 'Floating trigger must toggle drawer state');
+  assert.ok(appSrc.includes('⚙'), 'Floating trigger must have settings/controls icon');
+});
+
+test('Complete Sidebar Controls & Drawer Integration Invariants', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const drawerTsxPath = path.resolve('src/ui/ControlsDrawer.tsx');
+  const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
+
+  // Slide-out drawer container
+  assert.ok(
+    drawerSrc.includes('fixed inset-y-0 right-0 w-80'),
+    'ControlsDrawer must be a fixed slide-out drawer on right edge'
+  );
+  assert.ok(
+    drawerSrc.includes("isOpen ? 'translate-x-0' : 'translate-x-full'"),
+    'ControlsDrawer must slide smoothly in and out via translate-x'
+  );
+
+  // Playback transport with scrub slider and measure counter
+  assert.ok(
+    drawerSrc.includes('aria-label="Timeline scrubber"'),
+    'ControlsDrawer must contain a scrub slider with timeline scrubber aria-label'
+  );
+  assert.ok(
+    drawerSrc.includes('M{measure}') && drawerSrc.includes('B{beat}'),
+    'ControlsDrawer must display measure and beat counter'
+  );
+  assert.ok(
+    drawerSrc.includes('tempoMultiplier') && drawerSrc.includes('onTempoMultiplierChange'),
+    'ControlsDrawer must include tempo multiplier controls'
+  );
+
+  // Design Presets, Topography, Notehead Morphology, Timeline Orientation, Color Mode
+  assert.ok(drawerSrc.includes('Curated Design Presets'), 'Must contain presets section');
+  assert.ok(drawerSrc.includes('Staff Topography'), 'Must contain Staff Topography section');
+  assert.ok(drawerSrc.includes('Notehead Morphology'), 'Must contain Notehead Morphology section');
+  assert.ok(drawerSrc.includes('Timeline Orientation'), 'Must contain Timeline Orientation toggle');
+  assert.ok(drawerSrc.includes('Color Spectrum'), 'Must contain Color Mode dropdown');
+});
+
+
