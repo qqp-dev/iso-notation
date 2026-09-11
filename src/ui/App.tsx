@@ -38,7 +38,7 @@ export const App: React.FC = () => {
     zoom: 1.0,
     pixelsPerTick: 2.0,
     pixelsPerSemitone: 11,
-    showHandCrossings: true,
+    showHandCrossings: false,
     showBarlines: true,
     showGridLines: true,
     showBeamGrouping: false,

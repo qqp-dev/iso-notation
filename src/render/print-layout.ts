@@ -587,48 +587,7 @@ export function renderPageToSvg(
       }
     }
 
-    // Hand Crossings Overlay in Column
-    for (const hc of col.handCrossings) {
-      const hcStartTick = Math.max(col.startTick, hc.tick);
-      const hcEndTick = Math.min(col.endTick, hc.tick + hc.durationTicks);
-      if (hcEndTick > hcStartTick) {
-        const hcY1 = staffOriginY + (hcStartTick - col.startTick) * ptPerTick;
-        const hcY2 = staffOriginY + (hcEndTick - col.startTick) * ptPerTick;
-        const hcHeight = Math.max(2, hcY2 - hcY1);
-
-        svgParts.push(`    <!-- Hand Crossing Overlay -->`);
-        svgParts.push(`    <rect x="${(colStaffLeftPt - 2).toFixed(2)}" y="${hcY1.toFixed(2)}" width="${(rightStaffBound - colStaffLeftPt + 4).toFixed(2)}" height="${hcHeight.toFixed(2)}" fill="#F3F4F6" opacity="0.6"/>`);
-        svgParts.push(`    <text x="${(colLeftPt + colWidthPt - 4).toFixed(2)}" y="${(hcY1 + 8).toFixed(2)}" class="cross-label">LH/RH Cross</text>`);
-      }
-    }
-
     const octaveMode = layout.options.octaveExtensionMode || 'spillover';
-
-    // Notes: First Hold Ribbons (for d > tauRef)
-    for (const note of col.notes) {
-      if (note.durationTicks > tauRef) {
-        const rawLPitch = linearIndex(note.pitch);
-        let lPitch = rawLPitch;
-        if (octaveMode === 'badge') {
-          if (rawLPitch > maxPitch) {
-            const shift = Math.ceil((rawLPitch - maxPitch) / 12);
-            lPitch = rawLPitch - shift * 12;
-          } else if (rawLPitch < minPitch) {
-            const shift = Math.ceil((minPitch - rawLPitch) / 12);
-            lPitch = rawLPitch + shift * 12;
-          }
-        }
-        const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
-        const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
-        const rawRibbonHeight = note.durationTicks * ptPerTick;
-        const ribbonHeight = Math.max(2, Math.min(rawRibbonHeight, staffEndY - ny));
-        const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
-
-        svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${(ny + ribbonHeight).toFixed(2)}" stroke="${noteColor}" stroke-width="1.2" stroke-linecap="round"/>`);
-      }
-    }
-
-    // Notes: Klavar Lateral Stems & Noteheads with White Halo Knockout & Octave Indicator Badges
     const morph = normalizeNoteheadMorphology(layout.options.noteheadMorphology);
     const stemLength = 16.0;
 
@@ -673,6 +632,24 @@ export function renderPageToSvg(
       const nx = colStaffLeftPt + (lPitch - minPitch) * ptPerSemitone;
       const ny = staffOriginY + (note.startTick - col.startTick) * ptPerTick;
       noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
+    }
+
+    // Notes: Faint Dotted Continuation Trails for Long Notes (d > ticksPerBeat)
+    for (const note of col.notes) {
+      if (note.durationTicks > ticksPerBeat) {
+        const { nx, ny } = noteCoordMap.get(note.id)!;
+        const lPitch = displayPitchMap.get(note.id)!;
+        const isEven = wholeToneParity(lPitch) === 0;
+        const noteHeight = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
+        const trailStartY = ny + noteHeight / 2 + 2;
+        const rawReleaseY = ny + note.durationTicks * ptPerTick;
+        const trailEndY = Math.min(rawReleaseY, staffEndY);
+        const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
+
+        if (trailEndY > trailStartY) {
+          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.75" stroke-dasharray="2,3" opacity="0.45"/>`);
+        }
+      }
     }
 
     // Elaine Gould Angled Beam Engraving & Uniform Lateral Stems
