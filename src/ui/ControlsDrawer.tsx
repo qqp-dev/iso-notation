@@ -465,17 +465,40 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               <span className="font-bold">Print Sheet Music (A4)</span>
             </button>
 
-            <button
-              onClick={() => {
-                onOpenCompressionModal?.();
-                onClose();
-              }}
-              className="w-full mt-2 py-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-emerald-400 hover:text-emerald-300 border border-neutral-700 hover:border-emerald-500/50 rounded font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
-              title="Compare 12-Lane Isometric vs 6-Lane Folded layout"
-            >
-              <span>📐</span>
-              <span className="font-bold">6-Lane vs 12-Lane Analysis</span>
-            </button>
+            {/* View Mode Segmented Control */}
+            <div className="mt-3">
+              <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+                Notation View vs Piano Roll
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 bg-neutral-950 p-1 rounded border border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => onOptionsChange({ viewMode: 'isomorphic' })}
+                  className={`py-1.5 px-2 text-xs font-mono rounded flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    (options.viewMode || 'isomorphic') === 'isomorphic'
+                      ? 'bg-amber-500 text-black font-bold shadow'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  }`}
+                  title="Isomorphic whole-tone staff with row parity noteheads"
+                >
+                  <span>🎼</span>
+                  <span>Score View</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOptionsChange({ viewMode: 'pianoroll' })}
+                  className={`py-1.5 px-2 text-xs font-mono rounded flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    options.viewMode === 'pianoroll'
+                      ? 'bg-amber-500 text-black font-bold shadow'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  }`}
+                  title="Direct 1:1 geometric comparison with chromatic DAW Piano Roll"
+                >
+                  <span>🎹</span>
+                  <span>Piano Roll</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Score Selector */}

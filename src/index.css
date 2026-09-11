@@ -45,6 +45,12 @@ body, html {
   .print-only {
     display: none !important;
   }
+  .print-preview-card svg {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
 }
 
 @media print {
@@ -54,6 +60,8 @@ body, html {
     overflow: visible !important;
     width: auto !important;
     height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .no-print {

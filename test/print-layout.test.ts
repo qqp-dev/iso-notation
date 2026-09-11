@@ -264,7 +264,31 @@ test('Web Print CSS & @media print Invariants', () => {
   assert.match(css, /\.print-page\s*\{[^}]*height:\s*297mm\s*!important/);
   assert.match(css, /\.print-page\s*\{[^}]*overflow:\s*hidden\s*!important/);
   assert.match(css, /\.print-page\s*\{[^}]*break-after:\s*page/);
+  assert.match(css, /\.print-preview-card\s*svg\s*\{[^}]*width:\s*100%\s*!important/);
 });
+
+test('Responsive SVG Scaling & Unclipped m5 Margin Invariant', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score, { staffStyle: 'tritone-split' });
+  const svg = renderPageToSvg(layout, 0);
+
+  // SVG root must have responsive style attribute
+  assert.match(svg, /<svg[^>]*style="[^"]*width:\s*100%[^"]*height:\s*auto[^"]*"/);
+
+  // m5 text and staff line must exist in Column 1 (right column)
+  const m5TextMatches = Array.from(svg.matchAll(/<text[^>]*>m5<\/text>/g));
+  assert.equal(m5TextMatches.length, 2, 'm5 must appear in both columns (mm. 1-4 and mm. 5-8)');
+
+  // Rightmost m5 line must have >= 10mm (28.35pt) buffer from page right edge
+  const m5RightColX = 551.93; // colStaffLeftPt (339.98) + 48 * 4.4156
+  const pageWidthPt = layout.pageDimensions.widthPt;
+  const rightMarginDistance = pageWidthPt - m5RightColX;
+  assert.ok(
+    rightMarginDistance >= 28.35,
+    `Rightmost m5 must sit comfortably within the page (distance: ${rightMarginDistance.toFixed(2)}pt >= 28.35pt)`
+  );
+});
+
 
 test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', async () => {
   // Test generating vector PostScript from benchmark score

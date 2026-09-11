@@ -45,7 +45,10 @@ export type ColorMode =
   | 'monochrome'
   | 'ddr-subdivision';
 
+export type ViewMode = 'isomorphic' | 'pianoroll';
+
 export interface RenderOptions {
+  viewMode?: ViewMode;
   orientation: TimelineOrientation;
   staffStyle: StaffStyle;
   noteheadMorphology: NoteheadMorphology;

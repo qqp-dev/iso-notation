@@ -1474,4 +1474,55 @@ test('Notehead Morphology: rectangle-square morphology strictly encodes Row Pari
   assert.equal(ellipseCount, 0, 'Must render zero ellipses');
 });
 
+test('Piano Roll View: 1:1 Geometric Equivalence & Chromatic DAW Alignment', () => {
+  const score = buildBachGoldbergVar1Score();
+  const options = {
+    orientation: 'vertical' as const,
+    staffStyle: 'tritone-split' as const,
+    noteheadMorphology: 'rectangle-square' as const,
+    colorMode: 'duration-class' as const,
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 11,
+    showHandCrossings: false,
+    showBarlines: true,
+    showGridLines: true,
+    currentTick: 96,
+  };
+
+  // Dimensions must be 100% identical between Isomorphic and Piano Roll
+  const isoDims = calculateScoreDimensions(score, { ...options, viewMode: 'isomorphic' });
+  const rollDims = calculateScoreDimensions(score, { ...options, viewMode: 'pianoroll' });
+
+  assert.equal(isoDims.width, rollDims.width, 'Width must be identical across view modes');
+  assert.equal(isoDims.height, rollDims.height, 'Height must be identical across view modes');
+  assert.equal(isoDims.minPitch, rollDims.minPitch, 'Pitch bounds must be identical');
+  assert.equal(isoDims.maxPitch, rollDims.maxPitch, 'Pitch bounds must be identical');
+
+  // Verify Canvas renders piano roll note blocks and piano keyboard
+  let noteBlocksDrawn = 0;
+  let filledRects = 0;
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => { filledRects++; },
+    strokeRect: () => {},
+    roundRect: () => { noteBlocksDrawn++; },
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, { ...options, viewMode: 'pianoroll' });
+
+  assert.ok(noteBlocksDrawn >= score.notes.length, 'Every note must be rendered as a piano roll duration block');
+  assert.ok(filledRects > 0, 'Must render chromatic lanes and piano keyboard header');
+});
+
+
 

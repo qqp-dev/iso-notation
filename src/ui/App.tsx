@@ -288,14 +288,28 @@ export const App: React.FC = () => {
               <span>B{beat}</span>
             </button>
 
-            {/* Compression Analysis Button */}
+            {/* View Mode Toggle: Isomorphic Score vs Piano Roll */}
             <button
-              onClick={() => setIsCompressionModalOpen(true)}
-              className="px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-[11px] cursor-pointer transition flex items-center gap-1.5"
-              title="View 6-Lane vs 12-Lane Horizontal Compression Analysis"
+              onClick={() => {
+                setRenderOptions((prev) => ({
+                  ...prev,
+                  viewMode: prev.viewMode === 'pianoroll' ? 'isomorphic' : 'pianoroll',
+                }));
+              }}
+              className={`px-2.5 py-1 rounded-full border text-[11px] cursor-pointer transition flex items-center gap-1.5 ${
+                renderOptions.viewMode === 'pianoroll'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30 font-semibold shadow-sm'
+                  : 'bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-800'
+              }`}
+              title={
+                renderOptions.viewMode === 'pianoroll'
+                  ? 'Switch to Isomorphic Score View'
+                  : 'Switch to Piano Roll Comparison View (preserving exact geometry)'
+              }
+              aria-label={renderOptions.viewMode === 'pianoroll' ? 'Show Score View' : 'Show Piano Roll'}
             >
-              <span>📐</span>
-              <span className="hidden sm:inline">6-Lane vs 12-Lane</span>
+              <span>{renderOptions.viewMode === 'pianoroll' ? '🎹' : '🎼'}</span>
+              <span>{renderOptions.viewMode === 'pianoroll' ? 'Piano Roll' : 'Score View'}</span>
             </button>
 
             {/* Quick Print Button */}

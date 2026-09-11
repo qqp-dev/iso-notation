@@ -87,7 +87,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                     Page {idx + 1}: {layout.pages[idx]?.sectionName || `Page ${idx + 1}`}
                   </div>
                   <div
-                    className="w-full bg-white shadow-2xl rounded-sm overflow-hidden border border-neutral-700"
+                    className="w-full bg-white shadow-2xl rounded-sm overflow-hidden border border-neutral-700 print-preview-card [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
                     dangerouslySetInnerHTML={{ __html: svg }}
                   />
                 </div>

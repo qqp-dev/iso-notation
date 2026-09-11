@@ -320,11 +320,11 @@ export function renderPageToSvg(
 
   // 1. Root SVG with pure white paper background
   svgParts.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${widthPt.toFixed(2)} ${heightPt.toFixed(2)}" width="${widthMm.toFixed(1)}mm" height="${heightMm.toFixed(1)}mm">`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${widthPt.toFixed(2)} ${heightPt.toFixed(2)}" width="${widthMm.toFixed(1)}mm" height="${heightMm.toFixed(1)}mm" style="display: block; width: 100%; height: auto;">`
   );
   svgParts.push(`  <defs>`);
   svgParts.push(`    <style>`);
-  svgParts.push(`      .title { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 10.5pt; fill: #000000; }
+  svgParts.push(`      .title { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-weight: bold; font-size: 9.5pt; fill: #000000; }
       .subtitle { font-family: "DejaVu Sans", "Liberation Sans", system-ui, -apple-system, sans-serif; font-size: 8pt; fill: #444444; }
       .meta { font-family: "DejaVu Sans Mono", "Liberation Mono", system-ui, -apple-system, monospace; font-size: 7.5pt; fill: #666666; }
       .measure-num { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-weight: bold; font-size: 7pt; fill: #444444; text-anchor: end; }

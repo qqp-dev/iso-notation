@@ -99,8 +99,139 @@ export function renderScoreToCanvas(
   // 2. Draw Grid Background / Staff Lines
   ctx.save();
 
-  // 2a. Octave Ribbons Shading (if octave-ribbons)
-  if (normStaffStyle === 'octave-ribbons') {
+  const isPianoRoll = options.viewMode === 'pianoroll';
+
+  if (isPianoRoll) {
+    const isBlackKey = (pc: number) => [1, 3, 6, 8, 10].includes(pc);
+    const semitoneWidth = options.pixelsPerSemitone;
+
+    // 2a. Chromatic Lane backgrounds & pitch separators
+    for (let p = minPitch; p <= maxPitch; p++) {
+      const pc = ((p % 12) + 12) % 12;
+      const black = isBlackKey(pc);
+
+      if (isHoriz) {
+        const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
+        ctx.fillStyle = black ? '#141416' : '#08080a';
+        ctx.fillRect(paddingStart, y - semitoneWidth / 2, dims.width - paddingStart, semitoneWidth);
+
+        ctx.strokeStyle = pc === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.07)';
+        ctx.lineWidth = pc === 0 ? (p === 48 ? 1.5 : 1.0) : 0.5;
+        if (p === 48) ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(paddingStart, y - semitoneWidth / 2);
+        ctx.lineTo(dims.width, y - semitoneWidth / 2);
+        ctx.stroke();
+      } else {
+        const x = paddingPitch + (p - minPitch) * semitoneWidth;
+        ctx.fillStyle = black ? '#141416' : '#08080a';
+        ctx.fillRect(x - semitoneWidth / 2, paddingStart, semitoneWidth, dims.height - paddingStart);
+
+        ctx.strokeStyle = pc === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.07)';
+        ctx.lineWidth = pc === 0 ? (p === 48 ? 1.5 : 1.0) : 0.5;
+        if (p === 48) ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(x - semitoneWidth / 2, paddingStart);
+        ctx.lineTo(x - semitoneWidth / 2, dims.height);
+        ctx.stroke();
+      }
+    }
+
+    // 2b. Piano Keyboard Header (with active sounding key lights)
+    const activePitchSet = new Set(
+      score.notes
+        .filter(n => options.currentTick >= n.startTick && options.currentTick < n.startTick + n.durationTicks)
+        .map(n => linearIndex(n.pitch))
+    );
+
+    if (!isHoriz) {
+      // Vertical timeline keyboard at top margin
+      const keyH = paddingStart - 8;
+      const bkH = keyH * 0.62;
+
+      // White keys
+      for (let p = minPitch; p <= maxPitch; p++) {
+        const pc = ((p % 12) + 12) % 12;
+        if (!isBlackKey(pc)) {
+          const x = paddingPitch + (p - minPitch) * semitoneWidth;
+          const isActive = activePitchSet.has(p);
+          ctx.fillStyle = isActive ? '#F59E0B' : '#E5E7EB';
+          ctx.fillRect(x - semitoneWidth / 2 + 0.5, 4, semitoneWidth - 1, keyH);
+          ctx.strokeStyle = '#4B5563';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(x - semitoneWidth / 2 + 0.5, 4, semitoneWidth - 1, keyH);
+
+          if (pc === 0) {
+            const oct = Math.floor(p / 12);
+            ctx.fillStyle = isActive ? '#000000' : '#4B5563';
+            ctx.font = 'bold 8px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(`C${oct}`, x, keyH + 2);
+          }
+        }
+      }
+
+      // Black keys
+      for (let p = minPitch; p <= maxPitch; p++) {
+        const pc = ((p % 12) + 12) % 12;
+        if (isBlackKey(pc)) {
+          const x = paddingPitch + (p - minPitch) * semitoneWidth;
+          const isActive = activePitchSet.has(p);
+          const bkW = Math.max(4, semitoneWidth * 0.75);
+          ctx.fillStyle = isActive ? '#D97706' : '#111827';
+          ctx.fillRect(x - bkW / 2, 4, bkW, bkH);
+          ctx.strokeStyle = '#6B7280';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(x - bkW / 2, 4, bkW, bkH);
+        }
+      }
+    } else {
+      // Horizontal timeline keyboard at left margin
+      const keyW = paddingStart - 8;
+      const bkW = keyW * 0.62;
+
+      // White keys
+      for (let p = minPitch; p <= maxPitch; p++) {
+        const pc = ((p % 12) + 12) % 12;
+        if (!isBlackKey(pc)) {
+          const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
+          const isActive = activePitchSet.has(p);
+          ctx.fillStyle = isActive ? '#F59E0B' : '#E5E7EB';
+          ctx.fillRect(4, y - semitoneWidth / 2 + 0.5, keyW, semitoneWidth - 1);
+          ctx.strokeStyle = '#4B5563';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(4, y - semitoneWidth / 2 + 0.5, keyW, semitoneWidth - 1);
+
+          if (pc === 0) {
+            const oct = Math.floor(p / 12);
+            ctx.fillStyle = isActive ? '#000000' : '#4B5563';
+            ctx.font = 'bold 8px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`C${oct}`, keyW, y);
+          }
+        }
+      }
+
+      // Black keys
+      for (let p = minPitch; p <= maxPitch; p++) {
+        const pc = ((p % 12) + 12) % 12;
+        if (isBlackKey(pc)) {
+          const y = height - paddingPitch - (p - minPitch) * semitoneWidth;
+          const isActive = activePitchSet.has(p);
+          const bkH = Math.max(4, semitoneWidth * 0.75);
+          ctx.fillStyle = isActive ? '#D97706' : '#111827';
+          ctx.fillRect(4, y - bkH / 2, bkW, bkH);
+          ctx.strokeStyle = '#6B7280';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(4, y - bkH / 2, bkW, bkH);
+        }
+      }
+    }
+  } else {
+    // 2a. Octave Ribbons Shading (if octave-ribbons)
+    if (normStaffStyle === 'octave-ribbons') {
     const minOct = Math.floor(minPitch / 12);
     const maxOct = Math.floor(maxPitch / 12);
     for (let oct = minOct; oct <= maxOct; oct++) {
@@ -219,6 +350,7 @@ export function renderScoreToCanvas(
       }
     }
   }
+  }
   ctx.setLineDash([]);
   ctx.restore();
 
@@ -317,6 +449,62 @@ export function renderScoreToCanvas(
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
     const isHold = note.durationTicks > tauRef;
+
+    if (isPianoRoll) {
+      const isSounding =
+        options.currentTick >= note.startTick &&
+        options.currentTick < note.startTick + note.durationTicks;
+      const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
+
+      let blockFill = hand === 'RH' ? '#D97706' : '#2563EB';
+      let headerFill = hand === 'RH' ? '#FBBF24' : '#60A5FA';
+      let strokeColor = hand === 'RH' ? '#F59E0B' : '#3B82F6';
+
+      if (isHighlighted || isSounding) {
+        blockFill = '#F59E0B';
+        headerFill = '#FEF08A';
+        strokeColor = '#FFFFFF';
+      }
+
+      if (isHoriz) {
+        const { x, y } = getCoords(note.startTick, lPitch);
+        const blockW = Math.max(3, note.durationTicks * options.pixelsPerTick);
+        const blockH = Math.max(4, options.pixelsPerSemitone - 2);
+        const bx = x;
+        const by = y - blockH / 2;
+
+        ctx.fillStyle = blockFill;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, blockW, blockH, 1.5);
+        ctx.fill();
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 0.75;
+        ctx.stroke();
+
+        ctx.fillStyle = headerFill;
+        ctx.fillRect(bx, by, Math.min(blockW, 3), blockH);
+      } else {
+        const { x, y } = getCoords(note.startTick, lPitch);
+        const blockW = Math.max(4, options.pixelsPerSemitone - 2);
+        const blockH = Math.max(3, note.durationTicks * options.pixelsPerTick);
+        const bx = x - blockW / 2;
+        const by = y;
+
+        ctx.fillStyle = blockFill;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, blockW, blockH, 1.5);
+        ctx.fill();
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 0.75;
+        ctx.stroke();
+
+        ctx.fillStyle = headerFill;
+        ctx.fillRect(bx, by, blockW, Math.min(blockH, 3));
+      }
+      continue;
+    }
 
     if (isHoriz) {
       const { x, y } = getCoords(note.startTick, lPitch);
