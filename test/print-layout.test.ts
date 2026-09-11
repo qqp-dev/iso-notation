@@ -218,12 +218,14 @@ test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {
 
   // Klavar Lateral Stems Invariant:
   // RH notes have stems pointing right (x2 > x1), LH notes have stems pointing left (x2 < x1)
+  // Lateral stems are top-aligned with notehead (stemY === ny - nh / 2 < ny) with length >= 16pt
   const stemMatches = Array.from(svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="[^"]+" stroke-width="0\.6" stroke-linecap="round"/g));
   assert.ok(stemMatches.length > 0, 'Must find lateral stems in SVG');
 
   stemMatches.forEach((m) => {
     const len = Math.abs(Number(m[3]) - Number(m[1]));
-    assert.ok(Math.round(len * 10) / 10 >= 12.0, 'Lateral stem length must be >= 12pt');
+    assert.ok(Math.round(len * 10) / 10 >= 16.0, 'Lateral stem length must be >= 16pt');
+    assert.equal(Number(m[2]), Number(m[4]), 'Lateral stem must be horizontal (y1 === y2)');
   });
 
   const rhStems = stemMatches.filter((m) => Number(m[3]) > Number(m[1]));
@@ -321,11 +323,13 @@ test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
 
   assert.equal(svgs.length, 4);
   for (const svg of svgs) {
-    // 1. Lowercase m octave markers (m2, m3, m4) with Middle C at m3
+    // 1. Lowercase m octave markers (m1, m3, m5) with Middle C at m3, dropping m2 and m4
     assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct - 1} pitch labels');
-    assert.match(svg, />m2</);
-    assert.match(svg, />m3</);
-    assert.match(svg, />m4</);
+    assert.match(svg, />m1</, 'Must render m1 bottom octave label');
+    assert.doesNotMatch(svg, />m2</, 'Must NOT render m2 label');
+    assert.match(svg, />m3</, 'Must render m3 label (Middle C)');
+    assert.doesNotMatch(svg, />m4</, 'Must NOT render m4 label');
+    assert.match(svg, />m5</, 'Must render m5 top octave label');
 
     // 2. Zero diatonic C octave labels
     assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
@@ -428,11 +432,11 @@ test('4-Octave Core Staff (m1 to m5) & Clean Termination at m5', () => {
 
   const svg = renderPageToSvg(layout, 0);
 
-  // Octave labels: m1, m2, m3, m4, m5 present
+  // Octave labels: m1, m3, m5 present, m2 and m4 dropped
   assert.match(svg, />m1</, 'Must render m1 header label');
-  assert.match(svg, />m2</, 'Must render m2 header label');
+  assert.doesNotMatch(svg, />m2</, 'Must NOT render m2 header label');
   assert.match(svg, />m3</, 'Must render m3 header label (Middle C)');
-  assert.match(svg, />m4</, 'Must render m4 header label');
+  assert.doesNotMatch(svg, />m4</, 'Must NOT render m4 header label');
   assert.match(svg, />m5</, 'Must render m5 header label');
 
   // No labels above m5
@@ -450,9 +454,10 @@ test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', 
   // Page 4 contains measures 29–30 where D6 (pitch 74) occurs
   const page4SvgBadge = renderPageToSvg(badgeLayout, 3);
 
-  // Option 4 badge check: must render ↑8 badge for pitch 74 folded down to 62
-  assert.match(page4SvgBadge, /class="cross-label"|Notehead Octave Badge/, 'Must contain octave badges on page 4');
-  assert.match(page4SvgBadge, />↑8<\/text>/, 'Must render ↑8 badge for folded high outlier notes');
+  // Clean thin vector indicator check: must render ↑8 delicate text without heavy black blob rect
+  assert.match(page4SvgBadge, /class="cross-label"|Thin Vector Octave Indicator|Notehead Octave Badge/, 'Must contain octave indicators on page 4');
+  assert.match(page4SvgBadge, /<text[^>]*font-size="6pt"[^>]*>↑8<\/text>/, 'Must render clean thin vector text font-size="6pt"');
+  assert.doesNotMatch(page4SvgBadge, /Option 4 Notehead Octave Badge|<rect[^>]*rx="1\.5"[^>]*fill="#111827"/, 'Must NOT contain heavy black background rect on note');
 
   // Test Option 2: Spillover ('spillover')
   const spilloverLayout = computeColumnarLayout(score, {
@@ -462,5 +467,24 @@ test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', 
 
   // In spillover mode, no ↑8 badge is rendered
   assert.doesNotMatch(page4SvgSpillover, />↑8<\/text>/, 'Must NOT render ↑8 badge in spillover mode');
+  assert.doesNotMatch(page4SvgSpillover, /Option 4 Notehead Octave Badge/, 'Must NOT render octave badge rect in spillover mode');
+
+  // Test Default: Spillover ('spillover') is default
+  const defaultLayout = computeColumnarLayout(score);
+  assert.equal(defaultLayout.options.octaveExtensionMode, 'spillover', 'Default octaveExtensionMode must be spillover');
+  const page4SvgDefault = renderPageToSvg(defaultLayout, 3);
+  assert.doesNotMatch(page4SvgDefault, />↑8<\/text>/, 'Must NOT render ↑8 badge in default spillover mode');
+  assert.doesNotMatch(page4SvgDefault, /Option 4 Notehead Octave Badge/, 'Must NOT render octave badge rect in default spillover mode');
+
+  // Verify D6 note renders with pitch coordinate > 72 in right buffer margin past m5 line
+  const col = defaultLayout.pages[3].columns[1];
+  const marginPt = defaultLayout.options.pageMarginMm * (72 / 25.4);
+  const gapPt = defaultLayout.options.columnGapMm * (72 / 25.4);
+  const colLeftPt = marginPt + col.columnOnPageIndex * (defaultLayout.columnDimensions.widthPt + gapPt);
+  const colStaffLeftPt = colLeftPt + 16 + 15;
+  const expectedD6X = colStaffLeftPt + (74 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
+  const expectedM5X = colStaffLeftPt + (72 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
+  assert.ok(expectedD6X > expectedM5X, 'D6 coordinate must be to the right of m5 line');
+  assert.ok(page4SvgDefault.includes(expectedD6X.toFixed(2)), 'Must render D6 note in right buffer margin at true pitch');
 });
 

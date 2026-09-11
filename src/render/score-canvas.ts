@@ -378,12 +378,16 @@ export function renderScoreToCanvas(
       const isOctave0 = pc === 0;
       if (isOctave0) {
         const displayOct = Math.max(0, oct - 1);
-        const isCenterM3 = displayOct === 3;
-        ctx.fillStyle = isCenterM3 ? '#F59E0B' : '#FFFFFF';
-        ctx.font = isCenterM3 ? 'bold 12px monospace' : 'bold 10px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(`m${displayOct}`, x, paddingStart - 6);
+        if (displayOct === 2 || displayOct === 4) {
+          // Drop m2 and m4 to declutter header landmarks
+        } else {
+          const isCenterM3 = displayOct === 3;
+          ctx.fillStyle = isCenterM3 ? '#F59E0B' : '#FFFFFF';
+          ctx.font = isCenterM3 ? 'bold 12px monospace' : 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`m${displayOct}`, x, paddingStart - 6);
+        }
       } else if (normStaffStyle !== 'tritone-split') {
         ctx.fillStyle = '#666666';
         ctx.font = '9px monospace';
@@ -668,7 +672,7 @@ export function renderScoreToCanvas(
   // Elaine Gould Angled Beam Engraving for Vertical Timeline
   const stemEndMap = new Map<string, number>();
   if (!isHoriz && !isPianoRoll && options.showBeamGrouping === true) {
-    const stemLength = Math.max(14, options.pixelsPerSemitone * 1.0);
+    const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
     const MAX_SLANT = Math.max(16, options.pixelsPerSemitone * 1.5);
     const clusters = computeBeamClusters(score.notes, score.ticksPerBeat, tauRef, 7);
 
@@ -836,6 +840,7 @@ export function renderScoreToCanvas(
       // Vertical timeline
       const { x, y } = getCoords(note.startTick, lPitch);
       const noteWidth = Math.max(10, options.pixelsPerSemitone);
+      const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
 
       // Proportional thin hold line/tail down the timeline for d > tauRef
       if (isHold) {
@@ -855,15 +860,16 @@ export function renderScoreToCanvas(
       // Right Hand (RH) -> horizontal stem pointing Right (->)
       // Left Hand (LH) -> horizontal stem pointing Left (<-)
       const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
-      const stemLength = Math.max(16, options.pixelsPerSemitone * 1.1);
+      const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
       const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
       const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
 
+      const stemY = cy - noteHeight / 2;
       ctx.beginPath();
       ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
       ctx.lineWidth = 0.8;
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(stemEndX, cy);
+      ctx.moveTo(cx, stemY);
+      ctx.lineTo(stemEndX, stemY);
       ctx.stroke();
 
       renderNotehead(

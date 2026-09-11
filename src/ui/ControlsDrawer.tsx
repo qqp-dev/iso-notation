@@ -354,7 +354,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               <button
                 onClick={() => onOptionsChange({ octaveExtensionMode: 'badge' })}
                 className={`py-1.5 px-2 text-left rounded font-mono text-[10px] transition ${
-                  (options.octaveExtensionMode || 'badge') === 'badge'
+                  options.octaveExtensionMode === 'badge'
                     ? 'bg-neutral-800 text-white font-bold border border-neutral-700'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
@@ -365,7 +365,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               <button
                 onClick={() => onOptionsChange({ octaveExtensionMode: 'spillover' })}
                 className={`py-1.5 px-2 text-left rounded font-mono text-[10px] transition ${
-                  options.octaveExtensionMode === 'spillover'
+                  (options.octaveExtensionMode || 'spillover') === 'spillover'
                     ? 'bg-neutral-800 text-white font-bold border border-neutral-700'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
@@ -448,21 +448,11 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             </label>
 
             <label className="flex items-center justify-between p-1.5 rounded hover:bg-neutral-900 cursor-pointer font-mono text-[11px]">
-              <span>📏 Option 1: Klavar Beat Grid</span>
+              <span>📏 Klavar Beat Grid</span>
               <input
                 type="checkbox"
                 checked={!!options.showBeatGrid}
                 onChange={(e) => onOptionsChange({ showBeatGrid: e.target.checked })}
-                className="accent-amber-500 w-4 h-4 rounded"
-              />
-            </label>
-
-            <label className="flex items-center justify-between p-1.5 rounded hover:bg-neutral-900 cursor-pointer font-mono text-[11px]">
-              <span>⊏ Option 2: Gutter Beat Brackets</span>
-              <input
-                type="checkbox"
-                checked={!!options.showGutterBrackets}
-                onChange={(e) => onOptionsChange({ showGutterBrackets: e.target.checked })}
                 className="accent-amber-500 w-4 h-4 rounded"
               />
             </label>
