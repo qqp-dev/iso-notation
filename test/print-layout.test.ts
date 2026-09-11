@@ -250,17 +250,18 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
   const staffOriginY = 10 * (72 / 25.4) + 42 + 16;
   const note88Ny = staffOriginY + (note88.startTick - col88.startTick) * layout.ptPerTick;
   const note88Height = 6.0;
+  const note88KnockoutY = note88Ny + note88Height / 2;
   const note88StartY = note88Ny + note88Height / 2 + 2;
   const note88ReleaseY = note88Ny + note88.durationTicks * layout.ptPerTick;
   const colLeftPt88 = 10 * (72 / 25.4) + col88.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-  const note88X = colLeftPt88 + 14 + (36 - layout.minPitch) * layout.ptPerSemitone;
+  const note88X = colLeftPt88 + 22 + (36 - layout.minPitch) * layout.ptPerSemitone;
 
   const pSvg88 = svgs[col88.pageIndex];
-  // Verify white knockout underlay at note88
+  // Verify white knockout underlay at note88 extends from notehead bottom to prevent underlying line showing through gap
   assert.match(
     pSvg88,
-    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#FFFFFF" stroke-width="1\\.8" stroke-linecap="butt"\\/>`),
-    'Bar 6 note bach-var1-88 on line m2 must have white knockout underlay with stroke-width="1.8"'
+    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88KnockoutY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#FFFFFF" stroke-width="1\\.8" stroke-linecap="butt"\\/>`),
+    'Bar 6 note bach-var1-88 on line m2 must have white knockout underlay starting from notehead bottom with stroke-width="1.8"'
   );
   // Verify colored hold line at full octave staff line width (1.0pt)
   assert.match(
@@ -330,7 +331,7 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
 
   const col4Svg = svgs[col4.pageIndex];
   const col4LeftPt = 10 * (72 / 25.4) + col4.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-  const note68X = col4LeftPt + 14 + (38 - layout.minPitch) * layout.ptPerSemitone;
+  const note68X = col4LeftPt + 22 + (38 - layout.minPitch) * layout.ptPerSemitone;
 
   const note68Segments = Array.from(
     col4Svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g)
@@ -354,7 +355,7 @@ test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored No
     const colLeftPt = 10 * (72 / 25.4) + col.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
     const nNy = staffOriginY + (n.startTick - col.startTick) * layout.ptPerTick;
     const nReleaseY = nNy + n.durationTicks * layout.ptPerTick;
-    const nx = colLeftPt + 14 + (linearIndex(n.pitch) - layout.minPitch) * layout.ptPerSemitone;
+    const nx = colLeftPt + 22 + (linearIndex(n.pitch) - layout.minPitch) * layout.ptPerSemitone;
     const pSvg = svgs[col.pageIndex];
     const nLines = Array.from(
       pSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g)
@@ -643,8 +644,8 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
   // Full Squished Squares for Row 0 (width="7.50" height="5.60" fill!=#FFFFFF)
   assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="(?!#FFFFFF)/, 'Must render full solid squished square noteheads for Row 0');
 
-  // Empty Squished Squares for Row 1 (width="7.50" height="5.60" fill="#FFFFFF" with stroke for 16th, 8th, and quarter notes)
-  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke=/, 'Must render empty hollow squished square noteheads for Row 1');
+  // Empty Squished Squares for Row 1: inset to width="6.20" height="4.30" with stroke-width="1.3" so outer bounds match 7.50 x 5.60
+  assert.match(svg, /<rect[^>]*width="6\.20"[^>]*height="4\.30"[^>]*fill="#FFFFFF"[^>]*stroke=[^>]*stroke-width="1\.3"/, 'Must render empty hollow squished square noteheads for Row 1 with identical outer bounds');
 
   // Blue (8th) and Orange (quarter) hollow noteheads have void fills (zero fill-opacity on Page 0)
   assert.doesNotMatch(svg, /fill-opacity="0\.18"/, 'Blue and Orange hollow noteheads must have void fills (zero fill-opacity)');
@@ -655,7 +656,7 @@ test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine'
     noteheadMorphology: 'rectangle-square',
   });
   assert.doesNotMatch(svgPage2, /fill-opacity="0\.18"/, 'Red notes on Row 1 must have zero fill-opacity="0.18"');
-  assert.match(svgPage2, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="#FFFFFF"[^>]*stroke="#BE123C"/, 'Red notes on Row 1 must maintain clean white interior (#FFFFFF)');
+  assert.match(svgPage2, /<rect[^>]*width="6\.20"[^>]*height="4\.30"[^>]*fill="#FFFFFF"[^>]*stroke="#BE123C"[^>]*stroke-width="1\.3"/, 'Red notes on Row 1 must maintain clean white interior (#FFFFFF)');
 
   // Explicitly assert duration-class color behavior with synthetic score:
   const durationColorScore: QuantizedGridScore = {
@@ -755,7 +756,7 @@ test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', 
   const marginPt = defaultLayout.options.pageMarginMm * (72 / 25.4);
   const gapPt = defaultLayout.options.columnGapMm * (72 / 25.4);
   const colLeftPt = marginPt + col.columnOnPageIndex * (defaultLayout.columnDimensions.widthPt + gapPt);
-  const colStaffLeftPt = colLeftPt + 14;
+  const colStaffLeftPt = colLeftPt + 22;
   const expectedD6X = colStaffLeftPt + (74 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
   const expectedM5X = colStaffLeftPt + (72 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
   assert.ok(expectedD6X > expectedM5X, 'D6 coordinate must be to the right of m5 line');
@@ -772,7 +773,7 @@ test('Zero Barline & Beat Grid Overhang Invariant: flush with outer octave lines
     const marginPt = layout.options.pageMarginMm * (72 / 25.4);
     const gapPt = layout.options.columnGapMm * (72 / 25.4);
     const colLeftPt = marginPt + col.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-    const colStaffLeftPt = colLeftPt + 14;
+    const colStaffLeftPt = colLeftPt + 22;
     const rightStaffBound = colStaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
 
     const staffLeftStr = colStaffLeftPt.toFixed(2);
@@ -810,7 +811,7 @@ test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for 
     const pageSvg = renderPageToSvg(layout, pIndex);
     for (const col of layout.pages[pIndex].columns) {
       const colLeftPt = marginPt + col.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-      const colStaffLeftPt = colLeftPt + 14;
+      const colStaffLeftPt = colLeftPt + 22;
       const line76X = (colStaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
       assert.ok(
         !pageSvg.includes(`x1="${line76X}"`),
@@ -823,7 +824,7 @@ test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for 
   const page4Svg = renderPageToSvg(layout, 3);
   const col0 = layout.pages[3].columns[0]; // mm 25-28
   const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-  const col0StaffLeftPt = col0LeftPt + 14;
+  const col0StaffLeftPt = col0LeftPt + 22;
   const col0Line76X = (col0StaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
   assert.ok(
     !page4Svg.includes(`x1="${col0Line76X}"`),
@@ -832,7 +833,7 @@ test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for 
 
   const col1 = layout.pages[3].columns[1]; // mm 29-32
   const colLeftPt = marginPt + col1.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-  const colStaffLeftPt = colLeftPt + 14;
+  const colStaffLeftPt = colLeftPt + 22;
   const line76X = (colStaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
 
   // Must contain dashed line at pitch 76
@@ -874,7 +875,7 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(page1Svg.includes(`.subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }`));
   assert.ok(page1Svg.includes(`.meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
   assert.ok(page1Svg.includes(`.section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
-  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: end; }`));
+  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: middle; }`));
   assert.ok(!page1Svg.includes('.beat-counter'), 'Must not include .beat-counter style');
   assert.ok(page1Svg.includes(`.pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }`));
 
@@ -882,42 +883,43 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(page1Svg.includes(`font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">m3</text>`));
 });
 
-test('A4 Columnar Layout & Geometry Invariants: 14pt left clearance, measure number in margin clear of m1, zero beat counter', () => {
+test('A4 Columnar Layout & Geometry Invariants: 22pt left clearance, measure number in margin clear of m1, zero beat counter', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const page0Svg = renderPageToSvg(layout, 0);
 
-  // colMarginLeftPt is 14pt and rightBufferMarginPt is 22pt
-  const colMarginLeftPt = 14;
+  // colMarginLeftPt is 22pt and rightBufferMarginPt is 22pt
+  const colMarginLeftPt = 22;
   const rightBufferMarginPt = 22;
   const usablePitchWidthPt = layout.columnDimensions.widthPt - colMarginLeftPt - rightBufferMarginPt;
   assert.ok(Math.abs(layout.ptPerSemitone - usablePitchWidthPt / layout.pitchSpan) < 1e-6);
 
-  // colStaffLeftPt is colLeftPt + 14
+  // colStaffLeftPt is colLeftPt + 22
   const marginPt = layout.options.pageMarginMm * MM_TO_PT;
   const gapPt = layout.options.columnGapMm * MM_TO_PT;
   const col0 = layout.pages[0].columns[0];
   const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
   const col0StaffLeftPt = col0LeftPt + colMarginLeftPt;
-  assert.equal(col0StaffLeftPt, col0LeftPt + 14);
+  assert.equal(col0StaffLeftPt, col0LeftPt + 22);
 
   // Right staff bound is colStaffLeftPt + (maxPitch - minPitch) * ptPerSemitone
   const rightStaffBound = col0StaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
   assert.ok(page0Svg.includes(`x1="${col0StaffLeftPt.toFixed(2)}" y1="`));
   assert.ok(page0Svg.includes(`x2="${rightStaffBound.toFixed(2)}" y2="`));
 
-  // Measure number rendered in left margin clear of m1
+  // Measure number rendered in left margin clear of m1 and column boundary
   const staffOriginY = marginPt + 42 + 16;
+  const expectedMeasureNumX = col0LeftPt + colMarginLeftPt / 2;
   assert.match(
     page0Svg,
-    new RegExp(`<text x="${(col0StaffLeftPt - 4).toFixed(2)}" y="${(staffOriginY + 8).toFixed(2)}" class="measure-num">${col0.startMeasure}</text>`)
+    new RegExp(`<text x="${expectedMeasureNumX.toFixed(2)}" y="${(staffOriginY + 12).toFixed(2)}" class="measure-num">${col0.startMeasure}</text>`)
   );
 
   // Assert measure number coordinate does not overlap with m1 (which is at x = col0StaffLeftPt, y = colTopPt + 10)
   const colTopPt = marginPt + 42;
   const m1Y = colTopPt + 10;
-  const measureNumX = col0StaffLeftPt - 4;
-  const measureNumY = staffOriginY + 8;
+  const measureNumX = expectedMeasureNumX;
+  const measureNumY = staffOriginY + 12;
   assert.notEqual(measureNumX, col0StaffLeftPt, 'Measure number X must be shifted into left margin to clear m1');
   assert.notEqual(measureNumY, m1Y, 'Measure number Y must not overlap with m1 header');
 

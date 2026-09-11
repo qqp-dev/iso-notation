@@ -1658,7 +1658,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   assert.equal(note88Trail.lineWidth, 1.0, 'Bar 6 bach-var1-88 on m2 staff line must stroke at full staff-line width 1.0px');
   assert.equal(note88Trail.y2, note88ExpectedCy + note88.durationTicks * pixelsPerTick, 'bach-var1-88 must terminate cleanly at release');
   const note88Knockout = verticalKnockouts.find(
-    (k) => Math.abs(k.x1 - note88ExpectedCx) < 0.1 && Math.abs(k.y1 - (note88ExpectedCy + noteHeight / 2 + 2)) < 0.1
+    (k) => Math.abs(k.x1 - note88ExpectedCx) < 0.1 && Math.abs(k.y1 - (note88ExpectedCy + noteHeight / 2)) < 0.1
   );
   assert.ok(note88Knockout, 'Must find staff-line knockout line for bach-var1-88');
   assert.equal(note88Knockout.lineWidth, 1.8, 'Bar 6 bach-var1-88 on m2 staff line must have 1.8px knockout underlay');

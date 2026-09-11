@@ -84,5 +84,10 @@ bounded
      - Row 0: fill with `noteColor`.
      - Row 1: fill with `#000000` (canvas background knockout) / `#FFFFFF` and stroke with `noteColor`.
    - Remove `isRedNote` tint fill across all notehead render paths.
-3. **Update Tests**:
-   - Update unit test assertions in `test/print-layout.test.ts` and `test/notation-variations.test.ts` to assert directional baked notehead paths and absence of red tint fill.
+3. **Refinements**:
+   - **Optical Notehead Sizing**: Inset hollow noteheads (rectangles and pentagons) by `strokeWidth / 2` ($0.65\text{pt}$ / $0.9\text{px}$) so outer bounding box after $1.3\text{pt}$ stroke matches solid noteheads ($7.50\text{pt} \times 5.60\text{pt}$) exactly.
+   - **Measure Number Placement**: Increase left margin clearance to $22\text{pt}$, center-align measure numbers in margin at `staffOriginY + 12` to clear $m1$, top barline, and column border.
+   - **Unison Resolution**: In cadential unisons (e.g. Bar 32 G3), prioritize hand-crossing exception notehead (orange right-pointing pentagon) and deduplicate hold line and notehead rendering.
+   - **Staff-Line Gap Knockout**: Extend white knockout underlay up to notehead bottom (`ny + nh / 2`), creating a pristine white gap between notehead and hold line without underlying black staff line showing through.
+4. **Update Tests**:
+   - Update unit test assertions in `test/print-layout.test.ts` and `test/notation-variations.test.ts` to assert directional baked notehead paths, inset dimensions, 22pt clearance, and absence of red tint fill.

@@ -319,7 +319,7 @@ export function computeColumnarLayout(
   }
 
   // Calculate scales
-  const colMarginLeftPt = 14; // Left clearance before m1 (5mm)
+  const colMarginLeftPt = 22; // Left clearance before m1 (7.8mm)
   const rightBufferMarginPt = 22; // Right buffer after m5 (7.8mm)
   const usablePitchWidthPt = Math.max(50, columnWidthPt - colMarginLeftPt - rightBufferMarginPt);
 
@@ -382,7 +382,7 @@ export function renderPageToSvg(
   const colHeaderHeightPt = 16;
   const colTopPt = marginPt + headerHeightPt;
 
-  const colMarginLeftPt = 14;
+  const colMarginLeftPt = 22;
 
   const normStaffStyle = normalizeStaffStyle(options.staffStyle);
   const tauRef = score.gridResolution || 12;
@@ -400,7 +400,7 @@ export function renderPageToSvg(
       .subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }
       .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
       .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
-      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: end; }
+      .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: middle; }
       .pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }
       .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }`);
   svgParts.push(`    </style>`);
@@ -565,9 +565,10 @@ export function renderPageToSvg(
       // Barline across staff
       svgParts.push(`    <line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
 
-      // Measure number label: only for the first bar of each column, placed in left margin clear of m1
+      // Measure number label: only for the first bar of each column, centered in left margin clear of m1 and column boundary
       if (m === 0) {
-        svgParts.push(`    <text x="${(colStaffLeftPt - 4).toFixed(2)}" y="${(staffOriginY + 8).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
+        const measureNumX = colLeftPt + colMarginLeftPt / 2;
+        svgParts.push(`    <text x="${measureNumX.toFixed(2)}" y="${(staffOriginY + 12).toFixed(2)}" class="measure-num">${col.startMeasure}</text>`);
       }
     }
 
@@ -744,10 +745,15 @@ export function renderPageToSvg(
     }
 
     // Notes: Solid Thin Hold Lines with Obstacle Interruption (durationTicks > tauRef)
+    const renderedHoldKeys = new Set<string>();
     for (const note of col.notes) {
       if (note.durationTicks > tauRef) {
-        const { nx, ny } = noteCoordMap.get(note.id)!;
         const lPitch = displayPitchMap.get(note.id)!;
+        const unisonKey = `${lPitch}-${note.startTick}`;
+        if (renderedHoldKeys.has(unisonKey)) continue;
+        renderedHoldKeys.add(unisonKey);
+
+        const { nx, ny } = noteCoordMap.get(note.id)!;
         const isEven = wholeToneParity(lPitch) === 0;
         const nh = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
         const trailStartY = ny + nh / 2 + 2;
@@ -769,10 +775,17 @@ export function renderPageToSvg(
           }
         }
 
-        for (const [segY1, segY2] of intervals) {
+        for (let i = 0; i < intervals.length; i++) {
+          const [segY1, segY2] = intervals[i];
           if (segY2 - segY1 >= 1.5) {
             if (isOnStaffLine) {
-              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="#FFFFFF" stroke-width="${isBold ? '2.5' : '1.8'}" stroke-linecap="butt"/>`);
+              // Knock out the underlying staff line starting from the notehead bottom (ny + nh / 2)
+              // for the first segment so the small gap between notehead and hold line is a clean white gap,
+              // preventing the black staff line from showing through in the gap!
+              const knockoutY1 = (i === 0 && Math.abs(segY1 - trailStartY) < 0.1)
+                ? (ny + nh / 2)
+                : segY1;
+              svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${knockoutY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="#FFFFFF" stroke-width="${isBold ? '2.5' : '1.8'}" stroke-linecap="butt"/>`);
               svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="${isBold ? '1.35' : '1.0'}" stroke-linecap="round"/>`);
             } else {
               svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${segY1.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${segY2.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
@@ -782,6 +795,21 @@ export function renderPageToSvg(
       }
     }
 
+    // Identify unison notes where one voice has a hand-crossing exception
+    // (e.g. final bar cadence where RH and LH land on the same pitch; the hand exception
+    // takes precedence so the directional notehead is preserved without overlapping knockout)
+    const unisonHasHandException = new Set<string>();
+    for (const note of col.notes) {
+      const rawLPitch = linearIndex(note.pitch);
+      const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
+      const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
+      if (isHandException) {
+        const lPitch = displayPitchMap.get(note.id)!;
+        unisonHasHandException.add(`${lPitch}-${note.startTick}`);
+      }
+    }
+
+    const renderedNoteheadKeys = new Set<string>();
     for (const note of col.notes) {
       const rawLPitch = linearIndex(note.pitch);
       const { nx, ny, badgeText, badgeDirection } = noteCoordMap.get(note.id)!;
@@ -791,6 +819,17 @@ export function renderPageToSvg(
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
       const isHandException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
+      const unisonKey = `${lPitch}-${note.startTick}`;
+
+      // Skip generic non-exception notehead if a hand-exception notehead exists at this unison
+      if (!isHandException && unisonHasHandException.has(unisonKey)) {
+        continue;
+      }
+      // Deduplicate identical unison noteheads
+      if (renderedNoteheadKeys.has(unisonKey)) {
+        continue;
+      }
+      renderedNoteheadKeys.add(unisonKey);
 
       if (isHandException) {
         const nw = 7.5;
@@ -798,17 +837,27 @@ export function renderPageToSvg(
         const bx = nx - nw / 2;
         const by = ny - nh / 2;
         const tip = 2.4;
-        const bakedPath = getBakedPath(bx, by, nw, nh, ny, hand, tip, 1.2);
         const isRow0 = isEven;
 
-        // White knockout path
-        svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>`);
         if (isRow0) {
           // Row 0: Solid directional pentagon
+          const bakedPath = getBakedPath(bx, by, nw, nh, ny, hand, tip, 1.2);
+          svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>`);
           svgParts.push(`    <path d="${bakedPath}" fill="${noteColor}" stroke="${noteColor}" stroke-width="0.5" stroke-linejoin="round"/>`);
         } else {
           // Row 1: Hollow directional pentagon
-          svgParts.push(`    <path d="${bakedPath}" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3" stroke-linejoin="round"/>`);
+          // Inset by strokeWidth / 2 (0.65pt) so outer bounding box after 1.3pt stroke matches solid notehead exactly!
+          const sw = 1.3;
+          const halfSw = sw / 2;
+          const hbx = bx + halfSw;
+          const hby = by + halfSw;
+          const hnw = nw - sw;
+          const hnh = nh - sw;
+          const hrx = Math.max(0.5, 1.2 - halfSw);
+          const bakedPathKnockout = getBakedPath(bx, by, nw, nh, ny, hand, tip, 1.2);
+          const bakedPathHollow = getBakedPath(hbx, hby, hnw, hnh, ny, hand, tip, hrx);
+          svgParts.push(`    <path d="${bakedPathKnockout}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path d="${bakedPathHollow}" fill="#FFFFFF" stroke="${noteColor}" stroke-width="${sw}" stroke-linejoin="round"/>`);
         }
       } else if (morph === 'phonetic') {
         const pc = ((lPitch % 12) + 12) % 12;
@@ -838,7 +887,15 @@ export function renderPageToSvg(
           svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="${noteColor}"/>`);
         } else {
           // Row 1: Empty (Hollow) squished square (in whole-tone spaces)
-          svgParts.push(`    <rect x="${bx.toFixed(2)}" y="${by.toFixed(2)}" width="${nw.toFixed(2)}" height="${nh.toFixed(2)}" rx="1.5" fill="#FFFFFF" stroke="${noteColor}" stroke-width="1.3"/>`);
+          // Inset by strokeWidth / 2 (0.65pt) so outer bounding box after 1.3pt stroke matches solid notehead (7.5pt x 5.6pt) exactly!
+          const sw = 1.3;
+          const halfSw = sw / 2;
+          const hbx = bx + halfSw;
+          const hby = by + halfSw;
+          const hnw = nw - sw;
+          const hnh = nh - sw;
+          const hrx = Math.max(0.5, 1.5 - halfSw);
+          svgParts.push(`    <rect x="${hbx.toFixed(2)}" y="${hby.toFixed(2)}" width="${hnw.toFixed(2)}" height="${hnh.toFixed(2)}" rx="${hrx.toFixed(2)}" fill="#FFFFFF" stroke="${noteColor}" stroke-width="${sw}"/>`);
         }
       } else {
         const rx = 5.2;
