@@ -284,3 +284,22 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
   assert.match(wrappedHead, /@PJL ENTER LANGUAGE = POSTSCRIPT/);
   assert.match(wrappedTail, /@PJL EOJ/);
 });
+
+test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const svgs = renderAllPagesToSvg(layout);
+
+  assert.equal(svgs.length, 2);
+  for (const svg of svgs) {
+    // 1. Lowercase m octave markers (m2, m3, m4, m5)
+    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct} pitch labels');
+    assert.match(svg, />m2</);
+    assert.match(svg, />m3</);
+    assert.match(svg, />m4</);
+
+    // 2. Zero diatonic C octave labels
+    assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
+    assert.doesNotMatch(svg, />C\d+</, 'Must not contain any diatonic C${oct} markers');
+  }
+});

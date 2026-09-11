@@ -280,20 +280,105 @@ test('Monochrome margin labels: pure grayscale with zero blue or pink tints', ()
     currentTick: 0,
   });
 
-  // Verify pitch coordinate labels (e.g. "0:4", "6:4", "2:4")
-  const marginLabels = recordedFills.filter((r) => /^\d+:\d+$/.test(r.text));
+  // Verify pitch coordinate labels (e.g. "m4", "6:4", "2:4")
+  const marginLabels = recordedFills.filter((r) => /^m\d+$/.test(r.text) || /^\d+:\d+$/.test(r.text));
   assert.ok(marginLabels.length > 0, 'Must have rendered margin labels');
 
   marginLabels.forEach(({ text, fillStyle }) => {
-    const pc = parseInt(text.split(':')[0], 10);
+    const isOctaveBoundary = /^m\d+$/.test(text);
     assert.doesNotMatch(fillStyle, /#60A5FA/i, `Margin label ${text} must not be blue`);
     assert.doesNotMatch(fillStyle, /#F472B6/i, `Margin label ${text} must not be pink`);
-    if (pc === 0) {
-      assert.equal(fillStyle, '#FFFFFF', `PC 0 margin label must be #FFFFFF`);
+    if (isOctaveBoundary) {
+      assert.equal(fillStyle, '#FFFFFF', `Octave boundary margin label must be #FFFFFF`);
     } else {
       assert.equal(fillStyle, '#666666', `Other PC margin label must be #666666`);
     }
   });
+});
+
+test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', () => {
+  const score = buildBachGoldbergVar1Score();
+
+  const createMockCtx = () => {
+    const fills: { text: string; fillStyle: string; font: string }[] = [];
+    let currentFillStyle = '';
+    let currentFont = '';
+    const ctx = {
+      set fillStyle(val: string) { currentFillStyle = val; },
+      get fillStyle() { return currentFillStyle; },
+      set font(val: string) { currentFont = val; },
+      get font() { return currentFont; },
+      strokeStyle: '',
+      lineWidth: 1,
+      textAlign: '',
+      textBaseline: '',
+      save: () => {},
+      restore: () => {},
+      beginPath: () => {},
+      closePath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      stroke: () => {},
+      fill: () => {},
+      fillRect: () => {},
+      arc: () => {},
+      ellipse: () => {},
+      roundRect: () => {},
+      fillText: (text: string) => {
+        fills.push({ text, fillStyle: currentFillStyle, font: currentFont });
+      },
+      setLineDash: () => {},
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, fills };
+  };
+
+  // 1. Horizontal orientation
+  const { ctx: horizCtx, fills: horizFills } = createMockCtx();
+  renderScoreToCanvas(horizCtx, score, {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  const horizTexts = horizFills.map((f) => f.text);
+  const horizMOctaves = horizTexts.filter((t) => /^m\d+$/.test(t));
+  assert.ok(horizMOctaves.length > 0, 'Must render m${oct} octave markers in horizontal orientation');
+  assert.ok(horizMOctaves.includes('m3'), 'Should include m3');
+  assert.ok(horizMOctaves.includes('m4'), 'Should include m4');
+  assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
+  assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
+
+  // 2. Vertical orientation
+  const { ctx: vertCtx, fills: vertFills } = createMockCtx();
+  renderScoreToCanvas(vertCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  const vertTexts = vertFills.map((f) => f.text);
+  const vertMOctaves = vertTexts.filter((t) => /^m\d+$/.test(t));
+  assert.ok(vertMOctaves.length > 0, 'Must render m${oct} octave markers in vertical orientation');
+  assert.ok(vertMOctaves.includes('m3'), 'Should include m3');
+  assert.ok(vertMOctaves.includes('m4'), 'Should include m4');
+  assert.ok(!vertTexts.includes('0'), 'Must not render bare 0 at octave boundary in vertical orientation');
+  assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
 });
 
 test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and Left for LH', () => {

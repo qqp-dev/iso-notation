@@ -354,7 +354,7 @@ export function renderPageToSvg(
       const oct = Math.floor(p / 12);
       const px = colStaffLeftPt + (p - minPitch) * ptPerSemitone;
       if (pc === 0) {
-        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">C${oct}</text>`);
+        svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-weight="bold">m${oct}</text>`);
         svgParts.push(`    <line x1="${px.toFixed(2)}" y1="${(colTopPt + 12).toFixed(2)}" x2="${px.toFixed(2)}" y2="${(colTopPt + colHeaderHeightPt).toFixed(2)}" stroke="#000000" stroke-width="1.0"/>`);
       } else if (pc === 4 && normStaffStyle === 'tritone-split') {
         svgParts.push(`    <text x="${px.toFixed(2)}" y="${(colTopPt + 10).toFixed(2)}" class="pitch-label" font-size="6pt">5|7</text>`);
