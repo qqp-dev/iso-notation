@@ -1,5 +1,14 @@
 import React, { useRef } from 'react';
-import { RenderOptions, TimelineOrientation, NotationStyle, ColorMode } from '../render/types';
+import {
+  RenderOptions,
+  TimelineOrientation,
+  StaffStyle,
+  NoteheadMorphology,
+  ColorMode,
+  DESIGN_PRESETS,
+  normalizeStaffStyle,
+  normalizeNoteheadMorphology,
+} from '../render/types';
 import { BENCHMARK_METADATA } from '../scores';
 
 interface ControlsDrawerProps {
@@ -114,6 +123,116 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             </div>
           </div>
 
+          {/* Curated Design Presets */}
+          <div>
+            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+              Curated Design Presets
+            </label>
+            <div className="space-y-1">
+              {DESIGN_PRESETS.map((preset) => {
+                const isSelected =
+                  normalizeStaffStyle(options.staffStyle) === normalizeStaffStyle(preset.staffStyle) &&
+                  normalizeNoteheadMorphology(options.noteheadMorphology) ===
+                    normalizeNoteheadMorphology(preset.noteheadMorphology);
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() =>
+                      onOptionsChange({
+                        staffStyle: preset.staffStyle,
+                        noteheadMorphology: preset.noteheadMorphology,
+                        colorMode: preset.colorMode,
+                      })
+                    }
+                    className={`w-full text-left p-2 rounded border transition ${
+                      isSelected
+                        ? 'bg-neutral-900 border-amber-500 text-white shadow'
+                        : 'bg-black border-neutral-800 text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200'
+                    }`}
+                  >
+                    <div className="font-semibold text-xs text-neutral-100 flex items-center justify-between">
+                      <span>{preset.name}</span>
+                      {isSelected && <span className="text-[10px] text-amber-400">ACTIVE</span>}
+                    </div>
+                    <div className="text-[10px] text-neutral-400 mt-0.5">{preset.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Staff Topography */}
+          <div>
+            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+              Staff Topography
+            </label>
+            <div className="space-y-1 bg-neutral-950 p-1.5 rounded border border-neutral-800">
+              {[
+                { id: 'tritone-split' as StaffStyle, label: 'Tritone Split (3+3)', desc: 'PC 0 bold, PC 6 dashed landmark' },
+                { id: 'wholetone-uniform' as StaffStyle, label: '6-6 Whole-Tone Uniform', desc: '6 lines on even PCs (0,2,4,6,8,10)' },
+                { id: 'augmented-3line' as StaffStyle, label: 'Augmented Triad (3-Line)', desc: '3 major-third lines (0, 4, 8)' },
+                { id: 'octave-ribbons' as StaffStyle, label: 'Octave Ribbons', desc: 'Alternating register luminance ribbons' },
+                { id: 'chromatic-grid' as StaffStyle, label: 'Chromatic Grid', desc: '12 semitone bars per octave' },
+              ].map((st) => {
+                const isSelected = normalizeStaffStyle(options.staffStyle) === normalizeStaffStyle(st.id);
+                return (
+                  <button
+                    key={st.id}
+                    onClick={() => onOptionsChange({ staffStyle: st.id })}
+                    className={`w-full text-left px-2.5 py-1.5 rounded font-mono text-[11px] transition ${
+                      isSelected
+                        ? 'bg-neutral-800 text-white font-bold border border-neutral-700'
+                        : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{st.label}</span>
+                      {isSelected && <span className="text-amber-400 text-[10px]">✓</span>}
+                    </div>
+                    <div className="text-[9px] text-neutral-500 font-sans">{st.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Notehead Morphology */}
+          <div>
+            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
+              Notehead Morphology
+            </label>
+            <div className="space-y-1 bg-neutral-950 p-1.5 rounded border border-neutral-800">
+              {[
+                { id: 'row-parity-shape' as NoteheadMorphology, label: 'Row Parity Shapes', desc: 'Discs on lines (Row 0), Diamonds in spaces (Row 1)' },
+                { id: 'classic-oval' as NoteheadMorphology, label: 'Classic Oval', desc: 'Tilted elliptical notehead with line knockout' },
+                { id: 'phonetic' as NoteheadMorphology, label: '12-TET Phonetics', desc: 'Monosyllabic tokens (Ma, Di, Va, Pi, La, Ri...)' },
+                { id: 'numerical' as NoteheadMorphology, label: 'Numerical Digits', desc: 'Pitch-class integers 0..11' },
+                { id: 'minimal-dot' as NoteheadMorphology, label: 'Minimal Dots', desc: 'Uncluttered circular dots with line knockout' },
+              ].map((nh) => {
+                const isSelected =
+                  normalizeNoteheadMorphology(options.noteheadMorphology) ===
+                  normalizeNoteheadMorphology(nh.id);
+                return (
+                  <button
+                    key={nh.id}
+                    onClick={() => onOptionsChange({ noteheadMorphology: nh.id })}
+                    className={`w-full text-left px-2.5 py-1.5 rounded font-mono text-[11px] transition ${
+                      isSelected
+                        ? 'bg-neutral-800 text-white font-bold border border-neutral-700'
+                        : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{nh.label}</span>
+                      {isSelected && <span className="text-amber-400 text-[10px]">✓</span>}
+                    </div>
+                    <div className="text-[9px] text-neutral-500 font-sans">{nh.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Timeline Orientation */}
           <div>
             <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
@@ -133,35 +252,6 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                   {ori === 'horizontal' ? '↔ Horizontal' : '↕ Vertical'}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Notation Pipeline */}
-          <div>
-            <label className="text-neutral-400 font-semibold block mb-1.5 uppercase tracking-wider text-[10px]">
-              Notation Pipeline
-            </label>
-            <div className="grid grid-cols-2 gap-1.5 bg-neutral-950 p-1 rounded border border-neutral-800">
-              <button
-                onClick={() => onOptionsChange({ notationStyle: 'wholetone-staff' })}
-                className={`py-1.5 text-center rounded font-mono text-[11px] transition ${
-                  options.notationStyle === 'wholetone-staff'
-                    ? 'bg-neutral-800 text-white font-bold'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                6-6 Whole-Tone Staff
-              </button>
-              <button
-                onClick={() => onOptionsChange({ notationStyle: 'chromatic-grid' })}
-                className={`py-1.5 text-center rounded font-mono text-[11px] transition ${
-                  options.notationStyle === 'chromatic-grid'
-                    ? 'bg-neutral-800 text-white font-bold'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                Chromatic Grid
-              </button>
             </div>
           </div>
 

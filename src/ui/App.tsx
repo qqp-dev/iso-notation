@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { QuantizedGridScore, QuantizedNote, PitchCoordinate } from '../model/types';
-import { RenderOptions } from '../render/types';
+import {
+  RenderOptions,
+  DESIGN_PRESETS,
+  normalizeStaffStyle,
+  normalizeNoteheadMorphology,
+} from '../render/types';
 import { BENCHMARK_SCORES, BENCHMARK_METADATA } from '../scores';
 import { getActiveNotesAtTick, tickToMeasureBeat } from '../model/grid';
 import { parseMidiToScore } from '../model/midi';
@@ -27,6 +32,8 @@ export const App: React.FC = () => {
   // Render options state
   const [renderOptions, setRenderOptions] = useState<RenderOptions>({
     orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
     notationStyle: 'wholetone-staff',
     noteheadStyle: 'numerical',
     colorMode: 'wholetone-duality',
@@ -374,6 +381,75 @@ export const App: React.FC = () => {
                 <span>{score.tempos[0]?.bpm} BPM</span>
                 <span className="text-neutral-700">|</span>
                 <span>{score.notes.length} notes</span>
+              </div>
+            </div>
+
+            {/* Quick Variation Explorer Toolbar */}
+            <div className="h-8 bg-neutral-950 border-b border-neutral-800 px-3 flex items-center justify-between gap-2 text-xs overflow-x-auto shrink-0 select-none">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-neutral-500 font-mono">
+                  Presets:
+                </span>
+                {DESIGN_PRESETS.map((preset) => {
+                  const isActive =
+                    normalizeStaffStyle(renderOptions.staffStyle) === normalizeStaffStyle(preset.staffStyle) &&
+                    normalizeNoteheadMorphology(renderOptions.noteheadMorphology) ===
+                      normalizeNoteheadMorphology(preset.noteheadMorphology);
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() =>
+                        handleUpdateOptions({
+                          staffStyle: preset.staffStyle,
+                          noteheadMorphology: preset.noteheadMorphology,
+                          colorMode: preset.colorMode,
+                        })
+                      }
+                      className={`px-2 py-0.5 rounded font-mono text-[10px] transition shrink-0 ${
+                        isActive
+                          ? 'bg-amber-500 text-black font-bold'
+                          : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800'
+                      }`}
+                      title={preset.description}
+                    >
+                      {preset.name.replace(' (0..11)', '').replace(' (3-Line)', '')}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Staff Style Dropdown */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-mono text-neutral-500 hidden lg:inline">Staff:</span>
+                  <select
+                    value={normalizeStaffStyle(renderOptions.staffStyle)}
+                    onChange={(e) => handleUpdateOptions({ staffStyle: e.target.value as any })}
+                    className="bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5 text-[10px] text-neutral-200 font-mono focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="tritone-split">Tritone Split (3+3)</option>
+                    <option value="wholetone-uniform">6-6 Whole-Tone</option>
+                    <option value="augmented-3line">Augmented (3-Line)</option>
+                    <option value="octave-ribbons">Octave Ribbons</option>
+                    <option value="chromatic-grid">Chromatic Grid</option>
+                  </select>
+                </div>
+
+                {/* Notehead Morphology Dropdown */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-mono text-neutral-500 hidden lg:inline">Notehead:</span>
+                  <select
+                    value={normalizeNoteheadMorphology(renderOptions.noteheadMorphology)}
+                    onChange={(e) => handleUpdateOptions({ noteheadMorphology: e.target.value as any })}
+                    className="bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5 text-[10px] text-neutral-200 font-mono focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="row-parity-shape">Row Parity Shapes</option>
+                    <option value="classic-oval">Classic Oval</option>
+                    <option value="phonetic">12-TET Phonetics</option>
+                    <option value="numerical">Numerical Digits</option>
+                    <option value="minimal-dot">Minimal Dots</option>
+                  </select>
+                </div>
               </div>
             </div>
 

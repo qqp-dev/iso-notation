@@ -1,6 +1,13 @@
 import { QuantizedGridScore } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
-import { RenderOptions } from './types';
+import { getCanonicalSyllable } from '../model/phonetics';
+import {
+  RenderOptions,
+  normalizeStaffStyle,
+  normalizeNoteheadMorphology,
+  getStaffLineGeometry,
+  getParityShape,
+} from './types';
 import { getNoteColor } from './colors';
 
 export interface ScoreDimensions {
@@ -55,7 +62,7 @@ export function calculateScoreDimensions(
 /**
  * Pure mathematical Canvas renderer for QuantizedGridScore.
  * Strict pitch-black (#000000) minimal aesthetic, zero diatonic letter names,
- * deterministic vector precision.
+ * dynamic Staff Topography and Notehead Morphology variation explorer.
  */
 export function renderScoreToCanvas(
   ctx: CanvasRenderingContext2D,
@@ -73,6 +80,9 @@ export function renderScoreToCanvas(
   const paddingStart = 60;
   const paddingPitch = 40;
 
+  const normStaffStyle = normalizeStaffStyle(options.staffStyle || options.notationStyle);
+  const normNoteheadMorph = normalizeNoteheadMorphology(options.noteheadMorphology || options.noteheadStyle);
+
   // Convert (tick, linearPitch) to canvas (x, y)
   const getCoords = (tick: number, lPitch: number): { x: number; y: number } => {
     if (isHoriz) {
@@ -88,15 +98,43 @@ export function renderScoreToCanvas(
 
   // 2. Draw Grid Background / Staff Lines
   ctx.save();
+
+  // 2a. Octave Ribbons Shading (if octave-ribbons)
+  if (normStaffStyle === 'octave-ribbons') {
+    const minOct = Math.floor(minPitch / 12);
+    const maxOct = Math.floor(maxPitch / 12);
+    for (let oct = minOct; oct <= maxOct; oct++) {
+      if (Math.abs(oct) % 2 === 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+        if (isHoriz) {
+          const pBottom = oct * 12 - 0.5;
+          const pTop = (oct + 1) * 12 - 0.5;
+          const yBottom = height - paddingPitch - (pBottom - minPitch) * options.pixelsPerSemitone;
+          const yTop = height - paddingPitch - (pTop - minPitch) * options.pixelsPerSemitone;
+          ctx.fillRect(paddingStart, yTop, dims.width - paddingStart, yBottom - yTop);
+        } else {
+          const pLeft = oct * 12 - 0.5;
+          const pRight = (oct + 1) * 12 - 0.5;
+          const xLeft = paddingPitch + (pLeft - minPitch) * options.pixelsPerSemitone;
+          const xRight = paddingPitch + (pRight - minPitch) * options.pixelsPerSemitone;
+          ctx.fillRect(xLeft, paddingStart, xRight - xLeft, dims.height - paddingStart);
+        }
+      }
+    }
+  }
+
+  // 2b. Pitch Lines & Labels
   for (let p = minPitch; p <= maxPitch; p++) {
+    const pc = ((p % 12) + 12) % 12;
+    const oct = Math.floor(p / 12);
     const parity = wholeToneParity(p);
-    const isOctave0 = p % 12 === 0;
+    const lineGeom = getStaffLineGeometry(pc, normStaffStyle);
 
     if (isHoriz) {
       const y = height - paddingPitch - (p - minPitch) * options.pixelsPerSemitone;
 
       // Band shading in chromatic grid mode
-      if (options.notationStyle === 'chromatic-grid') {
+      if (normStaffStyle === 'chromatic-grid') {
         ctx.fillStyle = parity === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
         ctx.fillRect(
           paddingStart,
@@ -106,31 +144,29 @@ export function renderScoreToCanvas(
         );
       }
 
-      // 6-6 Whole-Tone Staff Lines: lines on WT Row 0 (parity === 0), spaces on WT Row 1
-      if (options.notationStyle === 'wholetone-staff') {
-        if (parity === 0) {
-          ctx.beginPath();
-          ctx.strokeStyle = isOctave0 ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.18)';
-          ctx.lineWidth = isOctave0 ? 1.5 : 0.8;
-          ctx.moveTo(paddingStart, y);
-          ctx.lineTo(dims.width, y);
-          ctx.stroke();
-        }
-      } else {
-        // Chromatic grid lines
+      if (lineGeom.isLine) {
         ctx.beginPath();
-        ctx.strokeStyle = isOctave0 ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = isOctave0 ? 1.5 : 0.6;
+        ctx.strokeStyle = lineGeom.color;
+        ctx.lineWidth = lineGeom.lineWidth;
+        if (lineGeom.isDashed && lineGeom.dashArray) {
+          ctx.setLineDash(lineGeom.dashArray);
+        } else {
+          ctx.setLineDash([]);
+        }
         ctx.moveTo(paddingStart, y);
         ctx.lineTo(dims.width, y);
         ctx.stroke();
       }
 
       // Pitch Coordinate label on left margin: pure (pitchClass:octave), zero letters
-      const pc = ((p % 12) + 12) % 12;
-      const oct = Math.floor(p / 12);
-      ctx.fillStyle = isOctave0 ? '#60A5FA' : parity === 0 ? '#CCCCCC' : '#666666';
-      ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
+      const isOctave0 = pc === 0;
+      let textColor = '#555555';
+      if (isOctave0) textColor = '#60A5FA';
+      else if (pc === 6 && normStaffStyle === 'tritone-split') textColor = '#F472B6';
+      else if (lineGeom.isLine) textColor = '#CCCCCC';
+
+      ctx.fillStyle = textColor;
+      ctx.font = isOctave0 || (pc === 6 && normStaffStyle === 'tritone-split') ? 'bold 11px monospace' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillText(`${pc}:${oct}`, paddingStart - 8, y);
@@ -138,7 +174,7 @@ export function renderScoreToCanvas(
       // Vertical timeline
       const x = paddingPitch + (p - minPitch) * options.pixelsPerSemitone;
 
-      if (options.notationStyle === 'chromatic-grid') {
+      if (normStaffStyle === 'chromatic-grid') {
         ctx.fillStyle = parity === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
         ctx.fillRect(
           x - options.pixelsPerSemitone / 2,
@@ -148,28 +184,29 @@ export function renderScoreToCanvas(
         );
       }
 
-      if (options.notationStyle === 'wholetone-staff') {
-        if (parity === 0) {
-          ctx.beginPath();
-          ctx.strokeStyle = isOctave0 ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.18)';
-          ctx.lineWidth = isOctave0 ? 1.5 : 0.8;
-          ctx.moveTo(x, paddingStart);
-          ctx.lineTo(x, dims.height);
-          ctx.stroke();
-        }
-      } else {
+      if (lineGeom.isLine) {
         ctx.beginPath();
-        ctx.strokeStyle = isOctave0 ? 'rgba(96, 165, 250, 0.7)' : 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = isOctave0 ? 1.5 : 0.6;
+        ctx.strokeStyle = lineGeom.color;
+        ctx.lineWidth = lineGeom.lineWidth;
+        if (lineGeom.isDashed && lineGeom.dashArray) {
+          ctx.setLineDash(lineGeom.dashArray);
+        } else {
+          ctx.setLineDash([]);
+        }
         ctx.moveTo(x, paddingStart);
         ctx.lineTo(x, dims.height);
         ctx.stroke();
       }
 
       // Pitch class label along top margin
-      const pc = ((p % 12) + 12) % 12;
-      ctx.fillStyle = isOctave0 ? '#60A5FA' : parity === 0 ? '#CCCCCC' : '#666666';
-      ctx.font = isOctave0 ? 'bold 10px monospace' : '9px monospace';
+      const isOctave0 = pc === 0;
+      let textColor = '#555555';
+      if (isOctave0) textColor = '#60A5FA';
+      else if (pc === 6 && normStaffStyle === 'tritone-split') textColor = '#F472B6';
+      else if (lineGeom.isLine) textColor = '#CCCCCC';
+
+      ctx.fillStyle = textColor;
+      ctx.font = isOctave0 || (pc === 6 && normStaffStyle === 'tritone-split') ? 'bold 10px monospace' : '9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(String(pc), x, paddingStart - 6);
@@ -245,7 +282,7 @@ export function renderScoreToCanvas(
     ctx.restore();
   }
 
-  // 5. Notes Rendering with strictly numerical noteheads (0..11)
+  // 5. Notes Rendering with selected morphology
   ctx.save();
   for (const note of score.notes) {
     const lPitch = linearIndex(note.pitch);
@@ -259,6 +296,8 @@ export function renderScoreToCanvas(
       options.colorMode,
       isActive || isSelected
     );
+    const strokeColor = isActive ? '#FACC15' : '#000000';
+    const pc = note.pitch.pitchClass;
 
     if (isHoriz) {
       const { x, y } = getCoords(note.startTick, lPitch);
@@ -271,32 +310,34 @@ export function renderScoreToCanvas(
       ctx.roundRect(x, y - noteHeight / 2, spanWidth, noteHeight, 3);
       ctx.fill();
 
-      // Onset anchor circle
-      ctx.beginPath();
-      ctx.arc(x + 5, y, noteHeight / 2 + 1, 0, Math.PI * 2);
-      ctx.fillStyle = isActive ? '#FFFFFF' : noteColor;
-      ctx.fill();
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      // Onset anchor coordinates
+      const cx = x + Math.min(spanWidth / 2, 7);
+      const cy = y;
 
-      // Pure numerical notehead: pitch class 0..11
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 9px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(note.pitch.pitchClass), x + 5, y);
+      // Render notehead morphology with line knockout
+      renderNotehead(
+        ctx,
+        normNoteheadMorph,
+        pc,
+        cx,
+        cy,
+        noteHeight,
+        noteColor,
+        isActive,
+        strokeColor,
+        false
+      );
 
       // Articulation marker
       if (note.articulation === 'staccato') {
         ctx.fillStyle = noteColor;
         ctx.beginPath();
-        ctx.arc(x + 5, y - noteHeight / 2 - 4, 2, 0, Math.PI * 2);
+        ctx.arc(cx, y - noteHeight / 2 - 4, 2, 0, Math.PI * 2);
         ctx.fill();
       } else if (note.articulation === 'accent') {
         ctx.fillStyle = '#F43F5E';
         ctx.font = 'bold 10px sans-serif';
-        ctx.fillText('>', x + 5, y - noteHeight / 2 - 4);
+        ctx.fillText('>', cx, y - noteHeight / 2 - 4);
       }
     } else {
       // Vertical timeline
@@ -304,24 +345,38 @@ export function renderScoreToCanvas(
       const spanHeight = Math.max(8, note.durationTicks * options.pixelsPerTick - 2);
       const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
 
+      // Duration ribbon
       ctx.fillStyle = noteColor;
       ctx.beginPath();
       ctx.roundRect(x - noteWidth / 2, y, noteWidth, spanHeight, 3);
       ctx.fill();
 
-      ctx.beginPath();
-      ctx.arc(x, y + 5, noteWidth / 2 + 1, 0, Math.PI * 2);
-      ctx.fillStyle = isActive ? '#FFFFFF' : noteColor;
-      ctx.fill();
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      const cx = x;
+      const cy = y + Math.min(spanHeight / 2, 7);
 
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 9px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(note.pitch.pitchClass), x, y + 5);
+      renderNotehead(
+        ctx,
+        normNoteheadMorph,
+        pc,
+        cx,
+        cy,
+        noteWidth,
+        noteColor,
+        isActive,
+        strokeColor,
+        true
+      );
+
+      if (note.articulation === 'staccato') {
+        ctx.fillStyle = noteColor;
+        ctx.beginPath();
+        ctx.arc(cx + noteWidth / 2 + 4, cy, 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (note.articulation === 'accent') {
+        ctx.fillStyle = '#F43F5E';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText('>', cx + noteWidth / 2 + 4, cy);
+      }
     }
   }
   ctx.restore();
@@ -359,3 +414,178 @@ export function renderScoreToCanvas(
   ctx.fill();
   ctx.restore();
 }
+
+/**
+ * Renders individual notehead according to NoteheadMorphology with crisp line knockout.
+ */
+function renderNotehead(
+  ctx: CanvasRenderingContext2D,
+  morphology: 'classic-oval' | 'row-parity-shape' | 'phonetic' | 'numerical' | 'minimal-dot',
+  pitchClass: number,
+  cx: number,
+  cy: number,
+  baseSize: number,
+  fillColor: string,
+  isActive: boolean,
+  strokeColor: string,
+  isVertical: boolean
+): void {
+  const headColor = isActive ? '#FFFFFF' : fillColor;
+
+  switch (morphology) {
+    case 'classic-oval': {
+      // Tilted elliptical notehead with crisp knockout
+      const rx = Math.max(6, baseSize * 0.7);
+      const ry = Math.max(4.2, baseSize * 0.46);
+      const tiltAngle = isVertical ? 0.38 : -0.38; // ~22 degrees tilt
+
+      // Knockout line-masking
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx + 2.5, ry + 2.5, tiltAngle, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Notehead fill
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, tiltAngle, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      break;
+    }
+
+    case 'row-parity-shape': {
+      const parityShape = getParityShape(pitchClass);
+      if (parityShape === 'disc') {
+        // Row 0: Even pitch classes on lines -> Disc / Oval
+        const r = Math.max(4.5, baseSize * 0.48);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = headColor;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else {
+        // Row 1: Odd pitch classes in spaces -> Diamond / Lozenge
+        const rw = Math.max(5.5, baseSize * 0.58);
+        const rh = Math.max(5.5, baseSize * 0.58);
+        const kw = rw + 3;
+        const kh = rh + 3;
+
+        // Knockout diamond
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - kh);
+        ctx.lineTo(cx + kw, cy);
+        ctx.lineTo(cx, cy + kh);
+        ctx.lineTo(cx - kw, cy);
+        ctx.closePath();
+        ctx.fill();
+
+        // Notehead diamond
+        ctx.fillStyle = headColor;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - rh);
+        ctx.lineTo(cx + rw, cy);
+        ctx.lineTo(cx, cy + rh);
+        ctx.lineTo(cx - rw, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      break;
+    }
+
+    case 'phonetic': {
+      // 12-TET monosyllabic tokens (Ma..Ki)
+      const syllable = getCanonicalSyllable(pitchClass);
+      const pw = Math.max(22, baseSize * 1.85);
+      const ph = Math.max(12, baseSize + 2);
+
+      // Knockout pill
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.roundRect(cx - (pw + 4) / 2, cy - (ph + 4) / 2, pw + 4, ph + 4, 4);
+      ctx.fill();
+
+      // Notehead pill
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, 3.5);
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Text label
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(syllable, cx, cy);
+      break;
+    }
+
+    case 'numerical': {
+      // Pitch-class integers 0..11
+      const isTwoDigit = pitchClass >= 10;
+      const pw = isTwoDigit ? 18 : 14;
+      const ph = Math.max(12, baseSize + 1);
+
+      // Knockout
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.roundRect(cx - (pw + 4) / 2, cy - (ph + 4) / 2, pw + 4, ph + 4, 4);
+      ctx.fill();
+
+      // Shape
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, 3.5);
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Number text
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(pitchClass), cx, cy);
+      break;
+    }
+
+    case 'minimal-dot': {
+      // Crisp, uncluttered circular dot with line knockout
+      const r = Math.max(3.5, baseSize * 0.36);
+
+      // Knockout
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dot fill
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+      break;
+    }
+  }
+}
+
