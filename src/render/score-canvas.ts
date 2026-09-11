@@ -411,13 +411,13 @@ export function renderScoreToCanvas(
   const ticksPerBeat = score.ticksPerBeat || 48;
   const numBeats = score.timeSignatures?.[0]?.numerator || 3;
   const ticksPerMeasure = ticksPerBeat * numBeats;
-  const totalMeasures = score.barlines.length > 0
+  const totalMeasures = score.barlines && score.barlines.length > 0
     ? score.barlines.length
     : Math.max(1, Math.ceil(score.totalTicks / ticksPerMeasure));
 
   for (let i = 0; i < totalMeasures; i++) {
-    const mStartTick = score.barlines[i] ? score.barlines[i].tick : i * ticksPerMeasure;
-    const mEndTick = score.barlines[i + 1] ? score.barlines[i + 1].tick : (mStartTick + ticksPerMeasure);
+    const mStartTick = score.barlines && score.barlines[i] ? score.barlines[i].tick : i * ticksPerMeasure;
+    const mEndTick = score.barlines && score.barlines[i + 1] ? score.barlines[i + 1].tick : (mStartTick + ticksPerMeasure);
 
     const measureNotes = score.notes.filter(
       n => n.startTick >= mStartTick && n.startTick < mEndTick
@@ -809,7 +809,14 @@ export function renderScoreToCanvas(
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
     const ticksPerBeat = score.ticksPerBeat || 48;
-    const isLongNote = note.durationTicks > ticksPerBeat;
+    const showDottedTrail =
+      note.durationTicks >= ticksPerBeat &&
+      score.notes.some(
+        other =>
+          other.id !== note.id &&
+          other.startTick > note.startTick &&
+          other.startTick < note.startTick + note.durationTicks
+      );
 
     if (isPianoRoll) {
       const isSounding =
@@ -864,8 +871,8 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for long notes (d > ticksPerBeat)
-      if (isLongNote) {
+      // Faint dotted continuation trail for long notes with polyphonic overlap
+      if (showDottedTrail) {
         const trailStartX = cx + noteWidth / 2 + 2;
         const trailEndX = cx + note.durationTicks * options.pixelsPerTick;
         if (trailEndX > trailStartX) {
@@ -893,7 +900,8 @@ export function renderScoreToCanvas(
         noteColor,
         isHighlighted,
         strokeColor,
-        false
+        false,
+        note.durationTicks > tauRef
       );
 
       // Articulation marker
@@ -917,8 +925,8 @@ export function renderScoreToCanvas(
       const cx = x;
       const cy = y;
 
-      // Faint dotted continuation trail for long notes (d > ticksPerBeat)
-      if (isLongNote) {
+      // Faint dotted continuation trail for long notes with polyphonic overlap
+      if (showDottedTrail) {
         const trailStartY = cy + noteHeight / 2 + 2;
         const trailEndY = cy + note.durationTicks * options.pixelsPerTick;
         if (trailEndY > trailStartY) {
@@ -935,20 +943,24 @@ export function renderScoreToCanvas(
         }
       }
 
-      // Klavar lateral stems for hand assignment:
-      // Right Hand (RH) -> horizontal stem pointing Right (->)
-      // Left Hand (LH) -> horizontal stem pointing Left (<-)
+      // Klavar lateral stems: symmetry around m3 (indicate only exceptions)
+      // Middle C (m3, linear pitch 60) is the natural keyboard symmetry axis.
+      // Default territory (RH >= 60 or LH < 60) renders NO stem.
       const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
-      const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
-      const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
-      const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
+      const isStemException = (hand === 'RH' && lPitch < 60) || (hand === 'LH' && lPitch >= 60);
 
-      ctx.beginPath();
-      ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
-      ctx.lineWidth = 0.8;
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(stemEndX, cy);
-      ctx.stroke();
+      if (isStemException) {
+        const stemLength = Math.max(20, options.pixelsPerSemitone * 1.45);
+        const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
+        const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
+
+        ctx.beginPath();
+        ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
+        ctx.lineWidth = 0.8;
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(stemEndX, cy);
+        ctx.stroke();
+      }
 
       renderNotehead(
         ctx,
@@ -960,7 +972,8 @@ export function renderScoreToCanvas(
         noteColor,
         isHighlighted,
         strokeColor,
-        true
+        true,
+        note.durationTicks > tauRef
       );
 
       if (note.articulation === 'staccato') {
@@ -1024,7 +1037,8 @@ function renderNotehead(
   fillColor: string,
   isActive: boolean,
   strokeColor: string,
-  isVertical: boolean
+  isVertical: boolean,
+  isColored: boolean = false
 ): void {
   const headColor = isActive
     ? (fillColor === '#FEF08A' || fillColor === '#FFFFFF' ? fillColor : '#FDE047')
@@ -1227,10 +1241,23 @@ function renderNotehead(
         ctx.stroke();
       } else {
         // Row 1: Empty (Hollow) squished square
+        // 100% VOID / transparent (pure black interior on canvas) for 16th notes (d <= tau_ref)
+        // Faint wash inside hollow notehead (~18% opacity) for colored notes (d > tau_ref)
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
         ctx.fill();
+
+        if (isColored) {
+          ctx.save();
+          ctx.globalAlpha = 0.18;
+          ctx.fillStyle = headColor;
+          ctx.beginPath();
+          ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, 1.5);
+          ctx.fill();
+          ctx.restore();
+        }
+
         ctx.strokeStyle = headColor;
         ctx.lineWidth = 1.8;
         ctx.stroke();
