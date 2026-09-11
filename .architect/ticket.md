@@ -1,4 +1,4 @@
-# Ticket: Center-Aligned Stems, Flush Barlines, Local Dashed Outlier Lines, and Quality Urtext Typography
+# Ticket: Drop Blurry Hand-Crossing Overlays and Eliminate Vertical Hold Ribbons in Favor of Pure Noteheads + Duration Color
 
 ## Kind
 
@@ -6,81 +6,38 @@ bounded
 
 ## Problem
 
-Following authentic player legibility and engraving evaluation:
-1. **Lateral Handedness Stems Vertical Alignment**: Top-alignment (`ny - nh / 2` / `cy - noteHeight / 2`) was tested and rejected. Stems must originate from the **center** of the notehead (`cy` in canvas, `ny` in print layout). The longer stem length ($\ge 20\text{px}$ / $16\text{pt}$) is approved and must be kept.
-2. **Barline Overhang (Measure Lines Sticking Out)**: The measure lines (and beat grid pulse lines) still stick out over the octave boundary lines by 4 units (`staffMin - 4` to `staffMax + 4`). They must be strictly flush with the outer octave lines (`m1` on the left/bottom to `m5` on the right/top) with zero overshoot.
-3. **Outlier Reference Staff Lines**: When a note is placed past an octave boundary line (e.g. D6 at pitch 74 in Bach Goldberg Var 1, which sits beyond the `m5` / C6 = 72 line), it currently floats in blank margin space without an upper reference. As a general rule, when notes extend past an octave boundary, the appropriate staff lines must be added **for the specific bars (measures) containing those notes**. In `tritone-split`, the next line above m5 is Landmark 5 (pitch 76, E6), which is a **dashed line** (`stroke-dasharray="5,2.5"` / `[5, 2.5]`). This dashed line must be drawn in measures 29 and 30 so D6 is cleanly contextualized between solid m5 (72) and dashed 5 (76).
-4. **Urtext Typography & Engraving Quality**: Current score elements rely on crude monospace and generic sans-serif fonts (`DejaVu Sans Mono`, `system-ui`, `monospace`). Authentic Urtext editions (Henle, Bärenreiter) achieve timeless distinction through refined classical serif typography, italicized measure numbers, and elegant title/composer typography.
+1. **Blurry Hand-Crossing Filter Overlay**: Translucent pink/gray shaded rectangles (`rgba(244, 114, 182, 0.12)` / `#F3F4F6 opacity="0.6"`) and text banners (`LH/RH Cross`) wash over the score like a blurry smudge. Hand assignment is already clearly and individually communicated on every note by Klavar lateral stems (Right for RH, Left for LH). The overlay is visual noise and should be removed completely.
+2. **Elongated Note Ribbons Colliding with Lateral Stems**: Vertical hold ribbons (`roundRect` in canvas, `<line>` in SVG print layout) extend straight down from $(cx, cy)$ for all notes with $d > \tau_{ref}$. In pieces like Bach Goldberg Var 1, where 165 notes (30%) are eighth or dotted-eighth notes, these vertical rods intersect the horizontal lateral stems at $(cx, cy)$, creating ugly right-angle T-junctions and crosshairs.
+3. **Pure Noteheads + Duration Color**: Note duration is already communicated through:
+   - Notehead color (the duration-class logarithmic palette / DDR subdivision color coding), and
+   - Metric beat-grid placement and rhythmic interval to subsequent notes.
+   Eliminating the vertical hold ribbons keeps noteheads pure and crisp with their lateral stems, completely eliminating stem-ribbon collisions while staying true to Klavarskribo principles.
 
 ## Solution
 
-1. **Center-Aligned Longer Lateral Stems**:
-   - In vertical canvas (`src/render/score-canvas.ts`):
-     - Draw lateral stems at `cy` (vertical center of notehead):
-       `ctx.moveTo(cx, cy); ctx.lineTo(stemEndX, cy);`
-     - Keep longer stem length: `Math.max(20, options.pixelsPerSemitone * 1.45)`.
-   - In SVG print layout (`src/render/print-layout.ts`):
-     - Draw lateral stems at `ny` (vertical center of notehead):
-       `svgParts.push(<line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>);`
-     - Keep longer stem length: `16.0pt`.
-   - Stems continue to point Right for RH and Left for LH.
+1. **Drop Hand-Crossing Overlays**:
+   - In `src/render/score-canvas.ts`: Remove Section 4 (`Hand-Crossing Shading Overlays`), deleting the translucent fill and `LH/RH Cross` text.
+   - In `src/render/print-layout.ts`: Remove `Hand Crossings Overlay in Column`, deleting the `<rect>` overlay and `<text class="cross-label">LH/RH Cross</text>`.
+   - In `src/ui/ControlsDrawer.tsx`: Remove the `showHandCrossings` checkbox.
+   - In `src/ui/App.tsx`: Default `showHandCrossings: false`.
+   - In `src/render/types.ts`: Keep `showHandCrossings?: boolean` for type compatibility, defaulting to `false`.
 
-2. **Staff-Flush Barlines & Pulse Lines (Zero Overhang)**:
+2. **Drop Vertical Hold Ribbons**:
    - In `src/render/score-canvas.ts`:
-     - Vertical timeline: Barlines span strictly from `staffMinX` to `staffMaxX`:
-       `ctx.moveTo(staffMinX, y); ctx.lineTo(staffMaxX, y);`
-     - Horizontal timeline: Barlines span strictly from `staffMinY` to `staffMaxY`:
-       `ctx.moveTo(x, staffMinY); ctx.lineTo(x, staffMaxY);`
+     - In vertical note rendering, remove the `if (isHold) { ctx.roundRect ... }` block.
+     - In horizontal note rendering, remove horizontal hold tails.
+     - Notes render cleanly as noteheads with lateral stems, with duration expressed through notehead fill color (duration class) and beat-grid location.
    - In `src/render/print-layout.ts`:
-     - Barlines span strictly from `colStaffLeftPt` to `rightStaffBound`:
-       `svgParts.push(<line x1="${colStaffLeftPt.toFixed(2)}" y1="${barY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${barY.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>);`
-     - Beat grid pulse lines also terminate strictly flush with `colStaffLeftPt` and `rightStaffBound`:
-       `x1="${colStaffLeftPt.toFixed(2)}" ... x2="${rightStaffBound.toFixed(2)}"`
+     - Remove the `Notes: First Hold Ribbons (for d > tauRef)` loop completely.
+     - SVG notes render purely as notehead + lateral stem (+ optional articulation/outlier landmark).
 
-3. **Local Dashed Staff Lines for Outlier Notes in Appropriate Bars**:
-   - In `src/render/print-layout.ts` and `src/render/score-canvas.ts`:
-     - Detect notes in each bar/measure that extend beyond `maxPitch` (or below `minPitch`).
-     - For Bach Goldberg Var 1 (and general spillover notes):
-       - High D6 is pitch 74.
-       - In `tritone-split`, the landmark line in octave 6 above C6 (72) is Landmark 5 at pitch 76 (E6, PC 4).
-       - In `getStaffLineGeometry`, PC 4 is a **dashed line** (`dashArray: [5, 2.5]`, `0.6pt`, `#444444` in SVG / `rgba(255, 255, 255, 0.4)` in canvas).
-       - For every bar that contains notes exceeding `maxPitch`:
-         - Determine the required staff line(s) above `maxPitch` up to the note pitch (e.g. for pitch 74, the line at pitch 76).
-         - Draw this dashed staff line segment strictly for the vertical span of that measure (from the start of that measure to the end of that measure).
-         - In SVG print layout: For measures 29 and 30 (page 4, column 2), render `<line x1="${lineX}" y1="${measureStartY}" x2="${lineX}" y2="${measureEndY}" stroke="#444444" stroke-width="0.6" stroke-dasharray="5,2.5"/>`.
-         - In canvas: Render the dashed line at pitch 76 across the tick span of those measures.
-       - Measures without outlier notes do NOT render this line.
-
-4. **Authentic Urtext Typography & Aesthetic Quality**:
-   - Define a classical Urtext serif typographic stack across print SVG and canvas:
-     `const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif';`
-   - In `src/render/print-layout.ts`:
-     - `.title`: `font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111;`
-     - `.subtitle`: `font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333;`
-     - `.meta` & section header: `font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222;`
-     - `.measure-num`: `font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: normal; font-size: 7.5pt; fill: #444444; text-anchor: end;`
-     - `.beat-counter`: `font-family: ${URTEXT_SERIF}; font-style: normal; font-size: 6.5pt; fill: #6B7280; text-anchor: end;`
-     - `.pitch-label` (`m1`, `m5`): `font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle;`
-     - Middle C (`m3`) header badge: refined classical badge with `font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 6.5pt; fill: #FFFFFF;`
-   - In `src/render/score-canvas.ts`:
-     - Octave markers (`m1`, `m3`, `m5`): `'italic bold 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif'`
-     - Measure numbers: `'italic 11px "Century Schoolbook", "Baskerville", "Liberation Serif", serif'` with subtle fill.
-
-## Testing Plan
-
-1. **Center-Aligned Stems Invariant**:
-   - Verify SVG print tests assert `y1 === ny` and `y2 === ny` for lateral stems, with `stemLength >= 16pt`.
-   - Verify canvas tests assert stem is at `cy`.
-2. **Zero Barline Overhang Invariant**:
-   - Verify SVG barlines use `x1="${colStaffLeftPt.toFixed(2)}"` and `x2="${rightStaffBound.toFixed(2)}"`, with no `±4` overhang.
-   - Verify canvas barlines strictly span `[staffMinX, staffMaxX]`.
-3. **Local Dashed Outlier Staff Line Invariant**:
-   - Verify that on Page 4 (measures 29–30 where D6 pitch 74 occurs), a dashed line at pitch 76 (`stroke-dasharray="5,2.5"`) is rendered.
-   - Verify that Pages 1–3 (measures 1–24) do NOT contain any dashed line at pitch 76.
-4. **Urtext Typography Invariant**:
-   - Verify SVG `<style>` block includes the classical serif font stack for `.title`, `.subtitle`, `.measure-num`, and `.beat-counter`.
-   - Verify measure numbers are set with `font-style: italic`.
-5. **Regression & Build Verification**:
-   - `npm test` passes cleanly.
-   - `npm run build` succeeds cleanly.
+3. **Testing Plan**:
+   - In `test/print-layout.test.ts`:
+     - Verify SVG print layout contains zero `Hand Crossing Overlay` rects or text.
+     - Verify SVG print layout contains zero hold ribbon lines.
+   - In `test/notation-variations.test.ts`:
+     - Update duration lattice invariants: assert that notes are rendered as pure noteheads with lateral stems, color-coded by duration class, without hold ribbon rects.
+     - Verify canvas render executes cleanly with zero hand-crossing overlay fills.
+   - All tests pass (`npm test`).
+   - Clean production build (`npm run build`).
 
