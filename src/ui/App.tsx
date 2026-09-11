@@ -36,7 +36,7 @@ export const App: React.FC = () => {
     noteheadMorphology: 'row-parity-shape',
     notationStyle: 'wholetone-staff',
     noteheadStyle: 'row-parity-shape',
-    colorMode: 'ddr-subdivision',
+    colorMode: 'duration-class',
     zoom: 1.0,
     pixelsPerTick: 2.0,
     pixelsPerSemitone: 14,
@@ -443,6 +443,7 @@ export const App: React.FC = () => {
                     onChange={(e) => handleUpdateOptions({ colorMode: e.target.value as any })}
                     className="bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5 text-[10px] text-neutral-200 font-mono focus:outline-none focus:border-amber-500"
                   >
+                    <option value="duration-class">Duration Class</option>
                     <option value="ddr-subdivision">DDR Subdivision</option>
                     <option value="monochrome">Monochrome</option>
                     <option value="wholetone-duality">Whole-Tone</option>

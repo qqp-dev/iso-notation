@@ -268,6 +268,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               onChange={(e) => onOptionsChange({ colorMode: e.target.value as ColorMode })}
               className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-neutral-200 focus:outline-none focus:border-amber-500 font-mono text-[11px]"
             >
+              <option value="duration-class">Duration Class (16th=Silver, 8th=Sky, 4th=Amber...)</option>
               <option value="ddr-subdivision">DDR Metric Subdivision (4th=Red, 8th=Blue...)</option>
               <option value="monochrome">Monochrome</option>
               <option value="wholetone-duality">Whole-Tone Parity (Row 0 / Row 1)</option>

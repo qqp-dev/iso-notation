@@ -58,19 +58,70 @@ export function getSubdivisionColor(
   return '#9CA3AF'; // Fallback neutral gray
 }
 
+/**
+ * Duration-Class Color Engine:
+ * Colors encode the rhythmic note value / duration of each note relative to ticksPerBeat (48 ticks in standard 4/4 or 3/4):
+ * - 16th notes (12t / 0.25 beats): Crisp White / Silver (#E2E8F0)
+ * - 8th notes (24t / 0.5 beats): Vibrant Sky Blue (#38BDF8)
+ * - Dotted 8th notes (36t / 0.75 beats): Indigo (#818CF8)
+ * - Quarter notes (48t / 1.0 beats): Warm Amber (#F59E0B)
+ * - Dotted quarter notes (72t / 1.5 beats): Orange (#FB923C)
+ * - Half notes (96t / 2.0 beats) and longer (>= 144t): Rose (#F43F5E)
+ * - Active sounding notes during playback glow bright gold/white (#FEF08A / #FACC15)
+ */
+export function getDurationClassColor(
+  durationTicks: number,
+  ticksPerBeat: number = 48,
+  isActive: boolean = false
+): string {
+  if (isActive) {
+    return '#FEF08A'; // Bright active gold glow
+  }
+
+  const tpb = ticksPerBeat > 0 ? ticksPerBeat : 48;
+  const ratio = durationTicks / tpb;
+
+  // 16th notes (12t -> 0.25 beats)
+  if (ratio < 0.375) {
+    return '#E2E8F0'; // Crisp White / Silver
+  }
+  // 8th notes (24t -> 0.5 beats)
+  if (ratio < 0.625) {
+    return '#38BDF8'; // Vibrant Sky Blue
+  }
+  // Dotted 8th notes (36t -> 0.75 beats)
+  if (ratio < 0.875) {
+    return '#818CF8'; // Indigo
+  }
+  // Quarter notes (48t -> 1.0 beats)
+  if (ratio < 1.25) {
+    return '#F59E0B'; // Warm Amber
+  }
+  // Dotted quarter notes (72t -> 1.5 beats)
+  if (ratio < 1.75) {
+    return '#FB923C'; // Orange
+  }
+  // Half notes (96t -> 2.0 beats) and longer (>= 144t)
+  return '#F43F5E'; // Rose
+}
+
 export function getNoteColor(
   pitch: PitchCoordinate,
   hand: Hand,
   mode: ColorMode,
   isActive: boolean = false,
   startTick?: number,
-  ticksPerBeat: number = 48
+  ticksPerBeat: number = 48,
+  durationTicks?: number
 ): string {
   if (isActive) {
-    return mode === 'ddr-subdivision' ? '#FEF08A' : '#FDE047'; // Bright active gold highlight
+    return mode === 'ddr-subdivision' || mode === 'duration-class' ? '#FEF08A' : '#FDE047'; // Bright active gold highlight
   }
 
   switch (mode) {
+    case 'duration-class':
+      return getDurationClassColor(durationTicks ?? 12, ticksPerBeat, false);
+
     case 'ddr-subdivision':
       return getSubdivisionColor(startTick ?? 0, ticksPerBeat, false);
 
@@ -126,6 +177,7 @@ export function getJankoKeyColor(
       };
     }
 
+    case 'duration-class':
     case 'voice-hand':
     case 'monochrome':
     default: {

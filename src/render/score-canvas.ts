@@ -8,7 +8,7 @@ import {
   getStaffLineGeometry,
   getParityShape,
 } from './types';
-import { getNoteColor, getSubdivisionColor } from './colors';
+import { getNoteColor, getSubdivisionColor, getDurationClassColor } from './colors';
 
 export interface ScoreDimensions {
   width: number;
@@ -291,13 +291,16 @@ export function renderScoreToCanvas(
     const isHighlighted = isActive || isSelected;
     const noteColor = options.colorMode === 'ddr-subdivision'
       ? getSubdivisionColor(note.startTick, score.ticksPerBeat, isHighlighted)
+      : options.colorMode === 'duration-class'
+      ? getDurationClassColor(note.durationTicks, score.ticksPerBeat, isHighlighted)
       : getNoteColor(
           note.pitch,
           note.hand,
           options.colorMode,
           isHighlighted,
           note.startTick,
-          score.ticksPerBeat
+          score.ticksPerBeat,
+          note.durationTicks
         );
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;

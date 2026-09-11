@@ -29,6 +29,7 @@ export type NoteheadMorphology =
 export type NotationStyle = 'wholetone-staff' | 'chromatic-grid' | StaffStyle;
 export type NoteheadStyle = 'numerical' | NoteheadMorphology;
 export type ColorMode =
+  | 'duration-class'
   | 'wholetone-duality'
   | 'pitch-class-wheel'
   | 'voice-hand'
@@ -71,6 +72,15 @@ export interface DesignPreset {
 }
 
 export const DESIGN_PRESETS: readonly DesignPreset[] = [
+  {
+    id: 'vertical-duration-parity',
+    name: 'Vertical Duration Classes + Parity Shapes',
+    description: 'Vertical timeline with note value duration classes and 3+3 parity shapes',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    orientation: 'vertical',
+  },
   {
     id: 'vertical-ddr-parity',
     name: 'Vertical DDR + Parity Shapes',
@@ -306,4 +316,4 @@ export function getParityShape(pitchClass: number): 'disc' | 'diamond' {
   return pc % 2 === 0 ? 'disc' : 'diamond';
 }
 
-export { getSubdivisionColor } from './colors';
+export { getSubdivisionColor, getDurationClassColor } from './colors';

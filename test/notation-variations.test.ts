@@ -10,6 +10,7 @@ import {
   getStaffLineGeometry,
   getParityShape,
   getSubdivisionColor,
+  getDurationClassColor,
   RenderOptions,
 } from '../src/render/types';
 import { wholeToneParity } from '../src/model/pitch';
@@ -170,21 +171,23 @@ test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {
 
 test('Curated Design Presets catalog completeness and integrity', () => {
   const presetIds = DESIGN_PRESETS.map((p) => p.id);
+  assert.ok(presetIds.includes('vertical-duration-parity'));
   assert.ok(presetIds.includes('vertical-ddr-parity'));
   assert.ok(presetIds.includes('subitizable-3plus3-parity'));
   assert.ok(presetIds.includes('clean-minimalist-oval'));
   assert.ok(presetIds.includes('analytical-phonetic'));
 
-  // Primary default preset must be Vertical DDR + Parity Shapes
-  const ddrPreset = DESIGN_PRESETS[0];
-  assert.equal(ddrPreset.id, 'vertical-ddr-parity');
-  assert.equal(ddrPreset.name, 'Vertical DDR + Parity Shapes');
-  assert.equal(ddrPreset.staffStyle, 'tritone-split');
-  assert.equal(ddrPreset.noteheadMorphology, 'row-parity-shape');
-  assert.equal(ddrPreset.colorMode, 'ddr-subdivision');
-  assert.equal(ddrPreset.orientation, 'vertical');
+  // Primary default preset must be Vertical Duration Classes + Parity Shapes
+  const defaultPreset = DESIGN_PRESETS[0];
+  assert.equal(defaultPreset.id, 'vertical-duration-parity');
+  assert.equal(defaultPreset.name, 'Vertical Duration Classes + Parity Shapes');
+  assert.equal(defaultPreset.staffStyle, 'tritone-split');
+  assert.equal(defaultPreset.noteheadMorphology, 'row-parity-shape');
+  assert.equal(defaultPreset.colorMode, 'duration-class');
+  assert.equal(defaultPreset.orientation, 'vertical');
 
   const names = DESIGN_PRESETS.map((p) => p.name);
+  assert.ok(names.includes('Vertical Duration Classes + Parity Shapes'));
   assert.ok(names.includes('Vertical DDR + Parity Shapes'));
   assert.ok(names.includes('Subitizable 3+3 + Parity Shapes'));
   assert.ok(names.includes('Clean Minimalist Oval'));
@@ -448,6 +451,7 @@ test('Full canvas rendering matrix executes across all variations without error'
   };
 
   const colorModes: ColorMode[] = [
+    'duration-class',
     'wholetone-duality',
     'pitch-class-wheel',
     'voice-hand',
@@ -678,3 +682,161 @@ test('Canvas Rendering with DDR Subdivision & Vertical Orientation: full renderi
   // Active note gold stroke (#FACC15)
   assert.ok(strokes.includes('#FACC15'), 'Active note gold border #FACC15 must be present');
 });
+
+test('Duration-Class Color Invariants: note value color mapping and active note glow', () => {
+  const tpb = 48;
+
+  // 16th notes (12t): Crisp White / Silver (#E2E8F0)
+  assert.equal(getDurationClassColor(12, tpb, false), '#E2E8F0');
+  // 8th notes (24t): Vibrant Sky Blue (#38BDF8)
+  assert.equal(getDurationClassColor(24, tpb, false), '#38BDF8');
+  // Dotted 8th notes (36t): Indigo (#818CF8)
+  assert.equal(getDurationClassColor(36, tpb, false), '#818CF8');
+  // Quarter notes (48t): Warm Amber (#F59E0B)
+  assert.equal(getDurationClassColor(48, tpb, false), '#F59E0B');
+  // Dotted quarter notes (72t): Orange (#FB923C)
+  assert.equal(getDurationClassColor(72, tpb, false), '#FB923C');
+  // Half notes (96t) and longer (144t): Rose (#F43F5E)
+  assert.equal(getDurationClassColor(96, tpb, false), '#F43F5E');
+  assert.equal(getDurationClassColor(144, tpb, false), '#F43F5E');
+
+  // Active note sounding glow: Bright gold/white (#FEF08A)
+  assert.equal(getDurationClassColor(12, tpb, true), '#FEF08A');
+  assert.equal(getDurationClassColor(48, tpb, true), '#FEF08A');
+
+  // Integration with getNoteColor
+  const testPitch = { pitchClass: 0, octave: 4 };
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 12), '#E2E8F0');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 24), '#38BDF8');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 36), '#818CF8');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 48), '#F59E0B');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 72), '#FB923C');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 96), '#F43F5E');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 144), '#F43F5E');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', true, 0, tpb, 12), '#FEF08A');
+});
+
+test('Duration Invariance (Zero Grid-Snap Strobing): identical colors across varying onsets', () => {
+  const tpb = 48;
+  const testPitch = { pitchClass: 7, octave: 4 };
+
+  // A running stream of 16th notes (12t) across all grid subdivisions
+  const onsets = [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144];
+  for (const onset of onsets) {
+    const color = getNoteColor(testPitch, 'RH', 'duration-class', false, onset, tpb, 12);
+    assert.equal(
+      color,
+      '#E2E8F0',
+      `16th note at onset tick ${onset} must be Silver #E2E8F0 (no grid-snap rainbow strobing)`
+    );
+  }
+
+  // Verify across all notes in Bach Goldberg Variation 1
+  const score = buildBachGoldbergVar1Score();
+  let sixteenthCount = 0;
+  let eighthCount = 0;
+  let dottedEighthCount = 0;
+
+  for (const note of score.notes) {
+    const color = getNoteColor(
+      note.pitch,
+      note.hand,
+      'duration-class',
+      false,
+      note.startTick,
+      score.ticksPerBeat,
+      note.durationTicks
+    );
+
+    if (note.durationTicks === 12) {
+      assert.equal(
+        color,
+        '#E2E8F0',
+        `Note ${note.id} (16th note at tick ${note.startTick}) must be Silver #E2E8F0`
+      );
+      sixteenthCount++;
+    } else if (note.durationTicks === 24) {
+      assert.equal(
+        color,
+        '#38BDF8',
+        `Note ${note.id} (8th note at tick ${note.startTick}) must be Sky Blue #38BDF8`
+      );
+      eighthCount++;
+    } else if (note.durationTicks === 36) {
+      assert.equal(
+        color,
+        '#818CF8',
+        `Note ${note.id} (dotted 8th note at tick ${note.startTick}) must be Indigo #818CF8`
+      );
+      dottedEighthCount++;
+    }
+  }
+
+  assert.ok(sixteenthCount > 100, 'Goldberg Var 1 contains over a hundred 16th notes');
+  assert.ok(eighthCount > 20, 'Goldberg Var 1 contains multiple 8th notes');
+  assert.ok(dottedEighthCount > 0, 'Goldberg Var 1 contains dotted 8th notes');
+});
+
+test('Canvas Rendering with Duration-Class & Vertical Orientation: full rendering with active note glow', () => {
+  const score = buildBachGoldbergVar1Score();
+  const fills: string[] = [];
+  const strokes: string[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {
+      strokes.push(String(mockCtx.strokeStyle));
+    },
+    fill: () => {
+      fills.push(String(mockCtx.fillStyle));
+    },
+    fillRect: () => {
+      fills.push(String(mockCtx.fillStyle));
+    },
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  const firstNote = score.notes[0];
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: true,
+    showBarlines: true,
+    showGridLines: true,
+    currentTick: firstNote.startTick,
+  });
+
+  // Black line knockout
+  assert.ok(fills.includes('#000000'), 'Line knockout #000000 must be present');
+  // 16th notes (Silver #E2E8F0) in Bach Goldberg Var 1
+  assert.ok(fills.includes('#E2E8F0'), '16th note Silver #E2E8F0 fill must be present');
+  // 8th notes (Sky Blue #38BDF8) in Bach Goldberg Var 1
+  assert.ok(fills.includes('#38BDF8'), '8th note Sky Blue #38BDF8 fill must be present');
+  // Dotted 8th notes (Indigo #818CF8) in Bach Goldberg Var 1
+  assert.ok(fills.includes('#818CF8'), 'Dotted 8th note Indigo #818CF8 fill must be present');
+  // Active note glow (#FEF08A)
+  assert.ok(fills.includes('#FEF08A'), 'Active note bright gold glow #FEF08A must be present');
+  // Active note gold stroke (#FACC15)
+  assert.ok(strokes.includes('#FACC15'), 'Active note gold border #FACC15 must be present');
+});
+
