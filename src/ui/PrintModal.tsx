@@ -22,7 +22,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({
         staffStyle: renderOptions?.staffStyle ?? 'tritone-split',
         noteheadMorphology: renderOptions?.noteheadMorphology ?? 'rectangle-square',
         octaveExtensionMode: renderOptions?.octaveExtensionMode ?? 'spillover',
-        showBeamGrouping: renderOptions?.showBeamGrouping,
         showBeatGrid: renderOptions?.showBeatGrid ?? true,
         showGutterBrackets: false,
       }),
@@ -31,7 +30,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({
       renderOptions?.staffStyle,
       renderOptions?.noteheadMorphology,
       renderOptions?.octaveExtensionMode,
-      renderOptions?.showBeamGrouping,
       renderOptions?.showBeatGrid,
       renderOptions?.showGutterBrackets,
     ]

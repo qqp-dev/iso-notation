@@ -1,7 +1,7 @@
 import { QuantizedGridScore, QuantizedNote, HandCrossingEvent } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { getCanonicalSyllable } from '../model/phonetics';
-import { detectHandCrossings, computeBeamClusters } from '../model/grid';
+import { detectHandCrossings } from '../model/grid';
 import { StaffStyle, NoteheadMorphology, normalizeStaffStyle, normalizeNoteheadMorphology, getPrintDurationColor, getStaffLineGeometry } from './types';
 
 export const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif';
@@ -26,7 +26,6 @@ export interface PrintLayoutOptions {
   pixelsPerTick?: number; // optional scale overrides
   pixelsPerSemitone?: number;
   octaveExtensionMode?: 'badge' | 'spillover' | 'auto';
-  showBeamGrouping?: boolean; // default: false
   showBeatGrid?: boolean; // default: false
   showGutterBrackets?: boolean; // default: false
 }
@@ -96,7 +95,6 @@ const DEFAULT_OPTIONS: Required<PrintLayoutOptions> = {
   pixelsPerTick: 0,
   pixelsPerSemitone: 0,
   octaveExtensionMode: 'spillover',
-  showBeamGrouping: false,
   showBeatGrid: true,
   showGutterBrackets: false,
 };
@@ -623,7 +621,31 @@ export function renderPageToSvg(
       noteCoordMap.set(note.id, { nx, ny, badgeText, badgeDirection });
     }
 
-    // Notes: Faint Dotted Continuation Trails for All Colored Notes (durationTicks > tauRef)
+    // Collect all lateral stems in the column
+    interface LateralStem {
+      id: string;
+      y: number;
+      x1: number;
+      x2: number;
+    }
+    const lateralStems: LateralStem[] = [];
+    for (const note of col.notes) {
+      const rawLPitch = linearIndex(note.pitch);
+      const hand = note.hand ?? (rawLPitch >= 48 ? 'RH' : 'LH');
+      const isStemException = (hand === 'RH' && rawLPitch < 48) || (hand === 'LH' && rawLPitch > 48);
+      if (isStemException) {
+        const { nx, ny } = noteCoordMap.get(note.id)!;
+        const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
+        lateralStems.push({
+          id: note.id,
+          y: ny,
+          x1: Math.min(nx, stemEndX),
+          x2: Math.max(nx, stemEndX),
+        });
+      }
+    }
+
+    // Notes: Solid Thin Hold Lines with Collision Truncation (durationTicks > tauRef)
     for (const note of col.notes) {
       if (note.durationTicks > tauRef) {
         const { nx, ny } = noteCoordMap.get(note.id)!;
@@ -633,62 +655,21 @@ export function renderPageToSvg(
         const noteHeight = morph === 'phonetic' ? 8.5 : (morph === 'rectangle-square' || morph === 'square-ellipse' || morph === 'square-triangle') ? 5.6 : (isEven ? 6.0 : 5.8);
         const trailStartY = ny + noteHeight / 2 + 2;
         const rawReleaseY = ny + note.durationTicks * ptPerTick;
-        const trailEndY = Math.min(rawReleaseY, staffEndY);
+        let trailEndY = Math.min(rawReleaseY, staffEndY);
         const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
 
-        if (trailEndY > trailStartY) {
-          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="0, 3.5" opacity="0.75"/>`);
+        for (const stem of lateralStems) {
+          if (stem.id !== note.id) {
+            if (nx >= stem.x1 - 0.5 && nx <= stem.x2 + 0.5) {
+              if (stem.y > trailStartY && stem.y <= trailEndY) {
+                trailEndY = Math.min(trailEndY, stem.y - 2.5);
+              }
+            }
+          }
         }
-      }
-    }
 
-    // Elaine Gould Angled Beam Engraving & Uniform Lateral Stems
-    const stemEndMap = new Map<string, number>();
-
-    if (layout.options.showBeamGrouping === true) {
-      const clusters = computeBeamClusters(col.notes, ticksPerBeat, tauRef, 7);
-      const MAX_SLANT_PT = 16.0;
-
-      for (const cluster of clusters) {
-        if (cluster.notes.length >= 2 && cluster.endTick > cluster.startTick) {
-          const cNotes = cluster.notes;
-          const nxArr = cNotes.map(n => noteCoordMap.get(n.id)!.nx);
-          const nyArr = cNotes.map(n => noteCoordMap.get(n.id)!.ny);
-
-          const y1 = nyArr[0];
-          const yK = nyArr[nyArr.length - 1];
-          const totalDy = yK - y1;
-
-          // Raw pitch delta from first to last note
-          const rawDx = nxArr[nxArr.length - 1] - nxArr[0];
-
-          // Gould slope capping: slant follows rawDx with capped magnitude
-          const slantSign = Math.sign(rawDx);
-          const rawSlantMagnitude = Math.abs(rawDx) * 0.65;
-          const cappedSlant = slantSign * Math.min(rawSlantMagnitude, MAX_SLANT_PT);
-          const slope = cappedSlant / totalDy;
-
-          // Anchor beam so that minimum stem length is exactly stemLength (12pt)
-          let X0: number;
-          if (cluster.hand === 'RH') {
-            const maxReq = Math.max(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
-            X0 = maxReq + stemLength;
-          } else {
-            const minReq = Math.min(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
-            X0 = minReq - stemLength;
-          }
-
-          const beamX1 = X0;
-          const beamXK = X0 + slope * totalDy;
-
-          svgParts.push(`    <!-- Elaine Gould Angled Beam (${cluster.hand}, beat ${cluster.beatIndex + 1}) -->`);
-          svgParts.push(`    <line x1="${beamX1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${beamXK.toFixed(2)}" y2="${yK.toFixed(2)}" stroke="#111827" stroke-width="2.0" stroke-linecap="round"/>`);
-
-          for (let i = 0; i < cNotes.length; i++) {
-            const note = cNotes[i];
-            const endX = X0 + slope * (nyArr[i] - y1);
-            stemEndMap.set(note.id, endX);
-          }
+        if (trailEndY > trailStartY) {
+          svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${trailStartY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${trailEndY.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
         }
       }
     }
@@ -706,8 +687,7 @@ export function renderPageToSvg(
       // Klavar lateral stem: symmetry around m3 (indicate only exceptions)
       // Middle C (m3, linear pitch 48) is stemless for both hands.
       if (isStemException) {
-        const defaultStemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
-        const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
+        const stemEndX = hand === 'RH' ? nx + stemLength : nx - stemLength;
         svgParts.push(`    <line x1="${nx.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${stemEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.6" stroke-linecap="round"/>`);
       }
 

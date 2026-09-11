@@ -41,7 +41,6 @@ export const App: React.FC = () => {
     showHandCrossings: false,
     showBarlines: true,
     showGridLines: true,
-    showBeamGrouping: false,
     showBeatGrid: true,
     showGutterBrackets: false,
     octaveExtensionMode: 'spillover',

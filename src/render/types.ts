@@ -62,7 +62,6 @@ export interface RenderOptions {
   showHandCrossings?: boolean;
   showBarlines: boolean;
   showGridLines: boolean;
-  showBeamGrouping?: boolean;
   showBeatGrid?: boolean;
   showGutterBrackets?: boolean;
   currentTick: number;
