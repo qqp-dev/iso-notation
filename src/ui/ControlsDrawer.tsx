@@ -427,15 +427,6 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               Overlays
             </label>
 
-            <label className="flex items-center justify-between p-1.5 rounded hover:bg-neutral-900 cursor-pointer font-mono text-[11px]">
-              <span>⚡ Hand Crossing Highlighting</span>
-              <input
-                type="checkbox"
-                checked={options.showHandCrossings}
-                onChange={(e) => onOptionsChange({ showHandCrossings: e.target.checked })}
-                className="accent-pink-500 w-4 h-4 rounded"
-              />
-            </label>
 
             <label className="flex items-center justify-between p-1.5 rounded hover:bg-neutral-900 cursor-pointer font-mono text-[11px]">
               <span>Barlines & Measure Numbers</span>

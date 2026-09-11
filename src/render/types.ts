@@ -59,7 +59,7 @@ export interface RenderOptions {
   pixelsPerTick: number; // calculated from zoom
   pixelsPerSemitone: number;
   octaveExtensionMode?: 'badge' | 'spillover' | 'auto';
-  showHandCrossings: boolean;
+  showHandCrossings?: boolean;
   showBarlines: boolean;
   showGridLines: boolean;
   showBeamGrouping?: boolean;
@@ -91,7 +91,7 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
   {
     id: 'unified-duration-lattice',
     name: 'Unified Duration Lattice + Parity Shapes',
-    description: 'Vertical timeline with unextended reference noteheads, proportional hold ribbons, and logarithmic duration palette',
+    description: 'Vertical timeline with pure noteheads, faint dotted long-note trails, and logarithmic duration palette',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'duration-class',

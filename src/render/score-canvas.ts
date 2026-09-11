@@ -605,35 +605,6 @@ export function renderScoreToCanvas(
     ctx.restore();
   }
 
-  // 4. Hand-Crossing Shading Overlays
-  if (options.showHandCrossings && score.handCrossings && score.handCrossings.length > 0) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(244, 114, 182, 0.12)';
-    for (const hc of score.handCrossings) {
-      if (isHoriz) {
-        const x1 = paddingStart + hc.tick * options.pixelsPerTick;
-        const x2 = x1 + hc.durationTicks * options.pixelsPerTick;
-        ctx.fillRect(x1, 15, x2 - x1, height - 30);
-
-        ctx.fillStyle = '#F472B6';
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('LH / RH Cross', x1 + 4, height - 18);
-        ctx.fillStyle = 'rgba(244, 114, 182, 0.12)';
-      } else {
-        const y1 = paddingStart + hc.tick * options.pixelsPerTick;
-        const y2 = y1 + hc.durationTicks * options.pixelsPerTick;
-        ctx.fillRect(15, y1, width - 30, y2 - y1);
-
-        ctx.fillStyle = '#F472B6';
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText('LH/RH Cross', width - 20, y1 + 14);
-        ctx.fillStyle = 'rgba(244, 114, 182, 0.12)';
-      }
-    }
-    ctx.restore();
-  }
 
   // 4b. Option 2: Gutter Beat Brackets (Outer margin beat grouping framing)
   if (options.showGutterBrackets) {
@@ -837,7 +808,8 @@ export function renderScoreToCanvas(
         );
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
-    const isHold = note.durationTicks > tauRef;
+    const ticksPerBeat = score.ticksPerBeat || 48;
+    const isLongNote = note.durationTicks > ticksPerBeat;
 
     if (isPianoRoll) {
       const isSounding =
@@ -886,20 +858,29 @@ export function renderScoreToCanvas(
     if (isHoriz) {
       const { x, y } = getCoords(note.startTick, lPitch);
       const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
-
-      // Proportional hold line/tail down the timeline for d > tauRef
-      if (isHold) {
-        const holdLength = note.durationTicks * options.pixelsPerTick;
-        const ribbonWidth = 1.5;
-        ctx.fillStyle = noteColor;
-        ctx.beginPath();
-        ctx.roundRect(x, y - ribbonWidth / 2, holdLength, ribbonWidth, 0.75);
-        ctx.fill();
-      }
+      const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
 
       // Notehead centered directly on exact onset coordinate (x, y)
       const cx = x;
       const cy = y;
+
+      // Faint dotted continuation trail for long notes (d > ticksPerBeat)
+      if (isLongNote) {
+        const trailStartX = cx + noteWidth / 2 + 2;
+        const trailEndX = cx + note.durationTicks * options.pixelsPerTick;
+        if (trailEndX > trailStartX) {
+          ctx.save();
+          ctx.setLineDash([2, 3]);
+          ctx.lineWidth = 0.8;
+          ctx.globalAlpha = 0.45;
+          ctx.strokeStyle = noteColor;
+          ctx.beginPath();
+          ctx.moveTo(trailStartX, cy);
+          ctx.lineTo(trailEndX, cy);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
 
       // Render notehead morphology with line knockout
       renderNotehead(
@@ -932,19 +913,27 @@ export function renderScoreToCanvas(
       const noteWidth = Math.max(10, options.pixelsPerSemitone);
       const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
 
-      // Proportional thin hold line/tail down the timeline for d > tauRef
-      if (isHold) {
-        const holdHeight = note.durationTicks * options.pixelsPerTick;
-        const ribbonWidth = 1.5;
-        ctx.fillStyle = noteColor;
-        ctx.beginPath();
-        ctx.roundRect(x - ribbonWidth / 2, y, ribbonWidth, holdHeight, 0.75);
-        ctx.fill();
-      }
-
       // Notehead centered directly on exact onset coordinate (x, y)
       const cx = x;
       const cy = y;
+
+      // Faint dotted continuation trail for long notes (d > ticksPerBeat)
+      if (isLongNote) {
+        const trailStartY = cy + noteHeight / 2 + 2;
+        const trailEndY = cy + note.durationTicks * options.pixelsPerTick;
+        if (trailEndY > trailStartY) {
+          ctx.save();
+          ctx.setLineDash([2, 3]);
+          ctx.lineWidth = 0.8;
+          ctx.globalAlpha = 0.45;
+          ctx.strokeStyle = noteColor;
+          ctx.beginPath();
+          ctx.moveTo(cx, trailStartY);
+          ctx.lineTo(cx, trailEndY);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
 
       // Klavar lateral stems for hand assignment:
       // Right Hand (RH) -> horizontal stem pointing Right (->)

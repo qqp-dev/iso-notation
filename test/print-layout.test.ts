@@ -172,26 +172,103 @@ test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector S
     assert.doesNotMatch(svg, /<ellipse[^>]*stroke="#FFFFFF"/, 'Must not have disruptive white shield on ovals');
     assert.doesNotMatch(svg, /<rect[^>]*stroke="#FFFFFF"/, 'Must not have disruptive white shield on bricks');
 
-    // 5. Color Palette Invariant in Print Engine & Thin Hold Lines
-    // - 16th notes (d <= 12t): unextended noteheads in dark slate/graphite (#1E293B)
+    // 5. Color Palette Invariant in Print Engine: Pure Noteheads for Regular Notes (d <= ticksPerBeat)
+    // - 16th notes (d <= 12t): pure noteheads in dark slate/graphite (#1E293B)
     assert.match(svg, /fill="#1E293B"/, 'Must render 16th notes in dark slate/graphite (#1E293B)');
-    // - 8th notes (d = 24t): Royal Blue (#1D4ED8) with thin hold line
-    assert.match(svg, /<line[^>]*stroke="#1D4ED8"[^>]*stroke-width="1\.2"/, 'Must render 8th note thin hold lines in Royal Blue (#1D4ED8)');
+    // - 8th notes (d = 24t): pure noteheads in Royal Blue (#1D4ED8)
+    assert.match(svg, /fill="#1D4ED8"/, 'Must render 8th notes in Royal Blue (#1D4ED8)');
+    // - Zero hold ribbon lines for regular notes (d <= ticksPerBeat)
+    assert.doesNotMatch(svg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2") for regular notes');
 
     // 6. Measure numbers: plain number on first bar of column, zero 'M' prefixes
     assert.match(svg, /class="measure-num">\d+<\/text>/, 'Must render measure number on first bar of column');
     assert.doesNotMatch(svg, /class="measure-num">M/, 'Must not prefix measure numbers with M');
   }
 
-  // Across the full document, verify quarter note thin hold lines in Amber/Gold (#D97706)
   const fullScoreSvg = svgs.join('\n');
-  assert.match(fullScoreSvg, /<line[^>]*stroke="#D97706"[^>]*stroke-width="1\.2"/, 'Must render quarter note thin hold lines in Amber/Gold (#D97706)');
+
+  // Verify SVG print layout contains zero Hand Crossing Overlay rects or text
+  assert.doesNotMatch(fullScoreSvg, /Hand Crossing Overlay/, 'Must contain zero Hand Crossing Overlay rects or comments');
+  assert.doesNotMatch(fullScoreSvg, /LH\/RH Cross/, 'Must contain zero LH/RH Cross overlay text');
+
+  // Across the full document, verify quarter note pure noteheads in Amber/Gold (#D97706) without hold ribbons
+  assert.match(fullScoreSvg, /fill="#D97706"/, 'Must render quarter notes in Amber/Gold (#D97706)');
+  assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke="#D97706"[^>]*stroke-width="1\.2"/, 'Must not render quarter note hold ribbons');
+
+  // Verify SVG print layout renders faint dotted continuation line (stroke-dasharray="2,3") for long notes (d > ticksPerBeat, e.g. 108t note in Bar 20)
+  assert.match(
+    fullScoreSvg,
+    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="0\.75" stroke-dasharray="2,3" opacity="0\.45"\/>/,
+    'Must render faint dotted continuation line (stroke-dasharray="2,3") for long notes'
+  );
 
   // Verify renderColumnarScoreToSvg helper
   const page0Svg = renderColumnarScoreToSvg(score, 0);
   assert.equal(page0Svg, svgs[0]);
   const defaultSvg = renderColumnarScoreToSvg(score);
   assert.equal(defaultSvg, svgs[0]);
+});
+
+test('Pure Noteheads for Regular Notes and Faint Dotted Continuation Line for Long Notes Invariant', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const svgs = layout.pages.map((_, p) => renderPageToSvg(layout, p));
+  const fullScoreSvg = svgs.join('\n');
+
+  // 1. Zero Hand Crossing Overlay rects or text
+  assert.doesNotMatch(fullScoreSvg, /Hand Crossing Overlay/, 'Must contain zero Hand Crossing Overlay rects or comments');
+  assert.doesNotMatch(fullScoreSvg, /LH\/RH Cross/, 'Must contain zero LH/RH Cross banners');
+
+  // 2. Zero hold ribbon lines for notes with d <= ticksPerBeat (12t, 24t, 36t, 48t)
+  assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2") for regular notes');
+
+  // 3. Faint dotted continuation line for long notes (d > ticksPerBeat, e.g. 108t note in Bar 20)
+  const longNote = score.notes.find((n) => n.durationTicks > 48);
+  assert.ok(longNote, 'Must find 108t long note in Goldberg Var 1');
+  assert.equal(longNote.durationTicks, 108);
+
+  // Check the dotted line rendered for the 108t note
+  const longNoteColumn = layout.columns.find((c) => c.notes.some((n) => n.id === longNote.id))!;
+  const pageSvg = svgs[longNoteColumn.pageIndex];
+  const dottedMatches = Array.from(
+    pageSvg.matchAll(
+      /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.75" stroke-dasharray="2,3" opacity="0\.45"\/>/g
+    )
+  );
+  assert.equal(dottedMatches.length, 1, 'Must contain exactly 1 faint dotted continuation line for the Bar 20 sustain');
+
+  const match = dottedMatches[0];
+  const x1 = parseFloat(match[1]);
+  const y1 = parseFloat(match[2]);
+  const x2 = parseFloat(match[3]);
+  const y2 = parseFloat(match[4]);
+  const stroke = match[5];
+
+  // Vertical line: x1 === x2
+  assert.equal(x1, x2, 'Continuation line must be perfectly vertical');
+
+  // Color must match duration color (#BE123C for 108t)
+  assert.equal(stroke, '#BE123C', 'Continuation line stroke must match duration color #BE123C');
+
+  // Release coordinate check: y2 terminates cleanly at note release coordinate clamped to column bounds
+  assert.ok(y2 > y1, 'Termination y2 must be below start y1');
+
+  // Optical stem clearance: trailStartY must start below notehead bottom
+  // Find lateral stem for the long note at x1
+  const stemRegex = new RegExp(
+    `<line x1="${x1.toFixed(2)}" y1="([\\d\\.]+)" x2="[\\d\\.]+" y2="([\\d\\.]+)" stroke="${stroke}" stroke-width="0\\.6"`
+  );
+  const stemMatch = pageSvg.match(stemRegex);
+  assert.ok(stemMatch, 'Must find lateral stem for the long note');
+  const stemY = parseFloat(stemMatch[1]);
+
+  // Notehead height for brick (Row 1 odd pc 11) is 5.8pt, half is 2.9pt, +2 = 4.9pt
+  const expectedTrailStartY = stemY + 5.8 / 2 + 2;
+  assert.ok(
+    Math.abs(y1 - expectedTrailStartY) < 0.05,
+    `trailStartY (${y1}) must match stemY + noteHeight / 2 + 2 (${expectedTrailStartY})`
+  );
+  assert.ok(y1 > stemY, 'trailStartY must be strictly below lateral stem at stemY');
 });
 
 test('Optical Notehead Sizing & Thin Long Stems in SVG Print Engine', () => {

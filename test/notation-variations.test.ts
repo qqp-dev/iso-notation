@@ -1115,10 +1115,15 @@ test('Canvas Rendering with Duration-Class & Vertical Orientation: full renderin
   assert.ok(strokes.includes('#FACC15'), 'Active note gold border #FACC15 must be present');
 });
 
-test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invariant (d <= tau_ref)', () => {
+test('Unified Euclidean Duration Lattice: Pure Noteheads Invariant for Regular Notes (d <= ticksPerBeat)', () => {
   const score = buildBachGoldbergVar1Score();
   const ribbons: { x: number; y: number; w: number; h: number }[] = [];
   const arcCenters: { x: number; y: number }[] = [];
+  const fills: string[] = [];
+  const lateralStems: { x1: number; y1: number; x2: number; y2: number }[] = [];
+
+  let currentPathStart: { x: number; y: number } | null = null;
+  let currentPathEnd: { x: number; y: number } | null = null;
 
   const mockCtx = {
     fillStyle: '',
@@ -1129,13 +1134,41 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
     textBaseline: '',
     save: () => {},
     restore: () => {},
-    beginPath: () => {},
+    beginPath: () => {
+      currentPathStart = null;
+      currentPathEnd = null;
+    },
     closePath: () => {},
-    moveTo: () => {},
-    lineTo: () => {},
-    stroke: () => {},
-    fill: () => {},
-    fillRect: () => {},
+    moveTo: (x: number, y: number) => {
+      currentPathStart = { x, y };
+      currentPathEnd = { x, y };
+    },
+    lineTo: (x: number, y: number) => {
+      currentPathEnd = { x, y };
+    },
+    stroke: () => {
+      if (currentPathStart && currentPathEnd) {
+        // Horizontal line for lateral stems: y1 === y2 and length > 0
+        if (currentPathStart.y === currentPathEnd.y && currentPathStart.x !== currentPathEnd.x) {
+          lateralStems.push({
+            x1: currentPathStart.x,
+            y1: currentPathStart.y,
+            x2: currentPathEnd.x,
+            y2: currentPathEnd.y,
+          });
+        }
+      }
+    },
+    fill: () => {
+      if (typeof mockCtx.fillStyle === 'string') {
+        fills.push(mockCtx.fillStyle);
+      }
+    },
+    fillRect: () => {
+      if (typeof mockCtx.fillStyle === 'string') {
+        fills.push(mockCtx.fillStyle);
+      }
+    },
     arc: (x: number, y: number) => {
       arcCenters.push({ x, y });
     },
@@ -1143,7 +1176,7 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
       arcCenters.push({ x, y });
     },
     roundRect: (x: number, y: number, w: number, h: number) => {
-      // Hold tails are thin (1.5px), notehead shapes are wider (> 4px)
+      // Hold tails were thin (1.5px), notehead shapes are wider (> 4px)
       if (w <= 2.0 || h <= 2.0) {
         ribbons.push({ x, y, w, h });
       }
@@ -1165,30 +1198,38 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
     zoom: 1.0,
     pixelsPerTick,
     pixelsPerSemitone,
-    showHandCrossings: false,
+    showHandCrossings: true,
     showBarlines: false,
     showGridLines: false,
     currentTick: 0,
   });
 
-  const tauRef = score.gridResolution ?? 12;
-  const sixteenthNotes = score.notes.filter((n) => n.durationTicks <= tauRef);
-  const sustainedNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+  const ticksPerBeat = score.ticksPerBeat || 48;
+  const regularNotes = score.notes.filter((n) => n.durationTicks <= ticksPerBeat);
+  const sixteenthNotes = score.notes.filter((n) => n.durationTicks <= 12);
+  const eighthNotes = score.notes.filter((n) => n.durationTicks === 24);
 
-  assert.ok(sixteenthNotes.length > 100, 'Must have > 100 reference 16th notes');
-  assert.ok(sustainedNotes.length > 0, 'Must have sustained notes');
+  assert.ok(regularNotes.length > 500, 'Must have > 500 regular notes in Goldberg Var 1');
+  assert.ok(sixteenthNotes.length > 100, 'Must have > 100 16th notes');
+  assert.ok(eighthNotes.length > 50, 'Must have > 50 8th notes');
 
-  // Exact ribbon count must match exactly the number of sustained notes (zero ribbons for 16th notes)
+  // Zero hold ribbon rects for regular notes: pure noteheads
   assert.equal(
     ribbons.length,
-    sustainedNotes.length,
-    `Ribbon count (${ribbons.length}) must equal sustained notes count (${sustainedNotes.length}), zero for 16th notes`
+    0,
+    `Ribbon count (${ribbons.length}) must be 0 for all regular notes (pure noteheads with zero rod collisions)`
   );
 
-  // Each hold ribbon must have ribbon width = 1.5
-  ribbons.forEach((r) => {
-    assert.equal(r.w, 1.5, 'Hold ribbon width in vertical orientation must be 1.5px');
-  });
+  // Notehead colors strictly duration-coded by duration class:
+  // 16th notes (Silver #E2E8F0)
+  assert.ok(fills.includes('#E2E8F0'), '16th note Silver #E2E8F0 fill must be present');
+  // 8th notes (Sky Blue #38BDF8)
+  assert.ok(fills.includes('#38BDF8'), '8th note Sky Blue #38BDF8 fill must be present');
+  // Quarter notes (Amber #F59E0B)
+  assert.ok(fills.includes('#F59E0B'), 'Quarter note Amber #F59E0B fill must be present');
+
+  // Klavar lateral stems rendered for all notes
+  assert.ok(lateralStems.length >= regularNotes.length, 'Every note must have a lateral stem');
 
   // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
@@ -1204,115 +1245,227 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
       const found = arcCenters.some((c) => Math.abs(c.x - expectedX) < 0.1 && Math.abs(c.y - expectedY) < 0.1);
       assert.ok(found, `Note ${n.id} (16th note) must be centered at exact onset coordinate (${expectedX}, ${expectedY})`);
     });
+
+  // Verify canvas render executes cleanly with zero hand-crossing overlay fills
+  assert.ok(
+    !fills.includes('rgba(244, 114, 182, 0.12)'),
+    'Must not render translucent pink hand-crossing overlay fill'
+  );
 });
 
-test('Unified Euclidean Duration Lattice: Proportional Hold Ribbon Invariant (d > tau_ref)', () => {
+test('Unified Euclidean Duration Lattice: Faint Dotted Long-Note Trails Invariant (d > ticksPerBeat)', () => {
   const score = buildBachGoldbergVar1Score();
-  const verticalRibbons: { x: number; y: number; w: number; h: number }[] = [];
-  const horizontalRibbons: { x: number; y: number; w: number; h: number }[] = [];
 
-  const createMock = (ribbonList: { x: number; y: number; w: number; h: number }[]) => {
+  interface DottedTrail {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    stroke: string;
+    lineWidth: number;
+    alpha: number;
+    dash: number[];
+  }
+
+  const createMock = (
+    dottedTrails: DottedTrail[],
+    ribbons: { x: number; y: number; w: number; h: number }[],
+    textCalls: string[]
+  ) => {
+    let currentDash: number[] = [];
+    let currentAlpha = 1.0;
+    let currentStrokeStyle = '';
+    let currentLineWidth = 1.0;
+    let pathStart: { x: number; y: number } | null = null;
+    let pathEnd: { x: number; y: number } | null = null;
+
     const noop = () => {};
-    return {
+    const mock = {
       fillStyle: '',
-      strokeStyle: '',
-      lineWidth: 1,
+      get strokeStyle() {
+        return currentStrokeStyle;
+      },
+      set strokeStyle(v: string) {
+        currentStrokeStyle = v;
+      },
+      get lineWidth() {
+        return currentLineWidth;
+      },
+      set lineWidth(v: number) {
+        currentLineWidth = v;
+      },
+      get globalAlpha() {
+        return currentAlpha;
+      },
+      set globalAlpha(v: number) {
+        currentAlpha = v;
+      },
       font: '',
       textAlign: '',
       textBaseline: '',
       save: noop,
-      restore: noop,
-      beginPath: noop,
+      restore: () => {
+        currentDash = [];
+        currentAlpha = 1.0;
+      },
+      beginPath: () => {
+        pathStart = null;
+        pathEnd = null;
+      },
       closePath: noop,
-      moveTo: noop,
-      lineTo: noop,
-      stroke: noop,
+      moveTo: (x: number, y: number) => {
+        pathStart = { x, y };
+        pathEnd = { x, y };
+      },
+      lineTo: (x: number, y: number) => {
+        pathEnd = { x, y };
+      },
+      stroke: () => {
+        if (
+          currentDash.length === 2 &&
+          currentDash[0] === 2 &&
+          currentDash[1] === 3 &&
+          pathStart &&
+          pathEnd
+        ) {
+          dottedTrails.push({
+            x1: pathStart.x,
+            y1: pathStart.y,
+            x2: pathEnd.x,
+            y2: pathEnd.y,
+            stroke: currentStrokeStyle,
+            lineWidth: currentLineWidth,
+            alpha: currentAlpha,
+            dash: [...currentDash],
+          });
+        }
+      },
       fill: noop,
       fillRect: noop,
       arc: noop,
       ellipse: noop,
       roundRect: (x: number, y: number, w: number, h: number) => {
-        // Hold tails are thin (1.5px), notehead shapes are wider (> 4px)
         if (w <= 2.0 || h <= 2.0) {
-          ribbonList.push({ x, y, w, h });
+          ribbons.push({ x, y, w, h });
         }
       },
-      fillText: noop,
-      setLineDash: noop,
+      fillText: (text: string) => {
+        textCalls.push(text);
+      },
+      setLineDash: (d: number[]) => {
+        currentDash = [...d];
+      },
     } as unknown as CanvasRenderingContext2D;
+
+    return mock;
   };
 
   const pixelsPerTick = 2.0;
+  const pixelsPerSemitone = 14;
+  const paddingStart = 60;
+  const paddingPitch = 40;
+
+  const ticksPerBeat = score.ticksPerBeat || 48;
+  const longNotes = score.notes.filter((n) => n.durationTicks > ticksPerBeat);
+  assert.equal(longNotes.length, 1, 'Goldberg Var 1 must contain exactly 1 long note (Bar 20 sustain)');
+  const longNote = longNotes[0];
+
+  const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
+  let minPitch = Math.min(...indices) - 2;
+  minPitch = Math.floor(minPitch / 2) * 2;
 
   // 1. Vertical orientation
-  renderScoreToCanvas(createMock(verticalRibbons), score, {
+  const verticalDottedTrails: DottedTrail[] = [];
+  const verticalRibbons: { x: number; y: number; w: number; h: number }[] = [];
+  const verticalTexts: string[] = [];
+
+  renderScoreToCanvas(createMock(verticalDottedTrails, verticalRibbons, verticalTexts), score, {
     orientation: 'vertical',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'duration-class',
     zoom: 1.0,
     pixelsPerTick,
-    pixelsPerSemitone: 14,
-    showHandCrossings: false,
+    pixelsPerSemitone,
+    showHandCrossings: true,
     showBarlines: false,
     showGridLines: false,
     currentTick: 0,
   });
 
+  // Zero hold ribbon rects
+  assert.equal(verticalRibbons.length, 0, 'Vertical hold ribbons must be 0');
+
+  // Dotted continuation trail rendered strictly for the long note
+  assert.equal(
+    verticalDottedTrails.length,
+    1,
+    'Must render exactly 1 faint dotted trail for the 108t long note'
+  );
+
+  const vTrail = verticalDottedTrails[0];
+  assert.deepEqual(vTrail.dash, [2, 3], 'Trail dash pattern must be [2, 3]');
+  assert.equal(vTrail.lineWidth, 0.8, 'Trail stroke width must be 0.8px');
+  assert.equal(vTrail.alpha, 0.45, 'Trail opacity must be 0.45');
+  assert.equal(vTrail.stroke, '#F43F5E', 'Trail stroke color must match duration class (#F43F5E for 108t)');
+
+  // Coordinates:
+  const lPitch = longNote.pitch.octave * 12 + longNote.pitch.pitchClass;
+  const expectedCx = paddingPitch + (lPitch - minPitch) * pixelsPerSemitone;
+  const expectedCy = paddingStart + longNote.startTick * pixelsPerTick;
+  const noteHeight = Math.max(8, pixelsPerSemitone - 3); // 11px
+  const expectedTrailStartY = expectedCy + noteHeight / 2 + 2; // expectedCy + 7.5
+  const expectedTrailEndY = expectedCy + longNote.durationTicks * pixelsPerTick;
+
+  assert.equal(vTrail.x1, expectedCx, 'Trail X must match notehead center cx');
+  assert.equal(vTrail.x2, expectedCx, 'Trail must be vertically aligned');
+  assert.equal(vTrail.y1, expectedTrailStartY, 'Trail must start below notehead bottom with optical stem clearance');
+  assert.equal(vTrail.y2, expectedTrailEndY, 'Trail must cleanly terminate at release coordinate');
+  assert.ok(
+    vTrail.y1 > expectedCy,
+    'Trail must start strictly below the center-aligned Klavar lateral stem at expectedCy'
+  );
+  assert.equal(vTrail.y1 - expectedCy, noteHeight / 2 + 2, 'Optical gap must be exactly noteHeight / 2 + 2');
+
+  // Hand-crossing text eliminated
+  assert.ok(
+    !verticalTexts.some((t) => t.includes('Cross')),
+    'Must not render LH/RH Cross banners in canvas'
+  );
+
   // 2. Horizontal orientation
-  renderScoreToCanvas(createMock(horizontalRibbons), score, {
+  const horizontalDottedTrails: DottedTrail[] = [];
+  const horizontalRibbons: { x: number; y: number; w: number; h: number }[] = [];
+  const horizontalTexts: string[] = [];
+
+  renderScoreToCanvas(createMock(horizontalDottedTrails, horizontalRibbons, horizontalTexts), score, {
     orientation: 'horizontal',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'duration-class',
     zoom: 1.0,
     pixelsPerTick,
-    pixelsPerSemitone: 14,
-    showHandCrossings: false,
+    pixelsPerSemitone,
+    showHandCrossings: true,
     showBarlines: false,
     showGridLines: false,
     currentTick: 0,
   });
 
-  const tauRef = score.gridResolution ?? 12;
-  const sustainedNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+  assert.equal(horizontalRibbons.length, 0, 'Horizontal hold ribbons must be 0');
+  assert.equal(horizontalDottedTrails.length, 1, 'Must render exactly 1 horizontal dotted trail');
 
-  assert.equal(verticalRibbons.length, sustainedNotes.length);
-  assert.equal(horizontalRibbons.length, sustainedNotes.length);
+  const hTrail = horizontalDottedTrails[0];
+  const hExpectedCx = paddingStart + longNote.startTick * pixelsPerTick;
+  const hNoteWidth = Math.max(8, pixelsPerSemitone - 3);
+  const expectedTrailStartX = hExpectedCx + hNoteWidth / 2 + 2;
+  const expectedTrailEndX = hExpectedCx + longNote.durationTicks * pixelsPerTick;
 
-  // In vertical orientation: height = durationTicks * pixelsPerTick, width = 5
-  verticalRibbons.forEach((r, i) => {
-    const note = sustainedNotes[i];
-    const expectedHeight = note.durationTicks * pixelsPerTick;
-    assert.equal(r.h, expectedHeight, `Vertical ribbon height for note ${note.id} must be ${expectedHeight}`);
-    assert.equal(r.w, 1.5, 'Vertical ribbon width must be 1.5px');
-  });
-
-  // In horizontal orientation: width = durationTicks * pixelsPerTick, height = 1.5
-  horizontalRibbons.forEach((r, i) => {
-    const note = sustainedNotes[i];
-    const expectedWidth = note.durationTicks * pixelsPerTick;
-    assert.equal(r.w, expectedWidth, `Horizontal ribbon width for note ${note.id} must be ${expectedWidth}`);
-    assert.equal(r.h, 1.5, 'Horizontal ribbon height must be 1.5px');
-  });
-
-  // Proportionality check: dotted 8th note (36t) vs 8th note (24t)
-  const eighthNote = sustainedNotes.find((n) => n.durationTicks === 24);
-  const dottedEighthNote = sustainedNotes.find((n) => n.durationTicks === 36);
-
-  assert.ok(eighthNote, 'Must find an 8th note');
-  assert.ok(dottedEighthNote, 'Must find a dotted 8th note');
-
-  const eighthRibbon = verticalRibbons[sustainedNotes.indexOf(eighthNote)];
-  const dottedEighthRibbon = verticalRibbons[sustainedNotes.indexOf(dottedEighthNote)];
-
-  assert.equal(eighthRibbon.h, 24 * pixelsPerTick); // 48px
-  assert.equal(dottedEighthRibbon.h, 36 * pixelsPerTick); // 72px
-  assert.equal(
-    dottedEighthRibbon.h / eighthRibbon.h,
-    1.5,
-    'Dotted 8th note hold ribbon must physically extend exactly 1.5x longer than 8th note'
-  );
+  assert.equal(hTrail.y1, hTrail.y2, 'Horizontal trail must be horizontally aligned');
+  assert.ok(hTrail.y1 > 0, 'Horizontal trail Y must be positive');
+  assert.equal(hTrail.x1, expectedTrailStartX, 'Horizontal trail must start past notehead width with stem clearance');
+  assert.equal(hTrail.x2, expectedTrailEndX, 'Horizontal trail must terminate cleanly at release coordinate');
+  assert.ok(hTrail.x1 > hExpectedCx, 'trailStartX must be strictly past notehead center');
 });
 
 test('Full-Viewport Score Canvas & Decluttered UI Invariants', async () => {
