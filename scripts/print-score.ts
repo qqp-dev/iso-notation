@@ -133,10 +133,15 @@ export async function generateScorePostscript(
     svgPaths.push(svgPath);
   }
 
-  // Convert SVGs to PostScript via rsvg-convert
+  // Convert SVGs to multi-page PDF via rsvg-convert, then PDF to Level 3 vector PostScript via pdftops.
+  // This avoids Cairo's 96-DPI bitmap rasterization fallback in rsvg-convert -f ps and guarantees
+  // 100% vector resolution at true page size (210 × 297 mm A4) on the Brother laser printer.
+  const pdfPath = path.join(tmpDir, 'score.pdf');
   const psPath = path.join(tmpDir, 'score.ps');
-  const rsvgCmd = `rsvg-convert -f ps --page-width 210mm --page-height 297mm -o "${psPath}" ${svgPaths.map(p => `"${p}"`).join(' ')}`;
+  const rsvgCmd = `rsvg-convert -f pdf --page-width 210mm --page-height 297mm -o "${pdfPath}" ${svgPaths.map(p => `"${p}"`).join(' ')}`;
   execSync(rsvgCmd, { stdio: 'pipe' });
+  const pdftopsCmd = `pdftops -level3 -origpagesizes "${pdfPath}" "${psPath}"`;
+  execSync(pdftopsCmd, { stdio: 'pipe' });
 
   const psBuffer = fs.readFileSync(psPath);
   return { psBuffer, svgPaths, layout };

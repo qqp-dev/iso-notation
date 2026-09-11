@@ -1184,12 +1184,20 @@ export function renderNotehead(
 
     if (isRow0) {
       // Row 0: Solid directional pentagon
+      // Inset by strokeWidth / 2 (0.6px) so outer bounding box after 1.2px stroke matches hollow notehead exactly!
+      const strokeW = 1.2;
+      const halfStroke = strokeW / 2;
+      const sbx = bx + halfStroke;
+      const sby = by + halfStroke;
+      const ssw = sw - strokeW;
+      const ssh = sh - strokeW;
+      const srx = Math.max(0.5, rx - halfStroke);
       ctx.fillStyle = headColor;
       ctx.beginPath();
-      drawBakedCanvasPath(ctx, bx, by, sw, sh, cy, handException, tip, rx);
+      drawBakedCanvasPath(ctx, sbx, sby, ssw, ssh, cy, handException, tip, srx);
       ctx.fill();
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = strokeW;
       ctx.stroke();
     } else {
       // Row 1: Hollow directional pentagon with void black interior

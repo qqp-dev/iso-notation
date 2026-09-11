@@ -401,9 +401,8 @@ test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine
   assert.doesNotMatch(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none"/, 'Zero standalone floating chevrons');
 
   // Baked Directional Noteheads Invariant (pointing Right for RH in bass, Left for LH in treble):
-  const directionalMatches = Array.from(
-    svg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="(0\.5|1\.3)" stroke-linejoin="round"\/>/g)
-  );
+  const directionalRegex = /<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)"(?: stroke="([^"]+)" stroke-width="1\.3" stroke-linejoin="round")?\/>/g;
+  const directionalMatches = Array.from(svg.matchAll(directionalRegex));
   assert.ok(directionalMatches.length > 0, 'Must find baked directional noteheads in SVG for crossing exceptions');
 
   directionalMatches.forEach((m) => {
@@ -419,9 +418,7 @@ test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine
   // Verify full score directional notehead count and directions:
   const allSvgs = renderAllPagesToSvg(layout);
   const fullScoreSvg = allSvgs.join('\n');
-  const allDirectional = Array.from(
-    fullScoreSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="(0\.5|1\.3)" stroke-linejoin="round"\/>/g)
-  );
+  const allDirectional = Array.from(fullScoreSvg.matchAll(directionalRegex));
   assert.equal(allDirectional.length, 63, 'Must render directional noteheads ONLY for exceptions (63 in Goldberg Var 1)');
 
   const rhDirectional = allDirectional.filter((m) => Number(m[5]) > Number(m[3]));
@@ -453,9 +450,7 @@ test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine
   };
 
   const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0);
-  const testDirectional = Array.from(
-    testSvg.matchAll(/<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)" stroke="([^"]+)" stroke-width="(0\.5|1\.3)" stroke-linejoin="round"\/>/g)
-  );
+  const testDirectional = Array.from(testSvg.matchAll(directionalRegex));
   assert.equal(testDirectional.length, 2, 'SVG must render directional noteheads strictly for the 2 exception notes');
 
   const testRh = testDirectional.filter((m) => Number(m[5]) > Number(m[3]));
