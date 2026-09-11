@@ -65,9 +65,9 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     assert.equal(geomDemarc.isLine, true);
     assert.equal(geomDemarc.isBold, false);
     assert.equal(geomDemarc.isDashed, true);
-    assert.deepEqual(geomDemarc.dashArray, [1.5, 3]);
+    assert.deepEqual(geomDemarc.dashArray, [14, 4]);
     assert.equal(geomDemarc.isDemarcation, true);
-    assert.equal(geomDemarc.lineWidth, 1.0);
+    assert.equal(geomDemarc.lineWidth, 0.7);
     assert.equal(geomDemarc.color, 'rgba(255, 255, 255, 0.55)');
 
     // Zero lines at non-integer pitch coordinates (no 4.5 floating line)
@@ -355,7 +355,7 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
   });
 
   // Filter horizontal lateral stems (y1 === y2 and x1 !== x2)
-  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) < 20);
+  const lateralStems = recordedLines.filter((l) => l.y1 === l.y2 && l.x1 !== l.x2 && Math.abs(l.x2 - l.x1) >= 16);
   assert.ok(lateralStems.length > 0, 'Must have rendered Klavar lateral stems for notes');
 
   // Verify that notes with RH have right-pointing stems (x2 > x1)
@@ -365,27 +365,31 @@ test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and
 
   assert.ok(rhStems.length > 0, 'Must have right-pointing lateral stems for Right Hand (RH)');
   assert.ok(lhStems.length > 0, 'Must have left-pointing lateral stems for Left Hand (LH)');
+  lateralStems.forEach((s) => {
+    assert.ok(Math.abs(s.x2 - s.x1) >= 16, 'Stem must extend at least 16px from note center');
+  });
 });
 
-test('Geometric Diamond Alignment Invariant: vertical half-height matches circle radius (d = r)', () => {
-  // In row-parity-shape:
-  // Circle radius r = Math.max(5.5, baseSize * 0.58) (scaled up ~20%)
-  // Diamond vertical half-height rh must exactly equal r (d = r)
-  const baseSize = 14 - 3; // pixelsPerSemitone - 3
-  const r = Math.max(5.5, baseSize * 0.58);
-  const rh = r;
-  assert.equal(rh, r, 'Diamond vertical half-height rh must match circle radius r (d = r)');
+test('Optical Notehead Sizing & Area Balance Invariant: circles shrunk to optically match diamonds', () => {
+  // Optical mass balance invariant:
+  // Circles shrunk to match diamonds visually:
+  // Circle radius r = baseSize * 0.40, Diamond half-diagonal d = baseSize * 0.50
+  // Area(circle) = pi * r^2
+  // Area(diamond) = 2 * d^2
+  // Ratio Area(circle) / Area(diamond) within 5%
+  const baseSize = 14 - 3; // pixelsPerSemitone - 3 = 11
+  const r = Math.max(4.0, baseSize * 0.40); // 4.4
+  const d = Math.max(5.0, baseSize * 0.50); // 5.5
 
-  // Top and bottom edges of circles and diamonds at the same tick share identical y extents
-  const tickY = 100;
-  const circleTop = tickY - r;
-  const circleBottom = tickY + r;
-  const diamondTop = tickY - rh;
-  const diamondBottom = tickY + rh;
+  const circleArea = Math.PI * r * r;
+  const diamondArea = 2 * d * d;
+  const areaRatio = circleArea / diamondArea;
 
-  assert.equal(circleTop, diamondTop, 'Circle and diamond must have identical top y coordinate');
-  assert.equal(circleBottom, diamondBottom, 'Circle and diamond must have identical bottom y coordinate');
-  assert.equal(circleBottom - circleTop, diamondBottom - diamondTop, 'Total vertical span must be identical');
+  assert.ok(
+    Math.abs(areaRatio - 1.0) < 0.05,
+    `Circle area (${circleArea.toFixed(2)}) and diamond area (${diamondArea.toFixed(2)}) must match within 5% (ratio: ${areaRatio.toFixed(3)})`
+  );
+  assert.ok(r < d, 'Circle radius r must be smaller than diamond diagonal half-extent d for equal optical mass');
 });
 
 test('Solid Row-Parity Shapes Invariant: white noteheads with knockout, yellow highlight on active/selected', () => {

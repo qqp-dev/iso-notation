@@ -373,12 +373,12 @@ export function renderScoreToCanvas(
       // Right Hand (RH) -> horizontal stem pointing Right (->)
       // Left Hand (LH) -> horizontal stem pointing Left (<-)
       const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
-      const stemLength = Math.max(9, options.pixelsPerSemitone * 0.75);
+      const stemLength = Math.max(16, options.pixelsPerSemitone * 1.1);
       const stemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
 
       ctx.beginPath();
       ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 0.8;
       ctx.moveTo(cx, cy);
       ctx.lineTo(stemEndX, cy);
       ctx.stroke();
@@ -489,7 +489,10 @@ function renderNotehead(
 
     case 'row-parity-shape': {
       const parityShape = getParityShape(pitchClass);
-      const r = Math.max(5.5, baseSize * 0.58);
+      // Optical balance: Circle radius r = baseSize * 0.40, Diamond half-diagonal d = baseSize * 0.50
+      // Optical areas: pi * r^2 = 0.503 * baseSize^2, 2 * d^2 = 0.500 * baseSize^2 (matched within 0.5%)
+      const r = Math.max(4.0, baseSize * 0.40);
+      const d = Math.max(5.0, baseSize * 0.50);
 
       if (parityShape === 'disc') {
         // Row 0: Even pitch classes on lines -> Disc / Oval
@@ -507,9 +510,8 @@ function renderNotehead(
         ctx.stroke();
       } else {
         // Row 1: Odd pitch classes in spaces -> Diamond / Lozenge
-        // Geometric Diamond Alignment Invariant: vertical half-height rh matches circle radius r (d = r)
-        const rh = r;
-        const rw = r;
+        const rh = d;
+        const rw = d;
         const kw = rw + 2.5;
         const kh = rh + 2.5;
 

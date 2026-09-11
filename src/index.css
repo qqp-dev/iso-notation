@@ -38,7 +38,7 @@ body, html {
 /* Printable Columnar Score & A4 Pagination */
 @page {
   size: A4 portrait;
-  margin: 10mm;
+  margin: 0;
 }
 
 @media screen {
@@ -66,13 +66,27 @@ body, html {
   }
 
   .print-page {
-    width: 100% !important;
-    height: 100% !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     page-break-after: always !important;
     break-after: page !important;
     display: block !important;
     box-sizing: border-box !important;
     background: #FFFFFF !important;
+  }
+
+  .print-page:first-child {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .print-page + .print-page {
+    page-break-before: always !important;
+    break-before: page !important;
   }
 
   .print-page:last-child {
@@ -81,8 +95,10 @@ body, html {
   }
 
   .print-page svg {
-    width: 100% !important;
-    height: 100% !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
     display: block !important;
   }
 }

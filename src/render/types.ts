@@ -275,11 +275,11 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         isLine: true,
         isBold: false,
         isDashed: true,
-        dashArray: [1.5, 3],
+        dashArray: [14, 4],
         isTritone: false,
         isDemarcation: true,
         isOctaveBoundary: false,
-        lineWidth: 1.0,
+        lineWidth: 0.7,
         color: 'rgba(255, 255, 255, 0.55)',
       };
     }
