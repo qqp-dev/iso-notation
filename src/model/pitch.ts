@@ -78,24 +78,19 @@ export function pitchClassLabel(
 }
 
 /**
- * Full pitch name as pure (pitchClass:octave), e.g. "9:0", "0:3", or phonetic "bi0", "ma3".
- * Uses 0-indexed octaves anchored on A (pitch class 9, consonant 'b', syllable 'bi'):
- * A is the reference pitch and lowest note on an 88-key piano (A0).
- * - A0 (lowest piano key) is b0 (bi0, linear index 9)
- * - Middle C is ma3 (linear index 48)
- * - Concert A (440 Hz) is b4 (bi4, linear index 57)
- * - Highest A on piano is b7 (bi7, linear index 93)
+ * Full pitch name as pure (pitchClass:octave), e.g. "0:3", "1:4", or phonetic "ma3".
+ * Uses 0-indexed piano octaves: m0 is lowest C (C1), m3 is Middle C (C4),
+ * and notes before m0 (A0, Bb0, B0) are also octave 0.
  */
 export function pitchLabel(
   pitch: PitchCoordinate,
   format: 'numeric' | 'phonetic' | 'sharp' | 'flat' = 'numeric'
 ): string {
-  const l = linearIndex(pitch);
-  const aOct = Math.max(0, Math.floor((l - 9) / 12));
+  const displayOct = Math.max(0, pitch.octave - 1);
   if (format === 'phonetic') {
-    return `${getCanonicalSyllable(pitch.pitchClass)}${aOct}`;
+    return `${getCanonicalSyllable(pitch.pitchClass)}${displayOct}`;
   }
-  return `${pitch.pitchClass}:${aOct}`;
+  return `${pitch.pitchClass}:${displayOct}`;
 }
 
 /**

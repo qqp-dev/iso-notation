@@ -205,12 +205,10 @@ export interface StaffLineGeometry {
 
 export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): StaffLineGeometry {
   const pc = ((pitchClass % 12) + 12) % 12;
-  // Semitone offset relative to A (pitch class 9, the octave root)
-  const relA = ((pc - 9) % 12 + 12) % 12;
   const normStyle = normalizeStaffStyle(style);
 
   if (normStyle === 'chromatic-grid') {
-    const isOctave = relA === 0;
+    const isOctave = pc === 0;
     return {
       isLine: true,
       isBold: isOctave,
@@ -221,8 +219,8 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'augmented-3line') {
-    // 3 major-third lines per octave starting at A: A (relA 0), C# (relA 4), F (relA 8)
-    if (relA === 0) {
+    // 3 major-third lines per octave: 0, 4, 8
+    if (pc === 0) {
       return {
         isLine: true,
         isBold: true,
@@ -233,7 +231,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         color: 'rgba(255, 255, 255, 0.9)',
       };
     }
-    if (relA === 4 || relA === 8) {
+    if (pc === 4 || pc === 8) {
       return {
         isLine: true,
         isBold: false,
@@ -256,12 +254,12 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   if (normStyle === 'tritone-split') {
-    // 5/7 Staff Topography anchored on A (b0..b7):
-    // 6 whole-tone lines partitioned into two 3-line groups by the 5/7 boundary demarcation at C# (relA 4):
-    // 5-group: A (relA 0, bold octave), B (relA 2, hairline), C# (relA 4, 5/7 continuous demarcation line)
-    // 7-group: D# (relA 6, hairline), F (relA 8, hairline), G (relA 10, hairline)
-    // Spaces: A# (relA 1), C (relA 3), D (relA 5), E (relA 7), F# (relA 9), G# (relA 11)
-    if (relA === 0) {
+    // 5/7 Staff Topography (Klavarscribo-style continuous demarcation):
+    // 6 whole-tone lines partitioned into two 3-line groups by the 5/7 boundary demarcation at PC 4 (E):
+    // 5-group: PC 0 (bold octave), PC 2 (hairline), PC 4 (5/7 continuous demarcation line)
+    // 7-group: PC 6, 8, 10 (hairlines)
+    // Odd integer PCs: spaces.
+    if (pc === 0) {
       return {
         isLine: true,
         isBold: true,
@@ -272,7 +270,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         color: 'rgba(255, 255, 255, 0.9)',
       };
     }
-    if (relA === 4) {
+    if (pc === 4) {
       return {
         isLine: true,
         isBold: false,
@@ -285,7 +283,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
         color: 'rgba(255, 255, 255, 0.55)',
       };
     }
-    if (relA === 2 || relA === 6 || relA === 8 || relA === 10) {
+    if (pc === 2 || pc === 6 || pc === 8 || pc === 10) {
       return {
         isLine: true,
         isBold: false,
@@ -308,9 +306,9 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
   }
 
   // wholetone-uniform & octave-ribbons
-  // Lines on whole-tone pitches aligned with A (relA: 0, 2, 4, 6, 8, 10), spaces on odd relA
-  const isLine = relA % 2 === 0;
-  if (!isLine) {
+  // Lines on even pitch classes (0, 2, 4, 6, 8, 10), spaces on odd
+  const isEven = pc % 2 === 0;
+  if (!isEven) {
     return {
       isLine: false,
       isBold: false,
@@ -321,7 +319,7 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
       color: 'transparent',
     };
   }
-  const isOctave = relA === 0;
+  const isOctave = pc === 0;
   return {
     isLine: true,
     isBold: isOctave,
@@ -334,8 +332,8 @@ export function getStaffLineGeometry(pitchClass: number, style: StaffStyle): Sta
 }
 
 export function getParityShape(pitchClass: number): 'disc' | 'diamond' {
-  const relA = ((pitchClass - 9) % 12 + 12) % 12;
-  return relA % 2 === 0 ? 'disc' : 'diamond';
+  const pc = ((pitchClass % 12) + 12) % 12;
+  return pc % 2 === 0 ? 'disc' : 'diamond';
 }
 
 export { getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor, getPrintDurationColor } from './colors';

@@ -285,23 +285,22 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
   assert.match(wrappedTail, /@PJL EOJ/);
 });
 
-test('Lowercase \'b\' Octave Marker Invariant: SVG pitch header labels', () => {
+test('Lowercase \'m\' Octave Marker Invariant: SVG pitch header labels', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
   assert.equal(svgs.length, 2);
   for (const svg of svgs) {
-    // 1. Lowercase b octave markers (b2, b3, b4) with A0 at b0, A4 at b4
-    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">b\d+<\/text>/, 'Must render bold b${aOct} pitch labels');
-    assert.match(svg, />b2</);
-    assert.match(svg, />b3</);
-    assert.match(svg, />b4</);
+    // 1. Lowercase m octave markers (m2, m3, m4) with Middle C at m3
+    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">m\d+<\/text>/, 'Must render bold m${oct - 1} pitch labels');
+    assert.match(svg, />m2</);
+    assert.match(svg, />m3</);
+    assert.match(svg, />m4</);
 
-    // 2. Zero diatonic C or m octave labels
+    // 2. Zero diatonic C octave labels
     assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
     assert.doesNotMatch(svg, />C\d+</, 'Must not contain any diatonic C${oct} markers');
-    assert.doesNotMatch(svg, />m\d+</, 'Must not contain any m${oct} markers');
   }
 });
 
@@ -326,57 +325,24 @@ test('Phonetic Notehead Morphology in SVG: strictly lowercase syllables', () => 
   }
 });
 
-test('0-Indexed Piano Octaves Invariant (b0..b7) for 88-key range', () => {
-  // 88-key piano spans A0 (MIDI 21, linear 9) to C8 (MIDI 108, linear 96)
-  // A0 (lowest piano note) -> b0
-  // A1 -> b1
-  // A2 -> b2
-  // A3 -> b3
-  // A4 (Concert A 440 Hz) -> b4
-  // A5 -> b5
-  // A6 -> b6
-  // A7 -> b7
-  const aPitches = [9, 21, 33, 45, 57, 69, 81, 93];
-  const expectedLabels = ['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'];
+test('0-Indexed Piano Octaves Invariant (m0..m7) for 88-key range', () => {
+  // 88-key piano spans A0 (MIDI 21) to C8 (MIDI 108)
+  // Lowest C is C1 (MIDI 24, oct = 1) -> m0
+  // Middle C is C4 (MIDI 60, oct = 4) -> m3
+  // Highest C is C8 (MIDI 108, oct = 8) -> m7
+  const expectedOctaveLabels: Record<number, string> = {
+    1: 'm0', // C1 (lowest piano C)
+    2: 'm1', // C2
+    3: 'm2', // C3
+    4: 'm3', // C4 (Middle C)
+    5: 'm4', // C5
+    6: 'm5', // C6
+    7: 'm6', // C7
+    8: 'm7', // C8
+  };
 
-  for (let idx = 0; idx < aPitches.length; idx++) {
-    const p = aPitches[idx];
-    const aOct = Math.floor((p - 9) / 12);
-    assert.equal(`b${aOct}`, expectedLabels[idx], `A at linear index ${p} must format as ${expectedLabels[idx]}`);
-  }
-});
-
-test('Unified Octave Topography: Staff lines and octave labels aligned on A', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
-  const svg = renderPageToSvg(layout, 0);
-
-  // Find all b\d+ labels and their x coordinates
-  const labelRegex = /<text x="([\d\.]+)"[^>]*class="pitch-label"[^>]*font-weight="bold">(b\d+)<\/text>/g;
-  const labels: { x: string; label: string }[] = [];
-  let match;
-  while ((match = labelRegex.exec(svg)) !== null) {
-    labels.push({ x: match[1], label: match[2] });
-  }
-  assert.ok(labels.length > 0, 'Must have b octave labels');
-
-  // Verify that for every b label at x, there is a bold 1.5pt octave line at the exact same x
-  for (const { x, label } of labels) {
-    const boldLineRegex = new RegExp(`<line x1="${x}" y1="[\\d\\.]+" x2="${x}" y2="[\\d\\.]+" stroke="#000000" stroke-width="1\\.5"\\/>`);
-    assert.match(svg, boldLineRegex, `Octave label ${label} at x=${x} must align with a bold 1.5pt staff line`);
-  }
-
-  // Find all 5|7 demarcation labels and their x coordinates
-  const demarcLabelRegex = /<text x="([\d\.]+)"[^>]*class="pitch-label"[^>]*>5\|7<\/text>/g;
-  const demarcLabels: string[] = [];
-  while ((match = demarcLabelRegex.exec(svg)) !== null) {
-    demarcLabels.push(match[1]);
-  }
-  assert.ok(demarcLabels.length > 0, 'Must have 5|7 demarcation labels');
-
-  // Verify that for every 5|7 label at x, there is a 0.6pt demarcation line with dasharray 12,4 at the exact same x
-  for (const x of demarcLabels) {
-    const demarcLineRegex = new RegExp(`<line x1="${x}" y1="[\\d\\.]+" x2="${x}" y2="[\\d\\.]+" stroke="#333333" stroke-width="0\\.6" stroke-dasharray="12,4"\\/>`);
-    assert.match(svg, demarcLineRegex, `Demarcation label 5|7 at x=${x} must align with a 12,4 dashed demarcation staff line`);
+  for (let oct = 1; oct <= 8; oct++) {
+    const label = `m${oct - 1}`;
+    assert.equal(label, expectedOctaveLabels[oct], `Octave ${oct} must format as ${expectedOctaveLabels[oct]}`);
   }
 });

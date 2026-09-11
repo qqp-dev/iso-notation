@@ -31,9 +31,9 @@ export function calculateScoreDimensions(
     maxPitch = Math.max(...indices) + 2;
   }
 
-  // Ensure whole-tone boundary aligned with A
-  minPitch = 9 + Math.floor((minPitch - 9) / 2) * 2;
-  maxPitch = 9 + Math.ceil((maxPitch - 9) / 2) * 2;
+  // Ensure whole-tone boundary
+  minPitch = Math.floor(minPitch / 2) * 2;
+  maxPitch = Math.ceil(maxPitch / 2) * 2;
 
   const pitchSpan = maxPitch - minPitch + 1;
   const timeLength = score.totalTicks * options.pixelsPerTick;
@@ -101,20 +101,20 @@ export function renderScoreToCanvas(
 
   // 2a. Octave Ribbons Shading (if octave-ribbons)
   if (normStaffStyle === 'octave-ribbons') {
-    const minOct = Math.floor((minPitch - 9) / 12);
-    const maxOct = Math.floor((maxPitch - 9) / 12);
+    const minOct = Math.floor(minPitch / 12);
+    const maxOct = Math.floor(maxPitch / 12);
     for (let oct = minOct; oct <= maxOct; oct++) {
       if (Math.abs(oct) % 2 === 0) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
         if (isHoriz) {
-          const pBottom = 9 + oct * 12 - 0.5;
-          const pTop = 9 + (oct + 1) * 12 - 0.5;
+          const pBottom = oct * 12 - 0.5;
+          const pTop = (oct + 1) * 12 - 0.5;
           const yBottom = height - paddingPitch - (pBottom - minPitch) * options.pixelsPerSemitone;
           const yTop = height - paddingPitch - (pTop - minPitch) * options.pixelsPerSemitone;
           ctx.fillRect(paddingStart, yTop, dims.width - paddingStart, yBottom - yTop);
         } else {
-          const pLeft = 9 + oct * 12 - 0.5;
-          const pRight = 9 + (oct + 1) * 12 - 0.5;
+          const pLeft = oct * 12 - 0.5;
+          const pRight = (oct + 1) * 12 - 0.5;
           const xLeft = paddingPitch + (pLeft - minPitch) * options.pixelsPerSemitone;
           const xRight = paddingPitch + (pRight - minPitch) * options.pixelsPerSemitone;
           ctx.fillRect(xLeft, paddingStart, xRight - xLeft, dims.height - paddingStart);
@@ -126,8 +126,8 @@ export function renderScoreToCanvas(
   // 2b. Pitch Lines & Labels
   for (let p = minPitch; p <= maxPitch; p++) {
     const pc = ((p % 12) + 12) % 12;
-    const relA = ((p - 9) % 12 + 12) % 12;
-    const isLine = relA % 2 === 0;
+    const oct = Math.floor(p / 12);
+    const parity = wholeToneParity(p);
     const lineGeom = getStaffLineGeometry(pc, normStaffStyle);
 
     if (isHoriz) {
@@ -135,7 +135,7 @@ export function renderScoreToCanvas(
 
       // Band shading in chromatic grid mode
       if (normStaffStyle === 'chromatic-grid') {
-        ctx.fillStyle = isLine ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
+        ctx.fillStyle = parity === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
         ctx.fillRect(
           paddingStart,
           y - options.pixelsPerSemitone / 2,
@@ -158,24 +158,24 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with b${aOct} at A octave boundaries (0-indexed starting at A0)
-      const aOct = Math.max(0, Math.floor((p - 9) / 12));
-      const isOctaveA = pc === 9;
+      // Pitch Coordinate label on left margin: pure (pitchClass:octave), with m${oct - 1} at octave boundaries (0-indexed piano octaves)
+      const isOctave0 = pc === 0;
       let textColor = '#666666';
-      if (isOctaveA) textColor = '#FFFFFF';
+      if (isOctave0) textColor = '#FFFFFF';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctaveA ? 'bold 11px monospace' : '10px monospace';
+      ctx.font = isOctave0 ? 'bold 11px monospace' : '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      const label = isOctaveA ? `b${aOct}` : `${pc}:${aOct}`;
+      const displayOct = Math.max(0, oct - 1);
+      const label = isOctave0 ? `m${displayOct}` : `${pc}:${displayOct}`;
       ctx.fillText(label, paddingStart - 8, y);
     } else {
       // Vertical timeline
       const x = paddingPitch + (p - minPitch) * options.pixelsPerSemitone;
 
       if (normStaffStyle === 'chromatic-grid') {
-        ctx.fillStyle = isLine ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
+        ctx.fillStyle = parity === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0)';
         ctx.fillRect(
           x - options.pixelsPerSemitone / 2,
           paddingStart,
@@ -198,17 +198,17 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch class label along top margin: b${aOct} at A octave boundaries (0-indexed starting at A0), pitch class number elsewhere
-      const aOct = Math.max(0, Math.floor((p - 9) / 12));
-      const isOctaveA = pc === 9;
+      // Pitch class label along top margin: m${oct - 1} at octave boundaries (0-indexed piano octaves), pitch class number elsewhere
+      const isOctave0 = pc === 0;
       let textColor = '#666666';
-      if (isOctaveA) textColor = '#FFFFFF';
+      if (isOctave0) textColor = '#FFFFFF';
 
       ctx.fillStyle = textColor;
-      ctx.font = isOctaveA ? 'bold 10px monospace' : '9px monospace';
+      ctx.font = isOctave0 ? 'bold 10px monospace' : '9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      const label = isOctaveA ? `b${aOct}` : String(pc);
+      const displayOct = Math.max(0, oct - 1);
+      const label = isOctave0 ? `m${displayOct}` : String(pc);
       ctx.fillText(label, x, paddingStart - 6);
     }
   }

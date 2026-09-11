@@ -25,16 +25,15 @@ test('Staff Topography: wholetone-uniform-6 invariants', () => {
   for (const style of styles) {
     assert.equal(normalizeStaffStyle(style), 'wholetone-uniform');
 
-    // Exactly 6 lines per octave (whole-tone pitches aligned with A: relA % 2 === 0)
+    // Exactly 6 lines per octave (even pitch classes: 0, 2, 4, 6, 8, 10)
     let lineCount = 0;
     for (let pc = 0; pc < 12; pc++) {
       const geom = getStaffLineGeometry(pc, style);
-      const relA = ((pc - 9) % 12 + 12) % 12;
-      if (relA % 2 === 0) {
+      if (pc % 2 === 0) {
         assert.equal(geom.isLine, true, `PC ${pc} should be a staff line`);
         lineCount++;
-        if (relA === 0) {
-          assert.equal(geom.isBold, true, 'PC 9 (A) should be marked as octave boundary');
+        if (pc === 0) {
+          assert.equal(geom.isBold, true, 'PC 0 should be marked as octave boundary');
         }
       } else {
         assert.equal(geom.isLine, false, `PC ${pc} should be a space`);
@@ -49,19 +48,20 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
   for (const style of styles) {
     assert.equal(normalizeStaffStyle(style), 'tritone-split');
 
-    // 5/7 Staff Topography Invariant anchored on A:
-    // PC 9 (A) is bold octave line.
-    // Demarcation line is placed at PC 1 (C#), the boundary of the 5-group (A, B, C#),
-    // PC 1 is a crisp dotted demarcation line (dashArray: [14, 4], isDemarcation: true, isDashed: true).
-    // PC 11, 3, 5, 7 are rendered as subtle hairlines (0.6px).
-    const geom0 = getStaffLineGeometry(9, style);
+    // 5/7 Staff Topography Invariant:
+    // PC 0 (C) is bold octave line.
+    // Demarcation line is placed at PC 4 (E), the boundary of the 5-group (C, D, E),
+    // replacing the old tritone line and unaligned PC 4.5 line.
+    // PC 4 is a crisp dotted demarcation line (1.0px / 0.9pt, dashArray: [1.5, 3], isDemarcation: true, isDashed: true).
+    // PC 2, 6, 8, 10 are rendered as subtle hairlines (0.6px).
+    const geom0 = getStaffLineGeometry(0, style);
     assert.equal(geom0.isLine, true);
     assert.equal(geom0.isBold, true);
     assert.equal(geom0.lineWidth, 2.0);
     assert.equal(geom0.color, 'rgba(255, 255, 255, 0.9)');
 
-    // 5/7 Demarcation Line at PC 1 (C#)
-    const geomDemarc = getStaffLineGeometry(1, style);
+    // 5/7 Demarcation Line at PC 4 (E)
+    const geomDemarc = getStaffLineGeometry(4, style);
     assert.equal(geomDemarc.isLine, true);
     assert.equal(geomDemarc.isBold, false);
     assert.equal(geomDemarc.isDashed, true);
@@ -74,15 +74,15 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
     const geom45 = getStaffLineGeometry(4.5, style);
     assert.equal(geom45.isLine, false, 'Non-integer 4.5 must not be a staff line');
 
-    // PC 3 (D#) is rendered as a regular hairline
-    const geom3 = getStaffLineGeometry(3, style);
-    assert.equal(geom3.isLine, true, 'PC 3 must be a line');
-    assert.equal(geom3.isBold, false, 'PC 3 must not be bold');
-    assert.equal(geom3.isDashed, false, 'PC 3 must not be dashed');
-    assert.equal(geom3.lineWidth, 0.6, 'PC 3 must be a 0.6 hairline');
+    // PC 6 is rendered as a regular hairline
+    const geom6 = getStaffLineGeometry(6, style);
+    assert.equal(geom6.isLine, true, 'PC 6 must be a line');
+    assert.equal(geom6.isBold, false, 'PC 6 must not be bold');
+    assert.equal(geom6.isDashed, false, 'PC 6 must not be dashed');
+    assert.equal(geom6.lineWidth, 0.6, 'PC 6 must be a 0.6 hairline');
 
-    // Hairlines across 5-group and 7-group (11, 3, 5, 7)
-    [11, 3, 5, 7].forEach((pc) => {
+    // Hairlines across 5-group and 7-group (2, 6, 8, 10)
+    [2, 6, 8, 10].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
       assert.equal(g.isLine, true, `PC ${pc} must be a hairline`);
       assert.equal(g.isBold, false);
@@ -91,17 +91,17 @@ test('Staff Topography: 5/7 staff demarcation & subitizable partitioning invaria
       assert.equal(g.color, 'rgba(255, 255, 255, 0.16)');
     });
 
-    // Spaces on odd pitch classes relative to A (10, 0, 2, 4, 6, 8)
-    [10, 0, 2, 4, 6, 8].forEach((pc) => {
+    // Spaces on odd pitch classes (1, 3, 5, 7, 9, 11)
+    [1, 3, 5, 7, 9, 11].forEach((pc) => {
       const g = getStaffLineGeometry(pc, style);
       assert.equal(g.isLine, false, `PC ${pc} must be a space`);
     });
 
-    // Subitizability verification: exactly 3 lines in 5-group (9, 11, 1: A, B, C#) and 3 lines in 7-group (3, 5, 7: D#, F, G)
-    const cluster5 = [9, 11, 1].filter((pc) => getStaffLineGeometry(pc, style).isLine);
-    const cluster7 = [3, 5, 7].filter((pc) => getStaffLineGeometry(pc, style).isLine);
-    assert.equal(cluster5.length, 3, '5-group (A, B, C#) must contain exactly 3 staff lines');
-    assert.equal(cluster7.length, 3, '7-group (D#, F, G) must contain exactly 3 staff lines');
+    // Subitizability verification: exactly 3 lines in 5-group (0, 2, 4) and 3 lines in 7-group (6, 8, 10)
+    const cluster5 = [0, 2, 4].filter((pc) => getStaffLineGeometry(pc, style).isLine);
+    const cluster7 = [6, 8, 10].filter((pc) => getStaffLineGeometry(pc, style).isLine);
+    assert.equal(cluster5.length, 3, '5-group (C, D, E) must contain exactly 3 staff lines');
+    assert.equal(cluster7.length, 3, '7-group (F#, G#, A#) must contain exactly 3 staff lines');
   }
 });
 
@@ -110,11 +110,11 @@ test('Staff Topography: augmented-triad-3line invariants', () => {
   for (const style of styles) {
     assert.equal(normalizeStaffStyle(style), 'augmented-3line');
 
-    // Exactly 3 lines per octave at major thirds from A: 9, 1, 5
+    // Exactly 3 lines per octave at major thirds: 0, 4, 8
     let lineCount = 0;
     for (let pc = 0; pc < 12; pc++) {
       const geom = getStaffLineGeometry(pc, style);
-      if (pc === 9 || pc === 1 || pc === 5) {
+      if (pc === 0 || pc === 4 || pc === 8) {
         assert.equal(geom.isLine, true, `PC ${pc} should be an augmented triad staff line`);
         lineCount++;
       } else {
@@ -127,11 +127,10 @@ test('Staff Topography: augmented-triad-3line invariants', () => {
 
 test('Staff Topography: octave-ribbons register shading invariants', () => {
   assert.equal(normalizeStaffStyle('octave-ribbons'), 'octave-ribbons');
-  // 6 lines on whole-tone set of A
+  // 6 lines on even PCs
   for (let pc = 0; pc < 12; pc++) {
     const geom = getStaffLineGeometry(pc, 'octave-ribbons');
-    const relA = ((pc - 9) % 12 + 12) % 12;
-    assert.equal(geom.isLine, relA % 2 === 0);
+    assert.equal(geom.isLine, pc % 2 === 0);
   }
 });
 
@@ -140,14 +139,16 @@ test('Notehead Morphology: row-parity-shapes dual-coded geometry', () => {
   for (const morph of morphs) {
     assert.equal(normalizeNoteheadMorphology(morph), 'row-parity-shape');
 
-    // Lines (relA even: 9, 11, 1, 3, 5, 7) must strictly map to disc/oval
-    [9, 11, 1, 3, 5, 7].forEach((pc) => {
-      assert.equal(getParityShape(pc), 'disc', `PC ${pc} (Line) must be a disc`);
+    // Row 0 (Even: 0, 2, 4, 6, 8, 10) must strictly map to disc/oval
+    [0, 2, 4, 6, 8, 10].forEach((pc) => {
+      assert.equal(getParityShape(pc), 'disc', `PC ${pc} (Row 0) must be a disc`);
+      assert.equal(wholeToneParity(pc), 0);
     });
 
-    // Spaces (relA odd: 10, 0, 2, 4, 6, 8) must strictly map to diamond/lozenge
-    [10, 0, 2, 4, 6, 8].forEach((pc) => {
-      assert.equal(getParityShape(pc), 'diamond', `PC ${pc} (Space) must be a diamond`);
+    // Row 1 (Odd: 1, 3, 5, 7, 9, 11) must strictly map to diamond/lozenge
+    [1, 3, 5, 7, 9, 11].forEach((pc) => {
+      assert.equal(getParityShape(pc), 'diamond', `PC ${pc} (Row 1) must be a diamond`);
+      assert.equal(wholeToneParity(pc), 1);
     });
   }
 });
@@ -356,7 +357,7 @@ test('Monochrome margin labels: pure grayscale with zero blue or pink tints', ()
   });
 });
 
-test('Lowercase \'b\' Octave Marker Invariant: score canvas margin indicators', () => {
+test('Lowercase \'m\' Octave Marker Invariant: score canvas margin indicators', () => {
   const score = buildBachGoldbergVar1Score();
 
   const createMockCtx = () => {
@@ -409,14 +410,12 @@ test('Lowercase \'b\' Octave Marker Invariant: score canvas margin indicators', 
   });
 
   const horizTexts = horizFills.map((f) => f.text);
-  const horizBOctaves = horizTexts.filter((t) => /^b\d+$/.test(t));
-  assert.ok(horizBOctaves.length > 0, 'Must render b${aOct} octave markers in horizontal orientation');
-  assert.ok(horizBOctaves.includes('b2'), 'Should include b2 (A2)');
-  assert.ok(horizBOctaves.includes('b3'), 'Should include b3 (A3)');
-  assert.ok(horizBOctaves.includes('b4'), 'Should include b4 (Concert A4)');
+  const horizMOctaves = horizTexts.filter((t) => /^m\d+$/.test(t));
+  assert.ok(horizMOctaves.length > 0, 'Must render m${oct - 1} octave markers in horizontal orientation');
+  assert.ok(horizMOctaves.includes('m2'), 'Should include m2 (C3)');
+  assert.ok(horizMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
   assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
-  assert.ok(!horizTexts.some((t) => /^m\d+$/.test(t)), 'Must not render m${oct} labels');
-  assert.ok(!horizTexts.some((t) => /^9:\d+$/.test(t)), 'Must not render 9:${oct} labels');
+  assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
 
   // 2. Vertical orientation
   const { ctx: vertCtx, fills: vertFills } = createMockCtx();
@@ -435,14 +434,12 @@ test('Lowercase \'b\' Octave Marker Invariant: score canvas margin indicators', 
   });
 
   const vertTexts = vertFills.map((f) => f.text);
-  const vertBOctaves = vertTexts.filter((t) => /^b\d+$/.test(t));
-  assert.ok(vertBOctaves.length > 0, 'Must render b${aOct} octave markers in vertical orientation');
-  assert.ok(vertBOctaves.includes('b2'), 'Should include b2 (A2)');
-  assert.ok(vertBOctaves.includes('b3'), 'Should include b3 (A3)');
-  assert.ok(vertBOctaves.includes('b4'), 'Should include b4 (Concert A4)');
-  assert.ok(!vertTexts.includes('9'), 'Must not render bare 9 at A octave boundary in vertical orientation');
+  const vertMOctaves = vertTexts.filter((t) => /^m\d+$/.test(t));
+  assert.ok(vertMOctaves.length > 0, 'Must render m${oct - 1} octave markers in vertical orientation');
+  assert.ok(vertMOctaves.includes('m2'), 'Should include m2 (C3)');
+  assert.ok(vertMOctaves.includes('m3'), 'Should include m3 (Middle C, C4)');
+  assert.ok(!vertTexts.includes('0'), 'Must not render bare 0 at octave boundary in vertical orientation');
   assert.ok(!vertTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
-  assert.ok(!vertTexts.some((t) => /^m\d+$/.test(t)), 'Must not render m${oct} labels');
 });
 
 test('Klavar Lateral Stems Invariant: horizontal ticks pointing Right for RH and Left for LH', () => {
@@ -1183,13 +1180,13 @@ test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invaria
     assert.equal(r.w, 5, 'Hold ribbon width in vertical orientation must be 5px');
   });
 
-  // Notehead center for each 16th note on staff lines (discs) must equal exact onset coordinate
+  // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
   const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
   let minPitch = Math.min(...indices) - 2;
-  minPitch = 9 + Math.floor((minPitch - 9) / 2) * 2;
+  minPitch = Math.floor(minPitch / 2) * 2;
 
   sixteenthNotes
-    .filter((n) => getParityShape(n.pitch.pitchClass) === 'disc')
+    .filter((n) => n.pitch.pitchClass % 2 === 0)
     .forEach((n) => {
       const lPitch = n.pitch.octave * 12 + n.pitch.pitchClass;
       const expectedX = paddingPitch + (lPitch - minPitch) * pixelsPerSemitone;

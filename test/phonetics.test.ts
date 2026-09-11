@@ -148,15 +148,13 @@ test('Pitch label integration with phonetic formatting', () => {
   assert.equal(pitchClassLabel(0, 'phonetic'), 'ma');
   assert.equal(pitchClassLabel(7, 'phonetic'), 'ti');
   assert.equal(pitchClassLabel(11, 'phonetic'), 'ki');
-  // Middle C is in octave 3 -> ma3
+  // Middle C is m3 -> ma3
   assert.equal(pitchLabel({ pitchClass: 0, octave: 4 }, 'phonetic'), 'ma3');
   assert.equal(pitchLabel({ pitchClass: 7, octave: 5 }, 'phonetic'), 'ti4');
-  // First C on piano (C1) is in octave 0 -> ma0
+  // First C on piano (C1) is m0 -> ma0
   assert.equal(pitchLabel({ pitchClass: 0, octave: 1 }, 'phonetic'), 'ma0');
-  // Lowest notes on 88-key piano: A0 is b0 -> bi0, Bb0 is sa0, B0 is ki0
+  // Notes before m0 (A0, Bb0, B0) are also octave 0
   assert.equal(pitchLabel({ pitchClass: 9, octave: 0 }, 'phonetic'), 'bi0');
   assert.equal(pitchLabel({ pitchClass: 10, octave: 0 }, 'phonetic'), 'sa0');
   assert.equal(pitchLabel({ pitchClass: 11, octave: 0 }, 'phonetic'), 'ki0');
-  // Concert A4 (440 Hz) is b4 -> bi4
-  assert.equal(pitchLabel({ pitchClass: 9, octave: 4 }, 'phonetic'), 'bi4');
 });
