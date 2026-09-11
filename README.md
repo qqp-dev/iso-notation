@@ -80,12 +80,22 @@ When running, the workbench is available locally at `http://localhost:5173` and 
 
 ---
 
-## 4. Documentation Index
+## 4. Documentation & Design Studies
 
+### Active Design Specifications & Typographic Studies
+- [**Duodecimal Notehead Numeral Typographic Specimen & Engraving Study**](docs/duodecimal_font_typography.md)
+  *Classical Urtext serif (Century Schoolbook), Calligraphic Roman (Palatino), Engineered Monospace (JetBrains Mono), and Geometric Modernism; Lining Caps A/B analysis and score context benchmark.*
+- [**Handedness Indicator Typographic & Calligraphic Tuning**](docs/chevron_tuning.md)
+  *Tuning study for hand-crossing indicators (`<` and `>`): French guillemets, broad-nib burin engraving, luxury letterpress diamond pips, and Roman accolades across mm. 4 & 30.*
+- [**Definitive Lightened 2-Line Staff Topography**](docs/definitive_duodecimal_lightened_staff.md)
+  *Elimination of staff line 8 for maximum visual breathing room; 2 landmark lines (bold octave 0 and dashed fifth 4) paired with duodecimal noteheads.*
+
+### Foundational Architecture & Specifications
 - [Cognitive Foundations & Isomorphic Philosophy](docs/philosophy.md)
 - [12-TET Monosyllabic Solfège Specification](docs/phonetics.md)
 - [Quantized Grid ("Fence") Model Specification](docs/grid-model-spec.md)
 - [Classical Symbol Taxonomy & Isomorphic Catalog](docs/symbol-taxonomy.md)
+
 
 ---
 
