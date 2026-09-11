@@ -1,6 +1,7 @@
 import { QuantizedGridScore } from '../model/types';
 import { linearIndex, wholeToneParity } from '../model/pitch';
 import { getCanonicalSyllable } from '../model/phonetics';
+import { computeBeamClusters } from '../model/grid';
 import {
   RenderOptions,
   normalizeStaffStyle,
@@ -396,6 +397,11 @@ export function renderScoreToCanvas(
   ctx.setLineDash([]);
   ctx.restore();
 
+  const staffMinX = paddingPitch;
+  const staffMaxX = paddingPitch + (maxPitch - minPitch) * options.pixelsPerSemitone;
+  const staffMinY = height - paddingPitch - (maxPitch - minPitch) * options.pixelsPerSemitone;
+  const staffMaxY = height - paddingPitch;
+
   // 3. Barlines & Measure Numbers
   if (options.showBarlines) {
     ctx.save();
@@ -403,34 +409,105 @@ export function renderScoreToCanvas(
       ctx.beginPath();
       ctx.strokeStyle =
         bar.type === 'double' || bar.type === 'final'
-          ? 'rgba(255, 255, 255, 0.7)'
-          : 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = bar.type === 'double' ? 2 : 1;
+          ? 'rgba(255, 255, 255, 0.85)'
+          : 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = bar.type === 'double' || bar.type === 'final' ? 2 : 1;
 
       if (isHoriz) {
         const x = paddingStart + bar.tick * options.pixelsPerTick;
-        ctx.moveTo(x, 15);
-        ctx.lineTo(x, height - 15);
+        ctx.moveTo(x, staffMinY - 4);
+        ctx.lineTo(x, staffMaxY + 4);
         ctx.stroke();
 
-        ctx.fillStyle = '#888888';
-        ctx.font = 'bold 10px monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(`M${bar.barNumber}`, x + 4, 18);
+        if (bar.barNumber === 1 || (bar.barNumber - 1) % 4 === 0) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(bar.barNumber), x + 4, staffMinY - 6);
+        }
       } else {
         const y = paddingStart + bar.tick * options.pixelsPerTick;
-        ctx.moveTo(15, y);
-        ctx.lineTo(width - 15, y);
+        ctx.moveTo(staffMinX - 4, y);
+        ctx.lineTo(staffMaxX + 4, y);
         ctx.stroke();
 
-        ctx.fillStyle = '#888888';
-        ctx.font = 'bold 10px monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(`M${bar.barNumber}`, 18, y - 4);
+        if (bar.barNumber === 1 || (bar.barNumber - 1) % 4 === 0) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(bar.barNumber), 14, y - 4);
+        }
       }
     }
+    ctx.restore();
+  }
+
+  // 3b. Option 1: Klavarskribo Beat Grid (Horizontal pulse lines for Beat 2, Beat 3, etc.)
+  if (options.showBeatGrid) {
+    ctx.save();
+    const ticksPerBeat = score.ticksPerBeat || 48;
+    const numBeats = score.timeSignatures?.[0]?.numerator || 3;
+    const ticksPerMeasure = ticksPerBeat * numBeats;
+    const totalTicks = score.totalTicks;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+    ctx.lineWidth = 0.6;
+    ctx.setLineDash([2, 3]);
+
+    for (let i = 0; i < score.barlines.length; i++) {
+      const bar = score.barlines[i];
+      const nextBar = score.barlines[i + 1];
+      const barEndTick = nextBar ? nextBar.tick : bar.tick + ticksPerMeasure;
+
+      for (let b = 1; b < numBeats; b++) {
+        const bTick = bar.tick + b * ticksPerBeat;
+        if (bTick >= barEndTick || bTick >= totalTicks) break;
+
+        if (isHoriz) {
+          const x = paddingStart + bTick * options.pixelsPerTick;
+          ctx.beginPath();
+          ctx.moveTo(x, staffMinY - 4);
+          ctx.lineTo(x, staffMaxY + 4);
+          ctx.stroke();
+        } else {
+          const y = paddingStart + bTick * options.pixelsPerTick;
+          ctx.beginPath();
+          ctx.moveTo(staffMinX - 4, y);
+          ctx.lineTo(staffMaxX + 4, y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.setLineDash([]);
+
+    // Left-Gutter Beat Counter Column (1 · 2 · 3) in vertical canvas
+    if (!isHoriz) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i < score.barlines.length; i++) {
+        const bar = score.barlines[i];
+        const nextBar = score.barlines[i + 1];
+        const barEndTick = nextBar ? nextBar.tick : bar.tick + ticksPerMeasure;
+        const barY = paddingStart + bar.tick * options.pixelsPerTick;
+
+        // Subtle beat count number 1 at Beat 1 (aligned with the solid barline)
+        ctx.fillText('1', staffMinX - 10, barY);
+
+        // Subtle beat count numbers 2, 3... aligned with the dotted pulse lines
+        for (let b = 1; b < numBeats; b++) {
+          const bTick = bar.tick + b * ticksPerBeat;
+          if (bTick >= barEndTick || bTick >= totalTicks) break;
+          const beatY = paddingStart + bTick * options.pixelsPerTick;
+          ctx.fillText(String(b + 1), staffMinX - 10, beatY);
+        }
+      }
+    }
+
     ctx.restore();
   }
 
@@ -464,9 +541,185 @@ export function renderScoreToCanvas(
     ctx.restore();
   }
 
+  // 4b. Option 2: Gutter Beat Brackets (Outer margin beat grouping framing)
+  if (options.showGutterBrackets) {
+    ctx.save();
+    const ticksPerBeat = score.ticksPerBeat || 48;
+    const numBeats = score.timeSignatures?.[0]?.numerator || 3;
+
+    const lhBeats = new Set<number>();
+    const rhBeats = new Set<number>();
+    for (const n of score.notes) {
+      const bIdx = Math.floor(n.startTick / ticksPerBeat);
+      const hand = n.hand ?? (linearIndex(n.pitch) >= 60 ? 'RH' : 'LH');
+      if (hand === 'RH') {
+        rhBeats.add(bIdx);
+      } else {
+        lhBeats.add(bIdx);
+      }
+    }
+
+    const totalBeats = Math.ceil(score.totalTicks / ticksPerBeat);
+    const staffLeft = paddingPitch;
+    const staffRight = paddingPitch + (maxPitch - minPitch) * options.pixelsPerSemitone;
+    const capLen = 4;
+
+    for (let bIdx = 0; bIdx < totalBeats; bIdx++) {
+      const bStart = bIdx * ticksPerBeat;
+      const bEnd = bStart + ticksPerBeat;
+      const beatNum = (bIdx % numBeats) + 1;
+      const isBeatActive = options.currentTick >= bStart && options.currentTick < bEnd;
+
+      if (isHoriz) {
+        // Horizontal timeline: time along X, RH gutter along top, LH gutter along bottom
+        const x1 = paddingStart + bStart * options.pixelsPerTick + 1.5;
+        const x2 = paddingStart + bEnd * options.pixelsPerTick - 1.5;
+        if (x2 <= x1) continue;
+
+        // RH Gutter Bracket (Top margin above staff)
+        if (rhBeats.has(bIdx)) {
+          const rhRailY = 18;
+          ctx.beginPath();
+          ctx.strokeStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = isBeatActive ? 2.0 : 1.0;
+          ctx.moveTo(x1, rhRailY - capLen);
+          ctx.lineTo(x1, rhRailY);
+          ctx.lineTo(x2, rhRailY);
+          ctx.lineTo(x2, rhRailY - capLen);
+          ctx.stroke();
+
+          ctx.fillStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.45)';
+          ctx.font = isBeatActive ? 'bold 10px monospace' : '9px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(beatNum), (x1 + x2) / 2, rhRailY - 2);
+        }
+
+        // LH Gutter Bracket (Bottom margin below staff)
+        if (lhBeats.has(bIdx)) {
+          const lhRailY = height - 18;
+          ctx.beginPath();
+          ctx.strokeStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = isBeatActive ? 2.0 : 1.0;
+          ctx.moveTo(x1, lhRailY + capLen);
+          ctx.lineTo(x1, lhRailY);
+          ctx.lineTo(x2, lhRailY);
+          ctx.lineTo(x2, lhRailY + capLen);
+          ctx.stroke();
+
+          ctx.fillStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.45)';
+          ctx.font = isBeatActive ? 'bold 10px monospace' : '9px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(String(beatNum), (x1 + x2) / 2, lhRailY + 2);
+        }
+      } else {
+        // Vertical timeline: time along Y, LH gutter to left of staff, RH gutter to right of staff
+        const y1 = paddingStart + bStart * options.pixelsPerTick + 1.5;
+        const y2 = paddingStart + bEnd * options.pixelsPerTick - 1.5;
+        if (y2 <= y1) continue;
+
+        // LH Gutter Bracket (Left margin)
+        if (lhBeats.has(bIdx)) {
+          const lhRailX = staffLeft - 12;
+          ctx.beginPath();
+          ctx.strokeStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = isBeatActive ? 2.0 : 1.0;
+          ctx.moveTo(lhRailX - capLen, y1);
+          ctx.lineTo(lhRailX, y1);
+          ctx.lineTo(lhRailX, y2);
+          ctx.lineTo(lhRailX - capLen, y2);
+          ctx.stroke();
+
+          ctx.fillStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.50)';
+          ctx.font = isBeatActive ? 'bold 10px monospace' : '9px monospace';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(beatNum), lhRailX - capLen - 2, (y1 + y2) / 2);
+        }
+
+        // RH Gutter Bracket (Right margin)
+        if (rhBeats.has(bIdx)) {
+          const rhRailX = staffRight + 12;
+          ctx.beginPath();
+          ctx.strokeStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = isBeatActive ? 2.0 : 1.0;
+          ctx.moveTo(rhRailX + capLen, y1);
+          ctx.lineTo(rhRailX, y1);
+          ctx.lineTo(rhRailX, y2);
+          ctx.lineTo(rhRailX + capLen, y2);
+          ctx.stroke();
+
+          ctx.fillStyle = isBeatActive ? '#FACC15' : 'rgba(255, 255, 255, 0.50)';
+          ctx.font = isBeatActive ? 'bold 10px monospace' : '9px monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(beatNum), rhRailX + capLen + 2, (y1 + y2) / 2);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   // 5. Notes Rendering with selected morphology and Unified Duration Lattice
   ctx.save();
   const tauRef = score.gridResolution || 12;
+
+  // Elaine Gould Angled Beam Engraving for Vertical Timeline
+  const stemEndMap = new Map<string, number>();
+  if (!isHoriz && !isPianoRoll && options.showBeamGrouping === true) {
+    const stemLength = Math.max(14, options.pixelsPerSemitone * 1.0);
+    const MAX_SLANT = Math.max(16, options.pixelsPerSemitone * 1.5);
+    const clusters = computeBeamClusters(score.notes, score.ticksPerBeat, tauRef, 7);
+
+    for (const cluster of clusters) {
+      if (cluster.notes.length >= 2 && cluster.endTick > cluster.startTick) {
+        const cNotes = cluster.notes;
+        const nxArr = cNotes.map(n => getCoords(n.startTick, linearIndex(n.pitch)).x);
+        const nyArr = cNotes.map(n => getCoords(n.startTick, 0).y);
+
+        const y1 = nyArr[0];
+        const yK = nyArr[nyArr.length - 1];
+        const totalDy = yK - y1;
+
+        const rawDx = nxArr[nxArr.length - 1] - nxArr[0];
+        const slantSign = Math.sign(rawDx);
+        const rawSlantMagnitude = Math.abs(rawDx) * 0.65;
+        const cappedSlant = slantSign * Math.min(rawSlantMagnitude, MAX_SLANT);
+        const slope = cappedSlant / totalDy;
+
+        let X0: number;
+        if (cluster.hand === 'RH') {
+          const maxReq = Math.max(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
+          X0 = maxReq + stemLength;
+        } else {
+          const minReq = Math.min(...nxArr.map((nx, i) => nx - slope * (nyArr[i] - y1)));
+          X0 = minReq - stemLength;
+        }
+
+        const isClusterActive = cluster.notes.some(n =>
+          (options.currentTick >= n.startTick && options.currentTick < n.startTick + n.durationTicks) ||
+          options.selectedNoteId === n.id
+        );
+
+        const beamX1 = X0;
+        const beamXK = X0 + slope * totalDy;
+
+        ctx.beginPath();
+        ctx.strokeStyle = isClusterActive ? '#FACC15' : 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = isClusterActive ? 2.4 : 2.0;
+        ctx.moveTo(beamX1, y1);
+        ctx.lineTo(beamXK, yK);
+        ctx.stroke();
+
+        for (let i = 0; i < cNotes.length; i++) {
+          const note = cNotes[i];
+          const endX = X0 + slope * (nyArr[i] - y1);
+          stemEndMap.set(note.id, endX);
+        }
+      }
+    }
+  }
 
   for (const note of score.notes) {
     const lPitch = linearIndex(note.pitch);
@@ -603,7 +856,8 @@ export function renderScoreToCanvas(
       // Left Hand (LH) -> horizontal stem pointing Left (<-)
       const hand = note.hand ?? (lPitch >= 60 ? 'RH' : 'LH');
       const stemLength = Math.max(16, options.pixelsPerSemitone * 1.1);
-      const stemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
+      const defaultStemEndX = hand === 'RH' ? cx + stemLength : cx - stemLength;
+      const stemEndX = stemEndMap.get(note.id) ?? defaultStemEndX;
 
       ctx.beginPath();
       ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;

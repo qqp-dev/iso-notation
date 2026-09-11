@@ -41,6 +41,9 @@ export const App: React.FC = () => {
     showHandCrossings: true,
     showBarlines: true,
     showGridLines: true,
+    showBeamGrouping: false,
+    showBeatGrid: true,
+    showGutterBrackets: true,
     currentTick: 0,
   });
 
@@ -311,6 +314,47 @@ export const App: React.FC = () => {
               <span>{renderOptions.viewMode === 'pianoroll' ? '🎹' : '🎼'}</span>
               <span>{renderOptions.viewMode === 'pianoroll' ? 'Piano Roll' : 'Score View'}</span>
             </button>
+
+            {/* Quick Metric & Rhythmic Legibility Toggles */}
+            <div className="flex items-center gap-1 bg-neutral-900/90 p-0.5 rounded-full border border-neutral-800 text-[11px]">
+              <button
+                onClick={() =>
+                  setRenderOptions((prev) => ({
+                    ...prev,
+                    showBeatGrid: !prev.showBeatGrid,
+                  }))
+                }
+                className={`px-2 py-1 rounded-full cursor-pointer transition flex items-center gap-1 ${
+                  renderOptions.showBeatGrid
+                    ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+                title="Option 1: Klavarskribo Beat Grid (Horizontal Pulse Lines)"
+                aria-label="Toggle Beat Grid"
+              >
+                <span>📏</span>
+                <span className="hidden sm:inline">Beat Grid</span>
+              </button>
+
+              <button
+                onClick={() =>
+                  setRenderOptions((prev) => ({
+                    ...prev,
+                    showGutterBrackets: !prev.showGutterBrackets,
+                  }))
+                }
+                className={`px-2 py-1 rounded-full cursor-pointer transition flex items-center gap-1 ${
+                  renderOptions.showGutterBrackets
+                    ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+                title="Option 2: Gutter Beat Brackets (Outer Margin Metric Framing)"
+                aria-label="Toggle Gutter Brackets"
+              >
+                <span>⊏</span>
+                <span className="hidden sm:inline">Brackets</span>
+              </button>
+            </div>
 
             {/* Quick Print Button */}
             <button
