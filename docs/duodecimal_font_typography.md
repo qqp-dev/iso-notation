@@ -122,22 +122,30 @@ Every numeral is rendered with an SVG `paint-order: stroke fill` halo (`stroke: 
 
 ---
 
-## 6. Recommendation for Definitive Adoption
+## 6. Definitive Architectural Selection
 
-Based on the score context study (Bach Goldberg Var. 1) and historical engraving principles:
+The user has selected the definitive combination:
+1. **Typeface**: **URW Gothic** (`'URW Gothic', 'Century Gothic', 'ITC Avant Garde Gothic', 'Avant Garde', sans-serif`).
+   - Geometric Swiss modernism with pure circular counters (`0, 6, 8, 9, b`) resonating with the circular 12-TET pitch-class geometry ($Z_{12}$).
+   - Loaded locally in the web client via bundled `@font-face` (`public/fonts/URWGothic-Book.otf` and `URWGothic-Demi.otf`).
+2. **Tokens**: Strictly **lowercase** `a` and `b` (`0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b`).
+3. **Handedness Indicator**: **Broad-Nib Calligraphy (Urtext Burin)**.
+   - $35^\circ$ italic pen angle producing an authoritative $1.15\text{pt}$ ($2.3\text{px}$) downstroke and a delicate $0.50\text{pt}$ ($1.0\text{px}$) hairline upstroke.
+   - For LH (`<`): top hairline, bottom downstroke.
+   - For RH (`>`): top downstroke, bottom hairline.
 
-1. **Adopt Lining Capitals (`A`, `B`) Immediately**:
-   - Permanently retire lowercase `a` and `b` in the notehead renderer.
-   - Eliminates all confusion with the musical flat symbol (`♭`).
-   - Ensures 100% optical height parity across all 12 chromatic pitches.
+---
 
-2. **Primary Recommendation**: **Century Schoolbook (Lining Caps A, B)**
-   - Delivers the authentic, dignified weight of an *Urtext* masterwork.
-   - Provides the highest optical legibility under distance and reading speed.
-   - Preserves the warmth of classical print without feeling cold or clinical.
+## 7. Definitive Score Renders
 
-3. **Alternative / Contemporary Preference**: **JetBrains Mono (Lining Caps A, B)**
-   - If a modern, technical, engineered, and perfectly monospaced tabular feel is preferred.
+### Measure 1–2 (Opening Theme):
+![Definitive mm. 1-2](img/definitive_m1_m2.png)
+
+### Measure 4 (RH Crossing Note `9 >`):
+![Definitive m. 4](img/definitive_m4.png)
+
+### Measure 30 (LH Rapid Crossing Arpeggio with `< 2` and `b`):
+![Definitive m. 30](img/definitive_m30.png)
 
 ---
 *Document author: Antigravity AI Pair Programmer*  

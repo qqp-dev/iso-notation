@@ -929,6 +929,9 @@ export function renderScoreToCanvas(
       }
 
       // Render notehead morphology with line knockout
+      const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
+      const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
+
       renderNotehead(
         ctx,
         normNoteheadMorph,
@@ -939,7 +942,8 @@ export function renderScoreToCanvas(
         noteColor,
         isHighlighted,
         strokeColor,
-        false
+        false,
+        isHandException ? hand : null
       );
 
       // Articulation marker
@@ -1379,16 +1383,18 @@ export function renderNotehead(
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
 
-      // Standalone naked digit
+      // Standalone naked digit in URW Gothic
       ctx.fillStyle = headColor;
-      ctx.font = isEven ? 'bold 10px monospace' : '600 10px monospace';
+      ctx.font = isEven
+        ? 'bold 11px "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif'
+        : '600 11px "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(digit, cx, cy);
 
-      // Tasteful abstract chevron for hand-crossing exceptions (< for LH, > for RH)
+      // Tasteful broad-nib calligraphic chevron for hand-crossing exceptions (< for LH, > for RH)
       if (handException !== null) {
-        const h = 5.0;
+        const h = 5.2;
         const w = 3.2;
         const clearance = 2.0;
 
@@ -1405,25 +1411,40 @@ export function renderNotehead(
         const botY = cy + h / 2;
         const apexY = cy;
 
+        // Authentic broad-nib calligraphy stroke contrast (35° italic pen angle)
+        // For LH (<): top hairline (1.0px), bottom downstroke (2.3px)
+        // For RH (>): top downstroke (2.3px), bottom hairline (1.0px)
+        const upperW = handException === 'RH' ? 2.3 : 1.0;
+        const lowerW = handException === 'RH' ? 1.0 : 2.3;
+
         ctx.save();
         ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
 
         // Knockout halo underlay
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2.6;
+        ctx.lineWidth = upperW + 2.4;
         ctx.beginPath();
         ctx.moveTo(baseX, topY);
         ctx.lineTo(apexX, apexY);
+        ctx.stroke();
+
+        ctx.lineWidth = lowerW + 2.4;
+        ctx.beginPath();
+        ctx.moveTo(apexX, apexY);
         ctx.lineTo(baseX, botY);
         ctx.stroke();
 
-        // Colored chevron
+        // Colored calligraphic strokes
         ctx.strokeStyle = headColor;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = upperW;
         ctx.beginPath();
         ctx.moveTo(baseX, topY);
         ctx.lineTo(apexX, apexY);
+        ctx.stroke();
+
+        ctx.lineWidth = lowerW;
+        ctx.beginPath();
+        ctx.moveTo(apexX, apexY);
         ctx.lineTo(baseX, botY);
         ctx.stroke();
 

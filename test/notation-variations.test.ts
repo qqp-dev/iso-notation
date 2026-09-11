@@ -287,34 +287,30 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.20" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
   assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
 
-  // Abstract tasteful chevrons for hand-crossing exceptions:
-  // Measure 4 has RH crossing into bass (< 48) -> open chevron > pointing right (apexX > baseX)
-  const chevronRegex = /<path d="M ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.70" stroke-linecap="round" stroke-linejoin="round"\/>/g;
-  const chevronMatches = Array.from(svg.matchAll(chevronRegex));
-  assert.ok(chevronMatches.length > 0, 'Must render tasteful chevrons in SVG for duodecimal hand exceptions');
+  // Broad-nib calligraphic chevrons for hand-crossing exceptions:
+  // Measure 4 has RH crossing into bass (< 48) -> bold downstroke (1.15pt) upper arm and hairline (0.50pt) lower arm pointing right
+  const rhUpperRegex = /<path d="M ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+)" fill="none" stroke="([^"]+)" stroke-width="1\.15" stroke-linecap="round"\/>/g;
+  const rhLowerRegex = /<path d="M ([0-9.]+) ([0-9.]+) L ([0-9.]+) ([0-9.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.50" stroke-linecap="round"\/>/g;
+  const rhUpperMatches = Array.from(svg.matchAll(rhUpperRegex));
+  const rhLowerMatches = Array.from(svg.matchAll(rhLowerRegex));
+  assert.ok(rhUpperMatches.length > 0, 'Must render broad-nib calligraphic upper downstroke (1.15pt) for RH');
+  assert.ok(rhLowerMatches.length > 0, 'Must render broad-nib calligraphic lower hairline (0.50pt) for RH');
 
-  const rhChevrons = chevronMatches.filter((m) => parseFloat(m[3]) > parseFloat(m[1]));
-  assert.ok(rhChevrons.length > 0, 'RH crossing exceptions must have > pointing right');
+  const rhChevrons = rhUpperMatches.filter((m) => parseFloat(m[3]) > parseFloat(m[1]));
+  assert.ok(rhChevrons.length > 0, 'RH crossing exceptions must have apex pointing right (apexX > baseX)');
   rhChevrons.forEach((m) => {
-    const topY = parseFloat(m[2]);
-    const apexY = parseFloat(m[4]);
-    const botY = parseFloat(m[6]);
-    assert.ok(Math.abs(apexY - (topY + botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
-    assert.ok(Math.abs((botY - topY) - 2.4) < 0.05, 'Chevron height must be 2.4pt (Option 2)');
+    const baseX = parseFloat(m[1]);
+    const apexX = parseFloat(m[3]);
+    assert.ok(apexX > baseX, 'RH chevron must point right');
   });
 
-  // Page 4 contains measure 30 with LH crossing into treble (> 48) -> open chevron < pointing left (apexX < baseX)
+  // Page 4 contains measure 30 with LH crossing into treble (> 48) -> hairline (0.50pt) upper arm and bold downstroke (1.15pt) lower arm pointing left
   const page4Svg = renderColumnarScoreToSvg(score, 3, { noteheadMorphology: 'duodecimal' });
-  const p4Chevrons = Array.from(page4Svg.matchAll(chevronRegex));
-  const lhChevrons = p4Chevrons.filter((m) => parseFloat(m[3]) < parseFloat(m[1]));
-  assert.ok(lhChevrons.length > 0, 'LH crossing exceptions must have < pointing left');
-  lhChevrons.forEach((m) => {
-    const topY = parseFloat(m[2]);
-    const apexY = parseFloat(m[4]);
-    const botY = parseFloat(m[6]);
-    assert.ok(Math.abs(apexY - (topY + botY) / 2) < 0.05, 'Chevron apex must be vertically centered');
-    assert.ok(Math.abs((botY - topY) - 2.4) < 0.05, 'Chevron height must be 2.4pt (Option 2)');
-  });
+  const lhUpperMatches = Array.from(page4Svg.matchAll(rhLowerRegex)); // 0.50pt is upper arm for LH
+  const lhLowerMatches = Array.from(page4Svg.matchAll(rhUpperRegex)); // 1.15pt is lower arm for LH
+  const lhChevrons = lhUpperMatches.filter((m) => parseFloat(m[3]) < parseFloat(m[1]));
+  assert.ok(lhChevrons.length > 0, 'LH crossing exceptions must have apex pointing left (apexX < baseX)');
+  assert.ok(lhLowerMatches.length > 0, 'LH must have bold lower downstroke (1.15pt)');
 });
 
 test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {

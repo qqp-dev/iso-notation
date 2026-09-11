@@ -213,7 +213,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
             <div className="space-y-1.5 text-[11px] text-neutral-400 font-sans">
               <div className="flex items-start gap-2">
                 <span className="text-amber-400 font-mono text-xs">•</span>
-                <span><strong className="text-neutral-200 font-mono">Duodecimal (0–9, a, b):</strong> Standalone base-12 digits with circular line knockout. Exposes interval arithmetic and row parity directly.</span>
+                <span><strong className="text-neutral-200 font-mono">Duodecimal (0–9, a, b) in URW Gothic:</strong> Standalone geometric base-12 digits with circular line knockout. Exposes interval arithmetic and row parity directly.</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-amber-400 font-mono text-xs">•</span>
@@ -221,7 +221,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-amber-400 font-mono text-xs">•</span>
-                <span><strong className="text-neutral-200 font-mono">Hand-Crossing Indicators:</strong> Abstract chevrons for crossing notes (&lt; for LH in treble, &gt; for RH in bass).</span>
+                <span><strong className="text-neutral-200 font-mono">Broad-Nib Calligraphic Chevrons:</strong> Authentic copperplate burin pen-angle stroke contrast for crossing notes (&lt; for LH in treble, &gt; for RH in bass).</span>
               </div>
             </div>
           </div>

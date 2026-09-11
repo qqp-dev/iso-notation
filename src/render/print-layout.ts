@@ -406,7 +406,7 @@ export function renderPageToSvg(
       .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: middle; }
       .pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }
       .cross-label { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 6pt; fill: #888888; font-weight: bold; text-anchor: end; }
-      .duo-digit { font-family: "JetBrains Mono", "SF Mono", "DejaVu Sans Mono", "Liberation Mono", monospace; text-anchor: middle; dominant-baseline: central; }`);
+      .duo-digit { font-family: "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif; text-anchor: middle; dominant-baseline: central; font-weight: bold; }`);
   svgParts.push(`    </style>`);
   svgParts.push(`  </defs>`);
 
@@ -846,12 +846,11 @@ export function renderPageToSvg(
         const weight = isRow0 ? '800' : '700';
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" class="duo-digit" font-weight="${weight}" font-size="6.8pt" fill="${noteColor}">${digit}</text>`);
 
-        // Tasteful abstract chevron for hand-crossing exceptions (< for LH, > for RH)
+        // Tasteful broad-nib calligraphic chevron for hand-crossing exceptions (< for LH, > for RH)
         if (isHandException) {
-          const h = 2.4;
-          const w = 1.5;
+          const h = 2.6;
+          const w = 1.6;
           const clearance = 1.0;
-          const strokeW = 0.7;
 
           let apexX: number;
           let baseX: number;
@@ -866,10 +865,19 @@ export function renderPageToSvg(
           const botY = ny + h / 2;
           const apexY = ny;
 
-          // White halo knockout underlay
-          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="${(strokeW + 1.2).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
-          // Colored chevron
-          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="${strokeW.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
+          // Authentic broad-nib calligraphy stroke contrast (35° italic pen angle)
+          // For LH (<): upper arm is thin hairline (0.50pt), lower arm is bold downstroke (1.15pt)
+          // For RH (>): upper arm is bold downstroke (1.15pt), lower arm is thin hairline (0.50pt)
+          const upperW = hand === 'RH' ? 1.15 : 0.50;
+          const lowerW = hand === 'RH' ? 0.50 : 1.15;
+
+          // White halo knockout underlays
+          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="${(upperW + 1.2).toFixed(2)}" stroke-linecap="round"/>`);
+          svgParts.push(`    <path d="M ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="#FFFFFF" stroke-width="${(lowerW + 1.2).toFixed(2)}" stroke-linecap="round"/>`);
+
+          // Colored calligraphic strokes
+          svgParts.push(`    <path d="M ${baseX.toFixed(2)} ${topY.toFixed(2)} L ${apexX.toFixed(2)} ${apexY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="${upperW.toFixed(2)}" stroke-linecap="round"/>`);
+          svgParts.push(`    <path d="M ${apexX.toFixed(2)} ${apexY.toFixed(2)} L ${baseX.toFixed(2)} ${botY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="${lowerW.toFixed(2)}" stroke-linecap="round"/>`);
         }
       } else if (isHandException) {
         const nw = 7.5;
