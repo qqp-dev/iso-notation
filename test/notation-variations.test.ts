@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import {
   StaffStyle,
   NoteheadMorphology,
+  ColorMode,
   DESIGN_PRESETS,
   normalizeStaffStyle,
   normalizeNoteheadMorphology,
   getStaffLineGeometry,
   getParityShape,
+  getSubdivisionColor,
   RenderOptions,
 } from '../src/render/types';
 import { wholeToneParity } from '../src/model/pitch';
+import { getNoteColor } from '../src/render/colors';
 import { getCanonicalSyllable } from '../src/model/phonetics';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { calculateScoreDimensions, renderScoreToCanvas } from '../src/render/score-canvas';
@@ -167,16 +170,22 @@ test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {
 
 test('Curated Design Presets catalog completeness and integrity', () => {
   const presetIds = DESIGN_PRESETS.map((p) => p.id);
+  assert.ok(presetIds.includes('vertical-ddr-parity'));
   assert.ok(presetIds.includes('subitizable-3plus3-parity'));
   assert.ok(presetIds.includes('clean-minimalist-oval'));
   assert.ok(presetIds.includes('analytical-phonetic'));
 
-  const primaryPreset = DESIGN_PRESETS.find((p) => p.id === 'subitizable-3plus3-parity')!;
-  assert.equal(primaryPreset.staffStyle, 'tritone-split');
-  assert.equal(primaryPreset.noteheadMorphology, 'row-parity-shape');
-  assert.equal(primaryPreset.colorMode, 'monochrome');
+  // Primary default preset must be Vertical DDR + Parity Shapes
+  const ddrPreset = DESIGN_PRESETS[0];
+  assert.equal(ddrPreset.id, 'vertical-ddr-parity');
+  assert.equal(ddrPreset.name, 'Vertical DDR + Parity Shapes');
+  assert.equal(ddrPreset.staffStyle, 'tritone-split');
+  assert.equal(ddrPreset.noteheadMorphology, 'row-parity-shape');
+  assert.equal(ddrPreset.colorMode, 'ddr-subdivision');
+  assert.equal(ddrPreset.orientation, 'vertical');
 
   const names = DESIGN_PRESETS.map((p) => p.name);
+  assert.ok(names.includes('Vertical DDR + Parity Shapes'));
   assert.ok(names.includes('Subitizable 3+3 + Parity Shapes'));
   assert.ok(names.includes('Clean Minimalist Oval'));
   assert.ok(names.includes('Analytical Phonetic'));
@@ -438,30 +447,234 @@ test('Full canvas rendering matrix executes across all variations without error'
     } as unknown as CanvasRenderingContext2D;
   };
 
+  const colorModes: ColorMode[] = [
+    'wholetone-duality',
+    'pitch-class-wheel',
+    'voice-hand',
+    'monochrome',
+    'ddr-subdivision',
+  ];
+
   for (const staffStyle of staffStyles) {
     for (const noteheadMorphology of morphologies) {
       for (const orientation of orientations) {
-        const options: RenderOptions = {
-          orientation,
-          staffStyle,
-          noteheadMorphology,
-          colorMode: 'wholetone-duality',
-          zoom: 1.0,
-          pixelsPerTick: 2.0,
-          pixelsPerSemitone: 14,
-          showHandCrossings: true,
-          showBarlines: true,
-          showGridLines: true,
-          currentTick: 144,
-        };
+        for (const colorMode of colorModes) {
+          const options: RenderOptions = {
+            orientation,
+            staffStyle,
+            noteheadMorphology,
+            colorMode,
+            zoom: 1.0,
+            pixelsPerTick: 2.0,
+            pixelsPerSemitone: 14,
+            showHandCrossings: true,
+            showBarlines: true,
+            showGridLines: true,
+            currentTick: 144,
+          };
 
-        const dims = calculateScoreDimensions(score, options);
-        assert.ok(dims.width > 0);
-        assert.ok(dims.height > 0);
+          const dims = calculateScoreDimensions(score, options);
+          assert.ok(dims.width > 0);
+          assert.ok(dims.height > 0);
 
-        const mockCtx = createMockCtx();
-        renderScoreToCanvas(mockCtx, score, options);
+          const mockCtx = createMockCtx();
+          renderScoreToCanvas(mockCtx, score, options);
+        }
       }
     }
   }
+});
+
+test('DDR Metric Subdivision Invariant: rhythmic color coding math across metric tiers and triplets', () => {
+  const tpb = 48; // Standard ticksPerBeat
+
+  // Quarter notes / Beat onsets: tick % 48 === 0 -> Red (#EF4444)
+  const quarterTicks = [0, 48, 96, 144, 192, 480];
+  quarterTicks.forEach((tick) => {
+    assert.equal(
+      getSubdivisionColor(tick, tpb),
+      '#EF4444',
+      `Tick ${tick} (beat onset) must be Red #EF4444`
+    );
+  });
+
+  // Eighth notes / Half-beat offbeats: tick % 24 === 0 (and not % 48) -> Blue (#3B82F6)
+  const eighthTicks = [24, 72, 120, 168, 216];
+  eighthTicks.forEach((tick) => {
+    assert.equal(
+      getSubdivisionColor(tick, tpb),
+      '#3B82F6',
+      `Tick ${tick} (8th note offbeat) must be Blue #3B82F6`
+    );
+  });
+
+  // Eighth-note triplets / 12th notes: tick % 16 === 0 (and not % 48) -> Purple (#A855F7)
+  const tripletTicks = [16, 32, 64, 80, 112, 128];
+  tripletTicks.forEach((tick) => {
+    assert.equal(
+      getSubdivisionColor(tick, tpb),
+      '#A855F7',
+      `Tick ${tick} (12th note triplet) must be Purple #A855F7`
+    );
+  });
+
+  // Sixteenth notes / Quarter-beat subdivisions: tick % 12 === 0 (and not % 24 or % 48) -> Yellow / Amber (#EAB308)
+  const sixteenthTicks = [12, 36, 60, 84, 108, 132];
+  sixteenthTicks.forEach((tick) => {
+    assert.equal(
+      getSubdivisionColor(tick, tpb),
+      '#EAB308',
+      `Tick ${tick} (16th note subdivision) must be Yellow #EAB308`
+    );
+  });
+
+  // Thirty-second notes: tick % 6 === 0 (and not % 12, % 16, % 24, % 48) -> Green (#10B981)
+  const thirtySecondTicks = [6, 18, 30, 42, 54, 66, 78, 90];
+  thirtySecondTicks.forEach((tick) => {
+    assert.equal(
+      getSubdivisionColor(tick, tpb),
+      '#10B981',
+      `Tick ${tick} (32nd note subdivision) must be Green #10B981`
+    );
+  });
+
+  // Active notes during playback: glow bright white/gold (#FEF08A)
+  [0, 6, 12, 16, 24, 32, 36, 48, 72].forEach((tick) => {
+    assert.equal(
+      getSubdivisionColor(tick, tpb, true),
+      '#FEF08A',
+      `Active note at tick ${tick} must glow bright gold #FEF08A`
+    );
+  });
+
+  // Integration with getNoteColor
+  const testPitch = { pitchClass: 0, octave: 4 };
+  assert.equal(getNoteColor(testPitch, 'RH', 'ddr-subdivision', false, 0, tpb), '#EF4444');
+  assert.equal(getNoteColor(testPitch, 'RH', 'ddr-subdivision', false, 24, tpb), '#3B82F6');
+  assert.equal(getNoteColor(testPitch, 'RH', 'ddr-subdivision', false, 12, tpb), '#EAB308');
+  assert.equal(getNoteColor(testPitch, 'RH', 'ddr-subdivision', false, 16, tpb), '#A855F7');
+  assert.equal(getNoteColor(testPitch, 'RH', 'ddr-subdivision', false, 6, tpb), '#10B981');
+  assert.equal(getNoteColor(testPitch, 'RH', 'ddr-subdivision', true, 0, tpb), '#FEF08A');
+});
+
+test('Vertical Timeline Invariant: canvas coordinates, descending time flow, and vertical staff lines', () => {
+  const score = buildBachGoldbergVar1Score();
+  const options: RenderOptions = {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'ddr-subdivision',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: true,
+    showBarlines: true,
+    showGridLines: true,
+    currentTick: 0,
+  };
+
+  const dims = calculateScoreDimensions(score, options);
+  assert.ok(dims.height > dims.width, 'Vertical score height (time) must exceed width (pitch breadth)');
+  assert.ok(dims.height >= score.totalTicks * options.pixelsPerTick, 'Height must accommodate total score ticks');
+
+  // Verify staff lines run vertically
+  const verticalLines: { x: number; y1: number; y2: number; strokeStyle: string }[] = [];
+  let lastMove: { x: number; y: number } | null = null;
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      lastMove = { x, y };
+    },
+    lineTo: (x: number, y: number) => {
+      if (lastMove && lastMove.x === x && y > lastMove.y) {
+        verticalLines.push({
+          x,
+          y1: lastMove.y,
+          y2: y,
+          strokeStyle: String(mockCtx.strokeStyle),
+        });
+      }
+    },
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, options);
+  assert.ok(verticalLines.length > 0, 'Vertical staff lines must be drawn across the score height');
+});
+
+test('Canvas Rendering with DDR Subdivision & Vertical Orientation: full rendering with active note glow', () => {
+  const score = buildBachGoldbergVar1Score();
+  const fills: string[] = [];
+  const strokes: string[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {
+      strokes.push(String(mockCtx.strokeStyle));
+    },
+    fill: () => {
+      fills.push(String(mockCtx.fillStyle));
+    },
+    fillRect: () => {
+      fills.push(String(mockCtx.fillStyle));
+    },
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  const firstNote = score.notes[0];
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'ddr-subdivision',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: true,
+    showBarlines: true,
+    showGridLines: true,
+    currentTick: firstNote.startTick,
+  });
+
+  // Black line knockout
+  assert.ok(fills.includes('#000000'), 'Line knockout #000000 must be present');
+  // Beat onset (Red #EF4444)
+  assert.ok(fills.includes('#EF4444'), 'Beat onset Red #EF4444 fill must be present');
+  // 16th notes (Yellow #EAB308) in Bach Goldberg Var 1
+  assert.ok(fills.includes('#EAB308'), '16th note Yellow #EAB308 fill must be present');
+  // Active note glow (#FEF08A)
+  assert.ok(fills.includes('#FEF08A'), 'Active note bright gold glow #FEF08A must be present');
+  // Active note gold stroke (#FACC15)
+  assert.ok(strokes.includes('#FACC15'), 'Active note gold border #FACC15 must be present');
 });

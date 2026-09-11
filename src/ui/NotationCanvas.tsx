@@ -71,14 +71,24 @@ export const NotationCanvas: React.FC<NotationCanvasProps> = ({
     if (isHoriz) {
       const scrollLeft = container.scrollLeft;
       const clientWidth = container.clientWidth;
-      if (clientWidth > 0 && (playheadPos > scrollLeft + clientWidth * 0.85 || playheadPos < scrollLeft)) {
-        container.scrollLeft = Math.max(0, playheadPos - clientWidth * 0.2);
+      if (clientWidth > 0 && (playheadPos > scrollLeft + clientWidth * 0.8 || playheadPos < scrollLeft)) {
+        const target = Math.max(0, playheadPos - clientWidth * 0.2);
+        if (typeof container.scrollTo === 'function') {
+          container.scrollTo({ left: target, behavior: 'smooth' });
+        } else {
+          container.scrollLeft = target;
+        }
       }
     } else {
       const scrollTop = container.scrollTop;
       const clientHeight = container.clientHeight;
-      if (clientHeight > 0 && (playheadPos > scrollTop + clientHeight * 0.85 || playheadPos < scrollTop)) {
-        container.scrollTop = Math.max(0, playheadPos - clientHeight * 0.2);
+      if (clientHeight > 0 && (playheadPos > scrollTop + clientHeight * 0.75 || playheadPos < scrollTop)) {
+        const target = Math.max(0, playheadPos - clientHeight * 0.25);
+        if (typeof container.scrollTo === 'function') {
+          container.scrollTo({ top: target, behavior: 'smooth' });
+        } else {
+          container.scrollTop = target;
+        }
       }
     }
   }, [options.currentTick, options.pixelsPerTick, options.orientation]);

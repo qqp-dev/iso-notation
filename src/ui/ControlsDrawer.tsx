@@ -133,7 +133,9 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                 const isSelected =
                   normalizeStaffStyle(options.staffStyle) === normalizeStaffStyle(preset.staffStyle) &&
                   normalizeNoteheadMorphology(options.noteheadMorphology) ===
-                    normalizeNoteheadMorphology(preset.noteheadMorphology);
+                    normalizeNoteheadMorphology(preset.noteheadMorphology) &&
+                  options.colorMode === preset.colorMode &&
+                  (!preset.orientation || options.orientation === preset.orientation);
                 return (
                   <button
                     key={preset.id}
@@ -142,6 +144,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                         staffStyle: preset.staffStyle,
                         noteheadMorphology: preset.noteheadMorphology,
                         colorMode: preset.colorMode,
+                        ...(preset.orientation ? { orientation: preset.orientation } : {}),
                       })
                     }
                     className={`w-full text-left p-2 rounded border transition ${
@@ -265,10 +268,11 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
               onChange={(e) => onOptionsChange({ colorMode: e.target.value as ColorMode })}
               className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-neutral-200 focus:outline-none focus:border-amber-500 font-mono text-[11px]"
             >
+              <option value="ddr-subdivision">DDR Metric Subdivision (4th=Red, 8th=Blue...)</option>
+              <option value="monochrome">Monochrome</option>
               <option value="wholetone-duality">Whole-Tone Parity (Row 0 / Row 1)</option>
               <option value="pitch-class-wheel">12-TET Pitch Class Wheel</option>
               <option value="voice-hand">Voice & Hand (RH / LH)</option>
-              <option value="monochrome">Monochrome</option>
             </select>
           </div>
 

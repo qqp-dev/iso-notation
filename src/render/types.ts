@@ -28,7 +28,12 @@ export type NoteheadMorphology =
 // Legacy aliases for backward compatibility
 export type NotationStyle = 'wholetone-staff' | 'chromatic-grid' | StaffStyle;
 export type NoteheadStyle = 'numerical' | NoteheadMorphology;
-export type ColorMode = 'wholetone-duality' | 'pitch-class-wheel' | 'voice-hand' | 'monochrome';
+export type ColorMode =
+  | 'wholetone-duality'
+  | 'pitch-class-wheel'
+  | 'voice-hand'
+  | 'monochrome'
+  | 'ddr-subdivision';
 
 export interface RenderOptions {
   orientation: TimelineOrientation;
@@ -62,9 +67,19 @@ export interface DesignPreset {
   staffStyle: StaffStyle;
   noteheadMorphology: NoteheadMorphology;
   colorMode: ColorMode;
+  orientation?: TimelineOrientation;
 }
 
 export const DESIGN_PRESETS: readonly DesignPreset[] = [
+  {
+    id: 'vertical-ddr-parity',
+    name: 'Vertical DDR + Parity Shapes',
+    description: 'Vertical timeline with DDR metric subdivision colors and 3+3 parity shapes',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'ddr-subdivision',
+    orientation: 'vertical',
+  },
   {
     id: 'subitizable-3plus3-parity',
     name: 'Subitizable 3+3 + Parity Shapes',
@@ -72,6 +87,7 @@ export const DESIGN_PRESETS: readonly DesignPreset[] = [
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
     colorMode: 'monochrome',
+    orientation: 'horizontal',
   },
   {
     id: 'clean-minimalist-oval',
@@ -289,3 +305,5 @@ export function getParityShape(pitchClass: number): 'disc' | 'diamond' {
   const pc = ((pitchClass % 12) + 12) % 12;
   return pc % 2 === 0 ? 'disc' : 'diamond';
 }
+
+export { getSubdivisionColor } from './colors';

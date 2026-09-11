@@ -8,7 +8,7 @@ import {
   getStaffLineGeometry,
   getParityShape,
 } from './types';
-import { getNoteColor } from './colors';
+import { getNoteColor, getSubdivisionColor } from './colors';
 
 export interface ScoreDimensions {
   width: number;
@@ -289,12 +289,16 @@ export function renderScoreToCanvas(
       options.currentTick < note.startTick + note.durationTicks;
     const isSelected = options.selectedNoteId === note.id;
     const isHighlighted = isActive || isSelected;
-    const noteColor = getNoteColor(
-      note.pitch,
-      note.hand,
-      options.colorMode,
-      isHighlighted
-    );
+    const noteColor = options.colorMode === 'ddr-subdivision'
+      ? getSubdivisionColor(note.startTick, score.ticksPerBeat, isHighlighted)
+      : getNoteColor(
+          note.pitch,
+          note.hand,
+          options.colorMode,
+          isHighlighted,
+          note.startTick,
+          score.ticksPerBeat
+        );
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
 
@@ -431,7 +435,9 @@ function renderNotehead(
   strokeColor: string,
   isVertical: boolean
 ): void {
-  const headColor = isActive ? '#FDE047' : fillColor;
+  const headColor = isActive
+    ? (fillColor === '#FEF08A' || fillColor === '#FFFFFF' ? fillColor : '#FDE047')
+    : fillColor;
 
   switch (morphology) {
     case 'classic-oval': {

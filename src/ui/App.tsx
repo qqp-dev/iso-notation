@@ -16,7 +16,7 @@ import { ControlsDrawer } from './ControlsDrawer';
 import { PhoneticSandbox } from './PhoneticSandbox';
 
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('phonetics');
+  const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('score');
   const [selectedScoreId, setSelectedScoreId] = useState<string>('bach-goldberg-var1');
   const [score, setScore] = useState<QuantizedGridScore>(() => BENCHMARK_SCORES['bach-goldberg-var1']());
 
@@ -31,12 +31,12 @@ export const App: React.FC = () => {
 
   // Render options state
   const [renderOptions, setRenderOptions] = useState<RenderOptions>({
-    orientation: 'horizontal',
+    orientation: 'vertical',
     staffStyle: 'tritone-split',
     noteheadMorphology: 'row-parity-shape',
     notationStyle: 'wholetone-staff',
-    noteheadStyle: 'numerical',
-    colorMode: 'monochrome',
+    noteheadStyle: 'row-parity-shape',
+    colorMode: 'ddr-subdivision',
     zoom: 1.0,
     pixelsPerTick: 2.0,
     pixelsPerSemitone: 14,
@@ -394,7 +394,9 @@ export const App: React.FC = () => {
                   const isActive =
                     normalizeStaffStyle(renderOptions.staffStyle) === normalizeStaffStyle(preset.staffStyle) &&
                     normalizeNoteheadMorphology(renderOptions.noteheadMorphology) ===
-                      normalizeNoteheadMorphology(preset.noteheadMorphology);
+                      normalizeNoteheadMorphology(preset.noteheadMorphology) &&
+                    renderOptions.colorMode === preset.colorMode &&
+                    (!preset.orientation || renderOptions.orientation === preset.orientation);
                   return (
                     <button
                       key={preset.id}
@@ -403,6 +405,7 @@ export const App: React.FC = () => {
                           staffStyle: preset.staffStyle,
                           noteheadMorphology: preset.noteheadMorphology,
                           colorMode: preset.colorMode,
+                          ...(preset.orientation ? { orientation: preset.orientation } : {}),
                         })
                       }
                       className={`px-2 py-0.5 rounded font-mono text-[10px] transition shrink-0 ${
@@ -419,6 +422,35 @@ export const App: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {/* Orientation Toggle Button */}
+                <button
+                  onClick={() =>
+                    handleUpdateOptions({
+                      orientation: renderOptions.orientation === 'vertical' ? 'horizontal' : 'vertical',
+                    })
+                  }
+                  className="bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 rounded px-2 py-0.5 text-[10px] text-neutral-200 font-mono flex items-center gap-1 transition"
+                  title="Toggle Timeline Orientation (Vertical / Horizontal)"
+                >
+                  <span>{renderOptions.orientation === 'vertical' ? '↕ Vert' : '↔ Horiz'}</span>
+                </button>
+
+                {/* Color Mode Dropdown */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-mono text-neutral-500 hidden lg:inline">Color:</span>
+                  <select
+                    value={renderOptions.colorMode}
+                    onChange={(e) => handleUpdateOptions({ colorMode: e.target.value as any })}
+                    className="bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5 text-[10px] text-neutral-200 font-mono focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="ddr-subdivision">DDR Subdivision</option>
+                    <option value="monochrome">Monochrome</option>
+                    <option value="wholetone-duality">Whole-Tone</option>
+                    <option value="pitch-class-wheel">12-TET Wheel</option>
+                    <option value="voice-hand">Voice & Hand</option>
+                  </select>
+                </div>
+
                 {/* Staff Style Dropdown */}
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] font-mono text-neutral-500 hidden lg:inline">Staff:</span>

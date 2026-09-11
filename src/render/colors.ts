@@ -18,17 +18,62 @@ const PITCH_CLASS_COLORS = [
   '#EC4899', // 11
 ];
 
+/**
+ * DDR (Dance Dance Revolution) Metric Subdivision Color Engine:
+ * Colors encode the metric subdivision of each note relative to ticksPerBeat (48 ticks in standard 4/4):
+ * - Quarter notes / Beat onsets (tick % 48 === 0): Red (#EF4444)
+ * - Eighth notes / Half-beat offbeats (tick % 24 === 0): Blue (#3B82F6)
+ * - Eighth-note triplets / 12th notes (tick % 16 === 0): Purple (#A855F7)
+ * - Sixteenth notes / Quarter-beat subdivisions (tick % 12 === 0): Yellow / Amber (#EAB308)
+ * - Thirty-second notes (tick % 6 === 0): Green (#10B981)
+ * - Active notes during playback glow bright white/gold (#FFFFFF / #FEF08A)
+ */
+export function getSubdivisionColor(
+  tick: number,
+  ticksPerBeat: number = 48,
+  isActive: boolean = false
+): string {
+  if (isActive) {
+    return '#FEF08A'; // Bright active gold glow
+  }
+
+  const tpb = ticksPerBeat > 0 ? ticksPerBeat : 48;
+  const mod = ((Math.round(tick) % tpb) + tpb) % tpb;
+
+  if (mod === 0) {
+    return '#EF4444'; // Red: Quarter notes / Beat onsets
+  }
+  if (mod % (tpb / 2) === 0) {
+    return '#3B82F6'; // Blue: Eighth notes / Half-beat offbeats
+  }
+  if (tpb % 3 === 0 && mod % (tpb / 3) === 0) {
+    return '#A855F7'; // Purple: Eighth-note triplets / 12th notes
+  }
+  if (mod % (tpb / 4) === 0) {
+    return '#EAB308'; // Yellow / Amber: Sixteenth notes / Quarter-beat subdivisions
+  }
+  if (mod % (tpb / 8) === 0) {
+    return '#10B981'; // Green: Thirty-second notes
+  }
+  return '#9CA3AF'; // Fallback neutral gray
+}
+
 export function getNoteColor(
   pitch: PitchCoordinate,
   hand: Hand,
   mode: ColorMode,
-  isActive: boolean = false
+  isActive: boolean = false,
+  startTick?: number,
+  ticksPerBeat: number = 48
 ): string {
   if (isActive) {
-    return '#FDE047'; // Bright active gold highlight
+    return mode === 'ddr-subdivision' ? '#FEF08A' : '#FDE047'; // Bright active gold highlight
   }
 
   switch (mode) {
+    case 'ddr-subdivision':
+      return getSubdivisionColor(startTick ?? 0, ticksPerBeat, false);
+
     case 'pitch-class-wheel':
       return PITCH_CLASS_COLORS[pitch.pitchClass];
 
