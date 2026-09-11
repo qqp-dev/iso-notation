@@ -73,6 +73,15 @@ export interface DesignPreset {
 
 export const DESIGN_PRESETS: readonly DesignPreset[] = [
   {
+    id: 'unified-duration-lattice',
+    name: 'Unified Duration Lattice + Parity Shapes',
+    description: 'Vertical timeline with unextended reference noteheads, proportional hold ribbons, and logarithmic duration palette',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    orientation: 'vertical',
+  },
+  {
     id: 'vertical-duration-parity',
     name: 'Vertical Duration Classes + Parity Shapes',
     description: 'Vertical timeline with note value duration classes and 3+3 parity shapes',
@@ -316,4 +325,4 @@ export function getParityShape(pitchClass: number): 'disc' | 'diamond' {
   return pc % 2 === 0 ? 'disc' : 'diamond';
 }
 
-export { getSubdivisionColor, getDurationClassColor } from './colors';
+export { getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor } from './colors';

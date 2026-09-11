@@ -11,6 +11,7 @@ import {
   getParityShape,
   getSubdivisionColor,
   getDurationClassColor,
+  getLogarithmicDurationColor,
   RenderOptions,
 } from '../src/render/types';
 import { wholeToneParity } from '../src/model/pitch';
@@ -171,22 +172,24 @@ test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {
 
 test('Curated Design Presets catalog completeness and integrity', () => {
   const presetIds = DESIGN_PRESETS.map((p) => p.id);
+  assert.ok(presetIds.includes('unified-duration-lattice'));
   assert.ok(presetIds.includes('vertical-duration-parity'));
   assert.ok(presetIds.includes('vertical-ddr-parity'));
   assert.ok(presetIds.includes('subitizable-3plus3-parity'));
   assert.ok(presetIds.includes('clean-minimalist-oval'));
   assert.ok(presetIds.includes('analytical-phonetic'));
 
-  // Primary default preset must be Vertical Duration Classes + Parity Shapes
+  // Primary default preset must be Unified Duration Lattice + Parity Shapes
   const defaultPreset = DESIGN_PRESETS[0];
-  assert.equal(defaultPreset.id, 'vertical-duration-parity');
-  assert.equal(defaultPreset.name, 'Vertical Duration Classes + Parity Shapes');
+  assert.equal(defaultPreset.id, 'unified-duration-lattice');
+  assert.equal(defaultPreset.name, 'Unified Duration Lattice + Parity Shapes');
   assert.equal(defaultPreset.staffStyle, 'tritone-split');
   assert.equal(defaultPreset.noteheadMorphology, 'row-parity-shape');
   assert.equal(defaultPreset.colorMode, 'duration-class');
   assert.equal(defaultPreset.orientation, 'vertical');
 
   const names = DESIGN_PRESETS.map((p) => p.name);
+  assert.ok(names.includes('Unified Duration Lattice + Parity Shapes'));
   assert.ok(names.includes('Vertical Duration Classes + Parity Shapes'));
   assert.ok(names.includes('Vertical DDR + Parity Shapes'));
   assert.ok(names.includes('Subitizable 3+3 + Parity Shapes'));
@@ -683,34 +686,49 @@ test('Canvas Rendering with DDR Subdivision & Vertical Orientation: full renderi
   assert.ok(strokes.includes('#FACC15'), 'Active note gold border #FACC15 must be present');
 });
 
-test('Duration-Class Color Invariants: note value color mapping and active note glow', () => {
-  const tpb = 48;
+test('Unified Euclidean Duration Lattice: Logarithmic Minimal Palette Invariants', () => {
+  const tauRef = 12; // Standard 16th note reference quantum (gcd of score)
 
-  // 16th notes (12t): Crisp White / Silver (#E2E8F0)
-  assert.equal(getDurationClassColor(12, tpb, false), '#E2E8F0');
-  // 8th notes (24t): Vibrant Sky Blue (#38BDF8)
-  assert.equal(getDurationClassColor(24, tpb, false), '#38BDF8');
-  // Dotted 8th notes (36t): Indigo (#818CF8)
-  assert.equal(getDurationClassColor(36, tpb, false), '#818CF8');
-  // Quarter notes (48t): Warm Amber (#F59E0B)
-  assert.equal(getDurationClassColor(48, tpb, false), '#F59E0B');
-  // Dotted quarter notes (72t): Orange (#FB923C)
-  assert.equal(getDurationClassColor(72, tpb, false), '#FB923C');
-  // Half notes (96t) and longer (144t): Rose (#F43F5E)
-  assert.equal(getDurationClassColor(96, tpb, false), '#F43F5E');
-  assert.equal(getDurationClassColor(144, tpb, false), '#F43F5E');
+  // k = floor(log2(d / tauRef))
+  // k = 0 (1x, 12t): Crisp Silver / White (#E2E8F0)
+  assert.equal(getLogarithmicDurationColor(12, tauRef, false), '#E2E8F0');
+  assert.equal(getLogarithmicDurationColor(6, tauRef, false), '#E2E8F0'); // sub-quantum also silver/white
+
+  // k = 1 (2x and 3x, 24t and 36t): Sky Blue (#38BDF8)
+  assert.equal(getLogarithmicDurationColor(24, tauRef, false), '#38BDF8');
+  assert.equal(getLogarithmicDurationColor(36, tauRef, false), '#38BDF8');
+
+  // k = 2 (4x to 7x, 48t to 72t): Warm Amber (#F59E0B)
+  assert.equal(getLogarithmicDurationColor(48, tauRef, false), '#F59E0B');
+  assert.equal(getLogarithmicDurationColor(72, tauRef, false), '#F59E0B');
+
+  // k >= 3 (>= 8x, 96t+): Rose (#F43F5E)
+  assert.equal(getLogarithmicDurationColor(96, tauRef, false), '#F43F5E');
+  assert.equal(getLogarithmicDurationColor(144, tauRef, false), '#F43F5E');
+  assert.equal(getLogarithmicDurationColor(192, tauRef, false), '#F43F5E');
 
   // Active note sounding glow: Bright gold/white (#FEF08A)
-  assert.equal(getDurationClassColor(12, tpb, true), '#FEF08A');
-  assert.equal(getDurationClassColor(48, tpb, true), '#FEF08A');
+  assert.equal(getLogarithmicDurationColor(12, tauRef, true), '#FEF08A');
+  assert.equal(getLogarithmicDurationColor(24, tauRef, true), '#FEF08A');
+  assert.equal(getLogarithmicDurationColor(48, tauRef, true), '#FEF08A');
 
-  // Integration with getNoteColor
+  // Integration with getDurationClassColor and getNoteColor
+  const tpb = 48; // tpb / 4 = 12
   const testPitch = { pitchClass: 0, octave: 4 };
+  assert.equal(getDurationClassColor(12, tpb, false), '#E2E8F0');
+  assert.equal(getDurationClassColor(24, tpb, false), '#38BDF8');
+  assert.equal(getDurationClassColor(36, tpb, false), '#38BDF8');
+  assert.equal(getDurationClassColor(48, tpb, false), '#F59E0B');
+  assert.equal(getDurationClassColor(72, tpb, false), '#F59E0B');
+  assert.equal(getDurationClassColor(96, tpb, false), '#F43F5E');
+  assert.equal(getDurationClassColor(144, tpb, false), '#F43F5E');
+  assert.equal(getDurationClassColor(12, tpb, true), '#FEF08A');
+
   assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 12), '#E2E8F0');
   assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 24), '#38BDF8');
-  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 36), '#818CF8');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 36), '#38BDF8');
   assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 48), '#F59E0B');
-  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 72), '#FB923C');
+  assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 72), '#F59E0B');
   assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 96), '#F43F5E');
   assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', false, 0, tpb, 144), '#F43F5E');
   assert.equal(getNoteColor(testPitch, 'RH', 'duration-class', true, 0, tpb, 12), '#FEF08A');
@@ -765,8 +783,8 @@ test('Duration Invariance (Zero Grid-Snap Strobing): identical colors across var
     } else if (note.durationTicks === 36) {
       assert.equal(
         color,
-        '#818CF8',
-        `Note ${note.id} (dotted 8th note at tick ${note.startTick}) must be Indigo #818CF8`
+        '#38BDF8',
+        `Note ${note.id} (dotted 8th note at tick ${note.startTick}) must be Sky Blue #38BDF8`
       );
       dottedEighthCount++;
     }
@@ -830,13 +848,203 @@ test('Canvas Rendering with Duration-Class & Vertical Orientation: full renderin
   assert.ok(fills.includes('#000000'), 'Line knockout #000000 must be present');
   // 16th notes (Silver #E2E8F0) in Bach Goldberg Var 1
   assert.ok(fills.includes('#E2E8F0'), '16th note Silver #E2E8F0 fill must be present');
-  // 8th notes (Sky Blue #38BDF8) in Bach Goldberg Var 1
+  // 8th notes & Dotted 8th notes (Sky Blue #38BDF8) in Bach Goldberg Var 1
   assert.ok(fills.includes('#38BDF8'), '8th note Sky Blue #38BDF8 fill must be present');
-  // Dotted 8th notes (Indigo #818CF8) in Bach Goldberg Var 1
-  assert.ok(fills.includes('#818CF8'), 'Dotted 8th note Indigo #818CF8 fill must be present');
   // Active note glow (#FEF08A)
   assert.ok(fills.includes('#FEF08A'), 'Active note bright gold glow #FEF08A must be present');
   // Active note gold stroke (#FACC15)
   assert.ok(strokes.includes('#FACC15'), 'Active note gold border #FACC15 must be present');
+});
+
+test('Unified Euclidean Duration Lattice: Unextended Reference Noteheads Invariant (d <= tau_ref)', () => {
+  const score = buildBachGoldbergVar1Score();
+  const ribbons: { x: number; y: number; w: number; h: number }[] = [];
+  const arcCenters: { x: number; y: number }[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    arc: (x: number, y: number) => {
+      arcCenters.push({ x, y });
+    },
+    ellipse: () => {},
+    roundRect: (x: number, y: number, w: number, h: number) => {
+      ribbons.push({ x, y, w, h });
+    },
+    fillText: () => {},
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  const pixelsPerTick = 2.0;
+  const pixelsPerSemitone = 14;
+  const paddingStart = 60;
+  const paddingPitch = 40;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick,
+    pixelsPerSemitone,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: false,
+    currentTick: 0,
+  });
+
+  const tauRef = score.gridResolution ?? 12;
+  const sixteenthNotes = score.notes.filter((n) => n.durationTicks <= tauRef);
+  const sustainedNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+
+  assert.ok(sixteenthNotes.length > 100, 'Must have > 100 reference 16th notes');
+  assert.ok(sustainedNotes.length > 0, 'Must have sustained notes');
+
+  // Exact ribbon count must match exactly the number of sustained notes (zero ribbons for 16th notes)
+  assert.equal(
+    ribbons.length,
+    sustainedNotes.length,
+    `Ribbon count (${ribbons.length}) must equal sustained notes count (${sustainedNotes.length}), zero for 16th notes`
+  );
+
+  // Each hold ribbon must have ribbon width = 5
+  ribbons.forEach((r) => {
+    assert.equal(r.w, 5, 'Hold ribbon width in vertical orientation must be 5px');
+  });
+
+  // Notehead center for each 16th note on even PC (discs) must equal exact onset coordinate
+  const indices = score.notes.map((n) => n.pitch.octave * 12 + n.pitch.pitchClass);
+  let minPitch = Math.min(...indices) - 2;
+  minPitch = Math.floor(minPitch / 2) * 2;
+
+  sixteenthNotes
+    .filter((n) => n.pitch.pitchClass % 2 === 0)
+    .forEach((n) => {
+      const lPitch = n.pitch.octave * 12 + n.pitch.pitchClass;
+      const expectedX = paddingPitch + (lPitch - minPitch) * pixelsPerSemitone;
+      const expectedY = paddingStart + n.startTick * pixelsPerTick;
+      const found = arcCenters.some((c) => Math.abs(c.x - expectedX) < 0.1 && Math.abs(c.y - expectedY) < 0.1);
+      assert.ok(found, `Note ${n.id} (16th note) must be centered at exact onset coordinate (${expectedX}, ${expectedY})`);
+    });
+});
+
+test('Unified Euclidean Duration Lattice: Proportional Hold Ribbon Invariant (d > tau_ref)', () => {
+  const score = buildBachGoldbergVar1Score();
+  const verticalRibbons: { x: number; y: number; w: number; h: number }[] = [];
+  const horizontalRibbons: { x: number; y: number; w: number; h: number }[] = [];
+
+  const createMock = (ribbonList: { x: number; y: number; w: number; h: number }[]) => {
+    const noop = () => {};
+    return {
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      save: noop,
+      restore: noop,
+      beginPath: noop,
+      closePath: noop,
+      moveTo: noop,
+      lineTo: noop,
+      stroke: noop,
+      fill: noop,
+      fillRect: noop,
+      arc: noop,
+      ellipse: noop,
+      roundRect: (x: number, y: number, w: number, h: number) => {
+        ribbonList.push({ x, y, w, h });
+      },
+      fillText: noop,
+      setLineDash: noop,
+    } as unknown as CanvasRenderingContext2D;
+  };
+
+  const pixelsPerTick = 2.0;
+
+  // 1. Vertical orientation
+  renderScoreToCanvas(createMock(verticalRibbons), score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: false,
+    currentTick: 0,
+  });
+
+  // 2. Horizontal orientation
+  renderScoreToCanvas(createMock(horizontalRibbons), score, {
+    orientation: 'horizontal',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'row-parity-shape',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: false,
+    currentTick: 0,
+  });
+
+  const tauRef = score.gridResolution ?? 12;
+  const sustainedNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+
+  assert.equal(verticalRibbons.length, sustainedNotes.length);
+  assert.equal(horizontalRibbons.length, sustainedNotes.length);
+
+  // In vertical orientation: height = durationTicks * pixelsPerTick, width = 5
+  verticalRibbons.forEach((r, i) => {
+    const note = sustainedNotes[i];
+    const expectedHeight = note.durationTicks * pixelsPerTick;
+    assert.equal(r.h, expectedHeight, `Vertical ribbon height for note ${note.id} must be ${expectedHeight}`);
+    assert.equal(r.w, 5, 'Vertical ribbon width must be 5px');
+  });
+
+  // In horizontal orientation: width = durationTicks * pixelsPerTick, height = 5
+  horizontalRibbons.forEach((r, i) => {
+    const note = sustainedNotes[i];
+    const expectedWidth = note.durationTicks * pixelsPerTick;
+    assert.equal(r.w, expectedWidth, `Horizontal ribbon width for note ${note.id} must be ${expectedWidth}`);
+    assert.equal(r.h, 5, 'Horizontal ribbon height must be 5px');
+  });
+
+  // Proportionality check: dotted 8th note (36t) vs 8th note (24t)
+  const eighthNote = sustainedNotes.find((n) => n.durationTicks === 24);
+  const dottedEighthNote = sustainedNotes.find((n) => n.durationTicks === 36);
+
+  assert.ok(eighthNote, 'Must find an 8th note');
+  assert.ok(dottedEighthNote, 'Must find a dotted 8th note');
+
+  const eighthRibbon = verticalRibbons[sustainedNotes.indexOf(eighthNote)];
+  const dottedEighthRibbon = verticalRibbons[sustainedNotes.indexOf(dottedEighthNote)];
+
+  assert.equal(eighthRibbon.h, 24 * pixelsPerTick); // 48px
+  assert.equal(dottedEighthRibbon.h, 36 * pixelsPerTick); // 72px
+  assert.equal(
+    dottedEighthRibbon.h / eighthRibbon.h,
+    1.5,
+    'Dotted 8th note hold ribbon must physically extend exactly 1.5x longer than 8th note'
+  );
 });
 

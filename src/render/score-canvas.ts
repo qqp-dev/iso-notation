@@ -8,7 +8,7 @@ import {
   getStaffLineGeometry,
   getParityShape,
 } from './types';
-import { getNoteColor, getSubdivisionColor, getDurationClassColor } from './colors';
+import { getNoteColor, getSubdivisionColor, getDurationClassColor, getLogarithmicDurationColor } from './colors';
 
 export interface ScoreDimensions {
   width: number;
@@ -280,8 +280,10 @@ export function renderScoreToCanvas(
     ctx.restore();
   }
 
-  // 5. Notes Rendering with selected morphology
+  // 5. Notes Rendering with selected morphology and Unified Duration Lattice
   ctx.save();
+  const tauRef = score.gridResolution || 12;
+
   for (const note of score.notes) {
     const lPitch = linearIndex(note.pitch);
     const isActive =
@@ -292,7 +294,7 @@ export function renderScoreToCanvas(
     const noteColor = options.colorMode === 'ddr-subdivision'
       ? getSubdivisionColor(note.startTick, score.ticksPerBeat, isHighlighted)
       : options.colorMode === 'duration-class'
-      ? getDurationClassColor(note.durationTicks, score.ticksPerBeat, isHighlighted)
+      ? getLogarithmicDurationColor(note.durationTicks, tauRef, isHighlighted)
       : getNoteColor(
           note.pitch,
           note.hand,
@@ -304,21 +306,24 @@ export function renderScoreToCanvas(
         );
     const strokeColor = isHighlighted ? '#FACC15' : '#000000';
     const pc = note.pitch.pitchClass;
+    const isHold = note.durationTicks > tauRef;
 
     if (isHoriz) {
       const { x, y } = getCoords(note.startTick, lPitch);
-      const spanWidth = Math.max(10, note.durationTicks * options.pixelsPerTick - 2);
       const noteHeight = Math.max(8, options.pixelsPerSemitone - 3);
 
-      // Duration ribbon
-      ctx.fillStyle = noteColor;
-      ctx.beginPath();
-      ctx.roundRect(x, y - noteHeight / 2, spanWidth, noteHeight, 3);
-      ctx.fill();
+      // Proportional hold ribbon down the timeline only for d > tauRef
+      if (isHold) {
+        const holdLength = note.durationTicks * options.pixelsPerTick;
+        const ribbonWidth = 5;
+        ctx.fillStyle = noteColor;
+        ctx.beginPath();
+        ctx.roundRect(x, y - ribbonWidth / 2, holdLength, ribbonWidth, 2.5);
+        ctx.fill();
+      }
 
-      // Onset anchor coordinates: anchored at onset with proportional offset
-      const anchorOffset = Math.min(spanWidth / 2, Math.max(8, noteHeight * 0.65));
-      const cx = x + anchorOffset;
+      // Notehead centered directly on exact onset coordinate (x, y)
+      const cx = x;
       const cy = y;
 
       // Render notehead morphology with line knockout
@@ -339,28 +344,31 @@ export function renderScoreToCanvas(
       if (note.articulation === 'staccato') {
         ctx.fillStyle = noteColor;
         ctx.beginPath();
-        ctx.arc(cx, y - noteHeight / 2 - 4, 2, 0, Math.PI * 2);
+        ctx.arc(cx, cy - noteHeight / 2 - 4, 2, 0, Math.PI * 2);
         ctx.fill();
       } else if (note.articulation === 'accent') {
         ctx.fillStyle = '#F43F5E';
         ctx.font = 'bold 10px sans-serif';
-        ctx.fillText('>', cx, y - noteHeight / 2 - 4);
+        ctx.fillText('>', cx, cy - noteHeight / 2 - 4);
       }
     } else {
       // Vertical timeline
       const { x, y } = getCoords(note.startTick, lPitch);
-      const spanHeight = Math.max(10, note.durationTicks * options.pixelsPerTick - 2);
       const noteWidth = Math.max(8, options.pixelsPerSemitone - 3);
 
-      // Duration ribbon
-      ctx.fillStyle = noteColor;
-      ctx.beginPath();
-      ctx.roundRect(x - noteWidth / 2, y, noteWidth, spanHeight, 3);
-      ctx.fill();
+      // Proportional hold ribbon down the timeline only for d > tauRef
+      if (isHold) {
+        const holdHeight = note.durationTicks * options.pixelsPerTick;
+        const ribbonWidth = 5;
+        ctx.fillStyle = noteColor;
+        ctx.beginPath();
+        ctx.roundRect(x - ribbonWidth / 2, y, ribbonWidth, holdHeight, 2.5);
+        ctx.fill();
+      }
 
-      const anchorOffset = Math.min(spanHeight / 2, Math.max(8, noteWidth * 0.65));
+      // Notehead centered directly on exact onset coordinate (x, y)
       const cx = x;
-      const cy = y + anchorOffset;
+      const cy = y;
 
       renderNotehead(
         ctx,

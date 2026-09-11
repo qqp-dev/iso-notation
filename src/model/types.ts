@@ -86,6 +86,7 @@ export interface QuantizedGridScore {
   pedals: PedalOverlay[];
   notes: QuantizedNote[];
   handCrossings?: HandCrossingEvent[];
+  gridResolution?: number;
 }
 
 export type JankoRowIndex = 0 | 1;

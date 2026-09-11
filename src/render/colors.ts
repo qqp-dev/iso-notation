@@ -59,50 +59,56 @@ export function getSubdivisionColor(
 }
 
 /**
- * Duration-Class Color Engine:
- * Colors encode the rhythmic note value / duration of each note relative to ticksPerBeat (48 ticks in standard 4/4 or 3/4):
- * - 16th notes (12t / 0.25 beats): Crisp White / Silver (#E2E8F0)
- * - 8th notes (24t / 0.5 beats): Vibrant Sky Blue (#38BDF8)
- * - Dotted 8th notes (36t / 0.75 beats): Indigo (#818CF8)
- * - Quarter notes (48t / 1.0 beats): Warm Amber (#F59E0B)
- * - Dotted quarter notes (72t / 1.5 beats): Orange (#FB923C)
- * - Half notes (96t / 2.0 beats) and longer (>= 144t): Rose (#F43F5E)
+ * Unified Euclidean Duration Lattice Logarithmic Color Engine:
+ * Minimal 3-tier logarithmic color palette based on rank k = floor(log2(duration / tau_ref)):
+ * - k = 0 (1x, 12t): Crisp Silver / White (#E2E8F0)
+ * - k = 1 (2x and 3x, 24t and 36t): Sky Blue (#38BDF8)
+ * - k = 2 (4x to 7x, 48t to 72t): Warm Amber (#F59E0B)
+ * - k >= 3 (>= 8x, 96t+): Rose (#F43F5E)
  * - Active sounding notes during playback glow bright gold/white (#FEF08A / #FACC15)
  */
-export function getDurationClassColor(
+export function getLogarithmicDurationColor(
   durationTicks: number,
-  ticksPerBeat: number = 48,
+  tauRef: number = 12,
   isActive: boolean = false
 ): string {
   if (isActive) {
     return '#FEF08A'; // Bright active gold glow
   }
 
-  const tpb = ticksPerBeat > 0 ? ticksPerBeat : 48;
-  const ratio = durationTicks / tpb;
+  const tau = tauRef > 0 ? tauRef : 12;
+  const ratio = durationTicks / tau;
 
-  // 16th notes (12t -> 0.25 beats)
-  if (ratio < 0.375) {
-    return '#E2E8F0'; // Crisp White / Silver
+  if (ratio <= 1.0) {
+    return '#E2E8F0'; // Crisp Silver / White (reference quantum)
   }
-  // 8th notes (24t -> 0.5 beats)
-  if (ratio < 0.625) {
-    return '#38BDF8'; // Vibrant Sky Blue
+
+  const k = Math.floor(Math.log2(ratio));
+  if (k <= 0) {
+    return '#E2E8F0'; // Crisp Silver / White (1x)
   }
-  // Dotted 8th notes (36t -> 0.75 beats)
-  if (ratio < 0.875) {
-    return '#818CF8'; // Indigo
+  if (k === 1) {
+    return '#38BDF8'; // Sky Blue (2x, 3x)
   }
-  // Quarter notes (48t -> 1.0 beats)
-  if (ratio < 1.25) {
-    return '#F59E0B'; // Warm Amber
+  if (k === 2) {
+    return '#F59E0B'; // Warm Amber (4x..7x)
   }
-  // Dotted quarter notes (72t -> 1.5 beats)
-  if (ratio < 1.75) {
-    return '#FB923C'; // Orange
-  }
-  // Half notes (96t -> 2.0 beats) and longer (>= 144t)
-  return '#F43F5E'; // Rose
+  return '#F43F5E'; // Rose (>= 8x)
+}
+
+/**
+ * Duration-Class Color Engine:
+ * Colors encode the rhythmic note value / duration of each note relative to ticksPerBeat (48 ticks in standard 4/4 or 3/4):
+ * Delegates to the Unified Euclidean Duration Lattice logarithmic color palette with tauRef = ticksPerBeat / 4.
+ */
+export function getDurationClassColor(
+  durationTicks: number,
+  ticksPerBeat: number = 48,
+  isActive: boolean = false
+): string {
+  const tpb = ticksPerBeat > 0 ? ticksPerBeat : 48;
+  const tauRef = tpb / 4;
+  return getLogarithmicDurationColor(durationTicks, tauRef, isActive);
 }
 
 export function getNoteColor(
@@ -119,8 +125,11 @@ export function getNoteColor(
   }
 
   switch (mode) {
-    case 'duration-class':
-      return getDurationClassColor(durationTicks ?? 12, ticksPerBeat, false);
+    case 'duration-class': {
+      const tpb = ticksPerBeat > 0 ? ticksPerBeat : 48;
+      const tauRef = tpb / 4;
+      return getLogarithmicDurationColor(durationTicks ?? 12, tauRef, false);
+    }
 
     case 'ddr-subdivision':
       return getSubdivisionColor(startTick ?? 0, ticksPerBeat, false);

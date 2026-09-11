@@ -609,6 +609,7 @@ export function buildBachGoldbergVar1Score(): QuantizedGridScore {
     composer: 'Johann Sebastian Bach',
     opus: 'BWV 988',
     ticksPerBeat: TICKS_PER_BEAT,
+    gridResolution: 12,
     totalTicks,
     timeSignatures: [{ tick: 0, numerator: 3, denominator: 4 }],
     barlines,
