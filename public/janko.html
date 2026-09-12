@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jánko Two-Row Engraving Studio</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .title-group h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .title-group p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #334155;
+      color: #f1f5f9;
+      border: 1px solid #475569;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background: #475569;
+      color: #fff;
+    }
+    .btn.active {
+      background: var(--accent);
+      color: #0f172a;
+      border-color: var(--accent);
+    }
+    .zoom-group {
+      display: flex;
+      align-items: center;
+      background: #090d16;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      padding: 2px;
+    }
+    .zoom-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .zoom-btn:hover {
+      color: #fff;
+      background: #1e293b;
+    }
+    .zoom-level {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      padding: 0 8px;
+      min-width: 48px;
+      text-align: center;
+    }
+    main {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-y: auto;
+    }
+    .viewer-card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      margin-bottom: 24px;
+      position: relative;
+      transition: transform 0.15s ease;
+      max-width: 100%;
+    }
+    .viewer-card img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+    .caption-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      max-width: 900px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+    .caption-card h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .caption-card p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .grid-crops {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+    .crop-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .crop-card .img-wrap {
+      background: #fff;
+      padding: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: auto;
+    }
+    .crop-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .crop-card .desc {
+      padding: 12px 16px;
+    }
+    .crop-card .desc h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .crop-card .desc p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <h1>Jánko Two-Row Engraving Studio</h1>
+      <p>Served via Tailscale at <code>http://100.102.70.49:5175/janko.html</code> · Bach Goldberg Var. 1</p>
+    </div>
+    <div class="controls">
+      <div style="display: flex; gap: 4px;">
+        <button class="btn active" id="tab-variants" onclick="switchTab("variants")">Comparison Sheet</button>
+        <button class="btn" id="tab-crops" onclick="switchTab("crops")">Macro Crops (288 DPI)</button>
+        <button class="btn" id="tab-page1" onclick="switchTab("page1")">Full Page 1</button>
+      </div>
+      <div class="zoom-group">
+        <button class="zoom-btn" onclick="adjustZoom(-0.25)">−</button>
+        <span class="zoom-level" id="zoom-label">100%</span>
+        <button class="zoom-btn" onclick="adjustZoom(0.25)">+</button>
+        <button class="zoom-btn" onclick="resetZoom()" style="font-size:10px;">Reset</button>
+      </div>
+      <button class="btn" onclick="reloadImages()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Section 1: Comparison Sheet -->
+    <div id="sec-variants" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+      <div class="caption-card">
+        <h2>Multi-Variant Contact Sheet: mm. 1–4 Across 3 Rhythmic &amp; Lattice Dialects <span class="badge">Side-by-Side</span></h2>
+        <p>Direct comparison of <strong>Variant A</strong> (Angled 35° cuts), <strong>Variant B</strong> (Traditional slope-clamped beams), and <strong>Variant C</strong> (Unified continuous 4-line lattice with horizontal ticks). Hand crossing is naturally disambiguated by stem direction (RH = Up, LH = Down).</p>
+      </div>
+      <div class="viewer-card" id="variants-card">
+        <img id="img-variants" src="/janko_variants.png" alt="Janko Variants Sheet">
+      </div>
+    </div>
+
+    <!-- Section 2: Macro Crops (288 DPI Focus) -->
+    <div id="sec-crops" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+      <div class="caption-card">
+        <h2>Targeted 288 DPI Macro Focus Crops <span class="badge">Enlarged Macro</span></h2>
+        <p>High-resolution enlarged windows focusing on the three critical engraving interaction zones without full-page shrinking.</p>
+      </div>
+      <div class="grid-crops">
+        <div class="crop-card">
+          <div class="img-wrap">
+            <img id="img-m1-m2" src="/janko_m1_m2.png" alt="mm. 1-2 Macro Crop">
+          </div>
+          <div class="desc">
+            <h3>Measures 1–2: Inception &amp; Accolade</h3>
+            <p>Slender copperplate accolade, Position of Honor concentric halo (R = 5.4 pt), Middle C anchor, and clean left margin without boxy bounding barline.</p>
+          </div>
+        </div>
+        <div class="crop-card">
+          <div class="img-wrap">
+            <img id="img-m4" src="/janko_m4.png" alt="m. 4 Macro Crop">
+          </div>
+          <div class="desc">
+            <h3>Measure 4: Cascading RH Run into Octave 3</h3>
+            <p>RH rapid 16th-note run descending into the bass register with dynamic ledger equators, maintaining complete clarity over LH counterpoint.</p>
+          </div>
+        </div>
+        <div class="crop-card">
+          <div class="img-wrap">
+            <img id="img-m8" src="/janko_m8.png" alt="m. 8 Macro Crop">
+          </div>
+          <div class="desc">
+            <h3>Measure 8: Rapid 16th Cluster Spacing</h3>
+            <p>Evaluation of horizontal notehead clearance (R = 4.2 pt) during rapid motoric sixteenth-note runs.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Full Page 1 Spread -->
+    <div id="sec-page1" style="display: none; flex-direction: column; align-items: center; width: 100%;">
+      <div class="caption-card">
+        <h2>Page 1 Spread: Systems 1–3 (Measures 1–12) <span class="badge">A4 Portrait</span></h2>
+        <p>Full-page layout showing vertical system balance, Urtext typography, measure numerals at system starts only, and clean breathing room.</p>
+      </div>
+      <div class="viewer-card" id="page1-card">
+        <img id="img-page1" src="/janko_portrait_page1.png" alt="Janko Page 1">
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentZoom = 1.0;
+
+    function switchTab(tab) {
+      document.querySelectorAll(".controls .btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-" + tab).classList.add("active");
+
+      document.getElementById("sec-variants").style.display = (tab === "variants") ? "flex" : "none";
+      document.getElementById("sec-crops").style.display = (tab === "crops") ? "flex" : "none";
+      document.getElementById("sec-page1").style.display = (tab === "page1") ? "flex" : "none";
+    }
+
+    function adjustZoom(delta) {
+      currentZoom = Math.max(0.5, Math.min(3.0, currentZoom + delta));
+      applyZoom();
+    }
+
+    function resetZoom() {
+      currentZoom = 1.0;
+      applyZoom();
+    }
+
+    function applyZoom() {
+      document.getElementById("zoom-label").textContent = Math.round(currentZoom * 100) + "%";
+      const cards = [document.getElementById("variants-card"), document.getElementById("page1-card")];
+      cards.forEach(c => {
+        if (c) {
+          c.style.transform = `scale(${currentZoom})`;
+          c.style.transformOrigin = "top center";
+        }
+      });
+      document.querySelectorAll(".crop-card img").forEach(img => {
+        img.style.transform = `scale(${currentZoom})`;
+        img.style.transformOrigin = "center center";
+      });
+    }
+
+    function reloadImages() {
+      const t = Date.now();
+      ["img-variants", "img-m1-m2", "img-m4", "img-m8", "img-page1"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          const base = el.src.split("?")[0];
+          el.src = base + "?v=" + t;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
