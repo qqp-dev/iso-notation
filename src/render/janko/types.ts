@@ -30,6 +30,8 @@ export interface JankoTokens {
   rowHeight: number;
   /** White-knockout circular notehead radius. */
   noteheadRadius: number;
+  /** Duodecimal digit font size (pt) — must fit inside the knockout disc. */
+  digitFontSize: number;
   /** Position of Honor concentric halo ring radius. */
   haloRadius: number;
   /** Octave equator step (2 * rowHeight). */
@@ -58,6 +60,8 @@ export interface JankoTokens {
   ledgerHalfWidth?: number;
   /** Primary beam thickness. */
   beamThickness?: number;
+  /** Absolute clamp for a beam connector slope (rise over run). */
+  maxBeamSlope?: number;
   /** Accolade-to-staff gap. */
   accoladeGap?: number;
   /** Radius of a dotted-rhythm augmentation dot. */
@@ -76,6 +80,7 @@ export type ResolvedJankoTokens = Required<JankoTokens>;
 export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   rowHeight: 15.0,
   noteheadRadius: 4.2,
+  digitFontSize: 6.5,
   haloRadius: 5.4,
   octaveStep: 30.0,
   accoladeWidth: 7.0,
@@ -89,6 +94,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   ticksPerBeat: 48,
   ledgerHalfWidth: 7.0,
   beamThickness: 1.8,
+  maxBeamSlope: 0.22,
   accoladeGap: 7.0,
   augmentationDotRadius: 1.3,
 };
@@ -131,6 +137,10 @@ export interface JankoLayoutOptions {
   showOctaveLabels?: boolean;
   /** Draw m.d./m.s. hand labels. */
   showHandLabels?: boolean;
+  /** Draw stacked time signature numerals (e.g. 3/4) on opening measure. */
+  showTimeSignature?: boolean;
+  /** Draw subtle vertical dashed pulse lines on beats 2, 3, … (Klavarskribo beat grid). */
+  showBeatGrid?: boolean;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -145,22 +155,24 @@ export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
 /** Default macro-layout: 3 systems of 4 measures on A4 portrait. */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   measuresPerSystem: 4,
-  rhythmStyle: 'angled-cuts',
+  rhythmStyle: 'beamed',
   interStaffGap: 45.0,
   middleCSpine: 'dashed',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   ticksPerBeat: 48,
   measureInset: 6.0,
-  timeSignatureWidth: 20.0,
+  timeSignatureWidth: 0,
   pageWidth: 595.28,
   pageHeight: 841.89,
   pageMargin: 36.0,
   headerHeight: 48.0,
   footerHeight: 24.0,
   showMeasureNumbers: true,
-  showOctaveLabels: true,
-  showHandLabels: true,
+  showOctaveLabels: false,
+  showHandLabels: false,
+  showTimeSignature: false,
+  showBeatGrid: true,
   title: 'J.S. Bach: Goldberg Variations, BWV 988',
   subtitle: 'Variatio 1. a 1 Clav. — Jánko Two-Row Equator System',
   composer: 'Johann Sebastian Bach',

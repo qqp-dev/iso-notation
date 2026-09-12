@@ -174,9 +174,11 @@ export function renderHandLabels(
 /** 3/4 time signature, aligned on the inner equators of both hands. */
 export function renderTimeSignature(
   geo: JankoSystemGeometry,
-  _options?: Partial<JankoLayoutOptions> | null,
+  options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null
 ): string {
+  const o = resolveJankoOptions(options);
+  if (!o.showTimeSignature) return '';
   const t = resolveJankoTokens(tokens);
   const tsx = geo.staffLeft + t.measureInset + 4;
   const out: string[] = ['  <g class="janko-time-signature">'];

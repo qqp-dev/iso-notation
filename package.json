@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5175",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "lint:engraving": "tsx scripts/lint_engraving.ts",
     "janko:export": "node --import tsx scripts/render_janko_suite.ts",
     "janko:watch": "tsx watch scripts/render_janko_suite.ts"
   },

@@ -47,13 +47,15 @@ import {
 } from './elements/staff';
 import { renderNotehead } from './elements/notehead';
 import {
+  JankoBeamGroupGeometry,
   JankoRhythmNote,
+  computeBeamGroupGeometry,
   partitionBeamGroups,
   renderBeamGroup,
   renderRhythm,
 } from './elements/rhythm';
 import { renderAccolade, renderCaptionLines, wrapCaptionText } from './elements/accolade';
-import { renderBarlines, renderMeasureNumber } from './elements/barlines';
+import { renderBarlines, renderBeatGrid, renderMeasureNumber } from './elements/barlines';
 
 /** Vertical reserve above a crop for its caption band (pt). */
 const CROP_CAPTION_HEIGHT = 15.0;
@@ -177,8 +179,39 @@ function renderPageFooter(geo: JankoPageGeometry, pageIndex: number, totalPages:
 }
 
 // ---------------------------------------------------------------------------
-// Note positioning
+// Layout model (shared by the renderers, the visual linter and the studio)
 // ---------------------------------------------------------------------------
+
+/**
+ * System geometry for a **global** system index.
+ *
+ * Every page reuses the same vertical slot rhythm, so the geometry of system
+ * `n` (0-based, across the whole score) is the geometry of slot
+ * `n % systemsPerPage` on its page. This is what lets pages 2, 3, … and macro
+ * crops of late measures render correctly instead of silently collapsing to an
+ * empty page.
+ */
+export function getSystemGeometry(
+  geo: JankoPageGeometry,
+  systemIndex: number
+): JankoSystemGeometry {
+  const perPage = Math.max(1, geo.systemsPerPage);
+  const slot = ((systemIndex % perPage) + perPage) % perPage;
+  return geo.systems[slot];
+}
+
+/** Total horizontal systems engraved for a score. */
+export function countJankoSystems(
+  score: QuantizedGridScore,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): number {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const totalTicks = score.totalTicks || 0;
+  const measuresTotal = Math.max(1, Math.ceil(totalTicks / t.ticksPerMeasure));
+  return Math.max(1, Math.ceil(measuresTotal / Math.max(1, o.measuresPerSystem)));
+}
 
 /** One positioned note with its resolved geometry and rhythm payload. */
 export interface PositionedJankoNote {
@@ -189,11 +222,26 @@ export interface PositionedJankoNote {
   rhythm: JankoRhythmNote;
 }
 
+/** Every geometric fact one engraved system is built from. */
+export interface JankoSystemLayout {
+  /** Zero-based global system index. */
+  index: number;
+  /** Absolute page geometry of the system's slot. */
+  geometry: JankoSystemGeometry;
+  /** Notes of this system, in engraving order (tick, then pitch class). */
+  notes: PositionedJankoNote[];
+  /** Beamed groups with fully resolved beam/stem geometry ([] when unbeamed). */
+  beams: JankoBeamGroupGeometry[];
+  /** Short notes engraved with a standalone tick instead of a beam. */
+  ungrouped: JankoRhythmNote[];
+}
+
 function handForNote(note: QuantizedNote): Hand {
   return note.hand ?? (note.pitch.octave >= 4 ? 'RH' : 'LH');
 }
 
-function positionNote(
+/** Position a single note inside one system (page pt coordinates). */
+export function positionJankoNote(
   note: QuantizedNote,
   geo: JankoSystemGeometry,
   systemIndex: number,
@@ -203,9 +251,10 @@ function positionNote(
   const { measureOffset, tickInMeasure } = splitTick(note.startTick, t);
   const measureIdx = measureOffset - systemIndex * geo.measuresPerSystem;
   const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
-  const insets = isOpeningMeasure
-    ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
-    : undefined;
+  const insets =
+    isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
+      ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
+      : undefined;
 
   const x =
     geo.staffLeft +
@@ -229,25 +278,96 @@ function positionNote(
   };
 }
 
+/** Position every note of one system, in engraving order. */
+export function layoutJankoSystem(
+  score: QuantizedGridScore,
+  geo: JankoPageGeometry,
+  systemIndex: number,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): JankoSystemLayout {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const geometry = getSystemGeometry(geo, systemIndex);
+  const mps = geometry.measuresPerSystem;
+  const startTick = systemIndex * mps * t.ticksPerMeasure;
+  const endTick = startTick + mps * t.ticksPerMeasure;
+  const sysNotes = score.notes
+    .filter((n) => n.startTick >= startTick && n.startTick < endTick)
+    .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
+  const notes = sysNotes.map((n) => positionJankoNote(n, geometry, systemIndex, o, t));
+
+  let beams: JankoBeamGroupGeometry[] = [];
+  let ungrouped: JankoRhythmNote[] = [];
+  if (o.rhythmStyle === 'beamed') {
+    const partition = partitionBeamGroups(
+      notes.map((p) => p.rhythm),
+      t
+    );
+    beams = partition.groups
+      .map((group) => computeBeamGroupGeometry(group, t))
+      .filter((g): g is JankoBeamGroupGeometry => g !== null);
+    ungrouped = partition.ungrouped;
+  }
+
+  return { index: systemIndex, geometry, notes, beams, ungrouped };
+}
+
+/** Position every system of a score (used by the linter and the studio). */
+export function layoutJankoScore(
+  score: QuantizedGridScore,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): JankoSystemLayout[] {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const geo = computePageGeometry(o, t);
+  const total = countJankoSystems(score, o, t);
+  const out: JankoSystemLayout[] = [];
+  for (let s = 0; s < total; s++) out.push(layoutJankoSystem(score, geo, s, o, t));
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // System rendering
 // ---------------------------------------------------------------------------
 
 function renderNotesLayer(
-  positioned: PositionedJankoNote[],
-  geo: JankoSystemGeometry,
+  layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): string {
   const out: string[] = ['  <g class="janko-notes">'];
-  const rhythmNotes: JankoRhythmNote[] = [];
 
-  for (const p of positioned) {
-    // 1. Dynamic ledger equators for out-of-staff octaves.
+  // 1. Dynamic ledger equators for out-of-staff octaves. They form their own
+  //    layer so a later note's ledger can never cut through an earlier note's
+  //    white knockout (see the linter's knockout pass-through audit).
+  const ledgers: string[] = [];
+  for (const p of layout.notes) {
     for (const ledgerY of p.coord.ledgerYs) {
-      out.push(renderLedgerEquator(p.x, geo.middleCY + ledgerY, t));
+      ledgers.push(renderLedgerEquator(p.x, layout.geometry.middleCY + ledgerY, t));
     }
-    // 2. Position of Honor halo + white knockout + duodecimal digit.
+  }
+  if (ledgers.length > 0) {
+    out.push('    <g class="janko-ledger-layer">');
+    out.push(...ledgers);
+    out.push('    </g>');
+  }
+
+  // 2. Rhythm layer (the beamed dialect renders its stems group-wise). It is
+  //    painted *beneath* the noteheads so the white knockouts erase whatever
+  //    stem or beam passes behind a glyph — the invariant the linter audits.
+  if (o.rhythmStyle === 'beamed') {
+    for (const beam of layout.beams) {
+      out.push(renderBeamGroup(beam.notes, t));
+    }
+    for (const n of layout.ungrouped) out.push(renderRhythm(n, 'beamed', t));
+  } else {
+    for (const p of layout.notes) out.push(renderRhythm(p.rhythm, o.rhythmStyle, t));
+  }
+
+  // 3. Position of Honor halo + white knockout + duodecimal digit, last.
+  for (const p of layout.notes) {
     out.push(
       renderNotehead(
         {
@@ -260,17 +380,6 @@ function renderNotesLayer(
         t
       )
     );
-    // 3. Rhythm (the beamed dialect renders its stems group-wise below).
-    rhythmNotes.push(p.rhythm);
-    if (o.rhythmStyle !== 'beamed') {
-      out.push(renderRhythm(p.rhythm, o.rhythmStyle, t));
-    }
-  }
-
-  if (o.rhythmStyle === 'beamed') {
-    const { groups, ungrouped } = partitionBeamGroups(rhythmNotes, t);
-    for (const group of groups) out.push(renderBeamGroup(group, t));
-    for (const n of ungrouped) out.push(renderRhythm(n, 'beamed', t));
   }
 
   out.push('  </g>');
@@ -286,19 +395,14 @@ export function renderSystem(
   geo: JankoSystemGeometry,
   systemIndex: number,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  layout?: JankoSystemLayout
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
-  const mps = geo.measuresPerSystem;
-  const startMeasureOffset = systemIndex * mps;
-  const startTick = startMeasureOffset * t.ticksPerMeasure;
-  const endTick = startTick + mps * t.ticksPerMeasure;
-  const sysNotes = score.notes
-    .filter((n) => n.startTick >= startTick && n.startTick < endTick)
-    .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
-
-  const positioned = sysNotes.map((n) => positionNote(n, geo, systemIndex, o, t));
+  const resolved =
+    layout ?? layoutJankoSystem(score, computePageGeometry(o, t), systemIndex, o, t);
+  const startMeasureOffset = systemIndex * geo.measuresPerSystem;
 
   const out: string[] = [];
   out.push(`  <g id="system-${systemIndex + 1}">`);
@@ -312,8 +416,9 @@ export function renderSystem(
   }
   out.push(renderOctaveLabels(geo, o, t));
   out.push(renderStaffLines(geo, o, t));
+  out.push(renderBeatGrid(geo, systemIndex, o, t));
   out.push(renderBarlines(geo, o, t));
-  out.push(renderNotesLayer(positioned, geo, o, t));
+  out.push(renderNotesLayer(resolved, o, t));
   out.push('  </g>');
   return out.join('\n');
 }
@@ -330,8 +435,10 @@ export function renderSystemsBody(
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const out: string[] = [];
-  for (let s = Math.max(0, firstSystem); s <= lastSystem && s < geo.systems.length; s++) {
-    out.push(renderSystem(score, geo.systems[s], s, o, t));
+  const total = countJankoSystems(score, o, t);
+  const last = Math.min(lastSystem, total - 1);
+  for (let s = Math.max(0, firstSystem); s <= last; s++) {
+    out.push(renderSystem(score, getSystemGeometry(geo, s), s, o, t));
   }
   return out.join('\n');
 }
@@ -368,9 +475,10 @@ export function renderJankoPage(
   const firstSystem = pageIndex * geo.systemsPerPage;
 
   const body: string[] = [];
+  const totalSystems = countJankoSystems(score, o, t);
   for (let s = firstSystem; s < firstSystem + geo.systemsPerPage; s++) {
-    if (s >= geo.systems.length) break;
-    body.push(renderSystem(score, geo.systems[s], s, o, t));
+    if (s >= totalSystems) break;
+    body.push(renderSystem(score, getSystemGeometry(geo, s), s, o, t));
   }
 
   return [
@@ -420,9 +528,10 @@ export function computeCropBox(
 
   let staffTop = Infinity;
   let staffBottom = -Infinity;
-  for (let s = firstSystem; s <= lastSystem && s < geo.systems.length; s++) {
-    staffTop = Math.min(staffTop, geo.systems[s].staffTopY);
-    staffBottom = Math.max(staffBottom, geo.systems[s].staffBotY);
+  for (let s = firstSystem; s <= lastSystem; s++) {
+    const sys = getSystemGeometry(geo, s);
+    staffTop = Math.min(staffTop, sys.staffTopY);
+    staffBottom = Math.max(staffBottom, sys.staffBotY);
   }
   if (!Number.isFinite(staffTop)) {
     staffTop = geo.systems[0].staffTopY;

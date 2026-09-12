@@ -1,8 +1,39 @@
 # Jánko Two-Row Engraving Ergonomics Harness
 
 > First-class iteration loop for the **Jánko Two-Row Equator** grand staff:
-> modular engine, targeted macro crops and multi-variant contact sheets in
-> sub-second time.
+> a modular engine, a **live two-view web studio**, a **mathematical visual
+> linter** and targeted macro crops in sub-second time.
+
+---
+
+## 0. The review loop (read this first)
+
+Design review happens **on the live website**, never by refreshing PNGs:
+
+| Surface | URL | Purpose |
+| --- | --- | --- |
+| Candidates view | `http://100.102.70.49:5175/janko.html#candidates` | the 2–4 candidates of the *current decision round*, side by side |
+| Reference view | `http://100.102.70.49:5175/janko.html#reference` | the golden master: full page spread + macro crops + lint diagnostics |
+
+- `janko.html` is a **Vite entry** that imports `src/render/janko/studio.ts`;
+  every SVG is rendered in the browser by the same TypeScript engine used by the
+  CLI, so the page **cannot drift** from the engraving code.
+- Vite HMR (`import.meta.hot`) re-renders both views in place on every edit
+  under `src/render/janko/` — zero user action.
+- Candidates are declared in `src/render/janko/candidates.ts`
+  (`CURRENT_ROUND_METADATA` + `CURRENT_CANDIDATES`); the page template is never
+  edited.
+- Zoom: `+`/`−`/`Reset` buttons, `+`/`−`/`0` keys, `Ctrl/⌘ + wheel`, 50 %–300 %.
+- `public/janko.html` is a byte-identical mirror of the root entry (the dev
+  server serves the public copy verbatim; the production build processes the
+  root entry), enforced by `test/janko-studio.test.ts`.
+
+Implementers verify the same engraving **without rendering anything**:
+
+```bash
+npm run lint:engraving            # ~25 ms, JSON/strict/quiet flags available
+npm test                          # 128 tests, < 1 s, includes the linter + studio suites
+```
 
 ---
 
@@ -35,7 +66,10 @@ npm run janko:watch    # same suite on every file change
 src/render/janko/
 ├── types.ts              JankoTokens + JankoLayoutOptions + defaults
 ├── geometry.ts           pure pitch/tick math (no SVG, no I/O)
-├── engine.ts             page / crop / variant composition
+├── engine.ts             page / crop / variant composition + shared layout model
+├── candidates.ts         declarative candidate registry for the current round
+├── linter.ts             mathematical visual linter (knockouts, clearance, beams, corridor)
+├── studio.ts             two-view live studio renderer (Vite HMR entry)
 └── elements/
     ├── staff.ts          octave equators, Middle C spine, row guides, ledgers
     ├── notehead.ts       white knockout, URW Gothic digit, Position of Honor halo
@@ -84,10 +118,39 @@ const svg = renderJankoCrop(score, 4, 1, { rhythmStyle: 'beamed' }, { haloRadius
 renderJankoPage(score, pageIndex, options?, tokens?): string
 renderJankoCrop(score, measureStart, measureCount, options?, tokens?, caption?): string
 renderJankoVariantComparison(score, variants?, measureStart?, measureCount?, baseOptions?, tokens?): string
+layoutJankoScore(score, options?, tokens?): JankoSystemLayout[]   // shared geometry model
 ```
 
 Crops are exact viewBox narrowings of the full page, so a macro crop is
 pixel-identical to the corresponding page region — no parallel layout path.
+`layoutJankoScore` is the single source of truth for positioned noteheads and
+resolved beam geometry; the renderers, the linter and the studio all consume it.
+
+### Visual linter
+
+`lintJankoScore(score, options?, tokens?, lintOptions?)` returns
+`{ ok, violations, warnings, diagnostics, stats }` after checking, in ~25 ms:
+
+| Check | Invariant |
+| --- | --- |
+| Notehead clearance | discs never overlap; chordal heads that land on one page point are warned |
+| Knockout coverage | the 6.5 pt digit fits inside the `r = 4.2 pt` mask with white margin |
+| Knockout paint order | every digit owns a mask, every mask owns a digit, and nothing painted later may cut through it |
+| Stem & beam validity | stems attach inside their own disc, land exactly on the beam centerline, slope ≤ 0.25 |
+| Barline clearance | heads, stems and beams keep ≥ 1 pt from every barline |
+| Margin furniture | measure numeral and accolade stay on the page, clear of the staff and each other |
+| Middle C corridor | no structural rule or beam crosses the spine; the spine never cuts a glyph |
+
+`npm run lint:engraving [--json|--strict|--quiet]` is the CLI (`0` clean,
+`1` violations, `--strict` also fails on warnings).
+
+### Two-view studio
+
+```ts
+renderCandidatesView(config?): string   // View 1 · Decision Candidates Matrix
+renderReferenceView(config?): string    // View 2 · Golden Reference Object
+mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-mount
+```
 
 ---
 
@@ -119,16 +182,17 @@ fallback.
 ## 4. Verification
 
 ```bash
-npm test            # includes test/janko-engraving.test.ts
-npm run janko:export
-npm run build
+npm test                          # 128 tests, < 1 s
+npm run lint:engraving            # visual lint of the golden master
+npm run janko:export              # refresh the mobile-app PNG artifacts
+npm run build                     # tsc + vite (index.html + janko.html entries)
 ```
 
-`test/janko-engraving.test.ts` locks the geometry invariants (rank mapping,
-lane offsets, 15 pt row steps, 30 pt octave steps, ledger accumulation, halo
-placement, tick spacing), the engine composition (page/crop equivalence,
-pluggable rhythm dialects, variant sheet), and the export suite itself
-(five PNGs in every delivery location, under the 2-second budget).
+| Suite | Locks |
+| --- | --- |
+| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, ledger accumulation, halo placement, tick spacing), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
+| `test/janko-linter.test.ts` | the report contract, the clean golden master, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating stem, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
+| `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test
 (Bach Variation 1 m. 8 does not contain that literal figure); the exported

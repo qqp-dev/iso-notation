@@ -1,0 +1,1150 @@
+/**
+ * Jánko Implementer Visual Linter
+ * ===============================
+ *
+ * Headless implementers cannot *see* an engraving, and rasterizing one just to
+ * notice that two noteheads touch is a slow feedback loop. This module verifies
+ * the aesthetics of a Jánko Two-Row engraving **mathematically**, in
+ * milliseconds, over the exact same layout model the renderer uses
+ * ({@link layoutJankoScore}) plus a paint-order audit of the emitted SVG.
+ *
+ * Checked invariants
+ * ------------------
+ * 1. **Knockout protection** — every duodecimal digit owns an opaque white
+ *    knockout disc, the glyph fits inside that disc, and nothing painted after
+ *    the disc (staff rules, row guidelines, ledger equators, beat grid, stems,
+ *    beams, barlines) may cut through it. This is the invariant that guarantees
+ *    "zero staff/beat line pass-through".
+ * 2. **Collision & clearance** — notehead discs may not overlap (chords are
+ *    allowed to *stack*, not to occupy the same point), and nothing may collide
+ *    with a barline.
+ * 3. **Corridor & guideline integrity** — the Middle C channel stays free of
+ *    structural rules and beams, and the spine is never cut by a glyph.
+ * 4. **Beam & stem validity** — stems attach inside their notehead and reach
+ *    the beam centerline exactly (no overshoot, no gap), and every beam slope
+ *    stays inside the acceptable threshold.
+ * 5. **Accolade & measure numeral clearances** — the left-margin furniture
+ *    never collides with the music or with itself.
+ *
+ * Usage
+ * -----
+ * ```ts
+ * const report = lintJankoScore(score, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+ * if (!report.ok) for (const v of report.violations) console.error(v.message);
+ * ```
+ */
+
+import { QuantizedGridScore } from '../../model/types';
+import {
+  JankoLayoutOptions,
+  JankoTokens,
+  ResolvedJankoLayoutOptions,
+  ResolvedJankoTokens,
+  resolveJankoOptions,
+  resolveJankoTokens,
+} from './types';
+import { JankoSystemLayout, PositionedJankoNote, layoutJankoScore, renderSystem } from './engine';
+import { JANKO_DIGIT_BASELINE_OFFSET } from './elements/notehead';
+
+// ---------------------------------------------------------------------------
+// Report model
+// ---------------------------------------------------------------------------
+
+/** Diagnostics are either hard engraving defects (`error`) or known risks. */
+export type JankoLintSeverity = 'error' | 'warning';
+
+/** Stable diagnostic identifiers (safe to assert on in tests). */
+export type JankoLintCode =
+  | 'notehead-overlap'
+  | 'chordal-overlap'
+  | 'knockout-missing'
+  | 'knockout-empty'
+  | 'knockout-undersized'
+  | 'knockout-pass-through'
+  | 'stem-detached'
+  | 'beam-slope'
+  | 'beam-stem-gap'
+  | 'barline-collision'
+  | 'measure-numeral-collision'
+  | 'accolade-collision'
+  | 'corridor-intrusion';
+
+/** One diagnostic, located on the page and in musical time. */
+export interface LintViolation {
+  code: JankoLintCode;
+  severity: JankoLintSeverity;
+  /** Human-readable, implementer-facing description. */
+  message: string;
+  /** Zero-based global system index. */
+  system: number;
+  /** One-based measure number, when the diagnostic concerns musical content. */
+  measure?: number;
+  /** Note ids involved, when applicable. */
+  noteIds?: string[];
+  /** Page pt coordinates of the defect. */
+  x?: number;
+  y?: number;
+  /** Numeric evidence (distances, slopes, radii, …). */
+  metrics?: Record<string, number>;
+}
+
+/** Structured result of {@link lintJankoScore}. */
+export interface LintReport {
+  /** True when no `error`-severity diagnostic was found. */
+  ok: boolean;
+  /** Hard engraving defects (empty for a clean golden master). */
+  violations: LintViolation[];
+  /** Non-blocking risks worth a designer's attention. */
+  warnings: LintViolation[];
+  /** `violations` + `warnings`, in detection order. */
+  diagnostics: LintViolation[];
+  stats: {
+    systems: number;
+    measures: number;
+    notes: number;
+    beams: number;
+    checks: number;
+    violations: number;
+    warnings: number;
+    durationMs: number;
+  };
+}
+
+/** Tunable thresholds for the visual linter. */
+export interface JankoLintOptions {
+  /** Maximum acceptable |slope| of a beam connector. */
+  maxBeamSlope: number;
+  /** Minimum air (pt) between a glyph and a barline / margin furniture. */
+  minClearance: number;
+  /** Band (pt) around the Middle C spine that structural rules must avoid. */
+  corridorClearance: number;
+  /** Approximate advance width of a digit as a fraction of its font size. */
+  digitAdvance: number;
+  /** Approximate cap height of a digit as a fraction of its font size. */
+  digitCapHeight: number;
+  /** Minimum white margin (pt) a knockout must leave around the digit box. */
+  knockoutMargin: number;
+  /** Run the SVG paint-order audit (slower, catches layer regressions). */
+  auditPaintOrder: boolean;
+}
+
+/** Canonical linter thresholds (aligned with the golden master). */
+export const DEFAULT_JANKO_LINT_OPTIONS: JankoLintOptions = {
+  maxBeamSlope: 0.25,
+  minClearance: 1.0,
+  corridorClearance: 2.0,
+  digitAdvance: 0.35,
+  digitCapHeight: 0.38,
+  knockoutMargin: 0.25,
+  auditPaintOrder: true,
+};
+
+/** Names of every check the linter runs, for coverage reporting. */
+export const JANKO_LINT_CHECKS = [
+  'notehead-clearance',
+  'knockout-coverage',
+  'stem-beam-validity',
+  'barline-clearance',
+  'measure-numeral-clearance',
+  'accolade-clearance',
+  'middle-c-corridor',
+  'knockout-paint-order',
+] as const;
+
+// ---------------------------------------------------------------------------
+// Small geometric helpers
+// ---------------------------------------------------------------------------
+
+interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+const EPS = 1e-6;
+
+function box(x0: number, y0: number, x1: number, y1: number): Box {
+  return { x0: Math.min(x0, x1), y0: Math.min(y0, y1), x1: Math.max(x0, x1), y1: Math.max(y0, y1) };
+}
+
+function boxesOverlap(a: Box, b: Box, clearance = 0): boolean {
+  return (
+    a.x0 - clearance < b.x1 &&
+    b.x0 - clearance < a.x1 &&
+    a.y0 - clearance < b.y1 &&
+    b.y0 - clearance < a.y1
+  );
+}
+
+/** Distance from a point to an axis-aligned box (0 when inside). */
+function pointToBoxDistance(px: number, py: number, b: Box): number {
+  const dx = Math.max(b.x0 - px, 0, px - b.x1);
+  const dy = Math.max(b.y0 - py, 0, py - b.y1);
+  return Math.hypot(dx, dy);
+}
+
+/** Distance from a point to a line segment. */
+function pointToSegmentDistance(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const len2 = vx * vx + vy * vy;
+  if (len2 <= EPS) return Math.hypot(px - x1, py - y1);
+  const tt = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / len2));
+  return Math.hypot(px - (x1 + tt * vx), py - (y1 + tt * vy));
+}
+
+/** Approximate advance width of a short text run. */
+function textWidth(text: string, fontSize: number, advance: number): number {
+  return text.length * fontSize * advance;
+}
+
+/** One-based measure number of an absolute tick. */
+function measureOfTick(tick: number, t: ResolvedJankoTokens): number {
+  return Math.floor(tick / t.ticksPerMeasure) + 1;
+}
+
+/** Disc of a notehead as a box (used for clearance math). */
+function noteDisc(p: PositionedJankoNote, r: number): Box {
+  return box(p.x - r, p.y - r, p.x + r, p.y + r);
+}
+
+/** Vertical extents of one hand's structural rules (barline / beat grid). */
+function handRuleSpans(
+  layout: JankoSystemLayout
+): Array<{ hand: 'RH' | 'LH'; top: number; bottom: number }> {
+  const g = layout.geometry;
+  return [
+    { hand: 'RH', top: g.equatorY('RH', 5) - 12, bottom: g.equatorY('RH', 4) + 12 },
+    { hand: 'LH', top: g.equatorY('LH', 3) - 12, bottom: g.equatorY('LH', 2) + 12 },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// 1. Notehead clearance
+// ---------------------------------------------------------------------------
+
+/**
+ * Notehead discs may never overlap. Chordal notes (same onset) are exempt from
+ * the *horizontal* rule — they are stacked vertically by design — but a chord
+ * whose heads land on the same page point still destroys information (the later
+ * digit erases the earlier one), so it is reported as a warning.
+ */
+export function checkNoteheadClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const r = t.noteheadRadius;
+  const sorted = [...layout.notes].sort((a, b) => a.x - b.x || a.y - b.y);
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i];
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j];
+      const dx = Math.abs(b.x - a.x);
+      if (dx >= 2 * r - EPS) break;
+      const dy = Math.abs(b.y - a.y);
+      if (dy >= 2 * r - EPS) continue;
+      const chordal = a.note.startTick === b.note.startTick;
+      const distance = Math.hypot(dx, dy);
+      const detail = {
+        dx,
+        dy,
+        distance,
+        required: 2 * r,
+      };
+      const base = {
+        system: layout.index,
+        measure: measureOfTick(Math.min(a.note.startTick, b.note.startTick), t),
+        noteIds: [a.note.id, b.note.id],
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2,
+        metrics: detail,
+      };
+      if (chordal) {
+        out.push({
+          code: 'chordal-overlap',
+          severity: 'warning',
+          message:
+            `Chordal noteheads ${a.note.id} (${a.coord.hand} pc${a.coord.pitchClass} o${a.coord.octave}) and ` +
+            `${b.note.id} (${b.coord.hand} pc${b.coord.pitchClass} o${b.coord.octave}) are ${distance.toFixed(2)}pt apart: ` +
+            `the later knockout erases the earlier digit. Displace the voices or merge the heads.`,
+          ...base,
+        });
+      } else {
+        out.push({
+          code: 'notehead-overlap',
+          severity: 'error',
+          message:
+            `Noteheads ${a.note.id} and ${b.note.id} overlap (${distance.toFixed(2)}pt apart, ` +
+            `${(2 * r).toFixed(2)}pt required; dx=${dx.toFixed(2)}, dy=${dy.toFixed(2)}).`,
+          ...base,
+        });
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. Knockout coverage (geometry side)
+// ---------------------------------------------------------------------------
+
+/**
+ * The white knockout must be at least as large as the notehead radius, and the
+ * duodecimal glyph must fit inside it with a white margin — otherwise the digit
+ * pokes out of its own mask and staff lines touch the glyph.
+ */
+export function checkKnockoutCoverage(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const r = t.noteheadRadius;
+  const halfW = t.digitFontSize * lint.digitAdvance;
+  const halfH = t.digitFontSize * lint.digitCapHeight;
+  const required = Math.hypot(halfW, halfH) + lint.knockoutMargin;
+  for (const p of layout.notes) {
+    if (r + EPS < required) {
+      out.push({
+        code: 'knockout-undersized',
+        severity: 'error',
+        message:
+          `Knockout r=${r.toFixed(2)}pt cannot shield the ${t.digitFontSize}pt digit ` +
+          `(needs r>=${required.toFixed(2)}pt): staff lines would graze the glyph.`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: p.x,
+        y: p.y,
+        metrics: { radius: r, required, digitFontSize: t.digitFontSize },
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. Stem & beam validity
+// ---------------------------------------------------------------------------
+
+/**
+ * Stems must attach inside their notehead disc and reach the beam centerline
+ * exactly (no overshoot, no shortfall). Beam slopes must stay inside the
+ * acceptable threshold, no matter how wide the leap.
+ */
+export function checkStemAndBeamValidity(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const r = t.noteheadRadius;
+  for (const p of layout.notes) {
+    const dir = p.coord.hand === 'RH' ? -1 : 1;
+    const stemX = dir === -1 ? p.x + r - 0.4 : p.x - r + 0.4;
+    const stemStartY = p.y + dir * 1.5;
+    const attach = Math.hypot(stemX - p.x, stemStartY - p.y);
+    if (attach > r + EPS) {
+      out.push({
+        code: 'stem-detached',
+        severity: 'error',
+        message:
+          `Stem of ${p.note.id} attaches ${attach.toFixed(2)}pt from the notehead centre ` +
+          `(disc r=${r.toFixed(2)}pt): the stem floats off the head.`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: stemX,
+        y: stemStartY,
+        metrics: { attach, radius: r, stemX, stemStartY },
+      });
+    }
+  }
+
+  for (const beam of layout.beams) {
+    const ids = beam.notes.map((n) => n.id);
+    const measure = measureOfTick(beam.notes[0].startTick, t);
+    if (Math.abs(beam.slope) > lint.maxBeamSlope + EPS) {
+      out.push({
+        code: 'beam-slope',
+        severity: 'error',
+        message:
+          `Beam slope ${beam.slope.toFixed(3)} exceeds the ${lint.maxBeamSlope} threshold ` +
+          `(raw ${beam.rawSlope.toFixed(3)}) — the connector is not clamped.`,
+        system: layout.index,
+        measure,
+        noteIds: ids,
+        x: beam.primary.x1,
+        y: beam.primary.y1,
+        metrics: { slope: beam.slope, rawSlope: beam.rawSlope, limit: lint.maxBeamSlope },
+      });
+    }
+    for (let i = 0; i < beam.stems.length; i++) {
+      const stem = beam.stems[i];
+      if (stem.stemX < beam.primary.x1 - EPS || stem.stemX > beam.primary.x2 + EPS) {
+        out.push({
+          code: 'beam-stem-gap',
+          severity: 'error',
+          message: `Stem of ${beam.notes[i].id} falls outside the beam connector span.`,
+          system: layout.index,
+          measure,
+          noteIds: [beam.notes[i].id],
+          x: stem.stemX,
+          y: stem.stemEndY,
+          metrics: { stemX: stem.stemX, spanX1: beam.primary.x1, spanX2: beam.primary.x2 },
+        });
+      }
+      if (stem.direction !== beam.direction) {
+        out.push({
+          code: 'stem-detached',
+          severity: 'error',
+          message: `Stem of ${beam.notes[i].id} points against its hand (${stem.direction} vs ${beam.direction}).`,
+          system: layout.index,
+          measure,
+          noteIds: [beam.notes[i].id],
+          x: stem.stemX,
+          y: stem.stemStartY,
+          metrics: { direction: stem.direction, expected: beam.direction },
+        });
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Barline clearance
+// ---------------------------------------------------------------------------
+
+/** No glyph (head, stem or beam) may collide with a barline. */
+export function checkBarlineClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const g = layout.geometry;
+  const r = t.noteheadRadius;
+  const spans = handRuleSpans(layout);
+  const barlines: Array<{ x: number; top: number; bottom: number }> = [];
+  for (let m = 0; m < o.measuresPerSystem; m++) {
+    const x = g.staffLeft + (m + 1) * g.measureWidth;
+    for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+  }
+  if (barlines.length === 0) return;
+
+  for (const b of barlines) {
+    for (const p of layout.notes) {
+      const verticalGap = Math.max(b.top - p.y, 0, p.y - b.bottom);
+      if (verticalGap > r) continue;
+      const horizontalGap = Math.abs(p.x - b.x);
+      const gap = Math.max(0, horizontalGap - r);
+      if (gap < lint.minClearance) {
+        out.push({
+          code: 'barline-collision',
+          severity: 'error',
+          message:
+            `Notehead ${p.note.id} clears the barline at x=${b.x.toFixed(2)} by only ` +
+            `${gap.toFixed(2)}pt (${lint.minClearance}pt required).`,
+          system: layout.index,
+          measure: measureOfTick(p.note.startTick, t),
+          noteIds: [p.note.id],
+          x: p.x,
+          y: p.y,
+          metrics: { gap, barlineX: b.x },
+        });
+      }
+    }
+    for (const beam of layout.beams) {
+      const x0 = Math.min(beam.primary.x1, beam.primary.x2);
+      const x1 = Math.max(beam.primary.x1, beam.primary.x2);
+      const ids = beam.notes.map((n) => n.id);
+      for (const stem of beam.stems) {
+        const stemTop = Math.min(stem.stemStartY, stem.stemEndY);
+        const stemBottom = Math.max(stem.stemStartY, stem.stemEndY);
+        const verticalGap = Math.max(b.top - stemTop, 0, stemBottom - b.bottom);
+        if (verticalGap > lint.minClearance) continue;
+        const gap = Math.abs(stem.stemX - b.x);
+        if (gap < lint.minClearance) {
+          out.push({
+            code: 'barline-collision',
+            severity: 'error',
+            message: `Stem at x=${stem.stemX.toFixed(2)} clears the barline at x=${b.x.toFixed(2)} by only ${gap.toFixed(2)}pt.`,
+            system: layout.index,
+            noteIds: ids,
+            x: stem.stemX,
+            y: (stem.stemStartY + stem.stemEndY) / 2,
+            metrics: { gap, barlineX: b.x },
+          });
+        }
+      }
+      if (b.x >= x0 - lint.minClearance && b.x <= x1 + lint.minClearance) {
+        const beamYAt = beam.beamY(Math.max(x0, Math.min(x1, b.x)));
+        const verticalGap = Math.max(b.top - beamYAt, 0, beamYAt - b.bottom);
+        if (verticalGap < lint.minClearance) {
+          out.push({
+            code: 'barline-collision',
+            severity: 'error',
+            message: `Beam crosses the barline at x=${b.x.toFixed(2)} with ${verticalGap.toFixed(2)}pt clearance.`,
+            system: layout.index,
+            noteIds: ids,
+            x: b.x,
+            y: beamYAt,
+            metrics: { gap: verticalGap, barlineX: b.x },
+          });
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. Left-margin furniture: measure numeral & accolade
+// ---------------------------------------------------------------------------
+
+/** Boxes of the measure numeral and the accolade of one system. */
+export function marginFurniture(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  measureNumber: number
+): { numeral: Box; accolade: Box } {
+  const g = layout.geometry;
+  const numeralText = String(measureNumber);
+  const numeralX = g.staffLeft - 2;
+  const numeralBaseline = g.staffTopY - 6;
+  const numeral = box(
+    numeralX,
+    numeralBaseline - t.digitFontSize * 1.2,
+    numeralX + textWidth(numeralText, 8.5, lint.digitAdvance * 1.5),
+    numeralBaseline + 2
+  );
+  const accolade = box(
+    g.staffLeft - t.accoladeGap - t.accoladeWidth,
+    g.staffTopY,
+    g.staffLeft - t.accoladeGap,
+    g.staffBotY
+  );
+  return { numeral, accolade };
+}
+
+/** The measure numeral must clear the accolade column, the staff and the music. */
+export function checkMeasureNumeralClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (!o.showMeasureNumbers) return;
+  const { numeral, accolade } = marginFurniture(
+    layout,
+    t,
+    lint,
+    layout.index * o.measuresPerSystem + 1
+  );
+  // The numeral opens the measure-number column: it must start to the right of
+  // the accolade's column, never above/inside it.
+  if (numeral.x0 < accolade.x1) {
+    out.push({
+      code: 'measure-numeral-collision',
+      severity: 'error',
+      message: `Measure numeral intrudes into the accolade column (numeral x0=${numeral.x0.toFixed(2)}, accolade x1=${accolade.x1.toFixed(2)}).`,
+      system: layout.index,
+      x: numeral.x0,
+      y: numeral.y1,
+      metrics: { numeralX0: numeral.x0, accoladeX1: accolade.x1 },
+    });
+  }
+  if (numeral.x0 < 0 || numeral.x1 > o.pageWidth) {
+    out.push({
+      code: 'measure-numeral-collision',
+      severity: 'error',
+      message: `Measure numeral leaves the page (x0=${numeral.x0.toFixed(2)}, x1=${numeral.x1.toFixed(2)}, page width ${o.pageWidth.toFixed(2)}).`,
+      system: layout.index,
+      x: numeral.x0,
+      y: numeral.y1,
+      metrics: { numeralX0: numeral.x0, numeralX1: numeral.x1, pageWidth: o.pageWidth },
+    });
+  }
+  if (numeral.y1 > layout.geometry.staffTopY - lint.minClearance) {
+    out.push({
+      code: 'measure-numeral-collision',
+      severity: 'error',
+      message: `Measure numeral descends into the staff (bottom ${numeral.y1.toFixed(2)}pt, staffTop ${layout.geometry.staffTopY.toFixed(2)}pt).`,
+      system: layout.index,
+      x: numeral.x0,
+      y: numeral.y1,
+      metrics: { numeralBottom: numeral.y1, staffTop: layout.geometry.staffTopY },
+    });
+  }
+  for (const p of layout.notes) {
+    const disc = noteDisc(p, t.noteheadRadius);
+    if (!boxesOverlap(numeral, disc, lint.minClearance)) continue;
+    out.push({
+      code: 'measure-numeral-collision',
+      severity: 'error',
+      message: `Measure numeral collides with notehead ${p.note.id}.`,
+      system: layout.index,
+      measure: measureOfTick(p.note.startTick, t),
+      noteIds: [p.note.id],
+      x: p.x,
+      y: p.y,
+      metrics: { noteX: p.x, noteY: p.y },
+    });
+  }
+}
+
+/** The accolade must stay on the page and clear the music column. */
+export function checkAccoladeClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const { numeral, accolade } = marginFurniture(
+    layout,
+    t,
+    lint,
+    layout.index * o.measuresPerSystem + 1
+  );
+  const g = layout.geometry;
+  if (accolade.x0 < 0 || accolade.x1 > g.staffLeft - EPS) {
+    out.push({
+      code: 'accolade-collision',
+      severity: 'error',
+      message: `Accolade leaves the left margin (x0=${accolade.x0.toFixed(2)}, x1=${accolade.x1.toFixed(2)}, staffLeft=${g.staffLeft.toFixed(2)}).`,
+      system: layout.index,
+      x: accolade.x0,
+      y: accolade.y0,
+      metrics: { accoladeX0: accolade.x0, accoladeX1: accolade.x1, staffLeft: g.staffLeft },
+    });
+  }
+  if (Math.abs(accolade.y0 - g.staffTopY) > EPS || Math.abs(accolade.y1 - g.staffBotY) > EPS) {
+    out.push({
+      code: 'accolade-collision',
+      severity: 'error',
+      message: 'Accolade does not clasp the full staff height (top/bottom rules must meet the staff).',
+      system: layout.index,
+      x: accolade.x0,
+      y: accolade.y0,
+      metrics: { top: accolade.y0, staffTop: g.staffTopY, bottom: accolade.y1, staffBot: g.staffBotY },
+    });
+  }
+  if (boxesOverlap(accolade, numeral, 0)) {
+    out.push({
+      code: 'accolade-collision',
+      severity: 'error',
+      message: 'Accolade collides with the measure numeral box.',
+      system: layout.index,
+      x: accolade.x1,
+      y: numeral.y0,
+      metrics: { accoladeX1: accolade.x1, numeralX0: numeral.x0 },
+    });
+  }
+  for (const p of layout.notes) {
+    const distance = pointToBoxDistance(p.x, p.y, accolade) - t.noteheadRadius;
+    if (distance < lint.minClearance) {
+      out.push({
+        code: 'accolade-collision',
+        severity: 'error',
+        message: `Notehead ${p.note.id} clears the accolade by only ${distance.toFixed(2)}pt.`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: p.x,
+        y: p.y,
+        metrics: { distance },
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 6. Middle C corridor & guideline integrity
+// ---------------------------------------------------------------------------
+
+/**
+ * The Middle C channel is a structural corridor: no barline, beat-grid pulse,
+ * guideline or beam may run into or across the spine. Noteheads and stems may
+ * legitimately cross the corridor (the hands share the register), but anything
+ * painted after a notehead's knockout must not cut through it — that is audited
+ * separately by {@link auditKnockoutProtection}.
+ */
+export function checkMiddleCCorridor(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const g = layout.geometry;
+  const spineY = g.middleCY;
+  const c = lint.corridorClearance;
+
+  // 1. Structural vertical rules must terminate clear of the spine.
+  for (const span of handRuleSpans(layout)) {
+    const lo = Math.min(span.top, span.bottom);
+    const hi = Math.max(span.top, span.bottom);
+    if (lo - c <= spineY && hi + c >= spineY) {
+      out.push({
+        code: 'corridor-intrusion',
+        severity: 'error',
+        message: `${span.hand} structural rules (${lo.toFixed(2)}..${hi.toFixed(2)}) intrude into the Middle C corridor at y=${spineY.toFixed(2)}.`,
+        system: layout.index,
+        y: spineY,
+        metrics: { ruleTop: lo, ruleBottom: hi, spineY, clearance: c },
+      });
+    }
+  }
+
+  // 2. Horizontal rules: nothing but the spine itself lives on the corridor.
+  const horizontalRules: Array<{ label: string; y: number }> = [];
+  for (const hand of ['RH', 'LH'] as const) {
+    for (const oct of hand === 'RH' ? [5, 4] : [3, 2]) {
+      const eq = g.equatorY(hand, oct);
+      horizontalRules.push({ label: `${hand} o${oct} equator`, y: eq });
+      horizontalRules.push({ label: `${hand} o${oct} upper guideline`, y: eq - t.rowHeight / 2 });
+      horizontalRules.push({ label: `${hand} o${oct} lower guideline`, y: eq + t.rowHeight / 2 });
+    }
+  }
+  for (const rule of horizontalRules) {
+    if (Math.abs(rule.y - spineY) < c) {
+      out.push({
+        code: 'corridor-intrusion',
+        severity: 'error',
+        message: `${rule.label} runs through the Middle C corridor (y=${rule.y.toFixed(2)}, spine y=${spineY.toFixed(2)}).`,
+        system: layout.index,
+        y: rule.y,
+        metrics: { ruleY: rule.y, spineY, clearance: c },
+      });
+    }
+  }
+
+  // 3. A beam connector must never slice across the spine. A beam merely
+  //    running parallel beside the corridor is legal; a crossing is not.
+  for (const beam of layout.beams) {
+    const lo = Math.min(beam.primary.y1, beam.primary.y2);
+    const hi = Math.max(beam.primary.y1, beam.primary.y2);
+    if (lo <= spineY && hi >= spineY) {
+      out.push({
+        code: 'corridor-intrusion',
+        severity: 'error',
+        message: `Beam connector crosses the Middle C spine (${lo.toFixed(2)}..${hi.toFixed(2)} vs ${spineY.toFixed(2)}).`,
+        system: layout.index,
+        measure: measureOfTick(beam.notes[0].startTick, t),
+        noteIds: beam.notes.map((n) => n.id),
+        x: beam.primary.x1,
+        y: spineY,
+        metrics: { beamY1: beam.primary.y1, beamY2: beam.primary.y2, spineY },
+      });
+    }
+  }
+
+  // 4. Hand labels (when enabled) must not be swallowed by the corridor.
+  if (o.showHandLabels) {
+    for (const p of layout.notes) {
+      if (Math.abs(p.y - spineY) < t.digitFontSize) {
+        out.push({
+          code: 'corridor-intrusion',
+          severity: 'error',
+          message: `Notehead ${p.note.id} sits on the m.s./m.d. hand-label baseline inside the corridor.`,
+          system: layout.index,
+          measure: measureOfTick(p.note.startTick, t),
+          noteIds: [p.note.id],
+          x: p.x,
+          y: p.y,
+          metrics: { noteY: p.y, spineY },
+        });
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 7. SVG paint-order audit (knockout protection in the emitted document)
+// ---------------------------------------------------------------------------
+
+interface SvgNode {
+  tag: string;
+  cls: string;
+  index: number;
+  attrs: Record<string, string>;
+}
+
+function parseSvgNodes(svg: string): SvgNode[] {
+  const nodes: SvgNode[] = [];
+  const tagRe = /<(line|circle|text|rect|path|ellipse|polyline|polygon)\b([^>]*)>/g;
+  let match: RegExpExecArray | null;
+  let index = 0;
+  while ((match = tagRe.exec(svg)) !== null) {
+    const attrs: Record<string, string> = {};
+    const attrRe = /([\w-]+)="([^"]*)"/g;
+    let attr: RegExpExecArray | null;
+    while ((attr = attrRe.exec(match[2])) !== null) attrs[attr[1]] = attr[2];
+    nodes.push({ tag: match[1], cls: attrs.class ?? '', index: index++, attrs });
+  }
+  return nodes;
+}
+
+function num(attrs: Record<string, string>, key: string): number {
+  const value = Number.parseFloat(attrs[key] ?? '');
+  return Number.isFinite(value) ? value : Number.NaN;
+}
+
+/** Options accepted by the paint-order audit. */
+export interface KnockoutAuditOptions {
+  /** Notehead (knockout) radius in pt. */
+  noteheadRadius: number;
+  /** Absolute y of the Middle C spine, used to name the offending rule. */
+  spineY?: number;
+  /** Optical baseline shift of the digit relative to the notehead centre. */
+  digitBaselineOffset?: number;
+  /** Intersection tolerance: a line must come this close to count as a cut. */
+  tolerance?: number;
+}
+
+/**
+ * Paint-order audit of one rendered system.
+ *
+ * Verifies three document-level invariants that pure geometry cannot express:
+ * 1. every duodecimal digit owns a knockout disc painted immediately before it;
+ * 2. every knockout disc actually carries a digit (no blank white holes);
+ * 3. nothing painted *after* a knockout disc may cut through that disc — this
+ *    is what "zero staff/beat line pass-through" means in practice.
+ *
+ * The notehead's own stem necessarily starts inside its own disc and is
+ * recognised (and exempted) by its exact ±(r-0.4) / ∓1.5 attachment offsets.
+ */
+export function auditKnockoutProtection(
+  svg: string,
+  options: KnockoutAuditOptions
+): LintViolation[] {
+  const out: LintViolation[] = [];
+  const r = options.noteheadRadius;
+  const tol = options.tolerance ?? 0.05;
+  const baseline = options.digitBaselineOffset ?? JANKO_DIGIT_BASELINE_OFFSET;
+  const nodes = parseSvgNodes(svg);
+
+  const knockouts = nodes.filter(
+    (n) => n.tag === 'circle' && n.cls.includes('janko-knockout')
+  );
+  const digits = nodes.filter((n) => n.tag === 'text' && n.cls.includes('janko-digit'));
+
+  // 1. Every digit must be shielded by a knockout painted before it.
+  for (const digit of digits) {
+    const dx = num(digit.attrs, 'x');
+    const dy = num(digit.attrs, 'y') - baseline;
+    const shield = knockouts.find((k) => {
+      return (
+        k.index < digit.index &&
+        Math.abs(num(k.attrs, 'cx') - dx) < 0.02 &&
+        Math.abs(num(k.attrs, 'cy') - dy) < 0.02
+      );
+    });
+    if (!shield) {
+      out.push({
+        code: 'knockout-missing',
+        severity: 'error',
+        message: `Digit at (${dx.toFixed(2)}, ${dy.toFixed(2)}) has no white knockout painted before it.`,
+        system: -1,
+        x: dx,
+        y: dy,
+        metrics: { digitX: dx, digitY: dy },
+      });
+    }
+  }
+
+  // 2. Every knockout must carry a digit (a blank disc erases staff lines).
+  for (const k of knockouts) {
+    const cx = num(k.attrs, 'cx');
+    const cy = num(k.attrs, 'cy');
+    const digit = digits.find(
+      (d) =>
+        d.index > k.index &&
+        Math.abs(num(d.attrs, 'x') - cx) < 0.02 &&
+        Math.abs(num(d.attrs, 'y') - baseline - cy) < 0.02
+    );
+    if (!digit) {
+      out.push({
+        code: 'knockout-empty',
+        severity: 'error',
+        message: `White knockout at (${cx}, ${cy}) carries no digit.`,
+        system: -1,
+        x: cx,
+        y: cy,
+        metrics: { cx, cy },
+      });
+    }
+  }
+
+  // 3. Nothing painted after a knockout may cut through it.
+  for (const k of knockouts) {
+    const cx = num(k.attrs, 'cx');
+    const cy = num(k.attrs, 'cy');
+    const kr = num(k.attrs, 'r');
+    const radius = Number.isFinite(kr) ? kr : r;
+    // The notehead's own stem: exact ±(r-0.4) / ∓1.5 attachment offsets.
+    const ownStemAnchors = [
+      { x: cx + (radius - 0.4), y: cy - 1.5 },
+      { x: cx - (radius - 0.4), y: cy + 1.5 },
+      { x: cx + (radius - 0.4), y: cy + 1.5 },
+      { x: cx - (radius - 0.4), y: cy - 1.5 },
+    ];
+    for (const node of nodes) {
+      if (node.index <= k.index) continue;
+      let distance = Number.POSITIVE_INFINITY;
+      if (node.tag === 'line') {
+        const x1 = num(node.attrs, 'x1');
+        const y1 = num(node.attrs, 'y1');
+        const x2 = num(node.attrs, 'x2');
+        const y2 = num(node.attrs, 'y2');
+        if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+        const isStem = node.cls.includes('janko-stem');
+        if (isStem) {
+          const attached = ownStemAnchors.some(
+            (a) => Math.abs(a.x - x1) < 0.02 && Math.abs(a.y - y1) < 0.02
+          );
+          if (attached) continue;
+        }
+        distance = pointToSegmentDistance(cx, cy, x1, y1, x2, y2);
+      } else if (node.tag === 'circle' && !node.cls.includes('janko-knockout')) {
+        const ox = num(node.attrs, 'cx');
+        const oy = num(node.attrs, 'cy');
+        const or = num(node.attrs, 'r');
+        if (![ox, oy, or].every(Number.isFinite)) continue;
+        distance = Math.hypot(ox - cx, oy - cy) - or;
+      } else if (node.tag === 'rect') {
+        const x0 = num(node.attrs, 'x');
+        const y0 = num(node.attrs, 'y');
+        const w = num(node.attrs, 'width');
+        const h = num(node.attrs, 'height');
+        if (![x0, y0, w, h].every(Number.isFinite)) continue;
+        distance = pointToBoxDistance(cx, cy, box(x0, y0, x0 + w, y0 + h));
+      } else {
+        continue;
+      }
+      if (distance < radius - tol) {
+        const spineHit =
+          options.spineY !== undefined &&
+          node.tag === 'line' &&
+          Math.abs(num(node.attrs, 'y1') - options.spineY) < 0.02 &&
+          Math.abs(num(node.attrs, 'y2') - options.spineY) < 0.02;
+        const label = node.cls.replace('janko-', '') || node.tag;
+        out.push({
+          code: 'knockout-pass-through',
+          severity: 'error',
+          message: spineHit
+            ? `Middle C spine cuts through the knockout at (${cx}, ${cy}) — layer order regression.`
+            : `${label} element painted after the knockout at (${cx}, ${cy}) cuts ${(radius - distance).toFixed(2)}pt into the glyph mask.`,
+          system: -1,
+          x: cx,
+          y: cy,
+          metrics: { distance, radius, overlap: radius - distance },
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+/** Options accepted by the stem/beam document audit. */
+export interface StemBeamAuditOptions {
+  /** Canonical stem length from the notehead centre. */
+  stemLength: number;
+  /** Maximum acceptable |slope| of a beam connector. */
+  maxBeamSlope: number;
+  /** Tolerance (pt) for "the stem tip lands on the beam". */
+  tolerance?: number;
+}
+
+/**
+ * Document-level stem/beam audit of one rendered system.
+ *
+ * A rendered stem is legal when it is either a standalone stem of exactly the
+ * canonical length, or when its tip lands on a beam connector. Every beam
+ * connector must also honour the slope clamp.
+ */
+export function auditStemBeamConnections(
+  svg: string,
+  options: StemBeamAuditOptions
+): LintViolation[] {
+  const out: LintViolation[] = [];
+  const tol = options.tolerance ?? 0.03;
+  const nodes = parseSvgNodes(svg);
+  const lines = nodes.filter((n) => n.tag === 'line');
+  const stems = lines.filter((n) => n.cls.includes('janko-stem'));
+  const beams = lines.filter(
+    (n) => n.cls.includes('janko-beam') || n.cls.includes('janko-beam-secondary')
+  );
+  const standaloneLength = options.stemLength - 1.5;
+
+  for (const beam of beams) {
+    const x1 = num(beam.attrs, 'x1');
+    const y1 = num(beam.attrs, 'y1');
+    const x2 = num(beam.attrs, 'x2');
+    const y2 = num(beam.attrs, 'y2');
+    if (![x1, y1, x2, y2].every(Number.isFinite) || Math.abs(x2 - x1) < EPS) continue;
+    const slope = (y2 - y1) / (x2 - x1);
+    if (Math.abs(slope) > options.maxBeamSlope + EPS) {
+      out.push({
+        code: 'beam-slope',
+        severity: 'error',
+        message: `Beam connector slope ${slope.toFixed(3)} exceeds the ${options.maxBeamSlope} threshold.`,
+        system: -1,
+        x: x1,
+        y: y1,
+        metrics: { slope, limit: options.maxBeamSlope },
+      });
+    }
+  }
+
+  for (const stem of stems) {
+    const x1 = num(stem.attrs, 'x1');
+    const y1 = num(stem.attrs, 'y1');
+    const x2 = num(stem.attrs, 'x2');
+    const y2 = num(stem.attrs, 'y2');
+    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+    const length = Math.hypot(x2 - x1, y2 - y1);
+    if (Math.abs(length - standaloneLength) <= tol + 0.02) continue;
+    const landsOnBeam = beams.some((beam) => {
+      const bx1 = num(beam.attrs, 'x1');
+      const by1 = num(beam.attrs, 'y1');
+      const bx2 = num(beam.attrs, 'x2');
+      const by2 = num(beam.attrs, 'y2');
+      if (![bx1, by1, bx2, by2].every(Number.isFinite)) return false;
+      const lo = Math.min(bx1, bx2);
+      const hi = Math.max(bx1, bx2);
+      if (x2 < lo - tol || x2 > hi + tol) return false;
+      const t = Math.abs(bx2 - bx1) < EPS ? 0 : (x2 - bx1) / (bx2 - bx1);
+      const beamYAt = by1 + t * (by2 - by1);
+      return Math.abs(beamYAt - y2) <= 0.35;
+    });
+    if (!landsOnBeam) {
+      const longer = length > standaloneLength;
+      out.push({
+        code: 'beam-stem-gap',
+        severity: 'error',
+        message:
+          `Stem at x=${x2.toFixed(2)} is ${length.toFixed(2)}pt long and does not land on any beam ` +
+          `(${longer ? 'overshoot' : 'shortfall'}).`,
+        system: -1,
+        x: x2,
+        y: y2,
+        metrics: { length, standaloneLength, overshoot: longer ? length - standaloneLength : 0 },
+      });
+    }
+  }
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Lint one Jánko engraving.
+ *
+ * @param score    quantized fence score to engrave and inspect
+ * @param options  macro-layout options (defaults to the golden master)
+ * @param tokens   micro-typography tokens (defaults to the golden master)
+ * @param lint     linter thresholds (defaults to {@link DEFAULT_JANKO_LINT_OPTIONS})
+ */
+export function lintJankoScore(
+  score: QuantizedGridScore,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null,
+  lint?: Partial<JankoLintOptions> | null
+): LintReport {
+  const startedAt = Date.now();
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const thresholds: JankoLintOptions = {
+    ...DEFAULT_JANKO_LINT_OPTIONS,
+    ...(lint ?? {}),
+  };
+
+  const layouts = layoutJankoScore(score, o, t);
+  const diagnostics: LintViolation[] = [];
+
+  for (const layout of layouts) {
+    checkNoteheadClearance(layout, t, thresholds, diagnostics);
+    checkKnockoutCoverage(layout, t, thresholds, diagnostics);
+    checkStemAndBeamValidity(layout, t, thresholds, diagnostics);
+    checkBarlineClearance(layout, o, t, thresholds, diagnostics);
+    checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
+    checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
+    checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
+    if (thresholds.auditPaintOrder) {
+      const svg = renderSystem(score, layout.geometry, layout.index, o, t, layout);
+      const audit = [
+        ...auditKnockoutProtection(svg, {
+          noteheadRadius: t.noteheadRadius,
+          spineY: layout.geometry.middleCY,
+        }),
+        ...auditStemBeamConnections(svg, {
+          stemLength: t.stemLength,
+          maxBeamSlope: thresholds.maxBeamSlope,
+        }),
+      ].map((v) => ({ ...v, system: layout.index }));
+      diagnostics.push(...audit);
+    }
+  }
+
+  const violations = diagnostics.filter((d) => d.severity === 'error');
+  const warnings = diagnostics.filter((d) => d.severity === 'warning');
+  const notes = layouts.reduce((sum, l) => sum + l.notes.length, 0);
+  const beams = layouts.reduce((sum, l) => sum + l.beams.length, 0);
+
+  return {
+    ok: violations.length === 0,
+    violations,
+    warnings,
+    diagnostics,
+    stats: {
+      systems: layouts.length,
+      measures: countMeasures(score, t),
+      notes,
+      beams,
+      checks: JANKO_LINT_CHECKS.length,
+      violations: violations.length,
+      warnings: warnings.length,
+      durationMs: Date.now() - startedAt,
+    },
+  };
+}
+
+/** Total measures engraved for a score. */
+export function countMeasures(score: QuantizedGridScore, t: ResolvedJankoTokens): number {
+  return Math.max(1, Math.ceil((score.totalTicks || 0) / t.ticksPerMeasure));
+}
+
+/** Convenience: format a report as a compact multi-line summary. */
+export function formatLintReport(report: LintReport): string {
+  const lines: string[] = [];
+  const s = report.stats;
+  lines.push(
+    `Jánko visual lint: ${report.ok ? '✓ clean' : `✗ ${s.violations} violation(s)`}` +
+      `${s.warnings > 0 ? ` · ${s.warnings} warning(s)` : ''}`
+  );
+  lines.push(
+    `  ${s.systems} systems · ${s.measures} measures · ${s.notes} noteheads · ${s.beams} beams · ` +
+      `${s.checks} checks · ${s.durationMs} ms`
+  );
+  for (const v of report.diagnostics) {
+    const where = `system ${v.system + 1}${v.measure ? `, m. ${v.measure}` : ''}`;
+    lines.push(`  ${v.severity === 'error' ? '✗' : '⚠'} [${v.code}] ${where}: ${v.message}`);
+  }
+  return lines.join('\n');
+}

@@ -43,6 +43,9 @@ export function renderHalo(
   return `    <circle class="janko-halo" cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(2)}"/>`;
 }
 
+/** Optical baseline shift of the duodecimal digit inside its knockout disc. */
+export const JANKO_DIGIT_BASELINE_OFFSET = 0.35;
+
 /** Circular white knockout (erases staff lines and beams beneath the digit). */
 export function renderNoteheadKnockout(
   x: number,
@@ -69,8 +72,7 @@ export function renderNoteheadDigit(
   // Whole-tone rank 0 (evens) gets the heavier cut for instant row legibility.
   const weight = pitchClass % 2 === 0 ? '800' : '700';
   void hand;
-  void t;
-  return `    <text class="janko-digit" x="${f(x)}" y="${f(y + 0.35)}" font-weight="${weight}" font-size="6.5pt" fill="#111111">${digit}</text>`;
+  return `    <text class="janko-digit" x="${f(x)}" y="${f(y + JANKO_DIGIT_BASELINE_OFFSET)}" font-weight="${weight}" font-size="${t.digitFontSize.toFixed(1)}pt" fill="#111111">${digit}</text>`;
 }
 
 /**
