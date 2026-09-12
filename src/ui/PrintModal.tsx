@@ -73,7 +73,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
             <div>
               <h2 className="text-sm font-bold font-mono text-white flex items-center gap-2">
                 <span>🖨️</span>
-                <span>Print Sheet Music (A4 Columnar Engraving)</span>
+                <span>Print Sheet Music (A4 Horizontal Portrait Engraving)</span>
               </h2>
               <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
                 {score.title} — {score.composer} • {layout.pages.length}-Page Urtext Spread

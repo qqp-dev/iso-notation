@@ -7,8 +7,12 @@ import {
   renderPageToSvg,
   renderAllPagesToSvg,
   renderColumnarScoreToSvg,
+  getSystemGeometry,
+  getVerticalAccoladePath,
   A4_WIDTH_PT,
   A4_HEIGHT_PT,
+  LETTER_WIDTH_PT,
+  LETTER_HEIGHT_PT,
   MM_TO_PT,
   URTEXT_SERIF,
 } from '../src/render/print-layout';
@@ -17,451 +21,622 @@ import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { linearIndex } from '../src/model/pitch';
 import { wrapInPjl, generateScorePostscript } from '../scripts/print-score';
 
-test('Columnar Engraving Geometry Invariant: 32-measure score with 48 ticks/measure', () => {
-  // Construct a synthetic 32-measure score with 48 ticks per measure (e.g. 4/4 meter, ticksPerBeat = 12)
-  const notes: QuantizedNote[] = [];
-  for (let m = 0; m < 32; m++) {
-    notes.push({
-      id: `test-note-${m}`,
-      pitch: { pitchClass: (m * 2) % 12, octave: 4 },
-      startTick: m * 48,
-      durationTicks: 12,
-      hand: 'RH',
-    });
+const TICKS_PER_MEASURE = 144;
+const DURATION_COLORS = ['#1E293B', '#1D4ED8', '#D97706', '#BE123C'];
+
+interface SvgLine {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  stroke: string;
+  width: string;
+  dash: string | undefined;
+  cap: string | undefined;
+}
+
+/** Extracts every straight <line> element emitted by the print engine. */
+function extractLines(svg: string): SvgLine[] {
+  return Array.from(
+    svg.matchAll(
+      /<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)" stroke="([^"]+)" stroke-width="([^"]+)"(?: stroke-dasharray="([^"]+)")?(?: stroke-linecap="([^"]+)")?\/>/g
+    )
+  ).map((m) => ({
+    x1: parseFloat(m[1]),
+    y1: parseFloat(m[2]),
+    x2: parseFloat(m[3]),
+    y2: parseFloat(m[4]),
+    stroke: m[5],
+    width: m[6],
+    dash: m[7],
+    cap: m[8],
+  }));
+}
+
+interface SvgChevron {
+  direction: 'up' | 'down';
+  leftX: number;
+  baseY1: number;
+  apexX: number;
+  apexY: number;
+  rightX: number;
+  baseY2: number;
+  stroke: string;
+}
+
+/** Extracts the intuitive up/down handedness chevrons. */
+function extractChevrons(svg: string): SvgChevron[] {
+  return Array.from(
+    svg.matchAll(
+      /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.80"/g
+    )
+  ).map((m) => ({
+    direction: m[1] as 'up' | 'down',
+    leftX: parseFloat(m[2]),
+    baseY1: parseFloat(m[3]),
+    apexX: parseFloat(m[4]),
+    apexY: parseFloat(m[5]),
+    rightX: parseFloat(m[6]),
+    baseY2: parseFloat(m[7]),
+    stroke: m[8],
+  }));
+}
+
+/** Extracts the vertical copperplate accolade paths in document order. */
+function extractAccolades(svg: string): string[] {
+  return Array.from(svg.matchAll(/<path d="(M [^"]+ Z)" fill="#111827"\/>/g)).map((m) => m[1]);
+}
+
+/** All (x, y) coordinate pairs of an absolute-coordinate SVG path. */
+function parsePathPoints(d: string): { x: number; y: number }[] {
+  const nums = (d.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    points.push({ x: nums[i], y: nums[i + 1] });
   }
+  return points;
+}
 
-  const score: QuantizedGridScore = {
-    id: 'test-32-bar',
-    title: 'Test 32 Measures Score',
-    composer: 'Test Composer',
-    ticksPerBeat: 12,
-    totalTicks: 32 * 48, // 1536 ticks
-    timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
-    barlines: [],
-    tempos: [{ tick: 0, bpm: 120 }],
-    dynamics: [],
-    pedals: [],
-    notes,
-    gridResolution: 12,
-  };
+function extractHaloRings(svg: string) {
+  return Array.from(
+    svg.matchAll(
+      /<circle cx="([\d.]+)" cy="([\d.]+)" r="5\.80" fill="none" stroke="([^"]+)" stroke-width="0\.75"\/>/g
+    )
+  ).map((m) => ({ cx: parseFloat(m[1]), cy: parseFloat(m[2]), stroke: m[3] }));
+}
 
-  const layout = computeColumnarLayout(score, { measuresPerColumn: 8, columnsPerPage: 2 });
-
-  assert.equal(layout.totalMeasures, 32, 'Must have exactly 32 total measures');
-  assert.equal(layout.ticksPerMeasure, 48, 'Must have 48 ticks per measure');
-  assert.equal(layout.columns.length, 4, 'Must have exactly 4 columns for 32 measures (8 mm/col)');
-
-  // Exact 4-column distribution (8 measures per column)
-  // Column 0: Measures 1–8 (ticks 0–384)
-  assert.equal(layout.columns[0].startMeasure, 1);
-  assert.equal(layout.columns[0].endMeasure, 8);
-  assert.equal(layout.columns[0].startTick, 0);
-  assert.equal(layout.columns[0].endTick, 384);
-  assert.equal(layout.columns[0].pageIndex, 0);
-  assert.equal(layout.columns[0].columnOnPageIndex, 0);
-
-  // Column 1: Measures 9–16 (ticks 384–768)
-  assert.equal(layout.columns[1].startMeasure, 9);
-  assert.equal(layout.columns[1].endMeasure, 16);
-  assert.equal(layout.columns[1].startTick, 384);
-  assert.equal(layout.columns[1].endTick, 768);
-  assert.equal(layout.columns[1].pageIndex, 0);
-  assert.equal(layout.columns[1].columnOnPageIndex, 1);
-
-  // Column 2: Measures 17–24 (ticks 768–1152)
-  assert.equal(layout.columns[2].startMeasure, 17);
-  assert.equal(layout.columns[2].endMeasure, 24);
-  assert.equal(layout.columns[2].startTick, 768);
-  assert.equal(layout.columns[2].endTick, 1152);
-  assert.equal(layout.columns[2].pageIndex, 1);
-  assert.equal(layout.columns[2].columnOnPageIndex, 0);
-
-  // Column 3: Measures 25–32 (ticks 1152–1536)
-  assert.equal(layout.columns[3].startMeasure, 25);
-  assert.equal(layout.columns[3].endMeasure, 32);
-  assert.equal(layout.columns[3].startTick, 1152);
-  assert.equal(layout.columns[3].endTick, 1536);
-  assert.equal(layout.columns[3].pageIndex, 1);
-  assert.equal(layout.columns[3].columnOnPageIndex, 1);
-
-  // Pages: Page 1 holds Cols 0 & 1 (Section A); Page 2 holds Cols 2 & 3 (Section B)
-  assert.equal(layout.pages.length, 2, 'Must produce exactly 2 pages');
-  assert.equal(layout.pages[0].columns.length, 2);
-  assert.match(layout.pages[0].sectionName, /Section A.*1.*16/);
-  assert.equal(layout.pages[1].columns.length, 2);
-  assert.match(layout.pages[1].sectionName, /Section B.*17.*32/);
-});
-
-test('Columnar Engraving Geometry Invariant: Bach Goldberg Variation 1', () => {
+test('Horizontal System Layout Invariant: 2-page zero-turn spread for Bach Goldberg Var 1', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, { measuresPerColumn: 8, columnsPerPage: 2 });
+  const layout = computeColumnarLayout(score);
 
   assert.equal(layout.totalMeasures, 32, 'Goldberg Var 1 has 32 measures');
-  assert.equal(layout.ticksPerMeasure, 144, '3/4 meter at 48 tpb = 144 ticks/measure');
-  assert.equal(layout.columns.length, 4, 'Must have 4 columns (8 measures per column)');
+  assert.equal(layout.ticksPerMeasure, TICKS_PER_MEASURE, '3/4 meter at 48 tpb = 144 ticks/measure');
+  assert.equal(layout.measuresPerSystem, 4, 'Four measures per horizontal system');
+  assert.equal(layout.systemsPerPage, 4, 'Four horizontal systems per portrait page');
+  assert.equal(layout.systems.length, 8, '32 measures / 4 per system = 8 systems');
+  assert.equal(layout.pages.length, 2, 'Exactly 2 pages (ceil(32 / 16) = 2)');
 
-  // Col 0: mm 1–8, ticks 0–1152
-  assert.equal(layout.columns[0].startMeasure, 1);
-  assert.equal(layout.columns[0].endMeasure, 8);
-  assert.equal(layout.columns[0].startTick, 0);
-  assert.equal(layout.columns[0].endTick, 1152);
+  // Page 1 contains Measures 1–16 across 4 systems
+  assert.deepEqual(
+    layout.pages[0].systems.map((s) => s.sysStartMeasure),
+    [1, 5, 9, 13],
+    'Page 1 system start measures must be [1, 5, 9, 13]'
+  );
+  // Page 2 contains Measures 17–32 across 4 systems
+  assert.deepEqual(
+    layout.pages[1].systems.map((s) => s.sysStartMeasure),
+    [17, 21, 25, 29],
+    'Page 2 system start measures must be [17, 21, 25, 29]'
+  );
 
-  // Col 1: mm 9–16, ticks 1152–2304
-  assert.equal(layout.columns[1].startMeasure, 9);
-  assert.equal(layout.columns[1].endMeasure, 16);
-  assert.equal(layout.columns[1].startTick, 1152);
-  assert.equal(layout.columns[1].endTick, 2304);
+  assert.deepEqual(layout.pages[0].systems.map((s) => s.endMeasure), [4, 8, 12, 16]);
+  assert.deepEqual(layout.pages[1].systems.map((s) => s.endMeasure), [20, 24, 28, 32]);
 
-  // Col 2: mm 17–24, ticks 2304–3456
-  assert.equal(layout.columns[2].startMeasure, 17);
-  assert.equal(layout.columns[2].endMeasure, 24);
-  assert.equal(layout.columns[2].startTick, 2304);
-  assert.equal(layout.columns[2].endTick, 3456);
-
-  // Col 3: mm 25–32, ticks 3456–4608
-  assert.equal(layout.columns[3].startMeasure, 25);
-  assert.equal(layout.columns[3].endMeasure, 32);
-  assert.equal(layout.columns[3].startTick, 3456);
-  assert.equal(layout.columns[3].endTick, 4608);
-
-  // Section A (Page 1): mm 1–16; Section B (Page 2): mm 17–32
-  assert.equal(layout.pages.length, 2);
-  assert.match(layout.pages[0].sectionName, /Section A/);
-  assert.match(layout.pages[1].sectionName, /Section B/);
-
-  // Partition check: all notes accountably sliced across the 4 columns
-  const totalPartitionedNotes = layout.columns.reduce((sum, col) => sum + col.notes.length, 0);
-  assert.equal(totalPartitionedNotes, score.notes.length, 'Every note must be present in exactly one column');
-});
-
-test('High-Contrast Print Topography & Morphology Invariant: Standalone Vector SVG', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, { noteheadMorphology: 'row-parity-shape' });
-  const svgs = renderAllPagesToSvg(layout);
-
-  assert.equal(svgs.length, 4, 'Must produce SVGs for all 4 pages in the luxurious Urtext layout');
-
-  for (let pIdx = 0; pIdx < svgs.length; pIdx++) {
-    const svg = svgs[pIdx];
-
-    // 1. Pure white background for paper savings & laser printing
-    assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
-
-    // 2. Definitive Staff Topography lines (2-Line Landmark Staff)
-    // - Refined octave line (PC 0, 1.0pt)
-    // - Thin 5 demarcation line at PC 4 (0.6pt, dasharray 5,2.5)
-    assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain thin 0.6pt 5 demarcation line');
-    // - Line at PC 8 dropped per definitive design to lighten up page
-    assert.doesNotMatch(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must NOT contain line 8 (dropped to lighten up page)');
-    // - Zero clunky hairlines (PC 2, 6, 8, 10 eliminated)
-    assert.doesNotMatch(svg, /stroke="#888888"[^>]*stroke-width="0\.5"/, 'Hairlines must be eliminated for decluttered staff');
-    // - Zero old 8,3.5 dashes
-    assert.doesNotMatch(svg, /stroke-dasharray="8,3\.5"/, 'Old 8,3.5 dashes must not be present');
-    // - Zero old 3,3 dashes
-    assert.doesNotMatch(svg, /stroke-dasharray="3,3"/, 'Old 3,3 dashes must not be present');
-
-    // 3. Baked Directional Noteheads Invariant
-    // - Zero straight lateral stem lines (stroke-width 0.6pt)
-    assert.doesNotMatch(svg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must have zero straight lateral stem lines');
-    // - Zero standalone floating chevrons
-    assert.doesNotMatch(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none" stroke="[^"]+" stroke-width="0\.8"/, 'Must have zero standalone floating chevrons');
-    // - Baked directional pentagons for hand crossing exceptions
-    assert.match(svg, /<path d="M [^"]+ L [^"]+ L [^"]+ L [^"]+ L [^"]+ A [^"]+ Z"/, 'Must render baked directional noteheads');
-
-    // 4. Solid row-parity noteheads with zero disruptive shield and duration colors
-    // - Ovals on lines (Row 0): horizontal ellipse rx="5.20" ry="3.00" sitting cleanly on line
-    assert.match(svg, /<ellipse[^>]*rx="5\.20"[^>]*ry="3\.00"/, 'Must render Row 0 ovals with 5.20pt/3.00pt radii');
-    // - Bricks in spaces (Row 1): crisp rectangular brick with width="8.60" height="5.80" rx="1.2" filling the slot
-    assert.match(svg, /<rect[^>]*width="8\.60"[^>]*height="5\.80"[^>]*rx="1\.2"/, 'Must render Row 1 crisp bricks filling whole slot');
-    // - Zero disruptive white halo shield
-    assert.doesNotMatch(svg, /<ellipse[^>]*stroke="#FFFFFF"/, 'Must not have disruptive white shield on ovals');
-    assert.doesNotMatch(svg, /<rect[^>]*stroke="#FFFFFF"/, 'Must not have disruptive white shield on bricks');
-
-    // 5. Color Palette Invariant in Print Engine: Pure Noteheads for Regular Notes (d <= ticksPerBeat)
-    // - 16th notes (d <= 12t): pure noteheads in dark slate/graphite (#1E293B)
-    assert.match(svg, /fill="#1E293B"/, 'Must render 16th notes in dark slate/graphite (#1E293B)');
-    // - 8th notes (d = 24t): pure noteheads in Royal Blue (#1D4ED8)
-    assert.match(svg, /fill="#1D4ED8"/, 'Must render 8th notes in Royal Blue (#1D4ED8)');
-    // - Zero hold ribbon lines for regular notes (d <= ticksPerBeat)
-    assert.doesNotMatch(svg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2") for regular notes');
-
-    // 6. Measure numbers: plain number on first bar of column, zero 'M' prefixes
-    assert.match(svg, /class="measure-num"[^>]*>\d+<\/text>/, 'Must render measure number on first bar of column');
-    assert.doesNotMatch(svg, /class="measure-num"[^>]*>M/, 'Must not prefix measure numbers with M');
+  for (const system of layout.systems) {
+    assert.equal(system.endMeasure - system.startMeasure + 1, 4, 'Every system spans 4 measures');
+    assert.equal(system.startTick, (system.startMeasure - 1) * TICKS_PER_MEASURE);
+    assert.equal(system.endTick, system.endMeasure * TICKS_PER_MEASURE);
+    assert.equal(system.sysStartMeasure, system.startMeasure);
+    assert.equal(system.systemOnPageIndex, system.systemIndex % 4);
+    assert.ok(system.notes.length > 0, `System ${system.systemIndex + 1} must own notes`);
   }
 
-  const fullScoreSvg = svgs.join('\n');
+  // Note partitioning: every note lives in exactly one system
+  const partitioned = layout.systems.reduce((sum, s) => sum + s.notes.length, 0);
+  assert.equal(partitioned, score.notes.length, 'Every note must be present in exactly one system');
+  for (const system of layout.systems) {
+    for (const note of system.notes) {
+      assert.ok(note.startTick >= system.startTick && note.startTick < system.endTick);
+    }
+  }
 
-  // Verify SVG print layout contains zero Hand Crossing Overlay rects or text
-  assert.doesNotMatch(fullScoreSvg, /Hand Crossing Overlay/, 'Must contain zero Hand Crossing Overlay rects or comments');
-  assert.doesNotMatch(fullScoreSvg, /LH\/RH Cross/, 'Must contain zero LH/RH Cross overlay text');
+  // Section names
+  assert.match(layout.pages[0].sectionName, /Section A.*1.*16/);
+  assert.match(layout.pages[1].sectionName, /Section B.*17.*32/);
 
-  // Across the full document, verify quarter note pure noteheads in Amber/Gold (#D97706) without hold ribbons
-  assert.match(fullScoreSvg, /fill="#D97706"/, 'Must render quarter notes in Amber/Gold (#D97706)');
-  assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke="#D97706"[^>]*stroke-width="1\.2"/, 'Must not render quarter note hold ribbons');
+  // Both pages render as standalone portrait SVGs
+  const svgs = renderAllPagesToSvg(layout);
+  assert.equal(svgs.length, 2, 'renderAllPagesToSvg must produce exactly 2 pages');
+  for (const svg of svgs) {
+    assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
+    assert.match(svg, /Page \d of 2/);
+  }
 
-  assert.match(
-    fullScoreSvg,
-    /<line x1="[\d\.]+" y1="[\d\.]+" x2="[\d\.]+" y2="[\d\.]+" stroke="#BE123C" stroke-width="0\.8" stroke-linecap="round"\/>/,
-    'Must render solid thin hold line (stroke-linecap="round") for long notes'
+  // Portrait A4 geometry: 4 stacked 124.8pt systems with generous breathing room
+  assert.ok(Math.abs(layout.pageDimensions.widthPt - A4_WIDTH_PT) < 0.01);
+  assert.ok(Math.abs(layout.pageDimensions.heightPt - A4_HEIGHT_PT) < 0.01);
+  assert.ok(Math.abs(layout.systemDimensions.staffHeightPt - 48 * 2.6) < 0.01, 'System height must be 124.8pt');
+  assert.ok(
+    layout.systemDimensions.slotHeightPt > 170 && layout.systemDimensions.slotHeightPt < 185,
+    `System slot height must leave ~50pt of breathing room (got ${layout.systemDimensions.slotHeightPt})`
   );
-
-  // Verify renderColumnarScoreToSvg helper
-  const page0Svg = renderColumnarScoreToSvg(score, 0, { noteheadMorphology: 'row-parity-shape' });
-  assert.equal(page0Svg, svgs[0]);
-  const defaultSvg = renderColumnarScoreToSvg(score, { noteheadMorphology: 'row-parity-shape' });
-  assert.equal(defaultSvg, svgs[0]);
-
-  // Default rendering must be duodecimal
-  const defaultDuoSvg = renderColumnarScoreToSvg(score);
-  assert.match(defaultDuoSvg, /class="duo-digit"/, 'Default score rendering must be duodecimal');
+  assert.ok(
+    layout.systemDimensions.measureWidthPt > 125 && layout.systemDimensions.measureWidthPt < 135,
+    'Each of the 4 measures spans ~130pt'
+  );
+  assert.ok(Math.abs(layout.ptPerSemitone - 2.6) < 1e-9, 'Pitch lane height must be 2.60pt');
 });
 
-test('Pure Noteheads for 16th Notes and Solid Thin Hold Lines for All Colored Notes Invariant', () => {
+test('Classical Vertical Accolade Invariant: copperplate brace clasping o1–o5 on the left margin', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, { noteheadMorphology: 'row-parity-shape' });
-  const svgs = layout.pages.map((_, p) => renderPageToSvg(layout, p));
-  const fullScoreSvg = svgs.join('\n');
+  const layout = computeColumnarLayout(score);
+  const svgs = renderAllPagesToSvg(layout);
 
-  // 1. Zero Hand Crossing Overlay rects or text
-  assert.doesNotMatch(fullScoreSvg, /Hand Crossing Overlay/, 'Must contain zero Hand Crossing Overlay rects or comments');
-  assert.doesNotMatch(fullScoreSvg, /LH\/RH Cross/, 'Must contain zero LH/RH Cross banners');
+  // The exported path generator is deterministic and spans the requested vertical range
+  const direct = getVerticalAccoladePath(30.35, 106.35, 231.15, 10, 1.25);
+  assert.match(direct, /^M [\d.]+ [\d.]+ C /);
+  assert.match(direct, / Z$/);
+  const directPoints = parsePathPoints(direct);
+  assert.ok(Math.abs(Math.min(...directPoints.map((p) => p.y)) - 106.35) < 0.01);
+  assert.ok(Math.abs(Math.max(...directPoints.map((p) => p.y)) - 231.15) < 0.01);
 
-  // 2. Zero hold ribbon lines for 16th notes (stroke-width="1.2")
-  assert.doesNotMatch(fullScoreSvg, /<line[^>]*stroke-width="1\.2"/, 'Must contain zero hold ribbon lines (stroke-width="1.2")');
+  for (let pageIndex = 0; pageIndex < 2; pageIndex++) {
+    const accolades = extractAccolades(svgs[pageIndex]);
+    assert.equal(accolades.length, 4, `Page ${pageIndex + 1} must render one accolade per system`);
 
-  // 3. Solid thin hold lines and Continuous Staff Lines (Bar 6 Blue)
-  const tauRef = score.gridResolution || 12;
-  const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
-  assert.equal(coloredNotes.length, 165, 'Must have exactly 165 colored notes in Goldberg Var 1');
+    for (let s = 0; s < 4; s++) {
+      const geo = getSystemGeometry(layout, pageIndex, s);
+      const path = accolades[s];
+      assert.match(path, /^M [\d.]+ [\d.]+ C [^"]+ Z$/, 'Accolade must be a closed sculptural path');
 
-  // Space notes render thin solid lines (stroke-width="0.8")
-  const spaceHoldLines = Array.from(
-    fullScoreSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="0\.8" stroke-linecap="round"\/>/g)
-  );
-  assert.ok(spaceHoldLines.length > 0, 'Must render thin solid hold lines for space notes');
+      const points = parsePathPoints(path);
+      const xs = points.map((p) => p.x);
+      const ys = points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
 
-  // Staff lines are permanent, continuous reference lines: zero staff-line knockouts
-  const knockoutRegex =
-    /<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="#FFFFFF" stroke-width="(2\.5|1\.8)" stroke-linecap="butt"\/>/g;
-  const allKnockouts = Array.from(fullScoreSvg.matchAll(knockoutRegex));
-  assert.equal(allKnockouts.length, 0, 'Zero staff-line knockouts (staff lines remain continuous)');
+      assert.ok(
+        Math.abs(Math.min(...ys) - geo.staffTopY) < 0.01,
+        'Accolade must clasp the top of the staff (o5)'
+      );
+      assert.ok(
+        Math.abs(Math.max(...ys) - geo.staffBotY) < 0.01,
+        'Accolade must clasp the bottom of the staff (o1)'
+      );
+      assert.ok(
+        Math.abs(geo.staffBotY - geo.staffTopY - 124.8) < 0.01,
+        'Accolade must span the full 4-octave staff (o1 → o5)'
+      );
 
-  // Verify Bar 6 note bach-var1-88 (tick 744, dur 36, blue) on staff line o2 (pitch 36):
-  // Staff line is colored continuously in Royal Blue (#1D4ED8) without white knockout cuts or stutter
-  const note88 = score.notes.find((n) => n.id === 'bach-var1-88')!;
-  const col88 = layout.columns.find((c) => c.notes.some((n) => n.id === note88.id))!;
-  const staffOriginY = 10 * (72 / 25.4) + 42 + 36;
-  const note88Ny = staffOriginY + (note88.startTick - col88.startTick) * layout.ptPerTick;
-  const note88StartY = note88Ny - 0.55 + 4.80;
-  const note88ReleaseY = note88Ny + note88.durationTicks * layout.ptPerTick;
-  const colLeftPt88 = 10 * (72 / 25.4) + col88.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-  const note88X = colLeftPt88 + 22 + (36 - layout.minPitch) * layout.ptPerSemitone;
+      // The central cusp is the rightmost point of the brace and points into Middle C
+      const y48 = geo.yForPitch(48);
+      const cuspPoints = points.filter((p) => Math.abs(p.x - maxX) < 0.01);
+      assert.ok(
+        cuspPoints.some((p) => Math.abs(p.y - y48) < 0.01),
+        `Accolade cusp must point at Middle C y(48) = ${y48.toFixed(2)}`
+      );
+      assert.ok(
+        Math.abs(y48 - (geo.staffTopY + geo.staffBotY) / 2) < 0.01,
+        'Middle C must sit dead-center of the 4-octave staff'
+      );
 
-  const pSvg88 = svgs[col88.pageIndex];
-  // Verify zero white knockout underlay at note88
-  assert.doesNotMatch(
-    pSvg88,
-    new RegExp(`<line x1="${note88X.toFixed(2)}" [^>]*stroke="#FFFFFF"`),
-    'Bar 6 note bach-var1-88 must not have white knockout underlay'
-  );
-  // Verify sensible continuous Royal Blue hold line on staff line o2
-  assert.match(
-    pSvg88,
-    new RegExp(`<line x1="${note88X.toFixed(2)}" y1="${note88StartY.toFixed(2)}" x2="${note88X.toFixed(2)}" y2="${note88ReleaseY.toFixed(2)}" stroke="#1D4ED8" stroke-width="0.65" stroke-linecap="butt"/>`),
-    'Bar 6 note bach-var1-88 on line o2 must render continuous sensible hold line in Royal Blue'
-  );
+      // Brace lives on the left margin, left of the opening barline
+      assert.ok(maxX < geo.staffLeftPt, 'Accolade must sit in the left margin, clear of the staff');
+      assert.ok(minX > 0, 'Accolade must remain inside the paper');
 
-  // 5. Clean termination without explicit stop ticks or release crossbars
-  assert.doesNotMatch(fullScoreSvg, /class="stop-tick"/, 'Must have zero explicit stop ticks');
-  assert.doesNotMatch(fullScoreSvg, /class="release-crossbar"/, 'Must have zero explicit release crossbars');
-
-  // 6. Check the 108t long note in Bar 20
-  const longNote = score.notes.find((n) => n.durationTicks > 48);
-  assert.ok(longNote, 'Must find 108t long note in Goldberg Var 1');
-  assert.equal(longNote.durationTicks, 108);
-
-  const longNoteColumn = layout.columns.find((c) => c.notes.some((n) => n.id === longNote.id))!;
-  const pageSvg = svgs[longNoteColumn.pageIndex];
-  const allHoldLinesOnPage = Array.from(pageSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g));
-  const longNoteMatch = allHoldLinesOnPage.find((m) => m[5] === '#BE123C');
-  assert.ok(longNoteMatch, 'Must find solid thin hold line for the Bar 20 sustain');
-
-  const x1 = parseFloat(longNoteMatch[1]);
-  const y1 = parseFloat(longNoteMatch[2]);
-  const x2 = parseFloat(longNoteMatch[3]);
-  const y2 = parseFloat(longNoteMatch[4]);
-  const stroke = longNoteMatch[5];
-
-  // Vertical line: x1 === x2
-  assert.equal(x1, x2, 'Continuation line must be perfectly vertical');
-
-  // Color must match duration color (#BE123C for 108t)
-  assert.equal(stroke, '#BE123C', 'Continuation line stroke must match duration color #BE123C');
-
-  // Release coordinate check: y2 terminates cleanly at note release coordinate clamped to column bounds
-  assert.ok(y2 > y1, 'Termination y2 must be below start y1');
-
-  // The long note (B4, linear pitch 59 >= 48) is in default RH territory and must have zero lateral stems or chevrons
-  assert.doesNotMatch(pageSvg, /<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/, 'Must have zero lateral stems');
-
-  // Notehead height for brick (Row 1 odd pc 11) is 5.8pt, half is 2.9pt, +2 = 4.9pt
-  const noteNy = staffOriginY + (longNote.startTick - longNoteColumn.startTick) * layout.ptPerTick;
-  const expectedTrailStartY = noteNy + 5.8 / 2 + 2;
-  assert.ok(
-    Math.abs(y1 - expectedTrailStartY) < 0.05,
-    `trailStartY (${y1}) must match noteNy + noteHeight / 2 + 2 (${expectedTrailStartY})`
-  );
-  assert.ok(y1 > noteNy, 'trailStartY must be strictly below notehead center at noteNy');
-
-  // 7. Obstacle Interruption ("Interrupt for the Obstacle then Finish") in Measure 4
-  // bach-var1-68 (tick 552, pitch 38, duration 24) intersects bach-var1-69 (tick 564, pitch 36 with RH crossing)
-  // Must render two disjoint line segments:
-  // - Segment 1: from onset start to before tick 564
-  // - Segment 2: resuming after tick 564 and finishing at note release (~tick 576)
-  const note68 = score.notes.find((n) => n.id === 'bach-var1-68')!;
-  const note69 = score.notes.find((n) => n.id === 'bach-var1-69')!;
-  const col4 = layout.columns.find((c) => c.notes.some((n) => n.id === note68.id))!;
-  const note68Ny = staffOriginY + (note68.startTick - col4.startTick) * layout.ptPerTick;
-  const note69Ny = staffOriginY + (note69.startTick - col4.startTick) * layout.ptPerTick;
-  const note68Height = 6.0; // Parity 0 (even) notehead height
-  const note68StartY = note68Ny + note68Height / 2 + 2;
-  const note68ReleaseY = note68Ny + note68.durationTicks * layout.ptPerTick;
-  const note69Height = 6.0;
-  const expectedObsY1 = note69Ny - note69Height / 2 - 2.0;
-  const expectedObsY2 = note69Ny + note69Height / 2 + 2.0;
-
-  const col4Svg = svgs[col4.pageIndex];
-  const col4LeftPt = 10 * (72 / 25.4) + col4.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-  const note68X = col4LeftPt + 22 + (38 - layout.minPitch) * layout.ptPerSemitone;
-
-  const note68Segments = Array.from(
-    col4Svg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g)
-  ).filter(
-    (m) => Math.abs(parseFloat(m[1]) - note68X) < 0.1 &&
-           parseFloat(m[2]) >= note68StartY - 0.1 &&
-           parseFloat(m[4]) <= note68ReleaseY + 0.1
-  );
-  assert.equal(note68Segments.length, 2, 'bach-var1-68 must render exactly 2 disjoint line segments (obstacle interruption)');
-  assert.ok(Math.abs(parseFloat(note68Segments[0][2]) - note68StartY) < 0.1, 'Segment 1 must start at note68StartY');
-  assert.ok(Math.abs(parseFloat(note68Segments[0][4]) - expectedObsY1) < 0.1, 'Segment 1 must terminate before obstacle');
-  assert.ok(Math.abs(parseFloat(note68Segments[1][2]) - expectedObsY2) < 0.1, 'Segment 2 must resume after obstacle');
-  assert.ok(Math.abs(parseFloat(note68Segments[1][4]) - note68ReleaseY) < 0.1, 'Segment 2 must finish at note release');
-
-  // 8. Robust Truncation & Segmentation in Measure 30
-  // Successive LH eighth notes (bach-var1-501, 504, 507, 510, 513) cleanly stop before subsequent obstacles
-  const m30NoteIds = ['bach-var1-501', 'bach-var1-504', 'bach-var1-507', 'bach-var1-510', 'bach-var1-513'];
-  for (const nId of m30NoteIds) {
-    const n = score.notes.find((x) => x.id === nId)!;
-    const col = layout.columns.find((c) => c.notes.some((x) => x.id === n.id))!;
-    const colLeftPt = 10 * (72 / 25.4) + col.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-    const nNy = staffOriginY + (n.startTick - col.startTick) * layout.ptPerTick;
-    const nReleaseY = nNy + n.durationTicks * layout.ptPerTick;
-    const nx = colLeftPt + 22 + (linearIndex(n.pitch) - layout.minPitch) * layout.ptPerSemitone;
-    const pSvg = svgs[col.pageIndex];
-    const nLines = Array.from(
-      pSvg.matchAll(/<line x1="([\d\.]+)" y1="([\d\.]+)" x2="([\d\.]+)" y2="([\d\.]+)" stroke="([^"]+)" stroke-width="[\d\.]+" stroke-linecap="round"\/>/g)
-    ).filter(
-      (m) => Math.abs(parseFloat(m[1]) - nx) < 0.1 &&
-             parseFloat(m[2]) >= nNy - 0.1 &&
-             parseFloat(m[2]) <= nReleaseY + 0.1
-    );
-    for (const seg of nLines) {
-      assert.ok(parseFloat(seg[4]) <= nReleaseY + 0.1, `${nId} hold line must never extend past note release coordinate`);
+      // Authentic copperplate proportions: ~1:10 (height : width)
+      const width = maxX - minX;
+      const aspect = (geo.staffBotY - geo.staffTopY) / width;
+      assert.ok(aspect > 8 && aspect < 15, `Accolade aspect ratio must be ~1:10 (got 1:${aspect.toFixed(1)})`);
     }
   }
 });
 
-test('Optical Notehead Sizing & Tasteful Handedness Chevrons in SVG Print Engine', () => {
+test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landmark dashes, vertical barlines & beat grid', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, { noteheadMorphology: 'row-parity-shape' });
-  const svg = renderPageToSvg(layout, 0);
+  const layout = computeColumnarLayout(score);
+  const page1 = renderPageToSvg(layout, 0);
+  const lines = extractLines(page1);
+  const round2 = (v: number) => parseFloat(v.toFixed(2));
 
-  // Optical Notehead Sizing Invariant (Midpoint Taller Noteheads):
-  // Oval on lines: rx = 5.2, ry = 3.0
-  // Brick in spaces: width = 8.6, height = 5.8
-  assert.match(svg, /<ellipse[^>]*rx="5\.20"[^>]*ry="3\.00"/, 'Squished oval rx must be 5.20pt and ry must be 3.00pt');
+  for (let s = 0; s < 4; s++) {
+    const geo = getSystemGeometry(layout, 0, s);
+    const staffTop = round2(geo.staffTopY);
+    const staffBot = round2(geo.staffBotY);
 
-  // Verify brick noteheads: width 8.60 and height 5.80
-  const brickMatches = Array.from(svg.matchAll(/<rect[^>]*width="8\.60"[^>]*height="5\.80"[^>]*rx="1\.2"/g));
-  assert.ok(brickMatches.length > 0, 'Must have rendered crisp brick noteheads in SVG');
+    // 1. Middle C (p = 48): bold horizontal center spine (1.35pt, #000000)
+    const spineLines = lines.filter(
+      (l) => l.y1 === l.y2 && l.stroke === '#000000' && l.width === '1.35' && round2(l.y1) === round2(geo.yForPitch(48))
+    );
+    assert.equal(spineLines.length, 1, `System ${s + 1} must render one 1.35pt Middle C spine`);
+    assert.ok(Math.abs(spineLines[0].x1 - geo.staffLeftPt) < 0.01, 'Spine must start at the opening barline');
+    assert.ok(Math.abs(spineLines[0].x2 - geo.staffRightPt) < 0.01, 'Spine must run to the page margin');
 
-  // Optical area balance invariant (< 5% difference)
-  const ellipseArea = Math.PI * 5.2 * 3.0;
-  const brickArea = 8.6 * 5.8;
-  const areaRatio = ellipseArea / brickArea;
-  assert.ok(
-    Math.abs(areaRatio - 1.0) < 0.05,
-    `Ellipse area (${ellipseArea.toFixed(2)}) and brick area (${brickArea.toFixed(2)}) must match within 5%`
+    // 2. Octaves (p = 24, 36, 60, 72): solid horizontal lines (0.65pt, #000000)
+    for (const octavePitch of [24, 36, 60, 72]) {
+      const y = round2(geo.yForPitch(octavePitch));
+      const octaveLines = lines.filter(
+        (l) => l.y1 === l.y2 && l.stroke === '#000000' && l.width === '0.65' && round2(l.y1) === y
+      );
+      assert.equal(octaveLines.length, 1, `System ${s + 1} octave line p=${octavePitch} must be horizontal`);
+    }
+
+    // 3. Landmark 4 (p = 28, 40, 52, 64): small horizontal dashed lines (0.6pt, #444444, [5, 2.5])
+    for (const landmarkPitch of [28, 40, 52, 64]) {
+      const y = round2(geo.yForPitch(landmarkPitch));
+      const landmarkLines = lines.filter(
+        (l) =>
+          l.y1 === l.y2 &&
+          l.stroke === '#444444' &&
+          l.width === '0.6' &&
+          l.dash === '5,2.5' &&
+          round2(l.y1) === y
+      );
+      assert.equal(landmarkLines.length, 1, `System ${s + 1} landmark dashed line p=${landmarkPitch} must be horizontal`);
+    }
+
+    // 4. Barlines are vertical across the staff (y1 = staffTopY, y2 = staffBotY)
+    const barlines = lines.filter(
+      (l) => l.x1 === l.x2 && l.width === '0.75' && round2(l.y1) === staffTop && round2(l.y2) === staffBot
+    );
+    assert.equal(barlines.length, 4, `System ${s + 1} must render exactly 4 vertical measure barlines`);
+    const expectedBarX = [1, 2, 3, 4].map((m) => {
+      const endTick = (s * 4 + m) * TICKS_PER_MEASURE;
+      const spec = (score.barlines || []).find((b) => b.tick === endTick);
+      const x = geo.staffLeftPt + m * geo.measureWidthPt;
+      // Double/final barlines place their thin stroke just inside the boundary
+      return round2(spec && (spec.type === 'double' || spec.type === 'final') ? x - 3.2 : x);
+    });
+    assert.deepEqual(
+      barlines.map((l) => round2(l.x1)).sort((a, b) => a - b),
+      expectedBarX.slice().sort((a, b) => a - b),
+      'Barlines must stand at exact measure boundaries'
+    );
+
+    // 5. Authoritative initial vertical barline at the head of every system (1.2pt)
+    const openingBarlines = lines.filter(
+      (l) =>
+        l.x1 === l.x2 &&
+        l.width === '1.2' &&
+        round2(l.x1) === round2(geo.staffLeftPt) &&
+        round2(l.y1) === staffTop &&
+        round2(l.y2) === staffBot
+    );
+    assert.equal(openingBarlines.length, 1, `System ${s + 1} must open with a 1.2pt vertical barline after the accolade`);
+
+    // 6. Beat grid pulse lines for beats 2 and 3: vertical dashed lines (#D1D5DB, 0.5pt, [2, 3])
+    const beatLines = lines.filter(
+      (l) =>
+        l.stroke === '#D1D5DB' &&
+        l.width === '0.5' &&
+        l.dash === '2,3' &&
+        round2(l.y1) === staffTop &&
+        round2(l.y2) === staffBot
+    );
+    assert.equal(beatLines.length, 8, `System ${s + 1} must render 2 vertical pulse lines per measure × 4 measures`);
+    for (const line of beatLines) {
+      assert.equal(line.x1, line.x2, 'Beat grid pulse lines must be perfectly vertical');
+    }
+  }
+
+  // 7. Clean Urtext measure numbering: 1..16 once each, above the measure start lines
+  const measureNumbers = Array.from(page1.matchAll(/class="measure-num">(\d+)<\/text>/g)).map((m) => Number(m[1]));
+  assert.deepEqual(
+    measureNumbers,
+    Array.from({ length: 16 }, (_, i) => i + 1),
+    'Page 1 must number measures 1–16 above their opening barlines'
   );
 
-  // Zero straight lateral stems:
-  const stemMatches = Array.from(svg.matchAll(/<line[^>]*stroke-width="0\.6"[^>]*stroke-linecap="round"/g));
-  assert.equal(stemMatches.length, 0, 'Zero straight lateral stem lines');
-
-  // Zero standalone floating chevrons:
-  assert.doesNotMatch(svg, /<path d="M [^"]+ L [^"]+ L [^"]+" fill="none"/, 'Zero standalone floating chevrons');
-
-  // Baked Directional Noteheads Invariant (pointing Right for RH in bass, Left for LH in treble):
-  const directionalRegex = /<path d="M ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) L ([\d\.]+) ([\d\.]+) A [^"]+ Z" fill="([^"]+)"(?: stroke="([^"]+)" stroke-width="1\.3" stroke-linejoin="round")?\/>/g;
-  const directionalMatches = Array.from(svg.matchAll(directionalRegex));
-  assert.ok(directionalMatches.length > 0, 'Must find baked directional noteheads in SVG for crossing exceptions');
-
-  directionalMatches.forEach((m) => {
-    const p1x = Number(m[3]);
-    const p1y = Number(m[4]);
-    const apexX = Number(m[5]);
-    const apexY = Number(m[6]);
-    const p3y = Number(m[8]);
-    assert.ok(apexX !== p1x, 'Notehead apex must have horizontal clearance from base');
-    assert.ok(Math.abs(apexY - (p1y + p3y) / 2) < 0.05, 'Notehead apex must be vertically centered');
-  });
-
-  // Verify full score directional notehead count and directions:
-  const allSvgs = renderAllPagesToSvg(layout);
-  const fullScoreSvg = allSvgs.join('\n');
-  const allDirectional = Array.from(fullScoreSvg.matchAll(directionalRegex));
-  assert.equal(allDirectional.length, 63, 'Must render directional noteheads ONLY for exceptions (63 in Goldberg Var 1)');
-
-  const rhDirectional = allDirectional.filter((m) => Number(m[5]) > Number(m[3]));
-  const lhDirectional = allDirectional.filter((m) => Number(m[5]) < Number(m[3]));
-  assert.equal(rhDirectional.length, 24, '24 crossing notes must have right-pointing noteheads for RH in bass (< 48)');
-  assert.equal(lhDirectional.length, 39, '39 crossing notes must have left-pointing noteheads for LH above m3 (> 48)');
-
-  // Verify SVG print engine with explicit hand crossings in both directions, and neutral Middle C (48):
-  const handednessTestScore: QuantizedGridScore = {
-    id: 'handedness-svg-test',
-    title: 'Handedness SVG Test',
-    composer: 'Test',
-    ticksPerBeat: 48,
-    gridResolution: 12,
-    totalTicks: 72,
-    timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
-    barlines: [],
-    tempos: [],
-    dynamics: [],
-    pedals: [],
-    notes: [
-      { id: 'rh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 0, durationTicks: 12, hand: 'RH', velocity: 90 }, // 48 -> neutral
-      { id: 'lh-m3', pitch: { pitchClass: 0, octave: 4 }, startTick: 12, durationTicks: 12, hand: 'LH', velocity: 90 }, // 48 -> neutral
-      { id: 'rh-default', pitch: { pitchClass: 7, octave: 4 }, startTick: 24, durationTicks: 12, hand: 'RH', velocity: 90 }, // 55 >= 48 -> default, no directional tip
-      { id: 'lh-default', pitch: { pitchClass: 7, octave: 3 }, startTick: 36, durationTicks: 12, hand: 'LH', velocity: 90 }, // 43 <= 48 -> default, no directional tip
-      { id: 'rh-exception', pitch: { pitchClass: 7, octave: 3 }, startTick: 48, durationTicks: 12, hand: 'RH', velocity: 90 }, // 43 < 48 -> exception, right tip
-      { id: 'lh-exception', pitch: { pitchClass: 7, octave: 4 }, startTick: 60, durationTicks: 12, hand: 'LH', velocity: 90 }, // 55 > 48 -> exception, left tip
-    ],
-  };
-
-  const testSvg = renderColumnarScoreToSvg(handednessTestScore, 0, { noteheadMorphology: 'row-parity-shape' });
-  const testDirectional = Array.from(testSvg.matchAll(directionalRegex));
-  assert.equal(testDirectional.length, 2, 'SVG must render directional noteheads strictly for the 2 exception notes');
-
-  const testRh = testDirectional.filter((m) => Number(m[5]) > Number(m[3]));
-  const testLh = testDirectional.filter((m) => Number(m[5]) < Number(m[3]));
-  assert.equal(testRh.length, 1, 'RH exception (< 48) must render right-pointing notehead in SVG');
-  assert.equal(testLh.length, 1, 'LH exception (> 48) must render left-pointing notehead in SVG');
+  // 8. Zero confusing margin numeral stacks and column-top octave badges
+  assert.doesNotMatch(page1, />o1</);
+  assert.doesNotMatch(page1, />o3</);
+  assert.doesNotMatch(page1, />o5</);
+  assert.doesNotMatch(page1, /class="pitch-label"/);
+  assert.doesNotMatch(page1, /class="time-sig"/);
+  assert.doesNotMatch(page1, /class="beat-counter"/);
 });
 
-test('A4 Print Dimensions & Page Margins Invariant', () => {
+test('Intuitive Up/Down Handedness Chevron Invariant: RH below Middle C points up, LH above Middle C points down', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const page1 = renderPageToSvg(layout, 0);
+  const page2 = renderPageToSvg(layout, 1);
+  const page1Chevrons = extractChevrons(page1);
+  const page2Chevrons = extractChevrons(page2);
+  const allChevrons = [...page1Chevrons, ...page2Chevrons];
+
+  // Measure 4 (system 1 of page 1): RH crossing into the bass
+  const geo4 = getSystemGeometry(layout, 0, 0);
+  const m4Notes = score.notes.filter(
+    (n) => n.startTick >= 3 * TICKS_PER_MEASURE && n.startTick < 4 * TICKS_PER_MEASURE
+  );
+  const m4Exceptions = m4Notes.filter((n) => n.hand === 'RH' && linearIndex(n.pitch) < 48);
+  assert.deepEqual(
+    [...new Set(m4Exceptions.map((n) => linearIndex(n.pitch)))].sort((a, b) => a - b),
+    [36, 42, 43, 45],
+    'Measure 4 RH exceptions must include pitches 45, 43, 42 and 36'
+  );
+
+  for (const note of m4Exceptions) {
+    const nx = parseFloat(geo4.xForTick(note.startTick).toFixed(2));
+    const ny = parseFloat(geo4.yForPitch(linearIndex(note.pitch)).toFixed(2));
+    const chevron = page1Chevrons.find(
+      (c) => c.direction === 'up' && Math.abs(c.apexX - nx) < 0.01 && Math.abs(c.apexY - ny) < 20
+    );
+    assert.ok(chevron, `Measure 4 note ${note.id} (p=${linearIndex(note.pitch)}) must render an upward chevron`);
+    assert.ok(chevron.apexY < chevron.baseY1, 'Upward chevron must have its apex above the base (∧)');
+    assert.ok(chevron.baseY1 < ny, 'Upward chevron must sit above the notehead');
+    assert.ok(Math.abs(chevron.apexX - nx) < 0.01, 'Chevron must be horizontally centered on the notehead');
+  }
+
+  // Measure 30 (system 8 of page 2): LH crossing into the treble
+  const geo30 = getSystemGeometry(layout, 1, 3);
+  const m30Notes = score.notes.filter(
+    (n) => n.startTick >= 29 * TICKS_PER_MEASURE && n.startTick < 30 * TICKS_PER_MEASURE
+  );
+  const m30Exceptions = m30Notes.filter((n) => n.hand === 'LH' && linearIndex(n.pitch) > 48);
+  assert.deepEqual(
+    [...new Set(m30Exceptions.map((n) => linearIndex(n.pitch)))].sort((a, b) => a - b),
+    [52, 54, 55, 56, 57],
+    'Measure 30 LH exceptions must include pitches 52, 54, 56, 57 and 55'
+  );
+
+  for (const note of m30Exceptions) {
+    const nx = parseFloat(geo30.xForTick(note.startTick).toFixed(2));
+    const ny = parseFloat(geo30.yForPitch(linearIndex(note.pitch)).toFixed(2));
+    const chevron = page2Chevrons.find(
+      (c) => c.direction === 'down' && Math.abs(c.apexX - nx) < 0.01 && Math.abs(c.apexY - ny) < 20
+    );
+    assert.ok(chevron, `Measure 30 note ${note.id} (p=${linearIndex(note.pitch)}) must render a downward chevron`);
+    assert.ok(chevron.apexY > chevron.baseY1, 'Downward chevron must have its apex below the base (∨)');
+    assert.ok(chevron.apexY > ny, 'Downward chevron must sit below the notehead');
+    assert.ok(Math.abs(chevron.apexX - nx) < 0.01, 'Chevron must be horizontally centered on the notehead');
+  }
+
+  // Handedness totals across the whole movement: 24 RH exceptions + 39 LH exceptions
+  const upChevrons = allChevrons.filter((c) => c.direction === 'up');
+  const downChevrons = allChevrons.filter((c) => c.direction === 'down');
+  assert.equal(upChevrons.length, 24, '24 RH crossing notes must render upward chevrons');
+  assert.equal(downChevrons.length, 39, '39 LH crossing notes must render downward chevrons');
+
+  // Register default notes (RH above Middle C, LH below) render zero chevrons
+  const defaultRhPitch = linearIndex({ pitchClass: 7, octave: 4 }); // G4 = 55
+  const geoAny = geo4;
+  const defaultUpAnchors = upChevrons.filter((c) => Math.abs(c.apexY - geoAny.yForPitch(defaultRhPitch)) < 0.01);
+  assert.equal(defaultUpAnchors.length, 0, 'Default RH register notes must not render chevrons');
+});
+
+test('Horizontal Hold Lines & Middle C Continuity Invariant', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const svgs = renderAllPagesToSvg(layout);
+  const tauRef = score.gridResolution || 12;
+
+  const holdLines = svgs.flatMap((svg) =>
+    extractLines(svg).filter(
+      (l) => DURATION_COLORS.includes(l.stroke) && (l.cap === 'butt' || l.cap === 'round')
+    )
+  );
+  assert.ok(holdLines.length > 0, 'Must render duration hold lines');
+
+  const geo97 = getSystemGeometry(layout, 0, 1); // mm. 5–8 system
+
+  // Every trail extends horizontally to the right and stays inside the staff bounds
+  for (const line of holdLines) {
+    assert.equal(line.y1, line.y2, 'Duration trails must extend horizontally (y1 === y2)');
+    assert.ok(line.x2 > line.x1, 'Duration trails must extend to the right (x2 > x1)');
+    assert.ok(line.x1 >= geo97.staffLeftPt - 0.01, 'Trails must begin inside the staff');
+    assert.ok(line.x2 <= geo97.staffRightPt + 0.01, 'Trails must be clamped to the right staff bound');
+  }
+
+  // Zero vertical trails from the defunct columnar layout
+  const verticalColoredLines = svgs.flatMap((svg) =>
+    extractLines(svg).filter((l) => DURATION_COLORS.includes(l.stroke) && l.x1 === l.x2)
+  );
+  assert.equal(verticalColoredLines.length, 0, 'Must render zero vertical duration trails');
+
+  // Every colored note (duration > tauRef) is represented by exactly one trail
+  const coloredNotes = score.notes.filter((n) => n.durationTicks > tauRef);
+  assert.equal(coloredNotes.length, 165, 'Goldberg Var 1 has exactly 165 colored (8th+) notes');
+  assert.equal(holdLines.length, coloredNotes.length, 'Every colored note must render one hold line');
+
+  // Bar 6 Middle C note bach-var1-97 (tick 816, dur 24): continuous Royal Blue trail on the bold spine
+  const note97 = score.notes.find((n) => n.id === 'bach-var1-97')!;
+  assert.equal(linearIndex(note97.pitch), 48, 'Note 97 must sit on Middle C');
+  const nx97 = geo97.xForTick(note97.startTick);
+  const ny97 = geo97.yForPitch(48);
+  const expectedHoldStartX = nx97 + 4.8;
+  const expectedHoldEndX = geo97.xForTick(note97.startTick + note97.durationTicks);
+
+  assert.match(
+    renderPageToSvg(layout, 0),
+    new RegExp(
+      `<line x1="${expectedHoldStartX.toFixed(2)}" y1="${ny97.toFixed(2)}" x2="${expectedHoldEndX.toFixed(2)}" y2="${ny97.toFixed(2)}" stroke="#1D4ED8" stroke-width="1.35" stroke-linecap="butt"/>`
+    ),
+    'Bar 6 Middle C note 97 must render a continuous Royal Blue hold line matching the 1.35pt spine'
+  );
+
+  // Open-space trails are thin and round-capped; staff-line trails are butt-capped
+  const spaceTrails = holdLines.filter((l) => l.cap === 'round');
+  const lineTrails = holdLines.filter((l) => l.cap === 'butt');
+  assert.ok(spaceTrails.length > 0, 'Open-space trails must use round line caps');
+  assert.ok(lineTrails.length > 0, 'Staff-line trails must use butt line caps');
+  for (const trail of spaceTrails) assert.equal(trail.width, '0.8', 'Open-space trails are 0.8pt');
+  const round2 = (v: number) => parseFloat(v.toFixed(2));
+  const middleCYs = new Set<number>();
+  const octaveYs = new Set<number>();
+  for (let s = 0; s < layout.systems.length; s++) {
+    const geo = getSystemGeometry(layout, Math.floor(s / layout.systemsPerPage), s % layout.systemsPerPage);
+    middleCYs.add(round2(geo.yForPitch(48)));
+    for (const p of [24, 36, 60, 72]) octaveYs.add(round2(geo.yForPitch(p)));
+  }
+  for (const trail of lineTrails) {
+    assert.ok(trail.width === '0.65' || trail.width === '1.35', 'Staff-line trails match staff line width');
+    if (trail.width === '1.35') {
+      assert.ok(middleCYs.has(round2(trail.y1)), 'Middle C trails must render at 1.35pt on the bold spine');
+    } else {
+      assert.ok(octaveYs.has(round2(trail.y1)), 'Other staff-line trails must render at 0.65pt on octave lines');
+    }
+  }
+
+  // Notes at or below the 16th-note resolution stay pure noteheads with zero trails
+  const regularNotes = score.notes.filter((n) => n.durationTicks <= tauRef);
+  assert.ok(regularNotes.length > 0);
+  for (const note of regularNotes) {
+    assert.ok(note.durationTicks <= 12);
+  }
+});
+
+test('Opening Sound Position of Honor: concentric noble halo ring for tick 0 notes of Measure 1', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const page1 = renderPageToSvg(layout, 0);
+  const geo = getSystemGeometry(layout, 0, 0);
+
+  const halos = extractHaloRings(page1);
+  assert.equal(halos.length, 2, 'Exactly the two opening sounds at tick 0 must receive a halo ring');
+
+  const openingNotes = score.notes.filter((n) => n.startTick === 0);
+  assert.equal(openingNotes.length, 2, 'Goldberg Var 1 opens with two sounds (LH + RH)');
+  const nx = geo.xForTick(0);
+  for (const note of openingNotes) {
+    const ny = geo.yForPitch(linearIndex(note.pitch));
+    assert.ok(
+      halos.some((h) => Math.abs(h.cx - nx) < 0.01 && Math.abs(h.cy - ny) < 0.01),
+      `Opening note ${note.id} (p=${linearIndex(note.pitch)}) must be framed by a concentric halo ring`
+    );
+  }
+
+  // The halo is concentric with the circular knockout that protects the digit
+  for (const halo of halos) {
+    assert.match(
+      page1,
+      new RegExp(`<circle cx="${halo.cx.toFixed(2)}" cy="${halo.cy.toFixed(2)}" r="4\\.80" fill="#FFFFFF"/>`),
+      'Halo ring must be concentric with the notehead knockout'
+    );
+  }
+
+  // No later note in the movement receives the position-of-honor halo
+  const laterHalos = renderAllPagesToSvg(layout)
+    .slice(0, 1)
+    .flatMap((svg) => extractHaloRings(svg))
+    .filter((h) => Math.abs(h.cx - nx) > 0.01);
+  assert.equal(laterHalos.length, 0, 'Only tick 0 sounds receive the halo');
+});
+
+test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for mm. 29–30', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const page1 = renderPageToSvg(layout, 0);
+  const page2 = renderPageToSvg(layout, 1);
+
+  // No page-1 system (mm. 1–16) contains notes above o5, so no outlier line may appear there
+  for (let s = 0; s < 4; s++) {
+    const geo = getSystemGeometry(layout, 0, s);
+    const y76 = parseFloat(geo.yForPitch(76).toFixed(2));
+    const aboveStaff = extractLines(page1).filter(
+      (l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
+    );
+    assert.equal(aboveStaff.length, 0, `Page 1 system ${s + 1} must not render outlier lines above o5`);
+  }
+
+  // Page 2 system 4 (mm. 29–32) contains D6 (pitch 74) in mm. 29–30 → local dashed line at pitch 76.
+  // Systems 1–3 of page 2 (mm. 17–28) stay within the 4-octave core.
+  for (let s = 0; s < 3; s++) {
+    const geo = getSystemGeometry(layout, 1, s);
+    const y76 = parseFloat(geo.yForPitch(76).toFixed(2));
+    const aboveStaff = extractLines(page2).filter(
+      (l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
+    );
+    assert.equal(aboveStaff.length, 0, `Page 2 system ${s + 1} must not render outlier lines above o5`);
+  }
+
+  const geoLast = getSystemGeometry(layout, 1, 3);
+  const y76 = parseFloat(geoLast.yForPitch(76).toFixed(2));
+  const outlierLines = extractLines(page2).filter(
+    (l) => l.y1 === l.y2 && l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
+  );
+  assert.equal(outlierLines.length, 2, 'Exactly two local dashed outlier segments (mm. 29 and 30)');
+  assert.ok(y76 < geoLast.staffTopY, 'The pitch 76 outlier line must sit above the o5 staff line');
+
+  const m29StartX = parseFloat(geoLast.xForMeasureStart(0).toFixed(2));
+  const m30StartX = parseFloat(geoLast.xForMeasureStart(1).toFixed(2));
+  const m31StartX = parseFloat(geoLast.xForMeasureStart(2).toFixed(2));
+  const segments = outlierLines.map((l) => [parseFloat(l.x1.toFixed(2)), parseFloat(l.x2.toFixed(2))]);
+  assert.deepEqual(segments, [[m29StartX, m30StartX], [m30StartX, m31StartX]], 'Outlier segments must cover mm. 29 and 30 only');
+});
+
+test('Horizontal Engraving API, Morphology & Legacy Alias Regression', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score);
+  const svgs = renderAllPagesToSvg(layout);
+
+  // renderColumnarScoreToSvg helper mirrors renderPageToSvg
+  assert.equal(renderColumnarScoreToSvg(score, 0), svgs[0]);
+  assert.equal(renderColumnarScoreToSvg(score), svgs[0]);
+  assert.equal(renderColumnarScoreToSvg(score, 1), svgs[1]);
+  assert.match(svgs[0], /<svg[^>]*style="[^"]*width:\s*100%[^"]*height:\s*auto[^"]*"/);
+
+  // Duodecimal default: naked digits protected by circular knockouts
+  assert.match(svgs[0], /class="duo-digit"/);
+  assert.match(svgs[0], /<circle cx="[\d.]+" cy="[\d.]+" r="4\.80" fill="#FFFFFF"\/>/);
+  assert.match(svgs[0], />7<\/text>/, 'Must render G as 7');
+  assert.match(svgs[0], />b<\/text>/, 'Must render B as b');
+  assert.doesNotMatch(svgs[0], /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around duodecimal noteheads');
+
+  // Phonetic morphology keeps lowercase syllables in the horizontal systems
+  const phoneticSvg = renderColumnarScoreToSvg(score, { noteheadMorphology: 'phonetic' });
+  assert.match(phoneticSvg, /<text[^>]*font-family="monospace"[^>]*>(?:o|wa|tu|ti|fo|fa|si|se|e|na|a|bi)<\/text>/);
+
+  // Rectangle / square morphology: solid Row 0 squares, hollow Row 1 squares
+  const rectSvg = renderColumnarScoreToSvg(score, { noteheadMorphology: 'rectangle-square' });
+  assert.match(rectSvg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*rx="1\.5" fill="(?!#FFFFFF)/);
+  assert.match(rectSvg, /<rect[^>]*width="6\.20"[^>]*height="4\.30"[^>]*fill="#FFFFFF"[^>]*stroke-width="1\.3"/);
+  assert.doesNotMatch(rectSvg, /<ellipse/);
+
+  // Row-parity morphology: oval on lines, brick in spaces
+  const paritySvg = renderColumnarScoreToSvg(score, { noteheadMorphology: 'row-parity-shape' });
+  assert.match(paritySvg, /<ellipse[^>]*rx="5\.20"[^>]*ry="3\.00"/);
+  assert.match(paritySvg, /<rect[^>]*width="8\.60"[^>]*height="5\.80"[^>]*rx="1\.2"/);
+
+  // Legacy columnar option aliases still resolve onto the horizontal system engine
+  const legacy = computeColumnarLayout(score, { measuresPerColumn: 2, columnsPerPage: 2 });
+  assert.equal(legacy.measuresPerSystem, 2);
+  assert.equal(legacy.systemsPerPage, 2);
+  assert.equal(legacy.systems.length, 16);
+  assert.equal(legacy.pages.length, 8);
+  assert.equal(legacy.columns.length, legacy.systems.length, 'columns alias must mirror systems');
+  assert.equal(legacy.pages[0].columns.length, legacy.pages[0].systems.length);
+
+  // Defaults remain intact for the UI
+  assert.equal(layout.options.showBeatGrid, true);
+  assert.equal(layout.options.showGutterBrackets, false);
+  assert.equal(layout.options.octaveExtensionMode, 'spillover');
+  assert.ok(!('showBeamGrouping' in layout.options));
+});
+
+test('Optional Gutter Beat Brackets adapt to horizontal systems (RH above, LH below)', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = computeColumnarLayout(score, { showBeatGrid: false, showGutterBrackets: true });
+  const page1 = renderPageToSvg(layout, 0);
+
+  assert.ok(page1.includes('LH Gutter Bracket'), 'Must render LH gutter brackets below the staff');
+  assert.ok(page1.includes('RH Gutter Bracket'), 'Must render RH gutter brackets above the staff');
+  assert.ok(page1.includes('fill="none" stroke="#6B7280"'), 'Brackets must use the gutter stroke');
+  assert.ok(!page1.includes('Klavarskribo Beat Grid'), 'Beat grid must be absent when disabled');
+});
+
+test('A4 & Letter Portrait Print Dimensions Invariant', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score, { pageMarginMm: 10 });
 
@@ -469,13 +644,26 @@ test('A4 Print Dimensions & Page Margins Invariant', () => {
   assert.equal(Math.round(layout.pageDimensions.widthPt * 100) / 100, Math.round(A4_WIDTH_PT * 100) / 100);
   assert.equal(Math.round(layout.pageDimensions.heightPt * 100) / 100, Math.round(A4_HEIGHT_PT * 100) / 100);
 
-  // 10mm margins = ~28.35 pt
   const marginPt = 10 * MM_TO_PT;
   const printableWidth = A4_WIDTH_PT - 2 * marginPt;
   assert.ok(printableWidth > 530 && printableWidth < 540);
 
-  // 2 columns with 8mm gap
-  assert.ok(layout.columnDimensions.widthPt > 250 && layout.columnDimensions.widthPt < 265);
+  // The system staff spans the printable width minus the accolade margin
+  const expectedStaffWidth = printableWidth - 10 - 8;
+  assert.ok(
+    Math.abs(layout.systemDimensions.widthPt - expectedStaffWidth) < 0.01,
+    `Horizontal system width must claim the printable width (got ${layout.systemDimensions.widthPt})`
+  );
+
+  // Letter portrait still forms the same 2-page spread
+  const letterLayout = computeColumnarLayout(score, { paperSize: 'letter' });
+  assert.equal(letterLayout.pageDimensions.widthPt, LETTER_WIDTH_PT);
+  assert.equal(letterLayout.pageDimensions.heightPt, LETTER_HEIGHT_PT);
+  assert.equal(letterLayout.pages.length, 2);
+  assert.equal(letterLayout.pages[0].systems.length, 4);
+  const letterGeo = getSystemGeometry(letterLayout, 0, 0);
+  assert.ok(letterGeo.staffBotY < LETTER_HEIGHT_PT - 28.35, 'Last system must stay inside the printable letter page');
+  assert.ok(letterGeo.staffTopY > 28.35 + 44);
 });
 
 test('Web Print CSS & @media print Invariants', () => {
@@ -495,48 +683,21 @@ test('Web Print CSS & @media print Invariants', () => {
   assert.match(css, /\.print-preview-card\s*svg\s*\{[^}]*width:\s*100%\s*!important/);
 });
 
-test('Responsive SVG Scaling & Unclipped o5 Margin Invariant', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, { staffStyle: 'tritone-split' });
-  const svg = renderPageToSvg(layout, 0);
-
-  // SVG root must have responsive style attribute
-  assert.match(svg, /<svg[^>]*style="[^"]*width:\s*100%[^"]*height:\s*auto[^"]*"/);
-
-  // o5 text and staff line must exist in Column 1 (right column)
-  const o5TextMatches = Array.from(svg.matchAll(/<text[^>]*>o5<\/text>/g));
-  assert.equal(o5TextMatches.length, 2, 'o5 must appear in both columns (mm. 1-4 and mm. 5-8)');
-
-  // Rightmost o5 line must have >= 10mm (28.35pt) buffer from page right edge
-  const col1 = layout.pages[0].columns[1];
-  const marginPt = layout.options.pageMarginMm * MM_TO_PT;
-  const gapPt = layout.options.columnGapMm * MM_TO_PT;
-  const colLeftPt = marginPt + col1.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-  const colStaffLeftPt = colLeftPt + 14;
-  const o5RightColX = colStaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
-  const pageWidthPt = layout.pageDimensions.widthPt;
-  const rightMarginDistance = pageWidthPt - o5RightColX;
-  assert.ok(
-    rightMarginDistance >= 28.35,
-    `Rightmost o5 must sit comfortably within the page (distance: ${rightMarginDistance.toFixed(2)}pt >= 28.35pt)`
-  );
-});
-
-
-test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', async () => {
+test('Network Laser Printing Pipeline: 2-page PostScript & PJL wrapping', async () => {
   // Test generating vector PostScript from benchmark score (defaulting to Letter for US printer tray)
   const { psBuffer, layout } = await generateScorePostscript('bach-goldberg-var1');
 
   assert.equal(layout.pageDimensions.widthPt, 612, 'Letter width must be 612 pt');
   assert.equal(layout.pageDimensions.heightPt, 792, 'Letter height must be 792 pt');
+  assert.equal(layout.pages.length, 2, 'Horizontal portrait engraving must yield a 2-page spread');
 
   assert.ok(psBuffer.length > 10000, 'PostScript buffer must be generated and non-trivial');
   const psText = psBuffer.toString('binary', 0, 1000);
   assert.match(psText, /%!PS-Adobe/);
 
-  // Check multi-page emission (%%Pages: 4)
+  // Check multi-page emission (%%Pages: 2)
   const fullPs = psBuffer.toString('binary');
-  assert.match(fullPs, /%%Pages:\s*4/);
+  assert.match(fullPs, /%%Pages:\s*2/);
 
   // Strictly enforce 100% vector output: zero raster image operator calls
   assert.doesNotMatch(fullPs, /\nimage\n/, 'PostScript must contain zero raster bitmap calls');
@@ -554,316 +715,6 @@ test('Network Laser Printing Pipeline: Multi-page PostScript & PJL wrapping', as
   assert.match(wrappedTail, /@PJL EOJ/);
 });
 
-test('Lowercase \'o\' Octave Marker Invariant: SVG pitch header labels', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
-  const svgs = renderAllPagesToSvg(layout);
-
-  assert.equal(svgs.length, 4);
-  for (const svg of svgs) {
-    // 1. Lowercase o octave markers (o1, o3, o5) with Middle C at o3, dropping o2 and o4
-    assert.match(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">o\d+<\/text>/, 'Must render bold o${oct - 1} pitch labels');
-    assert.match(svg, />o1</, 'Must render o1 bottom octave label');
-    assert.doesNotMatch(svg, />o2</, 'Must NOT render o2 label');
-    assert.match(svg, />o3</, 'Must render o3 label (Middle C)');
-    assert.doesNotMatch(svg, />o4</, 'Must NOT render o4 label');
-    assert.match(svg, />o5</, 'Must render o5 top octave label');
-
-    // 2. Zero diatonic C octave labels
-    assert.doesNotMatch(svg, /<text[^>]*class="pitch-label"[^>]*font-weight="bold">C\d+<\/text>/, 'Must not render diatonic C octave labels');
-    assert.doesNotMatch(svg, />C\d+</, 'Must not contain any diatonic C${oct} markers');
-
-    // 3. 5 and 9 dropped from column top, zero 5|7
-    assert.doesNotMatch(svg, />5\|7</, 'Must not contain 5|7');
-    assert.doesNotMatch(svg, /class="pitch-label"[^>]*>5<\/text>/, 'Must not contain 5 at top of column');
-  }
-});
-
-test('Phonetic Notehead Morphology in SVG: strictly lowercase syllables', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, {
-    noteheadMorphology: 'phonetic',
-  });
-  const svgs = renderAllPagesToSvg(layout);
-
-  assert.equal(svgs.length, 4);
-  const uppercaseSyllables = ['O', 'Wa', 'Tu', 'Ti', 'Fo', 'Fa', 'Si', 'Se', 'E', 'Na', 'A', 'Bi'];
-
-  for (const svg of svgs) {
-    // Must contain lowercase phonetic text elements
-    assert.match(svg, /<text[^>]*font-family="monospace"[^>]*>(?:o|wa|tu|ti|fo|fa|si|se|e|na|a|bi)<\/text>/);
-
-    // Must NOT contain any uppercase syllables in note text elements
-    for (const upper of uppercaseSyllables) {
-      assert.doesNotMatch(svg, new RegExp(`>${upper}<`), `SVG must not contain uppercase syllable ${upper}`);
-    }
-  }
-});
-
-test('0-Indexed Piano Octaves Invariant (o0..o7) for 88-key range', () => {
-  // 88-key piano spans A0 (MIDI 21) to C8 (MIDI 108)
-  // Lowest C is C1 (MIDI 24, oct = 1) -> o0
-  // Middle C is C4 (MIDI 60, oct = 4) -> o3
-  // Highest C is C8 (MIDI 108, oct = 8) -> o7
-  const expectedOctaveLabels: Record<number, string> = {
-    1: 'o0', // C1 (lowest piano C)
-    2: 'o1', // C2
-    3: 'o2', // C3
-    4: 'o3', // C4 (Middle C)
-    5: 'o4', // C5
-    6: 'o5', // C6
-    7: 'o6', // C7
-    8: 'o7', // C8
-  };
-
-  for (let oct = 1; oct <= 8; oct++) {
-    const label = `o${oct - 1}`;
-    assert.equal(label, expectedOctaveLabels[oct], `Octave ${oct} must format as ${expectedOctaveLabels[oct]}`);
-  }
-});
-
-test('Rectangle / Square Morphology & 1-5-9 Symmetric Lines in SVG Print Engine', () => {
-  const score = buildBachGoldbergVar1Score();
-  const svg = renderColumnarScoreToSvg(score, 0, {
-    staffStyle: 'tritone-split',
-    noteheadMorphology: 'rectangle-square',
-  });
-
-  // 1. Staff Lines: Definitive 2-Line Staff with o3 Spine Hierarchy
-  // PC 0 (o3): authoritative bold 1.35pt solid line
-  assert.match(svg, /stroke="#000000"[^>]*stroke-width="1\.35"/, 'Must contain bold 1.35pt central spine line (o3)');
-  // PC 0 (o1, o2, o4, o5): uniform 0.65pt octave lines
-  assert.match(svg, /stroke="#000000"[^>]*stroke-width="0\.65"/, 'Must contain uniform 0.65pt octave lines for o1, o2, o4, o5');
-  // PC 4: small dashes 5,2.5
-  assert.match(svg, /stroke="#444444"[^>]*stroke-width="0\.6"[^>]*stroke-dasharray="5,2\.5"/, 'Must contain small dashed line for 5');
-  // PC 8: thin straight solid line dropped
-  assert.doesNotMatch(svg, /stroke="#555555"[^>]*stroke-width="0\.6"/, 'Must NOT contain thin straight solid line for 9 (dropped)');
-  
-  // 5 and 9 dropped from top:
-  assert.doesNotMatch(svg, /class="pitch-label"[^>]*>3<\/text>/, 'Must not render header label for 3');
-  assert.doesNotMatch(svg, /class="pitch-label"[^>]*>5<\/text>/, 'Must not render header label for 5 at top');
-  assert.doesNotMatch(svg, /class="pitch-label"[^>]*>9<\/text>/, 'Must not render header label for 9 at top');
-
-  // 2. Notehead morphology: Vertically squished squares, Row 0 Full, Row 1 Empty
-  // Full Squished Squares for Row 0 (width="7.50" height="5.60" fill!=#FFFFFF)
-  assert.match(svg, /<rect[^>]*width="7\.50"[^>]*height="5\.60"[^>]*fill="(?!#FFFFFF)/, 'Must render full solid squished square noteheads for Row 0');
-
-  // Empty Squished Squares for Row 1: inset to width="6.20" height="4.30" with stroke-width="1.3" so outer bounds match 7.50 x 5.60
-  assert.match(svg, /<rect[^>]*width="6\.20"[^>]*height="4\.30"[^>]*fill="#FFFFFF"[^>]*stroke=[^>]*stroke-width="1\.3"/, 'Must render empty hollow squished square noteheads for Row 1 with identical outer bounds');
-
-  // Blue (8th) and Orange (quarter) hollow noteheads have void fills (zero fill-opacity on Page 0)
-  assert.doesNotMatch(svg, /fill-opacity="0\.18"/, 'Blue and Orange hollow noteheads must have void fills (zero fill-opacity)');
-
-  // Red Hollow Squished Squares for Row 1: clean white interior (#FFFFFF) on Page 2 (zero fill-opacity="0.18")
-  const svgPage2 = renderColumnarScoreToSvg(score, 2, {
-    staffStyle: 'tritone-split',
-    noteheadMorphology: 'rectangle-square',
-  });
-  assert.doesNotMatch(svgPage2, /fill-opacity="0\.18"/, 'Red notes on Row 1 must have zero fill-opacity="0.18"');
-  assert.match(svgPage2, /<rect[^>]*width="6\.20"[^>]*height="4\.30"[^>]*fill="#FFFFFF"[^>]*stroke="#BE123C"[^>]*stroke-width="1\.3"/, 'Red notes on Row 1 must maintain clean white interior (#FFFFFF)');
-
-  // Explicitly assert duration-class color behavior with synthetic score:
-  const durationColorScore: QuantizedGridScore = {
-    id: 'duration-color-svg-test',
-    title: 'Duration Color SVG Test',
-    composer: 'Test',
-    ticksPerBeat: 48,
-    gridResolution: 12,
-    totalTicks: 192,
-    timeSignatures: [{ numerator: 4, denominator: 4, tick: 0 }],
-    barlines: [],
-    tempos: [],
-    dynamics: [],
-    pedals: [],
-    notes: [
-      { id: 'hollow-8th', pitch: { pitchClass: 1, octave: 4 }, startTick: 0, durationTicks: 24, hand: 'RH', velocity: 90 }, // Blue 8th -> void fill (#FFFFFF)
-      { id: 'hollow-quarter', pitch: { pitchClass: 1, octave: 4 }, startTick: 24, durationTicks: 48, hand: 'RH', velocity: 90 }, // Amber/Orange Quarter -> void fill (#FFFFFF)
-      { id: 'hollow-half', pitch: { pitchClass: 1, octave: 4 }, startTick: 72, durationTicks: 96, hand: 'RH', velocity: 90 }, // Red Half -> clean white fill (#FFFFFF)
-    ],
-  };
-  const durationTestSvg = renderColumnarScoreToSvg(durationColorScore, 0, {
-    staffStyle: 'tritone-split',
-    noteheadMorphology: 'rectangle-square',
-  });
-  // Blue and Orange hollow noteheads must have void fills (#FFFFFF) and NO fill-opacity="0.18":
-  assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#1D4ED8"/, 'Blue (8th) hollow notehead must have void fill (#FFFFFF)');
-  assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#D97706"/, 'Orange (quarter) hollow notehead must have void fill (#FFFFFF)');
-  // Red hollow notehead must maintain clean white fill (#FFFFFF) and NO fill-opacity="0.18":
-  assert.match(durationTestSvg, /<rect[^>]*fill="#FFFFFF"[^>]*stroke="#BE123C"/, 'Red (half note d >= 96t) hollow notehead must have clean white fill (#FFFFFF)');
-  assert.doesNotMatch(durationTestSvg, /fill-opacity="0\.18"/, 'Zero fill-opacity="0.18" across all notes');
-
-  // Zero ellipses
-  assert.doesNotMatch(svg, /<ellipse/, 'Zero ellipses should be rendered when using rectangle-square morphology');
-
-  // Zero triangle polygons
-  const polyMatches = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g));
-  assert.equal(polyMatches.length, 0, 'Zero polygon triangles should be rendered when using rectangle-square morphology');
-});
-
-test('4-Octave Core Staff (o1 to o5) & Clean Termination at o5', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
-
-  // Core staff spans exactly 4 octaves (48 semitones): o1 (24) to o5 (72)
-  assert.equal(layout.minPitch, 24, 'Staff minPitch must anchor to o1 (linearIndex 24)');
-  assert.equal(layout.maxPitch, 72, 'Staff maxPitch must anchor to o5 (linearIndex 72)');
-  assert.equal(layout.pitchSpan, 48, 'Staff span must be exactly 48 semitones (4 octaves)');
-
-  const svg = renderPageToSvg(layout, 0);
-
-  // Octave labels: o1, o3, o5 present, o2 and o4 dropped
-  assert.match(svg, />o1</, 'Must render o1 header label');
-  assert.doesNotMatch(svg, />o2</, 'Must NOT render o2 header label');
-  assert.match(svg, />o3</, 'Must render o3 header label (Middle C)');
-  assert.doesNotMatch(svg, />o4</, 'Must NOT render o4 header label');
-  assert.match(svg, />o5</, 'Must render o5 header label');
-
-  // No labels above o5
-  assert.doesNotMatch(svg, />o6</, 'Must NOT render o6 header label');
-  assert.doesNotMatch(svg, />o7</, 'Must NOT render o7 header label');
-});
-
-test('Option 4 Notehead Octave Badges vs Option 2 Spillover for Outlier Notes', () => {
-  const score = buildBachGoldbergVar1Score();
-
-  // Test Option 4: Badges ('badge')
-  const badgeLayout = computeColumnarLayout(score, {
-    octaveExtensionMode: 'badge',
-  });
-  // Page 4 contains measures 29–30 where D6 (pitch 74) occurs
-  const page4SvgBadge = renderPageToSvg(badgeLayout, 3);
-
-  // Clean thin vector indicator check: must render ↑8 delicate text without heavy black blob rect
-  assert.match(page4SvgBadge, /class="cross-label"|Thin Vector Octave Indicator|Notehead Octave Badge/, 'Must contain octave indicators on page 4');
-  assert.match(page4SvgBadge, /<text[^>]*font-size="6pt"[^>]*>↑8<\/text>/, 'Must render clean thin vector text font-size="6pt"');
-  assert.doesNotMatch(page4SvgBadge, /Option 4 Notehead Octave Badge|<rect[^>]*rx="1\.5"[^>]*fill="#111827"/, 'Must NOT contain heavy black background rect on note');
-
-  // Test Option 2: Spillover ('spillover')
-  const spilloverLayout = computeColumnarLayout(score, {
-    octaveExtensionMode: 'spillover',
-  });
-  const page4SvgSpillover = renderPageToSvg(spilloverLayout, 3);
-
-  // In spillover mode, no ↑8 badge is rendered
-  assert.doesNotMatch(page4SvgSpillover, />↑8<\/text>/, 'Must NOT render ↑8 badge in spillover mode');
-  assert.doesNotMatch(page4SvgSpillover, /Option 4 Notehead Octave Badge/, 'Must NOT render octave badge rect in spillover mode');
-
-  // Test Default: Spillover ('spillover') is default
-  const defaultLayout = computeColumnarLayout(score);
-  assert.equal(defaultLayout.options.octaveExtensionMode, 'spillover', 'Default octaveExtensionMode must be spillover');
-  const page4SvgDefault = renderPageToSvg(defaultLayout, 3);
-  assert.doesNotMatch(page4SvgDefault, />↑8<\/text>/, 'Must NOT render ↑8 badge in default spillover mode');
-  assert.doesNotMatch(page4SvgDefault, /Option 4 Notehead Octave Badge/, 'Must NOT render octave badge rect in default spillover mode');
-
-  // Verify D6 note renders with pitch coordinate > 72 in right buffer margin past o5 line
-  const col = defaultLayout.pages[3].columns[1];
-  const marginPt = defaultLayout.options.pageMarginMm * (72 / 25.4);
-  const gapPt = defaultLayout.options.columnGapMm * (72 / 25.4);
-  const colLeftPt = marginPt + col.columnOnPageIndex * (defaultLayout.columnDimensions.widthPt + gapPt);
-  const colStaffLeftPt = colLeftPt + 22;
-  const expectedD6X = colStaffLeftPt + (74 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
-  const expectedO5X = colStaffLeftPt + (72 - defaultLayout.minPitch) * defaultLayout.ptPerSemitone;
-  assert.ok(expectedD6X > expectedO5X, 'D6 coordinate must be to the right of o5 line');
-  assert.ok(page4SvgDefault.includes(expectedD6X.toFixed(2)), 'Must render D6 note in right buffer margin at true pitch');
-});
-
-test('Zero Barline & Beat Grid Overhang Invariant: flush with outer octave lines [colStaffLeftPt, rightStaffBound]', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, { showBeatGrid: true });
-  const page4Svg = renderPageToSvg(layout, 3);
-
-  for (let c = 0; c < layout.pages[3].columns.length; c++) {
-    const col = layout.pages[3].columns[c];
-    const marginPt = layout.options.pageMarginMm * (72 / 25.4);
-    const gapPt = layout.options.columnGapMm * (72 / 25.4);
-    const colLeftPt = marginPt + col.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-    const colStaffLeftPt = colLeftPt + 22;
-    const rightStaffBound = colStaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
-
-    const staffLeftStr = colStaffLeftPt.toFixed(2);
-    const staffRightStr = rightStaffBound.toFixed(2);
-    const overhungLeftStr = (colStaffLeftPt - 4).toFixed(2);
-    const overhungRightStr = (rightStaffBound + 4).toFixed(2);
-
-    // Verify flush barline strings exist
-    assert.ok(
-      page4Svg.includes(`x1="${staffLeftStr}"`) && page4Svg.includes(`x2="${staffRightStr}"`),
-      `Page 4 Col ${c} must contain barlines flush to staff bounds [${staffLeftStr}, ${staffRightStr}]`
-    );
-
-    // Verify overhung bounds are strictly absent
-    assert.ok(
-      !page4Svg.includes(`x1="${overhungLeftStr}"`),
-      `Page 4 Col ${c} must NOT contain overhung x1="${overhungLeftStr}"`
-    );
-    assert.ok(
-      !page4Svg.includes(`x2="${overhungRightStr}"`),
-      `Page 4 Col ${c} must NOT contain overhung x2="${overhungRightStr}"`
-    );
-  }
-});
-
-test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for mm. 29-30 on Page 4 and absent on Pages 1-3', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score);
-
-  // Pages 1 to 3 (measures 1-24) do not have notes beyond C6 (pitch 72)
-  const marginPt = layout.options.pageMarginMm * (72 / 25.4);
-  const gapPt = layout.options.columnGapMm * (72 / 25.4);
-
-  for (let pIndex = 0; pIndex < 3; pIndex++) {
-    const pageSvg = renderPageToSvg(layout, pIndex);
-    for (const col of layout.pages[pIndex].columns) {
-      const colLeftPt = marginPt + col.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-      const colStaffLeftPt = colLeftPt + 22;
-      const line76X = (colStaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
-      assert.ok(
-        !pageSvg.includes(`x1="${line76X}"`),
-        `Page ${pIndex + 1} Col ${col.columnIndex} must NOT contain any dashed outlier staff line at pitch 76 (x1="${line76X}")`
-      );
-    }
-  }
-
-  // Page 4 contains measures 25-32. Specifically mm. 29-30 contain D6 (pitch 74), which triggers Landmark 5 (pitch 76).
-  const page4Svg = renderPageToSvg(layout, 3);
-  const col0 = layout.pages[3].columns[0]; // mm 25-28
-  const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-  const col0StaffLeftPt = col0LeftPt + 22;
-  const col0Line76X = (col0StaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
-  assert.ok(
-    !page4Svg.includes(`x1="${col0Line76X}"`),
-    `Page 4 Col 0 (mm. 25-28) must NOT contain any dashed outlier staff line at pitch 76`
-  );
-
-  const col1 = layout.pages[3].columns[1]; // mm 29-32
-  const colLeftPt = marginPt + col1.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-  const colStaffLeftPt = colLeftPt + 22;
-  const line76X = (colStaffLeftPt + (76 - layout.minPitch) * layout.ptPerSemitone).toFixed(2);
-
-  // Must contain dashed line at pitch 76
-  const dashedMatches = Array.from(
-    page4Svg.matchAll(
-      new RegExp(
-        `<line x1="${line76X}" y1="([\\d\\.]+)" x2="${line76X}" y2="([\\d\\.]+)" stroke="#444444" stroke-width="0\\.6" stroke-dasharray="5,2\\.5"\\/>`,
-        'g'
-      )
-    )
-  );
-  assert.equal(dashedMatches.length, 2, 'Page 4 must render exactly 2 dashed outlier line segments at pitch 76 (for mm. 29 and 30)');
-
-  // Verify the vertical bounds correspond to mm. 29 and 30
-  const staffOriginY = marginPt + 42 + 36;
-  const m29StartY = (staffOriginY + 0 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
-  const m29EndY = (staffOriginY + 1 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
-  const m30StartY = (staffOriginY + 1 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
-  const m30EndY = (staffOriginY + 2 * layout.ticksPerMeasure * layout.ptPerTick).toFixed(2);
-
-  assert.equal(dashedMatches[0][1], m29StartY, 'First segment must start at m29 start');
-  assert.equal(dashedMatches[0][2], m29EndY, 'First segment must end at m29 end');
-  assert.equal(dashedMatches[1][1], m30StartY, 'Second segment must start at m30 start');
-  assert.equal(dashedMatches[1][2], m30EndY, 'Second segment must end at m30 end');
-});
-
 test('Urtext Classical Serif Typography Invariant: refined font stack and italic styling', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
@@ -879,136 +730,67 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(page1Svg.includes(`.subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }`));
   assert.ok(page1Svg.includes(`.meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
   assert.ok(page1Svg.includes(`.section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
-  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; text-anchor: middle; }`));
+  assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; }`));
   assert.ok(!page1Svg.includes('.beat-counter'), 'Must not include .beat-counter style');
-  assert.ok(page1Svg.includes(`.pitch-label { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #333333; text-anchor: middle; }`));
 
-  // Verify Middle C o3 header badge uses URTEXT_SERIF with italic
-  assert.ok(page1Svg.includes(`font-family='${URTEXT_SERIF}' font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>`));
+  // Title block splits the score title on ':' into main title + movement subtitle
+  assert.ok(page1Svg.includes('>Goldberg Variations, BWV 988</text>'));
+  assert.ok(page1Svg.includes('>Variatio 1. a 1 Clav.</text>'));
+  assert.ok(page1Svg.includes('>Johann Sebastian Bach</text>'));
 });
 
-test('A4 Columnar Layout & Geometry Invariants: 22pt left clearance, measure number in margin clear of m1, zero beat counter', () => {
-  const score = buildBachGoldbergVar1Score();
+test('Deterministic horizontal layout for synthetic 32-measure score with 48 ticks/measure', () => {
+  const notes: QuantizedNote[] = [];
+  for (let m = 0; m < 32; m++) {
+    notes.push({
+      id: `test-note-${m}`,
+      pitch: { pitchClass: (m * 2) % 12, octave: 4 },
+      startTick: m * 48,
+      durationTicks: 12,
+      hand: 'RH',
+    });
+  }
+
+  const score: QuantizedGridScore = {
+    id: 'test-32-bar',
+    title: 'Test 32 Measures Score',
+    composer: 'Test Composer',
+    ticksPerBeat: 12,
+    totalTicks: 32 * 48,
+    timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+    barlines: [],
+    tempos: [{ tick: 0, bpm: 120 }],
+    dynamics: [],
+    pedals: [],
+    notes,
+    gridResolution: 12,
+  };
+
   const layout = computeColumnarLayout(score);
-  const page0Svg = renderPageToSvg(layout, 0);
 
-  // colMarginLeftPt is 22pt and rightBufferMarginPt is 22pt
-  const colMarginLeftPt = 22;
-  const rightBufferMarginPt = 22;
-  const usablePitchWidthPt = layout.columnDimensions.widthPt - colMarginLeftPt - rightBufferMarginPt;
-  assert.ok(Math.abs(layout.ptPerSemitone - usablePitchWidthPt / layout.pitchSpan) < 1e-6);
+  assert.equal(layout.totalMeasures, 32);
+  assert.equal(layout.ticksPerMeasure, 48);
+  assert.equal(layout.pages.length, 2, 'Two pages regardless of meter');
+  assert.deepEqual(layout.pages[0].systems.map((s) => s.sysStartMeasure), [1, 5, 9, 13]);
+  assert.deepEqual(layout.pages[1].systems.map((s) => s.sysStartMeasure), [17, 21, 25, 29]);
 
-  // colStaffLeftPt is colLeftPt + 22
-  const marginPt = layout.options.pageMarginMm * MM_TO_PT;
-  const gapPt = layout.options.columnGapMm * MM_TO_PT;
-  const col0 = layout.pages[0].columns[0];
-  const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + gapPt);
-  const col0StaffLeftPt = col0LeftPt + colMarginLeftPt;
-  assert.equal(col0StaffLeftPt, col0LeftPt + 22);
+  // 4/4 → three vertical pulse lines per measure (beats 2, 3, 4) on every system
+  const page1 = renderPageToSvg(layout, 0);
+  const page1Lines = extractLines(page1);
+  for (let s = 0; s < 4; s++) {
+    const geo = getSystemGeometry(layout, 0, s);
+    const staffTop = parseFloat(geo.staffTopY.toFixed(2));
+    const staffBot = parseFloat(geo.staffBotY.toFixed(2));
+    const beatLines = page1Lines.filter(
+      (l) =>
+        l.dash === '2,3' &&
+        parseFloat(l.y1.toFixed(2)) === staffTop &&
+        parseFloat(l.y2.toFixed(2)) === staffBot
+    );
+    assert.equal(beatLines.length, 12, '4/4 meter renders three vertical pulse lines per measure');
+    for (const line of beatLines) assert.equal(line.x1, line.x2);
+  }
 
-  // Right staff bound is colStaffLeftPt + (maxPitch - minPitch) * ptPerSemitone
-  const rightStaffBound = col0StaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
-  assert.ok(page0Svg.includes(`x1="${col0StaffLeftPt.toFixed(2)}" y1="`));
-  assert.ok(page0Svg.includes(`x2="${rightStaffBound.toFixed(2)}" y2="`));
-
-  // Measure number rendered in left margin clear of m1 and column boundary
-  const staffOriginY = marginPt + 42 + 36;
-  const expectedMeasureNumX = col0LeftPt + colMarginLeftPt / 2;
-  assert.match(
-    page0Svg,
-    new RegExp(`<text x="${expectedMeasureNumX.toFixed(2)}" y="${(staffOriginY + 12).toFixed(2)}" class="measure-num">${col0.startMeasure}</text>`)
-  );
-
-  // Assert measure number coordinate does not overlap with m1 (which is at x = col0StaffLeftPt, y = colTopPt + 10)
-  const colTopPt = marginPt + 42;
-  const m1Y = colTopPt + 10;
-  const measureNumX = expectedMeasureNumX;
-  const measureNumY = staffOriginY + 12;
-  assert.notEqual(measureNumX, col0StaffLeftPt, 'Measure number X must be shifted into left margin to clear m1');
-  assert.notEqual(measureNumY, m1Y, 'Measure number Y must not overlap with m1 header');
-
-  // SVG does NOT contain <text class="beat-counter">
-  assert.doesNotMatch(page0Svg, /<text[^>]*class="beat-counter"/);
-
-  // SVG DOES contain horizontal dashed pulse lines for beat subdivisions (stroke-dasharray="2,3")
-  assert.match(page0Svg, /stroke-dasharray="2,3"/);
+  const svgs = renderAllPagesToSvg(layout);
+  assert.equal(svgs.length, 2);
 });
-
-test('Classical Grand Staff Accolade, Incipit Position of Honor, and Sensible Continuous Hold Lines Invariant', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = computeColumnarLayout(score, {
-    staffStyle: 'tritone-split',
-    noteheadMorphology: 'duodecimal',
-  });
-  const page0Svg = renderPageToSvg(layout, 0);
-
-  // 1. Classical Urtext System Accolade (Curly Brace) tying o1 to o5 across the 4-octave register
-  assert.match(
-    page0Svg,
-    /<!-- Classical Urtext System Accolade \(Curly Brace\) tying o1 to o5 -->\s*<path d="M [\d\.]+ [\d\.]+ C [^"]+ Z" fill="#111827"\/>/,
-    'Must render classical Urtext accolade tying o1 to o5 at column top'
-  );
-
-  // 2. Position of Honor for opening sound(s) of the composition (tick 0 in Measure 1):
-  // Noble concentric halo ring (r = 6.20) framing the circular knockout
-  const openingRingMatches = Array.from(
-    page0Svg.matchAll(/<circle cx="[\d\.]+" cy="[\d\.]+" r="6\.20" fill="none" stroke="[^"]+" stroke-width="0\.75"\/>/g)
-  );
-  assert.ok(openingRingMatches.length >= 2, 'Must render noble concentric halo rings (r=6.20) for opening sounds at tick 0');
-
-  // 3. Classical Time Signature 3/4 engraved in left margin for Measure 1
-  assert.match(
-    page0Svg,
-    /<text x="[\d\.]+" y="[\d\.]+" class="time-sig"[^>]*>3<\/text>/,
-    'Must render time signature numerator 3 in left margin'
-  );
-  assert.match(
-    page0Svg,
-    /<text x="[\d\.]+" y="[\d\.]+" class="time-sig"[^>]*>4<\/text>/,
-    'Must render time signature denominator 4 in left margin'
-  );
-
-  // 4. Zero horizontal barline across m = 0 bisecting opening sounds
-  const col0 = layout.pages[0].columns[0];
-  const marginPt = layout.options.pageMarginMm * (72 / 25.4);
-  const staffOriginY = marginPt + 42 + 36;
-  const col0LeftPt = marginPt + col0.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-  const col0StaffLeftPt = col0LeftPt + 22;
-  const rightStaffBound = col0StaffLeftPt + (layout.maxPitch - layout.minPitch) * layout.ptPerSemitone;
-  assert.doesNotMatch(
-    page0Svg,
-    new RegExp(`<line x1="${col0StaffLeftPt.toFixed(2)}" y1="${staffOriginY.toFixed(2)}" x2="${rightStaffBound.toFixed(2)}" y2="${staffOriginY.toFixed(2)}"`),
-    'Must not render an arbitrary horizontal barline across m = 0 bisecting the opening notes'
-  );
-
-  // 5. Bar 6 Middle C note bach-var1-97 (tick 816, dur 24, pitch 48) on center spine o3:
-  // Must render continuous Royal Blue hold line without white voids or blue-black-blue-black stutter
-  const note97 = score.notes.find((n) => n.id === 'bach-var1-97')!;
-  const col97 = layout.columns.find((c) => c.notes.some((n) => n.id === note97.id))!;
-  const col97LeftPt = marginPt + col97.columnOnPageIndex * (layout.columnDimensions.widthPt + layout.options.columnGapMm * (72 / 25.4));
-  const col97StaffLeftPt = col97LeftPt + 22;
-  const note97X = col97StaffLeftPt + (48 - layout.minPitch) * layout.ptPerSemitone;
-  const note97Ny = staffOriginY + (note97.startTick - col97.startTick) * layout.ptPerTick;
-  const note97StartY = note97Ny - 0.55 + 4.80;
-  const note97ReleaseY = note97Ny + note97.durationTicks * layout.ptPerTick;
-
-  assert.match(
-    page0Svg,
-    new RegExp(`<line x1="${note97X.toFixed(2)}" y1="${note97StartY.toFixed(2)}" x2="${note97X.toFixed(2)}" y2="${note97ReleaseY.toFixed(2)}" stroke="#1D4ED8" stroke-width="1.35" stroke-linecap="butt"\/>`),
-    'Middle C note 97 on spine o3 must render continuous sensible hold line in Royal Blue matching spine width (1.35pt)'
-  );
-
-  // 6. Restored full-size French guillemet chevrons without white halo stroke outline
-  assert.doesNotMatch(
-    page0Svg,
-    /<path d="M [^"]+" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1\.4"/,
-    'Chevrons must not have white halo stroke outline causing triple-layer bites'
-  );
-  // Full-size chevron path: height 2.8pt (ny - 1.40 to ny + 1.40)
-  assert.match(
-    page0Svg,
-    /<path d="M [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Q [\d\.]+ [\d\.]+ [\d\.]+ [\d\.]+ Z" fill="[^"]+"\/>/,
-    'Must render full-size French guillemet chevrons'
-  );
-});
-

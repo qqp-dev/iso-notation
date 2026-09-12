@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Network Laser Printing Pipeline for Isomorphic Columnar Scores
+ * Network Laser Printing Pipeline for Isomorphic Horizontal System Scores
  *
  * Generates vector PostScript/PJL via rsvg-convert and streams the print job
  * over the local network via nacho-pi relay to the Brother HL-L3300CDW laser printer.
@@ -196,10 +196,10 @@ async function main(): Promise<void> {
   console.log(`• Paper Format:     ${options.paperSize.toUpperCase()} (${options.paperSize === 'letter' ? '8.5 × 11 in' : '210 × 297 mm'})`);
   console.log(`• Morphology:       ${options.morphology}`);
   console.log(`• Color Mode:       ${options.colorMode.toUpperCase()}`);
-  console.log(`• Layout:           4 Measures/Column, 2 Columns/Page (Luxurious Urtext)`);
+  console.log(`• Layout:           4 Measures/System, 4 Systems/Page (Horizontal Portrait Urtext)`);
   console.log(`• Mode:             ${options.dryRun ? 'DRY-RUN (Simulated)' : 'PRODUCTION PRINT'}\n`);
 
-  console.log('1. Computing columnar engraving layout...');
+  console.log('1. Computing horizontal system engraving layout...');
   const { psBuffer, svgPaths, layout } = await generateScorePostscript(
     options.scoreId,
     options.pageIndex,
@@ -209,10 +209,10 @@ async function main(): Promise<void> {
   );
 
   console.log(`   ✓ Total measures:  ${layout.totalMeasures} mm`);
-  console.log(`   ✓ Total columns:   ${layout.columns.length} columns`);
+  console.log(`   ✓ Total systems:   ${layout.systems.length} systems`);
   console.log(`   ✓ Total pages:     ${layout.pages.length} pages`);
   layout.pages.forEach((p, idx) => {
-    console.log(`     - Page ${idx + 1}: ${p.sectionName} (${p.columns.length} columns)`);
+    console.log(`     - Page ${idx + 1}: ${p.sectionName} (${p.systems.length} systems)`);
   });
 
   console.log('\n2. Generating vector PostScript via rsvg-convert...');
