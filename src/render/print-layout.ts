@@ -27,8 +27,8 @@ export const PT_TO_MM = 25.4 / 72;
  */
 export const STAFF_MIN_PITCH = 24;
 export const STAFF_MAX_PITCH = 72;
-/** One semitone lane = 2.60pt, so the 4-octave staff is exactly 124.8pt tall. */
-export const DEFAULT_PT_PER_SEMITONE = 2.6;
+/** One semitone lane = 5.50pt, so the 4-octave staff is 264.0pt tall. */
+export const DEFAULT_PT_PER_SEMITONE = 5.5;
 /** Breathing room before the first onset of every measure (keeps tick-0 noteheads clear of the opening barline). */
 export const MEASURE_INSET_PT = 6;
 /** Circular white knockout radius around every duodecimal notehead. */
@@ -42,12 +42,12 @@ export const ACCOLADE_GAP_PT = 7.0;
 /** Delicate copperplate swell of the accolade at its central spine. */
 export const ACCOLADE_THICKNESS_PT = 0.85;
 
-const HEADER_HEIGHT_PT = 44;
-const FOOTER_HEIGHT_PT = 18;
+const HEADER_HEIGHT_PT = 18;
+const FOOTER_HEIGHT_PT = 0;
 /** Reserved strip above each system for clean Urtext measure numerals. */
-const SYSTEM_LABEL_HEIGHT_PT = 12;
+const SYSTEM_LABEL_HEIGHT_PT = 8;
 const MEASURES_PER_SYSTEM_DEFAULT = 4;
-const SYSTEMS_PER_PAGE_DEFAULT = 3;
+const SYSTEMS_PER_PAGE_DEFAULT = 2;
 
 const pc12 = (p: number): number => ((p % 12) + 12) % 12;
 
@@ -162,35 +162,23 @@ export function getVerticalAccoladePath(
   w: number = ACCOLADE_WIDTH_PT,
   thick: number = ACCOLADE_THICKNESS_PT
 ): string {
-  const yMid = (yTop + yBot) / 2;
-  const h = yBot - yTop;
-  const qh = h / 4;
-
-  const tipX = x + w * 0.32;
+  const ym = (yTop + yBot) / 2;
+  const hh = (yBot - yTop) / 2;
   const cuspX = x + w;
-  const outerX = x - w * 0.35;
-  const innerOuterX = outerX + thick;
-  const innerCuspX = cuspX - Math.max(0.22, thick * 0.35);
-  const cuspCtlX = x + w * 0.1;
-  const innerCuspCtlX = x + w * 0.18 + thick;
-  // Control-point excursions scale with the clasped staff instead of ballooning
-  // to fixed point offsets (the "bloated control points" of the former brace).
-  const tipCtlY = h * 0.032;
-  const cuspCtlY = h * 0.024;
-  const innerCuspCtlY = h * 0.02;
+  const xb = x;
+  const tipX = xb + w * 0.45;
 
   return [
     `M ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
-    `C ${x.toFixed(2)} ${(yTop + tipCtlY).toFixed(2)}, ${outerX.toFixed(2)} ${(yTop + qh * 0.6).toFixed(2)}, ${outerX.toFixed(2)} ${(yTop + qh).toFixed(2)}`,
-    `C ${outerX.toFixed(2)} ${(yMid - qh * 0.6).toFixed(2)}, ${cuspCtlX.toFixed(2)} ${(yMid - cuspCtlY).toFixed(2)}, ${cuspX.toFixed(2)} ${yMid.toFixed(2)}`,
-    `C ${cuspCtlX.toFixed(2)} ${(yMid + cuspCtlY).toFixed(2)}, ${outerX.toFixed(2)} ${(yMid + qh * 0.6).toFixed(2)}, ${outerX.toFixed(2)} ${(yBot - qh).toFixed(2)}`,
-    `C ${outerX.toFixed(2)} ${(yBot - qh * 0.6).toFixed(2)}, ${x.toFixed(2)} ${(yBot - tipCtlY).toFixed(2)}, ${tipX.toFixed(2)} ${yBot.toFixed(2)}`,
-    // Inner contour: returns along the inner edge so the brace swells to `thick` at the spine
-    `C ${(x + thick * 0.4).toFixed(2)} ${(yBot - tipCtlY).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yBot - qh * 0.6).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yBot - qh).toFixed(2)}`,
-    `C ${innerOuterX.toFixed(2)} ${(yMid + qh * 0.6).toFixed(2)}, ${innerCuspCtlX.toFixed(2)} ${(yMid + innerCuspCtlY).toFixed(2)}, ${innerCuspX.toFixed(2)} ${yMid.toFixed(2)}`,
-    `C ${innerCuspCtlX.toFixed(2)} ${(yMid - innerCuspCtlY).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yMid - qh * 0.6).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yTop + qh).toFixed(2)}`,
-    `C ${innerOuterX.toFixed(2)} ${(yTop + qh * 0.6).toFixed(2)}, ${(x + thick * 0.4).toFixed(2)} ${(yTop + tipCtlY).toFixed(2)}, ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
-    `Z`
+    `C ${(xb + 0.8).toFixed(2)} ${(yTop + 4).toFixed(2)}, ${xb.toFixed(2)} ${(yTop + hh * 0.35).toFixed(2)}, ${xb.toFixed(2)} ${(ym - hh * 0.25).toFixed(2)}`,
+    `C ${xb.toFixed(2)} ${(ym - hh * 0.08).toFixed(2)}, ${(cuspX - 0.6).toFixed(2)} ${(ym - 2.5).toFixed(2)}, ${cuspX.toFixed(2)} ${ym.toFixed(2)}`,
+    `C ${(cuspX - 0.6).toFixed(2)} ${(ym + 2.5).toFixed(2)}, ${xb.toFixed(2)} ${(ym + hh * 0.08).toFixed(2)}, ${xb.toFixed(2)} ${(ym + hh * 0.25).toFixed(2)}`,
+    `C ${xb.toFixed(2)} ${(yBot - hh * 0.35).toFixed(2)}, ${(xb + 0.8).toFixed(2)} ${(yBot - 4).toFixed(2)}, ${tipX.toFixed(2)} ${yBot.toFixed(2)}`,
+    `C ${(xb + 0.8 - thick * 0.4).toFixed(2)} ${(yBot - 4).toFixed(2)}, ${(xb - thick).toFixed(2)} ${(yBot - hh * 0.35).toFixed(2)}, ${(xb - thick * 0.9).toFixed(2)} ${(ym + hh * 0.25).toFixed(2)}`,
+    `C ${(xb - thick * 0.6).toFixed(2)} ${(ym + hh * 0.08).toFixed(2)}, ${(cuspX - 0.6 - thick * 0.3).toFixed(2)} ${(ym + 1.8).toFixed(2)}, ${(cuspX - 0.6).toFixed(2)} ${ym.toFixed(2)}`,
+    `C ${(cuspX - 0.6 - thick * 0.3).toFixed(2)} ${(ym - 1.8).toFixed(2)}, ${(xb - thick * 0.6).toFixed(2)} ${(ym - hh * 0.08).toFixed(2)}, ${(xb - thick * 0.9).toFixed(2)} ${(ym - hh * 0.25).toFixed(2)}`,
+    `C ${(xb - thick).toFixed(2)} ${(yTop + hh * 0.35).toFixed(2)}, ${(xb + 0.8 - thick * 0.4).toFixed(2)} ${(yTop + 4).toFixed(2)}, ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
+    'Z'
   ].join(' ');
 }
 
@@ -317,7 +305,7 @@ const DEFAULT_OPTIONS: ResolvedPrintLayoutOptions = {
   measuresPerColumn: MEASURES_PER_SYSTEM_DEFAULT,
   systemsPerPage: SYSTEMS_PER_PAGE_DEFAULT,
   columnsPerPage: SYSTEMS_PER_PAGE_DEFAULT,
-  pageMarginMm: 10,
+  pageMarginMm: 6,
   columnGapMm: 8,
   staffStyle: 'tritone-split',
   noteheadMorphology: 'duodecimal',
@@ -429,7 +417,7 @@ export function computeColumnarLayout(
   let ptPerSemitone = options.pixelsPerSemitone > 0
     ? options.pixelsPerSemitone
     : DEFAULT_PT_PER_SEMITONE;
-  const maxFittingPtPerSemitone = (slotHeightPt - SYSTEM_LABEL_HEIGHT_PT - 8) / pitchSpan;
+  const maxFittingPtPerSemitone = (slotHeightPt - SYSTEM_LABEL_HEIGHT_PT) / pitchSpan;
   if (maxFittingPtPerSemitone > 0 && ptPerSemitone > maxFittingPtPerSemitone) {
     ptPerSemitone = maxFittingPtPerSemitone;
   }
@@ -585,7 +573,7 @@ export function getSystemGeometry(
 
   const systemTopY = marginPt + HEADER_HEIGHT_PT + systemOnPageIndex * slotHeightPt;
   const staffTopY =
-    systemTopY + SYSTEM_LABEL_HEIGHT_PT + (slotHeightPt - SYSTEM_LABEL_HEIGHT_PT - staffHeightPt) / 2;
+    systemTopY + SYSTEM_LABEL_HEIGHT_PT + Math.max(0, (slotHeightPt - SYSTEM_LABEL_HEIGHT_PT - staffHeightPt) / 2);
   const staffBotY = staffTopY + staffHeightPt;
 
   const spanTicks = (system.endMeasure - system.startMeasure + 1) * ticksPerMeasure;
@@ -600,13 +588,8 @@ export function getSystemGeometry(
     const rel = tick - system.startTick;
     if (rel <= 0) return staffLeftPt + MEASURE_INSET_PT;
     if (rel >= spanTicks) return staffRightPt;
-    let measureIdx = Math.floor(rel / ticksPerMeasure);
-    let localTicks = rel - measureIdx * ticksPerMeasure;
-    // A tick exactly on a barline belongs to the measure it closes.
-    if (localTicks === 0 && measureIdx > 0) {
-      measureIdx -= 1;
-      localTicks = ticksPerMeasure;
-    }
+    const measureIdx = Math.floor(rel / ticksPerMeasure);
+    const localTicks = rel - measureIdx * ticksPerMeasure;
     return xForMeasureStart(measureIdx) + MEASURE_INSET_PT + localTicks * ptPerTick;
   };
 
@@ -739,14 +722,14 @@ export function renderPageToSvg(
   svgParts.push(`  <!-- Page Header -->`);
   svgParts.push(`  <g id="page-header">`);
   if (page.pageIndex === 0) {
-    svgParts.push(`    <text x="${(widthPt / 2).toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="title" text-anchor="middle">${escapeXml(titleMain)}</text>`);
-    if (titleSub) {
-      svgParts.push(`    <text x="${(widthPt / 2).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="subtitle" text-anchor="middle">${escapeXml(titleSub)}</text>`);
+    const fullTitle = titleSub ? `${escapeXml(titleMain)} · ${escapeXml(titleSub)}` : escapeXml(titleMain);
+    svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="title">${fullTitle}</text>`);
+    if (score.composer) {
+      svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="meta" text-anchor="end">${escapeXml(score.composer)}</text>`);
     }
-    svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 27).toFixed(2)}" class="meta" text-anchor="end">${escapeXml(score.composer || '')}</text>`);
   } else {
-    svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="subtitle">${escapeXml(titleMain)}</text>`);
-    svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="section-header" text-anchor="end">${escapeXml(page.sectionName)}</text>`);
+    svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="subtitle">${escapeXml(titleMain)}</text>`);
+    svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="section-header" text-anchor="end">${escapeXml(page.sectionName)}</text>`);
   }
   svgParts.push(`  </g>`);
 
@@ -885,14 +868,33 @@ export function renderPageToSvg(
       }
     }
 
+    // 3g. Pre-calculate cluster offsets for harmonic intervals at the same onset
+    // (e.g. seconds and thirds) so white circular knockouts never erase neighboring digits.
+    const notesByTickInSys = new Map<number, QuantizedNote[]>();
+    for (const note of systemNotes) {
+      if (!notesByTickInSys.has(note.startTick)) notesByTickInSys.set(note.startTick, []);
+      notesByTickInSys.get(note.startTick)!.push(note);
+    }
+    const clusterOffsetMap = new Map<string, number>();
+    for (const [, tickNotes] of notesByTickInSys.entries()) {
+      if (tickNotes.length <= 1) continue;
+      tickNotes.sort((a, b) => linearIndex(a.pitch) - linearIndex(b.pitch));
+      for (let i = 0; i < tickNotes.length - 1; i++) {
+        const p1 = linearIndex(tickNotes[i].pitch);
+        const p2 = linearIndex(tickNotes[i + 1].pitch);
+        if (p2 - p1 <= 3) {
+          clusterOffsetMap.set(tickNotes[i].id, -4.2);
+          clusterOffsetMap.set(tickNotes[i + 1].id, 4.2);
+        }
+      }
+    }
+
     // 3g. Horizontal duration hold lines (pass 1, beneath the noteheads).
-    // Every tail starts flush against the effective circular boundary of its onset
-    // (halo ring for the opening sounds, white knockout otherwise) and stops clear
-    // of any subsequent note on the same pitch so the arithmetic never reads 0-b-0.
     for (const note of systemNotes) {
       if (note.durationTicks <= tauRef) continue; // regular notes stay pure noteheads
       const lp = linearIndex(note.pitch);
-      const nx = geo.xForTick(note.startTick);
+      const cDx = clusterOffsetMap.get(note.id) ?? 0;
+      const nx = geo.xForTick(note.startTick) + cDx;
       const ny = geo.yForPitch(lp);
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const effectiveRadius = note.startTick === 0 ? OPENING_HALO_RADIUS_PT : NOTEHEAD_KNOCKOUT_RADIUS_PT;
@@ -906,25 +908,23 @@ export function renderPageToSvg(
         if (nextOnsetTick === null || other.startTick < nextOnsetTick) nextOnsetTick = other.startTick;
       }
       if (nextOnsetTick !== null) {
-        const nextNx = geo.xForTick(nextOnsetTick);
+        const otherDx = clusterOffsetMap.get(systemNotes.find(o => linearIndex(o.pitch) === lp && o.startTick === nextOnsetTick)?.id ?? '') ?? 0;
+        const nextNx = geo.xForTick(nextOnsetTick) + otherDx;
         holdEndX = Math.min(holdEndX, nextNx - NOTEHEAD_KNOCKOUT_RADIUS_PT - 1.0);
       }
 
       if (pc12(lp) === 0) {
-        // On an octave staff line the trail colors the line continuously in the duration hue,
-        // flush from the circle boundary and butt-capped so it never bulges back into it
         if (holdEndX - holdStartX < 1.5) continue;
         const strokeW = lp === 48 ? '1.35' : '0.65';
         svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="${strokeW}" stroke-linecap="butt"/>`);
       } else {
-        // Open space: nudge the round cap 0.4pt clear of the circle boundary
         holdStartX = nx + effectiveRadius + 0.4;
         if (holdEndX - holdStartX < 1.5) continue;
         svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.80" stroke-linecap="round"/>`);
       }
     }
 
-    // 3h. Noteheads (pass 2) with circular knockouts and up/down handedness chevrons
+    // 3h. Noteheads (pass 2): first render all circular knockouts, then all glyphs
     const handOf = (n: QuantizedNote, lp: number): 'RH' | 'LH' =>
       n.hand ?? (lp >= 48 ? 'RH' : 'LH');
     const isHandException = (n: QuantizedNote, lp: number): boolean => {
@@ -943,14 +943,14 @@ export function renderPageToSvg(
     const renderedNoteheadKeys = new Set<string>();
     for (const note of systemNotes) {
       const lp = linearIndex(note.pitch);
-      const nx = geo.xForTick(note.startTick);
+      const cDx = clusterOffsetMap.get(note.id) ?? 0;
+      const nx = geo.xForTick(note.startTick) + cDx;
       const ny = geo.yForPitch(lp);
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
       const hand = handOf(note, lp);
       const isException = isHandException(note, lp);
       const unisonKey = `${lp}-${note.startTick}`;
 
-      // Skip a generic notehead when a hand-exception notehead claims the same unison
       if (!isException && exceptionKeys.has(unisonKey)) continue;
       if (renderedNoteheadKeys.has(unisonKey)) continue;
       renderedNoteheadKeys.add(unisonKey);
@@ -961,12 +961,10 @@ export function renderPageToSvg(
       if (morph === 'duodecimal') {
         const digit = DUODECIMAL_DIGITS[pc12(lp)];
 
-        // Opening Sound Position of Honor: noble concentric halo at tick 0 of Measure 1
         if (note.startTick === 0) {
           svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${OPENING_HALO_RADIUS_PT.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.75"/>`);
         }
 
-        // Circular line knockout so staff/barlines/beat grid never cut through the digit
         svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`);
         const weight = isEven ? '800' : '700';
         svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" class="duo-digit" font-weight="${weight}" font-size="6.8pt" fill="${noteColor}">${digit}</text>`);
@@ -995,7 +993,6 @@ export function renderPageToSvg(
           svgParts.push(`    <rect x="${(bx + halfSw).toFixed(2)}" y="${(by + halfSw).toFixed(2)}" width="${(nw - sw).toFixed(2)}" height="${(nh - sw).toFixed(2)}" rx="${Math.max(0.5, 1.5 - halfSw).toFixed(2)}" fill="#FFFFFF" stroke="${noteColor}" stroke-width="${sw}"/>`);
         }
       } else {
-        // row-parity-shape / classic-oval: solid oval on lines, crisp brick in spaces
         if (isEven) {
           svgParts.push(`    <ellipse cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" rx="5.20" ry="3.00" fill="${noteColor}"/>`);
         } else {
@@ -1005,7 +1002,6 @@ export function renderPageToSvg(
         }
       }
 
-      // Authoritative up/down handedness chevron pointing back toward Middle C
       if (isException) {
         const chW = 4.2;
         const chH = 2.8;
@@ -1013,16 +1009,16 @@ export function renderPageToSvg(
         const leftX = nx - chW / 2;
         const rightX = nx + chW / 2;
         if (hand === 'RH') {
-          // RH playing below Middle C → upward chevron above the notehead
           const cy = ny - (r + clearance);
           const baseY = cy + chH / 2;
           const apexY = cy - chH / 2;
+          svgParts.push(`    <path class="hand-chevron-shield" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)} Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.20" stroke-linecap="round" stroke-linejoin="round"/>`);
           svgParts.push(`    <path class="hand-chevron chevron-up" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="1.20" stroke-linecap="round" stroke-linejoin="round"/>`);
         } else {
-          // LH playing above Middle C → downward chevron below the notehead
           const cy = ny + (r + clearance);
           const baseY = cy - chH / 2;
           const apexY = cy + chH / 2;
+          svgParts.push(`    <path class="hand-chevron-shield" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)} Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.20" stroke-linecap="round" stroke-linejoin="round"/>`);
           svgParts.push(`    <path class="hand-chevron chevron-down" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="1.20" stroke-linecap="round" stroke-linejoin="round"/>`);
         }
       }
@@ -1031,12 +1027,7 @@ export function renderPageToSvg(
     svgParts.push(`  </g>`);
   }
 
-  // 4. Page footer: subtle Urtext page numbering, no tacky horizontal rule
-  svgParts.push(`  <!-- Page Footer -->`);
-  svgParts.push(`  <g id="page-footer">`);
-  svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta">Pure 12-TET Horizontal Engraving</text>`);
-  svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta" text-anchor="end" font-weight="bold">Page ${page.pageNumber} of ${page.totalPages}</text>`);
-  svgParts.push(`  </g>`);
+  // 4. Page footer removed per definitive engraving (clean Urtext, zero footer fluff)
 
   svgParts.push(`</svg>`);
 

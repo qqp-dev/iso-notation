@@ -214,7 +214,7 @@ export function normalizeStaffStyle(
   return 'tritone-split';
 }
 
-export const DUODECIMAL_DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b'] as const;
+export const DUODECIMAL_DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B'] as const;
 
 export function getDuodecimalDigit(pitchClass: number): string {
   const pc = ((pitchClass % 12) + 12) % 12;

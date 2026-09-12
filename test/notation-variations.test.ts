@@ -247,7 +247,7 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.equal(normalizeNoteheadMorphology('base-12'), 'duodecimal');
 
   assert.equal(DUODECIMAL_DIGITS.length, 12);
-  assert.deepEqual([...DUODECIMAL_DIGITS], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']);
+  assert.deepEqual([...DUODECIMAL_DIGITS], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B']);
 
   for (let pc = 0; pc < 12; pc++) {
     const digit = getDuodecimalDigit(pc);
@@ -255,9 +255,9 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
     assert.equal(digit.length, 1, 'Strictly 1 character per pitch class');
     const isEven = pc % 2 === 0;
     if (isEven) {
-      assert.match(digit, /^[02468a]$/, 'Row 0 must be even duodecimal digits');
+      assert.match(digit, /^[02468A]$/, 'Row 0 must be even duodecimal digits');
     } else {
-      assert.match(digit, /^[13579b]$/, 'Row 1 must be odd duodecimal digits');
+      assert.match(digit, /^[13579B]$/, 'Row 1 must be odd duodecimal digits');
     }
   }
 
@@ -274,11 +274,11 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   // SVG rendering test: duodecimal tokens in print layout
   const score = buildBachGoldbergVar1Score();
   const svg = renderColumnarScoreToSvg(score, 0, { noteheadMorphology: 'duodecimal' });
-  assert.match(svg, />[0-9ab]<\/text>/, 'SVG must render duodecimal text tokens');
-  // Check specifically for digits 7, 6, 2, 4, 9, b from mm. 1-4
+  assert.match(svg, />[0-9AB]<\/text>/, 'SVG must render duodecimal text tokens');
+  // Check specifically for digits 7, 6, 2, 4, 9, B from mm. 1-4
   assert.match(svg, />7<\/text>/, 'Must render G as 7');
   assert.match(svg, />6<\/text>/, 'Must render F# as 6');
-  assert.match(svg, />b<\/text>/, 'Must render B as b');
+  assert.match(svg, />B<\/text>/, 'Must render B as B');
   assert.match(svg, />2<\/text>/, 'Must render D as 2');
   assert.match(svg, />4<\/text>/, 'Must render E as 4');
 
@@ -297,9 +297,9 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
     assert.ok(Math.abs(parseFloat(m[4]) - parseFloat(m[2]) - 2.1) < 1e-9, 'Authoritative chevron half-width must be 2.1pt');
   });
 
-  // Page 3 contains measure 30 with LH crossing into the treble (> 48) -> downward chevrons below the noteheads
-  const page3Svg = renderColumnarScoreToSvg(score, 2, { noteheadMorphology: 'duodecimal' });
-  const downMatches = Array.from(page3Svg.matchAll(chevronRegex)).filter((m) => m[1] === 'down');
+  // Page 4 contains measure 30 with LH crossing into the treble (> 48) -> downward chevrons below the noteheads
+  const page4Svg = renderColumnarScoreToSvg(score, 3, { noteheadMorphology: 'duodecimal' });
+  const downMatches = Array.from(page4Svg.matchAll(chevronRegex)).filter((m) => m[1] === 'down');
   assert.ok(downMatches.length > 0, 'Must render downward chevrons for duodecimal LH crossing exceptions in m. 30');
   downMatches.forEach((m) => {
     assert.ok(parseFloat(m[5]) > parseFloat(m[3]), 'Downward chevron apex must sit below its base (∨)');

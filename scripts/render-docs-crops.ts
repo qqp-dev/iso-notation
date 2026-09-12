@@ -108,8 +108,8 @@ function main(): void {
   // Measure 6: continuous Royal Blue Middle C hold line (system 2 of page 1)
   write('definitive_m6.png', 0, measureBox(layout, 0, 1, 1, 1, { left: 8, right: 8 }));
 
-  // Measure 30: LH-in-treble downward chevrons (system 8 → page 3, system slot 2)
-  write('definitive_m30.png', 2, measureBox(layout, 2, 1, 1, 1, { left: 8, right: 8 }));
+  // Measure 30: LH-in-treble downward chevrons (system 8 → page 4, system slot 2)
+  write('definitive_m30.png', 3, measureBox(layout, 3, 1, 1, 1, { left: 8, right: 8 }));
 
   // Full first page of the 3-page landscape spread
   write(

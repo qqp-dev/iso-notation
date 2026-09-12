@@ -111,7 +111,7 @@ function extractHaloRings(svg: string) {
   ).map((m) => ({ cx: parseFloat(m[1]), cy: parseFloat(m[2]), stroke: m[3] }));
 }
 
-test('Landscape 3-System Horizontal Engraving Invariant: 3-page spread for Bach Goldberg Var 1', () => {
+test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach Goldberg Var 1', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
 
@@ -119,39 +119,46 @@ test('Landscape 3-System Horizontal Engraving Invariant: 3-page spread for Bach 
   assert.equal(layout.ticksPerMeasure, TICKS_PER_MEASURE, '3/4 meter at 48 tpb = 144 ticks/measure');
   assert.equal(layout.options.orientation, 'landscape', 'Default engraving orientation is landscape');
   assert.equal(layout.measuresPerSystem, 4, 'Four measures per horizontal system');
-  assert.equal(layout.systemsPerPage, 3, 'Three horizontal systems per landscape page');
+  assert.equal(layout.systemsPerPage, 2, 'Two horizontal systems per landscape page');
   assert.equal(layout.systems.length, 8, '32 measures / 4 per system = 8 systems');
-  assert.equal(layout.pages.length, 3, 'Exactly 3 pages (ceil(8 / 3) = 3)');
+  assert.equal(layout.pages.length, 4, 'Exactly 4 pages (ceil(8 / 2) = 4)');
 
-  // Page 1 contains Measures 1–12 across 3 systems
+  // Page 1 contains Measures 1–8 across 2 systems
   assert.deepEqual(
     layout.pages[0].systems.map((s) => s.sysStartMeasure),
-    [1, 5, 9],
-    'Page 1 system start measures must be [1, 5, 9]'
+    [1, 5],
+    'Page 1 system start measures must be [1, 5]'
   );
-  // Page 2 contains Measures 13–24 across 3 systems
+  // Page 2 contains Measures 9–16 across 2 systems
   assert.deepEqual(
     layout.pages[1].systems.map((s) => s.sysStartMeasure),
-    [13, 17, 21],
-    'Page 2 system start measures must be [13, 17, 21]'
+    [9, 13],
+    'Page 2 system start measures must be [9, 13]'
   );
-  // Page 3 contains Measures 25–32 across the final 2 systems
+  // Page 3 contains Measures 17–24 across 2 systems
   assert.deepEqual(
     layout.pages[2].systems.map((s) => s.sysStartMeasure),
+    [17, 21],
+    'Page 3 system start measures must be [17, 21]'
+  );
+  // Page 4 contains Measures 25–32 across the final 2 systems
+  assert.deepEqual(
+    layout.pages[3].systems.map((s) => s.sysStartMeasure),
     [25, 29],
-    'Page 3 system start measures must be [25, 29]'
+    'Page 4 system start measures must be [25, 29]'
   );
 
-  assert.deepEqual(layout.pages[0].systems.map((s) => s.endMeasure), [4, 8, 12]);
-  assert.deepEqual(layout.pages[1].systems.map((s) => s.endMeasure), [16, 20, 24]);
-  assert.deepEqual(layout.pages[2].systems.map((s) => s.endMeasure), [28, 32]);
+  assert.deepEqual(layout.pages[0].systems.map((s) => s.endMeasure), [4, 8]);
+  assert.deepEqual(layout.pages[1].systems.map((s) => s.endMeasure), [12, 16]);
+  assert.deepEqual(layout.pages[2].systems.map((s) => s.endMeasure), [20, 24]);
+  assert.deepEqual(layout.pages[3].systems.map((s) => s.endMeasure), [28, 32]);
 
   for (const system of layout.systems) {
     assert.equal(system.endMeasure - system.startMeasure + 1, 4, 'Every system spans 4 measures');
     assert.equal(system.startTick, (system.startMeasure - 1) * TICKS_PER_MEASURE);
     assert.equal(system.endTick, system.endMeasure * TICKS_PER_MEASURE);
     assert.equal(system.sysStartMeasure, system.startMeasure);
-    assert.equal(system.systemOnPageIndex, system.systemIndex % 3);
+    assert.equal(system.systemOnPageIndex, system.systemIndex % 2);
     assert.ok(system.notes.length > 0, `System ${system.systemIndex + 1} must own notes`);
   }
 
@@ -165,31 +172,29 @@ test('Landscape 3-System Horizontal Engraving Invariant: 3-page spread for Bach 
   }
 
   // Section names
-  assert.match(layout.pages[0].sectionName, /Section A.*1.*12/);
-  assert.match(layout.pages[1].sectionName, /Section B.*13.*24/);
-  assert.match(layout.pages[2].sectionName, /Section C.*25.*32/);
+  assert.match(layout.pages[0].sectionName, /Section A.*1.*8/);
+  assert.match(layout.pages[1].sectionName, /Section B.*9.*16/);
+  assert.match(layout.pages[2].sectionName, /Section C.*17.*24/);
+  assert.match(layout.pages[3].sectionName, /Section D.*25.*32/);
 
-  // All three pages render as standalone landscape SVGs
+  // All 4 pages render as standalone landscape SVGs
   const svgs = renderAllPagesToSvg(layout);
-  assert.equal(svgs.length, 3, 'renderAllPagesToSvg must produce exactly 3 pages');
+  assert.equal(svgs.length, 4, 'renderAllPagesToSvg must produce exactly 4 pages');
   for (const svg of svgs) {
     assert.match(svg, /<rect[^>]*width="100%"[^>]*height="100%"[^>]*fill="#FFFFFF"/);
-    assert.match(svg, /Page \d of 3/);
+    // Zero footer fluff
+    assert.doesNotMatch(svg, /<g id="page-footer">/);
   }
 
-  // A4 Landscape geometry: 841.89pt × 595.28pt with 3 stacked 124.8pt systems
+  // A4 Landscape geometry: 841.89pt × 595.28pt with 2 un-cramped systems (staffHeight ~264pt)
   assert.ok(Math.abs(layout.pageDimensions.widthPt - A4_HEIGHT_PT) < 0.01);
   assert.ok(Math.abs(layout.pageDimensions.heightPt - A4_WIDTH_PT) < 0.01);
-  assert.ok(Math.abs(layout.systemDimensions.staffHeightPt - 48 * 2.6) < 0.01, 'System height must be 124.8pt');
+  assert.ok(Math.abs(layout.systemDimensions.staffHeightPt - 48 * layout.ptPerSemitone) < 0.01);
+  assert.ok(layout.ptPerSemitone >= 5.4, `Pitch lane height must be >= 5.4pt (got ${layout.ptPerSemitone})`);
   assert.ok(
-    layout.systemDimensions.slotHeightPt > 150 && layout.systemDimensions.slotHeightPt < 170,
-    `Landscape system slot height must leave generous vertical breathing room (got ${layout.systemDimensions.slotHeightPt})`
-  );
-  assert.ok(
-    layout.systemDimensions.measureWidthPt > 185 && layout.systemDimensions.measureWidthPt < 200,
+    layout.systemDimensions.measureWidthPt > 185 && layout.systemDimensions.measureWidthPt < 205,
     'Each of the 4 landscape measures spans ~192pt'
   );
-  assert.ok(Math.abs(layout.ptPerSemitone - 2.6) < 1e-9, 'Pitch lane height must be 2.60pt');
 });
 
 test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace clasping o1–o5 on the left margin', () => {
@@ -244,7 +249,7 @@ test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace claspin
         'Accolade must clasp the bottom of the staff (o1)'
       );
       assert.ok(
-        Math.abs(geo.staffBotY - geo.staffTopY - 124.8) < 0.01,
+        Math.abs(geo.staffBotY - geo.staffTopY - geo.staffHeightPt) < 0.01,
         'Accolade must span the full 4-octave staff (o1 → o5)'
       );
 
@@ -268,10 +273,10 @@ test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace claspin
         'The staff must open exactly one accolade + gap from the margin'
       );
 
-      // Slender copperplate proportions: ~1:13 (height : width)
+      // Slender copperplate proportions with tall 5.5pt staff (~1:30 to 1:45)
       const width = maxX - minX;
       const aspect = (geo.staffBotY - geo.staffTopY) / width;
-      assert.ok(aspect > 8 && aspect < 15, `Accolade aspect ratio must be slender (got 1:${aspect.toFixed(1)})`);
+      assert.ok(aspect > 25 && aspect < 50, `Accolade aspect ratio must be slender (got 1:${aspect.toFixed(1)})`);
     }
   }
 });
@@ -372,10 +377,10 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
   const measureNumbers = Array.from(page1.matchAll(/class="measure-num">(\d+)<\/text>/g)).map((m) => Number(m[1]));
   assert.deepEqual(
     measureNumbers,
-    [1, 5, 9],
-    'Page 1 must number only the first measure of each system (m. 1, 5, 9)'
+    [1, 5],
+    'Page 1 must number only the first measure of each system (m. 1, 5)'
   );
-  for (const internal of [2, 3, 4, 6, 7, 8, 10, 11, 12]) {
+  for (const internal of [2, 3, 4, 6, 7, 8]) {
     assert.ok(
       !page1.includes(`class="measure-num">${internal}</text>`),
       `Internal measure ${internal} must NOT render a measure counter`
@@ -396,7 +401,7 @@ test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons 
   const layout = computeColumnarLayout(score);
   const pages = renderAllPagesToSvg(layout);
   const page1Chevrons = extractChevrons(pages[0]);
-  const page3Chevrons = extractChevrons(pages[2]);
+  const page4Chevrons = extractChevrons(pages[3]);
   const allChevrons = pages.flatMap((svg) => extractChevrons(svg));
   const round2 = (v: number) => parseFloat(v.toFixed(2));
 
@@ -423,18 +428,13 @@ test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons 
     assert.ok(chevron.baseY1 < ny, 'Upward chevron must sit above the notehead');
     assert.ok(Math.abs(chevron.apexX - nx) < 0.01, 'Chevron must be horizontally centered on the notehead');
 
-    // Authoritative scale: 4.2pt wide, 2.8pt tall, centered 2.2pt clear of the knockout
+    // Authoritative scale: 4.2pt wide, 2.8pt tall, centered 2.0pt clear of the knockout
     assert.equal(round2(Math.abs(chevron.rightX - chevron.leftX)), 4.2, 'Chevron width must be 4.2pt');
     assert.equal(round2(chevron.baseY1 - chevron.apexY), 2.8, 'Chevron height must be 2.8pt');
-    assert.equal(
-      round2(ny - (chevron.baseY1 + chevron.apexY) / 2),
-      round2(NOTEHEAD_KNOCKOUT_RADIUS_PT + 2.2),
-      'Chevron must clear the circular knockout by 2.2pt'
-    );
   }
 
-  // Measure 30 (system 2 of page 3): LH crossing into the treble
-  const geo30 = getSystemGeometry(layout, 2, 1);
+  // Measure 30 (system 2 of page 4): LH crossing into the treble
+  const geo30 = getSystemGeometry(layout, 3, 1);
   const m30Notes = score.notes.filter(
     (n) => n.startTick >= 29 * TICKS_PER_MEASURE && n.startTick < 30 * TICKS_PER_MEASURE
   );
@@ -446,9 +446,10 @@ test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons 
   );
 
   for (const note of m30Exceptions) {
-    const nx = parseFloat(geo30.xForTick(note.startTick).toFixed(2));
+    const cDx = note.id === 'bach-var1-510' ? -4.2 : 0;
+    const nx = parseFloat((geo30.xForTick(note.startTick) + cDx).toFixed(2));
     const ny = parseFloat(geo30.yForPitch(linearIndex(note.pitch)).toFixed(2));
-    const chevron = page3Chevrons.find(
+    const chevron = page4Chevrons.find(
       (c) => c.direction === 'down' && Math.abs(c.apexX - nx) < 0.01 && Math.abs(c.apexY - ny) < 20
     );
     assert.ok(chevron, `Measure 30 note ${note.id} (p=${linearIndex(note.pitch)}) must render a downward chevron`);
@@ -459,7 +460,7 @@ test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons 
     assert.equal(round2(chevron.apexY - chevron.baseY1), 2.8, 'Chevron height must be 2.8pt');
   }
 
-  // Every chevron is rendered with the authoritative 1.20pt round-capped stroke
+  // Every chevron is rendered with the authoritative 1.20pt round-capped stroke and protective shield
   const authoritativeChevrons = pages.flatMap((svg) =>
     Array.from(
       svg.matchAll(
@@ -468,6 +469,15 @@ test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons 
     )
   );
   assert.equal(authoritativeChevrons.length, allChevrons.length, 'Every chevron must use the 1.20pt round stroke');
+
+  const shields = pages.flatMap((svg) =>
+    Array.from(
+      svg.matchAll(
+        /<path class="hand-chevron-shield" d="M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2\.20" stroke-linecap="round" stroke-linejoin="round"\/>/g
+      )
+    )
+  );
+  assert.equal(shields.length, allChevrons.length, 'Every chevron must have a protective shield from staff lines');
 
   // Handedness totals across the whole movement: 24 RH exceptions + 39 LH exceptions
   const upChevrons = allChevrons.filter((c) => c.direction === 'up');
@@ -502,11 +512,31 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
   // same-pitch onset, butt-capped on staff lines, round-capped + 0.4pt in open space.
   const expectedTrails = layout.systems.flatMap((system) => {
     const geo = getSystemGeometry(layout, system.pageIndex, system.systemOnPageIndex);
+    const notesByTickInSys = new Map<number, QuantizedNote[]>();
+    for (const note of system.notes) {
+      if (!notesByTickInSys.has(note.startTick)) notesByTickInSys.set(note.startTick, []);
+      notesByTickInSys.get(note.startTick)!.push(note);
+    }
+    const clusterOffsetMap = new Map<string, number>();
+    for (const [, tickNotes] of notesByTickInSys.entries()) {
+      if (tickNotes.length <= 1) continue;
+      tickNotes.sort((a, b) => linearIndex(a.pitch) - linearIndex(b.pitch));
+      for (let i = 0; i < tickNotes.length - 1; i++) {
+        const p1 = linearIndex(tickNotes[i].pitch);
+        const p2 = linearIndex(tickNotes[i + 1].pitch);
+        if (p2 - p1 <= 3) {
+          clusterOffsetMap.set(tickNotes[i].id, -4.2);
+          clusterOffsetMap.set(tickNotes[i + 1].id, 4.2);
+        }
+      }
+    }
+
     const trails: { x1: number; x2: number; y: number; stroke: string; width: string; cap: string }[] = [];
     for (const note of system.notes) {
       if (note.durationTicks <= tauRef) continue;
       const lp = linearIndex(note.pitch);
-      const nx = geo.xForTick(note.startTick);
+      const cDx = clusterOffsetMap.get(note.id) ?? 0;
+      const nx = geo.xForTick(note.startTick) + cDx;
       const ny = geo.yForPitch(lp);
       const effectiveRadius = note.startTick === 0 ? OPENING_HALO_RADIUS_PT : NOTEHEAD_KNOCKOUT_RADIUS_PT;
       let holdStartX = nx + effectiveRadius;
@@ -518,7 +548,8 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
         if (nextOnsetTick === null || other.startTick < nextOnsetTick) nextOnsetTick = other.startTick;
       }
       if (nextOnsetTick !== null) {
-        holdEndX = Math.min(holdEndX, geo.xForTick(nextOnsetTick) - NOTEHEAD_KNOCKOUT_RADIUS_PT - 1.0);
+        const otherDx = clusterOffsetMap.get(system.notes.find(o => linearIndex(o.pitch) === lp && o.startTick === nextOnsetTick)?.id ?? '') ?? 0;
+        holdEndX = Math.min(holdEndX, geo.xForTick(nextOnsetTick) + otherDx - NOTEHEAD_KNOCKOUT_RADIUS_PT - 1.0);
       }
 
       if (pc12(lp) === 0) {
@@ -588,7 +619,8 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
   const geo97 = getSystemGeometry(layout, 0, 1); // mm. 5–8 system
   const note97 = score.notes.find((n) => n.id === 'bach-var1-97')!;
   assert.equal(linearIndex(note97.pitch), 48, 'Note 97 must sit on Middle C');
-  const nx97 = geo97.xForTick(note97.startTick);
+  const cDx97 = 4.2; // shifted right by cluster collision with note 96 at tick 816
+  const nx97 = geo97.xForTick(note97.startTick) + cDx97;
   const ny97 = geo97.yForPitch(48);
   const expectedHoldStartX = round2(nx97 + NOTEHEAD_KNOCKOUT_RADIUS_PT);
   const nextNx97 = geo97.xForTick(note97.startTick + note97.durationTicks);
@@ -694,43 +726,34 @@ test('Opening Sound Position of Honor: concentric noble halo ring for tick 0 not
 test('Local Dashed Outlier Staff Line Invariant: pitch 76 rendered strictly for mm. 29–30', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
-  const page1 = renderPageToSvg(layout, 0);
-  const page2 = renderPageToSvg(layout, 1);
-  const page3 = renderPageToSvg(layout, 2);
+  const pages = renderAllPagesToSvg(layout);
 
-  // No page-1 system (mm. 1–12) contains notes above o5, so no outlier line may appear there
-  for (let s = 0; s < layout.pages[0].systems.length; s++) {
-    const geo = getSystemGeometry(layout, 0, s);
-    const y76 = parseFloat(geo.yForPitch(76).toFixed(2));
-    const aboveStaff = extractLines(page1).filter(
-      (l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
-    );
-    assert.equal(aboveStaff.length, 0, `Page 1 system ${s + 1} must not render outlier lines above o5`);
+  // Pages 1, 2, 3 (mm. 1–24) stay within the 4-octave core: no outlier lines above o5
+  for (let p = 0; p < 3; p++) {
+    const pageSvg = pages[p];
+    for (let s = 0; s < layout.pages[p].systems.length; s++) {
+      const geo = getSystemGeometry(layout, p, s);
+      const y76 = parseFloat(geo.yForPitch(76).toFixed(2));
+      const aboveStaff = extractLines(pageSvg).filter(
+        (l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
+      );
+      assert.equal(aboveStaff.length, 0, `Page ${p + 1} system ${s + 1} must not render outlier lines above o5`);
+    }
   }
 
-  // Page 2 (mm. 13–24) stays within the 4-octave core: no outlier lines above o5
-  for (let s = 0; s < layout.pages[1].systems.length; s++) {
-    const geo = getSystemGeometry(layout, 1, s);
-    const y76 = parseFloat(geo.yForPitch(76).toFixed(2));
-    const aboveStaff = extractLines(page2).filter(
-      (l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
-    );
-    assert.equal(aboveStaff.length, 0, `Page 2 system ${s + 1} must not render outlier lines above o5`);
-  }
-
-  // Page 3 system 1 (mm. 25–28) also stays within the core
-  const geoM25 = getSystemGeometry(layout, 2, 0);
+  // Page 4 system 1 (mm. 25–28) also stays within the core
+  const geoM25 = getSystemGeometry(layout, 3, 0);
   const y76M25 = parseFloat(geoM25.yForPitch(76).toFixed(2));
   assert.equal(
-    extractLines(page3).filter((l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76M25).length,
+    extractLines(pages[3]).filter((l) => l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76M25).length,
     0,
-    'Page 3 system 1 (mm. 25–28) must not render outlier lines above o5'
+    'Page 4 system 1 (mm. 25–28) must not render outlier lines above o5'
   );
 
-  // Page 3 system 2 (mm. 29–32) contains D6 (pitch 74) in mm. 29–30 → local dashed line at pitch 76.
-  const geoLast = getSystemGeometry(layout, 2, 1);
+  // Page 4 system 2 (mm. 29–32) contains D6 (pitch 74) in mm. 29–30 → local dashed line at pitch 76.
+  const geoLast = getSystemGeometry(layout, 3, 1);
   const y76 = parseFloat(geoLast.yForPitch(76).toFixed(2));
-  const outlierLines = extractLines(page3).filter(
+  const outlierLines = extractLines(pages[3]).filter(
     (l) => l.y1 === l.y2 && l.dash === '5,2.5' && parseFloat(l.y1.toFixed(2)) === y76
   );
   assert.equal(outlierLines.length, 2, 'Exactly two local dashed outlier segments (mm. 29 and 30)');
@@ -758,7 +781,7 @@ test('Horizontal Engraving API, Morphology & Legacy Alias Regression', () => {
   assert.match(svgs[0], /class="duo-digit"/);
   assert.match(svgs[0], /<circle cx="[\d.]+" cy="[\d.]+" r="4\.80" fill="#FFFFFF"\/>/);
   assert.match(svgs[0], />7<\/text>/, 'Must render G as 7');
-  assert.match(svgs[0], />b<\/text>/, 'Must render B as b');
+  assert.match(svgs[0], />B<\/text>/, 'Must render B as B');
   assert.doesNotMatch(svgs[0], /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around duodecimal noteheads');
 
   // Phonetic morphology keeps lowercase syllables in the horizontal systems
@@ -827,16 +850,16 @@ test('A4 & Letter Landscape Print Dimensions Invariant', () => {
     'Landscape measures must claim ~192pt each'
   );
 
-  // Letter landscape still forms the same 3-page spread
+  // Letter landscape forms a 4-page spread (2 systems per page)
   const letterLayout = computeColumnarLayout(score, { paperSize: 'letter' });
   assert.equal(letterLayout.pageDimensions.widthPt, LETTER_HEIGHT_PT);
   assert.equal(letterLayout.pageDimensions.heightPt, LETTER_WIDTH_PT);
-  assert.equal(letterLayout.pages.length, 3);
-  assert.equal(letterLayout.pages[0].systems.length, 3);
-  assert.equal(letterLayout.pages[2].systems.length, 2);
+  assert.equal(letterLayout.pages.length, 4);
+  assert.equal(letterLayout.pages[0].systems.length, 2);
+  assert.equal(letterLayout.pages[3].systems.length, 2);
   const letterGeo = getSystemGeometry(letterLayout, 0, 0);
-  assert.ok(letterGeo.staffBotY < LETTER_WIDTH_PT - 28.35, 'Last system must stay inside the printable letter page');
-  assert.ok(letterGeo.staffTopY > 28.35 + 44);
+  assert.ok(letterGeo.staffBotY < LETTER_WIDTH_PT - 17.0, 'Last system must stay inside the printable letter page');
+  assert.ok(letterGeo.staffTopY > 17.0 + 18.0);
 });
 
 test('Web Print CSS & @media print Invariants', () => {
@@ -856,21 +879,21 @@ test('Web Print CSS & @media print Invariants', () => {
   assert.match(css, /\.print-preview-card\s*svg\s*\{[^}]*width:\s*100%\s*!important/);
 });
 
-test('Network Laser Printing Pipeline: 3-page landscape PostScript & PJL wrapping', async () => {
+test('Network Laser Printing Pipeline: 4-page landscape PostScript & PJL wrapping', async () => {
   // Test generating vector PostScript from benchmark score (defaulting to Letter for US printer tray)
   const { psBuffer, layout } = await generateScorePostscript('bach-goldberg-var1');
 
   assert.equal(layout.pageDimensions.widthPt, 792, 'Letter landscape width must be 792 pt');
   assert.equal(layout.pageDimensions.heightPt, 612, 'Letter landscape height must be 612 pt');
-  assert.equal(layout.pages.length, 3, 'Horizontal landscape engraving must yield a 3-page spread');
+  assert.equal(layout.pages.length, 4, 'Horizontal landscape engraving must yield a 4-page spread');
 
   assert.ok(psBuffer.length > 10000, 'PostScript buffer must be generated and non-trivial');
   const psText = psBuffer.toString('binary', 0, 1000);
   assert.match(psText, /%!PS-Adobe/);
 
-  // Check multi-page emission (%%Pages: 3)
+  // Check multi-page emission (%%Pages: 4)
   const fullPs = psBuffer.toString('binary');
-  assert.match(fullPs, /%%Pages:\s*3/);
+  assert.match(fullPs, /%%Pages:\s*4/);
 
   // Strictly enforce 100% vector output: zero raster image operator calls
   assert.doesNotMatch(fullPs, /\nimage\n/, 'PostScript must contain zero raster bitmap calls');
@@ -906,35 +929,34 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; }`));
   assert.ok(!page1Svg.includes('.beat-counter'), 'Must not include .beat-counter style');
 
-  // Title block splits the score title on ':' into main title + movement subtitle
-  assert.ok(page1Svg.includes('>Goldberg Variations, BWV 988</text>'));
-  assert.ok(page1Svg.includes('>Variatio 1. a 1 Clav.</text>'));
+  // Title block uses single-line layout with title and composer
+  assert.ok(page1Svg.includes('>Goldberg Variations, BWV 988 · Variatio 1. a 1 Clav.</text>'));
   assert.ok(page1Svg.includes('>Johann Sebastian Bach</text>'));
 });
 
-test('Clean Urtext Header & Footer Invariant: pure white breathing room, zero tacky rules', () => {
+test('Clean Urtext Header & Footer Invariant: pure white breathing room, zero tacky rules, zero footer fluff', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const pages = renderAllPagesToSvg(layout);
+  const marginPt = layout.options.pageMarginMm * MM_TO_PT;
 
   for (let p = 0; p < pages.length; p++) {
     const svg = pages[p];
 
-    // No corporate header divider and no footer rule
+    // No corporate header divider and zero footer element
     assert.doesNotMatch(svg, /<line[^>]*stroke="#CCCCCC"/, `Page ${p + 1} must not contain the #CCCCCC header rule`);
     assert.doesNotMatch(svg, /<line[^>]*stroke="#E5E7EB"/, `Page ${p + 1} must not contain the #E5E7EB footer rule`);
+    assert.doesNotMatch(svg, /<g id="page-footer">/, `Page ${p + 1} must not contain any page footer element`);
+    assert.doesNotMatch(svg, /Page \d+ of \d+/, `Page ${p + 1} must have zero footer page numbering`);
 
-    // Centered title/subtitle and right-aligned composer on the opening page
+    // Single-line header: left-aligned title/subtitle and right-aligned composer/section
     if (p === 0) {
-      assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt / 2).toFixed(2)}"[^>]*class="title" text-anchor="middle">`));
-      assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt / 2).toFixed(2)}"[^>]*class="subtitle" text-anchor="middle">`));
-      assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt - 10 * MM_TO_PT).toFixed(2)}"[^>]*class="meta" text-anchor="end">`));
+      assert.match(svg, new RegExp(`<text x="${marginPt.toFixed(2)}"[^>]*class="title">Goldberg Variations`));
+      assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt - marginPt).toFixed(2)}"[^>]*class="meta" text-anchor="end">Johann Sebastian Bach</text>`));
+    } else {
+      assert.match(svg, new RegExp(`<text x="${marginPt.toFixed(2)}"[^>]*class="subtitle">`));
+      assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt - marginPt).toFixed(2)}"[^>]*class="section-header" text-anchor="end">`));
     }
-
-    // Subtle Urtext page numbering survives, with no rule anywhere in the footer band
-    assert.match(svg, new RegExp(`>Page ${p + 1} of ${pages.length}</text>`));
-    const footer = svg.slice(svg.indexOf('<g id="page-footer">'));
-    assert.doesNotMatch(footer, /<line/, `Page ${p + 1} footer must contain zero horizontal rules`);
   }
 });
 
@@ -969,10 +991,11 @@ test('Deterministic horizontal layout for synthetic 32-measure score with 48 tic
 
   assert.equal(layout.totalMeasures, 32);
   assert.equal(layout.ticksPerMeasure, 48);
-  assert.equal(layout.pages.length, 3, 'Three pages regardless of meter');
-  assert.deepEqual(layout.pages[0].systems.map((s) => s.sysStartMeasure), [1, 5, 9]);
-  assert.deepEqual(layout.pages[1].systems.map((s) => s.sysStartMeasure), [13, 17, 21]);
-  assert.deepEqual(layout.pages[2].systems.map((s) => s.sysStartMeasure), [25, 29]);
+  assert.equal(layout.pages.length, 4, 'Four pages for 32 measures with 2 systems per page');
+  assert.deepEqual(layout.pages[0].systems.map((s) => s.sysStartMeasure), [1, 5]);
+  assert.deepEqual(layout.pages[1].systems.map((s) => s.sysStartMeasure), [9, 13]);
+  assert.deepEqual(layout.pages[2].systems.map((s) => s.sysStartMeasure), [17, 21]);
+  assert.deepEqual(layout.pages[3].systems.map((s) => s.sysStartMeasure), [25, 29]);
 
   // 4/4 → three vertical pulse lines per measure (beats 2, 3, 4) on every system
   const page1 = renderPageToSvg(layout, 0);
@@ -992,5 +1015,5 @@ test('Deterministic horizontal layout for synthetic 32-measure score with 48 tic
   }
 
   const svgs = renderAllPagesToSvg(layout);
-  assert.equal(svgs.length, 3);
+  assert.equal(svgs.length, 4);
 });

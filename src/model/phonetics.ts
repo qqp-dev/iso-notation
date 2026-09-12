@@ -45,8 +45,8 @@ export const DUODECIMAL_SOLFEGE: readonly DuodecimalSolfegeDefinition[] = [
   { pitchClass: 7, row: 1, digit: '7', syllable: 'se', derivation: 'seven (7)', notes: 'Mid-vowel sibilant fifth landmark on Row 1' },
   { pitchClass: 8, row: 0, digit: '8', syllable: 'e', derivation: 'eight (8)', notes: 'Bright mid-front vowel on Row 0' },
   { pitchClass: 9, row: 1, digit: '9', syllable: 'na', derivation: 'nine (9)', notes: 'Alveolar nasal resonance on Row 1' },
-  { pitchClass: 10, row: 0, digit: 'a', syllable: 'a', derivation: 'ten / a (10)', notes: 'Low open central vowel on Row 0' },
-  { pitchClass: 11, row: 1, digit: 'b', syllable: 'bi', derivation: 'eleven / b (11)', notes: 'Voiced bilabial pop leading into octave on Row 1' },
+  { pitchClass: 10, row: 0, digit: 'A', syllable: 'a', derivation: 'ten / A (10)', notes: 'Low open central vowel on Row 0' },
+  { pitchClass: 11, row: 1, digit: 'B', syllable: 'bi', derivation: 'eleven / B (11)', notes: 'Voiced bilabial pop leading into octave on Row 1' },
 ] as const;
 
 /** Canonical alias pointing to the definitive duodecimal solfège system */
@@ -73,7 +73,7 @@ export function duodecimalSolfegeString(pitches: readonly number[], delimiter: s
 export function pitchClassFromDuodecimalSyllable(syllable: string): number | undefined {
   const normalized = syllable.trim().toLowerCase();
   const entry = DUODECIMAL_SOLFEGE.find(
-    (e) => e.syllable === normalized || e.digit === normalized
+    (e) => e.syllable === normalized || e.digit.toLowerCase() === normalized
   );
   return entry ? entry.pitchClass : undefined;
 }
