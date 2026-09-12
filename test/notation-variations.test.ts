@@ -287,20 +287,22 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.80" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
   assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
 
-  // Sculpted French Guillemets for hand-crossing exceptions:
-  // Measure 4 has RH crossing into bass (< 48) -> curved symmetric flanks pointing right (ax > bx)
-  const guillemetRegex = /<path d="M ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) Q ([0-9.]+) ([0-9.]+) \1 \2 Z" fill="([^"]+)"\/>/g;
-  const rhMatches = Array.from(svg.matchAll(guillemetRegex));
-  assert.ok(rhMatches.length > 0, 'Must render Sculpted French Guillemets in SVG for duodecimal RH crossing exceptions');
+  // Intuitive Up/Down Handedness Chevrons for hand-crossing exceptions:
+  // Measure 4 contains RH crossing into the bass (< 48) -> upward chevrons above the noteheads
+  const chevronRegex = /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.80"/g;
+  const upMatches = Array.from(svg.matchAll(chevronRegex)).filter((m) => m[1] === 'up');
+  assert.ok(upMatches.length > 0, 'Must render upward chevrons for duodecimal RH crossing exceptions in mm. 1–16');
+  upMatches.forEach((m) => {
+    assert.ok(parseFloat(m[5]) < parseFloat(m[3]), 'Upward chevron apex must sit above its base (∧)');
+  });
 
-  const rhChevrons = rhMatches.filter((m) => parseFloat(m[5]) > parseFloat(m[1]));
-  assert.ok(rhChevrons.length > 0, 'RH crossing exceptions must have apex pointing right (apexX > baseX)');
-
-  // Page 4 contains measure 30 with LH crossing into treble (> 48) -> curved symmetric flanks pointing left (ax < bx)
-  const page4Svg = renderColumnarScoreToSvg(score, 3, { noteheadMorphology: 'duodecimal' });
-  const p4Matches = Array.from(page4Svg.matchAll(guillemetRegex));
-  const lhChevrons = p4Matches.filter((m) => parseFloat(m[5]) < parseFloat(m[1]));
-  assert.ok(lhChevrons.length > 0, 'LH crossing exceptions must have apex pointing left (apexX < baseX)');
+  // Page 2 contains measure 30 with LH crossing into the treble (> 48) -> downward chevrons below the noteheads
+  const page2Svg = renderColumnarScoreToSvg(score, 1, { noteheadMorphology: 'duodecimal' });
+  const downMatches = Array.from(page2Svg.matchAll(chevronRegex)).filter((m) => m[1] === 'down');
+  assert.ok(downMatches.length > 0, 'Must render downward chevrons for duodecimal LH crossing exceptions in m. 30');
+  downMatches.forEach((m) => {
+    assert.ok(parseFloat(m[5]) > parseFloat(m[3]), 'Downward chevron apex must sit below its base (∨)');
+  });
 });
 
 test('Notehead Morphology: minimal-dots and classic-oval normalization', () => {

@@ -352,7 +352,7 @@ export const App: React.FC = () => {
             <button
               onClick={() => setIsPrintModalOpen(true)}
               className="px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-amber-400 hover:text-amber-300 border border-neutral-800 text-[11px] cursor-pointer transition flex items-center gap-1.5"
-              title="Print Sheet Music (A4 Columnar Engraving)"
+              title="Print Sheet Music (A4 Horizontal Portrait Engraving)"
             >
               <span>🖨️</span>
               <span className="hidden sm:inline">Print</span>
