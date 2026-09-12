@@ -202,10 +202,15 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
       .join('');
     const opts = resolved.options;
+    const toks = resolved.tokens;
+    const channel =
+      opts.channelLayout === 'bounded-channel'
+        ? `bounded channel ±${toks.channelHalfWidth.toFixed(1)}pt · flanks ∓${toks.channelFlankOffset.toFixed(1)}pt`
+        : 'single equator';
     const facts =
       `mm. ${resolved.measureStart}–${resolved.measureStart + resolved.measureCount - 1} · ` +
       `${opts.rhythmStyle} · spine ${opts.middleCSpine} · gap ${opts.interStaffGap.toFixed(1)}pt · ` +
-      `beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
+      `${channel} · beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
     return [
       `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="${report.ok ? 'clean' : 'violations'}">`,
       '  <header class="candidate-head">',
@@ -293,6 +298,7 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
     '    <div class="badges">',
     `      <span class="badge"><b>rhythmStyle</b> = ${escapeHtml(options.rhythmStyle)}</span>`,
     `      <span class="badge"><b>middleCSpine</b> = ${escapeHtml(options.middleCSpine)}</span>`,
+    `      <span class="badge"><b>channelLayout</b> = ${escapeHtml(options.channelLayout)}</span>`,
     `      <span class="badge"><b>interStaffGap</b> = ${options.interStaffGap.toFixed(1)}pt</span>`,
     `      <span class="badge"><b>measuresPerSystem</b> = ${options.measuresPerSystem}</span>`,
     `      <span class="badge"><b>systemsPerPage</b> = ${options.systemsPerPage}</span>`,

@@ -131,6 +131,31 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
   }
 });
 
+test('Bounded center channel (Round 4 Candidate B) engraves with zero violations', () => {
+  const channel = { ...DEFAULT_JANKO_OPTIONS, channelLayout: 'bounded-channel' as const };
+  const report = lintJankoScore(SCORE, channel, DEFAULT_JANKO_TOKENS);
+  assert.deepEqual(
+    report.violations.map((v) => `${v.code}: ${v.message}`),
+    [],
+    'the channel layout must be as clean as the golden master'
+  );
+  assert.equal(report.ok, true);
+  // The channel separates the two whole-tone rows, so fewer hand crossings
+  // land on one lattice point than on the single equator.
+  assert.ok(
+    report.warnings.length < 9,
+    `the channel removes cross-hand coincidences (${report.warnings.length} left)`
+  );
+  for (const warning of report.warnings) assert.equal(warning.code, 'chordal-overlap');
+  // The corridor is structural: no beam connector may slice across the spine,
+  // whichever octave framing is in force.
+  assert.equal(
+    report.diagnostics.filter((d) => d.code === 'corridor-intrusion').length,
+    0,
+    'the bounded channel keeps the Middle C corridor beam-free'
+  );
+});
+
 test('Visual lint of the canonical score is a millisecond-scale operation', () => {
   const started = Date.now();
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);

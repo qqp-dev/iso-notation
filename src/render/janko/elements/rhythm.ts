@@ -266,6 +266,12 @@ export function renderFlags(
  * heads — preserving the clamped slope exactly — until every foreign head
  * keeps `noteheadRadius + minStemClearance` of air from the primary and the
  * 16th secondary connector.
+ *
+ * `spineY`, when supplied, declares the Middle C corridor a no-fly line: a
+ * connector that would slice across it is pushed the same way (away from its
+ * own heads) until it clears the spine by {@link BEAM_SPINE_CLEARANCE}. Both
+ * constraints push along the stem direction, so a single bounded loop settles
+ * them together.
  */
 export interface JankoBeamGroupGeometry {
   /** Group notes sorted by start tick. */
@@ -294,6 +300,13 @@ export interface JankoBeamGroupGeometry {
 const SECONDARY_BEAM_GAP = 1.6;
 /** Extra air (pt) the obstacle pass keeps beyond the required clearance. */
 const OBSTACLE_AIR_MARGIN = 0.02;
+/**
+ * Air (pt) a beam connector keeps from the Middle C spine when the corridor is
+ * declared as a no-fly line (see {@link computeBeamGroupGeometry}). Matches the
+ * linter's `corridorClearance`, so a beam that satisfies the solver always
+ * satisfies the structural corridor audit.
+ */
+export const BEAM_SPINE_CLEARANCE = 2.0;
 
 /** Distance from a point to a line segment. */
 function pointToSegmentDistance(
@@ -315,11 +328,16 @@ function pointToSegmentDistance(
 /**
  * Resolve the beam geometry of a group. Returns null for groups shorter than
  * two notes (a solitary short note is engraved with standard flags instead).
+ *
+ * @param obstacles other noteheads of the system the connector must avoid
+ * @param spineY    absolute y of the Middle C spine, when the corridor is a
+ *                  declared no-fly line for beams
  */
 export function computeBeamGroupGeometry(
   group: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
-  obstacles?: readonly JankoRhythmNote[] | null
+  obstacles?: readonly JankoRhythmNote[] | null,
+  spineY?: number | null
 ): JankoBeamGroupGeometry | null {
   const t = resolveJankoTokens(tokens);
   if (group.length < 2) return null;
@@ -383,35 +401,50 @@ export function computeBeamGroupGeometry(
     return list;
   };
 
-  // Cross-hand obstacle avoidance. The staff is shared, so a foreign notehead
-  // may sit on (or beside) the connector. Push the whole beam uniformly away
-  // from its own heads, past every obstacle, until the required air is kept.
+  // Cross-hand obstacle avoidance and Middle C corridor protection. The staff
+  // is shared, so a foreign notehead may sit on (or beside) the connector, and
+  // the corridor is structural negative space. Push the whole beam uniformly
+  // away from its own heads — past every obstacle and clear of the spine —
+  // until both constraints hold. Every push runs along the stem direction, so
+  // the bounded loop always terminates.
   const required = t.noteheadRadius + t.minStemClearance;
-  if (obstacles && obstacles.length > 0) {
-    const own = new Set(sorted.map((n) => n.id));
-    const foreign = obstacles.filter((o) => !own.has(o.id));
-    const cos = 1 / Math.sqrt(1 + slope * slope);
-    for (let pass = 0; pass < 16 && foreign.length > 0; pass++) {
-      let push = 0;
-      for (const line of connectorsAt(anchor)) {
-        const run = line.x2 - line.x1;
-        const lo = Math.min(line.x1, line.x2) - required;
-        const hi = Math.max(line.x1, line.x2) + required;
-        for (const o of foreign) {
-          if (o.x < lo || o.x > hi) continue;
-          const distance = pointToSegmentDistance(o.x, o.y, line.x1, line.y1, line.x2, line.y2);
-          if (distance >= required) continue;
-          const yAtX = run === 0 ? line.y1 : line.y1 + ((o.x - line.x1) / run) * (line.y2 - line.y1);
-          // Push just past the obstacle (its signed vertical offset + the
-          // perpendicular requirement), with a conservative fallback for
-          // obstacles that only graze a connector endpoint.
-          const need = direction * (o.y - yAtX) + (required + OBSTACLE_AIR_MARGIN) / cos;
-          push = Math.max(push, need, required - distance + OBSTACLE_AIR_MARGIN);
-        }
+  const own = new Set(sorted.map((n) => n.id));
+  const foreign = obstacles && obstacles.length > 0 ? obstacles.filter((o) => !own.has(o.id)) : [];
+  const cos = 1 / Math.sqrt(1 + slope * slope);
+  const spine = typeof spineY === 'number' && Number.isFinite(spineY) ? spineY : null;
+  /** Amount (pt) the spine forces the anchor to move along the stem direction. */
+  const spinePush = (line: JankoBeamConnector): number => {
+    if (spine === null) return 0;
+    const lo = Math.min(line.y1, line.y2);
+    const hi = Math.max(line.y1, line.y2);
+    // Only a connector that actually crosses the spine is displaced; a beam
+    // that merely runs parallel beside the corridor is legal.
+    if (lo > spine || hi < spine) return 0;
+    return direction === -1
+      ? hi - (spine - BEAM_SPINE_CLEARANCE)
+      : spine + BEAM_SPINE_CLEARANCE - lo;
+  };
+  for (let pass = 0; pass < 16; pass++) {
+    let push = 0;
+    for (const line of connectorsAt(anchor)) {
+      const run = line.x2 - line.x1;
+      const lo = Math.min(line.x1, line.x2) - required;
+      const hi = Math.max(line.x1, line.x2) + required;
+      for (const o of foreign) {
+        if (o.x < lo || o.x > hi) continue;
+        const distance = pointToSegmentDistance(o.x, o.y, line.x1, line.y1, line.x2, line.y2);
+        if (distance >= required) continue;
+        const yAtX = run === 0 ? line.y1 : line.y1 + ((o.x - line.x1) / run) * (line.y2 - line.y1);
+        // Push just past the obstacle (its signed vertical offset + the
+        // perpendicular requirement), with a conservative fallback for
+        // obstacles that only graze a connector endpoint.
+        const need = direction * (o.y - yAtX) + (required + OBSTACLE_AIR_MARGIN) / cos;
+        push = Math.max(push, need, required - distance + OBSTACLE_AIR_MARGIN);
       }
-      if (push <= 0) break;
-      anchor += direction * push;
+      push = Math.max(push, spinePush(line));
     }
+    if (push <= 0) break;
+    anchor += direction * push;
   }
 
   const beamY = (x: number): number => anchor + slope * (x - first.stemX);
@@ -431,10 +464,18 @@ export function computeBeamGroupGeometry(
   };
 }
 
-/** Traditional connected beam over one beat-sized group of 8ths/16ths. */
+/**
+ * Traditional connected beam over one beat-sized group of 8ths/16ths.
+ *
+ * `geometry` is the group's already resolved beam (as carried by the system
+ * layout). Supplying it guarantees the painted connector is byte-for-byte the
+ * geometry the solver resolved against the foreign noteheads and the Middle C
+ * corridor — and the one the visual linter audits.
+ */
 export function renderBeamGroup(
   group: JankoRhythmNote[],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  geometry?: JankoBeamGroupGeometry | null
 ): string {
   const t = resolveJankoTokens(tokens);
   if (group.length === 0) return '';
@@ -443,7 +484,7 @@ export function renderBeamGroup(
     return renderFlags(group[0], t);
   }
 
-  const beam = computeBeamGroupGeometry(group, t);
+  const beam = geometry ?? computeBeamGroupGeometry(group, t);
   if (!beam) return '';
   const { notes: sorted, stems, primary, secondary, direction } = beam;
 
