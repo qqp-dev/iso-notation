@@ -32,7 +32,9 @@ import {
   getTickX,
   getWholeToneRank,
   isOutOfStaffOctave,
+  resolveChannelFlanks,
 } from '../src/render/janko/geometry';
+import { getEquatorRuleYs } from '../src/render/janko/elements/staff';
 import {
   computeCropBox,
   computePageGeometry,
@@ -1055,7 +1057,212 @@ test('No beam group straddles an intervening longer value of the same hand', () 
 });
 
 // ---------------------------------------------------------------------------
-// 4. Export suite invariant
+// 4. Bounded Center Channel (Round 4)
+// ---------------------------------------------------------------------------
+
+/** Options delta of Candidate B: the bounded center channel. */
+const CHANNEL_OPTIONS = { ...OPTIONS, channelLayout: 'bounded-channel' as const };
+/** Options delta of Candidate A: the incumbent single equator (golden master). */
+const SINGLE_OPTIONS = { ...OPTIONS, channelLayout: 'single-equator' as const };
+
+test('Bounded channel schema: option, tokens and the untouched golden default', () => {
+  assert.equal(
+    DEFAULT_JANKO_OPTIONS.channelLayout,
+    'single-equator',
+    'the golden master stays on the single equator'
+  );
+  assert.equal(resolveJankoOptions({}).channelLayout, 'single-equator');
+  assert.equal(
+    resolveJankoOptions({ channelLayout: 'bounded-channel' }).channelLayout,
+    'bounded-channel'
+  );
+
+  close(DEFAULT_JANKO_TOKENS.channelHalfWidth, 6.5, 'canonical channel half width (13pt channel)');
+  close(DEFAULT_JANKO_TOKENS.channelFlankOffset, 13.0, 'canonical flank offset');
+  close(
+    DEFAULT_JANKO_TOKENS.channelFlankOffset,
+    2 * DEFAULT_JANKO_TOKENS.channelHalfWidth,
+    'the flank rows mirror the channel exactly'
+  );
+  assert.ok(
+    DEFAULT_JANKO_TOKENS.channelHalfWidth - DEFAULT_JANKO_TOKENS.noteheadRadius > 1.0,
+    'a notehead keeps real air from both boundary rules'
+  );
+
+  // One rule on the equator, two around it.
+  assert.deepEqual(getEquatorRuleYs(-28.0, SINGLE_OPTIONS, TOKENS), [-28.0]);
+  assert.deepEqual(getEquatorRuleYs(-28.0, CHANNEL_OPTIONS, TOKENS), [-34.5, -21.5]);
+
+  // The golden-master engraving is byte-identical with the channel in place.
+  const score = buildBachGoldbergVar1Score();
+  assert.equal(
+    renderJankoCrop(score, 1, 2, SINGLE_OPTIONS, TOKENS),
+    renderJankoCrop(score, 1, 2, OPTIONS, TOKENS)
+  );
+});
+
+test('Bounded channel rendering: two boundary rules per equator, Set A in the gap', () => {
+  const score = buildBachGoldbergVar1Score();
+  const halfWidth = TOKENS.channelHalfWidth;
+  const crop = renderJankoCrop(score, 1, 2, CHANNEL_OPTIONS, TOKENS);
+  const staffGroup = crop.match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)?.[0] ?? '';
+  const ruleYs = [...staffGroup.matchAll(/<line x1="[\d.]+" y1="([\d.]+)"/g)].map((m) => Number(m[1]));
+  const staffEquators: Array<[Hand, number]> = [
+    ['RH', 5],
+    ['LH', 2],
+    ['RH', 4],
+    ['LH', 3],
+  ];
+  assert.equal(ruleYs.length, staffEquators.length * 2, 'two boundary rules per octave equator');
+  const geo = computePageGeometry(CHANNEL_OPTIONS, TOKENS);
+  for (const [hand, oct] of staffEquators) {
+    const eq = geo.systems[0].equatorY(hand, oct);
+    assert.ok(ruleYs.includes(Number((eq - halfWidth).toFixed(2))), `${hand} o${oct} upper rule`);
+    assert.ok(ruleYs.includes(Number((eq + halfWidth).toFixed(2))), `${hand} o${oct} lower rule`);
+    assert.ok(!ruleYs.includes(Number(eq.toFixed(2))), `${hand} o${oct} carries no single equator`);
+  }
+
+  // Row assignment across the opening window: Set A on the equator (`offset
+  // 0.0`, inside the channel), Set B on its contour-resolved flank.
+  let channelHeads = 0;
+  let flankHeads = 0;
+  for (const layout of layoutJankoScore(score, CHANNEL_OPTIONS, TOKENS)) {
+    for (const p of layout.notes) {
+      const offset = p.coord.y - p.coord.equatorY;
+      if (p.coord.rank === 0) {
+        close(offset, 0.0, `${p.note.id} Set A sits on the equator`);
+        assert.equal(p.coord.side, 'channel', `${p.note.id} reads as the center row`);
+        assert.equal(p.coord.flank, null, 'the channel row has no flank');
+        channelHeads++;
+      } else {
+        close(Math.abs(offset), TOKENS.channelFlankOffset, `${p.note.id} Set B flank offset`);
+        assert.equal(p.coord.side, offset < 0 ? 'above' : 'below');
+        assert.equal(p.coord.flank, offset < 0 ? 'up' : 'down');
+        flankHeads++;
+      }
+      assert.ok(
+        (offset === 0
+          ? TOKENS.channelHalfWidth
+          : Math.abs(offset) - TOKENS.channelHalfWidth) -
+          TOKENS.noteheadRadius >
+          1.0,
+        `${p.note.id} disc never touches a boundary rule`
+      );
+    }
+  }
+  assert.ok(channelHeads > 0 && flankHeads > 0, 'the score exercises both whole-tone sets');
+
+  // Direction-sensitive flanks: ascending into Set B takes the upper row,
+  // descending into it takes the lower one.
+  const offsetsOf = (pcs: number[], prefix: string): number[] => {
+    const notes = pcs.map((pc, i) => makeNote(`${prefix}-${i}`, pc, 4, i * 12, 12, 'RH'));
+    const layout = layoutJankoScore(makeScore(notes, 144), CHANNEL_OPTIONS, TOKENS)[0];
+    return layout.notes.map((p) => p.coord.y - p.coord.equatorY);
+  };
+  assert.deepEqual(offsetsOf([2, 3, 4], 'rise'), [0, -TOKENS.channelFlankOffset, 0], 'ascending 2-3-4');
+  assert.deepEqual(
+    offsetsOf([2, 1, 0], 'fall'),
+    [0, TOKENS.channelFlankOffset, 0],
+    'the descending 2-1-0 puts 1 below the lower rule'
+  );
+});
+
+test('Channel contour solver: every Set B note resolved, single equator untouched', () => {
+  const score = buildBachGoldbergVar1Score();
+  assert.equal(
+    resolveChannelFlanks(score.notes, OPTIONS, TOKENS).size,
+    0,
+    'the single-equator layout never needs a flank'
+  );
+  const flanks = resolveChannelFlanks(score.notes, CHANNEL_OPTIONS, TOKENS);
+  const setB = score.notes.filter((n) => getWholeToneRank(n.pitch.pitchClass) === 1);
+  assert.equal(flanks.size, setB.length, 'one flank per whole-tone Set B note');
+  for (const n of setB) {
+    const flank = flanks.get(n.id);
+    assert.ok(flank === 'up' || flank === 'down', `${n.id} resolved to a row`);
+  }
+  assert.deepEqual(
+    [...resolveChannelFlanks(score.notes, CHANNEL_OPTIONS, TOKENS)],
+    [...flanks],
+    'the solver is a pure, deterministic function of the score'
+  );
+});
+
+test('Non-contradiction invariant: every m. 1 step follows the pitch contour', () => {
+  // The round-4 probe: a descending 7-6-4-2 run into the channel, across the
+  // 2-1 semitone neighbour and back up through 2-4-6.
+  const sequence = [7, 6, 4, 2, 1, 2, 4, 6];
+  const notes = sequence.map((pc, i) => makeNote(`channel-${i}`, pc, 4, i * 12, 12, 'RH'));
+  const layout = layoutJankoScore(makeScore(notes, 144), CHANNEL_OPTIONS, TOKENS)[0];
+  const offsets = new Map(layout.notes.map((p) => [p.note.id, p.coord.y - p.coord.equatorY]));
+  const step = (a: number, b: number): number => offsets.get(`channel-${b}`)! - offsets.get(`channel-${a}`)!;
+
+  // 7 -> 6 descends out of the upper flank into the center channel.
+  close(offsets.get('channel-0')!, -TOKENS.channelFlankOffset, '7 opens on the upper flank');
+  assert.ok(step(0, 1) > 0, '7 -> 6 moves down the page');
+  close(offsets.get('channel-1')!, 0, '6 lands in the channel');
+
+  // 6 -> 4 -> 2 stays flat inside the channel.
+  assert.equal(step(1, 2), 0);
+  assert.equal(step(2, 3), 0);
+
+  // 2 -> 1 descends onto the lower flank ...
+  close(offsets.get('channel-4')!, TOKENS.channelFlankOffset, '1 takes the lower flank');
+  assert.ok(step(3, 4) > 0, '2 -> 1 moves down the page');
+
+  // ... and 1 -> 2 rises back into the channel.
+  assert.ok(step(4, 5) < 0, '1 -> 2 moves up the page');
+  close(offsets.get('channel-5')!, 0, '2 lands back in the channel');
+
+  // 2 -> 4 -> 6 stays flat inside the channel.
+  assert.equal(step(5, 6), 0);
+  assert.equal(step(6, 7), 0);
+
+  // Zero steps of the probe contradict the pitch direction.
+  const pitches = sequence.map((pc) => pc);
+  for (let i = 1; i < pitches.length; i++) {
+    const dPitch = pitches[i] - pitches[i - 1];
+    if (dPitch === 0) continue;
+    const dy = step(i - 1, i);
+    assert.ok(
+      dPitch > 0 ? dy <= 1e-9 : dy >= -1e-9,
+      `pc ${pitches[i - 1]} -> pc ${pitches[i]} must not invert (dy=${dy})`
+    );
+  }
+});
+
+test('Bounded channel: the canonical Bach score never contradicts the pitch contour', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layouts = layoutJankoScore(score, CHANNEL_OPTIONS, TOKENS);
+  let steps = 0;
+  let flat = 0;
+  for (const hand of HANDS) {
+    const voice = layouts
+      .flatMap((layout) => layout.notes)
+      .filter((p) => p.coord.hand === hand)
+      .sort((a, b) => a.note.startTick - b.note.startTick || a.coord.y - b.coord.y);
+    for (let i = 1; i < voice.length; i++) {
+      const a = voice[i - 1];
+      const b = voice[i];
+      const dPitch =
+        b.coord.octave * 12 + b.coord.pitchClass - (a.coord.octave * 12 + a.coord.pitchClass);
+      if (dPitch === 0) continue;
+      steps++;
+      const dy = b.coord.y - a.coord.y;
+      if (Math.abs(dy) < 1e-9) flat++;
+      assert.ok(
+        dPitch > 0 ? dy <= 1e-9 : dy >= -1e-9,
+        `${hand} ${a.note.id} (pc${a.coord.pitchClass}) -> ${b.note.id} (pc${b.coord.pitchClass}) ` +
+          `inverts the contour (dy=${dy.toFixed(2)})`
+      );
+    }
+  }
+  assert.ok(steps > 500, `the score is contoured (${steps} steps)`);
+  assert.ok(flat > 100, `the channel absorbs a real share of the motion as flat steps (${flat})`);
+});
+
+// ---------------------------------------------------------------------------
+// 5. Export suite invariant
 // ---------------------------------------------------------------------------
 
 test('npm run janko:export produces all five PNGs everywhere in under 2 seconds', () => {

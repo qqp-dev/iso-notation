@@ -16,10 +16,13 @@
 
 import { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
 import {
+  JankoChannelFlank,
   JankoPitchCoordinate,
   getEquatorYForOctave,
+  getNoteHand,
   getPitchCoordinate,
   getTickX,
+  resolveChannelFlanks,
   splitTick,
 } from './geometry';
 import {
@@ -238,16 +241,23 @@ export interface JankoSystemLayout {
 }
 
 function handForNote(note: QuantizedNote): Hand {
-  return note.hand ?? (note.pitch.octave >= 4 ? 'RH' : 'LH');
+  return getNoteHand(note.hand, note.pitch.octave);
 }
 
-/** Position a single note inside one system (page pt coordinates). */
+/**
+ * Position a single note inside one system (page pt coordinates).
+ *
+ * `flank` carries the contour-resolved bounded-channel side of a Set B note
+ * (see `geometry.resolveChannelFlanks`); it is ignored by the single-equator
+ * layout and by Set A notes.
+ */
 export function positionJankoNote(
   note: QuantizedNote,
   geo: JankoSystemGeometry,
   systemIndex: number,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  flank?: JankoChannelFlank | null
 ): PositionedJankoNote {
   const { measureOffset, tickInMeasure } = splitTick(note.startTick, t);
   const measureIdx = measureOffset - systemIndex * geo.measuresPerSystem;
@@ -261,7 +271,14 @@ export function positionJankoNote(
     geo.staffLeft +
     getTickX(note.startTick, measureIdx, tickInMeasure, geo.measureWidth, t, insets);
   const hand = handForNote(note);
-  const coord = getPitchCoordinate(note.pitch.pitchClass, note.pitch.octave, hand, t, o);
+  const coord = getPitchCoordinate(
+    note.pitch.pitchClass,
+    note.pitch.octave,
+    hand,
+    t,
+    o,
+    flank ?? null
+  );
   const y = geo.middleCY + coord.y;
   return {
     note,
@@ -296,17 +313,25 @@ export function layoutJankoSystem(
   const sysNotes = score.notes
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
     .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
-  const notes = sysNotes.map((n) => positionJankoNote(n, geometry, systemIndex, o, t));
+  // The bounded center channel resolves each Set B flank against the *whole*
+  // voice, so the contour is continuous across system and page breaks.
+  const flanks =
+    o.channelLayout === 'bounded-channel' ? resolveChannelFlanks(score.notes, o, t) : null;
+  const notes = sysNotes.map((n) =>
+    positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null)
+  );
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
   if (o.rhythmStyle === 'beamed') {
     // Every notehead of the system is an obstacle for every beam group: the
     // shared lattice lets one hand's beam cross the other hand's staff lines.
+    // The Middle C spine is handed to the solver as well, so no connector can
+    // ever slice across the corridor.
     const rhythmNotes = notes.map((p) => p.rhythm);
     const partition = partitionBeamGroups(rhythmNotes, t);
     beams = partition.groups
-      .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes))
+      .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY))
       .filter((g): g is JankoBeamGroupGeometry => g !== null);
     ungrouped = partition.ungrouped;
   }
@@ -346,7 +371,7 @@ function renderNotesLayer(
   const ledgers: string[] = [];
   for (const p of layout.notes) {
     for (const ledgerY of p.coord.ledgerYs) {
-      ledgers.push(renderLedgerEquator(p.x, layout.geometry.middleCY + ledgerY, t));
+      ledgers.push(renderLedgerEquator(p.x, layout.geometry.middleCY + ledgerY, t, o));
     }
   }
   if (ledgers.length > 0) {
@@ -360,7 +385,7 @@ function renderNotesLayer(
   //    stem or beam passes behind a glyph — the invariant the linter audits.
   if (o.rhythmStyle === 'beamed') {
     for (const beam of layout.beams) {
-      out.push(renderBeamGroup(beam.notes, t));
+      out.push(renderBeamGroup(beam.notes, t, beam));
     }
     for (const n of layout.ungrouped) out.push(renderRhythm(n, 'beamed', t));
   } else {

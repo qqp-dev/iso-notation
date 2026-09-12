@@ -68,17 +68,21 @@ export interface JankoCandidate {
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
- * settled the Klavarskribo beat grid; this round interrogates the Middle C
- * corridor itself, the one place where both hands' lattices meet.
+ * settled the Klavarskribo beat grid and round 3 the Middle C corridor. This
+ * round interrogates the octave row itself: whether the single equator should
+ * open into a **bounded center channel** that holds whole-tone Set A in its
+ * negative space and sends Set B to a contour-resolved flank.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 3,
-  title: 'Middle C Corridor Treatment',
+  round: 4,
+  title: 'Bounded Center Channel & Non-Inverting Contour',
   description:
-    'Both hand lattices meet on the 45pt Middle C corridor. Candidates vary how the spine ' +
-    'asserts that boundary (dashed whisper, continuous hairline, double rule) and how much air ' +
-    'the corridor is given. Judge them on the shared m. 1–2 window, where the spine, the ' +
-    'Position of Honor halo and the first crossing stems all appear at once.',
+    'The unified equator lattice now asks its last structural question: should the center row sit on a line, ' +
+    'or inside an open channel? Candidate A keeps the incumbent single equator (even rank below it, odd rank ' +
+    'above it, every step 15pt). Candidate B draws two boundary rules at ±6.5pt around every equator, holds ' +
+    'whole-tone Set A in the channel with zero line knockouts, and places each Set B note on the upper or lower ' +
+    'flank so that no rising step ever moves down the page. Judge them on mm. 1–2, where the opening 7–9–11 ' +
+    'ascent and the m. 2 neighbour 2–1–2 turn the contour around.',
 };
 
 /**
@@ -87,39 +91,21 @@ export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'corridor-dashed',
-    label: 'A · Dashed Whisper (Golden)',
+    id: 'equator-single',
+    label: 'A · Single Equator (Golden)',
     description:
-      'The accumulated golden master: a faint 4,4-dashed spine that marks the corridor without competing with the music.',
-    options: { middleCSpine: 'dashed', interStaffGap: 45.0 },
+      'The accumulated golden master: one rule per octave, whole-tone rank 0 a half-row below it and rank 1 a half-row above it — every row-to-row step an identical 15pt.',
+    options: { channelLayout: 'single-equator' },
     measureStart: 1,
     measureCount: 2,
     tags: ['incumbent'],
   },
   {
-    id: 'corridor-continuous',
-    label: 'B · Continuous Hairline',
+    id: 'channel-bounded',
+    label: 'B · Bounded Center Channel',
     description:
-      'One uninterrupted hairline: reads as a true axis of symmetry, at the cost of a little extra ink between the hands.',
-    options: { middleCSpine: 'continuous', interStaffGap: 45.0 },
-    measureStart: 1,
-    measureCount: 2,
-  },
-  {
-    id: 'corridor-double',
-    label: 'C · Double Rule',
-    description:
-      'Two 1.1pt-separated rules bracket the corridor and give the hands an unmistakable shared boundary.',
-    options: { middleCSpine: 'double', interStaffGap: 45.0 },
-    measureStart: 1,
-    measureCount: 2,
-  },
-  {
-    id: 'corridor-spacious',
-    label: 'D · Spacious Corridor',
-    description:
-      'Keeps the golden dashed spine but opens the inter-staff gap from 45pt to 54pt, buying 4.5pt of extra air above and below the corridor.',
-    options: { middleCSpine: 'dashed', interStaffGap: 54.0 },
+      'Two boundary rules at ±6.5pt frame an open 13pt channel: whole-tone Set A rides the negative space with zero line knockouts, and every Set B note takes the upper or lower flank the melodic contour asks for — a rising step is flat or up, never down.',
+    options: { channelLayout: 'bounded-channel' },
     measureStart: 1,
     measureCount: 2,
   },

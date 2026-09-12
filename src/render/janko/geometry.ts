@@ -23,6 +23,17 @@
  * Row parity (Jánko Equator Principle):
  * - whole-tone rank 0 (even pc) => `rowHeight / 2` **below** its equator;
  * - whole-tone rank 1 (odd pc)  => `rowHeight / 2` **above** its equator.
+ *
+ * Bounded Center Channel (`channelLayout: 'bounded-channel'`)
+ * ----------------------------------------------------------
+ * The single equator is replaced by two boundary rules at
+ * `equator ± channelHalfWidth`. Whole-tone Set A (rank 0) then sits **inside**
+ * the open channel (`offset 0.0`, zero line knockouts) and whole-tone Set B
+ * (rank 1) takes a flanking row at `-channelFlankOffset` (above the upper rule)
+ * or `+channelFlankOffset` (below the lower rule). Which flank a Set B note
+ * takes is resolved **globally** by {@link resolveChannelFlanks}, which picks
+ * the assignment that never contradicts the melodic contour (a rising step may
+ * never move down the page, `Δpitch > 0 => Δy <= 0`, and vice versa).
  */
 
 import { Hand } from '../../model/types';
@@ -38,6 +49,36 @@ import {
 /** Whole-tone rank of a pitch class: 0 for evens, 1 for odds. */
 export type JankoWholeToneRank = 0 | 1;
 
+/**
+ * Flank of the bounded center channel taken by a whole-tone Set B note:
+ * `'up'` = the row above the upper boundary rule (`-channelFlankOffset`),
+ * `'down'` = the row below the lower boundary rule (`+channelFlankOffset`).
+ */
+export type JankoChannelFlank = 'up' | 'down';
+
+/** Which band of its octave a notehead occupies. */
+export type JankoChannelSide = 'above' | 'below' | 'channel';
+
+/** Both flanks, in canonical order (upper first). */
+const CHANNEL_FLANKS: readonly JankoChannelFlank[] = ['up', 'down'];
+
+/** Contour cost vector, compared lexicographically. See {@link resolveChannelFlanks}. */
+type ChannelCost = readonly [contradictions: number, dishonours: number, zigzags: number, lowerFlanks: number];
+
+const ZERO_COST: ChannelCost = [0, 0, 0, 0];
+const INFINITE_COST: ChannelCost = [Infinity, Infinity, Infinity, Infinity];
+
+function addCost(a: ChannelCost, b: ChannelCost): ChannelCost {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]];
+}
+
+function compareCost(a: ChannelCost, b: ChannelCost): number {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return 0;
+}
+
 /** Full geometric resolution of one pitch on the Jánko Two-Row staff. */
 export interface JankoPitchCoordinate {
   pitchClass: number;
@@ -47,9 +88,14 @@ export interface JankoPitchCoordinate {
   rank: JankoWholeToneRank;
   /** Alias of {@link rank} (Jánko keyboard row index). */
   row: JankoWholeToneRank;
-  /** Which side of the octave equator the notehead sits on. */
-  side: 'above' | 'below';
-  /** Signed offset from the equator (-h/2 above, +h/2 below). */
+  /** Which band of its octave the notehead sits in. */
+  side: JankoChannelSide;
+  /**
+   * Flank resolved for a Set B (odd) notehead under the bounded center
+   * channel; `null` for Set A notes and for the single-equator layout.
+   */
+  flank: JankoChannelFlank | null;
+  /** Signed offset from the equator (single equator: ±h/2; channel: 0 / ∓offset). */
   offsetFromEquator: number;
   /** y of this pitch's octave equator, relative to the Middle C spine. */
   equatorY: number;
@@ -69,14 +115,176 @@ export function getWholeToneRank(pitchClass: number): JankoWholeToneRank {
   return (pc % 2) as JankoWholeToneRank;
 }
 
-/** Signed row offset from the octave equator (+h/2 below, -h/2 above). */
-export function getRowOffsetFromEquator(
+/**
+ * Voice of a note: its explicit hand, or the register default (octave >= 4 is
+ * played by the right hand). Shared by the layout engine and the contour.
+ */
+export function getNoteHand(hand: Hand | undefined, octave: number): Hand {
+  return hand ?? (octave >= 4 ? 'RH' : 'LH');
+}
+
+/**
+ * Signed offset from the octave equator under the bounded center channel.
+ *
+ * Whole-tone Set A (even pitch classes) sits **inside** the channel, exactly on
+ * the equator (offset `0.0`, so nothing can cut through the glyph). Whole-tone
+ * Set B (odd pitch classes) sits on the requested flank: `-channelFlankOffset`
+ * above the upper boundary rule for `'up'`, `+channelFlankOffset` below the
+ * lower rule for `'down'`.
+ */
+export function getChannelOffsetFromEquator(
   pitchClass: number,
+  flank: JankoChannelFlank = 'up',
   tokens?: Partial<JankoTokens> | null
 ): number {
   const t = resolveJankoTokens(tokens);
+  if (getWholeToneRank(pitchClass) === 0) return 0;
+  return flank === 'down' ? t.channelFlankOffset : -t.channelFlankOffset;
+}
+
+/**
+ * Signed row offset from the octave equator.
+ *
+ * Under the golden-master single equator the offset is pure parity: `+h/2`
+ * below for even pitch classes, `-h/2` above for odd ones. Under the bounded
+ * center channel the offset follows {@link getChannelOffsetFromEquator}, with
+ * `flank` supplying the contour-resolved side of a Set B note (see
+ * {@link resolveChannelFlanks}); `'up'` is the canonical fallback.
+ */
+export function getRowOffsetFromEquator(
+  pitchClass: number,
+  tokens?: Partial<JankoTokens> | null,
+  options?: Partial<JankoLayoutOptions> | null,
+  flank?: JankoChannelFlank | null
+): number {
+  const o = resolveJankoOptions(options);
+  if (o.channelLayout === 'bounded-channel') {
+    return getChannelOffsetFromEquator(pitchClass, flank ?? 'up', tokens);
+  }
+  const t = resolveJankoTokens(tokens);
   const halfRow = t.rowHeight / 2;
   return getWholeToneRank(pitchClass) === 0 ? halfRow : -halfRow;
+}
+
+/**
+ * Minimal melodic description the bounded-channel contour solver needs. A
+ * quantized score note satisfies it structurally, so no mapping is required.
+ */
+export interface JankoChannelContourNote {
+  id: string;
+  pitch: { pitchClass: number; octave: number };
+  startTick: number;
+  /** Explicit hand; when omitted the register default applies (see {@link getNoteHand}). */
+  hand?: Hand;
+}
+
+/** Absolute pitch in semitones, the ordering the contour is measured against. */
+function absolutePitch(note: JankoChannelContourNote): number {
+  const pc = ((note.pitch.pitchClass % 12) + 12) % 12;
+  return note.pitch.octave * 12 + pc;
+}
+
+/**
+ * Resolve the bounded-channel flank of **every** whole-tone Set B note of a
+ * score, voice by voice, so that the engraved contour never contradicts the
+ * pitch contour:
+ *
+ * ```
+ * Δpitch > 0  =>  Δy <= 0   (a rising step is flat or moves up the page)
+ * Δpitch < 0  =>  Δy >= 0   (a falling step is flat or moves down the page)
+ * ```
+ *
+ * A Set B note can only sit on one of two rows (`∓channelFlankOffset`), so the
+ * choice is a two-state shortest-path problem per voice; it is solved exactly
+ * with a forward dynamic program over the score's notes in tick order. Among
+ * the assignments that minimise contour contradictions the solver prefers, in
+ * order: the flank the local melodic direction asks for, no zigzag on a
+ * repeated pitch, and finally the canonical upper (odd-rank) flank.
+ *
+ * The result is a pure, deterministic function of the score and the tokens, so
+ * the layout engine, the visual linter and the tests all agree. Under the
+ * single-equator layout the map is empty (Set B keeps its parity offset).
+ */
+export function resolveChannelFlanks(
+  notes: readonly JankoChannelContourNote[],
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): Map<string, JankoChannelFlank> {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const flanks = new Map<string, JankoChannelFlank>();
+  if (o.channelLayout !== 'bounded-channel') return flanks;
+
+  const rows: readonly number[] = [-t.channelFlankOffset, t.channelFlankOffset];
+
+  for (const hand of ['RH', 'LH'] as const) {
+    const voice = notes
+      .filter((n) => getNoteHand(n.hand, n.pitch.octave) === hand)
+      .sort((a, b) => a.startTick - b.startTick || absolutePitch(a) - absolutePitch(b));
+    if (voice.length === 0) continue;
+
+    // Absolute y of a note on one flank, relative to the Middle C spine: the
+    // octave equator carries the register step, the flank carries the row.
+    const yOf = (note: JankoChannelContourNote, state: number): number =>
+      getEquatorYForOctave(note.pitch.octave, hand, t, o) +
+      (getWholeToneRank(note.pitch.pitchClass) === 0 ? 0 : rows[state]);
+
+    // cost[state] = cheapest contour so far, ending on flank `state`.
+    let cost: ChannelCost[] = [ZERO_COST, ZERO_COST];
+    const back: number[][] = [];
+
+    for (let i = 0; i < voice.length; i++) {
+      const note = voice[i];
+      const prev = i > 0 ? voice[i - 1] : null;
+      const inChannel = getWholeToneRank(note.pitch.pitchClass) === 0;
+      const dPitch = prev ? absolutePitch(note) - absolutePitch(prev) : 0;
+      const local: JankoChannelFlank | null =
+        dPitch > 0 ? 'up' : dPitch < 0 ? 'down' : null;
+      const next: ChannelCost[] = [INFINITE_COST, INFINITE_COST];
+      const previous: number[] = [-1, -1];
+
+      for (let state = 0; state < CHANNEL_FLANKS.length; state++) {
+        const flank = CHANNEL_FLANKS[state];
+        for (let prevState = 0; prevState < cost.length; prevState++) {
+          const carried = cost[prevState];
+          if (!Number.isFinite(carried[0])) continue;
+          let step = ZERO_COST;
+          if (prev) {
+            const dy = yOf(note, state) - yOf(prev, prevState);
+            step = [
+              (dPitch > 0 && dy > 1e-9) || (dPitch < 0 && dy < -1e-9) ? 1 : 0,
+              local !== null && !inChannel && flank !== local ? 1 : 0,
+              dPitch === 0 && !inChannel && Math.abs(dy) > 1e-9 ? 1 : 0,
+              !inChannel && flank === 'down' ? 1 : 0,
+            ];
+          } else if (!inChannel && flank === 'down') {
+            // The opening sound opens on its canonical upper flank.
+            step = [0, 1, 0, 1];
+          }
+          const candidate = addCost(carried, step);
+          if (compareCost(candidate, next[state]) < 0) {
+            next[state] = candidate;
+            previous[state] = prevState;
+          }
+        }
+      }
+
+      back.push(previous);
+      cost = next;
+    }
+
+    let state = compareCost(cost[0], cost[1]) <= 0 ? 0 : 1;
+    for (let i = voice.length - 1; i >= 0; i--) {
+      const note = voice[i];
+      if (getWholeToneRank(note.pitch.pitchClass) === 1) {
+        flanks.set(note.id, CHANNEL_FLANKS[state]);
+      }
+      const prevState = back[i][state];
+      state = prevState < 0 ? 0 : prevState;
+    }
+  }
+
+  return flanks;
 }
 
 /**
@@ -155,27 +363,42 @@ export function getLedgerEquators(
  *
  * The returned `y`/`equatorY` are relative to the Middle C spine; add the
  * system's absolute `middleCY` (see `JankoSystemGeometry`) to place the note
- * on a page.
+ * on a page. Under the bounded center channel, `flank` carries the
+ * contour-resolved side of a Set B note (see {@link resolveChannelFlanks}).
  */
 export function getPitchCoordinate(
   pitchClass: number,
   octave: number,
   hand: Hand,
   tokens?: Partial<JankoTokens> | null,
-  options?: Partial<JankoLayoutOptions> | null
+  options?: Partial<JankoLayoutOptions> | null,
+  flank?: JankoChannelFlank | null
 ): JankoPitchCoordinate {
+  const o = resolveJankoOptions(options);
   const pc = ((pitchClass % 12) + 12) % 12;
   const rank = getWholeToneRank(pc);
-  const offsetFromEquator = getRowOffsetFromEquator(pc, tokens);
-  const equatorY = getEquatorYForOctave(octave, hand, tokens, options);
-  const ledgerYs = getLedgerEquators(pc, octave, hand, tokens, options);
+  const bounded = o.channelLayout === 'bounded-channel';
+  const resolvedFlank: JankoChannelFlank | null = bounded && rank === 1 ? flank ?? 'up' : null;
+  const offsetFromEquator = getRowOffsetFromEquator(pc, tokens, o, resolvedFlank);
+  const equatorY = getEquatorYForOctave(octave, hand, tokens, o);
+  const ledgerYs = getLedgerEquators(pc, octave, hand, tokens, o);
+  const side: JankoChannelSide = bounded
+    ? rank === 0
+      ? 'channel'
+      : resolvedFlank === 'down'
+        ? 'below'
+        : 'above'
+    : rank === 0
+      ? 'below'
+      : 'above';
   return {
     pitchClass: pc,
     octave,
     hand,
     rank,
     row: rank,
-    side: rank === 0 ? 'below' : 'above',
+    side,
+    flank: resolvedFlank,
     offsetFromEquator,
     equatorY,
     y: equatorY + offsetFromEquator,

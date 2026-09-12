@@ -7,6 +7,13 @@
  * - Whole-tone rank 0 (even pitch classes 0, 2, 4, 6, 8, a) sits **below** its
  *   octave equator; whole-tone rank 1 (odd pitch classes 1, 3, 5, 7, 9, b)
  *   sits **above** it. Every row-to-row step is exactly `rowHeight` (15pt).
+ * - The *Bounded Center Channel* alternative
+ *   ({@link JankoLayoutOptions.channelLayout} = `'bounded-channel'`) replaces
+ *   the single equator by **two boundary rules** at `equator ±
+ *   channelHalfWidth`. Whole-tone Set A then sits in the open channel (offset
+ *   0.0pt, zero line knockouts) and every Set B note takes the upper
+ *   (`-channelFlankOffset`) or lower (`+channelFlankOffset`) flank according to
+ *   the melodic contour, so a rising step never moves down the page.
  * - The four equators o5 (−58pt), o4 (−28pt), o3 (+28pt) and o2 (+58pt) form
  *   the *grand staff*: one **absolute, hand-independent** coordinate lattice
  *   shared by both hands. Octaves step by exactly `octaveStep`
@@ -35,6 +42,17 @@ export type JankoRhythmStyle = 'angled-cuts' | 'horizontal-ticks' | 'beamed';
  * negative breathing space of `interStaffGap`, with no rule dividing the hands.
  */
 export type JankoMiddleCSpine = 'none' | 'dashed' | 'double' | 'continuous';
+
+/**
+ * How an octave is framed horizontally.
+ *
+ * - `'single-equator'` — the incumbent golden master: one rule per octave,
+ *   whole-tone rank 0 (`h/2`) below it and rank 1 (`h/2`) above it.
+ * - `'bounded-channel'` — two boundary rules at `equator ± channelHalfWidth`
+ *   open a channel for whole-tone Set A (offset 0.0pt, zero line knockouts);
+ *   Set B is placed on the upper or lower flank by the melodic contour.
+ */
+export type JankoChannelLayout = 'single-equator' | 'bounded-channel';
 
 /** Engraving token set: geometric and styling constants (all in pt). */
 export interface JankoTokens {
@@ -90,6 +108,20 @@ export interface JankoTokens {
    * the group keeps this clearance; the visual linter audits the same number.
    */
   minStemClearance?: number;
+  /**
+   * Half-height of the bounded center channel (pt): the two boundary rules of
+   * an octave sit at `equator ± channelHalfWidth`. The canonical 6.5pt leaves
+   * 1.7pt of clean air around the 4.8pt knockout disc of a Set A notehead.
+   * Only consulted when `channelLayout === 'bounded-channel'`.
+   */
+  channelHalfWidth?: number;
+  /**
+   * Distance (pt) from the octave equator to a Set B flank row (the rows above
+   * the upper rule and below the lower rule) under the bounded center channel.
+   * The canonical 13.0pt is exactly twice `channelHalfWidth`, so a flanking
+   * notehead clears the boundary rule by the same 1.7pt as a channel note.
+   */
+  channelFlankOffset?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -127,6 +159,8 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   flagHeight: 6.6,
   flagSpacing: 3.4,
   minStemClearance: 1.5,
+  channelHalfWidth: 6.5,
+  channelFlankOffset: 13.0,
 };
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */
@@ -139,6 +173,11 @@ export interface JankoLayoutOptions {
   interStaffGap: number;
   /** Middle C spine rendering style. */
   middleCSpine: JankoMiddleCSpine;
+  /**
+   * Octave framing: the incumbent single equator (golden master) or the
+   * bounded center channel (`equator ± channelHalfWidth`).
+   */
+  channelLayout: JankoChannelLayout;
 
   // --- Optional page/layout refinements (resolved from defaults) ---
   /** Horizontal systems stacked on one page. */
@@ -194,6 +233,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   rhythmStyle: 'beamed',
   interStaffGap: 56.0,
   middleCSpine: 'none',
+  channelLayout: 'single-equator',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   ticksPerBeat: 48,
@@ -222,8 +262,9 @@ export function resolveJankoTokens(tokens?: Partial<JankoTokens> | null): Resolv
 
 /**
  * Fill in every optional layout option with its canonical default.
- * `measuresPerSystem`, `rhythmStyle`, `interStaffGap` and `middleCSpine`
- * may be omitted as well, in which case the canonical values are used.
+ * `measuresPerSystem`, `rhythmStyle`, `interStaffGap`, `middleCSpine` and
+ * `channelLayout` may be omitted as well, in which case the canonical values
+ * are used.
  */
 export function resolveJankoOptions(
   options?: Partial<JankoLayoutOptions> | null

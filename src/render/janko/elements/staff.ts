@@ -2,14 +2,19 @@
  * Staff elements: octave equator lines, Middle C spine, subtle row guides and
  * dynamic ledger equators.
  *
- * Every octave is one equator line on one **absolute, hand-independent**
- * lattice: the four staff equators (o5/o4/o3/o2) are continuous rules shared by
- * both hands, spaced by `octaveStep` (2h = 30pt) above and below the *spacious
- * corridor* — `interStaffGap` (56pt by default) of negative breathing space
- * with **no** spine by default. Only octaves outside the staff span emit
- * dynamic ledger equators. Horizontal dotted row guidelines and the dashed
- * Middle C spine are opt-in; the only dotted lines in the canonical engraving
- * are the vertical beat-grid pulses.
+ * Every octave is one **absolute, hand-independent** lattice: the four staff
+ * equators (o5/o4/o3/o2) are continuous rules shared by both hands, spaced by
+ * `octaveStep` (2h = 30pt) above and below the *spacious corridor* —
+ * `interStaffGap` (56pt by default) of negative breathing space with **no**
+ * spine by default. Only octaves outside the staff span emit dynamic ledger
+ * equators. Horizontal dotted row guidelines and the dashed Middle C spine are
+ * opt-in; the only dotted lines in the canonical engraving are the vertical
+ * beat-grid pulses.
+ *
+ * Under `channelLayout: 'bounded-channel'` every equator is drawn as **two**
+ * boundary rules at `equator ± channelHalfWidth`, opening the channel that
+ * holds whole-tone Set A; the same pairing is applied to dynamic ledgers so an
+ * out-of-staff octave keeps its center row open too.
  */
 
 import {
@@ -37,6 +42,24 @@ export function renderRule(
 }
 
 /**
+ * Absolute ys of the horizontal rules that frame one octave equator.
+ *
+ * The single-equator layout paints one rule, exactly on the equator. The
+ * bounded center channel paints two, at `equator ± channelHalfWidth`, so the
+ * whole-tone Set A row sits in the open negative space between them.
+ */
+export function getEquatorRuleYs(
+  equatorY: number,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): number[] {
+  const o = resolveJankoOptions(options);
+  if (o.channelLayout !== 'bounded-channel') return [equatorY];
+  const t = resolveJankoTokens(tokens);
+  return [equatorY - t.channelHalfWidth, equatorY + t.channelHalfWidth];
+}
+
+/**
  * The four staff octave equators (o5, o4, o3, o2), shared by both hands, plus
  * the opt-in Middle C spine and row guidelines of every staff lane.
  */
@@ -50,12 +73,18 @@ export function renderStaffLines(
   const out: string[] = ['  <g class="janko-staff-lines">'];
 
   // Outer equators (o5, o2): lighter hairline.
-  out.push(renderRule(geo.staffLeft, geo.staffRight, geo.equatorY('RH', 5), '#1E293B', 0.70));
-  out.push(renderRule(geo.staffLeft, geo.staffRight, geo.equatorY('LH', 2), '#1E293B', 0.70));
-
   // Inner equators (o4, o3): the definitive octave boundaries of each hand.
-  out.push(renderRule(geo.staffLeft, geo.staffRight, geo.equatorY('RH', 4), '#0F172A', 0.90));
-  out.push(renderRule(geo.staffLeft, geo.staffRight, geo.equatorY('LH', 3), '#0F172A', 0.90));
+  const equators: Array<[Hand, number, string, number]> = [
+    ['RH', 5, '#1E293B', 0.70],
+    ['LH', 2, '#1E293B', 0.70],
+    ['RH', 4, '#0F172A', 0.90],
+    ['LH', 3, '#0F172A', 0.90],
+  ];
+  for (const [hand, oct, stroke, width] of equators) {
+    for (const y of getEquatorRuleYs(geo.equatorY(hand, oct), o, t)) {
+      out.push(renderRule(geo.staffLeft, geo.staffRight, y, stroke, width));
+    }
+  }
 
   out.push('  </g>');
   // Both are opt-in and resolve to the empty string when disabled, so no empty
@@ -134,16 +163,24 @@ export function renderMiddleCSpine(
 
 /**
  * One dynamic ledger equator segment, centred on a notehead whose octave lies
- * outside the grand staff (`octave < 2` or `octave > 5`).
+ * outside the grand staff (`octave < 2` or `octave > 5`). The bounded center
+ * channel emits the same pair of boundary rules as the staff equators, so an
+ * out-of-staff octave keeps its center row open as well.
  */
 export function renderLedgerEquator(
   x: number,
   y: number,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  options?: Partial<JankoLayoutOptions> | null
 ): string {
   const t = resolveJankoTokens(tokens);
   const hw = t.ledgerHalfWidth;
-  return `    <line class="janko-ledger" x1="${f(x - hw)}" y1="${f(y)}" x2="${f(x + hw)}" y2="${f(y)}" stroke="#334155" stroke-width="0.75"/>`;
+  return getEquatorRuleYs(y, options, t)
+    .map(
+      (ruleY) =>
+        `    <line class="janko-ledger" x1="${f(x - hw)}" y1="${f(ruleY)}" x2="${f(x + hw)}" y2="${f(ruleY)}" stroke="#334155" stroke-width="0.75"/>`
+    )
+    .join('\n');
 }
 
 /** Left-margin octave labels for the four staff equators. */

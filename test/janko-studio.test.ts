@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
-import { renderJankoPage } from '../src/render/janko/engine';
+import { renderJankoPage, renderJankoVariantComparison } from '../src/render/janko/engine';
 import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
@@ -71,25 +71,92 @@ test('renderCandidatesView renders every registry candidate with label, badges a
       assert.ok(html.includes(badge.key), `${candidate.id} badge ${badge.key}`);
     }
   }
-  assert.match(html, /Round 3/);
-  assert.match(html, /Middle C Corridor Treatment/);
+  assert.match(html, /Round 4/);
+  assert.match(html, /Bounded Center Channel/);
+});
+
+test('Round 4 registry declares the incumbent equator and the bounded channel', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 4);
+  assert.match(CURRENT_ROUND_METADATA.title, /Bounded Center Channel/);
+  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+  assert.deepEqual(ids, ['equator-single', 'channel-bounded'], 'candidate A then candidate B');
+  assert.equal(CURRENT_CANDIDATES[0].measureStart, 1, 'the matrix compares mm. 1–2');
+  assert.equal(CURRENT_CANDIDATES[0].measureCount, 2);
+  assert.equal(resolveCandidate(getCandidate('equator-single')!).options.channelLayout, 'single-equator');
+  assert.equal(
+    resolveCandidate(getCandidate('channel-bounded')!).options.channelLayout,
+    'bounded-channel'
+  );
+  // Candidate B keeps the canonical channel geometry: no token delta needed.
+  const bounded = resolveCandidate(getCandidate('channel-bounded')!);
+  assert.equal(bounded.tokens.channelHalfWidth, DEFAULT_JANKO_TOKENS.channelHalfWidth);
+  assert.equal(bounded.tokens.channelFlankOffset, DEFAULT_JANKO_TOKENS.channelFlankOffset);
+  assert.equal(candidateBadges(getCandidate('equator-single')!)[0].key, 'baseline');
+});
+
+test('Round 4 candidates export cleanly to the contact sheet', () => {
+  const specs = CURRENT_CANDIDATES.map((candidate) => ({
+    id: candidate.id,
+    label: candidate.label,
+    options: resolveCandidate(candidate).options,
+  }));
+  const sheet = renderJankoVariantComparison(
+    SCORE,
+    specs,
+    1,
+    2,
+    DEFAULT_JANKO_OPTIONS,
+    DEFAULT_JANKO_TOKENS
+  );
+  assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one contact sheet document');
+  for (const candidate of CURRENT_CANDIDATES) {
+    assert.ok(sheet.includes(`data-variant="${candidate.id}"`), `${candidate.id} panel`);
+    assert.ok(sheet.includes(candidate.label), `${candidate.id} label`);
+  }
+  // The two panels must be genuinely different engravings: candidate B frames
+  // each octave with two boundary rules, candidate A with one.
+  const panelBody = (variantId: string): string => {
+    const start = sheet.indexOf(`data-variant="${variantId}"`);
+    const next = sheet.indexOf('data-variant="', start + 1);
+    return sheet.slice(start, next === -1 ? undefined : next);
+  };
+  const staffRules = (variantId: string): number => {
+    const group = panelBody(variantId).match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)?.[0] ?? '';
+    return (group.match(/<line/g) ?? []).length;
+  };
+  assert.equal(staffRules('equator-single'), 4, 'four single equators');
+  assert.equal(staffRules('channel-bounded'), 8, 'four equators, two rules each');
 });
 
 test('Candidate previews honour their own option deltas', () => {
   const html = renderCandidatesView(CONFIG);
-  // Middle C spine treatments are distinguishable in the emitted SVG.
-  const dashed = getCandidate('corridor-dashed');
-  const continuous = getCandidate('corridor-continuous');
-  const double = getCandidate('corridor-double');
-  assert.ok(dashed && continuous && double);
-  assert.equal(resolveCandidate(dashed).options.middleCSpine, 'dashed');
-  assert.equal(resolveCandidate(continuous).options.middleCSpine, 'continuous');
-  assert.equal(resolveCandidate(double).options.middleCSpine, 'double');
-  assert.match(html, /spine dashed · gap 45\.0pt/);
-  assert.match(html, /spine continuous · gap 45\.0pt/);
-  assert.match(html, /spine dashed · gap 54\.0pt/, 'spacious corridor candidate');
+  // The two Round-4 candidates differ in exactly one option: the channel.
+  const single = getCandidate('equator-single');
+  const bounded = getCandidate('channel-bounded');
+  assert.ok(single && bounded);
+  assert.equal(resolveCandidate(single).options.channelLayout, 'single-equator');
+  assert.equal(resolveCandidate(bounded).options.channelLayout, 'bounded-channel');
+  assert.match(html, /<b>channelLayout<\/b> = bounded-channel/);
+  assert.match(html, /<b>baseline<\/b> = golden master/, 'candidate A is the untouched golden master');
+  assert.match(html, /single equator/);
+  assert.match(html, /bounded channel ±6\.5pt · flanks ∓13\.0pt/);
   assert.match(html, /badge-delta/, 'deltas against the golden master are highlighted');
   assert.match(html, /chip chip-(warn|ok|error)/, 'every candidate carries a lint verdict');
+
+  const cardOf = (id: string): string => {
+    const card = html.slice(html.indexOf(`data-candidate="${id}"`));
+    return card.slice(0, card.indexOf('</article>'));
+  };
+  const staffRules = (card: string): number => {
+    const group = card.match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)?.[0] ?? '';
+    return (group.match(/<line/g) ?? []).length;
+  };
+  assert.equal(staffRules(cardOf('equator-single')), 4, 'the incumbent paints one rule per octave');
+  assert.equal(staffRules(cardOf('channel-bounded')), 8, 'the channel paints two rules per octave');
+  // Both candidates are structurally sound: the bounded channel keeps the
+  // Middle C corridor beam-free, so neither card is flagged with violations.
+  assert.match(cardOf('equator-single'), /data-lint="clean"/);
+  assert.match(cardOf('channel-bounded'), /data-lint="clean"/);
 });
 
 // ---------------------------------------------------------------------------
@@ -229,7 +296,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.ok(CURRENT_ROUND_METADATA.round >= 1);
+  assert.equal(CURRENT_ROUND_METADATA.round, 4);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 4, '2–4 candidates');

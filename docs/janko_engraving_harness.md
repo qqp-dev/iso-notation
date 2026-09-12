@@ -32,7 +32,7 @@ Implementers verify the same engraving **without rendering anything**:
 
 ```bash
 npm run lint:engraving            # ~25 ms, JSON/strict/quiet flags available
-npm test                          # 147 tests, < 1.5 s, includes the linter + studio suites
+npm test                          # 157 tests, < 1.5 s, includes the linter + studio suites
 ```
 
 ---
@@ -98,6 +98,9 @@ src/render/janko/
 | Stem column | `stemX === note.x` (centred on the notehead, both hands) |
 | Flag hook reach / drop | `4.0 pt` right of the stem / `6.6 pt` from the tip |
 | Minimum head-to-beam air | `noteheadRadius + minStemClearance` = 6.3 pt |
+| Bounded center channel (Round 4) | two rules at `equator ± 6.5 pt`; Set A on the equator (offset 0.0 pt), Set B at `∓13.0 pt` |
+| Channel boundary clearance | `6.5 − 4.8 = 1.7 pt` of clean air around every notehead disc |
+| Channel contour | `Δpitch > 0 ⇒ Δy ≤ 0`, `Δpitch < 0 ⇒ Δy ≥ 0` — never inverted |
 
 `getEquatorYForOctave` resolves **one** coordinate per octave, identical for both
 hands: `octave >= 4` maps to `-halfGap - (octave - 4) * 30`, `octave <= 3` to
@@ -110,12 +113,37 @@ ledger equators** — one per intervening octave, nearest first. A beam whose
 connector passes a foreign notehead of the shared staff is pushed uniformly
 further away from its own heads until every such head keeps 6.3 pt of air.
 
+### Bounded center channel (`channelLayout: 'bounded-channel'`)
+
+`DEFAULT_JANKO_OPTIONS.channelLayout` is `'single-equator'`: the golden master is
+untouched, and its engraving is byte-identical with the channel code in place.
+The alternative framing opens every octave into a **13 pt channel**:
+
+- `renderStaffLines` paints **two** boundary rules per staff octave — and
+  `renderLedgerEquator` two per dynamic ledger — at `equator ± channelHalfWidth`
+  (6.5 pt), so whole-tone Set A sits in the negative space with **zero line
+  knockouts**.
+- `resolveChannelFlanks(notes, options, tokens)` resolves the side of every
+  whole-tone Set B note (odd pitch classes) **per voice** with a two-state
+  dynamic program over the score in tick order: `'up'` = the row above the upper
+  rule (`-channelFlankOffset`), `'down'` = the row below the lower rule
+  (`+channelFlankOffset`). Among the assignments that minimise contour
+  contradictions the solver prefers, in order, the flank the local melodic
+  direction asks for, no zigzag on a repeated pitch, and finally the canonical
+  upper (odd-rank) row.
+- The solver is exact and pure, so the layout engine, the linter and the tests
+  agree: on the canonical Bach score all 547 same-hand steps satisfy
+  `Δpitch > 0 ⇒ Δy ≤ 0` and `Δpitch < 0 ⇒ Δy ≥ 0`, with 176 of them absorbed as
+  **flat** steps inside the channel.
+
 ### Tokens and options
 
 `JankoTokens` (`rowHeight`, `noteheadRadius`, `haloRadius`, `octaveStep`,
-`accoladeWidth`, `accoladeThick`, `fontFamily`, plus rhythm/spacing
-refinements) and `JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`,
-`interStaffGap`, `middleCSpine`, `showRowGuidelines`, page/header/footer geometry) are the **only**
+`channelHalfWidth` = 6.5, `channelFlankOffset` = 13.0, `accoladeWidth`,
+`accoladeThick`, `fontFamily`, plus rhythm/spacing refinements) and
+`JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`, `interStaffGap`,
+`middleCSpine`, `channelLayout` = `'single-equator' | 'bounded-channel'`,
+`showRowGuidelines`, page/header/footer geometry) are the **only**
 places layout constants live. Every renderer accepts partial overrides and
 resolves them against `DEFAULT_JANKO_TOKENS` / `DEFAULT_JANKO_OPTIONS`.
 
@@ -173,7 +201,13 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 - **Elevated beams** — `computeBeamGroupGeometry` clamps the slope first, then
   raises (RH) or lowers (LH) the baseline until the extreme notehead in the stem
   direction keeps a full `stemLength`; every other stem in the group is longer.
-  Ascending/descending runs therefore never see the beam cut through a head.
+  Ascending/descending runs therefore never see the beam cut through a head. The
+  same uniform push clears every foreign notehead of the shared staff by
+  `noteheadRadius + minStemClearance`, and — when the system's Middle C spine is
+  handed to the solver — keeps the connector entirely out of the corridor
+  (`BEAM_SPINE_CLEARANCE` = 2.0 pt, the linter's `corridorClearance`). The
+  renderer draws the **resolved** geometry it is given, so the painted connector
+  is exactly the one the solver and the linter reason about.
 - **No straddling beams** — `partitionBeamGroups` splits a run when a longer
   value of the same hand sits between two beamable notes, so a connector never
   crosses a notehead that is not part of its own group.
@@ -216,7 +250,7 @@ fallback.
 ## 4. Verification
 
 ```bash
-npm test                          # 136 tests, < 1.5 s
+npm test                          # 157 tests, < 1.5 s
 npm run lint:engraving            # visual lint of the golden master
 npm run janko:export              # refresh the mobile-app PNG artifacts
 npm run build                     # tsc + vite (index.html + janko.html entries)
@@ -224,9 +258,9 @@ npm run build                     # tsc + vite (index.html + janko.html entries)
 
 | Suite | Locks |
 | --- | --- |
-| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
-| `test/janko-linter.test.ts` | the report contract, the clean golden master, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
-| `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
+| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), the bounded center channel (option/token schema, two boundary rules per equator, Set A in the channel, direction-resolved Set B flanks, zero contour contradictions on the canonical score), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
+| `test/janko-linter.test.ts` | the report contract, the clean golden master, the clean bounded channel, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
+| `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the Round-4 registry (incumbent vs bounded channel), the contact sheet, the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test
 (Bach Variation 1 m. 8 does not contain that literal figure); the exported
