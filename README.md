@@ -51,7 +51,7 @@ On a 4-row Jánko keyboard:
    - **J.S. Bach**: *Goldberg Variations*, BWV 988 — **Variation 1** (dynamic two-part hand-crossing counterpoint, wide register leaps, motoric 16th notes).
 4. **Tailscale-Accessible Mobile Workbench**:
    - Touch-friendly interface with pinch-to-zoom, panning, and collapsible controls drawer for mobile devices.
-   - Configured for Tailscale access at `http://100.102.70.49:5173`.
+   - Configured for Tailscale access at `http://100.102.70.49:5175`.
 
 ---
 
@@ -76,7 +76,7 @@ npm test
 npm run build
 ```
 
-When running, the workbench is available locally at `http://localhost:5173` and across your Tailscale mesh at `http://100.102.70.49:5173`.
+When running, the workbench is available locally at `http://localhost:5175` and across your Tailscale mesh at `http://100.102.70.49:5175`.
 
 ---
 

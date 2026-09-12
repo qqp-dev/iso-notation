@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regenerates the definitive documentation crops for the horizontal portrait engraving.
+ * Regenerates the definitive documentation crops for the horizontal landscape engraving.
  *
  * Usage: npx tsx scripts/render-docs-crops.ts
  *
@@ -9,7 +9,7 @@
  *   docs/img/definitive_m4.png               (RH-in-bass upward chevrons)
  *   docs/img/definitive_m6.png               (continuous Middle C hold line)
  *   docs/img/definitive_m30.png              (LH-in-treble downward chevrons)
- *   docs/img/horizontal_portrait_page1.png   (full first page of the 2-page spread)
+ *   docs/img/horizontal_portrait_page1.png   (full first page of the 3-page landscape spread)
  */
 
 import { execFileSync } from 'node:child_process';
@@ -97,7 +97,7 @@ function main(): void {
     console.log(`  ✓ ${name} (${Math.round(box.w * pixelsPerPt)} × ${Math.round(box.h * pixelsPerPt)}px)`);
   };
 
-  console.log('Rendering horizontal portrait documentation crops...');
+  console.log('Rendering horizontal landscape documentation crops...');
 
   // Measures 1–2: vertical accolade, opening halo, clean measure numbering
   write('definitive_m1_m2.png', 0, measureBox(layout, 0, 0, 0, 2, { left: 22, right: 8 }));
@@ -108,10 +108,10 @@ function main(): void {
   // Measure 6: continuous Royal Blue Middle C hold line (system 2 of page 1)
   write('definitive_m6.png', 0, measureBox(layout, 0, 1, 1, 1, { left: 8, right: 8 }));
 
-  // Measure 30: LH-in-treble downward chevrons (system 8 → page 2, system slot 4)
-  write('definitive_m30.png', 1, measureBox(layout, 1, 3, 1, 1, { left: 8, right: 8 }));
+  // Measure 30: LH-in-treble downward chevrons (system 8 → page 3, system slot 2)
+  write('definitive_m30.png', 2, measureBox(layout, 2, 1, 1, 1, { left: 8, right: 8 }));
 
-  // Full first page of the 2-page zero-turn spread
+  // Full first page of the 3-page landscape spread
   write(
     'horizontal_portrait_page1.png',
     0,

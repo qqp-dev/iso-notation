@@ -196,7 +196,7 @@ async function main(): Promise<void> {
   console.log(`• Paper Format:     ${options.paperSize.toUpperCase()} (${options.paperSize === 'letter' ? '8.5 × 11 in' : '210 × 297 mm'})`);
   console.log(`• Morphology:       ${options.morphology}`);
   console.log(`• Color Mode:       ${options.colorMode.toUpperCase()}`);
-  console.log(`• Layout:           4 Measures/System, 4 Systems/Page (Horizontal Portrait Urtext)`);
+  console.log(`• Layout:           4 Measures/System, 3 Systems/Page (Horizontal Landscape Urtext)`);
   console.log(`• Mode:             ${options.dryRun ? 'DRY-RUN (Simulated)' : 'PRODUCTION PRINT'}\n`);
 
   console.log('1. Computing horizontal system engraving layout...');
