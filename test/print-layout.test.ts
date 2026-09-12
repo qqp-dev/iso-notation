@@ -10,6 +10,7 @@ import {
   getSystemGeometry,
   getVerticalAccoladePath,
   ACCOLADE_WIDTH_PT,
+  ACCOLADE_OFFSET_LEFT_PT,
   ACCOLADE_GAP_PT,
   ACCOLADE_THICKNESS_PT,
   NOTEHEAD_KNOCKOUT_RADIUS_PT,
@@ -192,15 +193,16 @@ test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach 
   );
 });
 
-test('Classical Vertical Accolade Invariant: 8pt slender copperplate curly brace clasping o1–o5 on the left margin', () => {
+test('Classical Vertical Accolade Invariant: slender copperplate curly brace clasping o1–o5 on the left margin', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  // Classical curly brace proportions: 8.0pt reach, 2.0pt swell, 8.0pt margin gap
-  assert.equal(ACCOLADE_WIDTH_PT, 8.0, 'Accolade reach must be 8.0pt');
-  assert.equal(ACCOLADE_THICKNESS_PT, 2.0, 'Accolade swell must be 2.0pt');
+  // Classical curly brace proportions: 7.5pt reach, 1.9pt swell, 8.0pt margin gap, 1.8pt offset
+  assert.equal(ACCOLADE_WIDTH_PT, 7.5, 'Accolade reach must be 7.5pt');
+  assert.equal(ACCOLADE_THICKNESS_PT, 1.9, 'Accolade swell must be 1.9pt');
   assert.equal(ACCOLADE_GAP_PT, 8.0, 'Accolade gap must be 8.0pt');
+  assert.equal(ACCOLADE_OFFSET_LEFT_PT, 1.8, 'Accolade offset must be 1.8pt');
 
   // The exported path generator is deterministic and spans the requested vertical range
   const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 11.0, 2.4);
@@ -229,7 +231,7 @@ test('Classical Vertical Accolade Invariant: 8pt slender copperplate curly brace
   assert.match(path, /^M [\d.]+ [\d.]+ C [^"]+ Z$/, 'Accolade must be a closed sculptural path');
   assert.equal(
     path,
-    getVerticalAccoladePath(geo0.staffLeftPt, geo0.staffTopY, geo0.staffBotY, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT),
+    getVerticalAccoladePath(geo0.staffLeftPt - ACCOLADE_OFFSET_LEFT_PT, geo0.staffTopY, geo0.staffBotY, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT),
     'Rendered accolade must use the classical calligraphic curly brace geometry'
   );
 
@@ -260,15 +262,15 @@ test('Classical Vertical Accolade Invariant: 8pt slender copperplate curly brace
     `Accolade cusp must point at Middle C y(48) = ${y48.toFixed(2)}`
   );
 
-  // Brace tips clasp the open staff at staffLeftPt
-  assert.ok(Math.abs(maxX - geo0.staffLeftPt) < 0.01, 'Accolade tips must clasp the staff at staffLeft');
+  // Brace tips clasp the open staff at staffLeftPt - ACCOLADE_OFFSET_LEFT_PT
+  assert.ok(Math.abs(maxX - (geo0.staffLeftPt - ACCOLADE_OFFSET_LEFT_PT)) < 0.01, 'Accolade tips must clasp at staffLeft - offset');
   assert.ok(minX > 0, 'Accolade must remain inside the paper');
   assert.ok(
     Math.abs(geo0.staffLeftPt - (marginPt + ACCOLADE_WIDTH_PT + ACCOLADE_GAP_PT)) < 0.01,
     'The staff must open exactly one accolade + gap from the margin'
   );
 
-  // Classical curly brace aspect ratio (~1:10 to 1:20)
+  // Classical curly brace aspect ratio (~1:10 to 1:30)
   const width = maxX - minX;
   const aspect = (geo0.staffBotY - geo0.staffTopY) / width;
   assert.ok(aspect > 10 && aspect < 30, `Accolade aspect ratio must be elegant (got 1:${aspect.toFixed(1)})`);
@@ -305,13 +307,14 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
     assert.ok(Math.abs(spineLines[0].x1 - geo.staffLeftPt) < 0.01, 'Spine must emerge cleanly from the accolade at the staff head');
     assert.ok(Math.abs(spineLines[0].x2 - geo.staffRightPt) < 0.01, 'Spine must run to the page margin');
 
-    // 2. Octaves (p = 24, 36, 60, 72): solid horizontal lines (0.65pt, #000000)
+    // 2. Octaves: outer octaves (p = 24, 72) at 0.70pt; inner octaves (p = 36, 60) at 0.60pt
     for (const octavePitch of [24, 36, 60, 72]) {
       const y = round2(geo.yForPitch(octavePitch));
+      const expectedWidth = (octavePitch === 24 || octavePitch === 72) ? '0.7' : '0.6';
       const octaveLines = lines.filter(
-        (l) => l.y1 === l.y2 && l.stroke === '#000000' && l.width === '0.65' && round2(l.y1) === y
+        (l) => l.y1 === l.y2 && l.stroke === '#000000' && l.width === expectedWidth && round2(l.y1) === y
       );
-      assert.equal(octaveLines.length, 1, `System ${s + 1} octave line p=${octavePitch} must be horizontal`);
+      assert.equal(octaveLines.length, 1, `System ${s + 1} octave line p=${octavePitch} must be horizontal with width ${expectedWidth}`);
     }
 
     // 3. Landmark 4 (p = 28, 40, 52, 64): small horizontal dashed lines (0.6pt, #444444, [5, 2.5])
@@ -571,7 +574,7 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
           x2: round2(holdEndX),
           y: round2(ny),
           stroke: getPrintDurationColor(note.durationTicks, tauRef),
-          width: lp === 48 ? '1.05' : '0.65',
+          width: lp === 48 ? '1.05' : (lp <= 24 || lp >= 72 ? '0.7' : '0.6'),
           cap: 'butt',
         });
       } else {
@@ -682,11 +685,11 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
     for (const p of [24, 36, 60, 72]) octaveYs.add(round2(geo.yForPitch(p)));
   }
   for (const trail of lineTrails) {
-    assert.ok(trail.width === '0.65' || trail.width === '1.05', 'Staff-line trails match staff line width');
+    assert.ok(trail.width === '0.6' || trail.width === '0.7' || trail.width === '1.05', 'Staff-line trails match staff line width');
     if (trail.width === '1.05') {
       assert.ok(middleCYs.has(round2(trail.y1)), 'Middle C trails must render at 1.05pt on the bold spine');
     } else {
-      assert.ok(octaveYs.has(round2(trail.y1)), 'Other staff-line trails must render at 0.65pt on octave lines');
+      assert.ok(octaveYs.has(round2(trail.y1)), 'Other staff-line trails must render at 0.6pt or 0.7pt on octave lines');
     }
   }
 

@@ -38,11 +38,13 @@ export const OPENING_HALO_RADIUS_PT = 4.75;
 /** Noble Urtext Gold stroke for the opening sound position of honor halo ring. */
 export const OPENING_HALO_STROKE = '#D4AF37';
 /** Classical architectural reach of the vertical accolade cusp from the staff edge. */
-export const ACCOLADE_WIDTH_PT = 8.0;
+export const ACCOLADE_WIDTH_PT = 7.5;
+/** Delicate margin offset giving breathing gap between accolade tips and staff lines. */
+export const ACCOLADE_OFFSET_LEFT_PT = 1.8;
 /** Margin breathing gap accommodating the classical accolade on System 1. */
 export const ACCOLADE_GAP_PT = 8.0;
 /** Delicate calligraphic swell of the accolade in its lobe bellies. */
-export const ACCOLADE_THICKNESS_PT = 2.0;
+export const ACCOLADE_THICKNESS_PT = 1.9;
 
 const HEADER_HEIGHT_PT = 18;
 const FOOTER_HEIGHT_PT = 0;
@@ -690,7 +692,8 @@ function getHorizontalStaffLine(p: number, normStyle: StaffStyle): HorizontalSta
   if (normStyle === 'tritone-split') {
     if (pc === 0) {
       if (p === 48) return { stroke: '#000000', width: 1.05, isSpine: true };
-      return { stroke: '#000000', width: 0.65, isSpine: false };
+      if (p <= 24 || p >= 72) return { stroke: '#000000', width: 0.70, isSpine: false };
+      return { stroke: '#000000', width: 0.60, isSpine: false };
     }
     if (pc === 4) {
       return { stroke: '#444444', width: 0.6, dashArray: '5,2.5', isSpine: false };
@@ -704,7 +707,10 @@ function getHorizontalStaffLine(p: number, normStyle: StaffStyle): HorizontalSta
     return { stroke: '#444444', width: 0.6, dashArray: geom.dashArray.join(','), isSpine: false };
   }
   if (p === 48) return { stroke: '#000000', width: 1.05, isSpine: true };
-  if (pc === 0) return { stroke: '#000000', width: 0.65, isSpine: false };
+  if (pc === 0) {
+    if (p <= 24 || p >= 72) return { stroke: '#000000', width: 0.70, isSpine: false };
+    return { stroke: '#000000', width: 0.60, isSpine: false };
+  }
   return { stroke: '#555555', width: 0.6, isSpine: false };
 }
 
@@ -824,7 +830,7 @@ export function renderPageToSvg(
 
       // Authentic Classical Accolade Curly Brace clasping o5 to o1
       svgParts.push(`    <!-- Classical Vertical Accolade (Curly Brace) clasping o1 to o5 -->`);
-      svgParts.push(`    <path class="accolade" d="${getVerticalAccoladePath(staffLeft, staffTop, staffBot, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT)}" fill="#111827"/>`);
+      svgParts.push(`    <path class="accolade" d="${getVerticalAccoladePath(staffLeft - ACCOLADE_OFFSET_LEFT_PT, staffTop, staffBot, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT)}" fill="#111827"/>`);
     } else {
       // Regular start for subsequent systems
       svgParts.push(`    <!-- Urtext Measure Number in Dedicated Left Margin -->`);
@@ -993,7 +999,7 @@ export function renderPageToSvg(
 
       if (pc12(lp) === 0) {
         if (holdEndX - holdStartX < 1.5) continue;
-        const strokeW = lp === 48 ? '1.05' : '0.65';
+        const strokeW = lp === 48 ? '1.05' : (lp <= 24 || lp >= 72 ? '0.7' : '0.6');
         svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="${strokeW}" stroke-linecap="butt"/>`);
       } else {
         holdStartX = nx + effectiveRadius + 0.4;
