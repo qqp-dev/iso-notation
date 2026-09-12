@@ -21,7 +21,13 @@ import { fileURLToPath } from 'node:url';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { JankoSystemLayout, layoutJankoScore, renderSystem, computePageGeometry, getSystemGeometry } from '../src/render/janko/engine';
-import { getStemGeometry } from '../src/render/janko/elements/rhythm';
+import { getStemAttachmentRadius, getStemGeometry } from '../src/render/janko/elements/rhythm';
+import {
+  JANKO_DIGIT_BASELINE_OFFSET,
+  digitBaselineOffset,
+  digitHalfExtents,
+  isPositionOfHonor,
+} from '../src/render/janko/elements/notehead';
 import {
   DEFAULT_JANKO_LINT_OPTIONS,
   JANKO_LINT_CHECKS,
@@ -31,10 +37,13 @@ import {
   checkAccoladeClearance,
   checkBarlineClearance,
   checkBeamNoteheadClearance,
+  checkHaloClearance,
+  checkKnockoutCoverage,
   checkMeasureNumeralClearance,
   checkMiddleCCorridor,
   checkNoteheadClearance,
   checkStemAndBeamValidity,
+  checkStemDigitClearance,
   formatLintReport,
   lintJankoScore,
 } from '../src/render/janko/linter';
@@ -44,6 +53,25 @@ const REPO_ROOT = path.resolve(HERE, '..');
 
 const SCORE = buildBachGoldbergVar1Score();
 const LINT = DEFAULT_JANKO_LINT_OPTIONS;
+const TOKENS = DEFAULT_JANKO_TOKENS;
+const R = TOKENS.noteheadRadius;
+const HALO_R = TOKENS.haloRadius;
+/** Canonical flush stem attachment radii (regular heads / tick-0 honor sounds). */
+const REGULAR_ATTACH = R + 0.2;
+const HONOR_ATTACH = HALO_R + 0.4;
+
+// --- Tiny document fixtures for the paint-order audit -----------------------
+
+const knockout = (cx: number, cy: number, r: number = R): string =>
+  `<circle class="janko-knockout" cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`;
+const digit = (cx: number, cy: number): string =>
+  `<text class="janko-digit" x="${cx}" y="${(cy + JANKO_DIGIT_BASELINE_OFFSET).toFixed(2)}" font-size="${TOKENS.digitFontSize}pt">7</text>`;
+const halo = (cx: number, cy: number, r: number = HALO_R): string =>
+  `<circle class="janko-halo" cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="none" stroke="#111111" stroke-width="0.75"/>`;
+const stem = (x: number, y1: number, y2: number): string =>
+  `<line class="janko-stem" x1="${x}" y1="${y1.toFixed(2)}" x2="${x}" y2="${y2.toFixed(2)}" stroke="#111"/>`;
+/** Stem direction of a hand: -1 = RH (up), +1 = LH (down). */
+const dir = (hand: string): number => (hand === 'RH' ? -1 : 1);
 
 function run(
   check: (layout: JankoSystemLayout, out: LintViolation[]) => void,
@@ -160,24 +188,116 @@ test('Defect: shrinking the knockout below the glyph box is caught', () => {
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, tiny);
   const undersized = report.violations.filter((v) => v.code === 'knockout-undersized');
   assert.equal(undersized.length, SCORE.notes.length, 'every notehead reports its undersized mask');
-  assert.match(undersized[0].message, /cannot shield the 6.5pt digit/);
+  assert.match(
+    undersized[0].message,
+    new RegExp(`cannot shield the ${DEFAULT_JANKO_TOKENS.digitFontSize}pt digit`)
+  );
   assert.ok(undersized[0].metrics!.required > undersized[0].metrics!.radius);
+  assert.ok(undersized[0].metrics!.vertical < 0, 'the glyph overflows the mask vertically');
 });
 
-test('Defect: a stem that no longer reaches into its own disc is caught', () => {
-  // Centred stems anchor 1.5pt from the notehead centre, so only a knockout
-  // smaller than that hairline attachment offset can leave the stem floating.
-  const tokens = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 1.2 };
+test('Golden master: every digit keeps ≥1.2pt of white inside its knockout disc', () => {
+  const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
   const out: LintViolation[] = [];
-  checkStemAndBeamValidity(systems(DEFAULT_JANKO_OPTIONS, tokens)[0], tokens, LINT, out);
+  for (const layout of systems()) {
+    checkKnockoutCoverage(layout, TOKENS, LINT, out);
+  }
+  assert.deepEqual(out, [], 'the canonical mask shields every digit on every side');
+  assert.ok(R - halfWidth >= LINT.digitClearance, 'left/right margin');
+  assert.ok(R - halfHeight >= LINT.digitClearance, 'top/bottom margin');
+  assert.ok(R - Math.hypot(halfWidth, halfHeight) >= LINT.digitClearance, 'corner margin');
+
+  // The check is a real gate: a 3.0pt mask cannot hold the digit.
+  const tight = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 3.0 };
+  const tightOut: LintViolation[] = [];
+  checkKnockoutCoverage(systems(DEFAULT_JANKO_OPTIONS, tight)[0], tight, LINT, tightOut);
+  assert.ok(tightOut.length > 0);
+  assert.ok(tightOut.every((v) => v.code === 'knockout-undersized'));
+});
+
+test('Defect: a stem that starts inside its circle (or floats off it) is caught', () => {
+  const layout = systems()[0];
+  // Pull each notehead's rhythm anchor inward: the stem then emerges *inside*
+  // the knockout disc — or, for the tick-0 sounds, inside the halo ring.
+  const inside: JankoSystemLayout = {
+    ...layout,
+    notes: layout.notes.map((p, i) =>
+      i < 2 ? { ...p, rhythm: { ...p.rhythm, y: p.y - dir(p.rhythm.hand) * 4 } } : p
+    ),
+  };
+  const out: LintViolation[] = [];
+  checkStemAndBeamValidity(inside, TOKENS, LINT, out);
   const detached = out.filter((v) => v.code === 'stem-detached');
-  assert.ok(detached.length > 0, 'floating stems must be reported');
-  assert.ok(detached.every((v) => v.metrics!.attach > v.metrics!.radius));
-  // A tighter disc pushes the anchor further outside.
-  const tighter = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 1.0 };
+  assert.equal(detached.length, 2, 'both opening stems are reported');
+  for (const v of detached) {
+    assert.ok(v.metrics!.attach < v.metrics!.required);
+    assert.match(v.message, /inside the .*ring|inside the .*disc/);
+  }
+
+  // Push the anchor outward instead: the stem floats off the glyph circle.
+  const floating: JankoSystemLayout = {
+    ...layout,
+    notes: layout.notes.map((p, i) =>
+      i < 2 ? { ...p, rhythm: { ...p.rhythm, y: p.y + dir(p.rhythm.hand) * 4 } } : p
+    ),
+  };
   const out2: LintViolation[] = [];
-  checkStemAndBeamValidity(systems(DEFAULT_JANKO_OPTIONS, tighter)[0], tighter, LINT, out2);
-  assert.ok(out2.some((v) => v.code === 'stem-detached' && v.metrics!.attach > 1.0));
+  checkStemAndBeamValidity(floating, TOKENS, LINT, out2);
+  const floats = out2.filter((v) => v.code === 'stem-detached');
+  assert.equal(floats.length, 2);
+  for (const v of floats) {
+    assert.ok(v.metrics!.attach > v.metrics!.required);
+    assert.match(v.message, /floats off the head/);
+  }
+});
+
+test('Golden master: stems attach flush, keep digit air and never pierce a halo', () => {
+  const out: LintViolation[] = [];
+  let honored = 0;
+  for (const layout of systems()) {
+    checkStemAndBeamValidity(layout, TOKENS, LINT, out);
+    checkStemDigitClearance(layout, TOKENS, LINT, out);
+    checkHaloClearance(layout, TOKENS, LINT, out);
+    for (const p of layout.notes) {
+      const stem = getStemGeometry(p.rhythm, TOKENS);
+      const attach = Math.hypot(stem.stemX - p.x, stem.stemStartY - p.y);
+      assert.ok(
+        Math.abs(attach - getStemAttachmentRadius(p.rhythm, TOKENS)) < 1e-9,
+        `${p.note.id} attaches exactly on the flush perimeter (${attach.toFixed(3)}pt)`
+      );
+      if (isPositionOfHonor(p.note.startTick)) honored++;
+    }
+  }
+  assert.deepEqual(out, [], 'flush stems, digit air and halo clearance all hold');
+  assert.equal(honored, 2, 'both opening sounds are audited against the halo');
+  for (const check of ['stem-digit-clearance', 'halo-clearance'] as const) {
+    assert.ok(
+      (JANKO_LINT_CHECKS as readonly string[]).includes(check),
+      `${check} is part of the lint contract`
+    );
+  }
+});
+
+test('Defect: a Position of Honor stem driven through the halo ring is caught', () => {
+  const layout = systems()[0];
+  const opening = layout.notes.filter((p) => p.note.startTick === 0);
+  assert.equal(opening.length, 2, 'two opening sounds');
+  const broken: JankoSystemLayout = {
+    ...layout,
+    notes: layout.notes.map((p) =>
+      isPositionOfHonor(p.note.startTick)
+        ? { ...p, rhythm: { ...p.rhythm, y: p.y - dir(p.rhythm.hand) * 4 } }
+        : p
+    ),
+  };
+  const out: LintViolation[] = [];
+  checkHaloClearance(broken, TOKENS, LINT, out);
+  assert.equal(out.length, 2, 'both halo-piercing stems are reported');
+  assert.ok(out.every((v) => v.code === 'halo-piercing' && v.severity === 'error'));
+  for (const v of out) {
+    assert.ok(v.metrics!.distance < v.metrics!.required);
+    assert.match(v.message, /cuts through the halo/);
+  }
 });
 
 test('Golden master: every stem is engraved on its notehead centreline', () => {
@@ -286,24 +406,25 @@ test('Defect: an unclamped beam slope is caught by the geometry check and the SV
 });
 
 test('Defect: a stem that does not land on any beam is caught in the rendered SVG', () => {
-  const svg = '<svg><line class="janko-stem" x1="10" y1="100" x2="10" y2="70" stroke="#111"/></svg>';
-  const audit = auditStemBeamConnections(svg, {
+  const options = {
     stemLength: DEFAULT_JANKO_TOKENS.stemLength,
     maxBeamSlope: LINT.maxBeamSlope,
-  });
+    stemAttachmentRadius: REGULAR_ATTACH,
+    honorStemAttachmentRadius: HONOR_ATTACH,
+  };
+  const svg = '<svg><line class="janko-stem" x1="10" y1="100" x2="10" y2="70" stroke="#111"/></svg>';
+  const audit = auditStemBeamConnections(svg, options);
   assert.equal(audit.length, 1);
   assert.equal(audit[0].code, 'beam-stem-gap');
   assert.match(audit[0].message, /does not land on any beam/);
 
-  // A standalone stem of the canonical length is legal.
-  const legal = '<svg><line class="janko-stem" x1="10" y1="100" x2="10" y2="85.5" stroke="#111"/></svg>';
-  assert.deepEqual(
-    auditStemBeamConnections(legal, {
-      stemLength: DEFAULT_JANKO_TOKENS.stemLength,
-      maxBeamSlope: LINT.maxBeamSlope,
-    }),
-    []
-  );
+  // Standalone stems of both canonical flush lengths are legal: the length is
+  // measured from the outer edge of the glyph circle, not the notehead centre.
+  for (const attachment of [REGULAR_ATTACH, HONOR_ATTACH]) {
+    const length = DEFAULT_JANKO_TOKENS.stemLength - attachment;
+    const legal = `<svg><line class="janko-stem" x1="10" y1="100" x2="10" y2="${(100 - length).toFixed(2)}" stroke="#111"/></svg>`;
+    assert.deepEqual(auditStemBeamConnections(legal, options), [], `${length}pt stem is canonical`);
+  }
 });
 
 test('Defect: noteheads driven into a barline are caught', () => {
@@ -350,15 +471,15 @@ test('Defect: collapsing the Middle C corridor is caught', () => {
 // ---------------------------------------------------------------------------
 
 test('Paint audit: a digit without its knockout is a violation', () => {
-  const svg = '<svg><text class="janko-digit" x="50" y="100.35" font-size="6.5pt">7</text></svg>';
-  const out = auditKnockoutProtection(svg, { noteheadRadius: 4.2 });
+  const svg = `<svg>${digit(50, 100)}</svg>`;
+  const out = auditKnockoutProtection(svg, { noteheadRadius: R });
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-missing');
 });
 
 test('Paint audit: a knockout without its digit is a violation', () => {
-  const svg = '<svg><circle class="janko-knockout" cx="50" cy="100" r="4.20" fill="#FFFFFF"/></svg>';
-  const out = auditKnockoutProtection(svg, { noteheadRadius: 4.2 });
+  const svg = `<svg>${knockout(50, 100)}</svg>`;
+  const out = auditKnockoutProtection(svg, { noteheadRadius: R });
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-empty');
 });
@@ -366,15 +487,17 @@ test('Paint audit: a knockout without its digit is a violation', () => {
 test('Paint audit: a rule painted after the knockout may not cut through it', () => {
   const clean =
     '<svg><line x1="40" y1="100" x2="60" y2="100" stroke="#111"/>' +
-    '<circle class="janko-knockout" cx="50" cy="100" r="4.20" fill="#FFFFFF"/>' +
-    '<text class="janko-digit" x="50" y="100.35" font-size="6.5pt">7</text></svg>';
-  assert.deepEqual(auditKnockoutProtection(clean, { noteheadRadius: 4.2 }), []);
+    knockout(50, 100) +
+    digit(50, 100) +
+    '</svg>';
+  assert.deepEqual(auditKnockoutProtection(clean, { noteheadRadius: R }), []);
 
   const regressed =
-    '<svg><circle class="janko-knockout" cx="50" cy="100" r="4.20" fill="#FFFFFF"/>' +
-    '<text class="janko-digit" x="50" y="100.35" font-size="6.5pt">7</text>' +
+    '<svg>' +
+    knockout(50, 100) +
+    digit(50, 100) +
     '<line class="janko-beat-line" x1="50" y1="90" x2="50" y2="110" stroke="#D1D5DB"/></svg>';
-  const out = auditKnockoutProtection(regressed, { noteheadRadius: 4.2 });
+  const out = auditKnockoutProtection(regressed, { noteheadRadius: R });
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-pass-through');
   assert.match(out[0].message, /beat-line element painted after the knockout/);
@@ -382,28 +505,76 @@ test('Paint audit: a rule painted after the knockout may not cut through it', ()
 
 test('Paint audit: the Middle C spine cutting a glyph is named explicitly', () => {
   const svg =
-    '<svg><circle class="janko-knockout" cx="50" cy="100" r="4.20" fill="#FFFFFF"/>' +
-    '<text class="janko-digit" x="50" y="100.35" font-size="6.5pt">7</text>' +
+    '<svg>' +
+    knockout(50, 100) +
+    digit(50, 100) +
     '<line x1="30" y1="100" x2="70" y2="100" stroke="#E2E8F0"/></svg>';
-  const out = auditKnockoutProtection(svg, { noteheadRadius: 4.2, spineY: 100 });
+  const out = auditKnockoutProtection(svg, { noteheadRadius: R, spineY: 100 });
   assert.equal(out.length, 1);
   assert.match(out[0].message, /Middle C spine cuts through the knockout/);
 });
 
-test('Paint audit: a notehead’s own stem is exempt, a foreign stem is not', () => {
+test('Paint audit: a flush stem is exempt, a stem starting inside the disc is not', () => {
+  // The notehead's own stem, painted after its mask, must start flush on the
+  // disc perimeter …
   const own =
-    '<svg><line class="janko-stem" x1="53.8" y1="98.5" x2="53.8" y2="85" stroke="#111"/>' +
-    '<circle class="janko-knockout" cx="50" cy="100" r="4.20" fill="#FFFFFF"/>' +
-    '<text class="janko-digit" x="50" y="100.35" font-size="6.5pt">7</text></svg>';
-  assert.deepEqual(auditKnockoutProtection(own, { noteheadRadius: 4.2 }), []);
+    '<svg>' +
+    knockout(50, 100) +
+    digit(50, 100) +
+    stem(50, 100 - REGULAR_ATTACH, 85) +
+    '</svg>';
+  assert.deepEqual(
+    auditKnockoutProtection(own, { noteheadRadius: R, haloRadius: HALO_R }),
+    []
+  );
 
-  const foreign =
-    '<svg><circle class="janko-knockout" cx="50" cy="100" r="4.20" fill="#FFFFFF"/>' +
-    '<text class="janko-digit" x="50" y="100.35" font-size="6.5pt">7</text>' +
-    '<line class="janko-stem" x1="52" y1="120" x2="52" y2="80" stroke="#111"/></svg>';
-  const out = auditKnockoutProtection(foreign, { noteheadRadius: 4.2 });
+  // … a stem emerging *inside* the disc pierces the mask instead.
+  const inside =
+    '<svg>' + knockout(50, 100) + digit(50, 100) + stem(50, 98.5, 85) + '</svg>';
+  const out = auditKnockoutProtection(inside, { noteheadRadius: R, haloRadius: HALO_R });
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-pass-through');
+
+  // A foreign stem crossing the disc is never exempt.
+  const foreign =
+    '<svg>' +
+    knockout(50, 100) +
+    digit(50, 100) +
+    '<line class="janko-stem" x1="52" y1="120" x2="52" y2="80" stroke="#111"/></svg>';
+  const out2 = auditKnockoutProtection(foreign, { noteheadRadius: R, haloRadius: HALO_R });
+  assert.equal(out2.length, 1);
+  assert.equal(out2[0].code, 'knockout-pass-through');
+});
+
+test('Paint audit: a stem piercing the Position of Honor halo is a violation', () => {
+  const clean =
+    '<svg>' +
+    halo(50, 100) +
+    knockout(50, 100) +
+    digit(50, 100) +
+    stem(50, 100 - HONOR_ATTACH, 85) +
+    '</svg>';
+  assert.deepEqual(
+    auditKnockoutProtection(clean, { noteheadRadius: R, haloRadius: HALO_R }),
+    [],
+    'the tick-0 stem starts outside the ring'
+  );
+
+  const pierced =
+    '<svg>' +
+    halo(50, 100) +
+    knockout(50, 100) +
+    digit(50, 100) +
+    stem(50, 98.5, 85) +
+    '</svg>';
+  const out = auditKnockoutProtection(pierced, { noteheadRadius: R, haloRadius: HALO_R });
+  assert.ok(
+    out.some((v) => v.code === 'halo-piercing'),
+    'a stem emerging inside the ring must be reported'
+  );
+  const piercing = out.find((v) => v.code === 'halo-piercing')!;
+  assert.match(piercing.message, /cuts through the Position of Honor halo/);
+  assert.ok(piercing.metrics!.distance < piercing.metrics!.required);
 });
 
 test('Every engraved system of the canonical score passes the paint-order audit', () => {
@@ -420,12 +591,42 @@ test('Every engraved system of the canonical score passes the paint-order audit'
     assert.deepEqual(
       auditKnockoutProtection(svg, {
         noteheadRadius: DEFAULT_JANKO_TOKENS.noteheadRadius,
+        haloRadius: DEFAULT_JANKO_TOKENS.haloRadius,
         spineY: layout.geometry.middleCY,
       }),
       [],
       `system ${layout.index + 1} must be mask-clean`
     );
   }
+});
+
+test('Paint audit honours the digit baseline of a custom token set', () => {
+  // A larger digit shifts its baseline: the audit must still pair every glyph
+  // with its mask instead of reporting phantom mask defects.
+  const tokens = { ...DEFAULT_JANKO_TOKENS, digitFontSize: 6.5, noteheadRadius: 5.2 };
+  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, tokens);
+  assert.equal(
+    report.violations.filter(
+      (v) => v.code === 'knockout-missing' || v.code === 'knockout-empty'
+    ).length,
+    0,
+    'no phantom mask defects for custom digit tokens'
+  );
+  const svg = renderSystem(
+    SCORE,
+    getSystemGeometry(computePageGeometry(DEFAULT_JANKO_OPTIONS, tokens), 0),
+    0,
+    DEFAULT_JANKO_OPTIONS,
+    tokens
+  );
+  assert.deepEqual(
+    auditKnockoutProtection(svg, {
+      noteheadRadius: tokens.noteheadRadius,
+      haloRadius: tokens.haloRadius,
+      digitBaselineOffset: digitBaselineOffset(tokens.digitFontSize),
+    }),
+    []
+  );
 });
 
 // ---------------------------------------------------------------------------

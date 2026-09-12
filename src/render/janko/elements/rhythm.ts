@@ -20,6 +20,7 @@
 
 import { Hand } from '../../../model/types';
 import { JankoRhythmStyle, JankoTokens, ResolvedJankoTokens, resolveJankoTokens } from '../types';
+import { isPositionOfHonor } from './notehead';
 import { f } from './style';
 
 /** One note as seen by the rhythm renderers (already positioned in page pt). */
@@ -49,6 +50,39 @@ function stemDirection(hand: Hand): -1 | 1 {
   return hand === 'RH' ? -1 : 1;
 }
 
+/** Air (pt) between a regular knockout disc and its stem start. */
+export const STEM_ATTACHMENT_AIR = 0.2;
+/** Air (pt) between the Position of Honor halo ring and its stem start. */
+export const HONOR_STEM_ATTACHMENT_AIR = 0.4;
+
+/** Canonical stem attachment radii (regular heads, tick-0 honor sounds). */
+export function getStemAttachmentRadii(tokens?: Partial<JankoTokens> | null): {
+  regular: number;
+  honor: number;
+} {
+  const t = resolveJankoTokens(tokens);
+  return {
+    regular: t.noteheadRadius + STEM_ATTACHMENT_AIR,
+    honor: t.haloRadius + HONOR_STEM_ATTACHMENT_AIR,
+  };
+}
+
+/**
+ * Distance (pt) from the notehead centre at which its stem begins.
+ *
+ * A stem starts flush on the **outside** of the glyph's own circle: the wider
+ * Position of Honor halo ring for the tick-0 opening sounds, the white knockout
+ * disc otherwise. The stem can therefore never cut through the halo ring, and
+ * it never emerges inside the mask where it would crowd the duodecimal digit.
+ */
+export function getStemAttachmentRadius(
+  note: JankoRhythmNote,
+  tokens?: Partial<JankoTokens> | null
+): number {
+  const radii = getStemAttachmentRadii(tokens);
+  return isPositionOfHonor(note.startTick) ? radii.honor : radii.regular;
+}
+
 /**
  * Pure stem geometry (RH stems up, LH stems down).
  *
@@ -56,6 +90,11 @@ function stemDirection(hand: Hand): -1 | 1 {
  * rather than on the round-notehead perimeter: duration indicators then begin
  * exactly on the note column for both hands, instead of staggering left of the
  * duodecimal digit for the LH and right of it for the RH.
+ *
+ * Vertically the stem starts at `note.y + dir * effectiveRadius` — flush on the
+ * outer edge of the knockout disc (or of the halo ring at tick 0) — and runs to
+ * the canonical `stemLength` measured from the notehead centre, so the visible
+ * stem stays substantial while never touching the glyph or the halo.
  */
 export function getStemGeometry(
   note: JankoRhythmNote,
@@ -65,7 +104,7 @@ export function getStemGeometry(
   const dir = stemDirection(note.hand);
   return {
     stemX: note.x,
-    stemStartY: note.y + dir * 1.5,
+    stemStartY: note.y + dir * getStemAttachmentRadius(note, t),
     stemEndY: note.y + dir * t.stemLength,
     direction: dir,
   };
@@ -274,6 +313,9 @@ export function computeBeamGroupGeometry(
   // Minimum stem length: the canonical stem, but never less than the notehead
   // disc plus the required air — counting the 16th secondary beam, which sits
   // `beamThickness + gap` closer to the heads than the primary connector.
+  // It is measured from the notehead centre (the beam anchor below), so the
+  // *visible* stem between the disc perimeter and the beam is
+  // `minStemLength - getStemAttachmentRadius(note)` and stays substantial.
   const secondaryDepth = hasSecondary ? t.beamThickness + SECONDARY_BEAM_GAP : 0;
   const minStemLength = Math.max(
     t.stemLength,

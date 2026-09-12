@@ -139,10 +139,11 @@ function main(): void {
         2,
         OPTIONS,
         TOKENS,
-        'accolade · halo · Middle C anchor'
+        'accolade · halo · spacious spine-free corridor'
       ),
       zoom: 4,
-      description: 'Macro crop mm. 1–2: accolade, halo, Middle C anchor, opening theme (288 DPI)',
+      description:
+        'Macro crop mm. 1–2: accolade, halo, spacious spine-free corridor, opening theme (288 DPI)',
     },
     {
       name: 'janko_m4.png',

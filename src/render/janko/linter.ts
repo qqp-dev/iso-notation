@@ -11,20 +11,24 @@
  * Checked invariants
  * ------------------
  * 1. **Knockout protection** — every duodecimal digit owns an opaque white
- *    knockout disc, the glyph fits inside that disc, and nothing painted after
- *    the disc (staff rules, row guidelines, ledger equators, beat grid, stems,
- *    beams, barlines) may cut through it. This is the invariant that guarantees
+ *    knockout disc, the glyph's ink box fits inside that disc with real white
+ *    breathing room on every side, and nothing painted after the disc (staff
+ *    rules, row guidelines, ledger equators, beat grid, stems, beams,
+ *    barlines) may cut through it. This is the invariant that guarantees
  *    "zero staff/beat line pass-through".
  * 2. **Collision & clearance** — notehead discs may not overlap (chords are
  *    allowed to *stack*, not to occupy the same point), and nothing may collide
  *    with a barline.
  * 3. **Corridor & guideline integrity** — the Middle C channel stays free of
  *    structural rules and beams, and the spine is never cut by a glyph.
- * 4. **Beam & stem validity** — stems attach on their notehead's vertical
- *    centreline (`stemX === note.x`) and reach the beam centerline exactly (no
- *    overshoot, no gap), every beam connector stays a minimum clearance away
- *    from every notehead disc (`beam-notehead-collision`), and every beam slope
- *    stays inside the acceptable threshold.
+ * 4. **Beam & stem validity** — stems attach *flush on the outside* of their
+ *    glyph circle (the halo ring at tick 0, the knockout disc otherwise), stay
+ *    clear of their own digit by a real margin, never pierce the Position of
+ *    Honor halo, sit on their notehead's vertical centreline (`stemX ===
+ *    note.x`) and reach the beam centerline exactly (no overshoot, no gap);
+ *    every beam connector stays a minimum clearance away from every notehead
+ *    disc (`beam-notehead-collision`), and every beam slope stays inside the
+ *    acceptable threshold.
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
  *
@@ -38,6 +42,7 @@
 
 import { QuantizedGridScore } from '../../model/types';
 import {
+  DEFAULT_JANKO_TOKENS,
   JankoLayoutOptions,
   JankoTokens,
   ResolvedJankoLayoutOptions,
@@ -46,8 +51,19 @@ import {
   resolveJankoTokens,
 } from './types';
 import { JankoSystemLayout, PositionedJankoNote, layoutJankoScore, renderSystem } from './engine';
-import { JankoBeamConnector, getStemGeometry } from './elements/rhythm';
-import { JANKO_DIGIT_BASELINE_OFFSET } from './elements/notehead';
+import {
+  JankoBeamConnector,
+  getStemAttachmentRadii,
+  getStemAttachmentRadius,
+  getStemGeometry,
+} from './elements/rhythm';
+import {
+  JANKO_DIGIT_BASELINE_OFFSET,
+  JANKO_HALO_STROKE_WIDTH,
+  digitBaselineOffset,
+  digitHalfExtents,
+  isPositionOfHonor,
+} from './elements/notehead';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -65,6 +81,8 @@ export type JankoLintCode =
   | 'knockout-undersized'
   | 'knockout-pass-through'
   | 'stem-detached'
+  | 'stem-digit-collision'
+  | 'halo-piercing'
   | 'beam-slope'
   | 'beam-stem-gap'
   | 'beam-notehead-collision'
@@ -124,9 +142,14 @@ export interface JankoLintOptions {
   corridorClearance: number;
   /** Approximate advance width of a digit as a fraction of its font size. */
   digitAdvance: number;
-  /** Approximate cap height of a digit as a fraction of its font size. */
-  digitCapHeight: number;
-  /** Minimum white margin (pt) a knockout must leave around the digit box. */
+  /**
+   * Minimum white margin (pt) the knockout disc must leave on **every side**
+   * (top, bottom, left, right) of the digit's ink box.
+   */
+  digitClearance: number;
+  /** Minimum air (pt) between a stem and its own digit glyph box. */
+  stemDigitClearance: number;
+  /** Minimum white margin (pt) a knockout must leave around the digit corner. */
   knockoutMargin: number;
   /** Run the SVG paint-order audit (slower, catches layer regressions). */
   auditPaintOrder: boolean;
@@ -138,7 +161,8 @@ export const DEFAULT_JANKO_LINT_OPTIONS: JankoLintOptions = {
   minClearance: 1.0,
   corridorClearance: 2.0,
   digitAdvance: 0.35,
-  digitCapHeight: 0.38,
+  digitClearance: 1.2,
+  stemDigitClearance: 1.2,
   knockoutMargin: 0.25,
   auditPaintOrder: true,
 };
@@ -148,6 +172,8 @@ export const JANKO_LINT_CHECKS = [
   'notehead-clearance',
   'knockout-coverage',
   'stem-beam-validity',
+  'stem-digit-clearance',
+  'halo-clearance',
   'beam-notehead-clearance',
   'barline-clearance',
   'measure-numeral-clearance',
@@ -204,6 +230,21 @@ function pointToSegmentDistance(
   if (len2 <= EPS) return Math.hypot(px - x1, py - y1);
   const tt = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / len2));
   return Math.hypot(px - (x1 + tt * vx), py - (y1 + tt * vy));
+}
+
+/** Distance from a vertical segment (`x`, `ya..yb`) to an axis-aligned box. */
+function verticalSegmentToBoxDistance(x: number, ya: number, yb: number, b: Box): number {
+  const lo = Math.min(ya, yb);
+  const hi = Math.max(ya, yb);
+  const horizontal = Math.max(b.x0 - x, 0, x - b.x1);
+  const vertical = Math.max(b.y0 - hi, 0, lo - b.y1);
+  return Math.hypot(horizontal, vertical);
+}
+
+/** The digit's ink box (page pt) centred on a notehead. */
+function digitBox(p: PositionedJankoNote, fontSize: number): Box {
+  const { halfWidth, halfHeight } = digitHalfExtents(fontSize);
+  return box(p.x - halfWidth, p.y - halfHeight, p.x + halfWidth, p.y + halfHeight);
 }
 
 /** Approximate advance width of a short text run. */
@@ -303,9 +344,14 @@ export function checkNoteheadClearance(
 // ---------------------------------------------------------------------------
 
 /**
- * The white knockout must be at least as large as the notehead radius, and the
- * duodecimal glyph must fit inside it with a white margin — otherwise the digit
- * pokes out of its own mask and staff lines touch the glyph.
+ * The white knockout must be large enough that the duodecimal glyph's ink box
+ * keeps a real white margin **on every side** — otherwise the digit pokes out
+ * of its own mask and staff lines graze the glyph.
+ *
+ * The digit box is derived from the renderer's own metrics
+ * ({@link digitHalfExtents}: URW Gothic cap height and widest-glyph half
+ * width, resolved against the CSS `pt` → user-unit factor), so the check can
+ * never drift from what is actually painted.
  */
 export function checkKnockoutCoverage(
   layout: JankoSystemLayout,
@@ -314,25 +360,43 @@ export function checkKnockoutCoverage(
   out: LintViolation[]
 ): void {
   const r = t.noteheadRadius;
-  const halfW = t.digitFontSize * lint.digitAdvance;
-  const halfH = t.digitFontSize * lint.digitCapHeight;
-  const required = Math.hypot(halfW, halfH) + lint.knockoutMargin;
+  const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize);
+  const horizontal = r - halfWidth;
+  const vertical = r - halfHeight;
+  const corner = r - Math.hypot(halfWidth, halfHeight);
+  const required = Math.max(halfWidth, halfHeight) + lint.digitClearance;
   for (const p of layout.notes) {
-    if (r + EPS < required) {
-      out.push({
-        code: 'knockout-undersized',
-        severity: 'error',
-        message:
-          `Knockout r=${r.toFixed(2)}pt cannot shield the ${t.digitFontSize}pt digit ` +
-          `(needs r>=${required.toFixed(2)}pt): staff lines would graze the glyph.`,
-        system: layout.index,
-        measure: measureOfTick(p.note.startTick, t),
-        noteIds: [p.note.id],
-        x: p.x,
-        y: p.y,
-        metrics: { radius: r, required, digitFontSize: t.digitFontSize },
-      });
+    if (
+      horizontal + EPS >= lint.digitClearance &&
+      vertical + EPS >= lint.digitClearance &&
+      corner + EPS >= lint.knockoutMargin
+    ) {
+      continue;
     }
+    out.push({
+      code: 'knockout-undersized',
+      severity: 'error',
+      message:
+        `Knockout r=${r.toFixed(2)}pt cannot shield the ${t.digitFontSize}pt digit ` +
+        `(needs r>=${required.toFixed(2)}pt for ${lint.digitClearance.toFixed(1)}pt of white on ` +
+        `every side; left/right ${horizontal.toFixed(2)}pt, top/bottom ${vertical.toFixed(2)}pt, ` +
+        `corner ${corner.toFixed(2)}pt): staff lines would graze the glyph.`,
+      system: layout.index,
+      measure: measureOfTick(p.note.startTick, t),
+      noteIds: [p.note.id],
+      x: p.x,
+      y: p.y,
+      metrics: {
+        radius: r,
+        required,
+        digitFontSize: t.digitFontSize,
+        digitHalfWidth: halfWidth,
+        digitHalfHeight: halfHeight,
+        horizontal,
+        vertical,
+        corner,
+      },
+    });
   }
 }
 
@@ -342,9 +406,11 @@ export function checkKnockoutCoverage(
 
 /**
  * Stems must be engraved on their notehead's vertical centreline
- * (`stemX === note.x`), attach inside the disc, and reach the beam centerline
- * exactly (no overshoot, no shortfall). Beam slopes must stay inside the
- * acceptable threshold, no matter how wide the leap.
+ * (`stemX === note.x`), attach **flush on the outside** of their glyph circle
+ * — the wider Position of Honor halo ring for tick-0 sounds, the knockout disc
+ * otherwise — and reach the beam centerline exactly (no overshoot, no
+ * shortfall). Beam slopes must stay inside the acceptable threshold, no matter
+ * how wide the leap.
  */
 export function checkStemAndBeamValidity(
   layout: JankoSystemLayout,
@@ -358,6 +424,12 @@ export function checkStemAndBeamValidity(
     const stem = getStemGeometry(p.rhythm, t);
     const stemX = stem.stemX;
     const stemStartY = stem.stemStartY;
+    const honor = isPositionOfHonor(p.note.startTick);
+    // The radius of the circle the stem must start flush against.
+    const effectiveRadius = getStemAttachmentRadius(p.rhythm, t);
+    const circleLabel = honor
+      ? `halo ring (R=${t.haloRadius.toFixed(2)}pt)`
+      : `knockout disc (r=${r.toFixed(2)}pt)`;
     if (Math.abs(stemX - p.x) > EPS) {
       out.push({
         code: 'stem-detached',
@@ -376,19 +448,34 @@ export function checkStemAndBeamValidity(
       continue;
     }
     const attach = Math.hypot(stemX - p.x, stemStartY - p.y);
-    if (attach > r + EPS) {
+    if (attach < effectiveRadius - EPS) {
       out.push({
         code: 'stem-detached',
         severity: 'error',
         message:
-          `Stem of ${p.note.id} attaches ${attach.toFixed(2)}pt from the notehead centre ` +
-          `(disc r=${r.toFixed(2)}pt): the stem floats off the head.`,
+          `Stem of ${p.note.id} starts ${attach.toFixed(2)}pt from the notehead centre, inside the ` +
+          `${circleLabel}: the stem would cut through it and crowd the digit ` +
+          `(${effectiveRadius.toFixed(2)}pt required).`,
         system: layout.index,
         measure: measureOfTick(p.note.startTick, t),
         noteIds: [p.note.id],
         x: stemX,
         y: stemStartY,
-        metrics: { attach, radius: r, stemX, stemStartY },
+        metrics: { attach, required: effectiveRadius, radius: r, haloRadius: t.haloRadius },
+      });
+    } else if (attach > effectiveRadius + EPS) {
+      out.push({
+        code: 'stem-detached',
+        severity: 'error',
+        message:
+          `Stem of ${p.note.id} attaches ${attach.toFixed(2)}pt from the notehead centre ` +
+          `(${circleLabel} perimeter at ${effectiveRadius.toFixed(2)}pt): the stem floats off the head.`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: stemX,
+        y: stemStartY,
+        metrics: { attach, required: effectiveRadius, radius: r, haloRadius: t.haloRadius },
       });
     }
   }
@@ -440,6 +527,105 @@ export function checkStemAndBeamValidity(
         });
       }
     }
+  }
+}
+
+/**
+ * No stem may encroach on its own digit glyph.
+ *
+ * The stem starts flush on the glyph circle's perimeter, so the air between
+ * the stem column and the digit's ink box is a pure consequence of the disc
+ * radius, the digit font size and the optical centring. It must stay at least
+ * {@link JankoLintOptions.stemDigitClearance} — with the canonical tokens the
+ * real margin is ≈2.1pt.
+ *
+ * Scope: each stem is audited against *its own* digit. A stem that crosses a
+ * foreign glyph is invisible anyway (the rhythm layer is painted beneath the
+ * noteheads, so that notehead's mask erases it), and the only way to reach a
+ * foreign digit box in the first place is the cross-hand chordal collision,
+ * which {@link checkNoteheadClearance} already surfaces as a warning.
+ */
+export function checkStemDigitClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  for (const p of layout.notes) {
+    const stem = getStemGeometry(p.rhythm, t);
+    const glyph = digitBox(p, t.digitFontSize);
+    const distance = verticalSegmentToBoxDistance(
+      stem.stemX,
+      stem.stemStartY,
+      stem.stemEndY,
+      glyph
+    );
+    if (distance + EPS >= lint.stemDigitClearance) continue;
+    out.push({
+      code: 'stem-digit-collision',
+      severity: 'error',
+      message:
+        `Stem of ${p.note.id} passes ${distance.toFixed(2)}pt from its own digit glyph ` +
+        `(${lint.stemDigitClearance.toFixed(1)}pt of air required): the stem crowds or touches the ` +
+        `numeral inside its mask.`,
+      system: layout.index,
+      measure: measureOfTick(p.note.startTick, t),
+      noteIds: [p.note.id],
+      x: stem.stemX,
+      y: stem.stemStartY,
+      metrics: {
+        distance,
+        required: lint.stemDigitClearance,
+        stemStartY: stem.stemStartY,
+        glyphTop: glyph.y0,
+        glyphBottom: glyph.y1,
+      },
+    });
+  }
+}
+
+/**
+ * A Position of Honor stem may never pierce its halo ring.
+ *
+ * The tick-0 opening sounds carry the concentric halo (R = `haloRadius`), which
+ * is painted on top of the rhythm layer: a stem emerging inside the ring reads
+ * as a radial cut straight through it. The distance from the notehead centre to
+ * the stem segment must therefore clear the ring's outer stroke edge.
+ */
+export function checkHaloClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  _lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  // The stem must clear the ring's *outer* edge, stroke width included.
+  const required = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  for (const p of layout.notes) {
+    if (!isPositionOfHonor(p.note.startTick)) continue;
+    const stem = getStemGeometry(p.rhythm, t);
+    const distance = pointToSegmentDistance(
+      p.x,
+      p.y,
+      stem.stemX,
+      stem.stemStartY,
+      stem.stemX,
+      stem.stemEndY
+    );
+    if (distance + EPS >= required) continue;
+    out.push({
+      code: 'halo-piercing',
+      severity: 'error',
+      message:
+        `Stem of opening sound ${p.note.id} passes ${distance.toFixed(2)}pt from the notehead centre, ` +
+        `inside the Position of Honor halo ring (R=${t.haloRadius.toFixed(2)}pt, outer edge ` +
+        `${required.toFixed(2)}pt): the stem cuts through the halo.`,
+      system: layout.index,
+      measure: measureOfTick(p.note.startTick, t),
+      noteIds: [p.note.id],
+      x: stem.stemX,
+      y: stem.stemStartY,
+      metrics: { distance, haloRadius: t.haloRadius, required, stemStartY: stem.stemStartY },
+    });
   }
 }
 
@@ -799,11 +985,13 @@ export function checkMiddleCCorridor(
   }
 
   // 2. Horizontal rules: nothing but the spine itself lives on the corridor.
+  //    Row guidelines are only audited when they are actually painted.
   const horizontalRules: Array<{ label: string; y: number }> = [];
   for (const hand of ['RH', 'LH'] as const) {
     for (const oct of hand === 'RH' ? [5, 4] : [3, 2]) {
       const eq = g.equatorY(hand, oct);
       horizontalRules.push({ label: `${hand} o${oct} equator`, y: eq });
+      if (!o.showRowGuidelines) continue;
       horizontalRules.push({ label: `${hand} o${oct} upper guideline`, y: eq - t.rowHeight / 2 });
       horizontalRules.push({ label: `${hand} o${oct} lower guideline`, y: eq + t.rowHeight / 2 });
     }
@@ -896,6 +1084,8 @@ function num(attrs: Record<string, string>, key: string): number {
 export interface KnockoutAuditOptions {
   /** Notehead (knockout) radius in pt. */
   noteheadRadius: number;
+  /** Position of Honor halo ring radius in pt (audited for stem piercing). */
+  haloRadius?: number;
   /** Absolute y of the Middle C spine, used to name the offending rule. */
   spineY?: number;
   /** Optical baseline shift of the digit relative to the notehead centre. */
@@ -907,15 +1097,18 @@ export interface KnockoutAuditOptions {
 /**
  * Paint-order audit of one rendered system.
  *
- * Verifies three document-level invariants that pure geometry cannot express:
+ * Verifies four document-level invariants that pure geometry cannot express:
  * 1. every duodecimal digit owns a knockout disc painted immediately before it;
  * 2. every knockout disc actually carries a digit (no blank white holes);
  * 3. nothing painted *after* a knockout disc may cut through that disc — this
- *    is what "zero staff/beat line pass-through" means in practice.
+ *    is what "zero staff/beat line pass-through" means in practice;
+ * 4. no stem may pierce a Position of Honor halo ring, whichever layer it is
+ *    painted in (the ring is stroked on top of the rhythm layer, so a stem
+ *    emerging inside it reads as a radial cut through the halo).
  *
- * The notehead's own stem necessarily starts inside its own disc and is
- * recognised (and exempted) by its exact centred `/ ∓1.5` attachment offset;
- * the legacy perimeter anchors are kept for older documents.
+ * A notehead's own stem is legal exactly when it starts flush on the outer edge
+ * of its circle — `noteheadRadius + 0.2` for a regular head, `haloRadius + 0.4`
+ * for a tick-0 Position of Honor sound; any deeper attachment is a violation.
  */
 export function auditKnockoutProtection(
   svg: string,
@@ -923,6 +1116,7 @@ export function auditKnockoutProtection(
 ): LintViolation[] {
   const out: LintViolation[] = [];
   const r = options.noteheadRadius;
+  const haloRadius = options.haloRadius ?? r;
   const tol = options.tolerance ?? 0.05;
   const baseline = options.digitBaselineOffset ?? JANKO_DIGIT_BASELINE_OFFSET;
   const nodes = parseSvgNodes(svg);
@@ -985,15 +1179,13 @@ export function auditKnockoutProtection(
     const cy = num(k.attrs, 'cy');
     const kr = num(k.attrs, 'r');
     const radius = Number.isFinite(kr) ? kr : r;
-    // The notehead's own stem: centred columns (current) and the legacy
-    // ±(r-0.4) perimeter attachment offsets.
+    // The notehead's own stem: a centred column that starts flush on the outer
+    // edge of its circle. The 0.4pt halo air also covers the tick-0 sounds.
     const ownStemAnchors = [
-      { x: cx, y: cy - 1.5 },
-      { x: cx, y: cy + 1.5 },
-      { x: cx + (radius - 0.4), y: cy - 1.5 },
-      { x: cx - (radius - 0.4), y: cy + 1.5 },
-      { x: cx + (radius - 0.4), y: cy + 1.5 },
-      { x: cx - (radius - 0.4), y: cy - 1.5 },
+      { x: cx, y: cy - (radius + 0.2) },
+      { x: cx, y: cy + (radius + 0.2) },
+      { x: cx, y: cy - (haloRadius + 0.4) },
+      { x: cx, y: cy + (haloRadius + 0.4) },
     ];
     for (const node of nodes) {
       if (node.index <= k.index) continue;
@@ -1050,15 +1242,53 @@ export function auditKnockoutProtection(
     }
   }
 
+  // 4. No stem may pierce a Position of Honor halo ring. The ring is stroked
+  //    above the rhythm layer, so a stem that starts inside it stays visible on
+  //    both sides of the ring: a radial cut straight through the halo.
+  const halos = nodes.filter((n) => n.tag === 'circle' && n.cls.includes('janko-halo'));
+  const stems = nodes.filter((n) => n.tag === 'line' && n.cls.includes('janko-stem'));
+  for (const halo of halos) {
+    const cx = num(halo.attrs, 'cx');
+    const cy = num(halo.attrs, 'cy');
+    const hr = num(halo.attrs, 'r');
+    const ring = Number.isFinite(hr) ? hr : haloRadius;
+    const required = ring + JANKO_HALO_STROKE_WIDTH / 2;
+    for (const stem of stems) {
+      const x1 = num(stem.attrs, 'x1');
+      const y1 = num(stem.attrs, 'y1');
+      const x2 = num(stem.attrs, 'x2');
+      const y2 = num(stem.attrs, 'y2');
+      if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+      const distance = pointToSegmentDistance(cx, cy, x1, y1, x2, y2);
+      if (distance + EPS >= required) continue;
+      out.push({
+        code: 'halo-piercing',
+        severity: 'error',
+        message:
+          `Stem at x=${x1.toFixed(2)} passes ${distance.toFixed(2)}pt from the halo centre at ` +
+          `(${cx}, ${cy}) (ring R=${ring.toFixed(2)}pt, outer edge ${required.toFixed(2)}pt): ` +
+          `the stem cuts through the Position of Honor halo.`,
+        system: -1,
+        x: x1,
+        y: y1,
+        metrics: { distance, haloRadius: ring, required },
+      });
+    }
+  }
+
   return out;
 }
 
 /** Options accepted by the stem/beam document audit. */
 export interface StemBeamAuditOptions {
-  /** Canonical stem length from the notehead centre. */
+  /** Canonical stem length measured from the notehead centre. */
   stemLength: number;
   /** Maximum acceptable |slope| of a beam connector. */
   maxBeamSlope: number;
+  /** Attachment radius (pt) of a regular stem (default `noteheadRadius + 0.2`). */
+  stemAttachmentRadius?: number;
+  /** Attachment radius (pt) of a tick-0 Position of Honor stem (default `haloRadius + 0.4`). */
+  honorStemAttachmentRadius?: number;
   /** Tolerance (pt) for "the stem tip lands on the beam". */
   tolerance?: number;
 }
@@ -1067,8 +1297,9 @@ export interface StemBeamAuditOptions {
  * Document-level stem/beam audit of one rendered system.
  *
  * A rendered stem is legal when it is either a standalone stem of exactly the
- * canonical length, or when its tip lands on a beam connector. Every beam
- * connector must also honour the slope clamp.
+ * canonical length — `stemLength` minus its flush attachment radius, measured
+ * from the outer edge of its glyph circle — or when its tip lands on a beam
+ * connector. Every beam connector must also honour the slope clamp.
  */
 export function auditStemBeamConnections(
   svg: string,
@@ -1082,7 +1313,12 @@ export function auditStemBeamConnections(
   const beams = lines.filter(
     (n) => n.cls.includes('janko-beam') || n.cls.includes('janko-beam-secondary')
   );
-  const standaloneLength = options.stemLength - 1.5;
+  const regularAttachment = options.stemAttachmentRadius ?? DEFAULT_JANKO_TOKENS.noteheadRadius + 0.2;
+  const honorAttachment = options.honorStemAttachmentRadius ?? DEFAULT_JANKO_TOKENS.haloRadius + 0.4;
+  const standaloneLengths = [
+    options.stemLength - regularAttachment,
+    options.stemLength - honorAttachment,
+  ];
 
   for (const beam of beams) {
     const x1 = num(beam.attrs, 'x1');
@@ -1111,7 +1347,8 @@ export function auditStemBeamConnections(
     const y2 = num(stem.attrs, 'y2');
     if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
     const length = Math.hypot(x2 - x1, y2 - y1);
-    if (Math.abs(length - standaloneLength) <= tol + 0.02) continue;
+    const canonical = standaloneLengths.some((l) => Math.abs(length - l) <= tol + 0.02);
+    if (canonical) continue;
     const landsOnBeam = beams.some((beam) => {
       const bx1 = num(beam.attrs, 'x1');
       const by1 = num(beam.attrs, 'y1');
@@ -1126,17 +1363,25 @@ export function auditStemBeamConnections(
       return Math.abs(beamYAt - y2) <= 0.35;
     });
     if (!landsOnBeam) {
-      const longer = length > standaloneLength;
+      const shortest = Math.max(...standaloneLengths);
+      const longer = length > shortest;
       out.push({
         code: 'beam-stem-gap',
         severity: 'error',
         message:
           `Stem at x=${x2.toFixed(2)} is ${length.toFixed(2)}pt long and does not land on any beam ` +
-          `(${longer ? 'overshoot' : 'shortfall'}).`,
+          `(${longer ? 'overshoot' : 'shortfall'}; canonical standalone lengths ` +
+          `${standaloneLengths.map((l) => l.toFixed(2)).join(' / ')}pt).`,
         system: -1,
         x: x2,
         y: y2,
-        metrics: { length, standaloneLength, overshoot: longer ? length - standaloneLength : 0 },
+        metrics: {
+          length,
+          standaloneLength: shortest,
+          regularStandaloneLength: standaloneLengths[0],
+          honorStandaloneLength: standaloneLengths[1],
+          overshoot: longer ? length - shortest : 0,
+        },
       });
     }
   }
@@ -1177,21 +1422,30 @@ export function lintJankoScore(
     checkNoteheadClearance(layout, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);
+    checkStemDigitClearance(layout, t, thresholds, diagnostics);
+    checkHaloClearance(layout, t, thresholds, diagnostics);
     checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
     checkBarlineClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     if (thresholds.auditPaintOrder) {
+      const attachment = getStemAttachmentRadii(t);
       const svg = renderSystem(score, layout.geometry, layout.index, o, t, layout);
       const audit = [
         ...auditKnockoutProtection(svg, {
           noteheadRadius: t.noteheadRadius,
+          haloRadius: t.haloRadius,
+          // The audit recovers the notehead centre from the digit's baseline,
+          // so it must know the offset the renderer actually used.
+          digitBaselineOffset: digitBaselineOffset(t.digitFontSize),
           spineY: layout.geometry.middleCY,
         }),
         ...auditStemBeamConnections(svg, {
           stemLength: t.stemLength,
           maxBeamSlope: thresholds.maxBeamSlope,
+          stemAttachmentRadius: attachment.regular,
+          honorStemAttachmentRadius: attachment.honor,
         }),
       ].map((v) => ({ ...v, system: layout.index }));
       diagnostics.push(...audit);
