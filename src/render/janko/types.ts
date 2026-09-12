@@ -7,6 +7,13 @@
  * - Whole-tone rank 0 (even pitch classes 0, 2, 4, 6, 8, a) sits **below** its
  *   octave equator; whole-tone rank 1 (odd pitch classes 1, 3, 5, 7, 9, b)
  *   sits **above** it. Every row-to-row step is exactly `rowHeight` (15pt).
+ * - Because a row is shared by six pitch classes, a chord can put two of its
+ *   tones on one row of one octave (`C` + `E`, `G` + `B`, `F` + `G` + `B` …).
+ *   Those heads are **never merged and never re-rowed**: the row is the
+ *   instrument's physical row, so the collision is resolved horizontally by
+ *   `chordalOffset` (Approach 2, Row-Snapped Parity Offset). See
+ *   {@link JankoTokens.chordalOffset} and
+ *   `engine.resolveRowSnappedChordOffsets`.
  * - The **channel layout** ({@link JankoLayoutOptions.channelLayout}) selects
  *   how an octave is framed. Besides the incumbent `'single-equator'`, three
  *   comparative paradigms are engraved: `'on-the-line'` (Set A anchored on the
@@ -151,6 +158,24 @@ export interface JankoTokens {
    * notehead clears the boundary rule by the same 1.7pt as a channel note.
    */
   channelFlankOffset?: number;
+  /**
+   * Horizontal displacement (pt) between two **same-row chord tones** of one
+   * onset (Approach 2 — Row-Snapped Parity Offset).
+   *
+   * A two-row whole-tone staff maps several chord tones onto one row of one
+   * octave (C major `[0, 4, 7]` puts 0 and 4 on Row 0; G7 `[7, 11, 2, 5]` puts
+   * 7 and 11 on Row 1 …). Those heads would land on one page point and the
+   * later knockout would erase the earlier digit. The engine therefore keeps
+   * every note's true row and spreads the colliding heads symmetrically around
+   * the beat column by this distance.
+   *
+   * The canonical 11.0pt exceeds one notehead diameter (2 × 4.8 = 9.6pt) by
+   * 1.4pt of air, so the discs never touch and the visual linter's
+   * `2r` clearance rule is satisfied with room to spare. Values below
+   * `2 * noteheadRadius + 1.2pt` are raised to that floor by the engine, so a
+   * larger notehead can never silently re-open the collision.
+   */
+  chordalOffset?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -190,6 +215,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   minStemClearance: 1.5,
   channelHalfWidth: 6.5,
   channelFlankOffset: 13.0,
+  chordalOffset: 11.0,
 };
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */

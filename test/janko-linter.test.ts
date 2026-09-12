@@ -28,6 +28,7 @@ import {
   digitHalfExtents,
   isPositionOfHonor,
 } from '../src/render/janko/elements/notehead';
+import { getChordalOffset } from '../src/render/janko/engine';
 import {
   DEFAULT_JANKO_LINT_OPTIONS,
   JANKO_LINT_CHECKS,
@@ -118,17 +119,48 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
     'golden master must be violation-free'
   );
   assert.equal(report.ok, true);
-  // The known cross-hand chordal collisions are surfaced, never hidden. The
-  // unified absolute lattice puts both hands on the same four staff rules, so
-  // every same-octave hand crossing that lands on one whole-tone row of one
-  // octave at one instant coincides — a real limitation of a two-row staff,
-  // reported as a non-blocking warning.
-  assert.equal(report.warnings.length, 9);
-  for (const warning of report.warnings) {
-    assert.equal(warning.code, 'chordal-overlap');
-    assert.match(warning.message, /erases the earlier digit/);
-    assert.equal(warning.metrics?.distance, 0, 'the two heads share one lattice point');
+  // Row-Snapped Parity Offset (Approach 2) closed the last open item: the nine
+  // cross-hand coincidences — two voices landing on one whole-tone row of one
+  // octave at one instant — are now spread horizontally around the beat instead
+  // of being reported. The golden master is therefore completely clean.
+  assert.deepEqual(
+    report.diagnostics.map((d) => `${d.code}: ${d.message}`),
+    [],
+    'the golden master reports neither violations nor warnings'
+  );
+  assert.equal(report.stats.warnings, 0);
+  assert.equal(report.stats.violations, 0);
+});
+
+test('Row-snapped chord tones: every same-row pair is spread by one full disc', () => {
+  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const r = DEFAULT_JANKO_TOKENS.noteheadRadius;
+  const offset = getChordalOffset(DEFAULT_JANKO_TOKENS);
+  let pairs = 0;
+  for (const layout of layouts) {
+    const rows = new Map<string, typeof layout.notes>();
+    for (const p of layout.notes) {
+      const key = `${p.note.startTick}|${(p.y + 0).toFixed(3)}`;
+      const bucket = rows.get(key);
+      if (bucket) bucket.push(p);
+      else rows.set(key, [p]);
+    }
+    for (const group of rows.values()) {
+      if (group.length < 2) continue;
+      pairs++;
+      const xs = group.map((p) => p.x).sort((a, b) => a - b);
+      assert.equal(group.length, 2, 'the canonical score only doubles rows');
+      assert.ok(
+        Math.abs(xs[1] - xs[0] - offset) < 1e-9,
+        `spread pair keeps Δx = ${offset.toFixed(2)}pt (got ${(xs[1] - xs[0]).toFixed(2)})`
+      );
+      assert.ok(xs[1] - xs[0] >= 2 * r, 'the spread clears one full notehead disc');
+      for (const p of group) assert.equal(p.coord.rank, group[0].coord.rank, 'true row preserved');
+    }
   }
+  assert.equal(pairs, 9, 'the nine canonical cross-hand coincidences are all spread');
+  assert.equal(report.stats.warnings, 0);
 });
 
 test('Bounded center channel (Round 4 Candidate B) engraves with zero violations', () => {
@@ -140,13 +172,11 @@ test('Bounded center channel (Round 4 Candidate B) engraves with zero violations
     'the channel layout must be as clean as the golden master'
   );
   assert.equal(report.ok, true);
-  // The channel separates the two whole-tone rows, so fewer hand crossings
-  // land on one lattice point than on the single equator.
-  assert.ok(
-    report.warnings.length < 9,
-    `the channel removes cross-hand coincidences (${report.warnings.length} left)`
-  );
-  for (const warning of report.warnings) assert.equal(warning.code, 'chordal-overlap');
+  // The channel separates the two whole-tone rows, so the same-row
+  // coincidences of the single equator simply do not exist here; the
+  // row-snapped solver keeps the layout clean in either framing.
+  assert.equal(report.warnings.length, 0, 'the channel adds no diagnostics of its own');
+  assert.equal(report.stats.warnings, 0);
   // The corridor is structural: no beam connector may slice across the spine,
   // whichever octave framing is in force.
   assert.equal(
@@ -168,7 +198,8 @@ test('formatLintReport renders a human-readable summary', () => {
   const text = formatLintReport(lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
   assert.match(text, /Jánko visual lint/);
   assert.match(text, /8 systems · 32 measures/);
-  assert.match(text, /chordal-overlap/);
+  assert.match(text, /551 noteheads/);
+  assert.match(text, /✓ clean/, 'the golden master reports clean with no diagnostic lines');
 });
 
 // ---------------------------------------------------------------------------
@@ -217,6 +248,34 @@ test('Defect: chordal heads on one point is warned, not silently accepted', () =
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'chordal-overlap');
   assert.equal(out[0].severity, 'warning');
+});
+
+test('Row-snapped chord tones clear the warning exactly at one notehead diameter', () => {
+  const layout = systems()[0];
+  const a = layout.notes[2];
+  const b = layout.notes[3];
+  /** The same two heads forced onto one row of one octave. */
+  const pairAt = (dx: number): JankoSystemLayout => ({
+    ...layout,
+    notes: [
+      a,
+      {
+        ...b,
+        x: a.x + dx,
+        y: a.y,
+        rhythm: { ...b.rhythm, x: a.x + dx, y: a.y },
+        note: { ...b.note, startTick: a.note.startTick },
+      },
+    ],
+  });
+  const offset = getChordalOffset(DEFAULT_JANKO_TOKENS);
+  const lintAt = (dx: number): LintViolation[] =>
+    run((l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_TOKENS, LINT, o), pairAt(dx));
+
+  assert.equal(lintAt(2 * R - 0.01).length, 1, 'one hundredth short of a disc still collides');
+  assert.equal(lintAt(2 * R - 0.01)[0].code, 'chordal-overlap');
+  assert.equal(lintAt(2 * R).length, 0, 'one full diameter clears the warning');
+  assert.equal(lintAt(offset).length, 0, 'the canonical row-snap offset clears it as well');
 });
 
 test('Defect: shrinking the knockout below the glyph box is caught', () => {
@@ -698,5 +757,5 @@ test('npm run lint:engraving reports the golden master clean and exits 0', () =>
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.match(out, /clean violations=0 warnings=9/);
+  assert.match(out, /clean violations=0 warnings=0/);
 });

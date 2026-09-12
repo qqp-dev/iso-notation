@@ -5,9 +5,10 @@
  *  1. Jánko geometry & pitch isomorphism (rank mapping, row/octave steps,
  *     dynamic ledger equators, Position of Honor halo).
  *  2. The modular engine (page/crop/variant SVG composition).
- *  3. The unified export suite (`npm run janko:export`) and its ten PNGs —
- *     including the Round 4 four-paradigm domain sheet — in every delivery
- *     location, inside the 3-second budget.
+ *  3. The unified export suite (`npm run janko:export`) and its twelve PNGs —
+ *     including the Round 4 four-paradigm domain sheet and the Brahms Op. 118
+ *     No. 1 pressure benchmark — in every delivery location, inside the
+ *     3-second budget.
  */
 
 import { test } from 'node:test';
@@ -44,6 +45,7 @@ import {
   computeCropBox,
   computePageGeometry,
   countJankoPages,
+  getChordalOffset,
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
@@ -83,6 +85,9 @@ const EXPORT_NAMES = [
   'janko_domain_b.png',
   'janko_domain_c.png',
   'janko_domain_d.png',
+  // Brahms Op. 118 No. 1 — the harmonic row-collision pressure benchmark.
+  'janko_brahms_page1.png',
+  'janko_brahms_m7_m8.png',
 ] as const;
 
 function close(actual: number, expected: number, message: string, epsilon = 1e-9): void {
@@ -551,6 +556,184 @@ test('Synthetic same-row 16th cluster 0 2 4 6 2 keeps strictly advancing x', () 
   }
   // 0, 2, 4, 6, 2 are all rank 0: one shared whole-tone row.
   for (const p of positions) close(p.y, positions[0].y, 'same-row cluster shares one y');
+});
+
+// ---------------------------------------------------------------------------
+// 1b. Row-Snapped Parity Offset (Approach 2)
+// ---------------------------------------------------------------------------
+
+/** The chord under test: C4–E4–G4, i.e. [0, 4, 7] on one onset. */
+function majorTriad(): QuantizedGridScore {
+  return makeScore(
+    [
+      makeNote('triad-c', 0, 4, 0, 96, 'RH'),
+      makeNote('triad-e', 4, 4, 0, 96, 'RH'),
+      makeNote('triad-g', 7, 4, 0, 96, 'RH'),
+    ],
+    144
+  );
+}
+
+test('Row-snapped parity offset: same-row chord tones spread symmetrically around the beat', () => {
+  const layout = layoutJankoScore(majorTriad(), OPTIONS, TOKENS)[0];
+  const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
+  const c = byId.get('triad-c')!;
+  const e = byId.get('triad-e')!;
+  const g = byId.get('triad-g')!;
+  const delta = getChordalOffset(TOKENS);
+
+  // C4 and E4 are both rank 0 of octave 4: one lattice point before the offset.
+  assert.equal(c.coord.rank, 0);
+  assert.equal(e.coord.rank, 0);
+  assert.equal(c.y, e.y, 'the two heads keep one row y');
+  close(Math.abs(e.x - c.x), delta, 'the pair is spread by exactly one chordal offset');
+  assert.ok(delta >= 2 * TOKENS.noteheadRadius, 'Δx covers a full notehead disc');
+
+  // …and symmetrically: the pair straddles the untouched beat column, which the
+  // different-row third of the triad still occupies exactly.
+  const nominal = g.x;
+  close((c.x + e.x) / 2, nominal, 'the pair is centred on the beat column');
+  close(Math.min(c.x, e.x), nominal - delta / 2, 'the lower head sits half an offset left');
+  close(Math.max(c.x, e.x), nominal + delta / 2, 'the upper head sits half an offset right');
+
+  // G4 is rank 1: a different row, so it never moves off the beat column, and
+  // the isomorphic Δ hand shape survives.
+  assert.equal(g.coord.rank, 1);
+  assert.notEqual(g.y, c.y);
+});
+
+test('Row-snapped parity offset: every note keeps its true row y and its beat column', () => {
+  const score = makeScore(
+    [
+      makeNote('chord-c', 0, 4, 48, 48, 'LH'),
+      makeNote('chord-e', 4, 4, 48, 48, 'RH'),
+      makeNote('chord-g', 7, 4, 48, 48, 'RH'),
+      makeNote('next-d', 2, 4, 96, 48, 'RH'),
+    ],
+    144
+  );
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const tickX = (tick: number): number =>
+    layout.geometry.staffLeft +
+    getTickX(tick, 0, tick, layout.geometry.measureWidth, TOKENS, {
+      left: TOKENS.measureInset,
+      right: TOKENS.measureInset,
+    });
+  for (const p of layout.notes) {
+    const expected = getPitchCoordinate(
+      p.note.pitch.pitchClass,
+      p.note.pitch.octave,
+      p.coord.hand,
+      TOKENS,
+      OPTIONS,
+      p.coord.flank
+    );
+    close(p.coord.y, expected.y, `${p.note.id} keeps its lattice row`);
+    assert.equal(p.y, layout.geometry.middleCY + expected.y, `${p.note.id} absolute y`);
+    assert.equal(p.rhythm.y, p.y, `${p.note.id} rhythm layer follows the row`);
+    assert.equal(p.rhythm.x, p.x, `${p.note.id} stem column follows the head`);
+    if (p.note.id === 'chord-g' || p.note.id === 'next-d') {
+      // Off the measure opening there is room on both sides, so the row-snapped
+      // pair straddles the untouched beat column exactly; the different-row
+      // third and the later onset both stay on it.
+      close(p.x, tickX(p.note.startTick), `${p.note.id} stays on the nominal beat column`);
+    }
+  }
+  const c = layout.notes.find((p) => p.note.id === 'chord-c')!;
+  const e = layout.notes.find((p) => p.note.id === 'chord-e')!;
+  close((c.x + e.x) / 2, tickX(48), 'the spread pair is centred on the beat');
+});
+
+test('Row-snapped parity offset: a crowd at the barline slides the whole column, never shears it', () => {
+  // On a downbeat the measure band has no room to the left, so the column
+  // translates; every voice of the onset travels together, which is what keeps
+  // the isomorphic hand shape intact.
+  const layout = layoutJankoScore(
+    makeScore(
+      [
+        makeNote('open-c', 0, 4, 0, 96, 'LH'),
+        makeNote('open-e', 4, 4, 0, 96, 'RH'),
+        makeNote('open-g', 7, 4, 0, 96, 'RH'),
+      ],
+      144
+    ),
+    OPTIONS,
+    TOKENS
+  )[0];
+  const c = layout.notes.find((p) => p.note.id === 'open-c')!;
+  const e = layout.notes.find((p) => p.note.id === 'open-e')!;
+  const g = layout.notes.find((p) => p.note.id === 'open-g')!;
+  assert.equal(layout.notes.length, 3);
+  close((c.x + e.x) / 2, g.x, 'the pair stays centred on its onset column');
+  close(Math.abs(e.x - c.x), getChordalOffset(TOKENS), 'the pair keeps its full spread');
+  assert.ok(
+    Math.min(c.x, e.x) - TOKENS.noteheadRadius >= layout.geometry.staffLeft + 1.0,
+    'the slid column still clears the opening barline by >= 1pt'
+  );
+});
+
+test('Row-snapped parity offset: a three-note row cluster spreads as −Δ, 0, +Δ', () => {
+  // G7 without its fifth: [7, 11, 2, 5] → 7, 11 and 5 all rank 1 of one octave.
+  const score = makeScore(
+    [
+      makeNote('g7-g', 7, 4, 0, 96, 'RH'),
+      makeNote('g7-b', 11, 4, 0, 96, 'RH'),
+      makeNote('g7-f', 5, 4, 0, 96, 'RH'),
+    ],
+    144
+  );
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
+  const delta = getChordalOffset(TOKENS);
+  assert.equal(xs.length, 3);
+  for (const p of layout.notes) {
+    assert.equal(p.coord.rank, 1, 'all three heads sit on row 1');
+    assert.equal(p.y, layout.notes[0].y, 'and share one y');
+  }
+  close(xs[1] - xs[0], delta, 'left pair separated by one offset');
+  close(xs[2] - xs[1], delta, 'right pair separated by one offset');
+});
+
+test('Row-snapped parity offset: a spread downbeat chord never crosses its barline', () => {
+  const layout = layoutJankoScore(
+    makeScore(
+      [
+        makeNote('low-a', 9, 3, 0, 96, 'LH'),
+        makeNote('low-b', 11, 3, 0, 96, 'LH'),
+        makeNote('low-f', 5, 3, 0, 96, 'LH'),
+      ],
+      144
+    ),
+    OPTIONS,
+    TOKENS
+  )[0];
+  const left = layout.geometry.staffLeft;
+  for (const p of layout.notes) {
+    assert.ok(
+      p.x - TOKENS.noteheadRadius >= left + 1.0,
+      `${p.note.id} keeps >= 1pt of air from the opening barline (x=${p.x.toFixed(2)})`
+    );
+  }
+  const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
+  close(xs[1] - xs[0], getChordalOffset(TOKENS), 'the cluster is still fully spread');
+});
+
+test('Row-snapped parity offset: the canonical Bach score is unchanged on unaffected onsets', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  // m. 1 of the Goldberg Variation writes two voices in different octaves, so
+  // no onset is a row collision and every head stays on its beat column.
+  const m1 = layout.notes.filter((p) => p.note.startTick < TOKENS.ticksPerMeasure!);
+  assert.ok(m1.length > 0);
+  for (const p of m1) {
+    const expected =
+      layout.geometry.staffLeft +
+      getTickX(p.note.startTick, 0, p.note.startTick, layout.geometry.measureWidth, TOKENS, {
+        left: TOKENS.measureInset,
+        right: TOKENS.measureInset,
+      });
+    close(p.x, expected, `${p.note.id} stays on its beat column`);
+  }
 });
 
 test('renderJankoVariantComparison: A/B/C contact sheet over the same measures', () => {
@@ -1479,7 +1662,7 @@ test('Anchored and 3-row layouts surface their real cost: high notes hit the num
 // 5. Export suite invariant
 // ---------------------------------------------------------------------------
 
-test('npm run janko:export produces all ten PNGs everywhere in under 3 seconds', () => {
+test('npm run janko:export produces all twelve PNGs everywhere in under 3 seconds', () => {
   const started = Date.now();
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/render_janko_suite.ts'], {
     cwd: REPO_ROOT,
@@ -1512,6 +1695,12 @@ test('npm run janko:export produces all ten PNGs everywhere in under 3 seconds',
   const sheet = fs.readFileSync(path.join(REPO_ROOT, 'janko_domain_exploration.png'));
   assert.ok(sheet.length > 10_000, 'the four-paradigm contact sheet is a real rasterization');
   assert.deepEqual([...sheet.subarray(1, 4)], [...Buffer.from('PNG')], 'the sheet is a PNG');
+
+  // The Brahms pressure benchmark ships as a full page plus the mm. 7–8 macro
+  // crop of the two five-voice chords.
+  const brahms = fs.readFileSync(path.join(REPO_ROOT, 'janko_brahms_m7_m8.png'));
+  assert.ok(brahms.length > 10_000, 'the Brahms chord crop is a real rasterization');
+  assert.deepEqual([...brahms.subarray(1, 4)], [...Buffer.from('PNG')], 'the crop is a PNG');
 
   assert.ok(elapsed < 3000, `export suite must finish under 3s (took ${elapsed}ms)`);
 });
