@@ -66,6 +66,18 @@ export interface JankoTokens {
   accoladeGap?: number;
   /** Radius of a dotted-rhythm augmentation dot. */
   augmentationDotRadius?: number;
+  /** Horizontal reach of a standard note flag, right of the stem. */
+  flagWidth?: number;
+  /** Vertical drop of a flag hook from its stem tip. */
+  flagHeight?: number;
+  /** Vertical spacing between stacked flags (16ths and shorter). */
+  flagSpacing?: number;
+  /**
+   * Minimum air (pt) that must remain between a notehead disc and the nearest
+   * beam edge. The beam solver raises/lowers the connector until every head in
+   * the group keeps this clearance; the visual linter audits the same number.
+   */
+  minStemClearance?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -97,6 +109,10 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   maxBeamSlope: 0.22,
   accoladeGap: 7.0,
   augmentationDotRadius: 1.3,
+  flagWidth: 4.0,
+  flagHeight: 6.6,
+  flagSpacing: 3.4,
+  minStemClearance: 1.5,
 };
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */

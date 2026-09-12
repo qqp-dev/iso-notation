@@ -20,8 +20,10 @@
  *    with a barline.
  * 3. **Corridor & guideline integrity** — the Middle C channel stays free of
  *    structural rules and beams, and the spine is never cut by a glyph.
- * 4. **Beam & stem validity** — stems attach inside their notehead and reach
- *    the beam centerline exactly (no overshoot, no gap), and every beam slope
+ * 4. **Beam & stem validity** — stems attach on their notehead's vertical
+ *    centreline (`stemX === note.x`) and reach the beam centerline exactly (no
+ *    overshoot, no gap), every beam connector stays a minimum clearance away
+ *    from every notehead disc (`beam-notehead-collision`), and every beam slope
  *    stays inside the acceptable threshold.
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
@@ -44,6 +46,7 @@ import {
   resolveJankoTokens,
 } from './types';
 import { JankoSystemLayout, PositionedJankoNote, layoutJankoScore, renderSystem } from './engine';
+import { JankoBeamConnector, getStemGeometry } from './elements/rhythm';
 import { JANKO_DIGIT_BASELINE_OFFSET } from './elements/notehead';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +67,7 @@ export type JankoLintCode =
   | 'stem-detached'
   | 'beam-slope'
   | 'beam-stem-gap'
+  | 'beam-notehead-collision'
   | 'barline-collision'
   | 'measure-numeral-collision'
   | 'accolade-collision'
@@ -144,6 +148,7 @@ export const JANKO_LINT_CHECKS = [
   'notehead-clearance',
   'knockout-coverage',
   'stem-beam-validity',
+  'beam-notehead-clearance',
   'barline-clearance',
   'measure-numeral-clearance',
   'accolade-clearance',
@@ -336,7 +341,8 @@ export function checkKnockoutCoverage(
 // ---------------------------------------------------------------------------
 
 /**
- * Stems must attach inside their notehead disc and reach the beam centerline
+ * Stems must be engraved on their notehead's vertical centreline
+ * (`stemX === note.x`), attach inside the disc, and reach the beam centerline
  * exactly (no overshoot, no shortfall). Beam slopes must stay inside the
  * acceptable threshold, no matter how wide the leap.
  */
@@ -348,9 +354,27 @@ export function checkStemAndBeamValidity(
 ): void {
   const r = t.noteheadRadius;
   for (const p of layout.notes) {
-    const dir = p.coord.hand === 'RH' ? -1 : 1;
-    const stemX = dir === -1 ? p.x + r - 0.4 : p.x - r + 0.4;
-    const stemStartY = p.y + dir * 1.5;
+    // Shared with the renderer, so a drifting stem column can never slip past.
+    const stem = getStemGeometry(p.rhythm, t);
+    const stemX = stem.stemX;
+    const stemStartY = stem.stemStartY;
+    if (Math.abs(stemX - p.x) > EPS) {
+      out.push({
+        code: 'stem-detached',
+        severity: 'error',
+        message:
+          `Stem of ${p.note.id} is engraved ${Math.abs(stemX - p.x).toFixed(2)}pt off the notehead ` +
+          `centreline (stemX=${stemX.toFixed(2)}, note x=${p.x.toFixed(2)}): duration indicators ` +
+          `would stagger against the digit.`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: stemX,
+        y: stemStartY,
+        metrics: { stemX, noteX: p.x, offset: stemX - p.x },
+      });
+      continue;
+    }
     const attach = Math.hypot(stemX - p.x, stemStartY - p.y);
     if (attach > r + EPS) {
       out.push({
@@ -413,6 +437,73 @@ export function checkStemAndBeamValidity(
           x: stem.stemX,
           y: stem.stemStartY,
           metrics: { direction: stem.direction, expected: beam.direction },
+        });
+      }
+    }
+  }
+}
+
+/**
+ * No beam connector may cut into a notehead disc.
+ *
+ * For every beam group — primary connector and the 16th secondary connector —
+ * and every notehead of the system whose column falls under the connector, the
+ * perpendicular distance from the notehead centre to the connector must be at
+ * least `noteheadRadius + minStemClearance`, where the air is the larger of the
+ * token's stem clearance and the linter's global {@link JankoLintOptions.minClearance}
+ * floor. Ascending or descending runs therefore always show a real stem between
+ * the head and the beam instead of a clipped beam/knockout intersection.
+ */
+export function checkBeamNoteheadClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const r = t.noteheadRadius;
+  // The token's stem clearance, never below the linter's global air floor.
+  const air = Math.max(t.minStemClearance, lint.minClearance);
+  const required = r + air;
+  for (const beam of layout.beams) {
+    const connectors: Array<{ label: string; connector: JankoBeamConnector }> = [
+      { label: 'primary beam', connector: beam.primary },
+    ];
+    if (beam.secondary) connectors.push({ label: 'secondary beam', connector: beam.secondary });
+    const beamIds = beam.notes.map((n) => n.id);
+
+    for (const { label, connector } of connectors) {
+      const lo = Math.min(connector.x1, connector.x2) - required;
+      const hi = Math.max(connector.x1, connector.x2) + required;
+      for (const p of layout.notes) {
+        if (p.x < lo || p.x > hi) continue;
+        const distance = pointToSegmentDistance(
+          p.x,
+          p.y,
+          connector.x1,
+          connector.y1,
+          connector.x2,
+          connector.y2
+        );
+        if (distance + EPS >= required) continue;
+        out.push({
+          code: 'beam-notehead-collision',
+          severity: 'error',
+          message:
+            `${label} of [${beamIds.join(', ')}] passes ${distance.toFixed(2)}pt from notehead ` +
+            `${p.note.id} (${required.toFixed(2)}pt required: disc r=${r.toFixed(2)} + ` +
+            `${air.toFixed(2)}pt air): the beam collides with the glyph.`,
+          system: layout.index,
+          measure: measureOfTick(p.note.startTick, t),
+          noteIds: [p.note.id, ...beamIds],
+          x: p.x,
+          y: p.y,
+          metrics: {
+            distance,
+            required,
+            radius: r,
+            minStemClearance: air,
+            beamSlope: beam.slope,
+          },
         });
       }
     }
@@ -823,7 +914,8 @@ export interface KnockoutAuditOptions {
  *    is what "zero staff/beat line pass-through" means in practice.
  *
  * The notehead's own stem necessarily starts inside its own disc and is
- * recognised (and exempted) by its exact ±(r-0.4) / ∓1.5 attachment offsets.
+ * recognised (and exempted) by its exact centred `/ ∓1.5` attachment offset;
+ * the legacy perimeter anchors are kept for older documents.
  */
 export function auditKnockoutProtection(
   svg: string,
@@ -893,8 +985,11 @@ export function auditKnockoutProtection(
     const cy = num(k.attrs, 'cy');
     const kr = num(k.attrs, 'r');
     const radius = Number.isFinite(kr) ? kr : r;
-    // The notehead's own stem: exact ±(r-0.4) / ∓1.5 attachment offsets.
+    // The notehead's own stem: centred columns (current) and the legacy
+    // ±(r-0.4) perimeter attachment offsets.
     const ownStemAnchors = [
+      { x: cx, y: cy - 1.5 },
+      { x: cx, y: cy + 1.5 },
       { x: cx + (radius - 0.4), y: cy - 1.5 },
       { x: cx - (radius - 0.4), y: cy + 1.5 },
       { x: cx + (radius - 0.4), y: cy + 1.5 },
@@ -1082,6 +1177,7 @@ export function lintJankoScore(
     checkNoteheadClearance(layout, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);
+    checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
     checkBarlineClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
