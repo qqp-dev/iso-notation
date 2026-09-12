@@ -22,7 +22,7 @@ import { getNoteColor } from '../src/render/colors';
 import { getCanonicalSyllable } from '../src/model/phonetics';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { calculateScoreDimensions, renderScoreToCanvas } from '../src/render/score-canvas';
-import { renderColumnarScoreToSvg, computeColumnarLayout, renderAllPagesToSvg } from '../src/render/print-layout';
+import { renderColumnarScoreToSvg, computeColumnarLayout, renderAllPagesToSvg, NOTEHEAD_KNOCKOUT_RADIUS_PT } from '../src/render/print-layout';
 
 test('Staff Topography: wholetone-uniform-6 invariants', () => {
   const styles: StaffStyle[] = ['wholetone-uniform-6', 'wholetone-uniform'];
@@ -247,7 +247,7 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.equal(normalizeNoteheadMorphology('base-12'), 'duodecimal');
 
   assert.equal(DUODECIMAL_DIGITS.length, 12);
-  assert.deepEqual([...DUODECIMAL_DIGITS], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']);
+  assert.deepEqual([...DUODECIMAL_DIGITS], ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B']);
 
   for (let pc = 0; pc < 12; pc++) {
     const digit = getDuodecimalDigit(pc);
@@ -255,9 +255,9 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
     assert.equal(digit.length, 1, 'Strictly 1 character per pitch class');
     const isEven = pc % 2 === 0;
     if (isEven) {
-      assert.match(digit, /^[02468a]$/, 'Row 0 must be even duodecimal digits');
+      assert.match(digit, /^[02468A]$/, 'Row 0 must be even duodecimal digits');
     } else {
-      assert.match(digit, /^[13579b]$/, 'Row 1 must be odd duodecimal digits');
+      assert.match(digit, /^[13579B]$/, 'Row 1 must be odd duodecimal digits');
     }
   }
 
@@ -274,22 +274,22 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   // SVG rendering test: duodecimal tokens in print layout
   const score = buildBachGoldbergVar1Score();
   const svg = renderColumnarScoreToSvg(score, 0, { noteheadMorphology: 'duodecimal' });
-  assert.match(svg, />[0-9ab]<\/text>/, 'SVG must render duodecimal text tokens');
-  // Check specifically for digits 7, 6, 2, 4, 9, b from mm. 1-4
+  assert.match(svg, />[0-9AB]<\/text>/, 'SVG must render duodecimal text tokens');
+  // Check specifically for digits 7, 6, 2, 4, 9, B from mm. 1-4
   assert.match(svg, />7<\/text>/, 'Must render G as 7');
   assert.match(svg, />6<\/text>/, 'Must render F# as 6');
-  assert.match(svg, />b<\/text>/, 'Must render B as b');
+  assert.match(svg, />B<\/text>/, 'Must render B as B');
   assert.match(svg, />2<\/text>/, 'Must render D as 2');
   assert.match(svg, />4<\/text>/, 'Must render E as 4');
 
   // Standalone naked digits invariant:
-  // Must render circular knockouts (r="4.80") and zero enclosing background tile rectangles
-  assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.80" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
+  // Must render circular knockouts (r=NOTEHEAD_KNOCKOUT_RADIUS_PT) and zero enclosing background tile rectangles
+  assert.match(svg, new RegExp(`<circle cx="[0-9.]+" cy="[0-9.]+" r="${NOTEHEAD_KNOCKOUT_RADIUS_PT.toFixed(2)}" fill="#FFFFFF"/>`), 'Must render circular line knockout');
   assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
 
   // Intuitive Up/Down Handedness Chevrons for hand-crossing exceptions:
   // Measure 4 contains RH crossing into the bass (< 48) -> upward chevrons above the noteheads
-  const chevronRegex = /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="1\.20"/g;
+  const chevronRegex = /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.80"/g;
   const upMatches = Array.from(svg.matchAll(chevronRegex)).filter((m) => m[1] === 'up');
   assert.ok(upMatches.length > 0, 'Must render upward chevrons for duodecimal RH crossing exceptions in mm. 1–12');
   upMatches.forEach((m) => {
@@ -297,9 +297,9 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
     assert.ok(Math.abs(parseFloat(m[4]) - parseFloat(m[2]) - 2.1) < 1e-9, 'Authoritative chevron half-width must be 2.1pt');
   });
 
-  // Page 3 contains measure 30 with LH crossing into the treble (> 48) -> downward chevrons below the noteheads
-  const page3Svg = renderColumnarScoreToSvg(score, 2, { noteheadMorphology: 'duodecimal' });
-  const downMatches = Array.from(page3Svg.matchAll(chevronRegex)).filter((m) => m[1] === 'down');
+  // Page 4 contains measure 30 with LH crossing into the treble (> 48) -> downward chevrons below the noteheads
+  const page4Svg = renderColumnarScoreToSvg(score, 3, { noteheadMorphology: 'duodecimal' });
+  const downMatches = Array.from(page4Svg.matchAll(chevronRegex)).filter((m) => m[1] === 'down');
   assert.ok(downMatches.length > 0, 'Must render downward chevrons for duodecimal LH crossing exceptions in m. 30');
   downMatches.forEach((m) => {
     assert.ok(parseFloat(m[5]) > parseFloat(m[3]), 'Downward chevron apex must sit below its base (∨)');
@@ -482,8 +482,10 @@ test('Lowercase \'o\' Octave Marker Invariant: score canvas margin indicators', 
   assert.ok(horizOOctaves.length > 0, 'Must render o${oct - 1} octave markers in horizontal orientation');
   assert.ok(horizOOctaves.includes('o2'), 'Should include o2 (C3)');
   assert.ok(horizOOctaves.includes('o3'), 'Should include o3 (Middle C, C4)');
-  assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
   assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
+  assert.ok(!horizTexts.some((t) => /^(10|11|12):\d+$/.test(t)), 'Must not render 1-based 10..12 labels; must use duodecimal A, B');
+  assert.ok(horizTexts.some((t) => /^A:\d+$/.test(t)), 'Must render A for pitch class 10');
+  assert.ok(horizTexts.some((t) => /^B:\d+$/.test(t)), 'Must render B for pitch class 11');
 
   // 2. Vertical orientation
   const { ctx: vertCtx, fills: vertFills } = createMockCtx();
@@ -749,6 +751,102 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
   const symLh = symDirectional.filter((s) => s.hand === 'LH');
   assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing notehead');
   assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing notehead');
+});
+
+test('Definitive Duodecimal Canvas Invariant: 0..B pitch tokens and Up/Down chevrons matching print layout', () => {
+  const score = buildBachGoldbergVar1Score();
+  const fills: { text: string; font: string }[] = [];
+  const chevrons: { baseX: number; apexX: number; baseY: number; apexY: number; hand: 'RH' | 'LH' }[] = [];
+  let currentStroke = '';
+  let currentPath: { x: number; y: number }[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    set strokeStyle(val: string) {
+      currentStroke = val;
+    },
+    get strokeStyle() {
+      return currentStroke;
+    },
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {
+      currentPath = [];
+    },
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      currentPath = [{ x, y }];
+    },
+    lineTo: (x: number, y: number) => {
+      currentPath.push({ x, y });
+    },
+    stroke: () => {
+      if (currentPath.length === 3 && currentStroke !== '#000000') {
+        const [p0, p1, p2] = currentPath;
+        if (Math.abs(p0.y - p2.y) < 0.01 && p1.y !== p0.y) {
+          const hand = p1.y < p0.y ? 'RH' : 'LH';
+          chevrons.push({
+            baseX: (p0.x + p2.x) / 2,
+            apexX: p1.x,
+            baseY: p0.y,
+            apexY: p1.y,
+            hand,
+          });
+        }
+      }
+    },
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string) => {
+      fills.push({ text, font: mockCtx.font });
+    },
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'duodecimal',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  // Notehead tokens: must include 0..9, A, B, and NEVER 10, 11, 12
+  const noteheadTokens = fills.filter((f) => f.font.includes('URW Gothic') || f.font.includes('Century Gothic')).map((f) => f.text);
+  assert.ok(noteheadTokens.length > 0, 'Must render duodecimal notehead tokens');
+  assert.ok(!noteheadTokens.includes('10'), 'Must never render 10');
+  assert.ok(!noteheadTokens.includes('11'), 'Must never render 11');
+  assert.ok(!noteheadTokens.includes('12'), 'Must never render 12');
+  assert.ok(noteheadTokens.includes('A'), 'Must render capital A for pitch class 10');
+  assert.ok(noteheadTokens.includes('B'), 'Must render capital B for pitch class 11');
+
+  // Chevrons: 63 hand crossing exceptions in Goldberg Var 1 (24 RH pointing Up, 39 LH pointing Down)
+  assert.equal(chevrons.length, 63, 'Must render exactly 63 Up/Down chevrons for crossing notes');
+  const rhChevrons = chevrons.filter((c) => c.hand === 'RH');
+  const lhChevrons = chevrons.filter((c) => c.hand === 'LH');
+  assert.equal(rhChevrons.length, 24, '24 RH exceptions must point Up (apexY < baseY)');
+  assert.equal(lhChevrons.length, 39, '39 LH exceptions must point Down (apexY > baseY)');
+  for (const c of rhChevrons) {
+    assert.ok(c.apexY < c.baseY, 'RH chevron must point UP (apex above base)');
+  }
+  for (const c of lhChevrons) {
+    assert.ok(c.apexY > c.baseY, 'LH chevron must point DOWN (apex below base)');
+  }
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {

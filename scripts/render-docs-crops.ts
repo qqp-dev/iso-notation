@@ -91,16 +91,22 @@ function main(): void {
   const layout = computeColumnarLayout(score);
   const pages = layout.pages.map((_, idx) => renderPageToSvg(layout, idx));
 
+  const PUBLIC_DIR = path.resolve('public/img');
+  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+
   const write = (name: string, pageIndex: number, box: CropBox, pixelsPerPt: number = CROP_PIXELS_PER_PT): void => {
     const outPath = path.join(OUT_DIR, name);
-    rasterize(cropSvg(pages[pageIndex], box, pixelsPerPt), outPath);
+    const pubPath = path.join(PUBLIC_DIR, name);
+    const cropped = cropSvg(pages[pageIndex], box, pixelsPerPt);
+    rasterize(cropped, outPath);
+    fs.copyFileSync(outPath, pubPath);
     console.log(`  ✓ ${name} (${Math.round(box.w * pixelsPerPt)} × ${Math.round(box.h * pixelsPerPt)}px)`);
   };
 
   console.log('Rendering horizontal landscape documentation crops...');
 
-  // Measures 1–2: vertical accolade, opening halo, clean measure numbering
-  write('definitive_m1_m2.png', 0, measureBox(layout, 0, 0, 0, 2, { left: 22, right: 8 }));
+  // Measures 1–2: classical vertical accolade, o3 Middle C pill badge, o5/o1 labels, opening halo, clean measure numbering
+  write('definitive_m1_m2.png', 0, measureBox(layout, 0, 0, 0, 2, { left: 52, right: 8, top: 20, bottom: 12 }));
 
   // Measure 4: RH-in-bass upward chevrons
   write('definitive_m4.png', 0, measureBox(layout, 0, 0, 3, 1, { left: 8, right: 8 }));
@@ -108,16 +114,31 @@ function main(): void {
   // Measure 6: continuous Royal Blue Middle C hold line (system 2 of page 1)
   write('definitive_m6.png', 0, measureBox(layout, 0, 1, 1, 1, { left: 8, right: 8 }));
 
-  // Measure 30: LH-in-treble downward chevrons (system 8 → page 3, system slot 2)
-  write('definitive_m30.png', 2, measureBox(layout, 2, 1, 1, 1, { left: 8, right: 8 }));
+  // Measure 30: LH-in-treble downward chevrons (system 8 → page 4, system slot 2)
+  write('definitive_m30.png', 3, measureBox(layout, 3, 1, 1, 1, { left: 8, right: 8 }));
 
-  // Full first page of the 3-page landscape spread
+  // Full first page of the landscape score
   write(
     'horizontal_portrait_page1.png',
     0,
     { x: 0, y: 0, w: layout.pageDimensions.widthPt, h: layout.pageDimensions.heightPt },
     PAGE_PIXELS_PER_PT
   );
+
+  // Full pages 1–4 for review
+  for (let p = 0; p < 4; p++) {
+    write(
+      `page${p + 1}_4.25.png`,
+      p,
+      { x: 0, y: 0, w: layout.pageDimensions.widthPt, h: layout.pageDimensions.heightPt },
+      PAGE_PIXELS_PER_PT
+    );
+  }
+
+  // Macro diagnostics: Bar 12 and Bar 16
+  write('bar12_4.25.png', 1, measureBox(layout, 1, 0, 3, 1, { left: 8, right: 8 }));
+  write('bar16_4.25.png', 1, measureBox(layout, 1, 1, 3, 1, { left: 8, right: 8 }));
+  write('crop_m11_12_4.25.png', 1, measureBox(layout, 1, 0, 2, 2, { left: 8, right: 8 }));
 }
 
 main();

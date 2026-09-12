@@ -89,7 +89,8 @@ export function renderScoreToCanvas(
   const paddingPitch = 40;
 
   const normStaffStyle = normalizeStaffStyle(options.staffStyle || options.notationStyle);
-  const normNoteheadMorph = normalizeNoteheadMorphology(options.noteheadMorphology || options.noteheadStyle);
+  const rawMorph = options.noteheadMorphology || (options.noteheadStyle && options.noteheadStyle !== 'numerical' ? options.noteheadStyle : 'duodecimal');
+  const normNoteheadMorph = normalizeNoteheadMorphology(rawMorph);
 
   // Convert (tick, linearPitch) to canvas (x, y)
   const getCoords = (tick: number, lPitch: number): { x: number; y: number } => {
@@ -326,9 +327,10 @@ export function renderScoreToCanvas(
       }
 
       if (lineGeom.isLine) {
+        const isMiddleC = p === 48;
         ctx.beginPath();
-        ctx.strokeStyle = lineGeom.color;
-        ctx.lineWidth = lineGeom.lineWidth;
+        ctx.strokeStyle = isMiddleC ? 'rgba(255, 255, 255, 0.95)' : lineGeom.color;
+        ctx.lineWidth = isMiddleC ? 2.0 : lineGeom.lineWidth;
         if (lineGeom.isDashed && lineGeom.dashArray) {
           ctx.setLineDash(lineGeom.dashArray);
         } else {
@@ -339,7 +341,7 @@ export function renderScoreToCanvas(
         ctx.stroke();
       }
 
-      // Pitch Coordinate label on left margin: 1-based (noteNum:octave), with m${oct - 1} at octave boundaries
+      // Pitch Coordinate label on left margin: duodecimal 0..B, with o${oct - 1} at octave boundaries
       const isOctave0 = pc === 0;
       let textColor = '#666666';
       if (isOctave0) textColor = '#FFFFFF';
@@ -350,7 +352,7 @@ export function renderScoreToCanvas(
       ctx.textBaseline = 'middle';
       const isAfterC = pc >= 9;
       const displayOct = isAfterC ? oct : Math.max(0, oct - 1);
-      const label = isOctave0 ? `o${displayOct}` : `${pc + 1}:${displayOct}`;
+      const label = isOctave0 ? `o${displayOct}` : `${DUODECIMAL_DIGITS[pc]}:${displayOct}`;
       ctx.fillText(label, paddingStart - 8, y);
     } else {
       // Vertical timeline
@@ -400,7 +402,7 @@ export function renderScoreToCanvas(
         ctx.font = '9px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(String(pc + 1), x, paddingStart - 6);
+        ctx.fillText(DUODECIMAL_DIGITS[pc], x, paddingStart - 6);
       }
     }
   }
@@ -918,6 +920,17 @@ export function renderScoreToCanvas(
         }
       }
 
+      // Position of Honor for opening sound(s) of the piece (tick 0)
+      if (note.startTick === 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy - 0.8, 9.2, 0, Math.PI * 2);
+        ctx.strokeStyle = isHighlighted ? '#FACC15' : '#D4AF37';
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Render notehead morphology with line knockout
       const hand = note.hand ?? (lPitch >= 48 ? 'RH' : 'LH');
       const isHandException = (hand === 'RH' && lPitch < 48) || (hand === 'LH' && lPitch > 48);
@@ -1013,9 +1026,9 @@ export function renderScoreToCanvas(
       if (note.startTick === 0) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(cx, cy - 0.8, 8.8, 0, Math.PI * 2);
-        ctx.strokeStyle = isHighlighted ? '#FACC15' : noteColor;
-        ctx.lineWidth = 1.2;
+        ctx.arc(cx, cy - 0.8, 9.2, 0, Math.PI * 2);
+        ctx.strokeStyle = isHighlighted ? '#FACC15' : '#D4AF37';
+        ctx.lineWidth = 1.3;
         ctx.stroke();
         ctx.restore();
       }
@@ -1380,33 +1393,76 @@ export function renderNotehead(
       ctx.textBaseline = 'middle';
       ctx.fillText(digit, cx, cy);
 
-      // Sculpted French Guillemet for hand-crossing exceptions (« for LH, » for RH)
+      // Up/Down chevrons for hand-crossing exceptions (Up for RH above notehead, Down for LH below notehead)
       if (handException !== null) {
-        const h = 5.6;
-        const w = 3.4;
-        const clr = 2.0;
-        const thick = 1.6;
-
-        let bx = handException === 'LH' ? cx - r - clr : cx + r + clr;
-        let ax = handException === 'LH' ? bx - w : bx + w;
-        let ctrlX = handException === 'LH' ? bx - w * 0.30 : bx + w * 0.30;
-        const ty = cyOpt - h / 2;
-        const by = cyOpt + h / 2;
-        const inAx = handException === 'LH' ? ax + thick : ax - thick;
-        const inCtrlX = handException === 'LH' ? ctrlX + thick * 0.45 : ctrlX - thick * 0.45;
+        const chW = 5.6;
+        const chH = 3.6;
+        const clearance = 2.8;
+        const leftX = cx - chW / 2;
+        const rightX = cx + chW / 2;
 
         ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(bx, ty);
-        ctx.quadraticCurveTo(ctrlX, cyOpt - h * 0.22, ax, cyOpt);
-        ctx.quadraticCurveTo(ctrlX, cyOpt + h * 0.22, bx, by);
-        ctx.quadraticCurveTo(inCtrlX, cyOpt + h * 0.16, inAx, cyOpt);
-        ctx.quadraticCurveTo(inCtrlX, cyOpt - h * 0.16, bx, ty);
-        ctx.closePath();
+        if (handException === 'RH') {
+          // RH exception: Upward chevron above notehead (apex pointing up)
+          const cyChev = cyOpt - (r + clearance);
+          const baseY = cyChev + chH / 2;
+          const apexY = cyChev - chH / 2;
 
-        // Direct solid fill without stroke halo knockout
-        ctx.fillStyle = headColor;
-        ctx.fill();
+          // Shield knockout behind chevron
+          ctx.beginPath();
+          ctx.moveTo(leftX, baseY);
+          ctx.lineTo(cx, apexY);
+          ctx.lineTo(rightX, baseY);
+          ctx.closePath();
+          ctx.fillStyle = '#000000';
+          ctx.fill();
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2.4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+
+          // Chevron stroke
+          ctx.beginPath();
+          ctx.moveTo(leftX, baseY);
+          ctx.lineTo(cx, apexY);
+          ctx.lineTo(rightX, baseY);
+          ctx.strokeStyle = headColor;
+          ctx.lineWidth = 1.2;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+        } else {
+          // LH exception: Downward chevron below notehead (apex pointing down)
+          const cyChev = cyOpt + (r + clearance);
+          const baseY = cyChev - chH / 2;
+          const apexY = cyChev + chH / 2;
+
+          // Shield knockout behind chevron
+          ctx.beginPath();
+          ctx.moveTo(leftX, baseY);
+          ctx.lineTo(cx, apexY);
+          ctx.lineTo(rightX, baseY);
+          ctx.closePath();
+          ctx.fillStyle = '#000000';
+          ctx.fill();
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2.4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+
+          // Chevron stroke
+          ctx.beginPath();
+          ctx.moveTo(leftX, baseY);
+          ctx.lineTo(cx, apexY);
+          ctx.lineTo(rightX, baseY);
+          ctx.strokeStyle = headColor;
+          ctx.lineWidth = 1.2;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+        }
         ctx.restore();
       }
       break;

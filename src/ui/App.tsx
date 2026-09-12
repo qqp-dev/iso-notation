@@ -11,7 +11,7 @@ import { SolfegeGuide } from './SolfegeGuide';
 import { PrintModal } from './PrintModal';
 import { CompressionModal } from './CompressionModal';
 
-const STORAGE_KEY = 'iso-notation-render-options-v2';
+const STORAGE_KEY = 'iso-notation-render-options-v3';
 
 const DEFINITIVE_RENDER_OPTIONS: RenderOptions = {
   orientation: 'vertical',

@@ -24,9 +24,9 @@ test('Definitive Duodecimal Solfege: 12 monosyllabic tokens and bijection', () =
   const pcs = DUODECIMAL_SOLFEGE.map((e) => e.pitchClass).sort((a, b) => a - b);
   assert.deepEqual(pcs, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
-  // Digits match '0'..'9', 'a', 'b'
+  // Digits match '0'..'9', 'A', 'B'
   const digits = DUODECIMAL_SOLFEGE.map((e) => e.digit);
-  assert.deepEqual(digits, ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']);
+  assert.deepEqual(digits, ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B']);
 });
 
 test('Jánko Row Parity Invariant: Evens are Row 0, Odds are Row 1', () => {
