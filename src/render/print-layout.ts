@@ -35,15 +35,19 @@ export const MEASURE_INSET_PT = 6;
 export const NOTEHEAD_KNOCKOUT_RADIUS_PT = 4.8;
 /** Noble concentric halo ring around the opening sound(s) at tick 0 in Measure 1. */
 export const OPENING_HALO_RADIUS_PT = 5.8;
-export const ACCOLADE_WIDTH_PT = 10;
-export const ACCOLADE_GAP_PT = 8;
+/** Slender copperplate horizontal reach of the vertical accolade. */
+export const ACCOLADE_WIDTH_PT = 7.0;
+/** Breathing gap between the accolade cusp and the opening of the staff. */
+export const ACCOLADE_GAP_PT = 7.0;
+/** Delicate copperplate swell of the accolade at its central spine. */
+export const ACCOLADE_THICKNESS_PT = 0.85;
 
 const HEADER_HEIGHT_PT = 44;
 const FOOTER_HEIGHT_PT = 18;
 /** Reserved strip above each system for clean Urtext measure numerals. */
 const SYSTEM_LABEL_HEIGHT_PT = 12;
 const MEASURES_PER_SYSTEM_DEFAULT = 4;
-const SYSTEMS_PER_PAGE_DEFAULT = 4;
+const SYSTEMS_PER_PAGE_DEFAULT = 3;
 
 const pc12 = (p: number): number => ((p % 12) + 12) % 12;
 
@@ -148,15 +152,15 @@ export function getClassicalAccoladePath(
  * @param x     X coordinate of the brace spine (outer edge of the swell)
  * @param yTop  Top of the clasped staff (o5)
  * @param yBot  Bottom of the clasped staff (o1)
- * @param w     Total horizontal reach of the brace (~1:10 aspect ratio versus the 124.8pt staff)
- * @param thick Maximum stroke thickness at the central spine
+ * @param w     Total horizontal reach of the brace (slender 7pt default)
+ * @param thick Maximum stroke thickness at the central spine (delicate 0.85pt swell)
  */
 export function getVerticalAccoladePath(
   x: number,
   yTop: number,
   yBot: number,
   w: number = ACCOLADE_WIDTH_PT,
-  thick: number = 1.25
+  thick: number = ACCOLADE_THICKNESS_PT
 ): string {
   const yMid = (yTop + yBot) / 2;
   const h = yBot - yTop;
@@ -166,21 +170,26 @@ export function getVerticalAccoladePath(
   const cuspX = x + w;
   const outerX = x - w * 0.35;
   const innerOuterX = outerX + thick;
-  const innerCuspX = cuspX - w * 0.04;
+  const innerCuspX = cuspX - Math.max(0.22, thick * 0.35);
   const cuspCtlX = x + w * 0.1;
   const innerCuspCtlX = x + w * 0.18 + thick;
+  // Control-point excursions scale with the clasped staff instead of ballooning
+  // to fixed point offsets (the "bloated control points" of the former brace).
+  const tipCtlY = h * 0.032;
+  const cuspCtlY = h * 0.024;
+  const innerCuspCtlY = h * 0.02;
 
   return [
     `M ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
-    `C ${x.toFixed(2)} ${(yTop + 4).toFixed(2)}, ${outerX.toFixed(2)} ${(yTop + qh * 0.6).toFixed(2)}, ${outerX.toFixed(2)} ${(yTop + qh).toFixed(2)}`,
-    `C ${outerX.toFixed(2)} ${(yMid - qh * 0.6).toFixed(2)}, ${cuspCtlX.toFixed(2)} ${(yMid - 3).toFixed(2)}, ${cuspX.toFixed(2)} ${yMid.toFixed(2)}`,
-    `C ${cuspCtlX.toFixed(2)} ${(yMid + 3).toFixed(2)}, ${outerX.toFixed(2)} ${(yMid + qh * 0.6).toFixed(2)}, ${outerX.toFixed(2)} ${(yBot - qh).toFixed(2)}`,
-    `C ${outerX.toFixed(2)} ${(yBot - qh * 0.6).toFixed(2)}, ${x.toFixed(2)} ${(yBot - 4).toFixed(2)}, ${tipX.toFixed(2)} ${yBot.toFixed(2)}`,
+    `C ${x.toFixed(2)} ${(yTop + tipCtlY).toFixed(2)}, ${outerX.toFixed(2)} ${(yTop + qh * 0.6).toFixed(2)}, ${outerX.toFixed(2)} ${(yTop + qh).toFixed(2)}`,
+    `C ${outerX.toFixed(2)} ${(yMid - qh * 0.6).toFixed(2)}, ${cuspCtlX.toFixed(2)} ${(yMid - cuspCtlY).toFixed(2)}, ${cuspX.toFixed(2)} ${yMid.toFixed(2)}`,
+    `C ${cuspCtlX.toFixed(2)} ${(yMid + cuspCtlY).toFixed(2)}, ${outerX.toFixed(2)} ${(yMid + qh * 0.6).toFixed(2)}, ${outerX.toFixed(2)} ${(yBot - qh).toFixed(2)}`,
+    `C ${outerX.toFixed(2)} ${(yBot - qh * 0.6).toFixed(2)}, ${x.toFixed(2)} ${(yBot - tipCtlY).toFixed(2)}, ${tipX.toFixed(2)} ${yBot.toFixed(2)}`,
     // Inner contour: returns along the inner edge so the brace swells to `thick` at the spine
-    `C ${(x + thick * 0.4).toFixed(2)} ${(yBot - 4).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yBot - qh * 0.6).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yBot - qh).toFixed(2)}`,
-    `C ${innerOuterX.toFixed(2)} ${(yMid + qh * 0.6).toFixed(2)}, ${innerCuspCtlX.toFixed(2)} ${(yMid + 2.5).toFixed(2)}, ${innerCuspX.toFixed(2)} ${yMid.toFixed(2)}`,
-    `C ${innerCuspCtlX.toFixed(2)} ${(yMid - 2.5).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yMid - qh * 0.6).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yTop + qh).toFixed(2)}`,
-    `C ${innerOuterX.toFixed(2)} ${(yTop + qh * 0.6).toFixed(2)}, ${(x + thick * 0.4).toFixed(2)} ${(yTop + 4).toFixed(2)}, ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
+    `C ${(x + thick * 0.4).toFixed(2)} ${(yBot - tipCtlY).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yBot - qh * 0.6).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yBot - qh).toFixed(2)}`,
+    `C ${innerOuterX.toFixed(2)} ${(yMid + qh * 0.6).toFixed(2)}, ${innerCuspCtlX.toFixed(2)} ${(yMid + innerCuspCtlY).toFixed(2)}, ${innerCuspX.toFixed(2)} ${yMid.toFixed(2)}`,
+    `C ${innerCuspCtlX.toFixed(2)} ${(yMid - innerCuspCtlY).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yMid - qh * 0.6).toFixed(2)}, ${innerOuterX.toFixed(2)} ${(yTop + qh).toFixed(2)}`,
+    `C ${innerOuterX.toFixed(2)} ${(yTop + qh * 0.6).toFixed(2)}, ${(x + thick * 0.4).toFixed(2)} ${(yTop + tipCtlY).toFixed(2)}, ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
     `Z`
   ].join(' ');
 }
@@ -192,7 +201,7 @@ export interface PrintLayoutOptions {
   measuresPerSystem?: number;
   /** @deprecated Legacy alias of measuresPerSystem. */
   measuresPerColumn?: number;
-  /** Horizontal systems stacked on each page (default: 4). */
+  /** Horizontal systems stacked on each page (default: 3). */
   systemsPerPage?: number;
   /** @deprecated Legacy alias of systemsPerPage. */
   columnsPerPage?: number;
@@ -303,7 +312,7 @@ export interface ColumnarScoreLayout {
 
 const DEFAULT_OPTIONS: ResolvedPrintLayoutOptions = {
   paperSize: 'A4',
-  orientation: 'portrait',
+  orientation: 'landscape',
   measuresPerSystem: MEASURES_PER_SYSTEM_DEFAULT,
   measuresPerColumn: MEASURES_PER_SYSTEM_DEFAULT,
   systemsPerPage: SYSTEMS_PER_PAGE_DEFAULT,
@@ -342,10 +351,10 @@ export function resolveLayoutOptions(
 
 /**
  * Computes pagination and geometry for the horizontal system layout:
- * measures flow left → right within a system, systems stack top → bottom on portrait pages.
+ * measures flow left → right within a system, systems stack top → bottom on landscape pages.
  *
- * Default invariant for a 32-measure movement: 4 measures/system × 4 systems/page = 16
- * measures/page → exactly 2 pages (a zero-turn piano spread).
+ * Default invariant for a 32-measure movement: 4 measures/system × 3 systems/page = 12
+ * measures/page → exactly 3 pages.
  */
 export function computeColumnarLayout(
   score: QuantizedGridScore,
@@ -675,8 +684,9 @@ function nextLandmarkBelow(p: number, normStyle: StaffStyle): number | null {
 }
 
 /**
- * Generates clean, standalone vector SVG for one portrait page of the horizontal score:
- * 4 systems per page, each clasped by a classical vertical accolade with time flowing left → right.
+ * Generates clean, standalone vector SVG for one landscape page of the horizontal score:
+ * 3 systems per page, each clasped by a slender copperplate vertical accolade with time
+ * flowing left → right.
  */
 export function renderPageToSvg(
   layout: ColumnarScoreLayout,
@@ -738,7 +748,6 @@ export function renderPageToSvg(
     svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="subtitle">${escapeXml(titleMain)}</text>`);
     svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 14).toFixed(2)}" class="section-header" text-anchor="end">${escapeXml(page.sectionName)}</text>`);
   }
-  svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(marginPt + 34).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(marginPt + 34).toFixed(2)}" stroke="#CCCCCC" stroke-width="0.75"/>`);
   svgParts.push(`  </g>`);
 
   // 3. Render each horizontal system
@@ -755,14 +764,13 @@ export function renderPageToSvg(
     svgParts.push(`  <!-- System ${system.systemIndex + 1} (mm. ${system.startMeasure}–${system.endMeasure}) -->`);
     svgParts.push(`  <g id="system-${system.systemIndex + 1}">`);
 
-    // 3a. Classical vertical accolade (curly brace) on the left margin, cusp into Middle C
+    // 3a. Slender copperplate vertical accolade (curly brace) on the left margin,
+    //     cusp pointing directly into the bold Middle C spine. The staff lines emerge
+    //     openly from the left: no staff-bounding opening barline.
     svgParts.push(`    <!-- Classical Vertical Accolade (Curly Brace) clasping o1 to o5 -->`);
-    svgParts.push(`    <path d="${getVerticalAccoladePath(marginPt + 2, staffTop, staffBot, ACCOLADE_WIDTH_PT, 1.25)}" fill="#111827"/>`);
+    svgParts.push(`    <path d="${getVerticalAccoladePath(marginPt + 2, staffTop, staffBot, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT)}" fill="#111827"/>`);
 
-    // 3b. Authoritative opening barline at the head of the system, clear of the accolade
-    svgParts.push(`    <line x1="${staffLeft.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${staffLeft.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#111827" stroke-width="1.2"/>`);
-
-    // 3c. Horizontal staff topography
+    // 3b. Horizontal staff topography
     for (let p = minPitch; p <= maxPitch; p++) {
       const line = getHorizontalStaffLine(p, normStaffStyle);
       if (!line) continue;
@@ -771,7 +779,7 @@ export function renderPageToSvg(
       svgParts.push(`    <line x1="${staffLeft.toFixed(2)}" y1="${y}" x2="${staffRight.toFixed(2)}" y2="${y}" stroke="${line.stroke}" stroke-width="${line.width}"${dash}/>`);
     }
 
-    // 3d. Local dashed outlier lines for notes escaping the 4-octave core
+    // 3c. Local dashed outlier lines for notes escaping the 4-octave core
     for (let m = 0; m < numMeasures; m++) {
       const mStartTick = (system.startMeasure - 1 + m) * ticksPerMeasure;
       const mEndTick = mStartTick + ticksPerMeasure;
@@ -808,9 +816,11 @@ export function renderPageToSvg(
       const mEndX = mStartX + geo.measureWidthPt;
       const mStartTick = (mNum - 1) * ticksPerMeasure;
 
-      // Clean Urtext measure number above the measure's opening barline, raised clear of
-      // high outlier noteheads (e.g. D6 in mm. 29–30) and the pitch-76 dashed line
-      svgParts.push(`    <text x="${(mStartX + 5).toFixed(2)}" y="${(staffTop - 12).toFixed(2)}" class="measure-num">${mNum}</text>`);
+      // Urtext measure number ONLY above the first measure of each system
+      // (m. 1, 5, 9, …) — no counter over every internal measure.
+      if (m === 0) {
+        svgParts.push(`    <text x="${(mStartX + 5).toFixed(2)}" y="${(staffTop - 12).toFixed(2)}" class="measure-num">${mNum}</text>`);
+      }
 
       // Vertical dashed pulse lines for beats 2, 3, … (Klavarskribo beat grid)
       if (options.showBeatGrid) {
@@ -875,23 +885,42 @@ export function renderPageToSvg(
       }
     }
 
-    // 3g. Horizontal duration hold lines (pass 1, beneath the noteheads)
+    // 3g. Horizontal duration hold lines (pass 1, beneath the noteheads).
+    // Every tail starts flush against the effective circular boundary of its onset
+    // (halo ring for the opening sounds, white knockout otherwise) and stops clear
+    // of any subsequent note on the same pitch so the arithmetic never reads 0-b-0.
     for (const note of systemNotes) {
       if (note.durationTicks <= tauRef) continue; // regular notes stay pure noteheads
       const lp = linearIndex(note.pitch);
       const nx = geo.xForTick(note.startTick);
       const ny = geo.yForPitch(lp);
       const noteColor = getPrintDurationColor(note.durationTicks, tauRef);
-      const holdStartX = nx + NOTEHEAD_KNOCKOUT_RADIUS_PT;
-      const holdEndX = Math.min(nx + note.durationTicks * geo.ptPerTick, staffRight);
-      if (holdEndX - holdStartX < 1.5) continue;
+      const effectiveRadius = note.startTick === 0 ? OPENING_HALO_RADIUS_PT : NOTEHEAD_KNOCKOUT_RADIUS_PT;
+      let holdStartX = nx + effectiveRadius;
+      let holdEndX = Math.min(nx + note.durationTicks * geo.ptPerTick, staffRight);
+
+      // Clip the tail before the next onset on the same pitch within this system
+      let nextOnsetTick: number | null = null;
+      for (const other of systemNotes) {
+        if (linearIndex(other.pitch) !== lp || other.startTick <= note.startTick) continue;
+        if (nextOnsetTick === null || other.startTick < nextOnsetTick) nextOnsetTick = other.startTick;
+      }
+      if (nextOnsetTick !== null) {
+        const nextNx = geo.xForTick(nextOnsetTick);
+        holdEndX = Math.min(holdEndX, nextNx - NOTEHEAD_KNOCKOUT_RADIUS_PT - 1.0);
+      }
 
       if (pc12(lp) === 0) {
-        // On an octave staff line the trail colors the line continuously in the duration hue
+        // On an octave staff line the trail colors the line continuously in the duration hue,
+        // flush from the circle boundary and butt-capped so it never bulges back into it
+        if (holdEndX - holdStartX < 1.5) continue;
         const strokeW = lp === 48 ? '1.35' : '0.65';
         svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="${strokeW}" stroke-linecap="butt"/>`);
       } else {
-        svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.8" stroke-linecap="round"/>`);
+        // Open space: nudge the round cap 0.4pt clear of the circle boundary
+        holdStartX = nx + effectiveRadius + 0.4;
+        if (holdEndX - holdStartX < 1.5) continue;
+        svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="0.80" stroke-linecap="round"/>`);
       }
     }
 
@@ -976,11 +1005,11 @@ export function renderPageToSvg(
         }
       }
 
-      // Intuitive up/down handedness chevron pointing back toward Middle C
+      // Authoritative up/down handedness chevron pointing back toward Middle C
       if (isException) {
-        const chW = 3.2;
-        const chH = 1.8;
-        const clearance = 2.0;
+        const chW = 4.2;
+        const chH = 2.8;
+        const clearance = 2.2;
         const leftX = nx - chW / 2;
         const rightX = nx + chW / 2;
         if (hand === 'RH') {
@@ -988,13 +1017,13 @@ export function renderPageToSvg(
           const cy = ny - (r + clearance);
           const baseY = cy + chH / 2;
           const apexY = cy - chH / 2;
-          svgParts.push(`    <path class="hand-chevron chevron-up" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.80" stroke-linecap="round" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path class="hand-chevron chevron-up" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="1.20" stroke-linecap="round" stroke-linejoin="round"/>`);
         } else {
           // LH playing above Middle C → downward chevron below the notehead
           const cy = ny + (r + clearance);
           const baseY = cy - chH / 2;
           const apexY = cy + chH / 2;
-          svgParts.push(`    <path class="hand-chevron chevron-down" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.80" stroke-linecap="round" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path class="hand-chevron chevron-down" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="1.20" stroke-linecap="round" stroke-linejoin="round"/>`);
         }
       }
     }
@@ -1002,10 +1031,9 @@ export function renderPageToSvg(
     svgParts.push(`  </g>`);
   }
 
-  // 4. Page footer
+  // 4. Page footer: subtle Urtext page numbering, no tacky horizontal rule
   svgParts.push(`  <!-- Page Footer -->`);
   svgParts.push(`  <g id="page-footer">`);
-  svgParts.push(`    <line x1="${marginPt.toFixed(2)}" y1="${(heightPt - marginPt - 14).toFixed(2)}" x2="${(widthPt - marginPt).toFixed(2)}" y2="${(heightPt - marginPt - 14).toFixed(2)}" stroke="#E5E7EB" stroke-width="0.75"/>`);
   svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta">Pure 12-TET Horizontal Engraving</text>`);
   svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(heightPt - marginPt - 4).toFixed(2)}" class="meta" text-anchor="end" font-weight="bold">Page ${page.pageNumber} of ${page.totalPages}</text>`);
   svgParts.push(`  </g>`);

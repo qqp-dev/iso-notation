@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Presentation-agnostic lossless 12-TET music notation system and deterministic vector visualization workbench for 4-row Jánko isomorphic keyboards.",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5173",
+    "dev": "vite --host 0.0.0.0 --port 5175",
     "build": "tsc && vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "preview": "vite preview --host 0.0.0.0 --port 5175",
     "test": "node --import tsx --test test/**/*.test.ts"
   },
   "devDependencies": {

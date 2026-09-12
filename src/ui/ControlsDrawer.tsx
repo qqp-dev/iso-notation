@@ -368,7 +368,7 @@ export const ControlsDrawer: React.FC<ControlsDrawerProps> = ({
                 onClose();
               }}
               className="w-full py-2.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-amber-400 hover:text-amber-300 border border-neutral-700 hover:border-amber-500/50 rounded font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
-              title="Open printable 2-page horizontal system layout for A4 paper"
+              title="Open printable 3-page landscape system layout for A4 paper"
             >
               <span>🖨️</span>
               <span className="font-bold">Print Sheet Music (A4)</span>
