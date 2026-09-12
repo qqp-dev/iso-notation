@@ -198,11 +198,11 @@ test('Classical Vertical Accolade Invariant: slender copperplate curly brace cla
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  // Classical curly brace proportions: 7.5pt reach, 1.9pt swell, 8.0pt margin gap, 1.8pt offset
+  // Classical curly brace proportions: 7.5pt reach, 1.9pt swell, 8.0pt margin gap, 4.5pt offset
   assert.equal(ACCOLADE_WIDTH_PT, 7.5, 'Accolade reach must be 7.5pt');
   assert.equal(ACCOLADE_THICKNESS_PT, 1.9, 'Accolade swell must be 1.9pt');
   assert.equal(ACCOLADE_GAP_PT, 8.0, 'Accolade gap must be 8.0pt');
-  assert.equal(ACCOLADE_OFFSET_LEFT_PT, 1.8, 'Accolade offset must be 1.8pt');
+  assert.equal(ACCOLADE_OFFSET_LEFT_PT, 4.5, 'Accolade offset must be 4.5pt');
 
   // The exported path generator is deterministic and spans the requested vertical range
   const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 11.0, 2.4);

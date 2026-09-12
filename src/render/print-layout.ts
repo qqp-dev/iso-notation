@@ -40,7 +40,7 @@ export const OPENING_HALO_STROKE = '#D4AF37';
 /** Classical architectural reach of the vertical accolade cusp from the staff edge. */
 export const ACCOLADE_WIDTH_PT = 7.5;
 /** Delicate margin offset giving breathing gap between accolade tips and staff lines. */
-export const ACCOLADE_OFFSET_LEFT_PT = 1.8;
+export const ACCOLADE_OFFSET_LEFT_PT = 4.5;
 /** Margin breathing gap accommodating the classical accolade on System 1. */
 export const ACCOLADE_GAP_PT = 8.0;
 /** Delicate calligraphic swell of the accolade in its lobe bellies. */
