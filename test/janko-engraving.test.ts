@@ -36,10 +36,15 @@ import {
   computeCropBox,
   computePageGeometry,
   countJankoPages,
+  layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
   renderJankoVariantComparison,
 } from '../src/render/janko/engine';
+import {
+  getStemGeometry,
+  partitionBeamGroups,
+} from '../src/render/janko/elements/rhythm';
 import { renderHalo } from '../src/render/janko/elements/notehead';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -458,7 +463,242 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
 });
 
 // ---------------------------------------------------------------------------
-// 3. Export suite invariant
+// 3. Rhythm engraving: centred stems, standard flags, collision-free beams
+// ---------------------------------------------------------------------------
+
+/** Perpendicular distance from a point to a line segment (page pt). */
+function segmentDistance(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const len2 = vx * vx + vy * vy;
+  if (len2 === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / len2));
+  return Math.hypot(px - (x1 + t * vx), py - (y1 + t * vy));
+}
+
+/** Stem length of one beamed note, measured along the stem direction. */
+function stemLengthTo(
+  beam: { direction: -1 | 1; beamY(x: number): number },
+  note: { x: number; y: number }
+): number {
+  return beam.direction === -1 ? note.y - beam.beamY(note.x) : beam.beamY(note.x) - note.y;
+}
+
+test('Stem centring: every note of every rhythm dialect centres its stem on the note column', () => {
+  const score = buildBachGoldbergVar1Score();
+  const styles = ['beamed', 'angled-cuts', 'horizontal-ticks'] as const;
+  for (const rhythmStyle of styles) {
+    const layouts = layoutJankoScore(score, { ...OPTIONS, rhythmStyle }, TOKENS);
+    assert.equal(layouts.length, 8, `${rhythmStyle}: eight systems`);
+    let notes = 0;
+    let beamStems = 0;
+    for (const layout of layouts) {
+      for (const p of layout.notes) {
+        close(
+          getStemGeometry(p.rhythm, TOKENS).stemX,
+          p.x,
+          `stem column of ${p.note.id} (${rhythmStyle})`
+        );
+        notes++;
+      }
+      for (const beam of layout.beams) {
+        for (let i = 0; i < beam.stems.length; i++) {
+          close(beam.stems[i].stemX, beam.notes[i].x, `beam stem column (${rhythmStyle})`);
+          beamStems++;
+        }
+      }
+    }
+    assert.ok(notes >= score.notes.length / 8, `${rhythmStyle}: notes were laid out`);
+    if (rhythmStyle === 'beamed') assert.ok(beamStems > 100, 'the beamed dialect beams its stems');
+  }
+
+  // SVG level: every engraved stem is a perfectly vertical line whose column is
+  // a notehead centre — no perimeter offset survives into the document.
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const columns = new Set(
+    layoutJankoScore(score, OPTIONS, TOKENS)[0].notes.map((p) => p.x.toFixed(2))
+  );
+  const stemLines = [
+    ...crop.matchAll(/class="janko-stem" x1="([\d.]+)" y1="[\d.]+" x2="([\d.]+)"/g),
+  ];
+  assert.ok(stemLines.length > 0, 'the crop engraves stems');
+  for (const m of stemLines) {
+    assert.equal(m[1], m[2], 'a stem must be perfectly vertical');
+    assert.ok(columns.has(m[1]), `stem column ${m[1]} must be a notehead centre`);
+  }
+});
+
+test('Unbeamed notes carry standard flags, never a crossbar through the stem', () => {
+  const score = buildBachGoldbergVar1Score();
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const system0 = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+
+  // The beamed dialect draws neither perpendicular ticks nor slash cuts.
+  assert.ok(!crop.includes('class="janko-tick"'), 'no duration crossbar in the beamed dialect');
+  assert.ok(!crop.includes('class="janko-cut"'), 'no angled cut in the beamed dialect');
+
+  const ungrouped = system0.ungrouped;
+  const expectedFlags = ungrouped.reduce(
+    (sum, n) => sum + (n.durationTicks <= 14 ? 2 : n.durationTicks <= 38 ? 1 : 0),
+    0
+  );
+  const expectedDots = ungrouped.filter(
+    (n) => n.durationTicks > 26 && n.durationTicks <= 38
+  ).length;
+  const flags = [
+    ...crop.matchAll(
+      /class="janko-flag" data-stem-x="([\d.]+)" data-flag-index="(\d)" d="([^"]+)"/g
+    ),
+  ];
+  assert.equal(flags.length, expectedFlags, 'one flag per 8th, two flags per 16th');
+  assert.equal(
+    (crop.match(/class="janko-augmentation-dot"/g) ?? []).length,
+    expectedDots,
+    'one augmentation dot per dotted solitary value'
+  );
+
+  // Standard flag geometry: the hook starts on the stem, stays strictly right
+  // of it, and never reaches beyond its tokenised width.
+  for (const m of flags) {
+    const stemX = Number(m[1]);
+    const numbers = [...m[3].matchAll(/-?\d+(?:\.\d+)?/g)].map((x) => Number(x[0]));
+    const xs = numbers.filter((_, i) => i % 2 === 0);
+    assert.ok(numbers.length >= 2 && numbers.length % 2 === 0, 'flag path samples come in x/y pairs');
+    assert.equal(xs[0], stemX, 'the flag latches onto the stem tip');
+    for (const x of xs) {
+      assert.ok(x >= stemX - 1e-9, `flag sample x=${x} must not cross the stem at ${stemX}`);
+    }
+    assert.ok(
+      Math.max(...xs) - stemX <= TOKENS.flagWidth + 1e-9,
+      'the flag keeps its tokenised horizontal reach'
+    );
+  }
+
+  // mm. 1–2: the solitary dotted 8ths of pitch 7 (m. 1) and pitch 2 (m. 2).
+  const dotted = ungrouped.filter((n) => n.durationTicks > 26 && n.durationTicks <= 38);
+  assert.deepEqual(dotted.map((n) => n.startTick), [24, 168, 312], 'three solitary dotted 8ths');
+  const opening = dotted.filter((n) => n.startTick < 2 * TOKENS.ticksPerMeasure);
+  assert.deepEqual(opening.map((n) => n.startTick), [24, 168], 'm. 1 pitch 7 · m. 2 pitch 2');
+  for (const n of opening) {
+    const noteFlags = flags.filter((m) => Math.abs(Number(m[1]) - n.x) < 0.02);
+    assert.equal(noteFlags.length, 1, `${n.id} carries exactly one flag`);
+    assert.ok(
+      crop.includes(
+        `class="janko-augmentation-dot" cx="${(n.x + TOKENS.noteheadRadius + 3.2).toFixed(2)}" cy="${n.y.toFixed(2)}"`
+      ),
+      `${n.id} carries its augmentation dot`
+    );
+  }
+});
+
+test('Beam clearance: every notehead keeps a full stem length to its beam (mm. 2 & 4 ascents)', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  const required = TOKENS.noteheadRadius + TOKENS.minStemClearance;
+  let beams = 0;
+  let worst = Infinity;
+  let worstNote = '';
+  for (const layout of layouts) {
+    for (const beam of layout.beams) {
+      beams++;
+      assert.ok(
+        Math.abs(beam.slope) <= TOKENS.maxBeamSlope + 1e-9,
+        `slope clamp survives the beam elevation (${beam.slope})`
+      );
+      for (const n of beam.notes) {
+        const stemLen = stemLengthTo(beam, n);
+        if (stemLen < worst) {
+          worst = stemLen;
+          worstNote = n.id;
+        }
+        assert.ok(
+          stemLen >= required - 1e-9,
+          `${n.id} keeps ${stemLen.toFixed(2)}pt of stem (${required.toFixed(2)}pt required)`
+        );
+      }
+      // No connector — primary or 16th secondary — may cut a notehead disc.
+      const connectors = [beam.primary, ...(beam.secondary ? [beam.secondary] : [])];
+      for (const c of connectors) {
+        for (const p of layout.notes) {
+          if (p.x < Math.min(c.x1, c.x2) - required || p.x > Math.max(c.x1, c.x2) + required) {
+            continue;
+          }
+          const distance = segmentDistance(p.x, p.y, c.x1, c.y1, c.x2, c.y2);
+          assert.ok(
+            distance >= required - 1e-9,
+            `${p.note.id} clears the beam by only ${distance.toFixed(2)}pt ` +
+              `(${required.toFixed(2)}pt required; beam ${beam.notes.map((n) => n.id).join('+')})`
+          );
+        }
+      }
+    }
+  }
+  assert.ok(beams > 100, 'the score is beamed');
+  assert.ok(worst >= TOKENS.stemLength - 1e-9, `every extreme head keeps the full stem (${worstNote})`);
+
+  // The ticket's ascending runs: m. 2 (pitch 1 after pitch 2 at tick 156) and
+  // m. 4 (tick 540) previously had the beam driven through the upper notehead.
+  for (const tick of [156, 540]) {
+    const beam = layouts[0].beams.find((b) => b.notes.some((n) => n.startTick === tick));
+    assert.ok(beam, `m. ${Math.floor(tick / 144) + 1} tick ${tick} belongs to a beam group`);
+    for (const n of beam.notes) {
+      assert.ok(
+        stemLengthTo(beam, n) >= TOKENS.stemLength - 1e-9,
+        `${n.id} (tick ${n.startTick}) keeps a real stem between head and beam`
+      );
+    }
+  }
+});
+
+test('No beam group straddles an intervening longer value of the same hand', () => {
+  const score = buildBachGoldbergVar1Score();
+  for (const layout of layoutJankoScore(score, OPTIONS, TOKENS)) {
+    for (const beam of layout.beams) {
+      const lo = beam.notes[0].startTick;
+      const hi = beam.notes[beam.notes.length - 1].startTick;
+      const hand = beam.notes[0].hand;
+      const interlopers = score.notes.filter(
+        (n) =>
+          n.hand === hand &&
+          n.startTick > lo &&
+          n.startTick < hi &&
+          !beam.notes.some((g) => g.id === n.id)
+      );
+      assert.deepEqual(
+        interlopers.map((n) => n.id),
+        [],
+        `beam [${beam.notes.map((n) => n.id).join(', ')}] must not straddle another notehead`
+      );
+    }
+  }
+
+  // Partition level: a dotted 8th between two 16ths splits them apart (m. 22).
+  const notes = layoutJankoScore(score, OPTIONS, TOKENS)[5].notes.map((p) => p.rhythm);
+  const partition = partitionBeamGroups(notes, TOKENS);
+  const m22 = [3036, 3060];
+  assert.deepEqual(
+    partition.groups
+      .filter((g) => g.some((n) => m22.includes(n.startTick)))
+      .map((g) => g.map((n) => n.startTick)),
+    [],
+    'the dotted 8th at tick 3048 breaks the m. 22 run instead of being straddled'
+  );
+  assert.deepEqual(
+    partition.ungrouped.filter((n) => m22.includes(n.startTick)).map((n) => n.startTick),
+    m22,
+    'both isolated 16ths fall back to standard flags'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 4. Export suite invariant
 // ---------------------------------------------------------------------------
 
 test('npm run janko:export produces all five PNGs everywhere in under 2 seconds', () => {

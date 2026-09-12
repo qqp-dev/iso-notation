@@ -32,7 +32,7 @@ Implementers verify the same engraving **without rendering anything**:
 
 ```bash
 npm run lint:engraving            # ~25 ms, JSON/strict/quiet flags available
-npm test                          # 128 tests, < 1 s, includes the linter + studio suites
+npm test                          # 136 tests, < 1.5 s, includes the linter + studio suites
 ```
 
 ---
@@ -73,7 +73,7 @@ src/render/janko/
 └── elements/
     ├── staff.ts          octave equators, Middle C spine, row guides, ledgers
     ├── notehead.ts       white knockout, URW Gothic digit, Position of Honor halo
-    ├── rhythm.ts         angled cuts · horizontal ticks · connected beams
+    ├── rhythm.ts         centred stems · angled cuts · horizontal ticks · beams + flags
     ├── accolade.ts       slender copperplate brace (w = 7.0, thick = 0.85)
     ├── barlines.ts       internal barlines + system boundaries
     └── style.ts          shared typographic style block
@@ -91,6 +91,9 @@ src/render/janko/
 | Middle C spine | centred in the 45 pt inter-staff channel (o4 −22.5 / o3 +22.5) |
 | Position of Honor halo | `R = 5.4 pt` at tick 0 of Measure 1 |
 | Notehead knockout | `r = 4.2 pt` |
+| Stem column | `stemX === note.x` (centred on the notehead, both hands) |
+| Flag hook reach / drop | `4.0 pt` right of the stem / `6.6 pt` from the tip |
+| Minimum head-to-beam air | `noteheadRadius + minStemClearance` = 5.7 pt |
 
 Each hand anchors its own uniform lattice on its two home equators
 (RH o4/o5, LH o3/o2) and extends it by 30 pt per octave, so out-of-staff
@@ -136,13 +139,32 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 | Notehead clearance | discs never overlap; chordal heads that land on one page point are warned |
 | Knockout coverage | the 6.5 pt digit fits inside the `r = 4.2 pt` mask with white margin |
 | Knockout paint order | every digit owns a mask, every mask owns a digit, and nothing painted later may cut through it |
-| Stem & beam validity | stems attach inside their own disc, land exactly on the beam centerline, slope ≤ 0.25 |
+| Stem & beam validity | stems sit on the notehead centreline (`stemX === note.x`), attach inside their own disc, land exactly on the beam centerline, slope ≤ 0.25 |
+| Beam/notehead clearance | no beam connector (primary or 16th secondary) comes closer than `noteheadRadius + minStemClearance` to any notehead centre |
 | Barline clearance | heads, stems and beams keep ≥ 1 pt from every barline |
 | Margin furniture | measure numeral and accolade stay on the page, clear of the staff and each other |
 | Middle C corridor | no structural rule or beam crosses the spine; the spine never cuts a glyph |
 
 `npm run lint:engraving [--json|--strict|--quiet]` is the CLI (`0` clean,
 `1` violations, `--strict` also fails on warnings).
+
+### Rhythm engraving invariants
+
+- **Centred stems** — `getStemGeometry` engraves every stem on the notehead's
+  vertical centreline, so duration indicators begin exactly on the note column
+  instead of staggering around a round-notehead perimeter.
+- **Standard flags** — solitary / unbeamed notes of the `beamed` dialect carry
+  calligraphic flag hooks latched to the stem tip (two for 16ths, one for 8ths,
+  plus the augmentation dot for dotted values). Every hook sample stays strictly
+  right of the stem, so no cross/dagger is ever drawn over the notehead. The
+  `angled-cuts` and `horizontal-ticks` dialects keep their crossbar identity.
+- **Elevated beams** — `computeBeamGroupGeometry` clamps the slope first, then
+  raises (RH) or lowers (LH) the baseline until the extreme notehead in the stem
+  direction keeps a full `stemLength`; every other stem in the group is longer.
+  Ascending/descending runs therefore never see the beam cut through a head.
+- **No straddling beams** — `partitionBeamGroups` splits a run when a longer
+  value of the same hand sits between two beamable notes, so a connector never
+  crosses a notehead that is not part of its own group.
 
 ### Two-view studio
 
@@ -182,7 +204,7 @@ fallback.
 ## 4. Verification
 
 ```bash
-npm test                          # 128 tests, < 1 s
+npm test                          # 136 tests, < 1.5 s
 npm run lint:engraving            # visual lint of the golden master
 npm run janko:export              # refresh the mobile-app PNG artifacts
 npm run build                     # tsc + vite (index.html + janko.html entries)
@@ -190,8 +212,8 @@ npm run build                     # tsc + vite (index.html + janko.html entries)
 
 | Suite | Locks |
 | --- | --- |
-| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, ledger accumulation, halo placement, tick spacing), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
-| `test/janko-linter.test.ts` | the report contract, the clean golden master, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating stem, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
+| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, ledger accumulation, halo placement, tick spacing), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
+| `test/janko-linter.test.ts` | the report contract, the clean golden master, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
 | `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test

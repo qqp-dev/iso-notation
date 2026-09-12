@@ -6,11 +6,16 @@
  *
  * - `angled-cuts`      — 35° slash cuts on the stem (default, Jánko dialect)
  * - `horizontal-ticks` — neutral horizontal duration ticks (unified lattice)
- * - `beamed`           — traditional connected beams inside each beat
+ * - `beamed`           — traditional connected beams inside each beat, with
+ *                        standard flags for solitary / unbeamed notes
  *
  * Duration mapping (48 ticks per quarter note):
- *   12 ticks = 16th (two cuts / two ticks), 24 = 8th (one cut / one tick),
- *   36 = dotted 8th (one cut + augmentation dot), 48 = quarter (bare stem).
+ *   12 ticks = 16th (two cuts / two ticks / two flags), 24 = 8th (one),
+ *   36 = dotted 8th (one + augmentation dot), 48 = quarter (bare stem).
+ *
+ * Every stem is engraved on the notehead's vertical centreline
+ * (`stemX === note.x`), so a duration indicator always starts exactly on the
+ * note column regardless of hand.
  */
 
 import { Hand } from '../../../model/types';
@@ -32,6 +37,7 @@ export interface JankoRhythmNote {
 
 /** Resolved stem geometry for one note. */
 export interface JankoStemGeometry {
+  /** Stem column: always the notehead's vertical centreline (`stemX === note.x`). */
   stemX: number;
   stemStartY: number;
   stemEndY: number;
@@ -43,16 +49,22 @@ function stemDirection(hand: Hand): -1 | 1 {
   return hand === 'RH' ? -1 : 1;
 }
 
-/** Pure stem geometry (RH stems up, LH stems down). */
+/**
+ * Pure stem geometry (RH stems up, LH stems down).
+ *
+ * The stem is engraved on the notehead's vertical centreline (`stemX = note.x`)
+ * rather than on the round-notehead perimeter: duration indicators then begin
+ * exactly on the note column for both hands, instead of staggering left of the
+ * duodecimal digit for the LH and right of it for the RH.
+ */
 export function getStemGeometry(
   note: JankoRhythmNote,
   tokens?: Partial<JankoTokens> | null
 ): JankoStemGeometry {
   const t = resolveJankoTokens(tokens);
   const dir = stemDirection(note.hand);
-  const stemX = dir === -1 ? note.x + t.noteheadRadius - 0.4 : note.x - t.noteheadRadius + 0.4;
   return {
-    stemX,
+    stemX: note.x,
     stemStartY: note.y + dir * 1.5,
     stemEndY: note.y + dir * t.stemLength,
     direction: dir,
@@ -139,12 +151,74 @@ export interface JankoBeamConnector {
 }
 
 /**
+ * One standard musical flag hook latched to a stem tip.
+ *
+ * The stroke starts exactly on the stem (`x = stemX`), sweeps to the right and
+ * curls back toward the stem as it drops, so **every sample of the hook stays
+ * strictly right of the stem** (`x >= stemX`). Unlike a perpendicular duration
+ * tick, a flag can therefore never draw a cross/dagger over its own notehead.
+ */
+function renderFlagHook(
+  stemX: number,
+  tipY: number,
+  direction: -1 | 1,
+  index: number,
+  t: ResolvedJankoTokens
+): string {
+  const w = t.flagWidth;
+  const h = t.flagHeight;
+  // Up-stems (direction -1) hang their flags downward (+y); down-stems mirror.
+  const sign = -direction;
+  const y = (k: number): number => tipY + sign * k * h;
+  const d =
+    `M ${f(stemX)} ${f(tipY)} ` +
+    `C ${f(stemX + 0.55 * w)} ${f(y(0.12))} ${f(stemX + w)} ${f(y(0.62))} ` +
+    `${f(stemX + 0.45 * w)} ${f(y(1))}`;
+  return (
+    `    <path class="janko-flag" data-stem-x="${f(stemX)}" data-flag-index="${index}" ` +
+    `d="${d}" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>`
+  );
+}
+
+/**
+ * Solitary / unbeamed short note: bare stem plus standard musical flags
+ * (two for 16ths and shorter, one for 8ths) and the augmentation dot for dotted
+ * values. Nothing crosses the stem — the flag grammar replaces the neutral
+ * perpendicular tick used by the `horizontal-ticks` lattice dialect.
+ */
+export function renderFlags(
+  note: JankoRhythmNote,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const s = getStemGeometry(note, t);
+  const parts: string[] = [renderStem(note, t)];
+
+  const dur = note.durationTicks;
+  if (dur <= 14) {
+    parts.push(renderFlagHook(s.stemX, s.stemEndY, s.direction, 1, t));
+    parts.push(
+      renderFlagHook(s.stemX, s.stemEndY - s.direction * t.flagSpacing, s.direction, 2, t)
+    );
+  } else if (dur <= 26) {
+    parts.push(renderFlagHook(s.stemX, s.stemEndY, s.direction, 1, t));
+  } else if (dur <= 38) {
+    parts.push(renderFlagHook(s.stemX, s.stemEndY, s.direction, 1, t));
+    parts.push(renderAugmentationDot(note, t));
+  }
+  return parts.join('\n');
+}
+
+/**
  * Pure geometry of one beamed group.
  *
  * The primary connector is clamped to ±`tokens.maxBeamSlope` so wide leaps do
- * not produce runaway diagonals; every stem is then grown from its notehead to
- * the clamped centerline. Renderers and the visual linter share this function,
- * so the geometry can never drift between the two.
+ * not produce runaway diagonals. The clamped line is then *elevated* (RH
+ * up-stems) or *depressed* (LH down-stems) until the extreme notehead of the
+ * group — in the stem direction — keeps at least a full stem length, so no
+ * beam can ever cut through an intermediate notehead of an ascending or
+ * descending run. Renderers and the visual linter share this function, so the
+ * geometry can never drift between the two.
  */
 export interface JankoBeamGroupGeometry {
   /** Group notes sorted by start tick. */
@@ -157,6 +231,8 @@ export interface JankoBeamGroupGeometry {
   rawSlope: number;
   /** Clamped slope actually engraved. */
   slope: number;
+  /** Vertical distance (pt) from the extreme notehead centre to the beam centreline. */
+  minStemLength: number;
   /** Primary beam thickness. */
   thickness: number;
   /** Primary connector across the stem tips. */
@@ -167,9 +243,12 @@ export interface JankoBeamGroupGeometry {
   beamY(x: number): number;
 }
 
+/** Gap (pt) between the primary beam and the 16th secondary beam. */
+const SECONDARY_BEAM_GAP = 1.6;
+
 /**
  * Resolve the beam geometry of a group. Returns null for groups shorter than
- * two notes (a solitary short note is engraved as a neutral tick instead).
+ * two notes (a solitary short note is engraved with standard flags instead).
  */
 export function computeBeamGroupGeometry(
   group: JankoRhythmNote[],
@@ -182,32 +261,55 @@ export function computeBeamGroupGeometry(
   const stems = sorted.map((n) => getStemGeometry(n, t));
   const first = stems[0];
   const last = stems[stems.length - 1];
+  const direction = first.direction;
   const dx = last.stemX - first.stemX;
   const rawSlope = dx !== 0 ? (last.stemEndY - first.stemEndY) / dx : 0;
   const limit = t.maxBeamSlope;
   const slope = Math.max(-limit, Math.min(limit, rawSlope));
-  const beamY = (x: number): number => first.stemEndY + slope * (x - first.stemX);
 
   const sixteenths = sorted.filter((n) => n.durationTicks <= 14);
+  const secondaryOffset = -direction * (t.beamThickness + SECONDARY_BEAM_GAP);
+  const hasSecondary = sixteenths.length >= 2;
+
+  // Minimum stem length: the canonical stem, but never less than the notehead
+  // disc plus the required air — counting the 16th secondary beam, which sits
+  // `beamThickness + gap` closer to the heads than the primary connector.
+  const secondaryDepth = hasSecondary ? t.beamThickness + SECONDARY_BEAM_GAP : 0;
+  const minStemLength = Math.max(
+    t.stemLength,
+    t.noteheadRadius + t.minStemClearance + secondaryDepth
+  );
+
+  // Elevate (up-stems) or depress (down-stems) the clamped baseline until the
+  // extreme notehead in the stem direction is exactly `minStemLength` away;
+  // every other stem in the group is then automatically longer. Because the
+  // shift is uniform it preserves the clamped slope exactly.
+  let anchor = direction === -1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < sorted.length; i++) {
+    const limitY = sorted[i].y + direction * minStemLength - slope * (stems[i].stemX - first.stemX);
+    anchor = direction === -1 ? Math.min(anchor, limitY) : Math.max(anchor, limitY);
+  }
+  const beamY = (x: number): number => anchor + slope * (x - first.stemX);
+
   let secondary: JankoBeamConnector | null = null;
-  if (sixteenths.length >= 2) {
+  if (hasSecondary) {
     const s0 = getStemGeometry(sixteenths[0], t);
     const s1 = getStemGeometry(sixteenths[sixteenths.length - 1], t);
-    const offset = -first.direction * (t.beamThickness + 1.6);
     secondary = {
       x1: s0.stemX,
-      y1: beamY(s0.stemX) + offset,
+      y1: beamY(s0.stemX) + secondaryOffset,
       x2: s1.stemX,
-      y2: beamY(s1.stemX) + offset,
+      y2: beamY(s1.stemX) + secondaryOffset,
     };
   }
 
   return {
     notes: sorted,
     stems,
-    direction: first.direction,
+    direction,
     rawSlope,
     slope,
+    minStemLength,
     thickness: t.beamThickness,
     primary: {
       x1: first.stemX,
@@ -228,8 +330,8 @@ export function renderBeamGroup(
   const t = resolveJankoTokens(tokens);
   if (group.length === 0) return '';
   if (group.length === 1) {
-    // A solitary short note keeps a single neutral tick instead of a beam.
-    return renderHorizontalTicks(group[0], t);
+    // A solitary short note is flagged, never crossbarred.
+    return renderFlags(group[0], t);
   }
 
   const beam = computeBeamGroupGeometry(group, t);
@@ -276,8 +378,8 @@ export function renderRhythm(
     case 'horizontal-ticks':
       return renderHorizontalTicks(note, tokens);
     case 'beamed':
-      // Standalone (unbeamable) notes fall back to a neutral single tick.
-      return renderHorizontalTicks(note, tokens);
+      // Standalone (unbeamable) notes carry standard flags, not crossbars.
+      return renderFlags(note, tokens);
     case 'angled-cuts':
     default:
       return renderAngledCuts(note, tokens);
@@ -293,7 +395,11 @@ export interface JankoBeamPartition {
 /**
  * Partition notes into beat-sized beam groups (same hand, same measure, same
  * beat, consecutive 8th-or-shorter durations). Groups of one note are returned
- * as ungrouped so the engine can render a neutral standalone rhythm.
+ * as ungrouped so the engine renders standard flags for them.
+ *
+ * A longer value of the same hand (dotted 8th or more) interrupts a run even
+ * though it is not itself beamable: a beam may never straddle a notehead that
+ * is not part of it, or the connector would cut through that glyph.
  */
 export function partitionBeamGroups(
   notes: JankoRhythmNote[],
@@ -301,8 +407,14 @@ export function partitionBeamGroups(
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
   const buckets = new Map<string, JankoRhythmNote[]>();
+  const unbeamable = new Map<Hand, JankoRhythmNote[]>();
   for (const n of notes) {
-    if (n.durationTicks > t.ticksPerBeat / 2) continue;
+    if (n.durationTicks > t.ticksPerBeat / 2) {
+      const blockers = unbeamable.get(n.hand);
+      if (blockers) blockers.push(n);
+      else unbeamable.set(n.hand, [n]);
+      continue;
+    }
     const measure = Math.floor(n.startTick / t.ticksPerMeasure);
     const beat = Math.floor((n.startTick % t.ticksPerMeasure) / t.ticksPerBeat);
     const key = `${n.hand}|${measure}|${beat}`;
@@ -328,7 +440,13 @@ export function partitionBeamGroups(
     };
     for (const n of sorted) {
       const prev = run[run.length - 1];
-      if (prev && n.startTick - prev.startTick > t.ticksPerBeat / 2) flush();
+      if (prev) {
+        const gap = n.startTick - prev.startTick > t.ticksPerBeat / 2;
+        const straddled = (unbeamable.get(n.hand) ?? []).some(
+          (b) => b.startTick > prev.startTick && b.startTick < n.startTick
+        );
+        if (gap || straddled) flush();
+      }
       run.push(n);
     }
     flush();

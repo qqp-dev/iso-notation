@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { JankoSystemLayout, layoutJankoScore, renderSystem, computePageGeometry, getSystemGeometry } from '../src/render/janko/engine';
+import { getStemGeometry } from '../src/render/janko/elements/rhythm';
 import {
   DEFAULT_JANKO_LINT_OPTIONS,
   JANKO_LINT_CHECKS,
@@ -29,6 +30,7 @@ import {
   auditStemBeamConnections,
   checkAccoladeClearance,
   checkBarlineClearance,
+  checkBeamNoteheadClearance,
   checkMeasureNumeralClearance,
   checkMiddleCCorridor,
   checkNoteheadClearance,
@@ -163,17 +165,104 @@ test('Defect: shrinking the knockout below the glyph box is caught', () => {
 });
 
 test('Defect: a stem that no longer reaches into its own disc is caught', () => {
-  const tokens = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 2.5 };
+  // Centred stems anchor 1.5pt from the notehead centre, so only a knockout
+  // smaller than that hairline attachment offset can leave the stem floating.
+  const tokens = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 1.2 };
   const out: LintViolation[] = [];
   checkStemAndBeamValidity(systems(DEFAULT_JANKO_OPTIONS, tokens)[0], tokens, LINT, out);
   const detached = out.filter((v) => v.code === 'stem-detached');
   assert.ok(detached.length > 0, 'floating stems must be reported');
-  // 2.41pt attachment on a 2.5pt disc is a hair inside, but the ±1.5pt optical
-  // offset pushes the anchor out of the disc for tighter radii.
-  const tighter = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 2.0 };
+  assert.ok(detached.every((v) => v.metrics!.attach > v.metrics!.radius));
+  // A tighter disc pushes the anchor further outside.
+  const tighter = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 1.0 };
   const out2: LintViolation[] = [];
   checkStemAndBeamValidity(systems(DEFAULT_JANKO_OPTIONS, tighter)[0], tighter, LINT, out2);
-  assert.ok(out2.some((v) => v.code === 'stem-detached' && v.metrics!.attach > 2.0));
+  assert.ok(out2.some((v) => v.code === 'stem-detached' && v.metrics!.attach > 1.0));
+});
+
+test('Golden master: every stem is engraved on its notehead centreline', () => {
+  const out: LintViolation[] = [];
+  for (const layout of systems()) {
+    checkStemAndBeamValidity(layout, DEFAULT_JANKO_TOKENS, LINT, out);
+    for (const p of layout.notes) {
+      assert.equal(
+        getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS).stemX,
+        p.x,
+        `${p.note.id} keeps stemX === note.x`
+      );
+    }
+  }
+  assert.deepEqual(out, [], 'centred stems attach inside the disc and span their beam');
+});
+
+test('Defect: a stem engraved off the notehead centreline is caught', () => {
+  const layout = systems()[0];
+  const shifted: JankoSystemLayout = {
+    ...layout,
+    notes: layout.notes.map((p, i) =>
+      i === 0 ? { ...p, rhythm: { ...p.rhythm, x: p.x + 1.4 } } : p
+    ),
+  };
+  const out: LintViolation[] = [];
+  checkStemAndBeamValidity(shifted, DEFAULT_JANKO_TOKENS, LINT, out);
+  const offCentre = out.filter(
+    (v) => v.code === 'stem-detached' && /centreline/.test(v.message)
+  );
+  assert.equal(offCentre.length, 1, 'the perimeter-style offset must be reported');
+  assert.deepEqual(offCentre[0].noteIds, [layout.notes[0].note.id]);
+  assert.ok(Math.abs(offCentre[0].metrics!.offset - 1.4) < 1e-9);
+});
+
+test('Golden master: no beam connector cuts into any notehead disc', () => {
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('beam-notehead-clearance'),
+    'the beam/notehead clearance check is part of the lint contract'
+  );
+  const required = DEFAULT_JANKO_TOKENS.noteheadRadius + DEFAULT_JANKO_TOKENS.minStemClearance;
+  const out: LintViolation[] = [];
+  const layouts = systems();
+  for (const layout of layouts) {
+    checkBeamNoteheadClearance(layout, DEFAULT_JANKO_TOKENS, LINT, out);
+  }
+  assert.deepEqual(out, [], 'every head keeps noteheadRadius + minStemClearance of air');
+  // The ticket's ascending runs: m. 2 (tick 156) and m. 4 (tick 540) keep a full
+  // stem between the upper notehead and the beam.
+  for (const tick of [156, 540]) {
+    const beam = layouts[0].beams.find((b) => b.notes.some((n) => n.startTick === tick));
+    assert.ok(beam, `tick ${tick} belongs to a beam group`);
+    for (const n of beam.notes) {
+      const stemLen =
+        beam.direction === -1 ? n.y - beam.beamY(n.x) : beam.beamY(n.x) - n.y;
+      assert.ok(
+        stemLen >= required,
+        `${n.id} keeps ${stemLen.toFixed(2)}pt of stem (${required.toFixed(2)}pt required)`
+      );
+    }
+  }
+});
+
+test('Defect: a beam driven through a notehead is caught', () => {
+  const layout = systems()[0];
+  const beam = layout.beams[0];
+  const victim = beam.notes[1];
+  const broken: JankoSystemLayout = {
+    ...layout,
+    beams: [
+      {
+        ...beam,
+        primary: { x1: beam.primary.x1, y1: victim.y, x2: beam.primary.x2, y2: victim.y },
+        secondary: null,
+      },
+      ...layout.beams.slice(1),
+    ],
+  };
+  const out: LintViolation[] = [];
+  checkBeamNoteheadClearance(broken, DEFAULT_JANKO_TOKENS, LINT, out);
+  assert.ok(out.length > 0, 'a beam through a glyph must be reported');
+  assert.ok(out.every((v) => v.code === 'beam-notehead-collision'));
+  assert.ok(out.every((v) => v.severity === 'error'));
+  assert.ok(out.some((v) => (v.noteIds ?? []).includes(victim.id)));
+  assert.ok(out[0].metrics!.distance < out[0].metrics!.required);
 });
 
 test('Defect: an unclamped beam slope is caught by the geometry check and the SVG audit', () => {
