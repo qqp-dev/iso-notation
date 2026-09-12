@@ -116,6 +116,10 @@ export function wrapInPjl(
     `\x1b%-12345X@PJL\r\n` +
     `@PJL JOB NAME = "${jobName}"\r\n` +
     `@PJL SET PAPER = ${paperSize === 'A4' ? 'A4' : 'LETTER'}\r\n` +
+    `@PJL SET ORIENTATION = LANDSCAPE\r\n` +
+    `@PJL SET PRINTQUALITY = HIGH\r\n` +
+    `@PJL SET RESOLUTION = 1200\r\n` +
+    `@PJL SET ECONOMODE = OFF\r\n` +
     `@PJL SET RENDERMODE = ${isMono ? 'GRAYSCALE' : 'COLOR'}\r\n` +
     `@PJL SET COLORMODE = ${isMono ? 'MONO' : 'COLOR'}\r\n` +
     `@PJL ENTER LANGUAGE = POSTSCRIPT\r\n`,
@@ -144,6 +148,7 @@ export async function generateScorePostscript(
   const score = scoreBuilder();
   const layout = computeColumnarLayout(score, {
     paperSize,
+    orientation: 'landscape',
     staffStyle: 'tritone-split',
     noteheadMorphology: morphology,
   });
@@ -196,7 +201,7 @@ async function main(): Promise<void> {
   console.log(`• Paper Format:     ${options.paperSize.toUpperCase()} (${options.paperSize === 'letter' ? '8.5 × 11 in' : '210 × 297 mm'})`);
   console.log(`• Morphology:       ${options.morphology}`);
   console.log(`• Color Mode:       ${options.colorMode.toUpperCase()}`);
-  console.log(`• Layout:           4 Measures/System, 3 Systems/Page (Horizontal Landscape Urtext)`);
+  console.log(`• Layout:           4 Measures/System, 2 Systems/Page (4-Page Landscape Urtext)`);
   console.log(`• Mode:             ${options.dryRun ? 'DRY-RUN (Simulated)' : 'PRODUCTION PRINT'}\n`);
 
   console.log('1. Computing horizontal system engraving layout...');
