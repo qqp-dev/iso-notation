@@ -75,7 +75,7 @@ interface SvgChevron {
 function extractChevrons(svg: string): SvgChevron[] {
   return Array.from(
     svg.matchAll(
-      /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="1\.20"/g
+      /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.80"/g
     )
   ).map((m) => ({
     direction: m[1] as 'up' | 'down',
@@ -273,14 +273,13 @@ test('Classical Vertical Accolade Invariant: 14pt curly brace clasping o1–o5 o
   const aspect = (geo0.staffBotY - geo0.staffTopY) / width;
   assert.ok(aspect > 10 && aspect < 30, `Accolade aspect ratio must be elegant (got 1:${aspect.toFixed(1)})`);
 
-  // Every system on every page renders the regular flat vertical start line
+  // Zero starting vertical line on all systems: staff lines emerge openly and freely from staffLeft
   for (let pageIndex = 0; pageIndex < layout.pages.length; pageIndex++) {
     for (let s = 0; s < layout.pages[pageIndex].systems.length; s++) {
       const geo = getSystemGeometry(layout, pageIndex, s);
-      assert.match(
-        svgs[pageIndex],
-        new RegExp(`<line x1="${geo.staffLeftPt.toFixed(2)}" y1="${geo.staffTopY.toFixed(2)}" x2="${geo.staffLeftPt.toFixed(2)}" y2="${geo.staffBotY.toFixed(2)}" stroke="#111827" stroke-width="1.0"\\/>`),
-        `System ${s + 1} on Page ${pageIndex + 1} must render the regular flat start line`
+      assert.ok(
+        !svgs[pageIndex].includes(`<line x1="${geo.staffLeftPt.toFixed(2)}" y1="${geo.staffTopY.toFixed(2)}" x2="${geo.staffLeftPt.toFixed(2)}" y2="${geo.staffBotY.toFixed(2)}"`),
+        `System ${s + 1} on Page ${pageIndex + 1} must NOT render a starting vertical line`
       );
     }
   }
@@ -402,7 +401,7 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
   assert.doesNotMatch(page1, /class="beat-counter"/);
 });
 
-test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons at 1.20pt stroke', () => {
+test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons at 0.80pt stroke (matched to noteheads)', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const pages = renderAllPagesToSvg(layout);
@@ -466,20 +465,20 @@ test('Authoritative Up/Down Handedness Chevron Invariant: 4.2 × 2.8pt chevrons 
     assert.equal(round2(chevron.apexY - chevron.baseY1), 2.8, 'Chevron height must be 2.8pt');
   }
 
-  // Every chevron is rendered with the authoritative 1.20pt round-capped stroke and protective shield
+  // Every chevron is rendered with the 0.80pt stroke (matching note stroke thickness) and protective shield
   const authoritativeChevrons = pages.flatMap((svg) =>
     Array.from(
       svg.matchAll(
-        /<path class="hand-chevron chevron-(?:up|down)" d="M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+" fill="none" stroke="[^"]+" stroke-width="1\.20" stroke-linecap="round" stroke-linejoin="round"\/>/g
+        /<path class="hand-chevron chevron-(?:up|down)" d="M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+" fill="none" stroke="[^"]+" stroke-width="0\.80" stroke-linecap="round" stroke-linejoin="round"\/>/g
       )
     )
   );
-  assert.equal(authoritativeChevrons.length, allChevrons.length, 'Every chevron must use the 1.20pt round stroke');
+  assert.equal(authoritativeChevrons.length, allChevrons.length, 'Every chevron must use the 0.80pt round stroke');
 
   const shields = pages.flatMap((svg) =>
     Array.from(
       svg.matchAll(
-        /<path class="hand-chevron-shield" d="M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2\.20" stroke-linecap="round" stroke-linejoin="round"\/>/g
+        /<path class="hand-chevron-shield" d="M [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ L [-\d.]+ [-\d.]+ Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1\.80" stroke-linecap="round" stroke-linejoin="round"\/>/g
       )
     )
   );

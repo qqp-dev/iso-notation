@@ -289,7 +289,7 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
 
   // Intuitive Up/Down Handedness Chevrons for hand-crossing exceptions:
   // Measure 4 contains RH crossing into the bass (< 48) -> upward chevrons above the noteheads
-  const chevronRegex = /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="1\.20"/g;
+  const chevronRegex = /<path class="hand-chevron chevron-(up|down)" d="M ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+) L ([-\d.]+) ([-\d.]+)" fill="none" stroke="([^"]+)" stroke-width="0\.80"/g;
   const upMatches = Array.from(svg.matchAll(chevronRegex)).filter((m) => m[1] === 'up');
   assert.ok(upMatches.length > 0, 'Must render upward chevrons for duodecimal RH crossing exceptions in mm. 1–12');
   upMatches.forEach((m) => {

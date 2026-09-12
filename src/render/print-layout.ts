@@ -147,15 +147,38 @@ export function getClassicalAccoladePath(
 }
 
 /**
- * Classical calligraphic vertical accolade (curly brace) for the left margin of a
+/**
+ * Classical LilyPond/Emmentaler brace outline command table.
+ * 14 cubic Bézier segments derived from authentic master music engraving.
+ */
+const LILY_BRACE_CMDS: Array<{ type: 'M' | 'c' | 's'; args: number[] }> = [
+  { type: 'M', args: [-76, -210] },
+  { type: 'c', args: [0, 164, -92, 194, -92, 210] },
+  { type: 's', args: [92, 46, 92, 210] },
+  { type: 'c', args: [0, 148, -62, 270, -62, 430] },
+  { type: 'c', args: [0, 120, 34, 234, 130, 304] },
+  { type: 'c', args: [14, 10, 30, -10, 16, -20] },
+  { type: 'c', args: [-68, -50, -88, -122, -88, -204] },
+  { type: 'c', args: [0, -144, 58, -266, 58, -420] },
+  { type: 'c', args: [0, -118, -32, -228, -122, -300] },
+  { type: 'c', args: [90, -72, 122, -182, 122, -300] },
+  { type: 'c', args: [0, -154, -58, -276, -58, -420] },
+  { type: 'c', args: [0, -82, 20, -154, 88, -204] },
+  { type: 'c', args: [14, -10, -2, -30, -16, -20] },
+  { type: 'c', args: [-96, 70, -130, 184, -130, 304] },
+  { type: 'c', args: [0, 160, 62, 282, 62, 430] },
+];
+
+/**
+ * Authentic classical vertical accolade (curly brace) for the left margin of a
  * horizontal system. It clasps the full 4-octave staff from yTop (o5) to yBot (o1)
  * with its central cusp pointing directly horizontally into the Middle C spine at y(48).
  *
- * It features authentic calligraphic S-curvature:
- * - Upper and lower lobes swelling outward to bellyReach
- * - Graceful concave inflection towards a slender waist
- * - Sharp central cusp sweeping outward horizontally at yMid
- * - Smooth inner return profile tapering to delicate needle finials at tips and cusp
+ * Implements the definitive Emmentaler/LilyPond master-engraved brace geometry:
+ * - Razor-sharp horizontal beak cusp at yMid pointing leftward into the margin
+ * - Delicate, graceful waist inflections
+ * - Sculptural, organic swelling bellies
+ * - Feather-tapered tips clasping the staff edges at staffLeft
  */
 export function getVerticalAccoladePath(
   staffLeft: number,
@@ -166,80 +189,50 @@ export function getVerticalAccoladePath(
   maybeThick?: number
 ): string {
   let reach = ACCOLADE_WIDTH_PT;
-  let thick = ACCOLADE_THICKNESS_PT;
 
   if (maybeThick !== undefined) {
     reach = cuspOrThick;
-    thick = maybeThick;
-  } else if (reachOrBelly > 0 && cuspOrThick > 0) {
+  } else if (reachOrBelly > 0) {
     reach = reachOrBelly;
-    thick = cuspOrThick;
   }
 
   const ym = (yTop + yBot) / 2;
   const h = yBot - yTop;
-  const hh = h / 2;
+  const FONT_MAX_Y = 954.0;
+  const FONT_MIN_X = -168.0;
+  const FONT_MAX_X = 22.0;
 
-  // Classical proportions:
-  // - Outer bellies swell to ~85% of full cusp reach
-  // - Slender waist indents inward to ~30% of cusp reach
-  // - Central cusp sweeps into a horizontal beak pointing away from the staff
-  const cuspW = reach;
-  const bellyW = reach * 0.85;
-  const waistW = reach * 0.30;
-  const cuspReachY = 2.4;
+  const scaleY = (h / 2) / FONT_MAX_Y;
+  const scaleX = reach / (FONT_MAX_X - FONT_MIN_X);
 
-  // Top tip: touches the top staff line (o5)
-  const p0 = [staffLeft, yTop];
-  // Upper lobe: Tip to belly
-  const c1 = [staffLeft - bellyW * 0.60, yTop + hh * 0.07];
-  const c2 = [staffLeft - bellyW, yTop + hh * 0.20];
-  const pBelly = [staffLeft - bellyW, yTop + hh * 0.36];
+  const toS = (x: number, y: number): string =>
+    `${(staffLeft + (x - FONT_MAX_X) * scaleX).toFixed(2)} ${(ym - y * scaleY).toFixed(2)}`;
 
-  // Upper lobe: Belly to waist
-  const c3 = [staffLeft - bellyW, yTop + hh * 0.52];
-  const c4 = [staffLeft - waistW - 0.2, ym - hh * 0.28];
-  const pWaist = [staffLeft - waistW, ym - hh * 0.16];
+  let curr: [number, number] = [LILY_BRACE_CMDS[0].args[0], LILY_BRACE_CMDS[0].args[1]];
+  let prevCp: [number, number] = [curr[0], curr[1]];
+  const parts = [`M ${toS(curr[0], curr[1])}`];
 
-  // Upper lobe: Waist to central cusp (horizontal beak at ym)
-  const c5 = [staffLeft - waistW + 1.2, ym - cuspReachY * 1.8];
-  const c6 = [staffLeft - cuspW * 0.85, ym - 0.2];
-  const pCusp = [staffLeft - cuspW, ym];
+  for (let i = 1; i < LILY_BRACE_CMDS.length; i++) {
+    const cmd = LILY_BRACE_CMDS[i];
+    let p1: [number, number];
+    let p2: [number, number];
+    let p3: [number, number];
 
-  // Lower lobe (symmetric mirror across ym)
-  const c7 = [staffLeft - cuspW * 0.85, ym + 0.2];
-  const c8 = [staffLeft - waistW + 1.2, ym + cuspReachY * 1.8];
-  const pWaistLower = [staffLeft - waistW, ym + hh * 0.16];
-
-  const c9 = [staffLeft - waistW - 0.2, ym + hh * 0.28];
-  const c10 = [staffLeft - bellyW, yBot - hh * 0.52];
-  const pBellyLower = [staffLeft - bellyW, yBot - hh * 0.36];
-
-  const c11 = [staffLeft - bellyW, yBot - hh * 0.20];
-  const c12 = [staffLeft - bellyW * 0.60, yBot - hh * 0.07];
-  const pBot = [staffLeft, yBot];
-
-  // Inner return contour (swells in bellies, tapers at tips and cusp)
-  const inThickBelly = thick;
-  const inThickWaist = thick * 0.70;
-  const inThickCusp = 0.4;
-
-  return [
-    `M ${p0[0].toFixed(2)} ${p0[1].toFixed(2)}`,
-    `C ${c1[0].toFixed(2)} ${c1[1].toFixed(2)}, ${c2[0].toFixed(2)} ${c2[1].toFixed(2)}, ${pBelly[0].toFixed(2)} ${pBelly[1].toFixed(2)}`,
-    `C ${c3[0].toFixed(2)} ${c3[1].toFixed(2)}, ${c4[0].toFixed(2)} ${c4[1].toFixed(2)}, ${pWaist[0].toFixed(2)} ${pWaist[1].toFixed(2)}`,
-    `C ${c5[0].toFixed(2)} ${c5[1].toFixed(2)}, ${c6[0].toFixed(2)} ${c6[1].toFixed(2)}, ${pCusp[0].toFixed(2)} ${pCusp[1].toFixed(2)}`,
-    `C ${c7[0].toFixed(2)} ${c7[1].toFixed(2)}, ${c8[0].toFixed(2)} ${c8[1].toFixed(2)}, ${pWaistLower[0].toFixed(2)} ${pWaistLower[1].toFixed(2)}`,
-    `C ${c9[0].toFixed(2)} ${c9[1].toFixed(2)}, ${c10[0].toFixed(2)} ${c10[1].toFixed(2)}, ${pBellyLower[0].toFixed(2)} ${pBellyLower[1].toFixed(2)}`,
-    `C ${c11[0].toFixed(2)} ${c11[1].toFixed(2)}, ${c12[0].toFixed(2)} ${c12[1].toFixed(2)}, ${pBot[0].toFixed(2)} ${pBot[1].toFixed(2)}`,
-    `C ${(c12[0] + inThickBelly * 0.3).toFixed(2)} ${c12[1].toFixed(2)}, ${(c11[0] + inThickBelly).toFixed(2)} ${c11[1].toFixed(2)}, ${(pBellyLower[0] + inThickBelly).toFixed(2)} ${pBellyLower[1].toFixed(2)}`,
-    `C ${(c10[0] + inThickBelly).toFixed(2)} ${c10[1].toFixed(2)}, ${(c9[0] + inThickWaist).toFixed(2)} ${c9[1].toFixed(2)}, ${(pWaistLower[0] + inThickWaist).toFixed(2)} ${pWaistLower[1].toFixed(2)}`,
-    `C ${(c8[0] + inThickWaist * 0.7).toFixed(2)} ${c8[1].toFixed(2)}, ${(c7[0] + inThickCusp).toFixed(2)} ${(c7[1] + 0.15).toFixed(2)}, ${(pCusp[0] + inThickCusp).toFixed(2)} ${ym.toFixed(2)}`,
-    `C ${(c6[0] + inThickCusp).toFixed(2)} ${(c6[1] - 0.15).toFixed(2)}, ${(c5[0] + inThickWaist * 0.7).toFixed(2)} ${c5[1].toFixed(2)}, ${(pWaist[0] + inThickWaist).toFixed(2)} ${pWaist[1].toFixed(2)}`,
-    `C ${(c4[0] + inThickWaist).toFixed(2)} ${c4[1].toFixed(2)}, ${(c3[0] + inThickBelly).toFixed(2)} ${c3[1].toFixed(2)}, ${(pBelly[0] + inThickBelly).toFixed(2)} ${pBelly[1].toFixed(2)}`,
-    `C ${(c2[0] + inThickBelly).toFixed(2)} ${c2[1].toFixed(2)}, ${(c1[0] + inThickBelly * 0.3).toFixed(2)} ${c1[1].toFixed(2)}, ${p0[0].toFixed(2)} ${p0[1].toFixed(2)}`,
-    'Z',
-  ].join(' ');
+    if (cmd.type === 'c') {
+      p1 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
+      p2 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
+      p3 = [curr[0] + cmd.args[4], curr[1] + cmd.args[5]];
+    } else {
+      p1 = [2 * curr[0] - prevCp[0], 2 * curr[1] - prevCp[1]];
+      p2 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
+      p3 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
+    }
+    parts.push(`C ${toS(p1[0], p1[1])}, ${toS(p2[0], p2[1])}, ${toS(p3[0], p3[1])}`);
+    prevCp = p2;
+    curr = p3;
+  }
+  parts.push('Z');
+  return parts.join(' ');
 }
 
 export interface PrintLayoutOptions {
@@ -485,7 +478,7 @@ export function computeColumnarLayout(
 
   const ptPerTick = options.pixelsPerTick > 0
     ? options.pixelsPerTick
-    : (measureWidthPt - MEASURE_INSET_PT) / ticksPerMeasure;
+    : measureWidthPt / ticksPerMeasure;
 
   // Slice the score into horizontal systems
   const numSystems = Math.ceil(totalMeasures / measuresPerSystem);
@@ -641,16 +634,21 @@ export function getSystemGeometry(
   const yForPitch = (pitch: number): number =>
     staffBotY - (pitch - minPitch) * ptPerSemitone;
 
+  const subdivisionTicks = (layout.score?.gridResolution && layout.score.gridResolution > 0)
+    ? layout.score.gridResolution
+    : (layout.ticksPerBeat > 0 ? layout.ticksPerBeat / 4 : 12);
+  const measureInsetPt = (subdivisionTicks / 2) * ptPerTick;
+
   const xForMeasureStart = (measureIndexOnSystem: number): number =>
     staffLeftPt + measureIndexOnSystem * measureWidthPt;
 
   const xForTick = (tick: number): number => {
     const rel = tick - system.startTick;
-    if (rel <= 0) return staffLeftPt + MEASURE_INSET_PT;
+    if (rel <= 0) return staffLeftPt + measureInsetPt;
     if (rel >= spanTicks) return staffRightPt;
     const measureIdx = Math.floor(rel / ticksPerMeasure);
     const localTicks = rel - measureIdx * ticksPerMeasure;
-    return xForMeasureStart(measureIdx) + MEASURE_INSET_PT + localTicks * ptPerTick;
+    return xForMeasureStart(measureIdx) + measureInsetPt + localTicks * ptPerTick;
   };
 
   return {
@@ -809,7 +807,8 @@ export function renderPageToSvg(
 
     // 3a. System Start:
     // System 1 (start of the piece) receives the classical calligraphic vertical accolade (curly brace).
-    // Systems after the start (systemIndex > 0) use a clean regular flat start.
+    // Subsequent systems use a regular open start without an accolade.
+    // Zero starting vertical line: staff lines emerge openly and freely from staffLeft across the system.
     if (system.systemIndex === 0) {
       // Dedicated measure number in the left margin clear of the accolade
       svgParts.push(`    <!-- Urtext Measure Number in Dedicated Left Margin -->`);
@@ -818,16 +817,10 @@ export function renderPageToSvg(
       // Authentic Classical Accolade Curly Brace clasping o5 to o1
       svgParts.push(`    <!-- Classical Vertical Accolade (Curly Brace) clasping o1 to o5 -->`);
       svgParts.push(`    <path class="accolade" d="${getVerticalAccoladePath(staffLeft, staffTop, staffBot, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT)}" fill="#111827"/>`);
-
-      // Initial flat vertical start line
-      svgParts.push(`    <line x1="${staffLeft.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${staffLeft.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#111827" stroke-width="1.0"/>`);
     } else {
-      // Regular flat start for subsequent systems
+      // Regular start for subsequent systems
       svgParts.push(`    <!-- Urtext Measure Number in Dedicated Left Margin -->`);
       svgParts.push(`    <text x="${(staffLeft - 10).toFixed(2)}" y="${(staffTop - 8).toFixed(2)}" text-anchor="end" class="measure-num">${system.startMeasure}</text>`);
-
-      // Regular flat vertical start line
-      svgParts.push(`    <line x1="${staffLeft.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${staffLeft.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#111827" stroke-width="1.0"/>`);
     }
 
     // 3b. Horizontal staff topography
@@ -1085,14 +1078,14 @@ export function renderPageToSvg(
           const cy = ny - (r + clearance);
           const baseY = cy + chH / 2;
           const apexY = cy - chH / 2;
-          svgParts.push(`    <path class="hand-chevron-shield" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)} Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.20" stroke-linecap="round" stroke-linejoin="round"/>`);
-          svgParts.push(`    <path class="hand-chevron chevron-up" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="1.20" stroke-linecap="round" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path class="hand-chevron-shield" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)} Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.80" stroke-linecap="round" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path class="hand-chevron chevron-up" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.80" stroke-linecap="round" stroke-linejoin="round"/>`);
         } else {
           const cy = ny + (r + clearance);
           const baseY = cy - chH / 2;
           const apexY = cy + chH / 2;
-          svgParts.push(`    <path class="hand-chevron-shield" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)} Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.20" stroke-linecap="round" stroke-linejoin="round"/>`);
-          svgParts.push(`    <path class="hand-chevron chevron-down" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="1.20" stroke-linecap="round" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path class="hand-chevron-shield" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)} Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.80" stroke-linecap="round" stroke-linejoin="round"/>`);
+          svgParts.push(`    <path class="hand-chevron chevron-down" d="M ${leftX.toFixed(2)} ${baseY.toFixed(2)} L ${nx.toFixed(2)} ${apexY.toFixed(2)} L ${rightX.toFixed(2)} ${baseY.toFixed(2)}" fill="none" stroke="${noteColor}" stroke-width="0.80" stroke-linecap="round" stroke-linejoin="round"/>`);
         }
       }
     }
