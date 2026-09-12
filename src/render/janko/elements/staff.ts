@@ -2,12 +2,14 @@
  * Staff elements: octave equator lines, Middle C spine, subtle row guides and
  * dynamic ledger equators.
  *
- * Every octave is one equator line. Within a hand, adjacent equators are
- * exactly `octaveStep` (2h = 30pt) apart; the two hands are separated by the
- * *spacious corridor* — `interStaffGap` (56pt by default) of negative
- * breathing space with **no** spine by default. Horizontal dotted row
- * guidelines and the dashed Middle C spine are opt-in; the only dotted lines
- * in the canonical engraving are the vertical beat-grid pulses.
+ * Every octave is one equator line on one **absolute, hand-independent**
+ * lattice: the four staff equators (o5/o4/o3/o2) are continuous rules shared by
+ * both hands, spaced by `octaveStep` (2h = 30pt) above and below the *spacious
+ * corridor* — `interStaffGap` (56pt by default) of negative breathing space
+ * with **no** spine by default. Only octaves outside the staff span emit
+ * dynamic ledger equators. Horizontal dotted row guidelines and the dashed
+ * Middle C spine are opt-in; the only dotted lines in the canonical engraving
+ * are the vertical beat-grid pulses.
  */
 
 import {
@@ -35,8 +37,8 @@ export function renderRule(
 }
 
 /**
- * The four home octave equators (RH o5/o4, LH o3/o2) plus the opt-in Middle C
- * spine and row guidelines of every home lane.
+ * The four staff octave equators (o5, o4, o3, o2), shared by both hands, plus
+ * the opt-in Middle C spine and row guidelines of every staff lane.
  */
 export function renderStaffLines(
   geo: JankoSystemGeometry,
@@ -68,7 +70,7 @@ export function renderStaffLines(
 
 /**
  * Subtle dashed guidelines showing the two whole-tone row lanes (odd rank
- * above / even rank below each home equator). They are intentionally faint:
+ * above / even rank below each staff equator). They are intentionally faint:
  * pure registration aids, never musical content — and **off by default**, so
  * the score keeps zero horizontal dotted lines.
  */
@@ -84,13 +86,13 @@ export function renderRowGuidelines(
   const out: string[] = ['  <g class="janko-row-guidelines" opacity="0.45">'];
   const x1 = geo.staffLeft + o.measureInset;
   const x2 = geo.staffRight - o.measureInset;
-  const homes: Array<[Hand, number]> = [
+  const staffEquators: Array<[Hand, number]> = [
     ['RH', 5],
     ['RH', 4],
     ['LH', 3],
     ['LH', 2],
   ];
-  for (const [hand, oct] of homes) {
+  for (const [hand, oct] of staffEquators) {
     const eq = geo.equatorY(hand, oct);
     out.push(renderRule(x1, x2, eq - halfRow, '#CBD5E1', 0.45, '3,3'));
     out.push(renderRule(x1, x2, eq + halfRow, '#CBD5E1', 0.45, '3,3'));
@@ -131,8 +133,8 @@ export function renderMiddleCSpine(
 }
 
 /**
- * One dynamic ledger equator segment, centred on a notehead that lies outside
- * the hand's home staff.
+ * One dynamic ledger equator segment, centred on a notehead whose octave lies
+ * outside the grand staff (`octave < 2` or `octave > 5`).
  */
 export function renderLedgerEquator(
   x: number,
@@ -144,7 +146,7 @@ export function renderLedgerEquator(
   return `    <line class="janko-ledger" x1="${f(x - hw)}" y1="${f(y)}" x2="${f(x + hw)}" y2="${f(y)}" stroke="#334155" stroke-width="0.75"/>`;
 }
 
-/** Left-margin octave labels for the four home equators. */
+/** Left-margin octave labels for the four staff equators. */
 export function renderOctaveLabels(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
@@ -154,13 +156,13 @@ export function renderOctaveLabels(
   if (!o.showOctaveLabels) return '';
   const x = geo.staffLeft - 5;
   const out: string[] = ['  <g class="janko-octave-labels">'];
-  const homes: Array<[Hand, number]> = [
+  const staffEquators: Array<[Hand, number]> = [
     ['RH', 5],
     ['RH', 4],
     ['LH', 3],
     ['LH', 2],
   ];
-  for (const [hand, oct] of homes) {
+  for (const [hand, oct] of staffEquators) {
     out.push(
       `    <text x="${f(x)}" y="${f(geo.equatorY(hand, oct) + 2.5)}" class="janko-octave-label" text-anchor="end">${oct}</text>`
     );

@@ -21,7 +21,7 @@ import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
-  JANKO_HOME_OCTAVES,
+  JANKO_STAFF_OCTAVES,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -31,6 +31,7 @@ import {
   getPitchCoordinate,
   getTickX,
   getWholeToneRank,
+  isOutOfStaffOctave,
 } from '../src/render/janko/geometry';
 import {
   computeCropBox,
@@ -166,27 +167,67 @@ test('Jánko row-to-row vertical step is universally isometric (h = 15.0pt)', ()
   }
 });
 
-test('Jánko octave equator step is 2h = 30.0pt within each hand lattice', () => {
-  close(TOKENS.octaveStep, 30.0, 'canonical octave step token');
+test('Unified global equator lattice: absolute coordinates, identical for both hands', () => {
+  // One absolute lattice: the same octave resolves to one coordinate whichever
+  // hand plays it.
+  for (let oct = 1; oct <= 6; oct++) {
+    close(
+      getEquatorYForOctave(oct, 'RH', TOKENS, OPTIONS),
+      getEquatorYForOctave(oct, 'LH', TOKENS, OPTIONS),
+      `octave ${oct} equator is hand-independent`
+    );
+  }
+
+  // The four continuous staff rules of the grand staff.
+  for (const hand of HANDS) {
+    close(getEquatorYForOctave(5, hand, TOKENS, OPTIONS), -58.0, `o5 staff rule (${hand})`);
+    close(getEquatorYForOctave(4, hand, TOKENS, OPTIONS), -28.0, `o4 staff rule (${hand})`);
+    close(getEquatorYForOctave(3, hand, TOKENS, OPTIONS), +28.0, `o3 staff rule (${hand})`);
+    close(getEquatorYForOctave(2, hand, TOKENS, OPTIONS), +58.0, `o2 staff rule (${hand})`);
+  }
+
+  // Octaves step by exactly 2h inside each staff half and climb upward; the
+  // only wider step is the 56pt Middle C corridor between o4 and o3.
   for (const hand of HANDS) {
     for (let oct = 0; oct <= 7; oct++) {
       const lower = getEquatorYForOctave(oct, hand, TOKENS, OPTIONS);
       const upper = getEquatorYForOctave(oct + 1, hand, TOKENS, OPTIONS);
-      close(Math.abs(upper - lower), TOKENS.octaveStep, `octave step ${oct}->${oct + 1} (${hand})`);
       assert.ok(upper < lower, 'higher octaves must climb upward on the page');
+      if (oct === 3) {
+        close(lower - upper, OPTIONS.interStaffGap, `corridor spans interStaffGap (${hand})`);
+      } else {
+        close(lower - upper, TOKENS.octaveStep, `octave step ${oct}->${oct + 1} (${hand})`);
+      }
     }
   }
-  // Every pitch class inherits the same octave step.
+
+  // A pitch's engraved height never depends on the hand that plays it.
   for (let pc = 0; pc < 12; pc++) {
-    for (const hand of HANDS) {
-      const a = getPitchCoordinate(pc, 3, hand, TOKENS, OPTIONS);
-      const b = getPitchCoordinate(pc, 4, hand, TOKENS, OPTIONS);
-      close(Math.abs(b.equatorY - a.equatorY), TOKENS.octaveStep, `pc ${pc} octave step`);
+    for (let oct = 0; oct <= 7; oct++) {
+      const rh = getPitchCoordinate(pc, oct, 'RH', TOKENS, OPTIONS);
+      const lh = getPitchCoordinate(pc, oct, 'LH', TOKENS, OPTIONS);
+      close(rh.equatorY, lh.equatorY, `pc ${pc} oct ${oct} equator`);
+      close(rh.y, lh.y, `pc ${pc} oct ${oct} notehead y`);
+      assert.equal(rh.isOutOfStaff, lh.isOutOfStaff, `pc ${pc} oct ${oct} staff membership`);
     }
   }
 });
 
-test('Spacious spine-free corridor anchors the two hand lattices (o4 -28pt / o3 +28pt)', () => {
+test('Out-of-staff octaves are strictly octave < 2 || octave > 5', () => {
+  const [minOct, maxOct] = JANKO_STAFF_OCTAVES;
+  assert.deepEqual([minOct, maxOct], [2, 5], 'the grand staff spans octaves 2–5');
+  for (let oct = -1; oct <= 8; oct++) {
+    const expected = oct < minOct || oct > maxOct;
+    for (const hand of HANDS) {
+      assert.equal(isOutOfStaffOctave(oct, hand), expected, `${hand} octave ${oct} out-of-staff`);
+      const c = getPitchCoordinate(0, oct, hand, TOKENS, OPTIONS);
+      assert.equal(c.isOutOfStaff, expected, `${hand} octave ${oct} coordinate`);
+      assert.equal(c.ledgerYs.length === 0, !expected, `${hand} octave ${oct} ledger presence`);
+    }
+  }
+});
+
+test('Spacious spine-free corridor anchors the two inner staff rules (o4 −28pt / o3 +28pt)', () => {
   close(OPTIONS.interStaffGap, 56.0, 'canonical spacious inter-staff gap');
   close(getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), -28.0, 'RH o4 equator');
   close(getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 28.0, 'LH o3 equator');
@@ -194,11 +235,11 @@ test('Spacious spine-free corridor anchors the two hand lattices (o4 -28pt / o3 
   close(getEquatorYForOctave(2, 'LH', TOKENS, OPTIONS), 58.0, 'LH o2 equator');
 });
 
-test('Dynamic ledger equators: home octaves are clean, out-of-staff octaves accumulate', () => {
-  // Home staff octaves never produce ledgers.
+test('Dynamic ledger equators: only octaves outside the grand staff accumulate', () => {
+  // Every staff octave (2–5) is a continuous rule shared by both hands: no
+  // ledger line may ever be generated for it, whichever hand plays the note.
   for (const hand of HANDS) {
-    const [minOct, maxOct] = JANKO_HOME_OCTAVES[hand];
-    for (let oct = minOct; oct <= maxOct; oct++) {
+    for (let oct = 2; oct <= 5; oct++) {
       for (let pc = 0; pc < 12; pc++) {
         const c = getPitchCoordinate(pc, oct, hand, TOKENS, OPTIONS);
         assert.equal(c.isOutOfStaff, false, `${hand} oct ${oct} is in staff`);
@@ -208,55 +249,127 @@ test('Dynamic ledger equators: home octaves are clean, out-of-staff octaves accu
     }
   }
 
-  // Measure 4 scenario: RH cascading run descending into octave 3.
+  // Measure 4 scenario: the RH cascading run descends onto the true o3 rule —
+  // the exact y where the old hand-relative lattice grew a phantom ledger
+  // floating inside the corridor.
   const rh3 = getPitchCoordinate(9, 3, 'RH', TOKENS, OPTIONS);
-  assert.equal(rh3.isOutOfStaff, true);
-  assert.equal(rh3.ledgerYs.length, 1);
-  close(rh3.ledgerY as number, getEquatorYForOctave(3, 'RH', TOKENS, OPTIONS), 'RH o3 ledger');
-  assert.equal(rh3.ledgerY, rh3.ledgerYs[0]);
-  assert.ok(Number.isFinite(rh3.ledgerY as number));
+  assert.equal(rh3.isOutOfStaff, false);
+  close(rh3.equatorY, getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 'RH o3 shares the LH o3 rule');
+  close(rh3.equatorY, 28.0, 'RH o3 is the true staff rule');
+  assert.equal(rh3.ledgerY, null);
 
-  // LH reaching up into octave 4.
+  // Measure 3 scenario: the LH reaching up into octave 4 lands on the o4 rule.
   const lh4 = getPitchCoordinate(0, 4, 'LH', TOKENS, OPTIONS);
-  assert.equal(lh4.ledgerYs.length, 1);
-  close(lh4.ledgerY as number, getEquatorYForOctave(4, 'LH', TOKENS, OPTIONS), 'LH o4 ledger');
+  assert.equal(lh4.isOutOfStaff, false);
+  close(lh4.equatorY, getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), 'LH o4 shares the RH o4 rule');
+  close(lh4.equatorY, -28.0, 'LH o4 is the true staff rule');
+  assert.equal(lh4.ledgerY, null);
 
-  // Deep out-of-staff pitches accumulate every intervening equator, nearest first.
+  // Outside the staff every intervening equator accumulates, nearest first.
+  const rh6 = getPitchCoordinate(0, 6, 'RH', TOKENS, OPTIONS);
+  assert.deepEqual(rh6.ledgerYs, [getEquatorYForOctave(6, 'RH', TOKENS, OPTIONS)]);
+  assert.equal(rh6.isOutOfStaff, true);
+  const lh1 = getPitchCoordinate(0, 1, 'LH', TOKENS, OPTIONS);
+  assert.deepEqual(lh1.ledgerYs, [getEquatorYForOctave(1, 'LH', TOKENS, OPTIONS)]);
   const rh1 = getPitchCoordinate(0, 1, 'RH', TOKENS, OPTIONS);
   assert.deepEqual(
     rh1.ledgerYs,
-    [3, 2, 1].map((oct) => getEquatorYForOctave(oct, 'RH', TOKENS, OPTIONS))
+    [1].map((oct) => getEquatorYForOctave(oct, 'RH', TOKENS, OPTIONS))
   );
-  const lh5 = getPitchCoordinate(0, 5, 'LH', TOKENS, OPTIONS);
+  const lh7 = getPitchCoordinate(0, 7, 'LH', TOKENS, OPTIONS);
   assert.deepEqual(
-    lh5.ledgerYs,
-    [4, 5].map((oct) => getEquatorYForOctave(oct, 'LH', TOKENS, OPTIONS))
+    lh7.ledgerYs,
+    [6, 7].map((oct) => getEquatorYForOctave(oct, 'LH', TOKENS, OPTIONS))
   );
 
-  // Every ledger equator is a valid (finite) coordinate on the hand lattice.
+  // Every ledger equator of an out-of-staff octave clears the staff entirely.
   for (const hand of HANDS) {
-    for (const oct of [0, 1, 6, 7]) {
+    for (const oct of [-1, 0, 1, 6, 7, 8]) {
       for (const y of getLedgerEquators(0, oct, hand, TOKENS, OPTIONS)) {
         assert.ok(Number.isFinite(y), `finite ledger y for ${hand} oct ${oct}`);
+        assert.ok(y < -58 || y > 58, `ledger at ${y}pt stays outside the staff rules`);
       }
     }
   }
 });
 
-test('Bach m. 4 RH octave-3 notes resolve to ledger equators in the rendered crop', () => {
+test('Zero corridor ledger cuts across the canonical Bach score (mm. 3 & 4 included)', () => {
   const score = buildBachGoldbergVar1Score();
-  const measureTicks = TOKENS.ticksPerMeasure;
-  const m4 = score.notes.filter(
-    (n) => n.startTick >= 3 * measureTicks && n.startTick < 4 * measureTicks
-  );
-  const rhOct3 = m4.filter((n) => n.hand === 'RH' && n.pitch.octave === 3);
-  assert.ok(rhOct3.length > 0, 'm. 4 must contain the RH run descending into octave 3');
-  for (const n of rhOct3) {
-    const c = getPitchCoordinate(n.pitch.pitchClass, n.pitch.octave, 'RH', TOKENS, OPTIONS);
-    assert.ok(c.ledgerY !== null && Number.isFinite(c.ledgerY), 'ledger equator emitted');
+  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  const staffRules = [5, 4, 3, 2].map((oct) => getEquatorYForOctave(oct, 'RH', TOKENS, OPTIONS));
+  // The old hand-relative lattice put LH o4 at -2pt and RH o3 at +2pt, deep
+  // inside the corridor: those phantom offsets may never come back.
+  const phantomOffsets = [-2.0, 2.0];
+
+  let ledgers = 0;
+  for (const layout of layouts) {
+    for (const p of layout.notes) {
+      for (const ledgerY of p.coord.ledgerYs) {
+        ledgers++;
+        // The corridor [-28, +28] must never carry a ledger cut ...
+        assert.ok(
+          ledgerY <= -28 - 1e-9 || ledgerY >= 28 + 1e-9,
+          `${p.note.id} (${p.coord.hand} o${p.coord.octave}) emits a ledger at ${ledgerY}pt ` +
+            'inside the corridor'
+        );
+        // ... no ledger may sit on one of the four continuous staff rules ...
+        for (const rule of staffRules) {
+          assert.ok(
+            Math.abs(ledgerY - rule) > 1e-9,
+            `ledger at ${ledgerY}pt coincides with the ${rule}pt staff rule`
+          );
+        }
+        // ... and every surviving ledger is a genuine out-of-staff rule.
+        assert.ok(
+          ledgerY < -58 - 1e-9 || ledgerY > 58 + 1e-9,
+          `ledger at ${ledgerY}pt must stay outside the grand staff`
+        );
+      }
+    }
   }
-  const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
-  assert.match(crop, /class="janko-ledger"/, 'm. 4 crop contains ledger equators');
+  assert.ok(ledgers > 0, 'the octave-6 excursions still carry their dynamic ledger');
+
+  // Measure 3: the LH octave-4 notes sit on the true o4 rule with no ledger.
+  const sys0 = layouts[0];
+  const o4Rule = sys0.geometry.equatorY('RH', 4);
+  const o3Rule = sys0.geometry.equatorY('LH', 3);
+  const lh4 = sys0.notes.filter((p) => p.coord.hand === 'LH' && p.coord.octave === 4);
+  assert.ok(lh4.length > 0, 'm. 3 contains LH octave-4 notes');
+  for (const p of lh4) {
+    close(p.coord.equatorY, -28.0, `${p.note.id} LH o4 equator`);
+    close(p.y, o4Rule + p.coord.offsetFromEquator, `${p.note.id} head sits on the o4 staff rule`);
+    assert.equal(p.coord.ledgerY, null, `${p.note.id} carries no ledger`);
+  }
+
+  // Measure 4: the RH octave-3 run sits on the true o3 rule with no ledger.
+  const rh3 = sys0.notes.filter((p) => p.coord.hand === 'RH' && p.coord.octave === 3);
+  assert.ok(rh3.length > 0, 'm. 4 contains RH octave-3 notes');
+  for (const p of rh3) {
+    close(p.coord.equatorY, 28.0, `${p.note.id} RH o3 equator`);
+    close(p.y, o3Rule + p.coord.offsetFromEquator, `${p.note.id} head sits on the o3 staff rule`);
+    assert.equal(p.coord.ledgerY, null, `${p.note.id} carries no ledger`);
+  }
+
+  // Document level: neither measure engraves a single floating ledger cut, and
+  // both true staff rules are painted continuously across the measure.
+  for (const measure of [3, 4]) {
+    const crop = renderJankoCrop(score, measure, 1, OPTIONS, TOKENS);
+    assert.ok(
+      crop.includes(`y1="${o4Rule.toFixed(2)}"`) && crop.includes(`y1="${o3Rule.toFixed(2)}"`),
+      `m. ${measure} paints the continuous o4 and o3 staff rules`
+    );
+    assert.ok(
+      !crop.includes('class="janko-ledger"'),
+      `m. ${measure} must not emit a phantom ledger inside the corridor`
+    );
+    for (const offset of phantomOffsets) {
+      const y = (sys0.geometry.middleCY + offset).toFixed(2);
+      assert.ok(
+        !new RegExp(`class="janko-ledger"[^>]*y1="${y}"`).test(crop),
+        `m. ${measure} has no ledger at the old phantom y=${y}`
+      );
+    }
+  }
 });
 
 test('Position of Honor halo ring (R = 6.2pt) is emitted at tick 0 of Measure 1', () => {
@@ -352,6 +465,29 @@ test('renderJankoPage: well-formed 3-system page with all rhythm styles availabl
   assert.ok(!ticks.includes('class="janko-beam"'), 'lattice dialect emits no beams');
   assert.match(beamed, /class="janko-beam"/);
   assert.ok(!beamed.includes('class="janko-cut"'), 'beam dialect emits no angled cuts');
+});
+
+test('Clean Urtext subtitle: the page header carries no system branding', () => {
+  const score = buildBachGoldbergVar1Score();
+  assert.equal(DEFAULT_JANKO_OPTIONS.subtitle, 'Variatio 1. a 1 Clav.');
+
+  const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
+  const header = page.match(/<g id="page-header">[\s\S]*?<\/g>/)?.[0] ?? '';
+  assert.ok(header.length > 0, 'the page carries a header group');
+  assert.match(header, /class="janko-subtitle"[^>]*>Variatio 1\. a 1 Clav\.<\/text>/);
+  assert.match(header, /class="janko-meta"[^>]*>Johann Sebastian Bach<\/text>/);
+  assert.ok(
+    !header.includes('Jánko Two-Row Equator System'),
+    'no notation branding may sit beside Bach’s name'
+  );
+  assert.ok(
+    !page.includes('Jánko Two-Row Equator System'),
+    'the branding is gone from the engraving'
+  );
+
+  // The system is still credited in the bottom attribution footer.
+  const footer = page.match(/<g id="page-footer">[\s\S]*?<\/g>/)?.[0] ?? '';
+  assert.match(footer, /Pure 12-TET Jánko Two-Row Grand Staff/);
 });
 
 test('renderJankoCrop: crops are exact viewBox narrowings of the full page', () => {

@@ -7,11 +7,16 @@
  * - Whole-tone rank 0 (even pitch classes 0, 2, 4, 6, 8, a) sits **below** its
  *   octave equator; whole-tone rank 1 (odd pitch classes 1, 3, 5, 7, 9, b)
  *   sits **above** it. Every row-to-row step is exactly `rowHeight` (15pt).
- * - Every octave step inside one hand's lattice is exactly `octaveStep`
- *   (2 * rowHeight = 30pt); the two hands anchor their lattices on their own
- *   two home equators, separated by the negative breathing space of
- *   `interStaffGap` (56pt by default) — the *spacious corridor* holds the
- *   Middle C channel open without any artificial rule dividing the hands.
+ * - The four equators o5 (−58pt), o4 (−28pt), o3 (+28pt) and o2 (+58pt) form
+ *   the *grand staff*: one **absolute, hand-independent** coordinate lattice
+ *   shared by both hands. Octaves step by exactly `octaveStep`
+ *   (2 * rowHeight = 30pt) away from the corridor, whose negative breathing
+ *   space is `interStaffGap` (56pt by default) between o4 and o3 — the
+ *   *spacious corridor* holds the Middle C channel open without any artificial
+ *   rule dividing the hands.
+ * - Only pitches **outside** the staff span (`octave < 2` or `octave > 5`)
+ *   emit dynamic ledger equators; every note in octaves 2–5 already sits on a
+ *   continuous staff line.
  *
  * Everything geometric or stylistic that a designer may want to tweak lives in
  * {@link JankoTokens} (micro-typography) and {@link JankoLayoutOptions}
@@ -130,7 +135,7 @@ export interface JankoLayoutOptions {
   measuresPerSystem: number;
   /** Pluggable rhythm renderer style. */
   rhythmStyle: JankoRhythmStyle;
-  /** Vertical gap between the RH inner equator (o4) and the LH inner equator (o3). */
+  /** Vertical gap between the two inner staff equators (o4 and o3) — the Middle C corridor. */
   interStaffGap: number;
   /** Middle C spine rendering style. */
   middleCSpine: JankoMiddleCSpine;
@@ -206,7 +211,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   showBeatGrid: true,
   showRowGuidelines: false,
   title: 'J.S. Bach: Goldberg Variations, BWV 988',
-  subtitle: 'Variatio 1. a 1 Clav. — Jánko Two-Row Equator System',
+  subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
 };
 
@@ -291,7 +296,7 @@ export interface JankoSystemGeometry {
   staffRight: number;
   /** Width of one measure. */
   measureWidth: number;
-  /** Absolute y of the hand-local octave equator for `octave`. */
+  /** Absolute y of the global octave equator for `octave` (hand-independent). */
   equatorY(hand: Hand, octave: number): number;
 }
 
@@ -315,11 +320,26 @@ export interface JankoPageGeometry {
   systems: JankoSystemGeometry[];
 }
 
-/** Inclusive home (in-staff) octave range of one hand: [minOctave, maxOctave]. */
-export type JankoHomeOctaveRange = readonly [number, number];
+/** Inclusive octave span of one staff region: [minOctave, maxOctave]. */
+export type JankoStaffOctaveRange = readonly [number, number];
 
-/** Home (in-staff) octave range of each hand. */
-export const JANKO_HOME_OCTAVES: Record<Hand, JankoHomeOctaveRange> = {
-  RH: [4, 5],
-  LH: [2, 3],
+/** Backwards-compatible alias of {@link JankoStaffOctaveRange}. */
+export type JankoHomeOctaveRange = JankoStaffOctaveRange;
+
+/**
+ * The grand staff spans octaves 2–5: four continuous equators (o5 −58pt,
+ * o4 −28pt, o3 +28pt, o2 +58pt) that both hands share. The lattice is
+ * **absolute**: a pitch's equator depends only on its octave, never on the
+ * hand that plays it. Pitches inside this span therefore never produce ledger
+ * lines; only `octave < 2` or `octave > 5` emits dynamic ledgers.
+ */
+export const JANKO_STAFF_OCTAVES: JankoStaffOctaveRange = [2, 5];
+
+/**
+ * In-staff octave range of each hand. Both hands read the same unified grand
+ * staff, so both resolve to {@link JANKO_STAFF_OCTAVES}.
+ */
+export const JANKO_HOME_OCTAVES: Record<Hand, JankoStaffOctaveRange> = {
+  RH: JANKO_STAFF_OCTAVES,
+  LH: JANKO_STAFF_OCTAVES,
 };
