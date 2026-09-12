@@ -32,6 +32,7 @@ import {
   resolveJankoTokens,
 } from './types';
 import { renderJankoCrop, renderJankoPage, countJankoSystems } from './engine';
+import { getChannelLayoutSpec } from './geometry';
 import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
@@ -166,6 +167,33 @@ function lintChip(report: LintReport): string {
   return '<span class="chip chip-ok" title="no diagnostics">✓ clean</span>';
 }
 
+/** Signed offset formatted as `+7.5pt` / `−15.0pt`. */
+function pt(value: number): string {
+  return `${value < 0 ? '−' : '+'}${Math.abs(value).toFixed(1)}pt`;
+}
+
+/**
+ * One-line geometric summary of a candidate's octave framing: how many rules it
+ * paints (the visual-density axis of Round 4) and where whole-tone Set A/B sit.
+ */
+export function describeChannelLayout(
+  options: ResolvedJankoLayoutOptions,
+  tokens: ResolvedJankoTokens
+): string {
+  const spec = getChannelLayoutSpec(options, tokens);
+  const rules = `${spec.rulesPerEquator} rule${spec.rulesPerEquator === 1 ? '' : 's'}/octave (${spec.staffRules} lines)`;
+  switch (spec.layout) {
+    case 'bounded-channel':
+      return `bounded channel ±${tokens.channelHalfWidth.toFixed(1)}pt · flanks ∓${spec.flankMagnitude.toFixed(1)}pt · ${rules}`;
+    case 'single-line-3row':
+      return `single line · Set A on the rule · contour flanks ∓${spec.flankMagnitude.toFixed(1)}pt · ${rules}`;
+    case 'on-the-line':
+      return `Set A on the line · Set B ${pt(spec.setBOffset)} above · ${rules}`;
+    default:
+      return `single equator · Set A ${pt(spec.setAOffset)} · Set B ${pt(spec.setBOffset)} · ${rules}`;
+  }
+}
+
 function badgeHtml(badge: CandidateOptionBadge): string {
   const changed = badge.value !== badge.golden;
   return (
@@ -203,14 +231,10 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .join('');
     const opts = resolved.options;
     const toks = resolved.tokens;
-    const channel =
-      opts.channelLayout === 'bounded-channel'
-        ? `bounded channel ±${toks.channelHalfWidth.toFixed(1)}pt · flanks ∓${toks.channelFlankOffset.toFixed(1)}pt`
-        : 'single equator';
     const facts =
       `mm. ${resolved.measureStart}–${resolved.measureStart + resolved.measureCount - 1} · ` +
       `${opts.rhythmStyle} · spine ${opts.middleCSpine} · gap ${opts.interStaffGap.toFixed(1)}pt · ` +
-      `${channel} · beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
+      `${describeChannelLayout(opts, toks)} · beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
     return [
       `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="${report.ok ? 'clean' : 'violations'}">`,
       '  <header class="candidate-head">',
@@ -257,6 +281,7 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
   const report = lintJankoScore(score, options, tokens);
   const systems = countJankoSystems(score, options, tokens);
   const beatsPerMeasure = Math.max(1, Math.round(options.ticksPerMeasure / options.ticksPerBeat));
+  const channelSpec = getChannelLayoutSpec(options, tokens);
 
   const pageCards = pages.map((page) => {
     const svg = renderJankoPage(score, page, options, tokens);
@@ -298,7 +323,7 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
     '    <div class="badges">',
     `      <span class="badge"><b>rhythmStyle</b> = ${escapeHtml(options.rhythmStyle)}</span>`,
     `      <span class="badge"><b>middleCSpine</b> = ${escapeHtml(options.middleCSpine)}</span>`,
-    `      <span class="badge"><b>channelLayout</b> = ${escapeHtml(options.channelLayout)}</span>`,
+    `      <span class="badge"><b>channelLayout</b> = ${escapeHtml(options.channelLayout)} · ${channelSpec.staffRules} lines</span>`,
     `      <span class="badge"><b>interStaffGap</b> = ${options.interStaffGap.toFixed(1)}pt</span>`,
     `      <span class="badge"><b>measuresPerSystem</b> = ${options.measuresPerSystem}</span>`,
     `      <span class="badge"><b>systemsPerPage</b> = ${options.systemsPerPage}</span>`,

@@ -32,7 +32,7 @@ Implementers verify the same engraving **without rendering anything**:
 
 ```bash
 npm run lint:engraving            # ~25 ms, JSON/strict/quiet flags available
-npm test                          # 157 tests, < 1.5 s, includes the linter + studio suites
+npm test                          # 166 tests, < 4 s, includes the linter + candidate/studio suites
 ```
 
 ---
@@ -54,7 +54,7 @@ turn because:
 The harness replaces all four failure modes with one command:
 
 ```bash
-npm run janko:export   # ~0.4 s, five PNGs, six delivery locations each
+npm run janko:export   # ~1 s, ten PNGs, six delivery locations each
 npm run janko:watch    # same suite on every file change
 ```
 
@@ -98,7 +98,7 @@ src/render/janko/
 | Stem column | `stemX === note.x` (centred on the notehead, both hands) |
 | Flag hook reach / drop | `4.0 pt` right of the stem / `6.6 pt` from the tip |
 | Minimum head-to-beam air | `noteheadRadius + minStemClearance` = 6.3 pt |
-| Bounded center channel (Round 4) | two rules at `equator ± 6.5 pt`; Set A on the equator (offset 0.0 pt), Set B at `∓13.0 pt` |
+| Channel layouts (Round 4) | `'single-equator'` `+7.5/−7.5 pt` (4 lines) · `'on-the-line'` `0/−15 pt` (4) · `'single-line-3row'` `0/±15 pt` (4) · `'bounded-channel'` `0/±13 pt` with rules at `equator ± 6.5 pt` (8) |
 | Channel boundary clearance | `6.5 − 4.8 = 1.7 pt` of clean air around every notehead disc |
 | Channel contour | `Δpitch > 0 ⇒ Δy ≤ 0`, `Δpitch < 0 ⇒ Δy ≥ 0` — never inverted |
 
@@ -113,28 +113,50 @@ ledger equators** — one per intervening octave, nearest first. A beam whose
 connector passes a foreign notehead of the shared staff is pushed uniformly
 further away from its own heads until every such head keeps 6.3 pt of air.
 
-### Bounded center channel (`channelLayout: 'bounded-channel'`)
+### Channel layouts (Round 4 domain exploration)
 
 `DEFAULT_JANKO_OPTIONS.channelLayout` is `'single-equator'`: the golden master is
-untouched, and its engraving is byte-identical with the channel code in place.
-The alternative framing opens every octave into a **13 pt channel**:
+untouched, and its engraving is byte-identical with the other framings in place.
+`JankoChannelLayout` declares four comparative paradigms, all on the same
+absolute octave lattice:
 
-- `renderStaffLines` paints **two** boundary rules per staff octave — and
-  `renderLedgerEquator` two per dynamic ledger — at `equator ± channelHalfWidth`
-  (6.5 pt), so whole-tone Set A sits in the negative space with **zero line
-  knockouts**.
-- `resolveChannelFlanks(notes, options, tokens)` resolves the side of every
+| Layout | Rules/octave | Set A (even pc) | Set B (odd pc) | Lines |
+| --- | --- | --- | --- | --- |
+| `'single-equator'` (golden) | 1, on the equator | `+h/2` = `+7.5 pt` below | `-h/2` = `-7.5 pt` above, static parity | 4 |
+| `'on-the-line'` | 1, on the equator | `0 pt` — centred **on** the rule | `-h` = `-15 pt` above, static | 4 |
+| `'single-line-3row'` | 1, on the equator | `0 pt` — centred **on** the rule | `∓h` = `∓15 pt`, contour-resolved | 4 |
+| `'bounded-channel'` | 2, at `equator ± 6.5 pt` | `0 pt` — inside the channel | `∓13 pt`, contour-resolved | 8 |
+
+- `getChannelLayoutSpec(options, tokens)` is the single source of truth for the
+  table (`setAOffset`, `setBOffset`, `flankMagnitude`, `rulesPerEquator`,
+  `staffRules`, `dynamicFlanks`, `setAOnRule`); the studio, the tests and the
+  export suite all read it, and `JANKO_CHANNEL_LAYOUTS` fixes the A–D order.
+- `renderStaffLines` paints one rule per staff octave for the first three
+  layouts (4 lines across the grand staff) and **two** boundary rules per octave
+  for `'bounded-channel'` (8 lines). `renderLedgerEquator` applies the same
+  pairing to dynamic ledger equators.
+- `usesContourFlanks(layout)` marks the two dynamic framings;
+  `resolveChannelFlanks(notes, options, tokens)` resolves the side of every
   whole-tone Set B note (odd pitch classes) **per voice** with a two-state
-  dynamic program over the score in tick order: `'up'` = the row above the upper
-  rule (`-channelFlankOffset`), `'down'` = the row below the lower rule
-  (`+channelFlankOffset`). Among the assignments that minimise contour
+  dynamic program over the score in tick order: `'up'` = the row above
+  (`-flankOffset`), `'down'` = the row below (`+flankOffset`), where the offset
+  is `rowHeight` (15 pt) for `'single-line-3row'` and `channelFlankOffset`
+  (13 pt) for `'bounded-channel'`. Among the assignments that minimise contour
   contradictions the solver prefers, in order, the flank the local melodic
   direction asks for, no zigzag on a repeated pitch, and finally the canonical
   upper (odd-rank) row.
+- The two static framings anchor Set B on a single row, so the solver map is
+  empty. `'on-the-line'` and `'single-line-3row'` put every Set A notehead
+  **on** the rule, so its knockout cuts that rule — the visibility trade-off the
+  round is studying. The linter reports the consequence honestly: on the
+  canonical Bach score both anchored framings surface exactly two
+  `measure-numeral-collision` violations (the outer Set B row reaches the
+  numeral margin at mm. 9 and 29), while `'single-equator'` and
+  `'bounded-channel'` stay violation-free.
 - The solver is exact and pure, so the layout engine, the linter and the tests
-  agree: on the canonical Bach score all 547 same-hand steps satisfy
-  `Δpitch > 0 ⇒ Δy ≤ 0` and `Δpitch < 0 ⇒ Δy ≥ 0`, with 176 of them absorbed as
-  **flat** steps inside the channel.
+  agree: on the canonical Bach score all dynamic-layout same-hand steps satisfy
+  `Δpitch > 0 ⇒ Δy ≤ 0` and `Δpitch < 0 ⇒ Δy ≥ 0`, with hundreds of them
+  absorbed as **flat** steps on the center row.
 
 ### Tokens and options
 
@@ -142,7 +164,8 @@ The alternative framing opens every octave into a **13 pt channel**:
 `channelHalfWidth` = 6.5, `channelFlankOffset` = 13.0, `accoladeWidth`,
 `accoladeThick`, `fontFamily`, plus rhythm/spacing refinements) and
 `JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`, `interStaffGap`,
-`middleCSpine`, `channelLayout` = `'single-equator' | 'bounded-channel'`,
+`middleCSpine`, `channelLayout` = `'single-equator' | 'on-the-line' |
+'single-line-3row' | 'bounded-channel'`,
 `showRowGuidelines`, page/header/footer geometry) are the **only**
 places layout constants live. Every renderer accepts partial overrides and
 resolves them against `DEFAULT_JANKO_TOKENS` / `DEFAULT_JANKO_OPTIONS`.
@@ -233,6 +256,11 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 | `janko_m4.png` | m. 4: RH cascading run onto the shared octave-3 staff rule (zero phantom ledgers) | 4× |
 | `janko_m8.png` | m. 8: 16th-cluster horizontal-spacing stress test | 4× |
 | `janko_variants.png` | A Angled Cuts vs B Traditional Beams vs C Unified Continuous Lattice on mm. 1–4 | 2× |
+| `janko_domain_exploration.png` | Round 4 domain sheet: the four channel paradigms on mm. 1–2, stacked | 3× |
+| `janko_domain_a.png` | Candidate A · floating single equator (golden master) on mm. 1–2 | 4× |
+| `janko_domain_b.png` | Candidate B · base row anchored on the line, Set B static above | 4× |
+| `janko_domain_c.png` | Candidate C · single line, three rows (contour-resolved flanks) | 4× |
+| `janko_domain_d.png` | Candidate D · bounded center channel, 8 lines | 4× |
 
 Every PNG is mirrored automatically to:
 
@@ -250,7 +278,7 @@ fallback.
 ## 4. Verification
 
 ```bash
-npm test                          # 157 tests, < 1.5 s
+npm test                          # 166 tests, < 4 s
 npm run lint:engraving            # visual lint of the golden master
 npm run janko:export              # refresh the mobile-app PNG artifacts
 npm run build                     # tsc + vite (index.html + janko.html entries)

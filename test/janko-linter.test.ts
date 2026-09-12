@@ -502,6 +502,29 @@ test('Defect: collapsing the Middle C corridor is caught', () => {
   assert.ok(intrusions.some((v) => /structural rules/.test(v.message)));
 });
 
+test('Corridor audit reads the true rule positions of the bounded channel', () => {
+  // The channel displaces its boundary rules to `equator ± 6.5pt`, so a tight
+  // corridor is cut by the inner rule even though the equator itself stays
+  // clear. The audit must follow the painted rules, not the empty equator.
+  const tight = { ...DEFAULT_JANKO_OPTIONS, interStaffGap: 12.0 };
+  const channel = { ...tight, channelLayout: 'bounded-channel' as const };
+  const ruleIntrusions = (options: typeof tight): LintViolation[] =>
+    run((layout, out) => checkMiddleCCorridor(layout, options, DEFAULT_JANKO_TOKENS, LINT, out), systems(options)[0]).filter(
+      (v) => v.code === 'corridor-intrusion' && /equator rule/.test(v.message)
+    );
+  assert.equal(ruleIntrusions(tight).length, 0, 'the single equator stays clear of the corridor');
+  const channelHits = ruleIntrusions(channel);
+  assert.ok(channelHits.length > 0, 'the displaced boundary rule is audited where it is painted');
+  assert.ok(
+    channelHits.some(
+      (v) =>
+        Math.abs(Number(v.metrics?.ruleY ?? NaN) - Number(v.metrics?.spineY ?? NaN)) <=
+        LINT.corridorClearance
+    ),
+    'the reported rule y is the one that actually reaches the spine'
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 4. Document-level paint-order audit
 // ---------------------------------------------------------------------------

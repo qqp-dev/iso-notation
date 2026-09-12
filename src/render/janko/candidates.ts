@@ -68,21 +68,23 @@ export interface JankoCandidate {
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
- * settled the Klavarskribo beat grid and round 3 the Middle C corridor. This
- * round interrogates the octave row itself: whether the single equator should
- * open into a **bounded center channel** that holds whole-tone Set A in its
- * negative space and sends Set B to a contour-resolved flank.
+ * settled the Klavarskribo beat grid and round 3 the Middle C corridor. Round 4
+ * opened the octave framing question with the bounded center channel; this
+ * expansion interrogates the two variables the operator isolated in Candidate
+ * B — **line density** and **interval proportionality** — by engraving the four
+ * comparative paradigms of the channel domain side by side.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 4,
-  title: 'Bounded Center Channel & Non-Inverting Contour',
+  title: 'Domain Exploration — Line Density vs Interval Proportionality',
   description:
-    'The unified equator lattice now asks its last structural question: should the center row sit on a line, ' +
-    'or inside an open channel? Candidate A keeps the incumbent single equator (even rank below it, odd rank ' +
-    'above it, every step 15pt). Candidate B draws two boundary rules at ±6.5pt around every equator, holds ' +
-    'whole-tone Set A in the channel with zero line knockouts, and places each Set B note on the upper or lower ' +
-    'flank so that no rising step ever moves down the page. Judge them on mm. 1–2, where the opening 7–9–11 ' +
-    'ascent and the m. 2 neighbour 2–1–2 turn the contour around.',
+    'Candidate B doubled the staff rules (8 lines across the grand staff) and its dynamic 3-row flanks ' +
+    'turned a descending 4th into a 43pt canyon followed by a 26pt whole step. Four paradigms now isolate ' +
+    'the two variables: A keeps the pristine 4-line floating equator (+7.5/−7.5pt, static parity), B anchors ' +
+    'Set A directly ON the 4-line rule with Set B statically one row above, C keeps the single 4-line rule but ' +
+    'lets Set B swing to the upper or lower ±15pt flank by contour, and D keeps the 8-line bounded channel with ' +
+    'Set B at ±13pt. Compare mm. 1–2: the opening ascent and the m. 2 neighbour 2–1–2 turn expose exactly how ' +
+    'much interval truth each paradigm can preserve per unit of ink.',
 };
 
 /**
@@ -91,23 +93,44 @@ export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'equator-single',
+    id: 'equator-floating',
     label: 'A · Single Equator (Golden)',
     description:
-      'The accumulated golden master: one rule per octave, whole-tone rank 0 a half-row below it and rank 1 a half-row above it — every row-to-row step an identical 15pt.',
+      'The accumulated golden master: one rule per octave through the gap between the rows, whole-tone Set A floating 7.5pt below it and Set B 7.5pt above it. Every row-to-row step is an identical 15pt, every notehead keeps 2.7pt of clear air to the rule, and not one glyph cuts the line — the 4-line control.',
     options: { channelLayout: 'single-equator' },
     measureStart: 1,
     measureCount: 2,
-    tags: ['incumbent'],
+    tags: ['incumbent', '4 lines', 'static'],
+  },
+  {
+    id: 'equator-anchored',
+    label: 'B · Base Row On the Line',
+    description:
+      'One rule per octave, and whole-tone Set A is centred directly ON it (y = 0), with Set B anchored one whole-tone row above (y = −15pt) and no lower row at all. The contour is stable by construction — but every Set A glyph now knocks a hole in the rule it sits on, all Set B pitches of an octave collapse onto one row, and the raised outer row grazes the measure-numeral margin (2 lint violations on the canonical score).',
+    options: { channelLayout: 'on-the-line' },
+    measureStart: 1,
+    measureCount: 2,
+    tags: ['4 lines', 'static', 'anchored'],
+  },
+  {
+    id: 'single-line-3row',
+    label: 'C · Single Line, Three Rows',
+    description:
+      'Half the ink of the bounded channel: one rule per octave (4 lines total) with Set A on the line and Set B contour-resolved to the upper (−15pt) or lower (+15pt) flank, so a rising step never moves down the page. Measures whether a single rule removes the visual noise without re-opening the 2-to-9 canyon; its raised outer row also grazes the measure-numeral margin (2 lint violations).',
+    options: { channelLayout: 'single-line-3row' },
+    measureStart: 1,
+    measureCount: 2,
+    tags: ['4 lines', 'dynamic', 'contour'],
   },
   {
     id: 'channel-bounded',
-    label: 'B · Bounded Center Channel',
+    label: 'D · Bounded Center Channel',
     description:
-      'Two boundary rules at ±6.5pt frame an open 13pt channel: whole-tone Set A rides the negative space with zero line knockouts, and every Set B note takes the upper or lower flank the melodic contour asks for — a rising step is flat or up, never down.',
+      'Two boundary rules at ±6.5pt frame an open 13pt channel: whole-tone Set A rides the negative space with zero line knockouts, and every Set B note takes the upper or lower ±13pt flank the melodic contour asks for. The 8-line datum that provoked this round — maximal line separation at twice the ink.',
     options: { channelLayout: 'bounded-channel' },
     measureStart: 1,
     measureCount: 2,
+    tags: ['8 lines', 'dynamic', 'contour'],
   },
 ];
 

@@ -51,6 +51,7 @@ import {
   resolveJankoTokens,
 } from './types';
 import { JankoSystemLayout, PositionedJankoNote, layoutJankoScore, renderSystem } from './engine';
+import { getEquatorRuleYs } from './elements/staff';
 import {
   JankoBeamConnector,
   getStemAttachmentRadii,
@@ -985,12 +986,16 @@ export function checkMiddleCCorridor(
   }
 
   // 2. Horizontal rules: nothing but the spine itself lives on the corridor.
-  //    Row guidelines are only audited when they are actually painted.
+  //    Row guidelines are only audited when they are actually painted, and the
+  //    boundary rules of the bounded channel at their true `equator ± half`
+  //    positions rather than the (empty) equator itself.
   const horizontalRules: Array<{ label: string; y: number }> = [];
   for (const hand of ['RH', 'LH'] as const) {
     for (const oct of hand === 'RH' ? [5, 4] : [3, 2]) {
       const eq = g.equatorY(hand, oct);
-      horizontalRules.push({ label: `${hand} o${oct} equator`, y: eq });
+      for (const ruleY of getEquatorRuleYs(eq, o, t)) {
+        horizontalRules.push({ label: `${hand} o${oct} equator rule`, y: ruleY });
+      }
       if (!o.showRowGuidelines) continue;
       horizontalRules.push({ label: `${hand} o${oct} upper guideline`, y: eq - t.rowHeight / 2 });
       horizontalRules.push({ label: `${hand} o${oct} lower guideline`, y: eq + t.rowHeight / 2 });

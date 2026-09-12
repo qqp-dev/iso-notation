@@ -6,11 +6,16 @@
  * One command (`npm run janko:export`) renders the full engraving review set in
  * sub-second time and mirrors every PNG to all delivery locations:
  *
- *   1. janko_portrait_page1.png  — full page 1, systems 1–3, mm. 1–12 (2×)
- *   2. janko_m1_m2.png           — macro crop mm. 1–2 (4× = 288 DPI)
- *   3. janko_m4.png              — macro crop m. 4 (4× = 288 DPI)
- *   4. janko_m8.png              — macro crop m. 8 (4× = 288 DPI)
- *   5. janko_variants.png        — variant contact sheet on mm. 1–4 (2×)
+ *   1. janko_portrait_page1.png      — full page 1, systems 1–3, mm. 1–12 (2×)
+ *   2. janko_m1_m2.png               — macro crop mm. 1–2 (4× = 288 DPI)
+ *   3. janko_m4.png                  — macro crop m. 4 (4× = 288 DPI)
+ *   4. janko_m8.png                  — macro crop m. 8 (4× = 288 DPI)
+ *   5. janko_variants.png            — rhythm-dialect contact sheet, mm. 1–4 (2×)
+ *   6. janko_domain_exploration.png  — Round 4 four-paradigm contact sheet (3×)
+ *   7. janko_domain_a.png            — Candidate A · floating single equator (4×)
+ *   8. janko_domain_b.png            — Candidate B · base row on the line (4×)
+ *   9. janko_domain_c.png            — Candidate C · single line, three rows (4×)
+ *  10. janko_domain_d.png            — Candidate D · bounded center channel (4×)
  *
  * Outputs are written to the current checkout root, `public/`, `docs/img/`
  * and mirrored to the main project checkout root (root, `public/`, `docs/img/`).
@@ -28,6 +33,7 @@ import {
   renderJankoVariantComparison,
 } from '../src/render/janko/engine';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
+import { CURRENT_CANDIDATES, resolveCandidate } from '../src/render/janko/candidates';
 import type { JankoLayoutOptions, JankoTokens } from '../src/render/janko/types';
 
 const CHECKOUT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,6 +46,9 @@ const RSVG_CONVERT_BIN = 'rsvg-convert';
 
 const OPTIONS: Partial<JankoLayoutOptions> = { ...DEFAULT_JANKO_OPTIONS };
 const TOKENS: Partial<JankoTokens> = { ...DEFAULT_JANKO_TOKENS };
+
+/** Letters A–D for the four domain-exploration candidates. */
+const CANDIDATE_LETTERS = 'abcd';
 
 interface ExportJob {
   /** PNG file name. */
@@ -124,6 +133,10 @@ function main(): void {
   const score = buildBachGoldbergVar1Score();
   const rasterizer = findRasterizer();
 
+  // Round 4 domain exploration: every candidate of the live registry, engraved
+  // from its own option delta — the artifacts can never drift from the studio.
+  const candidates = CURRENT_CANDIDATES.map((candidate) => resolveCandidate(candidate));
+
   const jobs: ExportJob[] = [
     {
       name: 'janko_portrait_page1.png',
@@ -179,6 +192,37 @@ function main(): void {
       description:
         'Contact sheet mm. 1–4: A Angled Cuts vs B Traditional Beams vs C Unified Continuous Lattice',
     },
+    {
+      name: 'janko_domain_exploration.png',
+      svg: renderJankoVariantComparison(
+        score,
+        candidates.map((c) => ({
+          id: c.candidate.id,
+          label: c.candidate.label,
+          options: c.options,
+        })),
+        1,
+        2,
+        OPTIONS,
+        TOKENS
+      ),
+      zoom: 3,
+      description:
+        'Unified domain exploration mm. 1–2 at 3×: A floating equator vs B anchored base row vs C three-row single line vs D bounded channel — line density against interval proportionality',
+    },
+    ...candidates.map((c, i) => ({
+      name: `janko_domain_${CANDIDATE_LETTERS[i] ?? String(i + 1)}.png`,
+      svg: renderJankoCrop(
+        score,
+        1,
+        2,
+        c.options,
+        c.tokens,
+        c.candidate.description ?? c.candidate.label
+      ),
+      zoom: 4,
+      description: `${c.candidate.label} — ${c.candidate.id} (288 DPI)`,
+    })),
   ];
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'janko-export-'));

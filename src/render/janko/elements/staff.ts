@@ -13,8 +13,10 @@
  *
  * Under `channelLayout: 'bounded-channel'` every equator is drawn as **two**
  * boundary rules at `equator ± channelHalfWidth`, opening the channel that
- * holds whole-tone Set A; the same pairing is applied to dynamic ledgers so an
- * out-of-staff octave keeps its center row open too.
+ * holds whole-tone Set A; the other three layouts (`'single-equator'`,
+ * `'on-the-line'`, `'single-line-3row'`) draw one rule per equator. The same
+ * pairing is applied to dynamic ledgers so an out-of-staff octave keeps its
+ * center row open too.
  */
 
 import {
@@ -44,9 +46,11 @@ export function renderRule(
 /**
  * Absolute ys of the horizontal rules that frame one octave equator.
  *
- * The single-equator layout paints one rule, exactly on the equator. The
- * bounded center channel paints two, at `equator ± channelHalfWidth`, so the
- * whole-tone Set A row sits in the open negative space between them.
+ * `'single-equator'`, `'on-the-line'` and `'single-line-3row'` paint exactly
+ * one rule, on the equator (4 across the staff). Only
+ * `'bounded-channel'` paints two, at `equator ± channelHalfWidth`, so the
+ * whole-tone Set A row sits in the open negative space between them (8 across
+ * the staff).
  */
 export function getEquatorRuleYs(
   equatorY: number,
