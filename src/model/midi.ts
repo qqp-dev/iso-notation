@@ -1,10 +1,14 @@
-import toneMidi from '@tonejs/midi';
+import * as toneMidi from '@tonejs/midi';
 import { QuantizedGridScore, QuantizedNote, Hand } from './types';
 import { fromMidi } from './pitch';
 import { detectHandCrossings } from './grid';
 
 // Handle CommonJS / ESM default export interop cleanly
-const MidiClass = (toneMidi as any).Midi || (toneMidi as any).default?.Midi || toneMidi;
+const MidiClass =
+  (toneMidi as any)?.Midi ||
+  (toneMidi as any)?.default?.Midi ||
+  (toneMidi as any)?.default ||
+  toneMidi;
 
 export interface MidiIngestOptions {
   id?: string;

@@ -128,6 +128,11 @@ export function computePageGeometry(
     const middleCY = systemTopY + 22.0 + t.octaveStep + o.interStaffGap / 2;
     const equatorY = (hand: Hand, octave: number): number =>
       middleCY + getEquatorYForOctave(octave, hand, t, o);
+    const isSys0Anacrusis = s === 0 && (t.anacrusisTicks ?? 0) > 0;
+    const effectiveMeasures = isSys0Anacrusis
+      ? measuresPerSystem + t.anacrusisTicks! / t.ticksPerMeasure
+      : measuresPerSystem;
+    const sysMeasureWidth = staffWidth / effectiveMeasures;
     systems.push({
       index: s,
       measuresPerSystem,
@@ -138,7 +143,7 @@ export function computePageGeometry(
       staffBotY: equatorY('LH', 2) + 16.0,
       staffLeft,
       staffRight,
-      measureWidth,
+      measureWidth: sysMeasureWidth,
       equatorY,
     });
   }
@@ -226,8 +231,10 @@ export function countJankoSystems(
 ): number {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
+  const anacrusis = t.anacrusisTicks ?? 0;
   const totalTicks = score.totalTicks || 0;
-  const measuresTotal = Math.max(1, Math.ceil(totalTicks / t.ticksPerMeasure));
+  const ticks = Math.max(0, totalTicks - anacrusis);
+  const measuresTotal = Math.max(1, Math.ceil(ticks / t.ticksPerMeasure));
   return Math.max(1, Math.ceil(measuresTotal / Math.max(1, o.measuresPerSystem)));
 }
 
@@ -282,6 +289,17 @@ export function getMeasureIndexOfTick(
   systemIndex: number,
   t: ResolvedJankoTokens
 ): number {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (anacrusis > 0) {
+    if (systemIndex === 0) {
+      if (note.startTick < anacrusis) return 0;
+      const elapsed = note.startTick - anacrusis;
+      return 1 + Math.floor(elapsed / t.ticksPerMeasure);
+    }
+    const elapsed = note.startTick - anacrusis;
+    const measureOffset = Math.floor(elapsed / t.ticksPerMeasure);
+    return measureOffset - systemIndex * geo.measuresPerSystem;
+  }
   const { measureOffset } = splitTick(note.startTick, t);
   return measureOffset - systemIndex * geo.measuresPerSystem;
 }
@@ -294,6 +312,40 @@ function getNominalNoteX(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): number {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (systemIndex === 0 && anacrusis > 0) {
+    const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
+    if (note.startTick < anacrusis) {
+      const insets = getMeasureInsets(0, 0, o, t);
+      const left = insets.left ?? t.measureInset;
+      const right = insets.right ?? t.measureInset;
+      const available = Math.max(0, upbeatWidth - left - right);
+      return geo.staffLeft + left + (note.startTick / anacrusis) * available;
+    }
+    const elapsed = note.startTick - anacrusis;
+    const m = Math.floor(elapsed / t.ticksPerMeasure);
+    const tickInMeasure = elapsed % t.ticksPerMeasure;
+    const insets = getMeasureInsets(0, m + 1, o, t);
+    const left = insets.left ?? t.measureInset;
+    const right = insets.right ?? t.measureInset;
+    const available = Math.max(0, geo.measureWidth - left - right);
+    const measureLeft = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
+    return measureLeft + left + (tickInMeasure / t.ticksPerMeasure) * available;
+  }
+
+  if (anacrusis > 0) {
+    const elapsed = note.startTick - anacrusis;
+    const measureOffset = Math.floor(elapsed / t.ticksPerMeasure);
+    const m = measureOffset - systemIndex * geo.measuresPerSystem;
+    const tickInMeasure = elapsed % t.ticksPerMeasure;
+    const insets = getMeasureInsets(systemIndex, m, o, t);
+    const left = insets.left ?? t.measureInset;
+    const right = insets.right ?? t.measureInset;
+    const available = Math.max(0, geo.measureWidth - left - right);
+    const measureLeft = geo.staffLeft + m * geo.measureWidth;
+    return measureLeft + left + (tickInMeasure / t.ticksPerMeasure) * available;
+  }
+
   const { tickInMeasure } = splitTick(note.startTick, t);
   const measureIdx = getMeasureIndexOfTick(note, geo, systemIndex, t);
   return (
@@ -475,7 +527,19 @@ export function resolveRowSnappedChordOffsets(
     if (!unit) {
       const measureIdx = getMeasureIndexOfTick(p.note, geo, systemIndex, t);
       const insets = getMeasureInsets(systemIndex, measureIdx, o, t);
-      const measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
+      const anacrusis = t.anacrusisTicks ?? 0;
+      let measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
+      let mWidth = geo.measureWidth;
+      if (systemIndex === 0 && anacrusis > 0) {
+        const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
+        if (p.note.startTick < anacrusis) {
+          measureLeft = geo.staffLeft;
+          mWidth = upbeatWidth;
+        } else {
+          const m = measureIdx - 1;
+          measureLeft = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
+        }
+      }
       unit = {
         tick: p.note.startTick,
         nominalX: p.x,
@@ -484,7 +548,7 @@ export function resolveRowSnappedChordOffsets(
         shift: 0,
         spread: false,
         bandLeft: measureLeft + (insets.left ?? t.measureInset),
-        bandRight: measureLeft + geo.measureWidth - (insets.right ?? t.measureInset),
+        bandRight: measureLeft + mWidth - (insets.right ?? t.measureInset),
       };
       unitByTick.set(p.note.startTick, unit);
     }
@@ -584,22 +648,52 @@ export function resolveRowSnappedChordOffsets(
     return worst;
   };
 
+  const unitHalfSpan = (u: OnsetUnit): number =>
+    u.rows.reduce((acc, c) => Math.max(acc, c.halfSpan), 0);
+  const MIN_TIME_AIR = 1.0;
+
   /** Legal translation window of one column against the *current* neighbours. */
   const windowOf = (unit: OnsetUnit): { lo: number; hi: number } => {
     let lo = Number.NEGATIVE_INFINITY;
     let hi = Number.POSITIVE_INFINITY;
+    const myH = unitHalfSpan(unit);
+
     for (const other of neighboursByUnit.get(unit)!) {
       const shortfall = shortfallFrom(unit, other);
-      if (shortfall > 0) lo = Math.max(lo, unit.shift + shortfall);
-      else if (shortfall < 0) hi = Math.min(hi, unit.shift + shortfall);
+      if (shortfall > 0) {
+        lo = Math.max(lo, unit.shift + shortfall);
+      } else if (shortfall < 0) {
+        // A plain column on the right yields rightward in Phase 3; only another spread column caps hi
+        if (other.spread || other.nominalX < unit.nominalX) {
+          hi = Math.min(hi, unit.shift + shortfall);
+        }
+      }
     }
+
+    // Strict horizontal time monotonicity: a note at a later onset must never be placed to the left of an earlier onset
+    for (const prev of ordered) {
+      if (prev.tick >= unit.tick) break;
+      const prevH = unitHalfSpan(prev);
+      const prevXRight = columnX(prev) + prevH;
+      lo = Math.max(lo, prevXRight + MIN_TIME_AIR + myH - unit.nominalX);
+    }
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const next = ordered[i];
+      if (next.tick <= unit.tick) break;
+      if (next.spread) {
+        const nextH = unitHalfSpan(next);
+        const nextXLeft = columnX(next) - nextH;
+        hi = Math.min(hi, nextXLeft - MIN_TIME_AIR - myH - unit.nominalX);
+      }
+    }
+
     // The measure band is structural: a spread downbeat chord may never be
     // driven onto the preceding barline.
     for (const cluster of unit.rows) {
       lo = Math.max(lo, unit.bandLeft + cluster.halfSpan - unit.nominalX);
       hi = Math.min(hi, unit.bandRight - cluster.halfSpan - unit.nominalX);
     }
-    return { lo, hi };
+    return { lo, hi: Math.max(lo, hi) };
   };
 
   const ordered = [...units].sort((a, b) => a.tick - b.tick);
@@ -613,14 +707,14 @@ export function resolveRowSnappedChordOffsets(
     if (lo <= 0 && 0 <= hi) continue;
     // Over-constrained: split the residual displacement evenly rather than
     // dumping it all on one side.
-    unit.shift = lo <= hi ? Math.max(lo, Math.min(hi, 0)) : (lo + hi) / 2;
+    unit.shift = lo <= hi ? Math.max(lo, Math.min(hi, 0)) : lo;
   }
 
   // -------------------------------------------------------------------------
   // 3. Plain columns yield the air a spread neighbour needs. A column only ever
   //    steps *away* from a violation, so this cannot oscillate.
   // -------------------------------------------------------------------------
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 5; pass++) {
     let moved = false;
     for (const unit of ordered) {
       if (unit.spread) continue;
@@ -631,15 +725,27 @@ export function resolveRowSnappedChordOffsets(
         if (shortfall > 0) pushRight = Math.max(pushRight, shortfall);
         else if (shortfall < 0) pushLeft = Math.max(pushLeft, -shortfall);
       }
+
+      // Enforce chronological monotonicity: unit must clear any earlier onset
+      for (const prev of ordered) {
+        if (prev.tick >= unit.tick) break;
+        const prevH = unitHalfSpan(prev);
+        const myH = unitHalfSpan(unit);
+        const prevXRight = columnX(prev) + prevH;
+        const timeShortfall = prevXRight + MIN_TIME_AIR + myH - columnX(unit);
+        if (timeShortfall > 0) {
+          pushRight = Math.max(pushRight, timeShortfall);
+        }
+      }
+
       if (pushRight <= 0 && pushLeft <= 0) continue;
-      // A column squeezed from both sides stays put: moving would only trade
-      // one collision for the other, and the linter reports the squeeze.
-      const step = pushRight > 0 && pushLeft > 0 ? 0 : pushRight > 0 ? pushRight : -pushLeft;
+      // Step away from violation: rightward yield takes precedence to preserve time flow
+      const step = pushRight > 0 ? pushRight : -pushLeft;
       if (step === 0) continue;
-      const halfSpans = unit.rows.map((cluster) => cluster.halfSpan);
+      const maxH = unitHalfSpan(unit);
       const clamped = Math.max(
-        unit.bandLeft + Math.max(...halfSpans) - unit.nominalX,
-        Math.min(unit.bandRight - Math.max(...halfSpans) - unit.nominalX, unit.shift + step)
+        unit.bandLeft + maxH - unit.nominalX,
+        Math.min(unit.bandRight - maxH - unit.nominalX, unit.shift + step)
       );
       if (clamped !== unit.shift) {
         unit.shift = clamped;
@@ -681,8 +787,10 @@ export function layoutJankoSystem(
   const t = resolveJankoTokens(tokens);
   const geometry = getSystemGeometry(geo, systemIndex);
   const mps = geometry.measuresPerSystem;
-  const startTick = systemIndex * mps * t.ticksPerMeasure;
-  const endTick = startTick + mps * t.ticksPerMeasure;
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const startTick =
+    systemIndex === 0 ? 0 : anacrusis + systemIndex * mps * t.ticksPerMeasure;
+  const endTick = anacrusis + (systemIndex + 1) * mps * t.ticksPerMeasure;
   const sysNotes = score.notes
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
     .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
@@ -706,7 +814,7 @@ export function layoutJankoSystem(
     // The Middle C spine is handed to the solver as well, so no connector can
     // ever slice across the corridor.
     const rhythmNotes = notes.map((p) => p.rhythm);
-    const partition = partitionBeamGroups(rhythmNotes, t);
+    const partition = partitionBeamGroups(rhythmNotes, t, geometry.middleCY);
     beams = partition.groups
       .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY))
       .filter((g): g is JankoBeamGroupGeometry => g !== null);
@@ -809,7 +917,8 @@ export function renderSystem(
 
   const out: string[] = [];
   out.push(`  <g id="system-${systemIndex + 1}">`);
-  if (o.showMeasureNumbers) {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) {
     out.push(renderMeasureNumber(geo, startMeasureOffset + 1, t));
   }
   out.push(renderAccolade(geo, o, t));
@@ -936,8 +1045,9 @@ export function computeCropExtents(
   const t = resolveJankoTokens(tokens);
   const startIdx = Math.max(0, Math.floor(measureStart) - 1);
   const count = Math.max(1, Math.floor(measureCount));
-  const startTick = startIdx * t.ticksPerMeasure;
-  const endTick = (startIdx + count) * t.ticksPerMeasure;
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const startTick = startIdx === 0 ? 0 : anacrusis + startIdx * t.ticksPerMeasure;
+  const endTick = anacrusis + (startIdx + count) * t.ticksPerMeasure;
   const reference = geo.systems[0];
   const staffTop = reference.staffTopY - reference.middleCY;
   const staffBottom = reference.staffBotY - reference.middleCY;
@@ -994,11 +1104,18 @@ export function computeCropBox(
   const startMIdx = startIdx % mps;
   const endMIdx = (endIdx - 1) % mps;
 
+  const anacrusis = geo.tokens.anacrusisTicks ?? 0;
+  const sysGeo = getSystemGeometry(geo, firstSystem);
+  const isSys0Anacrusis = firstSystem === 0 && anacrusis > 0;
+  const upbeatWidth = isSys0Anacrusis
+    ? (anacrusis / geo.tokens.ticksPerMeasure) * sysGeo.measureWidth
+    : 0;
+
   const x0 =
     startMIdx === 0
       ? geo.margin - CROP_PAD_X
-      : geo.staffLeft + startMIdx * geo.measureWidth - CROP_PAD_X;
-  const x1 = geo.staffLeft + (endMIdx + 1) * geo.measureWidth + CROP_PAD_X;
+      : geo.staffLeft + upbeatWidth + startMIdx * sysGeo.measureWidth - CROP_PAD_X;
+  const x1 = geo.staffLeft + upbeatWidth + (endMIdx + 1) * sysGeo.measureWidth + CROP_PAD_X;
 
   let staffTop = Infinity;
   let staffBottom = -Infinity;

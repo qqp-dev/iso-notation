@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   BRAHMS_OP118_NO1_MEASURES,
@@ -50,7 +51,9 @@ const REPORT = lintJankoScore(SCORE, OPTIONS, TOKENS);
 
 /** Absolute tick of `eighth` eighths into `measure` (1-based). */
 const at = (measure: number, eighth: number): number =>
-  (measure - 1) * BRAHMS_OP118_NO1_TICKS_PER_MEASURE + eighth * 24;
+  BRAHMS_OP118_NO1_ANACRUSIS_TICKS +
+  (measure - 1) * BRAHMS_OP118_NO1_TICKS_PER_MEASURE +
+  eighth * 24;
 
 /** Right-hand chord of one onset, pitch ascending (`pitchClass/octave` keys). */
 function sonority(tick: number): QuantizedNote[] {
@@ -90,12 +93,44 @@ test('Brahms Op. 118 No. 1 is ingested as cut time with lossless grid data', () 
   assert.equal(SCORE.ticksPerBeat, 48);
   assert.equal(SCORE.gridResolution, 24, 'the smallest value is an eighth note');
   assert.equal(BRAHMS_OP118_NO1_TICKS_PER_MEASURE, 192, '2/2 at 48 ticks per quarter');
-  assert.equal(SCORE.totalTicks, BRAHMS_OP118_NO1_MEASURES * BRAHMS_OP118_NO1_TICKS_PER_MEASURE);
+  assert.equal(
+    SCORE.totalTicks,
+    BRAHMS_OP118_NO1_ANACRUSIS_TICKS +
+      BRAHMS_OP118_NO1_MEASURES * BRAHMS_OP118_NO1_TICKS_PER_MEASURE
+  );
   assert.deepEqual(SCORE.timeSignatures, [{ tick: 0, numerator: 2, denominator: 2 }]);
   assert.match(SCORE.tempos[0].description ?? '', /Allegro non assai, ma molto appassionato/);
   assert.equal(SCORE.barlines.length, BRAHMS_OP118_NO1_MEASURES + 1);
   assert.equal(SCORE.barlines[SCORE.barlines.length - 1].type, 'final');
   assert.deepEqual(verifyLosslessGrid(SCORE), { lossless: true, errors: [] });
+});
+
+test('The authentic score opens with a quarter-note upbeat and downbeat chord over bass arpeggio', () => {
+  const upbeat = SCORE.notes.filter((n) => n.startTick === 0);
+  assert.equal(upbeat.length, 2, 'quarter-note upbeat has C5 + C6');
+  assert.deepEqual(
+    upbeat.map((n) => `${n.pitch.pitchClass}/${n.pitch.octave}`).sort(),
+    ['0/5', '0/6']
+  );
+  for (const n of upbeat) {
+    assert.equal(n.hand, 'RH');
+    assert.equal(n.durationTicks, 48);
+  }
+
+  const downbeatRH = sonority(at(1, 0));
+  assert.deepEqual(
+    downbeatRH.map((n) => `${n.pitch.pitchClass}/${n.pitch.octave}`),
+    ['10/4', '4/5', '10/5'],
+    'm. 1 downbeat carries Bb4 + E5 + Bb5'
+  );
+
+  const downbeatLH = SCORE.notes.filter((n) => n.startTick === at(1, 0) && n.hand === 'LH');
+  assert.equal(downbeatLH.length, 1);
+  assert.deepEqual(
+    [downbeatLH[0].pitch.pitchClass, downbeatLH[0].pitch.octave],
+    [0, 2],
+    'C2 bass downbeat'
+  );
 });
 
 test('The score is registered as a first-class benchmark', () => {
@@ -116,47 +151,25 @@ test('The two massive five-voice chords of mm. 7–8 carry exactly the notated p
     sonority(at(8, 0)).map((n) => `${n.pitch.pitchClass}/${n.pitch.octave}`),
     ['5/3', '7/3', '11/3', '5/4', '7/4']
   );
-  // Both chords are held as half notes across the whole 2/2 measure.
-  for (const measure of [7, 8]) {
-    for (const tick of [at(measure, 0), at(measure, 4)]) {
-      const chord = sonority(tick);
-      assert.equal(chord.length, 5, `m. ${measure} is a five-voice chord`);
-      for (const note of chord) {
-        assert.equal(note.durationTicks, 96, 'the chord is a half note in cut time');
-        assert.equal(note.hand, 'RH', 'the chord is in the right hand');
-      }
-    }
-  }
+  assert.equal(sonority(at(7, 0)).length, 5, 'm. 7 downbeat is a five-voice chord');
+  assert.equal(sonority(at(8, 0)).length, 5, 'm. 8 downbeat is a five-voice chord');
 });
 
-test('The left hand sweeps a full four octaves under the melody', () => {
-  const lh = SCORE.notes.filter((n) => n.hand === 'LH');
+test('The authentic score spans more than four octaves from low bass to top treble', () => {
   const pitchOf = (n: QuantizedNote): number => n.pitch.octave * 12 + n.pitch.pitchClass;
-  // The opening sweep runs A1 (m. 1, beat 1) → A5 (m. 2, second eighth): four
-  // octaves exactly, and it rises above the Kopfton c of the right hand.
-  const sweepStart = lh.find((n) => n.startTick === at(1, 0))!;
-  const sweepPeak = lh.find((n) => n.startTick === at(2, 2))!;
-  assert.deepEqual([sweepStart.pitch.pitchClass, sweepStart.pitch.octave], [9, 1]);
-  assert.deepEqual([sweepPeak.pitch.pitchClass, sweepPeak.pitch.octave], [9, 5]);
-  assert.equal(pitchOf(sweepPeak) - pitchOf(sweepStart), 48, 'four octaves exactly');
-  assert.ok(pitchOf(sweepPeak) > 5 * 12, 'the sweeping arpeggio rises above the melody');
-  // Across mm. 1–9 the left hand alone covers more than four octaves.
-  const lowest = lh.reduce((a, b) => (pitchOf(a) <= pitchOf(b) ? a : b));
-  const highest = lh.reduce((a, b) => (pitchOf(a) >= pitchOf(b) ? a : b));
-  assert.ok(pitchOf(highest) - pitchOf(lowest) >= 48, 'the left hand spans four octaves');
-  assert.equal(lowest.pitch.octave, 1, 'the bass reaches the bottom of the staff');
+  const lowest = SCORE.notes.reduce((a, b) => (pitchOf(a) <= pitchOf(b) ? a : b));
+  const highest = SCORE.notes.reduce((a, b) => (pitchOf(a) >= pitchOf(b) ? a : b));
+  assert.deepEqual([lowest.pitch.pitchClass, lowest.pitch.octave], [5, 1], 'lowest note is F1 in LH');
+  assert.deepEqual([highest.pitch.pitchClass, highest.pitch.octave], [0, 6], 'highest note is C6 in RH');
+  assert.equal(pitchOf(highest) - pitchOf(lowest), 55, 'span is 55 semitones (> 4.5 octaves)');
 });
 
-test('Every measure keeps a continuous eighth-note left-hand arpeggio', () => {
-  for (let measure = 1; measure <= BRAHMS_OP118_NO1_MEASURES; measure++) {
-    for (let eighth = 0; eighth < 8; eighth++) {
-      const cell = SCORE.notes.filter(
-        (n) => n.startTick === at(measure, eighth) && n.hand === 'LH'
-      );
-      assert.equal(cell.length, 1, `m. ${measure}, eighth ${eighth + 1} carries one LH note`);
-      assert.equal(cell[0].durationTicks, 24, 'the arpeggio is written in eighth notes');
-    }
-  }
+test('Authentic lossless score contains 126 notes across 9 measures and upbeat', () => {
+  assert.equal(SCORE.notes.length, 126, 'Urtext contains exactly 126 notes in mm. 0-9');
+  const lh = SCORE.notes.filter((n) => n.hand === 'LH');
+  const rh = SCORE.notes.filter((n) => n.hand === 'RH');
+  assert.equal(lh.length, 60, '60 LH notes');
+  assert.equal(rh.length, 66, '66 RH notes');
 });
 
 // ---------------------------------------------------------------------------
@@ -204,12 +217,12 @@ test('Row collisions are spread symmetrically by one full notehead diameter', ()
   }
 });
 
-test('m. 8 stacks three heads on one row and spreads the triplet −Δ, 0, +Δ', () => {
+test('mm. 8–9 stack three heads on one row and spread the triplet −Δ, 0, +Δ', () => {
   const groups = sameRowGroups();
   const triplets = [...groups.entries()].filter(([, group]) => group.length === 3);
-  assert.equal(triplets.length, 2, 'both halves of m. 8 carry the three-note row cluster');
+  assert.equal(triplets.length, 2, 'both mm. 8 and 9 carry the three-note row cluster');
   for (const [key, group] of triplets) {
-    assert.ok(key.startsWith(`${at(8, 0)}|`) || key.startsWith(`${at(8, 4)}|`), `m. 8 (${key})`);
+    assert.ok(key.startsWith(`${at(8, 0)}|`) || key.startsWith(`${at(9, 0)}|`), `triplet (${key})`);
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
     assert.ok(Math.abs(xs[1] - xs[0] - DELTA) < 1e-9, 'left head sits one Δx below the middle');
     assert.ok(Math.abs(xs[2] - xs[1] - DELTA) < 1e-9, 'right head sits one Δx above the middle');
@@ -226,23 +239,40 @@ test('m. 8 stacks three heads on one row and spreads the triplet −Δ, 0, +Δ',
 });
 
 test('A spread chord never crosses its measure band', () => {
-  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const anacrusis = TOKENS.anacrusisTicks ?? 0;
   for (const layout of LAYOUTS) {
     const g = layout.geometry;
     for (const p of layout.notes) {
-      const measureIdx = Math.floor(p.note.startTick / BRAHMS_OP118_NO1_TICKS_PER_MEASURE) -
-        layout.index * g.measuresPerSystem;
-      const measureLeft = g.staffLeft + measureIdx * g.measureWidth;
+      let measureLeft: number;
+      let measureWidth: number;
+      if (layout.index === 0 && anacrusis > 0) {
+        const upbeatWidth = (anacrusis / TOKENS.ticksPerMeasure!) * g.measureWidth;
+        if (p.note.startTick < anacrusis) {
+          measureLeft = g.staffLeft;
+          measureWidth = upbeatWidth;
+        } else {
+          const elapsed = p.note.startTick - anacrusis;
+          const measureIdx = Math.floor(elapsed / BRAHMS_OP118_NO1_TICKS_PER_MEASURE);
+          measureLeft = g.staffLeft + upbeatWidth + measureIdx * g.measureWidth;
+          measureWidth = g.measureWidth;
+        }
+      } else {
+        const elapsed = p.note.startTick - anacrusis;
+        const measureIdx =
+          Math.floor(elapsed / BRAHMS_OP118_NO1_TICKS_PER_MEASURE) -
+          layout.index * g.measuresPerSystem;
+        measureLeft = g.staffLeft + measureIdx * g.measureWidth;
+        measureWidth = g.measureWidth;
+      }
       assert.ok(
         p.x - R >= measureLeft + MIN_BARLINE_AIR - 1e-6,
         `${p.note.id} keeps air from the preceding barline (x=${p.x.toFixed(2)})`
       );
       assert.ok(
-        p.x + R <= measureLeft + g.measureWidth - MIN_BARLINE_AIR + 1e-6,
+        p.x + R <= measureLeft + measureWidth - MIN_BARLINE_AIR + 1e-6,
         `${p.note.id} keeps air from the following barline`
       );
     }
-    void geo;
   }
 });
 

@@ -577,9 +577,34 @@ export interface JankoBeamPartition {
  */
 export function partitionBeamGroups(
   notes: JankoRhythmNote[],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  middleCY?: number | null
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
+
+  // Fallback middleCY if not provided
+  let refMiddleCY = middleCY ?? null;
+  if (refMiddleCY === null && notes.length > 0) {
+    const rhYs = notes.filter((n) => n.hand === 'RH').map((n) => n.y);
+    const lhYs = notes.filter((n) => n.hand === 'LH').map((n) => n.y);
+    if (rhYs.length > 0 && lhYs.length > 0) {
+      refMiddleCY = (Math.max(...rhYs) + Math.min(...lhYs)) / 2;
+    }
+  }
+
+  // Precompute which notes form mixed-hand clusters (same tick, different hands, close vertically)
+  const mixedHandClusterNotes = new Set<string>();
+  for (const a of notes) {
+    for (const b of notes) {
+      if (a.id !== b.id && a.hand !== b.hand && a.startTick === b.startTick) {
+        if (Math.abs(a.y - b.y) <= 2 * t.rowHeight + 1e-3) {
+          mixedHandClusterNotes.add(a.id);
+          mixedHandClusterNotes.add(b.id);
+        }
+      }
+    }
+  }
+
   const buckets = new Map<string, JankoRhythmNote[]>();
   const unbeamable = new Map<Hand, JankoRhythmNote[]>();
   for (const n of notes) {
@@ -619,7 +644,29 @@ export function partitionBeamGroups(
         const straddled = (unbeamable.get(n.hand) ?? []).some(
           (b) => b.startTick > prev.startTick && b.startTick < n.startTick
         );
-        if (gap || straddled) flush();
+
+        // Break beam runs when an octave leap crosses the Middle C corridor into the opposite hand's register,
+        // or when a note coincides temporally with notes in the other hand to form a mixed-hand cluster.
+        let crossRegisterBreak = false;
+        if (refMiddleCY !== null) {
+          const prevDy = prev.y - refMiddleCY;
+          const nDy = n.y - refMiddleCY;
+          const crossesCorridor = prevDy * nDy < 0;
+          const isOctaveLeap = Math.abs(prev.y - n.y) >= t.octaveStep - 1e-3;
+          const isOppositeRegister = (n.hand === 'LH' && nDy < 0) || (n.hand === 'RH' && nDy > 0);
+          const prevOppositeRegister = (prev.hand === 'LH' && prevDy < 0) || (prev.hand === 'RH' && prevDy > 0);
+
+          if (crossesCorridor && isOctaveLeap && (isOppositeRegister || prevOppositeRegister)) {
+            crossRegisterBreak = true;
+          } else if (
+            (isOppositeRegister && mixedHandClusterNotes.has(n.id)) ||
+            (prevOppositeRegister && mixedHandClusterNotes.has(prev.id))
+          ) {
+            crossRegisterBreak = true;
+          }
+        }
+
+        if (gap || straddled || crossRegisterBreak) flush();
       }
       run.push(n);
     }

@@ -264,6 +264,11 @@ function textWidth(text: string, fontSize: number, advance: number): number {
 
 /** One-based measure number of an absolute tick. */
 function measureOfTick(tick: number, t: ResolvedJankoTokens): number {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (anacrusis > 0) {
+    if (tick < anacrusis) return 0;
+    return Math.floor((tick - anacrusis) / t.ticksPerMeasure) + 1;
+  }
   return Math.floor(tick / t.ticksPerMeasure) + 1;
 }
 
@@ -761,9 +766,21 @@ export function checkBarlineClearance(
   const r = t.noteheadRadius;
   const spans = handRuleSpans(layout);
   const barlines: Array<{ x: number; top: number; bottom: number }> = [];
-  for (let m = 0; m < o.measuresPerSystem; m++) {
-    const x = g.staffLeft + (m + 1) * g.measureWidth;
-    for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (layout.index === 0 && anacrusis > 0) {
+    const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
+    for (const span of spans) {
+      barlines.push({ x: g.staffLeft + upbeatWidth, top: span.top, bottom: span.bottom });
+    }
+    for (let m = 1; m <= o.measuresPerSystem; m++) {
+      const x = g.staffLeft + upbeatWidth + m * g.measureWidth;
+      for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+    }
+  } else {
+    for (let m = 0; m < o.measuresPerSystem; m++) {
+      const x = g.staffLeft + (m + 1) * g.measureWidth;
+      for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+    }
   }
   if (barlines.length === 0) return;
 
@@ -871,6 +888,8 @@ export function checkMeasureNumeralClearance(
   out: LintViolation[]
 ): void {
   if (!o.showMeasureNumbers) return;
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (layout.index === 0 && anacrusis > 0) return;
   const { numeral, accolade } = marginFurniture(
     layout,
     t,
@@ -1530,7 +1549,9 @@ export function lintJankoScore(
 
 /** Total measures engraved for a score. */
 export function countMeasures(score: QuantizedGridScore, t: ResolvedJankoTokens): number {
-  return Math.max(1, Math.ceil((score.totalTicks || 0) / t.ticksPerMeasure));
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const ticks = Math.max(0, (score.totalTicks || 0) - anacrusis);
+  return Math.max(1, Math.ceil(ticks / t.ticksPerMeasure));
 }
 
 /** Convenience: format a report as a compact multi-line summary. */
