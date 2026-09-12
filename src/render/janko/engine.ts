@@ -24,6 +24,7 @@ import {
   getTickX,
   resolveChannelFlanks,
   splitTick,
+  usesContourFlanks,
 } from './geometry';
 import {
   DEFAULT_JANKO_VARIANTS,
@@ -247,9 +248,9 @@ function handForNote(note: QuantizedNote): Hand {
 /**
  * Position a single note inside one system (page pt coordinates).
  *
- * `flank` carries the contour-resolved bounded-channel side of a Set B note
- * (see `geometry.resolveChannelFlanks`); it is ignored by the single-equator
- * layout and by Set A notes.
+ * `flank` carries the contour-resolved side of a Set B note under a dynamic
+ * layout (see `geometry.resolveChannelFlanks`); it is ignored by the two static
+ * layouts (`'single-equator'`, `'on-the-line'`) and by Set A notes.
  */
 export function positionJankoNote(
   note: QuantizedNote,
@@ -313,10 +314,11 @@ export function layoutJankoSystem(
   const sysNotes = score.notes
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
     .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
-  // The bounded center channel resolves each Set B flank against the *whole*
+  // The two dynamic layouts resolve each Set B flank against the *whole*
   // voice, so the contour is continuous across system and page breaks.
-  const flanks =
-    o.channelLayout === 'bounded-channel' ? resolveChannelFlanks(score.notes, o, t) : null;
+  const flanks = usesContourFlanks(o.channelLayout)
+    ? resolveChannelFlanks(score.notes, o, t)
+    : null;
   const notes = sysNotes.map((n) =>
     positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null)
   );

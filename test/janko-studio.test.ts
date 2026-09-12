@@ -72,26 +72,43 @@ test('renderCandidatesView renders every registry candidate with label, badges a
     }
   }
   assert.match(html, /Round 4/);
-  assert.match(html, /Bounded Center Channel/);
+  assert.match(html, /Domain Exploration/);
 });
 
-test('Round 4 registry declares the incumbent equator and the bounded channel', () => {
+test('Round 4 registry declares the four comparative channel paradigms', () => {
   assert.equal(CURRENT_ROUND_METADATA.round, 4);
-  assert.match(CURRENT_ROUND_METADATA.title, /Bounded Center Channel/);
+  assert.match(CURRENT_ROUND_METADATA.title, /Domain Exploration/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['equator-single', 'channel-bounded'], 'candidate A then candidate B');
-  assert.equal(CURRENT_CANDIDATES[0].measureStart, 1, 'the matrix compares mm. 1–2');
-  assert.equal(CURRENT_CANDIDATES[0].measureCount, 2);
-  assert.equal(resolveCandidate(getCandidate('equator-single')!).options.channelLayout, 'single-equator');
+  assert.deepEqual(
+    ids,
+    ['equator-floating', 'equator-anchored', 'single-line-3row', 'channel-bounded'],
+    'candidates A, B, C and D in display order'
+  );
+  for (const candidate of CURRENT_CANDIDATES) {
+    assert.equal(candidate.measureStart, 1, 'the matrix compares mm. 1–2');
+    assert.equal(candidate.measureCount, 2);
+  }
+  assert.equal(
+    resolveCandidate(getCandidate('equator-floating')!).options.channelLayout,
+    'single-equator'
+  );
+  assert.equal(resolveCandidate(getCandidate('equator-anchored')!).options.channelLayout, 'on-the-line');
+  assert.equal(
+    resolveCandidate(getCandidate('single-line-3row')!).options.channelLayout,
+    'single-line-3row'
+  );
   assert.equal(
     resolveCandidate(getCandidate('channel-bounded')!).options.channelLayout,
     'bounded-channel'
   );
-  // Candidate B keeps the canonical channel geometry: no token delta needed.
-  const bounded = resolveCandidate(getCandidate('channel-bounded')!);
-  assert.equal(bounded.tokens.channelHalfWidth, DEFAULT_JANKO_TOKENS.channelHalfWidth);
-  assert.equal(bounded.tokens.channelFlankOffset, DEFAULT_JANKO_TOKENS.channelFlankOffset);
-  assert.equal(candidateBadges(getCandidate('equator-single')!)[0].key, 'baseline');
+  // Every paradigm keeps the canonical tokens: the deltas are purely structural.
+  for (const candidate of CURRENT_CANDIDATES) {
+    const resolved = resolveCandidate(candidate);
+    assert.equal(resolved.tokens.channelHalfWidth, DEFAULT_JANKO_TOKENS.channelHalfWidth);
+    assert.equal(resolved.tokens.channelFlankOffset, DEFAULT_JANKO_TOKENS.channelFlankOffset);
+    assert.equal(resolved.tokens.rowHeight, DEFAULT_JANKO_TOKENS.rowHeight);
+  }
+  assert.equal(candidateBadges(getCandidate('equator-floating')!)[0].key, 'baseline');
 });
 
 test('Round 4 candidates export cleanly to the contact sheet', () => {
@@ -113,8 +130,8 @@ test('Round 4 candidates export cleanly to the contact sheet', () => {
     assert.ok(sheet.includes(`data-variant="${candidate.id}"`), `${candidate.id} panel`);
     assert.ok(sheet.includes(candidate.label), `${candidate.id} label`);
   }
-  // The two panels must be genuinely different engravings: candidate B frames
-  // each octave with two boundary rules, candidate A with one.
+  // The panels must be genuinely different engravings: A, B and C frame each
+  // octave with one rule, D doubles that to two boundary rules.
   const panelBody = (variantId: string): string => {
     const start = sheet.indexOf(`data-variant="${variantId}"`);
     const next = sheet.indexOf('data-variant="', start + 1);
@@ -124,19 +141,24 @@ test('Round 4 candidates export cleanly to the contact sheet', () => {
     const group = panelBody(variantId).match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)?.[0] ?? '';
     return (group.match(/<line/g) ?? []).length;
   };
-  assert.equal(staffRules('equator-single'), 4, 'four single equators');
+  assert.equal(staffRules('equator-floating'), 4, 'four single equators');
+  assert.equal(staffRules('equator-anchored'), 4, 'four anchored base rules');
+  assert.equal(staffRules('single-line-3row'), 4, 'four single rules in the 3-row framing');
   assert.equal(staffRules('channel-bounded'), 8, 'four equators, two rules each');
 });
 
 test('Candidate previews honour their own option deltas', () => {
   const html = renderCandidatesView(CONFIG);
-  // The two Round-4 candidates differ in exactly one option: the channel.
-  const single = getCandidate('equator-single');
-  const bounded = getCandidate('channel-bounded');
-  assert.ok(single && bounded);
-  assert.equal(resolveCandidate(single).options.channelLayout, 'single-equator');
-  assert.equal(resolveCandidate(bounded).options.channelLayout, 'bounded-channel');
+  // The four Round-4 candidates differ in exactly one option: the channel.
+  for (const candidate of CURRENT_CANDIDATES) {
+    assert.deepEqual(
+      Object.keys(candidate.options ?? {}),
+      ['channelLayout'],
+      `${candidate.id} declares only the channel delta`
+    );
+  }
   assert.match(html, /<b>channelLayout<\/b> = bounded-channel/);
+  assert.match(html, /<b>channelLayout<\/b> = on-the-line/, 'the anchored paradigm shows its raw value');
   assert.match(html, /<b>baseline<\/b> = golden master/, 'candidate A is the untouched golden master');
   assert.match(html, /single equator/);
   assert.match(html, /bounded channel ±6\.5pt · flanks ∓13\.0pt/);
@@ -151,12 +173,19 @@ test('Candidate previews honour their own option deltas', () => {
     const group = card.match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)?.[0] ?? '';
     return (group.match(/<line/g) ?? []).length;
   };
-  assert.equal(staffRules(cardOf('equator-single')), 4, 'the incumbent paints one rule per octave');
+  assert.equal(staffRules(cardOf('equator-floating')), 4, 'the incumbent paints one rule per octave');
+  assert.equal(staffRules(cardOf('equator-anchored')), 4, 'the anchored base row keeps 4 lines');
+  assert.equal(staffRules(cardOf('single-line-3row')), 4, 'the 3-row framing keeps 4 lines');
   assert.equal(staffRules(cardOf('channel-bounded')), 8, 'the channel paints two rules per octave');
-  // Both candidates are structurally sound: the bounded channel keeps the
-  // Middle C corridor beam-free, so neither card is flagged with violations.
-  assert.match(cardOf('equator-single'), /data-lint="clean"/);
+  // The density axis is visible in the card facts.
+  assert.match(cardOf('equator-floating'), /1 rule\/octave \(4 lines\)/);
+  assert.match(cardOf('channel-bounded'), /2 rules\/octave \(8 lines\)/);
+  // Two paradigms are structurally clean; the two anchored ones expose the real
+  // cost of riding the rule (the outer Set B row reaches the numeral margin).
+  assert.match(cardOf('equator-floating'), /data-lint="clean"/);
   assert.match(cardOf('channel-bounded'), /data-lint="clean"/);
+  assert.match(cardOf('equator-anchored'), /data-lint="violations"/);
+  assert.match(cardOf('single-line-3row'), /✗ 2 violations/);
 });
 
 // ---------------------------------------------------------------------------
@@ -274,10 +303,16 @@ test('studio.ts wires Vite HMR and re-mounts in place', () => {
   // module instance and clobber the fresh render with stale tokens.
   assert.match(source, /import\.meta\.hot\.accept\(\);/);
   assert.match(source, /mountJankoStudio/);
-  // No candidate-specific strings may leak into the template.
+  // No candidate-specific strings may leak into the template. The channel
+  // *layout* vocabulary ('single-equator', …) is shared with the type system
+  // and deliberately drives the geometry summary; what must never appear is a
+  // candidate label or a hardcoded card.
   for (const candidate of CURRENT_CANDIDATES) {
-    assert.ok(!source.includes(candidate.id), `studio.ts must not mention ${candidate.id}`);
     assert.ok(!source.includes(candidate.label), `studio.ts must not mention ${candidate.label}`);
+    assert.ok(
+      !source.includes(`data-candidate="${candidate.id}"`),
+      `studio.ts must not hardcode the ${candidate.id} card`
+    );
   }
 });
 

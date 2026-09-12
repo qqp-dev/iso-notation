@@ -7,13 +7,14 @@
  * - Whole-tone rank 0 (even pitch classes 0, 2, 4, 6, 8, a) sits **below** its
  *   octave equator; whole-tone rank 1 (odd pitch classes 1, 3, 5, 7, 9, b)
  *   sits **above** it. Every row-to-row step is exactly `rowHeight` (15pt).
- * - The *Bounded Center Channel* alternative
- *   ({@link JankoLayoutOptions.channelLayout} = `'bounded-channel'`) replaces
- *   the single equator by **two boundary rules** at `equator ±
- *   channelHalfWidth`. Whole-tone Set A then sits in the open channel (offset
- *   0.0pt, zero line knockouts) and every Set B note takes the upper
- *   (`-channelFlankOffset`) or lower (`+channelFlankOffset`) flank according to
- *   the melodic contour, so a rising step never moves down the page.
+ * - The **channel layout** ({@link JankoLayoutOptions.channelLayout}) selects
+ *   how an octave is framed. Besides the incumbent `'single-equator'`, three
+ *   comparative paradigms are engraved: `'on-the-line'` (Set A anchored on the
+ *   rule, Set B statically one row above), `'single-line-3row'` (one rule per
+ *   octave with Set B contour-resolved to `±rowHeight`) and
+ *   `'bounded-channel'` (two boundary rules at `equator ± channelHalfWidth`
+ *   with Set B contour-resolved to `±channelFlankOffset`). See
+ *   {@link JankoChannelLayout} for the full table.
  * - The four equators o5 (−58pt), o4 (−28pt), o3 (+28pt) and o2 (+58pt) form
  *   the *grand staff*: one **absolute, hand-independent** coordinate lattice
  *   shared by both hands. Octaves step by exactly `octaveStep`
@@ -44,15 +45,43 @@ export type JankoRhythmStyle = 'angled-cuts' | 'horizontal-ticks' | 'beamed';
 export type JankoMiddleCSpine = 'none' | 'dashed' | 'double' | 'continuous';
 
 /**
- * How an octave is framed horizontally.
+ * How an octave is framed horizontally — the four comparative paradigms of
+ * Round 4.
  *
- * - `'single-equator'` — the incumbent golden master: one rule per octave,
- *   whole-tone rank 0 (`h/2`) below it and rank 1 (`h/2`) above it.
- * - `'bounded-channel'` — two boundary rules at `equator ± channelHalfWidth`
- *   open a channel for whole-tone Set A (offset 0.0pt, zero line knockouts);
- *   Set B is placed on the upper or lower flank by the melodic contour.
+ * | layout              | rules/octave | Set A (even pc) | Set B (odd pc)          | lines |
+ * | ------------------- | ------------ | --------------- | ----------------------- | ----- |
+ * | `'single-equator'`  | 1, on the equator | `+rowHeight/2` (below) | `-rowHeight/2` (above), static | 4 |
+ * | `'on-the-line'`     | 1, on the equator | `0` (on the rule)      | `-rowHeight` (above), static   | 4 |
+ * | `'single-line-3row'`| 1, on the equator | `0` (on the rule)      | `±rowHeight`, contour-resolved | 4 |
+ * | `'bounded-channel'` | 2, at `equator ± channelHalfWidth` | `0` (in the channel) | `±channelFlankOffset`, contour-resolved | 8 |
+ *
+ * The first three therefore paint **4** rules across the grand staff (one per
+ * octave) and only `'bounded-channel'` doubles that to **8**. The dynamic
+ * layouts resolve the side of every Set B note against the melodic contour (see
+ * `geometry.resolveChannelFlanks`); the static ones anchor Set B on a single
+ * row.
  */
-export type JankoChannelLayout = 'single-equator' | 'bounded-channel';
+export type JankoChannelLayout =
+  | 'single-equator'
+  | 'on-the-line'
+  | 'single-line-3row'
+  | 'bounded-channel';
+
+/** Every channel layout, in the canonical exploration order (A, B, C, D). */
+export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
+  'single-equator',
+  'on-the-line',
+  'single-line-3row',
+  'bounded-channel',
+];
+
+/** Human-readable names of the four channel layouts. */
+export const JANKO_CHANNEL_LAYOUT_LABELS: Record<JankoChannelLayout, string> = {
+  'single-equator': 'Single Equator (floating rows)',
+  'on-the-line': 'Base Row on the Line (static 2-row)',
+  'single-line-3row': 'Single Line, 3 Rows (dynamic flanks)',
+  'bounded-channel': 'Bounded Channel (dynamic flanks)',
+};
 
 /** Engraving token set: geometric and styling constants (all in pt). */
 export interface JankoTokens {
@@ -174,8 +203,10 @@ export interface JankoLayoutOptions {
   /** Middle C spine rendering style. */
   middleCSpine: JankoMiddleCSpine;
   /**
-   * Octave framing: the incumbent single equator (golden master) or the
-   * bounded center channel (`equator ± channelHalfWidth`).
+   * Octave framing: the incumbent floating single equator (golden master, 4
+   * rules) or one of the three comparative paradigms — `'on-the-line'` and
+   * `'single-line-3row'` (4 rules each) and `'bounded-channel'` (8 rules). See
+   * {@link JankoChannelLayout}.
    */
   channelLayout: JankoChannelLayout;
 

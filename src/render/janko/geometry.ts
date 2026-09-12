@@ -20,25 +20,41 @@
  * inner rules) and never produce ledger lines; only octaves outside that span
  * accumulate *dynamic ledger equators*.
  *
- * Row parity (Jánko Equator Principle):
+ * Row parity (Jánko Equator Principle, golden-master `'single-equator'`):
  * - whole-tone rank 0 (even pc) => `rowHeight / 2` **below** its equator;
  * - whole-tone rank 1 (odd pc)  => `rowHeight / 2` **above** its equator.
  *
- * Bounded Center Channel (`channelLayout: 'bounded-channel'`)
- * ----------------------------------------------------------
- * The single equator is replaced by two boundary rules at
- * `equator ± channelHalfWidth`. Whole-tone Set A (rank 0) then sits **inside**
- * the open channel (`offset 0.0`, zero line knockouts) and whole-tone Set B
- * (rank 1) takes a flanking row at `-channelFlankOffset` (above the upper rule)
- * or `+channelFlankOffset` (below the lower rule). Which flank a Set B note
- * takes is resolved **globally** by {@link resolveChannelFlanks}, which picks
- * the assignment that never contradicts the melodic contour (a rising step may
- * never move down the page, `Δpitch > 0 => Δy <= 0`, and vice versa).
+ * Row framing (`channelLayout`)
+ * ----------------------------
+ * Four paradigms share the one octave lattice:
+ *
+ * | layout               | Set A (even pc)          | Set B (odd pc)                     | rules |
+ * | -------------------- | ------------------------ | ---------------------------------- | ----- |
+ * | `'single-equator'`   | `+h/2` (below the rule)  | `-h/2` (above), static parity      | 1     |
+ * | `'on-the-line'`      | `0` (on the rule)        | `-h` (above), static               | 1     |
+ * | `'single-line-3row'` | `0` (on the rule)        | `∓h`, contour-resolved             | 1     |
+ * | `'bounded-channel'`  | `0` (inside the channel) | `∓channelFlankOffset`, contour-resolved | 2 |
+ *
+ * `h` is `rowHeight` (15pt), so every static step between neighbouring rows is
+ * exactly one whole-tone row. The two **dynamic** layouts — `'single-line-3row'`
+ * and `'bounded-channel'` — resolve the side of every Set B note **globally**
+ * with {@link resolveChannelFlanks}, which picks the assignment that never
+ * contradicts the melodic contour (a rising step may never move down the page,
+ * `Δpitch > 0 => Δy <= 0`, and vice versa). The two static layouts anchor Set B
+ * on a single row and therefore need no solver.
+ *
+ * Under `'bounded-channel'` the single equator is replaced by two boundary
+ * rules at `equator ± channelHalfWidth`, so whole-tone Set A sits in the open
+ * negative space (`offset 0.0`, zero line knockouts) and Set B takes a flanking
+ * row at `-channelFlankOffset` (above the upper rule) or `+channelFlankOffset`
+ * (below the lower rule).
  */
 
 import { Hand } from '../../model/types';
 import {
+  JANKO_CHANNEL_LAYOUT_LABELS,
   JANKO_STAFF_OCTAVES,
+  JankoChannelLayout,
   JankoStaffOctaveRange,
   JankoTokens,
   JankoLayoutOptions,
@@ -50,13 +66,113 @@ import {
 export type JankoWholeToneRank = 0 | 1;
 
 /**
- * Flank of the bounded center channel taken by a whole-tone Set B note:
- * `'up'` = the row above the upper boundary rule (`-channelFlankOffset`),
- * `'down'` = the row below the lower boundary rule (`+channelFlankOffset`).
+ * The two channel layouts whose Set B row is resolved by the melodic contour
+ * (`'single-line-3row'`, `'bounded-channel'`), as opposed to the static
+ * `'single-equator'` and `'on-the-line'` framings.
+ */
+export type JankoDynamicChannelLayout = 'single-line-3row' | 'bounded-channel';
+
+/** True when the layout resolves Set B against the melodic contour. */
+export function usesContourFlanks(layout: JankoChannelLayout): layout is JankoDynamicChannelLayout {
+  return layout === 'single-line-3row' || layout === 'bounded-channel';
+}
+
+/**
+ * Magnitude of the Set B flank offset for a dynamic layout: one whole-tone row
+ * (`rowHeight`, 15pt) for `'single-line-3row'`, `channelFlankOffset` (13pt, the
+ * exact mirror of the 6.5pt channel) for `'bounded-channel'`.
+ */
+export function getFlankOffset(
+  layout: JankoChannelLayout,
+  tokens?: Partial<JankoTokens> | null
+): number {
+  const t = resolveJankoTokens(tokens);
+  return layout === 'bounded-channel' ? t.channelFlankOffset : t.rowHeight;
+}
+
+/**
+ * Fully resolved geometric description of one channel layout — the single
+ * source of truth shared by the renderers, the studio and the tests.
+ */
+export interface JankoChannelLayoutSpec {
+  layout: JankoChannelLayout;
+  /** Human-readable name of the framing. */
+  label: string;
+  /** Boundary rules painted per octave equator (1, or 2 for the channel). */
+  rulesPerEquator: number;
+  /** Rules painted across the four-octave grand staff (4, or 8 for the channel). */
+  staffRules: number;
+  /** Signed offset of the whole-tone Set A row from its equator. */
+  setAOffset: number;
+  /** Signed offset of the canonical (upper) Set B row from its equator. */
+  setBOffset: number;
+  /** Magnitude of the Set B row offset (the lower row mirrors it). */
+  flankMagnitude: number;
+  /** True when the side of a Set B note is resolved by the melodic contour. */
+  dynamicFlanks: boolean;
+  /**
+   * True when a Set A notehead sits exactly on a boundary rule and its knockout
+   * therefore cuts the rule (`'on-the-line'`, `'single-line-3row'`). False for
+   * the floating equator and for the bounded channel, whose Set A row is clear
+   * of every rule.
+   */
+  setAOnRule: boolean;
+}
+
+/**
+ * Resolve the complete geometric description of a channel layout, including
+ * the rule count that answers the round's visual-density question:
+ * `'single-equator'`, `'on-the-line'` and `'single-line-3row'` all paint **one**
+ * rule per octave (4 across the staff), while `'bounded-channel'` paints two
+ * (8 across the staff).
+ */
+export function getChannelLayoutSpec(
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): JankoChannelLayoutSpec {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const layout = o.channelLayout;
+  const halfRow = t.rowHeight / 2;
+  const octaves = JANKO_STAFF_OCTAVES[1] - JANKO_STAFF_OCTAVES[0] + 1;
+  const rulesPerEquator = layout === 'bounded-channel' ? 2 : 1;
+  // Set A floats below the incumbent equator, and sits on it in every
+  // anchored framing. Set B is either the parity row above (`-h/2`), the
+  // static row one whole-tone step above (`-h`), or the dynamic flank.
+  const setAOffset = layout === 'single-equator' ? halfRow : 0;
+  const setBOffset =
+    layout === 'single-equator'
+      ? -halfRow
+      : layout === 'on-the-line'
+        ? -t.rowHeight
+        : -getFlankOffset(layout, t);
+  return {
+    layout,
+    label: JANKO_CHANNEL_LAYOUT_LABELS[layout],
+    rulesPerEquator,
+    staffRules: rulesPerEquator * octaves,
+    setAOffset,
+    setBOffset,
+    flankMagnitude: Math.abs(setBOffset),
+    dynamicFlanks: usesContourFlanks(layout),
+    setAOnRule: layout === 'on-the-line' || layout === 'single-line-3row',
+  };
+}
+
+/**
+ * Flank of a dynamic channel layout taken by a whole-tone Set B note:
+ * `'up'` = the row above (`-flankOffset`), `'down'` = the row below
+ * (`+flankOffset`). The offset itself is `channelFlankOffset` (13pt) under the
+ * bounded channel and `rowHeight` (15pt) under the single-line 3-row layout.
  */
 export type JankoChannelFlank = 'up' | 'down';
 
-/** Which band of its octave a notehead occupies. */
+/**
+ * Which band of its octave a notehead occupies: `'channel'` is the anchored
+ * base row (offset 0) of every non-`'single-equator'` layout — on the rule for
+ * `'on-the-line'` and `'single-line-3row'`, inside the two boundary rules for
+ * `'bounded-channel'` — while `'above'`/`'below'` name the Set B side.
+ */
 export type JankoChannelSide = 'above' | 'below' | 'channel';
 
 /** Both flanks, in canonical order (upper first). */
@@ -91,11 +207,16 @@ export interface JankoPitchCoordinate {
   /** Which band of its octave the notehead sits in. */
   side: JankoChannelSide;
   /**
-   * Flank resolved for a Set B (odd) notehead under the bounded center
-   * channel; `null` for Set A notes and for the single-equator layout.
+   * Flank of a Set B (odd) notehead: contour-resolved under a dynamic layout,
+   * the canonical upper row under `'on-the-line'`; `null` for Set A notes and
+   * for the `'single-equator'` parity framing.
    */
   flank: JankoChannelFlank | null;
-  /** Signed offset from the equator (single equator: ±h/2; channel: 0 / ∓offset). */
+  /**
+   * Signed offset from the equator: `±h/2` for the single equator, `0` for the
+   * anchored Set A row, `-h` for the static `'on-the-line'` Set B row, and
+   * `0 / ∓flankOffset` for the two dynamic layouts.
+   */
   offsetFromEquator: number;
   /** y of this pitch's octave equator, relative to the Middle C spine. */
   equatorY: number;
@@ -124,32 +245,38 @@ export function getNoteHand(hand: Hand | undefined, octave: number): Hand {
 }
 
 /**
- * Signed offset from the octave equator under the bounded center channel.
+ * Signed offset from the octave equator under a dynamic flank layout.
  *
- * Whole-tone Set A (even pitch classes) sits **inside** the channel, exactly on
- * the equator (offset `0.0`, so nothing can cut through the glyph). Whole-tone
- * Set B (odd pitch classes) sits on the requested flank: `-channelFlankOffset`
- * above the upper boundary rule for `'up'`, `+channelFlankOffset` below the
- * lower rule for `'down'`.
+ * Whole-tone Set A (even pitch classes) sits exactly on the equator (offset
+ * `0.0`, so nothing can cut through the glyph). Whole-tone Set B (odd pitch
+ * classes) sits on the requested flank: `-offset` above for `'up'`, `+offset`
+ * below for `'down'`, where the offset is `channelFlankOffset` (13pt) under the
+ * bounded channel and one whole-tone row (`rowHeight`, 15pt) under the
+ * single-line 3-row layout.
  */
 export function getChannelOffsetFromEquator(
   pitchClass: number,
   flank: JankoChannelFlank = 'up',
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  layout: JankoChannelLayout = 'bounded-channel'
 ): number {
   const t = resolveJankoTokens(tokens);
   if (getWholeToneRank(pitchClass) === 0) return 0;
-  return flank === 'down' ? t.channelFlankOffset : -t.channelFlankOffset;
+  const offset = getFlankOffset(layout, t);
+  return flank === 'down' ? offset : -offset;
 }
 
 /**
  * Signed row offset from the octave equator.
  *
- * Under the golden-master single equator the offset is pure parity: `+h/2`
- * below for even pitch classes, `-h/2` above for odd ones. Under the bounded
- * center channel the offset follows {@link getChannelOffsetFromEquator}, with
- * `flank` supplying the contour-resolved side of a Set B note (see
- * {@link resolveChannelFlanks}); `'up'` is the canonical fallback.
+ * - `'single-equator'` — pure parity: `+h/2` below the rule for even pitch
+ *   classes, `-h/2` above it for odd ones.
+ * - `'on-the-line'` — Set A sits on the rule (`0`), Set B statically one
+ *   whole-tone row above it (`-h`): the anchored 2-row framing.
+ * - `'single-line-3row'` / `'bounded-channel'` — Set A sits on the equator
+ *   (`0`) and Set B follows {@link getChannelOffsetFromEquator}, with `flank`
+ *   supplying the contour-resolved side (see {@link resolveChannelFlanks});
+ *   `'up'` is the canonical fallback.
  */
 export function getRowOffsetFromEquator(
   pitchClass: number,
@@ -158,16 +285,20 @@ export function getRowOffsetFromEquator(
   flank?: JankoChannelFlank | null
 ): number {
   const o = resolveJankoOptions(options);
-  if (o.channelLayout === 'bounded-channel') {
-    return getChannelOffsetFromEquator(pitchClass, flank ?? 'up', tokens);
-  }
   const t = resolveJankoTokens(tokens);
+  const layout = o.channelLayout;
+  if (usesContourFlanks(layout)) {
+    return getChannelOffsetFromEquator(pitchClass, flank ?? 'up', t, layout);
+  }
+  if (layout === 'on-the-line') {
+    return getWholeToneRank(pitchClass) === 0 ? 0 : -t.rowHeight;
+  }
   const halfRow = t.rowHeight / 2;
   return getWholeToneRank(pitchClass) === 0 ? halfRow : -halfRow;
 }
 
 /**
- * Minimal melodic description the bounded-channel contour solver needs. A
+ * Minimal melodic description a dynamic-flank contour solver needs. A
  * quantized score note satisfies it structurally, so no mapping is required.
  */
 export interface JankoChannelContourNote {
@@ -185,25 +316,26 @@ function absolutePitch(note: JankoChannelContourNote): number {
 }
 
 /**
- * Resolve the bounded-channel flank of **every** whole-tone Set B note of a
- * score, voice by voice, so that the engraved contour never contradicts the
- * pitch contour:
+ * Resolve the flank of **every** whole-tone Set B note of a score, voice by
+ * voice, under a dynamic layout (`'single-line-3row'` or `'bounded-channel'`),
+ * so that the engraved contour never contradicts the pitch contour:
  *
  * ```
  * Δpitch > 0  =>  Δy <= 0   (a rising step is flat or moves up the page)
  * Δpitch < 0  =>  Δy >= 0   (a falling step is flat or moves down the page)
  * ```
  *
- * A Set B note can only sit on one of two rows (`∓channelFlankOffset`), so the
- * choice is a two-state shortest-path problem per voice; it is solved exactly
- * with a forward dynamic program over the score's notes in tick order. Among
- * the assignments that minimise contour contradictions the solver prefers, in
+ * A Set B note can only sit on one of two rows (`∓flankOffset`), so the choice
+ * is a two-state shortest-path problem per voice; it is solved exactly with a
+ * forward dynamic program over the score's notes in tick order. Among the
+ * assignments that minimise contour contradictions the solver prefers, in
  * order: the flank the local melodic direction asks for, no zigzag on a
  * repeated pitch, and finally the canonical upper (odd-rank) flank.
  *
  * The result is a pure, deterministic function of the score and the tokens, so
- * the layout engine, the visual linter and the tests all agree. Under the
- * single-equator layout the map is empty (Set B keeps its parity offset).
+ * the layout engine, the visual linter and the tests all agree. Under the two
+ * static layouts (`'single-equator'`, `'on-the-line'`) the map is empty because
+ * Set B is anchored on one row by construction.
  */
 export function resolveChannelFlanks(
   notes: readonly JankoChannelContourNote[],
@@ -213,9 +345,10 @@ export function resolveChannelFlanks(
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const flanks = new Map<string, JankoChannelFlank>();
-  if (o.channelLayout !== 'bounded-channel') return flanks;
+  if (!usesContourFlanks(o.channelLayout)) return flanks;
 
-  const rows: readonly number[] = [-t.channelFlankOffset, t.channelFlankOffset];
+  const flankOffset = getFlankOffset(o.channelLayout, t);
+  const rows: readonly number[] = [-flankOffset, flankOffset];
 
   for (const hand of ['RH', 'LH'] as const) {
     const voice = notes
@@ -363,8 +496,10 @@ export function getLedgerEquators(
  *
  * The returned `y`/`equatorY` are relative to the Middle C spine; add the
  * system's absolute `middleCY` (see `JankoSystemGeometry`) to place the note
- * on a page. Under the bounded center channel, `flank` carries the
- * contour-resolved side of a Set B note (see {@link resolveChannelFlanks}).
+ * on a page. Under the dynamic layouts (`'single-line-3row'`,
+ * `'bounded-channel'`) `flank` carries the contour-resolved side of a Set B
+ * note (see {@link resolveChannelFlanks}); the static `'on-the-line'` layout
+ * always anchors Set B on its upper row.
  */
 export function getPitchCoordinate(
   pitchClass: number,
@@ -377,20 +512,23 @@ export function getPitchCoordinate(
   const o = resolveJankoOptions(options);
   const pc = ((pitchClass % 12) + 12) % 12;
   const rank = getWholeToneRank(pc);
-  const bounded = o.channelLayout === 'bounded-channel';
-  const resolvedFlank: JankoChannelFlank | null = bounded && rank === 1 ? flank ?? 'up' : null;
+  const layout = o.channelLayout;
+  const dynamic = usesContourFlanks(layout);
+  // `'on-the-line'` is static: Set B is always the upper row. The dynamic
+  // layouts take the contour-resolved flank (canonical upper when unresolved).
+  const resolvedFlank: JankoChannelFlank | null =
+    rank === 1 && layout !== 'single-equator' ? (dynamic ? flank ?? 'up' : 'up') : null;
   const offsetFromEquator = getRowOffsetFromEquator(pc, tokens, o, resolvedFlank);
   const equatorY = getEquatorYForOctave(octave, hand, tokens, o);
   const ledgerYs = getLedgerEquators(pc, octave, hand, tokens, o);
-  const side: JankoChannelSide = bounded
-    ? rank === 0
-      ? 'channel'
+  const side: JankoChannelSide =
+    rank === 0
+      ? layout === 'single-equator'
+        ? 'below'
+        : 'channel'
       : resolvedFlank === 'down'
         ? 'below'
-        : 'above'
-    : rank === 0
-      ? 'below'
-      : 'above';
+        : 'above';
   return {
     pitchClass: pc,
     octave,
