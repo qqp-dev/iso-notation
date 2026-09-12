@@ -106,7 +106,7 @@ function parsePathPoints(d: string): { x: number; y: number }[] {
 function extractHaloRings(svg: string) {
   return Array.from(
     svg.matchAll(
-      /<circle cx="([\d.]+)" cy="([\d.]+)" r="5\.80" fill="none" stroke="([^"]+)" stroke-width="0\.75"\/>/g
+      new RegExp(`<circle cx="([\\d.]+)" cy="([\\d.]+)" r="${OPENING_HALO_RADIUS_PT.toFixed(2)}" fill="none" stroke="([^"]+)" stroke-width="0\\.75"\\/>`, 'g')
     )
   ).map((m) => ({ cx: parseFloat(m[1]), cy: parseFloat(m[2]), stroke: m[3] }));
 }
@@ -186,36 +186,36 @@ test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach 
     assert.doesNotMatch(svg, /<g id="page-footer">/);
   }
 
-  // A4 Landscape geometry: 841.89pt × 595.28pt with 2 un-cramped systems (staffHeight ~264pt)
+  // A4 Landscape geometry: 841.89pt × 595.28pt with 2 un-cramped systems (staffHeight 204pt)
   assert.ok(Math.abs(layout.pageDimensions.widthPt - A4_HEIGHT_PT) < 0.01);
   assert.ok(Math.abs(layout.pageDimensions.heightPt - A4_WIDTH_PT) < 0.01);
   assert.ok(Math.abs(layout.systemDimensions.staffHeightPt - 48 * layout.ptPerSemitone) < 0.01);
-  assert.ok(layout.ptPerSemitone >= 5.4, `Pitch lane height must be >= 5.4pt (got ${layout.ptPerSemitone})`);
+  assert.ok(Math.abs(layout.ptPerSemitone - 4.25) < 0.01, `Pitch lane height must be 4.25pt (got ${layout.ptPerSemitone})`);
   assert.ok(
-    layout.systemDimensions.measureWidthPt > 185 && layout.systemDimensions.measureWidthPt < 205,
-    'Each of the 4 landscape measures spans ~192pt'
+    layout.systemDimensions.measureWidthPt > 180 && layout.systemDimensions.measureWidthPt < 205,
+    'Each of the 4 landscape measures spans ~184pt'
   );
 });
 
-test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace clasping o1–o5 on the left margin', () => {
+test('Classical Vertical Accolade Invariant: 14pt curly brace clasping o1–o5 on the left margin', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  // Slender copperplate proportions: 7.0pt reach, delicate 0.85pt swell
-  assert.equal(ACCOLADE_WIDTH_PT, 7.0, 'Accolade reach must be a slender 7.0pt');
-  assert.equal(ACCOLADE_THICKNESS_PT, 0.85, 'Accolade swell must be a delicate 0.85pt');
-  assert.equal(ACCOLADE_GAP_PT, 7.0, 'Accolade gap must be 7.0pt');
+  // Classical curly brace proportions: 14.0pt reach, 1.45pt swell, 34.0pt margin gap
+  assert.equal(ACCOLADE_WIDTH_PT, 14.0, 'Accolade reach must be 14.0pt');
+  assert.equal(ACCOLADE_THICKNESS_PT, 1.45, 'Accolade swell must be 1.45pt');
+  assert.equal(ACCOLADE_GAP_PT, 34.0, 'Accolade gap must be 34.0pt');
 
   // The exported path generator is deterministic and spans the requested vertical range
-  const direct = getVerticalAccoladePath(30.35, 106.35, 231.15, 7.0, 0.85);
+  const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 8.0, 14.0, 1.45);
   assert.match(direct, /^M [\d.]+ [\d.]+ C /);
   assert.match(direct, / Z$/);
   const directPoints = parsePathPoints(direct);
   assert.ok(Math.abs(Math.min(...directPoints.map((p) => p.y)) - 106.35) < 0.01);
   assert.ok(Math.abs(Math.max(...directPoints.map((p) => p.y)) - 231.15) < 0.01);
   const directWidth = Math.max(...directPoints.map((p) => p.x)) - Math.min(...directPoints.map((p) => p.x));
-  assert.ok(directWidth < 10, `Slender accolade must be far narrower than the former 10pt brace (got ${directWidth})`);
+  assert.ok(directWidth <= 15, `Classical accolade width must be <= 15pt (got ${directWidth})`);
 
   const marginPt = layout.options.pageMarginMm * MM_TO_PT;
 
@@ -230,8 +230,8 @@ test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace claspin
       assert.match(path, /^M [\d.]+ [\d.]+ C [^"]+ Z$/, 'Accolade must be a closed sculptural path');
       assert.equal(
         path,
-        getVerticalAccoladePath(marginPt + 2, geo.staffTopY, geo.staffBotY, 7.0, 0.85),
-        'Rendered accolade must use the refined 7.0pt / 0.85pt copperplate geometry'
+        getVerticalAccoladePath(geo.staffLeftPt, geo.staffTopY, geo.staffBotY, 8.0, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT),
+        'Rendered accolade must use the classical 14.0pt / 1.45pt curly brace geometry'
       );
 
       const points = parsePathPoints(path);
@@ -253,9 +253,9 @@ test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace claspin
         'Accolade must span the full 4-octave staff (o1 → o5)'
       );
 
-      // The central cusp is the rightmost point of the brace and points into Middle C
+      // The central cusp is the leftmost point of the brace and points into Middle C
       const y48 = geo.yForPitch(48);
-      const cuspPoints = points.filter((p) => Math.abs(p.x - maxX) < 0.01);
+      const cuspPoints = points.filter((p) => Math.abs(p.x - minX) < 0.01);
       assert.ok(
         cuspPoints.some((p) => Math.abs(p.y - y48) < 0.01),
         `Accolade cusp must point at Middle C y(48) = ${y48.toFixed(2)}`
@@ -265,18 +265,18 @@ test('Refined Slender Vertical Accolade Invariant: 7pt copperplate brace claspin
         'Middle C must sit dead-center of the 4-octave staff'
       );
 
-      // Brace lives on the left margin, clear of the open staff (no bounding barline)
-      assert.ok(maxX < geo.staffLeftPt, 'Accolade must sit in the left margin, clear of the staff');
+      // Brace tips clasp the open staff at staffLeftPt
+      assert.ok(Math.abs(maxX - geo.staffLeftPt) < 0.01, 'Accolade tips must clasp the staff at staffLeft');
       assert.ok(minX > 0, 'Accolade must remain inside the paper');
       assert.ok(
         Math.abs(geo.staffLeftPt - (marginPt + ACCOLADE_WIDTH_PT + ACCOLADE_GAP_PT)) < 0.01,
         'The staff must open exactly one accolade + gap from the margin'
       );
 
-      // Slender copperplate proportions with tall 5.5pt staff (~1:30 to 1:45)
+      // Classical curly brace aspect ratio (~1:14 to 1:20)
       const width = maxX - minX;
       const aspect = (geo.staffBotY - geo.staffTopY) / width;
-      assert.ok(aspect > 25 && aspect < 50, `Accolade aspect ratio must be slender (got 1:${aspect.toFixed(1)})`);
+      assert.ok(aspect > 10 && aspect < 30, `Accolade aspect ratio must be elegant (got 1:${aspect.toFixed(1)})`);
     }
   }
 });
@@ -387,10 +387,12 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
     );
   }
 
-  // 8. Zero confusing margin numeral stacks and column-top octave badges
-  assert.doesNotMatch(page1, />o1</);
-  assert.doesNotMatch(page1, />o3</);
-  assert.doesNotMatch(page1, />o5</);
+  // 8. Authentic Urtext Middle C badge (o3) and octave boundary indicators (o1, o5)
+  assert.match(page1, />o1</);
+  assert.match(page1, />o3</);
+  assert.match(page1, />o5</);
+  assert.match(page1, /class="octave-badge-text"/);
+  assert.match(page1, /class="octave-boundary-text"/);
   assert.doesNotMatch(page1, /class="pitch-label"/);
   assert.doesNotMatch(page1, /class="time-sig"/);
   assert.doesNotMatch(page1, /class="beat-counter"/);
@@ -710,7 +712,7 @@ test('Opening Sound Position of Honor: concentric noble halo ring for tick 0 not
   for (const halo of halos) {
     assert.match(
       page1,
-      new RegExp(`<circle cx="${halo.cx.toFixed(2)}" cy="${halo.cy.toFixed(2)}" r="4\\.80" fill="#FFFFFF"/>`),
+      new RegExp(`<circle cx="${halo.cx.toFixed(2)}" cy="${halo.cy.toFixed(2)}" r="${NOTEHEAD_KNOCKOUT_RADIUS_PT.toFixed(2)}" fill="#FFFFFF"/>`),
       'Halo ring must be concentric with the notehead knockout'
     );
   }
@@ -779,7 +781,10 @@ test('Horizontal Engraving API, Morphology & Legacy Alias Regression', () => {
 
   // Duodecimal default: naked digits protected by circular knockouts
   assert.match(svgs[0], /class="duo-digit"/);
-  assert.match(svgs[0], /<circle cx="[\d.]+" cy="[\d.]+" r="4\.80" fill="#FFFFFF"\/>/);
+  assert.match(
+    svgs[0],
+    new RegExp(`<circle cx="[\\d.]+" cy="[\\d.]+" r="${NOTEHEAD_KNOCKOUT_RADIUS_PT.toFixed(2)}" fill="#FFFFFF"\\/>`)
+  );
   assert.match(svgs[0], />7<\/text>/, 'Must render G as 7');
   assert.match(svgs[0], />B<\/text>/, 'Must render B as B');
   assert.doesNotMatch(svgs[0], /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around duodecimal noteheads');

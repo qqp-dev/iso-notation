@@ -22,7 +22,7 @@ import { getNoteColor } from '../src/render/colors';
 import { getCanonicalSyllable } from '../src/model/phonetics';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { calculateScoreDimensions, renderScoreToCanvas } from '../src/render/score-canvas';
-import { renderColumnarScoreToSvg, computeColumnarLayout, renderAllPagesToSvg } from '../src/render/print-layout';
+import { renderColumnarScoreToSvg, computeColumnarLayout, renderAllPagesToSvg, NOTEHEAD_KNOCKOUT_RADIUS_PT } from '../src/render/print-layout';
 
 test('Staff Topography: wholetone-uniform-6 invariants', () => {
   const styles: StaffStyle[] = ['wholetone-uniform-6', 'wholetone-uniform'];
@@ -283,8 +283,8 @@ test('Notehead Morphology: duodecimal base-12 pitch-class tokens 0..9, a, b', ()
   assert.match(svg, />4<\/text>/, 'Must render E as 4');
 
   // Standalone naked digits invariant:
-  // Must render circular knockouts (r="4.80") and zero enclosing background tile rectangles
-  assert.match(svg, /<circle cx="[0-9.]+" cy="[0-9.]+" r="4\.80" fill="#FFFFFF"\/>/, 'Must render circular line knockout');
+  // Must render circular knockouts (r=NOTEHEAD_KNOCKOUT_RADIUS_PT) and zero enclosing background tile rectangles
+  assert.match(svg, new RegExp(`<circle cx="[0-9.]+" cy="[0-9.]+" r="${NOTEHEAD_KNOCKOUT_RADIUS_PT.toFixed(2)}" fill="#FFFFFF"/>`), 'Must render circular line knockout');
   assert.doesNotMatch(svg, /<rect[^>]*rx="1\.5"[^>]*fill=/, 'Zero background box tiles around noteheads');
 
   // Intuitive Up/Down Handedness Chevrons for hand-crossing exceptions:

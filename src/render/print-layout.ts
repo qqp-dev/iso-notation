@@ -27,20 +27,20 @@ export const PT_TO_MM = 25.4 / 72;
  */
 export const STAFF_MIN_PITCH = 24;
 export const STAFF_MAX_PITCH = 72;
-/** One semitone lane = 5.50pt, so the 4-octave staff is 264.0pt tall. */
-export const DEFAULT_PT_PER_SEMITONE = 5.5;
+/** One semitone lane = 4.25pt, so the 4-octave staff is 204.0pt tall. */
+export const DEFAULT_PT_PER_SEMITONE = 4.25;
 /** Breathing room before the first onset of every measure (keeps tick-0 noteheads clear of the opening barline). */
 export const MEASURE_INSET_PT = 6;
 /** Circular white knockout radius around every duodecimal notehead. */
-export const NOTEHEAD_KNOCKOUT_RADIUS_PT = 4.8;
+export const NOTEHEAD_KNOCKOUT_RADIUS_PT = 3.65;
 /** Noble concentric halo ring around the opening sound(s) at tick 0 in Measure 1. */
-export const OPENING_HALO_RADIUS_PT = 5.8;
-/** Slender copperplate horizontal reach of the vertical accolade. */
-export const ACCOLADE_WIDTH_PT = 7.0;
-/** Breathing gap between the accolade cusp and the opening of the staff. */
-export const ACCOLADE_GAP_PT = 7.0;
-/** Delicate copperplate swell of the accolade at its central spine. */
-export const ACCOLADE_THICKNESS_PT = 0.85;
+export const OPENING_HALO_RADIUS_PT = 4.75;
+/** Classical architectural reach of the vertical accolade cusp from the staff edge. */
+export const ACCOLADE_WIDTH_PT = 14.0;
+/** Margin breathing gap accommodating the Middle C (o3) anchor badge and octave numerals. */
+export const ACCOLADE_GAP_PT = 34.0;
+/** Delicate calligraphic swell of the accolade in its lobe bellies. */
+export const ACCOLADE_THICKNESS_PT = 1.45;
 
 const HEADER_HEIGHT_PT = 18;
 const FOOTER_HEIGHT_PT = 0;
@@ -145,39 +145,90 @@ export function getClassicalAccoladePath(
 }
 
 /**
- * Sculptural copperplate vertical accolade (curly brace) for the left margin of a
- * horizontal system. It clasps the full 4-octave staff from yTop (o1) to yBot (o5)
+ * Classical calligraphic vertical accolade (curly brace) for the left margin of a
+ * horizontal system. It clasps the full 4-octave staff from yTop (o5) to yBot (o1)
  * with its central cusp pointing directly into the bold Middle C spine at y(48).
  *
- * @param x     X coordinate of the brace spine (outer edge of the swell)
- * @param yTop  Top of the clasped staff (o5)
- * @param yBot  Bottom of the clasped staff (o1)
- * @param w     Total horizontal reach of the brace (slender 7pt default)
- * @param thick Maximum stroke thickness at the central spine (delicate 0.85pt swell)
+ * @param staffLeft  X coordinate of the staff head where tips touch
+ * @param yTop       Top of the clasped staff (o5)
+ * @param yBot       Bottom of the clasped staff (o1)
+ * @param reachOrBelly Reach or belly reach of the brace
+ * @param cuspOrThick  Cusp reach or thickness
+ * @param maybeThick   Maximum stroke thickness at the lobe bellies
  */
 export function getVerticalAccoladePath(
-  x: number,
+  staffLeft: number,
   yTop: number,
   yBot: number,
-  w: number = ACCOLADE_WIDTH_PT,
-  thick: number = ACCOLADE_THICKNESS_PT
+  reachOrBelly: number = 8.0,
+  cuspOrThick: number = ACCOLADE_WIDTH_PT,
+  maybeThick?: number
 ): string {
+  let bellyReach = 8.0;
+  let cuspReach = ACCOLADE_WIDTH_PT;
+  let thick = ACCOLADE_THICKNESS_PT;
+
+  if (maybeThick !== undefined) {
+    bellyReach = reachOrBelly;
+    cuspReach = cuspOrThick;
+    thick = maybeThick;
+  } else if (reachOrBelly > 0 && cuspOrThick > 0) {
+    if (reachOrBelly >= 10.0) {
+      cuspReach = reachOrBelly;
+      thick = cuspOrThick;
+      bellyReach = cuspReach * 0.57;
+    } else {
+      bellyReach = reachOrBelly;
+      cuspReach = cuspOrThick;
+    }
+  }
+
   const ym = (yTop + yBot) / 2;
-  const hh = (yBot - yTop) / 2;
-  const cuspX = x + w;
-  const xb = x;
-  const tipX = xb + w * 0.45;
+  const h = yBot - yTop;
+  const hh = h / 2;
+
+  const xTip = staffLeft;
+  const xBelly = staffLeft - bellyReach;
+  const xCusp = staffLeft - cuspReach;
+
+  // Outer contour (left side, forming belly arches and central cusp)
+  const cp1x = staffLeft - bellyReach * 0.45;
+  const cp1y = yTop + hh * 0.08;
+  const cp2x = xBelly;
+  const cp2y = yTop + hh * 0.25;
+  const bellyY1 = yTop + hh * 0.46;
+
+  const cp3x = xBelly + bellyReach * 0.12;
+  const cp3y = ym - hh * 0.20;
+  const cp4x = xCusp + (cuspReach - bellyReach) * 0.30;
+  const cp4y = ym - 3.2;
+
+  // Lower half (mirrored)
+  const cp5x = xCusp + (cuspReach - bellyReach) * 0.30;
+  const cp5y = ym + 3.2;
+  const cp6x = xBelly + bellyReach * 0.12;
+  const cp6y = ym + hh * 0.20;
+  const bellyY2 = yBot - hh * 0.46;
+
+  const cp7x = xBelly;
+  const cp7y = yBot - hh * 0.25;
+  const cp8x = staffLeft - bellyReach * 0.45;
+  const cp8y = yBot - hh * 0.08;
+
+  const inBellyX1 = xBelly + thick;
+  const inBellyX2 = xBelly + thick;
+  const inCuspX = xCusp + 0.65;
 
   return [
-    `M ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
-    `C ${(xb + 0.8).toFixed(2)} ${(yTop + 4).toFixed(2)}, ${xb.toFixed(2)} ${(yTop + hh * 0.35).toFixed(2)}, ${xb.toFixed(2)} ${(ym - hh * 0.25).toFixed(2)}`,
-    `C ${xb.toFixed(2)} ${(ym - hh * 0.08).toFixed(2)}, ${(cuspX - 0.6).toFixed(2)} ${(ym - 2.5).toFixed(2)}, ${cuspX.toFixed(2)} ${ym.toFixed(2)}`,
-    `C ${(cuspX - 0.6).toFixed(2)} ${(ym + 2.5).toFixed(2)}, ${xb.toFixed(2)} ${(ym + hh * 0.08).toFixed(2)}, ${xb.toFixed(2)} ${(ym + hh * 0.25).toFixed(2)}`,
-    `C ${xb.toFixed(2)} ${(yBot - hh * 0.35).toFixed(2)}, ${(xb + 0.8).toFixed(2)} ${(yBot - 4).toFixed(2)}, ${tipX.toFixed(2)} ${yBot.toFixed(2)}`,
-    `C ${(xb + 0.8 - thick * 0.4).toFixed(2)} ${(yBot - 4).toFixed(2)}, ${(xb - thick).toFixed(2)} ${(yBot - hh * 0.35).toFixed(2)}, ${(xb - thick * 0.9).toFixed(2)} ${(ym + hh * 0.25).toFixed(2)}`,
-    `C ${(xb - thick * 0.6).toFixed(2)} ${(ym + hh * 0.08).toFixed(2)}, ${(cuspX - 0.6 - thick * 0.3).toFixed(2)} ${(ym + 1.8).toFixed(2)}, ${(cuspX - 0.6).toFixed(2)} ${ym.toFixed(2)}`,
-    `C ${(cuspX - 0.6 - thick * 0.3).toFixed(2)} ${(ym - 1.8).toFixed(2)}, ${(xb - thick * 0.6).toFixed(2)} ${(ym - hh * 0.08).toFixed(2)}, ${(xb - thick * 0.9).toFixed(2)} ${(ym - hh * 0.25).toFixed(2)}`,
-    `C ${(xb - thick).toFixed(2)} ${(yTop + hh * 0.35).toFixed(2)}, ${(xb + 0.8 - thick * 0.4).toFixed(2)} ${(yTop + 4).toFixed(2)}, ${tipX.toFixed(2)} ${yTop.toFixed(2)}`,
+    `M ${xTip.toFixed(2)} ${yTop.toFixed(2)}`,
+    `C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${xBelly.toFixed(2)} ${bellyY1.toFixed(2)}`,
+    `C ${cp3x.toFixed(2)} ${cp3y.toFixed(2)}, ${cp4x.toFixed(2)} ${cp4y.toFixed(2)}, ${xCusp.toFixed(2)} ${ym.toFixed(2)}`,
+    `C ${cp5x.toFixed(2)} ${cp5y.toFixed(2)}, ${cp6x.toFixed(2)} ${cp6y.toFixed(2)}, ${xBelly.toFixed(2)} ${bellyY2.toFixed(2)}`,
+    `C ${cp7x.toFixed(2)} ${cp7y.toFixed(2)}, ${cp8x.toFixed(2)} ${cp8y.toFixed(2)}, ${xTip.toFixed(2)} ${yBot.toFixed(2)}`,
+    `C ${(cp8x + thick * 0.3).toFixed(2)} ${cp8y.toFixed(2)}, ${(cp7x + thick).toFixed(2)} ${cp7y.toFixed(2)}, ${inBellyX2.toFixed(2)} ${bellyY2.toFixed(2)}`,
+    `C ${(cp6x + thick * 0.75).toFixed(2)} ${cp6y.toFixed(2)}, ${(cp5x + thick * 0.25).toFixed(2)} ${(cp5y - 0.4).toFixed(2)}, ${inCuspX.toFixed(2)} ${ym.toFixed(2)}`,
+    `C ${(cp4x + thick * 0.25).toFixed(2)} ${(cp4y + 0.4).toFixed(2)}, ${(cp3x + thick * 0.75).toFixed(2)} ${cp3y.toFixed(2)}, ${inBellyX1.toFixed(2)} ${bellyY1.toFixed(2)}`,
+    `C ${(cp2x + thick).toFixed(2)} ${cp2y.toFixed(2)}, ${(cp1x + thick * 0.3).toFixed(2)} ${cp1y.toFixed(2)}, ${xTip.toFixed(2)} ${yTop.toFixed(2)}`,
     'Z'
   ].join(' ');
 }
@@ -707,6 +758,8 @@ export function renderPageToSvg(
       .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
       .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
       .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; }
+      .octave-badge-text { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #FFFFFF; text-anchor: middle; dominant-baseline: central; }
+      .octave-boundary-text { font-family: ${URTEXT_SERIF}; font-style: italic; font-weight: bold; font-size: 7pt; fill: #666666; text-anchor: middle; dominant-baseline: central; }
       .duo-digit { font-family: "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif; text-anchor: middle; dominant-baseline: central; font-weight: bold; }`);
   svgParts.push(`    </style>`);
   svgParts.push(`  </defs>`);
@@ -747,11 +800,35 @@ export function renderPageToSvg(
     svgParts.push(`  <!-- System ${system.systemIndex + 1} (mm. ${system.startMeasure}–${system.endMeasure}) -->`);
     svgParts.push(`  <g id="system-${system.systemIndex + 1}">`);
 
-    // 3a. Slender copperplate vertical accolade (curly brace) on the left margin,
-    //     cusp pointing directly into the bold Middle C spine. The staff lines emerge
-    //     openly from the left: no staff-bounding opening barline.
+    // 3a. Classical Urtext Vertical Accolade (curly brace) clasping o1 to o5,
+    //     anchored with the Middle C (o3) dark pill badge and octave labels o5 / o1.
+    const cuspX = staffLeft - ACCOLADE_WIDTH_PT;
+    const badgeW = 20;
+    const badgeH = 11;
+    const badgeX = cuspX - 3 - badgeW;
+    const yMid = (staffTop + staffBot) / 2;
+
+    // Dedicated measure number in the left margin above the accolade (zero collision risk)
+    svgParts.push(`    <!-- Urtext Measure Number in Dedicated Left Margin -->`);
+    svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(staffTop - 9).toFixed(2)}" class="measure-num">${system.startMeasure}</text>`);
+
+    // Middle C (o3) anchor pill badge
+    svgParts.push(`    <!-- Middle C (o3) Center Anchor Badge -->`);
+    svgParts.push(`    <rect x="${badgeX.toFixed(2)}" y="${(yMid - badgeH / 2).toFixed(2)}" width="${badgeW.toFixed(2)}" height="${badgeH.toFixed(2)}" rx="2.5" fill="#111827"/>`);
+    svgParts.push(`    <text x="${(badgeX + badgeW / 2).toFixed(2)}" y="${yMid.toFixed(2)}" class="octave-badge-text">o3</text>`);
+    svgParts.push(`    <line x1="${(badgeX + badgeW).toFixed(2)}" y1="${yMid.toFixed(2)}" x2="${cuspX.toFixed(2)}" y2="${yMid.toFixed(2)}" stroke="#111827" stroke-width="1.25"/>`);
+
+    // Octave boundaries o5 and o1
+    svgParts.push(`    <!-- Octave Boundaries o5 and o1 -->`);
+    svgParts.push(`    <text x="${(badgeX + badgeW / 2).toFixed(2)}" y="${staffTop.toFixed(2)}" class="octave-boundary-text">o5</text>`);
+    svgParts.push(`    <line x1="${(badgeX + badgeW).toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${staffLeft.toFixed(2)}" y2="${staffTop.toFixed(2)}" stroke="#888888" stroke-width="0.6"/>`);
+
+    svgParts.push(`    <text x="${(badgeX + badgeW / 2).toFixed(2)}" y="${staffBot.toFixed(2)}" class="octave-boundary-text">o1</text>`);
+    svgParts.push(`    <line x1="${(badgeX + badgeW).toFixed(2)}" y1="${staffBot.toFixed(2)}" x2="${staffLeft.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#888888" stroke-width="0.6"/>`);
+
+    // Authentic Classical Accolade Curly Brace clasping o5 to o1
     svgParts.push(`    <!-- Classical Vertical Accolade (Curly Brace) clasping o1 to o5 -->`);
-    svgParts.push(`    <path d="${getVerticalAccoladePath(marginPt + 2, staffTop, staffBot, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT)}" fill="#111827"/>`);
+    svgParts.push(`    <path d="${getVerticalAccoladePath(staffLeft, staffTop, staffBot, 8.0, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT)}" fill="#111827"/>`);
 
     // 3b. Horizontal staff topography
     for (let p = minPitch; p <= maxPitch; p++) {
@@ -799,11 +876,7 @@ export function renderPageToSvg(
       const mEndX = mStartX + geo.measureWidthPt;
       const mStartTick = (mNum - 1) * ticksPerMeasure;
 
-      // Urtext measure number ONLY above the first measure of each system
-      // (m. 1, 5, 9, …) — no counter over every internal measure.
-      if (m === 0) {
-        svgParts.push(`    <text x="${(mStartX + 5).toFixed(2)}" y="${(staffTop - 12).toFixed(2)}" class="measure-num">${mNum}</text>`);
-      }
+      // Note: Measure number is rendered in dedicated left margin in 3a above.
 
       // Vertical dashed pulse lines for beats 2, 3, … (Klavarskribo beat grid)
       if (options.showBeatGrid) {
@@ -967,7 +1040,7 @@ export function renderPageToSvg(
 
         svgParts.push(`    <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`);
         const weight = isEven ? '800' : '700';
-        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.3).toFixed(2)}" class="duo-digit" font-weight="${weight}" font-size="6.8pt" fill="${noteColor}">${digit}</text>`);
+        svgParts.push(`    <text x="${nx.toFixed(2)}" y="${(ny + 0.25).toFixed(2)}" class="duo-digit" font-weight="${weight}" font-size="5.4pt" fill="${noteColor}">${digit}</text>`);
       } else if (morph === 'phonetic') {
         const syllable = getCanonicalSyllable(pc12(lp));
         const pw = 15.0;
