@@ -72,6 +72,9 @@ npm run dev
 # Run test suite
 npm test
 
+# Jánko engraving harness: full page + macro crops + variant sheet (<1s)
+npm run janko:export
+
 # Production build
 npm run build
 ```
@@ -83,6 +86,8 @@ When running, the workbench is available locally at `http://localhost:5175` and 
 ## 4. Documentation & Design Studies
 
 ### Active Design Specifications & Typographic Studies
+- [**Jánko Two-Row Engraving Ergonomics Harness**](docs/janko_engraving_harness.md)
+  *Modular engine (`src/render/janko/`), pure geometry core, token/option system, sub-second export suite, targeted macro crops and multi-variant contact sheets.*
 - [**Duodecimal Notehead Numeral Typographic Specimen & Engraving Study**](docs/duodecimal_font_typography.md)
   *Classical Urtext serif (Century Schoolbook), Calligraphic Roman (Palatino), Engineered Monospace (JetBrains Mono), and Geometric Modernism; Lining Caps A/B analysis and score context benchmark.*
 - [**Handedness Indicator Typographic & Calligraphic Tuning**](docs/chevron_tuning.md)
