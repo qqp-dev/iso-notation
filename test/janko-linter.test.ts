@@ -118,11 +118,16 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
     'golden master must be violation-free'
   );
   assert.equal(report.ok, true);
-  // The two known cross-hand chordal collisions are surfaced, never hidden.
-  assert.equal(report.warnings.length, 2);
+  // The known cross-hand chordal collisions are surfaced, never hidden. The
+  // unified absolute lattice puts both hands on the same four staff rules, so
+  // every same-octave hand crossing that lands on one whole-tone row of one
+  // octave at one instant coincides — a real limitation of a two-row staff,
+  // reported as a non-blocking warning.
+  assert.equal(report.warnings.length, 9);
   for (const warning of report.warnings) {
     assert.equal(warning.code, 'chordal-overlap');
     assert.match(warning.message, /erases the earlier digit/);
+    assert.equal(warning.metrics?.distance, 0, 'the two heads share one lattice point');
   }
 });
 
@@ -147,13 +152,15 @@ test('formatLintReport renders a human-readable summary', () => {
 
 test('Defect: two different onsets collapsing onto one point is a notehead overlap', () => {
   const layout = systems()[0];
-  // Two 16ths of different hands, forced onto one page point.
+  // Two 16ths of different hands, forced onto one page point. The fixture is
+  // narrowed to the pair under test so the score's own cross-hand coincidences
+  // cannot add diagnostics.
   const a = layout.notes[2];
   const b = layout.notes[3];
   assert.notEqual(a.note.startTick, b.note.startTick, 'the defect needs distinct onsets');
   const collided: JankoSystemLayout = {
     ...layout,
-    notes: layout.notes.map((p) => (p === b ? { ...p, x: a.x, y: a.y } : p)),
+    notes: [a, { ...b, x: a.x, y: a.y }],
   };
   const out = run(
     (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_TOKENS, LINT, o),
@@ -168,11 +175,15 @@ test('Defect: two different onsets collapsing onto one point is a notehead overl
 
 test('Defect: chordal heads on one point is warned, not silently accepted', () => {
   const layout = systems()[0];
+  const a = layout.notes[2];
+  const b = layout.notes[3];
+  assert.notEqual(a.note.startTick, b.note.startTick, 'the defect needs distinct onsets');
   const chordal: JankoSystemLayout = {
     ...layout,
-    notes: layout.notes.map((p, i) =>
-      i === 1 ? { ...p, x: layout.notes[0].x, y: layout.notes[0].y, note: { ...p.note, startTick: layout.notes[0].note.startTick } } : p
-    ),
+    notes: [
+      a,
+      { ...b, x: a.x, y: a.y, note: { ...b.note, startTick: a.note.startTick } },
+    ],
   };
   const out = run(
     (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_TOKENS, LINT, o),
@@ -639,5 +650,5 @@ test('npm run lint:engraving reports the golden master clean and exits 0', () =>
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.match(out, /clean violations=0 warnings=2/);
+  assert.match(out, /clean violations=0 warnings=9/);
 });

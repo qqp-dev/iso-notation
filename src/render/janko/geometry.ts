@@ -6,15 +6,19 @@
  * Vertical coordinates are expressed **relative to the Middle C spine**
  * (y = 0) and grow **downward** (SVG convention):
  *
- * - RH octave 5 equator  -> -52.5pt   (interStaffGap 45 => ±22.5pt half gap)
- * - RH octave 4 equator  -> -22.5pt
+ * - octave 6 equator     -> -88.0pt   (dynamic ledger, outside the staff)
+ * - octave 5 equator     -> -58.0pt   (outer upper staff rule)
+ * - octave 4 equator     -> -28.0pt   (inner upper staff rule)
  * - Middle C spine       ->   0.0pt
- * - LH octave 3 equator  -> +22.5pt
- * - LH octave 2 equator  -> +52.5pt
+ * - octave 3 equator     -> +28.0pt   (inner lower staff rule)
+ * - octave 2 equator     -> +58.0pt   (outer lower staff rule)
+ * - octave 1 equator     -> +88.0pt   (dynamic ledger, outside the staff)
  *
- * Each hand anchors its own whole-tone lattice on its two home equators and
- * extends it by `octaveStep` (2h = 30pt) per octave. Out-of-staff octaves
- * therefore produce *dynamic ledger equators* on the hand's own lattice.
+ * The lattice is **absolute and unified**: `getEquatorYForOctave` resolves one
+ * global coordinate for every octave, identical for both hands. Octaves 2–5
+ * are the continuous grand staff (four rules, `interStaffGap` between the two
+ * inner rules) and never produce ledger lines; only octaves outside that span
+ * accumulate *dynamic ledger equators*.
  *
  * Row parity (Jánko Equator Principle):
  * - whole-tone rank 0 (even pc) => `rowHeight / 2` **below** its equator;
@@ -23,8 +27,8 @@
 
 import { Hand } from '../../model/types';
 import {
-  JANKO_HOME_OCTAVES,
-  JankoHomeOctaveRange,
+  JANKO_STAFF_OCTAVES,
+  JankoStaffOctaveRange,
   JankoTokens,
   JankoLayoutOptions,
   resolveJankoOptions,
@@ -51,11 +55,11 @@ export interface JankoPitchCoordinate {
   equatorY: number;
   /** Notehead centre y relative to the Middle C spine (equatorY + offset). */
   y: number;
-  /** True when the pitch's octave lies outside the hand's home staff. */
+  /** True when the pitch's octave lies outside the grand staff (o2–o5). */
   isOutOfStaff: boolean;
   /** Equator ys of every ledger octave, nearest to the staff first. */
   ledgerYs: number[];
-  /** Nearest ledger equator y, or null when the note sits on the home staff. */
+  /** Nearest ledger equator y, or null when the note sits inside the staff. */
   ledgerY: number | null;
 }
 
@@ -76,10 +80,19 @@ export function getRowOffsetFromEquator(
 }
 
 /**
- * y of an octave equator **relative to the Middle C spine** for one hand.
+ * y of an octave equator **relative to the Middle C spine**.
  *
- * RH home equators are octaves 4 (inner) and 5 (outer); LH home equators are
- * octaves 3 (inner) and 2 (outer). The lattice step is always `octaveStep`.
+ * The lattice is **absolute and unified**: octave 4 is the inner staff rule
+ * above the corridor (−halfGap), octave 3 the inner rule below it (+halfGap),
+ * and every further octave steps by exactly `octaveStep`. The result is
+ * identical for both hands, so a pitch's height never depends on which hand
+ * plays it:
+ *
+ * - `octave >= 4` → `-halfGap - (octave - 4) * octaveStep`
+ * - `octave <= 3` → `+halfGap + (3 - octave) * octaveStep`
+ *
+ * @param hand Accepted for call-site compatibility; the unified lattice makes
+ *             the resolved coordinate hand-independent.
  */
 export function getEquatorYForOctave(
   octave: number,
@@ -87,26 +100,34 @@ export function getEquatorYForOctave(
   tokens?: Partial<JankoTokens> | null,
   options?: Partial<JankoLayoutOptions> | null
 ): number {
+  void hand;
   const t = resolveJankoTokens(tokens);
   const o = resolveJankoOptions(options);
   const halfGap = o.interStaffGap / 2;
-  if (hand === 'RH') {
-    // o4 is the RH inner equator; higher octaves climb upward (negative y).
-    return -halfGap - (octave - 4) * t.octaveStep;
-  }
-  // o3 is the LH inner equator; lower octaves descend (positive y).
-  return halfGap + (3 - octave) * t.octaveStep;
+  return octave >= 4
+    ? -halfGap - (octave - 4) * t.octaveStep
+    : halfGap + (3 - octave) * t.octaveStep;
 }
 
-/** True when `octave` lies outside the hand's two home (in-staff) equators. */
-export function isOutOfStaffOctave(octave: number, hand: Hand): boolean {
-  const [minOct, maxOct] = JANKO_HOME_OCTAVES[hand];
+/**
+ * True when `octave` lies outside the grand staff.
+ *
+ * The staff is the absolute span o2–o5 (four continuous rules shared by both
+ * hands), so the test is strictly `octave < 2 || octave > 5` — never a
+ * hand-specific range.
+ *
+ * @param hand Accepted for call-site compatibility; the staff span is shared.
+ */
+export function isOutOfStaffOctave(octave: number, hand?: Hand): boolean {
+  void hand;
+  const [minOct, maxOct] = JANKO_STAFF_OCTAVES;
   return octave < minOct || octave > maxOct;
 }
 
 /**
- * Dynamic ledger equators for a pitch: every octave equator between the hand's
- * home staff and the note's own octave, nearest to the staff first.
+ * Dynamic ledger equators for a pitch: every octave equator between the grand
+ * staff and the note's own octave, nearest to the staff first. Returns `[]`
+ * for every in-staff octave (o2–o5), which never needs a ledger line.
  */
 export function getLedgerEquators(
   _pitchClass: number,
@@ -115,7 +136,7 @@ export function getLedgerEquators(
   tokens?: Partial<JankoTokens> | null,
   options?: Partial<JankoLayoutOptions> | null
 ): number[] {
-  const [minOct, maxOct] = JANKO_HOME_OCTAVES[hand];
+  const [minOct, maxOct] = JANKO_STAFF_OCTAVES;
   const out: number[] = [];
   if (octave > maxOct) {
     for (let o = maxOct + 1; o <= octave; o++) {
@@ -225,4 +246,4 @@ export function splitTick(
   return { measureOffset, tickInMeasure };
 }
 
-export type { JankoHomeOctaveRange };
+export type { JankoStaffOctaveRange };

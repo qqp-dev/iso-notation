@@ -258,6 +258,14 @@ export function renderFlags(
  * beam can ever cut through an intermediate notehead of an ascending or
  * descending run. Renderers and the visual linter share this function, so the
  * geometry can never drift between the two.
+ *
+ * `obstacles` are the other noteheads of the system. The grand staff is one
+ * shared lattice, so a hand-crossing run can put its beam straight through a
+ * foreign head (e.g. an LH beam descending across the RH's octave-3 line in
+ * mm. 13–14). The connector is pushed uniformly further away from its own
+ * heads — preserving the clamped slope exactly — until every foreign head
+ * keeps `noteheadRadius + minStemClearance` of air from the primary and the
+ * 16th secondary connector.
  */
 export interface JankoBeamGroupGeometry {
   /** Group notes sorted by start tick. */
@@ -284,6 +292,25 @@ export interface JankoBeamGroupGeometry {
 
 /** Gap (pt) between the primary beam and the 16th secondary beam. */
 const SECONDARY_BEAM_GAP = 1.6;
+/** Extra air (pt) the obstacle pass keeps beyond the required clearance. */
+const OBSTACLE_AIR_MARGIN = 0.02;
+
+/** Distance from a point to a line segment. */
+function pointToSegmentDistance(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const len2 = vx * vx + vy * vy;
+  if (len2 === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / len2));
+  return Math.hypot(px - (x1 + t * vx), py - (y1 + t * vy));
+}
 
 /**
  * Resolve the beam geometry of a group. Returns null for groups shorter than
@@ -291,7 +318,8 @@ const SECONDARY_BEAM_GAP = 1.6;
  */
 export function computeBeamGroupGeometry(
   group: JankoRhythmNote[],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  obstacles?: readonly JankoRhythmNote[] | null
 ): JankoBeamGroupGeometry | null {
   const t = resolveJankoTokens(tokens);
   if (group.length < 2) return null;
@@ -331,19 +359,63 @@ export function computeBeamGroupGeometry(
     const limitY = sorted[i].y + direction * minStemLength - slope * (stems[i].stemX - first.stemX);
     anchor = direction === -1 ? Math.min(anchor, limitY) : Math.max(anchor, limitY);
   }
-  const beamY = (x: number): number => anchor + slope * (x - first.stemX);
 
-  let secondary: JankoBeamConnector | null = null;
-  if (hasSecondary) {
-    const s0 = getStemGeometry(sixteenths[0], t);
-    const s1 = getStemGeometry(sixteenths[sixteenths.length - 1], t);
-    secondary = {
-      x1: s0.stemX,
-      y1: beamY(s0.stemX) + secondaryOffset,
-      x2: s1.stemX,
-      y2: beamY(s1.stemX) + secondaryOffset,
-    };
+  /** The two connectors (primary + optional 16th secondary) for one anchor. */
+  const connectorsAt = (a: number): JankoBeamConnector[] => {
+    const list: JankoBeamConnector[] = [
+      {
+        x1: first.stemX,
+        y1: a,
+        x2: last.stemX,
+        y2: a + slope * (last.stemX - first.stemX),
+      },
+    ];
+    if (hasSecondary) {
+      const s0 = getStemGeometry(sixteenths[0], t);
+      const s1 = getStemGeometry(sixteenths[sixteenths.length - 1], t);
+      list.push({
+        x1: s0.stemX,
+        y1: a + slope * (s0.stemX - first.stemX) + secondaryOffset,
+        x2: s1.stemX,
+        y2: a + slope * (s1.stemX - first.stemX) + secondaryOffset,
+      });
+    }
+    return list;
+  };
+
+  // Cross-hand obstacle avoidance. The staff is shared, so a foreign notehead
+  // may sit on (or beside) the connector. Push the whole beam uniformly away
+  // from its own heads, past every obstacle, until the required air is kept.
+  const required = t.noteheadRadius + t.minStemClearance;
+  if (obstacles && obstacles.length > 0) {
+    const own = new Set(sorted.map((n) => n.id));
+    const foreign = obstacles.filter((o) => !own.has(o.id));
+    const cos = 1 / Math.sqrt(1 + slope * slope);
+    for (let pass = 0; pass < 16 && foreign.length > 0; pass++) {
+      let push = 0;
+      for (const line of connectorsAt(anchor)) {
+        const run = line.x2 - line.x1;
+        const lo = Math.min(line.x1, line.x2) - required;
+        const hi = Math.max(line.x1, line.x2) + required;
+        for (const o of foreign) {
+          if (o.x < lo || o.x > hi) continue;
+          const distance = pointToSegmentDistance(o.x, o.y, line.x1, line.y1, line.x2, line.y2);
+          if (distance >= required) continue;
+          const yAtX = run === 0 ? line.y1 : line.y1 + ((o.x - line.x1) / run) * (line.y2 - line.y1);
+          // Push just past the obstacle (its signed vertical offset + the
+          // perpendicular requirement), with a conservative fallback for
+          // obstacles that only graze a connector endpoint.
+          const need = direction * (o.y - yAtX) + (required + OBSTACLE_AIR_MARGIN) / cos;
+          push = Math.max(push, need, required - distance + OBSTACLE_AIR_MARGIN);
+        }
+      }
+      if (push <= 0) break;
+      anchor += direction * push;
+    }
   }
+
+  const beamY = (x: number): number => anchor + slope * (x - first.stemX);
+  const [primary, secondary] = connectorsAt(anchor);
 
   return {
     notes: sorted,
@@ -353,13 +425,8 @@ export function computeBeamGroupGeometry(
     slope,
     minStemLength,
     thickness: t.beamThickness,
-    primary: {
-      x1: first.stemX,
-      y1: beamY(first.stemX),
-      x2: last.stemX,
-      y2: beamY(last.stemX),
-    },
-    secondary,
+    primary,
+    secondary: hasSecondary ? (secondary ?? null) : null,
     beamY,
   };
 }

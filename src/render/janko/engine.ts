@@ -80,9 +80,10 @@ export interface SvgBox {
 /**
  * Resolve the absolute A4 page geometry for a Jánko Two-Row page.
  *
- * The Middle C spine is centred in the `interStaffGap` channel between the RH
- * inner equator (o4) and the LH inner equator (o3); every hand's lattice then
- * extends by `octaveStep` per octave (see `geometry.getEquatorYForOctave`).
+ * The Middle C spine is centred in the `interStaffGap` channel between the two
+ * inner staff equators (o4 and o3); the unified lattice then extends by
+ * `octaveStep` per octave in both directions (see
+ * `geometry.getEquatorYForOctave`), identically for both hands.
  */
 export function computePageGeometry(
   options?: Partial<JankoLayoutOptions> | null,
@@ -300,12 +301,12 @@ export function layoutJankoSystem(
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
   if (o.rhythmStyle === 'beamed') {
-    const partition = partitionBeamGroups(
-      notes.map((p) => p.rhythm),
-      t
-    );
+    // Every notehead of the system is an obstacle for every beam group: the
+    // shared lattice lets one hand's beam cross the other hand's staff lines.
+    const rhythmNotes = notes.map((p) => p.rhythm);
+    const partition = partitionBeamGroups(rhythmNotes, t);
     beams = partition.groups
-      .map((group) => computeBeamGroupGeometry(group, t))
+      .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes))
       .filter((g): g is JankoBeamGroupGeometry => g !== null);
     ungrouped = partition.ungrouped;
   }

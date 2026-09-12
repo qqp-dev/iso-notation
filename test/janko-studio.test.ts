@@ -223,7 +223,7 @@ test('renderStudioMarkup contains both views and is DOM-free (SSR-safe)', () => 
 
 test('renderStatusLine reports live lint statistics', () => {
   const line = renderStatusLine(CONFIG, new Date('2024-01-01T12:34:56Z'));
-  assert.match(line, /0 violations · 2 warnings/);
+  assert.match(line, /0 violations · 9 warnings/);
   assert.match(line, /8 systems · 551 noteheads/);
   assert.match(line, /rendered live at 12:34:56Z/);
 });

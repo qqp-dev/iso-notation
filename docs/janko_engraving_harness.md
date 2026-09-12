@@ -87,7 +87,8 @@ src/render/janko/
 | Rank 0 (0, 2, 4, 6, 8, a) | `h/2` **below** its octave equator |
 | Rank 1 (1, 3, 5, 7, 9, b) | `h/2` **above** its octave equator |
 | Row-to-row step `h` | 15.0 pt |
-| Octave equator step | `2h` = 30.0 pt |
+| Octave equator step | `2h` = 30.0 pt (the o3→o4 step is the 56 pt corridor) |
+| Grand staff span | **absolute, hand-independent**: o5 −58 / o4 −28 / o3 +28 / o2 +58 pt |
 | Middle C corridor | **spacious spine-free**: 56 pt of negative space (o4 −28 / o3 +28), no dividing rule |
 | Horizontal dotted lines | none — the vertical beat-grid pulses are the only dashed elements |
 | Position of Honor halo | `R = 6.2 pt` at tick 0 of Measure 1 |
@@ -98,10 +99,16 @@ src/render/janko/
 | Flag hook reach / drop | `4.0 pt` right of the stem / `6.6 pt` from the tip |
 | Minimum head-to-beam air | `noteheadRadius + minStemClearance` = 6.3 pt |
 
-Each hand anchors its own uniform lattice on its two home equators
-(RH o4/o5, LH o3/o2) and extends it by 30 pt per octave, so out-of-staff
-pitches (e.g. the RH run descending into octave 3 in m. 4) emit **dynamic
-ledger equators** — one per intervening octave, nearest first.
+`getEquatorYForOctave` resolves **one** coordinate per octave, identical for both
+hands: `octave >= 4` maps to `-halfGap - (octave - 4) * 30`, `octave <= 3` to
+`+halfGap + (3 - octave) * 30`. Octaves 2–5 are the four continuous staff rules
+and therefore **never** produce ledger lines, whichever hand plays them (the LH
+octave-4 and RH octave-3 crossings of mm. 3–4 sit on the true rules instead of
+growing phantom cuts inside the corridor). `isOutOfStaffOctave` is strictly
+`octave < 2 || octave > 5`; only those out-of-staff pitches emit **dynamic
+ledger equators** — one per intervening octave, nearest first. A beam whose
+connector passes a foreign notehead of the shared staff is pushed uniformly
+further away from its own heads until every such head keeps 6.3 pt of air.
 
 ### Tokens and options
 
@@ -189,7 +196,7 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 | --- | --- | --- |
 | `janko_portrait_page1.png` | Full page 1, systems 1–3, mm. 1–12 | 2× |
 | `janko_m1_m2.png` | m. 1–2: accolade, halo, spacious spine-free corridor, opening theme | 4× |
-| `janko_m4.png` | m. 4: RH cascading run into octave 3 with ledger equators | 4× |
+| `janko_m4.png` | m. 4: RH cascading run onto the shared octave-3 staff rule (zero phantom ledgers) | 4× |
 | `janko_m8.png` | m. 8: 16th-cluster horizontal-spacing stress test | 4× |
 | `janko_variants.png` | A Angled Cuts vs B Traditional Beams vs C Unified Continuous Lattice on mm. 1–4 | 2× |
 
@@ -217,7 +224,7 @@ npm run build                     # tsc + vite (index.html + janko.html entries)
 
 | Suite | Locks |
 | --- | --- |
-| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, ledger accumulation, halo placement, tick spacing), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
+| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
 | `test/janko-linter.test.ts` | the report contract, the clean golden master, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
 | `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
 

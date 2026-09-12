@@ -153,10 +153,11 @@ function main(): void {
         1,
         OPTIONS,
         TOKENS,
-        'RH run → octave 3 · ledgers'
+        'RH run → shared octave-3 staff rule'
       ),
       zoom: 4,
-      description: 'Macro crop m. 4: RH run descending into octave 3 with ledger equators (288 DPI)',
+      description:
+        'Macro crop m. 4: RH run descending onto the shared o3 staff rule, zero phantom ledgers (288 DPI)',
     },
     {
       name: 'janko_m8.png',
