@@ -11,7 +11,9 @@ import {
   JankoSystemGeometry,
   JankoTokens,
   resolveJankoOptions,
+  resolveJankoTokens,
 } from '../types';
+import { getTickX } from '../geometry';
 import { f } from './style';
 
 /** One hand's barline segment at x, from its top rule to its bottom rule. */
@@ -65,4 +67,52 @@ export function renderMeasureNumber(
   const x = geo.staffLeft - 2;
   const y = geo.staffTopY - 6;
   return `    <text class="janko-measure-num" x="${f(x)}" y="${f(y)}">${measureNumber}</text>`;
+}
+
+/**
+ * Vertical dashed pulse lines for beats 2, 3, … (Klavarskribo beat grid).
+ * Replaces the heavy time signature numerals with subtle subdivision guidance,
+ * matching the prior perfected landscape engraving benchmark (stroke="#D1D5DB", width 0.50pt, dash 2,3).
+ */
+export function renderBeatGrid(
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  if (!o.showBeatGrid) return '';
+
+  const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / t.ticksPerBeat));
+  if (beatsPerMeasure <= 1) return '';
+
+  const out: string[] = ['  <g class="janko-beat-grid">'];
+  const rhTop = geo.equatorY('RH', 5) - 12;
+  const rhBot = geo.equatorY('RH', 4) + 12;
+  const lhTop = geo.equatorY('LH', 3) - 12;
+  const lhBot = geo.equatorY('LH', 2) + 12;
+
+  for (let m = 0; m < o.measuresPerSystem; m++) {
+    const isOpeningMeasure = systemIndex === 0 && m === 0;
+    const insets =
+      isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
+        ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
+        : undefined;
+
+    for (let b = 1; b < beatsPerMeasure; b++) {
+      const beatTick = b * t.ticksPerBeat;
+      const x =
+        geo.staffLeft + getTickX(beatTick, m, beatTick, geo.measureWidth, t, insets);
+      out.push(
+        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(rhBot)}" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>`
+      );
+      out.push(
+        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(lhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>`
+      );
+    }
+  }
+
+  out.push('  </g>');
+  return out.join('\n');
 }

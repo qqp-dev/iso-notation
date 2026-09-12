@@ -53,7 +53,7 @@ import {
   renderRhythm,
 } from './elements/rhythm';
 import { renderAccolade, renderCaptionLines, wrapCaptionText } from './elements/accolade';
-import { renderBarlines, renderMeasureNumber } from './elements/barlines';
+import { renderBarlines, renderBeatGrid, renderMeasureNumber } from './elements/barlines';
 
 /** Vertical reserve above a crop for its caption band (pt). */
 const CROP_CAPTION_HEIGHT = 15.0;
@@ -203,9 +203,10 @@ function positionNote(
   const { measureOffset, tickInMeasure } = splitTick(note.startTick, t);
   const measureIdx = measureOffset - systemIndex * geo.measuresPerSystem;
   const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
-  const insets = isOpeningMeasure
-    ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
-    : undefined;
+  const insets =
+    isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
+      ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
+      : undefined;
 
   const x =
     geo.staffLeft +
@@ -312,6 +313,7 @@ export function renderSystem(
   }
   out.push(renderOctaveLabels(geo, o, t));
   out.push(renderStaffLines(geo, o, t));
+  out.push(renderBeatGrid(geo, systemIndex, o, t));
   out.push(renderBarlines(geo, o, t));
   out.push(renderNotesLayer(positioned, geo, o, t));
   out.push('  </g>');

@@ -322,7 +322,13 @@ test('renderJankoPage: well-formed 3-system page with all rhythm styles availabl
   for (const s of [1, 2, 3]) assert.match(page, new RegExp(`id="system-${s}"`));
   assert.match(page, /Goldberg Variations/, 'Urtext header present');
   assert.match(page, /Page 1 of 3/);
-  assert.match(page, /3<\/text>[\s\S]*?4<\/text>/, 'time signature');
+  assert.ok(!page.includes('class="janko-time-signature"'), 'time signature removed by default');
+  assert.ok(!page.includes('class="janko-octave-labels"'), 'octave indicators removed by default');
+  assert.ok(!page.includes('class="janko-hand-labels"'), 'hand labels removed by default');
+  assert.match(page, /class="janko-beat-line"/, 'beat grid pulse lines emitted by default');
+
+  const withTs = renderJankoPage(score, 0, { ...OPTIONS, showTimeSignature: true }, TOKENS);
+  assert.match(withTs, /3<\/text>[\s\S]*?4<\/text>/, 'opt-in time signature');
 
   const angled = renderJankoCrop(score, 1, 2, { ...OPTIONS, rhythmStyle: 'angled-cuts' }, TOKENS);
   const ticks = renderJankoCrop(score, 1, 2, { ...OPTIONS, rhythmStyle: 'horizontal-ticks' }, TOKENS);
@@ -418,6 +424,37 @@ test('Token/option overrides flow through every renderer (pluggable design)', ()
   assert.match(crop, /r="5\.00"/, 'notehead override');
   const geo = computePageGeometry(options, tokens);
   close(geo.systems[0].equatorY('RH', 4) - geo.systems[0].middleCY, -30, 'interStaffGap override');
+});
+
+test('Subdivision Invariant: beat grid replaces time signature, octave/hand labels removed, beamed rhythm default', () => {
+  const score = buildBachGoldbergVar1Score();
+  // 1. Defaults align with user mandate
+  assert.equal(DEFAULT_JANKO_OPTIONS.rhythmStyle, 'beamed');
+  assert.equal(DEFAULT_JANKO_OPTIONS.showOctaveLabels, false);
+  assert.equal(DEFAULT_JANKO_OPTIONS.showHandLabels, false);
+  assert.equal(DEFAULT_JANKO_OPTIONS.showTimeSignature, false);
+  assert.equal(DEFAULT_JANKO_OPTIONS.showBeatGrid, true);
+  assert.equal(DEFAULT_JANKO_OPTIONS.timeSignatureWidth, 0);
+
+  // 2. Full-page engraving contains no octave labels, no hand labels, no time signatures
+  const page = renderJankoPage(score, 0, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.ok(!page.includes('class="janko-octave-label"'));
+  assert.ok(!page.includes('class="janko-hand-label"'));
+  assert.ok(!page.includes('class="janko-time-signature"'));
+
+  // 3. Beat grid pulse lines are emitted for beats 2 and 3 in every measure
+  const beatMatches = [...page.matchAll(/class="janko-beat-line"/g)];
+  // 3 systems * 4 measures/system * 2 beats/measure * 2 hands (RH + LH) = 48 lines
+  assert.equal(beatMatches.length, 3 * 4 * 2 * 2);
+  assert.match(page, /stroke="#D1D5DB" stroke-width="0\.50" stroke-dasharray="2,3"/);
+
+  // 4. Macro crop mm. 1–2 carries beat lines on beats 2 and 3 (system 0 DOM has 4 mm * 4 lines = 16)
+  const crop = renderJankoCrop(score, 1, 2, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const cropBeatLines = [...crop.matchAll(/class="janko-beat-line"/g)];
+  assert.equal(cropBeatLines.length, 4 * 2 * 2);
+
+  // 5. Notes use beamed rhythm by default
+  assert.match(crop, /class="janko-beam"/);
 });
 
 // ---------------------------------------------------------------------------
