@@ -7,6 +7,18 @@
  * element renderers (`elements/*`) and this page/crop/comparison composition
  * layer. No coordinate math or SVG template lives in the export scripts.
  *
+ * Row-Snapped Parity Offset (Approach 2)
+ * --------------------------------------
+ * A whole-tone row is shared by six pitch classes, so a chord regularly puts
+ * two of its tones on one row of one octave (C major `[0, 4, 7]`, G7
+ * `[7, 11, 2, 5]`, …). Every head keeps its **true row** — the row is the
+ * instrument's physical row and may never be re-spelled — and the collision is
+ * resolved *horizontally*: heads that share an onset, an octave and a row are
+ * sorted by pitch and spread symmetrically around the beat column by
+ * `tokens.chordalOffset` (see {@link resolveRowSnappedChordOffsets}). Heads on
+ * *different* rows stay vertically aligned on the nominal beat column, so the
+ * isomorphic ∇ / Δ hand shapes survive untouched.
+ *
  * Public entry points
  * -------------------
  * - {@link renderJankoPage}               — full A4 page (3 systems, 12 mm.)
@@ -18,6 +30,7 @@ import { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
 import {
   JankoChannelFlank,
   JankoPitchCoordinate,
+  JankoTickInsets,
   getEquatorYForOctave,
   getNoteHand,
   getPitchCoordinate,
@@ -246,6 +259,57 @@ function handForNote(note: QuantizedNote): Hand {
 }
 
 /**
+ * Horizontal insets of one measure of a system: the canonical
+ * `tokens.measureInset` on both sides, widened on the left of the very first
+ * measure of the page when a time signature has to be cleared.
+ */
+export function getMeasureInsets(
+  systemIndex: number,
+  measureIdx: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): JankoTickInsets {
+  const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
+  return isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
+    ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
+    : { left: t.measureInset, right: t.measureInset };
+}
+
+/** Measure index (inside its system) of a note's onset. */
+export function getMeasureIndexOfTick(
+  note: QuantizedNote,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  t: ResolvedJankoTokens
+): number {
+  const { measureOffset } = splitTick(note.startTick, t);
+  return measureOffset - systemIndex * geo.measuresPerSystem;
+}
+
+/** Beat column of one note inside its system (page pt, before any chord offset). */
+function getNominalNoteX(
+  note: QuantizedNote,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number {
+  const { tickInMeasure } = splitTick(note.startTick, t);
+  const measureIdx = getMeasureIndexOfTick(note, geo, systemIndex, t);
+  return (
+    geo.staffLeft +
+    getTickX(
+      note.startTick,
+      measureIdx,
+      tickInMeasure,
+      geo.measureWidth,
+      t,
+      getMeasureInsets(systemIndex, measureIdx, o, t)
+    )
+  );
+}
+
+/**
  * Position a single note inside one system (page pt coordinates).
  *
  * `flank` carries the contour-resolved side of a Set B note under a dynamic
@@ -260,17 +324,7 @@ export function positionJankoNote(
   t: ResolvedJankoTokens,
   flank?: JankoChannelFlank | null
 ): PositionedJankoNote {
-  const { measureOffset, tickInMeasure } = splitTick(note.startTick, t);
-  const measureIdx = measureOffset - systemIndex * geo.measuresPerSystem;
-  const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
-  const insets =
-    isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
-      ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
-      : undefined;
-
-  const x =
-    geo.staffLeft +
-    getTickX(note.startTick, measureIdx, tickInMeasure, geo.measureWidth, t, insets);
+  const x = getNominalNoteX(note, geo, systemIndex, o, t);
   const hand = handForNote(note);
   const coord = getPitchCoordinate(
     note.pitch.pitchClass,
@@ -297,6 +351,324 @@ export function positionJankoNote(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Row-Snapped Parity Offset (Approach 2)
+// ---------------------------------------------------------------------------
+
+/** Vertical tolerance (pt) of the exact-row and disc-clearance tests. */
+const EPS = 1e-6;
+
+/**
+ * Extra air (pt) a row-displaced chord tone keeps beyond the neighbouring
+ * notehead disc: `Δx ≥ 2r + 1.2pt`, i.e. 10.8pt for the canonical 4.8pt mask.
+ */
+export const CHORDAL_OFFSET_AIR = 1.2;
+
+/**
+ * Air (pt) a row-snapped head keeps from the nearest head of a *different*
+ * onset on its own row: exactly one notehead diameter, the hard rule the
+ * visual linter audits (`dx >= 2r`). It is deliberately not inflated — a dense
+ * 16th grid whose columns already sit at `2r + ε` must not be nudged by a
+ * solver that thinks it is 0.05pt short.
+ */
+export const CHORDAL_NEIGHBOUR_AIR = 0;
+
+/**
+ * Effective horizontal displacement (pt) between two same-row chord tones of
+ * one onset.
+ *
+ * `tokens.chordalOffset` (11.0pt by default) is authoritative, but it is never
+ * allowed to fall below `2 * noteheadRadius + 1.2pt`: a designer who enlarges
+ * the knockout disc must not silently re-open the collision the offset exists
+ * to remove.
+ */
+export function getChordalOffset(tokens?: Partial<JankoTokens> | null): number {
+  const t = resolveJankoTokens(tokens);
+  return Math.max(t.chordalOffset, 2 * t.noteheadRadius + CHORDAL_OFFSET_AIR);
+}
+
+/** One whole-tone row of one onset: the heads that must share a horizontal slot. */
+interface RowCluster {
+  /** Exact notehead-centre y of the row. */
+  y: number;
+  /** Row key (`y` to 1e-3 pt) used by the neighbour chains. */
+  key: string;
+  /** The heads of this onset sitting on that row, pitch ascending. */
+  notes: PositionedJankoNote[];
+  /** Half the horizontal span the displaced heads occupy (`(K-1)·Δx / 2`). */
+  halfSpan: number;
+}
+
+/** Every head of one onset, grouped by the whole-tone row it occupies. */
+interface OnsetUnit {
+  tick: number;
+  /** Beat column before the row-snapped pass (page pt). */
+  nominalX: number;
+  /** Measure index inside the system, for the measure's inset band. */
+  measureIdx: number;
+  rows: RowCluster[];
+  /** Resolved translation of the whole column (page pt, 0 = on the beat). */
+  shift: number;
+  /** True when at least one row of this onset carries a displaced pair. */
+  spread: boolean;
+  /** Left/right edge (page pt) the column's heads must stay inside. */
+  bandLeft: number;
+  bandRight: number;
+}
+
+/**
+ * Row-Snapped Parity Offset of one system (Approach 2).
+ *
+ * **The rule.** Two heads at the same `startTick` that resolve to the same
+ * `(octave, rank)` share one lattice point: the same `y` by construction, and —
+ * before this pass — the same `x` as well, so the later white knockout erases
+ * the earlier digit. Every such group of `K ≥ 2` heads is sorted by pitch
+ * ascending and spread symmetrically around its onset's column:
+ *
+ * ```
+ * x_i = x_onset + (i - (K - 1) / 2) · Δx_chord,   Δx_chord = getChordalOffset(tokens)
+ * ```
+ *
+ * So a two-note collision becomes the symmetric pair `x ∓ Δx/2` and a three-note
+ * collision the triplet `x − Δx, x, x + Δx`. Heads on **different** rows of the
+ * same onset keep one shared column, which is what preserves the isomorphic
+ * ∇ / Δ hand shapes of the staff.
+ *
+ * **The column solve.** A displaced head claims real horizontal room, and in
+ * dense writing the neighbouring onset of its own row is only one 16th away.
+ * The onset is therefore treated as one unit whose column may be translated as
+ * a whole — never sheared, so the chord keeps its shape — in two phases:
+ *
+ * 1. **Spread columns** place themselves against the *nominal* beat grid: the
+ *    symmetric placement is kept (`shift = 0`) whenever every head still clears
+ *    its row neighbours by `2r` and stays inside the measure's `measureInset`
+ *    band; otherwise the column slides to the nearest legal position. In
+ *    practice this makes a crowded chord take the air from whichever side has
+ *    it (a spreading downbeat chord slides right, off the barline).
+ * 2. **Plain columns** that the spread ones have crowded step away by exactly
+ *    the missing air — the local spacing relief a real engraver applies around
+ *    a displaced second.
+ *
+ * Every step is one-directional (a column only ever moves away from a
+ * violation), so the pass is deterministic, order-stable and terminating.
+ * Whatever still cannot fit — a three-note row cluster squeezed between two
+ * 16ths that are themselves out of room — is left for the visual linter to
+ * name (`chordal-overlap` / `notehead-overlap`) instead of being hidden.
+ */
+export function resolveRowSnappedChordOffsets(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): PositionedJankoNote[] {
+  const delta = getChordalOffset(t);
+  const gap = 2 * t.noteheadRadius + CHORDAL_NEIGHBOUR_AIR;
+
+  // -------------------------------------------------------------------------
+  // 1. Partition the system into onset units, each split into row clusters.
+  // -------------------------------------------------------------------------
+  const unitByTick = new Map<number, OnsetUnit>();
+  const clusterByRow = new Map<string, RowCluster>();
+  for (const p of notes) {
+    let unit = unitByTick.get(p.note.startTick);
+    if (!unit) {
+      const measureIdx = getMeasureIndexOfTick(p.note, geo, systemIndex, t);
+      const insets = getMeasureInsets(systemIndex, measureIdx, o, t);
+      const measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
+      unit = {
+        tick: p.note.startTick,
+        nominalX: p.x,
+        measureIdx,
+        rows: [],
+        shift: 0,
+        spread: false,
+        bandLeft: measureLeft + (insets.left ?? t.measureInset),
+        bandRight: measureLeft + geo.measureWidth - (insets.right ?? t.measureInset),
+      };
+      unitByTick.set(p.note.startTick, unit);
+    }
+    const rowKey = (p.y + 0).toFixed(3);
+    let cluster = clusterByRow.get(`${p.note.startTick}|${rowKey}`);
+    if (!cluster) {
+      cluster = { y: p.y, key: rowKey, notes: [], halfSpan: 0 };
+      clusterByRow.set(`${p.note.startTick}|${rowKey}`, cluster);
+      unit.rows.push(cluster);
+    }
+    cluster.notes.push(p);
+  }
+
+  // Pitch ascending inside every cluster; the id breaks exact unisons
+  // deterministically, so the engraving stays a pure function of the score.
+  for (const cluster of clusterByRow.values()) {
+    cluster.notes.sort(
+      (a, b) =>
+        a.coord.octave * 12 + a.coord.pitchClass - (b.coord.octave * 12 + b.coord.pitchClass) ||
+        (a.note.id < b.note.id ? -1 : a.note.id > b.note.id ? 1 : 0)
+    );
+    cluster.halfSpan = ((cluster.notes.length - 1) * delta) / 2;
+  }
+  const units = [...unitByTick.values()];
+  for (const unit of units) {
+    unit.spread = unit.rows.some((cluster) => cluster.halfSpan > 0);
+  }
+  // Fast path: a system with no same-row chord tone anywhere cannot move a
+  // single column, so the whole solve is skipped.
+  if (!units.some((unit) => unit.spread)) return [...notes];
+
+  const r = t.noteheadRadius;
+  const maxHalfSpan = units.reduce(
+    (acc, unit) => unit.rows.reduce((a, c) => Math.max(a, c.halfSpan), acc),
+    0
+  );
+  /** Columns further apart than this can never touch, whatever their rows. */
+  const reach = 2 * maxHalfSpan + 2 * r + delta;
+
+  /**
+   * Horizontal air two clusters owe each other: `2r` when they share a row,
+   * less when their rows are close but distinct (the bounded channel puts two
+   * flanks only 4pt apart), and no constraint at all once the rows are a full
+   * disc apart — vertical separation alone then keeps the glyphs clear.
+   */
+  const separation = (a: RowCluster, b: RowCluster): number | null => {
+    const dy = Math.abs(a.y - b.y);
+    if (dy >= 2 * r - EPS) return null;
+    return Math.sqrt(Math.max(0, 4 * r * r - dy * dy)) + CHORDAL_NEIGHBOUR_AIR;
+  };
+
+  /**
+   * Onsets whose columns are close enough to interact. The columns are sorted
+   * once by beat position and each unit only walks the neighbours inside
+   * `reach`, so the map costs `O(n · k)` instead of a full pairwise scan.
+   */
+  const byBeat = [...units].sort((a, b) => a.nominalX - b.nominalX || a.tick - b.tick);
+  const neighboursByUnit = new Map<OnsetUnit, OnsetUnit[]>();
+  for (let i = 0; i < byBeat.length; i++) {
+    const unit = byBeat[i];
+    const list: OnsetUnit[] = [];
+    for (let j = i - 1; j >= 0 && unit.nominalX - byBeat[j].nominalX <= reach; j--) {
+      list.push(byBeat[j]);
+    }
+    for (let j = i + 1; j < byBeat.length && byBeat[j].nominalX - unit.nominalX <= reach; j++) {
+      list.push(byBeat[j]);
+    }
+    neighboursByUnit.set(unit, list);
+  }
+
+  const columnX = (unit: OnsetUnit): number => unit.nominalX + unit.shift;
+
+  /**
+   * Air this column is missing against one neighbour, signed: `> 0` when the
+   * column must step right (the neighbour is on its left), `< 0` when it must
+   * step left, `0` when the two already clear each other. The worst (largest
+   * magnitude) row pair of the two onsets wins.
+   */
+  const shortfallFrom = (unit: OnsetUnit, other: OnsetUnit): number => {
+    let worst = 0;
+    const otherIsLeft = other.nominalX < unit.nominalX;
+    for (const cluster of unit.rows) {
+      for (const theirs of other.rows) {
+        const needed = separation(cluster, theirs);
+        if (needed === null) continue;
+        const gap = otherIsLeft
+          ? columnX(unit) -
+            cluster.halfSpan -
+            (columnX(other) + theirs.halfSpan)
+          : columnX(other) -
+            theirs.halfSpan -
+            (columnX(unit) + cluster.halfSpan);
+        const shortfall = Math.max(0, needed - gap) * (otherIsLeft ? 1 : -1);
+        if (Math.abs(shortfall) > Math.abs(worst)) worst = shortfall;
+      }
+    }
+    return worst;
+  };
+
+  /** Legal translation window of one column against the *current* neighbours. */
+  const windowOf = (unit: OnsetUnit): { lo: number; hi: number } => {
+    let lo = Number.NEGATIVE_INFINITY;
+    let hi = Number.POSITIVE_INFINITY;
+    for (const other of neighboursByUnit.get(unit)!) {
+      const shortfall = shortfallFrom(unit, other);
+      if (shortfall > 0) lo = Math.max(lo, unit.shift + shortfall);
+      else if (shortfall < 0) hi = Math.min(hi, unit.shift + shortfall);
+    }
+    // The measure band is structural: a spread downbeat chord may never be
+    // driven onto the preceding barline.
+    for (const cluster of unit.rows) {
+      lo = Math.max(lo, unit.bandLeft + cluster.halfSpan - unit.nominalX);
+      hi = Math.min(hi, unit.bandRight - cluster.halfSpan - unit.nominalX);
+    }
+    return { lo, hi };
+  };
+
+  const ordered = [...units].sort((a, b) => a.tick - b.tick);
+
+  // -------------------------------------------------------------------------
+  // 2. Spread columns first: keep the symmetric placement whenever it is legal.
+  // -------------------------------------------------------------------------
+  for (const unit of ordered) {
+    if (!unit.spread) continue;
+    const { lo, hi } = windowOf(unit);
+    if (lo <= 0 && 0 <= hi) continue;
+    // Over-constrained: split the residual displacement evenly rather than
+    // dumping it all on one side.
+    unit.shift = lo <= hi ? Math.max(lo, Math.min(hi, 0)) : (lo + hi) / 2;
+  }
+
+  // -------------------------------------------------------------------------
+  // 3. Plain columns yield the air a spread neighbour needs. A column only ever
+  //    steps *away* from a violation, so this cannot oscillate.
+  // -------------------------------------------------------------------------
+  for (let pass = 0; pass < 3; pass++) {
+    let moved = false;
+    for (const unit of ordered) {
+      if (unit.spread) continue;
+      let pushRight = 0;
+      let pushLeft = 0;
+      for (const other of neighboursByUnit.get(unit)!) {
+        const shortfall = shortfallFrom(unit, other);
+        if (shortfall > 0) pushRight = Math.max(pushRight, shortfall);
+        else if (shortfall < 0) pushLeft = Math.max(pushLeft, -shortfall);
+      }
+      if (pushRight <= 0 && pushLeft <= 0) continue;
+      // A column squeezed from both sides stays put: moving would only trade
+      // one collision for the other, and the linter reports the squeeze.
+      const step = pushRight > 0 && pushLeft > 0 ? 0 : pushRight > 0 ? pushRight : -pushLeft;
+      if (step === 0) continue;
+      const halfSpans = unit.rows.map((cluster) => cluster.halfSpan);
+      const clamped = Math.max(
+        unit.bandLeft + Math.max(...halfSpans) - unit.nominalX,
+        Math.min(unit.bandRight - Math.max(...halfSpans) - unit.nominalX, unit.shift + step)
+      );
+      if (clamped !== unit.shift) {
+        unit.shift = clamped;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+
+  // -------------------------------------------------------------------------
+  // 4. Apply: the column translation first, then the symmetric row spread.
+  // -------------------------------------------------------------------------
+  const resolved = new Map<string, number>();
+  for (const unit of ordered) {
+    for (const cluster of unit.rows) {
+      const k = cluster.notes.length;
+      cluster.notes.forEach((p, i) => {
+        resolved.set(p.note.id, unit.nominalX + unit.shift + (i - (k - 1) / 2) * delta);
+      });
+    }
+  }
+
+  return notes.map((p) => {
+    const x = resolved.get(p.note.id);
+    if (x === undefined || x === p.x) return p;
+    return { ...p, x, rhythm: { ...p.rhythm, x } };
+  });
+}
+
 /** Position every note of one system, in engraving order. */
 export function layoutJankoSystem(
   score: QuantizedGridScore,
@@ -319,9 +691,12 @@ export function layoutJankoSystem(
   const flanks = usesContourFlanks(o.channelLayout)
     ? resolveChannelFlanks(score.notes, o, t)
     : null;
-  const notes = sysNotes.map((n) =>
+  const positioned = sysNotes.map((n) =>
     positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null)
   );
+  // Approach 2: heads that share an onset, an octave and a whole-tone row are
+  // spread horizontally around the beat column instead of being merged.
+  const notes = resolveRowSnappedChordOffsets(positioned, geometry, systemIndex, o, t);
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
@@ -528,16 +903,87 @@ export interface JankoCropBox extends SvgBox {
   lastMeasure: number;
 }
 
+/** Extra vertical room (pt) a crop reserves above and below the staff rules. */
+export interface JankoCropExtents {
+  /** Extra pt above the top staff rule (ledger stacks of high octaves). */
+  top: number;
+  /** Extra pt below the bottom staff rule (ledger stacks of low octaves). */
+  bottom: number;
+}
+
+/**
+ * Vertical room a crop owes the music that reaches outside the grand staff.
+ *
+ * The canonical crop padding (`CROP_PAD_TOP` / `CROP_PAD_BOTTOM`) is sized for
+ * the in-staff octaves 2–5, whose stems stay inside it. A score that walks down
+ * to octave 1 (Brahms's sweeping bass arpeggios) or up to octave 6 adds a
+ * dynamic ledger equator, a notehead disc and a stem *beyond* that padding, and
+ * a flat crop would slice them off. This measures the true extent of every
+ * ledger, head and stem in the covered measures, relative to the staff rules.
+ *
+ * The result is `0 / 0` for any music inside the staff, so existing crops are
+ * bit-for-bit unchanged.
+ */
+export function computeCropExtents(
+  score: QuantizedGridScore,
+  geo: JankoPageGeometry,
+  measureStart: number,
+  measureCount: number,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): JankoCropExtents {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const startIdx = Math.max(0, Math.floor(measureStart) - 1);
+  const count = Math.max(1, Math.floor(measureCount));
+  const startTick = startIdx * t.ticksPerMeasure;
+  const endTick = (startIdx + count) * t.ticksPerMeasure;
+  const reference = geo.systems[0];
+  const staffTop = reference.staffTopY - reference.middleCY;
+  const staffBottom = reference.staffBotY - reference.middleCY;
+  const flanks = usesContourFlanks(o.channelLayout)
+    ? resolveChannelFlanks(score.notes, o, t)
+    : null;
+
+  let top = 0;
+  let bottom = 0;
+  for (const note of score.notes) {
+    if (note.startTick < startTick || note.startTick >= endTick) continue;
+    const hand = getNoteHand(note.hand, note.pitch.octave);
+    const coord = getPitchCoordinate(
+      note.pitch.pitchClass,
+      note.pitch.octave,
+      hand,
+      t,
+      o,
+      flanks?.get(note.id) ?? null
+    );
+    // A RH stem grows upward, a LH stem downward; both are `stemLength` long.
+    const stemTip = coord.y + (hand === 'RH' ? -t.stemLength : t.stemLength);
+    const r = t.noteheadRadius;
+    const ys = [coord.y - r, coord.y + r, stemTip];
+    for (const ledgerY of coord.ledgerYs) ys.push(ledgerY - r, ledgerY + r);
+    const highest = Math.min(...ys);
+    const lowest = Math.max(...ys);
+    top = Math.max(top, staffTop - CROP_PAD_TOP - highest);
+    bottom = Math.max(bottom, lowest - (staffBottom + CROP_PAD_BOTTOM));
+  }
+  return { top: Math.max(0, top), bottom: Math.max(0, bottom) };
+}
+
 /**
  * Compute the macro-crop box for `measureCount` measures from `measureStart`.
  * `includeCaptionBand` reserves the strip above the staff used by
- * {@link renderJankoCrop} for its caption (comparison panels omit it).
+ * {@link renderJankoCrop} for its caption (comparison panels omit it), and
+ * `extents` (see {@link computeCropExtents}) widens the box for music that
+ * leaves the grand staff.
  */
 export function computeCropBox(
   geo: JankoPageGeometry,
   measureStart: number,
   measureCount: number,
-  includeCaptionBand: boolean = true
+  includeCaptionBand: boolean = true,
+  extents?: Partial<JankoCropExtents> | null
 ): JankoCropBox {
   const mps = geo.measuresPerSystem;
   const startIdx = Math.max(0, Math.floor(measureStart) - 1);
@@ -567,8 +1013,8 @@ export function computeCropBox(
   }
 
   const captionHeight = includeCaptionBand ? CROP_CAPTION_HEIGHT : 0;
-  const y0 = staffTop - CROP_PAD_TOP - captionHeight;
-  const y1 = staffBottom + CROP_PAD_BOTTOM;
+  const y0 = staffTop - CROP_PAD_TOP - captionHeight - (extents?.top ?? 0);
+  const y1 = staffBottom + CROP_PAD_BOTTOM + (extents?.bottom ?? 0);
   return {
     x: x0,
     y: y0,
@@ -585,7 +1031,9 @@ export function computeCropBox(
  * Targeted macro crop of `measureCount` measures starting at `measureStart`
  * (1-based). The glyph work is identical to the full page — only the viewBox
  * is narrowed — so crops are pixel-identical to the corresponding page region.
- * An optional `caption` is appended to the auto measure-range label.
+ * The box grows just enough to keep out-of-staff ledger stacks, heads and
+ * stems whole (see {@link computeCropExtents}). An optional `caption` is
+ * appended to the auto measure-range label.
  */
 export function renderJankoCrop(
   score: QuantizedGridScore,
@@ -598,7 +1046,13 @@ export function renderJankoCrop(
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const geo = computePageGeometry(o, t);
-  const box = computeCropBox(geo, measureStart, measureCount);
+  const box = computeCropBox(
+    geo,
+    measureStart,
+    measureCount,
+    true,
+    computeCropExtents(score, geo, measureStart, measureCount, o, t)
+  );
 
   // Wrap the caption so even a single-measure crop keeps a fully visible label.
   const CAPTION_FONT_SIZE = 7;

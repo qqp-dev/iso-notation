@@ -16,9 +16,12 @@
  *    rules, row guidelines, ledger equators, beat grid, stems, beams,
  *    barlines) may cut through it. This is the invariant that guarantees
  *    "zero staff/beat line pass-through".
- * 2. **Collision & clearance** — notehead discs may not overlap (chords are
- *    allowed to *stack*, not to occupy the same point), and nothing may collide
- *    with a barline.
+ * 2. **Collision & clearance** — notehead *discs* may not overlap, measured as
+ *    circles: a chord is allowed to stack on different whole-tone rows, and two
+ *    tones that share one row of one octave are resolved by the engine's
+ *    Row-Snapped Parity Offset (Approach 2), which spreads them horizontally by
+ *    a full disc. A same-row pair that is still narrower than `2r` is surfaced
+ *    as `chordal-overlap`, and nothing may collide with a barline.
  * 3. **Corridor & guideline integrity** — the Middle C channel stays free of
  *    structural rules and beams, and the spine is never cut by a glyph.
  * 4. **Beam & stem validity** — stems attach *flush on the outside* of their
@@ -50,7 +53,13 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from './types';
-import { JankoSystemLayout, PositionedJankoNote, layoutJankoScore, renderSystem } from './engine';
+import {
+  JankoSystemLayout,
+  PositionedJankoNote,
+  getChordalOffset,
+  layoutJankoScore,
+  renderSystem,
+} from './engine';
 import { getEquatorRuleYs } from './elements/staff';
 import {
   JankoBeamConnector,
@@ -279,10 +288,24 @@ function handRuleSpans(
 // ---------------------------------------------------------------------------
 
 /**
- * Notehead discs may never overlap. Chordal notes (same onset) are exempt from
- * the *horizontal* rule — they are stacked vertically by design — but a chord
- * whose heads land on the same page point still destroys information (the later
- * digit erases the earlier one), so it is reported as a warning.
+ * Notehead discs may never overlap.
+ *
+ * Three cases are distinguished, and they are exactly the three musical
+ * situations a two-row whole-tone staff can produce:
+ *
+ * 1. **Row-snapped chord tones** (`a.startTick === b.startTick`, same `y`) — the
+ *    engine keeps every head on its true whole-tone row and resolves the
+ *    collision *horizontally* (Approach 2, Row-Snapped Parity Offset, see
+ *    `engine.resolveRowSnappedChordOffsets`). A horizontal displacement of at
+ *    least one notehead diameter (`dx >= 2r - ε`) therefore clears the pair —
+ *    this is the check that certifies the offset is real and wide enough. A
+ *    pair that still shares a page point is reported as `chordal-overlap`.
+ * 2. **Chordal heads on different rows** (`dy >= 2r`) — legal by construction:
+ *    the two whole-tone rows of an octave are one `rowHeight` (15pt) apart, so a
+ *    stacked chord never touches, and the ∇ / Δ hand shapes stay vertically
+ *    aligned on one beat column.
+ * 3. **Different onsets** — nothing may collapse onto one point: a hard
+ *    `notehead-overlap`, because two independent beats must never share a glyph.
  */
 export function checkNoteheadClearance(
   layout: JankoSystemLayout,
@@ -291,22 +314,32 @@ export function checkNoteheadClearance(
   out: LintViolation[]
 ): void {
   const r = t.noteheadRadius;
+  const required = 2 * r;
   const sorted = [...layout.notes].sort((a, b) => a.x - b.x || a.y - b.y);
   for (let i = 0; i < sorted.length; i++) {
     const a = sorted[i];
     for (let j = i + 1; j < sorted.length; j++) {
       const b = sorted[j];
       const dx = Math.abs(b.x - a.x);
-      if (dx >= 2 * r - EPS) break;
+      // x-sorted, so nothing further right can reach: the discs are circles.
+      if (dx >= required) break;
       const dy = Math.abs(b.y - a.y);
-      if (dy >= 2 * r - EPS) continue;
-      const chordal = a.note.startTick === b.note.startTick;
+      // The discs are circles, so the true test is the centre distance, not a
+      // bounding box: two heads on rows 4pt apart (the bounded channel's two
+      // octave flanks) are already clear at dx = √((2r)² − dy²) < 2r.
       const distance = Math.hypot(dx, dy);
+      if (distance >= required - EPS) continue;
+      const chordal = a.note.startTick === b.note.startTick;
+      const sameRow = dy < EPS;
       const detail = {
         dx,
         dy,
         distance,
-        required: 2 * r,
+        required,
+        /** Horizontal displacement still missing to clear the pair. */
+        missingOffset: Math.max(0, required - distance),
+        /** Canonical row-snapped displacement the engine aims for. */
+        canonicalOffset: sameRow && chordal ? getChordalOffset(t) : 0,
       };
       const base = {
         system: layout.index,
@@ -316,7 +349,22 @@ export function checkNoteheadClearance(
         y: (a.y + b.y) / 2,
         metrics: detail,
       };
-      if (chordal) {
+      if (chordal && sameRow) {
+        // Case 1: the row-snapped displacement did not happen, or was narrower
+        // than one disc. The later knockout would erase the earlier digit, so
+        // the pair is surfaced instead of being silently accepted.
+        const offset = getChordalOffset(t);
+        out.push({
+          code: 'chordal-overlap',
+          severity: 'warning',
+          message:
+            `Chordal noteheads ${a.note.id} (${a.coord.hand} pc${a.coord.pitchClass} o${a.coord.octave}) and ` +
+            `${b.note.id} (${b.coord.hand} pc${b.coord.pitchClass} o${b.coord.octave}) share row ${a.coord.rank} of ` +
+            `octave ${a.coord.octave} only ${dx.toFixed(2)}pt apart (${required.toFixed(2)}pt required): the later ` +
+            `knockout erases the earlier digit. Row-snap one head by Δx = ${offset.toFixed(2)}pt.`,
+          ...base,
+        });
+      } else if (chordal) {
         out.push({
           code: 'chordal-overlap',
           severity: 'warning',
@@ -332,7 +380,7 @@ export function checkNoteheadClearance(
           severity: 'error',
           message:
             `Noteheads ${a.note.id} and ${b.note.id} overlap (${distance.toFixed(2)}pt apart, ` +
-            `${(2 * r).toFixed(2)}pt required; dx=${dx.toFixed(2)}, dy=${dy.toFixed(2)}).`,
+            `${required.toFixed(2)}pt required; dx=${dx.toFixed(2)}, dy=${dy.toFixed(2)}).`,
           ...base,
         });
       }

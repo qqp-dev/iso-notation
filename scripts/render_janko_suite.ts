@@ -16,17 +16,28 @@
  *   8. janko_domain_b.png            — Candidate B · base row on the line (4×)
  *   9. janko_domain_c.png            — Candidate C · single line, three rows (4×)
  *  10. janko_domain_d.png            — Candidate D · bounded center channel (4×)
+ *  11. janko_brahms_page1.png        — Brahms Op. 118 No. 1, mm. 1–9, 3 systems (2×)
+ *  12. janko_brahms_m7_m8.png        — the two five-voice chords, mm. 7–8 (4×)
+ *
+ * The rasterizations run in parallel across the machine's cores (the sheets are
+ * the expensive part: the SVG generation itself is ~60 ms for the whole set),
+ * which keeps the suite inside its sub-second budget on a normal laptop.
  *
  * Outputs are written to the current checkout root, `public/`, `docs/img/`
  * and mirrored to the main project checkout root (root, `public/`, `docs/img/`).
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import {
+  BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  BRAHMS_OP118_NO1_JANKO_TOKENS,
+  buildBrahmsOp118No1Score,
+} from '../src/scores/brahms-op118-no1';
 import {
   renderJankoCrop,
   renderJankoPage,
@@ -77,14 +88,38 @@ function rasterize(
   svgPath: string,
   pngPath: string,
   zoom: number
-): void {
-  if (rasterizer.kind === 'resvg') {
-    execFileSync(rasterizer.bin, ['--zoom', String(zoom), svgPath, pngPath], { stdio: 'ignore' });
-  } else {
-    execFileSync(rasterizer.bin, ['-z', String(zoom), '-f', 'png', '-o', pngPath, svgPath], {
-      stdio: 'ignore',
-    });
-  }
+): Promise<void> {
+  const args =
+    rasterizer.kind === 'resvg'
+      ? ['--zoom', String(zoom), svgPath, pngPath]
+      : ['-z', String(zoom), '-f', 'png', '-o', pngPath, svgPath];
+  return new Promise((resolve, reject) => {
+    execFile(rasterizer.bin, args, { stdio: 'ignore' }, (error) =>
+      error ? reject(error) : resolve()
+    );
+  });
+}
+
+/**
+ * Run `worker` over `items` with a bounded number of parallel jobs. The export
+ * is dominated by rasterization (the largest sheet takes ~400 ms on one core),
+ * so spreading the ten documents over the machine's cores is what keeps the
+ * whole suite inside its budget.
+ */
+async function inParallel<T>(
+  items: readonly T[],
+  worker: (item: T) => Promise<void>,
+  limit = Math.max(1, Math.min(4, os.cpus().length))
+): Promise<void> {
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      await worker(items[index]);
+    }
+  });
+  await Promise.all(runners);
 }
 
 /** Copy one artifact to every delivery location (checkout + main checkout). */
@@ -125,12 +160,15 @@ function mirrorSvg(name: string, svg: string): void {
   }
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const startedAt = Date.now();
   fs.mkdirSync(DOCS_IMG, { recursive: true });
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
   const score = buildBachGoldbergVar1Score();
+  const brahms = buildBrahmsOp118No1Score();
+  const BRAHMS_OPTIONS = BRAHMS_OP118_NO1_JANKO_OPTIONS;
+  const BRAHMS_TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
   const rasterizer = findRasterizer();
 
   // Round 4 domain exploration: every candidate of the live registry, engraved
@@ -223,22 +261,54 @@ function main(): void {
       zoom: 4,
       description: `${c.candidate.label} — ${c.candidate.id} (288 DPI)`,
     })),
+    // Brahms Op. 118 No. 1: the harmonic pressure benchmark (four-octave
+    // arpeggios + the two five-voice chords that force the row-snapped offset).
+    {
+      name: 'janko_brahms_page1.png',
+      svg: renderJankoPage(brahms, 0, BRAHMS_OPTIONS, BRAHMS_TOKENS),
+      zoom: 2,
+      description: 'Brahms Op. 118 No. 1, mm. 1–9: three systems on A4 portrait',
+    },
+    {
+      name: 'janko_brahms_m7_m8.png',
+      svg: renderJankoCrop(
+        brahms,
+        7,
+        2,
+        BRAHMS_OPTIONS,
+        BRAHMS_TOKENS,
+        'the two five-voice chords — row-snapped parity offset'
+      ),
+      zoom: 4,
+      description:
+        'Macro crop mm. 7–8: ⟨A3,B3,D4,F4,A4⟩ and ⟨F3,G3,B3,F4,G4⟩, every colliding row spread (288 DPI)',
+    },
   ];
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'janko-export-'));
   const rows: string[] = [];
   let totalBytes = 0;
 
+  const results = new Map<string, { targets: string[]; bytes: number }>();
   try {
-    for (const job of jobs) {
+    // SVG generation is synchronous and cheap; rasterization is the slow part
+    // and is spread across the machine's cores.
+    const prepared = jobs.map((job) => {
       const base = job.name.replace(/\.png$/, '');
       const svgPath = path.join(tmpDir, `${base}.svg`);
-      const pngPath = path.join(DOCS_IMG, job.name);
       fs.writeFileSync(svgPath, job.svg, 'utf-8');
-      rasterize(rasterizer, svgPath, pngPath, job.zoom);
+      return { job, base, svgPath, pngPath: path.join(DOCS_IMG, job.name) };
+    });
+    await inParallel(prepared, async ({ job, svgPath, pngPath }) => {
+      await rasterize(rasterizer, svgPath, pngPath, job.zoom);
+    });
+    for (const { job, base, pngPath } of prepared) {
       mirrorSvg(`${base}.svg`, job.svg);
       const targets = copyEverywhere(job.name, pngPath);
-      const bytes = fs.statSync(pngPath).size;
+      results.set(job.name, { targets, bytes: fs.statSync(pngPath).size });
+    }
+    for (const job of jobs) {
+      const { targets, bytes } = results.get(job.name)!;
       totalBytes += bytes;
       rows.push(
         `  ✓ ${job.name.padEnd(28)} ${String(job.zoom) + '×'}  ${(bytes / 1024).toFixed(1).padStart(7)} KB  → ${targets.length} locations  (${job.description})`
@@ -260,4 +330,4 @@ function main(): void {
   }
 }
 
-main();
+await main();

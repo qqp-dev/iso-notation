@@ -80,9 +80,9 @@ export const DEFAULT_STUDIO_CROPS: StudioCrop[] = [
   {
     start: 14,
     count: 1,
-    title: 'm. 14 · Cross-hand collision site',
+    title: 'm. 14 · Cross-hand row collision',
     caption:
-      'The linter-flagged chordal collision: two voices landing on one page point — the open item of this round.',
+      'Two voices landing on one whole-tone row of one octave — the defect that opened the row-snapped round. Both heads keep their true row and are now spread horizontally, so neither digit is erased.',
   },
   {
     start: 24,

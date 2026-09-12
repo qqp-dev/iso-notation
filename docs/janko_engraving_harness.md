@@ -31,8 +31,8 @@ Design review happens **on the live website**, never by refreshing PNGs:
 Implementers verify the same engraving **without rendering anything**:
 
 ```bash
-npm run lint:engraving            # ~25 ms, JSON/strict/quiet flags available
-npm test                          # 166 tests, < 4 s, includes the linter + candidate/studio suites
+npm run lint:engraving            # ~60 ms, JSON/strict/quiet flags available
+npm test                          # 188 tests, < 4 s, includes the linter + candidate/studio suites
 ```
 
 ---
@@ -54,7 +54,7 @@ turn because:
 The harness replaces all four failure modes with one command:
 
 ```bash
-npm run janko:export   # ~1 s, ten PNGs, six delivery locations each
+npm run janko:export   # ~1.2 s, twelve PNGs, six delivery locations each
 npm run janko:watch    # same suite on every file change
 ```
 
@@ -193,11 +193,11 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 ### Visual linter
 
 `lintJankoScore(score, options?, tokens?, lintOptions?)` returns
-`{ ok, violations, warnings, diagnostics, stats }` after checking, in ~25 ms:
+`{ ok, violations, warnings, diagnostics, stats }` after checking, in ~60 ms:
 
 | Check | Invariant |
 | --- | --- |
-| Notehead clearance | discs never overlap; chordal heads that land on one page point are warned |
+| Notehead clearance | discs never overlap (true centre distance, so near rows are measured as circles); chordal heads that share a row are **spread horizontally** by the row-snapped parity offset, and only a spread narrower than `2r` is warned |
 | Knockout coverage | the 5.8 pt digit's ink box fits the `r = 4.8 pt` mask with ≥ 1.2 pt of white on **every** side (top, bottom, left, right, corner) |
 | Knockout paint order | every digit owns a mask, every mask owns a digit, and nothing painted later may cut through it |
 | Stem & beam validity | stems sit on the notehead centreline (`stemX === note.x`), attach **flush on the outside** of their glyph circle (`r + 0.2` / `haloR + 0.4`), land exactly on the beam centerline, slope ≤ 0.25 |

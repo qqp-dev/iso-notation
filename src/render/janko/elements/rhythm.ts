@@ -259,6 +259,15 @@ export function renderFlags(
  * descending run. Renderers and the visual linter share this function, so the
  * geometry can never drift between the two.
  *
+ * The connector spans the **outermost stem columns** (`min … max` of the
+ * group's `stemX`), not the first and last note in tick order. The two agree
+ * for every group engraved on the plain beat grid, but a row-snapped chord
+ * translates a whole onset column sideways (see
+ * `engine.resolveRowSnappedChordOffsets`), which can put a later onset a
+ * fraction of a point left of its predecessor. Spanning the extremes keeps
+ * every stem attached to its beam — the invariant the linter audits as
+ * `beam-stem-gap`.
+ *
  * `obstacles` are the other noteheads of the system. The grand staff is one
  * shared lattice, so a hand-crossing run can put its beam straight through a
  * foreign head (e.g. an LH beam descending across the RH's octave-3 line in
@@ -344,17 +353,34 @@ export function computeBeamGroupGeometry(
 
   const sorted = [...group].sort((a, b) => a.startTick - b.startTick);
   const stems = sorted.map((n) => getStemGeometry(n, t));
-  const first = stems[0];
-  const last = stems[stems.length - 1];
-  const direction = first.direction;
-  const dx = last.stemX - first.stemX;
-  const rawSlope = dx !== 0 ? (last.stemEndY - first.stemEndY) / dx : 0;
+  const direction = stems[0].direction;
+
+  /** Stem columns of a run: the two the beam is fitted through, and the span. */
+  const span = (list: JankoStemGeometry[]): { lo: JankoStemGeometry; hi: JankoStemGeometry } => {
+    let lo = list[0];
+    let hi = list[0];
+    for (const s of list) {
+      if (s.stemX < lo.stemX) lo = s;
+      if (s.stemX > hi.stemX) hi = s;
+    }
+    return { lo, hi };
+  };
+
+  const { lo, hi } = span(stems);
+  const dx = hi.stemX - lo.stemX;
+  const rawSlope = dx !== 0 ? (hi.stemEndY - lo.stemEndY) / dx : 0;
   const limit = t.maxBeamSlope;
   const slope = Math.max(-limit, Math.min(limit, rawSlope));
+  const beamX0 = lo.stemX;
 
   const sixteenths = sorted.filter((n) => n.durationTicks <= 14);
   const secondaryOffset = -direction * (t.beamThickness + SECONDARY_BEAM_GAP);
   const hasSecondary = sixteenths.length >= 2;
+  // The secondary connector's columns do not depend on the anchor, so they are
+  // resolved once instead of inside every relaxation pass.
+  const secondarySpan = hasSecondary
+    ? span(sixteenths.map((n) => getStemGeometry(n, t)))
+    : null;
 
   // Minimum stem length: the canonical stem, but never less than the notehead
   // disc plus the required air — counting the 16th secondary beam, which sits
@@ -374,7 +400,7 @@ export function computeBeamGroupGeometry(
   // shift is uniform it preserves the clamped slope exactly.
   let anchor = direction === -1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
   for (let i = 0; i < sorted.length; i++) {
-    const limitY = sorted[i].y + direction * minStemLength - slope * (stems[i].stemX - first.stemX);
+    const limitY = sorted[i].y + direction * minStemLength - slope * (stems[i].stemX - beamX0);
     anchor = direction === -1 ? Math.min(anchor, limitY) : Math.max(anchor, limitY);
   }
 
@@ -382,20 +408,18 @@ export function computeBeamGroupGeometry(
   const connectorsAt = (a: number): JankoBeamConnector[] => {
     const list: JankoBeamConnector[] = [
       {
-        x1: first.stemX,
+        x1: lo.stemX,
         y1: a,
-        x2: last.stemX,
-        y2: a + slope * (last.stemX - first.stemX),
+        x2: hi.stemX,
+        y2: a + slope * (hi.stemX - lo.stemX),
       },
     ];
-    if (hasSecondary) {
-      const s0 = getStemGeometry(sixteenths[0], t);
-      const s1 = getStemGeometry(sixteenths[sixteenths.length - 1], t);
+    if (hasSecondary && secondarySpan) {
       list.push({
-        x1: s0.stemX,
-        y1: a + slope * (s0.stemX - first.stemX) + secondaryOffset,
-        x2: s1.stemX,
-        y2: a + slope * (s1.stemX - first.stemX) + secondaryOffset,
+        x1: secondarySpan.lo.stemX,
+        y1: a + slope * (secondarySpan.lo.stemX - beamX0) + secondaryOffset,
+        x2: secondarySpan.hi.stemX,
+        y2: a + slope * (secondarySpan.hi.stemX - beamX0) + secondaryOffset,
       });
     }
     return list;
@@ -447,7 +471,7 @@ export function computeBeamGroupGeometry(
     anchor += direction * push;
   }
 
-  const beamY = (x: number): number => anchor + slope * (x - first.stemX);
+  const beamY = (x: number): number => anchor + slope * (x - beamX0);
   const [primary, secondary] = connectorsAt(anchor);
 
   return {
