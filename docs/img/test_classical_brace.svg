@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300" style="background: white;">
+  <!-- Staff lines -->
+  <line x1="60" y1="50" x2="180" y2="50" stroke="#000" stroke-width="0.65"/>
+  <line x1="60" y1="101" x2="180" y2="101" stroke="#000" stroke-width="0.65"/>
+  <line x1="60" y1="152" x2="180" y2="152" stroke="#000" stroke-width="1.35"/>
+  <line x1="60" y1="203" x2="180" y2="203" stroke="#000" stroke-width="0.65"/>
+  <line x1="60" y1="254" x2="180" y2="254" stroke="#000" stroke-width="0.65"/>
+
+  <!-- Accolade -->
+  <path d="M 60.00 50.00 C 57.68 54.00, 57.20 85.70, 57.20 126.50 C 57.20 143.84, 56.46 149.50, 51.00 152.00 C 56.46 154.50, 57.20 160.16, 57.20 177.50 C 57.20 218.30, 57.68 250.00, 60.00 254.00 C 58.18 250.00, 58.45 218.30, 58.33 177.50 C 57.95 160.16, 51.60 153.80, 51.60 152.00 C 51.60 150.20, 57.95 143.84, 58.33 126.50 C 58.45 85.70, 58.18 54.00, 60.00 50.00 Z" fill="#111827"/>
+
+  <!-- Middle C badge -->
+  <rect x="30" y="147.25" width="19" height="9.5" rx="2" fill="#111827"/>
+  <text x="39.5" y="154.2" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="6.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>
+  <line x1="49" y1="152" x2="51" y2="152" stroke="#111827" stroke-width="1.25"/>
+
+  <!-- Octave labels -->
+  <text x="38" y="53" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7pt" fill="#555555" text-anchor="middle">o5</text>
+  <line x1="45" y1="50" x2="60" y2="50" stroke="#888888" stroke-width="0.6"/>
+
+  <text x="38" y="257" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7pt" fill="#555555" text-anchor="middle">o1</text>
+  <line x1="45" y1="254" x2="60" y2="254" stroke="#888888" stroke-width="0.6"/>
+</svg>

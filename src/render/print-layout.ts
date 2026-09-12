@@ -38,11 +38,11 @@ export const OPENING_HALO_RADIUS_PT = 4.75;
 /** Noble Urtext Gold stroke for the opening sound position of honor halo ring. */
 export const OPENING_HALO_STROKE = '#D4AF37';
 /** Classical architectural reach of the vertical accolade cusp from the staff edge. */
-export const ACCOLADE_WIDTH_PT = 14.0;
+export const ACCOLADE_WIDTH_PT = 11.0;
 /** Margin breathing gap accommodating the classical accolade on System 1. */
 export const ACCOLADE_GAP_PT = 8.0;
 /** Delicate calligraphic swell of the accolade in its lobe bellies. */
-export const ACCOLADE_THICKNESS_PT = 1.85;
+export const ACCOLADE_THICKNESS_PT = 2.4;
 
 const HEADER_HEIGHT_PT = 18;
 const FOOTER_HEIGHT_PT = 0;
@@ -149,24 +149,24 @@ export function getClassicalAccoladePath(
 /**
 /**
  * Classical LilyPond/Emmentaler brace outline command table.
- * 14 cubic Bézier segments derived from authentic master music engraving.
+ * 15 cubic Bézier segments derived from authentic master music engraving (brace396).
  */
 const LILY_BRACE_CMDS: Array<{ type: 'M' | 'c' | 's'; args: number[] }> = [
-  { type: 'M', args: [-76, -210] },
-  { type: 'c', args: [0, 164, -92, 194, -92, 210] },
-  { type: 's', args: [92, 46, 92, 210] },
-  { type: 'c', args: [0, 148, -62, 270, -62, 430] },
-  { type: 'c', args: [0, 120, 34, 234, 130, 304] },
-  { type: 'c', args: [14, 10, 30, -10, 16, -20] },
-  { type: 'c', args: [-68, -50, -88, -122, -88, -204] },
-  { type: 'c', args: [0, -144, 58, -266, 58, -420] },
-  { type: 'c', args: [0, -118, -32, -228, -122, -300] },
-  { type: 'c', args: [90, -72, 122, -182, 122, -300] },
-  { type: 'c', args: [0, -154, -58, -276, -58, -420] },
-  { type: 'c', args: [0, -82, 20, -154, 88, -204] },
-  { type: 'c', args: [14, -10, -2, -30, -16, -20] },
-  { type: 'c', args: [-96, 70, -130, 184, -130, 304] },
-  { type: 'c', args: [0, 160, 62, 282, 62, 430] },
+  { type: 'M', args: [-133, -1078] },
+  { type: 'c', args: [0, 721, -287, 1064, -287, 1078] },
+  { type: 'c', args: [0, 35, 287, 329, 287, 1078] },
+  { type: 'c', args: [0, 756, -266, 1463, -266, 2324] },
+  { type: 'c', args: [0, 504, 98, 994, 378, 1414] },
+  { type: 'c', args: [21, 28, 63, -7, 42, -35] },
+  { type: 'c', args: [-217, -322, -287, -686, -287, -1071] },
+  { type: 'c', args: [0, -749, 259, -1449, 259, -2296] },
+  { type: 'c', args: [0, -504, -91, -994, -371, -1414] },
+  { type: 'c', args: [280, -420, 371, -910, 371, -1414] },
+  { type: 'c', args: [0, -847, -259, -1547, -259, -2296] },
+  { type: 'c', args: [0, -385, 70, -749, 287, -1071] },
+  { type: 'c', args: [21, -28, -21, -63, -42, -35] },
+  { type: 'c', args: [-280, 420, -378, 910, -378, 1414] },
+  { type: 'c', args: [0, 861, 266, 1568, 266, 2324] },
 ];
 
 /**
@@ -198,9 +198,9 @@ export function getVerticalAccoladePath(
 
   const ym = (yTop + yBot) / 2;
   const h = yBot - yTop;
-  const FONT_MAX_Y = 954.0;
-  const FONT_MIN_X = -168.0;
-  const FONT_MAX_X = 22.0;
+  const FONT_MAX_Y = 4844.0;
+  const FONT_MIN_X = -420.0;
+  const FONT_MAX_X = 42.0;
 
   const scaleY = (h / 2) / FONT_MAX_Y;
   const scaleX = reach / (FONT_MAX_X - FONT_MIN_X);
@@ -680,7 +680,7 @@ interface HorizontalStaffLine {
 
 /**
  * Horizontal staff topography for a linear pitch:
- * - Middle C (p = 48): bold center spine (1.35pt, #000000)
+ * - Middle C (p = 48): bold center spine (1.05pt, #000000)
  * - Octaves (p = 24, 36, 60, 72): solid lines (0.65pt, #000000)
  * - Landmark 4 (p = 28, 40, 52, 64): small dashed lines (0.6pt, #444444, [5, 2.5])
  */
@@ -689,7 +689,7 @@ function getHorizontalStaffLine(p: number, normStyle: StaffStyle): HorizontalSta
 
   if (normStyle === 'tritone-split') {
     if (pc === 0) {
-      if (p === 48) return { stroke: '#000000', width: 1.35, isSpine: true };
+      if (p === 48) return { stroke: '#000000', width: 1.05, isSpine: true };
       return { stroke: '#000000', width: 0.65, isSpine: false };
     }
     if (pc === 4) {
@@ -703,7 +703,7 @@ function getHorizontalStaffLine(p: number, normStyle: StaffStyle): HorizontalSta
   if (geom.isDashed && geom.dashArray && geom.dashArray.length > 0) {
     return { stroke: '#444444', width: 0.6, dashArray: geom.dashArray.join(','), isSpine: false };
   }
-  if (p === 48) return { stroke: '#000000', width: 1.35, isSpine: true };
+  if (p === 48) return { stroke: '#000000', width: 1.05, isSpine: true };
   if (pc === 0) return { stroke: '#000000', width: 0.65, isSpine: false };
   return { stroke: '#555555', width: 0.6, isSpine: false };
 }
@@ -760,10 +760,10 @@ export function renderPageToSvg(
   );
   svgParts.push(`  <defs>`);
   svgParts.push(`    <style>`);
-  svgParts.push(`      .title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }
-      .subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }
-      .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
-      .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }
+  svgParts.push(`      .title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11.5pt; letter-spacing: 0.8px; fill: #111111; }
+      .subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; letter-spacing: 0.2px; fill: #333333; }
+      .meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; letter-spacing: 0.2px; fill: #222222; }
+      .section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #222222; }
       .measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; }
       .duo-digit { font-family: "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif; text-anchor: middle; dominant-baseline: central; font-weight: bold; }`);
   svgParts.push(`    </style>`);
@@ -772,7 +772,7 @@ export function renderPageToSvg(
   svgParts.push(`  <!-- Paper Background -->`);
   svgParts.push(`  <rect width="100%" height="100%" fill="#FFFFFF"/>`);
 
-  // 2. Page header: full title block on page 1, running header on later pages
+  // 2. Page header: majestic classical Urtext title block on page 1, running header on later pages
   const titleParts = (score.title || 'Isomorphic Score').split(':');
   const titleMain = titleParts[0].trim();
   const titleSub = titleParts.slice(1).join(':').trim();
@@ -780,13 +780,21 @@ export function renderPageToSvg(
   svgParts.push(`  <!-- Page Header -->`);
   svgParts.push(`  <g id="page-header">`);
   if (page.pageIndex === 0) {
-    const fullTitle = titleSub ? `${escapeXml(titleMain)} · ${escapeXml(titleSub)}` : escapeXml(titleMain);
-    svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="title">${fullTitle}</text>`);
+    const centerTitle = titleSub ? titleSub.replace(/\.\s+a\b/, ' · a') : titleMain;
+    const leftTitle = titleSub ? titleMain : (score.opus || '');
+    if (leftTitle) {
+      svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="subtitle">${escapeXml(leftTitle)}</text>`);
+    }
+    svgParts.push(`    <text x="${(widthPt / 2).toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="title" text-anchor="middle">${escapeXml(centerTitle)}</text>`);
     if (score.composer) {
       svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="meta" text-anchor="end">${escapeXml(score.composer)}</text>`);
     }
   } else {
     svgParts.push(`    <text x="${marginPt.toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="subtitle">${escapeXml(titleMain)}</text>`);
+    if (titleSub) {
+      const runningSub = titleSub.replace(/\.\s+a\b/, ' · a');
+      svgParts.push(`    <text x="${(widthPt / 2).toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="title" font-size="9pt" text-anchor="middle">${escapeXml(runningSub)}</text>`);
+    }
     svgParts.push(`    <text x="${(widthPt - marginPt).toFixed(2)}" y="${(marginPt + 11).toFixed(2)}" class="section-header" text-anchor="end">${escapeXml(page.sectionName)}</text>`);
   }
   svgParts.push(`  </g>`);
@@ -885,14 +893,18 @@ export function renderPageToSvg(
       // Vertical barline at the measure boundary
       const endTick = mNum * ticksPerMeasure;
       const barSpec = (score.barlines || []).find(b => b.tick === endTick);
-      const isFinal = barSpec?.type === 'final';
+      const isFinal = barSpec?.type === 'final' || mNum >= layout.totalMeasures;
       const isDouble = barSpec?.type === 'double';
-      if (isDouble || isFinal) {
+      const isSystemEnd = (m === numMeasures - 1);
+
+      if (isSystemEnd && !isFinal) {
+        // System ends are dropped; staff lines float openly into the right margin
+      } else if (isDouble || isFinal) {
         const innerX = mEndX - 3.2;
-        svgParts.push(`    <line x1="${innerX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${innerX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
+        svgParts.push(`    <line x1="${innerX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${innerX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.55"/>`);
         svgParts.push(`    <line x1="${mEndX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${mEndX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#111827" stroke-width="${isFinal ? '1.8' : '1.0'}"/>`);
       } else {
-        svgParts.push(`    <line x1="${mEndX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${mEndX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.75"/>`);
+        svgParts.push(`    <line x1="${mEndX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${mEndX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.55"/>`);
       }
     }
 
@@ -981,7 +993,7 @@ export function renderPageToSvg(
 
       if (pc12(lp) === 0) {
         if (holdEndX - holdStartX < 1.5) continue;
-        const strokeW = lp === 48 ? '1.35' : '0.65';
+        const strokeW = lp === 48 ? '1.05' : '0.65';
         svgParts.push(`    <line x1="${holdStartX.toFixed(2)}" y1="${ny.toFixed(2)}" x2="${holdEndX.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${noteColor}" stroke-width="${strokeW}" stroke-linecap="butt"/>`);
       } else {
         holdStartX = nx + effectiveRadius + 0.4;

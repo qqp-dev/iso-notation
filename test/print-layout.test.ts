@@ -192,25 +192,25 @@ test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach 
   );
 });
 
-test('Classical Vertical Accolade Invariant: 14pt curly brace clasping o1–o5 on the left margin', () => {
+test('Classical Vertical Accolade Invariant: 11pt curly brace clasping o1–o5 on the left margin', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  // Classical curly brace proportions: 14.0pt reach, 1.85pt swell, 8.0pt margin gap
-  assert.equal(ACCOLADE_WIDTH_PT, 14.0, 'Accolade reach must be 14.0pt');
-  assert.equal(ACCOLADE_THICKNESS_PT, 1.85, 'Accolade swell must be 1.85pt');
+  // Classical curly brace proportions: 11.0pt reach, 2.4pt swell, 8.0pt margin gap
+  assert.equal(ACCOLADE_WIDTH_PT, 11.0, 'Accolade reach must be 11.0pt');
+  assert.equal(ACCOLADE_THICKNESS_PT, 2.4, 'Accolade swell must be 2.4pt');
   assert.equal(ACCOLADE_GAP_PT, 8.0, 'Accolade gap must be 8.0pt');
 
   // The exported path generator is deterministic and spans the requested vertical range
-  const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 14.0, 1.85);
+  const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 11.0, 2.4);
   assert.match(direct, /^M [\d.]+ [\d.]+ C /);
   assert.match(direct, / Z$/);
   const directPoints = parsePathPoints(direct);
   assert.ok(Math.abs(Math.min(...directPoints.map((p) => p.y)) - 106.35) < 0.01);
   assert.ok(Math.abs(Math.max(...directPoints.map((p) => p.y)) - 231.15) < 0.01);
   const directWidth = Math.max(...directPoints.map((p) => p.x)) - Math.min(...directPoints.map((p) => p.x));
-  assert.ok(directWidth <= 15, `Classical accolade width must be <= 15pt (got ${directWidth})`);
+  assert.ok(directWidth <= 12, `Classical accolade width must be <= 12pt (got ${directWidth})`);
 
   const marginPt = layout.options.pageMarginMm * MM_TO_PT;
 
@@ -297,11 +297,11 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
     const staffTop = round2(geo.staffTopY);
     const staffBot = round2(geo.staffBotY);
 
-    // 1. Middle C (p = 48): bold horizontal center spine (1.35pt, #000000)
+    // 1. Middle C (p = 48): bold horizontal center spine (1.05pt, #000000)
     const spineLines = lines.filter(
-      (l) => l.y1 === l.y2 && l.stroke === '#000000' && l.width === '1.35' && round2(l.y1) === round2(geo.yForPitch(48))
+      (l) => l.y1 === l.y2 && l.stroke === '#000000' && l.width === '1.05' && round2(l.y1) === round2(geo.yForPitch(48))
     );
-    assert.equal(spineLines.length, 1, `System ${s + 1} must render one 1.35pt Middle C spine`);
+    assert.equal(spineLines.length, 1, `System ${s + 1} must render one 1.05pt Middle C spine`);
     assert.ok(Math.abs(spineLines[0].x1 - geo.staffLeftPt) < 0.01, 'Spine must emerge cleanly from the accolade at the staff head');
     assert.ok(Math.abs(spineLines[0].x2 - geo.staffRightPt) < 0.01, 'Spine must run to the page margin');
 
@@ -329,11 +329,12 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
     }
 
     // 4. Barlines are vertical across the staff (y1 = staffTopY, y2 = staffBotY)
+    // Intermediate systems drop system ends, so mm. 1–4 has 3 barlines (at end of mm. 1, 2, 3)
     const barlines = lines.filter(
-      (l) => l.x1 === l.x2 && l.width === '0.75' && round2(l.y1) === staffTop && round2(l.y2) === staffBot
+      (l) => l.x1 === l.x2 && l.width === '0.55' && round2(l.y1) === staffTop && round2(l.y2) === staffBot
     );
-    assert.equal(barlines.length, 4, `System ${s + 1} must render exactly 4 vertical measure barlines`);
-    const expectedBarX = [1, 2, 3, 4].map((m) => {
+    assert.equal(barlines.length, 3, `System ${s + 1} must render exactly 3 internal vertical measure barlines`);
+    const expectedBarX = [1, 2, 3].map((m) => {
       const endTick = (s * 4 + m) * TICKS_PER_MEASURE;
       const spec = (score.barlines || []).find((b) => b.tick === endTick);
       const x = geo.staffLeftPt + m * geo.measureWidthPt;
@@ -344,6 +345,12 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
       barlines.map((l) => round2(l.x1)).sort((a, b) => a - b),
       expectedBarX.slice().sort((a, b) => a - b),
       'Barlines must stand at exact measure boundaries'
+    );
+
+    // System ends are dropped on intermediate systems: staff lines float openly into the right margin
+    assert.ok(
+      !lines.some((l) => l.x1 === l.x2 && round2(l.x1) === round2(geo.staffRightPt) && round2(l.y1) === staffTop && round2(l.y2) === staffBot),
+      `System ${s + 1} must NOT close with a vertical barline at staffRightPt`
     );
 
     // 5. Zero Starting System Barline: the staff emerges openly from the accolade,
@@ -564,7 +571,7 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
           x2: round2(holdEndX),
           y: round2(ny),
           stroke: getPrintDurationColor(note.durationTicks, tauRef),
-          width: lp === 48 ? '1.35' : '0.65',
+          width: lp === 48 ? '1.05' : '0.65',
           cap: 'butt',
         });
       } else {
@@ -635,7 +642,7 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
   assert.match(
     renderPageToSvg(layout, 0),
     new RegExp(
-      `<line x1="${expectedHoldStartX.toFixed(2)}" y1="${ny97.toFixed(2)}" x2="${expectedHoldEndX.toFixed(2)}" y2="${ny97.toFixed(2)}" stroke="#1D4ED8" stroke-width="1.35" stroke-linecap="butt"/>`
+      `<line x1="${expectedHoldStartX.toFixed(2)}" y1="${ny97.toFixed(2)}" x2="${expectedHoldEndX.toFixed(2)}" y2="${ny97.toFixed(2)}" stroke="#1D4ED8" stroke-width="1.05" stroke-linecap="butt"/>`
     ),
     'Bar 6 Middle C note 97 must render a continuous Royal Blue hold line flush to its knockout'
   );
@@ -675,9 +682,9 @@ test('Flush Duration Hold Lines & Subsequent Note Clipping Invariant', () => {
     for (const p of [24, 36, 60, 72]) octaveYs.add(round2(geo.yForPitch(p)));
   }
   for (const trail of lineTrails) {
-    assert.ok(trail.width === '0.65' || trail.width === '1.35', 'Staff-line trails match staff line width');
-    if (trail.width === '1.35') {
-      assert.ok(middleCYs.has(round2(trail.y1)), 'Middle C trails must render at 1.35pt on the bold spine');
+    assert.ok(trail.width === '0.65' || trail.width === '1.05', 'Staff-line trails match staff line width');
+    if (trail.width === '1.05') {
+      assert.ok(middleCYs.has(round2(trail.y1)), 'Middle C trails must render at 1.05pt on the bold spine');
     } else {
       assert.ok(octaveYs.has(round2(trail.y1)), 'Other staff-line trails must render at 0.65pt on octave lines');
     }
@@ -934,15 +941,16 @@ test('Urtext Classical Serif Typography Invariant: refined font stack and italic
   assert.ok(URTEXT_SERIF.includes('Liberation Serif'), 'URTEXT_SERIF contains Liberation Serif');
 
   // Verify <style> block includes URTEXT_SERIF for classes
-  assert.ok(page1Svg.includes(`.title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }`));
-  assert.ok(page1Svg.includes(`.subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }`));
-  assert.ok(page1Svg.includes(`.meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
-  assert.ok(page1Svg.includes(`.section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`));
+  assert.ok(page1Svg.includes(`.title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11.5pt; letter-spacing: 0.8px; fill: #111111; }`));
+  assert.ok(page1Svg.includes(`.subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; letter-spacing: 0.2px; fill: #333333; }`));
+  assert.ok(page1Svg.includes(`.meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; letter-spacing: 0.2px; fill: #222222; }`));
+  assert.ok(page1Svg.includes(`.section-header { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #222222; }`));
   assert.ok(page1Svg.includes(`.measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #444444; }`));
   assert.ok(!page1Svg.includes('.beat-counter'), 'Must not include .beat-counter style');
 
-  // Title block uses single-line layout with title and composer
-  assert.ok(page1Svg.includes('>Goldberg Variations, BWV 988 · Variatio 1. a 1 Clav.</text>'));
+  // Title block uses classical Urtext centered movement title, left work title, and right composer
+  assert.ok(page1Svg.includes('>Variatio 1 · a 1 Clav.</text>'));
+  assert.ok(page1Svg.includes('>Goldberg Variations, BWV 988</text>'));
   assert.ok(page1Svg.includes('>Johann Sebastian Bach</text>'));
 });
 
@@ -961,9 +969,10 @@ test('Clean Urtext Header & Footer Invariant: pure white breathing room, zero ta
     assert.doesNotMatch(svg, /<g id="page-footer">/, `Page ${p + 1} must not contain any page footer element`);
     assert.doesNotMatch(svg, /Page \d+ of \d+/, `Page ${p + 1} must have zero footer page numbering`);
 
-    // Single-line header: left-aligned title/subtitle and right-aligned composer/section
+    // Single-line header: left-aligned work title, centered movement title, right-aligned composer/section
     if (p === 0) {
-      assert.match(svg, new RegExp(`<text x="${marginPt.toFixed(2)}"[^>]*class="title">Goldberg Variations`));
+      assert.match(svg, new RegExp(`<text x="${marginPt.toFixed(2)}"[^>]*class="subtitle">Goldberg Variations`));
+      assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt / 2).toFixed(2)}"[^>]*class="title"[^>]*text-anchor="middle">Variatio 1 · a 1 Clav.</text>`));
       assert.match(svg, new RegExp(`<text x="${(layout.pageDimensions.widthPt - marginPt).toFixed(2)}"[^>]*class="meta" text-anchor="end">Johann Sebastian Bach</text>`));
     } else {
       assert.match(svg, new RegExp(`<text x="${marginPt.toFixed(2)}"[^>]*class="subtitle">`));

@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="320" viewBox="0 0 800 320" style="background: white;">
+    <g id="h6_tip3">
+      <text x="70" y="25" font-family="sans-serif" font-size="11" font-weight="bold" fill="#333">h6_tip3 (w=9)</text>
+      <!-- Staff lines -->
+      <line x1="120" y1="40" x2="170" y2="40" stroke="#000" stroke-width="0.65"/>
+      <line x1="120" y1="91" x2="170" y2="91" stroke="#000" stroke-width="0.65"/>
+      <line x1="120" y1="142" x2="170" y2="142" stroke="#000" stroke-width="1.35"/>
+      <line x1="120" y1="193" x2="170" y2="193" stroke="#000" stroke-width="0.65"/>
+      <line x1="120" y1="244" x2="170" y2="244" stroke="#000" stroke-width="0.65"/>
+
+      <!-- Accolade -->
+      <path d="M 120.00 40.00 C 117.51 44.00, 117.00 75.70, 117.00 116.50 C 117.00 133.84, 116.50 140.00, 111.00 142.00 C 116.50 144.00, 117.00 150.16, 117.00 167.50 C 117.00 208.30, 117.51 240.00, 120.00 244.00 C 117.95 240.00, 118.10 208.30, 117.99 167.50 C 117.66 150.16, 111.60 143.80, 111.60 142.00 C 111.60 140.20, 117.66 133.84, 117.99 116.50 C 118.10 75.70, 117.95 44.00, 120.00 40.00 Z" fill="#111827"/>
+
+      <!-- Middle C badge -->
+      <rect x="89" y="136.5" width="20" height="11" rx="2.5" fill="#111827"/>
+      <text x="99" y="144.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>
+      <line x1="109" y1="142" x2="111" y2="142" stroke="#111827" stroke-width="1.25"/>
+
+      <!-- o5 and o1 -->
+      <text x="94" y="43.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o5</text>
+      <line x1="102" y1="40" x2="120" y2="40" stroke="#888888" stroke-width="0.6"/>
+
+      <text x="94" y="247.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o1</text>
+      <line x1="102" y1="244" x2="120" y2="244" stroke="#888888" stroke-width="0.6"/>
+
+      <!-- Measure number -->
+      <text x="82" y="28" font-family="Century Schoolbook, serif" font-style="italic" font-size="9pt" fill="#333333">1</text>
+    </g>
+  
+    <g id="h8_tip4">
+      <text x="260" y="25" font-family="sans-serif" font-size="11" font-weight="bold" fill="#333">h8_tip4 (w=12)</text>
+      <!-- Staff lines -->
+      <line x1="310" y1="40" x2="360" y2="40" stroke="#000" stroke-width="0.65"/>
+      <line x1="310" y1="91" x2="360" y2="91" stroke="#000" stroke-width="0.65"/>
+      <line x1="310" y1="142" x2="360" y2="142" stroke="#000" stroke-width="1.35"/>
+      <line x1="310" y1="193" x2="360" y2="193" stroke="#000" stroke-width="0.65"/>
+      <line x1="310" y1="244" x2="360" y2="244" stroke="#000" stroke-width="0.65"/>
+
+      <!-- Accolade -->
+      <path d="M 310.00 40.00 C 306.68 44.00, 306.00 75.70, 306.00 116.50 C 306.00 133.84, 305.50 140.00, 298.00 142.00 C 305.50 144.00, 306.00 150.16, 306.00 167.50 C 306.00 208.30, 306.68 240.00, 310.00 244.00 C 307.18 240.00, 307.25 208.30, 307.13 167.50 C 306.75 150.16, 298.60 143.80, 298.60 142.00 C 298.60 140.20, 306.75 133.84, 307.13 116.50 C 307.25 75.70, 307.18 44.00, 310.00 40.00 Z" fill="#111827"/>
+
+      <!-- Middle C badge -->
+      <rect x="276" y="136.5" width="20" height="11" rx="2.5" fill="#111827"/>
+      <text x="286" y="144.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>
+      <line x1="296" y1="142" x2="298" y2="142" stroke="#111827" stroke-width="1.25"/>
+
+      <!-- o5 and o1 -->
+      <text x="284" y="43.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o5</text>
+      <line x1="292" y1="40" x2="310" y2="40" stroke="#888888" stroke-width="0.6"/>
+
+      <text x="284" y="247.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o1</text>
+      <line x1="292" y1="244" x2="310" y2="244" stroke="#888888" stroke-width="0.6"/>
+
+      <!-- Measure number -->
+      <text x="272" y="28" font-family="Century Schoolbook, serif" font-style="italic" font-size="9pt" fill="#333333">1</text>
+    </g>
+  
+    <g id="h10_tip5">
+      <text x="450" y="25" font-family="sans-serif" font-size="11" font-weight="bold" fill="#333">h10_tip5 (w=15)</text>
+      <!-- Staff lines -->
+      <line x1="500" y1="40" x2="550" y2="40" stroke="#000" stroke-width="0.65"/>
+      <line x1="500" y1="91" x2="550" y2="91" stroke="#000" stroke-width="0.65"/>
+      <line x1="500" y1="142" x2="550" y2="142" stroke="#000" stroke-width="1.35"/>
+      <line x1="500" y1="193" x2="550" y2="193" stroke="#000" stroke-width="0.65"/>
+      <line x1="500" y1="244" x2="550" y2="244" stroke="#000" stroke-width="0.65"/>
+
+      <!-- Accolade -->
+      <path d="M 500.00 40.00 C 495.85 44.00, 495.00 75.70, 495.00 116.50 C 495.00 133.84, 494.50 140.00, 485.00 142.00 C 494.50 144.00, 495.00 150.16, 495.00 167.50 C 495.00 208.30, 495.85 240.00, 500.00 244.00 C 496.41 240.00, 496.40 208.30, 496.26 167.50 C 495.84 150.16, 485.60 143.80, 485.60 142.00 C 485.60 140.20, 495.84 133.84, 496.26 116.50 C 496.40 75.70, 496.41 44.00, 500.00 40.00 Z" fill="#111827"/>
+
+      <!-- Middle C badge -->
+      <rect x="463" y="136.5" width="20" height="11" rx="2.5" fill="#111827"/>
+      <text x="473" y="144.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>
+      <line x1="483" y1="142" x2="485" y2="142" stroke="#111827" stroke-width="1.25"/>
+
+      <!-- o5 and o1 -->
+      <text x="474" y="43.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o5</text>
+      <line x1="482" y1="40" x2="500" y2="40" stroke="#888888" stroke-width="0.6"/>
+
+      <text x="474" y="247.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o1</text>
+      <line x1="482" y1="244" x2="500" y2="244" stroke="#888888" stroke-width="0.6"/>
+
+      <!-- Measure number -->
+      <text x="462" y="28" font-family="Century Schoolbook, serif" font-style="italic" font-size="9pt" fill="#333333">1</text>
+    </g>
+  
+    <g id="h12_tip6">
+      <text x="640" y="25" font-family="sans-serif" font-size="11" font-weight="bold" fill="#333">h12_tip6 (w=18)</text>
+      <!-- Staff lines -->
+      <line x1="690" y1="40" x2="740" y2="40" stroke="#000" stroke-width="0.65"/>
+      <line x1="690" y1="91" x2="740" y2="91" stroke="#000" stroke-width="0.65"/>
+      <line x1="690" y1="142" x2="740" y2="142" stroke="#000" stroke-width="1.35"/>
+      <line x1="690" y1="193" x2="740" y2="193" stroke="#000" stroke-width="0.65"/>
+      <line x1="690" y1="244" x2="740" y2="244" stroke="#000" stroke-width="0.65"/>
+
+      <!-- Accolade -->
+      <path d="M 690.00 40.00 C 685.02 44.00, 684.00 75.70, 684.00 116.50 C 684.00 133.84, 683.50 140.00, 672.00 142.00 C 683.50 144.00, 684.00 150.16, 684.00 167.50 C 684.00 208.30, 685.02 240.00, 690.00 244.00 C 685.62 240.00, 685.50 208.30, 685.35 167.50 C 684.90 150.16, 672.60 143.80, 672.60 142.00 C 672.60 140.20, 684.90 133.84, 685.35 116.50 C 685.50 75.70, 685.62 44.00, 690.00 40.00 Z" fill="#111827"/>
+
+      <!-- Middle C badge -->
+      <rect x="650" y="136.5" width="20" height="11" rx="2.5" fill="#111827"/>
+      <text x="660" y="144.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#FFFFFF" text-anchor="middle">o3</text>
+      <line x1="670" y1="142" x2="672" y2="142" stroke="#111827" stroke-width="1.25"/>
+
+      <!-- o5 and o1 -->
+      <text x="664" y="43.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o5</text>
+      <line x1="672" y1="40" x2="690" y2="40" stroke="#888888" stroke-width="0.6"/>
+
+      <text x="664" y="247.5" font-family="Century Schoolbook, serif" font-style="italic" font-weight="bold" font-size="7.5pt" fill="#555555" text-anchor="middle">o1</text>
+      <line x1="672" y1="244" x2="690" y2="244" stroke="#888888" stroke-width="0.6"/>
+
+      <!-- Measure number -->
+      <text x="652" y="28" font-family="Century Schoolbook, serif" font-style="italic" font-size="9pt" fill="#333333">1</text>
+    </g>
+  </svg>
