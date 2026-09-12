@@ -15,3 +15,6 @@
 export * from './types';
 export * from './geometry';
 export * from './engine';
+export * from './candidates';
+export * from './linter';
+export * from './studio';

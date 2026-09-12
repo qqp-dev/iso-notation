@@ -69,17 +69,38 @@ npm install
 # Run dev server accessible over local network & Tailscale
 npm run dev
 
-# Run test suite
+# Run test suite (128 tests, incl. visual linter + studio invariants, <1s)
 npm test
+
+# Mathematical engraving lint of the golden master (~25 ms)
+npm run lint:engraving
 
 # Jánko engraving harness: full page + macro crops + variant sheet (<1s)
 npm run janko:export
 
-# Production build
+# Production build (index.html + janko.html studio entries)
 npm run build
 ```
 
-When running, the workbench is available locally at `http://localhost:5175` and across your Tailscale mesh at `http://100.102.70.49:5175`.
+When running, the workbench is available across the Tailscale mesh at
+`http://100.102.70.49:5175` and the live engraving studio at
+`http://100.102.70.49:5175/janko.html`.
+
+### The Jánko Two-View Live Studio
+`janko.html` renders inline SVG straight from the TypeScript engine — no PNG
+round-trips, no manual refresh:
+
+- **View 1 · Decision Candidates Matrix** (`janko.html#candidates`): the 2–4
+  candidates of the current decision round, side by side with option-delta
+  badges and a live lint chip each. Candidates are declared in
+  `src/render/janko/candidates.ts`; the template never changes.
+- **View 2 · Golden Reference Object** (`janko.html#reference`): the accumulated
+  golden master (Bach Goldberg Var. 1) as a full page spread plus macro focus
+  crops, with the visual-linter diagnostics listed inline.
+
+Any edit under `src/render/janko/` hot-reloads the studio in place via Vite HMR,
+and `npm run lint:engraving` verifies the same engraving headlessly in
+milliseconds.
 
 ---
 
@@ -87,7 +108,7 @@ When running, the workbench is available locally at `http://localhost:5175` and 
 
 ### Active Design Specifications & Typographic Studies
 - [**Jánko Two-Row Engraving Ergonomics Harness**](docs/janko_engraving_harness.md)
-  *Modular engine (`src/render/janko/`), pure geometry core, token/option system, sub-second export suite, targeted macro crops and multi-variant contact sheets.*
+  *Modular engine (`src/render/janko/`), pure geometry core, token/option system, two-view live studio with Vite HMR, mathematical visual linter, sub-second export suite and macro crops.*
 - [**Duodecimal Notehead Numeral Typographic Specimen & Engraving Study**](docs/duodecimal_font_typography.md)
   *Classical Urtext serif (Century Schoolbook), Calligraphic Roman (Palatino), Engineered Monospace (JetBrains Mono), and Geometric Modernism; Lining Caps A/B analysis and score context benchmark.*
 - [**Handedness Indicator Typographic & Calligraphic Tuning**](docs/chevron_tuning.md)

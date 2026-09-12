@@ -130,6 +130,96 @@ export function renderHorizontalTicks(
   return parts.join('\n');
 }
 
+/** A straight connector in page pt coordinates. */
+export interface JankoBeamConnector {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/**
+ * Pure geometry of one beamed group.
+ *
+ * The primary connector is clamped to ±`tokens.maxBeamSlope` so wide leaps do
+ * not produce runaway diagonals; every stem is then grown from its notehead to
+ * the clamped centerline. Renderers and the visual linter share this function,
+ * so the geometry can never drift between the two.
+ */
+export interface JankoBeamGroupGeometry {
+  /** Group notes sorted by start tick. */
+  notes: JankoRhythmNote[];
+  /** One resolved stem per note (same order as `notes`). */
+  stems: JankoStemGeometry[];
+  /** -1 for RH (up), +1 for LH (down). */
+  direction: -1 | 1;
+  /** Slope measured between the outer stem tips, before clamping. */
+  rawSlope: number;
+  /** Clamped slope actually engraved. */
+  slope: number;
+  /** Primary beam thickness. */
+  thickness: number;
+  /** Primary connector across the stem tips. */
+  primary: JankoBeamConnector;
+  /** Secondary 16th connector, or null when fewer than two 16ths. */
+  secondary: JankoBeamConnector | null;
+  /** Beam centerline y at an absolute x. */
+  beamY(x: number): number;
+}
+
+/**
+ * Resolve the beam geometry of a group. Returns null for groups shorter than
+ * two notes (a solitary short note is engraved as a neutral tick instead).
+ */
+export function computeBeamGroupGeometry(
+  group: JankoRhythmNote[],
+  tokens?: Partial<JankoTokens> | null
+): JankoBeamGroupGeometry | null {
+  const t = resolveJankoTokens(tokens);
+  if (group.length < 2) return null;
+
+  const sorted = [...group].sort((a, b) => a.startTick - b.startTick);
+  const stems = sorted.map((n) => getStemGeometry(n, t));
+  const first = stems[0];
+  const last = stems[stems.length - 1];
+  const dx = last.stemX - first.stemX;
+  const rawSlope = dx !== 0 ? (last.stemEndY - first.stemEndY) / dx : 0;
+  const limit = t.maxBeamSlope;
+  const slope = Math.max(-limit, Math.min(limit, rawSlope));
+  const beamY = (x: number): number => first.stemEndY + slope * (x - first.stemX);
+
+  const sixteenths = sorted.filter((n) => n.durationTicks <= 14);
+  let secondary: JankoBeamConnector | null = null;
+  if (sixteenths.length >= 2) {
+    const s0 = getStemGeometry(sixteenths[0], t);
+    const s1 = getStemGeometry(sixteenths[sixteenths.length - 1], t);
+    const offset = -first.direction * (t.beamThickness + 1.6);
+    secondary = {
+      x1: s0.stemX,
+      y1: beamY(s0.stemX) + offset,
+      x2: s1.stemX,
+      y2: beamY(s1.stemX) + offset,
+    };
+  }
+
+  return {
+    notes: sorted,
+    stems,
+    direction: first.direction,
+    rawSlope,
+    slope,
+    thickness: t.beamThickness,
+    primary: {
+      x1: first.stemX,
+      y1: beamY(first.stemX),
+      x2: last.stemX,
+      y2: beamY(last.stemX),
+    },
+    secondary,
+    beamY,
+  };
+}
+
 /** Traditional connected beam over one beat-sized group of 8ths/16ths. */
 export function renderBeamGroup(
   group: JankoRhythmNote[],
@@ -142,41 +232,30 @@ export function renderBeamGroup(
     return renderHorizontalTicks(group[0], t);
   }
 
-  const sorted = [...group].sort((a, b) => a.startTick - b.startTick);
-  const stems = sorted.map((n) => getStemGeometry(n, t));
-  const dir = stems[0].direction;
+  const beam = computeBeamGroupGeometry(group, t);
+  if (!beam) return '';
+  const { notes: sorted, stems, primary, secondary, direction } = beam;
+
   const parts: string[] = ['  <g class="janko-beam-group">'];
 
-  // Traditional engraving clamps the beam slope so wide leaps do not produce
-  // runaway diagonal beams; every stem then grows to meet the beam line.
-  const first = stems[0];
-  const last = stems[stems.length - 1];
-  const dx = last.stemX - first.stemX;
-  const rawSlope = dx !== 0 ? (last.stemEndY - first.stemEndY) / dx : 0;
-  const MAX_BEAM_SLOPE = 0.22;
-  const slope = Math.max(-MAX_BEAM_SLOPE, Math.min(MAX_BEAM_SLOPE, rawSlope));
-  const beamY = (x: number): number => first.stemEndY + slope * (x - first.stemX);
-
+  // Every stem grows from its notehead to the (clamped) beam centerline.
   for (const s of stems) {
-    parts.push(`    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(beamY(s.stemX))}" stroke="#111111" stroke-width="0.90"/>`);
+    parts.push(`    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(beam.beamY(s.stemX))}" stroke="#111111" stroke-width="0.90"/>`);
   }
 
   // Primary beam: clamped straight connector across the stem tips.
   parts.push(
-    `    <line class="janko-beam" x1="${f(first.stemX)}" y1="${f(beamY(first.stemX))}" x2="${f(last.stemX)}" y2="${f(beamY(last.stemX))}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
+    `    <line class="janko-beam" x1="${f(primary.x1)}" y1="${f(primary.y1)}" x2="${f(primary.x2)}" y2="${f(primary.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
   );
 
   // Secondary beam: spans the consecutive 16th notes, closer to the noteheads.
-  const sixteenths = sorted.filter((n) => n.durationTicks <= 14);
-  if (sixteenths.length >= 2) {
-    const s0 = getStemGeometry(sixteenths[0], t);
-    const s1 = getStemGeometry(sixteenths[sixteenths.length - 1], t);
-    const offset = -dir * (t.beamThickness + 1.6);
+  if (secondary) {
     parts.push(
-      `    <line class="janko-beam-secondary" x1="${f(s0.stemX)}" y1="${f(beamY(s0.stemX) + offset)}" x2="${f(s1.stemX)}" y2="${f(beamY(s1.stemX) + offset)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
+      `    <line class="janko-beam-secondary" x1="${f(secondary.x1)}" y1="${f(secondary.y1)}" x2="${f(secondary.x2)}" y2="${f(secondary.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
     );
   }
 
+  void direction;
   for (const n of sorted) {
     if (n.durationTicks > 26 && n.durationTicks <= 38) {
       parts.push(renderAugmentationDot(n, t));

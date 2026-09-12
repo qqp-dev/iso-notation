@@ -59,10 +59,35 @@ This design is the standard of beauty for this repository. When taking inspirati
 
 ---
 
-## 4. Rapid Iteration Workflow (Sub-Second Feedback)
-- **Multi-Variant Contact Sheets**:
-  - Never guess one parameter per conversational turn (which takes 15+ minutes per cycle).
-  - When comparing design directions (rhythm, spacing, lattice), **always generate a multi-variant contact sheet** (e.g. `janko_variants.png`) showing candidates side-by-side on the exact same musical phrase.
-- **Fast Export Command**:
-  - Run `npm run janko:export` to generate all PNGs via `resvg` in ~380ms and mirror them across checkouts.
-  - Or use `npm run janko:watch` for real-time background file synchronization.
+## 4. Primary Design Review Loop: The Two-View Live Studio (No PNG Round-Trips)
+
+Design review happens **exclusively on the live website** — never by hand-navigating static PNGs:
+
+- **Live Studio (primary medium)**: `http://100.102.70.49:5175/janko.html`
+  - The page is a **Vite entry** (`janko.html`, mirrored byte-for-byte to `public/janko.html`) that renders inline SVG straight from the TypeScript engine in `src/render/janko/`. There is no PNG in the review loop.
+  - **Vite HMR**: any edit under `src/render/janko/` re-renders both views in place (`import.meta.hot`), with **zero user action** and no browser refresh.
+  - **View 1 · Decision Candidates Matrix**: the 2–4 exploratory candidates for the *current decision round*, engraved side by side on the same measures with option-delta badges, rationale and a live lint chip per candidate (`#candidates`, or `janko.html#candidates`).
+  - **View 2 · Golden Reference Object**: the accumulated golden master — full page spread (all pages) plus 288-DPI-equivalent macro focus crops and the live lint diagnostics list (`janko.html#reference`).
+  - **In-browser zoom**: `+` / `−` / `Reset` buttons, `+`/`−`/`0` keys, or `Ctrl/⌘ + wheel`, 50%–300%. Mobile-safe: 100% fits the card width.
+- **Declarative Candidate Registry**: `src/render/janko/candidates.ts` is the *only* file to touch when opening a round. `CURRENT_ROUND_METADATA` holds the round number/title/question, `CURRENT_CANDIDATES` holds the variants as 5-line option deltas against `DEFAULT_JANKO_OPTIONS`. The studio template never changes.
+- **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`**; the Reference view is always the canonical Bach Goldberg Var. 1 engraving under those options.
+
+---
+
+## 5. Implementer Verification: Visual Linter First (`npm run lint:engraving`)
+
+Headless implementers must not render images to see a defect. Run the mathematical linter instead — it verifies the engraving in **~25 ms**:
+
+- `lintJankoScore(score, options?, tokens?, lintOptions?)` in `src/render/janko/linter.ts` returns `LintReport { ok, violations, warnings, diagnostics, stats }`; `violations` are hard errors, `warnings` are known non-blocking risks (e.g. cross-hand chordal collisions).
+- Checks: knockout protection (glyph fits the mask; nothing painted after a knockout may cut through it), notehead-disc clearance (2r), barline clearance, stem attachment and beam-stem connection, beam slope ≤ 0.25, measure-numeral and accolade clearances, Middle C corridor integrity.
+- CLI: `npm run lint:engraving` (add `--json`, `--strict`, `--quiet`). Exit code 1 on violations; `--strict` also fails on warnings.
+- The canonical Bach score with `DEFAULT_JANKO_OPTIONS` must report **zero violations**. Any new defect class gets a matching assertion in `test/janko-linter.test.ts`.
+- `npm test` covers unit tests, engraving invariants, the visual linter and the studio architecture in **under 1 second**; run it before every hand-off. `npm run build` must stay clean.
+
+---
+
+## 6. Rapid Iteration Extras (PNG artifacts for the mobile app only)
+
+- **Multi-Variant Contact Sheets**: still available through `renderJankoVariantComparison` when a *file* artifact is genuinely needed.
+- **Fast Export Command**: `npm run janko:export` rasterizes the review set via `resvg` in ~380 ms and mirrors every PNG to the checkout root, `public/`, `docs/img/` and the main checkout — use it only to refresh the mobile-app artifacts, not as the review loop.
+- `npm run janko:watch` keeps those artifacts synchronized in the background.

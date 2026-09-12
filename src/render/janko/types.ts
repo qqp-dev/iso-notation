@@ -30,6 +30,8 @@ export interface JankoTokens {
   rowHeight: number;
   /** White-knockout circular notehead radius. */
   noteheadRadius: number;
+  /** Duodecimal digit font size (pt) — must fit inside the knockout disc. */
+  digitFontSize: number;
   /** Position of Honor concentric halo ring radius. */
   haloRadius: number;
   /** Octave equator step (2 * rowHeight). */
@@ -58,6 +60,8 @@ export interface JankoTokens {
   ledgerHalfWidth?: number;
   /** Primary beam thickness. */
   beamThickness?: number;
+  /** Absolute clamp for a beam connector slope (rise over run). */
+  maxBeamSlope?: number;
   /** Accolade-to-staff gap. */
   accoladeGap?: number;
   /** Radius of a dotted-rhythm augmentation dot. */
@@ -76,6 +80,7 @@ export type ResolvedJankoTokens = Required<JankoTokens>;
 export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   rowHeight: 15.0,
   noteheadRadius: 4.2,
+  digitFontSize: 6.5,
   haloRadius: 5.4,
   octaveStep: 30.0,
   accoladeWidth: 7.0,
@@ -89,6 +94,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   ticksPerBeat: 48,
   ledgerHalfWidth: 7.0,
   beamThickness: 1.8,
+  maxBeamSlope: 0.22,
   accoladeGap: 7.0,
   augmentationDotRadius: 1.3,
 };
