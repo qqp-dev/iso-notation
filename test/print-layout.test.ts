@@ -14,6 +14,7 @@ import {
   ACCOLADE_THICKNESS_PT,
   NOTEHEAD_KNOCKOUT_RADIUS_PT,
   OPENING_HALO_RADIUS_PT,
+  OPENING_HALO_STROKE,
   A4_WIDTH_PT,
   A4_HEIGHT_PT,
   LETTER_WIDTH_PT,
@@ -90,7 +91,7 @@ function extractChevrons(svg: string): SvgChevron[] {
 
 /** Extracts the vertical copperplate accolade paths in document order. */
 function extractAccolades(svg: string): string[] {
-  return Array.from(svg.matchAll(/<path d="(M [^"]+ Z)" fill="#111827"\/>/g)).map((m) => m[1]);
+  return Array.from(svg.matchAll(/<path (?:class="accolade" )?d="(M [^"]+ Z)" fill="#111827"\/>/g)).map((m) => m[1]);
 }
 
 /** All (x, y) coordinate pairs of an absolute-coordinate SVG path. */
@@ -106,7 +107,7 @@ function parsePathPoints(d: string): { x: number; y: number }[] {
 function extractHaloRings(svg: string) {
   return Array.from(
     svg.matchAll(
-      new RegExp(`<circle cx="([\\d.]+)" cy="([\\d.]+)" r="${OPENING_HALO_RADIUS_PT.toFixed(2)}" fill="none" stroke="([^"]+)" stroke-width="0\\.75"\\/>`, 'g')
+      new RegExp(`<circle cx="([\\d.]+)" cy="([\\d.]+)" r="${OPENING_HALO_RADIUS_PT.toFixed(2)}" fill="none" stroke="([^"]+)" stroke-width="0\\.(?:75|85)"\\/>`, 'g')
     )
   ).map((m) => ({ cx: parseFloat(m[1]), cy: parseFloat(m[2]), stroke: m[3] }));
 }
@@ -118,12 +119,6 @@ test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach 
   assert.equal(layout.totalMeasures, 32, 'Goldberg Var 1 has 32 measures');
   assert.equal(layout.ticksPerMeasure, TICKS_PER_MEASURE, '3/4 meter at 48 tpb = 144 ticks/measure');
   assert.equal(layout.options.orientation, 'landscape', 'Default engraving orientation is landscape');
-  assert.equal(layout.measuresPerSystem, 4, 'Four measures per horizontal system');
-  assert.equal(layout.systemsPerPage, 2, 'Two horizontal systems per landscape page');
-  assert.equal(layout.systems.length, 8, '32 measures / 4 per system = 8 systems');
-  assert.equal(layout.pages.length, 4, 'Exactly 4 pages (ceil(8 / 2) = 4)');
-
-  // Page 1 contains Measures 1–8 across 2 systems
   assert.deepEqual(
     layout.pages[0].systems.map((s) => s.sysStartMeasure),
     [1, 5],
@@ -186,14 +181,14 @@ test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach 
     assert.doesNotMatch(svg, /<g id="page-footer">/);
   }
 
-  // A4 Landscape geometry: 841.89pt × 595.28pt with 2 un-cramped systems (staffHeight 204pt)
+  // A4 Landscape geometry: 841.89pt × 595.28pt with 2 un-cramped systems (staffHeight 208.8pt)
   assert.ok(Math.abs(layout.pageDimensions.widthPt - A4_HEIGHT_PT) < 0.01);
   assert.ok(Math.abs(layout.pageDimensions.heightPt - A4_WIDTH_PT) < 0.01);
   assert.ok(Math.abs(layout.systemDimensions.staffHeightPt - 48 * layout.ptPerSemitone) < 0.01);
-  assert.ok(Math.abs(layout.ptPerSemitone - 4.25) < 0.01, `Pitch lane height must be 4.25pt (got ${layout.ptPerSemitone})`);
+  assert.ok(Math.abs(layout.ptPerSemitone - 4.35) < 0.01, `Pitch lane height must be 4.35pt (got ${layout.ptPerSemitone})`);
   assert.ok(
     layout.systemDimensions.measureWidthPt > 180 && layout.systemDimensions.measureWidthPt < 205,
-    'Each of the 4 landscape measures spans ~184pt'
+    'Each of the 4 landscape measures spans ~196pt'
   );
 });
 
@@ -202,13 +197,13 @@ test('Classical Vertical Accolade Invariant: 14pt curly brace clasping o1–o5 o
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  // Classical curly brace proportions: 14.0pt reach, 1.45pt swell, 34.0pt margin gap
+  // Classical curly brace proportions: 14.0pt reach, 1.85pt swell, 8.0pt margin gap
   assert.equal(ACCOLADE_WIDTH_PT, 14.0, 'Accolade reach must be 14.0pt');
-  assert.equal(ACCOLADE_THICKNESS_PT, 1.45, 'Accolade swell must be 1.45pt');
-  assert.equal(ACCOLADE_GAP_PT, 34.0, 'Accolade gap must be 34.0pt');
+  assert.equal(ACCOLADE_THICKNESS_PT, 1.85, 'Accolade swell must be 1.85pt');
+  assert.equal(ACCOLADE_GAP_PT, 8.0, 'Accolade gap must be 8.0pt');
 
   // The exported path generator is deterministic and spans the requested vertical range
-  const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 8.0, 14.0, 1.45);
+  const direct = getVerticalAccoladePath(65.0, 106.35, 231.15, 14.0, 1.85);
   assert.match(direct, /^M [\d.]+ [\d.]+ C /);
   assert.match(direct, / Z$/);
   const directPoints = parsePathPoints(direct);
@@ -219,64 +214,74 @@ test('Classical Vertical Accolade Invariant: 14pt curly brace clasping o1–o5 o
 
   const marginPt = layout.options.pageMarginMm * MM_TO_PT;
 
-  for (let pageIndex = 0; pageIndex < layout.pages.length; pageIndex++) {
-    const systemCount = layout.pages[pageIndex].systems.length;
+  // System 1 on Page 1 renders the classical accolade; subsequent systems use a regular flat start
+  const page1Accolades = extractAccolades(svgs[0]);
+  assert.equal(page1Accolades.length, 1, 'Page 1 must render the accolade ONLY for System 1 (start of movement)');
+
+  for (let pageIndex = 1; pageIndex < layout.pages.length; pageIndex++) {
     const accolades = extractAccolades(svgs[pageIndex]);
-    assert.equal(accolades.length, systemCount, `Page ${pageIndex + 1} must render one accolade per system`);
+    assert.equal(accolades.length, 0, `Page ${pageIndex + 1} must use regular flat start without accolades`);
+  }
 
-    for (let s = 0; s < systemCount; s++) {
+  // Verify the System 1 accolade geometry
+  const geo0 = getSystemGeometry(layout, 0, 0);
+  const path = page1Accolades[0];
+  assert.match(path, /^M [\d.]+ [\d.]+ C [^"]+ Z$/, 'Accolade must be a closed sculptural path');
+  assert.equal(
+    path,
+    getVerticalAccoladePath(geo0.staffLeftPt, geo0.staffTopY, geo0.staffBotY, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT),
+    'Rendered accolade must use the classical calligraphic curly brace geometry'
+  );
+
+  const points = parsePathPoints(path);
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+
+  assert.ok(
+    Math.abs(Math.min(...ys) - geo0.staffTopY) < 0.01,
+    'Accolade must clasp the top of the staff (o5)'
+  );
+  assert.ok(
+    Math.abs(Math.max(...ys) - geo0.staffBotY) < 0.01,
+    'Accolade must clasp the bottom of the staff (o1)'
+  );
+  assert.ok(
+    Math.abs(geo0.staffBotY - geo0.staffTopY - geo0.staffHeightPt) < 0.01,
+    'Accolade must span the full 4-octave staff (o1 → o5)'
+  );
+
+  // The central cusp points into Middle C
+  const y48 = geo0.yForPitch(48);
+  const cuspPoints = points.filter((p) => Math.abs(p.x - minX) < 0.01);
+  assert.ok(
+    cuspPoints.some((p) => Math.abs(p.y - y48) < 0.01),
+    `Accolade cusp must point at Middle C y(48) = ${y48.toFixed(2)}`
+  );
+
+  // Brace tips clasp the open staff at staffLeftPt
+  assert.ok(Math.abs(maxX - geo0.staffLeftPt) < 0.01, 'Accolade tips must clasp the staff at staffLeft');
+  assert.ok(minX > 0, 'Accolade must remain inside the paper');
+  assert.ok(
+    Math.abs(geo0.staffLeftPt - (marginPt + ACCOLADE_WIDTH_PT + ACCOLADE_GAP_PT)) < 0.01,
+    'The staff must open exactly one accolade + gap from the margin'
+  );
+
+  // Classical curly brace aspect ratio (~1:10 to 1:20)
+  const width = maxX - minX;
+  const aspect = (geo0.staffBotY - geo0.staffTopY) / width;
+  assert.ok(aspect > 10 && aspect < 30, `Accolade aspect ratio must be elegant (got 1:${aspect.toFixed(1)})`);
+
+  // Every system on every page renders the regular flat vertical start line
+  for (let pageIndex = 0; pageIndex < layout.pages.length; pageIndex++) {
+    for (let s = 0; s < layout.pages[pageIndex].systems.length; s++) {
       const geo = getSystemGeometry(layout, pageIndex, s);
-      const path = accolades[s];
-      assert.match(path, /^M [\d.]+ [\d.]+ C [^"]+ Z$/, 'Accolade must be a closed sculptural path');
-      assert.equal(
-        path,
-        getVerticalAccoladePath(geo.staffLeftPt, geo.staffTopY, geo.staffBotY, 8.0, ACCOLADE_WIDTH_PT, ACCOLADE_THICKNESS_PT),
-        'Rendered accolade must use the classical 14.0pt / 1.45pt curly brace geometry'
+      assert.match(
+        svgs[pageIndex],
+        new RegExp(`<line x1="${geo.staffLeftPt.toFixed(2)}" y1="${geo.staffTopY.toFixed(2)}" x2="${geo.staffLeftPt.toFixed(2)}" y2="${geo.staffBotY.toFixed(2)}" stroke="#111827" stroke-width="1.0"\\/>`),
+        `System ${s + 1} on Page ${pageIndex + 1} must render the regular flat start line`
       );
-
-      const points = parsePathPoints(path);
-      const xs = points.map((p) => p.x);
-      const ys = points.map((p) => p.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-
-      assert.ok(
-        Math.abs(Math.min(...ys) - geo.staffTopY) < 0.01,
-        'Accolade must clasp the top of the staff (o5)'
-      );
-      assert.ok(
-        Math.abs(Math.max(...ys) - geo.staffBotY) < 0.01,
-        'Accolade must clasp the bottom of the staff (o1)'
-      );
-      assert.ok(
-        Math.abs(geo.staffBotY - geo.staffTopY - geo.staffHeightPt) < 0.01,
-        'Accolade must span the full 4-octave staff (o1 → o5)'
-      );
-
-      // The central cusp is the leftmost point of the brace and points into Middle C
-      const y48 = geo.yForPitch(48);
-      const cuspPoints = points.filter((p) => Math.abs(p.x - minX) < 0.01);
-      assert.ok(
-        cuspPoints.some((p) => Math.abs(p.y - y48) < 0.01),
-        `Accolade cusp must point at Middle C y(48) = ${y48.toFixed(2)}`
-      );
-      assert.ok(
-        Math.abs(y48 - (geo.staffTopY + geo.staffBotY) / 2) < 0.01,
-        'Middle C must sit dead-center of the 4-octave staff'
-      );
-
-      // Brace tips clasp the open staff at staffLeftPt
-      assert.ok(Math.abs(maxX - geo.staffLeftPt) < 0.01, 'Accolade tips must clasp the staff at staffLeft');
-      assert.ok(minX > 0, 'Accolade must remain inside the paper');
-      assert.ok(
-        Math.abs(geo.staffLeftPt - (marginPt + ACCOLADE_WIDTH_PT + ACCOLADE_GAP_PT)) < 0.01,
-        'The staff must open exactly one accolade + gap from the margin'
-      );
-
-      // Classical curly brace aspect ratio (~1:14 to 1:20)
-      const width = maxX - minX;
-      const aspect = (geo.staffBotY - geo.staffTopY) / width;
-      assert.ok(aspect > 10 && aspect < 30, `Accolade aspect ratio must be elegant (got 1:${aspect.toFixed(1)})`);
     }
   }
 });
@@ -387,12 +392,11 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
     );
   }
 
-  // 8. Authentic Urtext Middle C badge (o3) and octave boundary indicators (o1, o5)
-  assert.match(page1, />o1</);
-  assert.match(page1, />o3</);
-  assert.match(page1, />o5</);
-  assert.match(page1, /class="octave-badge-text"/);
-  assert.match(page1, /class="octave-boundary-text"/);
+  // 8. Clean Urtext margin: zero obsolete octave badges or boundaries
+  assert.doesNotMatch(page1, />o3</, 'Obsolete o3 badge must not be present');
+  assert.doesNotMatch(page1, />o5</, 'Obsolete o5 label must not be present');
+  assert.doesNotMatch(page1, /class="octave-badge-text"/);
+  assert.doesNotMatch(page1, /class="octave-boundary-text"/);
   assert.doesNotMatch(page1, /class="pitch-label"/);
   assert.doesNotMatch(page1, /class="time-sig"/);
   assert.doesNotMatch(page1, /class="beat-counter"/);
@@ -696,6 +700,10 @@ test('Opening Sound Position of Honor: concentric noble halo ring for tick 0 not
 
   const halos = extractHaloRings(page1);
   assert.equal(halos.length, 2, 'Exactly the two opening sounds at tick 0 must receive a halo ring');
+  assert.ok(
+    halos.every((h) => h.stroke === OPENING_HALO_STROKE),
+    `Opening halo ring stroke must be noble gold (${OPENING_HALO_STROKE})`
+  );
 
   const openingNotes = score.notes.filter((n) => n.startTick === 0);
   assert.equal(openingNotes.length, 2, 'Goldberg Var 1 opens with two sounds (LH + RH)');

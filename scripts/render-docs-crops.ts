@@ -91,9 +91,15 @@ function main(): void {
   const layout = computeColumnarLayout(score);
   const pages = layout.pages.map((_, idx) => renderPageToSvg(layout, idx));
 
+  const PUBLIC_DIR = path.resolve('public/img');
+  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+
   const write = (name: string, pageIndex: number, box: CropBox, pixelsPerPt: number = CROP_PIXELS_PER_PT): void => {
     const outPath = path.join(OUT_DIR, name);
-    rasterize(cropSvg(pages[pageIndex], box, pixelsPerPt), outPath);
+    const pubPath = path.join(PUBLIC_DIR, name);
+    const cropped = cropSvg(pages[pageIndex], box, pixelsPerPt);
+    rasterize(cropped, outPath);
+    fs.copyFileSync(outPath, pubPath);
     console.log(`  ✓ ${name} (${Math.round(box.w * pixelsPerPt)} × ${Math.round(box.h * pixelsPerPt)}px)`);
   };
 
