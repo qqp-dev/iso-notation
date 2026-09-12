@@ -3,8 +3,11 @@
  * dynamic ledger equators.
  *
  * Every octave is one equator line. Within a hand, adjacent equators are
- * exactly `octaveStep` (2h = 30pt) apart; the two hands are separated by
- * `interStaffGap` (default 45pt) with the Middle C spine centred between them.
+ * exactly `octaveStep` (2h = 30pt) apart; the two hands are separated by the
+ * *spacious corridor* — `interStaffGap` (56pt by default) of negative
+ * breathing space with **no** spine by default. Horizontal dotted row
+ * guidelines and the dashed Middle C spine are opt-in; the only dotted lines
+ * in the canonical engraving are the vertical beat-grid pulses.
  */
 
 import {
@@ -32,8 +35,8 @@ export function renderRule(
 }
 
 /**
- * The four home octave equators (RH o5/o4, LH o3/o2), the Middle C spine and
- * the subtle dashed row guidelines of every home lane.
+ * The four home octave equators (RH o5/o4, LH o3/o2) plus the opt-in Middle C
+ * spine and row guidelines of every home lane.
  */
 export function renderStaffLines(
   geo: JankoSystemGeometry,
@@ -53,8 +56,12 @@ export function renderStaffLines(
   out.push(renderRule(geo.staffLeft, geo.staffRight, geo.equatorY('LH', 3), '#0F172A', 0.90));
 
   out.push('  </g>');
-  out.push(renderRowGuidelines(geo, o, t));
-  out.push(renderMiddleCSpine(geo, o, t));
+  // Both are opt-in and resolve to the empty string when disabled, so no empty
+  // <g> wrapper ever reaches the document.
+  const guidelines = renderRowGuidelines(geo, o, t);
+  if (guidelines) out.push(guidelines);
+  const spine = renderMiddleCSpine(geo, o, t);
+  if (spine) out.push(spine);
 
   return out.join('\n');
 }
@@ -62,7 +69,8 @@ export function renderStaffLines(
 /**
  * Subtle dashed guidelines showing the two whole-tone row lanes (odd rank
  * above / even rank below each home equator). They are intentionally faint:
- * pure registration aids, never musical content.
+ * pure registration aids, never musical content — and **off by default**, so
+ * the score keeps zero horizontal dotted lines.
  */
 export function renderRowGuidelines(
   geo: JankoSystemGeometry,
@@ -70,6 +78,7 @@ export function renderRowGuidelines(
   tokens?: Partial<JankoTokens> | null
 ): string {
   const o = resolveJankoOptions(options);
+  if (!o.showRowGuidelines) return '';
   const t = resolveJankoTokens(tokens);
   const halfRow = t.rowHeight / 2;
   const out: string[] = ['  <g class="janko-row-guidelines" opacity="0.45">'];
@@ -90,13 +99,18 @@ export function renderRowGuidelines(
   return out.join('\n');
 }
 
-/** The Middle C spine between the two hands (`dashed` | `double` | `continuous`). */
+/**
+ * The Middle C spine between the two hands (`dashed` | `double` | `continuous`
+ * | `none`). `'none'` is the canonical treatment: the corridor is held open by
+ * the negative space of `interStaffGap` alone, with nothing dividing the hands.
+ */
 export function renderMiddleCSpine(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null
 ): string {
   const o = resolveJankoOptions(options);
+  if (o.middleCSpine === 'none') return '';
   const t = resolveJankoTokens(tokens);
   const y = geo.middleCY;
   const x1 = geo.staffLeft + t.measureInset;

@@ -32,7 +32,7 @@ Implementers verify the same engraving **without rendering anything**:
 
 ```bash
 npm run lint:engraving            # ~25 ms, JSON/strict/quiet flags available
-npm test                          # 136 tests, < 1.5 s, includes the linter + studio suites
+npm test                          # 147 tests, < 1.5 s, includes the linter + studio suites
 ```
 
 ---
@@ -71,7 +71,7 @@ src/render/janko/
 ├── linter.ts             mathematical visual linter (knockouts, clearance, beams, corridor)
 ├── studio.ts             two-view live studio renderer (Vite HMR entry)
 └── elements/
-    ├── staff.ts          octave equators, Middle C spine, row guides, ledgers
+    ├── staff.ts          octave equators, opt-in spine/row guides, ledgers
     ├── notehead.ts       white knockout, URW Gothic digit, Position of Honor halo
     ├── rhythm.ts         centred stems · angled cuts · horizontal ticks · beams + flags
     ├── accolade.ts       slender copperplate brace (w = 7.0, thick = 0.85)
@@ -88,12 +88,15 @@ src/render/janko/
 | Rank 1 (1, 3, 5, 7, 9, b) | `h/2` **above** its octave equator |
 | Row-to-row step `h` | 15.0 pt |
 | Octave equator step | `2h` = 30.0 pt |
-| Middle C spine | centred in the 45 pt inter-staff channel (o4 −22.5 / o3 +22.5) |
-| Position of Honor halo | `R = 5.4 pt` at tick 0 of Measure 1 |
-| Notehead knockout | `r = 4.2 pt` |
+| Middle C corridor | **spacious spine-free**: 56 pt of negative space (o4 −28 / o3 +28), no dividing rule |
+| Horizontal dotted lines | none — the vertical beat-grid pulses are the only dashed elements |
+| Position of Honor halo | `R = 6.2 pt` at tick 0 of Measure 1 |
+| Notehead knockout | `r = 4.8 pt` around a `5.8 pt` URW Gothic digit (≥ 1.2 pt of white on every side) |
+| Digit optical centre | alphabetic baseline dropped half a cap height (`0.739 em × 4/3` per pt) below the head centre |
+| Stem attachment | flush on the outer perimeter: `r + 0.2 pt` (regular), `haloR + 0.4 pt` (tick 0) |
 | Stem column | `stemX === note.x` (centred on the notehead, both hands) |
 | Flag hook reach / drop | `4.0 pt` right of the stem / `6.6 pt` from the tip |
-| Minimum head-to-beam air | `noteheadRadius + minStemClearance` = 5.7 pt |
+| Minimum head-to-beam air | `noteheadRadius + minStemClearance` = 6.3 pt |
 
 Each hand anchors its own uniform lattice on its two home equators
 (RH o4/o5, LH o3/o2) and extends it by 30 pt per octave, so out-of-staff
@@ -105,7 +108,7 @@ ledger equators** — one per intervening octave, nearest first.
 `JankoTokens` (`rowHeight`, `noteheadRadius`, `haloRadius`, `octaveStep`,
 `accoladeWidth`, `accoladeThick`, `fontFamily`, plus rhythm/spacing
 refinements) and `JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`,
-`interStaffGap`, `middleCSpine`, page/header/footer geometry) are the **only**
+`interStaffGap`, `middleCSpine`, `showRowGuidelines`, page/header/footer geometry) are the **only**
 places layout constants live. Every renderer accepts partial overrides and
 resolves them against `DEFAULT_JANKO_TOKENS` / `DEFAULT_JANKO_OPTIONS`.
 
@@ -137,13 +140,15 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 | Check | Invariant |
 | --- | --- |
 | Notehead clearance | discs never overlap; chordal heads that land on one page point are warned |
-| Knockout coverage | the 6.5 pt digit fits inside the `r = 4.2 pt` mask with white margin |
+| Knockout coverage | the 5.8 pt digit's ink box fits the `r = 4.8 pt` mask with ≥ 1.2 pt of white on **every** side (top, bottom, left, right, corner) |
 | Knockout paint order | every digit owns a mask, every mask owns a digit, and nothing painted later may cut through it |
-| Stem & beam validity | stems sit on the notehead centreline (`stemX === note.x`), attach inside their own disc, land exactly on the beam centerline, slope ≤ 0.25 |
+| Stem & beam validity | stems sit on the notehead centreline (`stemX === note.x`), attach **flush on the outside** of their glyph circle (`r + 0.2` / `haloR + 0.4`), land exactly on the beam centerline, slope ≤ 0.25 |
+| Stem/digit clearance | no stem comes within 1.2 pt of its own digit glyph box |
+| Halo clearance | no stem pierces the Position of Honor ring (outer stroke edge included) |
 | Beam/notehead clearance | no beam connector (primary or 16th secondary) comes closer than `noteheadRadius + minStemClearance` to any notehead centre |
 | Barline clearance | heads, stems and beams keep ≥ 1 pt from every barline |
 | Margin furniture | measure numeral and accolade stay on the page, clear of the staff and each other |
-| Middle C corridor | no structural rule or beam crosses the spine; the spine never cuts a glyph |
+| Middle C corridor | no structural rule or beam crosses the corridor centre line; when a spine is opted in it never cuts a glyph |
 
 `npm run lint:engraving [--json|--strict|--quiet]` is the CLI (`0` clean,
 `1` violations, `--strict` also fails on warnings).
@@ -183,7 +188,7 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 | Artifact | Content | Zoom |
 | --- | --- | --- |
 | `janko_portrait_page1.png` | Full page 1, systems 1–3, mm. 1–12 | 2× |
-| `janko_m1_m2.png` | m. 1–2: accolade, halo, Middle C anchor, opening theme | 4× |
+| `janko_m1_m2.png` | m. 1–2: accolade, halo, spacious spine-free corridor, opening theme | 4× |
 | `janko_m4.png` | m. 4: RH cascading run into octave 3 with ledger equators | 4× |
 | `janko_m8.png` | m. 8: 16th-cluster horizontal-spacing stress test | 4× |
 | `janko_variants.png` | A Angled Cuts vs B Traditional Beams vs C Unified Continuous Lattice on mm. 1–4 | 2× |

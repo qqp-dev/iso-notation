@@ -4,13 +4,22 @@
  *
  * The white knockout guarantees that ledger equators, row guides and beams
  * never cross the digit; the halo is reserved for the opening sound of the
- * piece (tick 0 of Measure 1), where it is emitted at R = 5.4pt.
+ * piece (tick 0 of Measure 1), where it is emitted at R = 6.2pt around the
+ * canonical 4.8pt mask.
+ *
+ * Digit optics
+ * ------------
+ * The duodecimal digit is *optically centred* inside its mask: its ink box is
+ * measured from the URW Gothic face (cap height 739/1000 em, widest glyph half
+ * width ≈ 0.25 em) and its alphabetic baseline is dropped exactly half a cap
+ * height below the notehead centre. Nothing here is guesswork — the linter
+ * audits the very same numbers ({@link digitHalfExtents}).
  */
 
 import { Hand } from '../../../model/types';
 import { getDuodecimalDigit } from '../../types';
 import { JankoPitchCoordinate } from '../geometry';
-import { JankoTokens, resolveJankoTokens } from '../types';
+import { DEFAULT_JANKO_TOKENS, JankoTokens, resolveJankoTokens } from '../types';
 import { f } from './style';
 
 /** Input accepted by {@link renderNotehead}. */
@@ -29,7 +38,10 @@ export interface JankoNoteheadSpec {
   digit?: string;
 }
 
-/** Position of Honor concentric halo ring (R = tokens.haloRadius = 5.4pt). */
+/** Stroke width of the Position of Honor halo ring (pt). */
+export const JANKO_HALO_STROKE_WIDTH = 0.75;
+
+/** Position of Honor concentric halo ring (R = tokens.haloRadius = 6.2pt). */
 export function renderHalo(
   x: number,
   y: number,
@@ -39,12 +51,64 @@ export function renderHalo(
   const t = resolveJankoTokens(tokens);
   const r = options.radius ?? t.haloRadius;
   const stroke = options.stroke ?? '#111111';
-  const strokeWidth = options.strokeWidth ?? 0.75;
+  const strokeWidth = options.strokeWidth ?? JANKO_HALO_STROKE_WIDTH;
   return `    <circle class="janko-halo" cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(2)}"/>`;
 }
 
-/** Optical baseline shift of the duodecimal digit inside its knockout disc. */
-export const JANKO_DIGIT_BASELINE_OFFSET = 0.35;
+/**
+ * CSS absolute-length resolution inside the engraving viewBox.
+ *
+ * A font size declared in `pt` is converted to CSS px at 4/3 px per pt, and
+ * one CSS px is one SVG user unit — so an `fs`-pt face renders with an em box
+ * of `fs * 4/3` page pt. Every digit metric below is expressed against that
+ * *rendered* em box.
+ */
+export const JANKO_USER_UNITS_PER_PT = 4 / 3;
+
+/** Cap height of the URW Gothic duodecimal digit face (739/1000 em). */
+export const JANKO_DIGIT_CAP_HEIGHT_EM = 0.739;
+
+/** Half width of the widest duodecimal glyph (`0`, `8`) in em units. */
+export const JANKO_DIGIT_HALF_WIDTH_EM = 0.25;
+
+/** Rendered em box (page pt) of a digit declared at `fontSize` pt. */
+export function digitEmBox(fontSize: number): number {
+  return fontSize * JANKO_USER_UNITS_PER_PT;
+}
+
+/**
+ * Half extents (page pt) of the digit's ink box.
+ *
+ * Digits are cap-height figures: `2 * halfHeight` tall (the round glyphs `0`
+ * and `8` overshoot the cap line by ≈0.02 em, absorbed by the clearance
+ * margin) and at most `2 * halfWidth` wide, centred on the glyph's optical
+ * middle.
+ */
+export function digitHalfExtents(fontSize: number): {
+  halfWidth: number;
+  halfHeight: number;
+} {
+  const em = digitEmBox(fontSize);
+  return {
+    halfWidth: JANKO_DIGIT_HALF_WIDTH_EM * em,
+    halfHeight: (JANKO_DIGIT_CAP_HEIGHT_EM / 2) * em,
+  };
+}
+
+/**
+ * Optical baseline offset (page pt) of a digit declared at `fontSize` pt: the
+ * alphabetic baseline is dropped exactly half a cap height below the notehead
+ * centre, so the ink box is vertically centred on the mask instead of hanging
+ * against its upper edge.
+ */
+export function digitBaselineOffset(fontSize: number): number {
+  return digitHalfExtents(fontSize).halfHeight;
+}
+
+/** Canonical baseline offset of the 5.8pt digit (≈ 2.86pt). */
+export const JANKO_DIGIT_BASELINE_OFFSET = digitBaselineOffset(
+  DEFAULT_JANKO_TOKENS.digitFontSize
+);
 
 /** Circular white knockout (erases staff lines and beams beneath the digit). */
 export function renderNoteheadKnockout(
@@ -72,7 +136,10 @@ export function renderNoteheadDigit(
   // Whole-tone rank 0 (evens) gets the heavier cut for instant row legibility.
   const weight = pitchClass % 2 === 0 ? '800' : '700';
   void hand;
-  return `    <text class="janko-digit" x="${f(x)}" y="${f(y + JANKO_DIGIT_BASELINE_OFFSET)}" font-weight="${weight}" font-size="${t.digitFontSize.toFixed(1)}pt" fill="#111111">${digit}</text>`;
+  // The digit is positioned by its alphabetic baseline (not by
+  // `dominant-baseline`), so the optical centring is renderer-independent.
+  const baseline = y + digitBaselineOffset(t.digitFontSize);
+  return `    <text class="janko-digit" x="${f(x)}" y="${f(baseline)}" font-weight="${weight}" font-size="${t.digitFontSize.toFixed(1)}pt" fill="#111111">${digit}</text>`;
 }
 
 /**

@@ -9,7 +9,9 @@
  *   sits **above** it. Every row-to-row step is exactly `rowHeight` (15pt).
  * - Every octave step inside one hand's lattice is exactly `octaveStep`
  *   (2 * rowHeight = 30pt); the two hands anchor their lattices on their own
- *   two home equators, separated by `interStaffGap`.
+ *   two home equators, separated by the negative breathing space of
+ *   `interStaffGap` (56pt by default) — the *spacious corridor* holds the
+ *   Middle C channel open without any artificial rule dividing the hands.
  *
  * Everything geometric or stylistic that a designer may want to tweak lives in
  * {@link JankoTokens} (micro-typography) and {@link JankoLayoutOptions}
@@ -21,8 +23,13 @@ import { Hand } from '../../model/types';
 /** Pluggable rhythm renderer styles (see `elements/rhythm.ts`). */
 export type JankoRhythmStyle = 'angled-cuts' | 'horizontal-ticks' | 'beamed';
 
-/** Middle C spine (the central channel between the two hands) styles. */
-export type JankoMiddleCSpine = 'dashed' | 'double' | 'continuous';
+/**
+ * Middle C spine (the central channel between the two hands) styles.
+ *
+ * `'none'` is the canonical treatment: the corridor is defined purely by the
+ * negative breathing space of `interStaffGap`, with no rule dividing the hands.
+ */
+export type JankoMiddleCSpine = 'none' | 'dashed' | 'double' | 'continuous';
 
 /** Engraving token set: geometric and styling constants (all in pt). */
 export interface JankoTokens {
@@ -86,14 +93,16 @@ export type ResolvedJankoTokens = Required<JankoTokens>;
 /**
  * Canonical Jánko Two-Row engraving tokens.
  *
- * h = 15.0pt row grid; the octave equator step is 2h = 30.0pt; the
- * Position-of-Honor halo ring is R = 5.4pt on a 4.2pt white knockout.
+ * h = 15.0pt row grid; the octave equator step is 2h = 30.0pt. The
+ * Position-of-Honor halo ring is R = 6.2pt around a 4.8pt white knockout, and
+ * the duodecimal digit is set at 5.8pt so its ink box keeps ≈1.9pt of clean
+ * white perimeter margin on every side of the mask.
  */
 export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   rowHeight: 15.0,
-  noteheadRadius: 4.2,
-  digitFontSize: 6.5,
-  haloRadius: 5.4,
+  noteheadRadius: 4.8,
+  digitFontSize: 5.8,
+  haloRadius: 6.2,
   octaveStep: 30.0,
   accoladeWidth: 7.0,
   accoladeThick: 0.85,
@@ -157,6 +166,12 @@ export interface JankoLayoutOptions {
   showTimeSignature?: boolean;
   /** Draw subtle vertical dashed pulse lines on beats 2, 3, … (Klavarskribo beat grid). */
   showBeatGrid?: boolean;
+  /**
+   * Draw the faint dashed whole-tone row guidelines (`equator ± h/2`).
+   * Off by default: the only dotted lines in the engraving are the vertical
+   * beat-grid pulses, so the staff is never cluttered with horizontal dashes.
+   */
+  showRowGuidelines?: boolean;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -172,8 +187,8 @@ export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   measuresPerSystem: 4,
   rhythmStyle: 'beamed',
-  interStaffGap: 45.0,
-  middleCSpine: 'dashed',
+  interStaffGap: 56.0,
+  middleCSpine: 'none',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   ticksPerBeat: 48,
@@ -189,6 +204,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   showHandLabels: false,
   showTimeSignature: false,
   showBeatGrid: true,
+  showRowGuidelines: false,
   title: 'J.S. Bach: Goldberg Variations, BWV 988',
   subtitle: 'Variatio 1. a 1 Clav. — Jánko Two-Row Equator System',
   composer: 'Johann Sebastian Bach',

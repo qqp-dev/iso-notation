@@ -22,7 +22,11 @@ export function renderJankoStyleDefs(tokens?: Partial<JankoTokens> | null): stri
     `      .janko-ts-num { font-family: ${URTEXT_SERIF}; font-weight: bold; font-size: 14pt; fill: #111111; text-anchor: middle; }`,
     `      .janko-caption { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 8pt; fill: #111827; }`,
     `      .janko-caption-sub { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 7.5pt; fill: #4B5563; }`,
-    `      .janko-digit { font-family: ${t.fontFamily}; text-anchor: middle; dominant-baseline: central; font-weight: bold; }`,
+    // Digits are optically centred with an explicit alphabetic-baseline offset
+    // (see `notehead.digitBaselineOffset`); `dominant-baseline` is deliberately
+    // not used, because engines disagree on the central baseline and the glyph
+    // would drift off the mask centre.
+    `      .janko-digit { font-family: ${t.fontFamily}; text-anchor: middle; font-weight: bold; }`,
     '    </style>',
     '  </defs>',
   ].join('\n');

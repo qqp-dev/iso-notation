@@ -62,7 +62,7 @@ export const DEFAULT_STUDIO_CROPS: StudioCrop[] = [
     count: 2,
     title: 'mm. 1–2 · Inception',
     caption:
-      'Accolade, Position of Honor halo, Middle C anchor and the opening m.d./m.s. dialogue.',
+      'Accolade, Position of Honor halo, the spacious spine-free Middle C corridor and the opening m.d./m.s. dialogue.',
   },
   {
     start: 4,

@@ -42,10 +42,18 @@ import {
   renderJankoVariantComparison,
 } from '../src/render/janko/engine';
 import {
+  getStemAttachmentRadii,
+  getStemAttachmentRadius,
   getStemGeometry,
   partitionBeamGroups,
 } from '../src/render/janko/elements/rhythm';
-import { renderHalo } from '../src/render/janko/elements/notehead';
+import {
+  JANKO_DIGIT_BASELINE_OFFSET,
+  digitBaselineOffset,
+  digitHalfExtents,
+  isPositionOfHonor,
+  renderHalo,
+} from '../src/render/janko/elements/notehead';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -178,12 +186,12 @@ test('Jánko octave equator step is 2h = 30.0pt within each hand lattice', () =>
   }
 });
 
-test('Middle C spine anchors the two hand lattices (o4 -22.5pt / o3 +22.5pt)', () => {
-  close(OPTIONS.interStaffGap, 45.0, 'canonical inter-staff gap');
-  close(getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), -22.5, 'RH o4 equator');
-  close(getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 22.5, 'LH o3 equator');
-  close(getEquatorYForOctave(5, 'RH', TOKENS, OPTIONS), -52.5, 'RH o5 equator');
-  close(getEquatorYForOctave(2, 'LH', TOKENS, OPTIONS), 52.5, 'LH o2 equator');
+test('Spacious spine-free corridor anchors the two hand lattices (o4 -28pt / o3 +28pt)', () => {
+  close(OPTIONS.interStaffGap, 56.0, 'canonical spacious inter-staff gap');
+  close(getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), -28.0, 'RH o4 equator');
+  close(getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 28.0, 'LH o3 equator');
+  close(getEquatorYForOctave(5, 'RH', TOKENS, OPTIONS), -58.0, 'RH o5 equator');
+  close(getEquatorYForOctave(2, 'LH', TOKENS, OPTIONS), 58.0, 'LH o2 equator');
 });
 
 test('Dynamic ledger equators: home octaves are clean, out-of-staff octaves accumulate', () => {
@@ -251,10 +259,10 @@ test('Bach m. 4 RH octave-3 notes resolve to ledger equators in the rendered cro
   assert.match(crop, /class="janko-ledger"/, 'm. 4 crop contains ledger equators');
 });
 
-test('Position of Honor halo ring (R = 5.4pt) is emitted at tick 0 of Measure 1', () => {
-  close(TOKENS.haloRadius, 5.4, 'canonical halo radius');
-  assert.match(renderHalo(10, 20, TOKENS), /r="5\.40"/);
-  assert.match(renderHalo(10, 20), /r="5\.40"/, 'halo radius survives default tokens');
+test('Position of Honor halo ring (R = 6.2pt) is emitted at tick 0 of Measure 1', () => {
+  close(TOKENS.haloRadius, 6.2, 'canonical halo radius');
+  assert.match(renderHalo(10, 20, TOKENS), /r="6\.20"/);
+  assert.match(renderHalo(10, 20), /r="6\.20"/, 'halo radius survives default tokens');
 
   const score = buildBachGoldbergVar1Score();
   const tickZero = score.notes.filter((n) => n.startTick === 0);
@@ -262,7 +270,7 @@ test('Position of Honor halo ring (R = 5.4pt) is emitted at tick 0 of Measure 1'
   const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
   const halos = crop.match(/class="janko-halo"/g) ?? [];
   assert.equal(halos.length, tickZero.length, 'one halo per opening sound');
-  assert.match(crop, /r="5\.40"/);
+  assert.match(crop, /r="6\.20"/);
   // Every halo sits inside Measure 1 (before the first internal barline).
   const geo = computePageGeometry(OPTIONS, TOKENS);
   const m1Right = geo.staffLeft + geo.measureWidth;
@@ -312,8 +320,8 @@ test('computePageGeometry: A4 portrait, accolade-anchored staff column, 3 system
   close(geo.pageWidth, 595.28, 'A4 width');
   close(geo.pageHeight, 841.89, 'A4 height');
   for (const sys of geo.systems) {
-    close(sys.equatorY('RH', 4) - sys.middleCY, -22.5, 'RH o4 above spine');
-    close(sys.equatorY('LH', 3) - sys.middleCY, 22.5, 'LH o3 below spine');
+    close(sys.equatorY('RH', 4) - sys.middleCY, -28.0, 'RH o4 above spine');
+    close(sys.equatorY('LH', 3) - sys.middleCY, 28.0, 'LH o3 below spine');
     assert.ok(sys.staffTopY < sys.staffBotY);
   }
 });
@@ -460,6 +468,219 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
 
   // 5. Notes use beamed rhythm by default
   assert.match(crop, /class="janko-beam"/);
+});
+
+// ---------------------------------------------------------------------------
+// 2b. Spacious corridor, dotted-line elimination, notehead optics & stem air
+// ---------------------------------------------------------------------------
+
+const MIDDLE_C_SPINE_GROUP = 'class="janko-middle-c-spine"';
+const ROW_GUIDELINES_GROUP = 'class="janko-row-guidelines"';
+
+test('Spacious spine-free corridor invariant: 56pt of negative space, zero Middle C rule', () => {
+  const score = buildBachGoldbergVar1Score();
+  assert.equal(DEFAULT_JANKO_OPTIONS.interStaffGap, 56.0);
+  assert.equal(DEFAULT_JANKO_OPTIONS.middleCSpine, 'none');
+
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  for (const sys of geo.systems) {
+    close(sys.middleCY - sys.equatorY('RH', 4), 28.0, 'RH half corridor');
+    close(sys.equatorY('LH', 3) - sys.middleCY, 28.0, 'LH half corridor');
+  }
+
+  const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  for (const svg of [page, crop]) {
+    assert.ok(!svg.includes(MIDDLE_C_SPINE_GROUP), 'no Middle C spine group may be engraved');
+  }
+  // No horizontal rule may be engraved on the corridor centre line itself.
+  for (const sys of geo.systems) {
+    const y = sys.middleCY.toFixed(2);
+    assert.ok(
+      !new RegExp(`y1="${y}" x2="[^"]*" y2="${y}"`).test(page),
+      `no horizontal rule may run along the Middle C corridor (y=${y})`
+    );
+  }
+
+  // The spine survives as an explicit designer opt-in.
+  const withSpine = renderJankoCrop(
+    score,
+    1,
+    2,
+    { ...OPTIONS, middleCSpine: 'continuous' },
+    TOKENS
+  );
+  assert.match(withSpine, /class="janko-middle-c-spine"/);
+});
+
+test('Zero horizontal dashed guidelines: the vertical beat grid is the only dotted line', () => {
+  const score = buildBachGoldbergVar1Score();
+  assert.equal(DEFAULT_JANKO_OPTIONS.showRowGuidelines, false);
+  const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  for (const svg of [page, crop]) {
+    assert.ok(!svg.includes(ROW_GUIDELINES_GROUP), 'no row guideline group may be engraved');
+  }
+
+  const dashed = [...page.matchAll(/<(\w+)\b[^>]*stroke-dasharray="[^"]*"[^>]*>/g)].map((m) => m[0]);
+  assert.ok(dashed.length > 0, 'the vertical beat grid pulses must survive');
+  for (const element of dashed) {
+    assert.match(element, /class="janko-beat-line"/, 'only beat lines may be dashed');
+    const x1 = element.match(/x1="([\d.]+)"/)?.[1];
+    const x2 = element.match(/x2="([\d.]+)"/)?.[1];
+    assert.equal(x1, x2, 'a beat grid pulse is strictly vertical');
+  }
+
+  // Row guidelines survive as an explicit designer opt-in.
+  const withGuides = renderJankoCrop(score, 1, 1, { ...OPTIONS, showRowGuidelines: true }, TOKENS);
+  assert.match(withGuides, /class="janko-row-guidelines"/);
+  assert.match(withGuides, /stroke-dasharray="3,3"/);
+});
+
+test('Optical notehead: 5.8pt digits sit dead-centre in the 4.8pt knockout disc', () => {
+  const score = buildBachGoldbergVar1Score();
+  close(TOKENS.noteheadRadius, 4.8, 'canonical knockout radius');
+  close(TOKENS.digitFontSize, 5.8, 'canonical digit font size');
+  const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
+  assert.ok(TOKENS.noteheadRadius - halfWidth >= 1.2, 'left/right white margin');
+  assert.ok(TOKENS.noteheadRadius - halfHeight >= 1.2, 'top/bottom white margin');
+  assert.ok(
+    TOKENS.noteheadRadius - Math.hypot(halfWidth, halfHeight) >= 1.2,
+    'corner white margin'
+  );
+
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const knockouts = [
+    ...crop.matchAll(/class="janko-knockout" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g),
+  ].map((m) => ({ cx: Number(m[1]), cy: Number(m[2]), r: Number(m[3]) }));
+  const digits = [
+    ...crop.matchAll(
+      /class="janko-digit" x="([\d.]+)" y="([\d.]+)" font-weight="\d+" font-size="([\d.]+)pt"/g
+    ),
+  ].map((m) => ({ x: Number(m[1]), y: Number(m[2]), size: Number(m[3]) }));
+  assert.ok(knockouts.length > 0, 'the crop engraves noteheads');
+  assert.equal(digits.length, knockouts.length, 'every knockout carries exactly one digit');
+  for (const disc of knockouts) {
+    close(disc.r, TOKENS.noteheadRadius, 'knockout radius');
+  }
+  for (const d of digits) {
+    close(d.size, TOKENS.digitFontSize, 'digit font size');
+    // The alphabetic baseline sits half a cap height below the notehead centre.
+    const glyphCentreY = d.y - digitBaselineOffset(d.size);
+    const disc = knockouts.find(
+      (k) => Math.abs(k.cx - d.x) < 0.02 && Math.abs(k.cy - glyphCentreY) < 0.02
+    );
+    assert.ok(disc, `digit at (${d.x}, ${d.y}) owns a concentric knockout disc`);
+  }
+  close(
+    JANKO_DIGIT_BASELINE_OFFSET,
+    digitHalfExtents(TOKENS.digitFontSize).halfHeight,
+    'canonical baseline offset is half a cap height'
+  );
+});
+
+test('Stem attachment: every stem starts flush outside its knockout disc — and its halo at tick 0', () => {
+  const score = buildBachGoldbergVar1Score();
+  const radii = getStemAttachmentRadii(TOKENS);
+  close(radii.regular, TOKENS.noteheadRadius + 0.2, 'regular attachment radius');
+  close(radii.honor, TOKENS.haloRadius + 0.4, 'Position of Honor attachment radius');
+
+  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  let honored = 0;
+  for (const layout of layouts) {
+    for (const p of layout.notes) {
+      const stem = getStemGeometry(p.rhythm, TOKENS);
+      const expected = getStemAttachmentRadius(p.rhythm, TOKENS);
+      const attach = Math.hypot(stem.stemX - p.x, stem.stemStartY - p.y);
+      close(attach, expected, `flush attachment of ${p.note.id}`, 1e-9);
+      assert.ok(attach >= TOKENS.noteheadRadius, `${p.note.id} never starts inside the disc`);
+      if (isPositionOfHonor(p.note.startTick)) {
+        honored++;
+        assert.ok(
+          attach >= TOKENS.haloRadius + 0.375,
+          `${p.note.id} clears the halo ring stroke (${attach.toFixed(2)}pt)`
+        );
+      }
+    }
+  }
+  assert.equal(honored, 2, 'both opening sounds carry the halo attachment');
+
+  // SVG level: every engraved stem starts exactly on the flush perimeter.
+  const system0 = layouts[0];
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const expectedStarts = new Set(
+    system0.notes.map((p) => {
+      const s = getStemGeometry(p.rhythm, TOKENS);
+      return `${s.stemX.toFixed(2)},${s.stemStartY.toFixed(2)}`;
+    })
+  );
+  const starts = [
+    ...crop.matchAll(/class="janko-stem" x1="([\d.]+)" y1="([\d.]+)" x2="[\d.]+"/g),
+  ].map((m) => `${m[1]},${m[2]}`);
+  assert.ok(starts.length > 0, 'mm. 1–2 engrave stems');
+  for (const start of starts) {
+    assert.ok(expectedStarts.has(start), `stem start ${start} must sit on the disc perimeter`);
+  }
+  for (const start of expectedStarts) {
+    assert.ok(starts.includes(start), `notehead stem start ${start} must reach the document`);
+  }
+});
+
+test('Stems keep ≥1.2pt of clean air from their own digit glyph', () => {
+  const score = buildBachGoldbergVar1Score();
+  const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
+  let worst = Infinity;
+  let worstNote = '';
+  for (const layout of layoutJankoScore(score, OPTIONS, TOKENS)) {
+    for (const p of layout.notes) {
+      const stem = getStemGeometry(p.rhythm, TOKENS);
+      const lo = Math.min(stem.stemStartY, stem.stemEndY);
+      const hi = Math.max(stem.stemStartY, stem.stemEndY);
+      const horizontal = Math.max(p.x - halfWidth - stem.stemX, 0, stem.stemX - (p.x + halfWidth));
+      const vertical = Math.max(p.y - halfHeight - hi, 0, lo - (p.y + halfHeight));
+      const distance = Math.hypot(horizontal, vertical);
+      if (distance < worst) {
+        worst = distance;
+        worstNote = p.note.id;
+      }
+    }
+  }
+  assert.ok(
+    worst >= 1.2,
+    `every stem keeps ≥1.2pt from its digit (worst ${worst.toFixed(2)}pt at ${worstNote})`
+  );
+});
+
+test('Measure 1 opening stems (pitch 7 RH & LH) never cut through the halo ring', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const opening = layout.notes.filter((p) => p.note.startTick === 0);
+  assert.equal(opening.length, 2, 'two opening sounds');
+  assert.deepEqual(
+    opening.map((p) => p.coord.pitchClass),
+    [7, 7],
+    'the opening sounds are the two pitch-7 notes'
+  );
+  assert.deepEqual(
+    [...new Set(opening.map((p) => p.coord.hand))].sort(),
+    ['LH', 'RH'],
+    'one per hand'
+  );
+  for (const p of opening) {
+    const stem = getStemGeometry(p.rhythm, TOKENS);
+    const distance = segmentDistance(
+      p.x,
+      p.y,
+      stem.stemX,
+      stem.stemStartY,
+      stem.stemX,
+      stem.stemEndY
+    );
+    assert.ok(
+      distance >= TOKENS.haloRadius + 0.375,
+      `${p.note.id} clears the halo ring by ${(distance - TOKENS.haloRadius).toFixed(2)}pt`
+    );
+  }
 });
 
 // ---------------------------------------------------------------------------
