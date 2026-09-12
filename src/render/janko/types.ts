@@ -120,6 +120,8 @@ export interface JankoTokens {
   measureInset?: number;
   /** Ticks in one measure (3/4 at 48 ticks/beat => 144). */
   ticksPerMeasure?: number;
+  /** Upbeat duration in ticks (e.g. 48 for cut-time quarter note upbeat). */
+  anacrusisTicks?: number;
   /** Ticks per beat (quarter note => 48). */
   ticksPerBeat?: number;
   /** Half-width of a ledger equator segment. */
@@ -203,6 +205,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   slashDy: 1.6,
   measureInset: 6.0,
   ticksPerMeasure: 144,
+  anacrusisTicks: 0,
   ticksPerBeat: 48,
   ledgerHalfWidth: 7.0,
   beamThickness: 1.8,
@@ -241,6 +244,8 @@ export interface JankoLayoutOptions {
   systemsPerPage?: number;
   /** Ticks in one measure. */
   ticksPerMeasure?: number;
+  /** Upbeat duration in ticks. */
+  anacrusisTicks?: number;
   /** Ticks per beat. */
   ticksPerBeat?: number;
   /** Horizontal inset of the first/last note of a measure. */
@@ -293,6 +298,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   channelLayout: 'single-equator',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
+  anacrusisTicks: 0,
   ticksPerBeat: 48,
   measureInset: 6.0,
   timeSignatureWidth: 0,

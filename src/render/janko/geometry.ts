@@ -602,6 +602,16 @@ export function splitTick(
   tokens?: Partial<JankoTokens> | null
 ): { measureOffset: number; tickInMeasure: number } {
   const t = resolveJankoTokens(tokens);
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (anacrusis > 0) {
+    if (tick < anacrusis) {
+      return { measureOffset: 0, tickInMeasure: tick };
+    }
+    const elapsed = tick - anacrusis;
+    const measureOffset = 1 + Math.floor(elapsed / t.ticksPerMeasure);
+    const tickInMeasure = ((elapsed % t.ticksPerMeasure) + t.ticksPerMeasure) % t.ticksPerMeasure;
+    return { measureOffset, tickInMeasure };
+  }
   const measureOffset = Math.floor(tick / t.ticksPerMeasure);
   const tickInMeasure = ((tick % t.ticksPerMeasure) + t.ticksPerMeasure) % t.ticksPerMeasure;
   return { measureOffset, tickInMeasure };

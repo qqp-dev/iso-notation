@@ -1,4 +1,4 @@
-# Ticket: Live Web Iteration Rig, Implementer Visual Linter & Two-View Decision Studio
+# Ticket: Lossless Brahms Op. 118 No. 1 MIDI Ingestion & Mixed-Hand Cluster Grouping (Bach m. 3)
 
 ## Kind
 
@@ -6,67 +6,38 @@ bounded
 
 ## Problem
 
-The previous iteration cycle established a sub-second export pipeline and confirmed Variant B (Traditional Beams) with Klavarskribo beat grid lines. However, two structural friction points remain:
+The operator inspected the Approach 2 implementation and Brahms benchmark, and provided two critical directives:
 
-1. **User / Designer Friction (Static PNG Dependency)**:
-   - Reviewing static PNGs requires manual file navigation or manual browser refresh.
-   - The user wants to **stop generating PNGs** for design review and work exclusively through the **live website** (`http://100.102.70.49:5175/janko.html`).
-   - The website must **auto-update live via Vite HMR** without requiring user action.
-   - The design studio must present **two distinct, purpose-built views**:
-     - **View 1: Decision Candidates Matrix**: The 2–4 exploratory candidates for the *current decision round* (e.g. comparing Middle C corridor treatments, inter-staff spacing, or beam grouping rules).
-     - **View 2: The Reference Object (Golden Master)**: The canonical score being perfected (Bach Goldberg Variations BWV 988, Var. 1) showing the accumulated state of the engraving on the full page and macro crops, allowing the user to observe progress toward "done".
+1. **Brahms Op. 118 No. 1 Score Oversight & Lossless MIDI Pipeline**:
+   - Operator: *"first off at least the starting note is wrong, which worries me because maybe there's other oversights? anyhow, 040 it the start has these strange vertical lines coming out of it. what are those supposed to represent?"*
+   - Operator follow-up: *"always work with a midi reference first since it's lossless when you read it. direct score is risky unless digitized some reliable way"*
+   - In `src/scores/brahms-op118-no1.ts`, the previous implementer hand-coded notes and invented an opening chord of $C_5, E_4, C_4$ (`040`) at tick 0. In reality, Brahms Op. 118 No. 1 opens with an authentic quarter-note upbeat (anacrusis) of $C_5 + C_6$ in octaves, followed by $B\flat_4 + B\flat_5 + E_5$ over the $C_2$ ascending arpeggio in m. 1.
+   - The "strange vertical lines" were rhythmic stems (`renderStem`) drawn individually on each notehead of unbeamed chords.
+   - **Fix**: Ingest the score losslessly and deterministically from the authentic LilyPond-compiled MIDI reference `public/midi/brahms-op118-no1.mid` via `parseMidiToScore()`. Support anacrusis (upbeat) of 48 ticks in `JankoTokens`/`JankoLayoutOptions` so barlines and measure numbers align with the musical meter.
 
-2. **Implementer Agent Friction (Lack of Visual Feedback / Headless Blindness)**:
-   - Implementer subagents cannot "see" SVG output without costly image rendering cycles.
-   - Subagents need **Programmatic Visual Linting** (`src/render/janko/linter.ts`) to mathematically verify engraving aesthetics in milliseconds:
-     - **Knockout Protection**: Duodecimal digits are shielded by circular white knockouts with zero staff/beat line pass-through.
-     - **Collision & Clearance Detection**: Horizontal clearance between consecutive noteheads (>= 2r unless chordal); accolade and measure numeral clearances.
-     - **Corridor & Guideline Integrity**: Middle C channel stays clean and free of spurious cross-intersections.
-     - **Beam & Stem Validity**: Stems connect noteheads to beams without overshoot; beam slopes stay within acceptable thresholds (<= 0.25).
-   - Subagents need a **Declarative Candidate Registry** (`src/render/janko/candidates.ts`) where candidates for the next round can be defined in 5 lines of code without altering engine internals.
+2. **Mixed-Hand Cluster Grouping & Chronological Monotonicity (Bach Goldberg Var 1, Measure 3)**:
+   - Operator: *"and bar 3 of bach: the left hand 1 extending into the right hand octave exposes an issue. our rule for how we group can be refined further. the second 1 overlaps with the right hand 9 temporally right? then they form a mixed hand cluster, just like other chords."*
+   - In Bach Goldberg Var 1, m. 3 at tick 408:
+     - LH plays eighth note $C\sharp_4$ (pc 1, oct 4, row 1).
+     - RH plays sixteenth note $A_4$ (pc 9, oct 4, row 1).
+   - Currently, two defects occur:
+     a) **Time Inversion in `resolveRowSnappedChordOffsets()`**: When the chord $\langle 1, 9 \rangle$ spreads by $\pm 5.5\text{pt}$, the column relaxation pushed Unit 408 left by $5.5\text{pt}$ to clear Unit 420 on Row 1, pushing Note 49 ($C\sharp_4$) to $x = 395.75$. But Note 48 ($E_5$ at tick 396) sits at $x = 397.13$! Note 49 was placed to the *left* of Note 48, so Note 48 appeared sandwiched between 1 and 9, inverting time!
+     b) **Spurious Cross-Staff Beaming in `partitionBeamGroups()`**: `partitionBeamGroups` grouped LH $C\sharp_4$ (octave 4) with LH $A_2$ (octave 2) across an 86pt vertical gap and across the Middle C spine, drawing a 95pt vertical stem!
+   - **Fix**:
+     - Enforce strict chronological monotonicity in `resolveRowSnappedChordOffsets`: for any onsets $t_A < t_B$, $x_{\text{left}}(B) \ge x_{\text{right}}(A) + \text{minAir}$. Notes can never jump backwards in time.
+     - In `partitionBeamGroups`: notes that enter the opposite hand's register to form a mixed-hand cluster must not beam across the Middle C corridor with an octave leap to a distant bass note.
 
 ## Testing Plan
 
-1. **Implementer Visual Linter Invariants (`test/janko-linter.test.ts`)**:
-   - `lintJankoScore(score, options, tokens)` returns structured diagnostics (`violations: LintViolation[]`).
-   - Catch intentional layout defects: overlapping noteheads, missing knockouts, extreme beam slope, barline collision.
-   - Verify that the canonical Bach Goldberg score with `DEFAULT_JANKO_OPTIONS` passes the visual linter with **zero violations**.
-2. **Two-View Studio Architecture Invariants (`test/janko-studio.test.ts`)**:
-   - `renderCandidatesView()` renders all active candidates defined in `src/render/janko/candidates.ts` with labels, options badges, and SVG previews.
-   - `renderReferenceView()` renders the Golden Master (full page spread and macro focus crops) based on `DEFAULT_JANKO_OPTIONS`.
-   - `janko.html` provides seamless navigation between Candidates View and Reference Object View, with in-browser zoom and live HMR auto-refresh.
-3. **Declarative Candidate Registry Invariant**:
-   - Adding or modifying entries in `src/render/janko/candidates.ts` immediately reflects in the Candidates View with zero template edits.
-4. **Zero Regressions & Fast Verification**:
-   - `npm test` runs all unit tests, engraving invariants, and visual lint checks in <1s.
-   - `npm run build` compiles without TypeScript or bundle errors.
-
-## [bounded]
-
-### Solution
-
-1. **Implementer Visual Linter (`src/render/janko/linter.ts`)**:
-   - Implement `lintJankoScore(score: QuantizedGridScore, options?: Partial<JankoLayoutOptions>, tokens?: Partial<JankoTokens>): LintReport`.
-   - Checks:
-     - Notehead knockout integrity (no unmasked staff/beat line crossings behind glyphs).
-     - Minimum notehead-to-notehead horizontal clearance.
-     - Stem connection and beam slope clamp.
-     - Measure numeral and accolade bounding box clearances.
-     - Middle C spine corridor cleanliness.
-   - Add npm script: `"lint:engraving": "tsx scripts/lint_engraving.ts"`.
-
-2. **Declarative Candidate Registry (`src/render/janko/candidates.ts`)**:
-   - Export `CURRENT_ROUND_METADATA = { round: number, title: string, description: string }`.
-   - Export `CURRENT_CANDIDATES: JankoCandidate[] = [ ... ]` specifying candidate variants with their individual option overrides.
-
-3. **Dynamic Two-View Live Studio (`public/janko.html` & `src/render/janko/studio.ts`)**:
-   - Mount a client-side bundle or self-contained dynamic renderer that directly renders SVGs using the TypeScript engine.
-   - **View 1: Decision Candidates Matrix**: Renders each candidate in `CURRENT_CANDIDATES` side-by-side with comparison diffs and parameter tags.
-   - **View 2: Golden Reference Object**: Renders the complete Bach Goldberg Var. 1 score (Page 1 + macro focus crops) using the current golden master options.
-   - Integrates Vite HMR (`import.meta.hot`) so any edit in `src/render/janko/` triggers an immediate live re-render with zero user action.
-
-4. **Documentation & Agent Rules (`AGENTS.md` & `GEMINI.md`)**:
-   - Update instructions to mandate the new workflow:
-     - Review via `http://100.102.70.49:5175/janko.html`.
-     - Two-view paradigm (Candidates vs Reference).
-     - Run `npm test` (including Visual Linter) for immediate implementer verification.
+1. **`src/scores/brahms-op118-no1.ts`**:
+   - Ingests `public/midi/brahms-op118-no1.mid` losslessly via `parseMidiToScore()`.
+   - Measure 0 (upbeat) has $C_5 + C_6$. Measure 1 has authentic $B\flat$ chord and $C$ bass arpeggio.
+   - All 9 measures match authentic Urtext note-for-note.
+2. **`src/render/janko/engine.ts`**:
+   - `resolveRowSnappedChordOffsets`: Enforces time monotonicity across onsets. In Bach m. 3, $x(48) < x(49) < x(50) < x(51)$.
+   - `partitionBeamGroups`: No spurious 95pt cross-corridor beam between $A_2$ and $C\sharp_4$.
+3. **Automated Tests & Linter**:
+   - `npm test` passes 100% (< 2s).
+   - `npm run lint:engraving --strict` reports zero violations and zero warnings on both Bach and Brahms.
+4. **Exports**:
+   - Fast export refreshes all PNGs in root `./` and `public/`.

@@ -34,9 +34,10 @@ export function renderStaffBarline(
 export function renderBarlines(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
-  _tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null
 ): string {
   const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
   const out: string[] = ['  <g class="janko-barlines">'];
 
   const rhTop = geo.equatorY('RH', 5) - 12;
@@ -44,13 +45,30 @@ export function renderBarlines(
   const lhTop = geo.equatorY('LH', 3) - 12;
   const lhBot = geo.equatorY('LH', 2) + 12;
 
-  // Internal boundaries: every measure end, including the system end.
-  for (let m = 0; m < o.measuresPerSystem; m++) {
-    const x = geo.staffLeft + (m + 1) * geo.measureWidth;
-    const isFinal = m === o.measuresPerSystem - 1;
-    const width = isFinal ? 1.05 : 0.85;
-    out.push(renderStaffBarline(x, rhTop, rhBot, width));
-    out.push(renderStaffBarline(x, lhTop, lhBot, width));
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (geo.index === 0 && anacrusis > 0) {
+    const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
+    // 1. Barline ending the upbeat
+    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, rhTop, rhBot, 0.85));
+    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, lhTop, lhBot, 0.85));
+
+    // 2. Measure barlines for mm. 1..measuresPerSystem
+    for (let m = 1; m <= o.measuresPerSystem; m++) {
+      const x = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
+      const isFinal = m === o.measuresPerSystem;
+      const width = isFinal ? 1.05 : 0.85;
+      out.push(renderStaffBarline(x, rhTop, rhBot, width));
+      out.push(renderStaffBarline(x, lhTop, lhBot, width));
+    }
+  } else {
+    // Internal boundaries: every measure end, including the system end.
+    for (let m = 0; m < o.measuresPerSystem; m++) {
+      const x = geo.staffLeft + (m + 1) * geo.measureWidth;
+      const isFinal = m === o.measuresPerSystem - 1;
+      const width = isFinal ? 1.05 : 0.85;
+      out.push(renderStaffBarline(x, rhTop, rhBot, width));
+      out.push(renderStaffBarline(x, lhTop, lhBot, width));
+    }
   }
 
   out.push('  </g>');
@@ -93,6 +111,10 @@ export function renderBeatGrid(
   const lhTop = geo.equatorY('LH', 3) - 12;
   const lhBot = geo.equatorY('LH', 2) + 12;
 
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
+  const upbeatWidth = isSys0Anacrusis ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth : 0;
+
   for (let m = 0; m < o.measuresPerSystem; m++) {
     const isOpeningMeasure = systemIndex === 0 && m === 0;
     const insets =
@@ -100,10 +122,17 @@ export function renderBeatGrid(
         ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
         : undefined;
 
+    const measureLeft = isSys0Anacrusis
+      ? geo.staffLeft + upbeatWidth + m * geo.measureWidth
+      : geo.staffLeft + m * geo.measureWidth;
+
+    const left = insets?.left ?? t.measureInset;
+    const right = insets?.right ?? t.measureInset;
+    const available = Math.max(0, geo.measureWidth - left - right);
+
     for (let b = 1; b < beatsPerMeasure; b++) {
-      const beatTick = b * t.ticksPerBeat;
-      const x =
-        geo.staffLeft + getTickX(beatTick, m, beatTick, geo.measureWidth, t, insets);
+      const frac = b / beatsPerMeasure;
+      const x = measureLeft + left + frac * available;
       out.push(
         `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(rhBot)}" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>`
       );
