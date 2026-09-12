@@ -482,8 +482,10 @@ test('Lowercase \'o\' Octave Marker Invariant: score canvas margin indicators', 
   assert.ok(horizOOctaves.length > 0, 'Must render o${oct - 1} octave markers in horizontal orientation');
   assert.ok(horizOOctaves.includes('o2'), 'Should include o2 (C3)');
   assert.ok(horizOOctaves.includes('o3'), 'Should include o3 (Middle C, C4)');
-  assert.ok(!horizTexts.some((t) => /^C\d+$/.test(t)), 'Must not render diatonic C${oct} labels');
   assert.ok(!horizTexts.some((t) => /^0:\d+$/.test(t)), 'Must not render 0:${oct} labels');
+  assert.ok(!horizTexts.some((t) => /^(10|11|12):\d+$/.test(t)), 'Must not render 1-based 10..12 labels; must use duodecimal A, B');
+  assert.ok(horizTexts.some((t) => /^A:\d+$/.test(t)), 'Must render A for pitch class 10');
+  assert.ok(horizTexts.some((t) => /^B:\d+$/.test(t)), 'Must render B for pitch class 11');
 
   // 2. Vertical orientation
   const { ctx: vertCtx, fills: vertFills } = createMockCtx();
@@ -749,6 +751,102 @@ test('Tasteful Handedness Chevrons Invariant: open chevrons pointing Right for R
   const symLh = symDirectional.filter((s) => s.hand === 'LH');
   assert.equal(symRh.length, 1, 'RH exception (< 48) must render right-pointing notehead');
   assert.equal(symLh.length, 1, 'LH exception (> 48) must render left-pointing notehead');
+});
+
+test('Definitive Duodecimal Canvas Invariant: 0..B pitch tokens and Up/Down chevrons matching print layout', () => {
+  const score = buildBachGoldbergVar1Score();
+  const fills: { text: string; font: string }[] = [];
+  const chevrons: { baseX: number; apexX: number; baseY: number; apexY: number; hand: 'RH' | 'LH' }[] = [];
+  let currentStroke = '';
+  let currentPath: { x: number; y: number }[] = [];
+
+  const mockCtx = {
+    fillStyle: '',
+    set strokeStyle(val: string) {
+      currentStroke = val;
+    },
+    get strokeStyle() {
+      return currentStroke;
+    },
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {
+      currentPath = [];
+    },
+    closePath: () => {},
+    moveTo: (x: number, y: number) => {
+      currentPath = [{ x, y }];
+    },
+    lineTo: (x: number, y: number) => {
+      currentPath.push({ x, y });
+    },
+    stroke: () => {
+      if (currentPath.length === 3 && currentStroke !== '#000000') {
+        const [p0, p1, p2] = currentPath;
+        if (Math.abs(p0.y - p2.y) < 0.01 && p1.y !== p0.y) {
+          const hand = p1.y < p0.y ? 'RH' : 'LH';
+          chevrons.push({
+            baseX: (p0.x + p2.x) / 2,
+            apexX: p1.x,
+            baseY: p0.y,
+            apexY: p1.y,
+            hand,
+          });
+        }
+      }
+    },
+    fill: () => {},
+    fillRect: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    roundRect: () => {},
+    fillText: (text: string) => {
+      fills.push({ text, font: mockCtx.font });
+    },
+    setLineDash: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  renderScoreToCanvas(mockCtx, score, {
+    orientation: 'vertical',
+    staffStyle: 'tritone-split',
+    noteheadMorphology: 'duodecimal',
+    colorMode: 'duration-class',
+    zoom: 1.0,
+    pixelsPerTick: 2.0,
+    pixelsPerSemitone: 14,
+    showHandCrossings: false,
+    showBarlines: false,
+    showGridLines: true,
+    currentTick: 0,
+  });
+
+  // Notehead tokens: must include 0..9, A, B, and NEVER 10, 11, 12
+  const noteheadTokens = fills.filter((f) => f.font.includes('URW Gothic') || f.font.includes('Century Gothic')).map((f) => f.text);
+  assert.ok(noteheadTokens.length > 0, 'Must render duodecimal notehead tokens');
+  assert.ok(!noteheadTokens.includes('10'), 'Must never render 10');
+  assert.ok(!noteheadTokens.includes('11'), 'Must never render 11');
+  assert.ok(!noteheadTokens.includes('12'), 'Must never render 12');
+  assert.ok(noteheadTokens.includes('A'), 'Must render capital A for pitch class 10');
+  assert.ok(noteheadTokens.includes('B'), 'Must render capital B for pitch class 11');
+
+  // Chevrons: 63 hand crossing exceptions in Goldberg Var 1 (24 RH pointing Up, 39 LH pointing Down)
+  assert.equal(chevrons.length, 63, 'Must render exactly 63 Up/Down chevrons for crossing notes');
+  const rhChevrons = chevrons.filter((c) => c.hand === 'RH');
+  const lhChevrons = chevrons.filter((c) => c.hand === 'LH');
+  assert.equal(rhChevrons.length, 24, '24 RH exceptions must point Up (apexY < baseY)');
+  assert.equal(lhChevrons.length, 39, '39 LH exceptions must point Down (apexY > baseY)');
+  for (const c of rhChevrons) {
+    assert.ok(c.apexY < c.baseY, 'RH chevron must point UP (apex above base)');
+  }
+  for (const c of lhChevrons) {
+    assert.ok(c.apexY > c.baseY, 'LH chevron must point DOWN (apex below base)');
+  }
 });
 
 test('Optical Notehead Sizing & Area Balance Invariant: ovals optically matched to bricks', () => {

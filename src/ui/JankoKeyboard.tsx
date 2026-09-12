@@ -3,7 +3,7 @@ import { PitchCoordinate } from '../model/types';
 import { linearIndex } from '../model/pitch';
 import { buildJankoLayout } from '../render/janko-model';
 import { getJankoKeyColor } from '../render/colors';
-import { ColorMode } from '../render/types';
+import { ColorMode, DUODECIMAL_DIGITS } from '../render/types';
 import { synth } from '../audio/synth';
 
 interface JankoKeyboardProps {
@@ -65,7 +65,7 @@ export const JankoKeyboard: React.FC<JankoKeyboardProps> = ({
                   stroke={isActive ? '#FACC15' : isOctave0 ? '#38BDF8' : colors.border}
                   strokeWidth={isActive ? 2 : isOctave0 ? 1.5 : 1}
                 />
-                {/* Strictly numerical pitch class (0..11) */}
+                {/* Strictly duodecimal pitch class (0..B) */}
                 <text
                   x={(layout.keyWidth - 2) / 2}
                   y={layout.keyHeight / 2 - 4}
@@ -76,7 +76,7 @@ export const JankoKeyboard: React.FC<JankoKeyboardProps> = ({
                   fontWeight={isActive || isOctave0 ? 'bold' : 'normal'}
                   fontFamily="monospace"
                 >
-                  {k.pitch.pitchClass}
+                  {DUODECIMAL_DIGITS[k.pitch.pitchClass]}
                 </text>
                 {/* Octave subscript */}
                 <text

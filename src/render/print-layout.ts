@@ -38,11 +38,11 @@ export const OPENING_HALO_RADIUS_PT = 4.75;
 /** Noble Urtext Gold stroke for the opening sound position of honor halo ring. */
 export const OPENING_HALO_STROKE = '#D4AF37';
 /** Classical architectural reach of the vertical accolade cusp from the staff edge. */
-export const ACCOLADE_WIDTH_PT = 11.0;
+export const ACCOLADE_WIDTH_PT = 8.0;
 /** Margin breathing gap accommodating the classical accolade on System 1. */
 export const ACCOLADE_GAP_PT = 8.0;
 /** Delicate calligraphic swell of the accolade in its lobe bellies. */
-export const ACCOLADE_THICKNESS_PT = 2.4;
+export const ACCOLADE_THICKNESS_PT = 2.0;
 
 const HEADER_HEIGHT_PT = 18;
 const FOOTER_HEIGHT_PT = 0;
@@ -901,10 +901,10 @@ export function renderPageToSvg(
         // System ends are dropped; staff lines float openly into the right margin
       } else if (isDouble || isFinal) {
         const innerX = mEndX - 3.2;
-        svgParts.push(`    <line x1="${innerX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${innerX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.55"/>`);
+        svgParts.push(`    <line x1="${innerX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${innerX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.45"/>`);
         svgParts.push(`    <line x1="${mEndX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${mEndX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#111827" stroke-width="${isFinal ? '1.8' : '1.0'}"/>`);
       } else {
-        svgParts.push(`    <line x1="${mEndX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${mEndX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.55"/>`);
+        svgParts.push(`    <line x1="${mEndX.toFixed(2)}" y1="${staffTop.toFixed(2)}" x2="${mEndX.toFixed(2)}" y2="${staffBot.toFixed(2)}" stroke="#333333" stroke-width="0.45"/>`);
       }
     }
 

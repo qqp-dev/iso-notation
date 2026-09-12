@@ -192,14 +192,14 @@ test('Landscape 2-System Horizontal Engraving Invariant: 4-page spread for Bach 
   );
 });
 
-test('Classical Vertical Accolade Invariant: 11pt curly brace clasping o1–o5 on the left margin', () => {
+test('Classical Vertical Accolade Invariant: 8pt slender copperplate curly brace clasping o1–o5 on the left margin', () => {
   const score = buildBachGoldbergVar1Score();
   const layout = computeColumnarLayout(score);
   const svgs = renderAllPagesToSvg(layout);
 
-  // Classical curly brace proportions: 11.0pt reach, 2.4pt swell, 8.0pt margin gap
-  assert.equal(ACCOLADE_WIDTH_PT, 11.0, 'Accolade reach must be 11.0pt');
-  assert.equal(ACCOLADE_THICKNESS_PT, 2.4, 'Accolade swell must be 2.4pt');
+  // Classical curly brace proportions: 8.0pt reach, 2.0pt swell, 8.0pt margin gap
+  assert.equal(ACCOLADE_WIDTH_PT, 8.0, 'Accolade reach must be 8.0pt');
+  assert.equal(ACCOLADE_THICKNESS_PT, 2.0, 'Accolade swell must be 2.0pt');
   assert.equal(ACCOLADE_GAP_PT, 8.0, 'Accolade gap must be 8.0pt');
 
   // The exported path generator is deterministic and spans the requested vertical range
@@ -331,7 +331,7 @@ test('Horizontal Staff Topography Invariant: Middle C spine, octave lines, landm
     // 4. Barlines are vertical across the staff (y1 = staffTopY, y2 = staffBotY)
     // Intermediate systems drop system ends, so mm. 1–4 has 3 barlines (at end of mm. 1, 2, 3)
     const barlines = lines.filter(
-      (l) => l.x1 === l.x2 && l.width === '0.55' && round2(l.y1) === staffTop && round2(l.y2) === staffBot
+      (l) => l.x1 === l.x2 && l.width === '0.45' && round2(l.y1) === staffTop && round2(l.y2) === staffBot
     );
     assert.equal(barlines.length, 3, `System ${s + 1} must render exactly 3 internal vertical measure barlines`);
     const expectedBarX = [1, 2, 3].map((m) => {
