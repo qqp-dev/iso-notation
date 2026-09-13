@@ -19,9 +19,11 @@
  * `'tight'`), the pinned head keeping its column, behind the hard beat-cell
  * barriers (see {@link resolveRowSnappedChordOffsets}). The v2 solver then
  * centres each spread unit in its free space, shrinks the fan pin-preservingly
- * where room runs short, redistributes disturbed local groups and interleaves
- * multi-row onsets at the half-step — single-head rows stay vertically aligned
- * on their column, so the isomorphic ∇ / Δ hand shapes survive untouched.
+ * where room runs short, redistributes disturbed local groups and **tucks** an
+ * uneven multi-row onset symmetrically (Round 19): every row narrower than the
+ * widest one is re-centred on the widest row's own middle, so the cluster
+ * mirrors about its centre (m. 46) while an even cluster stays exactly as the
+ * fan placed it.
  *
  * Shared stems (Round 16): one onset's same-duration voices share a single
  * stem object nearest the nominal column (standard chord rule); mixed-duration
@@ -79,6 +81,7 @@ import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, renderNotehead } from './el
 import {
   JankoBeamGroupGeometry,
   JankoChordBridge,
+  JankoClaspDurationInk,
   JankoClaspGroupGeometry,
   JankoClaspRailGeometry,
   JankoRhythmNote,
@@ -89,6 +92,7 @@ import {
   HONOR_STEM_ATTACHMENT_AIR,
   STEM_ATTACHMENT_AIR,
   bridgeBeamGroupsAcrossRests,
+  claspDurationClass,
   claspInkBox,
   claspQualifies,
   computeBeamGroupGeometry,
@@ -343,6 +347,66 @@ export interface JankoClaspCluster {
    * value (the `'bounding-phrase'` paradigm carries its opening value).
    */
   durationTicks?: number;
+  /**
+   * Round 19: true when this cluster is the **unified** bracket of an onset
+   * whose two hands' spans overlap or touch. The bracket then spans every head
+   * of the onset and paints one duration group per hand (see
+   * {@link JankoClaspDurationInk}): the open half/whole marks at the bracket's
+   * own midpoint, the transverse subdivision marks at their hand's centre.
+   */
+  unified?: boolean;
+}
+
+/**
+ * Round 6/8/19 — the clasp groups of **one onset** under the
+ * `'per-hand-clasp'` paradigm.
+ *
+ * Round 6/8 rule (unchanged): the grouping unit is the **hand**. A hand's
+ * onset is grouped when it carries two or more heads that are horizontally
+ * displaced (row-snapped parity offset), or when it is a vertical chord of
+ * three or more heads; a clean 2-note column and a lone melodic note are never
+ * grouped.
+ *
+ * Round 19 **overlap-conditional unification**: when *both* hands of the onset
+ * produce a qualifying group and their vertical spans (member heads grown by
+ * the notehead disc) overlap or touch, the two per-hand brackets would sit on
+ * top of one another and the onset is grouped as **one** bracket spanning every
+ * head of the onset (m. 46: RH 93.7–148.3 + LH 138.7–178.3 → one 93.7–178.3
+ * bracket). Disjoint spans keep the Round 6 per-hand brackets unchanged — the
+ * m. 3 downbeat regression guard, whose 90pt hand gap must stay split.
+ *
+ * `spreadX` supplies the x the qualification test measures (the pre-solve
+ * row-snapped **offset** inside the column solve, the final page x once the
+ * columns are solved).
+ */
+export function resolveOnsetClaspGroups(
+  onset: readonly PositionedJankoNote[],
+  t: ResolvedJankoTokens,
+  spreadX: (p: PositionedJankoNote) => number
+): PositionedJankoNote[][] {
+  const byHand = new Map<Hand, PositionedJankoNote[]>();
+  for (const p of onset) {
+    const bucket = byHand.get(p.rhythm.hand);
+    if (bucket) bucket.push(p);
+    else byHand.set(p.rhythm.hand, [p]);
+  }
+  const groups: PositionedJankoNote[][] = [];
+  for (const hand of ['RH', 'LH'] as const) {
+    const group = byHand.get(hand);
+    if (!group || group.length < 2) continue;
+    const displaced = group.map((p) => ({ ...p.rhythm, x: spreadX(p) }));
+    if (claspQualifies(displaced)) groups.push(group);
+  }
+  if (groups.length < 2) return groups;
+  /** Vertical span of one group's heads, disc included. */
+  const span = (group: readonly PositionedJankoNote[]): { top: number; bot: number } => ({
+    top: Math.min(...group.map((p) => p.y)) - t.noteheadRadius,
+    bot: Math.max(...group.map((p) => p.y)) + t.noteheadRadius,
+  });
+  const [a, b] = [span(groups[0]), span(groups[1])];
+  const disjoint = a.bot < b.top - EPS || b.bot < a.top - EPS;
+  if (disjoint) return groups;
+  return [[...onset].sort((p, q) => p.y - q.y || p.x - q.x)];
 }
 
 /**
@@ -389,12 +453,17 @@ export function collectClaspClusters(
     const groups: JankoClaspCluster[] = [];
     for (const [tick, onset] of onsets) {
       if (claspTicks && !claspTicks.has(tick)) continue;
-      for (const hand of ['RH', 'LH'] as const) {
-        const members = onset.filter((p) => p.rhythm.hand === hand);
-        // Round 8 scope: a horizontally spread hand cluster or a vertical chord
-        // of three or more heads qualifies; a 2-note column does not.
-        if (!claspQualifies(members.map((p) => p.rhythm))) continue;
-        groups.push({ notes: members, measureIdx: measureOf(members[0]) });
+      // Round 6/8 scope per hand (a spread cluster or a 3+ head vertical
+      // chord), unified into one cross-hand bracket by Round 19 when the two
+      // hands' spans overlap or touch.
+      const handGroups = resolveOnsetClaspGroups(onset, t, (p) => p.rhythm.x);
+      const unified = handGroups.length === 1 && handGroups[0].length === onset.length;
+      for (const members of handGroups) {
+        groups.push({
+          notes: members,
+          measureIdx: measureOf(members[0]),
+          ...(unified ? { unified: true } : {}),
+        });
       }
     }
     return groups;
@@ -858,6 +927,13 @@ export interface JankoSystemLayout {
    * flanked seconds).
    */
   sharedStems: JankoSharedStemGroup[];
+  /**
+   * Round 19: the **laid-out column** (page pt) of every onset of the system —
+   * the beat's true x after the column solve's rigid translation. The beat grid
+   * paints its dotted quarter lines through these columns where a beat carries
+   * an onset (see `renderBeatGrid`), so the pulse and the music share one axis.
+   */
+  columns: ReadonlyMap<number, number>;
 }
 
 /**
@@ -1852,8 +1928,8 @@ interface RowCluster {
    * Resolved horizontal offsets (page pt, signed) of this row's heads from the
    * onset column: the single standard grammar's asymmetric fan — one head on
    * the column, the rest stepping toward the roomier side at `2wx + air` per
-   * step — plus the multi-row interleave half-step, where one applies (see
-   * {@link resolveChordColumns}).
+   * step — plus the Round 19 symmetric tuck that re-centres a row narrower
+   * than the onset's widest one (see {@link resolveChordColumns}).
    */
   minOffset: number;
   maxOffset: number;
@@ -2018,10 +2094,10 @@ function perHandDownbeatQualifies(notes: readonly QuantizedNote[]): boolean {
  *
  * So a two-note collision becomes the pair `x, x + pairGap·d` (5.46pt apart on
  * the golden `'tight'`) and a three-note collision the triplet
- * `x − pairGap, x, x + pairGap`. Alternate fanned rows of one onset nest at
- * the half-step (`pairGap / 2`), while single-head rows keep one shared
- * column, which is what preserves the isomorphic ∇ / Δ hand shapes of the
- * staff.
+ * `x − pairGap, x, x + pairGap`. Round 19 then **tucks** the rows of an uneven
+ * onset: every row narrower than the widest one is re-centred on the widest
+ * row's middle (m. 46), while rows of equal count stay exactly as the fan
+ * placed them.
  *
  * **The column solve.** A displaced head claims real horizontal room, and in
  * dense writing the neighbouring onset of its own row is only one 16th away.
@@ -2069,6 +2145,14 @@ export interface JankoChordColumnResolution {
   notes: PositionedJankoNote[];
   /** Ticks of the onsets whose cluster carries a left clasp after the fit rule. */
   claspTicks: ReadonlySet<number>;
+  /**
+   * Round 19: the **laid-out column** (page pt) of every onset of the system —
+   * the unit's proportional beat column after the whole rigid translation the
+   * solve applied (`nominalX + shift`). The column solve moves a unit as one
+   * piece, so this is the beat's true x: the beat grid follows it (see
+   * `renderBeatGrid`), and the Round 16 shared stem stands on it.
+   */
+  columns: ReadonlyMap<number, number>;
 }
 
 /** Full result of the chord-column solve (see {@link resolveRowSnappedChordOffsets}). */
@@ -2237,12 +2321,19 @@ export function resolveChordColumns(
         offsetsById.set(cluster.notes[0].note.id, 0);
         continue;
       }
-      // The head that keeps its column: the RH tone when the row is
-      // mixed-hand, otherwise the middle head.
-      let anchor = Math.floor((k - 1) / 2);
-      const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
-      const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
-      if (hands.size > 1 && rh >= 0) anchor = rh;
+      // The head that keeps its column (Round 19 `clusterAnchor`): `'rh'` is
+      // the incumbent rule — the RH tone when the row is mixed-hand, the middle
+      // head otherwise — while the `'lower-first'` demonstrator pins the
+      // lowest-pitched head of every row (the naive uniform variant).
+      let anchor: number;
+      if (o.clusterAnchor === 'lower-first') {
+        anchor = 0;
+      } else {
+        anchor = Math.floor((k - 1) / 2);
+        const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
+        const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
+        if (hands.size > 1 && rh >= 0) anchor = rh;
+      }
       // The flank must clear whatever glyph the heads actually wear: a tick-0
       // sound carries the wider halo box, and two rings may never cut into
       // each other's box either. Box half-widths — the fan is a horizontal
@@ -2300,33 +2391,35 @@ export function resolveChordColumns(
   });
 
   // -------------------------------------------------------------------------
-  // 1a2. Multi-row interleave: one onset with two or more fanned rows nests
-  //      alternate rows at the half-step (`pairGap / 2` toward the roomier
-  //      side), so upper heads sit over lower gaps instead of phase-aligning
-  //      on the column. The widest row anchors (its middle head on the
-  //      column); single-head rows stay on the column. A row whose half-step
-  //      would leave the beat cell keeps its unshifted fan — the interleave
-  //      never buys nesting with a grid crossing.
+  // 1a2. Symmetric tuck (Round 19): one onset whose rows carry *different*
+  //      head counts is re-centred instead of interleaved. The widest row(s)
+  //      keep the fan of 1a — they define the onset's middle — and every
+  //      smaller row shifts so that its **own middle** lands on the widest
+  //      row's middle, making the whole cluster mirror-symmetric about it
+  //      (m. 46: F5/D3 tucked to the pair columns' midpoint 53.88, the pair
+  //      rows holding 51.15 / 56.61). The shift is
+  //      `(maxCount − rowCount) · (pairGap / 2) · d` wherever the widest row
+  //      fans from a head at its end (the m. 46 pairs); a middle-anchored
+  //      widest row is already symmetric about the column, so its smaller rows
+  //      do not move at all. Rows of equal count never shift, so an even
+  //      cluster (1+1, 2+2+2, 3+3) stays exactly as the fan placed it. A tuck
+  //      that would leave the beat cell is skipped — the tuck never buys
+  //      symmetry with a grid crossing.
   // -------------------------------------------------------------------------
   for (const unit of units) {
-    const fanned = unit.rows.filter((c) => c.notes.length >= 2);
-    if (fanned.length < 2) continue;
-    let widest = fanned[0];
-    for (const row of fanned) {
-      if (row.notes.length > widest.notes.length) widest = row;
-    }
-    const order = [...unit.rows].sort((a, b) => a.y - b.y);
-    const home = order.indexOf(widest);
+    const maxCount = unit.rows.reduce((acc, c) => Math.max(acc, c.notes.length), 0);
+    if (maxCount < 2) continue;
+    const widest = unit.rows.find((c) => c.notes.length === maxCount);
+    if (!widest) continue;
+    const middle = (widest.minOffset + widest.maxOffset) / 2;
     const idx = byX.indexOf(unit);
-    const leftReach = unit.nominalX - (idx > 0 ? byX[idx - 1].nominalX : unit.cellLeft);
-    const rightReach = (idx + 1 < byX.length ? byX[idx + 1].nominalX : unit.cellRight) - unit.nominalX;
-    const d: 1 | -1 = rightReach >= leftReach ? 1 : -1;
     const { loAir, hiAir } = cellAirs(unit);
     const cellLo = unit.cellLeft + loAir - unit.nominalX;
     const cellHi = unit.cellRight - hiAir - unit.nominalX;
-    for (const row of fanned) {
-      if (Math.abs(order.indexOf(row) - home) % 2 === 0) continue;
-      const shift = (pairGap / 2) * d;
+    for (const row of unit.rows) {
+      if (row.notes.length === maxCount) continue;
+      const shift = middle - (row.minOffset + row.maxOffset) / 2;
+      if (shift === 0) continue;
       const lo = row.minOffset + shift;
       const hi = row.maxOffset + shift;
       if (lo < cellLo - EPS || hi > cellHi + EPS) continue;
@@ -2348,28 +2441,18 @@ export function resolveChordColumns(
   };
 
   /**
-   * Round 6/8 — the hand groups of one onset that qualify for a per-hand clasp:
-   * two or more heads of **one** hand, either horizontally displaced by the
-   * row-snapped parity offset or forming a vertical chord of three or more.
-   * A clean 2-note vertical column is never grouped, and the two hands of the
-   * grand staff are never merged into one bracket.
+   * Round 6/8/19 — the clasp groups of one onset that qualify under the
+   * per-hand paradigm, unified into one cross-hand bracket where the hands'
+   * spans overlap (see {@link resolveOnsetClaspGroups}). Qualification is
+   * measured in row-offset space here: the heads still share their nominal
+   * column, before the solve.
    */
   const handClaspGroups = (unit: OnsetUnit): PositionedJankoNote[][] => {
     const offsets = rowOffsetOf(unit);
-    const byHand = new Map<Hand, PositionedJankoNote[]>();
-    for (const cluster of unit.rows) {
-      for (const p of cluster.notes) {
-        const group = byHand.get(p.rhythm.hand);
-        if (group) group.push(p);
-        else byHand.set(p.rhythm.hand, [p]);
-      }
-    }
-    const qualified: PositionedJankoNote[][] = [];
-    for (const group of byHand.values()) {
-      const displaced = group.map((p) => ({ ...p.rhythm, x: offsets.get(p.note.id) ?? 0 }));
-      if (claspQualifies(displaced)) qualified.push(group);
-    }
-    return qualified;
+    const onset = unit.rows
+      .flatMap((cluster) => cluster.notes)
+      .sort((a, b) => a.y - b.y || a.x - b.x);
+    return resolveOnsetClaspGroups(onset, t, (p) => offsets.get(p.note.id) ?? 0);
   };
 
   for (const unit of units) {
@@ -2503,7 +2586,11 @@ export function resolveChordColumns(
           }
         : p;
     });
-    return { notes: untouched, claspTicks: new Set<number>() };
+    return {
+      notes: untouched,
+      claspTicks: new Set<number>(),
+      columns: new Map(units.map((unit) => [unit.tick, unit.nominalX + unit.shift])),
+    };
   }
 
   /** Extreme resolved offsets of one unit's heads (page pt, signed). */
@@ -2918,6 +3005,9 @@ export function resolveChordColumns(
   return {
     notes: placed,
     claspTicks: new Set(ordered.filter((unit) => unit.clasp).map((unit) => unit.tick)),
+    // Round 19: the beat's laid-out x — the unit's column after its rigid
+    // translation, which is what the beat grid and the shared stem follow.
+    columns: new Map(ordered.map((unit) => [unit.tick, unit.nominalX + unit.shift])),
   };
 }
 
@@ -2951,7 +3041,11 @@ export function layoutJankoSystem(
   // withdrawn until the engraving is collision-free.
   const claspInsets = new Map(computeClaspInsetMap(score, geometry, systemIndex, o, t));
   let positioned: PositionedJankoNote[] = [];
-  let chordColumns: JankoChordColumnResolution = { notes: [], claspTicks: new Set<number>() };
+  let chordColumns: JankoChordColumnResolution = {
+    notes: [],
+    claspTicks: new Set<number>(),
+    columns: new Map<number, number>(),
+  };
   for (let attempt = 0; ; attempt++) {
     positioned = sysNotes.map((n) =>
       positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets)
@@ -3006,6 +3100,43 @@ export function layoutJankoSystem(
   // real 16th-note beam is ever broken by the grouping. Every bracket is
   // re-audited against the *solved* columns: a clasp the engine cannot engrave
   // cleanly is dropped and its cluster falls back to traditional stems.
+  //
+  // Round 19: a **unified** cross-hand bracket (both hands' spans overlap) keeps
+  // both hands' duration information — one ink group per hand. The open
+  // half/whole marks read as the bracket's own value and sit at its midpoint;
+  // each hand's transverse subdivision marks stay at that hand's vertical
+  // centre.
+  const unifiedClaspInk = (
+    cluster: JankoClaspCluster
+  ): JankoClaspDurationInk[] | undefined => {
+    if (!cluster.unified) return undefined;
+    const handY = (members: readonly PositionedJankoNote[]): number =>
+      (Math.min(...members.map((p) => p.y)) + Math.max(...members.map((p) => p.y))) / 2;
+    const byHand = new Map<Hand, PositionedJankoNote[]>();
+    for (const p of cluster.notes) {
+      const bucket = byHand.get(p.rhythm.hand);
+      if (bucket) bucket.push(p);
+      else byHand.set(p.rhythm.hand, [p]);
+    }
+    const open: number[] = [];
+    const transverse: JankoClaspDurationInk[] = [];
+    for (const members of byHand.values()) {
+      const value = Math.min(...members.map((p) => p.note.durationTicks));
+      const cls = claspDurationClass(value);
+      if (cls === 'pip' || cls === 'double-pip') open.push(value);
+      else if (cls === 'spire-one-flag' || cls === 'spire-two-flags') {
+        transverse.push({ centerY: handY(members), durationTicks: value });
+      }
+    }
+    const midY =
+      (Math.min(...cluster.notes.map((p) => p.y)) +
+        Math.max(...cluster.notes.map((p) => p.y))) /
+      2; // the bracket's midpoint (the disc radius cancels out)
+    const ink: JankoClaspDurationInk[] = [];
+    if (open.length > 0) ink.push({ centerY: midY, durationTicks: Math.min(...open) });
+    ink.push(...transverse);
+    return ink.length > 0 ? ink : undefined;
+  };
   const clusters = collectClaspClusters(
     notes,
     geometry,
@@ -3026,6 +3157,10 @@ export function layoutJankoSystem(
           // vertical column keeps its stems.
           requireBracketScope: o.chordGrouping === 'per-hand-clasp',
           claspDurationStyle: o.claspDurationStyle,
+          ...(() => {
+            const ink = unifiedClaspInk(cluster);
+            return ink ? { durationInk: ink } : {};
+          })(),
         }
       ),
     }))
@@ -3146,9 +3281,18 @@ export function layoutJankoSystem(
       if (!group.every((p) => p.note.durationTicks === group[0].note.durationTicks)) continue;
       const hand = group[0].rhythm.hand;
       const dir = stemDirection(hand);
+      // The unit's **laid-out** column (Round 19): the column solve translates
+      // the whole onset rigidly, so the axis every member of this hand is
+      // fanned around is `nominalX + shift`, not the un-shifted proportional
+      // beat column. The symmetric tuck can leave a displaced head sitting on
+      // the *old* nominal x while the row anchors moved off it — ranking by
+      // that stale x is what handed the shared stem to a tucked interior head
+      // whose stem then pierced the anchor's disc (Brahms m. 17).
       const nominal =
-        group[0].nominalX ?? group.reduce((acc, p) => acc + p.x, 0) / group.length;
-      // Nearest the nominal column first, then the extremity in stem direction
+        chordColumns.columns.get(group[0].note.startTick) ??
+        group[0].nominalX ??
+        group.reduce((acc, p) => acc + p.x, 0) / group.length;
+      // Nearest the column first, then the extremity in stem direction
       // (topmost for RH, bottommost for LH), then id: deterministic, on-column
       // whenever any member kept the column, and always outward-facing.
       const rank = (p: PositionedJankoNote): [number, number, string] => [
@@ -3198,6 +3342,7 @@ export function layoutJankoSystem(
     verticalChords,
     chordBridges,
     sharedStems,
+    columns: chordColumns.columns,
   };
 }
 
@@ -3396,7 +3541,7 @@ export function renderSystem(
   // painted above the rhythm ink on its own white air channels; every other
   // policy paints it first, as the transparent structural background it is.
   const gridInk = [
-    renderBeatGrid(geo, systemIndex, o, t),
+    renderBeatGrid(geo, systemIndex, o, t, resolved.columns),
     renderBarlines(geo, o, t, resolved.isFinalSystem),
   ].join('\n');
   if (channelsGridInk(o.gridWritingPolicy)) {

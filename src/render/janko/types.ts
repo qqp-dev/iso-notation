@@ -120,7 +120,8 @@ export const JANKO_DIGIT_HALF_HEIGHT = 2.86;
  * stem per same-duration stack nearest the nominal column, coincident stems
  * for mixed stacks, flanked same-row seconds with two stems at head-x, the
  * v2 spacing solver (unit centering, pin-preserving shrink, local
- * redistribution, multi-row interleave) behind the hard beat-cell barriers.
+ * redistribution, symmetric tuck — Round 19) behind the hard beat-cell
+ * barriers.
  */
 export type JankoClusterSpacing = 'snug' | 'tight';
 
@@ -435,6 +436,35 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
 ];
 
 /**
+ * Which head of a same-onset row cluster keeps the beat column when the row is
+ * fanned out (Round 19).
+ *
+ * A row that carries two or more heads of one onset fans them out around the
+ * column (see `resolveRowSnappedChordOffsets`); exactly one head keeps the
+ * column and the rest step toward the roomier side. `clusterAnchor` names that
+ * head:
+ *
+ * | value          | anchor head                                          |
+ * | -------------- | ---------------------------------------------------- |
+ * | `'rh'`         | the RH tone on a mixed-hand row, otherwise the row's middle head (Round 16/17 incumbent) |
+ * | `'lower-first'`| the lowest-pitched head of **every** row — the naive uniform rule |
+ *
+ * The Round 19 axis is deliberately one question: `'lower-first'` is the
+ * **demonstrator** (a knowingly lint-dirty variant that shows the same-onset
+ * stem collision the RH anchor avoids), never a golden candidate.
+ */
+export type JankoClusterAnchor = 'rh' | 'lower-first';
+
+/** Every cluster-anchor rule, in the canonical exploration order (A, B). */
+export const JANKO_CLUSTER_ANCHORS: readonly JankoClusterAnchor[] = ['rh', 'lower-first'];
+
+/** Human-readable names of the two cluster-anchor rules. */
+export const JANKO_CLUSTER_ANCHOR_LABELS: Record<JankoClusterAnchor, string> = {
+  rh: 'RH Anchor (incumbent)',
+  'lower-first': 'Lower-First (lowest pitch anchors)',
+};
+
+/**
  * How a **vertical chord / cluster** of one onset is grouped and how it carries
  * its duration — the Round 5 question, refined by Round 6 with
  * `'per-hand-clasp'`.
@@ -450,21 +480,25 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
  * | `'left-clasp-spire'` | one chord / cluster      | one external bracket per cluster       |
  * | `'beamed-clasp-rail'`| one chord / cluster      | + a measure-bounded rail joining tips  |
  * | `'bounding-phrase'`  | one measure (the phrase) | one bracket bounding every note        |
- * | `'per-hand-clasp'`   | one hand of one onset    | one bracket per hand (Round 6)         |
+ * | `'per-hand-clasp'`   | one hand of one onset    | one bracket per hand (Round 6), unified across the hands where their spans overlap (Round 19) |
  *
  * The clasp is drawn **outside** the cluster (`claspX = minX − r − claspOffset`)
  * and carries the cluster's shortest duration at its tip: an open pip for
  * halves/wholes, a clean spire for quarters and flag hooks for 8ths/16ths.
  *
- * `'per-hand-clasp'` is the Round 6 refinement: the grouping unit is strictly
- * one hand (`RH` or `LH`), never the grand staff, and a bracket is drawn **only**
- * for a horizontally displaced (row-snapped) hand cluster — a clean vertical
- * column and a lone melodic note keep their stems. Round 8 widened its scope to
- * a vertical hand chord of three or more heads. Round 14 makes it the
- * golden-master default: a same-onset cluster inside one hand is always either
- * bracketed or unified by the gap-gated stem grammar, so no stem of one chord
- * tone can ever be painted through the notehead disc of another (the defect the
- * linter now names `stem-through-simultaneity`).
+ * `'per-hand-clasp'` is the Round 6 refinement: the grouping unit is one hand
+ * (`RH` or `LH`), and a bracket is drawn **only** for a horizontally displaced
+ * (row-snapped) hand cluster — a clean vertical column and a lone melodic note
+ * keep their stems. Round 8 widened its scope to a vertical hand chord of three
+ * or more heads. Round 14 makes it the golden-master default: a same-onset
+ * cluster inside one hand is always either bracketed or unified by the
+ * gap-gated stem grammar, so no stem of one chord tone can ever be painted
+ * through the notehead disc of another (the defect the linter names
+ * `stem-through-simultaneity`). Round 19 adds **overlap-conditional
+ * unification**: where both hands of one onset produce a qualifying group and
+ * their spans overlap or touch, one bracket spans every head of the onset and
+ * carries one duration group per hand; a gapped onset (Brahms m. 3's 90pt hand
+ * gap) keeps the two per-hand brackets.
  */
 export type JankoChordGrouping =
   | 'none'
@@ -684,6 +718,12 @@ export interface JankoLayoutOptions {
    * {@link JankoChordGrouping}). Defaults to the settled `'per-hand-clasp'`.
    */
   chordGrouping: JankoChordGrouping;
+  /**
+   * Which head of a fanned same-onset row keeps the beat column (Round 19):
+   * the incumbent RH-anchored rule or the naive lower-first demonstrator. See
+   * {@link JankoClusterAnchor}. Defaults to the settled `'rh'`.
+   */
+  clusterAnchor?: JankoClusterAnchor;
 
   // --- Optional page/layout refinements (resolved from defaults) ---
   /**
@@ -790,6 +830,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   middleCSpine: 'none',
   channelLayout: 'single-equator',
   chordGrouping: 'per-hand-clasp',
+  clusterAnchor: 'rh',
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',

@@ -3,10 +3,10 @@
  *
  * Covers:
  *  1. `renderCandidatesView()` renders every candidate declared in the
- *     registry, on **every engraving window it declares** (Round 18 judges the
- *     four rest shapes on the carried clean windows plus the Bach m4
- *     fixed-context window), with labels, per-axis option badges, lint chips
- *     and SVG previews.
+ *     registry, on **every engraving window it declares** (Round 19 judges the
+ *     cluster anchor on Brahms mm. 46 / 26 / 3 plus the chord specimen's
+ *     triples), with labels, per-axis option badges, lint chips and SVG
+ *     previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
  *     (every page carries glyphs) plus the macro focus crops, based on
  *     `DEFAULT_JANKO_OPTIONS`.
@@ -97,9 +97,9 @@ test('renderCandidatesView renders every registry candidate on every declared wi
   );
   assert.match(html, new RegExp(`data-candidate-count="${CURRENT_CANDIDATES.length}"`));
   const windows = CURRENT_CANDIDATES.reduce((n, c) => n + resolveCandidate(c).windows.length, 0);
-  assert.equal(windows, 28, 'four shape candidates × 7 verdict windows');
-  // Round 18 judges one axis; the header states its declared window count.
-  assert.match(html, /data-window-count="7"/, 'the header states the verdict set window count');
+  assert.equal(windows, 8, 'two anchor candidates × 4 case windows');
+  // Round 19 judges one axis; the header states its declared window count.
+  assert.match(html, /data-window-count="4"/, 'the header states the case window count');
   assert.equal((html.match(/<svg/g) ?? []).length, windows, 'one preview per declared window');
   assert.equal((html.match(/data-window="/g) ?? []).length, windows);
   for (const candidate of CURRENT_CANDIDATES) {
@@ -123,34 +123,34 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 18/);
-  assert.match(html, /Rest-Shape Verdict/);
+  assert.match(html, /Round 19/);
+  assert.match(html, /Symmetric-Tuck Clusters/);
 });
 
-test('Round 18 registry judges the rest shape on its single open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 18);
-  assert.match(CURRENT_ROUND_METADATA.title, /Rest-Shape Verdict/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['restStyle'], 'one open axis');
+test('Round 19 registry judges the cluster anchor on its single open axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 19);
+  assert.match(CURRENT_ROUND_METADATA.title, /Symmetric-Tuck Clusters/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterAnchor'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['rest-kinetic-monoline', 'rest-classical-urtext', 'rest-geometric-node', 'rest-phantom-notehead'],
-    'the four carried dialects A–D, in display order'
+    ['cluster-anchor-rh', 'cluster-anchor-lower-first'],
+    'the incumbent anchor and the demonstrator A–B, in display order'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.axis),
-    ['restStyle', 'restStyle', 'restStyle', 'restStyle'],
+    ['clusterAnchor', 'clusterAnchor'],
     'each candidate declares the round’s open axis'
   );
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.restStyle),
-    ['kinetic-monoline', 'classical-urtext', 'geometric-node', 'phantom-notehead'],
-    'the shape axis: the incumbent and the three challengers'
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.clusterAnchor),
+    ['rh', 'lower-first'],
+    'the anchor axis: the incumbent and the naive variant'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.clusterSpacing),
-    ['tight', 'tight', 'tight', 'tight'],
-    'every shape candidate keeps the decided tight golden (the gap verdict is in)'
+    ['tight', 'tight'],
+    'every anchor candidate keeps the decided tight golden'
   );
   // The two axes are independent: every resolved option set departs from the
   // golden master ONLY on the candidate's own axis key (incumbent values are
@@ -255,14 +255,14 @@ test('Round 18 registry judges the rest shape on its single open axis', () => {
   }
   // The incumbent states the golden value on its axis, without a delta.
   assert.deepEqual(
-    candidateBadges(getCandidate('rest-kinetic-monoline')!)[0],
+    candidateBadges(getCandidate('cluster-anchor-rh')!)[0],
     {
-      key: 'restStyle',
-      value: 'kinetic-monoline',
-      golden: 'kinetic-monoline',
+      key: 'clusterAnchor',
+      value: 'rh',
+      golden: 'rh',
       axis: true,
     },
-    'the incumbent dialect still states its value on the axis'
+    'the incumbent anchor still states its value on the axis'
   );
 });
 
@@ -287,23 +287,23 @@ test('Candidate previews honour their own option deltas', () => {
   // The settled decisions ride along as shared context and are never badged.
   assert.ok(
     !html.includes('<b>chordGrouping</b>'),
-    'the restored per-hand clasp is shared context, never a Round 18 question'
+    'the restored per-hand clasp is shared context, never a Round 19 question'
   );
   assert.ok(
     !html.includes('<b>systemStartStyle</b>'),
-    'the canonical flared bracket is shared context, never a Round 18 question'
+    'the canonical flared bracket is shared context, never a Round 19 question'
   );
   assert.ok(
     !html.includes('<b>gridWritingPolicy</b>'),
-    'the settled Round 14 grid policy is shared context, never a Round 18 question'
+    'the settled Round 14 grid policy is shared context, never a Round 19 question'
   );
   assert.ok(
     !html.includes('<b>stemAttachmentStyle</b>'),
-    'the doctrine default splay is shared context, never a Round 18 question'
+    'the doctrine default splay is shared context, never a Round 19 question'
   );
   assert.ok(
     !html.includes('<b>clusterSpacing</b>'),
-    'the decided tight gap is shared context, never a Round 18 question'
+    'the decided tight gap is shared context, never a Round 19 question'
   );
   assert.doesNotMatch(
     html,
@@ -330,11 +330,7 @@ test('Candidate previews honour their own option deltas', () => {
       axisValue(candidate, candidate.axis ?? '') !==
       String((golden as unknown as Record<string, unknown>)[candidate.axis ?? ''])
   );
-  assert.equal(
-    departures.length,
-    3,
-    'the three challengers depart from golden'
-  );
+  assert.equal(departures.length, 1, 'the lower-first demonstrator departs from golden');
   assert.equal(
     (html.match(/badge-delta/g) ?? []).length,
     departures.length,
@@ -344,7 +340,7 @@ test('Candidate previews honour their own option deltas', () => {
   // The lint chips report each candidate's real verdict. The behavior is
   // fixed, so every card is clean — the verdict judges shapes, never defects.
   assert.ok(
-    !cardOf('rest-kinetic-monoline').includes('chip chip-warn'),
+    !cardOf('cluster-anchor-rh').includes('chip chip-warn'),
     'the incumbent never merely warns'
   );
 
@@ -357,7 +353,7 @@ test('Candidate previews honour their own option deltas', () => {
       new RegExp(`<b>${axis}</b> = ${axisValue(candidate, axis)}`),
       `${candidate.id} states its own axis value`
     );
-    const otherAxis = axis === 'restStyle' ? 'clusterSpacing' : 'restStyle';
+    const otherAxis = axis === 'clusterAnchor' ? 'clusterSpacing' : 'clusterAnchor';
     assert.ok(!card.includes(`<b>${otherAxis}</b>`), `${candidate.id} never badges the other axis`);
     assert.equal(
       (card.match(/data-window="/g) ?? []).length,
@@ -375,30 +371,28 @@ test('Candidate previews honour their own option deltas', () => {
     );
   }
 
-  // The shape axis is judged on the carried clean windows plus the Bach m4
-  // fixed-context window — never on the retired spacing cluster windows.
-  const incumbentCard = cardOf('rest-kinetic-monoline');
-  for (const measure of [1, 2, 3, 4]) {
+  // The anchor axis is judged on the Round 19 case windows only — never on the
+  // retired rest-dialect or spacing windows.
+  const incumbentCard = cardOf('cluster-anchor-rh');
+  for (const measure of [46, 26, 3]) {
     assert.match(
       incumbentCard,
-      new RegExp(`data-window="rest-duration-specimen:${measure}-${measure}"`),
-      `shape rest specimen m. ${measure}`
+      new RegExp(`data-window="brahms-op118-no1:${measure}-${measure}"`),
+      `anchor Brahms m. ${measure}`
     );
   }
   assert.match(
     incumbentCard,
-    /data-window="brahms-op118-no1:68-68"/,
-    'shape Brahms m. 68'
-  );
-  assert.match(
-    incumbentCard,
     /data-window="chord-duration-specimen:2-2"/,
-    'shape chord specimen m. 2'
+    'anchor chord specimen m. 2'
   );
-  assert.match(incumbentCard, /data-window="primary:4-4"/, 'shape Bach m. 4 fixed context');
+  assert.ok(
+    !incumbentCard.includes('data-window="rest-duration-specimen:1-1"'),
+    'the anchor axis is never judged on the retired rest windows'
+  );
   assert.ok(
     !incumbentCard.includes('data-window="primary:8-8"'),
-    'the shape axis is never judged on the retired cluster windows'
+    'the anchor axis is never judged on the retired cluster windows'
   );
 
   // The settled clasp grammar and grid policy are stated in the card facts.
@@ -612,15 +606,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 18);
-  assert.match(CURRENT_ROUND_METADATA.title, /Rest-Shape Verdict/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 19);
+  assert.match(CURRENT_ROUND_METADATA.title, /Symmetric-Tuck Clusters/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['restStyle'],
+    ['clusterAnchor'],
     'the single judged axis is declared'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'the four carried dialects');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'the incumbent anchor and the demonstrator');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

@@ -540,6 +540,53 @@ export function claspDurationDotted(durationTicks: number): boolean {
   return Number.isInteger(plain) && CLASP_PLAIN_VALUES.includes(plain);
 }
 
+/**
+ * One **duration-ink group** of a clasp: a value painted at one point on the
+ * bracket spine (Round 19).
+ *
+ * A classic per-hand bracket carries exactly one group, at its own midpoint
+ * (`yMid`). A **unified** cross-hand bracket (see the engine's
+ * `resolveOnsetClaspGroups`) carries one group per hand, so each hand's value
+ * survives the unification: the open half/whole marks sit at the bracket's own
+ * midpoint (they read as the bracket's value), while the transverse
+ * subdivision marks stay at their own hand's vertical centre.
+ */
+export interface ResolvedJankoClaspInk {
+  /** Absolute y of the group's centre on the spine. */
+  centerY: number;
+  /** The value this group carries (ticks). */
+  durationTicks: number;
+  /** Resolved duration grammar of that value. */
+  duration: JankoClaspDuration;
+  /** Duration notches (0 = quarter, 1 = 8th, 2 = 16th). */
+  flags: number;
+  /** Open knockout marks (0–2) painted at the spine midpoint. */
+  pips: number;
+  /** A dotted value adds the 0.75pt augmentation dot beside the mark. */
+  dotted: boolean;
+}
+
+/** A duration-ink group the caller asks for (unresolved: value + spine y). */
+export interface JankoClaspDurationInk {
+  /** Absolute y of the group's centre on the spine. */
+  centerY: number;
+  /** The value the group carries (ticks). */
+  durationTicks: number;
+}
+
+/** Resolve one requested duration-ink group into its painted mark grammar. */
+export function resolveClaspInk(ink: JankoClaspDurationInk): ResolvedJankoClaspInk {
+  const duration = claspDurationClass(ink.durationTicks);
+  return {
+    centerY: ink.centerY,
+    durationTicks: ink.durationTicks,
+    duration,
+    flags: duration === 'spire-two-flags' ? 2 : duration === 'spire-one-flag' ? 1 : 0,
+    pips: duration === 'double-pip' ? 2 : duration === 'pip' ? 1 : 0,
+    dotted: claspDurationDotted(ink.durationTicks),
+  };
+}
+
 /** One resolved left clasp: bracket geometry plus its symmetrical duration ink. */
 export interface JankoClaspGroupGeometry {
   /** Onset tick shared by every member of the cluster. */
@@ -573,6 +620,14 @@ export interface JankoClaspGroupGeometry {
   pips: number;
   /** Round 11: a dotted value adds the 0.75pt augmentation dot at the midpoint. */
   dotted: boolean;
+  /**
+   * Round 19: every duration-ink group this bracket paints, in paint order. A
+   * classic per-hand bracket has exactly one (at its own midpoint); a unified
+   * cross-hand bracket has one per hand. The scalar `duration` / `flags` /
+   * `pips` / `dotted` fields mirror the bracket's **primary** group (the first
+   * entry), which is all a classic bracket ever has.
+   */
+  durationInk: ResolvedJankoClaspInk[];
   /** The bracket itself: `M cap topY L claspX topY L claspX botY L cap botY`. */
   path: string;
 }
@@ -596,6 +651,13 @@ export interface JankoClaspOptions {
    * Defaults to the settled `'kinetic-cross-slashes'`.
    */
   claspDurationStyle?: JankoClaspDurationStyle;
+  /**
+   * Round 19: explicit duration-ink groups (value + spine y) for a **unified**
+   * cross-hand bracket, which paints one group per hand. Omitted for a classic
+   * bracket, whose single group sits at its own midpoint and carries the
+   * carried value.
+   */
+  durationInk?: JankoClaspDurationInk[];
 }
 
 /** The bracket `[` path: cap → spine → cap. */
@@ -640,11 +702,17 @@ export function computeClaspGeometry(
   const topY = minY - r;
   const botY = maxY + r;
   const durationTicks = options?.durationTicks ?? Math.min(...notes.map((n) => n.durationTicks));
-  const duration = claspDurationClass(durationTicks);
-  const flags =
-    duration === 'spire-two-flags' ? 2 : duration === 'spire-one-flag' ? 1 : 0;
-  const pips = duration === 'double-pip' ? 2 : duration === 'pip' ? 1 : 0;
-  const dotted = claspDurationDotted(durationTicks);
+  const durationInk = (
+    options?.durationInk && options.durationInk.length > 0
+      ? options.durationInk
+      : [{ centerY: (topY + botY) / 2, durationTicks }]
+  ).map(resolveClaspInk);
+  // `durationTicks` stays the **carried value** — the shortest member value,
+  // which is what the cluster's first voice moves on, unified bracket or not.
+  // The scalar mark fields mirror the bracket's primary ink group (the first
+  // entry): for a classic bracket the only group, for a unified cross-hand
+  // bracket its open half/whole group.
+  const primary = durationInk[0];
   const cap = t.claspWidth;
   return {
     tick: notes[0].startTick,
@@ -659,11 +727,12 @@ export function computeClaspGeometry(
     capWidth: cap,
     strokeWidth: t.claspStrokeWidth,
     durationTicks,
-    duration,
+    duration: claspDurationClass(durationTicks),
     durationStyle: options?.claspDurationStyle ?? 'kinetic-cross-slashes',
-    flags,
-    pips,
-    dotted,
+    flags: primary.flags,
+    pips: primary.pips,
+    dotted: primary.dotted,
+    durationInk,
     path: claspBracketPath(claspX, topY, botY, cap),
   };
 }
@@ -773,64 +842,70 @@ function renderClaspDurationInk(
   t: ResolvedJankoTokens
 ): string[] {
   const out: string[] = [];
-  const yMid = (group.topY + group.botY) / 2;
   const claspX = group.claspX;
   const stroke = CLASP_TRANSVERSE_STROKE.toFixed(2);
   const rake = t.maxBeamSlope;
-  const open = group.pips > 0;
-  const hasMark = open || group.flags > 0;
-  const mark = open
-    ? claspOpenMark(group.pips)
-    : claspFlagMark(group.durationStyle, group.flags, rake);
-  const centers =
-    mark.stack === 0 ? [yMid] : [yMid - mark.stack, yMid + mark.stack];
+  const groups =
+    group.durationInk && group.durationInk.length > 0
+      ? group.durationInk
+      : [resolveClaspInk({ centerY: (group.topY + group.botY) / 2, durationTicks: group.durationTicks })];
 
-  for (const cy of hasMark ? centers : []) {
-    if (open) {
-      // Every paradigm shares the clean open white ring: its 100% white
-      // interior knocks the spine out with zero crosshairs.
+  for (const ink of groups) {
+    const yMid = ink.centerY;
+    const open = ink.pips > 0;
+    const hasMark = open || ink.flags > 0;
+    const mark = open
+      ? claspOpenMark(ink.pips)
+      : claspFlagMark(group.durationStyle, ink.flags, rake);
+    const centers = mark.stack === 0 ? [yMid] : [yMid - mark.stack, yMid + mark.stack];
+
+    for (const cy of hasMark ? centers : []) {
+      if (open) {
+        // Every paradigm shares the clean open white ring: its 100% white
+        // interior knocks the spine out with zero crosshairs.
+        out.push(
+          `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(CLASP_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"/>`
+        );
+        continue;
+      }
+
+      const half = CLASP_TRANSVERSE_WIDTH / 2;
+      const dy = half * rake;
+      switch (group.durationStyle) {
+        case 'kinetic-cross-slashes':
+          // Up-raked: the cut rises from left to right.
+          out.push(
+            `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy + dy)}" x2="${f(claspX + half)}" y2="${f(cy - dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+          );
+          break;
+        case 'down-raked-slashes':
+          // Down-raked: the mirrored cut falls from left to right.
+          out.push(
+            `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy - dy)}" x2="${f(claspX + half)}" y2="${f(cy + dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+          );
+          break;
+        case 'cross-hatch-stitches':
+          // A symmetrical `×`: both rakes cross on the spine's own centreline.
+          out.push(
+            `    <path class="janko-clasp-stitch" d="M ${f(claspX - half)} ${f(cy + dy)} L ${f(claspX + half)} ${f(cy - dy)} M ${f(claspX - half)} ${f(cy - dy)} L ${f(claspX + half)} ${f(cy + dy)}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+          );
+          break;
+        case 'transverse-cross-bars':
+        default:
+          out.push(
+            `    <line class="janko-clasp-bar" x1="${f(claspX - half)}" y1="${f(cy)}" x2="${f(claspX + half)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+          );
+          break;
+      }
+    }
+
+    // A dotted value adds the canonical 0.75pt augmentation dot just right of
+    // the mark, painted last so a white knockout can never erase it.
+    if (ink.dotted) {
       out.push(
-        `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(CLASP_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"/>`
+        `    <circle class="janko-clasp-dot" cx="${f(claspX + CLASP_DOT_OFFSET)}" cy="${f(yMid)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
       );
-      continue;
     }
-
-    const half = CLASP_TRANSVERSE_WIDTH / 2;
-    const dy = half * rake;
-    switch (group.durationStyle) {
-      case 'kinetic-cross-slashes':
-        // Up-raked: the cut rises from left to right.
-        out.push(
-          `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy + dy)}" x2="${f(claspX + half)}" y2="${f(cy - dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-        );
-        break;
-      case 'down-raked-slashes':
-        // Down-raked: the mirrored cut falls from left to right.
-        out.push(
-          `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy - dy)}" x2="${f(claspX + half)}" y2="${f(cy + dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-        );
-        break;
-      case 'cross-hatch-stitches':
-        // A symmetrical `×`: both rakes cross on the spine's own centreline.
-        out.push(
-          `    <path class="janko-clasp-stitch" d="M ${f(claspX - half)} ${f(cy + dy)} L ${f(claspX + half)} ${f(cy - dy)} M ${f(claspX - half)} ${f(cy - dy)} L ${f(claspX + half)} ${f(cy + dy)}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-        );
-        break;
-      case 'transverse-cross-bars':
-      default:
-        out.push(
-          `    <line class="janko-clasp-bar" x1="${f(claspX - half)}" y1="${f(cy)}" x2="${f(claspX + half)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-        );
-        break;
-    }
-  }
-
-  // A dotted value adds the canonical 0.75pt augmentation dot just right of the
-  // mark, painted last so a white knockout can never erase it.
-  if (group.dotted) {
-    out.push(
-      `    <circle class="janko-clasp-dot" cx="${f(claspX + CLASP_DOT_OFFSET)}" cy="${f(yMid)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
-    );
   }
   return out;
 }
@@ -849,20 +924,28 @@ export function claspInkBox(
   let x1 = group.claspX + group.capWidth;
   let y0 = group.topY;
   let y1 = group.botY;
-  const yMid = (group.topY + group.botY) / 2;
 
-  if (group.pips > 0 || group.flags > 0) {
-    const mark =
-      group.pips > 0
-        ? claspOpenMark(group.pips)
-        : claspFlagMark(group.durationStyle, group.flags, t.maxBeamSlope);
-    x0 = Math.min(x0, group.claspX - mark.halfWidth);
-    x1 = Math.max(x1, group.claspX + mark.halfWidth);
-    y0 = Math.min(y0, yMid - mark.stack - mark.halfHeight);
-    y1 = Math.max(y1, yMid + mark.stack + mark.halfHeight);
-  }
-  if (group.dotted) {
-    x1 = Math.max(x1, group.claspX + CLASP_DOT_OFFSET + t.augmentationDotRadius);
+  // Round 19: every duration-ink group of the bracket, not just the primary
+  // one, so a unified bracket's per-hand marks are covered by the audited box.
+  const inks =
+    group.durationInk && group.durationInk.length > 0
+      ? group.durationInk
+      : [resolveClaspInk({ centerY: (group.topY + group.botY) / 2, durationTicks: group.durationTicks })];
+  for (const ink of inks) {
+    const yMid = ink.centerY;
+    if (ink.pips > 0 || ink.flags > 0) {
+      const mark =
+        ink.pips > 0
+          ? claspOpenMark(ink.pips)
+          : claspFlagMark(group.durationStyle, ink.flags, t.maxBeamSlope);
+      x0 = Math.min(x0, group.claspX - mark.halfWidth);
+      x1 = Math.max(x1, group.claspX + mark.halfWidth);
+      y0 = Math.min(y0, yMid - mark.stack - mark.halfHeight);
+      y1 = Math.max(y1, yMid + mark.stack + mark.halfHeight);
+    }
+    if (ink.dotted) {
+      x1 = Math.max(x1, group.claspX + CLASP_DOT_OFFSET + t.augmentationDotRadius);
+    }
   }
   return { x0, y0, x1, y1 };
 }

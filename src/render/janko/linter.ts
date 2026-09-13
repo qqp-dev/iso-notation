@@ -79,6 +79,7 @@ import {
   suppressedStemIds,
 } from './engine';
 import { getEquatorRuleYs } from './elements/staff';
+import { resolveBeatPulseXs } from './elements/barlines';
 import {
   JankoBeamConnector,
   JankoRhythmNote,
@@ -1419,38 +1420,19 @@ export function systemInkExtents(
   return { top, bottom };
 }
 
-/** X positions of every dashed beat pulse painted in one system. */
+/**
+ * X positions of every dashed beat pulse painted in one system.
+ *
+ * Round 19: the pulses are resolved by the *renderer's own* function, fed with
+ * the system's laid-out columns — so an occupied beat's pulse is audited at the
+ * column the music actually stands on, never at a stale proportional x.
+ */
 function beatPulseXs(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): number[] {
-  if (!o.showBeatGrid) return [];
-  const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / t.ticksPerBeat));
-  if (beatsPerMeasure <= 1) return [];
-  const g = layout.geometry;
-  const baseInset = getGridNoteInset(o, t);
-  const anacrusis = t.anacrusisTicks ?? 0;
-  const isSys0Anacrusis = layout.index === 0 && anacrusis > 0;
-  const upbeatWidth = isSys0Anacrusis ? (anacrusis / t.ticksPerMeasure) * g.measureWidth : 0;
-  const xs: number[] = [];
-  for (let m = 0; m < o.measuresPerSystem; m++) {
-    const isOpening = layout.index === 0 && m === 0;
-    const insets =
-      isOpening && o.showTimeSignature && o.timeSignatureWidth > 0
-        ? { left: baseInset + o.timeSignatureWidth, right: baseInset }
-        : undefined;
-    const measureLeft = isSys0Anacrusis
-      ? g.staffLeft + upbeatWidth + m * g.measureWidth
-      : g.staffLeft + m * g.measureWidth;
-    const left = insets?.left ?? baseInset;
-    const right = insets?.right ?? baseInset;
-    const available = Math.max(0, g.measureWidth - left - right);
-    for (let b = 1; b < beatsPerMeasure; b++) {
-      xs.push(measureLeft + left + (b / beatsPerMeasure) * available);
-    }
-  }
-  return xs;
+  return resolveBeatPulseXs(layout.geometry, layout.index, o, t, layout.columns);
 }
 
 /** One barline segment of a system, per hand (RH and LH halves). */

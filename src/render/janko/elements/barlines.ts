@@ -21,6 +21,8 @@ import {
   JankoLayoutOptions,
   JankoSystemGeometry,
   JankoTokens,
+  ResolvedJankoLayoutOptions,
+  ResolvedJankoTokens,
   channelsGridInk,
   getGridNoteInset,
   resolveJankoOptions,
@@ -211,28 +213,35 @@ export function renderMeasureNumber(
  * may cross it), while the transparent policy lets the note field use the full
  * measure width and knocks the pulse out with the circular glyph mask.
  */
-export function renderBeatGrid(
+/**
+ * X position of every dashed beat pulse of one system, in painting order
+ * (measure by measure, beat by beat).
+ *
+ * Round 19: a beat that **carries an onset** is painted through that onset's
+ * **laid-out column** (`columns`, the solve's rigidly translated beat x). The
+ * proportional grid starts at the measure's grid inset and steps by the free
+ * width, while the note columns start `claspInset` further in and step tighter,
+ * so the two axes drift apart by up to ~8.5pt on the corpus (Brahms m. 3: the
+ * dotted quarter lines sat 8.51 / 7.67 / 6.84pt left of their own note columns,
+ * and the m. 3 pair's bracket spine landed 0.76pt from its pulse). Beats with
+ * no onset keep the proportional line.
+ */
+export function resolveBeatPulseXs(
   geo: JankoSystemGeometry,
   systemIndex: number,
-  options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
-): string {
-  const o = resolveJankoOptions(options);
-  const t = resolveJankoTokens(tokens);
-  if (!o.showBeatGrid) return '';
-
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  columns?: ReadonlyMap<number, number> | null
+): number[] {
+  if (!o.showBeatGrid) return [];
   const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / t.ticksPerBeat));
-  if (beatsPerMeasure <= 1) return '';
+  if (beatsPerMeasure <= 1) return [];
 
-  const out: string[] = ['  <g class="janko-beat-grid">'];
-  const rhTop = gridTopY(geo);
-  const lhBot = gridBotY(geo);
-  const channelled = channelsGridInk(o.gridWritingPolicy);
   const baseInset = getGridNoteInset(o, t);
-
   const anacrusis = t.anacrusisTicks ?? 0;
   const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
   const upbeatWidth = isSys0Anacrusis ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth : 0;
+  const xs: number[] = [];
 
   for (let m = 0; m < o.measuresPerSystem; m++) {
     const isOpeningMeasure = systemIndex === 0 && m === 0;
@@ -240,25 +249,69 @@ export function renderBeatGrid(
       isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
         ? { left: baseInset + o.timeSignatureWidth, right: baseInset }
         : undefined;
-
     const measureLeft = isSys0Anacrusis
       ? geo.staffLeft + upbeatWidth + m * geo.measureWidth
       : geo.staffLeft + m * geo.measureWidth;
-
     const left = insets?.left ?? baseInset;
     const right = insets?.right ?? baseInset;
     const available = Math.max(0, geo.measureWidth - left - right);
-
+    // The absolute tick of this loop cell's first beat. The anacrusis system's
+    // opening cell is the first *full* measure (measure index 1, starting at
+    // the anacrusis); every other cell follows the ordinary measure grid.
+    const measureStartTick = isSys0Anacrusis
+      ? anacrusis + m * t.ticksPerMeasure
+      : anacrusis + (systemIndex * o.measuresPerSystem + m) * t.ticksPerMeasure;
     for (let b = 1; b < beatsPerMeasure; b++) {
-      const frac = b / beatsPerMeasure;
-      const x = measureLeft + left + frac * available;
-      if (channelled) {
-        out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BEAT, 'janko-grid-channel', '2,3'));
-      }
-      out.push(
-        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
-      );
+      const tick = measureStartTick + b * t.ticksPerBeat;
+      xs.push(columns?.get(tick) ?? measureLeft + left + (b / beatsPerMeasure) * available);
     }
+  }
+  return xs;
+}
+
+/**
+ * Vertical dashed pulse lines for beats 2, 3, … (Klavarskribo beat grid).
+ * Replaces the heavy time signature numerals with subtle subdivision guidance.
+ * Round 7 steps the grid up to 0.70pt `#9CA3AF`: the beat pulses stay clearly
+ * subordinate to the music but now read as a real structural layer above the
+ * lightened staff rules.
+ *
+ * Round 12 makes each pulse one **continuous** rule from `rhTop` down to
+ * `lhBot` across the Middle C corridor, matching the measure barlines, and
+ * honours the active `gridWritingPolicy`: the strict policy gives every pulse a
+ * white air channel (painted above the rhythm layer by the engine, so no stem
+ * may cross it), while the transparent policy lets the note field use the full
+ * measure width and knocks the pulse out with the circular glyph mask.
+ *
+ * Round 19 makes each **occupied** beat's pulse follow its onset's laid-out
+ * column (see {@link resolveBeatPulseXs}).
+ */
+export function renderBeatGrid(
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null,
+  columns?: ReadonlyMap<number, number> | null
+): string {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  if (!o.showBeatGrid) return '';
+
+  const pulses = resolveBeatPulseXs(geo, systemIndex, o, t, columns);
+  if (pulses.length === 0) return '';
+
+  const out: string[] = ['  <g class="janko-beat-grid">'];
+  const rhTop = gridTopY(geo);
+  const lhBot = gridBotY(geo);
+  const channelled = channelsGridInk(o.gridWritingPolicy);
+
+  for (const x of pulses) {
+    if (channelled) {
+      out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BEAT, 'janko-grid-channel', '2,3'));
+    }
+    out.push(
+      `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
+    );
   }
 
   out.push('  </g>');

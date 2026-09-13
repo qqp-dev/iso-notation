@@ -741,12 +741,30 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
   const clasps = brahms.flatMap((l) => l.clasps);
   assert.ok(clasps.length >= 3, `Brahms hand clusters are clasped (${clasps.length})`);
   const r = BRAHMS_T.noteheadRadius;
+  let unified = 0;
   for (const clasp of clasps) {
-    assert.equal(
-      new Set(clasp.notes.map((n) => n.hand)).size,
-      1,
-      'a bracket never spans both hands'
-    );
+    const hands = new Set(clasp.notes.map((n) => n.hand));
+    if (hands.size > 1) {
+      // Round 19: a bracket spans both hands only as the **unified** bracket of
+      // an onset whose two hand spans overlap or touch — a gapped onset (the
+      // m. 3 downbeat, 90pt apart) keeps Round 6's per-hand brackets.
+      unified++;
+      const byHand = new Map<string, typeof clasp.notes>();
+      for (const n of clasp.notes) {
+        const bucket = byHand.get(n.hand);
+        if (bucket) bucket.push(n);
+        else byHand.set(n.hand, [n]);
+      }
+      const spans = [...byHand.values()].map((group) => ({
+        top: Math.min(...group.map((n) => n.y)) - r,
+        bot: Math.max(...group.map((n) => n.y)) + r,
+      }));
+      assert.equal(spans.length, 2, 'exactly the two hands of one onset');
+      assert.ok(
+        spans[0].bot >= spans[1].top - 1e-6 && spans[1].bot >= spans[0].top - 1e-6,
+        `unified clasp at tick ${clasp.tick} spans two overlapping hands`
+      );
+    }
     assert.ok(
       claspQualifies(clasp.notes),
       'every bracket is either row-snapped or a 3-or-more-note vertical chord'
@@ -779,6 +797,9 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
       assert.ok(BRAHMS_T.claspMinBarlineAir >= 3.5, 'the ticket floor is 3.5pt');
     }
   }
+  // Round 19 corpus pin: exactly the two interlocking-hands downbeats (mm. 46
+  // and 26) unify; every other Brahms bracket stays a per-hand bracket.
+  assert.equal(unified, 2, 'only the two overlapping-hands onsets unify');
   // Duration ownership: a member whose stem is not part of a real beam loses its
   // standalone stem, because the bracket now carries the value.
   const beamed = new Set(

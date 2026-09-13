@@ -348,8 +348,9 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   spring-relaxation over a ~4-onset sliding window, cells as hard clamps,
   place-then-relax (m15); (d) multi-row interleave at the half-step G/2 with
   the widest row anchoring (Brahms t1392/t1584), shared-stem carrier rule
-  unchanged; (e) clasp-shifted anchor-on-shifted-column, beat-cell +
-  barline-floor barriers unchanged, still violations.
+  unchanged — **superseded by the Round 19 symmetric tuck**; (e)
+  clasp-shifted anchor-on-shifted-column, beat-cell + barline-floor barriers
+  unchanged, still violations.
 - **Dot hug (direct)** — the dot hugs its mask's corner (gap 1.2, lane 3.5
   above the head), always right, uniform sign (`dotY < head`); rule-graze
   stepping stays with high-lane fallback; `dot-collision` stays a
@@ -386,6 +387,59 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   byte-identical R15 clean windows plus a Bach m4 fixed-context window per
   card; `openAxes: ['restStyle']`; every card engraves under `tight`.
 
+### Round 19 symmetric tuck + overlap unification + grid-on-columns
+
+- **Symmetric tuck (direct; replaces the multi-row interleave)** — one onset
+  whose rows carry *different* head counts is re-centred: the widest row(s)
+  keep the `1a` fan (roomier-side machinery untouched) and every smaller row
+  shifts so its **own middle** (`(minOffset + maxOffset) / 2`) lands on the
+  widest row's middle. The ticket's `(maxCount − rowCount) · (pairGap / 2) · d`
+  is the special case of a widest row fanned from a head at its end — the
+  m. 46 pairs; a middle-anchored triple is already symmetric, so its narrower
+  row does not move at all (t1392). Rows of equal count never shift, so an even
+  cluster (1+1, 2+2+2, 3+3) coincides exactly. A tuck that would leave the beat
+  cell is skipped. m. 46: F5/D3 tuck to 53.88 (the pair columns' midpoint),
+  F4/G♯4 hold 51.15, B4/D4 fan to 56.61 — mirror-symmetric about 53.88.
+- **Stem joinery (direct)** — two edits make the tucked layouts stem-clean:
+  the Round 16 shared-stem carrier ranks against the onset's **laid-out
+  column** (`nominalX + shift`, the axis the whole unit was translated to),
+  not the stale pre-solve proportional x, so a tucked interior head can no
+  longer take the stem and pierce the anchor's disc (Brahms m. 17/t3120); and
+  the overlap unification below removes the m. 46 stems altogether. The
+  linter's `stem-through-simultaneity` defect these produced (m. 46 at 0.00pt,
+  m. 17 at 2.73pt) is pinned as a negative test through `chordGrouping: 'none'`,
+  the paradigm with no bracket to own the duration.
+- **Overlap-conditional unification (direct)** — where **both** hands of one
+  onset produce a Round 6 qualifying group and their spans (heads ± disc)
+  overlap or touch, the onset is grouped as **one** bracket spanning every head
+  (m. 46: 93.7–178.3; m. 26: 574.96–659.56), instead of two brackets painted
+  over one another. Disjoint spans keep Round 6's per-hand brackets unchanged —
+  the m. 3 downbeat guard, whose 90pt hand gap must stay split. A unified
+  bracket paints **one duration group per hand** (`durationInk`): the open
+  half/whole marks at the bracket's own midpoint (m. 46's ring at cy = 136),
+  the transverse subdivision marks at their own hand's vertical centre. The
+  bracket still carries the shortest member value.
+- **`clusterAnchor` (the one judged axis)** — `'rh'` (golden) anchors the RH
+  tone on a mixed-hand row, the middle head otherwise; `'lower-first'` is the
+  naive demonstrator (the lowest-pitched head of every row keeps the column).
+  With the fixed joinery both cards are lint-clean; the axis decides the head
+  order at the interlocking onsets (m. 46: G♯4 left/D4 right vs D4 left/G♯4
+  right), never a defect.
+- **Beat grid follows the columns (direct; score-wide)** — the dashed pulse of
+  a beat that carries an onset is painted through that onset's laid-out column
+  (`nominalX + shift`), exposed as `JankoSystemLayout.columns`; an empty beat
+  keeps the proportional line, and barlines are untouched. The renderer and the
+  linter share one resolver (`resolveBeatPulseXs`), so an audited pulse is
+  always the painted pulse. Brahms m. 3's dotted-quarter lines move from
+  450.71 / 488.90 / 527.09 to 459.22 / 496.57 / 533.93 (the 8.51 / 7.67 /
+  6.84pt left-drift is gone), and the m. 3 pair's bracket spine (526.33) now
+  clears its pulse by ≈7.6pt instead of grazing it at 0.76pt.
+- **Round 19 registry** — two candidates (A `cluster-anchor-rh`,
+  B `cluster-anchor-lower-first`) on the shared case windows (Brahms m. 46,
+  m. 26, the m. 3 guard, the chord specimen's triples); `openAxes:
+  ['clusterAnchor']`; the mega-vs-split bracket evidence rides the served PNGs,
+  never a candidate (grouping is not this round's axis).
+
 ### Two-view studio
 
 ```ts
@@ -399,7 +453,7 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 ## 3. Verification
 
 ```bash
-npm test                          # 273 tests, < 4 s
+npm test                          # 287 tests, < 6 s
 npm run lint:engraving            # visual lint of the golden master
 npm run build                     # tsc + vite (index.html + janko.html entries)
 ```
@@ -409,6 +463,7 @@ npm run build                     # tsc + vite (index.html + janko.html entries)
 | `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), the bounded center channel (option/token schema, two boundary rules per equator, Set A in the channel, direction-resolved Set B flanks, zero contour contradictions on the canonical score), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects) |
 | `test/janko-linter.test.ts` | the report contract, the clean golden master, the clean bounded channel, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
 | `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the Round-4 registry (incumbent vs bounded channel), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
+| `test/janko-round19.test.ts` | the Round 19 cluster law: the `clusterAnchor` option, the symmetric tuck's exact m. 46 positions and its score-wide mirror property, the even-cluster coincidence, the beat-cell guard, the overlap unification (m. 46 / m. 26) and the m. 3 split guard, the unified bracket's per-hand duration groups, the anchor demonstrator's head order, the `stem-through-simultaneity` signature the joinery owns, and the beat grid's column-following pulses (m. 3, the anacrusis mapping, an empty beat, both scores score-wide) |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test
 (Bach Variation 1 m. 8 does not contain that literal figure); the m. 8 crop
