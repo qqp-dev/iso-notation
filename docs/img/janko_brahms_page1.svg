@@ -476,6 +476,11 @@
     <line class="janko-stem" x1="415.29" y1="604.76" x2="415.29" y2="593.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="420.79" y1="634.76" x2="420.79" y2="623.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="523.66" y1="619.76" x2="523.66" y2="608.76" stroke="#111111" stroke-width="0.90"/>
+    <g class="janko-rest-group" data-rest-tick="1284" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
+    <line class="janko-rest-stem" x1="114.64" y1="630.51" x2="114.64" y2="642.51" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="114.64" y1="630.51" x2="118.64" y2="631.39" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="2" x1="114.64" y1="633.91" x2="118.64" y2="634.79" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    </g>
     <circle class="janko-knockout" cx="47.30" cy="624.76" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="47.30" y="627.62" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
     <circle class="janko-knockout" cx="41.80" cy="609.76" r="4.80" fill="#FFFFFF"/>

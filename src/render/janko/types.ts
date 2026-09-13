@@ -97,30 +97,34 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
  * | style               | 16th / 8th                                  | quarter                     | half / whole            |
  * | ------------------- | ------------------------------------------- | --------------------------- | ----------------------- |
  * | `'kinetic-monoline'`| vertical stem + 12.4° kinetic tabs (`//`,`/`)| central horizontal notch    | hollow bar (7 × 2.2pt)  |
- * | `'classical-urtext'`| calligraphic double / single hook (`𝄿`, `𝄾`) | serpentine lightning (`𝄽`)  | solid block (6 × 2.5pt) |
+ * | `'classical-urtext'`| calligraphic hooks with teardrop bulbs (`𝄿`, `𝄾`) | serpentine lightning (`𝄽`) | solid block (6 × 2.5pt) |
  * | `'geometric-node'`  | hollow diamond + 2 / 1 lateral rays          | solid diamond (5 × 5pt)     | open capsule / lozenge  |
  * | `'bauhaus-slash'`   | 45° beveled slash + 2 / 1 parallel wings     | minimalist reversed-Z       | thin hairline box       |
+ * | `'phantom-notehead'`| dashed open head (R 3.0pt) + stem + 2 / 1 downward-hooked flags | dashed head + bare stem | dashed head + hollow bar |
  */
 export type JankoRestStyle =
   | 'kinetic-monoline'
   | 'classical-urtext'
   | 'geometric-node'
-  | 'bauhaus-slash';
+  | 'bauhaus-slash'
+  | 'phantom-notehead';
 
-/** Every rest dialect, in the canonical exploration order (A–D). */
+/** Every rest dialect, in the canonical exploration order (A–E). */
 export const JANKO_REST_STYLES: readonly JankoRestStyle[] = [
   'kinetic-monoline',
   'classical-urtext',
   'geometric-node',
   'bauhaus-slash',
+  'phantom-notehead',
 ];
 
-/** Human-readable names of the four rest dialects. */
+/** Human-readable names of the five rest dialects. */
 export const JANKO_REST_STYLE_LABELS: Record<JankoRestStyle, string> = {
   'kinetic-monoline': 'Kinetic Monoline Rests (12.4° tabs)',
   'classical-urtext': 'Classical Urtext Rest Glyphs',
   'geometric-node': 'Geometric Pause Nodes',
   'bauhaus-slash': 'Bauhaus Beveled Slashes',
+  'phantom-notehead': 'Phantom Notehead Rests',
 };
 
 /**
@@ -243,8 +247,9 @@ export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, 
  * | ------------------------ | --------------------------------------------------------- |
  * | `'open-halo'`            | none: the staff lines emerge openly from the margin, and  |
  * |                          | the Position of Honor halo rings the opening tick-0 heads |
- * | `'architectural-bracket'`| a straight 0.65pt rule with 3.0pt right-angled spurs      |
- * |                          | clasping the Octave 5 and Octave 2 rules                  |
+ * | `'architectural-bracket'`| a straight 0.65pt rule with 3.0pt spurs that   |
+ * |                          | clasp the Octave 5 and Octave 2 rules and flare  |
+ * |                          | diagonally outward by 13° (Round 13)             |
  * | `'delicate-bracket'`     | the same bracket drawn lighter: a 0.50pt rule with 2.5pt  |
  * |                          | right-angled spurs (Round 12)                             |
  * | `'clef-pillar'`          | a slender 0.50pt pillar connecting the octave equators    |
@@ -280,7 +285,7 @@ export const JANKO_SYSTEM_START_STYLES: readonly JankoSystemStartStyle[] = [
 /** Human-readable names of the system-start styles. */
 export const JANKO_SYSTEM_START_STYLE_LABELS: Record<JankoSystemStartStyle, string> = {
   'open-halo': 'Open Margin with Position-of-Honor Halo',
-  'architectural-bracket': 'Architectural Bracket (0.65pt rule + 3.0pt spurs)',
+  'architectural-bracket': 'Flared Architectural Bracket (0.65pt rule + 13° flared spurs)',
   'delicate-bracket': 'Delicate Architectural Bracket (0.50pt rule + 2.5pt spurs)',
   'clef-pillar': 'Nib-Free Clef Pillar (0.50pt lattice ticks)',
   'double-hairline': 'Double Hairline Frame (0.75pt / 0.35pt)',
@@ -606,9 +611,10 @@ export interface JankoLayoutOptions {
    */
   claspDurationStyle?: JankoClaspDurationStyle;
   /**
-   * Rest symbol dialect (Round 12): how a hand's silent span inside an active
-   * measure is written. Defaults to `'kinetic-monoline'` (see
-   * {@link JankoRestStyle}).
+   * Rest symbol dialect (Round 12, extended by Round 13): how a hand's silent
+   * span inside an active measure is written. The rest is anchored on the
+   * **voice contour** of the surrounding notes of its own hand (Round 13).
+   * Defaults to `'kinetic-monoline'` (see {@link JankoRestStyle}).
    */
   restStyle?: JankoRestStyle;
   /**

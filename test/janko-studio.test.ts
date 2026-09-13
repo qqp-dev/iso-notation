@@ -108,48 +108,59 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 12/);
-  assert.match(html, /Rest Symbol Dialects/);
+  assert.match(html, /Round 13/);
+  assert.match(html, /Voice Contour Rests/);
 });
 
-test('Round 12 registry pairs four rest dialects with start symbols and grid policies', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 12);
-  assert.match(CURRENT_ROUND_METADATA.title, /Rest Symbol Dialects/);
+test('Round 13 registry pairs the four rest finalists with the flared bracket', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 13);
+  assert.match(CURRENT_ROUND_METADATA.title, /Voice Contour Rests/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
     [
-      'kinetic-monoline-architectural-bracket',
-      'classical-urtext-delicate-bracket',
-      'geometric-node-clef-pillar',
-      'bauhaus-slash-architectural-bracket',
+      'classical-urtext-flared-bracket',
+      'phantom-notehead-flared-bracket',
+      'geometric-node-flared-bracket',
+      'kinetic-monoline-flared-bracket',
     ],
     'candidates A–D in display order'
   );
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.chordGrouping),
-    ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp']
-  );
-  assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.restStyle),
-    ['kinetic-monoline', 'classical-urtext', 'geometric-node', 'bauhaus-slash'],
-    'each candidate demonstrates one rest dialect'
+    ['classical-urtext', 'phantom-notehead', 'geometric-node', 'kinetic-monoline'],
+    'each candidate demonstrates one high-fidelity rest dialect'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
-    ['architectural-bracket', 'delicate-bracket', 'clef-pillar', 'architectural-bracket'],
-    'the three refined architectural start symbols'
+    [
+      'architectural-bracket',
+      'architectural-bracket',
+      'architectural-bracket',
+      'architectural-bracket',
+    ],
+    'the flared 0.65pt bracket is standardized for the whole round'
   );
+  // Round 13 keeps the settled clasp, the settled grid and the settled glide:
+  // the round varies exactly one variable — the rest dialect.
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.gridWritingPolicy),
-    ['overlaid-beat-grid', 'strict-protected-grid', 'unified-transparent-grid', 'overlaid-beat-grid'],
-    'the three grid writing policies'
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.chordGrouping),
+    ['none', 'none', 'none', 'none'],
+    'the golden chord grouping stays golden'
   );
-  // The settled beam-harmonized tab and the standardized 12.4° kinetic clasp are
-  // shared by all four, so the round varies exactly three variables.
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
     ['kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam']
+  );
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.gridWritingPolicy),
+    [
+      'overlaid-beat-grid',
+      'overlaid-beat-grid',
+      'overlaid-beat-grid',
+      'overlaid-beat-grid',
+    ],
+    'the settled golden grid policy'
   );
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
@@ -174,29 +185,29 @@ test('Round 12 registry pairs four rest dialects with start symbols and grid pol
     assert.equal(resolved.options.interStaffGap, 30.0, 'the symmetrical octave lattice');
   }
   assert.deepEqual(
-    candidateBadges(getCandidate('kinetic-monoline-architectural-bracket')!).map((b) => b.key),
-    ['chordGrouping', 'systemStartStyle'],
-    'candidate A is the golden rest dialect and grid policy itself'
+    candidateBadges(getCandidate('kinetic-monoline-flared-bracket')!).map((b) => b.key),
+    ['systemStartStyle'],
+    'candidate D is the golden rest dialect itself'
   );
   assert.deepEqual(
-    candidateBadges(getCandidate('classical-urtext-delicate-bracket')!).map((b) => b.key),
-    ['chordGrouping', 'restStyle', 'systemStartStyle', 'gridWritingPolicy']
+    candidateBadges(getCandidate('classical-urtext-flared-bracket')!).map((b) => b.key),
+    ['restStyle', 'systemStartStyle']
   );
   assert.deepEqual(
-    candidateBadges(getCandidate('bauhaus-slash-architectural-bracket')!).map((b) => b.key),
-    ['chordGrouping', 'restStyle', 'systemStartStyle']
+    candidateBadges(getCandidate('phantom-notehead-flared-bracket')!).map((b) => b.key),
+    ['restStyle', 'systemStartStyle']
   );
 });
 
-test('Round 12 candidates export cleanly to the contact sheet', () => {
+test('Round 13 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
     options: resolveCandidate(candidate).options,
   }));
-  // The specimen is the contact sheet's window: its five chords carry the whole
-  // taxonomy under the standardized up-raked 12.4° kinetic clasp, so the ink is
-  // countable side by side.
+  // The specimen is the contact sheet's window: five dense four-voice chords
+  // with their m. 2 silence written in each candidate's own dialect, so the
+  // rest ink is countable side by side.
   const specimen = CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID];
   const sheet = renderJankoVariantComparison(
     SPECIMEN,
@@ -217,39 +228,17 @@ test('Round 12 candidates export cleanly to the contact sheet', () => {
     const next = sheet.indexOf('data-variant="', start + 1);
     return sheet.slice(start, next === -1 ? undefined : next);
   };
+  const seen = new Set<string>();
   for (const candidate of CURRENT_CANDIDATES) {
     const body = panelBody(candidate.id);
-    assert.match(body, /class="janko-clasp-layer"/, `${candidate.id} paints its clasps`);
-    assert.match(
-      body,
-      /data-clasp-duration-style="kinetic-cross-slashes"/,
-      `${candidate.id} tags the settled duration paradigm`
-    );
-    const groups = [...body.matchAll(
-      /<g class="janko-clasp-group"[^>]*data-clasp-duration="([^"]*)"[^>]*>([\s\S]*?)<\/g>/g
-    )];
-    const eighth = groups.find((m) => m[1] === 'spire-one-flag')![2];
-    const sixteenth = groups.find((m) => m[1] === 'spire-two-flags')![2];
-    assert.equal((eighth.match(/janko-clasp-slash/g) ?? []).length, 1, `${candidate.id} 8th slash`);
-    assert.equal(
-      (sixteenth.match(/janko-clasp-slash/g) ?? []).length,
-      2,
-      `${candidate.id} 16th slash pair`
-    );
-    const spires = groups.filter((m) => m[1] === 'spire');
-    assert.equal(spires.length, 2, `${candidate.id} quarter + dotted quarter`);
-    assert.match(spires[1][2], /janko-clasp-dot/, `${candidate.id} dotted-quarter dot`);
-    assert.doesNotMatch(
-      spires[0][2],
-      /janko-clasp-(ring|slash|stitch|dot|pip)/,
-      `${candidate.id} plain quarter`
-    );
-    // Every candidate shares the one open white ring for the half note.
-    const half = groups.find((m) => m[1] === 'pip')![2];
-    assert.equal((half.match(/janko-clasp-ring/g) ?? []).length, 1, `${candidate.id} half ring`);
-    // …and the rest layer is on the sheet too.
-    assert.match(body, /class="janko-rest-group"/, `${candidate.id} writes the specimen silence`);
+    // One rest per panel — the specimen's m. 2 silence, in this dialect.
+    const rests = [...body.matchAll(/<g class="janko-rest-group"[^>]*data-rest-style="([^"]*)"/g)];
+    assert.equal(rests.length, 1, `${candidate.id} writes exactly the specimen silence`);
+    assert.equal(rests[0][1], resolveCandidate(candidate).options.restStyle, `${candidate.id} dialect`);
+    assert.match(body, /class="janko-system-bracket"/, `${candidate.id} paints the flared bracket`);
+    seen.add(body.replace(/ data-rest-style="[^"]*"/g, ''));
   }
+  assert.equal(seen.size, CURRENT_CANDIDATES.length, 'four distinct specimen engravings');
   // The Bach window keeps the shared beam-harmonized rake and the continuous
   // vertical grid.
   const bachSheet = renderJankoVariantComparison(
@@ -276,12 +265,14 @@ test('Candidate previews honour their own option deltas', () => {
   for (const candidate of CURRENT_CANDIDATES) {
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['chordGrouping', 'restStyle', 'systemStartStyle', 'gridWritingPolicy'],
-      `${candidate.id} declares the per-hand clasp, its rest dialect, its start symbol and its grid policy`
+      ['restStyle', 'systemStartStyle'],
+      `${candidate.id} declares its rest dialect and the standardized flared bracket`
     );
   }
-  assert.match(html, /<b>chordGrouping<\/b> = per-hand-clasp/);
-  assert.match(html, /<s>none<\/s>/, 'the golden grouping value every candidate departs from');
+  assert.ok(
+    !html.includes('<b>chordGrouping</b>'),
+    'the golden chord grouping is not a Round 13 question'
+  );
   assert.match(
     html,
     /<s>kinetic-monoline<\/s>/,
@@ -290,12 +281,11 @@ test('Candidate previews honour their own option deltas', () => {
   assert.match(
     html,
     /<s>open-halo<\/s>/,
-    'the golden System 1 start the three replacement candidates depart from'
+    'the golden System 1 start every candidate departs from'
   );
-  assert.match(
-    html,
-    /<s>overlaid-beat-grid<\/s>/,
-    'the golden grid policy the two exploratory candidates depart from'
+  assert.ok(
+    !html.includes('<b>gridWritingPolicy</b>'),
+    'the settled golden grid policy is not a Round 13 question'
   );
   assert.doesNotMatch(
     html,
@@ -311,12 +301,12 @@ test('Candidate previews honour their own option deltas', () => {
   };
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
-    // Candidate A *is* the golden rest dialect, and candidates A and D are the
-    // golden grid policy, so only the departures show those badges.
+    // Candidate D *is* the golden rest dialect, so only the three replacement
+    // dialects show that badge.
     if (resolved.options.restStyle === DEFAULT_JANKO_OPTIONS.restStyle) {
       assert.ok(
         !cardOf(candidate.id).includes('<b>restStyle</b>'),
-        'candidate A is the golden rest dialect itself'
+        'candidate D is the golden rest dialect itself'
       );
     } else {
       assert.match(
@@ -325,30 +315,11 @@ test('Candidate previews honour their own option deltas', () => {
         `${candidate.id} rest badge`
       );
     }
-    if (resolved.options.systemStartStyle === DEFAULT_JANKO_OPTIONS.systemStartStyle) {
-      assert.ok(
-        !cardOf(candidate.id).includes('<b>systemStartStyle</b>'),
-        'no candidate keeps the golden open margin in this round'
-      );
-    } else {
-      assert.match(
-        cardOf(candidate.id),
-        new RegExp(`<b>systemStartStyle</b> = ${resolved.options.systemStartStyle}`),
-        `${candidate.id} system-start badge`
-      );
-    }
-    if (resolved.options.gridWritingPolicy === DEFAULT_JANKO_OPTIONS.gridWritingPolicy) {
-      assert.ok(
-        !cardOf(candidate.id).includes('<b>gridWritingPolicy</b>'),
-        'candidates A and D are the golden grid policy itself'
-      );
-    } else {
-      assert.match(
-        cardOf(candidate.id),
-        new RegExp(`<b>gridWritingPolicy</b> = ${resolved.options.gridWritingPolicy}`),
-        `${candidate.id} grid policy badge`
-      );
-    }
+    assert.match(
+      cardOf(candidate.id),
+      /<b>systemStartStyle<\/b> = architectural-bracket/,
+      `${candidate.id} always shows the flared-bracket delta`
+    );
     // Round 12 standardizes the up-raked 12.4° kinetic clasp: it is the golden
     // duration paradigm now, so no candidate ever shows a duration badge.
     assert.ok(
@@ -359,11 +330,11 @@ test('Candidate previews honour their own option deltas', () => {
   // The clasp grammar is stated in the card facts.
   for (const candidate of CURRENT_CANDIDATES) {
     assert.match(cardOf(candidate.id), /clasp 2\.8pt offset \/ 4\.0pt barline air/, `${candidate.id} tokens`);
-    assert.match(cardOf(candidate.id), /chord grouping per-hand-clasp/, `${candidate.id} grouping fact`);
-    // Every candidate paints the refined per-hand clasps and its rest layer.
+    assert.match(cardOf(candidate.id), /chord grouping none/, `${candidate.id} grouping fact`);
+    // Every candidate paints the flared bracket and its own rest layer.
     assert.ok(
-      cardOf(candidate.id).includes('janko-clasp-layer'),
-      `${candidate.id} renders its clasp layer`
+      cardOf(candidate.id).includes('janko-system-bracket'),
+      `${candidate.id} renders the flared bracket`
     );
     assert.ok(
       cardOf(candidate.id).includes('janko-rest-group'),
@@ -551,7 +522,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 12);
+  assert.equal(CURRENT_ROUND_METADATA.round, 13);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');

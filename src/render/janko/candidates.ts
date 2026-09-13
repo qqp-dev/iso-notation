@@ -105,128 +105,121 @@ export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
  * dialects with the per-hand clasp, round 7 the kinetic subdivision tabs with
  * gap-gated vertical chording, round 8 the symmetrical clasp with the
  * beam-harmonized tab, round 9 the midpoint duration taxonomy, round 10 the
- * scaled midpoint clasps with the retired accolade, and round 11 the four
- * System 1 start replacements with the light transverse cuts. Round 12 answers
- * the operator's verdict on that round: the notation gains a **rest** — four
- * rest dialects are compared on the Bach m. 4 silence that used to be an
- * invisible void — while the vertical grid becomes one **continuous** rule
- * across Middle C, its three writing policies are tested on dense sixteenths,
- * the System 1 start narrows to three architectural finalists, and the up-raked
- * 12.4° kinetic clasp is standardized as the golden duration paradigm.
+ * scaled midpoint clasps with the retired accolade, round 11 the four System 1
+ * start replacements with the light transverse cuts, and round 12 the rest
+ * symbol dialects on the continuous vertical grid. Round 13 answers the
+ * operator's verdict on that round: the rest **moves onto the voice contour**
+ * of its own hand (no more sky-floating Octave 4 equator), the System 1 start
+ * is standardized to the **flared 0.65pt architectural bracket**, a beam may no
+ * longer bridge the rest that interrupts it, and the four high-fidelity rest
+ * finalists — authentic Urtext, phantom notehead, geometric node and the
+ * corrected downward-hooked kinetic monoline — are compared side by side.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 12,
-  title:
-    'Rest Symbol Dialects, Continuous Vertical Grid, Start Symbols & Grid Writing Policies',
+  round: 13,
+  title: 'Voice Contour Rests, Flared 0.65pt Bracket & Beam Discontinuity',
   description:
-    'Comparing 4 rest symbol dialects, testing the 3-way grid writing policy on mm. 27 & 29, with continuous barlines and beat lines across Middle C and refined architectural start symbols.',
+    'Comparing 4 high-fidelity rest dialects anchored on the melodic voice contour, under the standardized flared 0.65pt architectural bracket, with beams that break across rests and multi-system crops that no longer collapse to an empty white page.',
 };
 
 /**
- * The four display windows every Round 12 candidate is engraved on: the Bach
- * opening (System 1 start symbol), the Bach Var. 1 m. 4 silence (the four rest
- * dialects at tick 552, resolving the RH syncopation), the Bach Var. 1
- * mm. 27–29 dense-sixteenth run (the 3-way grid writing policy under
- * continuous barlines and beat lines), and the **wide-span chord specimen**,
- * whose stemless chords carry the standardized up-raked 12.4° kinetic clasps.
+ * The four display windows every Round 13 candidate is engraved on: the Bach
+ * opening (the standardized flared 0.65pt architectural bracket), the Bach
+ * Var. 1 m. 4 silence (the four rest dialects at tick 552, resolving the RH
+ * syncopation on the Octave 3 voice contour, plus the `528 540 | 564` beam
+ * break), the Bach Var. 1 mm. 27–28 dense-sixteenth run (**one** system, full
+ * measure width — the Round 12 window straddled Systems 6 and 7 and collapsed
+ * to a 1pt white strip), and the **wide-span chord specimen**, whose dense
+ * four-voice chords carry the contour-anchored silence of their m. 2 measure.
  */
-const ROUND_12_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_13_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
     title:
-      'Bach Goldberg Var. 1 · mm. 1–2 — System 1 start symbols: 0.65pt architectural bracket vs 0.50pt delicate bracket vs nib-free clef pillar',
+      'Bach Goldberg Var. 1 · mm. 1–2 — the standardized System 1 start: one 0.65pt architectural rule clasping Octaves 5 … 2, its 3.0pt spurs flaring 13° diagonally outward',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 4,
     measureCount: 1,
     title:
-      'Bach Goldberg Var. 1 · m. 4 — the 4 rest dialects at tick 552 (RH 16th rest on the Octave 4 equator at x ≈ 545pt), resolving the RH syncopation against the LH entry',
+      'Bach Goldberg Var. 1 · m. 4 — the 4 rest dialects at tick 552, anchored on the RH voice contour (target y = 166pt, the midpoint of digit 9 at 158.5pt and digit 0 at 173.5pt, fitted to the nearest legal position beside the LH D3 head), with the beam breaking at the rest: 528 + 540 beamed, 564 an independent flagged 16th',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 27,
-    measureCount: 3,
+    measureCount: 2,
     title:
-      'Bach Goldberg Var. 1 · mm. 27–29 — the 3-way grid writing policy on dense sixteenths: protected barlines / strict air-channelled grid / unified transparent grid, with continuous barlines and beat lines across Middle C',
+      'Bach Goldberg Var. 1 · mm. 27–28 — one system at full width: the dense sixteenths under the continuous barline + beat-pulse grid across Middle C (the Round 12 cross-system window collapsed to an empty white page)',
   },
   {
     scoreId: SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
     title:
-      'Wide-Span Chord Specimen · standardized up-raked 12.4° kinetic clasps (half: open white ring, quarter: plain bracket, dotted quarter: +0.75pt dot, 8th: 1 slash, 16th: 2 slashes) on clean stemless 1.5-octave chords',
+      'Wide-Span Chord Specimen · the m. 2 voice-contour 8th rest anchored on the mean register of the four-voice chords that surround it (y = 121pt) — the written silence inside a dense chordal texture',
   },
 ];
 
 /**
- * The active candidate set — the four Round 12 rest dialects, each paired with
- * one System 1 start symbol and one grid writing policy. Order is the display
- * order in the Decision Candidates Matrix. All four share the settled
- * beam-harmonized kinetic tab (`'kinetic-tab-beam'`), the per-hand bracket
- * scope, the standardized up-raked 12.4° kinetic clasp and the continuous
- * vertical grid, so a candidate states exactly three deltas: the ink a silent
- * span leaves on the voice equator, the margin ink at the system start, and the
- * policy that decides who owns the grid overlap.
+ * The active candidate set — the four Round 13 rest finalists, all engraved
+ * under the **standardized** flared 0.65pt architectural bracket and the golden
+ * chord grouping. Order is the display order in the Decision Candidates Matrix.
+ * A candidate therefore varies the round's **single** question — the ink a
+ * silent span leaves on its hand's voice contour: authentic calligraphic
+ * Urtext, phantom notehead, geometric pause node, or the corrected
+ * downward-hooked kinetic monoline.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'kinetic-monoline-architectural-bracket',
-    label: 'A · Kinetic Monoline Rests / Architectural Bracket (0.65pt)',
+    id: 'classical-urtext-flared-bracket',
+    label: 'A · Authentic Classical Urtext Rest / Flared Bracket',
     description:
-      'A slender 12pt rest stem anchored on the voice equator, carrying the score’s own beam-harmonized 12.4° kinetic tabs — two for a 16th, one for an 8th — a clean central horizontal notch for a quarter and a hollow 7 × 2.2pt bar for a half. The silence speaks the exact kinetic language of the subdivision tab and the clasp slash. The system opens on the 0.65pt architectural bracket with 3.0pt spurs, and the barlines keep their protected air while the beat pulses pass behind the noteheads.',
+      'The timeless calligraphic Urtext rest, redrawn with true SMuFL vector grammar: a slightly slanted calligraphic stem whose single hook (8th) or double hook (16th) sweeps left into a solid teardrop bulb, the serpentine 𝄽 lightning for a quarter and a solid 6 × 2.5pt block sitting on the contour for a half. Instantly recognizable to any reader, and anchored exactly where the missing note would have been. The system opens on the standardized flared 0.65pt architectural bracket.',
     options: {
-      chordGrouping: 'per-hand-clasp',
+      restStyle: 'classical-urtext',
+      systemStartStyle: 'architectural-bracket',
+    },
+    windows: ROUND_13_WINDOWS,
+    tags: ['calligraphic 𝄿 𝄾 𝄽', 'teardrop bulbs', 'flared 0.65pt bracket'],
+  },
+  {
+    id: 'phantom-notehead-flared-bracket',
+    label: 'B · Phantom Notehead Rest / Flared Bracket',
+    description:
+      'An open dashed notehead (R = 3.0pt) standing exactly where the unvoiced note would have been, carrying the score’s own duration grammar: a monoline stem with one downward-hooked flag for an 8th, two for a 16th, the bare stem for a quarter and a calm hollow dashed bar for a half. The silence keeps the melodic contour of the line it interrupts — the eye reads the missing note, not an abstract pause. The system opens on the standardized flared 0.65pt architectural bracket.',
+    options: {
+      restStyle: 'phantom-notehead',
+      systemStartStyle: 'architectural-bracket',
+    },
+    windows: ROUND_13_WINDOWS,
+    tags: ['dashed phantom head R 3.0pt', 'downward-hooked flags', 'voice-contour anchor'],
+  },
+  {
+    id: 'geometric-node-flared-bracket',
+    label: 'C · Geometric Pause Node / Flared Bracket',
+    description:
+      'Minimalist pause nodes centred on the voice contour: a hollow 4 × 4pt diamond with two lateral tick rays for a 16th, one ray for an 8th, a solid 5 × 5pt diamond for a quarter and an open capsule for a half — pure geometry, zero calligraphy, the smallest footprint of the four so it nestles deepest into the contour. The system opens on the standardized flared 0.65pt architectural bracket.',
+    options: {
+      restStyle: 'geometric-node',
+      systemStartStyle: 'architectural-bracket',
+    },
+    windows: ROUND_13_WINDOWS,
+    tags: ['geometric nodes', 'smallest footprint', 'flared 0.65pt bracket'],
+  },
+  {
+    id: 'kinetic-monoline-flared-bracket',
+    label: 'D · Corrected Kinetic Monoline Rest / Flared Bracket',
+    description:
+      'The golden rest dialect with its kinetic tabs corrected: a slender 12pt monoline stem on the voice contour whose 12.4° tabs now hook **downward** to the right, exactly like the score’s own beam-harmonized flags — two for a 16th, one for an 8th — a central horizontal notch for a quarter and a hollow 7 × 2.2pt bar for a half. The silence speaks the kinetic language of the subdivision tab and the clasp slash. The system opens on the standardized flared 0.65pt architectural bracket.',
+    options: {
       restStyle: 'kinetic-monoline',
       systemStartStyle: 'architectural-bracket',
-      gridWritingPolicy: 'overlaid-beat-grid',
     },
-    windows: ROUND_12_WINDOWS,
-    tags: ['12.4° kinetic tabs', '0.65pt + 3.0pt spurs', 'protected barlines'],
-  },
-  {
-    id: 'classical-urtext-delicate-bracket',
-    label: 'B · Classical Urtext Rests / Delicate Bracket (0.50pt)',
-    description:
-      'The timeless calligraphic Urtext rest: a double hook for a 16th, a single hook for an 8th, the serpentine lightning glyph for a quarter and a solid 6 × 2.5pt block for a half — instantly recognizable to any reader. The system opens on the delicate 0.50pt bracket with 2.5pt spurs, and the grid is strict: barlines and beat pulses alike are painted through dedicated white air channels above the rhythm layer, so no stem or beam may ever overwrite a grid line.',
-    options: {
-      chordGrouping: 'per-hand-clasp',
-      restStyle: 'classical-urtext',
-      systemStartStyle: 'delicate-bracket',
-      gridWritingPolicy: 'strict-protected-grid',
-    },
-    windows: ROUND_12_WINDOWS,
-    tags: ['calligraphic 𝄿 𝄾 𝄽', '0.50pt + 2.5pt spurs', 'air-channelled grid'],
-  },
-  {
-    id: 'geometric-node-clef-pillar',
-    label: 'C · Geometric Node Rests / Nib-Free Clef Pillar',
-    description:
-      'Minimalist pause nodes: a hollow 4 × 4pt diamond with two lateral tick rays for a 16th, one ray for an 8th, a solid 5 × 5pt diamond for a quarter and an open capsule for a half — pure geometry, zero calligraphy. The system opens on the nib-free 0.50pt clef pillar that ticks the four octave equators only, and the grid turns fully transparent: the music uses the full measure width and every glyph mask knocks the grid out, barline and beat pulse alike, exactly as it knocks out a background coordinate.',
-    options: {
-      chordGrouping: 'per-hand-clasp',
-      restStyle: 'geometric-node',
-      systemStartStyle: 'clef-pillar',
-      gridWritingPolicy: 'unified-transparent-grid',
-    },
-    windows: ROUND_12_WINDOWS,
-    tags: ['geometric nodes', 'nib-free 0.50pt pillar', 'transparent grid'],
-  },
-  {
-    id: 'bauhaus-slash-architectural-bracket',
-    label: 'D · Bauhaus Hairline Rests / Architectural Bracket (0.65pt)',
-    description:
-      'Architectural 45° beveled slashes: a single slash with one parallel wing for an 8th, the slash with two wings for a 16th, a minimalist reversed-Z for a quarter and a thin hairline box for a half — the Bauhaus grammar of the modern score, at the monoline weight of every other element. The system opens on the 0.65pt architectural bracket with 3.0pt spurs, and the barlines keep their protected air while the beat pulses pass behind the noteheads.',
-    options: {
-      chordGrouping: 'per-hand-clasp',
-      restStyle: 'bauhaus-slash',
-      systemStartStyle: 'architectural-bracket',
-      gridWritingPolicy: 'overlaid-beat-grid',
-    },
-    windows: ROUND_12_WINDOWS,
-    tags: ['45° beveled slashes', '0.65pt + 3.0pt spurs', 'Bauhaus grammar'],
+    windows: ROUND_13_WINDOWS,
+    tags: ['downward 12.4° kinetic tabs', 'voice-contour anchor', 'flared 0.65pt bracket'],
   },
 ];
 

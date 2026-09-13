@@ -200,17 +200,17 @@
     <line class="janko-stem" x1="469.22" y1="364.13" x2="469.22" y2="353.13" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-flag" data-stem-x="469.22" data-flag-index="1" x1="469.22" y1="353.13" x2="473.22" y2="354.01" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
     <g class="janko-rest-group" data-rest-tick="720" data-rest-value="eighth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
-    <line class="janko-rest-stem" x1="175.67" y1="370.63" x2="175.67" y2="382.63" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
-    <line class="janko-rest-tab" data-rest-tab="1" x1="175.67" y1="370.63" x2="179.67" y2="369.75" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-stem" x1="175.67" y1="348.13" x2="175.67" y2="360.13" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="175.67" y1="348.13" x2="179.67" y2="349.01" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
     </g>
     <g class="janko-rest-group" data-rest-tick="864" data-rest-value="eighth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
-    <line class="janko-rest-stem" x1="309.54" y1="370.63" x2="309.54" y2="382.63" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
-    <line class="janko-rest-tab" data-rest-tab="1" x1="309.54" y1="370.63" x2="313.54" y2="369.75" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-stem" x1="309.54" y1="348.13" x2="309.54" y2="360.13" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="309.54" y1="348.13" x2="313.54" y2="349.01" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
     </g>
     <g class="janko-rest-group" data-rest-tick="1056" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
-    <line class="janko-rest-stem" x1="484.03" y1="370.63" x2="484.03" y2="382.63" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
-    <line class="janko-rest-tab" data-rest-tab="1" x1="484.03" y1="370.63" x2="488.03" y2="369.75" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
-    <line class="janko-rest-tab" data-rest-tab="2" x1="484.03" y1="374.03" x2="488.03" y2="373.15" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-stem" x1="484.03" y1="363.13" x2="484.03" y2="375.13" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="484.03" y1="363.13" x2="488.03" y2="364.01" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="2" x1="484.03" y1="366.53" x2="488.03" y2="367.41" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
     </g>
     <circle class="janko-knockout" cx="41.80" cy="429.13" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="41.80" y="431.99" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
