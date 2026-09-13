@@ -25,6 +25,7 @@ import {
   DEFAULT_JANKO_TOKENS,
   JANKO_CHANNEL_LAYOUTS,
   JANKO_STAFF_OCTAVES,
+  JANKO_SUBDIVISION_STYLES,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -57,6 +58,13 @@ import {
   getStemAttachmentRadius,
   getStemGeometry,
   partitionBeamGroups,
+  renderChordClasp,
+  renderFlags,
+  renderSubdivisionMark,
+  subdivisionMarkCount,
+  computeClaspGeometry,
+  SUBDIVISION_BEVEL_REACH,
+  SUBDIVISION_TAB_THICKNESS,
 } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -1150,6 +1158,117 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
       `${n.id} carries its augmentation dot`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Round 6 — the five single-note subdivision dialects
+// ---------------------------------------------------------------------------
+
+/** Anchor y of one rendered subdivision mark (its `M` / rect / line anchor). */
+function subdivisionAnchorY(markup: string): number {
+  const path = /d="M [\d.-]+ ([\d.-]+)/.exec(markup);
+  if (path) return Number(path[1]);
+  const rect = / y="([\d.]+)"/.exec(markup);
+  if (rect) return Number(rect[1]) + SUBDIVISION_TAB_THICKNESS / 2;
+  return Number(/ y1="([\d.]+)"/.exec(markup)![1]) + SUBDIVISION_BEVEL_REACH;
+}
+
+test('Round 6: the five subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
+  assert.equal(
+    DEFAULT_JANKO_OPTIONS.subdivisionStyle,
+    'classical-urtext',
+    'the golden master keeps the sculpted urtext flag'
+  );
+  assert.deepEqual(
+    [...JANKO_SUBDIVISION_STYLES],
+    ['classical-urtext', 'copperplate-pennant', 'architectural-tab', 'beveled-slash', 'aerodynamic-winglet'],
+    'the two classical traditions precede the three modern concepts'
+  );
+  // Stack grammar: 32nd → 3 marks, 16th → 2, 8th/dotted 8th → 1.
+  assert.equal(subdivisionMarkCount(6), 3);
+  assert.equal(subdivisionMarkCount(12), 2);
+  assert.equal(subdivisionMarkCount(24), 1);
+  assert.equal(subdivisionMarkCount(36), 1);
+  assert.equal(subdivisionMarkCount(48), 0);
+
+  const sixteenth = {
+    id: 'probe-16th',
+    startTick: 0,
+    durationTicks: 12,
+    hand: 'RH' as const,
+    x: 120,
+    y: 200,
+  };
+  const stem = getStemGeometry(sixteenth, TOKENS);
+  const ink = new Set<string>();
+  for (const style of JANKO_SUBDIVISION_STYLES) {
+    const markup = renderFlags(sixteenth, TOKENS, style);
+    ink.add(markup.replace(/[\d.-]+/g, '#'));
+    assert.match(markup, /class="janko-stem"/, `${style} keeps the stem`);
+    assert.ok(
+      !markup.includes('janko-tick') && !markup.includes('janko-cut'),
+      `${style} is a flag, never a duration crossbar`
+    );
+    assert.ok(markup.includes(`data-subdivision-style="${style}"`), `${style} tags its ink`);
+    const marks = [
+      ...markup.matchAll(/class="janko-flag" data-stem-x="([\d.]+)" data-flag-index="(\d)"/g),
+    ];
+    assert.equal(marks.length, 2, `${style} stacks two marks on a 16th`);
+    assert.equal(marks[0][1], stem.stemX.toFixed(2), `${style} latches onto the stem column`);
+    assert.deepEqual(marks.map((m) => m[2]), ['1', '2'], `${style} stacks in order`);
+
+    // The stack is spaced by `flagSpacing` along the flag drop.
+    const first = renderSubdivisionMark(stem.stemX, stem.stemEndY, -1, 1, style, TOKENS);
+    const second = renderSubdivisionMark(stem.stemX, stem.stemEndY, -1, 2, style, TOKENS);
+    assert.ok(
+      Math.abs(subdivisionAnchorY(second) - subdivisionAnchorY(first) - TOKENS.flagSpacing) < 1e-9,
+      `${style} stacks by flagSpacing`
+    );
+
+    // Stem safety: four dialects stay strictly right of the stem, the bevel
+    // cuts symmetrically across it — none reaches beyond `flagWidth`.
+    const element = /<(path|rect|line) class="janko-flag"[^>]*\/>/.exec(markup)![0];
+    if (element.startsWith('<rect')) {
+      const x = Number(/ x="([\d.]+)"/.exec(element)![1]);
+      const w = Number(/ width="([\d.]+)"/.exec(element)![1]);
+      assert.equal(x, stem.stemX, `${style} tab starts on the stem`);
+      assert.ok(w <= TOKENS.flagWidth + 1e-9, `${style} tab keeps its tokenised reach`);
+    } else if (element.startsWith('<line')) {
+      const x1 = Number(/ x1="([\d.]+)"/.exec(element)![1]);
+      const x2 = Number(/ x2="([\d.]+)"/.exec(element)![1]);
+      assert.equal(stem.stemX - x1, x2 - stem.stemX, `${style} cuts symmetrically through the tip`);
+      assert.ok(x2 - stem.stemX <= TOKENS.flagWidth + 1e-9);
+    } else {
+      const xs = [.../d="([^"]+)"/.exec(element)![1].matchAll(/-?\d+(?:\.\d+)?/g)]
+        .map((n) => Number(n[0]))
+        .filter((_, i) => i % 2 === 0);
+      assert.equal(xs[0], stem.stemX, `${style} latches onto the stem tip`);
+      for (const x of xs) {
+        assert.ok(x >= stem.stemX - 1e-9, `${style} sample x=${x} must not cross its stem`);
+      }
+      assert.ok(Math.max(...xs) - stem.stemX <= TOKENS.flagWidth + 1e-9);
+    }
+  }
+  assert.equal(ink.size, JANKO_SUBDIVISION_STYLES.length, 'every dialect paints distinct ink');
+
+  // The refined clasp tip carries the active dialect too, so a clasped cluster
+  // and a flagged stem of the same value can never disagree.
+  const tipped = computeClaspGeometry(
+    [
+      { id: 'tip-a', startTick: 0, durationTicks: 24, hand: 'RH' as const, x: 100, y: 100 },
+      { id: 'tip-b', startTick: 0, durationTicks: 24, hand: 'RH' as const, x: 100, y: 130 },
+    ],
+    TOKENS
+  )!;
+  for (const style of JANKO_SUBDIVISION_STYLES) {
+    const markup = renderChordClasp(tipped, TOKENS, style);
+    assert.match(markup, /class="janko-clasp-flag"/, `${style} tip mark`);
+    assert.ok(markup.includes(`data-subdivision-style="${style}"`), `${style} clasp tip dialect`);
+  }
+
+  // End to end: the default render dispatches the urtext flag.
+  const golden = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, OPTIONS, TOKENS);
+  assert.match(golden, /data-subdivision-style="classical-urtext"/);
 });
 
 test('Beam clearance: every notehead keeps a full stem length to its beam (mm. 2 & 4 ascents)', () => {

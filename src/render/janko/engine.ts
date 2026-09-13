@@ -70,6 +70,7 @@ import {
   JankoClaspRailGeometry,
   JankoRhythmNote,
   claspInkBox,
+  claspNotesHorizontallySpread,
   computeBeamGroupGeometry,
   computeClaspGeometry,
   partitionBeamGroups,
@@ -278,6 +279,12 @@ export interface JankoClaspCluster {
  * - `'bounding-phrase'`: one group per measure that contains a chord, bounding
  *   **every** note of the measure. The bracket carries the measure's opening
  *   duration.
+ * - `'per-hand-clasp'` (Round 6): the grouping unit is the **hand** — never the
+ *   grand staff. A hand's onset is grouped only when it carries two or more
+ *   heads that are horizontally displaced by the row-snapped parity offset; a
+ *   clean vertical column and a lone melodic note keep their stems. A hand
+ *   cluster that crosses Middle C is grouped across the corridor, because the
+ *   bracket spans that hand's own full reach.
  */
 export function collectClaspClusters(
   notes: readonly PositionedJankoNote[],
@@ -299,6 +306,19 @@ export function collectClaspClusters(
     .sort((a, b) => a[0] - b[0]);
   const measureOf = (p: PositionedJankoNote): number =>
     getMeasureIndexOfTick(p.note, geo, systemIndex, t);
+
+  if (o.chordGrouping === 'per-hand-clasp') {
+    const groups: JankoClaspCluster[] = [];
+    for (const [tick, onset] of onsets) {
+      if (claspTicks && !claspTicks.has(tick)) continue;
+      for (const hand of ['RH', 'LH'] as const) {
+        const members = onset.filter((p) => p.rhythm.hand === hand);
+        if (!claspNotesHorizontallySpread(members.map((p) => p.rhythm))) continue;
+        groups.push({ notes: members, measureIdx: measureOf(members[0]) });
+      }
+    }
+    return groups;
+  }
 
   if (o.chordGrouping !== 'bounding-phrase') {
     return onsets
@@ -1036,6 +1056,7 @@ export function resolveChordColumns(
   const delta = getChordalOffset(t);
   const gap = 2 * t.noteheadRadius + CHORDAL_NEIGHBOUR_AIR;
   const claspsActive = usesChordClasps(o.chordGrouping);
+  const perHandClasps = o.chordGrouping === 'per-hand-clasp';
   const claspReach = t.noteheadRadius + t.claspOffset;
 
   // -------------------------------------------------------------------------
@@ -1105,8 +1126,53 @@ export function resolveChordColumns(
     cluster.halfSpan = ((cluster.notes.length - 1) * delta) / 2;
   }
   const units = [...unitByTick.values()];
+
+  /** Row-snapped horizontal offset (page pt) of every head of one onset unit. */
+  const rowOffsetOf = (unit: OnsetUnit): Map<string, number> => {
+    const offsets = new Map<string, number>();
+    for (const cluster of unit.rows) {
+      const k = cluster.notes.length;
+      cluster.notes.forEach((p, i) => offsets.set(p.note.id, (i - (k - 1) / 2) * delta));
+    }
+    return offsets;
+  };
+
+  /**
+   * Round 6 — the hand groups of one onset that qualify for a per-hand clasp:
+   * two or more heads of **one** hand, horizontally displaced by the row-snapped
+   * parity offset. A clean vertical column of one hand is never grouped, and the
+   * two hands of the grand staff are never merged into one bracket.
+   */
+  const handClaspGroups = (unit: OnsetUnit): PositionedJankoNote[][] => {
+    const offsets = rowOffsetOf(unit);
+    const byHand = new Map<Hand, PositionedJankoNote[]>();
+    for (const cluster of unit.rows) {
+      for (const p of cluster.notes) {
+        const group = byHand.get(p.rhythm.hand);
+        if (group) group.push(p);
+        else byHand.set(p.rhythm.hand, [p]);
+      }
+    }
+    const qualified: PositionedJankoNote[][] = [];
+    for (const group of byHand.values()) {
+      const displaced = group.map((p) => ({ ...p.rhythm, x: offsets.get(p.note.id) ?? 0 }));
+      if (claspNotesHorizontallySpread(displaced)) qualified.push(group);
+    }
+    return qualified;
+  };
+
   for (const unit of units) {
     unit.spread = unit.rows.some((cluster) => cluster.halfSpan > 0);
+    if (perHandClasps) {
+      const groups = handClaspGroups(unit);
+      unit.clasp = claspsActive && groups.length > 0;
+      if (unit.clasp) {
+        const members = groups.flat();
+        unit.claspTop = Math.min(...members.map((p) => p.y)) - t.noteheadRadius;
+        unit.claspBot = Math.max(...members.map((p) => p.y)) + t.noteheadRadius;
+      }
+      continue;
+    }
     // A chord/cluster (two or more simultaneous heads) is clasped; a lone
     // melodic note never is.
     const size = unit.rows.reduce((sum, cluster) => sum + cluster.notes.length, 0);
@@ -1127,26 +1193,56 @@ export function resolveChordColumns(
   //     "only actual chords receive clasps, never feathers" means in practice.
   // -------------------------------------------------------------------------
   const claspFits = (unit: OnsetUnit): boolean => {
-    const members = unit.rows.flatMap((cluster) => cluster.notes);
-    const geometry = computeClaspGeometry(
-      members.map((p) => p.rhythm),
-      t
-    );
-    if (!geometry) return false;
-    const disk = claspInkBox(geometry, t);
-    // Slot 0 of a system opens from the left margin: there is no barline to
-    // clear, only the accolade (which the fit test below covers as a foreign
-    // glyph-free zone).
-    if (unit.measureIdx > 0 && disk.x0 - unit.measureLeft < t.claspMinBarlineAir - CLASP_EPS) {
-      return false;
-    }
-    for (const other of units) {
-      if (other === unit) continue;
-      for (const cluster of other.rows) {
-        for (const p of cluster.notes) {
-          const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
-          const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
-          if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR) return false;
+    // The Round 6 per-hand paradigm audits each hand's own bracket — a bracket
+    // never spans the grand staff — while the Round 5 paradigms audit the one
+    // union bracket of the onset.
+    const groups = perHandClasps
+      ? handClaspGroups(unit)
+      : [unit.rows.flatMap((cluster) => cluster.notes)];
+    const offsets = perHandClasps ? rowOffsetOf(unit) : null;
+    /** A head of this onset as the row-snapped column will place it. */
+    const displacedX = (p: PositionedJankoNote): number =>
+      p.x + (offsets?.get(p.note.id) ?? 0);
+    for (const members of groups) {
+      // `handClaspGroups` has already accepted only horizontally displaced hand
+      // clusters (in row-offset space; the heads still share their nominal
+      // column here, before the solve).
+      const geometry = computeClaspGeometry(
+        members.map((p) => p.rhythm),
+        t
+      );
+      if (!geometry) return false;
+      // Slot 0 of a system opens from the left margin: there is no barline to
+      // clear, only the accolade (which the fit test below covers as a foreign
+      // glyph-free zone). The bracket's barline air is a property of the solved
+      // column — the measure's clasp inset and the spread band pay for it (see
+      // `windowOf`) — so it is measured against the nominal column, exactly as
+      // the Round 5 rule does.
+      if (unit.measureIdx > 0) {
+        const disk = claspInkBox(geometry, t);
+        if (disk.x0 - unit.measureLeft < t.claspMinBarlineAir - CLASP_EPS) return false;
+      }
+      // Disc clearance is relative ink: every head of one onset moves with the
+      // same column shift, so the row-snapped spread is measured directly.
+      const spreadGeometry =
+        offsets === null
+          ? geometry
+          : computeClaspGeometry(
+              members.map((p) => ({ ...p.rhythm, x: displacedX(p) })),
+              t
+            );
+      const disk = claspInkBox(spreadGeometry ?? geometry, t);
+      for (const other of units) {
+        for (const cluster of other.rows) {
+          for (const p of cluster.notes) {
+            // A per-hand bracket treats the other hand's heads of its own onset
+            // as foreign ink, exactly as the linter does.
+            if (other === unit && members.includes(p)) continue;
+            const px = other === unit ? displacedX(p) : p.x;
+            const dx = Math.max(disk.x0 - px, 0, px - disk.x1);
+            const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
+            if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR) return false;
+          }
         }
       }
     }
@@ -1469,7 +1565,12 @@ export function layoutJankoSystem(
       geometry: computeClaspGeometry(
         cluster.notes.map((p) => p.rhythm),
         t,
-        cluster.durationTicks === undefined ? undefined : { durationTicks: cluster.durationTicks }
+        {
+          ...(cluster.durationTicks === undefined ? {} : { durationTicks: cluster.durationTicks }),
+          // Round 6: a per-hand clasp exists only for a horizontally displaced
+          // cluster; a clean vertical column keeps its stems.
+          requireHorizontalSpread: o.chordGrouping === 'per-hand-clasp',
+        }
       ),
     }))
     .filter(
@@ -1576,23 +1677,24 @@ function renderNotesLayer(
   const clasped = new Set(layout.claspedStems);
   if (o.rhythmStyle === 'beamed') {
     for (const beam of layout.beams) {
-      out.push(renderBeamGroup(beam.notes, t, beam));
+      out.push(renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle));
     }
     for (const n of layout.ungrouped) {
       if (clasped.has(n.id)) continue;
-      out.push(renderRhythm(n, 'beamed', t));
+      out.push(renderRhythm(n, 'beamed', t, o.subdivisionStyle));
     }
   } else {
     for (const p of layout.notes) {
       if (clasped.has(p.rhythm.id)) continue;
-      out.push(renderRhythm(p.rhythm, o.rhythmStyle, t));
+      out.push(renderRhythm(p.rhythm, o.rhythmStyle, t, o.subdivisionStyle));
     }
   }
 
   // 2b. External left clasps + their rails (Round 5), painted above the stems
-  //     they replace and beneath the noteheads they must never touch.
+  //     they replace and beneath the noteheads they must never touch. Their
+  //     duration tips carry the active Round 6 subdivision style.
   if (layout.clasps.length > 0 || layout.claspRails.length > 0) {
-    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t));
+    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t, o.subdivisionStyle));
   }
 
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.

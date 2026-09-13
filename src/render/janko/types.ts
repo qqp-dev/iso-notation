@@ -44,6 +44,44 @@ import { Hand } from '../../model/types';
 export type JankoRhythmStyle = 'angled-cuts' | 'horizontal-ticks' | 'beamed';
 
 /**
+ * Pluggable single-note **subdivision** styles — the Round 6 question: how an
+ * isolated 8th/16th/32nd draws its duration at the stem tip (see
+ * `elements/rhythm.renderSubdivisionMark`).
+ *
+ * | style                 | tradition  | ink at the stem tip                                  |
+ * | --------------------- | ---------- | ---------------------------------------------------- |
+ * | `'classical-urtext'`  | Henle / Bärenreiter | tapered filled calligraphic burin hook        |
+ * | `'copperplate-pennant'` | early copperplate | straight-edged triangular wedge               |
+ * | `'architectural-tab'` | modern     | crisp horizontal rectangular tab, grid-aligned        |
+ * | `'beveled-slash'`     | modern     | sharp 45° beveled cut, guillemet chevron weight      |
+ * | `'aerodynamic-winglet'` | modern   | tapered fin with a vertical spine and cutback         |
+ */
+export type JankoSubdivisionStyle =
+  | 'classical-urtext'
+  | 'copperplate-pennant'
+  | 'architectural-tab'
+  | 'beveled-slash'
+  | 'aerodynamic-winglet';
+
+/** Every subdivision style, in the canonical exploration order (A–E). */
+export const JANKO_SUBDIVISION_STYLES: readonly JankoSubdivisionStyle[] = [
+  'classical-urtext',
+  'copperplate-pennant',
+  'architectural-tab',
+  'beveled-slash',
+  'aerodynamic-winglet',
+];
+
+/** Human-readable names of the five subdivision styles. */
+export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, string> = {
+  'classical-urtext': 'Sculpted Classical Urtext Flag',
+  'copperplate-pennant': 'Historic Copperplate Pennant',
+  'architectural-tab': 'Architectural Lateral Tab',
+  'beveled-slash': 'Beveled Burin Slash',
+  'aerodynamic-winglet': 'Modernist Aerodynamic Winglet',
+};
+
+/**
  * Middle C spine (the central channel between the two hands) styles.
  *
  * `'none'` is the canonical treatment: the corridor is defined purely by the
@@ -84,7 +122,8 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
 
 /**
  * How a **vertical chord / cluster** of one onset is grouped and how it carries
- * its duration — the Round 5 question.
+ * its duration — the Round 5 question, refined by Round 6 with
+ * `'per-hand-clasp'`.
  *
  * A two-row whole-tone staff spreads a chord's tones over several rows, so a
  * multi-note onset used to be engraved as N independent stems that overlap into
@@ -97,31 +136,40 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
  * | `'left-clasp-spire'` | one chord / cluster      | one external bracket per cluster       |
  * | `'beamed-clasp-rail'`| one chord / cluster      | + a measure-bounded rail joining tips  |
  * | `'bounding-phrase'`  | one measure (the phrase) | one bracket bounding every note        |
+ * | `'per-hand-clasp'`   | one hand of one onset    | one bracket per hand (Round 6)         |
  *
  * The clasp is drawn **outside** the cluster (`claspX = minX − r − claspOffset`)
  * and carries the cluster's shortest duration at its tip: an open pip for
  * halves/wholes, a clean spire for quarters and flag hooks for 8ths/16ths.
+ *
+ * `'per-hand-clasp'` is the Round 6 refinement: the grouping unit is strictly
+ * one hand (`RH` or `LH`), never the grand staff, and a bracket is drawn **only**
+ * for a horizontally displaced (row-snapped) hand cluster — a clean vertical
+ * column and a lone melodic note keep their stems.
  */
 export type JankoChordGrouping =
   | 'none'
   | 'left-clasp-spire'
   | 'beamed-clasp-rail'
-  | 'bounding-phrase';
+  | 'bounding-phrase'
+  | 'per-hand-clasp';
 
-/** Every chord-grouping paradigm, in the canonical exploration order (A–D). */
+/** Every chord-grouping paradigm, in the canonical exploration order (A–E). */
 export const JANKO_CHORD_GROUPINGS: readonly JankoChordGrouping[] = [
   'none',
   'left-clasp-spire',
   'beamed-clasp-rail',
   'bounding-phrase',
+  'per-hand-clasp',
 ];
 
-/** Human-readable names of the four chord-grouping paradigms. */
+/** Human-readable names of the five chord-grouping paradigms. */
 export const JANKO_CHORD_GROUPING_LABELS: Record<JankoChordGrouping, string> = {
   none: 'Traditional Stems (no clasp)',
   'left-clasp-spire': 'Independent Left Clasp',
   'beamed-clasp-rail': 'Beamed Clasp Rail',
   'bounding-phrase': 'Bounding Phrase Clasp',
+  'per-hand-clasp': 'Per-Hand Cluster Clasp (non-vertical only)',
 };
 
 /** Human-readable names of the four channel layouts. */
@@ -308,13 +356,19 @@ export interface JankoLayoutOptions {
    */
   channelLayout: JankoChannelLayout;
   /**
-   * Vertical chord/cluster grouping and duration carrier (Round 5). `'none'`
-   * keeps the incumbent per-note stems; the three clasp paradigms draw an
-   * external left bracket per cluster (see {@link JankoChordGrouping}).
+   * Vertical chord/cluster grouping and duration carrier (Round 5, refined by
+   * Round 6). `'none'` keeps the incumbent per-note stems; the clasp paradigms
+   * draw an external left bracket per cluster (see {@link JankoChordGrouping}).
    */
   chordGrouping: JankoChordGrouping;
 
   // --- Optional page/layout refinements (resolved from defaults) ---
+  /**
+   * Single-note subdivision style (Round 6): how an isolated 8th/16th/32nd
+   * draws its duration at the stem tip. Defaults to the classical
+   * `'classical-urtext'` flag (see {@link JankoSubdivisionStyle}).
+   */
+  subdivisionStyle?: JankoSubdivisionStyle;
   /** Horizontal systems stacked on one page. */
   systemsPerPage?: number;
   /** Ticks in one measure. */
@@ -372,6 +426,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   middleCSpine: 'none',
   channelLayout: 'single-equator',
   chordGrouping: 'none',
+  subdivisionStyle: 'classical-urtext',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   anacrusisTicks: 0,

@@ -3,7 +3,7 @@
  *
  * Covers:
  *  1. `renderCandidatesView()` renders every candidate declared in the
- *     registry, on **every engraving window it declares** (Round 5 judges a
+ *     registry, on **every engraving window it declares** (Round 6 judges a
  *     candidate on the Bach opening and the dense Brahms chords at once), with
  *     labels, option-delta badges, lint chips and SVG previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
@@ -88,35 +88,49 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 5/);
-  assert.match(html, /Chord &amp; Cluster Duration/);
+  assert.match(html, /Round 6/);
+  assert.match(html, /Single-Note Subdivisions/);
 });
 
-test('Round 5 registry declares the four chord-grouping paradigms', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 5);
-  assert.match(CURRENT_ROUND_METADATA.title, /Left Clasp/);
+test('Round 6 registry declares the five subdivision dialects on refined per-hand clasps', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 6);
+  assert.match(CURRENT_ROUND_METADATA.title, /Subdivisions/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['traditional-stems', 'independent-left-clasp', 'beamed-clasp-rail', 'bounding-phrase-clasp'],
-    'candidates A, B, C and D in display order'
+    ['classical-urtext', 'copperplate-pennant', 'architectural-tab', 'beveled-slash', 'aerodynamic-winglet'],
+    'candidates A–E in display order'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.chordGrouping),
-    ['none', 'left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase']
+    ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp']
   );
-  // Every paradigm keeps the canonical tokens: the delta is purely structural.
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
+    ids,
+    'each candidate carries its own dialect'
+  );
+  // Every dialect keeps the canonical tokens: the delta is purely structural.
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
     assert.equal(resolved.tokens.claspWidth, DEFAULT_JANKO_TOKENS.claspWidth);
     assert.equal(resolved.tokens.claspOffset, DEFAULT_JANKO_TOKENS.claspOffset);
     assert.equal(resolved.tokens.claspMinBarlineAir, DEFAULT_JANKO_TOKENS.claspMinBarlineAir);
     assert.equal(resolved.tokens.rowHeight, DEFAULT_JANKO_TOKENS.rowHeight);
+    assert.equal(resolved.tokens.flagSpacing, DEFAULT_JANKO_TOKENS.flagSpacing);
   }
-  assert.equal(candidateBadges(getCandidate('traditional-stems')!)[0].key, 'baseline');
+  assert.deepEqual(
+    candidateBadges(getCandidate('classical-urtext')!).map((b) => b.key),
+    ['chordGrouping'],
+    'the classical control is the golden subdivision itself'
+  );
+  assert.deepEqual(
+    candidateBadges(getCandidate('beveled-slash')!).map((b) => b.key),
+    ['chordGrouping', 'subdivisionStyle']
+  );
 });
 
-test('Round 5 candidates export cleanly to the contact sheet', () => {
+test('Round 6 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
@@ -135,19 +149,31 @@ test('Round 5 candidates export cleanly to the contact sheet', () => {
     assert.ok(sheet.includes(`data-variant="${candidate.id}"`), `${candidate.id} panel`);
     assert.ok(sheet.includes(candidate.label), `${candidate.id} label`);
   }
-  // The panels must be genuinely different engravings: only A paints no clasp,
-  // and only C adds rails on top of B's brackets.
+  // The panels must be genuinely different engravings: each dialect paints its
+  // own stem-tip ink, and every panel shares the refined per-hand clasps.
   const panelBody = (variantId: string): string => {
     const start = sheet.indexOf(`data-variant="${variantId}"`);
     const next = sheet.indexOf('data-variant="', start + 1);
     return sheet.slice(start, next === -1 ? undefined : next);
   };
-  const count = (id: string, needle: string): number =>
-    (panelBody(id).match(new RegExp(needle, 'g')) ?? []).length;
-  assert.equal(count('traditional-stems', 'janko-clasp-group'), 0, 'A keeps per-note stems');
-  assert.equal(count('independent-left-clasp', 'janko-clasp-group'), 4);
-  assert.equal(count('beamed-clasp-rail', 'janko-clasp-rail'), 0, 'mm. 1–4 carry no rail run');
-  assert.equal(count('bounding-phrase-clasp', 'janko-clasp-group'), 3, 'one bracket per measure');
+  /** The stem-tip element each dialect paints (and only that dialect). */
+  const SIGNATURES: Record<string, RegExp> = {
+    'classical-urtext': /class="janko-flag"[^>]*d="M [^"]* C /,
+    'copperplate-pennant': /class="janko-flag"[^>]*d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ Z"/,
+    'architectural-tab': /<rect class="janko-flag"/,
+    'beveled-slash': /<line class="janko-flag"[^>]*stroke-width="1\.20"/,
+    'aerodynamic-winglet': /class="janko-flag"[^>]*d="M [^"]* L [^"]* L [^"]* L [^"]* Z"/,
+  };
+  for (const candidate of CURRENT_CANDIDATES) {
+    const body = panelBody(candidate.id);
+    for (const [style, signature] of Object.entries(SIGNATURES)) {
+      assert.equal(
+        signature.test(body),
+        style === candidate.id,
+        `${candidate.id} panel paints ${style === candidate.id ? 'only' : 'no'} ${style} ink`
+      );
+    }
+  }
 });
 
 test('Candidate previews honour their own option deltas', () => {
@@ -155,15 +181,17 @@ test('Candidate previews honour their own option deltas', () => {
   for (const candidate of CURRENT_CANDIDATES) {
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['chordGrouping'],
-      `${candidate.id} declares only the chord-grouping delta`
+      ['chordGrouping', 'subdivisionStyle'],
+      `${candidate.id} declares the per-hand clasp and its own dialect`
     );
   }
-  assert.match(html, /<b>chordGrouping<\/b> = left-clasp-spire/);
-  assert.match(html, /<b>chordGrouping<\/b> = beamed-clasp-rail/);
-  assert.match(html, /<b>chordGrouping<\/b> = bounding-phrase/);
-  assert.match(html, /<b>baseline<\/b> = golden master/, 'candidate A is the untouched golden master');
-  assert.match(html, /<s>none<\/s>/, 'the golden value each paradigm departs from');
+  assert.match(html, /<b>chordGrouping<\/b> = per-hand-clasp/);
+  assert.match(html, /<s>none<\/s>/, 'the golden grouping value every candidate departs from');
+  assert.match(
+    html,
+    /<s>classical-urtext<\/s>/,
+    'the golden subdivision value the modern candidates depart from'
+  );
   assert.match(html, /badge-delta/, 'deltas against the golden master are highlighted');
   assert.match(html, /chip chip-ok/, 'every candidate lints clean in this round');
 
@@ -171,19 +199,33 @@ test('Candidate previews honour their own option deltas', () => {
     const card = html.slice(html.indexOf(`data-candidate="${id}"`));
     return card.slice(0, card.indexOf('</article>'));
   };
-  // The clasp grammar is stated in the card facts.
-  for (const id of ['independent-left-clasp', 'beamed-clasp-rail', 'bounding-phrase-clasp']) {
-    assert.match(cardOf(id), /clasp 2\.8pt offset \/ 4\.0pt barline air/, `${id} tokens`);
+  for (const candidate of CURRENT_CANDIDATES) {
+    // The classical control *is* the golden subdivision, so only the four
+    // dialect candidates show a subdivision badge.
+    if (candidate.id === DEFAULT_JANKO_OPTIONS.subdivisionStyle) {
+      assert.ok(
+        !cardOf(candidate.id).includes('<b>subdivisionStyle</b>'),
+        'the classical control is the golden subdivision itself'
+      );
+    } else {
+      assert.match(
+        cardOf(candidate.id),
+        new RegExp(`<b>subdivisionStyle</b> = ${candidate.id}`),
+        `${candidate.id} subdivision badge`
+      );
+    }
   }
-  assert.match(cardOf('traditional-stems'), /chord grouping none/);
-  // Only candidate A paints no clasp layer; every clasp candidate replaces at
-  // least the standalone stems of the Brahms block chords.
-  assert.ok(!cardOf('traditional-stems').includes('janko-clasp-layer'));
-  assert.ok(cardOf('independent-left-clasp').includes('janko-clasp-layer'));
-  assert.ok(cardOf('beamed-clasp-rail').includes('janko-clasp-rail'));
-  assert.ok(cardOf('bounding-phrase-clasp').includes('janko-clasp-layer'));
-  assert.match(cardOf('traditional-stems'), /data-lint="clean"/);
-  assert.match(cardOf('bounding-phrase-clasp'), /data-lint="clean"/);
+  // The clasp grammar is stated in the card facts.
+  for (const candidate of CURRENT_CANDIDATES) {
+    assert.match(cardOf(candidate.id), /clasp 2\.8pt offset \/ 4\.0pt barline air/, `${candidate.id} tokens`);
+    assert.match(cardOf(candidate.id), /chord grouping per-hand-clasp/, `${candidate.id} grouping fact`);
+    // Every candidate paints the refined per-hand clasps of the Brahms window.
+    assert.ok(
+      cardOf(candidate.id).includes('janko-clasp-layer'),
+      `${candidate.id} renders its clasp layer`
+    );
+    assert.match(cardOf(candidate.id), /data-lint="clean"/);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -255,7 +297,10 @@ test('Adding a candidate to the registry needs zero template edits', () => {
   assert.match(html, /data-candidate="probe-round-candidate"/);
   assert.match(html, /data-candidate="probe-second"/);
   assert.match(html, /Probe Round/);
-  assert.ok(!html.includes(CURRENT_CANDIDATES[0].id), 'registry entries are not hardcoded');
+  assert.ok(
+    !html.includes(`data-candidate="${CURRENT_CANDIDATES[0].id}"`),
+    'registry entries are not hardcoded'
+  );
   assert.ok((html.match(/<svg/g) ?? []).length === 2);
 });
 
@@ -346,10 +391,10 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 5);
+  assert.equal(CURRENT_ROUND_METADATA.round, 6);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 4, '2–4 candidates');
+  assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
 });
