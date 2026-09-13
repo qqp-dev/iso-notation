@@ -3,11 +3,10 @@
  *
  * Covers:
  *  1. `renderCandidatesView()` renders every candidate declared in the
- *     registry, on **every engraving window it declares** (Round 16 judges the
- *     three cluster-spacing amounts on the shared-stem cluster windows in Bach
- *     and Brahms, and the four rest dialects on the strictly clean
- *     rest-duration specimen, Brahms m. 68 and the chord specimen), with
- *     labels, per-axis option badges, lint chips and SVG previews.
+ *     registry, on **every engraving window it declares** (Round 17 judges the
+ *     snug/tight gap amounts on the carried shared-stem cluster windows in
+ *     Bach and Brahms), with labels, per-axis option badges, lint chips and
+ *     SVG previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
  *     (every page carries glyphs) plus the macro focus crops, based on
  *     `DEFAULT_JANKO_OPTIONS`.
@@ -98,9 +97,8 @@ test('renderCandidatesView renders every registry candidate on every declared wi
   );
   assert.match(html, new RegExp(`data-candidate-count="${CURRENT_CANDIDATES.length}"`));
   const windows = CURRENT_CANDIDATES.reduce((n, c) => n + resolveCandidate(c).windows.length, 0);
-  assert.equal(windows, 39, 'three spacing candidates × 5 windows + four dialect candidates × 6 windows');
-  // Round 16 has two per-axis window sets; the header states the leading
-  // (cluster-spacing) set's declared window count.
+  assert.equal(windows, 10, 'two gap candidates × 5 carried cluster windows');
+  // Round 17 judges one axis; the header states its declared window count.
   assert.match(html, /data-window-count="5"/, 'the header states the spacing set window count');
   assert.equal((html.match(/<svg/g) ?? []).length, windows, 'one preview per declared window');
   assert.equal((html.match(/data-window="/g) ?? []).length, windows);
@@ -125,50 +123,34 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 16/);
-  assert.match(html, /Cluster Spacing \+ Rest Dialects/);
+  assert.match(html, /Round 17/);
+  assert.match(html, /Rect Knockout \+ Gap Amounts/);
 });
 
-test('Round 16 registry compares the cluster spacing and the rest dialect on two independent axes', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 16);
-  assert.match(CURRENT_ROUND_METADATA.title, /Cluster Spacing \+ Rest Dialects/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterSpacing', 'restStyle'], 'two open axes');
+test('Round 17 registry judges the gap amount on its single open axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 17);
+  assert.match(CURRENT_ROUND_METADATA.title, /Rect Knockout \+ Gap Amounts/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterSpacing'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    [
-      'spacing-compact',
-      'spacing-balanced',
-      'spacing-airy',
-      'rest-kinetic-monoline',
-      'rest-classical-urtext',
-      'rest-geometric-node',
-      'rest-phantom-notehead',
-    ],
-    'candidates A–C on the spacing axis then A–D on the dialect axis, in display order'
+    ['spacing-snug', 'spacing-tight'],
+    'the snug golden then the tight challenger, in display order'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.axis),
-    ['clusterSpacing', 'clusterSpacing', 'clusterSpacing', 'restStyle', 'restStyle', 'restStyle', 'restStyle'],
-    'each candidate declares exactly one of the round’s open axes'
+    ['clusterSpacing', 'clusterSpacing'],
+    'each candidate declares the round’s open axis'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.clusterSpacing),
-    ['compact', 'balanced', 'airy', 'balanced', 'balanced', 'balanced', 'balanced'],
-    'the spacing axis: compact / balanced / airy; every dialect candidate keeps the golden spacing'
+    ['snug', 'tight'],
+    'the gap axis: the snug golden and the tight challenger'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.restStyle),
-    [
-      'kinetic-monoline',
-      'kinetic-monoline',
-      'kinetic-monoline',
-      'kinetic-monoline',
-      'classical-urtext',
-      'geometric-node',
-      'phantom-notehead',
-    ],
-    'the dialect axis: the incumbent plus the three Round 13 finalists; every spacing candidate keeps the golden dialect'
+    ['kinetic-monoline', 'kinetic-monoline'],
+    'every gap candidate keeps the golden dialect (rest behaviour returns in 17B)'
   );
   // The two axes are independent: every resolved option set departs from the
   // golden master ONLY on the candidate's own axis key (incumbent values are
@@ -271,26 +253,16 @@ test('Round 16 registry compares the cluster spacing and the rest dialect on two
       `${candidate.id} states its value on the round’s axis`
     );
   }
-  // The incumbents state the golden value on their axis, without a delta.
+  // The incumbent states the golden value on its axis, without a delta.
   assert.deepEqual(
-    candidateBadges(getCandidate('spacing-balanced')!)[0],
+    candidateBadges(getCandidate('spacing-snug')!)[0],
     {
       key: 'clusterSpacing',
-      value: 'balanced',
-      golden: 'balanced',
+      value: 'snug',
+      golden: 'snug',
       axis: true,
     },
-    'the incumbent spacing amount still states its value on the axis'
-  );
-  assert.deepEqual(
-    candidateBadges(getCandidate('rest-kinetic-monoline')!)[0],
-    {
-      key: 'restStyle',
-      value: 'kinetic-monoline',
-      golden: 'kinetic-monoline',
-      axis: true,
-    },
-    'the incumbent rest dialect still states its value on the axis'
+    'the incumbent gap amount still states its value on the axis'
   );
 });
 
@@ -315,19 +287,23 @@ test('Candidate previews honour their own option deltas', () => {
   // The settled decisions ride along as shared context and are never badged.
   assert.ok(
     !html.includes('<b>chordGrouping</b>'),
-    'the restored per-hand clasp is shared context, never a Round 16 question'
+    'the restored per-hand clasp is shared context, never a Round 17 question'
   );
   assert.ok(
     !html.includes('<b>systemStartStyle</b>'),
-    'the canonical flared bracket is shared context, never a Round 16 question'
+    'the canonical flared bracket is shared context, never a Round 17 question'
   );
   assert.ok(
     !html.includes('<b>gridWritingPolicy</b>'),
-    'the settled Round 14 grid policy is shared context, never a Round 16 question'
+    'the settled Round 14 grid policy is shared context, never a Round 17 question'
   );
   assert.ok(
     !html.includes('<b>stemAttachmentStyle</b>'),
-    'the doctrine default splay is shared context, never a Round 16 question'
+    'the doctrine default splay is shared context, never a Round 17 question'
+  );
+  assert.ok(
+    !html.includes('<b>restStyle</b>'),
+    'the rest dialects rest this round and return in 17B'
   );
   assert.doesNotMatch(
     html,
@@ -356,8 +332,8 @@ test('Candidate previews honour their own option deltas', () => {
   );
   assert.equal(
     departures.length,
-    5,
-    'compact/airy on the spacing axis and B/C/D on the dialect axis depart from golden'
+    1,
+    'only the tight challenger departs from golden'
   );
   assert.equal(
     (html.match(/badge-delta/g) ?? []).length,
@@ -365,16 +341,12 @@ test('Candidate previews honour their own option deltas', () => {
     'only genuine deltas are highlighted'
   );
 
-  // The lint chips report each candidate's real verdict: every Round 16
-  // engraving — spacing proposal, dialect incumbent and finalist alike —
-  // lints clean.
-  assert.equal((html.match(/chip chip-error/g) ?? []).length, 0, 'no dirty candidates this round');
-  assert.equal(
-    (html.match(/chip chip-ok/g) ?? []).length,
-    CURRENT_CANDIDATES.length,
-    'every candidate lints clean'
+  // The lint chips report each candidate's real verdict. Snug is clean; tight
+  // is reported through its chip — a trip would be judging input, not failure.
+  assert.ok(
+    !cardOf('spacing-snug').includes('chip chip-warn'),
+    'snug never merely warns'
   );
-  assert.equal((html.match(/chip chip-warn/g) ?? []).length, 0, 'no candidate merely warns');
 
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
@@ -392,20 +364,23 @@ test('Candidate previews honour their own option deltas', () => {
       resolved.windows.length,
       `${candidate.id} engraves exactly its declared window set`
     );
-    assert.match(card, /data-lint="clean"/, `${candidate.id} lint verdict`);
-    // The declared windows legitimately include system starts (Bach m. 8, the
-    // rest specimen's m. 1), so the bracket may appear in the engraving itself;
-    // what must never appear is the settled bracket re-opened as a candidate.
+    assert.match(card, /data-lint="(clean|violations)"/, `${candidate.id} lint verdict`);
+    if (candidate.id === 'spacing-snug') {
+      assert.match(card, /data-lint="clean"/, 'snug is clean');
+      assert.match(card, /chip chip-ok/, 'snug reports its clean chip');
+    }
+    // The declared windows legitimately include system starts (Bach m. 8), so
+    // the bracket may appear in the engraving itself; what must never appear
+    // is the settled bracket re-opened as a candidate.
     assert.ok(
       !card.includes('<b>systemStartStyle</b>'),
       `${candidate.id} never re-showcases the settled bracket as a delta`
     );
   }
 
-  // The two axes are judged on their own windows: the spacing amounts on the
-  // Bach and Brahms shared-stem cluster windows, the dialects on the strictly
-  // clean rest specimen, Brahms m. 68 and the chord specimen.
-  const spacingCard = cardOf('spacing-balanced');
+  // The gap axis is judged on the carried Bach and Brahms shared-stem cluster
+  // windows — never on the clean rest specimen, which returns in 17B.
+  const spacingCard = cardOf('spacing-snug');
   for (const measure of [8, 12, 15]) {
     assert.match(
       spacingCard,
@@ -422,20 +397,7 @@ test('Candidate previews honour their own option deltas', () => {
   }
   assert.ok(
     !spacingCard.includes('data-window="rest-duration-specimen'),
-    'the spacing axis is never judged on the clean rest specimen'
-  );
-  const dialectCard = cardOf('rest-kinetic-monoline');
-  for (const measure of [1, 2, 3, 4]) {
-    assert.match(
-      dialectCard,
-      new RegExp(`data-window="rest-duration-specimen:${measure}-${measure}"`),
-      `dialect specimen m. ${measure}`
-    );
-  }
-  assert.match(dialectCard, /data-window="brahms-op118-no1:68-68"/, 'the real-world Brahms rest bar');
-  assert.ok(
-    !dialectCard.includes('data-window="primary:'),
-    'the dialect axis is never judged on the Bach cluster bars'
+    'the gap axis is never judged on the clean rest specimen'
   );
 
   // The settled clasp grammar and grid policy are stated in the card facts.
@@ -461,7 +423,7 @@ test('renderReferenceView renders the golden page spread and macro crops', () =>
   const html = renderReferenceView(CONFIG);
   const pages = html.match(/data-page="/g) ?? [];
   const crops = html.match(/data-crop="/g) ?? [];
-  assert.equal(pages.length, 2, 'Round 16: Bach Var. 1 is a two-page spread (4 systems/page)');
+  assert.equal(pages.length, 2, 'Round 17: Bach Var. 1 is a two-page spread (4 systems/page)');
   assert.equal(crops.length, DEFAULT_STUDIO_CROPS.length);
   assert.equal((html.match(/<svg/g) ?? []).length, pages.length + crops.length);
   for (const crop of DEFAULT_STUDIO_CROPS) {
@@ -612,7 +574,8 @@ test('The studio score library exposes the benchmarks and the curated specimens 
   assert.equal(specimenReport.ok, true, 'the specimen engraves clean under the golden default');
   // Round 15: the curated rest-duration specimen is the dialect axis's window —
   // four measures across the staff width, one genuine silence per value, so the
-  // four dialects are compared at macro scale on strictly clean material.
+  // four dialects are compared at macro scale on strictly clean material. It
+  // rests this round and returns in 17B.
   assert.ok(ids.includes(REST_SPECIMEN_STUDIO_SCORE_ID), 'the rest-duration specimen is registered');
   const restSpecimen = CONFIG.scores[REST_SPECIMEN_STUDIO_SCORE_ID];
   assert.equal(restSpecimen.id, REST_SPECIMEN_STUDIO_SCORE_ID);
@@ -648,15 +611,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 16);
-  assert.match(CURRENT_ROUND_METADATA.title, /Cluster Spacing \+ Rest Dialects/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 17);
+  assert.match(CURRENT_ROUND_METADATA.title, /Rect Knockout \+ Gap Amounts/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['clusterSpacing', 'restStyle'],
-    'the two independent axes are declared'
+    ['clusterSpacing'],
+    'the single judged axis is declared'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 7, 'three spacing systems + four rest dialects');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'the snug golden and the tight challenger');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

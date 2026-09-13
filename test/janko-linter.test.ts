@@ -78,17 +78,20 @@ const TOKENS = DEFAULT_JANKO_TOKENS;
 const BRAHMS_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const R = TOKENS.noteheadRadius;
 const HALO_R = TOKENS.haloRadius;
+/** The golden rectangular mask half-extents (Round 17 `'snug'`). */
+const MASK_WX = getClusterSpacingPreset('snug').wx;
+const MASK_HY = getClusterSpacingPreset('snug').hy;
 /** Canonical flush stem attachment radii (regular heads / tick-0 honor sounds). */
-const REGULAR_ATTACH = R + 0.2;
+const REGULAR_ATTACH = MASK_HY + 0.2;
 const HONOR_ATTACH = HALO_R + 0.4;
+/** Paint-audit options for the golden mask. */
+const MASK_AUDIT = { knockoutWx: MASK_WX, knockoutHy: MASK_HY, haloRadius: HALO_R };
 
 // --- Tiny document fixtures for the paint-order audit -----------------------
 
-const knockout = (cx: number, cy: number, r: number = R): string =>
-  `<circle class="janko-knockout" cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`;
-/** The Round 16 elliptical mask (tight `rx`, generous `ry`). */
-const ellipseKnockout = (cx: number, cy: number, rx: number, ry: number = R): string =>
-  `<ellipse class="janko-knockout" cx="${cx}" cy="${cy}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="#FFFFFF"/>`;
+/** The Round 17 sharp rectangular mask. */
+const knockout = (cx: number, cy: number, wx: number = MASK_WX, hy: number = MASK_HY): string =>
+  `<rect class="janko-knockout" x="${(cx - wx).toFixed(2)}" y="${(cy - hy).toFixed(2)}" width="${(2 * wx).toFixed(2)}" height="${(2 * hy).toFixed(2)}" fill="#FFFFFF"/>`;
 const digit = (cx: number, cy: number): string =>
   `<text class="janko-digit" x="${cx}" y="${(cy + JANKO_DIGIT_BASELINE_OFFSET).toFixed(2)}" font-size="${TOKENS.digitFontSize}pt">7</text>`;
 const halo = (cx: number, cy: number, r: number = HALO_R): string =>
@@ -159,10 +162,10 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
 test('Row-snapped chord tones: every same-row pair is fanned by the preset pair gap', () => {
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  // Round 16: the golden `'balanced'` fan is the asymmetric preset pair gap
-  // 2rx + air (8.2pt) — tighter than the old circular diameter, and the exact
-  // amount the axis-aware clearance model requires.
-  const offset = getClusterSpacingPreset('balanced').pairGap;
+  // Round 17: the golden `'snug'` fan is the asymmetric preset pair gap
+  // 2wx + air (5.86pt) — tighter than the old circular diameter, and wider
+  // than the box-overlap bound the clearance model audits.
+  const offset = getClusterSpacingPreset('snug').pairGap;
   let pairs = 0;
   for (const layout of layouts) {
     const rows = new Map<string, typeof layout.notes>();
@@ -281,7 +284,7 @@ test('Defect: chordal heads on one point is warned, not silently accepted', () =
   assert.equal(out[0].severity, 'warning');
 });
 
-test('Row-snapped chord tones clear the warning exactly at the preset pair gap', () => {
+test('Row-snapped chord tones warn exactly where their mask boxes overlap', () => {
   const layout = systems()[0];
   const a = layout.notes[2];
   const b = layout.notes[3];
@@ -299,19 +302,20 @@ test('Row-snapped chord tones clear the warning exactly at the preset pair gap',
       },
     ],
   });
-  const gap = getClusterSpacingPreset('balanced').pairGap;
   const lintAt = (dx: number): LintViolation[] =>
     run(
       (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, o),
       pairAt(dx)
     );
 
-  assert.equal(lintAt(gap - 0.01).length, 1, 'one hundredth short of the pair gap still collides');
-  assert.equal(lintAt(gap - 0.01)[0].code, 'chordal-overlap');
-  assert.equal(lintAt(gap).length, 0, 'the preset pair gap clears the warning');
+  assert.equal(lintAt(2 * MASK_WX - 0.01).length, 1, 'overlapping masks still collide');
+  assert.equal(lintAt(2 * MASK_WX - 0.01)[0].code, 'chordal-overlap');
+  assert.equal(lintAt(2 * MASK_WX).length, 0, 'touching masks clear the warning');
+  const gap = getClusterSpacingPreset('snug').pairGap;
+  assert.equal(lintAt(gap - 0.01).length, 0, 'a shrunk-but-clear fan is legal');
 });
 
-test('Different-onset neighbours keep the conservative circular diameter', () => {
+test('Different-onset neighbours keep the box bound', () => {
   const layout = systems()[0];
   const a = layout.notes[2];
   const b = layout.notes[3];
@@ -327,51 +331,44 @@ test('Different-onset neighbours keep the conservative circular diameter', () =>
       pairAt(dx)
     );
 
-  assert.equal(lintAt(2 * R - 0.01).length, 1, 'one hundredth short of a disc still collides');
-  assert.equal(lintAt(2 * R - 0.01)[0].code, 'notehead-overlap');
-  assert.equal(lintAt(2 * R).length, 0, 'one full diameter clears the error');
+  assert.equal(lintAt(2 * MASK_WX - 0.01).length, 1, 'overlapping masks still collide');
+  assert.equal(lintAt(2 * MASK_WX - 0.01)[0].code, 'notehead-overlap');
+  assert.equal(lintAt(2 * MASK_WX).length, 0, 'touching masks clear the error');
 });
 
-test('Defect: shrinking the knockout below the glyph box is caught', () => {
-  const tiny = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 2.0 };
-  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, tiny);
+test('Defect: a digit grown past its mask margin is caught', () => {
+  const big = { ...DEFAULT_JANKO_TOKENS, digitFontSize: 9.0 };
+  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, big);
   const undersized = report.violations.filter((v) => v.code === 'knockout-undersized');
   assert.equal(undersized.length, SCORE.notes.length, 'every notehead reports its undersized mask');
-  assert.match(
-    undersized[0].message,
-    new RegExp(`cannot shield the ${DEFAULT_JANKO_TOKENS.digitFontSize}pt digit`)
-  );
-  assert.ok(undersized[0].metrics!.requiredRy > undersized[0].metrics!.ry);
-  assert.ok(undersized[0].metrics!.vertical < 0, 'the glyph overflows the mask vertically');
+  assert.match(undersized[0].message, /cannot shield the 9pt digit/);
+  assert.ok(undersized[0].metrics!.horizontal < undersized[0].metrics!.required);
+  assert.ok(undersized[0].metrics!.vertical < undersized[0].metrics!.required);
 });
 
-test('Golden master: every digit keeps ≥1.2pt of white inside its knockout ellipse', () => {
+test('Golden master: every digit keeps the preset margin of white inside its knockout rect', () => {
   const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
-  const rx = getClusterSpacingPreset('balanced').rx;
+  const preset = getClusterSpacingPreset('snug');
   const out: LintViolation[] = [];
   for (const layout of systems()) {
     checkKnockoutCoverage(layout, DEFAULT_JANKO_OPTIONS, TOKENS, LINT, out);
   }
   assert.deepEqual(out, [], 'the canonical mask shields every digit on every side');
-  assert.ok(rx - halfWidth >= LINT.digitClearance, 'left/right margin against rx');
-  assert.ok(R - halfHeight >= LINT.digitClearance, 'top/bottom margin against ry');
-  assert.ok(
-    1 - (halfWidth / rx) ** 2 - (halfHeight / R) ** 2 >= LINT.knockoutMargin,
-    'ellipse corner budget'
-  );
+  assert.ok(preset.wx - halfWidth >= preset.margin - 0.01, 'left/right preset margin');
+  assert.ok(preset.hy - halfHeight >= preset.margin - 0.01, 'top/bottom preset margin');
 
-  // The check is a real gate: a 3.0pt mask cannot hold the digit.
-  const tight = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 3.0 };
-  const tightOut: LintViolation[] = [];
+  // The check is a real gate: a 9pt digit overflows the golden mask.
+  const big = { ...DEFAULT_JANKO_TOKENS, digitFontSize: 9.0 };
+  const bigOut: LintViolation[] = [];
   checkKnockoutCoverage(
-    systems(DEFAULT_JANKO_OPTIONS, tight)[0],
+    systems(DEFAULT_JANKO_OPTIONS, big)[0],
     DEFAULT_JANKO_OPTIONS,
-    tight,
+    big,
     LINT,
-    tightOut
+    bigOut
   );
-  assert.ok(tightOut.length > 0);
-  assert.ok(tightOut.every((v) => v.code === 'knockout-undersized'));
+  assert.ok(bigOut.length > 0);
+  assert.ok(bigOut.every((v) => v.code === 'knockout-undersized'));
 });
 
 test('Defect: a stem that starts inside its circle (or floats off it) is caught', () => {
@@ -390,7 +387,7 @@ test('Defect: a stem that starts inside its circle (or floats off it) is caught'
   assert.equal(detached.length, 2, 'both opening stems are reported');
   for (const v of detached) {
     assert.ok(v.metrics!.attach < v.metrics!.required);
-    assert.match(v.message, /inside the .*ring|inside the .*disc/);
+    assert.match(v.message, /inside the .*(ring|mask edge)/);
   }
 
   // Push the anchor outward instead: the stem floats off the glyph circle.
@@ -1050,14 +1047,14 @@ test('Defect: a rail that crosses a barline is caught', () => {
 
 test('Paint audit: a digit without its knockout is a violation', () => {
   const svg = `<svg>${digit(50, 100)}</svg>`;
-  const out = auditKnockoutProtection(svg, { noteheadRadius: R });
+  const out = auditKnockoutProtection(svg, MASK_AUDIT);
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-missing');
 });
 
 test('Paint audit: a knockout without its digit is a violation', () => {
   const svg = `<svg>${knockout(50, 100)}</svg>`;
-  const out = auditKnockoutProtection(svg, { noteheadRadius: R });
+  const out = auditKnockoutProtection(svg, MASK_AUDIT);
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-empty');
 });
@@ -1068,14 +1065,14 @@ test('Paint audit: a rule painted after the knockout may not cut through it', ()
     knockout(50, 100) +
     digit(50, 100) +
     '</svg>';
-  assert.deepEqual(auditKnockoutProtection(clean, { noteheadRadius: R }), []);
+  assert.deepEqual(auditKnockoutProtection(clean, MASK_AUDIT), []);
 
   const regressed =
     '<svg>' +
     knockout(50, 100) +
     digit(50, 100) +
     '<line class="janko-beat-line" x1="50" y1="90" x2="50" y2="110" stroke="#D1D5DB"/></svg>';
-  const out = auditKnockoutProtection(regressed, { noteheadRadius: R });
+  const out = auditKnockoutProtection(regressed, MASK_AUDIT);
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-pass-through');
   assert.match(out[0].message, /beat-line element painted after the knockout/);
@@ -1087,75 +1084,69 @@ test('Paint audit: the Middle C spine cutting a glyph is named explicitly', () =
     knockout(50, 100) +
     digit(50, 100) +
     '<line x1="30" y1="100" x2="70" y2="100" stroke="#E2E8F0"/></svg>';
-  const out = auditKnockoutProtection(svg, { noteheadRadius: R, spineY: 100 });
+  const out = auditKnockoutProtection(svg, { ...MASK_AUDIT, spineY: 100 });
   assert.equal(out.length, 1);
   assert.match(out[0].message, /Middle C spine cuts through the knockout/);
 });
 
-test('Paint audit: a flush stem is exempt, a stem starting inside the disc is not', () => {
+test('Paint audit: a flush stem is exempt, a stem starting inside the mask is not', () => {
   // The notehead's own stem, painted after its mask, must start flush on the
-  // disc perimeter …
+  // mask edge …
   const own =
     '<svg>' +
     knockout(50, 100) +
     digit(50, 100) +
     stem(50, 100 - REGULAR_ATTACH, 85) +
     '</svg>';
-  assert.deepEqual(
-    auditKnockoutProtection(own, { noteheadRadius: R, haloRadius: HALO_R }),
-    []
-  );
+  assert.deepEqual(auditKnockoutProtection(own, MASK_AUDIT), []);
 
-  // … a stem emerging *inside* the disc pierces the mask instead.
+  // … a stem emerging *inside* the mask pierces it instead.
   const inside =
     '<svg>' + knockout(50, 100) + digit(50, 100) + stem(50, 98.5, 85) + '</svg>';
-  const out = auditKnockoutProtection(inside, { noteheadRadius: R, haloRadius: HALO_R });
+  const out = auditKnockoutProtection(inside, MASK_AUDIT);
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-pass-through');
 
-  // A foreign stem crossing the disc is never exempt.
+  // A foreign stem crossing the mask is never exempt.
   const foreign =
     '<svg>' +
     knockout(50, 100) +
     digit(50, 100) +
     '<line class="janko-stem" x1="52" y1="120" x2="52" y2="80" stroke="#111"/></svg>';
-  const out2 = auditKnockoutProtection(foreign, { noteheadRadius: R, haloRadius: HALO_R });
+  const out2 = auditKnockoutProtection(foreign, MASK_AUDIT);
   assert.equal(out2.length, 1);
   assert.equal(out2[0].code, 'knockout-pass-through');
 });
 
-test('Paint audit: the elliptical mask is audited in its own normalized metric', () => {
-  // The ellipse owns its digit exactly like the legacy circle.
-  const owned = `<svg>${ellipseKnockout(50, 100, 3.6)}${digit(50, 100)}</svg>`;
-  assert.deepEqual(auditKnockoutProtection(owned, { noteheadRadius: R, knockoutRx: 3.6 }), []);
-  // A rule through the ellipse's horizontal interior is a cut …
+test('Paint audit: the rectangular mask is audited box-exact', () => {
+  // The rect owns its digit exactly.
+  const owned = `<svg>${knockout(50, 100)}${digit(50, 100)}</svg>`;
+  assert.deepEqual(auditKnockoutProtection(owned, MASK_AUDIT), []);
+  // A rule through the mask's horizontal interior is a cut …
   const cut =
     '<svg>' +
-    ellipseKnockout(50, 100, 3.6) +
+    knockout(50, 100) +
     digit(50, 100) +
     '<line class="janko-beat-line" x1="52" y1="90" x2="52" y2="110" stroke="#D1D5DB"/></svg>';
-  const out = auditKnockoutProtection(cut, { noteheadRadius: R, knockoutRx: 3.6 });
+  const out = auditKnockoutProtection(cut, MASK_AUDIT);
   assert.equal(out.length, 1);
   assert.equal(out[0].code, 'knockout-pass-through');
-  // … while a rule at dx = 4.0 — inside the legacy circle, outside rx 3.6 —
-  // is clean: the audit is anisotropic, not circular.
+  // … while a rule at dx = 3.0 — inside the legacy disc, outside wx 2.73 —
+  // is clean: the audit is box-exact, not circular.
   const grazing =
     '<svg>' +
-    ellipseKnockout(50, 100, 3.6) +
+    knockout(50, 100) +
     digit(50, 100) +
-    '<line class="janko-beat-line" x1="54" y1="90" x2="54" y2="110" stroke="#D1D5DB"/></svg>';
-  assert.deepEqual(auditKnockoutProtection(grazing, { noteheadRadius: R, knockoutRx: 3.6 }), []);
-  // The notehead's own stem stays flush on the vertical perimeter (ry + 0.2).
+    '<line class="janko-beat-line" x1="53" y1="90" x2="53" y2="110" stroke="#D1D5DB"/></svg>';
+  assert.deepEqual(auditKnockoutProtection(grazing, MASK_AUDIT), []);
+  // The notehead's own stem stays flush on the mask edge (hy + 0.2).
   const own =
     '<svg>' +
-    ellipseKnockout(50, 100, 3.6) +
+    knockout(50, 100) +
     digit(50, 100) +
     stem(50, 100 - REGULAR_ATTACH, 85) +
     '</svg>';
-  assert.deepEqual(
-    auditKnockoutProtection(own, { noteheadRadius: R, knockoutRx: 3.6, haloRadius: HALO_R }),
-    []
-  );
+  assert.deepEqual(auditKnockoutProtection(own, MASK_AUDIT), []);
 });
 
 test('Paint audit: a stem piercing the Position of Honor halo is a violation', () => {
@@ -1167,7 +1158,7 @@ test('Paint audit: a stem piercing the Position of Honor halo is a violation', (
     stem(50, 100 - HONOR_ATTACH, 85) +
     '</svg>';
   assert.deepEqual(
-    auditKnockoutProtection(clean, { noteheadRadius: R, haloRadius: HALO_R }),
+    auditKnockoutProtection(clean, MASK_AUDIT),
     [],
     'the tick-0 stem starts outside the ring'
   );
@@ -1179,7 +1170,7 @@ test('Paint audit: a stem piercing the Position of Honor halo is a violation', (
     digit(50, 100) +
     stem(50, 98.5, 85) +
     '</svg>';
-  const out = auditKnockoutProtection(pierced, { noteheadRadius: R, haloRadius: HALO_R });
+  const out = auditKnockoutProtection(pierced, MASK_AUDIT);
   assert.ok(
     out.some((v) => v.code === 'halo-piercing'),
     'a stem emerging inside the ring must be reported'
@@ -1202,7 +1193,8 @@ test('Every engraved system of the canonical score passes the paint-order audit'
     );
     assert.deepEqual(
       auditKnockoutProtection(svg, {
-        noteheadRadius: DEFAULT_JANKO_TOKENS.noteheadRadius,
+        knockoutWx: MASK_WX,
+        knockoutHy: MASK_HY,
         haloRadius: DEFAULT_JANKO_TOKENS.haloRadius,
         spineY: layout.geometry.middleCY,
       }),
@@ -1233,7 +1225,8 @@ test('Paint audit honours the digit baseline of a custom token set', () => {
   );
   assert.deepEqual(
     auditKnockoutProtection(svg, {
-      noteheadRadius: tokens.noteheadRadius,
+      knockoutWx: MASK_WX,
+      knockoutHy: MASK_HY,
       haloRadius: tokens.haloRadius,
       digitBaselineOffset: digitBaselineOffset(tokens.digitFontSize),
     }),

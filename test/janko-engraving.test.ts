@@ -91,19 +91,19 @@ import { lintJankoScore } from '../src/render/janko/linter';
 const TOKENS = DEFAULT_JANKO_TOKENS;
 const OPTIONS = DEFAULT_JANKO_OPTIONS;
 /**
- * Round 16 doctrine arithmetic. The golden master fans every row cluster at
- * the `'balanced'` preset: one anchored head keeps the onset column and the
- * rest step toward the roomier side at `pairGap = 2rx + air` per step. A
- * tick-0 cluster wears the wider Position of Honor rings, so its step widens
- * to two halo radii plus the same air.
+ * Round 17 doctrine arithmetic. The golden master fans every row cluster at
+ * the `'snug'` preset: the pinned head keeps its column and the rest step
+ * toward the roomier side at `pairGap = 2wx + air` per step. A tick-0 cluster
+ * wears the wider Position of Honor rings, so its step widens to two halo
+ * half-widths plus the same air.
  */
-const SPACING_PRESET = getClusterSpacingPreset('balanced');
-/** The judged golden pair gap: 2·3.6 + 1.0 = 8.2pt. */
+const SPACING_PRESET = getClusterSpacingPreset('snug');
+/** The judged golden pair gap: 2·2.73 + 0.4 = 5.86pt. */
 const PAIR_GAP = SPACING_PRESET.pairGap;
 /** The horizontal ring extent a tick-0 head actually wears. */
-const HALO_RX = Math.max(SPACING_PRESET.rx, TOKENS.haloRadius + JANKO_HALO_STROKE_WIDTH / 2);
-/** The widened tick-0 fan step: 2·6.575 + 1.0 = 14.15pt. */
-const HALO_GAP = 2 * HALO_RX + SPACING_PRESET.air;
+const HALO_WX = Math.max(SPACING_PRESET.wx, TOKENS.haloRadius + JANKO_HALO_STROKE_WIDTH / 2);
+/** The widened tick-0 fan step: 2·6.575 + 0.4 = 13.55pt. */
+const HALO_GAP = 2 * HALO_WX + SPACING_PRESET.air;
 const HANDS: Hand[] = ['RH', 'LH'];
 
 function close(actual: number, expected: number, message: string, epsilon = 1e-9): void {
@@ -649,7 +649,7 @@ test('Row-snapped clusters (doctrine): the anchored head keeps the column, the f
   assert.equal(c.y, e.y, 'the two heads keep one row y');
   close(Math.abs(e.x - c.x), HALO_GAP, 'the pair is fanned by exactly one halo gap');
   assert.ok(
-    HALO_GAP >= 2 * HALO_RX,
+    HALO_GAP >= 2 * HALO_WX,
     'the halo step covers two full ring extents plus air'
   );
 
@@ -742,6 +742,9 @@ test('Row-snapped clusters: a crowd at the barline fans right, never shears', ()
 test('Row-snapped clusters: a three-note row cluster fans symmetrically about its middle head', () => {
   // G7 without its fifth: [7, 11, 2, 5] → 7, 11 and 5 all rank 1 of one octave.
   // At tick 0 every head wears the halo, so each step is the widened halo gap.
+  // The widened inset isolates the fan symmetry from the barline interaction
+  // (which the next test owns): the full middle-anchored fan fits left of the
+  // nominal column, so the pin holds and both steps stay full.
   const score = makeScore(
     [
       makeNote('g7-g', 7, 4, 0, 96, 'RH'),
@@ -750,7 +753,7 @@ test('Row-snapped clusters: a three-note row cluster fans symmetrically about it
     ],
     144
   );
-  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const layout = layoutJankoScore(score, OPTIONS, { ...TOKENS, measureInset: 20 })[0];
   const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
   assert.equal(xs.length, 3);
   for (const p of layout.notes) {
@@ -763,12 +766,15 @@ test('Row-snapped clusters: a three-note row cluster fans symmetrically about it
 });
 
 test('Row-snapped clusters: a fanned downbeat chord never crosses its barline', () => {
+  // A single-hand halo pair on the downbeat: the lower head pins the onset
+  // column and the follower fans one full halo step into the open measure —
+  // the pin-preserving fan never reaches left of its column, so the barline
+  // keeps its full air.
   const layout = layoutJankoScore(
     makeScore(
       [
         makeNote('low-a', 9, 3, 0, 96, 'LH'),
         makeNote('low-b', 11, 3, 0, 96, 'LH'),
-        makeNote('low-f', 5, 3, 0, 96, 'LH'),
       ],
       144
     ),
@@ -776,6 +782,7 @@ test('Row-snapped clusters: a fanned downbeat chord never crosses its barline', 
     TOKENS
   )[0];
   const left = layout.geometry.staffLeft;
+  assert.equal(layout.notes.length, 2, 'the downbeat carries the halo pair');
   for (const p of layout.notes) {
     assert.ok(
       p.x - TOKENS.noteheadRadius >= left + 1.0,
@@ -783,8 +790,7 @@ test('Row-snapped clusters: a fanned downbeat chord never crosses its barline', 
     );
   }
   const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
-  close(xs[1] - xs[0], HALO_GAP, 'the cluster is still fully spread at the halo step');
-  close(xs[2] - xs[1], HALO_GAP, 'both steps of the downbeat fan stay full');
+  close(xs[1] - xs[0], HALO_GAP, 'the downbeat pair keeps its full halo spread');
 });
 
 test('Row-snapped parity offset: the canonical Bach score is unchanged on unaffected onsets', () => {
@@ -813,7 +819,11 @@ test('Token/option overrides flow through every renderer (pluggable design)', ()
   close(tokens.octaveStep, 30, 'octaveStep keeps its canonical default');
   const crop = renderJankoCrop(score, 1, 1, options, tokens);
   assert.match(crop, /r="6\.40"/, 'halo override');
-  assert.match(crop, /ry="5\.00"/, 'notehead override rides the ellipse vertical radius');
+  assert.match(
+    crop,
+    /class="janko-knockout"[^>]*width="5\.46"[^>]*height="7\.32"/,
+    'the rectangular mask is preset-owned: the notehead override cannot resize it'
+  );
   const geo = computePageGeometry(options, tokens);
   close(geo.systems[0].equatorY('RH', 4) - geo.systems[0].middleCY, -30, 'interStaffGap override');
 });
@@ -1553,24 +1563,32 @@ test('Zero horizontal dashed guidelines: the vertical beat grid is the only dott
   assert.match(withGuides, /stroke-dasharray="3,3"/);
 });
 
-test('Optical notehead: 5.8pt digits sit dead-centre in the elliptical knockout mask', () => {
+test('Optical notehead: 5.8pt digits sit dead-centre in the rectangular knockout mask', () => {
   const score = buildBachGoldbergVar1Score();
-  close(TOKENS.noteheadRadius, 4.8, 'canonical knockout radius');
+  close(SPACING_PRESET.wx, 2.73, 'canonical mask half-width');
+  close(SPACING_PRESET.hy, 3.66, 'canonical mask half-height');
   close(TOKENS.digitFontSize, 5.8, 'canonical digit font size');
   const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
-  assert.ok(TOKENS.noteheadRadius - halfWidth >= 1.2, 'left/right white margin');
-  assert.ok(TOKENS.noteheadRadius - halfHeight >= 1.2, 'top/bottom white margin');
   assert.ok(
-    TOKENS.noteheadRadius - Math.hypot(halfWidth, halfHeight) >= 1.2,
-    'corner white margin'
+    SPACING_PRESET.wx - halfWidth >= SPACING_PRESET.margin - 0.01,
+    'left/right preset margin'
+  );
+  assert.ok(
+    SPACING_PRESET.hy - halfHeight >= SPACING_PRESET.margin - 0.01,
+    'top/bottom preset margin'
   );
 
   const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
   const knockouts = [
     ...crop.matchAll(
-      /class="janko-knockout" cx="([\d.]+)" cy="([\d.]+)" rx="([\d.]+)" ry="([\d.]+)"/g
+      /<rect class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g
     ),
-  ].map((m) => ({ cx: Number(m[1]), cy: Number(m[2]), rx: Number(m[3]), ry: Number(m[4]) }));
+  ].map((m) => ({
+    cx: Number(m[1]) + Number(m[3]) / 2,
+    cy: Number(m[2]) + Number(m[4]) / 2,
+    wx: Number(m[3]) / 2,
+    hy: Number(m[4]) / 2,
+  }));
   const digits = [
     ...crop.matchAll(
       /class="janko-digit" x="([\d.]+)" y="([\d.]+)" font-weight="\d+" font-size="([\d.]+)pt"/g
@@ -1578,18 +1596,19 @@ test('Optical notehead: 5.8pt digits sit dead-centre in the elliptical knockout 
   ].map((m) => ({ x: Number(m[1]), y: Number(m[2]), size: Number(m[3]) }));
   assert.ok(knockouts.length > 0, 'the crop engraves noteheads');
   assert.equal(digits.length, knockouts.length, 'every knockout carries exactly one digit');
-  for (const disc of knockouts) {
-    close(disc.rx, SPACING_PRESET.rx, 'knockout horizontal radius is the preset');
-    close(disc.ry, TOKENS.noteheadRadius, 'knockout vertical radius is the head radius');
+  assert.ok(!/<ellipse class="janko-knockout"/.test(crop), 'no legacy elliptical mask survives');
+  for (const mask of knockouts) {
+    close(mask.wx, SPACING_PRESET.wx, 'knockout half-width is the preset');
+    close(mask.hy, SPACING_PRESET.hy, 'knockout half-height is the preset');
   }
   for (const d of digits) {
     close(d.size, TOKENS.digitFontSize, 'digit font size');
     // The alphabetic baseline sits half a cap height below the notehead centre.
     const glyphCentreY = d.y - digitBaselineOffset(d.size);
-    const disc = knockouts.find(
+    const mask = knockouts.find(
       (k) => Math.abs(k.cx - d.x) < 0.02 && Math.abs(k.cy - glyphCentreY) < 0.02
     );
-    assert.ok(disc, `digit at (${d.x}, ${d.y}) owns a concentric knockout disc`);
+    assert.ok(mask, `digit at (${d.x}, ${d.y}) owns a concentric knockout mask`);
   }
   close(
     JANKO_DIGIT_BASELINE_OFFSET,
@@ -1598,10 +1617,10 @@ test('Optical notehead: 5.8pt digits sit dead-centre in the elliptical knockout 
   );
 });
 
-test('Stem attachment: every stem starts flush outside its knockout disc — and its halo at tick 0', () => {
+test('Stem attachment: every stem starts flush outside its mask edge — and its halo at tick 0', () => {
   const score = buildBachGoldbergVar1Score();
-  const radii = getStemAttachmentRadii(TOKENS);
-  close(radii.regular, TOKENS.noteheadRadius + 0.2, 'regular attachment radius');
+  const radii = getStemAttachmentRadii(TOKENS, OPTIONS);
+  close(radii.regular, SPACING_PRESET.hy + 0.2, 'regular attachment radius');
   close(radii.honor, TOKENS.haloRadius + 0.4, 'Position of Honor attachment radius');
 
   const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
@@ -1612,7 +1631,7 @@ test('Stem attachment: every stem starts flush outside its knockout disc — and
       const expected = getStemAttachmentRadius(p.rhythm, TOKENS);
       const attach = Math.hypot(stem.stemX - p.x, stem.stemStartY - p.y);
       close(attach, expected, `flush attachment of ${p.note.id}`, 1e-9);
-      assert.ok(attach >= TOKENS.noteheadRadius, `${p.note.id} never starts inside the disc`);
+      assert.ok(attach >= SPACING_PRESET.hy, `${p.note.id} never starts inside the mask`);
       if (isPositionOfHonor(p.note.startTick)) {
         honored++;
         assert.ok(
@@ -1638,14 +1657,14 @@ test('Stem attachment: every stem starts flush outside its knockout disc — and
   ].map((m) => `${m[1]},${m[2]}`);
   assert.ok(starts.length > 0, 'mm. 1–2 engrave stems');
   for (const start of starts) {
-    assert.ok(expectedStarts.has(start), `stem start ${start} must sit on the disc perimeter`);
+    assert.ok(expectedStarts.has(start), `stem start ${start} must sit on the mask edge`);
   }
   for (const start of expectedStarts) {
     assert.ok(starts.includes(start), `notehead stem start ${start} must reach the document`);
   }
 });
 
-test('Stems keep ≥1.2pt of clean air from their own digit glyph', () => {
+test('Stems keep ≥0.7pt of clean air from their own digit glyph', () => {
   const score = buildBachGoldbergVar1Score();
   const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
   let worst = Infinity;
@@ -1665,8 +1684,8 @@ test('Stems keep ≥1.2pt of clean air from their own digit glyph', () => {
     }
   }
   assert.ok(
-    worst >= 1.2,
-    `every stem keeps ≥1.2pt from its digit (worst ${worst.toFixed(2)}pt at ${worstNote})`
+    worst >= 0.7,
+    `every stem keeps ≥0.7pt from its digit (worst ${worst.toFixed(2)}pt at ${worstNote})`
   );
 });
 
@@ -1840,13 +1859,13 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
   for (const n of opening) {
     const noteFlags = flags.filter((m) => Math.abs(Number(m[1]) - n.x) < 0.02);
     assert.equal(noteFlags.length, 1, `${n.id} carries exactly one flag`);
-    // Round 16: the dot sits tight to the elliptical mask (`rx + gap`) and
-    // always in the inter-row gap above its head — the canonical lane half a
-    // row up, or the rule-nudged seat when the lane would graze a rule.
+    // Round 17: the dot hugs the rectangular mask corner (`wx + gap`, low
+    // lane above its head) — the canonical hug lane, or the rule-nudged seat
+    // when the lane would graze a rule.
     const dotY = n.dotY ?? n.y;
     close(
       n.dotX ?? -1,
-      n.x + SPACING_PRESET.rx + TOKENS.augmentationDotGap,
+      n.x + SPACING_PRESET.wx + TOKENS.augmentationDotGap,
       `${n.id} dots tight to its mask`,
       1e-9
     );

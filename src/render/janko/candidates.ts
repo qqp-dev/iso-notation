@@ -78,10 +78,10 @@ export interface JankoCandidate {
   /** One-line designer rationale. */
   description?: string;
   /**
-   * The **open axis** this candidate exists to decide (Round 16's two-axis
-   * round). Only this axis is ever badged, even when the round has more than
-   * one open axis: per-candidate purity means a spacing candidate never shows a
-   * rest-dialect badge and vice versa.
+   * The **open axis** this candidate exists to decide. Only this axis is ever
+   * badged, even when the round has more than one open axis: per-candidate
+   * purity means a spacing candidate never shows a rest-dialect badge and
+   * vice versa.
    */
   axis?: string;
   /** Macro-layout delta against the golden master. */
@@ -140,30 +140,32 @@ export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
  * question again: how the continuous vertical grid is written against the
  * music, on the dense 16ths of mm. 27–28. Round 15 settled the crowded column
  * (stem-anchored flanks behind hard beat-cell barriers) and compared the four
- * rest dialects on strictly clean material. Round 16 engraves the cluster
- * doctrine direct — one shared stem per same-duration stack, coincident mixed
- * stacks, the elliptical knockout, dots always above, rule-hung smaller rests —
- * and judges only the horizontal spacing amount (compact / balanced / airy) on
- * real two- and three-note clusters, carrying the four rest dialects into a
- * second independent axis.
+ * rest dialects on strictly clean material. Round 16 engraved the cluster
+ * doctrine direct and judged the horizontal spacing amount (compact / balanced
+ * / airy) on real two- and three-note clusters. Round 17A goes rectangular and
+ * much tighter: the sharp fitted mask, the v2 spacing solver (unit centering,
+ * pin-preserving shrink, local redistribution, multi-row interleave) and the
+ * hugging dots go direct to golden, and the round judges only the gap amount —
+ * snug (−30%) or tight (−35%). Rest behaviour is untouched (Round 17B).
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 16,
-  title: 'Cluster Spacing + Rest Dialects: Two Independent Axes',
+  round: 17,
+  title: 'Rect Knockout + Gap Amounts: Snug −30% vs Tight −35%',
   description:
-    'The cluster doctrine goes direct to golden: one shared stem per same-duration stack on the nominal column, coincident stems for mixed stacks with each beam or flag at its own end, two stems at head-x for cross-hand or mixed-duration seconds, the elliptical knockout (ry 4.8, digit 5.8), augmentation dots always in the inter-row gap above, and smaller rests hung from the nearest staff rule toward Middle C. Axis 1 judges only the horizontal spacing amount — compact (rx 3.2, air 0.8), balanced (rx 3.6, air 1.0, the golden master) or airy (rx 4.0, air 1.2) — on real two- and three-note clusters in Bach and Brahms. Axis 2 carries the four rest dialects on their strictly clean windows, engraved under golden spacing. The two axes are independent by construction: the spacing question cannot move rest ink. The settled grid policy C, the flared bracket, the per-hand clasp and the four-systems-per-page layout ride along as invisible fixed context.',
-  openAxes: ['clusterSpacing', 'restStyle'],
+    'The rectangular knockout goes direct to golden: a sharp fitted mask (digit ink box plus a uniform margin, no corner fudge), the v2 spacing solver (spread units centred in their free space, pin-preserving shrink where room runs short, disturbed local groups redistributed, multi-row onsets interleaved at the half-step), and augmentation dots hugging the mask corner. The round judges only the gap amount — snug (margin 0.8, air 0.4, pairs 5.86pt, the golden master) or tight (margin 0.6, air 0.4, pairs 5.46pt) — on the Round 16 cluster windows, so the verdict compares against what the operator already saw. Rest behaviour is explicitly out: rests, beams and the m4 beam-break stay exactly Round 16, and the spacing question cannot move rest ink. The settled grid policy C, the flared bracket, the per-hand clasp and the four-systems-per-page layout ride along as invisible fixed context.',
+  openAxes: ['clusterSpacing'],
 };
 
 /**
- * The Round 16 spacing-axis window set: real two- and three-note clusters in
- * real music. Bach m. 8 (the t1032 pair in a 16th-note run), m. 12 (the
- * pulse-edge t1632 pair) and m. 15 (the double pair t2040/t2064, grouped and
- * still in time order) show pairs that must read grouped at a glance; Brahms
- * mm. 8–9 (the held triples t1392/t1584, one shared stem each) show how much
- * air a three-note fan needs.
+ * The Round 17 spacing window set, carried from Round 16 for continuity: real
+ * two- and three-note clusters in real music. Bach m. 8 (the t1032 pair in a
+ * 16th-note run, now centred), m. 12 (the pulse-edge t1632 pair, pinned) and
+ * m. 15 (the double pair t2040/t2064, evened and still in time order) show
+ * pairs that must read grouped at a glance; Brahms mm. 8–9 (the held triples
+ * t1392/t1584, interleaved rows, one shared stem each) show how much air a
+ * three-note fan needs.
  */
-const ROUND_16_SPACING_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_17_SPACING_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 8,
@@ -197,129 +199,31 @@ const ROUND_16_SPACING_WINDOWS: JankoCandidateWindow[] = [
 ];
 
 /**
- * The Round 15 dialect-axis window set: strictly clean material only. The
- * curated rest-duration specimen gives one genuine silence per value at macro
- * scale; Brahms m. 68 is the one real-world bar of the five the operator named
- * that carries a writable rest *and* no crowded column (mm. 7 and 17 carry
- * rests but crowd columns elsewhere, mm. 39 and 66 hold no standard-value
- * silence — a painted rest never lies); the chord specimen's m. 2 adds the
- * genuine 8th rest in a chord context.
- */
-const ROUND_15_DIALECT_WINDOWS: JankoCandidateWindow[] = [
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 1,
-    title: 'Rest specimen · m. 1 — the genuine 16th silence in a stepwise contour, free column',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 2,
-    measureCount: 1,
-    title: 'Rest specimen · m. 2 — the genuine 8th silence',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 3,
-    measureCount: 1,
-    title: 'Rest specimen · m. 3 — the genuine quarter silence',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 4,
-    measureCount: 1,
-    title: 'Rest specimen · m. 4 — the genuine half silence',
-  },
-  {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 68,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 68 — the one real-world bar with a writable rest and no crowded column',
-  },
-  {
-    scoreId: SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 2,
-    measureCount: 1,
-    title: 'Chord specimen · m. 2 — the genuine tick-180 8th rest among the clasped chords',
-  },
-];
-
-/**
- * The active candidate set — Round 16's **two independent axes**, in display
- * order: first the three cluster-spacing amounts (A/B/C), then the four rest
- * dialects carried byte-identical from Round 15 (A–D). Each candidate states
- * only its own axis.
+ * The active candidate set — Round 17's **single judged axis**, in display
+ * order: the snug golden (A) and the tight challenger (B), both on the
+ * carried cluster windows. Each candidate states only the spacing axis; the
+ * rest dialects return in Round 17B.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'spacing-compact',
-    label: 'A · Compact Spacing — rx 3.2, air 0.8',
+    id: 'spacing-snug',
+    label: 'A · Snug Spacing — margin 0.8, air 0.4 (golden)',
     axis: 'clusterSpacing',
     description:
-      'The tightest honest fan: same-row pairs stand 7.2pt apart, triples 14.4pt. Fixed context is the direct-to-golden cluster doctrine — one shared stem per same-duration stack, coincident mixed stacks, the elliptical knockout at ry 4.8 with the 5.8pt digit, dots always above, rule-hung rests — so only the horizontal air is judged: grouped at a glance, or too tight for the halo?',
-    options: { clusterSpacing: 'compact' },
-    windows: ROUND_16_SPACING_WINDOWS,
-    tags: ['7.2pt pairs', '14.4pt triples', 'tightest honest fan'],
+      'The recommended golden amount: same-row pairs stand 5.86pt apart, triples 11.72pt — grouped at a glance with honest white everywhere. Fixed context is the direct-to-golden Round 17A doctrine — the sharp rectangular mask, the v2 spacing solver (centring, pin-preserving shrink, redistribution, interleave), hugging dots, Round 16 rests and beams — so only the gap amount is judged.',
+    options: { clusterSpacing: 'snug' },
+    windows: ROUND_17_SPACING_WINDOWS,
+    tags: ['golden amount', '5.86pt pairs', '11.72pt triples'],
   },
   {
-    id: 'spacing-balanced',
-    label: 'B · Balanced Spacing — rx 3.6, air 1.0 (golden)',
+    id: 'spacing-tight',
+    label: 'B · Tight Spacing — margin 0.6, air 0.4',
     axis: 'clusterSpacing',
     description:
-      'The agreed golden amount: same-row pairs stand 8.2pt apart, triples 16.4pt — inside one 16th column either way. Fixed context is the direct-to-golden cluster doctrine — one shared stem per same-duration stack, coincident mixed stacks, the elliptical knockout at ry 4.8 with the 5.8pt digit, dots always above, rule-hung rests — so only the horizontal air is judged.',
-    options: { clusterSpacing: 'balanced' },
-    windows: ROUND_16_SPACING_WINDOWS,
-    tags: ['golden amount', '8.2pt pairs', '16.4pt triples'],
-  },
-  {
-    id: 'spacing-airy',
-    label: 'C · Airy Spacing — rx 4.0, air 1.2',
-    axis: 'clusterSpacing',
-    description:
-      'The most generous fan: same-row pairs stand 9.2pt apart, triples 18.4pt. Fixed context is the direct-to-golden cluster doctrine — one shared stem per same-duration stack, coincident mixed stacks, the elliptical knockout at ry 4.8 with the 5.8pt digit, dots always above, rule-hung rests — so only the horizontal air is judged: breathing room, or does the cluster stop reading as one onset?',
-    options: { clusterSpacing: 'airy' },
-    windows: ROUND_16_SPACING_WINDOWS,
-    tags: ['9.2pt pairs', '18.4pt triples', 'most generous fan'],
-  },
-  {
-    id: 'rest-kinetic-monoline',
-    label: 'A · Kinetic Monoline Rests — stem + 12.4° tabs',
-    axis: 'restStyle',
-    description:
-      'The incumbent dialect: a vertical rest stem with the score own beam-harmonized 12.4° kinetic tabs (two for a 16th, one for an 8th), a central horizontal notch for the quarter and a hollow 4.0 × 1.3pt bar for the half. Monoline, architectural, and already the golden master choice.',
-    options: { restStyle: 'kinetic-monoline' },
-    windows: ROUND_15_DIALECT_WINDOWS,
-    tags: ['incumbent dialect', '12.4° kinetic tabs', 'hollow half bar'],
-  },
-  {
-    id: 'rest-classical-urtext',
-    label: 'B · Classical Urtext Rest Glyphs — calligraphic hooks',
-    axis: 'restStyle',
-    description:
-      'The engraved-urtext alternative: calligraphic hooks with solid teardrop bulbs for the 16th and 8th, the serpentine lightning stroke for the quarter and a solid 3.5 × 1.4pt block for the half. Organic, hand-cut, and the most traditional reading of a silence.',
-    options: { restStyle: 'classical-urtext' },
-    windows: ROUND_15_DIALECT_WINDOWS,
-    tags: ['calligraphic hooks', 'serpentine quarter', 'solid half block'],
-  },
-  {
-    id: 'rest-geometric-node',
-    label: 'C · Geometric Pause Nodes — diamonds and rays',
-    axis: 'restStyle',
-    description:
-      'A pure-geometry answer: a hollow diamond with two lateral rays for the 16th, one ray for the 8th, a solid 2.9 × 2.9pt diamond for the quarter and an open capsule for the half. Zero calligraphy — the silence reads as a plotted node on the lattice.',
-    options: { restStyle: 'geometric-node' },
-    windows: ROUND_15_DIALECT_WINDOWS,
-    tags: ['hollow diamond + rays', 'solid quarter node', 'open capsule half'],
-  },
-  {
-    id: 'rest-phantom-notehead',
-    label: 'D · Phantom Notehead Rests — the unwritten head',
-    axis: 'restStyle',
-    description:
-      'The Round 13 finalist that states a silence as the note that is not there: a dashed open notehead (R 1.7pt) with its bare stem, plus two downward-hooked flags for the 16th and one for the 8th, and a dashed head with a hollow bar for the half. The most semantically literal and the most unconventional of the four.',
-    options: { restStyle: 'phantom-notehead' },
-    windows: ROUND_15_DIALECT_WINDOWS,
-    tags: ['dashed open head', 'hooked phantom flags', 'semantic silence'],
+      'The challenger: same-row pairs stand 5.46pt apart, triples 10.92pt. The digit breathing room gets thin; the eye judges. Fixed context is the direct-to-golden Round 17A doctrine — the sharp rectangular mask, the v2 spacing solver (centring, pin-preserving shrink, redistribution, interleave), hugging dots, Round 16 rests and beams — so only the gap amount is judged.',
+    options: { clusterSpacing: 'tight' },
+    windows: ROUND_17_SPACING_WINDOWS,
+    tags: ['5.46pt pairs', '10.92pt triples', 'thin breathing room'],
   },
 ];
 
@@ -394,10 +298,9 @@ export function candidateBadges(
   const goldenTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const openAxes = new Set(round.openAxes ?? []);
 
-  // Round 16 carries two open axes at once. A candidate badges the axis it
-  // declares (`candidate.axis`) — never the other one — so per-candidate purity
-  // stays visible: a spacing candidate shows only its spacing delta, a dialect
-  // candidate only its dialect delta.
+  // A candidate badges the axis it declares (`candidate.axis`) — never any
+  // other open axis — so per-candidate purity stays visible: a spacing
+  // candidate shows only its spacing delta.
   const isOwnAxis = (key: string): boolean =>
     openAxes.has(key) && (candidate.axis === undefined || candidate.axis === key);
   for (const [key, value] of Object.entries(candidate.options ?? {})) {

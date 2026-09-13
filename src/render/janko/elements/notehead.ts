@@ -1,5 +1,5 @@
 /**
- * Notehead elements: elliptical white knockout, URW Gothic duodecimal digit and
+ * Notehead elements: rectangular white knockout, URW Gothic duodecimal digit and
  * the Position of Honor concentric halo ring.
  *
  * The white knockout guarantees that ledger equators, row guides and beams
@@ -7,14 +7,16 @@
  * piece (tick 0 of Measure 1), where it is emitted at R = 6.2pt around the
  * canonical mask.
  *
- * Anisotropic knockout (Round 16)
- * -------------------------------
- * The mask is an **ellipse**: tight horizontally (`rx` from the active
- * {@link JankoClusterSpacing} preset — neighbour symbols populate that space),
- * generous vertically (`ry = noteheadRadius` = 4.8pt, unchanged — nothing needs
- * that space). Staff rules, stems and dots keep exactly today's vertical
- * geometry; only the horizontal protection varies. The digit stays 5.8pt and
- * the halo stays a circular ring in every preset.
+ * Rectangular knockout (Round 17)
+ * --------------------------------
+ * The mask is a **sharp rectangle**: the digit ink box grown by the preset's
+ * uniform margin on all four sides (`wx = 1.93 + m`, `hy = 2.86 + m` — no
+ * rounding fudge). The Round 16 ellipse and its corner budget are deleted: to
+ * protect the digit's corners where the curve pulled away, every gap paid a
+ * ~0.2–0.4pt corner tax; the rect protects exactly and erases nothing extra
+ * (rows sit 15pt apart, so nothing but the head's own row line ever crosses
+ * the hole). The digit stays 5.8pt and the halo stays a circular ring in every
+ * preset.
  *
  * Digit optics
  * ------------
@@ -127,24 +129,25 @@ export const JANKO_DIGIT_BASELINE_OFFSET = digitBaselineOffset(
 );
 
 /**
- * Elliptical white knockout (erases staff lines and beams beneath the digit).
+ * Rectangular white knockout (erases staff lines and beams beneath the digit).
  *
- * `rx` is the tight horizontal radius of the active cluster-spacing preset
- * (3.6pt on the golden `'balanced'`), `ry` the generous vertical
- * `noteheadRadius` (4.8pt, fixed). The explicit `rx` override is for callers
- * that resolve the preset themselves; otherwise the layout options select it
- * (defaulting to the golden preset).
+ * `wx`/`hy` are the mask half-extents of the active cluster-spacing preset
+ * (2.73 × 3.66 on the golden `'snug'`), painted with sharp corners. The
+ * explicit override is for callers that resolve the preset themselves;
+ * otherwise the layout options select it (defaulting to the golden preset).
  */
 export function renderNoteheadKnockout(
   x: number,
   y: number,
   tokens?: Partial<JankoTokens> | null,
   layoutOptions?: Partial<JankoLayoutOptions> | null,
-  rxOverride?: number
+  maskOverride?: { wx: number; hy: number }
 ): string {
-  const t = resolveJankoTokens(tokens);
-  const rx = rxOverride ?? getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing).rx;
-  return `    <ellipse class="janko-knockout" cx="${f(x)}" cy="${f(y)}" rx="${f(rx)}" ry="${f(t.noteheadRadius)}" fill="#FFFFFF"/>`;
+  void tokens;
+  const preset = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
+  const wx = maskOverride?.wx ?? preset.wx;
+  const hy = maskOverride?.hy ?? preset.hy;
+  return `    <rect class="janko-knockout" x="${f(x - wx)}" y="${f(y - hy)}" width="${f(2 * wx)}" height="${f(2 * hy)}" fill="#FFFFFF"/>`;
 }
 
 /** Duodecimal digit notehead glyph in URW Gothic / Avant Garde. */

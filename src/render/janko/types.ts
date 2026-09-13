@@ -90,66 +90,79 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
- * Horizontal **cluster spacing** — the Round 16 judged axis: how much room a
+ * Measured digit half-extents (pt) at the canonical 5.8pt digit size — the
+ * construction bases of the rectangular knockout (see
+ * {@link JankoClusterSpacingPreset}). Rounded to two decimals for humans; the
+ * exact optical box is `digitHalfExtents(5.8)` = 1.9333 × 2.8577.
+ */
+export const JANKO_DIGIT_HALF_WIDTH = 1.93;
+export const JANKO_DIGIT_HALF_HEIGHT = 2.86;
+
+/**
+ * Horizontal **cluster spacing** — the Round 17 judged axis: how much room a
  * same-row cluster of one onset takes.
  *
- * The knockout is an **ellipse** with a tight horizontal radius `rx` (this
- * preset) and a generous vertical radius `ry = noteheadRadius` (4.8pt, fixed in
- * every preset — staff rules, stems and dots keep exactly today's vertical
- * geometry). Neighbour symbols populate the horizontal space, so the horizontal
- * protection is what the round judges; nothing needs the vertical space, so it
- * stays generous. The digit stays 5.8pt in every preset.
+ * The knockout is a **sharp rectangle**: the digit ink box grown by a uniform
+ * margin `m` on all four sides (`wx = 1.93 + m`, `hy = 2.86 + m`). The
+ * Round 16 ellipse and its corner budget are deleted with it: the rect erases
+ * nothing extra while protecting exactly. The digit stays 5.8pt in every
+ * preset, and rows sit 15pt apart, so nothing but the head's own row line ever
+ * crosses the hole.
  *
- * | preset       | rx   | air  | pair span (`2rx + air`) | triple span |
- * | ------------ | ---- | ---- | ----------------------- | ----------- |
- * | `'compact'`  | 3.2  | 0.8  | 7.2                     | 14.4        |
- * | `'balanced'` | 3.6  | 1.0  | 8.2                     | 16.4        |
- * | `'airy'`     | 4.0  | 1.2  | 9.2                     | 18.4        |
+ * | preset    | margin | air  | pair gap (`2wx + air`) | triple span |
+ * | --------- | ------ | ---- | ---------------------- | ----------- |
+ * | `'snug'`  | 0.8    | 0.4  | 5.86                   | 11.72       |
+ * | `'tight'` | 0.6    | 0.4  | 5.46                   | 10.92       |
  *
- * `'balanced'` is the golden master (the agreed 3.6/1.0). The cluster grammar
- * itself is settled doctrine, not a candidate: one shared stem per same-duration
- * stack on the nominal column, coincident stems for mixed stacks, flanked
- * same-row seconds with two stems at head-x, room-seeking asymmetric
- * distribution behind the hard beat-cell barriers.
+ * `'snug'` is the golden master (the recommended −30% vs the Round 16 8.2).
+ * The cluster grammar itself is settled doctrine, not a candidate: one shared
+ * stem per same-duration stack nearest the nominal column, coincident stems
+ * for mixed stacks, flanked same-row seconds with two stems at head-x, the
+ * v2 spacing solver (unit centering, pin-preserving shrink, local
+ * redistribution, multi-row interleave) behind the hard beat-cell barriers.
  */
-export type JankoClusterSpacing = 'compact' | 'balanced' | 'airy';
+export type JankoClusterSpacing = 'snug' | 'tight';
 
 /** Every cluster-spacing preset, in the canonical exploration order. */
 export const JANKO_CLUSTER_SPACINGS: readonly JankoClusterSpacing[] = [
-  'compact',
-  'balanced',
-  'airy',
+  'snug',
+  'tight',
 ];
 
-/** Human-readable names of the three cluster-spacing presets. */
+/** Human-readable names of the two cluster-spacing presets. */
 export const JANKO_CLUSTER_SPACING_LABELS: Record<JankoClusterSpacing, string> = {
-  compact: 'Compact Cluster Spacing (rx 3.2, air 0.8)',
-  balanced: 'Balanced Cluster Spacing (rx 3.6, air 1.0)',
-  airy: 'Airy Cluster Spacing (rx 4.0, air 1.2)',
+  snug: 'Snug Cluster Spacing (margin 0.8, air 0.4)',
+  tight: 'Tight Cluster Spacing (margin 0.6, air 0.4)',
 };
 
 /** Resolved geometry of one {@link JankoClusterSpacing} preset (all in pt). */
 export interface JankoClusterSpacingPreset {
-  /** Horizontal knockout radius: the tight axis of the elliptical mask. */
-  rx: number;
-  /** Breathing air between two neighbouring knockout ellipses of one row. */
+  /**
+   * Uniform white margin the rectangular mask leaves around the digit ink box
+   * on all four sides: `wx = 1.93 + margin`, `hy = 2.86 + margin`.
+   */
+  margin: number;
+  /** Breathing air between two neighbouring knockout masks of one row. */
   air: number;
-  /** Centre-to-centre span of a same-row pair: `2rx + air`. */
+  /** Centre-to-centre span of a same-row pair: `2wx + air`. */
   pairGap: number;
+  /** Mask half-width: `1.93 + margin`. */
+  wx: number;
+  /** Mask half-height: `2.86 + margin`. */
+  hy: number;
 }
 
-/** The three judged spacing amounts, exactly as the Round 16 ticket tables them. */
+/** The two judged spacing amounts, exactly as the Round 17A ticket tables them. */
 export const JANKO_CLUSTER_SPACING_PRESETS: Record<JankoClusterSpacing, JankoClusterSpacingPreset> = {
-  compact: { rx: 3.2, air: 0.8, pairGap: 7.2 },
-  balanced: { rx: 3.6, air: 1.0, pairGap: 8.2 },
-  airy: { rx: 4.0, air: 1.2, pairGap: 9.2 },
+  snug: { margin: 0.8, air: 0.4, pairGap: 5.86, wx: 2.73, hy: 3.66 },
+  tight: { margin: 0.6, air: 0.4, pairGap: 5.46, wx: 2.53, hy: 3.46 },
 };
 
-/** Resolve one spacing preset (defaults to the golden `'balanced'`). */
+/** Resolve one spacing preset (defaults to the golden `'snug'`). */
 export function getClusterSpacingPreset(
   spacing?: JankoClusterSpacing | null
 ): JankoClusterSpacingPreset {
-  return JANKO_CLUSTER_SPACING_PRESETS[spacing ?? 'balanced'];
+  return JANKO_CLUSTER_SPACING_PRESETS[spacing ?? 'snug'];
 }
 
 /**
@@ -490,9 +503,11 @@ export interface JankoTokens {
   /** Vertical distance between the two whole-tone rows. */
   rowHeight: number;
   /**
-   * White-knockout notehead radius: the **vertical** radius `ry` of the
-   * elliptical mask (Round 16). The tight horizontal radius `rx` comes from the
-   * active {@link JankoClusterSpacing} preset instead.
+   * Conservative circular glyph bound (4.8pt): the clearance radius the
+   * clasp, rest, beam and barline grammars keep around a notehead. Round 17
+   * paints a sharp rectangular mask instead (`wx`/`hy` from the active
+   * {@link JankoClusterSpacing} preset, both well inside this circle), so every
+   * circular audit stays a safe over-approximation of the true rect.
    */
   noteheadRadius: number;
   /** Duodecimal digit font size (pt) — must fit inside the knockout disc. */
@@ -534,19 +549,18 @@ export interface JankoTokens {
   /** Radius of a dotted-rhythm augmentation dot. */
   augmentationDotRadius?: number;
   /**
-   * Horizontal air (pt) between a notehead and its augmentation dot:
-   * `dotX = note.x + rx + augmentationDotGap`, for **both** hands, where `rx`
-   * is the tight horizontal radius of the elliptical head (Round 16). The dot
-   * is always right of the head it belongs to, as in standard notation.
+   * Horizontal offset (pt) of an augmentation dot's centre from its mask's
+   * right edge: `dotX = note.x + wx + augmentationDotGap`, for **both** hands,
+   * where `wx` is the rectangular mask half-width of the active
+   * {@link JankoClusterSpacing} preset (Round 17 hug fit). The dot is always
+   * right of the head it belongs to, as in standard notation.
    */
   augmentationDotGap?: number;
   /**
-   * Vertical displacement (pt) of an augmentation dot off its own notehead row,
-   * into the inter-row gap **above** (Round 16, standard-analog: a line note
-   * dots the space above). A 16th-note grid seats neighbouring columns only
-   * 10.2pt apart, so an on-row dot can never clear the next column's mask; the
-   * inter-row lane is the only honest home for it. The canonical value is half
-   * a whole-tone row (`rowHeight / 2`).
+   * Vertical lane (pt) of an augmentation dot's centre above its head row
+   * (Round 17 hug fit): the dot hugs the mask's top-right corner instead of
+   * floating in the inter-row gap. The high lane (`rowHeight / 2`) survives
+   * only as the fallback when a same-row neighbour sits inside the mask band.
    */
   augmentationDotRowOffset?: number;
   /** Horizontal reach of a standard note flag, right of the stem. */
@@ -606,9 +620,9 @@ export type ResolvedJankoTokens = Required<JankoTokens>;
  * Canonical Jánko Two-Row engraving tokens.
  *
  * h = 15.0pt row grid; the octave equator step is 2h = 30.0pt. The
- * Position-of-Honor halo ring is R = 6.2pt around a 4.8pt white knockout, and
- * the duodecimal digit is set at 5.8pt so its ink box keeps ≈1.9pt of clean
- * white perimeter margin on every side of the mask.
+ * Position-of-Honor halo ring is R = 6.2pt around the rectangular white mask,
+ * and the duodecimal digit is set at 5.8pt so its ink box keeps the preset
+ * margin (0.8pt golden) of clean white on every side of the mask.
  */
 export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   rowHeight: 15.0,
@@ -631,8 +645,8 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   maxBeamSlope: 0.22,
   accoladeGap: 7.0,
   augmentationDotRadius: 0.75,
-  augmentationDotGap: 3.2,
-  augmentationDotRowOffset: 7.5,
+  augmentationDotGap: 1.2,
+  augmentationDotRowOffset: 3.5,
   flagWidth: 4.0,
   flagHeight: 6.6,
   flagSpacing: 3.4,
@@ -694,9 +708,9 @@ export interface JankoLayoutOptions {
    */
   restStyle?: JankoRestStyle;
   /**
-   * Horizontal cluster spacing (Round 16): the tight knockout radius `rx` and
-   * the breathing air between same-row heads of one onset. Defaults to the
-   * golden `'balanced'` (see {@link JankoClusterSpacing}).
+   * Horizontal cluster spacing (Round 17): the rectangular mask margin and the
+   * breathing air between same-row heads of one onset. Defaults to the golden
+   * `'snug'` (see {@link JankoClusterSpacing}).
    */
   clusterSpacing?: JankoClusterSpacing;
   /**
@@ -778,7 +792,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',
-  clusterSpacing: 'balanced',
+  clusterSpacing: 'snug',
   gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'architectural-bracket',
   finalBarlineStyle: 'unified',
