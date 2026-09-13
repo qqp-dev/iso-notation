@@ -3,7 +3,7 @@
  *
  * Covers:
  *  1. `renderCandidatesView()` renders every candidate declared in the
- *     registry, on **every engraving window it declares** (Round 7 judges a
+ *     registry, on **every engraving window it declares** (Round 8 judges a
  *     candidate on the Bach opening and the dense Brahms chords at once), with
  *     labels, option-delta badges, lint chips and SVG previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
@@ -23,6 +23,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import {
+  BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  BRAHMS_OP118_NO1_JANKO_TOKENS,
+  buildBrahmsOp118No1Score,
+} from '../src/scores/brahms-op118-no1';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { renderJankoPage, renderJankoVariantComparison } from '../src/render/janko/engine';
 import {
@@ -50,6 +55,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
 
 const SCORE = buildBachGoldbergVar1Score();
+const BRAHMS = buildBrahmsOp118No1Score();
 const CONFIG = createStudioConfig({ score: SCORE });
 assert.ok(resolveCandidate(CURRENT_CANDIDATES[0]).windows.length > 0);
 
@@ -88,17 +94,17 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 7/);
-  assert.match(html, /Kinetic Subdivision Tabs/);
+  assert.match(html, /Round 8/);
+  assert.match(html, /Symmetrical Clasps/);
 });
 
-test('Round 7 registry declares the four kinetic subdivision dialects on per-hand clasps', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 7);
-  assert.match(CURRENT_ROUND_METADATA.title, /Kinetic Subdivision Tabs/);
+test('Round 8 registry declares the four symmetrical clasp-duration paradigms on per-hand clasps', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 8);
+  assert.match(CURRENT_ROUND_METADATA.title, /Symmetrical Clasps/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['kinetic-tab-30', 'kinetic-tab-45', 'kinetic-tab-tapered', 'classical-urtext'],
+    ['center-ticks', 'cap-cuts', 'framing-only', 'bilateral-fins'],
     'candidates A–D in display order'
   );
   assert.deepEqual(
@@ -106,11 +112,16 @@ test('Round 7 registry declares the four kinetic subdivision dialects on per-han
     ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp']
   );
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.claspDurationStyle),
     ids,
-    'each candidate carries its own dialect'
+    'each candidate carries its own duration paradigm'
   );
-  // Every dialect keeps the canonical tokens: the delta is purely structural.
+  // The settled Round 8 tab is shared by all four: the round varies one variable.
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
+    ['kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam']
+  );
+  // Every paradigm keeps the canonical tokens: the delta is purely structural.
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
     assert.equal(resolved.tokens.claspWidth, DEFAULT_JANKO_TOKENS.claspWidth);
@@ -118,87 +129,88 @@ test('Round 7 registry declares the four kinetic subdivision dialects on per-han
     assert.equal(resolved.tokens.claspMinBarlineAir, DEFAULT_JANKO_TOKENS.claspMinBarlineAir);
     assert.equal(resolved.tokens.rowHeight, DEFAULT_JANKO_TOKENS.rowHeight);
     assert.equal(resolved.tokens.flagSpacing, DEFAULT_JANKO_TOKENS.flagSpacing);
+    assert.equal(resolved.tokens.accoladeThick, 0.65, 'the lightened accolade');
+    assert.equal(resolved.options.pageMargin, 24.0, 'the widened page margin');
   }
   assert.deepEqual(
-    candidateBadges(getCandidate('classical-urtext')!).map((b) => b.key),
-    ['chordGrouping'],
-    'the classical control is the golden subdivision itself'
+    candidateBadges(getCandidate('center-ticks')!).map((b) => b.key),
+    ['chordGrouping', 'subdivisionStyle'],
+    'candidate A is the golden duration paradigm itself'
   );
   assert.deepEqual(
-    candidateBadges(getCandidate('kinetic-tab-45')!).map((b) => b.key),
-    ['chordGrouping', 'subdivisionStyle']
+    candidateBadges(getCandidate('bilateral-fins')!).map((b) => b.key),
+    ['chordGrouping', 'claspDurationStyle', 'subdivisionStyle']
   );
 });
 
-test('Round 7 candidates export cleanly to the contact sheet', () => {
+test('Round 8 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
     options: resolveCandidate(candidate).options,
   }));
   const sheet = renderJankoVariantComparison(
-    SCORE,
+    BRAHMS,
     specs,
-    1,
+    7,
     2,
-    DEFAULT_JANKO_OPTIONS,
-    DEFAULT_JANKO_TOKENS
+    BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    BRAHMS_OP118_NO1_JANKO_TOKENS
   );
   assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one contact sheet document');
   for (const candidate of CURRENT_CANDIDATES) {
     assert.ok(sheet.includes(`data-variant="${candidate.id}"`), `${candidate.id} panel`);
     assert.ok(sheet.includes(candidate.label), `${candidate.id} label`);
   }
-  // The panels must be genuinely different engravings: each dialect paints its
-  // own stem-tip ink, and every panel shares the refined per-hand clasps.
+  // The panels must be genuinely different engravings: each paradigm paints its
+  // own symmetrical clasp-duration ink on the same Brahms chords, and every
+  // panel shares the settled beam-harmonized kinetic tab.
   const panelBody = (variantId: string): string => {
     const start = sheet.indexOf(`data-variant="${variantId}"`);
     const next = sheet.indexOf('data-variant="', start + 1);
     return sheet.slice(start, next === -1 ? undefined : next);
   };
-  /** The stem-tip element each dialect paints (and only that dialect). */
-  const SIGNATURES: Record<string, RegExp> = {
-    'kinetic-tab-30': /<line class="janko-flag"[^>]*stroke-width="1\.10"/,
-    'kinetic-tab-45': /<line class="janko-flag"[^>]*stroke-width="1\.10"/,
-    'kinetic-tab-tapered': /<path class="janko-flag"[^>]*d="M [^"]* L [^"]* L [^"]* L [^"]* Z"/,
-    'classical-urtext': /class="janko-flag"[^>]*d="M [^"]* C /,
+  /** The duration ink each paradigm paints on a quarter-value clasp. */
+  const SIGNATURES: Record<string, RegExp | null> = {
+    'center-ticks': null,
+    'cap-cuts': /janko-clasp-cap-cut/,
+    'framing-only': null,
+    'bilateral-fins': /janko-clasp-fin/,
   };
-  /** The kinetic rake of a panel's tab ink: 30° (`tan = √3/3`) or exactly 45°. */
-  const rakes = (body: string): number[] =>
-    [
-      ...body.matchAll(
-        /<line class="janko-flag"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
-      ),
-    ].map((m) => Math.abs((Number(m[4]) - Number(m[2])) / (Number(m[3]) - Number(m[1]))));
-  const RAKES: Record<string, number> = {
-    'kinetic-tab-30': Math.tan(Math.PI / 6),
-    'kinetic-tab-45': 1,
+  const FOREIGN: Record<string, RegExp> = {
+    'center-ticks': /janko-clasp-(tick|cap-cut|fin|pip)/,
+    'cap-cuts': /janko-clasp-(tick|fin|pip)/,
+    'framing-only': /janko-clasp-(tick|cap-cut|fin|pip)/,
+    'bilateral-fins': /janko-clasp-(tick|cap-cut|pip)/,
   };
   for (const candidate of CURRENT_CANDIDATES) {
     const body = panelBody(candidate.id);
-    for (const [style, signature] of Object.entries(SIGNATURES)) {
-      // The two monoline tabs share an element shape; their rake tells them
-      // apart, so the plain signature is only asserted for the other dialects.
-      if (style === 'kinetic-tab-45' || style === 'kinetic-tab-30') continue;
-      assert.equal(
-        signature.test(body),
-        style === candidate.id,
-        `${candidate.id} panel paints ${style === candidate.id ? 'only' : 'no'} ${style} ink`
-      );
+    assert.match(body, /class="janko-clasp-layer"/, `${candidate.id} paints its clasps`);
+    assert.match(
+      body,
+      new RegExp(`data-clasp-duration-style="${candidate.id}"`),
+      `${candidate.id} tags its duration paradigm`
+    );
+    assert.match(body, /data-subdivision-style="kinetic-tab-beam"/, `${candidate.id} settled tab`);
+    const quarter = [
+      ...body.matchAll(
+        /<g class="janko-clasp-group"[^>]*data-clasp-duration="spire"[^>]*>([\s\S]*?)<\/g>/g
+      ),
+    ][0][1].replace(/<path class="janko-clasp"[^>]*\/>/, '');
+    if (SIGNATURES[candidate.id]) {
+      assert.match(quarter, SIGNATURES[candidate.id]!, `${candidate.id} own ink`);
     }
-    const expected = RAKES[candidate.id];
-    const panelRakes = rakes(body);
-    if (expected === undefined) {
-      assert.equal(panelRakes.length, 0, `${candidate.id} paints no monoline tab`);
-    } else {
-      assert.ok(panelRakes.length > 0, `${candidate.id} paints its kinetic tab`);
-      for (const rake of panelRakes) {
-        assert.ok(
-          Math.abs(rake - expected) < 5e-3,
-          `${candidate.id} rakes at ${expected} (got ${rake})`
-        );
-      }
-    }
+    assert.doesNotMatch(quarter, FOREIGN[candidate.id], `${candidate.id} paints no foreign ink`);
+  }
+  // The beam-harmonized rake is the shared kinetic geometry.
+  const rakes = [
+    ...panelBody(CURRENT_CANDIDATES[0].id).matchAll(
+      /<line class="janko-flag"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
+    ),
+  ].map((m) => Math.abs((Number(m[4]) - Number(m[2])) / (Number(m[3]) - Number(m[1]))));
+  assert.ok(rakes.length > 0, 'the Bach/Brahms window carries subdivision marks');
+  for (const rake of rakes) {
+    assert.ok(Math.abs(rake - DEFAULT_JANKO_TOKENS.maxBeamSlope) < 5e-3, `beam rake ${rake}`);
   }
 });
 
@@ -207,16 +219,21 @@ test('Candidate previews honour their own option deltas', () => {
   for (const candidate of CURRENT_CANDIDATES) {
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['chordGrouping', 'subdivisionStyle'],
-      `${candidate.id} declares the per-hand clasp and its own dialect`
+      ['chordGrouping', 'claspDurationStyle', 'subdivisionStyle'],
+      `${candidate.id} declares the per-hand clasp, its duration paradigm and the kinetic tab`
     );
   }
   assert.match(html, /<b>chordGrouping<\/b> = per-hand-clasp/);
   assert.match(html, /<s>none<\/s>/, 'the golden grouping value every candidate departs from');
   assert.match(
     html,
+    /<s>center-ticks<\/s>/,
+    'the golden duration value the three modern candidates depart from'
+  );
+  assert.match(
+    html,
     /<s>classical-urtext<\/s>/,
-    'the golden subdivision value the modern candidates depart from'
+    'the golden subdivision value every candidate departs from'
   );
   assert.match(html, /badge-delta/, 'deltas against the golden master are highlighted');
   assert.match(html, /chip chip-ok/, 'every candidate lints clean in this round');
@@ -226,18 +243,18 @@ test('Candidate previews honour their own option deltas', () => {
     return card.slice(0, card.indexOf('</article>'));
   };
   for (const candidate of CURRENT_CANDIDATES) {
-    // The classical control *is* the golden subdivision, so only the four
-    // dialect candidates show a subdivision badge.
-    if (candidate.id === DEFAULT_JANKO_OPTIONS.subdivisionStyle) {
+    // Candidate A *is* the golden duration paradigm, so only the three modern
+    // candidates show a duration badge.
+    if (candidate.id === DEFAULT_JANKO_OPTIONS.claspDurationStyle) {
       assert.ok(
-        !cardOf(candidate.id).includes('<b>subdivisionStyle</b>'),
-        'the classical control is the golden subdivision itself'
+        !cardOf(candidate.id).includes('<b>claspDurationStyle</b>'),
+        'candidate A is the golden duration paradigm itself'
       );
     } else {
       assert.match(
         cardOf(candidate.id),
-        new RegExp(`<b>subdivisionStyle</b> = ${candidate.id}`),
-        `${candidate.id} subdivision badge`
+        new RegExp(`<b>claspDurationStyle</b> = ${candidate.id}`),
+        `${candidate.id} duration badge`
       );
     }
   }
@@ -417,7 +434,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 7);
+  assert.equal(CURRENT_ROUND_METADATA.round, 8);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');

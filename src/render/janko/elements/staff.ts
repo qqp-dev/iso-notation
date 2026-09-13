@@ -76,16 +76,14 @@ export function renderStaffLines(
   const t = resolveJankoTokens(tokens);
   const out: string[] = ['  <g class="janko-staff-lines">'];
 
-  // Outer equators (o5, o2): lighter hairline.
-  // Inner equators (o4, o3): the definitive octave boundaries of each hand.
-  // Round 7 lightens the whole hierarchy: the outer equators fall to a 0.50pt
-  // hairline and the inner octave boundaries to 0.65pt, so the staff reads as
-  // four quiet rules behind the music instead of two competing weights.
+  // Round 8 uniformizes the hierarchy: all four octave equators (RH 5, LH 2,
+  // RH 4, LH 3) are one identical 0.50pt `#1E293B` hairline, so no octave line
+  // competes with another and the staff reads as four quiet, equal rules.
   const equators: Array<[Hand, number, string, number]> = [
     ['RH', 5, '#1E293B', 0.50],
     ['LH', 2, '#1E293B', 0.50],
-    ['RH', 4, '#0F172A', 0.65],
-    ['LH', 3, '#0F172A', 0.65],
+    ['RH', 4, '#1E293B', 0.50],
+    ['LH', 3, '#1E293B', 0.50],
   ];
   for (const [hand, oct, stroke, width] of equators) {
     for (const y of getEquatorRuleYs(geo.equatorY(hand, oct), o, t)) {

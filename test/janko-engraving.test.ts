@@ -68,6 +68,7 @@ import {
   computeClaspGeometry,
   SUBDIVISION_TAB_30_TAN,
   SUBDIVISION_TAPER_ROOT,
+  SUBDIVISION_URTEXT_STROKE,
 } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -814,20 +815,29 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   assert.match(crop, /class="janko-beam"/);
 });
 
-test('Round 7 staff hierarchy: lightened equators, heavier beat grid, lighter measure barlines', () => {
+test('Round 8 staff hierarchy: four uniform equators, light accolade and widened margins', () => {
   const score = buildBachGoldbergVar1Score();
   const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
 
+  // All four octave lines are one identical 0.50pt `#1E293B` hairline.
   const staff = page.match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)![0];
   assert.equal(
     (staff.match(/stroke="#1E293B" stroke-width="0\.50"/g) ?? []).length,
-    2,
-    'the outer equators (RH 5, LH 2) fall to a 0.50pt hairline'
+    4,
+    'RH 5, LH 2, RH 4 and LH 3 are all the same 0.50pt hairline'
   );
+  assert.ok(!staff.includes('#0F172A'), 'the 0.65pt inner-equator discrepancy is gone');
+
+  // The lightened accolade and the widened page margin (Round 8 tokens).
+  assert.equal(DEFAULT_JANKO_TOKENS.accoladeThick, 0.65, 'the accolade falls to 0.65pt');
+  assert.equal(DEFAULT_JANKO_OPTIONS.pageMargin, 24.0, 'the page margin widens to 24pt');
+  assert.match(page, /class="janko-accolade"/, 'the accolade is drawn once at the start');
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  assert.equal(geo.margin, 24.0, 'the page geometry uses the widened margin');
   assert.equal(
-    (staff.match(/stroke="#0F172A" stroke-width="0\.65"/g) ?? []).length,
-    2,
-    'the inner equators (RH 4, LH 3) fall to 0.65pt'
+    geo.staffLeft,
+    24.0 + DEFAULT_JANKO_TOKENS.accoladeWidth + DEFAULT_JANKO_TOKENS.accoladeGap,
+    'the staff column keeps its accolade-anchored inset'
   );
 
   // The beat grid is the structural layer above the lightened staff rules.
@@ -1233,16 +1243,16 @@ function subdivisionAnchorY(markup: string): number {
   return Number(/ y1="([\d.]+)"/.exec(markup)![1]);
 }
 
-test('Round 7: the four subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
+test('Round 8: the subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
   assert.equal(
     DEFAULT_JANKO_OPTIONS.subdivisionStyle,
     'classical-urtext',
-    'the golden master keeps the balanced urtext flag'
+    'the golden master keeps the slender urtext hairline'
   );
   assert.deepEqual(
     [...JANKO_SUBDIVISION_STYLES],
-    ['kinetic-tab-30', 'kinetic-tab-45', 'kinetic-tab-tapered', 'classical-urtext'],
-    'the three kinetic tabs precede the classical control'
+    ['kinetic-tab-30', 'kinetic-tab-45', 'kinetic-tab-tapered', 'classical-urtext', 'kinetic-tab-beam'],
+    'the exploratory rakes precede the settled beam-harmonized tab'
   );
   // Stack grammar: 32nd → 3 marks, 16th → 2, 8th/dotted 8th → 1.
   assert.equal(subdivisionMarkCount(6), 3);
@@ -1264,8 +1274,8 @@ test('Round 7: the four subdivision dialects dispatch at the stem tip and stack 
   for (const style of JANKO_SUBDIVISION_STYLES) {
     const markup = renderFlags(sixteenth, TOKENS, style);
     // The ink *shape* is the comparison key: the style tag and the shared stem
-    // anchor are stripped, the geometry is kept — the two monoline tabs differ
-    // by their rake alone.
+    // anchor are stripped, the geometry is kept — the monoline tabs differ by
+    // their rake alone.
     ink.add(
       markup
         .replace(/ data-subdivision-style="[^"]*"/g, '')
@@ -1300,12 +1310,17 @@ test('Round 7: the four subdivision dialects dispatch at the stem tip and stack 
       assert.equal(x1, stem.stemX, `${style} tab is rooted on the stem`);
       assert.ok(x2 - stem.stemX <= TOKENS.flagWidth + 1e-9, `${style} tab keeps its tokenised reach`);
       assert.match(element, /stroke-width="1\.10"/, `${style} is a 1.1pt monoline`);
-      // The kinetic rake itself: 30° or exactly 45° off horizontal.
+      // The kinetic rake itself: 30°, exactly 45°, or the beam-harmonized slope.
       const rake = Math.abs(
         (Number(/ y2="([\d.-]+)"/.exec(element)![1]) - Number(/ y1="([\d.-]+)"/.exec(element)![1])) /
           (x2 - x1)
       );
-      const expected = style === 'kinetic-tab-45' ? 1 : SUBDIVISION_TAB_30_TAN;
+      const expected =
+        style === 'kinetic-tab-45'
+          ? 1
+          : style === 'kinetic-tab-beam'
+            ? TOKENS.maxBeamSlope
+            : SUBDIVISION_TAB_30_TAN;
       assert.ok(Math.abs(rake - expected) < 5e-3, `${style} rakes at ${expected}`);
       continue;
     }
@@ -1325,6 +1340,15 @@ test('Round 7: the four subdivision dialects dispatch at the stem tip and stack 
       );
       continue;
     }
+    // Round 8: the urtext control is a slender **open hairline** — never a
+    // filled solid shape — stroked at the stem's own weight.
+    assert.match(element, /fill="none"/, `${style} is an open stroke`);
+    assert.match(
+      element,
+      new RegExp(`stroke-width="${SUBDIVISION_URTEXT_STROKE.toFixed(2)}"`),
+      `${style} matches the 0.90pt stem weight`
+    );
+    assert.ok(!/d="[^"]*Z"/.test(element), `${style} never closes into a filled shape`);
     assert.equal(xs[0], stem.stemX, `${style} latches onto the stem tip`);
     for (const x of xs) {
       assert.ok(x >= stem.stemX - 1e-9, `${style} sample x=${x} must not cross its stem`);
@@ -1333,33 +1357,43 @@ test('Round 7: the four subdivision dialects dispatch at the stem tip and stack 
   }
   assert.equal(ink.size, JANKO_SUBDIVISION_STYLES.length, 'every dialect paints distinct ink');
 
+  // The beam-harmonized tab is the settled Round 8 rake: atan(0.22) ≈ 12.4°.
+  assert.ok(
+    Math.abs(Math.atan(TOKENS.maxBeamSlope) * (180 / Math.PI) - 12.4) < 0.1,
+    'the beam-harmonized tab rakes at ~12.4°'
+  );
+
   // The multi-tier grammar: 8th → 1 tab, 16th → 2 tabs, 32nd → 3 tabs.
   const marksFor = (durationTicks: number): number => {
     const note = { ...sixteenth, durationTicks };
-    return (renderFlags(note, TOKENS, 'kinetic-tab-30').match(/class="janko-flag"/g) ?? []).length;
+    return (renderFlags(note, TOKENS, 'kinetic-tab-beam').match(/class="janko-flag"/g) ?? []).length;
   };
   assert.equal(marksFor(24), 1, '8th = one kinetic tab');
   assert.equal(marksFor(12), 2, '16th = two kinetic tabs');
   assert.equal(marksFor(6), 3, '32nd = three kinetic tabs');
 
-  // The refined clasp tip carries the active dialect too, so a clasped cluster
-  // and a flagged stem of the same value can never disagree.
-  const tipped = computeClaspGeometry(
+  // Round 8: the clasp no longer borrows the subdivision dialect — its duration
+  // ink is the bracket's own symmetrical paradigm (see test/janko-clasp.test.ts).
+  const clasped = computeClaspGeometry(
     [
       { id: 'tip-a', startTick: 0, durationTicks: 24, hand: 'RH' as const, x: 100, y: 100 },
       { id: 'tip-b', startTick: 0, durationTicks: 24, hand: 'RH' as const, x: 100, y: 130 },
     ],
     TOKENS
   )!;
-  for (const style of JANKO_SUBDIVISION_STYLES) {
-    const markup = renderChordClasp(tipped, TOKENS, style);
-    assert.match(markup, /class="janko-clasp-flag"/, `${style} tip mark`);
-    assert.ok(markup.includes(`data-subdivision-style="${style}"`), `${style} clasp tip dialect`);
-  }
+  assert.equal(clasped.durationStyle, 'center-ticks', 'the clasp carries its own paradigm');
+  const claspMarkup = renderChordClasp(clasped, TOKENS);
+  assert.ok(!claspMarkup.includes('janko-flag'), 'no subdivision ink on the clasp');
 
-  // End to end: the default render dispatches the urtext flag.
+  // End to end: the default render dispatches the open urtext hairline, and the
+  // settled Round 8 tab dispatches on request.
   const golden = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, OPTIONS, TOKENS);
   assert.match(golden, /data-subdivision-style="classical-urtext"/);
+  const settled = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, {
+    ...OPTIONS,
+    subdivisionStyle: 'kinetic-tab-beam',
+  }, TOKENS);
+  assert.match(settled, /data-subdivision-style="kinetic-tab-beam"/);
 });
 
 test('Beam clearance: every notehead keeps a full stem length to its beam (mm. 2 & 4 ascents)', () => {

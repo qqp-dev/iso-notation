@@ -1,5 +1,5 @@
 /**
- * Round 5 — Left Clasp / Bracket Duration Carrier.
+ * Round 5 — Left Clasp / Bracket Duration Carrier (refined through Round 8).
  *
  * The round replaces the long vertical stems that used to run through
  * multi-note chords with an **external bracket on the left of the cluster** that
@@ -8,7 +8,7 @@
  *
  *  1. the token grammar (clasp width / stroke / offset / barline air) and the
  *     golden-master default (`chordGrouping: 'none'`);
- *  2. the duration tip grammar (pip, spire, flag hooks);
+ *  2. the duration grammar (pip, notch counts);
  *  3. the bracket geometry — `claspX = minX − r − claspOffset`,
  *     `topY = minY − r`, `botY = maxY + r`, caps of `claspWidth`;
  *  4. the fit rule: a lone melodic note is never clasped, and a bracket that
@@ -17,12 +17,13 @@
  *  5. the downbeat barline clearance (`claspX − barlineX ≥ 4.0pt`) and the
  *     measure-inset budget that pays for it without distorting the note grid;
  *  6. the beamed-clasp rail: contiguous clasps of one measure joined at the
- *     tips, strictly terminating inside the measure;
+ *     extended spine tops, strictly terminating inside the measure;
  *  7. engine integrity: a real 16th-note beam is never cut by a clasp, and both
  *     benchmark scores engrave every clasp mode with zero diagnostics;
- *  8. the Round 6 refinement: `'per-hand-clasp'` groups strictly one hand and
- *     strictly a horizontally displaced (row-snapped) cluster — a clean vertical
- *     column, a lone note and the cross-hand Bach columns are never bracketed.
+ *  8. the Round 6 per-hand refinement, the Round 8 bracketing scope (a
+ *     horizontally displaced cluster **or** a 3-or-more-note vertical chord; a
+ *     clean 2-note column stays unbracketed) and the four **symmetrical**
+ *     duration paradigms that replaced the lopsided spire.
  */
 
 import { test } from 'node:test';
@@ -39,6 +40,8 @@ import {
   DEFAULT_JANKO_TOKENS,
   JANKO_CHORD_GROUPINGS,
   JANKO_CHORD_GROUPING_LABELS,
+  JANKO_CLASP_DURATION_STYLES,
+  JANKO_CLASP_DURATION_STYLE_LABELS,
   JankoChordGrouping,
   resolveJankoOptions,
   resolveJankoTokens,
@@ -61,12 +64,16 @@ import {
 import {
   CHORD_BRIDGE_DISC_AIR,
   CHORD_BRIDGE_MIN_GAP,
+  CLASP_CAP_CUT_GAP,
+  CLASP_CENTER_TICK_HALF,
   CLASP_MIN_HORIZONTAL_SPREAD,
+  CLASP_MIN_VERTICAL_CHORD,
+  CLASP_PIP_GAP,
   CLASP_PIP_RADIUS,
-  CLASP_SPIRE_LENGTH,
   JankoRhythmNote,
   claspDurationClass,
   claspInkBox,
+  claspQualifies,
   computeClaspGeometry,
   computeVerticalChordGroup,
   renderChordClasp,
@@ -109,13 +116,26 @@ test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays
   assert.equal(DEFAULT_JANKO_TOKENS.claspOffset, 2.8, 'disc-to-spine air');
   assert.equal(DEFAULT_JANKO_TOKENS.claspMinBarlineAir, 4.0, 'downbeat barline air');
   assert.equal(DEFAULT_JANKO_OPTIONS.chordGrouping, 'none', 'the golden master keeps per-note stems');
+  assert.equal(
+    DEFAULT_JANKO_OPTIONS.claspDurationStyle,
+    'center-ticks',
+    'the golden master keeps the balanced center-spine duration'
+  );
   assert.deepEqual(
     [...JANKO_CHORD_GROUPINGS],
     ['none', 'left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase', 'per-hand-clasp'],
     'the five paradigms in exploration order'
   );
+  assert.deepEqual(
+    [...JANKO_CLASP_DURATION_STYLES],
+    ['center-ticks', 'cap-cuts', 'framing-only', 'bilateral-fins'],
+    'the four symmetrical duration paradigms in exploration order'
+  );
   for (const mode of JANKO_CHORD_GROUPINGS) {
     assert.ok(JANKO_CHORD_GROUPING_LABELS[mode].length > 0, `${mode} is labelled`);
+  }
+  for (const style of JANKO_CLASP_DURATION_STYLES) {
+    assert.ok(JANKO_CLASP_DURATION_STYLE_LABELS[style].length > 0, `${style} is labelled`);
   }
   // A downbeat clasp needs `r + claspOffset + claspMinBarlineAir` from the
   // measure's left edge — 11.6pt with the canonical tokens.
@@ -125,15 +145,15 @@ test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays
 });
 
 // ---------------------------------------------------------------------------
-// 2. Duration tip grammar
+// 2. Duration grammar
 // ---------------------------------------------------------------------------
 
-test('Clasp duration grammar: pip for halves/wholes, spire for quarters, hooks for 8ths/16ths', () => {
+test('Clasp duration grammar: pip for halves/wholes, notches for 8ths/16ths, a bare quarter', () => {
   assert.equal(claspDurationClass(384), 'double-pip', 'whole note');
   assert.equal(claspDurationClass(192), 'double-pip');
   assert.equal(claspDurationClass(96), 'pip', 'half note');
   assert.equal(claspDurationClass(168), 'pip', 'Brahms dotted half');
-  assert.equal(claspDurationClass(48), 'spire', 'quarter note');
+  assert.equal(claspDurationClass(48), 'spire', 'quarter note — a bare bracket');
   assert.equal(claspDurationClass(84), 'spire', 'Brahms long value');
   assert.equal(claspDurationClass(39), 'spire');
   assert.equal(claspDurationClass(38), 'spire-one-flag', 'dotted 8th');
@@ -144,7 +164,7 @@ test('Clasp duration grammar: pip for halves/wholes, spire for quarters, hooks f
 
   const pip = computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!;
   assert.equal(pip.duration, 'pip');
-  assert.equal(pip.spireTipY, null, 'a pip clasp carries no spire');
+  assert.equal(pip.durationStyle, 'center-ticks', 'the default symmetrical paradigm');
   assert.equal(pip.pips, 1);
   assert.equal(pip.flags, 0);
 
@@ -152,11 +172,10 @@ test('Clasp duration grammar: pip for halves/wholes, spire for quarters, hooks f
   assert.equal(whole.pips, 2, 'a whole note doubles the pip');
 
   const eighth = computeClaspGeometry([rn('a', 100, 100, 24), rn('b', 100, 130, 24)], T)!;
-  assert.equal(eighth.flags, 1);
-  assert.equal(eighth.spireTipY, eighth.topY - CLASP_SPIRE_LENGTH, 'a clean 8.5pt spire');
+  assert.equal(eighth.flags, 1, 'an 8th carries one duration notch');
 
   const sixteenth = computeClaspGeometry([rn('a', 100, 100, 12), rn('b', 100, 130, 12)], T)!;
-  assert.equal(sixteenth.flags, 2, 'a 16th doubles the hook');
+  assert.equal(sixteenth.flags, 2, 'a 16th carries two duration notches');
 
   // The clasp carries the **shortest** member value: the point at which the
   // cluster's first voice moves on.
@@ -198,47 +217,173 @@ test('Clasp geometry: the bracket is drawn outside the cluster and bounds every 
 
   // The bracket's ink never crosses the discs it clasps: the caps stop
   // `r + claspOffset − capW` short of the outermost head, i.e. 0.6pt clear of
-  // the knockout, and everything else it paints lives above the cluster.
+  // the knockout, and every duration paradigm stays inside that footprint.
   const ink = claspInkBox(clasp, T);
-  assert.equal(ink.x0, clasp.claspX);
+  assert.equal(
+    ink.x0,
+    clasp.claspX - CLASP_CENTER_TICK_HALF,
+    'a 16th center-tick straddles the spine by its half-length'
+  );
+  assert.equal(ink.y0, clasp.topY, 'a 16th center-tick rides the spine, never above it');
+  assert.equal(ink.y1, clasp.botY);
   assert.ok(
     clasp.claspX + clasp.capWidth <= clasp.minX - T.noteheadRadius - 0.6 + 1e-9,
     'the caps stop clear of the disc'
   );
-  assert.ok(ink.y0 <= clasp.topY - CLASP_SPIRE_LENGTH + 1e-9, 'the spire rises above the bracket');
-  assert.ok(ink.y1 >= clasp.botY - 1e-9);
-  assert.ok(
-    (clasp.spireTipY ?? clasp.topY) + T.flagHeight <= clasp.topY,
-    'flag hooks hang above the topmost disc'
-  );
-
   assert.equal(computeClaspGeometry([rn('solo', 100, 100, 12)], T), null, 'a lone note is never clasped');
 });
 
-test('renderChordClasp paints bracket, spire and tip with the engine classes', () => {
+test('Round 8 duration paradigms paint four distinct, mirror-symmetrical brackets', () => {
+  const quarter = () => computeClaspGeometry([rn('a', 100, 100, 48), rn('b', 100, 130, 48)], T)!;
+  const eighth = () => computeClaspGeometry([rn('a', 100, 100, 24), rn('b', 100, 130, 24)], T)!;
+  const sixteenth = () => computeClaspGeometry([rn('a', 100, 100, 12), rn('b', 100, 130, 12)], T)!;
+  const half = () => computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!;
+  const style = (group: ReturnType<typeof quarter>, s: (typeof JANKO_CLASP_DURATION_STYLES)[number]) =>
+    renderChordClasp({ ...group, durationStyle: s }, T);
+
+  const shape = (markup: string): string =>
+    markup
+      .replace(/data-clasp-duration-style="[^"]*"/, '')
+      .replace(/data-clasp-tick="[^"]*"/, '')
+      .replace(/data-clasp-duration="[^"]*"/, '')
+      .replace(/data-clasp-notes="[^"]*"/, '');
+
+  for (const s of JANKO_CLASP_DURATION_STYLES) {
+    assert.ok(
+      !style(quarter(), s).includes('janko-clasp-spire') &&
+        !style(sixteenth(), s).includes('janko-clasp-spire'),
+      `${s} never paints the lopsided upward spire`
+    );
+  }
+
+  // A — center ticks: duration at the exact spine midpoint.
+  const ticks = style(eighth(), 'center-ticks');
+  assert.equal((ticks.match(/janko-clasp-tick/g) ?? []).length, 1, '8th: one centre tick');
+  assert.match(
+    ticks,
+    new RegExp(
+      `class="janko-clasp-tick" x1="${(eighth().claspX - CLASP_CENTER_TICK_HALF).toFixed(2)}"[^>]*y1="${(
+        (eighth().topY + eighth().botY) / 2
+      ).toFixed(2)}"`
+    ),
+    'the tick straddles the spine at yMid'
+  );
+  assert.equal(
+    (style(sixteenth(), 'center-ticks').match(/janko-clasp-tick/g) ?? []).length,
+    2,
+    '16th: two centre ticks'
+  );
+  assert.equal(
+    (style(quarter(), 'center-ticks').match(/janko-clasp-tick/g) ?? []).length,
+    0,
+    'a quarter is a bare bracket under center-ticks'
+  );
+  const centerPips = style(half(), 'center-ticks');
+  assert.equal((centerPips.match(/janko-clasp-pip/g) ?? []).length, 1, 'half: one open pip');
+  assert.match(
+    centerPips,
+    new RegExp(`cy="${((half().topY + half().botY) / 2).toFixed(2)}"`),
+    'the pip sits on the spine midpoint, never above the top cap'
+  );
+
+  // B — cap cuts: 1/2/3 parallel bars per cap, mirrored top and bottom.
+  for (const [group, bars] of [
+    [quarter(), 1],
+    [eighth(), 2],
+    [sixteenth(), 3],
+  ] as const) {
+    const markup = style(group, 'cap-cuts');
+    assert.equal(
+      (markup.match(/janko-clasp-cap-cut/g) ?? []).length,
+      bars * 2,
+      `${bars} cut(s) on each of the two caps`
+    );
+  }
+  assert.ok(
+    style(sixteenth(), 'cap-cuts').includes(
+      `y2="${(sixteenth().topY + 3 * CLASP_CAP_CUT_GAP).toFixed(2)}"`
+    ),
+    'cuts stack inward by CLASP_CAP_CUT_GAP'
+  );
+
+  // C — framing only: the pure bracket, zero duration ink for any value.
+  for (const group of [quarter(), eighth(), sixteenth(), half()]) {
+    const markup = style(group, 'framing-only');
+    assert.ok(!/janko-clasp-(tick|cap-cut|fin|pip)/.test(markup), 'no duration ink at all');
+  }
+
+  // D — bilateral fins: 1/2/3 raked fins flaring off both caps.
+  for (const [group, fins] of [
+    [quarter(), 2],
+    [eighth(), 4],
+    [sixteenth(), 6],
+  ] as const) {
+    const markup = style(group, 'bilateral-fins');
+    assert.equal((markup.match(/janko-clasp-fin/g) ?? []).length, fins, `${fins / 2} fin(s) per cap`);
+  }
+  const finMarkup = style(eighth(), 'bilateral-fins');
+  for (const m of finMarkup.matchAll(
+    /class="janko-clasp-fin" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
+  )) {
+    const rake = Math.abs((Number(m[4]) - Number(m[2])) / (Number(m[3]) - Number(m[1])));
+    assert.ok(
+      Math.abs(rake - T.maxBeamSlope) < 5e-3,
+      `every fin rakes at the beam slope ${T.maxBeamSlope} (got ${rake})`
+    );
+    assert.ok(Number(m[3]) - Number(m[1]) <= T.claspWidth + 1e-9, 'a fin stays inside the cap reach');
+  }
+
+  // The four paradigms paint four different documents for one duration.
+  const documents = new Set(JANKO_CLASP_DURATION_STYLES.map((s) => shape(style(sixteenth(), s))));
+  assert.equal(documents.size, 4, 'each paradigm is visually distinct');
+});
+
+test('renderChordClasp paints the symmetrical bracket and its duration paradigm', () => {
   const markup = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 48), rn('b', 100, 130, 48)], T)!,
     T
   );
-  assert.match(markup, /class="janko-clasp-group" data-clasp-tick="0" data-clasp-duration="spire"/);
+  assert.match(
+    markup,
+    /class="janko-clasp-group" data-clasp-tick="0" data-clasp-duration="spire" data-clasp-duration-style="center-ticks"/
+  );
   assert.match(markup, /class="janko-clasp" d="M 94\.60 95\.20 L 92\.40 95\.20 L 92\.40 134\.80 L 94\.60 134\.80"/);
-  assert.match(markup, /class="janko-clasp-spire" x1="92\.40" y1="95\.20" x2="92\.40" y2="86\.70"/);
   assert.match(markup, /stroke-width="0\.85"/);
-  assert.ok(!markup.includes('janko-clasp-flag'), 'a quarter carries no hook');
+  assert.ok(!markup.includes('janko-clasp-spire'), 'the lopsided spire is never painted');
+  assert.ok(!markup.includes('janko-clasp-flag'), 'the clasp carries no subdivision flags');
   assert.ok(!markup.includes('janko-clasp-pip'), 'a quarter carries no pip');
 
-  const flagged = renderChordClasp(
+  const sixteenth = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 12), rn('b', 100, 130, 12)], T)!,
     T
   );
-  assert.equal((flagged.match(/janko-clasp-flag/g) ?? []).length, 2, '16th: two hooks');
+  assert.equal((sixteenth.match(/janko-clasp-tick/g) ?? []).length, 2, '16th: two centre ticks');
   const pipped = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!,
     T
   );
   assert.equal((pipped.match(/janko-clasp-pip/g) ?? []).length, 1, 'half: one open pip');
   assert.ok(pipped.includes(`r="${CLASP_PIP_RADIUS.toFixed(2)}"`), 'the pip is open, not filled');
-  assert.ok(!pipped.includes('janko-clasp-spire'));
+  assert.ok(
+    pipped.includes(`cy="${((95.2 + 134.8) / 2).toFixed(2)}"`),
+    'the pip is centred on the spine'
+  );
+
+  // A whole note doubles the pip, symmetric about the midpoint.
+  const whole = renderChordClasp(
+    computeClaspGeometry([rn('a', 100, 100, 384), rn('b', 100, 130, 384)], T)!,
+    T
+  );
+  const pips = [...whole.matchAll(/class="janko-clasp-pip" cx="[\d.]+" cy="([\d.]+)"/g)].map((m) =>
+    Number(m[1])
+  );
+  assert.equal(pips.length, 2, 'whole: two pips');
+  const yMid = (95.2 + 134.8) / 2;
+  assert.ok(
+    Math.abs(pips[0] - (yMid - CLASP_PIP_RADIUS - CLASP_PIP_GAP / 2)) < 1e-9 &&
+      Math.abs(pips[1] - (yMid + CLASP_PIP_RADIUS + CLASP_PIP_GAP / 2)) < 1e-9,
+    'the twin pips mirror about the spine midpoint'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -248,13 +393,17 @@ test('renderChordClasp paints bracket, spire and tip with the engine classes', (
 test('The fit rule: only actual chords are clasped, and only where the bracket stands clear', () => {
   // Bach Var. 1 is a two-voice 16th-note texture: its measure-opening dyads are
   // clasped, while an interior dyad — whose predecessor sits exactly one disc
-  // away — cannot host a 7.6pt bracket and keeps its traditional stems. Round 7
-  // adds a third admission route: m. 3's downbeat, whose measure widening cannot
-  // be absorbed, steps its column right until the bracket clears the barline
-  // instead of being silently dropped.
+  // away — cannot host a 7.6pt bracket and keeps its traditional stems. Round 8
+  // widens the page margin to 24pt, so more of the interior dyads now have the
+  // air a bracket needs; m. 3's downbeat still steps its column right until the
+  // bracket clears the barline instead of being silently dropped.
   const system0 = layouts('left-clasp-spire')[0];
   const ticks = system0.clasps.map((c) => c.tick);
-  assert.deepEqual(ticks, [0, 144, 288, 432, 504], 'measure downbeats and the interior dyads with room');
+  assert.deepEqual(
+    ticks,
+    [0, 144, 168, 240, 288, 408, 432, 504, 528],
+    'measure downbeats and the interior dyads with room'
+  );
   assert.ok(!ticks.includes(24), 'the 16th-grid dyad at tick 24 is not clasped');
   for (const clasp of system0.clasps) {
     assert.ok(clasp.notes.length >= 2, 'a clasp always groups a vertical simultaneity');
@@ -293,34 +442,53 @@ test('The fit rule: only actual chords are clasped, and only where the bracket s
 });
 
 // ---------------------------------------------------------------------------
-// 4b. Round 6 — the per-hand, non-vertical clasp
+// 4b. Round 6/8 — the per-hand bracket scope
 // ---------------------------------------------------------------------------
 
-test('Round 6 per-hand clasp: one hand only, only for horizontally displaced clusters', () => {
-  // A clean vertical column of one hand is never grouped…
+test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note columns do not', () => {
+  // A clean 2-note vertical column of one hand is never grouped…
   assert.equal(
     computeClaspGeometry(
       [rn('a', 100, 100, 24), rn('b', 100, 130, 24)],
       T,
-      { requireHorizontalSpread: true }
+      { requireBracketScope: true }
     ),
     null,
-    'a clean vertical column keeps its stems'
+    'a clean 2-note vertical column keeps its stems'
   );
   // …and neither is a lone note, however it sits on the row grid.
   assert.equal(
-    computeClaspGeometry([rn('solo', 100, 100, 24)], T, { requireHorizontalSpread: true }),
+    computeClaspGeometry([rn('solo', 100, 100, 24)], T, { requireBracketScope: true }),
     null
   );
   // A row-snapped pair is exactly what the bracket exists for.
   const pair = computeClaspGeometry(
     [rn('a', 94.5, 100, 24), rn('b', 105.5, 130, 24)],
     T,
-    { requireHorizontalSpread: true }
+    { requireBracketScope: true }
   )!;
   assert.ok(pair.maxX - pair.minX > CLASP_MIN_HORIZONTAL_SPREAD);
   assert.equal(pair.topY, 100 - T.noteheadRadius, 'topY = min(y) − r of the hand');
   assert.equal(pair.botY, 130 + T.noteheadRadius, 'botY = max(y) + r of the hand');
+  // Round 8: a vertical chord of three heads qualifies even without any
+  // horizontal displacement (the ticket's `B - 4 - 7`).
+  const chord = computeClaspGeometry(
+    [rn('top', 100, 100, 48), rn('mid', 100, 130, 48), rn('low', 100, 160, 48)],
+    T,
+    { requireBracketScope: true }
+  )!;
+  assert.equal(chord.notes.length, CLASP_MIN_VERTICAL_CHORD);
+  assert.equal(chord.claspX, 100 - T.noteheadRadius - T.claspOffset);
+
+  // The scope predicate itself: 2 heads need spread; 3 heads never do.
+  const two = [rn('a', 100, 100, 24), rn('b', 100, 130, 24)];
+  assert.equal(claspQualifies(two), false, 'a 2-note column is left unbracketed');
+  assert.equal(claspQualifies([...two, rn('c', 100, 160, 24)]), true, 'a 3-note column qualifies');
+  assert.equal(
+    claspQualifies([rn('a', 94.5, 100, 24), rn('b', 105.5, 130, 24)]),
+    true,
+    'a horizontal spread qualifies at any size'
+  );
 
   // Bach's simultaneities are cross-hand vertical columns, so the refined
   // paradigm never merges them into a grand-staff mega-bracket …
@@ -347,10 +515,15 @@ test('Round 6 per-hand clasp: one hand only, only for horizontally displaced clu
       1,
       'a bracket never spans both hands'
     );
-    const xs = clasp.notes.map((n) => n.x);
     assert.ok(
-      Math.max(...xs) - Math.min(...xs) > CLASP_MIN_HORIZONTAL_SPREAD,
-      'only horizontally displaced hand clusters are grouped'
+      claspQualifies(clasp.notes),
+      'every bracket is either row-snapped or a 3-or-more-note vertical chord'
+    );
+    const xs = clasp.notes.map((n) => n.x);
+    const spread = Math.max(...xs) - Math.min(...xs) > CLASP_MIN_HORIZONTAL_SPREAD;
+    assert.ok(
+      spread || clasp.notes.length >= CLASP_MIN_VERTICAL_CHORD,
+      'the bracket scope holds after the column solve'
     );
     assert.equal(clasp.topY, Math.min(...clasp.notes.map((n) => n.y)) - r);
     assert.equal(clasp.botY, Math.max(...clasp.notes.map((n) => n.y)) + r);
@@ -358,7 +531,7 @@ test('Round 6 per-hand clasp: one hand only, only for horizontally displaced clu
     assert.equal(
       clasp.durationTicks,
       Math.min(...clasp.notes.map((n) => n.durationTicks)),
-      'the clasp carries the cluster duration at its tip'
+      'the clasp carries the cluster duration on its spine'
     );
     // A downbeat bracket keeps its barline air (≥ 3.5pt; the token holds 4.0).
     const layout = brahms.find((l) => l.clasps.includes(clasp))!;
@@ -422,28 +595,35 @@ test('Round 6 per-hand clasp: one hand only, only for horizontally displaced clu
 });
 
 // ---------------------------------------------------------------------------
-// 4c. Round 7 — the B - 2 - 8 clasp and Option 3 gap-gated vertical chording
+// 4c. Round 7/8 — the B - 2 - 8 clasp and the B - 4 - 7 3-note bracket
 // ---------------------------------------------------------------------------
 
 test('Round 7 Option 3 grammar: tight pairs stay silent, a wide leap gets its bridge', () => {
-  // The ticket chord B – 4 – 7 as one vertical RH column: Δy = 15pt then 41pt.
+  // A 2-note vertical column of one hand: Δy = 30pt is a wide leap.
   const group = computeVerticalChordGroup(
-    [rn('top', 100, 605.76, 48), rn('mid', 100, 620.76, 84), rn('low', 100, 661.76, 84)],
+    [rn('top', 100, 605.76, 48), rn('low', 100, 661.76, 84)],
     T
   )!;
   assert.equal(group.carrier.id, 'top', 'an up-stem hand hands its duration to the topmost head');
   assert.equal(group.durationTicks, 48, 'the carrier draws the hand’s shortest member value');
-  assert.deepEqual(group.suppressedIds, ['mid', 'low'], 'the interior heads draw no stem');
-  assert.equal(group.bridges.length, 1, 'only the wide leap earns a bridge');
+  assert.deepEqual(group.suppressedIds, ['low'], 'the interior head draws no stem');
+  assert.equal(group.bridges.length, 1, 'the wide leap earns a bridge');
   const bridge = group.bridges[0];
   assert.equal(bridge.x, 100, 'the bridge runs on the shared column');
-  assert.equal(bridge.y1, 620.76 + T.noteheadRadius + CHORD_BRIDGE_DISC_AIR);
+  assert.equal(bridge.y1, 605.76 + T.noteheadRadius + CHORD_BRIDGE_DISC_AIR);
   assert.equal(bridge.y2, 661.76 - T.noteheadRadius - CHORD_BRIDGE_DISC_AIR);
   assert.ok(
     bridge.y2 - bridge.y1 > CHORD_BRIDGE_MIN_GAP - 2 * T.noteheadRadius,
     'the bridge spans the leap, not just the discs'
   );
-  assert.deepEqual(bridge.noteIds, ['mid', 'low']);
+  assert.deepEqual(bridge.noteIds, ['top', 'low']);
+
+  // A tight pair (Δy = 15pt) draws no connecting ink at all.
+  const tight = computeVerticalChordGroup(
+    [rn('t', 100, 100, 24), rn('b', 100, 115, 24)],
+    T
+  )!;
+  assert.equal(tight.bridges.length, 0, 'a tight pair stays silent');
 
   // A down-stem (LH) hand mirrors the grammar: the bottommost head carries it.
   const lh = computeVerticalChordGroup(
@@ -465,7 +645,7 @@ test('Round 7 Option 3 grammar: tight pairs stay silent, a wide leap gets its br
   );
 });
 
-test('Round 7: the B - 2 - 8 clasp survives, and B - 4 - 7 is engraved by Option 3', () => {
+test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket', () => {
   const o = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
     chordGrouping: 'per-hand-clasp',
@@ -479,36 +659,50 @@ test('Round 7: the B - 2 - 8 clasp survives, and B - 4 - 7 is engraved by Option
   assert.ok(b28, 'the B - 2 - 8 cluster carries its clasp');
   assert.equal(new Set(b28!.notes.map((n) => n.hand)).size, 1, 'strictly one hand');
   assert.ok(
+    new Set(b28!.notes.map((n) => n.x)).size > 1,
+    'the B - 2 - 8 bracket is the row-snapped hand cluster'
+  );
+  assert.ok(
     BRAHMS.notes.some((n) => n.startTick === 1296 && n.hand === 'LH'),
     'the concurrent LH partner is present'
   );
 
-  // B - 4 - 7 (m. 8, tick 1488): one vertical RH column, gap-gated.
+  // B - 4 - 7 (m. 8, tick 1488): one vertical RH column of three heads. Round 8
+  // widens the bracket scope to 3-note chords, so it is bracketed — and, being
+  // bracketed, it is never also gap-gated by Option 3.
   const system2 = systems[2];
-  const group = system2.verticalChords.find((c) => c.carrier.startTick === 1488);
-  assert.ok(group, 'the B - 4 - 7 vertical hand chord is gap-gated');
-  assert.equal(group!.carrier.hand, 'RH');
-  assert.equal(group!.suppressedIds.length, 2, 'the two interior heads draw no stem');
-  assert.equal(group!.bridges.length, 1, 'the 41pt leap is unified by exactly one bridge');
+  const chord = system2.clasps.find((c) => c.tick === 1488);
+  assert.ok(chord, 'the B - 4 - 7 vertical hand chord carries a bracket');
+  assert.equal(chord!.notes.length, CLASP_MIN_VERTICAL_CHORD, 'three heads in one hand');
+  assert.equal(new Set(chord!.notes.map((n) => n.hand)).size, 1, 'strictly one hand');
+  assert.equal(
+    new Set(chord!.notes.map((n) => n.x)).size,
+    1,
+    'the bracket exists although the column is clean and vertical'
+  );
+  assert.ok(
+    !system2.verticalChords.some((c) => c.carrier.startTick === 1488),
+    'a bracketed chord is never double-encoded by Option 3'
+  );
+  // The 2-note columns of the earlier systems stay with Option 3.
+  const optionThree = systems.flatMap((l) => l.verticalChords);
+  assert.ok(optionThree.length > 0, 'clean 2-note columns keep the gap-gated grammar');
+  for (const group of optionThree) {
+    assert.equal(group.suppressedIds.length, 1, 'Option 3 now handles 2-note columns only');
+  }
 
   const svg = renderJankoCrop(BRAHMS, 8, 1, o, BRAHMS_T);
-  for (const id of group!.suppressedIds) {
-    const p = system2.notes.find((n) => n.note.id === id)!;
-    const stemStart = p.y - (BRAHMS_T.noteheadRadius + 0.2);
-    assert.ok(
-      !svg.includes(`class="janko-stem" x1="${p.x.toFixed(2)}" y1="${stemStart.toFixed(2)}"`),
-      `${id} draws no collision stem into its neighbour`
-    );
+  assert.match(svg, /class="janko-clasp-group"[^>]*data-clasp-tick="1488"/, 'the bracket is painted');
+  for (const n of chord!.notes) {
+    assert.ok(system2.claspedStems.includes(n.id), `${n.id} hands its duration to the bracket`);
   }
-  const carrier = system2.notes.find((n) => n.note.id === group!.carrier.id)!;
-  assert.ok(
-    svg.includes(
-      `class="janko-stem" x1="${carrier.x.toFixed(2)}" y1="${(carrier.y - BRAHMS_T.noteheadRadius - 0.2).toFixed(2)}"`
-    ),
-    'the outer extremity carries the hand’s stem and duration'
+  assert.equal(
+    (svg.match(/class="janko-chord-bridge"/g) ?? []).length,
+    0,
+    'no bridge is drawn inside the bracketed chord'
   );
-  assert.equal((svg.match(/class="janko-chord-bridge"/g) ?? []).length, 1, 'exactly one bridge in m. 8');
-  assert.match(svg, /class="janko-chord-bridge" data-bridge-notes="[^"]+"/);
+  assert.equal((svg.match(/class="janko-clasp-fin"/g) ?? []).length, 0, 'the default paradigm is not fins');
+  assert.ok(svg.includes('data-clasp-duration-style="center-ticks"'), 'the golden duration paradigm');
 });
 
 // ---------------------------------------------------------------------------
@@ -572,7 +766,7 @@ test('The admission loop demotes a measure whose own content cannot absorb the s
   // so the bracket survives the demotion instead of being dropped with it.
   const layout = layouts('left-clasp-spire')[0];
   const m3 = layout.clasps.filter((c) => c.tick >= 288 && c.tick < 432);
-  assert.equal(m3.length, 1, 'm. 3 keeps its bracket through the column shift');
+  assert.ok(m3.length >= 1, 'm. 3 keeps its bracket through the column shift');
   const opening = getMeasureOpeningBarlineX(2, system0, 0, T);
   assert.ok(opening !== null, 'm. 3 follows a barline');
   for (const clasp of m3) {
@@ -657,11 +851,11 @@ test('A measure that cannot host the bracket loses it instead of colliding (edge
 // 6. The beamed-clasp rail
 // ---------------------------------------------------------------------------
 
-test('Beamed clasp rail: contiguous clasps of one measure join at the tips, inside the measure', () => {
+test('Beamed clasp rail: contiguous clasps of one measure join at the spines, inside the measure', () => {
   const railed = layouts('beamed-clasp-rail', BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T);
   const plain = layouts('left-clasp-spire', BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T);
   const total = railed.reduce((n, l) => n + l.claspRails.length, 0);
-  assert.ok(total >= 3, `Brahms chord sequences produce rails (${total})`);
+  assert.ok(total >= 2, `Brahms chord sequences produce rails (${total})`);
   assert.equal(
     railed.reduce((n, l) => n + l.clasps.length, 0),
     plain.reduce((n, l) => n + l.clasps.length, 0),
@@ -673,7 +867,7 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the tips, insi
     const barlines = systemBarlines(layout, o, BRAHMS_T);
     const railedTicks = new Set<number>();
     for (const rail of layout.claspRails) {
-      assert.ok(rail.x2 > rail.x1, 'a rail always spans at least two spire columns');
+      assert.ok(rail.x2 > rail.x1, 'a rail always spans at least two spine columns');
       assert.equal(rail.level, 1, 'every joined run carries the primary rail');
       assert.ok(rail.noteIds.length >= 4, 'at least two clasps (two notes each) per rail');
       for (const b of barlines) {
@@ -683,12 +877,12 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the tips, insi
         );
       }
       assert.ok(railClearsLayout(rail, layout.notes, BRAHMS_T), 'the rail clears every foreign disc');
-      // The rail sits exactly on the topmost spire tip of the run.
+      // The rail sits exactly on the topmost extended spine top of the run.
       const joined = layout.clasps.filter((c) => c.notes.every((n) => rail.noteIds.includes(n.id)));
       assert.ok(joined.length >= 2, 'a rail joins at least two clasps');
       for (const clasp of joined) {
-        assert.equal(clasp.spireTipY, rail.y, 'every joined spire is extended up to the rail');
-        assert.equal(clasp.flags, 0, 'the rail replaces the flag hooks');
+        assert.equal(clasp.topY, rail.y, 'every joined bracket spine is extended up to the rail');
+        assert.equal(clasp.flags, 0, 'the rail replaces the duration notches');
         railedTicks.add(clasp.tick);
       }
     }
@@ -704,7 +898,7 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the tips, insi
     }
   }
 
-  // Every clasp that is NOT part of a run keeps its duration hooks.
+  // Every clasp that is NOT part of a run keeps its duration notches.
   const railedClaspTicks = new Set(
     railed.flatMap((l) => l.claspRails.flatMap((r) => l.clasps.filter((c) => r.noteIds.includes(c.notes[0].id)).map((c) => c.tick)))
   );

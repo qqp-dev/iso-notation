@@ -72,7 +72,7 @@ import {
   JankoRhythmNote,
   JankoVerticalChordGroup,
   claspInkBox,
-  claspNotesHorizontallySpread,
+  claspQualifies,
   computeBeamGroupGeometry,
   computeClaspGeometry,
   computeVerticalChordGroup,
@@ -283,12 +283,13 @@ export interface JankoClaspCluster {
  * - `'bounding-phrase'`: one group per measure that contains a chord, bounding
  *   **every** note of the measure. The bracket carries the measure's opening
  *   duration.
- * - `'per-hand-clasp'` (Round 6): the grouping unit is the **hand** — never the
- *   grand staff. A hand's onset is grouped only when it carries two or more
- *   heads that are horizontally displaced by the row-snapped parity offset; a
- *   clean vertical column and a lone melodic note keep their stems. A hand
- *   cluster that crosses Middle C is grouped across the corridor, because the
- *   bracket spans that hand's own full reach.
+ * - `'per-hand-clasp'` (Round 6, widened by Round 8): the grouping unit is the
+ *   **hand** — never the grand staff. A hand's onset is grouped when it carries
+ *   two or more heads that are horizontally displaced by the row-snapped parity
+ *   offset, **or** when it is a vertical chord of three or more heads; a clean
+ *   2-note column and a lone melodic note keep their stems. A hand cluster that
+ *   crosses Middle C is grouped across the corridor, because the bracket spans
+ *   that hand's own full reach.
  */
 export function collectClaspClusters(
   notes: readonly PositionedJankoNote[],
@@ -317,7 +318,9 @@ export function collectClaspClusters(
       if (claspTicks && !claspTicks.has(tick)) continue;
       for (const hand of ['RH', 'LH'] as const) {
         const members = onset.filter((p) => p.rhythm.hand === hand);
-        if (!claspNotesHorizontallySpread(members.map((p) => p.rhythm))) continue;
+        // Round 8 scope: a horizontally spread hand cluster or a vertical chord
+        // of three or more heads qualifies; a 2-note column does not.
+        if (!claspQualifies(members.map((p) => p.rhythm))) continue;
         groups.push({ notes: members, measureIdx: measureOf(members[0]) });
       }
     }
@@ -583,20 +586,21 @@ export interface JankoClaspRailRun {
 export type JankoClaspRailVerdict = (run: JankoClaspRailRun) => boolean;
 
 /**
- * Join the spire tips of contiguous clasps with a horizontal rail
+ * Join the extended spine tops of contiguous clasps with a horizontal rail
  * (`'beamed-clasp-rail'`).
  *
  * Two clasps are *contiguous* when they are consecutive clasps of one measure —
  * the measure is the phrase unit of this notation, so the rail is always a
- * measure-bounded beam: it spans only its own measure's spire columns and
+ * measure-bounded beam: it spans only its own measure's spine columns and
  * therefore can never approach, let alone cross, a barline. The primary rail
- * runs at the **topmost** tip, so every joined spire is extended up to it (the
- * run's beam); flag hooks are dropped exactly as a traditional beam replaces
- * them. A second rail `flagSpacing` below carries the 16th-note level whenever
- * the run holds two or more 16th-class clasps. A half/whole clasp carries a pip
- * rather than a spire and never joins a run.
+ * runs at the **topmost** extended spine top, so every joined bracket reaches it
+ * (Round 8 removed the lopsided spire: the spine itself is extended); duration
+ * notches are dropped exactly as a traditional beam replaces them. A second rail
+ * `flagSpacing` below carries the 16th-note level whenever the run holds two or
+ * more 16th-class clasps. A half/whole clasp carries a pip rather than a notch
+ * and never joins a run.
  *
- * `verdict`, when supplied, sees the tentatively railed run — extended spires
+ * `verdict`, when supplied, sees the tentatively railed run — extended spines
  * and rails — and may reject it; the clasps are then engraved unrailed rather
  * than letting a rail cut through a foreign glyph.
  */
@@ -613,7 +617,7 @@ export function computeClaspRails(
   }
   const buckets = new Map<number, number[]>();
   clusters.forEach((cluster, index) => {
-    if (resolved[index].spireTipY === null) return;
+    if (resolved[index].pips > 0) return;
     const bucket = buckets.get(cluster.measureIdx);
     if (bucket) bucket.push(index);
     else buckets.set(cluster.measureIdx, [index]);
@@ -622,7 +626,7 @@ export function computeClaspRails(
   for (const bucket of buckets.values()) {
     if (bucket.length < 2) continue;
     const run = bucket.sort((a, b) => resolved[a].tick - resolved[b].tick);
-    const railY = Math.min(...run.map((i) => resolved[i].spireTipY as number));
+    const railY = Math.min(...run.map((i) => resolved[i].topY));
     const railed = run.map((i) => withClaspRail(resolved[i], railY));
     const ids = (indexes: readonly number[]): string[] =>
       indexes.flatMap((i) => resolved[i].notes.map((n) => n.id));
@@ -1185,10 +1189,11 @@ export function resolveChordColumns(
   };
 
   /**
-   * Round 6 — the hand groups of one onset that qualify for a per-hand clasp:
-   * two or more heads of **one** hand, horizontally displaced by the row-snapped
-   * parity offset. A clean vertical column of one hand is never grouped, and the
-   * two hands of the grand staff are never merged into one bracket.
+   * Round 6/8 — the hand groups of one onset that qualify for a per-hand clasp:
+   * two or more heads of **one** hand, either horizontally displaced by the
+   * row-snapped parity offset or forming a vertical chord of three or more.
+   * A clean 2-note vertical column is never grouped, and the two hands of the
+   * grand staff are never merged into one bracket.
    */
   const handClaspGroups = (unit: OnsetUnit): PositionedJankoNote[][] => {
     const offsets = rowOffsetOf(unit);
@@ -1203,7 +1208,7 @@ export function resolveChordColumns(
     const qualified: PositionedJankoNote[][] = [];
     for (const group of byHand.values()) {
       const displaced = group.map((p) => ({ ...p.rhythm, x: offsets.get(p.note.id) ?? 0 }));
-      if (claspNotesHorizontallySpread(displaced)) qualified.push(group);
+      if (claspQualifies(displaced)) qualified.push(group);
     }
     return qualified;
   };
@@ -1221,7 +1226,8 @@ export function resolveChordColumns(
         for (const group of groups) {
           const geometry = computeClaspGeometry(
             group.map((p) => ({ ...p.rhythm, x: p.x + (offsets.get(p.note.id) ?? 0) })),
-            t
+            t,
+            { claspDurationStyle: o.claspDurationStyle }
           );
           if (geometry) {
             unit.claspInkLeft = Math.min(
@@ -1242,7 +1248,8 @@ export function resolveChordColumns(
       unit.claspBot = unit.rows.reduce((max, c) => Math.max(max, c.y), -Infinity) + t.noteheadRadius;
       const geometry = computeClaspGeometry(
         unit.rows.flatMap((cluster) => cluster.notes.map((p) => p.rhythm)),
-        t
+        t,
+        { claspDurationStyle: o.claspDurationStyle }
       );
       if (geometry) unit.claspInkLeft = claspInkBox(geometry, t).x0 - unit.nominalX;
     }
@@ -1282,7 +1289,8 @@ export function resolveChordColumns(
       // column here, before the solve).
       const geometry = computeClaspGeometry(
         members.map((p) => p.rhythm),
-        t
+        t,
+        { claspDurationStyle: o.claspDurationStyle }
       );
       if (!geometry) return false;
       // Disc clearance is relative ink: every head of one onset moves with the
@@ -1292,7 +1300,8 @@ export function resolveChordColumns(
           ? geometry
           : computeClaspGeometry(
               members.map((p) => ({ ...p.rhythm, x: displacedX(p) })),
-              t
+              t,
+              { claspDurationStyle: o.claspDurationStyle }
             );
       const disk = claspInkBox(spreadGeometry ?? geometry, t);
       for (const other of units) {
@@ -1643,9 +1652,11 @@ export function layoutJankoSystem(
         t,
         {
           ...(cluster.durationTicks === undefined ? {} : { durationTicks: cluster.durationTicks }),
-          // Round 6: a per-hand clasp exists only for a horizontally displaced
-          // cluster; a clean vertical column keeps its stems.
-          requireHorizontalSpread: o.chordGrouping === 'per-hand-clasp',
+          // Round 6/8: a per-hand clasp exists only for a horizontally displaced
+          // cluster or a vertical chord of three or more heads; a clean 2-note
+          // vertical column keeps its stems.
+          requireBracketScope: o.chordGrouping === 'per-hand-clasp',
+          claspDurationStyle: o.claspDurationStyle,
         }
       ),
     }))
@@ -1699,9 +1710,17 @@ export function layoutJankoSystem(
   // draws no internal stem, a wide leap gets an explicit bridge, and the outer
   // extremity carries the hand's duration. A head that belongs to a real beam
   // keeps its stem and is left untouched.
+  //
+  // Round 8 adds the three-or-more-note vertical chord to the bracket's own
+  // scope, so an onset that actually carries a bracket is excluded here: the
+  // bracket already replaces those stems and carries their duration, and the
+  // two grammars must never double-encode one sonority.
   const verticalChords: JankoVerticalChordGroup[] = [];
   const chordBridges: JankoChordBridge[] = [];
   if (o.chordGrouping === 'per-hand-clasp') {
+    const bracketedHandOnsets = new Set(
+      clasps.map((clasp) => `${clasp.tick}|${clasp.notes[0].hand}`)
+    );
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
       const key = `${p.note.startTick}|${p.rhythm.hand}`;
@@ -1709,8 +1728,9 @@ export function layoutJankoSystem(
       if (bucket) bucket.push(p);
       else byHandOnset.set(key, [p]);
     }
-    for (const group of byHandOnset.values()) {
+    for (const [key, group] of byHandOnset.entries()) {
       if (group.length < 2) continue;
+      if (bracketedHandOnsets.has(key)) continue;
       const standalone = group.filter((p) => !beamedIds.has(p.note.id));
       if (standalone.length < 2) continue;
       const resolved = computeVerticalChordGroup(
@@ -1818,10 +1838,10 @@ function renderNotesLayer(
   if (layout.chordBridges.length > 0) out.push(renderChordBridges(layout.chordBridges));
 
   // 2b. External left clasps + their rails (Round 5), painted above the stems
-  //     they replace and beneath the noteheads they must never touch. Their
-  //     duration tips carry the active Round 7 subdivision style.
+  //     they replace and beneath the noteheads they must never touch. Round 8
+  //     carries each bracket's symmetrical duration paradigm on its geometry.
   if (layout.clasps.length > 0 || layout.claspRails.length > 0) {
-    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t, o.subdivisionStyle));
+    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t));
   }
 
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.

@@ -48,37 +48,84 @@ export type JankoRhythmStyle = 'angled-cuts' | 'horizontal-ticks' | 'beamed';
  * isolated 8th/16th/32nd draws its duration at the stem tip (see
  * `elements/rhythm.renderSubdivisionMark`).
  *
- * The round replaces Round 6's static perpendicular tab with **diagonal kinetic
+ * Round 7 replaced Round 6's static perpendicular tab with **diagonal kinetic
  * direction** — the mark rakes away from the stem tip, leading the eye along the
- * stem's motion — and keeps the classical flag as the balanced control.
+ * stem's motion — and kept the classical flag as the balanced control. Round 8
+ * answers the operator's verdict on that round: the 30°/45° rakes clashed with
+ * the score's shallow beams, so the settled kinetic tab is **beam-harmonized**
+ * at the score's own `maxBeamSlope` (0.22 ≈ 12.4°), while the classical control
+ * becomes a slender open urtext hairline.
  *
  * | style                   | ink at the stem tip                                  |
  * | ----------------------- | ---------------------------------------------------- |
  * | `'kinetic-tab-30'`      | 30° diagonal tab, 1.1pt monoline                     |
  * | `'kinetic-tab-45'`      | 45° diagonal tab, 1.1pt monoline (chevron harmony)   |
  * | `'kinetic-tab-tapered'` | 30° diagonal tab, optical taper 1.4pt root → 0.8pt   |
- * | `'classical-urtext'`    | refined numeral-balanced urtext flag                 |
+ * | `'classical-urtext'`    | slender open 0.90pt urtext hairline                  |
+ * | `'kinetic-tab-beam'`    | beam-harmonized tab: `maxBeamSlope` ≈ 12.4°, 1.1pt   |
  */
 export type JankoSubdivisionStyle =
   | 'kinetic-tab-30'
   | 'kinetic-tab-45'
   | 'kinetic-tab-tapered'
-  | 'classical-urtext';
+  | 'classical-urtext'
+  | 'kinetic-tab-beam';
 
-/** Every subdivision style, in the canonical exploration order (A–D). */
+/** Every subdivision style, in the canonical exploration order. */
 export const JANKO_SUBDIVISION_STYLES: readonly JankoSubdivisionStyle[] = [
   'kinetic-tab-30',
   'kinetic-tab-45',
   'kinetic-tab-tapered',
   'classical-urtext',
+  'kinetic-tab-beam',
 ];
 
-/** Human-readable names of the four subdivision styles. */
+/** Human-readable names of the subdivision styles. */
 export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, string> = {
   'kinetic-tab-30': '30° Kinetic Architectural Tab',
   'kinetic-tab-45': '45° Dynamic Chevron Tab',
   'kinetic-tab-tapered': 'Tapered Kinetic Wing Tab',
-  'classical-urtext': 'Balanced Numeral-Urtext Flag',
+  'classical-urtext': 'Slender Open Urtext Flag',
+  'kinetic-tab-beam': 'Beam-Harmonized Kinetic Tab (12.4°)',
+};
+
+/**
+ * Symmetrical clasp **duration** paradigms — the Round 8 question: how an
+ * external per-hand bracket carries the cluster's duration without breaking its
+ * mirror symmetry.
+ *
+ * Round 7 hung the duration off a lopsided upward spire at the bracket's top
+ * corner, which made the bracket read as asymmetric. Round 8 removes the spire
+ * and tests four balanced solutions (see
+ * `elements/rhythm.renderChordClasp`):
+ *
+ * | style              | duration ink                                                     |
+ * | ------------------ | ---------------------------------------------------------------- |
+ * | `'center-ticks'`   | 1/2 horizontal ticks (or pips) at the spine's exact midpoint      |
+ * | `'cap-cuts'`       | 1/2/3 parallel horizontal bars stacked inside both caps           |
+ * | `'framing-only'`   | pure bracket `[` — duration stays on the notehead's own ink       |
+ * | `'bilateral-fins'` | 12.4° kinetic fins flaring symmetrically off both caps            |
+ */
+export type JankoClaspDurationStyle =
+  | 'center-ticks'
+  | 'cap-cuts'
+  | 'framing-only'
+  | 'bilateral-fins';
+
+/** Every clasp-duration paradigm, in the canonical exploration order (A–D). */
+export const JANKO_CLASP_DURATION_STYLES: readonly JankoClaspDurationStyle[] = [
+  'center-ticks',
+  'cap-cuts',
+  'framing-only',
+  'bilateral-fins',
+];
+
+/** Human-readable names of the four symmetrical clasp-duration paradigms. */
+export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, string> = {
+  'center-ticks': 'Balanced Center-Spine Ticks',
+  'cap-cuts': 'Stacked Horizontal Cap Cuts',
+  'framing-only': 'Pure Symmetrical Framing Bracket',
+  'bilateral-fins': 'Bilateral Cap Fins',
 };
 
 /**
@@ -311,7 +358,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   haloRadius: 6.2,
   octaveStep: 30.0,
   accoladeWidth: 7.0,
-  accoladeThick: 0.85,
+  accoladeThick: 0.65,
   fontFamily: '"URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif',
   stemLength: 16.0,
   slashDx: 2.8,
@@ -364,11 +411,17 @@ export interface JankoLayoutOptions {
 
   // --- Optional page/layout refinements (resolved from defaults) ---
   /**
-   * Single-note subdivision style (Round 7): how an isolated 8th/16th/32nd
-   * draws its duration at the stem tip. Defaults to the classical
-   * `'classical-urtext'` flag (see {@link JankoSubdivisionStyle}).
+   * Single-note subdivision style (Round 7, settled by Round 8): how an
+   * isolated 8th/16th/32nd draws its duration at the stem tip. Defaults to the
+   * classical `'classical-urtext'` flag (see {@link JankoSubdivisionStyle}).
    */
   subdivisionStyle?: JankoSubdivisionStyle;
+  /**
+   * Symmetrical clasp-duration paradigm (Round 8): how an external per-hand
+   * bracket carries its cluster's duration. Defaults to `'center-ticks'` (see
+   * {@link JankoClaspDurationStyle}).
+   */
+  claspDurationStyle?: JankoClaspDurationStyle;
   /** Horizontal systems stacked on one page. */
   systemsPerPage?: number;
   /** Ticks in one measure. */
@@ -427,6 +480,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   channelLayout: 'single-equator',
   chordGrouping: 'none',
   subdivisionStyle: 'classical-urtext',
+  claspDurationStyle: 'center-ticks',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   anacrusisTicks: 0,
@@ -435,7 +489,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   timeSignatureWidth: 0,
   pageWidth: 595.28,
   pageHeight: 841.89,
-  pageMargin: 36.0,
+  pageMargin: 24.0,
   headerHeight: 48.0,
   footerHeight: 24.0,
   showMeasureNumbers: true,
