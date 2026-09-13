@@ -38,7 +38,7 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
-import { countJankoPages, renderJankoPage, renderJankoVariantComparison } from '../src/render/janko/engine';
+import { countJankoPages, renderJankoPage } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
 import {
   CURRENT_CANDIDATES,
@@ -294,59 +294,6 @@ test('Round 16 registry compares the cluster spacing and the rest dialect on two
   );
 });
 
-test('Round 16 candidates export cleanly to the contact sheet', () => {
-  const specs = CURRENT_CANDIDATES.map((candidate) => ({
-    id: candidate.id,
-    label: candidate.label,
-    options: resolveCandidate(candidate).options,
-  }));
-  // The dense mm. 27–28 run remains the contact sheet's stress window: all
-  // seven Round 16 candidates export side by side from the real engine.
-  const sheet = renderJankoVariantComparison(
-    SCORE,
-    specs,
-    27,
-    2,
-    DEFAULT_JANKO_OPTIONS,
-    DEFAULT_JANKO_TOKENS
-  );
-  assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one contact sheet document');
-  for (const candidate of CURRENT_CANDIDATES) {
-    assert.ok(sheet.includes(`data-variant="${candidate.id}"`), `${candidate.id} panel`);
-    // SVG text nodes escape `&`, `<` and `>`.
-    assert.ok(sheet.includes(esc(candidate.label)), `${candidate.id} label`);
-  }
-  const panelBody = (variantId: string): string => {
-    const start = sheet.indexOf(`data-variant="${variantId}"`);
-    const next = sheet.indexOf('data-variant="', start + 1);
-    return sheet.slice(start, next === -1 ? undefined : next);
-  };
-  const seen = new Set<string>();
-  for (const candidate of CURRENT_CANDIDATES) {
-    const body = panelBody(candidate.id);
-    assert.ok(
-      (body.match(/class="janko-digit"/g) ?? []).length >= 20,
-      `${candidate.id} engraves the dense sixteenths`
-    );
-    assert.ok(
-      (body.match(/class="janko-barline"/g) ?? []).length >= 2,
-      `${candidate.id} paints the measure barlines`
-    );
-    seen.add(body);
-  }
-  assert.equal(seen.size, CURRENT_CANDIDATES.length, 'seven distinct Round 16 engravings');
-  // The Bach window keeps the shared beam-harmonized rake and the continuous
-  // vertical grid.
-  const rakes = [
-    ...sheet.matchAll(
-      /<line class="janko-flag"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
-    ),
-  ].map((m) => Math.abs((Number(m[4]) - Number(m[2])) / (Number(m[3]) - Number(m[1]))));
-  assert.ok(rakes.length > 0, 'the dense window carries subdivision marks');
-  for (const rake of rakes) {
-    assert.ok(Math.abs(rake - DEFAULT_JANKO_TOKENS.maxBeamSlope) < 5e-3, `beam rake ${rake}`);
-  }
-});
 
 test('Candidate previews honour their own option deltas', () => {
   const html = renderCandidatesView(CONFIG);

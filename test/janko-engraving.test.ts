@@ -4,19 +4,11 @@
  * Covers:
  *  1. Jánko geometry & pitch isomorphism (rank mapping, row/octave steps,
  *     dynamic ledger equators, Position of Honor halo).
- *  2. The modular engine (page/crop/variant SVG composition).
- *  3. The unified export suite (`npm run janko:export`) and its twelve PNGs —
- *     including the Round 4 four-paradigm domain sheet and the Brahms Op. 118
- *     No. 1 pressure benchmark — in every delivery location, inside the
- *     3-second budget.
+ *  2. The modular engine (page/crop SVG composition).
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { Hand, QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
@@ -58,7 +50,6 @@ import {
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
-  renderJankoVariantComparison,
   renderSystem,
   restClearsLayout,
   REST_FIT_MARGIN,
@@ -97,10 +88,6 @@ import {
 } from '../src/render/janko/elements/rests';
 import { lintJankoScore } from '../src/render/janko/linter';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, '..');
-const MAIN_CHECKOUT = '/home/qqp/projects/iso-notation';
-
 const TOKENS = DEFAULT_JANKO_TOKENS;
 const OPTIONS = DEFAULT_JANKO_OPTIONS;
 /**
@@ -118,22 +105,6 @@ const HALO_RX = Math.max(SPACING_PRESET.rx, TOKENS.haloRadius + JANKO_HALO_STROK
 /** The widened tick-0 fan step: 2·6.575 + 1.0 = 14.15pt. */
 const HALO_GAP = 2 * HALO_RX + SPACING_PRESET.air;
 const HANDS: Hand[] = ['RH', 'LH'];
-
-const EXPORT_NAMES = [
-  'janko_portrait_page1.png',
-  'janko_m1_m2.png',
-  'janko_m4.png',
-  'janko_m8.png',
-  'janko_variants.png',
-  'janko_domain_exploration.png',
-  'janko_domain_a.png',
-  'janko_domain_b.png',
-  'janko_domain_c.png',
-  'janko_domain_d.png',
-  // Brahms Op. 118 No. 1 — the harmonic row-collision pressure benchmark.
-  'janko_brahms_page1.png',
-  'janko_brahms_m7_m8.png',
-] as const;
 
 function close(actual: number, expected: number, message: string, epsilon = 1e-9): void {
   assert.ok(
@@ -834,28 +805,6 @@ test('Row-snapped parity offset: the canonical Bach score is unchanged on unaffe
   }
 });
 
-test('renderJankoVariantComparison: A/B/C contact sheet over the same measures', () => {
-  const score = buildBachGoldbergVar1Score();
-  const sheet = renderJankoVariantComparison(score, undefined, 1, 4, OPTIONS, TOKENS);
-  assert.ok(sheet.startsWith('<svg'));
-  assert.ok(sheet.trimEnd().endsWith('</svg>'));
-  for (const label of [
-    'Variant A: Angled Cuts',
-    'Variant B: Traditional Beams',
-    'Variant C: Unified Continuous Lattice',
-  ]) {
-    assert.ok(sheet.includes(label), `contact sheet must label ${label}`);
-  }
-  for (const id of ['angled-cuts', 'beamed', 'horizontal-ticks']) {
-    assert.match(sheet, new RegExp(`data-variant="${id}"`));
-  }
-  // One panel per variant, each containing a full 4-measure system.
-  assert.equal((sheet.match(/class="janko-variant-panel"/g) ?? []).length, 3);
-  assert.equal((sheet.match(/id="system-1"/g) ?? []).length, 3);
-  assert.match(sheet, /class="janko-cut"/);
-  assert.match(sheet, /class="janko-beam"/);
-  assert.match(sheet, /class="janko-tick"/);
-});
 
 test('Token/option overrides flow through every renderer (pluggable design)', () => {
   const score = buildBachGoldbergVar1Score();
@@ -2722,50 +2671,4 @@ test('Anchored and 3-row layouts surface their real cost: high notes crowd the n
       `${c.id} keeps ${CLEARANCE[c.id]}pt of numeral air (measured ${air.toFixed(2)}pt)`
     );
   }
-});
-
-// ---------------------------------------------------------------------------
-// 5. Export suite invariant
-// ---------------------------------------------------------------------------
-
-test('npm run janko:export produces all twelve PNGs everywhere in under 3 seconds', () => {
-  const started = Date.now();
-  execFileSync(process.execPath, ['--import', 'tsx', 'scripts/render_janko_suite.ts'], {
-    cwd: REPO_ROOT,
-    stdio: 'pipe',
-  });
-  const elapsed = Date.now() - started;
-
-  const mirrors = (root: string): string[] => [
-    path.join(root, 'public'),
-    path.join(root, 'docs', 'img'),
-  ];
-  for (const name of EXPORT_NAMES) {
-    for (const dir of mirrors(REPO_ROOT)) {
-      const p = path.join(dir, name);
-      assert.ok(fs.existsSync(p), `${name} must exist in ${dir}`);
-      assert.ok(fs.statSync(p).size > 1000, `${name} in ${dir} must be a real rasterization`);
-    }
-  }
-  if (fs.existsSync(MAIN_CHECKOUT)) {
-    for (const name of EXPORT_NAMES) {
-      for (const dir of mirrors(MAIN_CHECKOUT)) {
-        assert.ok(fs.existsSync(path.join(dir, name)), `${name} must be mirrored to ${dir}`);
-      }
-    }
-  }
-
-  // The unified domain sheet is the round's headline artifact: four panels at
-  // 3× (216 DPI) on the same two measures.
-  const sheet = fs.readFileSync(path.join(REPO_ROOT, 'public', 'janko_domain_exploration.png'));
-  assert.ok(sheet.length > 10_000, 'the four-paradigm contact sheet is a real rasterization');
-  assert.deepEqual([...sheet.subarray(1, 4)], [...Buffer.from('PNG')], 'the sheet is a PNG');
-
-  // The Brahms pressure benchmark ships as a full page plus the mm. 7–8 macro
-  // crop of the two five-voice chords.
-  const brahms = fs.readFileSync(path.join(REPO_ROOT, 'public', 'janko_brahms_m7_m8.png'));
-  assert.ok(brahms.length > 10_000, 'the Brahms chord crop is a real rasterization');
-  assert.deepEqual([...brahms.subarray(1, 4)], [...Buffer.from('PNG')], 'the crop is a PNG');
-
-  assert.ok(elapsed < 3000, `export suite must finish under 3s (took ${elapsed}ms)`);
 });

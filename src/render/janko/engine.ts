@@ -30,7 +30,6 @@
  * -------------------
  * - {@link renderJankoPage}               — full A4 page (4 systems, 16 mm.)
  * - {@link renderJankoCrop}               — targeted macro crop of N measures
- * - {@link renderJankoVariantComparison}  — side-by-side variant contact sheet
  */
 
 import { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
@@ -47,7 +46,6 @@ import {
   usesContourFlanks,
 } from './geometry';
 import {
-  DEFAULT_JANKO_VARIANTS,
   JANKO_RHYTHM_STYLE_LABELS,
   JankoChordGrouping,
   JankoLayoutOptions,
@@ -56,8 +54,6 @@ import {
   JankoSystemGeometry,
   JankoSystemStartStyle,
   JankoTokens,
-  JankoVariant,
-  JankoVariantSpec,
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
   channelsGridInk,
@@ -3305,145 +3301,4 @@ export function renderJankoCrop(
     '  </g>',
     '</svg>',
   ].join('\n');
-}
-
-// ---------------------------------------------------------------------------
-// Variant comparison sheet
-// ---------------------------------------------------------------------------
-
-/** Normalize any accepted variant spec into a fully resolved variant. */
-export function normalizeJankoVariant(
-  spec: JankoVariantSpec,
-  index: number,
-  base?: Partial<JankoLayoutOptions> | null
-): JankoVariant {
-  const letter = String.fromCharCode(65 + (index % 26));
-  if (typeof spec === 'string') {
-    const style = spec as JankoRhythmStyle;
-    return {
-      id: style,
-      label: `Variant ${letter}: ${JANKO_RHYTHM_STYLE_LABELS[style] ?? style}`,
-      options: resolveJankoOptions({ ...(base ?? {}), rhythmStyle: style }),
-    };
-  }
-  const def = spec as Record<string, unknown>;
-  const isDefinition =
-    'options' in def ||
-    'rhythmStyle' in def ||
-    'label' in def ||
-    'name' in def ||
-    'title' in def ||
-    'id' in def;
-  if (isDefinition) {
-    const style =
-      (def.rhythmStyle as JankoRhythmStyle | undefined) ?? resolveJankoOptions(base).rhythmStyle;
-    const options = resolveJankoOptions({
-      ...(base ?? {}),
-      ...((def.options as Partial<JankoLayoutOptions> | undefined) ?? {}),
-      rhythmStyle: style,
-    });
-    const label =
-      (def.label as string | undefined) ??
-      (def.name as string | undefined) ??
-      (def.title as string | undefined) ??
-      `Variant ${letter}: ${JANKO_RHYTHM_STYLE_LABELS[style] ?? style}`;
-    return {
-      id: (def.id as string | undefined) ?? `variant-${index + 1}`,
-      label,
-      options,
-    };
-  }
-  const options = resolveJankoOptions({
-    ...(base ?? {}),
-    ...(spec as Partial<JankoLayoutOptions>),
-  });
-  return {
-    id: `variant-${index + 1}`,
-    label: `Variant ${letter}: ${
-      JANKO_RHYTHM_STYLE_LABELS[options.rhythmStyle] ?? options.rhythmStyle
-    }`,
-    options,
-  };
-}
-
-/** Escape text for an SVG `<text>` node (a label may carry `&`, `<` or `>`). */
-function escapeXmlText(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/**
- * Multi-variant comparative contact sheet: every variant engraves the exact
- * same measures, stacked vertically with an identifying label. The default
- * variants are A: Angled Cuts, B: Traditional Beams, C: Unified Continuous
- * Lattice.
- */
-export function renderJankoVariantComparison(
-  score: QuantizedGridScore,
-  variants?: JankoVariantSpec[] | null,
-  measureStart: number = 1,
-  measureCount: number = 4,
-  baseOptions?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
-): string {
-  const o = resolveJankoOptions(baseOptions);
-  const t = resolveJankoTokens(tokens);
-  const specs = variants && variants.length > 0 ? variants : DEFAULT_JANKO_VARIANTS;
-  const resolved = specs.map((spec, i) => normalizeJankoVariant(spec, i, o));
-
-  const panels = resolved.map((variant) => {
-    const geo = computePageGeometry(variant.options, t);
-    const box = computeCropBox(geo, measureStart, measureCount, false);
-    const body = renderSystemsBody(score, geo, box.firstSystem, box.lastSystem, variant.options, t);
-    return { variant, box, body };
-  });
-
-  const pad = 10;
-  const labelBand = 16;
-  const gap = 12;
-  const contentW = Math.max(...panels.map((p) => p.box.w));
-  const contentH = Math.max(...panels.map((p) => p.box.h));
-  const panelH = labelBand + contentH;
-  const totalW = contentW + 2 * pad;
-  const totalH = pad + panels.length * panelH + (panels.length - 1) * gap + pad;
-
-  const out: string[] = [
-    svgOpen({ x: 0, y: 0, w: totalW, h: totalH }),
-    renderJankoStyleDefs(t),
-    '  <rect width="100%" height="100%" fill="#FFFFFF"/>',
-  ];
-
-  panels.forEach((panel, i) => {
-    const top = pad + i * (panelH + gap);
-    out.push(`  <g class="janko-variant-panel" data-variant="${panel.variant.id}">`);
-    out.push(
-      `    <rect x="${f(pad)}" y="${f(top)}" width="${f(contentW)}" height="${f(panelH)}" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.60"/>`
-    );
-    out.push(
-      `    <text x="${f(pad + 6)}" y="${f(top + 11)}" class="janko-caption">${escapeXmlText(panel.variant.label)}</text>`
-    );
-    out.push(
-      `    <text x="${f(pad + contentW - 6)}" y="${f(top + 11)}" class="janko-caption-sub" text-anchor="end">mm. ${panel.box.firstMeasure}–${panel.box.lastMeasure} · ${escapeXmlText(panel.variant.options.rhythmStyle)}</text>`
-    );
-    out.push(`    <clipPath id="janko-panel-clip-${i}">`);
-    out.push(
-      `      <rect x="${f(pad)}" y="${f(top + labelBand)}" width="${f(contentW)}" height="${f(contentH)}"/>`
-    );
-    out.push('    </clipPath>');
-    // The clip lives on an untransformed wrapper so its rectangle stays in
-    // sheet coordinates; the inner group carries the crop registration.
-    out.push(`    <g clip-path="url(#janko-panel-clip-${i})">`);
-    out.push(
-      `      <g transform="translate(${f(pad - panel.box.x)}, ${f(top + labelBand - panel.box.y)})">`
-    );
-    out.push(
-      `        <rect x="${f(panel.box.x)}" y="${f(panel.box.y)}" width="${f(panel.box.w)}" height="${f(panel.box.h)}" fill="#FFFFFF"/>`
-    );
-    out.push(panel.body);
-    out.push('      </g>');
-    out.push('    </g>');
-    out.push('  </g>');
-  });
-
-  out.push('</svg>');
-  return out.join('\n');
 }

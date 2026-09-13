@@ -32,7 +32,7 @@ Implementers verify the same engraving **without rendering anything**:
 
 ```bash
 npm run lint:engraving            # ~60 ms, JSON/strict/quiet flags available
-npm test                          # 261 tests, < 4 s, includes the linter + candidate/studio suites
+npm test                          # 259 tests, < 4 s, includes the linter + candidate/studio suites
 ```
 
 ---
@@ -47,15 +47,16 @@ turn because:
 2. **Whole-page fatigue** — every micro-decision was judged on a full
    3-system A4 page (595 × 842 pt) instead of a targeted macro crop.
 3. **Single-variant guessing** — one parameter choice was proposed per turn
-   instead of a side-by-side contact sheet.
+   instead of side-by-side candidates in the studio.
 4. **Mechanical overhead** — images had to be copied by hand between the
    checkout, `docs/`, `public/` and the main project root.
 
-The harness replaces all four failure modes with one command:
+The harness replaces all four failure modes with the live studio plus the
+headless linter:
 
 ```bash
-npm run janko:export   # ~1.2 s, twelve PNGs, six delivery locations each
-npm run janko:watch    # same suite on every file change
+npm run dev                 # live two-view studio with Vite HMR
+npm run lint:engraving      # the same engraving, verified headlessly in ~60 ms
 ```
 
 ---
@@ -132,8 +133,8 @@ absolute octave lattice:
 
 - `getChannelLayoutSpec(options, tokens)` is the single source of truth for the
   table (`setAOffset`, `setBOffset`, `flankMagnitude`, `rulesPerEquator`,
-  `staffRules`, `dynamicFlanks`, `setAOnRule`); the studio, the tests and the
-  export suite all read it, and `JANKO_CHANNEL_LAYOUTS` fixes the A–D order.
+  `staffRules`, `dynamicFlanks`, `setAOnRule`); the studio and the tests
+  all read it, and `JANKO_CHANNEL_LAYOUTS` fixes the A–D order.
 - `renderStaffLines` paints one rule per staff octave for the first three
   layouts (4 lines across the grand staff) and **two** boundary rules per octave
   for `'bounded-channel'` (8 lines). `renderLedgerEquator` applies the same
@@ -240,7 +241,6 @@ const svg = renderJankoCrop(score, 4, 1, { rhythmStyle: 'beamed' }, { haloRadius
 ```ts
 renderJankoPage(score, pageIndex, options?, tokens?): string
 renderJankoCrop(score, measureStart, measureCount, options?, tokens?, caption?): string
-renderJankoVariantComparison(score, variants?, measureStart?, measureCount?, baseOptions?, tokens?): string
 layoutJankoScore(score, options?, tokens?): JankoSystemLayout[]   // shared geometry model
 ```
 
@@ -337,52 +337,20 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 
 ---
 
-## 3. Export suite
-
-`scripts/render_janko_suite.ts` (via `npm run janko:export`) renders:
-
-| Artifact | Content | Zoom |
-| --- | --- | --- |
-| `janko_portrait_page1.png` | Full page 1, systems 1–3, mm. 1–12 | 2× |
-| `janko_m1_m2.png` | m. 1–2: accolade, halo, spacious spine-free corridor, opening theme | 4× |
-| `janko_m4.png` | m. 4: RH cascading run onto the shared octave-3 staff rule (zero phantom ledgers) | 4× |
-| `janko_m8.png` | m. 8: 16th-cluster horizontal-spacing stress test | 4× |
-| `janko_variants.png` | A Angled Cuts vs B Traditional Beams vs C Unified Continuous Lattice on mm. 1–4 | 2× |
-| `janko_domain_exploration.png` | Round 5 domain sheet: the four chord-grouping paradigms on mm. 1–2, stacked | 3× |
-| `janko_domain_a.png` | Candidate A · traditional per-note stems (golden master) on mm. 1–2 | 4× |
-| `janko_domain_b.png` | Candidate B · independent left clasp with its duration spire | 4× |
-| `janko_domain_c.png` | Candidate C · beamed clasp rail joining the spire tips | 4× |
-| `janko_domain_d.png` | Candidate D · bounding phrase clasp, one bracket per measure | 4× |
-
-Every PNG is mirrored automatically to:
-
-1. current checkout root (`./`)
-2. main project checkout root (`/home/qqp/projects/iso-notation/`)
-3. `public/` (served by Vite on port 5175)
-4. `docs/img/`
-
-The matching `.svg` sources are written to `docs/img/` for designer
-inspection. `resvg` is preferred for rasterization with an `rsvg-convert`
-fallback.
-
----
-
-## 4. Verification
+## 3. Verification
 
 ```bash
-npm test                          # 261 tests, < 4 s
+npm test                          # 259 tests, < 4 s
 npm run lint:engraving            # visual lint of the golden master
-npm run janko:export              # refresh the mobile-app PNG artifacts (operator on main only:
-                                  # it mirrors into every checkout, never run it in a ticket worktree)
 npm run build                     # tsc + vite (index.html + janko.html entries)
 ```
 
 | Suite | Locks |
 | --- | --- |
-| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), the bounded center channel (option/token schema, two boundary rules per equator, Set A in the channel, direction-resolved Set B flanks, zero contour contradictions on the canonical score), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects, variant sheet) and the export suite budget |
+| `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), the bounded center channel (option/token schema, two boundary rules per equator, Set A in the channel, direction-resolved Set B flanks, zero contour contradictions on the canonical score), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects) |
 | `test/janko-linter.test.ts` | the report contract, the clean golden master, the clean bounded channel, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
-| `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the Round-4 registry (incumbent vs bounded channel), the contact sheet, the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
+| `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the Round-4 registry (incumbent vs bounded channel), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test
-(Bach Variation 1 m. 8 does not contain that literal figure); the exported
-`janko_m8.png` is the real m. 8 of the canonical benchmark.
+(Bach Variation 1 m. 8 does not contain that literal figure); the m. 8 crop
+is the real m. 8 of the canonical benchmark.

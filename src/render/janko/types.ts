@@ -821,45 +821,12 @@ export function resolveJankoOptions(
   return { ...DEFAULT_JANKO_OPTIONS, ...(options ?? {}) };
 }
 
-/** Normalized description of one comparison-sheet variant. */
-export interface JankoVariant {
-  id: string;
-  label: string;
-  options: ResolvedJankoLayoutOptions;
-}
-
-/** Loose variant input accepted by the comparison sheet renderer. */
-export interface JankoVariantDefinition {
-  id?: string;
-  name?: string;
-  label?: string;
-  title?: string;
-  rhythmStyle?: JankoRhythmStyle;
-  options?: Partial<JankoLayoutOptions>;
-}
-
-export type JankoVariantSpec =
-  | JankoVariantDefinition
-  | JankoRhythmStyle
-  | Partial<JankoLayoutOptions>;
-
 /** Human-readable names for the pluggable rhythm renderers. */
 export const JANKO_RHYTHM_STYLE_LABELS: Record<JankoRhythmStyle, string> = {
   'angled-cuts': 'Angled Cuts',
   'horizontal-ticks': 'Unified Continuous Lattice',
   beamed: 'Traditional Beams',
 };
-
-/** Canonical A–C contact-sheet variants (Angled Cuts / Beams / Lattice). */
-export const DEFAULT_JANKO_VARIANTS: JankoVariantSpec[] = [
-  { id: 'angled-cuts', label: 'Variant A: Angled Cuts', rhythmStyle: 'angled-cuts' },
-  { id: 'beamed', label: 'Variant B: Traditional Beams', rhythmStyle: 'beamed' },
-  {
-    id: 'horizontal-ticks',
-    label: 'Variant C: Unified Continuous Lattice',
-    rhythmStyle: 'horizontal-ticks',
-  },
-];
 
 /**
  * Absolute page geometry for one horizontal system, in page pt coordinates

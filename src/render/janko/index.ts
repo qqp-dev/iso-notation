@@ -5,7 +5,6 @@
  * import {
  *   renderJankoPage,
  *   renderJankoCrop,
- *   renderJankoVariantComparison,
  *   DEFAULT_JANKO_TOKENS,
  *   DEFAULT_JANKO_OPTIONS,
  * } from './src/render/janko';

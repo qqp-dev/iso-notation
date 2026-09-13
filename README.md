@@ -69,14 +69,11 @@ npm install
 # Run dev server accessible over local network & Tailscale
 npm run dev
 
-# Run test suite (210 tests, incl. visual linter + clasp + studio invariants, ~2s)
+# Run test suite (259 tests, incl. visual linter + clasp + studio invariants, ~2s)
 npm test
 
 # Mathematical engraving lint of the golden master (~25 ms)
 npm run lint:engraving
-
-# Jánko engraving harness: full page + macro crops + variant sheet (<1s)
-npm run janko:export
 
 # Production build (index.html + janko.html studio entries)
 npm run build
@@ -110,7 +107,7 @@ milliseconds.
 
 ### Active Design Specifications & Typographic Studies
 - [**Jánko Two-Row Engraving Ergonomics Harness**](docs/janko_engraving_harness.md)
-  *Modular engine (`src/render/janko/`), pure geometry core, token/option system, two-view live studio with Vite HMR, mathematical visual linter, sub-second export suite and macro crops.*
+  *Modular engine (`src/render/janko/`), pure geometry core, token/option system, two-view live studio with Vite HMR, mathematical visual linter and macro crops.*
 - [**Duodecimal Notehead Numeral Typographic Specimen & Engraving Study**](docs/duodecimal_font_typography.md)
   *Classical Urtext serif (Century Schoolbook), Calligraphic Roman (Palatino), Engineered Monospace (JetBrains Mono), and Geometric Modernism; Lining Caps A/B analysis and score context benchmark.*
 - [**Handedness Indicator Typographic & Calligraphic Tuning**](docs/chevron_tuning.md)

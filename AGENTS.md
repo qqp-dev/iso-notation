@@ -17,10 +17,9 @@
 ---
 
 ## 1. Network & Link Invariants
-- **NEVER output `localhost` links or references**. The user accesses the environment remotely via **Tailscale** and the **Orca mobile app**.
+- **NEVER output `localhost` links or references**. The user accesses the environment remotely via **Tailscale**.
 - **ALWAYS use the Tailscale address or GitHub Pages**:
   - Live Studio & Web UI: `http://100.102.70.49:5175/janko.html` (or `http://100.102.70.49:5175/`)
-  - Direct image URLs: `http://100.102.70.49:5175/<filename>.png`
   - GitHub Pages: `https://qqp-dev.github.io/iso-notation/`
 
 ---
@@ -28,7 +27,7 @@
 ## 2. Zero Images at Root & Clean Asset Organization Invariants
 - **Root Cleanliness Invariant**:
   - **NEVER place generated images, PNGs, SVGs, or temporary review files in the checkout root (`./`)**. The root directory must remain clean and uncluttered, containing only project source, configuration, and documentation files.
-  - All generated review images and static score previews belong strictly in `public/` and `docs/img/`.
+  - No generated review images exist, period: review is pixels on the live website only. `docs/img/` and `public/img/` hold committed reference documentation (the §3 benchmark assets), never render outputs.
 - **Primary Design Review Medium**:
   - Review happens exclusively in the **live web studio** (`http://100.102.70.49:5175/janko.html`), which renders SVG directly in the browser with full zoom controls (50%–300%) and instant Vite HMR.
 
@@ -95,11 +94,3 @@ Headless implementers must not render images to see a defect. Run the mathematic
     - `npm run build`
   - **NEVER** run ad-hoc or unconfigured compiler flags (e.g. `tsc --noEmit --noUnusedLocals --noUnusedParameters`) that are not enabled in `tsconfig.json` or `package.json`.
   - **NEVER** embark on rabbit holes attempting to fix pre-existing unused parameters, dead code, or refactor functions outside the ticket's explicit scope. Keep diffs strictly minimal and bounded to the ticket requirements.
-
----
-
-## 6. Rapid Iteration Extras (PNG artifacts for the mobile app only)
-
-- **Multi-Variant Contact Sheets**: still available through `renderJankoVariantComparison` when a *file* artifact is genuinely needed.
-- **Fast Export Command**: `npm run janko:export` rasterizes the review set via `resvg` in ~380 ms and mirrors every PNG to the checkout root, `public/`, `docs/img/` and the main checkout — use it only to refresh the mobile-app artifacts, not as the review loop.
-- `npm run janko:watch` keeps those artifacts synchronized in the background.
