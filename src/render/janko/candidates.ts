@@ -77,6 +77,13 @@ export interface JankoCandidate {
   label: string;
   /** One-line designer rationale. */
   description?: string;
+  /**
+   * The **open axis** this candidate exists to decide (Round 15's two-axis
+   * round). Only this axis is ever badged, even when the round has more than
+   * one open axis: per-candidate purity means a column candidate never shows a
+   * rest-dialect badge and vice versa.
+   */
+  axis?: string;
   /** Macro-layout delta against the golden master. */
   options?: Partial<JankoLayoutOptions>;
   /** Micro-typography delta against the golden master. */
@@ -107,6 +114,13 @@ export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
 export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
 
 /**
+ * Score id of the curated rest-duration specimen (Round 15): four measures,
+ * one genuine silence per value (16th / 8th / quarter / half), each on a column
+ * guaranteed free of the other hand's heads.
+ */
+export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
+
+/**
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
@@ -127,75 +141,189 @@ export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
  * music, on the dense 16ths of mm. 27–28.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 14,
-  title: 'Grid Writing Policy: On the Lines, Between the Lines, Barline-Only',
+  round: 15,
+  title: 'Crowded Columns + Rest Dialects: Two Independent Axes',
   description:
-    'The three ways the continuous vertical grid can meet the music, compared all else equal on the dense 16th-note run of mm. 27–28 in one full-width system: start the columns ON the barline and the beat pulses and let the glyph masks knock the grid out (unified transparent), keep every column BETWEEN the lines and paint the grid through dedicated white air channels that no stem may overwrite (strict protected), or clear the barlines but write the pulses over the beat columns (overlaid). The flared 0.65pt System 1 bracket, the per-hand clasp and the pocket-seated m. 4 rest are settled engineering, identical in every candidate.',
-  openAxes: ['gridWritingPolicy'],
+    'The operator directed both open questions at once. Axis 1 — the crowded column: how a colliding same-row pair is placed when the parity offset has to fan it out (the beat-x spine with flanking heads, the minimal asymmetric micro-offset behind hard beat-cell barriers, or the rejected Round 14 symmetric spread kept as control). Axis 2 — the rest dialect: the four Round 13 finalists compared on strictly clean material where no column can lie. The two axes are independent by construction: every dialect window renders byte-identical SVG under all three column systems, because it contains no same-column collision at all. The settled grid policy C, the flared bracket, the per-hand clasp, the off-row augmentation dot and the four-systems-per-page layout ride along as invisible fixed context.',
+  openAxes: ['crowdedColumn', 'restStyle'],
 };
 
 /**
- * The one display window every Round 14 candidate is engraved on: Bach
- * Goldberg Var. 1 mm. 27–28, the dense sixteenth-note run, in **one** system at
- * its true measure width. The grid-writing question is only legible where the
- * grid and the music actually meet on every 16th, so the locked decisions
- * (bracket, clasp, rest placement) deliberately get no showcase slot here.
+ * The Round 15 column-axis window set: the five crime scenes the operator named
+ * (bars 8, 12, 13, 14, 15 — row collisions, a beat-boundary push, fused stems
+ * and a time inversion) plus the §4 regression windows that prove the column
+ * rework does not disturb the Round 14 m. 4 rest pocket or the specimen's
+ * tick-180 8th rest. These are **not** clean windows: they exist to show the
+ * column systems disagreeing.
  */
-const ROUND_14_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_15_COLUMN_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 27,
-    measureCount: 2,
-    title:
-      'Bach Goldberg Var. 1 · mm. 27–28 — the dense sixteenths in one full-width system: who owns the overlap where the continuous barline + beat-pulse grid meets the note columns',
+    measureStart: 8,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 8 — a same-row pair in a 16th-note run: does the column still mean time?',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 12,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 12 — the pair on the beat-2 pulse: no head may cross into beat 1',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 13,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 13 — opposing hands sharing one column: two voices or one fused rule?',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 14,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 14 — the densest cross-hand column sharing of the variation',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 15,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 15 — consecutive onsets: does the page still read in time order?',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 4,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 4 — fixed context: the pocket-seated RH 16th rest and its beam break survive the column rework',
+  },
+  {
+    scoreId: SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 2,
+    measureCount: 1,
+    title: 'Chord specimen · m. 2 — fixed context: the genuine tick-180 8th rest in the default dialect',
   },
 ];
 
 /**
- * The active candidate set — the three grid writing policies, all else equal.
- * Order is the display order in the Decision Candidates Matrix.
- *
- * Each candidate states the round's **open axis** (`gridWritingPolicy`) and
- * nothing else: the flared 0.65pt bracket and the per-hand clasp are declared
- * as the shared fixed context they now are (both equal the golden master, so
- * neither ever shows as a delta badge).
+ * The Round 15 dialect-axis window set: strictly clean material only. The
+ * curated rest-duration specimen gives one genuine silence per value at macro
+ * scale; Brahms m. 68 is the one real-world bar of the five the operator named
+ * that carries a writable rest *and* no crowded column (mm. 7 and 17 carry
+ * rests but crowd columns elsewhere, mm. 39 and 66 hold no standard-value
+ * silence — a painted rest never lies); the chord specimen's m. 2 adds the
+ * genuine 8th rest in a chord context.
+ */
+const ROUND_15_DIALECT_WINDOWS: JankoCandidateWindow[] = [
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 1,
+    measureCount: 1,
+    title: 'Rest specimen · m. 1 — the genuine 16th silence in a stepwise contour, free column',
+  },
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 2,
+    measureCount: 1,
+    title: 'Rest specimen · m. 2 — the genuine 8th silence',
+  },
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 3,
+    measureCount: 1,
+    title: 'Rest specimen · m. 3 — the genuine quarter silence',
+  },
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 4,
+    measureCount: 1,
+    title: 'Rest specimen · m. 4 — the genuine half silence',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 68,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 68 — the one real-world bar with a writable rest and no crowded column',
+  },
+  {
+    scoreId: SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 2,
+    measureCount: 1,
+    title: 'Chord specimen · m. 2 — the genuine tick-180 8th rest among the clasped chords',
+  },
+];
+
+/**
+ * The active candidate set — Round 15's **two independent axes**, in display
+ * order: first the three crowded-column systems (A/B/C), then the four rest
+ * dialects (A–D). Each candidate states only its own axis.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'unified-transparent-grid',
-    label: 'A · Unified Transparent Grid — columns ON the lines',
+    id: 'stem-anchored-columns',
+    label: 'A · Stem-Anchored Columns — the beat-x spine, flanking heads',
+    axis: 'crowdedColumn',
     description:
-      'The vertical grid becomes a pure background coordinate: the note field withdraws the measure inset, so a downbeat column starts exactly ON the barline and every beat pulse runs straight through the beat columns. The glyph masks then own the overlap — a circular knockout erases the barline exactly as it erases a beat pulse, and no stem or beam is ever asked to step aside. The music reads as one uninterrupted line of sixteenths; the grid survives only in the air between the notes.',
-    options: {
-      gridWritingPolicy: 'unified-transparent-grid',
-      chordGrouping: 'per-hand-clasp',
-    },
-    windows: ROUND_14_WINDOWS,
-    tags: ['columns ON barline + pulses', 'glyph masks own the overlap', 'full measure width'],
+      'The traditional answer. The colliding pair keeps a real rhythmic anchor: the RH head stays exactly on the nominal beat column whenever the row is mixed-hand, the displaced head takes the roomier side at the minimal 2r + 0.4pt flank — never the symmetric 11pt fan — and the crowded column itself never translates, so the neighbour columns yield the air instead. Opposing hands stagger their stems by ±1.2pt, so two voices can never fuse into one head-to-head rule, and every head stays inside its own beat cell: no head crosses a beat pulse or a barline.',
+    options: { crowdedColumn: 'stem-anchored' },
+    windows: ROUND_15_COLUMN_WINDOWS,
+    tags: ['rhythmic anchor on beat-x', 'minimal 10.0pt asymmetric flank', 'neighbours yield', 'no grid crossing'],
   },
   {
-    id: 'strict-protected-grid',
-    label: 'B · Strict Protected Grid — columns BETWEEN the lines',
+    id: 'asymmetric-micro-columns',
+    label: 'B · Minimal Asymmetric Micro-Offset — barrier-clamped',
+    axis: 'crowdedColumn',
     description:
-      'The grid is never overwritten. Every barline and every beat pulse is painted above the rhythm layer through its own dedicated white air channel, so a stem or beam that would cross a grid line is cut by the channel instead — the line stays unbroken from the Octave 5 rule to the Octave 2 rule. The columns keep the canonical measure inset and stay clear of the barlines. Nothing in the engraving may touch the grid; the cost is the air the channels take out of the stems.',
-    options: {
-      gridWritingPolicy: 'strict-protected-grid',
-      chordGrouping: 'per-hand-clasp',
-    },
-    windows: ROUND_14_WINDOWS,
-    tags: ['white air channels', 'grid never overwritten', 'protected measure inset'],
+      'The smallest honest change that ends the lying. The colliding pair fans out asymmetrically — never symmetric by default — and the whole cluster slides up to a 1pt micro-bias toward the side with room before any neighbour is asked to move. The hard barrier clamps every head to its own beat cell (no crossing a beat pulse or a barline), the side is chosen by the air actually left to the neighbouring columns, and opposing stems that would fuse stagger by the fixed ±1.2pt.',
+    options: { crowdedColumn: 'asymmetric-micro' },
+    windows: ROUND_15_COLUMN_WINDOWS,
+    tags: ['asymmetric by default', '1pt micro-bias', 'hard beat-cell + midpoint barriers', 'staggered opposing stems'],
   },
   {
-    id: 'overlaid-beat-grid',
-    label: 'C · Overlaid Beat Grid — clear of the barline, over the pulses',
+    id: 'symmetric-spread-control',
+    label: 'C · Symmetric Spread — the Round 14 control',
+    axis: 'crowdedColumn',
     description:
-      'The incumbent balance: the barlines are protected — every column keeps a real inset and no glyph may approach them — while the dashed beat pulses are painted first, beneath the rhythm layer, and are simply written over by the notes. The barline reads as a hard structural boundary and the beat pulses as a soft background pulse that the music owns wherever the two meet. This is the policy the golden master has carried since Round 12.',
-    options: {
-      gridWritingPolicy: 'overlaid-beat-grid',
-      chordGrouping: 'per-hand-clasp',
-    },
-    windows: ROUND_14_WINDOWS,
-    tags: ['protected barlines', 'pulses overlaid beneath the notes', 'incumbent policy'],
+      'The rejected Round 14 baseline, kept so the improvement is judged and not assumed: the colliding pair straddles its column at ∓5.5pt (the full 11pt chordal offset) and the whole column translates until it fits, with the Round 11 centerline stems. Its lint chip is expected to name the very defects this round removes — a head pushed across the beat pulse, a later onset left of an earlier one, and two opposing stems fused into one continuous rule.',
+    options: { crowdedColumn: 'symmetric-spread' },
+    windows: ROUND_15_COLUMN_WINDOWS,
+    tags: ['control — expected violations', '∓5.5pt symmetric spread', 'centerline stems', 'Round 14 baseline'],
+  },
+  {
+    id: 'rest-kinetic-monoline',
+    label: 'A · Kinetic Monoline Rests — stem + 12.4° tabs',
+    axis: 'restStyle',
+    description:
+      'The incumbent dialect: a vertical rest stem with the score own beam-harmonized 12.4° kinetic tabs (two for a 16th, one for an 8th), a central horizontal notch for the quarter and a hollow 7 × 2.2pt bar for the half. Monoline, architectural, and already the golden master choice.',
+    options: { restStyle: 'kinetic-monoline' },
+    windows: ROUND_15_DIALECT_WINDOWS,
+    tags: ['incumbent dialect', '12.4° kinetic tabs', 'hollow half bar'],
+  },
+  {
+    id: 'rest-classical-urtext',
+    label: 'B · Classical Urtext Rest Glyphs — calligraphic hooks',
+    axis: 'restStyle',
+    description:
+      'The engraved-urtext alternative: calligraphic hooks with solid teardrop bulbs for the 16th and 8th, the serpentine lightning stroke for the quarter and a solid 6 × 2.5pt block for the half. Organic, hand-cut, and the most traditional reading of a silence.',
+    options: { restStyle: 'classical-urtext' },
+    windows: ROUND_15_DIALECT_WINDOWS,
+    tags: ['calligraphic hooks', 'serpentine quarter', 'solid half block'],
+  },
+  {
+    id: 'rest-geometric-node',
+    label: 'C · Geometric Pause Nodes — diamonds and rays',
+    axis: 'restStyle',
+    description:
+      'A pure-geometry answer: a hollow diamond with two lateral rays for the 16th, one ray for the 8th, a solid 5 × 5pt diamond for the quarter and an open capsule for the half. Zero calligraphy — the silence reads as a plotted node on the lattice.',
+    options: { restStyle: 'geometric-node' },
+    windows: ROUND_15_DIALECT_WINDOWS,
+    tags: ['hollow diamond + rays', 'solid quarter node', 'open capsule half'],
+  },
+  {
+    id: 'rest-phantom-notehead',
+    label: 'D · Phantom Notehead Rests — the unwritten head',
+    axis: 'restStyle',
+    description:
+      'The Round 13 finalist that states a silence as the note that is not there: a dashed open notehead (R 3.0pt) with its bare stem, plus two downward-hooked flags for the 16th and one for the 8th, and a dashed head with a hollow bar for the half. The most semantically literal and the most unconventional of the four.',
+    options: { restStyle: 'phantom-notehead' },
+    windows: ROUND_15_DIALECT_WINDOWS,
+    tags: ['dashed open head', 'hooked phantom flags', 'semantic silence'],
   },
 ];
 
@@ -270,16 +398,22 @@ export function candidateBadges(
   const goldenTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const openAxes = new Set(round.openAxes ?? []);
 
+  // Round 15 carries two open axes at once. A candidate badges the axis it
+  // declares (`candidate.axis`) — never the other one — so per-candidate purity
+  // stays visible: a column candidate shows only its column delta, a dialect
+  // candidate only its dialect delta.
+  const isOwnAxis = (key: string): boolean =>
+    openAxes.has(key) && (candidate.axis === undefined || candidate.axis === key);
   for (const [key, value] of Object.entries(candidate.options ?? {})) {
     const gold = (golden as unknown as Record<string, unknown>)[key];
-    const axis = openAxes.has(key);
+    const axis = isOwnAxis(key);
     if (gold !== value || axis) {
       badges.push({ key, value: String(value), golden: String(gold), ...(axis ? { axis } : {}) });
     }
   }
   for (const [key, value] of Object.entries(candidate.tokens ?? {})) {
     const gold = (goldenTokens as unknown as Record<string, unknown>)[key];
-    const axis = openAxes.has(key);
+    const axis = isOwnAxis(key);
     if (gold !== value || axis) {
       badges.push({ key, value: String(value), golden: String(gold), ...(axis ? { axis } : {}) });
     }

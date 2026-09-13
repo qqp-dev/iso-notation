@@ -66,6 +66,7 @@ import {
   REST_POCKET_AIR,
 } from '../src/render/janko/engine';
 import {
+  JANKO_STEM_STAGGER,
   JankoRhythmNote,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
@@ -97,6 +98,14 @@ const MAIN_CHECKOUT = '/home/qqp/projects/iso-notation';
 
 const TOKENS = DEFAULT_JANKO_TOKENS;
 const OPTIONS = DEFAULT_JANKO_OPTIONS;
+/**
+ * Round 15 policy deltas. The golden master is `'stem-anchored'` (the RH head
+ * keeps the beat column, the displaced head takes the roomier side); the
+ * Round 14 symmetric spread survives as the `'symmetric-spread'` control the
+ * parity-offset arithmetic below is still stated against.
+ */
+const SYMMETRIC_OPTIONS = { ...OPTIONS, crowdedColumn: 'symmetric-spread' as const };
+const ASYMMETRIC_OPTIONS = { ...OPTIONS, crowdedColumn: 'asymmetric-micro' as const };
 const HANDS: Hand[] = ['RH', 'LH'];
 
 const EXPORT_NAMES = [
@@ -464,11 +473,15 @@ test('getTickX: measure insets, measure offsets and strict monotonicity', () => 
 // 2. Modular engine invariants
 // ---------------------------------------------------------------------------
 
-test('computePageGeometry: A4 portrait, accolade-anchored staff column, 3 systems', () => {
+test('computePageGeometry: A4 portrait, accolade-anchored staff column, 4 systems (Round 15)', () => {
   const geo = computePageGeometry(OPTIONS, TOKENS);
-  assert.equal(geo.systemsPerPage, 3);
+  assert.equal(geo.systemsPerPage, 4);
   assert.equal(geo.measuresPerSystem, 4);
-  assert.equal(geo.systems.length, 3);
+  assert.equal(geo.systems.length, 4);
+  assert.ok(
+    Math.abs(geo.slotHeight - geo.bodyHeight / 4) < 1e-9,
+    'four equal slots share the body height'
+  );
   close(geo.staffLeft, geo.margin + TOKENS.accoladeWidth + TOKENS.accoladeGap, 'staff left');
   close(geo.measureWidth, geo.staffWidth / 4, 'measure width');
   close(geo.pageWidth, 595.28, 'A4 width');
@@ -480,15 +493,15 @@ test('computePageGeometry: A4 portrait, accolade-anchored staff column, 3 system
   }
 });
 
-test('renderJankoPage: well-formed 3-system page with all rhythm styles available', () => {
+test('renderJankoPage: well-formed 4-system page with all rhythm styles available', () => {
   const score = buildBachGoldbergVar1Score();
-  assert.equal(countJankoPages(score, OPTIONS, TOKENS), 3);
+  assert.equal(countJankoPages(score, OPTIONS, TOKENS), 2);
   const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
   assert.ok(page.startsWith('<svg'), 'page starts with an svg root');
   assert.ok(page.trimEnd().endsWith('</svg>'), 'page closes the svg root');
-  for (const s of [1, 2, 3]) assert.match(page, new RegExp(`id="system-${s}"`));
+  for (const s of [1, 2, 3, 4]) assert.match(page, new RegExp(`id="system-${s}"`));
   assert.match(page, /Goldberg-Variationen/, 'Urtext header present');
-  assert.match(page, /Page 1 of 3/);
+  assert.match(page, /Page 1 of 2/);
   assert.ok(!page.includes('class="janko-time-signature"'), 'time signature removed by default');
   assert.ok(!page.includes('class="janko-octave-labels"'), 'octave indicators removed by default');
   assert.ok(!page.includes('class="janko-hand-labels"'), 'hand labels removed by default');
@@ -531,7 +544,7 @@ test('Clean Urtext subtitle: the page header carries no system branding', () => 
   // unbolded and the only ink left is `Page N of M`.
   const footer = page.match(/<g id="page-footer">[\s\S]*?<\/g>/)?.[0] ?? '';
   assert.ok(!footer.includes('Pure 12-TET'), 'the footer slogan is retired');
-  assert.match(footer, /class="janko-page-num"[^>]*>Page 1 of 3<\/text>/);
+  assert.match(footer, /class="janko-page-num"[^>]*>Page 1 of 2<\/text>/);
   assert.ok(!footer.includes('font-weight="bold"'), 'the page number is not bolded');
   const css = page.match(/<style>[\s\S]*?<\/style>/)?.[0] ?? '';
   assert.match(
@@ -547,7 +560,7 @@ test('Round 10 multi-page headers: full title block on page 1, running header af
   const firstHeader = first.match(/<g id="page-header">[\s\S]*?<\/g>/)?.[0] ?? '';
   assert.match(firstHeader, /class="janko-title"/, 'page 1 carries the full title');
 
-  for (const pageIndex of [1, 2]) {
+  for (const pageIndex of [1]) {
     const page = renderJankoPage(score, pageIndex, OPTIONS, TOKENS);
     const header = page.match(/<g id="page-header">[\s\S]*?<\/g>/)?.[0] ?? '';
     assert.ok(header.length > 0, `page ${pageIndex + 1} carries a header group`);
@@ -563,7 +576,7 @@ test('Round 10 multi-page headers: full title block on page 1, running header af
       ),
       `page ${pageIndex + 1} carries the discreet running header at margin + 10`
     );
-    assert.match(page, new RegExp(`Page ${pageIndex + 1} of 3`));
+    assert.match(page, new RegExp(`Page ${pageIndex + 1} of 2`));
   }
   const css = first.match(/<style>[\s\S]*?<\/style>/)?.[0] ?? '';
   assert.match(
@@ -639,8 +652,8 @@ function majorTriad(): QuantizedGridScore {
   );
 }
 
-test('Row-snapped parity offset: same-row chord tones spread symmetrically around the beat', () => {
-  const layout = layoutJankoScore(majorTriad(), OPTIONS, TOKENS)[0];
+test('Row-snapped parity offset (control): same-row chord tones spread symmetrically around the beat', () => {
+  const layout = layoutJankoScore(majorTriad(), SYMMETRIC_OPTIONS, TOKENS)[0];
   const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
   const c = byId.get('triad-c')!;
   const e = byId.get('triad-e')!;
@@ -677,7 +690,7 @@ test('Row-snapped parity offset: every note keeps its true row y and its beat co
     ],
     144
   );
-  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const layout = layoutJankoScore(score, SYMMETRIC_OPTIONS, TOKENS)[0];
   const tickX = (tick: number): number =>
     layout.geometry.staffLeft +
     getTickX(tick, 0, tick, layout.geometry.measureWidth, TOKENS, {
@@ -722,7 +735,7 @@ test('Row-snapped parity offset: a crowd at the barline slides the whole column,
       ],
       144
     ),
-    OPTIONS,
+    SYMMETRIC_OPTIONS,
     TOKENS
   )[0];
   const c = layout.notes.find((p) => p.note.id === 'open-c')!;
@@ -747,7 +760,7 @@ test('Row-snapped parity offset: a three-note row cluster spreads as −Δ, 0, +
     ],
     144
   );
-  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const layout = layoutJankoScore(score, SYMMETRIC_OPTIONS, TOKENS)[0];
   const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
   const delta = getChordalOffset(TOKENS);
   assert.equal(xs.length, 3);
@@ -769,7 +782,7 @@ test('Row-snapped parity offset: a spread downbeat chord never crosses its barli
       ],
       144
     ),
-    OPTIONS,
+    SYMMETRIC_OPTIONS,
     TOKENS
   )[0];
   const left = layout.geometry.staffLeft;
@@ -854,9 +867,10 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
 
   // 3. Beat grid pulse lines are emitted for beats 2 and 3 in every measure.
   // Round 12 makes each pulse ONE continuous rule across the Middle C corridor
-  // (no more RH + LH halves): 3 systems * 4 measures/system * 2 beats = 24.
+  // (no more RH + LH halves); Round 15 packs 4 systems on the page:
+  // 4 systems * 4 measures/system * 2 beats = 32.
   const beatMatches = [...page.matchAll(/class="janko-beat-line"/g)];
-  assert.equal(beatMatches.length, 3 * 4 * 2);
+  assert.equal(beatMatches.length, 4 * 4 * 2);
   assert.match(page, /stroke="#9CA3AF" stroke-width="0\.70" stroke-dasharray="2,3"/);
 
   // 4. Macro crop mm. 1–2 carries beat lines on beats 2 and 3 (system 0 DOM has 4 mm * 2 lines = 8)
@@ -1250,7 +1264,12 @@ test('Round 13 multi-system crops span the staff column instead of collapsing to
     1e-9
   );
   assert.ok(multi.w > 500, `the crop is a full page width, not a 1pt strip (${multi.w.toFixed(1)}pt)`);
-  assert.ok(multi.h > 350, 'and tall enough to hold both systems');
+  // Round 15 packs four systems per page: the two-system crop spans one full
+  // 180pt slot plus the second system's 122pt staff block.
+  assert.ok(
+    multi.h > geo.slotHeight + 110,
+    `and tall enough to hold both systems (${multi.h.toFixed(1)}pt)`
+  );
   const wide = renderJankoCrop(score, 27, 3, OPTIONS, TOKENS);
   assert.match(wide, new RegExp(`viewBox="${multi.x.toFixed(2)} `), 'the viewBox carries the fixed box');
   assert.ok(
@@ -1728,16 +1747,27 @@ test('Stem centring: every note of every rhythm dialect centres its stem on the 
     let beamStems = 0;
     for (const layout of layouts) {
       for (const p of layout.notes) {
+        // Round 15: a stem sits on its head's centreline or on the documented
+        // ±JANKO_STEM_STAGGER anti-fusion offset — never anywhere else.
+        const declared = p.rhythm.stemDx ?? 0;
+        assert.ok(
+          Math.abs(declared) <= JANKO_STEM_STAGGER + 1e-9,
+          `${p.note.id} staggers only by the documented delta (${declared})`
+        );
         close(
           getStemGeometry(p.rhythm, TOKENS).stemX,
-          p.x,
+          p.x + declared,
           `stem column of ${p.note.id} (${rhythmStyle})`
         );
         notes++;
       }
       for (const beam of layout.beams) {
         for (let i = 0; i < beam.stems.length; i++) {
-          close(beam.stems[i].stemX, beam.notes[i].x, `beam stem column (${rhythmStyle})`);
+          close(
+            beam.stems[i].stemX,
+            beam.notes[i].x + (beam.notes[i].stemDx ?? 0),
+            `beam stem column (${rhythmStyle})`
+          );
           beamStems++;
         }
       }
@@ -1750,7 +1780,9 @@ test('Stem centring: every note of every rhythm dialect centres its stem on the 
   // a notehead centre — no perimeter offset survives into the document.
   const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
   const columns = new Set(
-    layoutJankoScore(score, OPTIONS, TOKENS)[0].notes.map((p) => p.x.toFixed(2))
+    layoutJankoScore(score, OPTIONS, TOKENS)[0].notes.map((p) =>
+      (p.x + (p.rhythm.stemDx ?? 0)).toFixed(2)
+    )
   );
   const stemLines = [
     ...crop.matchAll(/class="janko-stem" x1="([\d.]+)" y1="[\d.]+" x2="([\d.]+)"/g),
@@ -1821,11 +1853,19 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
   for (const n of opening) {
     const noteFlags = flags.filter((m) => Math.abs(Number(m[1]) - n.x) < 0.02);
     assert.equal(noteFlags.length, 1, `${n.id} carries exactly one flag`);
+    // Round 15: the dot is always right of its own head and lives in the
+    // inter-row lane (`n.dotY`), never on the notehead row.
+    const dotY = n.dotY ?? n.y;
+    assert.ok(
+      Math.abs(Math.abs(dotY - n.y) - TOKENS.augmentationDotRowOffset) < 1e-9,
+      `${n.id} dots ${TOKENS.augmentationDotRowOffset}pt off its own row`
+    );
+    assert.ok(dotY !== n.y, `${n.id} never carries an on-row dot`);
     assert.ok(
       crop.includes(
-        `class="janko-augmentation-dot" cx="${(n.x + TOKENS.noteheadRadius + 3.2).toFixed(2)}" cy="${n.y.toFixed(2)}" r="${TOKENS.augmentationDotRadius.toFixed(2)}"`
+        `class="janko-augmentation-dot" cx="${(n.x + TOKENS.noteheadRadius + TOKENS.augmentationDotGap).toFixed(2)}" cy="${dotY.toFixed(2)}" r="${TOKENS.augmentationDotRadius.toFixed(2)}"`
       ),
-      `${n.id} carries its augmentation dot`
+      `${n.id} carries its augmentation dot right of its head, in the inter-row lane`
     );
   }
 });

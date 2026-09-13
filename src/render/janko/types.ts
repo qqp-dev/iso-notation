@@ -90,6 +90,43 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
+ * How a **crowded column** disambiguates two noteheads that share one whole-tone
+ * row of one onset — the Round 15 question: what happens to the beat column
+ * when the row-snapped parity offset has to spread a colliding pair.
+ *
+ * | policy                | head placement                                        | column                       | stem fusion                          |
+ * | --------------------- | ----------------------------------------------------- | ---------------------------- | ------------------------------------ |
+ * | `'stem-anchored'`     | asymmetric flank, RH head preferred on the column, the displaced head takes the roomier side, total disclosure `2r + 0.4` (never the symmetric `chordalOffset`) | the crowded column never translates (a neighbour yields instead) | opposing hands stagger `±δ` |
+ * | `'asymmetric-micro'`  | asymmetric flank with a micro-bias toward the roomier side (never symmetric by default) | the column may slide a micro-offset inside its own beat cell | opposing hands stagger `±δ` |
+ * | `'symmetric-spread'`  | the incumbent symmetric `±chordalOffset/2` spread      | the column translates until the pair clears | centerline stems (Round 11 doctrine) |
+ *
+ * Round 15 hard barriers, enforced under the first two policies: no head may
+ * leave the **beat cell** of its nominal column (the span between the two
+ * neighbouring painted grid lines), and no two opposing stems may fuse into one
+ * continuous head-to-head rule. `'symmetric-spread'` is the rejected Round 14
+ * baseline, kept as the control that the new linter checks
+ * (`grid-crossing-offset`, `stem-fusion`) exist to name.
+ */
+export type JankoCrowdedColumnPolicy =
+  | 'stem-anchored'
+  | 'asymmetric-micro'
+  | 'symmetric-spread';
+
+/** Every crowded-column policy, in the canonical exploration order (A–C). */
+export const JANKO_CROWDED_COLUMN_POLICIES: readonly JankoCrowdedColumnPolicy[] = [
+  'stem-anchored',
+  'asymmetric-micro',
+  'symmetric-spread',
+];
+
+/** Human-readable names of the three crowded-column policies. */
+export const JANKO_CROWDED_COLUMN_POLICY_LABELS: Record<JankoCrowdedColumnPolicy, string> = {
+  'stem-anchored': 'Stem-Anchored Columns (beat-x spine, flanking heads)',
+  'asymmetric-micro': 'Minimal Asymmetric Micro-Offset (barrier-clamped)',
+  'symmetric-spread': 'Symmetric Row Spread (Round 14 control)',
+};
+
+/**
  * Pluggable **rest symbol dialects** — the Round 12 question: how a hand's
  * silent span inside an active measure is written (see
  * `elements/rests.renderRest`).
@@ -466,6 +503,24 @@ export interface JankoTokens {
   accoladeGap?: number;
   /** Radius of a dotted-rhythm augmentation dot. */
   augmentationDotRadius?: number;
+  /**
+   * Horizontal air (pt) between a notehead disc and its augmentation dot:
+   * `dotX = note.x + noteheadRadius + augmentationDotGap`, for **both** hands.
+   * Round 15 retires the hand-mirrored dot (which rendered LH dots left of the
+   * head, where they attached to the wrong note) — a dot is always right of the
+   * head it belongs to, as in standard notation.
+   */
+  augmentationDotGap?: number;
+  /**
+   * Vertical displacement (pt) of an augmentation dot off its own notehead row,
+   * into the inter-row space on the side **away from the nearer staff rule**
+   * (Round 15). A 16th-note grid seats neighbouring columns only 10.2pt apart
+   * with 9.6pt discs, so an on-row dot can never clear the next column's disc;
+   * the inter-row lane is the only honest home for it. The canonical value is
+   * half a whole-tone row (`rowHeight / 2`), the exact midpoint between the
+   * dotted row and its neighbouring row.
+   */
+  augmentationDotRowOffset?: number;
   /** Horizontal reach of a standard note flag, right of the stem. */
   flagWidth?: number;
   /** Vertical drop of a flag hook from its stem tip. */
@@ -567,6 +622,8 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   maxBeamSlope: 0.22,
   accoladeGap: 7.0,
   augmentationDotRadius: 0.75,
+  augmentationDotGap: 3.2,
+  augmentationDotRowOffset: 7.5,
   flagWidth: 4.0,
   flagHeight: 6.6,
   flagSpacing: 3.4,
@@ -627,6 +684,13 @@ export interface JankoLayoutOptions {
    * Defaults to `'kinetic-monoline'` (see {@link JankoRestStyle}).
    */
   restStyle?: JankoRestStyle;
+  /**
+   * Crowded-column policy (Round 15): how a colliding same-row pair of one
+   * onset is placed around its beat column, and whether the column itself may
+   * translate. Defaults to the settled `'stem-anchored'` (see
+   * {@link JankoCrowdedColumnPolicy}).
+   */
+  crowdedColumn?: JankoCrowdedColumnPolicy;
   /**
    * Vertical grid writing policy (Round 12): how the continuous barlines and
    * dashed beat pulses coexist with the music. Defaults to
@@ -695,7 +759,7 @@ export interface JankoLayoutOptions {
 /** Fully resolved layout options (every optional option filled in). */
 export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
 
-/** Default macro-layout: 3 systems of 4 measures on A4 portrait. */
+/** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   measuresPerSystem: 4,
   rhythmStyle: 'beamed',
@@ -706,10 +770,11 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',
+  crowdedColumn: 'stem-anchored',
   gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'architectural-bracket',
   finalBarlineStyle: 'unified',
-  systemsPerPage: 3,
+  systemsPerPage: 4,
   ticksPerMeasure: 144,
   anacrusisTicks: 0,
   ticksPerBeat: 48,
