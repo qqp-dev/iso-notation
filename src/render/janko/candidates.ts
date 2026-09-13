@@ -87,35 +87,36 @@ export interface JankoCandidate {
 /** Score id of the studio's primary benchmark (Bach Goldberg Var. 1). */
 export const DEFAULT_STUDIO_SCORE_ID = 'primary';
 
-/** Score id of the Brahms Intermezzo benchmark, used by the Round 5 windows. */
+/** Score id of the Brahms Intermezzo benchmark, used by the Round 5/6 windows. */
 export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
 
 /**
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
- * the Klavarskribo beat grid, round 3 the Middle C corridor and round 4 the
- * octave framing. Round 5 interrogates the one piece of ink the operator still
- * finds noisy: the **long vertical stems that run through multi-note chords and
- * cluster sonorities**. Four paradigms now test the external left clasp — the
- * bracket that groups a vertical cluster and carries its duration — against the
- * incumbent per-note stems.
+ * the Klavarskribo beat grid, round 3 the Middle C corridor, round 4 the octave
+ * framing and round 5 the external left clasp. Round 6 refines the two pieces of
+ * ink the operator still finds clumsy: the **isolated single-note flag** (five
+ * competing subdivision dialects — two classical traditions and three modern
+ * concepts) and the **clasp grouping unit**, now strictly one hand and strictly
+ * for horizontally displaced (row-snapped) clusters.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 5,
-  title: 'Chord & Cluster Duration — Left Clasp with Barline Clearance',
+  round: 6,
+  title: 'Single-Note Subdivisions & Refined Hand-Cluster Clasps',
   description:
-    'Testing external left-side clasps as simultaneous grouping brackets and duration carriers. Downbeat clasps maintain ' +
-    'clear air from the preceding barline, eliminating through-stems without visual collision.',
+    'Balancing 2 classical traditions (Sculpted Urtext Flag, Copperplate Pennant) with 3 creative modern concepts ' +
+    '(Architectural Tab, Beveled Slash, Aerodynamic Winglet) on isolated notes, alongside refined per-hand clasps ' +
+    'strictly for non-vertical clusters.',
 };
 
 /**
- * The two display windows every Round 5 candidate is engraved on: the Bach
- * opening (the tick-0 chord plus continuous 16th-note counterpoint, where the
- * clasp must prove it never breaks a real beam) and the dense Brahms chords of
- * mm. 7–8, where the through-stems it replaces are at their worst.
+ * The two display windows every Round 6 candidate is engraved on: the Bach
+ * opening (melodic flow and the isolated subdivision notes that carry the round)
+ * and the dense Brahms chords of mm. 7–8, where the non-vertical (`2-5-9`)
+ * clusters the refined per-hand clasp targets are at their densest.
  */
-const ROUND_5_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_6_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
@@ -131,45 +132,54 @@ const ROUND_5_WINDOWS: JankoCandidateWindow[] = [
 ];
 
 /**
- * The active candidate set — 2–4 exploratory variants for the current round.
- * Order is the display order in the Decision Candidates Matrix.
+ * The active candidate set — the five Round 6 subdivision dialects. Order is
+ * the display order in the Decision Candidates Matrix.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'traditional-stems',
-    label: 'A · Traditional Stems (Golden Master)',
+    id: 'classical-urtext',
+    label: 'A · Sculpted Classical Urtext Flag',
     description:
-      'The accumulated golden master: every note owns its own stem, RH up and LH down, and a five-note Brahms chord therefore paints one long vertical line chopped into segments by each knockout it passes. The control the clasp paradigms must beat.',
-    options: { chordGrouping: 'none' },
-    windows: ROUND_5_WINDOWS,
-    tags: ['incumbent', 'per-note stems'],
+      'The Henle / Bärenreiter lineage: a tapered calligraphic burin curve latched to the stem tip, drawn as a filled path with optical body weighting — thick where the stroke turns, tapering to a hairline at the tail. The classical control every modern concept must beat.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'classical-urtext' },
+    windows: ROUND_6_WINDOWS,
+    tags: ['classical', 'urtext', 'tapered burin'],
   },
   {
-    id: 'independent-left-clasp',
-    label: 'B · Independent Left Clasp',
+    id: 'copperplate-pennant',
+    label: 'B · Historic Copperplate Pennant',
     description:
-      'One external bracket per vertical simultaneity, drawn clear of the outermost disc (claspX = minX − r − 2.8pt), bounding the whole cluster from minY − r to maxY + r and carrying its duration at the tip: an open pip for halves and wholes, a clean 8.5pt spire for quarters, single and double flag hooks for 8ths and 16ths. It replaces the standalone stems of a block chord, keeps every beamed 16th intact, and is engraved only where the bracket stands clear of its barline, its neighbours and the margin furniture — the opening Bach chord is clasped, the running counterpoint is not.',
-    options: { chordGrouping: 'left-clasp-spire' },
-    windows: ROUND_5_WINDOWS,
-    tags: ['per chord', 'duration carrier', 'barline air 4pt'],
+      'Early European copperplate engraving: a straight-edged triangular wedge tapering off the stem tip, cut with three straight strokes and no calligraphic swell. Crisper and more geometric than the urtext hook, but visibly stiffer at small sizes.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'copperplate-pennant' },
+    windows: ROUND_6_WINDOWS,
+    tags: ['classical', 'copperplate', 'straight wedge'],
   },
   {
-    id: 'beamed-clasp-rail',
-    label: 'C · Beamed Clasp Rail',
+    id: 'architectural-tab',
+    label: 'C · Architectural Lateral Tab',
     description:
-      'Every clasp of B, plus a measure-bounded rail that joins the spire tips of the contiguous clasps inside one measure: the topmost tip sets the rail, every joined spire is extended up to it and the flag hooks are dropped exactly as a traditional beam replaces them (a second rail carries the 16th level). The rail spans only its own measure’s spire columns, so it terminates inside the measure and never reaches a barline; a run whose extended spire or rail would touch a glyph is engraved unrailed instead.',
-    options: { chordGrouping: 'beamed-clasp-rail' },
-    windows: ROUND_5_WINDOWS,
-    tags: ['chord sequence', 'measure-bounded rail'],
+      'A modern architectural alternative: crisp horizontal rectangular tabs perpendicular to the stem (one tab for 8ths, two for 16ths), grid-aligned and drawn at a constant 1.1pt weight. It reads as duration data rather than calligraphy, and it never crosses its own notehead.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'architectural-tab' },
+    windows: ROUND_6_WINDOWS,
+    tags: ['modern', 'grid-aligned tab', '1.1pt'],
   },
   {
-    id: 'bounding-phrase-clasp',
-    label: 'D · Bounding Phrase Clasp',
+    id: 'beveled-slash',
+    label: 'D · Beveled Burin Slash',
     description:
-      'One bracket per measure: the phrase itself is the grouping unit. The clasp bounds every note of the measure — minY − r to maxY + r over the whole phrase, drawn at the measure’s opening edge — and carries the phrase’s opening duration at its tip, while the beats inside keep their traditional stems and beams. It groups the harmony of a bar at a single stroke instead of decorating each simultaneity, at the cost of one tall bracket in front of every chord-bearing measure.',
-    options: { chordGrouping: 'bounding-phrase' },
-    windows: ROUND_5_WINDOWS,
-    tags: ['per measure', 'phrase bracket'],
+      'Sharp 45° beveled cuts across the stem tip at the design system’s 1.20pt French Guillemet chevron weight, so the subdivision ink speaks the same handedness language as the exception chevrons. The boldest and most directional of the five dialects.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'beveled-slash' },
+    windows: ROUND_6_WINDOWS,
+    tags: ['modern', '45° bevel', 'chevron weight'],
+  },
+  {
+    id: 'aerodynamic-winglet',
+    label: 'E · Modernist Aerodynamic Winglet',
+    description:
+      'A sleek modern fin: a straight vertical spine on the outer edge with a sharp diagonal cutback returning to the stem, giving the subdivision a swept, aerodynamic silhouette. The most sculptural of the modern concepts and the closest in mass to the classical hook.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'aerodynamic-winglet' },
+    windows: ROUND_6_WINDOWS,
+    tags: ['modern', 'vertical spine', 'cutback'],
   },
 ];
 

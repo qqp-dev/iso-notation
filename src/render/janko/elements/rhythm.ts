@@ -7,7 +7,8 @@
  * - `angled-cuts`      — 35° slash cuts on the stem (default, Jánko dialect)
  * - `horizontal-ticks` — neutral horizontal duration ticks (unified lattice)
  * - `beamed`           — traditional connected beams inside each beat, with
- *                        standard flags for solitary / unbeamed notes
+ *                        pluggable subdivision marks (Round 6) for solitary /
+ *                        unbeamed notes
  *
  * Duration mapping (48 ticks per quarter note):
  *   12 ticks = 16th (two cuts / two ticks / two flags), 24 = 8th (one),
@@ -19,7 +20,13 @@
  */
 
 import { Hand } from '../../../model/types';
-import { JankoRhythmStyle, JankoTokens, ResolvedJankoTokens, resolveJankoTokens } from '../types';
+import {
+  JankoRhythmStyle,
+  JankoSubdivisionStyle,
+  JankoTokens,
+  ResolvedJankoTokens,
+  resolveJankoTokens,
+} from '../types';
 import { isPositionOfHonor } from './notehead';
 import { f } from './style';
 
@@ -189,61 +196,123 @@ export interface JankoBeamConnector {
   y2: number;
 }
 
+// ---------------------------------------------------------------------------
+// Round 6 — single-note subdivision grammar (five engraving dialects)
+// ---------------------------------------------------------------------------
+
+/** Thickness (pt) of one architectural lateral tab. */
+export const SUBDIVISION_TAB_THICKNESS = 1.1;
+/** Half-reach (pt) of one beveled burin slash (45°, so `dx === dy`). */
+export const SUBDIVISION_BEVEL_REACH = 2.4;
+/** Stroke (pt) of one beveled burin slash — the design system's chevron weight. */
+export const SUBDIVISION_BEVEL_STROKE = 1.2;
+
 /**
- * One standard musical flag hook latched to a stem tip.
- *
- * The stroke starts exactly on the stem (`x = stemX`), sweeps to the right and
- * curls back toward the stem as it drops, so **every sample of the hook stays
- * strictly right of the stem** (`x >= stemX`). Unlike a perpendicular duration
- * tick, a flag can therefore never draw a cross/dagger over its own notehead.
+ * Number of subdivision marks stacked at a stem tip: three for a 32nd, two for
+ * a 16th, one for an 8th (dotted or plain) and none for a quarter or longer.
+ * Stacks are spaced by `tokens.flagSpacing`, so every dialect stacks alike.
  */
-function renderFlagHook(
+export function subdivisionMarkCount(durationTicks: number): number {
+  if (durationTicks <= 7) return 3;
+  if (durationTicks <= 14) return 2;
+  if (durationTicks <= 38) return 1;
+  return 0;
+}
+
+/**
+ * Paint one subdivision mark latched to a stem tip, in the active Round 6
+ * dialect. `stemX`/`tipY` are the stem column and anchor, `direction` the stem
+ * direction (−1 up, +1 down) and `index` the 1-based stack position: mark `k`
+ * sits `(k − 1) · flagSpacing` further along the flag drop (`−direction`).
+ *
+ * Every dialect reaches at most `flagWidth` right of the stem — four of them
+ * stay strictly right of it (a mark can never dagger its own notehead), while
+ * the beveled slash cuts symmetrically across the tip — so the shared
+ * `claspInkBox` audit covers all five without a per-style box:
+ *
+ * - `classical-urtext`    tapered filled burin hook (optical body weighting)
+ * - `copperplate-pennant` straight-edged triangular wedge
+ * - `architectural-tab`   horizontal rectangular tab, `tabW = flagWidth`
+ * - `beveled-slash`       45° cut across the stem tip at chevron weight
+ * - `aerodynamic-winglet` tapered fin with a vertical spine and cutback
+ */
+export function renderSubdivisionMark(
   stemX: number,
   tipY: number,
   direction: -1 | 1,
   index: number,
-  t: ResolvedJankoTokens,
+  style: JankoSubdivisionStyle,
+  tokens?: Partial<JankoTokens> | null,
   cls = 'janko-flag'
 ): string {
+  const t = resolveJankoTokens(tokens);
+  const sign = -direction;
+  const cy = tipY + sign * (index - 1) * t.flagSpacing;
   const w = t.flagWidth;
   const h = t.flagHeight;
-  // Up-stems (direction -1) hang their flags downward (+y); down-stems mirror.
-  const sign = -direction;
-  const y = (k: number): number => tipY + sign * k * h;
-  const d =
-    `M ${f(stemX)} ${f(tipY)} ` +
-    `C ${f(stemX + 0.55 * w)} ${f(y(0.12))} ${f(stemX + w)} ${f(y(0.62))} ` +
-    `${f(stemX + 0.45 * w)} ${f(y(1))}`;
-  return (
-    `    <path class="${cls}" data-stem-x="${f(stemX)}" data-flag-index="${index}" ` +
-    `d="${d}" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>`
-  );
+  const head = `class="${cls}" data-stem-x="${f(stemX)}" data-flag-index="${index}"`;
+  const tail = ` data-subdivision-style="${style}"`;
+  switch (style) {
+    case 'copperplate-pennant': {
+      const d =
+        `M ${f(stemX)} ${f(cy)} L ${f(stemX + w)} ${f(cy + sign * 0.5 * h)} ` +
+        `L ${f(stemX)} ${f(cy + sign * h)} Z`;
+      return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
+    }
+    case 'architectural-tab':
+      return (
+        `    <rect ${head} x="${f(stemX)}" y="${f(cy - SUBDIVISION_TAB_THICKNESS / 2)}" ` +
+        `width="${f(w)}" height="${f(SUBDIVISION_TAB_THICKNESS)}" fill="#111111"${tail}/>`
+      );
+    case 'beveled-slash': {
+      const b = SUBDIVISION_BEVEL_REACH;
+      return (
+        `    <line ${head} x1="${f(stemX - b)}" y1="${f(cy - sign * b)}" ` +
+        `x2="${f(stemX + b)}" y2="${f(cy + sign * b)}" stroke="#111111" ` +
+        `stroke-width="${SUBDIVISION_BEVEL_STROKE.toFixed(2)}" stroke-linecap="butt"${tail}/>`
+      );
+    }
+    case 'aerodynamic-winglet': {
+      const d =
+        `M ${f(stemX)} ${f(cy)} L ${f(stemX + w)} ${f(cy + sign * 0.30 * h)} ` +
+        `L ${f(stemX + w)} ${f(cy + sign * h)} L ${f(stemX)} ${f(cy + sign * 0.55 * h)} Z`;
+      return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
+    }
+    case 'classical-urtext':
+    default: {
+      const d =
+        `M ${f(stemX)} ${f(cy)} ` +
+        `C ${f(stemX + 0.55 * w)} ${f(cy + sign * 0.10 * h)} ${f(stemX + w)} ` +
+        `${f(cy + sign * 0.62 * h)} ${f(stemX + 0.42 * w)} ${f(cy + sign * h)} ` +
+        `C ${f(stemX + 0.30 * w)} ${f(cy + sign * 0.66 * h)} ${f(stemX + 0.14 * w)} ` +
+        `${f(cy + sign * 0.70 * h)} ${f(stemX)} ${f(cy + sign * 0.52 * h)} Z`;
+      return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
+    }
+  }
 }
 
 /**
- * Solitary / unbeamed short note: bare stem plus standard musical flags
- * (two for 16ths and shorter, one for 8ths) and the augmentation dot for dotted
- * values. Nothing crosses the stem — the flag grammar replaces the neutral
- * perpendicular tick used by the `horizontal-ticks` lattice dialect.
+ * Solitary / unbeamed short note: bare stem plus the active subdivision style
+ * (see {@link renderSubdivisionMark}) and the augmentation dot for dotted
+ * values. Every dialect latches onto the stem tip and reaches no further right
+ * than `flagWidth`, so the duration grammar replaces the neutral perpendicular
+ * tick used by the `horizontal-ticks` lattice dialect without ever crossing the
+ * stem.
  */
 export function renderFlags(
   note: JankoRhythmNote,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  style: JankoSubdivisionStyle = 'classical-urtext'
 ): string {
   const t = resolveJankoTokens(tokens);
   const s = getStemGeometry(note, t);
   const parts: string[] = [renderStem(note, t)];
 
-  const dur = note.durationTicks;
-  if (dur <= 14) {
-    parts.push(renderFlagHook(s.stemX, s.stemEndY, s.direction, 1, t));
-    parts.push(
-      renderFlagHook(s.stemX, s.stemEndY - s.direction * t.flagSpacing, s.direction, 2, t)
-    );
-  } else if (dur <= 26) {
-    parts.push(renderFlagHook(s.stemX, s.stemEndY, s.direction, 1, t));
-  } else if (dur <= 38) {
-    parts.push(renderFlagHook(s.stemX, s.stemEndY, s.direction, 1, t));
+  const marks = subdivisionMarkCount(note.durationTicks);
+  for (let i = 1; i <= marks; i++) {
+    parts.push(renderSubdivisionMark(s.stemX, s.stemEndY, s.direction, i, style, t));
+  }
+  if (note.durationTicks > 26 && note.durationTicks <= 38) {
     parts.push(renderAugmentationDot(note, t));
   }
   return parts.join('\n');
@@ -259,6 +328,25 @@ export const CLASP_SPIRE_LENGTH = 8.5;
 export const CLASP_PIP_RADIUS = 1.5;
 /** Vertical gap (pt) between the two pips of a whole-note clasp. */
 export const CLASP_PIP_GAP = 1.0;
+/**
+ * Minimum horizontal spread (pt) that makes an onset a *horizontally displaced*
+ * cluster (Round 6). Heads that share one clean vertical column spread by 0pt
+ * and are never clasped: the clasp exists solely to unify row-snapped heads.
+ */
+export const CLASP_MIN_HORIZONTAL_SPREAD = 1.0;
+
+/**
+ * Are two or more of these heads horizontally displaced by more than
+ * {@link CLASP_MIN_HORIZONTAL_SPREAD}? A clean vertical column (and a lone
+ * melodic note) is not.
+ */
+export function claspNotesHorizontallySpread(
+  notes: readonly JankoRhythmNote[]
+): boolean {
+  if (notes.length < 2) return false;
+  const xs = notes.map((n) => n.x);
+  return Math.max(...xs) - Math.min(...xs) > CLASP_MIN_HORIZONTAL_SPREAD;
+}
 
 /**
  * Duration grammar of a clasp tip.
@@ -332,6 +420,12 @@ export interface JankoClaspOptions {
    * value — the point at which the cluster's first voice moves on.
    */
   durationTicks?: number;
+  /**
+   * Round 6: reject a purely vertical cluster. `'per-hand-clasp'` passes `true`
+   * so a hand's clean column keeps its traditional stems; the Round 5 paradigms
+   * leave it off and clasp every simultaneity.
+   */
+  requireHorizontalSpread?: boolean;
 }
 
 /**
@@ -341,10 +435,14 @@ export interface JankoClaspOptions {
  * claspOffset`, `topY = minY − r`, `botY = maxY + r` — so the vertical extent
  * bounds every member disc and the spine never crosses a glyph. The duration
  * carried is the **shortest** member value (or the override the caller
- * supplies).
+ * supplies); under `'per-hand-clasp'` the caller hands in one hand's notes, so
+ * the bracket spans that hand's full reach — across Middle C when the hand
+ * crosses it — and never the grand staff.
  *
- * Returns null for a lone note: a clasp groups a vertical simultaneity, so
- * melodic writing is never touched (no "feathers").
+ * Returns null for a lone note, and (with `requireHorizontalSpread`) for a
+ * cluster whose heads share one vertical column: a clasp groups a
+ * horizontally displaced simultaneity, so melodic writing and clean columns are
+ * never touched.
  */
 export function computeClaspGeometry(
   notes: readonly JankoRhythmNote[],
@@ -357,6 +455,7 @@ export function computeClaspGeometry(
   const sortX = [...notes].sort((a, b) => a.x - b.x);
   const minX = sortX[0].x;
   const maxX = sortX[sortX.length - 1].x;
+  if (options?.requireHorizontalSpread && !claspNotesHorizontallySpread(notes)) return null;
   const minY = sorted[0].y;
   const maxY = sorted[sorted.length - 1].y;
   const r = t.noteheadRadius;
@@ -427,13 +526,16 @@ export function claspInkBox(
 }
 
 /**
- * Paint one left clasp: the bracket, its duration spire, flag hooks or pips.
- * The group is engraved in the rhythm layer (beneath the noteheads), so a
- * knockout always erases whatever a clasp should never have touched.
+ * Paint one left clasp: the bracket, its duration spire, subdivision marks or
+ * pips. The group is engraved in the rhythm layer (beneath the noteheads), so a
+ * knockout always erases whatever a clasp should never have touched. The tip
+ * draws its 8th/16th marks in the active `subdivisionStyle` (Round 6), so a
+ * clasped cluster and a flagged stem of the same value can never disagree.
  */
 export function renderChordClasp(
   group: JankoClaspGroupGeometry,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext'
 ): string {
   const t = resolveJankoTokens(tokens);
   const ids = group.notes.map((n) => n.id).join(',');
@@ -448,11 +550,12 @@ export function renderChordClasp(
   }
   for (let i = 1; i <= group.flags; i++) {
     parts.push(
-      renderFlagHook(
+      renderSubdivisionMark(
         group.claspX,
-        (group.spireTipY ?? group.topY) + (i - 1) * t.flagSpacing,
+        group.spireTipY ?? group.topY,
         -1,
         i,
+        subdivisionStyle,
         t,
         'janko-clasp-flag'
       )
@@ -501,12 +604,13 @@ export function renderClaspRail(
 export function renderClaspGroup(
   groups: readonly JankoClaspGroupGeometry[],
   rails: readonly JankoClaspRailGeometry[] = [],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext'
 ): string {
   if (groups.length === 0 && rails.length === 0) return '';
   const t = resolveJankoTokens(tokens);
   const parts: string[] = ['  <g class="janko-clasp-layer">'];
-  for (const group of groups) parts.push(renderChordClasp(group, t));
+  for (const group of groups) parts.push(renderChordClasp(group, t, subdivisionStyle));
   for (const rail of rails) parts.push(renderClaspRail(rail, t));
   parts.push('  </g>');
   return parts.join('\n');
@@ -762,13 +866,14 @@ export function computeBeamGroupGeometry(
 export function renderBeamGroup(
   group: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
-  geometry?: JankoBeamGroupGeometry | null
+  geometry?: JankoBeamGroupGeometry | null,
+  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext'
 ): string {
   const t = resolveJankoTokens(tokens);
   if (group.length === 0) return '';
   if (group.length === 1) {
     // A solitary short note is flagged, never crossbarred.
-    return renderFlags(group[0], t);
+    return renderFlags(group[0], t, subdivisionStyle);
   }
 
   const beam = geometry ?? computeBeamGroupGeometry(group, t);
@@ -809,14 +914,15 @@ export function renderBeamGroup(
 export function renderRhythm(
   note: JankoRhythmNote,
   style: JankoRhythmStyle,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext'
 ): string {
   switch (style) {
     case 'horizontal-ticks':
       return renderHorizontalTicks(note, tokens);
     case 'beamed':
       // Standalone (unbeamable) notes carry standard flags, not crossbars.
-      return renderFlags(note, tokens);
+      return renderFlags(note, tokens, subdivisionStyle);
     case 'angled-cuts':
     default:
       return renderAngledCuts(note, tokens);

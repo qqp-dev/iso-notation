@@ -19,7 +19,10 @@
  *  6. the beamed-clasp rail: contiguous clasps of one measure joined at the
  *     tips, strictly terminating inside the measure;
  *  7. engine integrity: a real 16th-note beam is never cut by a clasp, and both
- *     benchmark scores engrave every clasp mode with zero diagnostics.
+ *     benchmark scores engrave every clasp mode with zero diagnostics;
+ *  8. the Round 6 refinement: `'per-hand-clasp'` groups strictly one hand and
+ *     strictly a horizontally displaced (row-snapped) cluster — a clean vertical
+ *     column, a lone note and the cross-hand Bach columns are never bracketed.
  */
 
 import { test } from 'node:test';
@@ -56,6 +59,7 @@ import {
   renderJankoCrop,
 } from '../src/render/janko/engine';
 import {
+  CLASP_MIN_HORIZONTAL_SPREAD,
   CLASP_PIP_RADIUS,
   CLASP_SPIRE_LENGTH,
   JankoRhythmNote,
@@ -96,7 +100,7 @@ function layouts(
 // 1. Tokens & options
 // ---------------------------------------------------------------------------
 
-test('Round 5 tokens: clasp geometry lands on the ticket defaults, golden grouping stays none', () => {
+test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays none', () => {
   assert.equal(DEFAULT_JANKO_TOKENS.claspWidth, 2.2, 'cap reach');
   assert.equal(DEFAULT_JANKO_TOKENS.claspStrokeWidth, 0.85, 'bracket stroke');
   assert.equal(DEFAULT_JANKO_TOKENS.claspOffset, 2.8, 'disc-to-spine air');
@@ -104,8 +108,8 @@ test('Round 5 tokens: clasp geometry lands on the ticket defaults, golden groupi
   assert.equal(DEFAULT_JANKO_OPTIONS.chordGrouping, 'none', 'the golden master keeps per-note stems');
   assert.deepEqual(
     [...JANKO_CHORD_GROUPINGS],
-    ['none', 'left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase'],
-    'the four paradigms in exploration order'
+    ['none', 'left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase', 'per-hand-clasp'],
+    'the five paradigms in exploration order'
   );
   for (const mode of JANKO_CHORD_GROUPINGS) {
     assert.ok(JANKO_CHORD_GROUPING_LABELS[mode].length > 0, `${mode} is labelled`);
@@ -114,6 +118,7 @@ test('Round 5 tokens: clasp geometry lands on the ticket defaults, golden groupi
   // measure's left edge — 11.6pt with the canonical tokens.
   assert.equal(getClaspDownbeatInset(T), 4.8 + 2.8 + 4.0);
   assert.equal(resolveJankoOptions({ chordGrouping: 'left-clasp-spire' }).chordGrouping, 'left-clasp-spire');
+  assert.equal(resolveJankoOptions({ chordGrouping: 'per-hand-clasp' }).chordGrouping, 'per-hand-clasp');
 });
 
 // ---------------------------------------------------------------------------
@@ -279,6 +284,135 @@ test('The fit rule: only actual chords are clasped, and only where the bracket s
   const report = lintJankoScore(BACH, { ...DEFAULT_JANKO_OPTIONS, chordGrouping: 'left-clasp-spire' }, T);
   assert.equal(report.violations.length, 0);
   assert.equal(report.warnings.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 4b. Round 6 — the per-hand, non-vertical clasp
+// ---------------------------------------------------------------------------
+
+test('Round 6 per-hand clasp: one hand only, only for horizontally displaced clusters', () => {
+  // A clean vertical column of one hand is never grouped…
+  assert.equal(
+    computeClaspGeometry(
+      [rn('a', 100, 100, 24), rn('b', 100, 130, 24)],
+      T,
+      { requireHorizontalSpread: true }
+    ),
+    null,
+    'a clean vertical column keeps its stems'
+  );
+  // …and neither is a lone note, however it sits on the row grid.
+  assert.equal(
+    computeClaspGeometry([rn('solo', 100, 100, 24)], T, { requireHorizontalSpread: true }),
+    null
+  );
+  // A row-snapped pair is exactly what the bracket exists for.
+  const pair = computeClaspGeometry(
+    [rn('a', 94.5, 100, 24), rn('b', 105.5, 130, 24)],
+    T,
+    { requireHorizontalSpread: true }
+  )!;
+  assert.ok(pair.maxX - pair.minX > CLASP_MIN_HORIZONTAL_SPREAD);
+  assert.equal(pair.topY, 100 - T.noteheadRadius, 'topY = min(y) − r of the hand');
+  assert.equal(pair.botY, 130 + T.noteheadRadius, 'botY = max(y) + r of the hand');
+
+  // Bach's simultaneities are cross-hand vertical columns, so the refined
+  // paradigm never merges them into a grand-staff mega-bracket …
+  const bach = layouts('per-hand-clasp');
+  assert.equal(
+    bach.reduce((n, l) => n + l.clasps.length, 0),
+    0,
+    'no bracket on the cross-hand Bach columns'
+  );
+
+  // … while the dense Brahms writing carries the row-snapped hand clusters the
+  // round targets (the 2-5-9 sonority among them).
+  const o = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    chordGrouping: 'per-hand-clasp',
+  });
+  const brahms = layoutJankoScore(BRAHMS, o, BRAHMS_T);
+  const clasps = brahms.flatMap((l) => l.clasps);
+  assert.ok(clasps.length >= 3, `Brahms hand clusters are clasped (${clasps.length})`);
+  const r = BRAHMS_T.noteheadRadius;
+  for (const clasp of clasps) {
+    assert.equal(
+      new Set(clasp.notes.map((n) => n.hand)).size,
+      1,
+      'a bracket never spans both hands'
+    );
+    const xs = clasp.notes.map((n) => n.x);
+    assert.ok(
+      Math.max(...xs) - Math.min(...xs) > CLASP_MIN_HORIZONTAL_SPREAD,
+      'only horizontally displaced hand clusters are grouped'
+    );
+    assert.equal(clasp.topY, Math.min(...clasp.notes.map((n) => n.y)) - r);
+    assert.equal(clasp.botY, Math.max(...clasp.notes.map((n) => n.y)) + r);
+    // Duration ownership: the bracket carries the shortest member value.
+    assert.equal(
+      clasp.durationTicks,
+      Math.min(...clasp.notes.map((n) => n.durationTicks)),
+      'the clasp carries the cluster duration at its tip'
+    );
+    // A downbeat bracket keeps its barline air (≥ 3.5pt; the token holds 4.0).
+    const layout = brahms.find((l) => l.clasps.includes(clasp))!;
+    const leftBarline = systemBarlines(layout, o, BRAHMS_T).reduce(
+      (best, b) => (b.x <= clasp.claspX + 1e-6 && b.x > best ? b.x : best),
+      Number.NEGATIVE_INFINITY
+    );
+    if (Number.isFinite(leftBarline)) {
+      assert.ok(
+        clasp.claspX - leftBarline >= BRAHMS_T.claspMinBarlineAir - 1e-6,
+        `clasp at tick ${clasp.tick} keeps ${BRAHMS_T.claspMinBarlineAir}pt of barline air`
+      );
+      assert.ok(BRAHMS_T.claspMinBarlineAir >= 3.5, 'the ticket floor is 3.5pt');
+    }
+  }
+  // Duration ownership: a member whose stem is not part of a real beam loses its
+  // standalone stem, because the bracket now carries the value.
+  const beamed = new Set(
+    brahms.flatMap((l) => l.beams.flatMap((b) => b.notes.map((n) => n.id)))
+  );
+  for (const layout of brahms) {
+    for (const id of layout.claspedStems) {
+      assert.ok(!beamed.has(id), `${id} is not inside a beam`);
+      assert.ok(
+        clasps.some((c) => c.notes.some((n) => n.id === id)),
+        `${id} belongs to a per-hand clasp`
+      );
+    }
+    for (const clasp of layout.clasps) {
+      if (clasp.notes.some((n) => beamed.has(n.id))) continue;
+      for (const n of clasp.notes) {
+        assert.ok(layout.claspedStems.includes(n.id), `${n.id} loses its standalone stem`);
+      }
+    }
+  }
+  assert.ok(
+    clasps.some((c) => c.notes.every((n) => !beamed.has(n.id))),
+    'the Brahms clasps really replace standalone stems'
+  );
+  // The mm. 7–8 window's 2-5-9 sonority is clasped as one right-hand bracket
+  // whose vertical reach spans the hand's full (corridor-crossing) stretch.
+  const target = clasps.find((c) => c.tick === 1200);
+  assert.ok(target, 'the 2-5-9 sonority is clasped');
+  const onset = BRAHMS.notes.filter((n) => n.startTick === 1200 && n.hand === 'RH');
+  const classes = onset.map((n) => n.pitch.pitchClass);
+  assert.ok([2, 5, 9].every((pc) => classes.includes(pc)), 'the ticket’s 2-5-9 sonority');
+  assert.equal(target!.notes.length, onset.length, 'the bracket groups the whole hand onset');
+  assert.equal(
+    new Set(target!.notes.map((n) => n.x)).size > 1,
+    true,
+    'the bracket exists because the hand cluster is row-snapped'
+  );
+
+  const report = lintJankoScore(
+    BRAHMS,
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'per-hand-clasp' },
+    BRAHMS_T
+  );
+  assert.equal(report.ok, true);
+  assert.equal(report.warnings.length, 0, 'the per-hand refinement adds no warning');
 });
 
 // ---------------------------------------------------------------------------
