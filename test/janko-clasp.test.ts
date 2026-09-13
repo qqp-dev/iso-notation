@@ -124,8 +124,8 @@ test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays
   assert.equal(DEFAULT_JANKO_OPTIONS.chordGrouping, 'none', 'the golden master keeps per-note stems');
   assert.equal(
     DEFAULT_JANKO_OPTIONS.claspDurationStyle,
-    'transverse-cross-bars',
-    'the golden master keeps the horizontal cross-rungs'
+    'kinetic-cross-slashes',
+    'Round 12 standardizes the up-raked 12.4° kinetic clasp'
   );
   assert.deepEqual(
     [...JANKO_CHORD_GROUPINGS],
@@ -179,7 +179,7 @@ test('Clasp duration grammar: pip for halves/wholes, notches for 8ths/16ths, a b
 
   const pip = computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!;
   assert.equal(pip.duration, 'pip');
-  assert.equal(pip.durationStyle, 'transverse-cross-bars', 'the default midpoint paradigm');
+  assert.equal(pip.durationStyle, 'kinetic-cross-slashes', 'the standardized midpoint paradigm');
   assert.equal(pip.pips, 1);
   assert.equal(pip.flags, 0);
   assert.equal(pip.dotted, false);
@@ -518,7 +518,7 @@ test('renderChordClasp paints the symmetrical bracket and its light duration par
   );
   assert.match(
     markup,
-    /class="janko-clasp-group" data-clasp-tick="0" data-clasp-duration="spire" data-clasp-duration-style="transverse-cross-bars"/
+    /class="janko-clasp-group" data-clasp-tick="0" data-clasp-duration="spire" data-clasp-duration-style="kinetic-cross-slashes"/
   );
   assert.match(markup, /class="janko-clasp" d="M 94\.60 95\.20 L 92\.40 95\.20 L 92\.40 134\.80 L 94\.60 134\.80"/);
   assert.match(markup, /stroke-width="0\.85"/);
@@ -529,28 +529,43 @@ test('renderChordClasp paints the symmetrical bracket and its light duration par
   const eighthGroup = computeClaspGeometry([rn('a', 100, 100, 24), rn('b', 100, 130, 24)], T)!;
   const eighth = renderChordClasp(eighthGroup, T);
   const yMid = (eighthGroup.topY + eighthGroup.botY) / 2;
-  assert.equal((eighth.match(/janko-clasp-bar/g) ?? []).length, 1, '8th: one transverse rung');
+  assert.equal((eighth.match(/janko-clasp-slash/g) ?? []).length, 1, '8th: one up-raked slash');
+  const eighthSlash =
+    /class="janko-clasp-slash" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(eighth)!;
+  const eighthHalf = CLASP_TRANSVERSE_WIDTH / 2;
+  const eighthRake = eighthHalf * T.maxBeamSlope;
+  assert.equal(
+    eighthSlash[1],
+    (eighthGroup.claspX - eighthHalf).toFixed(2),
+    'the slash spans the 7.5pt transverse width'
+  );
   assert.ok(
-    eighth.includes(
-      `x1="${(eighthGroup.claspX - CLASP_TRANSVERSE_WIDTH / 2).toFixed(2)}" y1="${yMid.toFixed(2)}" ` +
-        `x2="${(eighthGroup.claspX + CLASP_TRANSVERSE_WIDTH / 2).toFixed(2)}" y2="${yMid.toFixed(2)}"`
-    ),
-    'the rung cuts symmetrically across the spine at yMid'
+    Math.abs((Number(eighthSlash[2]) + Number(eighthSlash[4])) / 2 - yMid) < 0.01,
+    'the slash is centred on the spine midpoint'
+  );
+  assert.ok(
+    Math.abs(Number(eighthSlash[2]) - (yMid + eighthRake)) < 0.01 &&
+      Math.abs(Number(eighthSlash[4]) - (yMid - eighthRake)) < 0.01,
+    'the slash rakes up at the beam-harmonized 12.4°'
   );
 
   const sixteenth = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 12), rn('b', 100, 130, 12)], T)!,
     T
   );
-  assert.equal((sixteenth.match(/janko-clasp-bar/g) ?? []).length, 2, '16th: two parallel rungs');
-  const bars = [
-    ...sixteenth.matchAll(/class="janko-clasp-bar" x1="[\d.-]+" y1="([\d.-]+)"/g),
-  ].map((m) => Number(m[1]));
-  assert.deepEqual(
-    bars,
-    [yMid - CLASP_CROSS_SPACING / 2, yMid + CLASP_CROSS_SPACING / 2],
-    'the 16th pair straddles the midpoint at the 2.5pt spacing'
-  );
+  assert.equal((sixteenth.match(/janko-clasp-slash/g) ?? []).length, 2, '16th: two parallel slashes');
+  const slashMids = [
+    ...sixteenth.matchAll(
+      /class="janko-clasp-slash" x1="[\d.-]+" y1="([\d.-]+)" x2="[\d.-]+" y2="([\d.-]+)"/g
+    ),
+  ].map((m) => (Number(m[1]) + Number(m[2])) / 2);
+  for (const [i, slashMid] of slashMids.entries()) {
+    const expected = i === 0 ? yMid - CLASP_CROSS_SPACING / 2 : yMid + CLASP_CROSS_SPACING / 2;
+    assert.ok(
+      Math.abs(slashMid - expected) < 0.01,
+      'the 16th pair straddles the midpoint at the 2.5pt spacing'
+    );
+  }
 
   // The half note knocks the spine out with the shared open white ring; a whole
   // note stacks a mirrored pair.
@@ -566,7 +581,7 @@ test('renderChordClasp paints the symmetrical bracket and its light duration par
     ),
     'the ring is R = 3.0pt at 1.0pt with a 100% white knockout interior'
   );
-  assert.ok(!half.includes('janko-clasp-bar'), 'a half note carries no transverse bar');
+  assert.ok(!half.includes('janko-clasp-slash'), 'a half note carries no transverse slash');
 
   const whole = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 384), rn('b', 100, 130, 384)], T)!,
@@ -920,8 +935,8 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
     'the default paradigm is not the diamond band'
   );
   assert.ok(
-    svg.includes('data-clasp-duration-style="transverse-cross-bars"'),
-    'the golden duration paradigm'
+    svg.includes('data-clasp-duration-style="kinetic-cross-slashes"'),
+    'the standardized up-raked 12.4° duration paradigm'
   );
 });
 

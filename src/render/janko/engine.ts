@@ -53,6 +53,9 @@ import {
   JankoVariantSpec,
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
+  channelsGridInk,
+  getGridNoteInset,
+  protectsBarlineInk,
   resolveJankoOptions,
   resolveJankoTokens,
 } from './types';
@@ -91,6 +94,8 @@ import {
   ARCHITECTURAL_BRACKET_STROKE,
   CLEF_PILLAR_STROKE,
   CLEF_PILLAR_TICK,
+  DELICATE_BRACKET_SPUR,
+  DELICATE_BRACKET_STROKE,
   DOUBLE_HAIRLINE_INNER_STROKE,
   DOUBLE_HAIRLINE_OUTER_STROKE,
   DOUBLE_HAIRLINE_SPACING,
@@ -105,6 +110,13 @@ import {
   renderBeatGrid,
   renderMeasureNumber,
 } from './elements/barlines';
+import {
+  JankoRestGeometry,
+  isStandardRestValue,
+  renderRest,
+  restInkBox,
+  restValueForTicks,
+} from './elements/rests';
 
 /** Vertical reserve above a crop for its caption band (pt). */
 const CROP_CAPTION_HEIGHT = 15.0;
@@ -448,12 +460,17 @@ export const COLUMN_BARLINE_AIR = 1.0;
  * (see {@link getMeasureInsets}); where the measure's own content is too dense
  * to absorb that shift, this test is what demotes it — and with it the bracket —
  * back to the canonical margins instead of letting the engraving collide.
+ *
+ * Round 12: under the `'unified-transparent-grid'` policy the barline carries no
+ * protected air at all — the music uses the full measure width and the circular
+ * knockout erases whatever it crosses — so only the disc-to-disc rule remains.
  */
 export function measuresWithColumnCollisions(
   notes: readonly PositionedJankoNote[],
   geo: JankoSystemGeometry,
   systemIndex: number,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  protectBarlines: boolean = true
 ): Set<number> {
   const bad = new Set<number>();
   const r = t.noteheadRadius;
@@ -472,6 +489,7 @@ export function measuresWithColumnCollisions(
       }
     }
   }
+  if (!protectBarlines) return bad;
   for (const p of notes) {
     const m = measureOf(p);
     const barlineX = getMeasureClosingBarlineX(m, geo, systemIndex, t);
@@ -506,6 +524,7 @@ export const MARGIN_NUMERAL_FONT_SIZE = 7.0;
 export function paintsSystemStartInk(style: JankoSystemStartStyle): boolean {
   return (
     style === 'architectural-bracket' ||
+    style === 'delicate-bracket' ||
     style === 'clef-pillar' ||
     style === 'double-hairline'
   );
@@ -553,6 +572,10 @@ export function getMarginFurniture(
       const half = ARCHITECTURAL_BRACKET_STROKE / 2;
       x0 = x - half;
       x1 = x + ARCHITECTURAL_BRACKET_SPUR + half;
+    } else if (systemStartStyle === 'delicate-bracket') {
+      const half = DELICATE_BRACKET_STROKE / 2;
+      x0 = x - half;
+      x1 = x + DELICATE_BRACKET_SPUR + half;
     } else if (systemStartStyle === 'clef-pillar') {
       const half = CLEF_PILLAR_STROKE / 2;
       x0 = x - half;
@@ -768,6 +791,12 @@ export interface JankoSystemLayout {
   beams: JankoBeamGroupGeometry[];
   /** Short notes engraved with a standalone tick instead of a beam. */
   ungrouped: JankoRhythmNote[];
+  /**
+   * Round 12 voice rests: the written silences of this system, one per inactive
+   * span of a hand inside a measure that hand is active in (see
+   * {@link computeJankoRests}).
+   */
+  rests: JankoRestGeometry[];
   /** External left clasps of the chord-grouping paradigm ([] for `'none'`). */
   clasps: JankoClaspGroupGeometry[];
   /** Rails joining contiguous clasps (`'beamed-clasp-rail'` only). */
@@ -839,10 +868,14 @@ export function getMeasureInsets(
   claspLeftInset: number = 0
 ): JankoTickInsets {
   const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
+  // Round 12: the transparent grid withdraws the canonical measure inset, so
+  // the music uses the full measure width and a downbeat column stands exactly
+  // on the barline, where its circular knockout erases it.
+  const inset = getGridNoteInset(o, t);
   const base =
     isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
-      ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
-      : { left: t.measureInset, right: t.measureInset };
+      ? { left: inset + o.timeSignatureWidth, right: inset }
+      : { left: inset, right: inset };
   const extra = Math.max(0, claspLeftInset - base.left);
   return { left: base.left + extra, right: Math.max(0, base.right - extra) };
 }
@@ -883,18 +916,34 @@ function getNominalNoteX(
   t: ResolvedJankoTokens,
   claspInsets?: JankoClaspInsetMap | null
 ): number {
+  return getTickColumnX(note.startTick, geo, systemIndex, o, t, claspInsets);
+}
+
+/**
+ * Beat column of one **tick** inside its system (page pt). The notes and the
+ * Round 12 voice rests share this one function, so a rest stands on exactly the
+ * proportional grid the surrounding writing uses — never on an ad-hoc offset.
+ */
+function getTickColumnX(
+  tick: number,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  claspInsets?: JankoClaspInsetMap | null
+): number {
   const claspInset = (measureIdx: number): number => claspInsets?.get(measureIdx) ?? 0;
   const anacrusis = t.anacrusisTicks ?? 0;
   if (systemIndex === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
-    if (note.startTick < anacrusis) {
+    if (tick < anacrusis) {
       const insets = getMeasureInsets(0, 0, o, t, claspInset(0));
       const left = insets.left ?? t.measureInset;
       const right = insets.right ?? t.measureInset;
       const available = Math.max(0, upbeatWidth - left - right);
-      return geo.staffLeft + left + (note.startTick / anacrusis) * available;
+      return geo.staffLeft + left + (tick / anacrusis) * available;
     }
-    const elapsed = note.startTick - anacrusis;
+    const elapsed = tick - anacrusis;
     const m = Math.floor(elapsed / t.ticksPerMeasure);
     const tickInMeasure = elapsed % t.ticksPerMeasure;
     const insets = getMeasureInsets(0, m + 1, o, t, claspInset(m + 1));
@@ -906,7 +955,7 @@ function getNominalNoteX(
   }
 
   if (anacrusis > 0) {
-    const elapsed = note.startTick - anacrusis;
+    const elapsed = tick - anacrusis;
     const measureOffset = Math.floor(elapsed / t.ticksPerMeasure);
     const m = measureOffset - systemIndex * geo.measuresPerSystem;
     const tickInMeasure = elapsed % t.ticksPerMeasure;
@@ -918,12 +967,12 @@ function getNominalNoteX(
     return measureLeft + left + (tickInMeasure / t.ticksPerMeasure) * available;
   }
 
-  const { tickInMeasure } = splitTick(note.startTick, t);
-  const measureIdx = getMeasureIndexOfTick(note, geo, systemIndex, t);
+  const { measureOffset, tickInMeasure } = splitTick(tick, t);
+  const measureIdx = measureOffset - systemIndex * geo.measuresPerSystem;
   return (
     geo.staffLeft +
     getTickX(
-      note.startTick,
+      tick,
       measureIdx,
       tickInMeasure,
       geo.measureWidth,
@@ -974,6 +1023,142 @@ export function positionJankoNote(
       y,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Round 12 — voice rests for the inactive spans of an active hand
+// ---------------------------------------------------------------------------
+
+/**
+ * Air (pt) a rest's ink box keeps from a foreign notehead disc. Mirrors
+ * `DEFAULT_JANKO_LINT_OPTIONS.minClearance` and the clasp fit rule, so a rest the
+ * engine admits can never be a surprise collision.
+ */
+export const REST_NOTEHEAD_AIR = 1.0;
+
+/**
+ * System-local measure index of an absolute tick (mirrors
+ * {@link getMeasureIndexOfTick}, which needs a note).
+ */
+function measureIndexOfTick(
+  tick: number,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  t: ResolvedJankoTokens
+): number {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (anacrusis > 0) {
+    if (tick < anacrusis) return systemIndex === 0 ? 0 : -1;
+    return Math.floor((tick - anacrusis) / t.ticksPerMeasure) - systemIndex * geo.measuresPerSystem;
+  }
+  return splitTick(tick, t).measureOffset - systemIndex * geo.measuresPerSystem;
+}
+
+/**
+ * Does a rest's ink stand clear of every foreign glyph of its system?
+ *
+ * The rest layer is painted beneath the noteheads, so an overlap would be
+ * silently half-erased rather than reported; the engine therefore admits a rest
+ * only where its own {@link restInkBox} keeps {@link REST_NOTEHEAD_AIR} from
+ * every notehead disc — of **both** hands, because the other hand is exactly
+ * what is playing while this one is silent.
+ */
+export function restClearsLayout(
+  rest: JankoRestGeometry,
+  notes: readonly PositionedJankoNote[],
+  t: ResolvedJankoTokens
+): boolean {
+  const box = restInkBox(rest, t);
+  for (const p of notes) {
+    const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
+    const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
+    if (Math.hypot(dx, dy) < t.noteheadRadius + REST_NOTEHEAD_AIR - EPS) return false;
+  }
+  return true;
+}
+
+/**
+ * Round 12 voice rests.
+ *
+ * A hand's **inactive span inside an active measure** is written with the active
+ * rest dialect: the engine walks one hand's onsets in the system, and wherever
+ * the next onset starts strictly after the previous note's release *and* the
+ * silence is exactly one standard rest value (`isStandardRestValue`), a rest is
+ * placed on the beat column of the release — the very column the silent voice
+ * would have occupied. The column is the **canonical** proportional grid column
+ * (`getTickColumnX` without a clasp inset), exactly like the dashed beat pulse
+ * it stands beside: the Round 5 clasp-inset widening shifts a measure's note
+ * field, never the absolute grid the rest belongs to.
+ *
+ * - Bach Goldberg Var. 1 m. 4 is the canonical case: the RH plays 16ths up to
+ *   tick 540, releases at 552 and resumes at 564, while the LH enters at 552 —
+ *   so a **16th rest** stands in the Right Hand at `x ≈ 545.0pt` (the tick-552
+ *   beat column) on the Octave 4 voice equator (`y = −15.0pt`), turning the
+ *   invisible void into a written silence.
+ * - A silence that is not a standard value (a 2.5-beat gap, a tie artefact) is
+ *   left unwritten rather than approximated.
+ * - A rest whose ink would collide with any notehead of the system (either hand)
+ *   is dropped by {@link restClearsLayout}, exactly like a bracket the fit rule
+ *   refuses.
+ */
+export function computeJankoRests(
+  score: QuantizedGridScore,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  notes: readonly PositionedJankoNote[]
+): JankoRestGeometry[] {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const startTick =
+    systemIndex === 0 ? 0 : anacrusis + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure;
+  const endTick = anacrusis + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure;
+  const sysNotes = score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick);
+  const out: JankoRestGeometry[] = [];
+
+  for (const hand of ['RH', 'LH'] as const) {
+    // One release per onset: a chord is silent only when every member is.
+    const release = new Map<number, number>();
+    for (const n of sysNotes) {
+      if (handForNote(n) !== hand) continue;
+      release.set(n.startTick, Math.max(release.get(n.startTick) ?? 0, n.startTick + n.durationTicks));
+    }
+    const ticks = [...release.keys()].sort((a, b) => a - b);
+    if (ticks.length === 0) continue;
+    const activeMeasures = new Set(ticks.map((tick) => measureIndexOfTick(tick, geo, systemIndex, t)));
+
+    for (let i = 0; i < ticks.length - 1; i++) {
+      const releaseTick = release.get(ticks[i])!;
+      const gap = ticks[i + 1] - releaseTick;
+      if (gap <= 0 || !isStandardRestValue(gap)) continue;
+      const measureIdx = measureIndexOfTick(releaseTick, geo, systemIndex, t);
+      // The rest belongs to an *active* measure of this hand: the hand must own
+      // at least one onset inside the measure the silence opens in.
+      if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
+      if (!activeMeasures.has(measureIdx)) continue;
+      const candidate: JankoRestGeometry = {
+        tick: releaseTick,
+        durationTicks: gap,
+        hand,
+        x: getTickColumnX(releaseTick, geo, systemIndex, o, t),
+        y: geo.middleCY + getEquatorYForOctave(hand === 'RH' ? 4 : 3, hand, t, o),
+        value: restValueForTicks(gap),
+        style: o.restStyle,
+      };
+      // A rest never straddles a protected barline: when a silence opens exactly
+      // on a measure boundary, that column belongs to the grid. The transparent
+      // policy reserves nothing, so there the rest is admitted like any glyph.
+      if (protectsBarlineInk(o.gridWritingPolicy)) {
+        const opening = getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t);
+        if (opening !== null && Math.abs(candidate.x - opening) < t.noteheadRadius + REST_NOTEHEAD_AIR) {
+          continue;
+        }
+      }
+      if (restClearsLayout(candidate, notes, t)) out.push(candidate);
+    }
+  }
+
+  return out.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1));
 }
 
 // ---------------------------------------------------------------------------
@@ -1692,7 +1877,8 @@ export function layoutJankoSystem(
       chordColumns.notes,
       geometry,
       systemIndex,
-      t
+      t,
+      protectsBarlineInk(o.gridWritingPolicy)
     );
     const demoted = [...claspInsets.keys()].filter((m) => colliding.has(m));
     if (demoted.length === 0) break;
@@ -1752,7 +1938,11 @@ export function layoutJankoSystem(
     .filter((entry) =>
       claspClearsLayout(
         entry.geometry,
-        getMeasureOpeningBarlineX(entry.cluster.measureIdx, geometry, systemIndex, t),
+        // Round 12: the transparent grid reserves no barline air, so a bracket
+        // is judged against the glyphs alone (its barline is knocked out).
+        protectsBarlineInk(o.gridWritingPolicy)
+          ? getMeasureOpeningBarlineX(entry.cluster.measureIdx, geometry, systemIndex, t)
+          : null,
         notes,
         t,
         furnitureLaid
@@ -1833,6 +2023,7 @@ export function layoutJankoSystem(
     notes,
     beams,
     ungrouped,
+    rests: computeJankoRests(score, geometry, systemIndex, o, t, notes),
     clasps,
     claspRails,
     claspedStems,
@@ -1863,7 +2054,8 @@ export function layoutJankoScore(
 function renderNotesLayer(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  gridInk: string = ''
 ): string {
   const out: string[] = ['  <g class="janko-notes">'];
 
@@ -1961,6 +2153,17 @@ function renderNotesLayer(
     out.push(renderClaspGroup(layout.clasps, layout.claspRails, t));
   }
 
+  // 2c. Round 12 voice rests: the written silences of an inactive hand span,
+  //     painted above the rhythm layer they interrupt and beneath the noteheads,
+  //     so a glyph mask always erases whatever a rest should never have touched.
+  for (const rest of layout.rests) out.push(renderRest(rest, t));
+
+  // 2d. Round 12 `'strict-protected-grid'`: the continuous vertical grid is
+  //     painted here, on its dedicated white air channels, *above* the rhythm
+  //     layer — so no stem or beam may ever overwrite it — while the circular
+  //     notehead masks painted in step 3 still knock it out inside their disc.
+  if (gridInk.length > 0) out.push(gridInk);
+
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.
   for (const p of layout.notes) {
     out.push(
@@ -2017,9 +2220,20 @@ export function renderSystem(
   }
   out.push(renderOctaveLabels(geo, o, t));
   out.push(renderStaffLines(geo, o, t));
-  out.push(renderBeatGrid(geo, systemIndex, o, t));
-  out.push(renderBarlines(geo, o, t, resolved.isFinalSystem));
-  out.push(renderNotesLayer(resolved, o, t));
+  // Round 12: the continuous vertical grid (measure barlines + dashed beat
+  // pulses). Under `'strict-protected-grid'` it is handed to the notes layer and
+  // painted above the rhythm ink on its own white air channels; every other
+  // policy paints it first, as the transparent structural background it is.
+  const gridInk = [
+    renderBeatGrid(geo, systemIndex, o, t),
+    renderBarlines(geo, o, t, resolved.isFinalSystem),
+  ].join('\n');
+  if (channelsGridInk(o.gridWritingPolicy)) {
+    out.push(renderNotesLayer(resolved, o, t, gridInk));
+  } else {
+    out.push(gridInk);
+    out.push(renderNotesLayer(resolved, o, t));
+  }
   out.push('  </g>');
   return out.join('\n');
 }

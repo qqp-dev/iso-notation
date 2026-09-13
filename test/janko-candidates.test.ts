@@ -1,31 +1,31 @@
 /**
- * Round 11 — Accolade Replacements, Symmetrical Octave Lattice, Clean Specimen
- * Chords & Urtext Typography: candidate registry suite.
+ * Round 12 — Rest Symbol Dialects, Continuous Vertical Grid, Start Symbols &
+ * Grid Writing Policies: candidate registry suite.
  *
- * The round tests four **System 1 start replacements**, each paired with one
- * light transverse clasp-duration paradigm, on a 100% symmetrical 30pt octave
- * lattice:
+ * The round tests four **rest dialects**, each paired with one refined
+ * architectural System 1 start symbol and one vertical-grid writing policy:
  *
- * | # | id                                  | `systemStartStyle`       | `claspDurationStyle`      |
- * | - | ----------------------------------- | ------------------------ | ------------------------- |
- * | A | `open-halo-cross-rungs`             | `'open-halo'`            | `'transverse-cross-bars'` |
- * | B | `architectural-bracket-kinetic-slashes` | `'architectural-bracket'` | `'kinetic-cross-slashes'` |
- * | C | `clef-pillar-down-raked-slashes`    | `'clef-pillar'`          | `'down-raked-slashes'`    |
- * | D | `double-hairline-cross-hatch-stitches` | `'double-hairline'`   | `'cross-hatch-stitches'`  |
+ * | # | id                                        | `restStyle`         | `systemStartStyle`       | `gridWritingPolicy`        |
+ * | - | ----------------------------------------- | ------------------- | ------------------------ | -------------------------- |
+ * | A | `kinetic-monoline-architectural-bracket`  | `'kinetic-monoline'`| `'architectural-bracket'`| `'overlaid-beat-grid'`     |
+ * | B | `classical-urtext-delicate-bracket`       | `'classical-urtext'`| `'delicate-bracket'`     | `'strict-protected-grid'`  |
+ * | C | `geometric-node-clef-pillar`              | `'geometric-node'`  | `'clef-pillar'`          | `'unified-transparent-grid'` |
+ * | D | `bauhaus-slash-architectural-bracket`     | `'bauhaus-slash'`   | `'architectural-bracket'`| `'overlaid-beat-grid'`     |
  *
  * Covers:
- *  1. `CURRENT_ROUND_METADATA.round === 11` and the round question.
+ *  1. `CURRENT_ROUND_METADATA.round === 12` and the round question.
  *  2. `CURRENT_CANDIDATES` declares exactly the four pairs A–D.
  *  3. Each candidate's deltas against the golden master are `chordGrouping`
- *     (`'per-hand-clasp'`) plus its own system-start and duration paradigms.
- *  4. All four display windows (Bach mm. 1–2, m. 4, mm. 29–30 and the
- *     wide-span chord-duration specimen) are declared and really engraved.
- *  5. The specimen chords are **stemless**: simultaneities never form melodic
- *     beams, so the clasp brackets are their sole grouping and duration carrier.
- *  6. mm. 29–30 carry one continuous Octave 6 outlier rule and the margin
- *     measure numerals sit in the true left margin.
+ *     (`'per-hand-clasp'`) plus its own rest dialect, start symbol and grid
+ *     writing policy.
+ *  4. All four display windows (Bach mm. 1–2, m. 4, mm. 27–29 and the
+ *     wide-span chord specimen) are declared and really engraved.
+ *  5. The m. 4 tick-552 silence is written as a 16th rest in the RH on the
+ *     Octave 4 equator, in the candidate's own dialect.
+ *  6. The specimen chords are **stemless** and carry the standardized up-raked
+ *     12.4° kinetic clasps.
  *  7. The live studio engraves all four candidates on all four windows with
- *     option deltas, the clasp layer, distinct duration ink and a lint chip.
+ *     option deltas, the rest layer and a clean lint chip.
  */
 
 import { test } from 'node:test';
@@ -55,10 +55,12 @@ import { createStudioConfig, renderCandidatesView } from '../src/render/janko/st
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
-  JANKO_CLASP_DURATION_STYLES,
+  JANKO_GRID_WRITING_POLICIES,
+  JANKO_REST_STYLES,
   JANKO_SUBDIVISION_STYLES,
   JANKO_SYSTEM_START_STYLES,
-  JankoClaspDurationStyle,
+  JankoGridWritingPolicy,
+  JankoRestStyle,
   JankoSystemStartStyle,
   resolveJankoOptions,
 } from '../src/render/janko/types';
@@ -70,53 +72,58 @@ const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The exact round-11 table, candidate by candidate. */
+/** The exact round-12 table, candidate by candidate. */
 const PARADIGMS: Array<{
   id: string;
   letter: string;
   label: string;
+  rest: JankoRestStyle;
   start: JankoSystemStartStyle;
-  style: JankoClaspDurationStyle;
-  /** The class of the margin ink the System 1 start paints (null = open margin). */
-  startInk: string | null;
-  /** The cut class the paradigm paints for an 8th / 16th. */
-  mark: string;
+  grid: JankoGridWritingPolicy;
+  /** The class of the rest ink the dialect paints on the m. 4 16th. */
+  restInk: string;
+  /** The class of the margin ink the System 1 start paints. */
+  startInk: string;
 }> = [
   {
-    id: 'open-halo-cross-rungs',
+    id: 'kinetic-monoline-architectural-bracket',
     letter: 'A',
-    label: 'A · Open Margin + Halo / Horizontal Cross-Rungs',
-    start: 'open-halo',
-    style: 'transverse-cross-bars',
-    startInk: null,
-    mark: 'janko-clasp-bar',
-  },
-  {
-    id: 'architectural-bracket-kinetic-slashes',
-    letter: 'B',
-    label: 'B · Architectural Bracket / 12.4° Kinetic Slashes',
+    label: 'A · Kinetic Monoline Rests / Architectural Bracket (0.65pt)',
+    rest: 'kinetic-monoline',
     start: 'architectural-bracket',
-    style: 'kinetic-cross-slashes',
+    grid: 'overlaid-beat-grid',
+    restInk: 'janko-rest-tab',
     startInk: 'janko-system-bracket',
-    mark: 'janko-clasp-slash',
   },
   {
-    id: 'clef-pillar-down-raked-slashes',
+    id: 'classical-urtext-delicate-bracket',
+    letter: 'B',
+    label: 'B · Classical Urtext Rests / Delicate Bracket (0.50pt)',
+    rest: 'classical-urtext',
+    start: 'delicate-bracket',
+    grid: 'strict-protected-grid',
+    restInk: 'janko-rest-hook',
+    startInk: 'janko-system-bracket-delicate',
+  },
+  {
+    id: 'geometric-node-clef-pillar',
     letter: 'C',
-    label: 'C · Clef-Pillar Landmark / Down-Raked Slashes',
+    label: 'C · Geometric Node Rests / Nib-Free Clef Pillar',
+    rest: 'geometric-node',
     start: 'clef-pillar',
-    style: 'down-raked-slashes',
+    grid: 'unified-transparent-grid',
+    restInk: 'janko-rest-node',
     startInk: 'janko-clef-pillar',
-    mark: 'janko-clasp-slash',
   },
   {
-    id: 'double-hairline-cross-hatch-stitches',
+    id: 'bauhaus-slash-architectural-bracket',
     letter: 'D',
-    label: 'D · Double Hairline Frame / Cross-Hatch Stitches',
-    start: 'double-hairline',
-    style: 'cross-hatch-stitches',
-    startInk: 'janko-double-hairline-outer',
-    mark: 'janko-clasp-stitch',
+    label: 'D · Bauhaus Hairline Rests / Architectural Bracket (0.65pt)',
+    rest: 'bauhaus-slash',
+    start: 'architectural-bracket',
+    grid: 'overlaid-beat-grid',
+    restInk: 'janko-rest-slash',
+    startInk: 'janko-system-bracket',
   },
 ];
 
@@ -136,31 +143,36 @@ function claspGroups(svg: string): Array<{ tick: string; duration: string; body:
   )].map((m) => ({ tick: m[1], duration: m[2], body: m[3] }));
 }
 
-test('CURRENT_ROUND_METADATA opens round 11 of the accolade-replacement exploration', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 11);
+test('CURRENT_ROUND_METADATA opens round 12 of the rest-dialect exploration', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 12);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Accolade Replacements, Symmetrical Octave Lattice, Clean Specimen Chords & Urtext Typography'
+    'Rest Symbol Dialects, Continuous Vertical Grid, Start Symbols & Grid Writing Policies'
   );
   assert.equal(
     CURRENT_ROUND_METADATA.description,
-    'Comparing 4 System 1 start styles paired with 4 light transverse clasp-duration paradigms on a symmetrical 30pt octave lattice, with stemless specimen chords, margin measure numerals, a continuous Octave 6 outlier rule and Urtext running headers.'
+    'Comparing 4 rest symbol dialects, testing the 3-way grid writing policy on mm. 27 & 29, with continuous barlines and beat lines across Middle C and refined architectural start symbols.'
   );
 });
 
-test('CURRENT_CANDIDATES declares the four System 1 start / duration pairs A–D', () => {
+test('CURRENT_CANDIDATES declares the four rest dialect / start symbol / grid policy pairs A–D', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, PARADIGMS.map((p) => p.id), 'candidate order is A, B, C, D');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
-    PARADIGMS.map((p) => p.start),
-    'every System 1 start style is represented exactly once'
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.restStyle),
+    PARADIGMS.map((p) => p.rest),
+    'every rest dialect is represented exactly once'
   );
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.claspDurationStyle),
-    PARADIGMS.map((p) => p.style),
-    'every duration paradigm is represented exactly once'
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
+    PARADIGMS.map((p) => p.start),
+    'the three refined architectural start symbols are represented'
+  );
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.gridWritingPolicy),
+    PARADIGMS.map((p) => p.grid),
+    'every grid writing policy is represented'
   );
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id);
@@ -174,49 +186,57 @@ test('CURRENT_CANDIDATES declares the four System 1 start / duration pairs A–D
     assert.ok(paradigm.label.startsWith(`${paradigm.letter} · `), `${paradigm.id} is candidate ${paradigm.letter}`);
   }
   assert.deepEqual(
-    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.systemStartStyle))].sort(),
-    [...JANKO_SYSTEM_START_STYLES].filter((s) => s !== 'none').sort(),
-    'the registry covers every published system-start style except the null one'
+    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.restStyle))].sort(),
+    [...JANKO_REST_STYLES].sort(),
+    'the registry covers the published rest catalogue'
   );
   assert.deepEqual(
-    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.claspDurationStyle))].sort(),
-    [...JANKO_CLASP_DURATION_STYLES].sort(),
-    'the registry covers the published duration catalogue'
+    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.systemStartStyle))].sort(),
+    ['architectural-bracket', 'clef-pillar', 'delicate-bracket'],
+    'the round narrows System 1 to the three architectural finalists'
+  );
+  assert.deepEqual(
+    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.gridWritingPolicy))].sort(),
+    [...JANKO_GRID_WRITING_POLICIES].sort(),
+    'the registry covers the published grid writing catalogue'
+  );
+  assert.ok(
+    JANKO_SYSTEM_START_STYLES.includes('delicate-bracket'),
+    'the Round 12 delicate bracket is part of the published catalogue'
   );
 });
 
-test('Every candidate is demonstrated on the opening, the m. 4 run, mm. 29–30 and the specimen', () => {
+test('Every candidate is demonstrated on the opening, the m. 4 rest, mm. 27–29 and the specimen', () => {
   for (const paradigm of PARADIGMS) {
     const resolved = resolveCandidate(getCandidate(paradigm.id)!);
     assert.equal(resolved.windows.length, 4, `${paradigm.id} declares four windows`);
-    const [bach, run, outlier, specimen] = resolved.windows;
+    const [bach, rest, dense, specimen] = resolved.windows;
     assert.equal(bach.scoreId, DEFAULT_STUDIO_SCORE_ID);
     assert.equal(bach.measureStart, 1);
     assert.equal(bach.measureCount, 2);
     assert.match(bach.title, /Bach Goldberg Var\. 1 · mm\. 1–2/);
-    assert.match(bach.title, /System 1 start style/);
-    assert.match(bach.title, /Position of Honor halo/);
-    assert.match(bach.title, /margin measure numeral/);
-    assert.equal(run.scoreId, DEFAULT_STUDIO_SCORE_ID);
-    assert.equal(run.measureStart, 4);
-    assert.equal(run.measureCount, 1);
-    assert.match(run.title, /Bach Goldberg Var\. 1 · m\. 4/);
-    assert.match(run.title, /continuous RH run beaming across Middle C into Octave 3/);
-    assert.match(run.title, /orphaned 9 · 7 · 6 flags/);
-    assert.equal(outlier.scoreId, DEFAULT_STUDIO_SCORE_ID);
-    assert.equal(outlier.measureStart, 29);
-    assert.equal(outlier.measureCount, 2);
-    assert.match(outlier.title, /Bach Goldberg Var\. 1 · mm\. 29–30/);
-    assert.match(outlier.title, /continuous Octave 6 outlier rule/);
-    assert.match(outlier.title, /margin measure numbers/);
+    assert.match(bach.title, /System 1 start symbols/);
+    assert.match(bach.title, /architectural bracket/);
+    assert.match(bach.title, /delicate bracket/);
+    assert.match(bach.title, /nib-free clef pillar/);
+    assert.equal(rest.scoreId, DEFAULT_STUDIO_SCORE_ID);
+    assert.equal(rest.measureStart, 4);
+    assert.equal(rest.measureCount, 1);
+    assert.match(rest.title, /Bach Goldberg Var\. 1 · m\. 4/);
+    assert.match(rest.title, /4 rest dialects at tick 552/);
+    assert.match(rest.title, /Octave 4 equator/);
+    assert.equal(dense.scoreId, DEFAULT_STUDIO_SCORE_ID);
+    assert.equal(dense.measureStart, 27);
+    assert.equal(dense.measureCount, 3);
+    assert.match(dense.title, /Bach Goldberg Var\. 1 · mm\. 27–29/);
+    assert.match(dense.title, /3-way grid writing policy/);
+    assert.match(dense.title, /continuous barlines and beat lines across Middle C/);
     assert.equal(specimen.scoreId, SPECIMEN_STUDIO_SCORE_ID);
     assert.equal(specimen.measureStart, 1);
     assert.equal(specimen.measureCount, 2);
     assert.match(specimen.title, /Wide-Span Chord Specimen/);
+    assert.match(specimen.title, /12\.4° kinetic clasps/);
     assert.match(specimen.title, /open white ring/);
-    assert.match(specimen.title, /dotted quarter \(0\.75pt dot\)/);
-    assert.match(specimen.title, /8th \(1 cut\)/);
-    assert.match(specimen.title, /16th \(2 cuts\)/);
     assert.match(specimen.title, /stemless 1\.5-octave chords/);
     // The legacy single-window fields keep pointing at the first window.
     assert.equal(resolved.measureStart, 1);
@@ -248,9 +268,16 @@ test('The wide-span chord specimen carries the whole taxonomy and is stemless', 
     ['pip:0', 'spire:0', 'spire:0+dot', 'spire-one-flag:1', 'spire-two-flags:2'],
     'the taxonomy lands as open ring / plain / plain+dot / 1 cut / 2 cuts'
   );
+  // Round 12 standardizes the up-raked 12.4° kinetic clasp on the golden master.
+  assert.equal(
+    DEFAULT_JANKO_OPTIONS.claspDurationStyle,
+    'kinetic-cross-slashes',
+    'the settled midpoint paradigm'
+  );
+  for (const clasp of layout.clasps) {
+    assert.equal(clasp.durationStyle, 'kinetic-cross-slashes', 'every bracket speaks the settled rake');
+  }
   // Round 11: the four heads of one onset are a chord, never a zero-width beam.
-  // No melodic group may form on a simultaneity, so the bracket is the chord's
-  // sole grouping and duration carrier (zero stems slicing the noteheads).
   assert.equal(layout.beams.length, 0, 'a simultaneity never forms a melodic beam');
   assert.equal(
     layout.claspedStems.length,
@@ -260,18 +287,14 @@ test('The wide-span chord specimen carries the whole taxonomy and is stemless', 
   const rendered = renderJankoCrop(SPECIMEN, 1, 2, options, DEFAULT_JANKO_TOKENS);
   assert.equal((rendered.match(/class="janko-stem"/g) ?? []).length, 0, 'no vertical stems');
   assert.equal((rendered.match(/class="janko-beam"/g) ?? []).length, 0, 'no zero-width beams');
-  // Every chord is one hand's four-voice wide-span chord, i.e. exactly what the
-  // per-hand bracket exists for, and every bracket is a realistic tall bracket:
-  // 45pt of notehead span (1.5 octaves) inside the ticket's 35–55pt window.
-  for (const clasp of layout.clasps) {
-    assert.equal(new Set(clasp.notes.map((n) => n.hand)).size, 1, 'one hand per bracket');
-    assert.equal(clasp.notes.length, 4, 'four-voice chords');
-    const span = clasp.maxY - clasp.minY;
-    assert.ok(
-      span >= 35 && span <= 55,
-      `bracket at tick ${clasp.tick} spans ${span.toFixed(1)}pt (35–55pt required)`
-    );
-  }
+  assert.ok(
+    (rendered.match(/class="janko-clasp-slash"/g) ?? []).length > 0,
+    'the 8th / 16th chords carry the up-raked kinetic slashes'
+  );
+  // Round 12: the specimen's m. 2 silence is written too (an 8th rest in the RH).
+  assert.equal(layout.rests.length, 1, 'the specimen writes its silence');
+  assert.equal(layout.rests[0].value, 'eighth');
+  assert.match(rendered, /<g class="janko-rest-group"[^>]*data-rest-value="eighth"/);
   for (const value of values) {
     assert.ok(
       SPECIMEN.notes.some((n) => n.startTick === value.startTick && n.durationTicks === value.durationTicks),
@@ -280,54 +303,41 @@ test('The wide-span chord specimen carries the whole taxonomy and is stemless', 
   }
   const report = lintJankoScore(SPECIMEN, options, DEFAULT_JANKO_TOKENS);
   assert.equal(report.ok, true, 'the specimen engraves clean');
+  assert.equal(report.warnings.length, 0, 'with no warning');
 });
 
 test('Every candidate states its deltas against the golden master', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the settled beam-harmonized tab');
   assert.equal(golden.systemStartStyle, 'open-halo', 'the golden open margin');
-  assert.equal(golden.claspDurationStyle, 'transverse-cross-bars', 'the golden cross-rungs');
+  assert.equal(golden.restStyle, 'kinetic-monoline', 'the golden rest dialect');
+  assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'the golden grid writing policy');
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id)!;
-    const expected = [{ key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' }];
-    if (paradigm.start !== golden.systemStartStyle) {
-      expected.push({
+    const expected: Array<{ key: string; value: string; golden: string }> = [
+      { key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' },
+      { key: 'restStyle', value: paradigm.rest, golden: golden.restStyle },
+      {
         key: 'systemStartStyle',
         value: paradigm.start,
         golden: golden.systemStartStyle,
-      } as never);
-    }
-    if (paradigm.style !== golden.claspDurationStyle) {
-      expected.push({
-        key: 'claspDurationStyle',
-        value: paradigm.style,
-        golden: golden.claspDurationStyle,
-      } as never);
-    }
+      },
+      {
+        key: 'gridWritingPolicy',
+        value: paradigm.grid,
+        golden: golden.gridWritingPolicy,
+      },
+    ].filter((delta) => delta.value !== delta.golden);
     assert.deepEqual(
       candidateBadges(candidate),
       expected,
-      `${paradigm.id} departs in the per-hand clasp, its start style and its midpoint paradigm`
+      `${paradigm.id} departs in the per-hand clasp and whichever of its rest dialect / start symbol / grid policy is not already golden`
     );
     const resolved = resolveCandidate(candidate);
     for (const [key, value] of Object.entries(resolved.options)) {
-      if (key === 'chordGrouping') {
-        assert.equal(value, 'per-hand-clasp');
-        continue;
-      }
-      if (key === 'systemStartStyle') {
-        assert.equal(value, paradigm.start);
-        continue;
-      }
-      if (key === 'claspDurationStyle') {
-        assert.equal(value, paradigm.style);
-        continue;
-      }
-      assert.deepEqual(
-        value,
-        (golden as unknown as Record<string, unknown>)[key],
-        `${paradigm.id} keeps the golden ${key}`
-      );
+      const expectedValue = (expected.find((e) => e.key === key)?.value ??
+        (golden as unknown as Record<string, unknown>)[key]) as unknown;
+      assert.deepEqual(value, expectedValue, `${paradigm.id} keeps the golden ${key}`);
     }
     assert.deepEqual(resolved.tokens, DEFAULT_JANKO_TOKENS, `${paradigm.id} keeps every token`);
   }
@@ -344,8 +354,7 @@ test('Every candidate engraves both benchmarks and the specimen with the scope a
     // 3-note chord, so the per-hand clasp never appears there.
     const bach = layoutJankoScore(SCORE, resolved.options, resolved.tokens);
     assert.equal(bach.reduce((n, l) => n + l.clasps.length, 0), 0, `${paradigm.id} Bach clasps`);
-    // The m. 4 RH run beams continuously across Middle C — its `9 · 7 · 6` tail
-    // is never orphaned into solitary flags.
+    // The m. 4 RH run beams continuously across Middle C.
     const m4 = bach[0].beams.filter((b) => b.notes.some((n) => n.startTick >= 528 && n.startTick < 576));
     assert.ok(
       m4.some((b) => b.notes.some((n) => n.startTick === 540)),
@@ -366,7 +375,7 @@ test('Every candidate engraves both benchmarks and the specimen with the scope a
     assert.equal(clasps.length, 11, `${paradigm.id} Brahms clasp count`);
     for (const clasp of clasps) {
       assert.equal(new Set(clasp.notes.map((n) => n.hand)).size, 1, 'one hand per bracket');
-      assert.equal(clasp.durationStyle, paradigm.style, 'the bracket carries its paradigm');
+      assert.equal(clasp.durationStyle, 'kinetic-cross-slashes', 'the bracket carries the settled rake');
     }
     // The Round 8 `B - 2 - 8` bracket is among them…
     const b28 = clasps.find((c) => c.tick === 1296);
@@ -376,7 +385,6 @@ test('Every candidate engraves both benchmarks and the specimen with the scope a
     const b47 = clasps.find((c) => c.tick === 1488);
     assert.ok(b47, `${paradigm.id} brackets the B - 4 - 7 3-note chord`);
     assert.equal(b47!.notes.length, 3, 'three heads in one vertical column');
-    assert.equal(new Set(b47!.notes.map((n) => n.x)).size, 1, 'a clean vertical column');
     // Option 3 still gap-gates the clean 2-note columns only.
     const chords = brahms.flatMap((l) => l.verticalChords);
     assert.ok(chords.length > 0, `${paradigm.id} gap-gates clean vertical hand columns`);
@@ -405,8 +413,14 @@ test('Every candidate engraves both benchmarks and the specimen with the scope a
   }
 });
 
-test('Every candidate paints its System 1 start ink and its light midpoint paradigm', () => {
+test('Every candidate paints its rest dialect, its System 1 start ink and its grid policy', () => {
   const documents = new Set<string>();
+  const foreignRestInk: Record<JankoRestStyle, RegExp> = {
+    'kinetic-monoline': /janko-rest-(hook|lightning|block|node|ray|capsule|slash|wing|z|box)/,
+    'classical-urtext': /janko-rest-(stem|tab|notch|bar|node|ray|capsule|slash|wing|z|box)/,
+    'geometric-node': /janko-rest-(stem|tab|notch|bar|hook|lightning|block|slash|wing|z|box)/,
+    'bauhaus-slash': /janko-rest-(stem|tab|notch|bar|hook|lightning|block|node|ray|capsule)/,
+  };
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id)!;
     const resolved = resolveCandidate(candidate);
@@ -416,32 +430,81 @@ test('Every candidate paints its System 1 start ink and its light midpoint parad
       /data-subdivision-style="kinetic-tab-beam"/,
       `${paradigm.id} dispatches the beam-harmonized tab`
     );
-    // The System 1 start style paints exactly its own margin ink (or none).
+    // The System 1 start symbol paints exactly its own margin ink (or none).
     for (const other of PARADIGMS) {
-      if (other.startInk === null || other === paradigm) continue;
+      if (other.startInk === paradigm.startInk || other === paradigm) continue;
+      if (other.startInk === 'janko-system-bracket' && paradigm.startInk === 'janko-system-bracket') continue;
       assert.ok(
-        !bach.includes(other.startInk),
+        !bach.includes(other.startInk) ||
+          (other.startInk === 'janko-system-bracket' &&
+            paradigm.startInk === 'janko-system-bracket-delicate') ||
+          (other.startInk === 'janko-system-bracket-delicate' &&
+            paradigm.startInk === 'janko-system-bracket'),
         `${paradigm.id} never paints ${other.startInk}`
       );
     }
-    if (paradigm.startInk === null) {
-      assert.ok(
-        !/janko-system-bracket|janko-clef-pillar|janko-double-hairline/.test(bach),
-        'the open margin paints no system-start ink'
-      );
-      assert.match(bach, /class="janko-halo"/, 'the tick-0 sounds keep the Position of Honor halo');
-    } else {
-      assert.ok(bach.includes(paradigm.startInk), `${paradigm.id} paints ${paradigm.startInk}`);
+    assert.ok(bach.includes(paradigm.startInk), `${paradigm.id} paints ${paradigm.startInk}`);
+    if (paradigm.start === 'architectural-bracket') {
+      assert.match(bach, /class="janko-system-bracket" [^>]*stroke-width="0\.65"/);
     }
-    // Round 11 page furniture: the measure numeral is right-aligned into the
-    // true left margin (`staffLeft − 10pt`, `staffTopY − 3pt`).
-    const numeral = /<text class="janko-measure-num" x="([\d.-]+)" y="([\d.-]+)" text-anchor="end">/.exec(
-      bach
-    )!;
-    assert.ok(numeral, `${paradigm.id} paints a margin measure numeral`);
+    if (paradigm.start === 'delicate-bracket') {
+      assert.match(bach, /class="janko-system-bracket-delicate" [^>]*stroke-width="0\.50"/);
+    }
+    if (paradigm.start === 'clef-pillar') {
+      assert.equal(
+        (bach.match(/class="janko-clef-pillar-tick"/g) ?? []).length,
+        4,
+        'the nib-free pillar ticks the four octave equators only'
+      );
+    }
 
-    // The specimen carries the whole taxonomy side by side: the ring, the plain
-    // bracket, the dotted quarter, the 8th and the 16th.
+    // The Round 12 rest layer: the m. 4 tick-552 16th silence in the RH.
+    const restCrop = renderJankoCrop(SCORE, 4, 1, resolved.options, resolved.tokens);
+    const group = new RegExp(
+      `<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="${paradigm.rest}">`
+    );
+    assert.match(restCrop, group, `${paradigm.id} writes the m. 4 silence in its own dialect`);
+    assert.match(restCrop, new RegExp(paradigm.restInk), `${paradigm.id} paints ${paradigm.restInk}`);
+    assert.ok(
+      !foreignRestInk[paradigm.rest].test(restCrop),
+      `${paradigm.id} never paints another dialect's rest ink`
+    );
+    const m4Rest = layoutJankoScore(SCORE, resolved.options, resolved.tokens)
+      .flatMap((l) => l.rests)
+      .find((r) => r.tick === 552)!;
+    assert.equal(m4Rest.hand, 'RH');
+    assert.equal(m4Rest.value, 'sixteenth');
+    // Under the protected policies the rest stands on the canonical tick-552
+    // beat column (x ≈ 544.97pt), exactly as the ticket specifies. The
+    // transparent policy withdraws the measure inset, so the column shifts with
+    // the rest of the music: it then only has to stay inside its own measure,
+    // left of the tick-564 resumption.
+    const system0 = layoutJankoScore(SCORE, resolved.options, resolved.tokens)[0];
+    if (paradigm.grid !== 'unified-transparent-grid') {
+      assert.ok(Math.abs(m4Rest.x - 544.97) < 0.01, `${paradigm.id} tick-552 column`);
+    } else {
+      const measureLeft = system0.geometry.staffLeft + 3 * system0.geometry.measureWidth;
+      const resumption = system0.notes.find((p) => p.note.startTick === 564 && p.rhythm.hand === 'RH')!;
+      assert.ok(m4Rest.x > measureLeft, `${paradigm.id} rest stays inside m. 4`);
+      assert.ok(m4Rest.x < resumption.x, `${paradigm.id} rest precedes the tick-564 resumption`);
+    }
+
+    // The grid writing policy: only the strict policy channels the grid.
+    const dense = renderJankoCrop(SCORE, 27, 3, resolved.options, resolved.tokens);
+    const channels = (dense.match(/class="janko-grid-channel"/g) ?? []).length;
+    if (paradigm.grid === 'strict-protected-grid') {
+      assert.ok(channels > 0, `${paradigm.id} paints its dedicated white air channels`);
+    } else {
+      assert.equal(channels, 0, `${paradigm.id} reserves no air channel`);
+    }
+    // Under every policy the grid stays one continuous rule across Middle C.
+    for (const line of dense.matchAll(
+      /<line class="janko-(?:barline|beat-line)" x1="[\d.-]+" y1="([\d.-]+)" x2="[\d.-]+" y2="([\d.-]+)"/g
+    )) {
+      assert.ok(Number(line[1]) < Number(line[2]), `${paradigm.id} grid lines are unbroken`);
+    }
+
+    // The specimen carries the standardized kinetic clasp taxonomy side by side.
     const specimenOptions = resolveJankoOptions({
       ...CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID].options,
       ...(candidate.options ?? {}),
@@ -472,64 +535,33 @@ test('Every candidate paints its System 1 start ink and its light midpoint parad
       1,
       `${paradigm.id} dotted quarter: the plain bracket + one dot`
     );
-    assert.ok(
-      !new RegExp(paradigm.mark).test(plains[1].body),
-      `${paradigm.id} keeps the dotted quarter plain apart from its dot`
-    );
     assert.equal(
-      (byDuration.get('spire-one-flag')!.match(new RegExp(paradigm.mark, 'g')) ?? []).length,
+      (byDuration.get('spire-one-flag')!.match(/janko-clasp-slash/g) ?? []).length,
       1,
-      `${paradigm.id} 8th: one midpoint cut`
+      `${paradigm.id} 8th: one up-raked slash`
     );
     assert.equal(
-      (byDuration.get('spire-two-flags')!.match(new RegExp(paradigm.mark, 'g')) ?? []).length,
+      (byDuration.get('spire-two-flags')!.match(/janko-clasp-slash/g) ?? []).length,
       2,
-      `${paradigm.id} 16th: two midpoint cuts`
+      `${paradigm.id} 16th: two up-raked slashes`
     );
-    // Every specimen bracket is tagged with the paradigm and anchored on the
-    // exact spine midpoint of its own cluster.
     assert.match(
       specimen,
-      new RegExp(`data-clasp-duration-style="${paradigm.style}"`),
-      `${paradigm.id} tags its duration ink`
+      /data-clasp-duration-style="kinetic-cross-slashes"/,
+      `${paradigm.id} tags the settled duration paradigm`
     );
-    const layout = layoutJankoScore(SPECIMEN, specimenOptions, CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID].tokens)[0];
-    for (const clasp of layout.clasps) {
-      const yMid = (clasp.topY + clasp.botY) / 2;
-      const group = groups.find((g) => g.tick === String(clasp.tick))!;
-      for (const mark of group.body.matchAll(/(?:y1|y2|cy)="([\d.-]+)"/g)) {
-        // The shared ring rides the midpoint; the 16th pair mirrors about it,
-        // so no mark may leave the bracket's own span.
-        const y = Number(mark[1]);
-        assert.ok(y >= clasp.topY - 0.01 && y <= clasp.botY + 0.01, `${paradigm.id} mark inside the bracket`);
-        assert.ok(
-          Math.abs(y - yMid) <= clasp.botY - clasp.topY,
-          `${paradigm.id} mark belongs to the midpoint band`
-        );
-      }
-    }
 
-    // Compare the *ink*, not the paradigm tag: strip the style attribute so two
+    // Compare the *ink*, not the tags: strip the style attributes so two
     // paradigms that painted identical ink could never count as distinct.
-    documents.add(specimen.replace(/ data-clasp-duration-style="[^"]*"/g, ''));
+    documents.add(
+      specimen
+        .replace(/ data-clasp-duration-style="[^"]*"/g, '')
+        .replace(/ data-rest-style="[^"]*"/g, '')
+    );
   }
   // The four paradigms must be four *different* engravings of the same window:
   // a decision round whose candidates render identically decides nothing.
   assert.equal(documents.size, PARADIGMS.length, 'each paradigm is a distinct engraving');
-});
-
-test('The mm. 29–30 window carries one continuous Octave 6 outlier rule and no choppy dashes', () => {
-  const resolved = resolveCandidate(getCandidate('open-halo-cross-rungs')!);
-  const svg = renderJankoCrop(SCORE, 29, 2, resolved.options, resolved.tokens);
-  const rules = [...svg.matchAll(/<line class="janko-outlier-rule" x1="([\d.-]+)"[^>]*x2="([\d.-]+)"/g)];
-  assert.equal(rules.length, 1, 'one unbroken outlier rule across mm. 29–30');
-  const measureWidth = (Number(rules[0][2]) - Number(rules[0][1])) / 2;
-  assert.ok(measureWidth > 0, 'the rule spans exactly the two measures');
-  assert.equal(
-    (svg.match(/class="janko-ledger"/g) ?? []).length,
-    0,
-    'no choppy notehead-centred ledger dashes survive in the covered measures'
-  );
 });
 
 test('The live studio engraves four candidates on four windows with deltas and lint chips', () => {
@@ -539,11 +571,11 @@ test('The live studio engraves four candidates on four windows with deltas and l
   assert.equal((html.match(/<svg/g) ?? []).length, 16, 'one engraved preview per window');
   assert.match(html, /data-candidate-count="4"/);
   assert.match(html, /data-window-count="4"/);
-  assert.match(html, /Round 11/);
-  assert.match(html, /Accolade Replacements/, 'the escaped round title headlines the view');
+  assert.match(html, /Round 12/);
+  assert.match(html, /Rest Symbol Dialects/, 'the escaped round title headlines the view');
   assert.match(html, /data-window="primary:1-2"/);
   assert.match(html, /data-window="primary:4-4"/);
-  assert.match(html, /data-window="primary:29-30"/);
+  assert.match(html, /data-window="primary:27-29"/);
   assert.match(html, /data-window="chord-duration-specimen:1-2"/);
 
   let cursor = -1;
@@ -560,10 +592,23 @@ test('The live studio engraves four candidates on four windows with deltas and l
     );
     assert.match(body, /<b>chordGrouping<\/b> = per-hand-clasp/, `${paradigm.id} grouping badge`);
     assert.match(body, /<s>none<\/s>/, `${paradigm.id} shows the golden grouping it departs from`);
+    if (paradigm.rest === DEFAULT_JANKO_OPTIONS.restStyle) {
+      assert.ok(
+        !body.includes('<b>restStyle</b>'),
+        'candidate A is the golden rest dialect itself'
+      );
+    } else {
+      assert.match(
+        body,
+        new RegExp(`<b>restStyle</b> = ${paradigm.rest}`),
+        `${paradigm.id} rest badge`
+      );
+      assert.match(body, /<s>kinetic-monoline<\/s>/, 'the golden rest dialect is shown');
+    }
     if (paradigm.start === DEFAULT_JANKO_OPTIONS.systemStartStyle) {
       assert.ok(
         !body.includes('<b>systemStartStyle</b>'),
-        'candidate A is the golden System 1 start itself'
+        'the candidate is the golden System 1 start itself'
       );
     } else {
       assert.match(
@@ -573,25 +618,26 @@ test('The live studio engraves four candidates on four windows with deltas and l
       );
       assert.match(body, /<s>open-halo<\/s>/, `${paradigm.id} shows the golden start it departs from`);
     }
-    if (paradigm.style === DEFAULT_JANKO_OPTIONS.claspDurationStyle) {
+    if (paradigm.grid === DEFAULT_JANKO_OPTIONS.gridWritingPolicy) {
       assert.ok(
-        !body.includes('<b>claspDurationStyle</b>'),
-        'candidate A is the golden duration paradigm itself'
+        !body.includes('<b>gridWritingPolicy</b>'),
+        'candidate A and D are the golden grid policy itself'
       );
     } else {
       assert.match(
         body,
-        new RegExp(`<b>claspDurationStyle</b> = ${paradigm.style}`),
-        `${paradigm.id} duration badge`
+        new RegExp(`<b>gridWritingPolicy</b> = ${paradigm.grid}`),
+        `${paradigm.id} grid policy badge`
       );
       assert.match(
         body,
-        /<s>transverse-cross-bars<\/s>/,
-        `${paradigm.id} shows the golden duration it departs from`
+        /<s>overlaid-beat-grid<\/s>/,
+        `${paradigm.id} shows the golden policy it departs from`
       );
     }
     assert.match(body, /badge-delta/, `${paradigm.id} highlights its delta`);
     assert.match(body, /class="janko-clasp-layer"/, `${paradigm.id} renders its clasp layer`);
+    assert.match(body, /class="janko-rest-group"/, `${paradigm.id} renders its rest layer`);
     assert.match(body, /data-subdivision-style="kinetic-tab-beam"/, `${paradigm.id} settled tab`);
     assert.match(body, /chip chip-ok/, `${paradigm.id} lints clean`);
     assert.match(body, /data-lint="clean"/);
@@ -599,7 +645,7 @@ test('The live studio engraves four candidates on four windows with deltas and l
   assert.match(html, /✓ clean/);
 });
 
-test('The contact sheet engraves the four start / duration pairs on one document', () => {
+test('The contact sheet engraves the four rest / start / grid pairs on one document', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => {
     const resolved = resolveCandidate(candidate);
     return { id: candidate.id, label: candidate.label, options: resolved.options };

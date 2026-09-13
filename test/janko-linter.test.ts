@@ -55,6 +55,7 @@ import {
   checkMeasureNumeralClearance,
   checkMiddleCCorridor,
   checkNoteheadClearance,
+  checkRestClearance,
   checkStemAndBeamValidity,
   checkStemDigitClearance,
   formatLintReport,
@@ -597,13 +598,51 @@ test('Defect: a system-start mark pushed off the page and into the numeral is ca
 });
 
 test('Defect: collapsing the Middle C corridor is caught', () => {
-  const cramped = { ...DEFAULT_JANKO_OPTIONS, interStaffGap: 18.0 };
+  // Round 12: the vertical grid crosses the corridor on purpose, so the
+  // remaining corridor invariant is the horizontal one — a squeezed lattice
+  // drives the Octave 4 rule into the spine.
+  const cramped = { ...DEFAULT_JANKO_OPTIONS, interStaffGap: 2.0 };
   const out: LintViolation[] = [];
   const layout = systems(cramped)[0];
   checkMiddleCCorridor(layout, cramped, DEFAULT_JANKO_TOKENS, LINT, out);
   const intrusions = out.filter((v) => v.code === 'corridor-intrusion');
-  assert.ok(intrusions.length > 0, 'structural rules may not cut the spine');
-  assert.ok(intrusions.some((v) => /structural rules/.test(v.message)));
+  assert.ok(intrusions.length > 0, 'a horizontal rule may not cut the spine');
+  assert.ok(intrusions.some((v) => /equator rule/.test(v.message)));
+});
+
+test('Round 12: the continuous grid is not a corridor intrusion by construction', () => {
+  // Every barline and beat pulse spans `rhTop..lhBot`; the audit must accept
+  // that continuous grid under the golden policy (and report no corridor hit).
+  const out: LintViolation[] = [];
+  const layout = systems(DEFAULT_JANKO_OPTIONS)[0];
+  checkMiddleCCorridor(layout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, out);
+  assert.deepEqual(
+    out.filter((v) => v.code === 'corridor-intrusion'),
+    [],
+    'the Round 12 vertical grid deliberately crosses Middle C'
+  );
+});
+
+test('Defect: a rest driven into a foreign notehead is caught', () => {
+  const out: LintViolation[] = [];
+  const layout = systems(DEFAULT_JANKO_OPTIONS)[0];
+  assert.ok(layout.rests.length > 0, 'the canonical score writes its silences');
+  const rest = layout.rests.find((r) => r.tick === 552)!;
+  const victim = layout.notes[0];
+  const broken: JankoSystemLayout = {
+    ...layout,
+    rests: [{ ...rest, x: victim.x, y: victim.y }],
+  };
+  checkRestClearance(broken, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, out);
+  const hits = out.filter((v) => v.code === 'rest-collision');
+  assert.equal(hits.length, 1, 'the rest is reported once');
+  assert.match(hits[0].message, /passes .* from notehead/);
+  assert.ok((JANKO_LINT_CHECKS as readonly string[]).includes('rest-clearance'));
+
+  // The engine's own rests pass the same audit untouched.
+  const clean: LintViolation[] = [];
+  checkRestClearance(layout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, clean);
+  assert.deepEqual(clean, []);
 });
 
 test('Corridor audit reads the true rule positions of the bounded channel', () => {

@@ -33,30 +33,19 @@
     <line x1="35.80" y1="166.00" x2="571.28" y2="166.00" stroke="#1E293B" stroke-width="0.50"/>
   </g>
   <g class="janko-beat-grid">
-    <line class="janko-beat-line" x1="82.42" y1="94.00" x2="82.42" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="82.42" y1="154.00" x2="82.42" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="123.05" y1="94.00" x2="123.05" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="123.05" y1="154.00" x2="123.05" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="216.29" y1="94.00" x2="216.29" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="216.29" y1="154.00" x2="216.29" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="256.92" y1="94.00" x2="256.92" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="256.92" y1="154.00" x2="256.92" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="350.16" y1="94.00" x2="350.16" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="350.16" y1="154.00" x2="350.16" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="390.79" y1="94.00" x2="390.79" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="390.79" y1="154.00" x2="390.79" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="484.03" y1="94.00" x2="484.03" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="484.03" y1="154.00" x2="484.03" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="524.66" y1="94.00" x2="524.66" y2="148.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="524.66" y1="154.00" x2="524.66" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="82.42" y1="94.00" x2="82.42" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="123.05" y1="94.00" x2="123.05" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="216.29" y1="94.00" x2="216.29" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="256.92" y1="94.00" x2="256.92" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="350.16" y1="94.00" x2="350.16" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="390.79" y1="94.00" x2="390.79" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="484.03" y1="94.00" x2="484.03" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="524.66" y1="94.00" x2="524.66" y2="208.00" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
   </g>
   <g class="janko-barlines">
-    <line class="janko-barline" x1="169.67" y1="94.00" x2="169.67" y2="148.00" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="169.67" y1="154.00" x2="169.67" y2="208.00" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="303.54" y1="94.00" x2="303.54" y2="148.00" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="303.54" y1="154.00" x2="303.54" y2="208.00" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="437.41" y1="94.00" x2="437.41" y2="148.00" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="437.41" y1="154.00" x2="437.41" y2="208.00" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="169.67" y1="94.00" x2="169.67" y2="208.00" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="303.54" y1="94.00" x2="303.54" y2="208.00" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="437.41" y1="94.00" x2="437.41" y2="208.00" stroke="#111111" stroke-width="0.60"/>
   </g>
   <g class="janko-notes">
   <g class="janko-beam-group">
@@ -222,6 +211,11 @@
     <line class="janko-stem" x1="329.85" y1="93.50" x2="329.85" y2="82.50" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-flag" data-stem-x="329.85" data-flag-index="1" x1="329.85" y1="82.50" x2="333.85" y2="83.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
     <circle class="janko-augmentation-dot" cx="337.85" cy="98.50" r="0.75" fill="#111111"/>
+    <g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
+    <line class="janko-rest-stem" x1="544.97" y1="130.00" x2="544.97" y2="142.00" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="544.97" y1="130.00" x2="548.97" y2="129.12" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="2" x1="544.97" y1="133.40" x2="548.97" y2="132.52" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    </g>
     <circle class="janko-halo" cx="41.80" cy="188.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
     <circle class="janko-knockout" cx="41.80" cy="188.50" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="41.80" y="191.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
@@ -374,30 +368,19 @@
     <line x1="35.80" y1="406.63" x2="571.28" y2="406.63" stroke="#1E293B" stroke-width="0.50"/>
   </g>
   <g class="janko-beat-grid">
-    <line class="janko-beat-line" x1="82.42" y1="334.63" x2="82.42" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="82.42" y1="394.63" x2="82.42" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="123.05" y1="334.63" x2="123.05" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="123.05" y1="394.63" x2="123.05" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="216.29" y1="334.63" x2="216.29" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="216.29" y1="394.63" x2="216.29" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="256.92" y1="334.63" x2="256.92" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="256.92" y1="394.63" x2="256.92" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="350.16" y1="334.63" x2="350.16" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="350.16" y1="394.63" x2="350.16" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="390.79" y1="334.63" x2="390.79" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="390.79" y1="394.63" x2="390.79" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="484.03" y1="334.63" x2="484.03" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="484.03" y1="394.63" x2="484.03" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="524.66" y1="334.63" x2="524.66" y2="388.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="524.66" y1="394.63" x2="524.66" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="82.42" y1="334.63" x2="82.42" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="123.05" y1="334.63" x2="123.05" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="216.29" y1="334.63" x2="216.29" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="256.92" y1="334.63" x2="256.92" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="350.16" y1="334.63" x2="350.16" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="390.79" y1="334.63" x2="390.79" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="484.03" y1="334.63" x2="484.03" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="524.66" y1="334.63" x2="524.66" y2="448.63" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
   </g>
   <g class="janko-barlines">
-    <line class="janko-barline" x1="169.67" y1="334.63" x2="169.67" y2="388.63" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="169.67" y1="394.63" x2="169.67" y2="448.63" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="303.54" y1="334.63" x2="303.54" y2="388.63" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="303.54" y1="394.63" x2="303.54" y2="448.63" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="437.41" y1="334.63" x2="437.41" y2="388.63" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="437.41" y1="394.63" x2="437.41" y2="448.63" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="169.67" y1="334.63" x2="169.67" y2="448.63" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="303.54" y1="334.63" x2="303.54" y2="448.63" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="437.41" y1="334.63" x2="437.41" y2="448.63" stroke="#111111" stroke-width="0.60"/>
   </g>
   <g class="janko-notes">
   <g class="janko-beam-group">
@@ -555,6 +538,19 @@
     <line class="janko-stem" x1="411.10" y1="349.13" x2="411.10" y2="338.13" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="469.22" y1="364.13" x2="469.22" y2="353.13" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-flag" data-stem-x="469.22" data-flag-index="1" x1="469.22" y1="353.13" x2="473.22" y2="354.01" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
+    <g class="janko-rest-group" data-rest-tick="720" data-rest-value="eighth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
+    <line class="janko-rest-stem" x1="175.67" y1="370.63" x2="175.67" y2="382.63" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="175.67" y1="370.63" x2="179.67" y2="369.75" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    </g>
+    <g class="janko-rest-group" data-rest-tick="864" data-rest-value="eighth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
+    <line class="janko-rest-stem" x1="309.54" y1="370.63" x2="309.54" y2="382.63" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="309.54" y1="370.63" x2="313.54" y2="369.75" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    </g>
+    <g class="janko-rest-group" data-rest-tick="1056" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="kinetic-monoline">
+    <line class="janko-rest-stem" x1="484.03" y1="370.63" x2="484.03" y2="382.63" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="1" x1="484.03" y1="370.63" x2="488.03" y2="369.75" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    <line class="janko-rest-tab" data-rest-tab="2" x1="484.03" y1="374.03" x2="488.03" y2="373.15" stroke="#111111" stroke-width="0.90" stroke-linecap="butt"/>
+    </g>
     <circle class="janko-knockout" cx="41.80" cy="429.13" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="41.80" y="431.99" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
     <circle class="janko-knockout" cx="51.96" cy="429.13" r="4.80" fill="#FFFFFF"/>
@@ -703,30 +699,19 @@
     <line x1="35.80" y1="647.26" x2="571.28" y2="647.26" stroke="#1E293B" stroke-width="0.50"/>
   </g>
   <g class="janko-beat-grid">
-    <line class="janko-beat-line" x1="82.42" y1="575.26" x2="82.42" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="82.42" y1="635.26" x2="82.42" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="123.05" y1="575.26" x2="123.05" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="123.05" y1="635.26" x2="123.05" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="216.29" y1="575.26" x2="216.29" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="216.29" y1="635.26" x2="216.29" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="256.92" y1="575.26" x2="256.92" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="256.92" y1="635.26" x2="256.92" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="350.16" y1="575.26" x2="350.16" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="350.16" y1="635.26" x2="350.16" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="390.79" y1="575.26" x2="390.79" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="390.79" y1="635.26" x2="390.79" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="484.03" y1="575.26" x2="484.03" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="484.03" y1="635.26" x2="484.03" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="524.66" y1="575.26" x2="524.66" y2="629.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="524.66" y1="635.26" x2="524.66" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="82.42" y1="575.26" x2="82.42" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="123.05" y1="575.26" x2="123.05" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="216.29" y1="575.26" x2="216.29" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="256.92" y1="575.26" x2="256.92" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="350.16" y1="575.26" x2="350.16" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="390.79" y1="575.26" x2="390.79" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="484.03" y1="575.26" x2="484.03" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="524.66" y1="575.26" x2="524.66" y2="689.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
   </g>
   <g class="janko-barlines">
-    <line class="janko-barline" x1="169.67" y1="575.26" x2="169.67" y2="629.26" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="169.67" y1="635.26" x2="169.67" y2="689.26" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="303.54" y1="575.26" x2="303.54" y2="629.26" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="303.54" y1="635.26" x2="303.54" y2="689.26" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="437.41" y1="575.26" x2="437.41" y2="629.26" stroke="#111111" stroke-width="0.60"/>
-    <line class="janko-barline" x1="437.41" y1="635.26" x2="437.41" y2="689.26" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="169.67" y1="575.26" x2="169.67" y2="689.26" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="303.54" y1="575.26" x2="303.54" y2="689.26" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="437.41" y1="575.26" x2="437.41" y2="689.26" stroke="#111111" stroke-width="0.60"/>
   </g>
   <g class="janko-notes">
   <g class="janko-beam-group">

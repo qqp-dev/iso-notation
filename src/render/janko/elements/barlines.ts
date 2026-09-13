@@ -1,15 +1,28 @@
 /**
  * Barlines: internal measure barlines and system boundaries.
  *
- * Each hand keeps its own classical barline segment (RH: o5..o4, LH: o3..o2),
- * preserving the "two independent grand-staff halves" reading of the Jánko
- * Two-Row Equator system. The system end is drawn as a final boundary.
+ * Round 12 unifies the vertical grid: every measure barline and every dashed
+ * beat pulse runs **continuously** from the top of Octave 5 (`rhTop ≈ −57.0`)
+ * down to the bottom of Octave 2 (`lhBot ≈ +57.0`), straight across the Middle
+ * C corridor. The Round 7–11 split hand segments (with their arbitrary 24pt
+ * gap) are gone: the grid is one absolute coordinate system, exactly like the
+ * horizontal octave lattice it crosses. Only the score's closing boundary still
+ * offers the `'split-corridor'` opt-out.
+ *
+ * The `gridWritingPolicy` decides how that grid meets the music:
+ * `'overlaid-beat-grid'` (default) keeps the barlines' protected air while the
+ * beat pulses pass behind the noteheads; `'strict-protected-grid'` paints every
+ * grid line through a dedicated white **air channel** so the grid is never
+ * written over; `'unified-transparent-grid'` lets the music use the full
+ * measure width and knocks the grid out with the circular glyph masks.
  */
 
 import {
   JankoLayoutOptions,
   JankoSystemGeometry,
   JankoTokens,
+  channelsGridInk,
+  getGridNoteInset,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
@@ -27,6 +40,38 @@ export function renderStaffBarline(
   return `    <line class="janko-barline" x1="${f(x)}" y1="${f(yTop)}" x2="${f(x)}" y2="${f(yBot)}" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(2)}"/>`;
 }
 
+/** Absolute y of the continuous grid's top (`rhTop`, Octave 5 + 12pt). */
+export function gridTopY(geo: JankoSystemGeometry): number {
+  return geo.equatorY('RH', 5) - 12;
+}
+
+/** Absolute y of the continuous grid's bottom (`lhBot`, Octave 2 + 12pt). */
+export function gridBotY(geo: JankoSystemGeometry): number {
+  return geo.equatorY('LH', 2) + 12;
+}
+
+/**
+ * Round 12 dedicated **air channel**: the white casing a grid line paints
+ * beneath itself under `'strict-protected-grid'`, so a stem or beam crossing the
+ * grid is cut by clean air instead of overwriting it. The circular notehead
+ * masks are painted after the grid and still knock it out — the glyph always
+ * wins inside its own disc.
+ */
+export const GRID_CHANNEL_BARLINE = 2.6;
+export const GRID_CHANNEL_BEAT = 3.2;
+
+function gridChannel(
+  x: number,
+  yTop: number,
+  yBot: number,
+  width: number,
+  cls: string,
+  dash?: string
+): string {
+  const dashAttr = dash ? ` stroke-dasharray="${dash}"` : '';
+  return `    <line class="${cls}" x1="${f(x)}" y1="${f(yTop)}" x2="${f(x)}" y2="${f(yBot)}" stroke="#FFFFFF" stroke-width="${width.toFixed(2)}"${dashAttr}/>`;
+}
+
 /**
  * All internal measure barlines of one system, plus the closing system
  * boundary. Measure numbers are the caller's responsibility (see engine).
@@ -36,11 +81,10 @@ export function renderStaffBarline(
  * (`isFinalScoreMeasure`) draws the closing vertical barline. Every other
  * system simply stops in open negative space, matching its open left start.
  *
- * Round 10 gives that closing boundary two paradigms
- * ({@link JankoLayoutOptions.finalBarlineStyle}): `'unified'` (the default)
- * draws one continuous double barline from `rhTop` down to `lhBot`, sealing the
- * Middle C corridor; `'split-corridor'` keeps the two independent hand
- * segments and leaves the corridor open.
+ * Round 12 makes every painted internal barline continuous across the Middle C
+ * corridor (see the module header). Round 10's `finalBarlineStyle` still
+ * selects the closing boundary: `'unified'` (the default) is the same
+ * continuous rule, `'split-corridor'` restores the two hand halves.
  */
 export function renderBarlines(
   geo: JankoSystemGeometry,
@@ -51,19 +95,29 @@ export function renderBarlines(
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const out: string[] = ['  <g class="janko-barlines">'];
+  const channelled = channelsGridInk(o.gridWritingPolicy);
 
-  const rhTop = geo.equatorY('RH', 5) - 12;
+  const rhTop = gridTopY(geo);
   const rhBot = geo.equatorY('RH', 4) + 12;
   const lhTop = geo.equatorY('LH', 3) - 12;
-  const lhBot = geo.equatorY('LH', 2) + 12;
+  const lhBot = gridBotY(geo);
+
+  /** Push one internal measure barline: continuous across the corridor. */
+  const pushMeasure = (x: number, strokeWidth: number = 0.60): void => {
+    if (channelled) out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
+    out.push(renderStaffBarline(x, rhTop, lhBot, strokeWidth));
+  };
 
   /** The authoritative final boundary of the score. */
   const pushFinal = (x: number): void => {
     if (o.finalBarlineStyle === 'split-corridor') {
+      if (channelled) out.push(gridChannel(x, rhTop, rhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
       out.push(renderStaffBarline(x, rhTop, rhBot, 1.05));
+      if (channelled) out.push(gridChannel(x, lhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
       out.push(renderStaffBarline(x, lhTop, lhBot, 1.05));
       return;
     }
+    if (channelled) out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
     out.push(renderStaffBarline(x, rhTop, lhBot, 1.05));
   };
 
@@ -71,8 +125,7 @@ export function renderBarlines(
   if (geo.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
     // 1. Barline ending the upbeat
-    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, rhTop, rhBot, 0.60));
-    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, lhTop, lhBot, 0.60));
+    pushMeasure(geo.staffLeft + upbeatWidth);
 
     // 2. Measure barlines for mm. 1..measuresPerSystem
     for (let m = 1; m <= o.measuresPerSystem; m++) {
@@ -83,8 +136,7 @@ export function renderBarlines(
         pushFinal(x);
         continue;
       }
-      out.push(renderStaffBarline(x, rhTop, rhBot, 0.60));
-      out.push(renderStaffBarline(x, lhTop, lhBot, 0.60));
+      pushMeasure(x);
     }
   } else {
     // Internal boundaries: every measure end; the system end only closes the
@@ -97,8 +149,7 @@ export function renderBarlines(
         pushFinal(x);
         continue;
       }
-      out.push(renderStaffBarline(x, rhTop, rhBot, 0.60));
-      out.push(renderStaffBarline(x, lhTop, lhBot, 0.60));
+      pushMeasure(x);
     }
   }
 
@@ -152,6 +203,13 @@ export function renderMeasureNumber(
  * Round 7 steps the grid up to 0.70pt `#9CA3AF`: the beat pulses stay clearly
  * subordinate to the music but now read as a real structural layer above the
  * lightened staff rules.
+ *
+ * Round 12 makes each pulse one **continuous** rule from `rhTop` down to
+ * `lhBot` across the Middle C corridor, matching the measure barlines, and
+ * honours the active `gridWritingPolicy`: the strict policy gives every pulse a
+ * white air channel (painted above the rhythm layer by the engine, so no stem
+ * may cross it), while the transparent policy lets the note field use the full
+ * measure width and knocks the pulse out with the circular glyph mask.
  */
 export function renderBeatGrid(
   geo: JankoSystemGeometry,
@@ -167,10 +225,10 @@ export function renderBeatGrid(
   if (beatsPerMeasure <= 1) return '';
 
   const out: string[] = ['  <g class="janko-beat-grid">'];
-  const rhTop = geo.equatorY('RH', 5) - 12;
-  const rhBot = geo.equatorY('RH', 4) + 12;
-  const lhTop = geo.equatorY('LH', 3) - 12;
-  const lhBot = geo.equatorY('LH', 2) + 12;
+  const rhTop = gridTopY(geo);
+  const lhBot = gridBotY(geo);
+  const channelled = channelsGridInk(o.gridWritingPolicy);
+  const baseInset = getGridNoteInset(o, t);
 
   const anacrusis = t.anacrusisTicks ?? 0;
   const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
@@ -180,25 +238,25 @@ export function renderBeatGrid(
     const isOpeningMeasure = systemIndex === 0 && m === 0;
     const insets =
       isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
-        ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
+        ? { left: baseInset + o.timeSignatureWidth, right: baseInset }
         : undefined;
 
     const measureLeft = isSys0Anacrusis
       ? geo.staffLeft + upbeatWidth + m * geo.measureWidth
       : geo.staffLeft + m * geo.measureWidth;
 
-    const left = insets?.left ?? t.measureInset;
-    const right = insets?.right ?? t.measureInset;
+    const left = insets?.left ?? baseInset;
+    const right = insets?.right ?? baseInset;
     const available = Math.max(0, geo.measureWidth - left - right);
 
     for (let b = 1; b < beatsPerMeasure; b++) {
       const frac = b / beatsPerMeasure;
       const x = measureLeft + left + frac * available;
+      if (channelled) {
+        out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BEAT, 'janko-grid-channel', '2,3'));
+      }
       out.push(
-        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(rhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
-      );
-      out.push(
-        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(lhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
+        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
       );
     }
   }

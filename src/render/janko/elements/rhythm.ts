@@ -540,7 +540,7 @@ export interface JankoClaspOptions {
   requireBracketScope?: boolean;
   /**
    * Round 11: the light transverse duration paradigm the bracket paints.
-   * Defaults to `'transverse-cross-bars'`.
+   * Defaults to the settled `'kinetic-cross-slashes'`.
    */
   claspDurationStyle?: JankoClaspDurationStyle;
 }
@@ -607,7 +607,7 @@ export function computeClaspGeometry(
     strokeWidth: t.claspStrokeWidth,
     durationTicks,
     duration,
-    durationStyle: options?.claspDurationStyle ?? 'transverse-cross-bars',
+    durationStyle: options?.claspDurationStyle ?? 'kinetic-cross-slashes',
     flags,
     pips,
     dotted,
