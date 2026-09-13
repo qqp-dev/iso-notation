@@ -792,10 +792,17 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
         `${id} belongs to a per-hand clasp`
       );
     }
+    // Round 16 shared stems: the carrier keeps its stem — the one stem the
+    // bracket does not replace — while every other unbeamed member loses its
+    // standalone stem to the bracket.
+    const carriers = new Set(layout.sharedStems.map((g) => g.carrierId));
     for (const clasp of layout.clasps) {
       if (clasp.notes.some((n) => beamed.has(n.id))) continue;
       for (const n of clasp.notes) {
-        assert.ok(layout.claspedStems.includes(n.id), `${n.id} loses its standalone stem`);
+        assert.ok(
+          layout.claspedStems.includes(n.id) || carriers.has(n.id),
+          `${n.id} loses its standalone stem or carries the shared stem`
+        );
       }
     }
   }
@@ -1076,33 +1083,10 @@ test('A measure that cannot host the bracket loses it instead of colliding (edge
   } as QuantizedGridScore;
 
   for (const mode of ['left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase'] as const) {
-    // Round 15 control: the Round 14 symmetric spread still drives the
-    // tick-143 head into the closing barline, so the admission loop withdraws
-    // the widening — and the bracket — for the cramped measure. This is the
-    // demotion regression the edge case exists to pin.
-    const control = resolveJankoOptions({
-      ...DEFAULT_JANKO_OPTIONS,
-      chordGrouping: mode,
-      measuresPerSystem: 2,
-      systemsPerPage: 1,
-      crowdedColumn: 'symmetric-spread',
-    });
-    const controlReport = lintJankoScore(edge, control, T);
-    assert.deepEqual(
-      controlReport.diagnostics.map((d) => `${d.code}: ${d.message}`),
-      [],
-      `${mode} control demotes the cramped measure instead of colliding`
-    );
-    const controlLayouts = layoutJankoScore(edge, control, T);
-    assert.equal(
-      controlLayouts[0].clasps.every((c) => c.tick < 144),
-      true,
-      `${mode} control engraves no bracket in the cramped measure`
-    );
-
-    // Round 15 golden: the minimal asymmetric flank keeps the tick-143 head
-    // clear of the barline, so the measure can host its bracket after all —
-    // and the engraving is still diagnostic-free.
+    // Round 16 golden: the anchored one-gap fan keeps the tick-143 head clear
+    // of the closing barline inside its beat cell, so the measure hosts its
+    // bracket and the engraving is diagnostic-free. (The retired symmetric
+    // control was the only policy that ever demoted this measure.)
     const options = resolveJankoOptions({
       ...DEFAULT_JANKO_OPTIONS,
       chordGrouping: mode,
@@ -1113,7 +1097,7 @@ test('A measure that cannot host the bracket loses it instead of colliding (edge
     assert.deepEqual(
       report.diagnostics.map((d) => `${d.code}: ${d.message}`),
       [],
-      `${mode} engraves the cramped edge score clean under the Round 15 flank`
+      `${mode} engraves the cramped edge score clean under the doctrine fan`
     );
     const layouts = layoutJankoScore(edge, options, T);
     assert.ok(
@@ -1217,12 +1201,18 @@ test('Engine integrity: a real 16th-note beam is never cut, only standalone chor
       assert.ok(!beamed.has(id), `${mode}: ${id} is not inside a beam`);
       assert.ok(clasped.has(id), `${mode}: ${id} belongs to a clasp`);
     }
-    // Every clasp whose members are all unbeamed actually replaces their stems.
+    // Every clasp whose members are all unbeamed actually replaces their stems —
+    // except the shared-stem carrier, which keeps the one stem the bracket
+    // does not replace.
     for (const layout of withClasps) {
+      const carriers = new Set(layout.sharedStems.map((g) => g.carrierId));
       for (const clasp of layout.clasps) {
         if (clasp.notes.some((n) => beamed.has(n.id))) continue;
         for (const n of clasp.notes) {
-          assert.ok(layout.claspedStems.includes(n.id), `${n.id} loses its standalone stem`);
+          assert.ok(
+            layout.claspedStems.includes(n.id) || carriers.has(n.id),
+            `${n.id} loses its standalone stem or carries the shared stem`
+          );
         }
       }
     }

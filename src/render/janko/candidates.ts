@@ -78,9 +78,9 @@ export interface JankoCandidate {
   /** One-line designer rationale. */
   description?: string;
   /**
-   * The **open axis** this candidate exists to decide (Round 15's two-axis
+   * The **open axis** this candidate exists to decide (Round 16's two-axis
    * round). Only this axis is ever badged, even when the round has more than
-   * one open axis: per-candidate purity means a column candidate never shows a
+   * one open axis: per-candidate purity means a spacing candidate never shows a
    * rest-dialect badge and vice versa.
    */
   axis?: string;
@@ -138,66 +138,61 @@ export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
  * stack per-note stems through its own heads, the m. 4 rest keeps its beam
  * break and gains a **guaranteed-clear pocket** — and the whole round is one
  * question again: how the continuous vertical grid is written against the
- * music, on the dense 16ths of mm. 27–28.
+ * music, on the dense 16ths of mm. 27–28. Round 15 settled the crowded column
+ * (stem-anchored flanks behind hard beat-cell barriers) and compared the four
+ * rest dialects on strictly clean material. Round 16 engraves the cluster
+ * doctrine direct — one shared stem per same-duration stack, coincident mixed
+ * stacks, the elliptical knockout, dots always above, rule-hung smaller rests —
+ * and judges only the horizontal spacing amount (compact / balanced / airy) on
+ * real two- and three-note clusters, carrying the four rest dialects into a
+ * second independent axis.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 15,
-  title: 'Crowded Columns + Rest Dialects: Two Independent Axes',
+  round: 16,
+  title: 'Cluster Spacing + Rest Dialects: Two Independent Axes',
   description:
-    'The operator directed both open questions at once. Axis 1 — the crowded column: how a colliding same-row pair is placed when the parity offset has to fan it out (the beat-x spine with flanking heads, the minimal asymmetric micro-offset behind hard beat-cell barriers, or the rejected Round 14 symmetric spread kept as control). Axis 2 — the rest dialect: the four Round 13 finalists compared on strictly clean material where no column can lie. The two axes are independent by construction: every dialect window renders byte-identical SVG under all three column systems, because it contains no same-column collision at all. The settled grid policy C, the flared bracket, the per-hand clasp, the off-row augmentation dot and the four-systems-per-page layout ride along as invisible fixed context.',
-  openAxes: ['crowdedColumn', 'restStyle'],
+    'The cluster doctrine goes direct to golden: one shared stem per same-duration stack on the nominal column, coincident stems for mixed stacks with each beam or flag at its own end, two stems at head-x for cross-hand or mixed-duration seconds, the elliptical knockout (ry 4.8, digit 5.8), augmentation dots always in the inter-row gap above, and smaller rests hung from the nearest staff rule toward Middle C. Axis 1 judges only the horizontal spacing amount — compact (rx 3.2, air 0.8), balanced (rx 3.6, air 1.0, the golden master) or airy (rx 4.0, air 1.2) — on real two- and three-note clusters in Bach and Brahms. Axis 2 carries the four rest dialects on their strictly clean windows, engraved under golden spacing. The two axes are independent by construction: the spacing question cannot move rest ink. The settled grid policy C, the flared bracket, the per-hand clasp and the four-systems-per-page layout ride along as invisible fixed context.',
+  openAxes: ['clusterSpacing', 'restStyle'],
 };
 
 /**
- * The Round 15 column-axis window set: the five crime scenes the operator named
- * (bars 8, 12, 13, 14, 15 — row collisions, a beat-boundary push, fused stems
- * and a time inversion) plus the §4 regression windows that prove the column
- * rework does not disturb the Round 14 m. 4 rest pocket or the specimen's
- * tick-180 8th rest. These are **not** clean windows: they exist to show the
- * column systems disagreeing.
+ * The Round 16 spacing-axis window set: real two- and three-note clusters in
+ * real music. Bach m. 8 (the t1032 pair in a 16th-note run), m. 12 (the
+ * pulse-edge t1632 pair) and m. 15 (the double pair t2040/t2064, grouped and
+ * still in time order) show pairs that must read grouped at a glance; Brahms
+ * mm. 8–9 (the held triples t1392/t1584, one shared stem each) show how much
+ * air a three-note fan needs.
  */
-const ROUND_15_COLUMN_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_16_SPACING_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 8,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 8 — a same-row pair in a 16th-note run: does the column still mean time?',
+    title: 'Bach Var. 1 · m. 8 — the t1032 same-row pair in a 16th-note run: grouped at a glance?',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 12,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 12 — the pair on the beat-2 pulse: no head may cross into beat 1',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 13,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 13 — opposing hands sharing one column: two voices or one fused rule?',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 14,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 14 — the densest cross-hand column sharing of the variation',
+    title: 'Bach Var. 1 · m. 12 — the pulse-edge t1632 pair: grouped, in-cell, in order?',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 15,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 15 — consecutive onsets: does the page still read in time order?',
+    title: 'Bach Var. 1 · m. 15 — the double pair t2040/t2064: grouped and still in time order?',
   },
   {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 4,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 8,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 4 — fixed context: the pocket-seated RH 16th rest and its beam break survive the column rework',
+    title: 'Brahms Op. 118/1 · m. 8 — the t1392 held triple on one shared stem: how much air?',
   },
   {
-    scoreId: SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 2,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 9,
     measureCount: 1,
-    title: 'Chord specimen · m. 2 — fixed context: the genuine tick-180 8th rest in the default dialect',
+    title: 'Brahms Op. 118/1 · m. 9 — the t1584 held triple on one shared stem under a new span',
   },
 ];
 
@@ -250,47 +245,48 @@ const ROUND_15_DIALECT_WINDOWS: JankoCandidateWindow[] = [
 ];
 
 /**
- * The active candidate set — Round 15's **two independent axes**, in display
- * order: first the three crowded-column systems (A/B/C), then the four rest
- * dialects (A–D). Each candidate states only its own axis.
+ * The active candidate set — Round 16's **two independent axes**, in display
+ * order: first the three cluster-spacing amounts (A/B/C), then the four rest
+ * dialects carried byte-identical from Round 15 (A–D). Each candidate states
+ * only its own axis.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'stem-anchored-columns',
-    label: 'A · Stem-Anchored Columns — the beat-x spine, flanking heads',
-    axis: 'crowdedColumn',
+    id: 'spacing-compact',
+    label: 'A · Compact Spacing — rx 3.2, air 0.8',
+    axis: 'clusterSpacing',
     description:
-      'The traditional answer. The colliding pair keeps a real rhythmic anchor: the RH head stays exactly on the nominal beat column whenever the row is mixed-hand, the displaced head takes the roomier side at the minimal 2r + 0.4pt flank — never the symmetric 11pt fan — and the crowded column itself never translates, so the neighbour columns yield the air instead. Opposing hands stagger their stems by ±1.2pt, so two voices can never fuse into one head-to-head rule, and every head stays inside its own beat cell: no head crosses a beat pulse or a barline.',
-    options: { crowdedColumn: 'stem-anchored' },
-    windows: ROUND_15_COLUMN_WINDOWS,
-    tags: ['rhythmic anchor on beat-x', 'minimal 10.0pt asymmetric flank', 'neighbours yield', 'no grid crossing'],
+      'The tightest honest fan: same-row pairs stand 7.2pt apart, triples 14.4pt. Fixed context is the direct-to-golden cluster doctrine — one shared stem per same-duration stack, coincident mixed stacks, the elliptical knockout at ry 4.8 with the 5.8pt digit, dots always above, rule-hung rests — so only the horizontal air is judged: grouped at a glance, or too tight for the halo?',
+    options: { clusterSpacing: 'compact' },
+    windows: ROUND_16_SPACING_WINDOWS,
+    tags: ['7.2pt pairs', '14.4pt triples', 'tightest honest fan'],
   },
   {
-    id: 'asymmetric-micro-columns',
-    label: 'B · Minimal Asymmetric Micro-Offset — barrier-clamped',
-    axis: 'crowdedColumn',
+    id: 'spacing-balanced',
+    label: 'B · Balanced Spacing — rx 3.6, air 1.0 (golden)',
+    axis: 'clusterSpacing',
     description:
-      'The smallest honest change that ends the lying. The colliding pair fans out asymmetrically — never symmetric by default — and the whole cluster slides up to a 1pt micro-bias toward the side with room before any neighbour is asked to move. The hard barrier clamps every head to its own beat cell (no crossing a beat pulse or a barline), the side is chosen by the air actually left to the neighbouring columns, and opposing stems that would fuse stagger by the fixed ±1.2pt.',
-    options: { crowdedColumn: 'asymmetric-micro' },
-    windows: ROUND_15_COLUMN_WINDOWS,
-    tags: ['asymmetric by default', '1pt micro-bias', 'hard beat-cell + midpoint barriers', 'staggered opposing stems'],
+      'The agreed golden amount: same-row pairs stand 8.2pt apart, triples 16.4pt — inside one 16th column either way. Fixed context is the direct-to-golden cluster doctrine — one shared stem per same-duration stack, coincident mixed stacks, the elliptical knockout at ry 4.8 with the 5.8pt digit, dots always above, rule-hung rests — so only the horizontal air is judged.',
+    options: { clusterSpacing: 'balanced' },
+    windows: ROUND_16_SPACING_WINDOWS,
+    tags: ['golden amount', '8.2pt pairs', '16.4pt triples'],
   },
   {
-    id: 'symmetric-spread-control',
-    label: 'C · Symmetric Spread — the Round 14 control',
-    axis: 'crowdedColumn',
+    id: 'spacing-airy',
+    label: 'C · Airy Spacing — rx 4.0, air 1.2',
+    axis: 'clusterSpacing',
     description:
-      'The rejected Round 14 baseline, kept so the improvement is judged and not assumed: the colliding pair straddles its column at ∓5.5pt (the full 11pt chordal offset) and the whole column translates until it fits, with the Round 11 centerline stems. Its lint chip is expected to name the very defects this round removes — a head pushed across the beat pulse, a later onset left of an earlier one, and two opposing stems fused into one continuous rule.',
-    options: { crowdedColumn: 'symmetric-spread' },
-    windows: ROUND_15_COLUMN_WINDOWS,
-    tags: ['control — expected violations', '∓5.5pt symmetric spread', 'centerline stems', 'Round 14 baseline'],
+      'The most generous fan: same-row pairs stand 9.2pt apart, triples 18.4pt. Fixed context is the direct-to-golden cluster doctrine — one shared stem per same-duration stack, coincident mixed stacks, the elliptical knockout at ry 4.8 with the 5.8pt digit, dots always above, rule-hung rests — so only the horizontal air is judged: breathing room, or does the cluster stop reading as one onset?',
+    options: { clusterSpacing: 'airy' },
+    windows: ROUND_16_SPACING_WINDOWS,
+    tags: ['9.2pt pairs', '18.4pt triples', 'most generous fan'],
   },
   {
     id: 'rest-kinetic-monoline',
     label: 'A · Kinetic Monoline Rests — stem + 12.4° tabs',
     axis: 'restStyle',
     description:
-      'The incumbent dialect: a vertical rest stem with the score own beam-harmonized 12.4° kinetic tabs (two for a 16th, one for an 8th), a central horizontal notch for the quarter and a hollow 7 × 2.2pt bar for the half. Monoline, architectural, and already the golden master choice.',
+      'The incumbent dialect: a vertical rest stem with the score own beam-harmonized 12.4° kinetic tabs (two for a 16th, one for an 8th), a central horizontal notch for the quarter and a hollow 4.0 × 1.3pt bar for the half. Monoline, architectural, and already the golden master choice.',
     options: { restStyle: 'kinetic-monoline' },
     windows: ROUND_15_DIALECT_WINDOWS,
     tags: ['incumbent dialect', '12.4° kinetic tabs', 'hollow half bar'],
@@ -300,7 +296,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     label: 'B · Classical Urtext Rest Glyphs — calligraphic hooks',
     axis: 'restStyle',
     description:
-      'The engraved-urtext alternative: calligraphic hooks with solid teardrop bulbs for the 16th and 8th, the serpentine lightning stroke for the quarter and a solid 6 × 2.5pt block for the half. Organic, hand-cut, and the most traditional reading of a silence.',
+      'The engraved-urtext alternative: calligraphic hooks with solid teardrop bulbs for the 16th and 8th, the serpentine lightning stroke for the quarter and a solid 3.5 × 1.4pt block for the half. Organic, hand-cut, and the most traditional reading of a silence.',
     options: { restStyle: 'classical-urtext' },
     windows: ROUND_15_DIALECT_WINDOWS,
     tags: ['calligraphic hooks', 'serpentine quarter', 'solid half block'],
@@ -310,7 +306,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     label: 'C · Geometric Pause Nodes — diamonds and rays',
     axis: 'restStyle',
     description:
-      'A pure-geometry answer: a hollow diamond with two lateral rays for the 16th, one ray for the 8th, a solid 5 × 5pt diamond for the quarter and an open capsule for the half. Zero calligraphy — the silence reads as a plotted node on the lattice.',
+      'A pure-geometry answer: a hollow diamond with two lateral rays for the 16th, one ray for the 8th, a solid 2.9 × 2.9pt diamond for the quarter and an open capsule for the half. Zero calligraphy — the silence reads as a plotted node on the lattice.',
     options: { restStyle: 'geometric-node' },
     windows: ROUND_15_DIALECT_WINDOWS,
     tags: ['hollow diamond + rays', 'solid quarter node', 'open capsule half'],
@@ -320,7 +316,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     label: 'D · Phantom Notehead Rests — the unwritten head',
     axis: 'restStyle',
     description:
-      'The Round 13 finalist that states a silence as the note that is not there: a dashed open notehead (R 3.0pt) with its bare stem, plus two downward-hooked flags for the 16th and one for the 8th, and a dashed head with a hollow bar for the half. The most semantically literal and the most unconventional of the four.',
+      'The Round 13 finalist that states a silence as the note that is not there: a dashed open notehead (R 1.7pt) with its bare stem, plus two downward-hooked flags for the 16th and one for the 8th, and a dashed head with a hollow bar for the half. The most semantically literal and the most unconventional of the four.',
     options: { restStyle: 'phantom-notehead' },
     windows: ROUND_15_DIALECT_WINDOWS,
     tags: ['dashed open head', 'hooked phantom flags', 'semantic silence'],
@@ -398,9 +394,9 @@ export function candidateBadges(
   const goldenTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const openAxes = new Set(round.openAxes ?? []);
 
-  // Round 15 carries two open axes at once. A candidate badges the axis it
+  // Round 16 carries two open axes at once. A candidate badges the axis it
   // declares (`candidate.axis`) — never the other one — so per-candidate purity
-  // stays visible: a column candidate shows only its column delta, a dialect
+  // stays visible: a spacing candidate shows only its spacing delta, a dialect
   // candidate only its dialect delta.
   const isOwnAxis = (key: string): boolean =>
     openAxes.has(key) && (candidate.axis === undefined || candidate.axis === key);

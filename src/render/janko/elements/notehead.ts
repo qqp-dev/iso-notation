@@ -1,11 +1,20 @@
 /**
- * Notehead elements: circular white knockout, URW Gothic duodecimal digit and
+ * Notehead elements: elliptical white knockout, URW Gothic duodecimal digit and
  * the Position of Honor concentric halo ring.
  *
  * The white knockout guarantees that ledger equators, row guides and beams
  * never cross the digit; the halo is reserved for the opening sound of the
  * piece (tick 0 of Measure 1), where it is emitted at R = 6.2pt around the
- * canonical 4.8pt mask.
+ * canonical mask.
+ *
+ * Anisotropic knockout (Round 16)
+ * -------------------------------
+ * The mask is an **ellipse**: tight horizontally (`rx` from the active
+ * {@link JankoClusterSpacing} preset — neighbour symbols populate that space),
+ * generous vertically (`ry = noteheadRadius` = 4.8pt, unchanged — nothing needs
+ * that space). Staff rules, stems and dots keep exactly today's vertical
+ * geometry; only the horizontal protection varies. The digit stays 5.8pt and
+ * the halo stays a circular ring in every preset.
  *
  * Digit optics
  * ------------
@@ -19,7 +28,14 @@
 import { Hand } from '../../../model/types';
 import { getDuodecimalDigit } from '../../types';
 import { JankoPitchCoordinate } from '../geometry';
-import { DEFAULT_JANKO_TOKENS, JankoTokens, resolveJankoTokens } from '../types';
+import {
+  DEFAULT_JANKO_TOKENS,
+  JankoLayoutOptions,
+  JankoTokens,
+  getClusterSpacingPreset,
+  resolveJankoOptions,
+  resolveJankoTokens,
+} from '../types';
 import { f } from './style';
 
 /** Input accepted by {@link renderNotehead}. */
@@ -110,16 +126,25 @@ export const JANKO_DIGIT_BASELINE_OFFSET = digitBaselineOffset(
   DEFAULT_JANKO_TOKENS.digitFontSize
 );
 
-/** Circular white knockout (erases staff lines and beams beneath the digit). */
+/**
+ * Elliptical white knockout (erases staff lines and beams beneath the digit).
+ *
+ * `rx` is the tight horizontal radius of the active cluster-spacing preset
+ * (3.6pt on the golden `'balanced'`), `ry` the generous vertical
+ * `noteheadRadius` (4.8pt, fixed). The explicit `rx` override is for callers
+ * that resolve the preset themselves; otherwise the layout options select it
+ * (defaulting to the golden preset).
+ */
 export function renderNoteheadKnockout(
   x: number,
   y: number,
   tokens?: Partial<JankoTokens> | null,
-  radius?: number
+  layoutOptions?: Partial<JankoLayoutOptions> | null,
+  rxOverride?: number
 ): string {
   const t = resolveJankoTokens(tokens);
-  const r = radius ?? t.noteheadRadius;
-  return `    <circle class="janko-knockout" cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="#FFFFFF"/>`;
+  const rx = rxOverride ?? getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing).rx;
+  return `    <ellipse class="janko-knockout" cx="${f(x)}" cy="${f(y)}" rx="${f(rx)}" ry="${f(t.noteheadRadius)}" fill="#FFFFFF"/>`;
 }
 
 /** Duodecimal digit notehead glyph in URW Gothic / Avant Garde. */
@@ -148,13 +173,14 @@ export function renderNoteheadDigit(
  */
 export function renderNotehead(
   spec: JankoNoteheadSpec,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  layoutOptions?: Partial<JankoLayoutOptions> | null
 ): string {
   const parts: string[] = [];
   if (spec.isPositionOfHonor) {
     parts.push(renderHalo(spec.x, spec.y, tokens));
   }
-  parts.push(renderNoteheadKnockout(spec.x, spec.y, tokens));
+  parts.push(renderNoteheadKnockout(spec.x, spec.y, tokens, layoutOptions));
   parts.push(
     renderNoteheadDigit(spec.x, spec.y, spec.pitchClass, spec.hand ?? 'RH', tokens, spec.digit)
   );

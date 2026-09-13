@@ -11,8 +11,8 @@
  *   tones on one row of one octave (`C` + `E`, `G` + `B`, `F` + `G` + `B` …).
  *   Those heads are **never merged and never re-rowed**: the row is the
  *   instrument's physical row, so the collision is resolved horizontally by
- *   `chordalOffset` (Approach 2, Row-Snapped Parity Offset). See
- *   {@link JankoTokens.chordalOffset} and
+ *   the active {@link JankoClusterSpacing} preset (Approach 2, Row-Snapped
+ *   Parity Offset). See {@link JANKO_CLUSTER_SPACING_PRESETS} and
  *   `engine.resolveRowSnappedChordOffsets`.
  * - The **channel layout** ({@link JankoLayoutOptions.channelLayout}) selects
  *   how an octave is framed. Besides the incumbent `'single-equator'`, three
@@ -90,41 +90,67 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
- * How a **crowded column** disambiguates two noteheads that share one whole-tone
- * row of one onset — the Round 15 question: what happens to the beat column
- * when the row-snapped parity offset has to spread a colliding pair.
+ * Horizontal **cluster spacing** — the Round 16 judged axis: how much room a
+ * same-row cluster of one onset takes.
  *
- * | policy                | head placement                                        | column                       | stem fusion                          |
- * | --------------------- | ----------------------------------------------------- | ---------------------------- | ------------------------------------ |
- * | `'stem-anchored'`     | asymmetric flank, RH head preferred on the column, the displaced head takes the roomier side, total disclosure `2r + 0.4` (never the symmetric `chordalOffset`) | the crowded column never translates (a neighbour yields instead) | opposing hands stagger `±δ` |
- * | `'asymmetric-micro'`  | asymmetric flank with a micro-bias toward the roomier side (never symmetric by default) | the column may slide a micro-offset inside its own beat cell | opposing hands stagger `±δ` |
- * | `'symmetric-spread'`  | the incumbent symmetric `±chordalOffset/2` spread      | the column translates until the pair clears | centerline stems (Round 11 doctrine) |
+ * The knockout is an **ellipse** with a tight horizontal radius `rx` (this
+ * preset) and a generous vertical radius `ry = noteheadRadius` (4.8pt, fixed in
+ * every preset — staff rules, stems and dots keep exactly today's vertical
+ * geometry). Neighbour symbols populate the horizontal space, so the horizontal
+ * protection is what the round judges; nothing needs the vertical space, so it
+ * stays generous. The digit stays 5.8pt in every preset.
  *
- * Round 15 hard barriers, enforced under the first two policies: no head may
- * leave the **beat cell** of its nominal column (the span between the two
- * neighbouring painted grid lines), and no two opposing stems may fuse into one
- * continuous head-to-head rule. `'symmetric-spread'` is the rejected Round 14
- * baseline, kept as the control that the new linter checks
- * (`grid-crossing-offset`, `stem-fusion`) exist to name.
+ * | preset       | rx   | air  | pair span (`2rx + air`) | triple span |
+ * | ------------ | ---- | ---- | ----------------------- | ----------- |
+ * | `'compact'`  | 3.2  | 0.8  | 7.2                     | 14.4        |
+ * | `'balanced'` | 3.6  | 1.0  | 8.2                     | 16.4        |
+ * | `'airy'`     | 4.0  | 1.2  | 9.2                     | 18.4        |
+ *
+ * `'balanced'` is the golden master (the agreed 3.6/1.0). The cluster grammar
+ * itself is settled doctrine, not a candidate: one shared stem per same-duration
+ * stack on the nominal column, coincident stems for mixed stacks, flanked
+ * same-row seconds with two stems at head-x, room-seeking asymmetric
+ * distribution behind the hard beat-cell barriers.
  */
-export type JankoCrowdedColumnPolicy =
-  | 'stem-anchored'
-  | 'asymmetric-micro'
-  | 'symmetric-spread';
+export type JankoClusterSpacing = 'compact' | 'balanced' | 'airy';
 
-/** Every crowded-column policy, in the canonical exploration order (A–C). */
-export const JANKO_CROWDED_COLUMN_POLICIES: readonly JankoCrowdedColumnPolicy[] = [
-  'stem-anchored',
-  'asymmetric-micro',
-  'symmetric-spread',
+/** Every cluster-spacing preset, in the canonical exploration order. */
+export const JANKO_CLUSTER_SPACINGS: readonly JankoClusterSpacing[] = [
+  'compact',
+  'balanced',
+  'airy',
 ];
 
-/** Human-readable names of the three crowded-column policies. */
-export const JANKO_CROWDED_COLUMN_POLICY_LABELS: Record<JankoCrowdedColumnPolicy, string> = {
-  'stem-anchored': 'Stem-Anchored Columns (beat-x spine, flanking heads)',
-  'asymmetric-micro': 'Minimal Asymmetric Micro-Offset (barrier-clamped)',
-  'symmetric-spread': 'Symmetric Row Spread (Round 14 control)',
+/** Human-readable names of the three cluster-spacing presets. */
+export const JANKO_CLUSTER_SPACING_LABELS: Record<JankoClusterSpacing, string> = {
+  compact: 'Compact Cluster Spacing (rx 3.2, air 0.8)',
+  balanced: 'Balanced Cluster Spacing (rx 3.6, air 1.0)',
+  airy: 'Airy Cluster Spacing (rx 4.0, air 1.2)',
 };
+
+/** Resolved geometry of one {@link JankoClusterSpacing} preset (all in pt). */
+export interface JankoClusterSpacingPreset {
+  /** Horizontal knockout radius: the tight axis of the elliptical mask. */
+  rx: number;
+  /** Breathing air between two neighbouring knockout ellipses of one row. */
+  air: number;
+  /** Centre-to-centre span of a same-row pair: `2rx + air`. */
+  pairGap: number;
+}
+
+/** The three judged spacing amounts, exactly as the Round 16 ticket tables them. */
+export const JANKO_CLUSTER_SPACING_PRESETS: Record<JankoClusterSpacing, JankoClusterSpacingPreset> = {
+  compact: { rx: 3.2, air: 0.8, pairGap: 7.2 },
+  balanced: { rx: 3.6, air: 1.0, pairGap: 8.2 },
+  airy: { rx: 4.0, air: 1.2, pairGap: 9.2 },
+};
+
+/** Resolve one spacing preset (defaults to the golden `'balanced'`). */
+export function getClusterSpacingPreset(
+  spacing?: JankoClusterSpacing | null
+): JankoClusterSpacingPreset {
+  return JANKO_CLUSTER_SPACING_PRESETS[spacing ?? 'balanced'];
+}
 
 /**
  * Pluggable **rest symbol dialects** — the Round 12 question: how a hand's
@@ -463,7 +489,11 @@ export const JANKO_CHANNEL_LAYOUT_LABELS: Record<JankoChannelLayout, string> = {
 export interface JankoTokens {
   /** Vertical distance between the two whole-tone rows. */
   rowHeight: number;
-  /** White-knockout circular notehead radius. */
+  /**
+   * White-knockout notehead radius: the **vertical** radius `ry` of the
+   * elliptical mask (Round 16). The tight horizontal radius `rx` comes from the
+   * active {@link JankoClusterSpacing} preset instead.
+   */
   noteheadRadius: number;
   /** Duodecimal digit font size (pt) — must fit inside the knockout disc. */
   digitFontSize: number;
@@ -504,21 +534,19 @@ export interface JankoTokens {
   /** Radius of a dotted-rhythm augmentation dot. */
   augmentationDotRadius?: number;
   /**
-   * Horizontal air (pt) between a notehead disc and its augmentation dot:
-   * `dotX = note.x + noteheadRadius + augmentationDotGap`, for **both** hands.
-   * Round 15 retires the hand-mirrored dot (which rendered LH dots left of the
-   * head, where they attached to the wrong note) — a dot is always right of the
-   * head it belongs to, as in standard notation.
+   * Horizontal air (pt) between a notehead and its augmentation dot:
+   * `dotX = note.x + rx + augmentationDotGap`, for **both** hands, where `rx`
+   * is the tight horizontal radius of the elliptical head (Round 16). The dot
+   * is always right of the head it belongs to, as in standard notation.
    */
   augmentationDotGap?: number;
   /**
    * Vertical displacement (pt) of an augmentation dot off its own notehead row,
-   * into the inter-row space on the side **away from the nearer staff rule**
-   * (Round 15). A 16th-note grid seats neighbouring columns only 10.2pt apart
-   * with 9.6pt discs, so an on-row dot can never clear the next column's disc;
-   * the inter-row lane is the only honest home for it. The canonical value is
-   * half a whole-tone row (`rowHeight / 2`), the exact midpoint between the
-   * dotted row and its neighbouring row.
+   * into the inter-row gap **above** (Round 16, standard-analog: a line note
+   * dots the space above). A 16th-note grid seats neighbouring columns only
+   * 10.2pt apart, so an on-row dot can never clear the next column's mask; the
+   * inter-row lane is the only honest home for it. The canonical value is half
+   * a whole-tone row (`rowHeight / 2`).
    */
   augmentationDotRowOffset?: number;
   /** Horizontal reach of a standard note flag, right of the stem. */
@@ -547,25 +575,6 @@ export interface JankoTokens {
    * notehead clears the boundary rule by the same 1.7pt as a channel note.
    */
   channelFlankOffset?: number;
-  /**
-   * Horizontal displacement (pt) between two **same-row chord tones** of one
-   * onset (Approach 2 — Row-Snapped Parity Offset).
-   *
-   * A two-row whole-tone staff maps several chord tones onto one row of one
-   * octave (C major `[0, 4, 7]` puts 0 and 4 on Row 0; G7 `[7, 11, 2, 5]` puts
-   * 7 and 11 on Row 1 …). Those heads would land on one page point and the
-   * later knockout would erase the earlier digit. The engine therefore keeps
-   * every note's true row and spreads the colliding heads symmetrically around
-   * the beat column by this distance.
-   *
-   * The canonical 11.0pt exceeds one notehead diameter (2 × 4.8 = 9.6pt) by
-   * 1.4pt of air, so the discs never touch and the visual linter's
-   * `2r` clearance rule is satisfied with room to spare. Values below
-   * `2 * noteheadRadius + 1.2pt` are raised to that floor by the engine, so a
-   * larger notehead can never silently re-open the collision.
-   */
-  chordalOffset?: number;
-
   // --- Optional chord-clasp refinements (Round 5, resolved from defaults) ---
   /**
    * Horizontal reach (pt) of a clasp's two caps — the short horizontal serifs
@@ -630,7 +639,6 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   minStemClearance: 1.5,
   channelHalfWidth: 6.5,
   channelFlankOffset: 13.0,
-  chordalOffset: 11.0,
   claspWidth: 2.2,
   claspStrokeWidth: 0.85,
   claspOffset: 2.8,
@@ -679,18 +687,18 @@ export interface JankoLayoutOptions {
   claspDurationStyle?: JankoClaspDurationStyle;
   /**
    * Rest symbol dialect (Round 12, extended by Round 13): how a hand's silent
-   * span inside an active measure is written. The rest is anchored on the
-   * **voice contour** of the surrounding notes of its own hand (Round 13).
-   * Defaults to `'kinetic-monoline'` (see {@link JankoRestStyle}).
+   * span inside an active measure is written. The rest hangs from the nearest
+   * staff rule to its voice and extends toward the Middle C corridor
+   * (Round 16 rule-hang). Defaults to `'kinetic-monoline'` (see
+   * {@link JankoRestStyle}).
    */
   restStyle?: JankoRestStyle;
   /**
-   * Crowded-column policy (Round 15): how a colliding same-row pair of one
-   * onset is placed around its beat column, and whether the column itself may
-   * translate. Defaults to the settled `'stem-anchored'` (see
-   * {@link JankoCrowdedColumnPolicy}).
+   * Horizontal cluster spacing (Round 16): the tight knockout radius `rx` and
+   * the breathing air between same-row heads of one onset. Defaults to the
+   * golden `'balanced'` (see {@link JankoClusterSpacing}).
    */
-  crowdedColumn?: JankoCrowdedColumnPolicy;
+  clusterSpacing?: JankoClusterSpacing;
   /**
    * Vertical grid writing policy (Round 12): how the continuous barlines and
    * dashed beat pulses coexist with the music. Defaults to
@@ -770,7 +778,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',
-  crowdedColumn: 'stem-anchored',
+  clusterSpacing: 'balanced',
   gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'architectural-bracket',
   finalBarlineStyle: 'unified',

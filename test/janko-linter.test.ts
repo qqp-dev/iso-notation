@@ -30,6 +30,7 @@ import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   JankoChordGrouping,
+  getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -41,8 +42,6 @@ import {
   digitHalfExtents,
   isPositionOfHonor,
 } from '../src/render/janko/elements/notehead';
-import { JANKO_STEM_STAGGER } from '../src/render/janko/elements/rhythm';
-import { CROWDED_MICRO_AIR, getChordalOffset } from '../src/render/janko/engine';
 import {
   DEFAULT_JANKO_LINT_OPTIONS,
   JANKO_LINT_CHECKS,
@@ -59,6 +58,7 @@ import {
   checkMiddleCCorridor,
   checkNoteheadClearance,
   checkRestClearance,
+  checkSplitStackStems,
   checkStemAndBeamValidity,
   checkStemDigitClearance,
   checkStemThroughSimultaneity,
@@ -86,6 +86,9 @@ const HONOR_ATTACH = HALO_R + 0.4;
 
 const knockout = (cx: number, cy: number, r: number = R): string =>
   `<circle class="janko-knockout" cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#FFFFFF"/>`;
+/** The Round 16 elliptical mask (tight `rx`, generous `ry`). */
+const ellipseKnockout = (cx: number, cy: number, rx: number, ry: number = R): string =>
+  `<ellipse class="janko-knockout" cx="${cx}" cy="${cy}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="#FFFFFF"/>`;
 const digit = (cx: number, cy: number): string =>
   `<text class="janko-digit" x="${cx}" y="${(cy + JANKO_DIGIT_BASELINE_OFFSET).toFixed(2)}" font-size="${TOKENS.digitFontSize}pt">7</text>`;
 const halo = (cx: number, cy: number, r: number = HALO_R): string =>
@@ -153,13 +156,13 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
   assert.equal(report.stats.violations, 0);
 });
 
-test('Row-snapped chord tones: every same-row pair is spread by one full disc', () => {
+test('Row-snapped chord tones: every same-row pair is fanned by the preset pair gap', () => {
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const r = DEFAULT_JANKO_TOKENS.noteheadRadius;
-  // Round 15: the golden `'stem-anchored'` flank is the minimal asymmetric
-  // 2r + 0.4pt (10.0pt), not the Round 14 symmetric `chordalOffset` (11.0pt).
-  const offset = 2 * r + CROWDED_MICRO_AIR;
+  // Round 16: the golden `'balanced'` fan is the asymmetric preset pair gap
+  // 2rx + air (8.2pt) — tighter than the old circular diameter, and the exact
+  // amount the axis-aware clearance model requires.
+  const offset = getClusterSpacingPreset('balanced').pairGap;
   let pairs = 0;
   for (const layout of layouts) {
     const rows = new Map<string, typeof layout.notes>();
@@ -175,10 +178,10 @@ test('Row-snapped chord tones: every same-row pair is spread by one full disc', 
       const xs = group.map((p) => p.x).sort((a, b) => a - b);
       assert.equal(group.length, 2, 'the canonical score only doubles rows');
       assert.ok(
-        Math.abs(xs[1] - xs[0] - offset) < 1e-9,
+        Math.abs(xs[1] - xs[0] - offset) < 1e-6,
         `spread pair keeps Δx = ${offset.toFixed(2)}pt (got ${(xs[1] - xs[0]).toFixed(2)})`
       );
-      assert.ok(xs[1] - xs[0] >= 2 * r, 'the spread clears one full notehead disc');
+      assert.ok(xs[1] - xs[0] >= offset - 1e-6, 'the fan meets the preset pair gap');
       for (const p of group) assert.equal(p.coord.rank, group[0].coord.rank, 'true row preserved');
     }
   }
@@ -247,7 +250,7 @@ test('Defect: two different onsets collapsing onto one point is a notehead overl
     notes: [a, { ...b, x: a.x, y: a.y }],
   };
   const out = run(
-    (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_TOKENS, LINT, o),
+    (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, o),
     collided
   );
   assert.equal(out.length, 1);
@@ -270,7 +273,7 @@ test('Defect: chordal heads on one point is warned, not silently accepted', () =
     ],
   };
   const out = run(
-    (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_TOKENS, LINT, o),
+    (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, o),
     chordal
   );
   assert.equal(out.length, 1);
@@ -278,7 +281,7 @@ test('Defect: chordal heads on one point is warned, not silently accepted', () =
   assert.equal(out[0].severity, 'warning');
 });
 
-test('Row-snapped chord tones clear the warning exactly at one notehead diameter', () => {
+test('Row-snapped chord tones clear the warning exactly at the preset pair gap', () => {
   const layout = systems()[0];
   const a = layout.notes[2];
   const b = layout.notes[3];
@@ -296,14 +299,37 @@ test('Row-snapped chord tones clear the warning exactly at one notehead diameter
       },
     ],
   });
-  const offset = getChordalOffset(DEFAULT_JANKO_TOKENS);
+  const gap = getClusterSpacingPreset('balanced').pairGap;
   const lintAt = (dx: number): LintViolation[] =>
-    run((l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_TOKENS, LINT, o), pairAt(dx));
+    run(
+      (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, o),
+      pairAt(dx)
+    );
+
+  assert.equal(lintAt(gap - 0.01).length, 1, 'one hundredth short of the pair gap still collides');
+  assert.equal(lintAt(gap - 0.01)[0].code, 'chordal-overlap');
+  assert.equal(lintAt(gap).length, 0, 'the preset pair gap clears the warning');
+});
+
+test('Different-onset neighbours keep the conservative circular diameter', () => {
+  const layout = systems()[0];
+  const a = layout.notes[2];
+  const b = layout.notes[3];
+  assert.notEqual(a.note.startTick, b.note.startTick, 'the pair needs distinct onsets');
+  /** The same two heads forced onto one row at a horizontal distance. */
+  const pairAt = (dx: number): JankoSystemLayout => ({
+    ...layout,
+    notes: [a, { ...b, x: a.x + dx, y: a.y }],
+  });
+  const lintAt = (dx: number): LintViolation[] =>
+    run(
+      (l, o) => checkNoteheadClearance(l, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, o),
+      pairAt(dx)
+    );
 
   assert.equal(lintAt(2 * R - 0.01).length, 1, 'one hundredth short of a disc still collides');
-  assert.equal(lintAt(2 * R - 0.01)[0].code, 'chordal-overlap');
-  assert.equal(lintAt(2 * R).length, 0, 'one full diameter clears the warning');
-  assert.equal(lintAt(offset).length, 0, 'the canonical row-snap offset clears it as well');
+  assert.equal(lintAt(2 * R - 0.01)[0].code, 'notehead-overlap');
+  assert.equal(lintAt(2 * R).length, 0, 'one full diameter clears the error');
 });
 
 test('Defect: shrinking the knockout below the glyph box is caught', () => {
@@ -315,25 +341,35 @@ test('Defect: shrinking the knockout below the glyph box is caught', () => {
     undersized[0].message,
     new RegExp(`cannot shield the ${DEFAULT_JANKO_TOKENS.digitFontSize}pt digit`)
   );
-  assert.ok(undersized[0].metrics!.required > undersized[0].metrics!.radius);
+  assert.ok(undersized[0].metrics!.requiredRy > undersized[0].metrics!.ry);
   assert.ok(undersized[0].metrics!.vertical < 0, 'the glyph overflows the mask vertically');
 });
 
-test('Golden master: every digit keeps ≥1.2pt of white inside its knockout disc', () => {
+test('Golden master: every digit keeps ≥1.2pt of white inside its knockout ellipse', () => {
   const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
+  const rx = getClusterSpacingPreset('balanced').rx;
   const out: LintViolation[] = [];
   for (const layout of systems()) {
-    checkKnockoutCoverage(layout, TOKENS, LINT, out);
+    checkKnockoutCoverage(layout, DEFAULT_JANKO_OPTIONS, TOKENS, LINT, out);
   }
   assert.deepEqual(out, [], 'the canonical mask shields every digit on every side');
-  assert.ok(R - halfWidth >= LINT.digitClearance, 'left/right margin');
-  assert.ok(R - halfHeight >= LINT.digitClearance, 'top/bottom margin');
-  assert.ok(R - Math.hypot(halfWidth, halfHeight) >= LINT.digitClearance, 'corner margin');
+  assert.ok(rx - halfWidth >= LINT.digitClearance, 'left/right margin against rx');
+  assert.ok(R - halfHeight >= LINT.digitClearance, 'top/bottom margin against ry');
+  assert.ok(
+    1 - (halfWidth / rx) ** 2 - (halfHeight / R) ** 2 >= LINT.knockoutMargin,
+    'ellipse corner budget'
+  );
 
   // The check is a real gate: a 3.0pt mask cannot hold the digit.
   const tight = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 3.0 };
   const tightOut: LintViolation[] = [];
-  checkKnockoutCoverage(systems(DEFAULT_JANKO_OPTIONS, tight)[0], tight, LINT, tightOut);
+  checkKnockoutCoverage(
+    systems(DEFAULT_JANKO_OPTIONS, tight)[0],
+    DEFAULT_JANKO_OPTIONS,
+    tight,
+    LINT,
+    tightOut
+  );
   assert.ok(tightOut.length > 0);
   assert.ok(tightOut.every((v) => v.code === 'knockout-undersized'));
 });
@@ -423,29 +459,26 @@ test('Defect: a Position of Honor stem driven through the halo ring is caught', 
   }
 });
 
-test('Golden master: every stem is engraved on its notehead centreline (or its declared stagger)', () => {
+test('Golden master: every stem is engraved on its notehead centreline', () => {
   const out: LintViolation[] = [];
-  let staggered = 0;
   for (const layout of systems()) {
     checkStemAndBeamValidity(layout, DEFAULT_JANKO_TOKENS, LINT, out);
     for (const p of layout.notes) {
-      const declared = p.rhythm.stemDx ?? 0;
-      if (declared !== 0) {
-        staggered++;
-        assert.ok(
-          Math.abs(declared) <= JANKO_STEM_STAGGER + 1e-9,
-          `${p.note.id} staggers by the documented anti-fusion delta`
-        );
-      }
       assert.equal(
         getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS).stemX,
-        p.x + declared,
-        `${p.note.id} keeps stemX === note.x (+ its declared stagger)`
+        p.x,
+        `${p.note.id} keeps stemX === note.x — the Round 15 stagger is deleted`
       );
     }
+    const split: LintViolation[] = [];
+    checkSplitStackStems(layout, DEFAULT_JANKO_TOKENS, split);
+    assert.deepEqual(split, [], `system ${layout.index + 1}: no onset column splits its stems`);
   }
-  assert.ok(staggered > 0, 'the Round 15 golden un-fuses at least one opposing-hand column');
-  assert.deepEqual(out, [], 'centred stems attach inside the disc and span their beam');
+  assert.deepEqual(out, [], 'centred stems attach inside the mask and span their beam');
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('split-stack-stems'),
+    'the split-stack audit is part of the published check list'
+  );
 });
 
 test('Defect: a stem engraved off the notehead centreline is caught', () => {
@@ -727,8 +760,9 @@ test('Defect: an unclasped four-voice simultaneity paints its stems through its 
     'and it is rejected for exactly this defect'
   );
 
-  // The same chord with the restored per-hand clasp is clean: every stem is
-  // replaced by the bracket, so nothing is painted through a head.
+  // The same chord with the restored per-hand clasp is clean: every stem but
+  // the Round 16 shared carrier is replaced by the bracket, and the carrier
+  // leaves outward, so nothing is painted through a head.
   const fixed = layoutJankoScore(SPECIMEN, clasped, TOKENS)[0];
   assert.deepEqual(
     run((l, out) => checkStemThroughSimultaneity(l, clasped, TOKENS, out), fixed),
@@ -754,21 +788,21 @@ test('Defect: an unclasped four-voice simultaneity paints its stems through its 
 });
 
 test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', () => {
-  // A disc wide enough to wall the m. 4 column shut: no staff position keeps
-  // the guaranteed pocket air from the LH D3 head that shares the column.
+  // A disc wide enough to wall the m. 4 beat cell shut: no slot along the rule
+  // keeps the guaranteed seating air from the LH D3 head that shares the column.
   const fat = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 60.0 };
   const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, fat)[0];
   assert.ok(!layout.rests.some((r) => r.tick === 552), 'the refused rest is not painted');
   const refusal = layout.unwrittenRests.find((r) => r.tick === 552);
   assert.ok(refusal, 'the refusal is recorded instead of being dropped silently');
-  assert.equal(refusal!.reason, 'no-pocket');
+  assert.equal(refusal!.reason, 'no-slot');
   assert.equal(refusal!.hand, 'RH');
   assert.equal(refusal!.value, 'sixteenth');
   assert.ok(
     Math.abs(refusal!.x - 544.97) < 0.01,
     `the refusal keeps the canonical tick-552 beat column (x = ${refusal!.x.toFixed(2)}pt)`
   );
-  assert.ok(Number.isFinite(refusal!.targetY), 'and records the contour target it could not honour');
+  assert.ok(Number.isFinite(refusal!.targetY), 'and records the rule-hang centre it could not honour');
 
   const out: LintViolation[] = [];
   checkUnwrittenRests(layout, DEFAULT_JANKO_TOKENS, out);
@@ -789,8 +823,8 @@ test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', 
     assert.deepEqual(system.unwrittenRests, [], `system ${system.index + 1} refuses no silence`);
   }
 
-  // A silence that opens exactly on a protected barline is refused **by name**
-  // too, and admitted under the transparent policy that reserves no barline.
+  // A silence that opens exactly on a protected barline is nudged along its
+  // rule instead of straddling the grid; only a walled cell is refused by name.
   const crossing = fixtureScore(
     [
       { id: 'rh-1', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 144, hand: 'RH', velocity: 80 },
@@ -803,16 +837,23 @@ test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', 
     3
   );
   // A tight measure inset puts the downbeat column within the rest's own air of
-  // the opening barline: that column belongs to the grid, so the silence is
-  // refused by name rather than straddling it.
+  // the opening barline: the nudge carries the rest off the grid instead of
+  // straddling it, and the written rest clears the barline audit.
   const tightTokens = { ...TOKENS, measureInset: 4.0 };
   const protectedLayout = layoutJankoScore(crossing, DEFAULT_JANKO_OPTIONS, tightTokens)[0];
-  const barlineRefusal = protectedLayout.unwrittenRests.find((r) => r.tick === 144);
-  assert.ok(barlineRefusal, 'the barline-crossing silence is refused, not swallowed');
-  assert.equal(barlineRefusal!.reason, 'protected-barline');
-  assert.ok(
-    !protectedLayout.rests.some((r) => r.tick === 144),
-    'and no rest is painted on the protected barline column'
+  const nudged = protectedLayout.rests.find((r) => r.tick === 144);
+  assert.ok(nudged, 'the barline-opening silence is written, not swallowed');
+  assert.deepEqual(
+    protectedLayout.unwrittenRests.filter((r) => r.tick === 144),
+    [],
+    'and nothing is refused when a clear slot exists'
+  );
+  const barOut: LintViolation[] = [];
+  checkBarlineClearance(protectedLayout, resolveJankoOptions(DEFAULT_JANKO_OPTIONS), tightTokens, LINT, barOut);
+  assert.deepEqual(
+    barOut.filter((v) => /[Rr]est/.test(v.message)),
+    [],
+    'the nudged rest clears the protected barline (the tight inset still crowds a head elsewhere)'
   );
   const transparentLayout = layoutJankoScore(
     crossing,
@@ -821,12 +862,23 @@ test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', 
   )[0];
   assert.ok(
     transparentLayout.rests.some((r) => r.tick === 144),
-    'the transparent policy reserves no barline, so there the rest is written'
+    'the transparent policy reserves no barline, so there the rest is written too'
   );
   assert.deepEqual(
     transparentLayout.unwrittenRests,
     [],
     'and nothing is refused under the transparent policy'
+  );
+
+  // A walled downbeat cell is refused **by name**: the silence opens on the
+  // grid and the nudge cannot escape it.
+  const walled = layoutJankoScore(crossing, DEFAULT_JANKO_OPTIONS, { ...tightTokens, noteheadRadius: 60.0 })[0];
+  const barlineRefusal = walled.unwrittenRests.find((r) => r.tick === 144);
+  assert.ok(barlineRefusal, 'the walled barline-opening silence is refused, not swallowed');
+  assert.equal(barlineRefusal!.reason, 'protected-barline');
+  assert.ok(
+    !walled.rests.some((r) => r.tick === 144),
+    'and no rest is painted into the walled cell'
   );
 });
 
@@ -1070,6 +1122,40 @@ test('Paint audit: a flush stem is exempt, a stem starting inside the disc is no
   const out2 = auditKnockoutProtection(foreign, { noteheadRadius: R, haloRadius: HALO_R });
   assert.equal(out2.length, 1);
   assert.equal(out2[0].code, 'knockout-pass-through');
+});
+
+test('Paint audit: the elliptical mask is audited in its own normalized metric', () => {
+  // The ellipse owns its digit exactly like the legacy circle.
+  const owned = `<svg>${ellipseKnockout(50, 100, 3.6)}${digit(50, 100)}</svg>`;
+  assert.deepEqual(auditKnockoutProtection(owned, { noteheadRadius: R, knockoutRx: 3.6 }), []);
+  // A rule through the ellipse's horizontal interior is a cut …
+  const cut =
+    '<svg>' +
+    ellipseKnockout(50, 100, 3.6) +
+    digit(50, 100) +
+    '<line class="janko-beat-line" x1="52" y1="90" x2="52" y2="110" stroke="#D1D5DB"/></svg>';
+  const out = auditKnockoutProtection(cut, { noteheadRadius: R, knockoutRx: 3.6 });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].code, 'knockout-pass-through');
+  // … while a rule at dx = 4.0 — inside the legacy circle, outside rx 3.6 —
+  // is clean: the audit is anisotropic, not circular.
+  const grazing =
+    '<svg>' +
+    ellipseKnockout(50, 100, 3.6) +
+    digit(50, 100) +
+    '<line class="janko-beat-line" x1="54" y1="90" x2="54" y2="110" stroke="#D1D5DB"/></svg>';
+  assert.deepEqual(auditKnockoutProtection(grazing, { noteheadRadius: R, knockoutRx: 3.6 }), []);
+  // The notehead's own stem stays flush on the vertical perimeter (ry + 0.2).
+  const own =
+    '<svg>' +
+    ellipseKnockout(50, 100, 3.6) +
+    digit(50, 100) +
+    stem(50, 100 - REGULAR_ATTACH, 85) +
+    '</svg>';
+  assert.deepEqual(
+    auditKnockoutProtection(own, { noteheadRadius: R, knockoutRx: 3.6, haloRadius: HALO_R }),
+    []
+  );
 });
 
 test('Paint audit: a stem piercing the Position of Honor halo is a violation', () => {
