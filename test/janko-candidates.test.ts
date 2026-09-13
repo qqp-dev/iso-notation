@@ -1,44 +1,41 @@
 /**
- * Round 17A — Rect Knockout + Spacing Solver v2 + Dot Hug: registry, gap
- * fixtures, solver fixtures, dot fixtures and rest-ink identity.
+ * Round 17B — Rest Behavior (weight, phrase rows, bridging) + Rest-Shape
+ * Verdict: the fixed rest behavior, the m4 bridge, and the round 18 registry.
  *
- * Single judged axis — the gap amount:
+ * The gap verdict is in: `tight` is the golden master (`snug` remains
+ * implemented). Rest behavior goes direct: 0.90pt rest strokes (the note stem
+ * weight), phrase-row placement (the rest hangs from the nearest whole-tone
+ * row of its phrase octave toward Middle C, with an adjacent-row fallback),
+ * and standard beam bridging across a single printed 16th rest strictly
+ * inside one beat — so the m4 beat-3 run beams as one gesture [528, 540, 564]
+ * over its printed rest. The Round 13 m4 beam break is retired with cause;
+ * every rest SVG group stays identical under both spacing presets.
  *
- * | # | id               | `clusterSpacing` | window set                    |
- * | - | ---------------- | ---------------- | ----------------------------- |
- * | A | `spacing-snug`   | `snug` (golden)  | the carried cluster windows   |
- * | B | `spacing-tight`  | `tight`          | the carried cluster windows   |
+ * Single judged axis — the rest shape (round 18):
  *
- * Everything else goes direct: the sharp rectangular mask, the v2 solver
- * (unit centering, pin-preserving shrink, local redistribution, multi-row
- * interleave) and the hugging dots. Rest behaviour is explicitly out —
- * rests, beams and the m4 beam-break stay exactly Round 16, so every rest
- * SVG group is identical under both spacing presets (and byte-identical to
- * the Round 16 golden, verified at implementation time).
+ * | # | id                      | `restStyle`          | window set             |
+ * | - | ----------------------- | -------------------- | ---------------------- |
+ * | A | `rest-kinetic-monoline` | `kinetic-monoline`   | the verdict windows    |
+ * | B | `rest-classical-urtext` | `classical-urtext`   | the verdict windows    |
+ * | C | `rest-geometric-node`   | `geometric-node`     | the verdict windows    |
+ * | D | `rest-phantom-notehead` | `phantom-notehead`   | the verdict windows    |
  *
  * Committed fixtures for every directive the round fixes:
- *  1. the preset table (margin / air / pair gap / wx / hy) and the gap
- *     identity G = 2(1.93 + m) + air, pinned per preset;
- *  2. the rect paint pin: every mask a sharp rect with the preset wx/hy,
- *     every digit 5.8pt;
- *  3. pair spans (G ±0.1), triple spans (2G ±0.2), beat-cell containment and
- *     time order — every preset, every ticketed tick;
- *  4. unit centering (t1032 free-space symmetry ≤1.5pt);
- *  5. the pin (m12: the 9 holds ±0.3, gap = min(G, room)) plus a synthetic
- *     shrink proof;
- *  6. redistribution (t2052..t2076 gap spread ≤2.0);
- *  7. interleave (t1392 row offset G/2 ±0.2, one shared stem) and the t1584
- *     triple;
- *  8. the mixed t1752 stack: one stem-x, both beams, each drawn once;
- *  9. synthetic same-duration stacks: one painted stem;
- * 10. zero split-stack-stems golden-wide, plus the defect;
- * 11. dots hug the mask corner (offsets, clearance proof, uniform sign) and
- *     bar 6 attaches only to t744;
- * 12. the digit inside the rect for all 12 glyphs, every preset evaluated;
- * 13. rest size maxima, rule-hang and rest-ink identity (Round 16 behaviour,
- *     untouched);
- * 14. bar 5 beat 2 beam arithmetic (locked, unchanged);
- * 15. the four-systems-per-page golden.
+ *  1. the round 18 registry: four carried dialects, one rest-shape axis,
+ *     per-candidate purity, the byte-identical R15 clean windows plus the
+ *     Bach m4 fixed-context window on every card;
+ *  2. rest weight: every rest stroke at its Round 15 pre-scale width
+ *     (REST_STROKE = 0.90pt, the note stem stroke) with scaled extents, and
+ *     size maxima recomputed per value × 4 dialects;
+ *  3. phrase rows: the showcase set (Bach m4 + m6 + m7, chord-m2, the rest
+ *     specimen, Brahms m68) hangs a glyph edge exactly on a phrase row,
+ *     clear, with no diagnostics — all 4 dialects;
+ *  4. bridging: m4 beams [528, 540, 564] with the 16th rest printed beneath
+ *     a clearing beam; 8th rests and cross-beat gaps still break runs; bar 5
+ *     beat 2 re-verified (locked);
+ *  5. the 17A solver, dot and knockout fixtures stay verbatim (preset-explicit;
+ *     heads never move in this ticket), rest-ink identity across both gaps,
+ *     zero split-stack-stems golden-wide, and the four-systems-per-page golden.
  */
 
 import { test } from 'node:test';
@@ -61,6 +58,8 @@ import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
+  REST_SPECIMEN_STUDIO_SCORE_ID,
+  SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   getCandidate,
   resolveCandidate,
@@ -86,14 +85,31 @@ import {
   renderSystem,
   restClearsLayout,
   suppressedStemIds,
+  wholeToneRowOffsets,
 } from '../src/render/janko/engine';
 import { getEquatorRuleYs } from '../src/render/janko/elements/staff';
 import { getEquatorYForOctave } from '../src/render/janko/geometry';
 import { digitHalfExtents } from '../src/render/janko/elements/notehead';
-import { getStemGeometry } from '../src/render/janko/elements/rhythm';
-import { restInkBox } from '../src/render/janko/elements/rests';
+import {
+  JankoRhythmNote,
+  bridgeBeamGroupsAcrossRests,
+  getStemGeometry,
+  partitionBeamGroups,
+} from '../src/render/janko/elements/rhythm';
+import {
+  JANKO_REST_VALUES,
+  JankoRestValue,
+  REST_BOX_STROKE,
+  REST_LINEAR_SCALE,
+  REST_PHANTOM_HEAD_RADIUS,
+  REST_PHANTOM_HEAD_STROKE,
+  REST_STROKE,
+  REST_URTEXT_BULB_RADIUS,
+  restInkBox,
+} from '../src/render/janko/elements/rests';
 import {
   DEFAULT_JANKO_LINT_OPTIONS,
+  checkBeamRestClearance,
   checkKnockoutCoverage,
   checkSplitStackStems,
   lintJankoScore,
@@ -105,13 +121,13 @@ const SPECIMEN = buildChordDurationSpecimenScore();
 const REST_SPECIMEN = buildRestDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The two spacing candidates, in display order. */
+/** The two spacing presets (kept for the preset-explicit 17A solver fixtures). */
 const SPACING_CANDIDATES: Array<{ id: string; spacing: JankoClusterSpacing; letter: string }> = [
   { id: 'spacing-snug', spacing: 'snug', letter: 'A' },
   { id: 'spacing-tight', spacing: 'tight', letter: 'B' },
 ];
 
-/** The four rest dialects whose Round 16 behaviour stays untouched. */
+/** The four carried rest dialects the round 18 verdict judges. */
 const REST_STYLES: JankoRestStyle[] = [
   'kinetic-monoline',
   'classical-urtext',
@@ -119,13 +135,26 @@ const REST_STYLES: JankoRestStyle[] = [
   'phantom-notehead',
 ];
 
-/** The carried cluster windows: real 2- and 3-note clusters in real music. */
-const SPACING_WINDOWS = [
-  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 8 },
-  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 12 },
-  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 15 },
-  { scoreId: BRAHMS_STUDIO_SCORE_ID, measureStart: 8 },
-  { scoreId: BRAHMS_STUDIO_SCORE_ID, measureStart: 9 },
+/** The four verdict candidates, in display order. */
+const VERDICT_CANDIDATES: Array<{ id: string; style: JankoRestStyle; letter: string }> = [
+  { id: 'rest-kinetic-monoline', style: 'kinetic-monoline', letter: 'A' },
+  { id: 'rest-classical-urtext', style: 'classical-urtext', letter: 'B' },
+  { id: 'rest-geometric-node', style: 'geometric-node', letter: 'C' },
+  { id: 'rest-phantom-notehead', style: 'phantom-notehead', letter: 'D' },
+];
+
+/**
+ * The round 18 verdict window set: the R15 clean windows byte-identical
+ * (fourth carry) plus the Bach m4 fixed-context window on every card.
+ */
+const VERDICT_WINDOWS = [
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 1 },
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 3 },
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 4 },
+  { scoreId: BRAHMS_STUDIO_SCORE_ID, measureStart: 68 },
+  { scoreId: SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 4 },
 ];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
@@ -212,48 +241,48 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 17 with the single gap-amount axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 17);
+test('CURRENT_ROUND_METADATA opens round 18 with the single rest-shape axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 18);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Rect Knockout + Gap Amounts: Snug −30% vs Tight −35%'
+    'Rest-Shape Verdict: Four Dialects on Fixed Behavior'
   );
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['clusterSpacing'],
+    ['restStyle'],
     'the round carries exactly the operator-approved axis'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /rectangular knockout/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /gap amount/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /shape/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /behavior is fixed/);
   assert.match(
     CURRENT_ROUND_METADATA.description,
-    /cannot move rest ink/,
-    'the independence proof is stated'
+    /fourth carry/,
+    'the clean windows compare against everything the operator saw'
   );
 });
 
-test('CURRENT_CANDIDATES declares exactly the snug golden and the tight challenger', () => {
+test('CURRENT_CANDIDATES declares exactly the four carried dialects', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    SPACING_CANDIDATES.map((c) => c.id),
-    'golden first, then the challenger, in registry order'
+    VERDICT_CANDIDATES.map((c) => c.id),
+    'A–D in registry order'
   );
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two candidates on one axis');
+  assert.equal(CURRENT_CANDIDATES.length, 4, 'four candidates on one axis');
 
   assert.deepEqual(
-    SPACING_CANDIDATES.map((c) => resolveCandidate(getCandidate(c.id)!).options.clusterSpacing),
-    SPACING_CANDIDATES.map((c) => c.spacing),
-    'every published spacing preset is represented exactly once'
+    VERDICT_CANDIDATES.map((c) => resolveCandidate(getCandidate(c.id)!).options.restStyle),
+    VERDICT_CANDIDATES.map((c) => c.style),
+    'every carried dialect is represented exactly once'
   );
   assert.deepEqual(
-    [...new Set(SPACING_CANDIDATES.map((c) => c.spacing))].sort(),
-    [...JANKO_CLUSTER_SPACINGS].sort(),
-    'the registry covers the published spacing catalogue'
+    [...new Set(VERDICT_CANDIDATES.map((c) => c.style))].sort(),
+    [...REST_STYLES].sort(),
+    'the registry covers the four carried dialects'
   );
 
-  for (const { id, letter } of SPACING_CANDIDATES) {
+  for (const { id, letter } of VERDICT_CANDIDATES) {
     const candidate = getCandidate(id)!;
     assert.ok(candidate.label.startsWith(`${letter} · `), `${id} is candidate ${letter}`);
     assert.ok((candidate.description ?? '').length > 120, `${id} carries a rationale`);
@@ -261,20 +290,20 @@ test('CURRENT_CANDIDATES declares exactly the snug golden and the tight challeng
   }
 });
 
-test('Per-candidate purity: each candidate states only the spacing axis and no locked delta', () => {
+test('Per-candidate purity: each candidate states only the rest-shape axis and no locked delta', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  for (const { id, spacing } of SPACING_CANDIDATES) {
+  for (const { id, style } of VERDICT_CANDIDATES) {
     const candidate = getCandidate(id)!;
-    assert.equal(candidate.axis, 'clusterSpacing', `${id} declares the spacing axis`);
+    assert.equal(candidate.axis, 'restStyle', `${id} declares the rest-shape axis`);
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['clusterSpacing'],
-      `${id} varies the spacing axis and nothing else`
+      ['restStyle'],
+      `${id} varies the rest-shape axis and nothing else`
     );
-    assert.equal(candidate.options?.clusterSpacing, spacing);
+    assert.equal(candidate.options?.restStyle, style);
     const options = (candidate.options ?? {}) as Record<string, unknown>;
     for (const locked of [
-      'restStyle',
+      'clusterSpacing',
       'gridWritingPolicy',
       'systemStartStyle',
       'chordGrouping',
@@ -286,7 +315,7 @@ test('Per-candidate purity: each candidate states only the spacing axis and no l
     assert.equal(candidate.tokens, undefined, `${id} carries no token delta`);
   }
   // The golden context every candidate inherits, unchanged.
-  assert.equal(golden.clusterSpacing, 'snug', 'the recommended spacing golden');
+  assert.equal(golden.clusterSpacing, 'tight', 'the decided spacing golden');
   assert.equal(golden.restStyle, 'kinetic-monoline', 'the incumbent dialect golden');
   assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'grid candidate C is locked');
   assert.equal(golden.systemStartStyle, 'architectural-bracket', 'the flared bracket is locked');
@@ -295,36 +324,59 @@ test('Per-candidate purity: each candidate states only the spacing axis and no l
 });
 
 test('Every candidate states exactly its open-axis badge and nothing else', () => {
-  for (const { id, spacing } of SPACING_CANDIDATES) {
+  for (const { id, style } of VERDICT_CANDIDATES) {
     const badges = candidateBadges(getCandidate(id)!);
     assert.deepEqual(
       badges.map((b) => b.key),
-      ['clusterSpacing'],
+      ['restStyle'],
       `${id} badges only its own axis`
     );
-    assert.equal(badges[0].value, spacing);
-    assert.equal(badges[0].axis, true, `${id} flags the spacing axis`);
+    assert.equal(badges[0].value, style);
+    assert.equal(badges[0].axis, true, `${id} flags the rest-shape axis`);
   }
-  // Departures from golden: the tight challenger alone.
+  // Departures from golden: the three challengers; the incumbent states the
+  // golden value on the axis without a delta.
   const departures = CURRENT_CANDIDATES.flatMap((c) =>
     candidateBadges(c).filter((b) => b.value !== b.golden)
   );
-  assert.equal(departures.length, 1, 'one spacing departure');
-  assert.equal(departures[0].value, 'tight');
+  assert.equal(departures.length, 3, 'three shape departures');
+  assert.deepEqual(
+    departures.map((b) => b.value).sort(),
+    ['classical-urtext', 'geometric-node', 'phantom-notehead'].sort()
+  );
 });
 
-test('Both candidates share the carried cluster windows', () => {
-  for (const { id } of SPACING_CANDIDATES) {
+test('All four candidates share the verdict windows: the R15 clean set plus Bach m4', () => {
+  for (const { id } of VERDICT_CANDIDATES) {
     const resolved = resolveCandidate(getCandidate(id)!);
     assert.deepEqual(
       resolved.windows.map((w) => ({ scoreId: w.scoreId, measureStart: w.measureStart })),
-      SPACING_WINDOWS,
+      VERDICT_WINDOWS,
       `${id} window set`
     );
     for (const window of resolved.windows) {
       assert.equal(window.measureCount, 1, `${id} shows one measure per window`);
       assert.ok(window.title.length > 20, `${id} titles every window`);
     }
+    // The carried clean windows are byte-identical to Round 15 (fourth
+    // carry): the verdict compares against everything the operator saw.
+    assert.deepEqual(
+      resolved.windows.slice(0, 6).map((w) => w.title),
+      [
+        'Rest specimen · m. 1 — the genuine 16th silence in a stepwise contour, free column',
+        'Rest specimen · m. 2 — the genuine 8th silence',
+        'Rest specimen · m. 3 — the genuine quarter silence',
+        'Rest specimen · m. 4 — the genuine half silence',
+        'Brahms Op. 118/1 · m. 68 — the one real-world bar with a writable rest and no crowded column',
+        'Chord specimen · m. 2 — the genuine tick-180 8th rest among the clasped chords',
+      ],
+      `${id} carries the clean windows byte-identical`
+    );
+    // The fixed-context window proves the bridging, the weight and the
+    // phrase rows on every card.
+    const m4 = resolved.windows[6];
+    assert.equal(m4.scoreId, DEFAULT_STUDIO_SCORE_ID, `${id} fixes its context on Bach`);
+    assert.equal(m4.measureStart, 4, `${id} fixes its context on m. 4`);
   }
 });
 
@@ -353,42 +405,33 @@ test('The golden page layout is four systems per page and two pages — every pr
   }
 });
 
-test('Snug passes every gate; tight is reported through the real engine (trippable)', () => {
-  const snug = resolveJankoOptions({
-    ...DEFAULT_JANKO_OPTIONS,
-    clusterSpacing: 'snug',
-  });
-  const report = lintJankoScore(SCORE, snug, DEFAULT_JANKO_TOKENS);
-  assert.equal(report.violations.length, 0, 'snug: zero violations on Bach');
-  assert.equal(report.warnings.length, 0, 'snug: zero warnings on Bach');
-  const brahms = lintJankoScore(
-    BRAHMS,
-    resolveJankoOptions({
-      ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
-      clusterSpacing: 'snug',
-    }),
-    BRAHMS_OP118_NO1_JANKO_TOKENS
+test('The decided tight golden passes every gate; snug stays implemented and clean', () => {
+  // The verdict is in: tight is the golden master, so the DEFAULT options —
+  // exactly what the CLI gates — must report zero violations and zero
+  // warnings on both benchmark scores.
+  assert.equal(
+    resolveJankoOptions(DEFAULT_JANKO_OPTIONS).clusterSpacing,
+    'tight',
+    'the golden master is the decided tight gap'
   );
-  assert.equal(brahms.violations.length, 0, 'snug: zero violations on Brahms');
-  assert.equal(brahms.warnings.length, 0, 'snug: zero warnings on Brahms');
-  // Tight is REPORTED, not gated: its lint chip carries whatever the engine
-  // finds, and a trip is judging input, not failure. The suite pins only that
-  // the report runs on both scores — never its counts.
-  const tightCases = [
+  for (const [score, base, tokens, label] of [
     [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
     [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
-  ] as const;
-  for (const [score, base, tokens, label] of tightCases) {
-    const tight = lintJankoScore(
-      score,
-      { ...base, clusterSpacing: 'tight' },
-      tokens
-    );
-    assert.equal(typeof tight.ok, 'boolean', `tight ${label}: the report runs`);
-    assert.ok(
-      Array.isArray(tight.violations) && Array.isArray(tight.warnings),
-      `tight ${label}: the report carries violation and warning counts`
-    );
+  ] as const) {
+    const report = lintJankoScore(score, base, tokens);
+    assert.equal(report.violations.length, 0, `tight golden: zero violations on ${label}`);
+    assert.equal(report.warnings.length, 0, `tight golden: zero warnings on ${label}`);
+    assert.equal(report.ok, true, `tight golden: ${label} engraves clean`);
+  }
+  // Snug remains implemented: the rest behavior is gap-independent, so the
+  // retired golden stays clean too.
+  for (const [score, base, tokens, label] of [
+    [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
+    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
+  ] as const) {
+    const snug = lintJankoScore(score, { ...base, clusterSpacing: 'snug' }, tokens);
+    assert.equal(snug.violations.length, 0, `snug: zero violations on ${label}`);
+    assert.equal(snug.warnings.length, 0, `snug: zero warnings on ${label}`);
   }
 });
 
@@ -618,7 +661,13 @@ test('Pin-preserving shrink: a pair starved of room narrows to the room with the
     note('shrink-hi', 4, 5, 43, 12),
     note('shrink-b', 1, 5, 48, 12),
   ]);
-  const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 3 });
+  // The synthetic room is tuned to the snug gap (snug remains implemented);
+  // the solver itself is untouched by the golden verdict.
+  const options = resolveJankoOptions({
+    ...DEFAULT_JANKO_OPTIONS,
+    measuresPerSystem: 3,
+    clusterSpacing: 'snug',
+  });
   const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const placed = layoutJankoScore(shrink, options, tokens).flatMap((l) => l.notes);
   const lo = placed.find((p) => p.note.id === 'shrink-lo')!;
@@ -862,7 +911,7 @@ test('Synthetic same-duration stacks: one painted stem — stacked and flanked',
   // The flanked pair spans the golden gap and shares one stem on the column.
   const flank = layout.notes.filter((p) => p.note.startTick === 48).sort((a, b) => a.x - b.x);
   assert.equal(flank.length, 2);
-  const G = getClusterSpacingPreset('snug').pairGap;
+  const G = getClusterSpacingPreset('tight').pairGap;
   assert.ok(
     Math.abs(flank[1].x - flank[0].x - G) < 0.05,
     `the flanked pair spans the golden ${G}pt (got ${(flank[1].x - flank[0].x).toFixed(2)})`
@@ -1168,23 +1217,74 @@ test('All 12 pitch-class digits sit inside the rect with the preset margin — e
 });
 
 // ---------------------------------------------------------------------------
-// 16. Rests: Round 16 behaviour, untouched (locked, verbatim)
+// 16. Rests: Round 17B fixed behavior (weight, phrase rows, bridging)
 // ---------------------------------------------------------------------------
 
-test('Rest size maxima: pinned per value over the four carried dialects (locked)', () => {
+test('Rest weight: every rest stroke is the note-stem weight with scaled extents', () => {
+  // The constants: strokes back at Round 15 pre-scale values, extents scaled.
+  assert.equal(REST_STROKE, 0.9, 'the monoline rest stroke is exactly the note stem stroke');
+  assert.equal(REST_BOX_STROKE, 0.6, 'the bauhaus box stroke is its pre-scale 0.6pt');
+  assert.equal(REST_PHANTOM_HEAD_STROKE, 0.8, 'the phantom stroke is its pre-scale 0.8pt');
+  assert.equal(REST_LINEAR_SCALE, 0.575, 'extents keep the 0.575 scale');
+  assert.ok(
+    Math.abs(REST_PHANTOM_HEAD_RADIUS - 3.0 * REST_LINEAR_SCALE) < 1e-9,
+    'the phantom head radius is an extent and stays scaled'
+  );
+  assert.ok(
+    Math.abs(REST_URTEXT_BULB_RADIUS - 0.7 * REST_LINEAR_SCALE) < 1e-9,
+    'the urtext bulb radius is an extent and stays scaled'
+  );
+
+  // The paint: every stroke-width inside every printed rest group, over Bach
+  // (16ths, 8ths, quarters) plus the rest specimen (all four values).
+  const widthsOf = (style: JankoRestStyle): string[] => {
+    const groups = [
+      ...restInkOf(SCORE, { ...DEFAULT_JANKO_OPTIONS, restStyle: style }, DEFAULT_JANKO_TOKENS, 'tight'),
+      ...restInkOf(
+        REST_SPECIMEN,
+        { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4, restStyle: style },
+        DEFAULT_JANKO_TOKENS,
+        'tight'
+      ),
+    ];
+    assert.ok(groups.length >= 13, `${style} prints its rests (${groups.length} groups)`);
+    return [...groups.join('\n').matchAll(/stroke-width="([\d.]+)"/g)].map((m) => m[1]);
+  };
+  for (const style of ['kinetic-monoline', 'classical-urtext', 'geometric-node'] as const) {
+    const widths = widthsOf(style);
+    assert.ok(widths.length > 0, `${style} paints stroked ink`);
+    assert.ok(
+      widths.every((w) => w === '0.90'),
+      `${style}: every rest stroke is 0.90pt (saw ${[...new Set(widths)].join(', ')})`
+    );
+  }
+  const phantom = widthsOf('phantom-notehead');
+  assert.ok(
+    phantom.length > 0 && phantom.every((w) => w === '0.80'),
+    `phantom: every rest stroke is 0.80pt (saw ${[...new Set(phantom)].join(', ')})`
+  );
+  const bauhaus = widthsOf('bauhaus-slash');
+  assert.ok(
+    bauhaus.length > 0 && bauhaus.every((w) => w === '0.90' || w === '0.60'),
+    `bauhaus: slashes at 0.90pt, the hairline box at 0.60pt (saw ${[...new Set(bauhaus)].join(', ')})`
+  );
+  assert.ok(bauhaus.includes('0.60'), 'the bauhaus half box really paints its 0.60pt hairline');
+});
+
+test('Rest size maxima: pinned per value over the four carried dialects', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const expected: Record<string, { w: number; h: number }> = {
-    sixteenth: { w: 4.83, h: 7.3025 },
-    eighth: { w: 4.83, h: 7.3025 },
-    quarter: { w: 3.91, h: 6.9 },
-    half: { w: 4.5425, h: 5.06 },
+    sixteenth: { w: 4.94, h: 7.3025 },
+    eighth: { w: 4.94, h: 7.3025 },
+    quarter: { w: 4.25, h: 6.9 },
+    half: { w: 4.925, h: 5.06 },
   };
   for (const [value, max] of Object.entries(expected)) {
     let w = 0;
     let h = 0;
     for (const style of REST_STYLES) {
       const box = restInkBox(
-        { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value: value as 'quarter', style },
+        { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value: value as JankoRestValue, style },
         t
       );
       w = Math.max(w, box.x1 - box.x0);
@@ -1196,9 +1296,16 @@ test('Rest size maxima: pinned per value over the four carried dialects (locked)
     assert.ok(w < 2 * t.noteheadRadius, `${value}: narrower than one head`);
     assert.ok(h < 2 * t.noteheadRadius, `${value}: shorter than one head`);
   }
+  // The weight change grows widths (stroke padding) but no extent: heights are
+  // exactly the Round 16 pins.
+  assert.deepEqual(
+    JANKO_REST_VALUES.map((value) => expected[value].h),
+    [7.3025, 7.3025, 6.9, 5.06],
+    'extents keep the scaled heights'
+  );
 });
 
-test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-side, clear — every dialect (locked)', () => {
+test('Phrase rows: the showcase rests hang a glyph edge exactly on a phrase row — every dialect', () => {
   const cases = [
     {
       label: 'Bach m. 4',
@@ -1206,6 +1313,20 @@ test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-sid
       options: DEFAULT_JANKO_OPTIONS,
       tokens: DEFAULT_JANKO_TOKENS,
       ticks: [552],
+    },
+    {
+      label: 'Bach m. 6',
+      score: SCORE,
+      options: DEFAULT_JANKO_OPTIONS,
+      tokens: DEFAULT_JANKO_TOKENS,
+      ticks: [720],
+    },
+    {
+      label: 'Bach m. 7',
+      score: SCORE,
+      options: DEFAULT_JANKO_OPTIONS,
+      tokens: DEFAULT_JANKO_TOKENS,
+      ticks: [864],
     },
     {
       label: 'chord specimen m. 2',
@@ -1239,31 +1360,31 @@ test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-sid
         assert.ok(layout, `${style} · ${c.label}: the t${tick} rest is written`);
         const rest = layout!.rests.find((r) => r.tick === tick)!;
         const box = restInkBox(rest, t);
-        // On-rule: one glyph edge sits exactly on a staff rule of the lattice
-        // (staff octaves plus ledger registers) — the hang.
-        const rules: number[] = [];
+        // On-row: one glyph edge sits exactly on a whole-tone row of the
+        // lattice (staff octaves plus ledger registers) — the hang.
+        const rows: number[] = [];
         for (let octave = 0; octave <= 8; octave++) {
           const base = layout!.geometry.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
-          rules.push(...getEquatorRuleYs(base, o, t));
+          for (const offset of wholeToneRowOffsets(o, t)) rows.push(base + offset);
         }
-        let ruleY = rules[0];
-        let ruleDistance = Infinity;
+        let rowDistance = Infinity;
+        let rowY = rows[0];
         for (const edge of [box.y0, box.y1]) {
-          for (const candidate of rules) {
+          for (const candidate of rows) {
             const distance = Math.abs(edge - candidate);
-            if (distance < ruleDistance) {
-              ruleDistance = distance;
-              ruleY = candidate;
+            if (distance < rowDistance) {
+              rowDistance = distance;
+              rowY = candidate;
             }
           }
         }
         assert.ok(
-          ruleDistance < 0.01,
-          `${style} · ${c.label} t${tick}: a glyph edge hangs on a rule (off by ${ruleDistance.toFixed(3)})`
+          rowDistance < 1e-6,
+          `${style} · ${c.label} t${tick}: a glyph edge hangs exactly on a phrase row (off by ${rowDistance.toFixed(6)})`
         );
-        // Corridor-side: the glyph extends from its rule toward Middle C.
-        const toCorridor = layout!.geometry.middleCY - ruleY;
-        const extendsTo = (box.y0 + box.y1) / 2 - ruleY;
+        // Corridor-side: the glyph extends from its row toward Middle C.
+        const toCorridor = layout!.geometry.middleCY - rowY;
+        const extendsTo = (box.y0 + box.y1) / 2 - rowY;
         assert.ok(
           Math.sign(extendsTo) === Math.sign(toCorridor),
           `${style} · ${c.label} t${tick}: the glyph extends toward the corridor`
@@ -1277,12 +1398,233 @@ test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-sid
       }
       const report = lintJankoScore(c.score, { ...c.options, restStyle: style }, c.tokens);
       assert.equal(
-        report.diagnostics.filter((d) => d.code === 'rest-collision' || d.code === 'rest-unwritable').length,
+        report.diagnostics.filter(
+          (d) => d.code === 'rest-collision' || d.code === 'rest-unwritable' || d.code === 'beam-rest-clearance'
+        ).length,
         0,
         `${style} · ${c.label}: no rest diagnostic`
       );
     }
   }
+});
+
+test('Vertical fallback: a walled reference row seats the adjacent row; a roomy cell keeps the reference', () => {
+  // One RH 16th silence (60..72) on the octave-3 even row, with the LH
+  // walling the whole beat cell on that row: at 4 per system the reference
+  // row offers no clear slot, so the adjacent row toward the corridor seats
+  // the rest; at 2 per system the wider cell keeps the reference seat.
+  const wall = score('synthetic-rest-fallback', [
+    note('rh-a', 2, 3, 48, 12),
+    note('rh-b', 2, 3, 72, 12),
+    note('rh-c', 2, 3, 84, 12),
+    note('lh-54', 2, 3, 54, 12, 'LH'),
+    note('lh-60', 2, 3, 60, 12, 'LH'),
+    note('lh-66', 2, 3, 66, 12, 'LH'),
+    note('lh-78', 2, 3, 78, 12, 'LH'),
+    note('lh-90', 2, 3, 90, 12, 'LH'),
+  ]);
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+
+  const narrow = layoutJankoScore(
+    wall,
+    { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 },
+    DEFAULT_JANKO_TOKENS
+  )[0];
+  assert.deepEqual(narrow.unwrittenRests, [], 'the walled silence is written, not refused');
+  const rest = narrow.rests.find((r) => r.tick === 60)!;
+  assert.ok(rest, 'the tick-60 rest is admitted');
+  assert.equal(rest.hand, 'RH');
+  assert.equal(rest.value, 'sixteenth');
+  const box = restInkBox(rest, t);
+  const release = narrow.notes.find((p) => p.note.id === 'rh-a')!;
+  const resume = narrow.notes.find((p) => p.note.id === 'rh-b')!;
+  assert.equal(release.y, resume.y, 'the releasing and resuming rows agree');
+  const referenceRow = release.y;
+  assert.ok(
+    Math.abs(box.y0 - referenceRow) > 1 && Math.abs(box.y1 - referenceRow) > 1,
+    'the walled reference row seats nothing'
+  );
+  assert.ok(
+    Math.abs(box.y1 - (referenceRow - t.rowHeight)) < 1e-6,
+    `the adjacent row toward the corridor seats the rest (edge at ${box.y1.toFixed(2)}pt)`
+  );
+  assert.equal(restClearsLayout(rest, narrow.notes, t), true, 'the fallback seat clears every head');
+  assert.ok(
+    narrow.beams.some((b) => b.notes.map((n) => n.startTick).join(',') === '48,72,84'),
+    'the run still bridges across its printed rest'
+  );
+  const narrowReport = lintJankoScore(
+    wall,
+    { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 },
+    DEFAULT_JANKO_TOKENS
+  );
+  assert.equal(narrowReport.violations.length, 0, 'the fallback engraving is violation-free');
+  assert.equal(narrowReport.warnings.length, 0, '... with no warnings either');
+
+  // The same silence in a roomy cell never falls back.
+  const wide = layoutJankoScore(
+    wall,
+    { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 },
+    DEFAULT_JANKO_TOKENS
+  )[0];
+  const kept = wide.rests.find((r) => r.tick === 60)!;
+  const keptBox = restInkBox(kept, t);
+  const wideRelease = wide.notes.find((p) => p.note.id === 'rh-a')!;
+  assert.ok(
+    Math.abs(keptBox.y1 - wideRelease.y) < 1e-6,
+    'the roomy cell keeps the reference seat'
+  );
+});
+
+test('Bridging: m. 4 beams [528, 540, 564] as one gesture with its 16th rest printed beneath', () => {
+  const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[0];
+  const groups = layout.beams.map((b) => b.notes.map((n) => n.startTick).join(','));
+  assert.ok(groups.includes('528,540,564'), `the beat-3 run beams as one gesture (got ${groups.join(' | ')})`);
+  const beam = layout.beams.find((b) => b.notes.map((n) => n.startTick).join(',') === '528,540,564')!;
+  assert.ok(
+    beam.notes.every((n) => n.hand === 'RH'),
+    'the bridged gesture is one right-hand voice'
+  );
+  assert.deepEqual(
+    layout.ungrouped.filter((n) => n.startTick >= 528 && n.startTick < 576).map((n) => n.startTick),
+    [],
+    'no orphaned flag survives inside the bridged beat'
+  );
+  // The rest is still computed, admitted and printed — the beam continues
+  // across it, and the admission is unchanged by the bridge.
+  const rest = layout.rests.find((r) => r.tick === 552)!;
+  assert.ok(rest, 'the tick-552 rest is admitted');
+  assert.equal(rest.hand, 'RH');
+  assert.equal(rest.value, 'sixteenth');
+  assert.equal(rest.durationTicks, 12);
+  const crop = renderJankoCrop(SCORE, 4, 1, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.match(
+    crop,
+    /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH"/,
+    'the bridged rest is printed in its natural gap'
+  );
+  // Beneath a clearing beam: the connector rides above the rest ink with the
+  // full beam air, and the linter's beam-rest audit agrees.
+  const box = restInkBox(rest, resolveJankoTokens(DEFAULT_JANKO_TOKENS));
+  const air = DEFAULT_JANKO_TOKENS.minStemClearance!;
+  assert.ok(
+    beam.beamY(rest.x) + air <= box.y0,
+    `the beam clears the rest ink (beam ${beam.beamY(rest.x).toFixed(2)}pt, ink top ${box.y0.toFixed(2)}pt)`
+  );
+  const out: Parameters<typeof checkBeamRestClearance>[3] = [];
+  checkBeamRestClearance(layout, resolveJankoTokens(DEFAULT_JANKO_TOKENS), DEFAULT_JANKO_LINT_OPTIONS, out);
+  assert.deepEqual(out, [], 'the bridged beam passes the beam-rest audit');
+  // And the rest hangs where a note would go: its near edge exactly on the
+  // digit 9 phrase row it releases from.
+  assert.ok(
+    Math.abs(box.y1 - 158.5) < 1e-6,
+    `the m. 4 rest hangs its near edge on the 158.5pt phrase row (got ${box.y1})`
+  );
+});
+
+test('Bridging is the only new beam: Bach and Brahms span exactly the two qualifying 16th rests', () => {
+  // A same-hand rest strictly inside a beam span can only arise from a
+  // bridge (the partition splits every other hole), so scanning every span
+  // pins the complete musical change — no silent re-beamings.
+  const spans: string[] = [];
+  for (const [score, options, tokens, label] of [
+    [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
+    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
+  ] as const) {
+    const o = resolveJankoOptions(options);
+    const t = resolveJankoTokens(tokens);
+    for (const l of layoutJankoScore(score, o, t)) {
+      for (const b of l.beams) {
+        const ticks = b.notes.map((n) => n.startTick);
+        const lo = ticks[0];
+        const hi = ticks[ticks.length - 1];
+        const hand = b.notes[0].hand;
+        for (const r of l.rests) {
+          if (r.hand === hand && r.tick > lo && r.tick < hi) {
+            assert.equal(r.durationTicks, 12, `${label}: only a 16th rest bridges`);
+            spans.push(`${label} [${ticks.join(',')}] over t${r.tick}`);
+          }
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    spans,
+    ['Bach [528,540,564] over t552', 'Bach [3408,3420,3444] over t3432'],
+    'exactly the two qualifying bridges, both intended'
+  );
+});
+
+test('Bridging unit: a single 16th rest bridges; 8ths, chains and cross-beat gaps break', () => {
+  const rnote = (id: string, startTick: number, durationTicks: number): JankoRhythmNote => ({
+    id,
+    startTick,
+    durationTicks,
+    hand: 'RH',
+    x: startTick,
+    y: 0,
+  });
+  const ticksOf = (partition: { groups: JankoRhythmNote[][]; ungrouped: JankoRhythmNote[] }): string =>
+    `groups=${JSON.stringify(partition.groups.map((g) => g.map((n) => n.startTick)))} ungrouped=${JSON.stringify(partition.ungrouped.map((n) => n.startTick))}`;
+
+  // The qualifying bridge: a one-16th hole with its printed rest re-joins.
+  const holed = partitionBeamGroups([rnote('a', 0, 12), rnote('b', 12, 12), rnote('c', 36, 12)]);
+  assert.deepEqual(
+    holed.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12]],
+    `the partition still splits at the hole (${ticksOf(holed)})`
+  );
+  const bridged = bridgeBeamGroupsAcrossRests(holed, [{ tick: 24, durationTicks: 12, hand: 'RH' }]);
+  assert.deepEqual(
+    bridged.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12, 36]],
+    `the printed 16th rest re-joins the run (${ticksOf(bridged)})`
+  );
+  assert.deepEqual(bridged.ungrouped.map((n) => n.startTick), [], 'the resumption loses its flag');
+
+  // An 8th rest never bridges, even strictly inside the beat.
+  const eighth = partitionBeamGroups([rnote('a', 0, 12), rnote('c', 36, 12)]);
+  const eighthBridged = bridgeBeamGroupsAcrossRests(eighth, [{ tick: 12, durationTicks: 24, hand: 'RH' }]);
+  assert.deepEqual(eighthBridged.groups, [], 'the 8th rest breaks the run');
+  assert.deepEqual(
+    eighthBridged.ungrouped.map((n) => n.startTick),
+    [0, 36],
+    'both notes keep their flags'
+  );
+
+  // A rest chain never bridges: no single rest spans the boundary.
+  const chained = partitionBeamGroups([rnote('a', 0, 12), rnote('c', 36, 12)]);
+  const chainedBridged = bridgeBeamGroupsAcrossRests(chained, [
+    { tick: 12, durationTicks: 12, hand: 'RH' },
+    { tick: 24, durationTicks: 12, hand: 'RH' },
+  ]);
+  assert.deepEqual(chainedBridged.groups, [], 'the rest chain breaks the run');
+
+  // A cross-beat 16th rest never bridges: the flanks share no beat window.
+  const crossBeat = partitionBeamGroups([rnote('a', 36, 12), rnote('c', 60, 12)]);
+  const crossBridged = bridgeBeamGroupsAcrossRests(crossBeat, [{ tick: 48, durationTicks: 12, hand: 'RH' }]);
+  assert.deepEqual(crossBridged.groups, [], 'the cross-beat gap breaks the run');
+
+  // A sounding onset strictly between the flanks refuses the bridge.
+  const straddled = partitionBeamGroups([rnote('a', 0, 12), rnote('x', 12, 48), rnote('c', 24, 12)]);
+  const straddledBridged = bridgeBeamGroupsAcrossRests(straddled, [{ tick: 12, durationTicks: 12, hand: 'RH' }]);
+  assert.deepEqual(straddledBridged.groups, [], 'the straddled flank breaks the run');
+
+  // Without a printed rest the partition stands exactly as partitioned.
+  const untouched = bridgeBeamGroupsAcrossRests(holed, []);
+  assert.deepEqual(
+    untouched.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12]],
+    'no rest, no bridge'
+  );
+
+  // A legato overlap is still one continuous gesture (Round 13 stands).
+  const legato = partitionBeamGroups([rnote('a', 0, 24), rnote('b', 12, 12), rnote('c', 24, 12)]);
+  assert.deepEqual(
+    legato.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12, 24]],
+    'a sounding overlap bridges without any rest'
+  );
 });
 
 test('Rest-ink identity: extracted rest SVG groups are equal across both spacing presets', () => {
@@ -1434,40 +1776,37 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: two cards, snug clean, tight reported
+// 17. Studio: four verdict cards, every card clean
 // ---------------------------------------------------------------------------
 
-test('The live studio engraves both candidates on their own windows with spacing badges', () => {
+test('The live studio engraves all four verdict candidates on their own windows with shape badges', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /Round 17/);
-  assert.match(html, /Rect Knockout \+ Gap Amounts/, 'the round title headlines the view');
-  assert.ok(!html.includes('Cluster Spacing + Rest Dialects'), 'the Round 16 title is retired');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
+  assert.match(html, /data-candidate-count="4"/);
+  assert.match(html, /Round 18/);
+  assert.match(html, /Rest-Shape Verdict/, 'the round title headlines the view');
+  assert.ok(!html.includes('Rect Knockout + Gap Amounts'), 'the Round 17 title is retired');
   let cursor = -1;
-  for (const { id, spacing } of SPACING_CANDIDATES) {
+  for (const { id, style } of VERDICT_CANDIDATES) {
     const at = html.indexOf(`data-candidate="${id}"`);
     assert.ok(at > cursor, `${id} appears in registry order`);
     cursor = at;
     const body = html.slice(at, html.indexOf('</article>', at));
     assert.match(
       body,
-      new RegExp(`<span class="badge[^"]*badge-axis[^"]*"><b>clusterSpacing</b> = ${spacing}`),
-      `${id} shows its spacing badge`
+      new RegExp(`<span class="badge[^"]*badge-axis[^"]*"><b>restStyle</b> = ${style}`),
+      `${id} shows its shape badge`
     );
-    assert.ok(!body.includes('<b>restStyle</b>'), `${id} never shows a dialect badge`);
+    assert.ok(!body.includes('<b>clusterSpacing</b>'), `${id} never shows a spacing badge`);
     assert.ok(!body.includes('<b>chordGrouping</b>'), `${id} never badges the locked clasp`);
-    if (spacing === DEFAULT_JANKO_OPTIONS.clusterSpacing) {
+    if (style === DEFAULT_JANKO_OPTIONS.restStyle) {
       assert.ok(!body.includes('badge-delta'), 'candidate A is the incumbent: no delta styling');
     } else {
       assert.match(body, /badge-delta/, `${id} highlights its departure from golden`);
     }
-    // Snug is clean; tight is reported through its chip — a trip would be
-    // judging input, not failure.
-    assert.match(body, /chip chip-(ok|error)/, `${id} reports its lint verdict`);
-    assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint chip`);
-    if (spacing === 'snug') {
-      assert.match(body, /data-lint="clean"/, 'snug is clean');
-    }
+    // The behavior is fixed, so every card is clean — the verdict judges
+    // shapes, never defects.
+    assert.match(body, /data-lint="clean"/, `${id} carries a clean lint chip`);
+    assert.match(body, /chip chip-ok/, `${id} reports its clean chip`);
   }
 });

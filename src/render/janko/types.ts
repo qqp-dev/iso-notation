@@ -114,7 +114,8 @@ export const JANKO_DIGIT_HALF_HEIGHT = 2.86;
  * | `'snug'`  | 0.8    | 0.4  | 5.86                   | 11.72       |
  * | `'tight'` | 0.6    | 0.4  | 5.46                   | 10.92       |
  *
- * `'snug'` is the golden master (the recommended −30% vs the Round 16 8.2).
+ * `'tight'` is the golden master (the decided −35% vs the Round 16 8.2, Round
+ * 17B verdict).
  * The cluster grammar itself is settled doctrine, not a candidate: one shared
  * stem per same-duration stack nearest the nominal column, coincident stems
  * for mixed stacks, flanked same-row seconds with two stems at head-x, the
@@ -158,11 +159,11 @@ export const JANKO_CLUSTER_SPACING_PRESETS: Record<JankoClusterSpacing, JankoClu
   tight: { margin: 0.6, air: 0.4, pairGap: 5.46, wx: 2.53, hy: 3.46 },
 };
 
-/** Resolve one spacing preset (defaults to the golden `'snug'`). */
+/** Resolve one spacing preset (defaults to the golden `'tight'`). */
 export function getClusterSpacingPreset(
   spacing?: JankoClusterSpacing | null
 ): JankoClusterSpacingPreset {
-  return JANKO_CLUSTER_SPACING_PRESETS[spacing ?? 'snug'];
+  return JANKO_CLUSTER_SPACING_PRESETS[spacing ?? 'tight'];
 }
 
 /**
@@ -702,15 +703,15 @@ export interface JankoLayoutOptions {
   /**
    * Rest symbol dialect (Round 12, extended by Round 13): how a hand's silent
    * span inside an active measure is written. The rest hangs from the nearest
-   * staff rule to its voice and extends toward the Middle C corridor
-   * (Round 16 rule-hang). Defaults to `'kinetic-monoline'` (see
+   * whole-tone row of its phrase octave and extends toward the Middle C
+   * corridor (Round 17B phrase rows). Defaults to `'kinetic-monoline'` (see
    * {@link JankoRestStyle}).
    */
   restStyle?: JankoRestStyle;
   /**
    * Horizontal cluster spacing (Round 17): the rectangular mask margin and the
    * breathing air between same-row heads of one onset. Defaults to the golden
-   * `'snug'` (see {@link JankoClusterSpacing}).
+   * `'tight'` (see {@link JankoClusterSpacing}).
    */
   clusterSpacing?: JankoClusterSpacing;
   /**
@@ -792,7 +793,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',
-  clusterSpacing: 'snug',
+  clusterSpacing: 'tight',
   gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'architectural-bracket',
   finalBarlineStyle: 'unified',

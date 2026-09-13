@@ -51,6 +51,7 @@ import {
   checkAccoladeClearance,
   checkBarlineClearance,
   checkBeamNoteheadClearance,
+  checkBeamRestClearance,
   checkClaspClearance,
   checkHaloClearance,
   checkKnockoutCoverage,
@@ -78,9 +79,9 @@ const TOKENS = DEFAULT_JANKO_TOKENS;
 const BRAHMS_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const R = TOKENS.noteheadRadius;
 const HALO_R = TOKENS.haloRadius;
-/** The golden rectangular mask half-extents (Round 17 `'snug'`). */
-const MASK_WX = getClusterSpacingPreset('snug').wx;
-const MASK_HY = getClusterSpacingPreset('snug').hy;
+/** The golden rectangular mask half-extents (Round 17B verdict `'tight'`). */
+const MASK_WX = getClusterSpacingPreset('tight').wx;
+const MASK_HY = getClusterSpacingPreset('tight').hy;
 /** Canonical flush stem attachment radii (regular heads / tick-0 honor sounds). */
 const REGULAR_ATTACH = MASK_HY + 0.2;
 const HONOR_ATTACH = HALO_R + 0.4;
@@ -162,10 +163,10 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
 test('Row-snapped chord tones: every same-row pair is fanned by the preset pair gap', () => {
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  // Round 17: the golden `'snug'` fan is the asymmetric preset pair gap
-  // 2wx + air (5.86pt) — tighter than the old circular diameter, and wider
+  // Round 17B: the golden `'tight'` fan is the asymmetric preset pair gap
+  // 2wx + air (5.46pt) — tighter than the old circular diameter, and wider
   // than the box-overlap bound the clearance model audits.
-  const offset = getClusterSpacingPreset('snug').pairGap;
+  const offset = getClusterSpacingPreset('tight').pairGap;
   let pairs = 0;
   for (const layout of layouts) {
     const rows = new Map<string, typeof layout.notes>();
@@ -311,7 +312,7 @@ test('Row-snapped chord tones warn exactly where their mask boxes overlap', () =
   assert.equal(lintAt(2 * MASK_WX - 0.01).length, 1, 'overlapping masks still collide');
   assert.equal(lintAt(2 * MASK_WX - 0.01)[0].code, 'chordal-overlap');
   assert.equal(lintAt(2 * MASK_WX).length, 0, 'touching masks clear the warning');
-  const gap = getClusterSpacingPreset('snug').pairGap;
+  const gap = getClusterSpacingPreset('tight').pairGap;
   assert.equal(lintAt(gap - 0.01).length, 0, 'a shrunk-but-clear fan is legal');
 });
 
@@ -348,7 +349,7 @@ test('Defect: a digit grown past its mask margin is caught', () => {
 
 test('Golden master: every digit keeps the preset margin of white inside its knockout rect', () => {
   const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
-  const preset = getClusterSpacingPreset('snug');
+  const preset = getClusterSpacingPreset('tight');
   const out: LintViolation[] = [];
   for (const layout of systems()) {
     checkKnockoutCoverage(layout, DEFAULT_JANKO_OPTIONS, TOKENS, LINT, out);
@@ -697,6 +698,42 @@ test('Defect: a rest driven into a foreign notehead is caught', () => {
   assert.deepEqual(clean, []);
 });
 
+test('Defect: a beam driven into a printed rest is caught', () => {
+  const out: LintViolation[] = [];
+  const layout = systems(DEFAULT_JANKO_OPTIONS)[0];
+  assert.ok(layout.beams.length > 0, 'the canonical score beams');
+  // The Round 17B bridged beam: m. 4 beat 3 continues across the printed RH
+  // 16th rest at tick 552.
+  const beam = layout.beams.find((b) => b.notes.some((n) => n.startTick === 528 && n.hand === 'RH'))!;
+  const rest = layout.rests.find((r) => r.tick === 552)!;
+  assert.deepEqual(
+    beam.notes.map((n) => n.startTick),
+    [528, 540, 564],
+    'the m. 4 run beams as one gesture across its rest'
+  );
+  // Drive the primary connector onto the rest ink: collapse it to a
+  // horizontal segment through the rest centre.
+  const broken: JankoSystemLayout = {
+    ...layout,
+    beams: layout.beams.map((b) =>
+      b === beam ? { ...b, primary: { x1: rest.x - 5, y1: rest.y, x2: rest.x + 5, y2: rest.y } } : b
+    ),
+  };
+  checkBeamRestClearance(broken, DEFAULT_JANKO_TOKENS, LINT, out);
+  const hits = out.filter((v) => v.code === 'beam-rest-clearance');
+  assert.equal(hits.length, 1, 'the beam is reported once');
+  assert.match(hits[0].message, /never touch it/);
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('beam-rest-clearance'),
+    'the beam-rest audit is part of the published check list'
+  );
+
+  // The engine's own beams pass the same audit untouched.
+  const clean: LintViolation[] = [];
+  checkBeamRestClearance(layout, DEFAULT_JANKO_TOKENS, LINT, clean);
+  assert.deepEqual(clean, []);
+});
+
 // ---------------------------------------------------------------------------
 // 3c. Round 14 — simultaneity integrity and named rest refusals
 // ---------------------------------------------------------------------------
@@ -785,7 +822,7 @@ test('Defect: an unclasped four-voice simultaneity paints its stems through its 
 });
 
 test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', () => {
-  // A disc wide enough to wall the m. 4 beat cell shut: no slot along the rule
+  // A disc wide enough to wall the m. 4 beat cell shut: no slot along the row
   // keeps the guaranteed seating air from the LH D3 head that shares the column.
   const fat = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 60.0 };
   const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, fat)[0];
@@ -799,7 +836,7 @@ test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', 
     Math.abs(refusal!.x - 544.97) < 0.01,
     `the refusal keeps the canonical tick-552 beat column (x = ${refusal!.x.toFixed(2)}pt)`
   );
-  assert.ok(Number.isFinite(refusal!.targetY), 'and records the rule-hang centre it could not honour');
+  assert.ok(Number.isFinite(refusal!.targetY), 'and records the phrase-row hang centre it could not honour');
 
   const out: LintViolation[] = [];
   checkUnwrittenRests(layout, DEFAULT_JANKO_TOKENS, out);
@@ -821,7 +858,7 @@ test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', 
   }
 
   // A silence that opens exactly on a protected barline is nudged along its
-  // rule instead of straddling the grid; only a walled cell is refused by name.
+  // row instead of straddling the grid; only a walled cell is refused by name.
   const crossing = fixtureScore(
     [
       { id: 'rh-1', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 144, hand: 'RH', velocity: 80 },
