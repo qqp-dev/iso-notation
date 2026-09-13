@@ -108,21 +108,21 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 10/);
-  assert.match(html, /Scaled Midpoint Clasps/);
+  assert.match(html, /Round 11/);
+  assert.match(html, /Accolade Replacements/);
 });
 
-test('Round 10 registry declares the four scaled clasp-duration paradigms on per-hand clasps', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 10);
-  assert.match(CURRENT_ROUND_METADATA.title, /Scaled Midpoint Clasps/);
+test('Round 11 registry pairs four system-start styles with four light duration paradigms', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 11);
+  assert.match(CURRENT_ROUND_METADATA.title, /Accolade Replacements/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
     [
-      'transverse-cross-bars',
-      'kinetic-cross-slashes',
-      'interrupted-spine-node',
-      'faceted-diamond-bands',
+      'open-halo-cross-rungs',
+      'architectural-bracket-kinetic-slashes',
+      'clef-pillar-down-raked-slashes',
+      'double-hairline-cross-hatch-stitches',
     ],
     'candidates A–D in display order'
   );
@@ -131,12 +131,22 @@ test('Round 10 registry declares the four scaled clasp-duration paradigms on per
     ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp']
   );
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.claspDurationStyle),
-    ids,
-    'each candidate carries its own duration paradigm'
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
+    ['open-halo', 'architectural-bracket', 'clef-pillar', 'double-hairline'],
+    'each candidate demonstrates one System 1 start style'
   );
-  // The settled beam-harmonized tab is shared by all four: the round varies one
-  // variable.
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.claspDurationStyle),
+    [
+      'transverse-cross-bars',
+      'kinetic-cross-slashes',
+      'down-raked-slashes',
+      'cross-hatch-stitches',
+    ],
+    'each candidate carries its own light transverse duration paradigm'
+  );
+  // The settled beam-harmonized tab is shared by all four, so the round varies
+  // exactly two variables: the margin ink and the midpoint cut.
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
     ['kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam']
@@ -153,19 +163,20 @@ test('Round 10 registry declares the four scaled clasp-duration paradigms on per
     assert.equal(resolved.tokens.accoladeWidth, 4.8, 'the slender accolade reach');
     assert.equal(resolved.tokens.augmentationDotRadius, 0.75, 'the delicate dot');
     assert.equal(resolved.options.pageMargin, 24.0, 'the widened page margin');
+    assert.equal(resolved.options.interStaffGap, 30.0, 'the symmetrical octave lattice');
   }
   assert.deepEqual(
-    candidateBadges(getCandidate('transverse-cross-bars')!).map((b) => b.key),
+    candidateBadges(getCandidate('open-halo-cross-rungs')!).map((b) => b.key),
     ['chordGrouping'],
-    'candidate A is the golden duration paradigm itself'
+    'candidate A is the golden start and duration paradigm itself'
   );
   assert.deepEqual(
-    candidateBadges(getCandidate('faceted-diamond-bands')!).map((b) => b.key),
-    ['chordGrouping', 'claspDurationStyle']
+    candidateBadges(getCandidate('double-hairline-cross-hatch-stitches')!).map((b) => b.key),
+    ['chordGrouping', 'systemStartStyle', 'claspDurationStyle']
   );
 });
 
-test('Round 10 candidates export cleanly to the contact sheet', () => {
+test('Round 11 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
@@ -193,25 +204,26 @@ test('Round 10 candidates export cleanly to the contact sheet', () => {
     const next = sheet.indexOf('data-variant="', start + 1);
     return sheet.slice(start, next === -1 ? undefined : next);
   };
-  /** The mark each paradigm paints on the specimen's 8th / 16th chord. */
+  /** The cut each paradigm paints on the specimen's 8th / 16th chord. */
   const SIGNATURES: Record<string, RegExp> = {
     'transverse-cross-bars': /janko-clasp-bar/,
     'kinetic-cross-slashes': /janko-clasp-slash/,
-    'interrupted-spine-node': /janko-clasp-bead/,
-    'faceted-diamond-bands': /janko-clasp-band/,
+    'down-raked-slashes': /janko-clasp-slash/,
+    'cross-hatch-stitches': /janko-clasp-stitch/,
   };
   const FOREIGN: Record<string, RegExp> = {
-    'transverse-cross-bars': /janko-clasp-(gap|lozenge|ring|diamond|slash|bead|band|dot|pip)/,
-    'kinetic-cross-slashes': /janko-clasp-(gap|lozenge|ring|diamond|bar|bead|band|dot|pip)/,
-    'interrupted-spine-node': /janko-clasp-(gap|lozenge|ring|diamond|bar|slash|band|dot|pip)/,
-    'faceted-diamond-bands': /janko-clasp-(gap|lozenge|ring|diamond|bar|slash|bead|dot|pip)/,
+    'transverse-cross-bars': /janko-clasp-(ring|slash|stitch|dot|pip)/,
+    'kinetic-cross-slashes': /janko-clasp-(ring|bar|stitch|dot|pip)/,
+    'down-raked-slashes': /janko-clasp-(ring|bar|stitch|dot|pip)/,
+    'cross-hatch-stitches': /janko-clasp-(ring|bar|slash|dot|pip)/,
   };
   for (const candidate of CURRENT_CANDIDATES) {
     const body = panelBody(candidate.id);
     assert.match(body, /class="janko-clasp-layer"/, `${candidate.id} paints its clasps`);
+    const durationStyle = resolveCandidate(candidate).options.claspDurationStyle;
     assert.match(
       body,
-      new RegExp(`data-clasp-duration-style="${candidate.id}"`),
+      new RegExp(`data-clasp-duration-style="${durationStyle}"`),
       `${candidate.id} tags its duration paradigm`
     );
     const groups = [...body.matchAll(
@@ -219,14 +231,25 @@ test('Round 10 candidates export cleanly to the contact sheet', () => {
     )];
     const eighth = groups.find((m) => m[1] === 'spire-one-flag')![2];
     const sixteenth = groups.find((m) => m[1] === 'spire-two-flags')![2];
-    assert.equal((eighth.match(new RegExp(SIGNATURES[candidate.id], 'g')) ?? []).length, 1, `${candidate.id} 8th ink`);
-    assert.equal((sixteenth.match(new RegExp(SIGNATURES[candidate.id], 'g')) ?? []).length, 2, `${candidate.id} 16th ink`);
+    assert.equal(
+      (eighth.match(new RegExp(SIGNATURES[durationStyle], 'g')) ?? []).length,
+      1,
+      `${candidate.id} 8th ink`
+    );
+    assert.equal(
+      (sixteenth.match(new RegExp(SIGNATURES[durationStyle], 'g')) ?? []).length,
+      2,
+      `${candidate.id} 16th ink`
+    );
     const spires = groups.filter((m) => m[1] === 'spire');
     assert.equal(spires.length, 2, `${candidate.id} quarter + dotted quarter`);
     assert.match(spires[1][2], /janko-clasp-dot/, `${candidate.id} dotted-quarter dot`);
+    // Every paradigm shares the one open white ring for the half note.
+    const half = groups.find((m) => m[1] === 'pip')![2];
+    assert.equal((half.match(/janko-clasp-ring/g) ?? []).length, 1, `${candidate.id} half ring`);
     const quarter = spires[0][2];
-    assert.doesNotMatch(quarter, FOREIGN[candidate.id], `${candidate.id} plain quarter`);
-    assert.doesNotMatch(quarter, SIGNATURES[candidate.id], `${candidate.id} plain quarter mark`);
+    assert.doesNotMatch(quarter, FOREIGN[durationStyle], `${candidate.id} plain quarter`);
+    assert.doesNotMatch(quarter, SIGNATURES[durationStyle], `${candidate.id} plain quarter mark`);
   }
   // The Bach window keeps the shared beam-harmonized rake.
   const bachSheet = renderJankoVariantComparison(
@@ -253,8 +276,8 @@ test('Candidate previews honour their own option deltas', () => {
   for (const candidate of CURRENT_CANDIDATES) {
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['chordGrouping', 'claspDurationStyle', 'subdivisionStyle'],
-      `${candidate.id} declares the per-hand clasp, its duration paradigm and the kinetic tab`
+      ['chordGrouping', 'systemStartStyle', 'claspDurationStyle', 'subdivisionStyle'],
+      `${candidate.id} declares the per-hand clasp, its start style, its duration paradigm and the kinetic tab`
     );
   }
   assert.match(html, /<b>chordGrouping<\/b> = per-hand-clasp/);
@@ -263,6 +286,11 @@ test('Candidate previews honour their own option deltas', () => {
     html,
     /<s>transverse-cross-bars<\/s>/,
     'the golden duration value the three modern candidates depart from'
+  );
+  assert.match(
+    html,
+    /<s>open-halo<\/s>/,
+    'the golden System 1 start the three replacement candidates depart from'
   );
   assert.doesNotMatch(
     html,
@@ -277,9 +305,10 @@ test('Candidate previews honour their own option deltas', () => {
     return card.slice(0, card.indexOf('</article>'));
   };
   for (const candidate of CURRENT_CANDIDATES) {
-    // Candidate A *is* the golden duration paradigm, so only the three modern
-    // candidates show a duration badge.
-    if (candidate.id === DEFAULT_JANKO_OPTIONS.claspDurationStyle) {
+    const resolved = resolveCandidate(candidate);
+    // Candidate A *is* the golden start + duration paradigm, so only the three
+    // replacement candidates show those badges.
+    if (resolved.options.claspDurationStyle === DEFAULT_JANKO_OPTIONS.claspDurationStyle) {
       assert.ok(
         !cardOf(candidate.id).includes('<b>claspDurationStyle</b>'),
         'candidate A is the golden duration paradigm itself'
@@ -287,8 +316,20 @@ test('Candidate previews honour their own option deltas', () => {
     } else {
       assert.match(
         cardOf(candidate.id),
-        new RegExp(`<b>claspDurationStyle</b> = ${candidate.id}`),
+        new RegExp(`<b>claspDurationStyle</b> = ${resolved.options.claspDurationStyle}`),
         `${candidate.id} duration badge`
+      );
+    }
+    if (resolved.options.systemStartStyle === DEFAULT_JANKO_OPTIONS.systemStartStyle) {
+      assert.ok(
+        !cardOf(candidate.id).includes('<b>systemStartStyle</b>'),
+        'candidate A is the golden System 1 start itself'
+      );
+    } else {
+      assert.match(
+        cardOf(candidate.id),
+        new RegExp(`<b>systemStartStyle</b> = ${resolved.options.systemStartStyle}`),
+        `${candidate.id} system-start badge`
       );
     }
   }
@@ -483,7 +524,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 10);
+  assert.equal(CURRENT_ROUND_METADATA.round, 11);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');

@@ -61,6 +61,7 @@ import {
   renderHandLabels,
   renderLedgerEquator,
   renderOctaveLabels,
+  renderOutlierRule,
   renderStaffLines,
   renderTimeSignature,
 } from './elements/staff';
@@ -88,6 +89,11 @@ import {
 import {
   ARCHITECTURAL_BRACKET_SPUR,
   ARCHITECTURAL_BRACKET_STROKE,
+  CLEF_PILLAR_STROKE,
+  CLEF_PILLAR_TICK,
+  DOUBLE_HAIRLINE_INNER_STROKE,
+  DOUBLE_HAIRLINE_OUTER_STROKE,
+  DOUBLE_HAIRLINE_SPACING,
   renderAccolade,
   renderCaptionLines,
   wrapCaptionText,
@@ -490,7 +496,7 @@ export interface JankoBox {
 export const MARGIN_DIGIT_ADVANCE = 0.35;
 
 /** Font size (pt) of the measure numeral (see `elements/barlines`). */
-export const MARGIN_NUMERAL_FONT_SIZE = 8.5;
+export const MARGIN_NUMERAL_FONT_SIZE = 7.0;
 
 /**
  * Does a system-start style paint any margin ink? `'open-halo'` (the golden
@@ -498,7 +504,11 @@ export const MARGIN_NUMERAL_FONT_SIZE = 8.5;
  * nothing is reserved — for them.
  */
 export function paintsSystemStartInk(style: JankoSystemStartStyle): boolean {
-  return style === 'architectural-bracket' || style === 'clef-pillar';
+  return (
+    style === 'architectural-bracket' ||
+    style === 'clef-pillar' ||
+    style === 'double-hairline'
+  );
 }
 
 /**
@@ -517,29 +527,41 @@ export function getMarginFurniture(
   digitAdvance: number = MARGIN_DIGIT_ADVANCE,
   systemStartStyle: JankoSystemStartStyle = 'open-halo'
 ): { numeral: JankoBox; accolade: JankoBox | null } {
+  // Round 11: the numeral moves into the true left margin
+  // (`x = staffLeft − 10.0pt`) and is set flush right against the staff column,
+  // so its reserved box opens to the left of the anchor.
   const numeralX = geometry.staffLeft - MEASURE_NUMBER_LEFT_OFFSET;
-  // Round 9: the numeral's reserved box shares the painted baseline (14pt above
-  // the top rule), so the linter audits exactly the ink the renderer draws.
   const numeralBaseline = getMeasureNumberBaselineY(geometry);
+  const numeralWidth =
+    String(measureNumber).length * MARGIN_NUMERAL_FONT_SIZE * digitAdvance * 1.5;
   const numeral: JankoBox = {
-    x0: numeralX,
-    y0: numeralBaseline - t.digitFontSize * 1.2,
+    x0: numeralX - numeralWidth,
+    y0: numeralBaseline - MARGIN_NUMERAL_FONT_SIZE * 1.2,
     // The numeral is set on an alphabetic baseline and figures carry no
     // descender: the ink stops at the baseline.
-    x1: numeralX + String(measureNumber).length * MARGIN_NUMERAL_FONT_SIZE * digitAdvance * 1.5,
+    x1: numeralX,
     y1: numeralBaseline,
   };
   let accolade: JankoBox | null = null;
   if (paintsSystemStartInk(systemStartStyle)) {
     const x = geometry.staffLeft - t.accoladeGap - t.accoladeWidth;
-    const half = ARCHITECTURAL_BRACKET_STROKE / 2;
-    const spur = systemStartStyle === 'architectural-bracket' ? ARCHITECTURAL_BRACKET_SPUR : 0;
-    accolade = {
-      x0: x - half,
-      y0: geometry.staffTopY,
-      x1: x + spur + half,
-      y1: geometry.staffBotY,
-    };
+    const top = geometry.equatorY('RH', 5);
+    const bot = geometry.equatorY('LH', 2);
+    let x0 = x;
+    let x1 = x;
+    if (systemStartStyle === 'architectural-bracket') {
+      const half = ARCHITECTURAL_BRACKET_STROKE / 2;
+      x0 = x - half;
+      x1 = x + ARCHITECTURAL_BRACKET_SPUR + half;
+    } else if (systemStartStyle === 'clef-pillar') {
+      const half = CLEF_PILLAR_STROKE / 2;
+      x0 = x - half;
+      x1 = x + CLEF_PILLAR_TICK + half;
+    } else {
+      x0 = x - DOUBLE_HAIRLINE_OUTER_STROKE / 2;
+      x1 = x + DOUBLE_HAIRLINE_SPACING + DOUBLE_HAIRLINE_INNER_STROKE / 2;
+    }
+    accolade = { x0, y0: top, x1, y1: bot };
   }
   return { numeral, accolade };
 }
@@ -1848,9 +1870,43 @@ function renderNotesLayer(
   // 1. Dynamic ledger equators for out-of-staff octaves. They form their own
   //    layer so a later note's ledger can never cut through an earlier note's
   //    white knockout (see the linter's knockout pass-through audit).
+  //
+  //    Round 11: when successive measures share the **Octave 6** outlier
+  //    equator (Bach Var. 1 climbs into Octave 6 across mm. 29–30), the choppy
+  //    notehead-centred dashes are suppressed in favour of one continuous
+  //    outlier rule spanning those measures edge to edge.
   const ledgers: string[] = [];
+  const spans = new Map<number, { first: number; last: number }>();
+  for (const p of layout.notes) {
+    if (p.coord.octave <= 5) continue;
+    const m = getMeasureIndexOfTick(p.note, layout.geometry, layout.index, t);
+    for (const ledgerY of p.coord.ledgerYs) {
+      const key = Math.round(ledgerY * 100);
+      const span = spans.get(key);
+      if (!span) spans.set(key, { first: m, last: m });
+      else {
+        span.first = Math.min(span.first, m);
+        span.last = Math.max(span.last, m);
+      }
+    }
+  }
+  const anacrusisTicks = t.anacrusisTicks ?? 0;
+  const upbeatWidth =
+    layout.index === 0 && anacrusisTicks > 0
+      ? (anacrusisTicks / t.ticksPerMeasure) * layout.geometry.measureWidth
+      : 0;
+  const continuous = new Map<number, { x1: number; x2: number }>();
+  for (const [key, span] of spans) {
+    if (span.last <= span.first) continue;
+    const x1 = layout.geometry.staffLeft + upbeatWidth + span.first * layout.geometry.measureWidth;
+    const x2 = layout.geometry.staffLeft + upbeatWidth + (span.last + 1) * layout.geometry.measureWidth;
+    continuous.set(key, { x1, x2 });
+    ledgers.push(renderOutlierRule(x1, x2, layout.geometry.middleCY + key / 100));
+  }
   for (const p of layout.notes) {
     for (const ledgerY of p.coord.ledgerYs) {
+      const key = Math.round(ledgerY * 100);
+      if (continuous.has(key)) continue;
       ledgers.push(renderLedgerEquator(p.x, layout.geometry.middleCY + ledgerY, t, o));
     }
   }

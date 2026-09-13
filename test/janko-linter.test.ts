@@ -187,10 +187,15 @@ test('Bounded center channel (Round 4 Candidate B) engraves with zero violations
   );
   assert.equal(report.ok, true);
   // The channel separates the two whole-tone rows, so the same-row
-  // coincidences of the single equator simply do not exist here; the
-  // row-snapped solver keeps the layout clean in either framing.
-  assert.equal(report.warnings.length, 0, 'the channel adds no diagnostics of its own');
-  assert.equal(report.stats.warnings, 0);
+  // coincidences of the single equator simply do not exist here. Round 11's
+  // symmetrical 30pt corridor brings the two dynamic flank rows within 4pt of
+  // each other on two cross-hand coincidences, which the linter reports as the
+  // known non-blocking `chordal-overlap` risk rather than a violation.
+  assert.ok(
+    report.warnings.every((w) => w.code === 'chordal-overlap'),
+    'the bounded channel adds no warning class of its own'
+  );
+  assert.equal(report.stats.warnings, report.warnings.length);
   // The corridor is structural: no beam connector may slice across the spine,
   // whichever octave framing is in force.
   assert.equal(
@@ -565,10 +570,26 @@ test('Defect: a system-start mark pushed off the page and into the numeral is ca
   checkAccoladeClearance(openLayout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, open);
   assert.deepEqual(open, [], 'the open margin has no mark to audit');
 
-  const tight = { ...DEFAULT_JANKO_TOKENS, accoladeGap: 1.0 };
+  // Round 11 sets the numeral snug above the top rule and right-aligned 10pt
+  // into the margin, so the ruled column and the numeral coexist: the audit
+  // reports nothing for the canonical geometry.
+  const snug = { ...DEFAULT_JANKO_TOKENS, accoladeGap: 1.0 };
+  const clean: LintViolation[] = [];
+  checkMeasureNumeralClearance(systems(ruled)[0], ruled, snug, LINT, clean);
+  assert.deepEqual(clean, [], 'the margin numeral and the ruled mark coexist');
+
+  // A regression that drives the numeral's band down into the mark's column is
+  // caught even though both sit left of the staff.
+  const sunkLayout = systems(ruled)[0];
+  const sunk = {
+    ...sunkLayout,
+    geometry: {
+      ...sunkLayout.geometry,
+      staffTopY: sunkLayout.geometry.equatorY('RH', 5) + 4,
+    },
+  };
   const out2: LintViolation[] = [];
-  const tightLayout = systems(ruled, tight)[0];
-  checkMeasureNumeralClearance(tightLayout, ruled, tight, LINT, out2);
+  checkMeasureNumeralClearance(sunk, ruled, DEFAULT_JANKO_TOKENS, LINT, out2);
   assert.ok(
     out2.some((v) => v.code === 'measure-numeral-collision' && /accolade/.test(v.message)),
     'numeral/system-start collision reported'

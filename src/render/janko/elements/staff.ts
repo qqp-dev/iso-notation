@@ -4,12 +4,12 @@
  *
  * Every octave is one **absolute, hand-independent** lattice: the four staff
  * equators (o5/o4/o3/o2) are continuous rules shared by both hands, spaced by
- * `octaveStep` (2h = 30pt) above and below the *spacious corridor* —
- * `interStaffGap` (56pt by default) of negative breathing space with **no**
- * spine by default. Only octaves outside the staff span emit dynamic ledger
- * equators. Horizontal dotted row guidelines and the dashed Middle C spine are
- * opt-in; the only dotted lines in the canonical engraving are the vertical
- * beat-grid pulses.
+ * `octaveStep` (2h = 30pt) above and below Middle C — Round 11 equalizes
+ * `interStaffGap` to that same 30pt, so the corridor carries exactly one
+ * octave step of negative breathing space with **no** spine by default. Only
+ * octaves outside the staff span emit dynamic ledger equators. Horizontal
+ * dotted row guidelines and the dashed Middle C spine are opt-in; the only
+ * dotted lines in the canonical engraving are the vertical beat-grid pulses.
  *
  * Under `channelLayout: 'bounded-channel'` every equator is drawn as **two**
  * boundary rules at `equator ± channelHalfWidth`, opening the channel that
@@ -186,6 +186,18 @@ export function renderLedgerEquator(
         `    <line class="janko-ledger" x1="${f(x - hw)}" y1="${f(ruleY)}" x2="${f(x + hw)}" y2="${f(ruleY)}" stroke="#334155" stroke-width="0.75"/>`
     )
     .join('\n');
+}
+
+/**
+ * One **continuous outlier rule** (Round 11) at `y`, spanning `x1 … x2`.
+ *
+ * When successive measures share an out-of-staff ledger equator — Bach Var. 1
+ * climbs into Octave 6 across mm. 29–30 — the choppy notehead-centred ledger
+ * dashes are replaced by a single unbroken staff rule from the first measure's
+ * opening edge to the last measure's closing edge.
+ */
+export function renderOutlierRule(x1: number, x2: number, y: number): string {
+  return `    <line class="janko-outlier-rule" x1="${f(x1)}" y1="${f(y)}" x2="${f(x2)}" y2="${f(y)}" stroke="#334155" stroke-width="0.75"/>`;
 }
 
 /** Left-margin octave labels for the four staff equators. */

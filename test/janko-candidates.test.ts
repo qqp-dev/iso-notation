@@ -1,31 +1,30 @@
 /**
- * Round 10 — Scaled Midpoint Clasps, Beaming Integrity, Accolade Retirement &
- * Page Furniture Polish: candidate registry suite.
+ * Round 11 — Accolade Replacements, Symmetrical Octave Lattice, Clean Specimen
+ * Chords & Urtext Typography: candidate registry suite.
  *
- * The round scales every clasp duration mark so it cuts symmetrically across
- * the bracket spine and tests four **scaled** paradigms, all sharing the
- * settled beam-harmonized kinetic subdivision tab, the open System 1 start,
- * continuous run beaming, the unified final barline and the uncluttered
- * multi-page headers:
+ * The round tests four **System 1 start replacements**, each paired with one
+ * light transverse clasp-duration paradigm, on a 100% symmetrical 30pt octave
+ * lattice:
  *
- * | # | id                       | `claspDurationStyle`       | 8th / 16th mark          |
- * | - | ------------------------ | -------------------------- | ------------------------ |
- * | A | `transverse-cross-bars`  | `'transverse-cross-bars'`  | 7.5pt bars, 1 / 2        |
- * | B | `kinetic-cross-slashes`  | `'kinetic-cross-slashes'`  | 12.4° slashes, 1 / 2     |
- * | C | `interrupted-spine-node` | `'interrupted-spine-node'` | beads, 1 / 2 stacked     |
- * | D | `faceted-diamond-bands`  | `'faceted-diamond-bands'`  | diamond bands, 1 / 2     |
+ * | # | id                                  | `systemStartStyle`       | `claspDurationStyle`      |
+ * | - | ----------------------------------- | ------------------------ | ------------------------- |
+ * | A | `open-halo-cross-rungs`             | `'open-halo'`            | `'transverse-cross-bars'` |
+ * | B | `architectural-bracket-kinetic-slashes` | `'architectural-bracket'` | `'kinetic-cross-slashes'` |
+ * | C | `clef-pillar-down-raked-slashes`    | `'clef-pillar'`          | `'down-raked-slashes'`    |
+ * | D | `double-hairline-cross-hatch-stitches` | `'double-hairline'`   | `'cross-hatch-stitches'`  |
  *
  * Covers:
- *  1. `CURRENT_ROUND_METADATA.round === 10` and the round question.
- *  2. `CURRENT_CANDIDATES` declares exactly the four scaled paradigms A–D.
+ *  1. `CURRENT_ROUND_METADATA.round === 11` and the round question.
+ *  2. `CURRENT_CANDIDATES` declares exactly the four pairs A–D.
  *  3. Each candidate's deltas against the golden master are `chordGrouping`
- *     (`'per-hand-clasp'`) and its own `claspDurationStyle`.
- *  4. All three display windows (Bach mm. 1–2, Bach m. 4 and the wide-span
- *     chord-duration specimen) are declared and really engraved.
- *  5. The specimen carries the whole taxonomy — half, quarter, dotted quarter,
- *     8th, 16th — on 1.5-octave (45pt) brackets, so every scaled mark is on
- *     screen on a realistic tall bracket.
- *  6. The live studio engraves all four candidates on all three windows with
+ *     (`'per-hand-clasp'`) plus its own system-start and duration paradigms.
+ *  4. All four display windows (Bach mm. 1–2, m. 4, mm. 29–30 and the
+ *     wide-span chord-duration specimen) are declared and really engraved.
+ *  5. The specimen chords are **stemless**: simultaneities never form melodic
+ *     beams, so the clasp brackets are their sole grouping and duration carrier.
+ *  6. mm. 29–30 carry one continuous Octave 6 outlier rule and the margin
+ *     measure numerals sit in the true left margin.
+ *  7. The live studio engraves all four candidates on all four windows with
  *     option deltas, the clasp layer, distinct duration ink and a lint chip.
  */
 
@@ -58,7 +57,9 @@ import {
   DEFAULT_JANKO_TOKENS,
   JANKO_CLASP_DURATION_STYLES,
   JANKO_SUBDIVISION_STYLES,
+  JANKO_SYSTEM_START_STYLES,
   JankoClaspDurationStyle,
+  JankoSystemStartStyle,
   resolveJankoOptions,
 } from '../src/render/janko/types';
 import { layoutJankoScore, renderJankoCrop, renderJankoVariantComparison } from '../src/render/janko/engine';
@@ -69,49 +70,53 @@ const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The exact round-9 table, candidate by candidate. */
-/** The exact round-10 table, candidate by candidate. */
+/** The exact round-11 table, candidate by candidate. */
 const PARADIGMS: Array<{
   id: string;
   letter: string;
   label: string;
+  start: JankoSystemStartStyle;
   style: JankoClaspDurationStyle;
-  /** The mark class the paradigm paints for an 8th / 16th. */
+  /** The class of the margin ink the System 1 start paints (null = open margin). */
+  startInk: string | null;
+  /** The cut class the paradigm paints for an 8th / 16th. */
   mark: string;
-  /** The open half/whole mark class. */
-  open: string;
 }> = [
   {
-    id: 'transverse-cross-bars',
+    id: 'open-halo-cross-rungs',
     letter: 'A',
-    label: 'A · Transverse Cross-Bars',
+    label: 'A · Open Margin + Halo / Horizontal Cross-Rungs',
+    start: 'open-halo',
     style: 'transverse-cross-bars',
+    startInk: null,
     mark: 'janko-clasp-bar',
-    open: 'janko-clasp-gap',
   },
   {
-    id: 'kinetic-cross-slashes',
+    id: 'architectural-bracket-kinetic-slashes',
     letter: 'B',
-    label: 'B · Kinetic 12.4° Cross-Slashes',
+    label: 'B · Architectural Bracket / 12.4° Kinetic Slashes',
+    start: 'architectural-bracket',
     style: 'kinetic-cross-slashes',
+    startInk: 'janko-system-bracket',
     mark: 'janko-clasp-slash',
-    open: 'janko-clasp-lozenge',
   },
   {
-    id: 'interrupted-spine-node',
+    id: 'clef-pillar-down-raked-slashes',
     letter: 'C',
-    label: 'C · Interrupted-Spine Node',
-    style: 'interrupted-spine-node',
-    mark: 'janko-clasp-bead',
-    open: 'janko-clasp-ring',
+    label: 'C · Clef-Pillar Landmark / Down-Raked Slashes',
+    start: 'clef-pillar',
+    style: 'down-raked-slashes',
+    startInk: 'janko-clef-pillar',
+    mark: 'janko-clasp-slash',
   },
   {
-    id: 'faceted-diamond-bands',
+    id: 'double-hairline-cross-hatch-stitches',
     letter: 'D',
-    label: 'D · Faceted Diamond Bands',
-    style: 'faceted-diamond-bands',
-    mark: 'janko-clasp-band',
-    open: 'janko-clasp-diamond',
+    label: 'D · Double Hairline Frame / Cross-Hatch Stitches',
+    start: 'double-hairline',
+    style: 'cross-hatch-stitches',
+    startInk: 'janko-double-hairline-outer',
+    mark: 'janko-clasp-stitch',
   },
 ];
 
@@ -131,22 +136,27 @@ function claspGroups(svg: string): Array<{ tick: string; duration: string; body:
   )].map((m) => ({ tick: m[1], duration: m[2], body: m[3] }));
 }
 
-test('CURRENT_ROUND_METADATA opens round 10 of the scaled-clasp exploration', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 10);
+test('CURRENT_ROUND_METADATA opens round 11 of the accolade-replacement exploration', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 11);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Scaled Midpoint Clasps, Beaming Integrity, Accolade Retirement & Page Furniture Polish'
+    'Accolade Replacements, Symmetrical Octave Lattice, Clean Specimen Chords & Urtext Typography'
   );
   assert.equal(
     CURRENT_ROUND_METADATA.description,
-    'Comparing 4 scaled clasp-duration paradigms cutting across the spine on wide-span chords, with continuous run beaming, open System 1 start, unified final barline, and uncluttered multi-page headers.'
+    'Comparing 4 System 1 start styles paired with 4 light transverse clasp-duration paradigms on a symmetrical 30pt octave lattice, with stemless specimen chords, margin measure numerals, a continuous Octave 6 outlier rule and Urtext running headers.'
   );
 });
 
-test('CURRENT_CANDIDATES declares the four scaled duration paradigms A–D', () => {
+test('CURRENT_CANDIDATES declares the four System 1 start / duration pairs A–D', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, PARADIGMS.map((p) => p.id), 'candidate order is A, B, C, D');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
+    PARADIGMS.map((p) => p.start),
+    'every System 1 start style is represented exactly once'
+  );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.claspDurationStyle),
     PARADIGMS.map((p) => p.style),
@@ -164,45 +174,57 @@ test('CURRENT_CANDIDATES declares the four scaled duration paradigms A–D', () 
     assert.ok(paradigm.label.startsWith(`${paradigm.letter} · `), `${paradigm.id} is candidate ${paradigm.letter}`);
   }
   assert.deepEqual(
+    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.systemStartStyle))].sort(),
+    [...JANKO_SYSTEM_START_STYLES].filter((s) => s !== 'none').sort(),
+    'the registry covers every published system-start style except the null one'
+  );
+  assert.deepEqual(
     [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.claspDurationStyle))].sort(),
     [...JANKO_CLASP_DURATION_STYLES].sort(),
     'the registry covers the published duration catalogue'
   );
 });
 
-test('Every candidate is demonstrated on the Bach opening, the m. 4 run and the specimen', () => {
+test('Every candidate is demonstrated on the opening, the m. 4 run, mm. 29–30 and the specimen', () => {
   for (const paradigm of PARADIGMS) {
     const resolved = resolveCandidate(getCandidate(paradigm.id)!);
-    assert.equal(resolved.windows.length, 3, `${paradigm.id} declares three windows`);
-    const [bach, run, specimen] = resolved.windows;
+    assert.equal(resolved.windows.length, 4, `${paradigm.id} declares four windows`);
+    const [bach, run, outlier, specimen] = resolved.windows;
     assert.equal(bach.scoreId, DEFAULT_STUDIO_SCORE_ID);
     assert.equal(bach.measureStart, 1);
     assert.equal(bach.measureCount, 2);
     assert.match(bach.title, /Bach Goldberg Var\. 1 · mm\. 1–2/);
-    assert.match(bach.title, /open margin start/);
+    assert.match(bach.title, /System 1 start style/);
     assert.match(bach.title, /Position of Honor halo/);
-    assert.match(bach.title, /12° kinetic tabs/);
+    assert.match(bach.title, /margin measure numeral/);
     assert.equal(run.scoreId, DEFAULT_STUDIO_SCORE_ID);
     assert.equal(run.measureStart, 4);
     assert.equal(run.measureCount, 1);
     assert.match(run.title, /Bach Goldberg Var\. 1 · m\. 4/);
     assert.match(run.title, /continuous RH run beaming across Middle C into Octave 3/);
     assert.match(run.title, /orphaned 9 · 7 · 6 flags/);
+    assert.equal(outlier.scoreId, DEFAULT_STUDIO_SCORE_ID);
+    assert.equal(outlier.measureStart, 29);
+    assert.equal(outlier.measureCount, 2);
+    assert.match(outlier.title, /Bach Goldberg Var\. 1 · mm\. 29–30/);
+    assert.match(outlier.title, /continuous Octave 6 outlier rule/);
+    assert.match(outlier.title, /margin measure numbers/);
     assert.equal(specimen.scoreId, SPECIMEN_STUDIO_SCORE_ID);
     assert.equal(specimen.measureStart, 1);
     assert.equal(specimen.measureCount, 2);
     assert.match(specimen.title, /Wide-Span Chord Specimen/);
+    assert.match(specimen.title, /open white ring/);
     assert.match(specimen.title, /dotted quarter \(0\.75pt dot\)/);
-    assert.match(specimen.title, /8th \(1 mark\)/);
-    assert.match(specimen.title, /16th \(2 marks\)/);
-    assert.match(specimen.title, /1\.5-octave brackets/);
+    assert.match(specimen.title, /8th \(1 cut\)/);
+    assert.match(specimen.title, /16th \(2 cuts\)/);
+    assert.match(specimen.title, /stemless 1\.5-octave chords/);
     // The legacy single-window fields keep pointing at the first window.
     assert.equal(resolved.measureStart, 1);
     assert.equal(resolved.measureCount, 2);
   }
 });
 
-test('The wide-span chord specimen really carries the whole duration taxonomy', () => {
+test('The wide-span chord specimen carries the whole taxonomy and is stemless', () => {
   const values = CHORD_DURATION_SPECIMEN_VALUES;
   assert.deepEqual(
     values.map((v) => v.durationTicks),
@@ -224,8 +246,20 @@ test('The wide-span chord specimen really carries the whole duration taxonomy', 
   assert.deepEqual(
     layout.clasps.map((c) => `${c.duration}:${c.flags}${c.dotted ? '+dot' : ''}`),
     ['pip:0', 'spire:0', 'spire:0+dot', 'spire-one-flag:1', 'spire-two-flags:2'],
-    'the taxonomy lands as open mark / plain / plain+dot / 1 mark / 2 marks'
+    'the taxonomy lands as open ring / plain / plain+dot / 1 cut / 2 cuts'
   );
+  // Round 11: the four heads of one onset are a chord, never a zero-width beam.
+  // No melodic group may form on a simultaneity, so the bracket is the chord's
+  // sole grouping and duration carrier (zero stems slicing the noteheads).
+  assert.equal(layout.beams.length, 0, 'a simultaneity never forms a melodic beam');
+  assert.equal(
+    layout.claspedStems.length,
+    SPECIMEN.notes.length,
+    'every specimen head hands its duration to its bracket'
+  );
+  const rendered = renderJankoCrop(SPECIMEN, 1, 2, options, DEFAULT_JANKO_TOKENS);
+  assert.equal((rendered.match(/class="janko-stem"/g) ?? []).length, 0, 'no vertical stems');
+  assert.equal((rendered.match(/class="janko-beam"/g) ?? []).length, 0, 'no zero-width beams');
   // Every chord is one hand's four-voice wide-span chord, i.e. exactly what the
   // per-hand bracket exists for, and every bracket is a realistic tall bracket:
   // 45pt of notehead span (1.5 octaves) inside the ticket's 35–55pt window.
@@ -250,32 +284,39 @@ test('The wide-span chord specimen really carries the whole duration taxonomy', 
 
 test('Every candidate states its deltas against the golden master', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the Round 9 golden tab');
+  assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the settled beam-harmonized tab');
+  assert.equal(golden.systemStartStyle, 'open-halo', 'the golden open margin');
+  assert.equal(golden.claspDurationStyle, 'transverse-cross-bars', 'the golden cross-rungs');
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id)!;
-    // Candidate A *is* the golden duration paradigm, so it departs only in the
-    // per-hand bracket scope; the settled kinetic tab and the golden open-halo
-    // start / unified final barline are no longer deltas.
-    const expected =
-      paradigm.style === golden.claspDurationStyle
-        ? [{ key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' }]
-        : [
-            { key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' },
-            {
-              key: 'claspDurationStyle',
-              value: paradigm.style,
-              golden: golden.claspDurationStyle,
-            },
-          ];
+    const expected = [{ key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' }];
+    if (paradigm.start !== golden.systemStartStyle) {
+      expected.push({
+        key: 'systemStartStyle',
+        value: paradigm.start,
+        golden: golden.systemStartStyle,
+      } as never);
+    }
+    if (paradigm.style !== golden.claspDurationStyle) {
+      expected.push({
+        key: 'claspDurationStyle',
+        value: paradigm.style,
+        golden: golden.claspDurationStyle,
+      } as never);
+    }
     assert.deepEqual(
       candidateBadges(candidate),
       expected,
-      `${paradigm.id} departs in the per-hand clasp and its own midpoint paradigm`
+      `${paradigm.id} departs in the per-hand clasp, its start style and its midpoint paradigm`
     );
     const resolved = resolveCandidate(candidate);
     for (const [key, value] of Object.entries(resolved.options)) {
       if (key === 'chordGrouping') {
         assert.equal(value, 'per-hand-clasp');
+        continue;
+      }
+      if (key === 'systemStartStyle') {
+        assert.equal(value, paradigm.start);
         continue;
       }
       if (key === 'claspDurationStyle') {
@@ -296,15 +337,15 @@ test('Every candidate states its deltas against the golden master', () => {
   );
 });
 
-test('Every paradigm engraves both benchmarks and the specimen with the scope and lint it claims', () => {
+test('Every candidate engraves both benchmarks and the specimen with the scope and lint it claims', () => {
   for (const paradigm of PARADIGMS) {
     const resolved = resolveCandidate(getCandidate(paradigm.id)!);
     // The Bach opening is melodic: no hand carries a row-snapped cluster or a
     // 3-note chord, so the per-hand clasp never appears there.
     const bach = layoutJankoScore(SCORE, resolved.options, resolved.tokens);
     assert.equal(bach.reduce((n, l) => n + l.clasps.length, 0), 0, `${paradigm.id} Bach clasps`);
-    // Round 10: the m. 4 RH run beams continuously across Middle C — its
-    // `9 · 7 · 6` tail is never orphaned into solitary flags.
+    // The m. 4 RH run beams continuously across Middle C — its `9 · 7 · 6` tail
+    // is never orphaned into solitary flags.
     const m4 = bach[0].beams.filter((b) => b.notes.some((n) => n.startTick >= 528 && n.startTick < 576));
     assert.ok(
       m4.some((b) => b.notes.some((n) => n.startTick === 540)),
@@ -364,7 +405,7 @@ test('Every paradigm engraves both benchmarks and the specimen with the scope an
   }
 });
 
-test('Every paradigm paints its own midpoint duration ink and the settled kinetic tab', () => {
+test('Every candidate paints its System 1 start ink and its light midpoint paradigm', () => {
   const documents = new Set<string>();
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id)!;
@@ -375,6 +416,29 @@ test('Every paradigm paints its own midpoint duration ink and the settled kineti
       /data-subdivision-style="kinetic-tab-beam"/,
       `${paradigm.id} dispatches the beam-harmonized tab`
     );
+    // The System 1 start style paints exactly its own margin ink (or none).
+    for (const other of PARADIGMS) {
+      if (other.startInk === null || other === paradigm) continue;
+      assert.ok(
+        !bach.includes(other.startInk),
+        `${paradigm.id} never paints ${other.startInk}`
+      );
+    }
+    if (paradigm.startInk === null) {
+      assert.ok(
+        !/janko-system-bracket|janko-clef-pillar|janko-double-hairline/.test(bach),
+        'the open margin paints no system-start ink'
+      );
+      assert.match(bach, /class="janko-halo"/, 'the tick-0 sounds keep the Position of Honor halo');
+    } else {
+      assert.ok(bach.includes(paradigm.startInk), `${paradigm.id} paints ${paradigm.startInk}`);
+    }
+    // Round 11 page furniture: the measure numeral is right-aligned into the
+    // true left margin (`staffLeft − 10pt`, `staffTopY − 3pt`).
+    const numeral = /<text class="janko-measure-num" x="([\d.-]+)" y="([\d.-]+)" text-anchor="end">/.exec(
+      bach
+    )!;
+    assert.ok(numeral, `${paradigm.id} paints a margin measure numeral`);
 
     // The specimen carries the whole taxonomy side by side: the ring, the plain
     // bracket, the dotted quarter, the 8th and the 16th.
@@ -393,14 +457,14 @@ test('Every paradigm paints its own midpoint duration ink and the settled kineti
     assert.equal(groups.length, 5, `${paradigm.id} paints five specimen brackets`);
     const byDuration = new Map(groups.map((g) => [g.duration, g.body]));
     assert.equal(
-      (byDuration.get('pip')!.match(new RegExp(paradigm.open, 'g')) ?? []).length,
+      (byDuration.get('pip')!.match(/janko-clasp-ring/g) ?? []).length,
       1,
-      `${paradigm.id} half: one open knockout mark`
+      `${paradigm.id} half: one shared open white ring`
     );
     const plains = groups.filter((g) => g.duration === 'spire');
     assert.equal(plains.length, 2, `${paradigm.id} paints a quarter and a dotted quarter`);
     assert.ok(
-      !/janko-clasp-(gap|lozenge|ring|diamond|bar|slash|bead|band|dot|pip)/.test(plains[0].body),
+      !/janko-clasp-(ring|bar|slash|stitch|dot|pip)/.test(plains[0].body),
       `${paradigm.id} quarter: the plain bracket`
     );
     assert.equal(
@@ -415,12 +479,12 @@ test('Every paradigm paints its own midpoint duration ink and the settled kineti
     assert.equal(
       (byDuration.get('spire-one-flag')!.match(new RegExp(paradigm.mark, 'g')) ?? []).length,
       1,
-      `${paradigm.id} 8th: one midpoint mark`
+      `${paradigm.id} 8th: one midpoint cut`
     );
     assert.equal(
       (byDuration.get('spire-two-flags')!.match(new RegExp(paradigm.mark, 'g')) ?? []).length,
       2,
-      `${paradigm.id} 16th: two midpoint marks`
+      `${paradigm.id} 16th: two midpoint cuts`
     );
     // Every specimen bracket is tagged with the paradigm and anchored on the
     // exact spine midpoint of its own cluster.
@@ -434,8 +498,8 @@ test('Every paradigm paints its own midpoint duration ink and the settled kineti
       const yMid = (clasp.topY + clasp.botY) / 2;
       const group = groups.find((g) => g.tick === String(clasp.tick))!;
       for (const mark of group.body.matchAll(/(?:y1|y2|cy)="([\d.-]+)"/g)) {
-        // The shared pip/whole ink rides the midpoint; the 16th pair mirrors
-        // about it, so no mark may leave the bracket's own span.
+        // The shared ring rides the midpoint; the 16th pair mirrors about it,
+        // so no mark may leave the bracket's own span.
         const y = Number(mark[1]);
         assert.ok(y >= clasp.topY - 0.01 && y <= clasp.botY + 0.01, `${paradigm.id} mark inside the bracket`);
         assert.ok(
@@ -454,17 +518,32 @@ test('Every paradigm paints its own midpoint duration ink and the settled kineti
   assert.equal(documents.size, PARADIGMS.length, 'each paradigm is a distinct engraving');
 });
 
-test('The live studio engraves four candidates on three windows with deltas and lint chips', () => {
+test('The mm. 29–30 window carries one continuous Octave 6 outlier rule and no choppy dashes', () => {
+  const resolved = resolveCandidate(getCandidate('open-halo-cross-rungs')!);
+  const svg = renderJankoCrop(SCORE, 29, 2, resolved.options, resolved.tokens);
+  const rules = [...svg.matchAll(/<line class="janko-outlier-rule" x1="([\d.-]+)"[^>]*x2="([\d.-]+)"/g)];
+  assert.equal(rules.length, 1, 'one unbroken outlier rule across mm. 29–30');
+  const measureWidth = (Number(rules[0][2]) - Number(rules[0][1])) / 2;
+  assert.ok(measureWidth > 0, 'the rule spans exactly the two measures');
+  assert.equal(
+    (svg.match(/class="janko-ledger"/g) ?? []).length,
+    0,
+    'no choppy notehead-centred ledger dashes survive in the covered measures'
+  );
+});
+
+test('The live studio engraves four candidates on four windows with deltas and lint chips', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards, side by side');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'three engraving windows per card');
-  assert.equal((html.match(/<svg/g) ?? []).length, 12, 'one engraved preview per window');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 16, 'four engraving windows per card');
+  assert.equal((html.match(/<svg/g) ?? []).length, 16, 'one engraved preview per window');
   assert.match(html, /data-candidate-count="4"/);
-  assert.match(html, /data-window-count="3"/);
-  assert.match(html, /Round 10/);
-  assert.match(html, /Scaled Midpoint Clasps/, 'the escaped round title headlines the view');
+  assert.match(html, /data-window-count="4"/);
+  assert.match(html, /Round 11/);
+  assert.match(html, /Accolade Replacements/, 'the escaped round title headlines the view');
   assert.match(html, /data-window="primary:1-2"/);
   assert.match(html, /data-window="primary:4-4"/);
+  assert.match(html, /data-window="primary:29-30"/);
   assert.match(html, /data-window="chord-duration-specimen:1-2"/);
 
   let cursor = -1;
@@ -481,6 +560,19 @@ test('The live studio engraves four candidates on three windows with deltas and 
     );
     assert.match(body, /<b>chordGrouping<\/b> = per-hand-clasp/, `${paradigm.id} grouping badge`);
     assert.match(body, /<s>none<\/s>/, `${paradigm.id} shows the golden grouping it departs from`);
+    if (paradigm.start === DEFAULT_JANKO_OPTIONS.systemStartStyle) {
+      assert.ok(
+        !body.includes('<b>systemStartStyle</b>'),
+        'candidate A is the golden System 1 start itself'
+      );
+    } else {
+      assert.match(
+        body,
+        new RegExp(`<b>systemStartStyle</b> = ${paradigm.start}`),
+        `${paradigm.id} system-start badge`
+      );
+      assert.match(body, /<s>open-halo<\/s>/, `${paradigm.id} shows the golden start it departs from`);
+    }
     if (paradigm.style === DEFAULT_JANKO_OPTIONS.claspDurationStyle) {
       assert.ok(
         !body.includes('<b>claspDurationStyle</b>'),
@@ -507,18 +599,19 @@ test('The live studio engraves four candidates on three windows with deltas and 
   assert.match(html, /✓ clean/);
 });
 
-test('The contact sheet engraves the four scaled clasp paradigms on one document', () => {
+test('The contact sheet engraves the four start / duration pairs on one document', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => {
     const resolved = resolveCandidate(candidate);
     return { id: candidate.id, label: candidate.label, options: resolved.options };
   });
+  const specimen = CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID];
   const sheet = renderJankoVariantComparison(
-    SCORE,
+    SPECIMEN,
     specs,
     1,
     2,
-    DEFAULT_JANKO_OPTIONS,
-    DEFAULT_JANKO_TOKENS
+    specimen.options,
+    specimen.tokens
   );
   assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one sheet document');
   assert.equal((sheet.match(/data-variant="/g) ?? []).length, 4, 'four stacked panels');
@@ -529,6 +622,13 @@ test('The contact sheet engraves the four scaled clasp paradigms on one document
     cursor = at;
     const next = sheet.indexOf('data-variant="', at + 1);
     const panel = sheet.slice(at, next === -1 ? undefined : next);
-    assert.match(panel, /data-subdivision-style="kinetic-tab-beam"/, `${paradigm.id} settled tab`);
+    // The specimen is all simultaneities: no melodic beam and no standalone
+    // flag survives, because the brackets carry every duration.
+    assert.match(panel, /class="janko-clasp-layer"/, `${paradigm.id} paints its clasp layer`);
+    assert.equal(
+      (panel.match(/class="janko-stem"/g) ?? []).length,
+      0,
+      `${paradigm.id} leaves the specimen chords stemless`
+    );
   }
 });

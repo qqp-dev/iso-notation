@@ -104,37 +104,38 @@ export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
  * framing, round 5 the external left clasp, round 6 the single-note subdivision
  * dialects with the per-hand clasp, round 7 the kinetic subdivision tabs with
  * gap-gated vertical chording, round 8 the symmetrical clasp with the
- * beam-harmonized tab, and round 9 the midpoint duration taxonomy. Round 10
- * answers the operator's verdict on that round: the copperplate accolade is
- * retired for an open System 1 start with the Position of Honor halo, the final
- * barline unifies across the Middle C corridor, the brittle cross-register beam
- * break is gone (the Bach Var. 1 m. 4 run beams continuously into octave 3),
- * the page furniture lightens (running headers, unbolded numerals and footer)
- * and four **scaled** clasp-duration paradigms — marks that cut symmetrically
- * across the spine at 2–3× the Round 9 size — are tested on wide-span chords.
+ * beam-harmonized tab, round 9 the midpoint duration taxonomy, and round 10 the
+ * scaled midpoint clasps with the retired accolade. Round 11 answers the
+ * operator's verdict on that round: four **System 1 start replacements** are
+ * tested side by side while the staves become a 100% symmetrical 30pt octave
+ * lattice (Middle C equalized), the specimen chords lose their zero-width
+ * beams, the clasp durations fall to light transverse line cuts, and the page
+ * furniture turns fully Urtext (running headers, margin measure numerals, a
+ * continuous Octave 6 outlier rule).
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 10,
-  title: 'Scaled Midpoint Clasps, Beaming Integrity, Accolade Retirement & Page Furniture Polish',
+  round: 11,
+  title:
+    'Accolade Replacements, Symmetrical Octave Lattice, Clean Specimen Chords & Urtext Typography',
   description:
-    'Comparing 4 scaled clasp-duration paradigms cutting across the spine on wide-span chords, with continuous run beaming, open System 1 start, unified final barline, and uncluttered multi-page headers.',
+    'Comparing 4 System 1 start styles paired with 4 light transverse clasp-duration paradigms on a symmetrical 30pt octave lattice, with stemless specimen chords, margin measure numerals, a continuous Octave 6 outlier rule and Urtext running headers.',
 };
 
 /**
- * The three display windows every Round 10 candidate is engraved on: the Bach
- * opening (open margin start, Position of Honor halo and the beam-harmonized
- * kinetic subdivision tabs), the Bach Var. 1 m. 4 RH run that now beams
- * continuously across Middle C into octave 3, and the **wide-span chord
- * specimen**, whose 1.5-octave brackets carry the full duration taxonomy so
- * every paradigm's scaled marks are on screen.
+ * The four display windows every Round 11 candidate is engraved on: the Bach
+ * opening (System 1 start style, Position of Honor halo, margin numeral), the
+ * Bach Var. 1 m. 4 RH run (continuous beaming across Middle C), the Bach
+ * Var. 1 mm. 29–30 Octave 6 climb (continuous outlier rule in the left margin's
+ * numeral column), and the **wide-span chord specimen**, whose stemless chords
+ * carry the full duration taxonomy so every light transverse cut is on screen.
  */
-const ROUND_10_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_11_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
     title:
-      'Bach Goldberg Var. 1 · mm. 1–2 — open margin start + Position of Honor halo + 12° kinetic tabs',
+      'Bach Goldberg Var. 1 · mm. 1–2 — System 1 start style + Position of Honor halo + margin measure numeral',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
@@ -144,75 +145,87 @@ const ROUND_10_WINDOWS: JankoCandidateWindow[] = [
       'Bach Goldberg Var. 1 · m. 4 — continuous RH run beaming across Middle C into Octave 3 (no orphaned 9 · 7 · 6 flags)',
   },
   {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 29,
+    measureCount: 2,
+    title:
+      'Bach Goldberg Var. 1 · mm. 29–30 — one continuous Octave 6 outlier rule (no choppy notehead dashes) with margin measure numbers',
+  },
+  {
     scoreId: SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
     title:
-      'Wide-Span Chord Specimen · half → quarter → dotted quarter (0.75pt dot) → 8th (1 mark) → 16th (2 marks) on 1.5-octave brackets',
+      'Wide-Span Chord Specimen · half (open white ring) → quarter (plain bracket) → dotted quarter (0.75pt dot) → 8th (1 cut) → 16th (2 cuts) on stemless 1.5-octave chords',
   },
 ];
 
 /**
- * The active candidate set — the four Round 10 scaled clasp-duration paradigms
- * that cut symmetrically across the spine. Order is the display order in the
- * Decision Candidates Matrix. All four share the settled beam-harmonized
- * kinetic tab (`'kinetic-tab-beam'`) and the golden open-halo start, continuous
- * beaming, unified final barline and running headers, so the round varies
- * exactly one variable: the scaled ink a duration leaves at the bracket spine's
- * midpoint.
+ * The active candidate set — the four Round 11 System 1 start replacements,
+ * each paired with one light transverse clasp-duration paradigm. Order is the
+ * display order in the Decision Candidates Matrix. All four share the settled
+ * beam-harmonized kinetic tab (`'kinetic-tab-beam'`), the per-hand bracket
+ * scope, continuous run beaming, the unified final barline, the symmetrical
+ * 30pt lattice and the Urtext page furniture, so a candidate states exactly
+ * two deltas: the margin ink at the system start and the ink a duration leaves
+ * at the bracket spine's midpoint.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'transverse-cross-bars',
-    label: 'A · Transverse Cross-Bars',
+    id: 'open-halo-cross-rungs',
+    label: 'A · Open Margin + Halo / Horizontal Cross-Rungs',
     description:
-      'Crisp 7.5pt bars cut straight across the spine at 1.2pt: a clean 4×7pt rectangular knockout gap for a half, a bare spine for a quarter, one bar for an 8th and two parallel bars for a 16th. The most architectural of the four — a value reads as a tally crossing the bracket, impossible to miss at 100% zoom.',
+      'The settled open margin: horizontal staff rules emerge cleanly into white space while the tick-0 sounds carry the concentric Position-of-Honor halo (R = 6.2pt). Durations cut across the bracket spine as crisp 7.5pt horizontal rungs at 1.0pt — one for an 8th, a parallel pair for a 16th — and a half note knocks the spine out with a clean open white ring (R = 3.0pt). The quietest and most classical of the four.',
     options: {
       chordGrouping: 'per-hand-clasp',
+      systemStartStyle: 'open-halo',
       claspDurationStyle: 'transverse-cross-bars',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_10_WINDOWS,
-    tags: ['scaled 7.5pt', 'cross-bars', 'open gap half'],
+    windows: ROUND_11_WINDOWS,
+    tags: ['open margin + halo', '7.5pt rungs', 'open white ring'],
   },
   {
-    id: 'kinetic-cross-slashes',
-    label: 'B · Kinetic 12.4° Cross-Slashes',
+    id: 'architectural-bracket-kinetic-slashes',
+    label: 'B · Architectural Bracket / 12.4° Kinetic Slashes',
     description:
-      'The same transverse bars raked at the score’s own beam-harmonized 12.4°: a hollow raked lozenge knocks the spine out for a half, one slash carries an 8th and a parallel pair carries a 16th. The paradigm speaks the settled kinetic language of the subdivision tab, so a clasped chord and a flagged melody rake at exactly the same angle.',
+      'A slender 0.65pt vertical rule with crisp 3.0pt right-angled spurs clasping the Octave 5 and Octave 2 rules — structural, frontal, and perfectly aligned with the staff rules it bounds. Its subdivisions rake upward at the score’s own beam-harmonized 12.4°, so a clasped chord speaks the exact kinetic language of the settled subdivision tab.',
     options: {
       chordGrouping: 'per-hand-clasp',
+      systemStartStyle: 'architectural-bracket',
       claspDurationStyle: 'kinetic-cross-slashes',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_10_WINDOWS,
-    tags: ['scaled 7.5pt', '12.4° raked', 'beam-harmonized'],
+    windows: ROUND_11_WINDOWS,
+    tags: ['0.65pt + 3.0pt spurs', 'up-raked 12.4°', 'beam-harmonized'],
   },
   {
-    id: 'interrupted-spine-node',
-    label: 'C · Interrupted-Spine Node',
+    id: 'clef-pillar-down-raked-slashes',
+    label: 'C · Clef-Pillar Landmark / Down-Raked Slashes',
     description:
-      'The spine stops flush into an emphatic node with a 100% white knockout interior: a bold open ring (R = 3.0pt, stroke 1.1pt) for a half, and solid circular beads (R = 2.8pt, or a stacked pair at 2.2pt) for the subdivisions. Zero quadrants, zero crosshairs — the most instrument-like of the four, a bead threaded on the bracket.',
+      'A slender 0.50pt vertical hairline connecting the octave equators, ticked at Middle C and at every octave line: a quiet registration landmark that teaches the symmetrical lattice at a glance. Its transverse cuts mirror Candidate B downward (−12.4°), a descending rake that answers the falling left-hand figures of the crossing runs.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'interrupted-spine-node',
+      systemStartStyle: 'clef-pillar',
+      claspDurationStyle: 'down-raked-slashes',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_10_WINDOWS,
-    tags: ['scaled R = 3.0pt', 'white knockout', 'solid beads'],
+    windows: ROUND_11_WINDOWS,
+    tags: ['0.50pt lattice ticks', 'down-raked −12.4°', 'Middle C landmark'],
   },
   {
-    id: 'faceted-diamond-bands',
-    label: 'D · Faceted Diamond Bands',
+    id: 'double-hairline-cross-hatch-stitches',
+    label: 'D · Double Hairline Frame / Cross-Hatch Stitches',
     description:
-      'Sculpted 8.0 × 4.5pt diamond lozenges cut symmetrically across the spine: a hollow white diamond knocks the spine out for a half, one solid filled band carries an 8th and a stacked pair carries a 16th. Solid, frontal and unambiguous — the widest and loudest of the four paradigms.',
+      'A modern double vertical bounding rule — 0.75pt outer, 0.35pt inner, 2.5pt apart — flush at the start of System 1: the firmest frame of the four, borrowed from contemporary Urtext engraving. Its subdivisions are symmetrical cross-stitches (×): one for an 8th and a stacked pair for a 16th, a stitched tally that reads at any zoom without a single heavy bead.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'faceted-diamond-bands',
+      systemStartStyle: 'double-hairline',
+      claspDurationStyle: 'cross-hatch-stitches',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_10_WINDOWS,
-    tags: ['scaled 8.0 × 4.5pt', 'diamond bands', 'hollow to solid'],
+    windows: ROUND_11_WINDOWS,
+    tags: ['0.75pt / 0.35pt frame', 'cross-hatch ××', 'modern Urtext'],
   },
 ];
 

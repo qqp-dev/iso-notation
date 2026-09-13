@@ -6,19 +6,22 @@
  * Vertical coordinates are expressed **relative to the Middle C spine**
  * (y = 0) and grow **downward** (SVG convention):
  *
- * - octave 6 equator     -> -88.0pt   (dynamic ledger, outside the staff)
- * - octave 5 equator     -> -58.0pt   (outer upper staff rule)
- * - octave 4 equator     -> -28.0pt   (inner upper staff rule)
+ * - octave 6 equator     -> -75.0pt   (dynamic ledger, outside the staff)
+ * - octave 5 equator     -> -45.0pt   (outer upper staff rule)
+ * - octave 4 equator     -> -15.0pt   (inner upper staff rule)
  * - Middle C spine       ->   0.0pt
- * - octave 3 equator     -> +28.0pt   (inner lower staff rule)
- * - octave 2 equator     -> +58.0pt   (outer lower staff rule)
- * - octave 1 equator     -> +88.0pt   (dynamic ledger, outside the staff)
+ * - octave 3 equator     -> +15.0pt   (inner lower staff rule)
+ * - octave 2 equator     -> +45.0pt   (outer lower staff rule)
+ * - octave 1 equator     -> +75.0pt   (dynamic ledger, outside the staff)
  *
  * The lattice is **absolute and unified**: `getEquatorYForOctave` resolves one
- * global coordinate for every octave, identical for both hands. Octaves 2–5
- * are the continuous grand staff (four rules, `interStaffGap` between the two
- * inner rules) and never produce ledger lines; only octaves outside that span
- * accumulate *dynamic ledger equators*.
+ * global coordinate for every octave, identical for both hands. Round 11
+ * equalizes `interStaffGap` to `octaveStep` (30pt), so the equators are
+ * uniformly spaced everywhere — Octave 5 (−45), Octave 4 (−15), Middle C (0),
+ * Octave 3 (+15), Octave 2 (+45) — and the corridor is no wider than any other
+ * octave step. Octaves 2–5 are the continuous grand staff (four rules) and
+ * never produce ledger lines; only octaves outside that span accumulate
+ * *dynamic ledger equators*.
  *
  * Row parity (Jánko Equator Principle, golden-master `'single-equator'`):
  * - whole-tone rank 0 (even pc) => `rowHeight / 2` **below** its equator;
@@ -425,9 +428,11 @@ export function resolveChannelFlanks(
  *
  * The lattice is **absolute and unified**: octave 4 is the inner staff rule
  * above the corridor (−halfGap), octave 3 the inner rule below it (+halfGap),
- * and every further octave steps by exactly `octaveStep`. The result is
- * identical for both hands, so a pitch's height never depends on which hand
- * plays it:
+ * and every further octave steps by exactly `octaveStep`. Round 11 sets
+ * `interStaffGap = octaveStep = 30pt`, so `halfGap` is 15pt and the whole
+ * lattice is uniformly spaced by 30pt: o5 −45, o4 −15, Middle C 0, o3 +15,
+ * o2 +45. The result is identical for both hands, so a pitch's height never
+ * depends on which hand plays it:
  *
  * - `octave >= 4` → `-halfGap - (octave - 4) * octaveStep`
  * - `octave <= 3` → `+halfGap + (3 - octave) * octaveStep`

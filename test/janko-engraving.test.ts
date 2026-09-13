@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import { Hand, QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -59,6 +60,7 @@ import {
   renderSystem,
 } from '../src/render/janko/engine';
 import {
+  JankoRhythmNote,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
@@ -211,26 +213,24 @@ test('Unified global equator lattice: absolute coordinates, identical for both h
     );
   }
 
-  // The four continuous staff rules of the grand staff.
+  // The four continuous staff rules of the grand staff. Round 11 equalizes the
+  // lattice: o5 -45, o4 -15, Middle C 0, o3 +15, o2 +45.
   for (const hand of HANDS) {
-    close(getEquatorYForOctave(5, hand, TOKENS, OPTIONS), -58.0, `o5 staff rule (${hand})`);
-    close(getEquatorYForOctave(4, hand, TOKENS, OPTIONS), -28.0, `o4 staff rule (${hand})`);
-    close(getEquatorYForOctave(3, hand, TOKENS, OPTIONS), +28.0, `o3 staff rule (${hand})`);
-    close(getEquatorYForOctave(2, hand, TOKENS, OPTIONS), +58.0, `o2 staff rule (${hand})`);
+    close(getEquatorYForOctave(5, hand, TOKENS, OPTIONS), -45.0, `o5 staff rule (${hand})`);
+    close(getEquatorYForOctave(4, hand, TOKENS, OPTIONS), -15.0, `o4 staff rule (${hand})`);
+    close(getEquatorYForOctave(3, hand, TOKENS, OPTIONS), +15.0, `o3 staff rule (${hand})`);
+    close(getEquatorYForOctave(2, hand, TOKENS, OPTIONS), +45.0, `o2 staff rule (${hand})`);
   }
+  close(OPTIONS.interStaffGap, TOKENS.octaveStep, 'the corridor is exactly one octave step');
 
-  // Octaves step by exactly 2h inside each staff half and climb upward; the
-  // only wider step is the 56pt Middle C corridor between o4 and o3.
+  // Every octave steps by exactly 2h (30pt) — including the Middle C corridor,
+  // which is no wider than any other octave step.
   for (const hand of HANDS) {
     for (let oct = 0; oct <= 7; oct++) {
       const lower = getEquatorYForOctave(oct, hand, TOKENS, OPTIONS);
       const upper = getEquatorYForOctave(oct + 1, hand, TOKENS, OPTIONS);
       assert.ok(upper < lower, 'higher octaves must climb upward on the page');
-      if (oct === 3) {
-        close(lower - upper, OPTIONS.interStaffGap, `corridor spans interStaffGap (${hand})`);
-      } else {
-        close(lower - upper, TOKENS.octaveStep, `octave step ${oct}->${oct + 1} (${hand})`);
-      }
+      close(lower - upper, TOKENS.octaveStep, `octave step ${oct}->${oct + 1} (${hand})`);
     }
   }
 
@@ -260,12 +260,12 @@ test('Out-of-staff octaves are strictly octave < 2 || octave > 5', () => {
   }
 });
 
-test('Spacious spine-free corridor anchors the two inner staff rules (o4 −28pt / o3 +28pt)', () => {
-  close(OPTIONS.interStaffGap, 56.0, 'canonical spacious inter-staff gap');
-  close(getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), -28.0, 'RH o4 equator');
-  close(getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 28.0, 'LH o3 equator');
-  close(getEquatorYForOctave(5, 'RH', TOKENS, OPTIONS), -58.0, 'RH o5 equator');
-  close(getEquatorYForOctave(2, 'LH', TOKENS, OPTIONS), 58.0, 'LH o2 equator');
+test('Symmetrical spine-free corridor anchors the two inner staff rules (o4 −15pt / o3 +15pt)', () => {
+  close(OPTIONS.interStaffGap, 30.0, 'Round 11 equalizes the corridor to the 30pt octave step');
+  close(getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), -15.0, 'RH o4 equator');
+  close(getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 15.0, 'LH o3 equator');
+  close(getEquatorYForOctave(5, 'RH', TOKENS, OPTIONS), -45.0, 'RH o5 equator');
+  close(getEquatorYForOctave(2, 'LH', TOKENS, OPTIONS), 45.0, 'LH o2 equator');
 });
 
 test('Dynamic ledger equators: only octaves outside the grand staff accumulate', () => {
@@ -288,14 +288,14 @@ test('Dynamic ledger equators: only octaves outside the grand staff accumulate',
   const rh3 = getPitchCoordinate(9, 3, 'RH', TOKENS, OPTIONS);
   assert.equal(rh3.isOutOfStaff, false);
   close(rh3.equatorY, getEquatorYForOctave(3, 'LH', TOKENS, OPTIONS), 'RH o3 shares the LH o3 rule');
-  close(rh3.equatorY, 28.0, 'RH o3 is the true staff rule');
+  close(rh3.equatorY, 15.0, 'RH o3 is the true staff rule');
   assert.equal(rh3.ledgerY, null);
 
   // Measure 3 scenario: the LH reaching up into octave 4 lands on the o4 rule.
   const lh4 = getPitchCoordinate(0, 4, 'LH', TOKENS, OPTIONS);
   assert.equal(lh4.isOutOfStaff, false);
   close(lh4.equatorY, getEquatorYForOctave(4, 'RH', TOKENS, OPTIONS), 'LH o4 shares the RH o4 rule');
-  close(lh4.equatorY, -28.0, 'LH o4 is the true staff rule');
+  close(lh4.equatorY, -15.0, 'LH o4 is the true staff rule');
   assert.equal(lh4.ledgerY, null);
 
   // Outside the staff every intervening equator accumulates, nearest first.
@@ -369,7 +369,7 @@ test('Zero corridor ledger cuts across the canonical Bach score (mm. 3 & 4 inclu
   const lh4 = sys0.notes.filter((p) => p.coord.hand === 'LH' && p.coord.octave === 4);
   assert.ok(lh4.length > 0, 'm. 3 contains LH octave-4 notes');
   for (const p of lh4) {
-    close(p.coord.equatorY, -28.0, `${p.note.id} LH o4 equator`);
+    close(p.coord.equatorY, -15.0, `${p.note.id} LH o4 equator`);
     close(p.y, o4Rule + p.coord.offsetFromEquator, `${p.note.id} head sits on the o4 staff rule`);
     assert.equal(p.coord.ledgerY, null, `${p.note.id} carries no ledger`);
   }
@@ -378,7 +378,7 @@ test('Zero corridor ledger cuts across the canonical Bach score (mm. 3 & 4 inclu
   const rh3 = sys0.notes.filter((p) => p.coord.hand === 'RH' && p.coord.octave === 3);
   assert.ok(rh3.length > 0, 'm. 4 contains RH octave-3 notes');
   for (const p of rh3) {
-    close(p.coord.equatorY, 28.0, `${p.note.id} RH o3 equator`);
+    close(p.coord.equatorY, 15.0, `${p.note.id} RH o3 equator`);
     close(p.y, o3Rule + p.coord.offsetFromEquator, `${p.note.id} head sits on the o3 staff rule`);
     assert.equal(p.coord.ledgerY, null, `${p.note.id} carries no ledger`);
   }
@@ -466,8 +466,8 @@ test('computePageGeometry: A4 portrait, accolade-anchored staff column, 3 system
   close(geo.pageWidth, 595.28, 'A4 width');
   close(geo.pageHeight, 841.89, 'A4 height');
   for (const sys of geo.systems) {
-    close(sys.equatorY('RH', 4) - sys.middleCY, -28.0, 'RH o4 above spine');
-    close(sys.equatorY('LH', 3) - sys.middleCY, 28.0, 'LH o3 below spine');
+    close(sys.equatorY('RH', 4) - sys.middleCY, -15.0, 'RH o4 above spine');
+    close(sys.equatorY('LH', 3) - sys.middleCY, 15.0, 'LH o3 below spine');
     assert.ok(sys.staffTopY < sys.staffBotY);
   }
 });
@@ -479,7 +479,7 @@ test('renderJankoPage: well-formed 3-system page with all rhythm styles availabl
   assert.ok(page.startsWith('<svg'), 'page starts with an svg root');
   assert.ok(page.trimEnd().endsWith('</svg>'), 'page closes the svg root');
   for (const s of [1, 2, 3]) assert.match(page, new RegExp(`id="system-${s}"`));
-  assert.match(page, /Goldberg Variations/, 'Urtext header present');
+  assert.match(page, /Goldberg-Variationen/, 'Urtext header present');
   assert.match(page, /Page 1 of 3/);
   assert.ok(!page.includes('class="janko-time-signature"'), 'time signature removed by default');
   assert.ok(!page.includes('class="janko-octave-labels"'), 'octave indicators removed by default');
@@ -551,7 +551,7 @@ test('Round 10 multi-page headers: full title block on page 1, running header af
       header,
       new RegExp(
         `<text x="${geo.margin.toFixed(2)}" y="${(geo.margin + 10).toFixed(2)}" class="janko-running-head">` +
-          'Johann Sebastian Bach · J\\.S\\. Bach: Goldberg Variations, BWV 988 · Variatio 1\\. a 1 Clav\\.</text>'
+          'Johann Sebastian Bach · Goldberg-Variationen · Variatio 1\\. a 1 Clav\\.</text>'
       ),
       `page ${pageIndex + 1} carries the discreet running header at margin + 10`
     );
@@ -879,7 +879,7 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
   assert.equal(DEFAULT_JANKO_OPTIONS.finalBarlineStyle, 'unified', 'the unified final barline is the default');
   assert.deepEqual(
     [...JANKO_SYSTEM_START_STYLES],
-    ['open-halo', 'architectural-bracket', 'clef-pillar', 'none'],
+    ['open-halo', 'architectural-bracket', 'clef-pillar', 'double-hairline', 'none'],
     'the published system-start catalogue'
   );
   assert.deepEqual(
@@ -911,27 +911,35 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
   // The beat grid is the structural layer above the lightened staff rules.
   assert.match(page, /class="janko-beat-line"[^>]*stroke="#9CA3AF" stroke-width="0\.70"/);
 
-  // Round 10 lightens the measure numeral to a normal-weight italic #555555 and
-  // pushes it 6pt into the margin; the painted baseline and the linter's
-  // margin-furniture box agree, and the canonical score keeps 14pt+ of air.
-  const painted = /<text class="janko-measure-num" x="([\d.-]+)" y="([\d.-]+)"/.exec(page)!;
+  // Round 11 moves the measure numeral into the true left margin
+  // (`x = staffLeft − 10.0`, right-aligned) and sets it snug just above the top
+  // staff rule (`y = staffTopY − 3.0`) as a 7pt normal-weight italic #555555;
+  // the painted baseline and the linter's margin-furniture box agree.
+  const painted =
+    /<text class="janko-measure-num" x="([\d.-]+)" y="([\d.-]+)" text-anchor="end">/.exec(page)!;
   const system0 = geo.systems[0];
-  close(Number(painted[1]), system0.staffLeft - 6.0, 'the numeral sits 6pt left of the staff column', 1e-6);
+  close(
+    Number(painted[1]),
+    system0.staffLeft - 10.0,
+    'the numeral is right-aligned 10pt left of the staff column',
+    1e-6
+  );
   close(
     Number(painted[2]),
-    system0.staffTopY - 14.0,
-    'the numeral keeps a full 14pt above the staff top rule',
+    system0.staffTopY - 3.0,
+    'the numeral sits snug 3pt above the staff top rule',
     1e-6
   );
   const css = page.match(/<style>[\s\S]*?<\/style>/)?.[0] ?? '';
   assert.match(
     css,
-    /\.janko-measure-num \{[^}]*font-style: italic; font-size: 8\.5pt; fill: #555555; font-weight: normal; \}/,
-    'the numeral is a normal-weight #555555 italic'
+    /\.janko-measure-num \{[^}]*font-style: italic; font-size: 7pt; fill: #555555; font-weight: normal; \}/,
+    'the numeral is a normal-weight 7pt #555555 italic'
   );
   const furniture = getMarginFurniture(system0, TOKENS, 1);
   close(furniture.numeral.y1, Number(painted[2]), 'painted and audited baselines agree', 1e-6);
-  close(furniture.numeral.x0, Number(painted[1]), 'painted and audited x agree', 1e-6);
+  close(furniture.numeral.x1, Number(painted[1]), 'painted and audited x agree', 1e-6);
+  assert.ok(furniture.numeral.x0 < furniture.numeral.x1, 'the right-aligned numeral box opens left');
   const layout0 = layoutJankoScore(score, OPTIONS, TOKENS)[0];
   for (const p of layout0.notes) {
     const dx = Math.max(furniture.numeral.x0 - p.x, 0, p.x - furniture.numeral.x1);
@@ -1022,15 +1030,15 @@ test('Round 10 system openness: open margin, unified final barline, no mid-piece
 const MIDDLE_C_SPINE_GROUP = 'class="janko-middle-c-spine"';
 const ROW_GUIDELINES_GROUP = 'class="janko-row-guidelines"';
 
-test('Spacious spine-free corridor invariant: 56pt of negative space, zero Middle C rule', () => {
+test('Symmetrical spine-free corridor invariant: 30pt of negative space, zero Middle C rule', () => {
   const score = buildBachGoldbergVar1Score();
-  assert.equal(DEFAULT_JANKO_OPTIONS.interStaffGap, 56.0);
+  assert.equal(DEFAULT_JANKO_OPTIONS.interStaffGap, 30.0);
   assert.equal(DEFAULT_JANKO_OPTIONS.middleCSpine, 'none');
 
   const geo = computePageGeometry(OPTIONS, TOKENS);
   for (const sys of geo.systems) {
-    close(sys.middleCY - sys.equatorY('RH', 4), 28.0, 'RH half corridor');
-    close(sys.equatorY('LH', 3) - sys.middleCY, 28.0, 'LH half corridor');
+    close(sys.middleCY - sys.equatorY('RH', 4), 15.0, 'RH half corridor');
+    close(sys.equatorY('LH', 3) - sys.middleCY, 15.0, 'LH half corridor');
   }
 
   const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
@@ -1632,6 +1640,104 @@ test('No beam group straddles an intervening longer value of the same hand', () 
   );
 });
 
+test('Round 11 beaming integrity: a simultaneity never forms a zero-width melodic beam', () => {
+  const note = (id: string, startTick: number, durationTicks: number): JankoRhythmNote => ({
+    id,
+    startTick,
+    durationTicks,
+    hand: 'RH',
+    x: startTick,
+    y: 0,
+  });
+
+  // Four chord tones sharing one onset: no group may form at all (the
+  // zero-width beam whose vertical stem sliced every notehead).
+  const chord = partitionBeamGroups([
+    note('a', 0, 12),
+    note('b', 0, 12),
+    note('c', 0, 12),
+    note('d', 0, 12),
+  ]);
+  assert.deepEqual(chord.groups, [], 'a simultaneity is never beamed');
+  assert.equal(chord.ungrouped.length, 4, 'every chord head stays ungrouped');
+
+  // A melodic run across distinct onsets still beams as one gesture.
+  const run = partitionBeamGroups([
+    note('a', 0, 12),
+    note('b', 12, 12),
+    note('c', 24, 12),
+    note('d', 36, 12),
+  ]);
+  assert.deepEqual(
+    run.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12, 24, 36]],
+    'a melodic run is untouched'
+  );
+
+  // A chord beside a run: the run keeps beaming, the simultaneity stays out.
+  const mixed = partitionBeamGroups([
+    note('a', 0, 24),
+    note('b', 24, 24),
+    note('c', 24, 24),
+    note('d', 48, 24),
+  ]);
+  for (const group of mixed.groups) {
+    const ticks = group.map((n) => n.startTick);
+    assert.equal(new Set(ticks).size, ticks.length, 'no group ever repeats an onset');
+  }
+  assert.equal(
+    mixed.ungrouped.filter((n) => n.startTick === 24).length,
+    2,
+    'both heads of the simultaneity fall out of the beam'
+  );
+
+  // The canonical specimen is the case that exposed the defect: every onset is
+  // a four-voice chord, so nothing beams and the clasps own every duration.
+  const specimen = buildChordDurationSpecimenScore();
+  const layout = layoutJankoScore(
+    specimen,
+    { ...OPTIONS, chordGrouping: 'per-hand-clasp', measuresPerSystem: 2 },
+    TOKENS
+  )[0];
+  assert.equal(layout.beams.length, 0, 'the specimen forms no zero-width beam');
+  assert.equal(
+    layout.claspedStems.length,
+    specimen.notes.length,
+    'every chord head hands its duration to its bracket'
+  );
+});
+
+test('Round 11 m. 31 counterpoint: LH 2 stems down, RH B stems up, no stem collision', () => {
+  const score = buildBachGoldbergVar1Score();
+  const onset = layoutJankoScore(score, OPTIONS, TOKENS)
+    .flatMap((layout) => layout.notes)
+    .filter((p) => p.note.startTick === 4344);
+  assert.equal(onset.length, 2, 'the m. 31 tick 4344 onset is a two-voice simultaneity');
+  const lh = onset.find((p) => p.coord.hand === 'LH')!;
+  const rh = onset.find((p) => p.coord.hand === 'RH')!;
+  assert.equal(lh.coord.pitchClass, 2, 'the LH voice is the duodecimal 2');
+  assert.equal(rh.coord.pitchClass, 11, 'the RH voice is the duodecimal b');
+  assert.equal(lh.coord.octave, 4);
+  assert.equal(rh.coord.octave, 4);
+  assert.ok(rh.y < lh.y, 'the RH b sits above the LH 2');
+
+  // Opposing stem directions: down for the lower LH voice, up for the upper RH
+  // voice, so the two stems point away from each other instead of colliding.
+  const lhStem = getStemGeometry(lh.rhythm, TOKENS);
+  const rhStem = getStemGeometry(rh.rhythm, TOKENS);
+  assert.equal(lhStem.direction, 1, 'the LH 2 stems down');
+  assert.equal(rhStem.direction, -1, 'the RH b stems up');
+  assert.ok(lh.y < lhStem.stemEndY, 'the LH stem runs below its head');
+  assert.ok(rh.y > rhStem.stemEndY, 'the RH stem runs above its head');
+
+  // The two stem segments share a column but never overlap.
+  assert.equal(lhStem.stemX, rhStem.stemX, 'both voices sound on the same beat column');
+  const overlap =
+    Math.min(Math.max(lhStem.stemStartY, lhStem.stemEndY), Math.max(rhStem.stemStartY, rhStem.stemEndY)) -
+    Math.max(Math.min(lhStem.stemStartY, lhStem.stemEndY), Math.min(rhStem.stemStartY, rhStem.stemEndY));
+  assert.ok(overlap < 0, `the m. 31 stems keep clear air (overlap ${overlap.toFixed(2)}pt)`);
+});
+
 // ---------------------------------------------------------------------------
 // 4. Channel layouts (Round 4) — four comparative paradigms
 // ---------------------------------------------------------------------------
@@ -2017,20 +2123,19 @@ test('Dynamic layouts: the canonical Bach score never contradicts the pitch cont
 
 test('Anchored and 3-row layouts surface their real cost: high notes crowd the numeral margin', () => {
   // Anchoring Set A on the rule pushes the outer Set B row one half-row higher
-  // than the golden master, so the topmost o5 notes come within 2.2pt of the
-  // measure numeral's baseline — 4× tighter than the golden master's 9.7pt. The
-  // linter measures that air (the numeral box is the figures' real ink box, from
-  // cap height down to the baseline), so the decision matrix shows the real cost
-  // of the paradigm without inventing a collision that is not painted.
+  // than the golden master, so the topmost o5 notes come closer to the measure
+  // numeral's box. The linter measures that air (the numeral box is the figures'
+  // real ink box, from cap height down to the baseline) from the Round 11
+  // right-aligned margin anchor, so the decision matrix shows the real cost of
+  // the paradigm without inventing a collision that is not painted.
   const score = buildBachGoldbergVar1Score();
-  // Round 9 elevated the numeral to a full 14pt above the top rule; Round 10
-  // pushes it a further 4pt into the margin (`staffLeft − 6`), so every
-  // paradigm's air grows by that much again.
+  // Round 11 equalizes the lattice to one 30pt octave step, so the four layout
+  // paradigms share the same staff geometry; only the row framing differs.
   const CLEARANCE: Record<string, number> = {
-    'single-equator': 17.91,
-    'on-the-line': 10.51,
-    'single-line-3row': 10.51,
-    'bounded-channel': 12.48,
+    'single-equator': 14.90,
+    'on-the-line': 11.69,
+    'single-line-3row': 11.69,
+    'bounded-channel': 12.29,
   };
   for (const c of LAYOUT_CASES) {
     const report = lintJankoScore(score, c.options, TOKENS);

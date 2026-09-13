@@ -1098,11 +1098,10 @@ export function checkMeasureNumeralClearance(
     layout.index * o.measuresPerSystem + 1,
     o.systemStartStyle
   );
-  // The numeral opens the measure-number column: it must start to the right of
-  // the system-start mark's column, never above/inside it. Round 7 paints the
-  // mark only at the start of the piece, and Round 10's `'open-halo'` default
-  // paints none at all, so the column is normally free.
-  if (layout.index === 0 && accolade !== null && numeral.x0 < accolade.x1) {
+  // The numeral is right-aligned into the true left margin, so it may share the
+  // system-start mark's x-column as long as the two boxes never actually meet
+  // (the numeral rides snug above the top rule, the mark spans the staff).
+  if (layout.index === 0 && accolade !== null && boxesOverlap(numeral, accolade, 0)) {
     out.push({
       code: 'measure-numeral-collision',
       severity: 'error',
@@ -1184,11 +1183,14 @@ export function checkAccoladeClearance(
       metrics: { accoladeX0: accolade.x0, accoladeX1: accolade.x1, staffLeft: g.staffLeft },
     });
   }
-  if (Math.abs(accolade.y0 - g.staffTopY) > EPS || Math.abs(accolade.y1 - g.staffBotY) > EPS) {
+  if (
+    Math.abs(accolade.y0 - g.equatorY('RH', 5)) > EPS ||
+    Math.abs(accolade.y1 - g.equatorY('LH', 2)) > EPS
+  ) {
     out.push({
       code: 'accolade-collision',
       severity: 'error',
-      message: 'Accolade does not clasp the full staff height (top/bottom rules must meet the staff).',
+      message: 'Accolade does not clasp the full staff height (top/bottom rules must meet the octave rules).',
       system: layout.index,
       x: accolade.x0,
       y: accolade.y0,
