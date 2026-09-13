@@ -69,7 +69,7 @@ npm install
 # Run dev server accessible over local network & Tailscale
 npm run dev
 
-# Run test suite (128 tests, incl. visual linter + studio invariants, <1s)
+# Run test suite (210 tests, incl. visual linter + clasp + studio invariants, ~2s)
 npm test
 
 # Mathematical engraving lint of the golden master (~25 ms)
@@ -91,8 +91,10 @@ When running, the workbench is available across the Tailscale mesh at
 round-trips, no manual refresh:
 
 - **View 1 · Decision Candidates Matrix** (`janko.html#candidates`): the 2–4
-  candidates of the current decision round, side by side with option-delta
-  badges and a live lint chip each. Candidates are declared in
+  candidates of the current decision round, engraved side by side on **every
+  display window they declare** (Round 5 judges the chord-duration paradigms on
+  Bach mm. 1–2 and Brahms mm. 7–8 at once) with option-delta badges and a live
+  lint chip each. Candidates are declared in
   `src/render/janko/candidates.ts`; the template never changes.
 - **View 2 · Golden Reference Object** (`janko.html#reference`): the accumulated
   golden master (Bach Goldberg Var. 1) as a full page spread plus macro focus

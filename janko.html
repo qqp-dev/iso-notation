@@ -186,6 +186,11 @@
       transition: width 0.12s ease;
     }
     .janko-canvas .janko-svg { display: block; width: 100%; height: auto; }
+    /* Round 5: a candidate is judged on several engraving windows at once. */
+    .candidate-windows { display: flex; flex-direction: column; gap: 10px; }
+    .candidate-window { display: flex; flex-direction: column; gap: 5px; }
+    .candidate-window figcaption { font-size: 11.5px; color: #e2e8f0; line-height: 1.4; }
+    .candidate-window figcaption b { font-size: 12px; font-weight: 600; }
     .candidate-foot { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
     .page-card figcaption, .crop-card figcaption {
       font-size: 12px;

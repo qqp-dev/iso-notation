@@ -202,7 +202,8 @@ function renderFlagHook(
   tipY: number,
   direction: -1 | 1,
   index: number,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  cls = 'janko-flag'
 ): string {
   const w = t.flagWidth;
   const h = t.flagHeight;
@@ -214,7 +215,7 @@ function renderFlagHook(
     `C ${f(stemX + 0.55 * w)} ${f(y(0.12))} ${f(stemX + w)} ${f(y(0.62))} ` +
     `${f(stemX + 0.45 * w)} ${f(y(1))}`;
   return (
-    `    <path class="janko-flag" data-stem-x="${f(stemX)}" data-flag-index="${index}" ` +
+    `    <path class="${cls}" data-stem-x="${f(stemX)}" data-flag-index="${index}" ` +
     `d="${d}" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>`
   );
 }
@@ -248,11 +249,273 @@ export function renderFlags(
   return parts.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Round 5 — the external left clasp: cluster bracket + duration carrier
+// ---------------------------------------------------------------------------
+
+/** Length (pt) of a quarter-note clasp spire, measured up from the top corner. */
+export const CLASP_SPIRE_LENGTH = 8.5;
+/** Radius (pt) of the open pip a half/whole-note clasp carries. */
+export const CLASP_PIP_RADIUS = 1.5;
+/** Vertical gap (pt) between the two pips of a whole-note clasp. */
+export const CLASP_PIP_GAP = 1.0;
+
+/**
+ * Duration grammar of a clasp tip.
+ *
+ * | class               | value            | ink at the clasp corner          |
+ * | ------------------- | ---------------- | -------------------------------- |
+ * | `'double-pip'`      | whole (≥ 192 t)  | two stacked open circles          |
+ * | `'pip'`             | half (≥ 96 t)    | one open circle                   |
+ * | `'spire'`           | quarter (≥ 39 t) | clean vertical spire, 8.5pt       |
+ * | `'spire-one-flag'`  | 8th (15–38 t)    | spire + one flag hook             |
+ * | `'spire-two-flags'` | 16th (≤ 14 t)    | spire + two flag hooks            |
+ *
+ * The thresholds mirror the flag grammar of {@link renderFlags}, so a clasped
+ * cluster and a flagged stem of the same value can never disagree.
+ */
+export type JankoClaspDuration =
+  | 'double-pip'
+  | 'pip'
+  | 'spire'
+  | 'spire-one-flag'
+  | 'spire-two-flags';
+
+/** Classify a duration into the clasp tip grammar (see {@link JankoClaspDuration}). */
+export function claspDurationClass(durationTicks: number): JankoClaspDuration {
+  if (durationTicks >= 192) return 'double-pip';
+  if (durationTicks >= 96) return 'pip';
+  if (durationTicks > 38) return 'spire';
+  if (durationTicks > 14) return 'spire-one-flag';
+  return 'spire-two-flags';
+}
+
+/** One resolved left clasp: bracket geometry plus its duration tip. */
+export interface JankoClaspGroupGeometry {
+  /** Onset tick shared by every member of the cluster. */
+  tick: number;
+  /** Cluster members, sorted by page y (top to bottom). */
+  notes: JankoRhythmNote[];
+  /** Extents of the member notehead centres (page pt). */
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  /** Absolute x of the clasp spine, left of the outermost disc. */
+  claspX: number;
+  /** Top corner of the bracket (`minY − r`). */
+  topY: number;
+  /** Bottom corner of the bracket (`maxY + r`). */
+  botY: number;
+  /** Horizontal reach of both caps (token `claspWidth`). */
+  capWidth: number;
+  /** Stroke thickness of the bracket and spire (token `claspStrokeWidth`). */
+  strokeWidth: number;
+  /** Shortest member value — the duration the clasp carries. */
+  durationTicks: number;
+  /** Resolved tip grammar. */
+  duration: JankoClaspDuration;
+  /** Flag hooks (0–2) drawn at the spire tip. */
+  flags: number;
+  /** Open pips (0–2) drawn at the top corner. */
+  pips: number;
+  /** Spire tip y, or null when the clasp carries a pip instead. */
+  spireTipY: number | null;
+  /** The bracket itself: `M cap topY L claspX topY L claspX botY L cap botY`. */
+  path: string;
+}
+
+/** Overrides accepted by {@link computeClaspGeometry}. */
+export interface JankoClaspOptions {
+  /**
+   * Duration (ticks) the clasp carries. Defaults to the **shortest** member
+   * value — the point at which the cluster's first voice moves on.
+   */
+  durationTicks?: number;
+}
+
+/**
+ * Resolve the left clasp of one chord / cluster.
+ *
+ * The bracket is drawn **outside** the cluster — `claspX = minX − r −
+ * claspOffset`, `topY = minY − r`, `botY = maxY + r` — so the vertical extent
+ * bounds every member disc and the spine never crosses a glyph. The duration
+ * carried is the **shortest** member value (or the override the caller
+ * supplies).
+ *
+ * Returns null for a lone note: a clasp groups a vertical simultaneity, so
+ * melodic writing is never touched (no "feathers").
+ */
+export function computeClaspGeometry(
+  notes: readonly JankoRhythmNote[],
+  tokens?: Partial<JankoTokens> | null,
+  options?: JankoClaspOptions
+): JankoClaspGroupGeometry | null {
+  const t = resolveJankoTokens(tokens);
+  if (notes.length < 2) return null;
+  const sorted = [...notes].sort((a, b) => a.y - b.y || a.x - b.x);
+  const sortX = [...notes].sort((a, b) => a.x - b.x);
+  const minX = sortX[0].x;
+  const maxX = sortX[sortX.length - 1].x;
+  const minY = sorted[0].y;
+  const maxY = sorted[sorted.length - 1].y;
+  const r = t.noteheadRadius;
+  const claspX = minX - r - t.claspOffset;
+  const topY = minY - r;
+  const botY = maxY + r;
+  const durationTicks = options?.durationTicks ?? Math.min(...notes.map((n) => n.durationTicks));
+  const duration = claspDurationClass(durationTicks);
+  const flags =
+    duration === 'spire-two-flags' ? 2 : duration === 'spire-one-flag' ? 1 : 0;
+  const pips = duration === 'double-pip' ? 2 : duration === 'pip' ? 1 : 0;
+  const spireTipY = flags > 0 || duration === 'spire' ? topY - CLASP_SPIRE_LENGTH : null;
+  const cap = t.claspWidth;
+  const path =
+    `M ${f(claspX + cap)} ${f(topY)} L ${f(claspX)} ${f(topY)} ` +
+    `L ${f(claspX)} ${f(botY)} L ${f(claspX + cap)} ${f(botY)}`;
+  return {
+    tick: notes[0].startTick,
+    notes: sorted,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    claspX,
+    topY,
+    botY,
+    capWidth: cap,
+    strokeWidth: t.claspStrokeWidth,
+    durationTicks,
+    duration,
+    flags,
+    pips,
+    spireTipY,
+    path,
+  };
+}
+
+/** Stretch a clasp's spire so its tip lands on a rail at `railY`. */
+export function withClaspRail(
+  group: JankoClaspGroupGeometry,
+  railY: number
+): JankoClaspGroupGeometry {
+  if (group.spireTipY === null) return group;
+  return { ...group, spireTipY: railY, flags: 0 };
+}
+
+/**
+ * Axis-aligned ink box of one clasp: spine, caps, spire, flag hooks and pips.
+ * Shared by the visual linter and the rail solver, so the audited box can never
+ * drift from the painted ink.
+ */
+export function claspInkBox(
+  group: JankoClaspGroupGeometry,
+  tokens?: Partial<JankoTokens> | null
+): { x0: number; y0: number; x1: number; y1: number } {
+  const t = resolveJankoTokens(tokens);
+  const pipTop = group.pips > 0 ? group.topY - CLASP_PIP_RADIUS - (group.pips - 1) * (2 * CLASP_PIP_RADIUS + CLASP_PIP_GAP) : group.topY;
+  const tip = group.spireTipY ?? group.topY;
+  const flagReach = group.flags > 0 ? t.flagWidth : 0;
+  const flagDrop = group.flags > 0 ? t.flagHeight + (group.flags - 1) * t.flagSpacing : 0;
+  const reach = Math.max(group.capWidth, flagReach, group.pips > 0 ? CLASP_PIP_RADIUS : 0);
+  return {
+    x0: group.claspX - (group.pips > 0 ? CLASP_PIP_RADIUS : 0),
+    y0: Math.min(pipTop, tip),
+    x1: group.claspX + reach,
+    y1: Math.max(group.botY, tip + flagDrop),
+  };
+}
+
+/**
+ * Paint one left clasp: the bracket, its duration spire, flag hooks or pips.
+ * The group is engraved in the rhythm layer (beneath the noteheads), so a
+ * knockout always erases whatever a clasp should never have touched.
+ */
+export function renderChordClasp(
+  group: JankoClaspGroupGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const ids = group.notes.map((n) => n.id).join(',');
+  const parts: string[] = [
+    `  <g class="janko-clasp-group" data-clasp-tick="${group.tick}" data-clasp-duration="${group.duration}" data-clasp-notes="${ids}">`,
+    `    <path class="janko-clasp" d="${group.path}" fill="none" stroke="#111111" stroke-width="${group.strokeWidth.toFixed(2)}" stroke-linejoin="miter" stroke-linecap="butt"/>`,
+  ];
+  if (group.spireTipY !== null) {
+    parts.push(
+      `    <line class="janko-clasp-spire" x1="${f(group.claspX)}" y1="${f(group.topY)}" x2="${f(group.claspX)}" y2="${f(group.spireTipY)}" stroke="#111111" stroke-width="${group.strokeWidth.toFixed(2)}" stroke-linecap="butt"/>`
+    );
+  }
+  for (let i = 1; i <= group.flags; i++) {
+    parts.push(
+      renderFlagHook(
+        group.claspX,
+        (group.spireTipY ?? group.topY) + (i - 1) * t.flagSpacing,
+        -1,
+        i,
+        t,
+        'janko-clasp-flag'
+      )
+    );
+  }
+  for (let i = 0; i < group.pips; i++) {
+    const cy = group.topY - CLASP_PIP_RADIUS - i * (2 * CLASP_PIP_RADIUS + CLASP_PIP_GAP);
+    parts.push(
+      `    <circle class="janko-clasp-pip" cx="${f(group.claspX)}" cy="${f(cy)}" r="${f(CLASP_PIP_RADIUS)}" fill="none" stroke="#111111" stroke-width="${group.strokeWidth.toFixed(2)}"/>`
+    );
+  }
+  parts.push('  </g>');
+  return parts.join('\n');
+}
+
+/** One horizontal rail joining the spire tips of contiguous clasps. */
+export interface JankoClaspRailGeometry {
+  /** Leftmost spire column of the joined run. */
+  x1: number;
+  /** Rightmost spire column of the joined run. */
+  x2: number;
+  /** Rail centreline y. */
+  y: number;
+  /** Rail thickness (token `beamThickness`). */
+  thickness: number;
+  /** 1 = primary (8th) level, 2 = 16th level. */
+  level: 1 | 2;
+  /** Ids of every note of the joined clasps. */
+  noteIds: string[];
+}
+
+/** Paint one clasp rail (a measure-bounded horizontal connector). */
+export function renderClaspRail(
+  rail: JankoClaspRailGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const cls = rail.level === 2 ? 'janko-clasp-rail janko-clasp-rail-secondary' : 'janko-clasp-rail';
+  return `    <line class="${cls}" data-rail-level="${rail.level}" data-rail-notes="${rail.noteIds.join(',')}" x1="${f(rail.x1)}" y1="${f(rail.y)}" x2="${f(rail.x2)}" y2="${f(rail.y)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`;
+}
+
+/**
+ * Paint a whole clasp layer: every bracket, then the rails of
+ * `'beamed-clasp-rail'` (which are painted after the spires they join).
+ */
+export function renderClaspGroup(
+  groups: readonly JankoClaspGroupGeometry[],
+  rails: readonly JankoClaspRailGeometry[] = [],
+  tokens?: Partial<JankoTokens> | null
+): string {
+  if (groups.length === 0 && rails.length === 0) return '';
+  const t = resolveJankoTokens(tokens);
+  const parts: string[] = ['  <g class="janko-clasp-layer">'];
+  for (const group of groups) parts.push(renderChordClasp(group, t));
+  for (const rail of rails) parts.push(renderClaspRail(rail, t));
+  parts.push('  </g>');
+  return parts.join('\n');
+}
+
 /**
  * Pure geometry of one beamed group.
  *
  * The primary connector is clamped to ±`tokens.maxBeamSlope` so wide leaps do
- * not produce runaway diagonals. The clamped line is then *elevated* (RH
  * up-stems) or *depressed* (LH down-stems) until the extreme notehead of the
  * group — in the stem direction — keeps at least a full stem length, so no
  * beam can ever cut through an intermediate notehead of an ascending or

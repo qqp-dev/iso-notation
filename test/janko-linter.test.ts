@@ -19,7 +19,18 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
+import {
+  BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  BRAHMS_OP118_NO1_JANKO_TOKENS,
+  buildBrahmsOp118No1Score,
+} from '../src/scores/brahms-op118-no1';
+import {
+  DEFAULT_JANKO_OPTIONS,
+  DEFAULT_JANKO_TOKENS,
+  JankoChordGrouping,
+  resolveJankoOptions,
+  resolveJankoTokens,
+} from '../src/render/janko/types';
 import { JankoSystemLayout, layoutJankoScore, renderSystem, computePageGeometry, getSystemGeometry } from '../src/render/janko/engine';
 import { getStemAttachmentRadius, getStemGeometry } from '../src/render/janko/elements/rhythm';
 import {
@@ -38,6 +49,7 @@ import {
   checkAccoladeClearance,
   checkBarlineClearance,
   checkBeamNoteheadClearance,
+  checkClaspClearance,
   checkHaloClearance,
   checkKnockoutCoverage,
   checkMeasureNumeralClearance,
@@ -47,6 +59,7 @@ import {
   checkStemDigitClearance,
   formatLintReport,
   lintJankoScore,
+  systemBarlines,
 } from '../src/render/janko/linter';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -55,6 +68,7 @@ const REPO_ROOT = path.resolve(HERE, '..');
 const SCORE = buildBachGoldbergVar1Score();
 const LINT = DEFAULT_JANKO_LINT_OPTIONS;
 const TOKENS = DEFAULT_JANKO_TOKENS;
+const BRAHMS_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const R = TOKENS.noteheadRadius;
 const HALO_R = TOKENS.haloRadius;
 /** Canonical flush stem attachment radii (regular heads / tick-0 honor sounds). */
@@ -582,6 +596,137 @@ test('Corridor audit reads the true rule positions of the bounded channel', () =
     ),
     'the reported rule y is the one that actually reaches the spine'
   );
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Round 5 — clasp clearance
+// ---------------------------------------------------------------------------
+
+/** A canonical Bach system engraved with one of the clasp paradigms. */
+function claspSystem(
+  mode: JankoChordGrouping,
+  systemIndex: number = 0
+): { layout: JankoSystemLayout; options: ReturnType<typeof resolveJankoOptions> } {
+  const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, chordGrouping: mode });
+  return { layout: systems(options)[systemIndex], options };
+}
+
+test("Clasp audit: the engine's own brackets pass every clearance rule", () => {
+  for (const mode of ['left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase'] as const) {
+    const { layout, options } = claspSystem(mode);
+    const out = run((l, o) => checkClaspClearance(l, options, TOKENS, LINT, o), layout);
+    assert.deepEqual(
+      out.map((v) => `${v.code}: ${v.message}`),
+      [],
+      `${mode} brackets are admitted only where they stand clear`
+    );
+    assert.ok(layout.clasps.length > 0, `${mode} paints brackets`);
+  }
+  // The Brahms rail paradigm is audited the same way.
+  const brahmsOptions = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    chordGrouping: 'beamed-clasp-rail',
+  });
+  const brahms = layoutJankoScore(
+    buildBrahmsOp118No1Score(),
+    brahmsOptions,
+    BRAHMS_OP118_NO1_JANKO_TOKENS
+  );
+  const rails = brahms.flatMap((l) => l.claspRails);
+  assert.ok(rails.length > 0, 'the Brahms chord sequences produce rails');
+  for (const layout of brahms) {
+    const out = run(
+      (l, o) => checkClaspClearance(l, brahmsOptions, BRAHMS_TOKENS, LINT, o),
+      layout
+    );
+    assert.deepEqual(out, []);
+  }
+});
+
+test('Defect: a clasp driven into its opening barline is caught', () => {
+  const { layout, options } = claspSystem('left-clasp-spire');
+  const target = layout.clasps.find(
+    (c) => c.tick >= options.ticksPerMeasure && c.tick < 2 * options.ticksPerMeasure
+  );
+  assert.ok(target, 'm. 2 opens on a clasped dyad');
+  const barline = systemBarlines(layout, options, TOKENS).reduce(
+    (best, b) => (b.x <= target!.claspX + 1e-6 && b.x > best ? b.x : best),
+    Number.NEGATIVE_INFINITY
+  );
+  const broken: JankoSystemLayout = {
+    ...layout,
+    clasps: layout.clasps.map((c) =>
+      c.tick === target!.tick ? { ...c, claspX: barline + 1.0 } : c
+    ),
+  };
+  const out = run((l, o) => checkClaspClearance(l, options, TOKENS, LINT, o), broken);
+  const hits = out.filter((v) => v.code === 'clasp-barline-collision');
+  assert.equal(hits.length, 1, 'the bracket touches the barline');
+  assert.match(hits[0].message, /clears the barline/);
+  assert.ok((hits[0].metrics?.gap ?? 99) < TOKENS.claspMinBarlineAir);
+});
+
+test('Defect: a clasp cutting through a foreign notehead is caught', () => {
+  const { layout, options } = claspSystem('left-clasp-spire');
+  const target = layout.clasps[0];
+  const own = new Set(target.notes.map((n) => n.id));
+  const foreign = layout.notes.find(
+    (p) => !own.has(p.note.id) && p.y > target.topY && p.y < target.botY
+  );
+  assert.ok(foreign, 'a foreign head shares the bracket band');
+  const broken: JankoSystemLayout = {
+    ...layout,
+    clasps: layout.clasps.map((c) =>
+      c.tick === target.tick ? { ...c, claspX: foreign!.x - 1.0 } : c
+    ),
+  };
+  const out = run((l, o) => checkClaspClearance(l, options, TOKENS, LINT, o), broken);
+  const hits = out.filter(
+    (v) => v.code === 'clasp-collision' && v.noteIds?.includes(foreign!.note.id)
+  );
+  assert.equal(hits.length, 1, 'the bracket slices the foreign disc');
+  assert.ok((hits[0].metrics?.gap ?? 99) < LINT.minClearance);
+});
+
+test('Defect: a clasp pushed into the accolade column is caught', () => {
+  const { layout, options } = claspSystem('left-clasp-spire');
+  const target = layout.clasps[0];
+  // The accolade's column ends at `staffLeft − accoladeGap` = 43pt.
+  const broken: JankoSystemLayout = {
+    ...layout,
+    clasps: layout.clasps.map((c) => (c.tick === target.tick ? { ...c, claspX: 40.0 } : c)),
+  };
+  const out = run((l, o) => checkClaspClearance(l, options, TOKENS, LINT, o), broken);
+  assert.ok(
+    out.some((v) => v.code === 'clasp-collision' && /accolade|numeral/.test(v.message)),
+    'left-margin furniture collision reported'
+  );
+});
+
+test('Defect: a rail that crosses a barline is caught', () => {
+  const brahmsOptions = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    chordGrouping: 'beamed-clasp-rail',
+  });
+  const layouts = layoutJankoScore(
+    buildBrahmsOp118No1Score(),
+    brahmsOptions,
+    BRAHMS_OP118_NO1_JANKO_TOKENS
+  );
+  const layout = layouts.find((l) => l.claspRails.length > 0)!;
+  const rail = layout.claspRails[0];
+  const barline = systemBarlines(layout, brahmsOptions, BRAHMS_TOKENS).find(
+    (b) => b.x > rail.x2
+  )!;
+  const broken: JankoSystemLayout = { ...layout, claspRails: [{ ...rail, x2: barline.x + 2.0 }] };
+  const out = run(
+    (l, o) => checkClaspClearance(l, brahmsOptions, BRAHMS_TOKENS, LINT, o),
+    broken
+  );
+  const hits = out.filter((v) => v.code === 'clasp-rail-crossing');
+  assert.ok(hits.length >= 1, 'the rail reaches the barline');
+  // Both the RH and the LH barline segment are painted at that x.
+  assert.ok(hits.every((v) => v.metrics?.barlineX === barline.x));
 });
 
 // ---------------------------------------------------------------------------

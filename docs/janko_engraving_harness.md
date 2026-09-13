@@ -101,6 +101,9 @@ src/render/janko/
 | Channel layouts (Round 4) | `'single-equator'` `+7.5/−7.5 pt` (4 lines) · `'on-the-line'` `0/−15 pt` (4) · `'single-line-3row'` `0/±15 pt` (4) · `'bounded-channel'` `0/±13 pt` with rules at `equator ± 6.5 pt` (8) |
 | Channel boundary clearance | `6.5 − 4.8 = 1.7 pt` of clean air around every notehead disc |
 | Channel contour | `Δpitch > 0 ⇒ Δy ≤ 0`, `Δpitch < 0 ⇒ Δy ≥ 0` — never inverted |
+| Left clasp (Round 5) | `claspX = minX − r − 2.8`, `topY = minY − r`, `botY = maxY + r`, caps `2.2 × 0.85 pt` |
+| Clasp duration tip | `≥ 96 t` open pip (whole = double pip) · `48–95 t` bare 8.5 pt spire · `24–38 t` spire + one hook · `≤ 14 t` spire + two hooks |
+| Downbeat clasp air | `claspX − barlineX ≥ 4.0 pt`; the measure's left inset grows to `r + claspOffset + claspMinBarlineAir` = 11.6 pt out of its closing margin |
 
 `getEquatorYForOctave` resolves **one** coordinate per octave, identical for both
 hands: `octave >= 4` maps to `-halfGap - (octave - 4) * 30`, `octave <= 3` to
@@ -158,14 +161,66 @@ absolute octave lattice:
   `Δpitch > 0 ⇒ Δy ≤ 0` and `Δpitch < 0 ⇒ Δy ≥ 0`, with hundreds of them
   absorbed as **flat** steps on the center row.
 
+### Chord grouping (Round 5 — left clasp / bracket duration carrier)
+
+A two-row whole-tone staff spreads a chord's tones over several rows, so a
+multi-note onset used to be engraved as N independent stems that overlap into one
+long vertical line — chopped into segments by every white knockout it passes.
+`DEFAULT_JANKO_OPTIONS.chordGrouping` now selects how a vertical simultaneity is
+grouped **and** how it carries its duration:
+
+| Mode | Grouping unit | Ink |
+| --- | --- | --- |
+| `'none'` (golden) | — | per-note stems, RH up / LH down |
+| `'left-clasp-spire'` | one chord / cluster | one external bracket per cluster |
+| `'beamed-clasp-rail'` | one chord / cluster | + a measure-bounded rail joining the spire tips |
+| `'bounding-phrase'` | one measure (the phrase) | one bracket bounding every note of the measure |
+
+- **Geometry** — `computeClaspGeometry` draws the bracket outside the cluster:
+  `claspX = minX − r − claspOffset`, `topY = minY − r`, `botY = maxY + r`, and the
+  path `M (claspX + capW) topY L claspX topY L claspX botY L (claspX + capW) botY`.
+  The caps stop `r + claspOffset − capW` = 0.6 pt short of the outermost disc, so
+  a bracket can never touch a glyph it clasps.
+- **Duration carrier** — the tip carries the cluster's **shortest** member value
+  (`claspDurationClass`): an open circular pip for halves (two stacked pips for
+  wholes), a clean 8.5 pt spire for quarters, one flag hook for 8ths and two for
+  16ths (the `'bounding-phrase'` bracket carries its measure's opening value).
+- **Stem replacement** — a clasp member that is **not** part of a beam loses its
+  standalone stem; a member inside a beam keeps it, so a real 16th-note beam is
+  never cut to pieces by a grouping bracket (no "feathers").
+- **Fit rule** — an external bracket protrudes 7.6 pt to the left, which a
+  continuous 16th-note grid (columns exactly one disc apart) cannot host. A clasp
+  is engraved only where its ink stands clear of every foreign disc by
+  `CLASP_NOTEHEAD_AIR` = 1.2 pt, of its opening barline by
+  `claspMinBarlineAir` = 4.0 pt and of the left-margin furniture; everywhere else
+  the cluster keeps its traditional stems. Only actual chords are clasped — a
+  lone melodic note never is.
+- **Barline clearance & the inset budget** — a measure whose downbeat carries a
+  clasp reserves `r + claspOffset + claspMinBarlineAir` = 11.6 pt on the left, and
+  **takes it out of its closing margin**: `left + right` stays at
+  `2 × measureInset`, so the note field keeps its canonical width and every
+  downstream beat keeps its natural proportional spacing. A measure whose own
+  content cannot absorb the shift (the admission loop, `measuresWithColumnCollisions`)
+  is demoted back to the canonical margins and loses its bracket instead of
+  colliding.
+- **Rail (`'beamed-clasp-rail'`)** — `computeClaspRails` joins the spire tips of
+  the contiguous clasps of one measure: the topmost tip sets the rail, every
+  joined spire is extended up to it, flag hooks are dropped exactly as a
+  traditional beam replaces them, and a second rail carries the 16th level when
+  two or more 16th-class clasps are joined. A rail spans only its own measure's
+  spire columns, so it always terminates inside the measure; a run whose extended
+  spire or rail would touch a glyph is engraved unrailed.
+
 ### Tokens and options
 
 `JankoTokens` (`rowHeight`, `noteheadRadius`, `haloRadius`, `octaveStep`,
-`channelHalfWidth` = 6.5, `channelFlankOffset` = 13.0, `accoladeWidth`,
-`accoladeThick`, `fontFamily`, plus rhythm/spacing refinements) and
-`JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`, `interStaffGap`,
+`channelHalfWidth` = 6.5, `channelFlankOffset` = 13.0, `claspWidth` = 2.2,
+`claspStrokeWidth` = 0.85, `claspOffset` = 2.8, `claspMinBarlineAir` = 4.0,
+`accoladeWidth`, `accoladeThick`, `fontFamily`, plus rhythm/spacing refinements)
+and `JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`, `interStaffGap`,
 `middleCSpine`, `channelLayout` = `'single-equator' | 'on-the-line' |
-'single-line-3row' | 'bounded-channel'`,
+'single-line-3row' | 'bounded-channel'`, `chordGrouping` = `'none' |
+'left-clasp-spire' | 'beamed-clasp-rail' | 'bounding-phrase'`,
 `showRowGuidelines`, page/header/footer geometry) are the **only**
 places layout constants live. Every renderer accepts partial overrides and
 resolves them against `DEFAULT_JANKO_TOKENS` / `DEFAULT_JANKO_OPTIONS`.
@@ -205,6 +260,7 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 | Halo clearance | no stem pierces the Position of Honor ring (outer stroke edge included) |
 | Beam/notehead clearance | no beam connector (primary or 16th secondary) comes closer than `noteheadRadius + minStemClearance` to any notehead centre |
 | Barline clearance | heads, stems and beams keep ≥ 1 pt from every barline |
+| Clasp clearance | no clasp spine comes within `claspMinBarlineAir` = 4 pt of a barline or within 1 pt of a foreign disc, halo or the margin furniture; no rail reaches a barline |
 | Margin furniture | measure numeral and accolade stay on the page, clear of the staff and each other |
 | Middle C corridor | no structural rule or beam crosses the corridor centre line; when a spine is opted in it never cuts a glyph |
 
@@ -234,6 +290,10 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 - **No straddling beams** — `partitionBeamGroups` splits a run when a longer
   value of the same hand sits between two beamable notes, so a connector never
   crosses a notehead that is not part of its own group.
+- **Left clasps** — `computeClaspGeometry` / `renderChordClasp` /
+  `renderClaspGroup` engrave the Round 5 bracket layer beneath the noteheads; the
+  layout model carries `clasps`, `claspRails` and `claspedStems`, so the
+  renderer, the linter and the studio reason about the very same brackets.
 
 ### Two-view studio
 
@@ -256,11 +316,11 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 | `janko_m4.png` | m. 4: RH cascading run onto the shared octave-3 staff rule (zero phantom ledgers) | 4× |
 | `janko_m8.png` | m. 8: 16th-cluster horizontal-spacing stress test | 4× |
 | `janko_variants.png` | A Angled Cuts vs B Traditional Beams vs C Unified Continuous Lattice on mm. 1–4 | 2× |
-| `janko_domain_exploration.png` | Round 4 domain sheet: the four channel paradigms on mm. 1–2, stacked | 3× |
-| `janko_domain_a.png` | Candidate A · floating single equator (golden master) on mm. 1–2 | 4× |
-| `janko_domain_b.png` | Candidate B · base row anchored on the line, Set B static above | 4× |
-| `janko_domain_c.png` | Candidate C · single line, three rows (contour-resolved flanks) | 4× |
-| `janko_domain_d.png` | Candidate D · bounded center channel, 8 lines | 4× |
+| `janko_domain_exploration.png` | Round 5 domain sheet: the four chord-grouping paradigms on mm. 1–2, stacked | 3× |
+| `janko_domain_a.png` | Candidate A · traditional per-note stems (golden master) on mm. 1–2 | 4× |
+| `janko_domain_b.png` | Candidate B · independent left clasp with its duration spire | 4× |
+| `janko_domain_c.png` | Candidate C · beamed clasp rail joining the spire tips | 4× |
+| `janko_domain_d.png` | Candidate D · bounding phrase clasp, one bracket per measure | 4× |
 
 Every PNG is mirrored automatically to:
 

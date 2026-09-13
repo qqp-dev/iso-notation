@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="28.00 17.00 284.64 243.00" width="284.64pt" height="243.00pt" style="background:#FFFFFF;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="28.00 26.00 284.64 234.00" width="284.64pt" height="234.00pt" style="background:#FFFFFF;">
   <defs>
     <style>
       .janko-title { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }
@@ -13,14 +13,13 @@
       .janko-digit { font-family: "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif; text-anchor: middle; font-weight: bold; }
     </style>
   </defs>
-  <rect x="28.00" y="17.00" width="284.64" height="243.00" fill="#FFFFFF"/>
-    <text x="34.00" y="27.50" class="janko-caption" font-size="7.00pt">mm. 1–2</text>
-    <text x="34.00" y="36.50" class="janko-caption" font-size="7.00pt">The accumulated golden master: one rule per octave</text>
-    <text x="34.00" y="45.50" class="janko-caption" font-size="7.00pt">through the gap between the rows, whole-tone Set A</text>
-    <text x="34.00" y="54.50" class="janko-caption" font-size="7.00pt">floating 7.5pt below it and Set B 7.5pt above it. Every</text>
-    <text x="34.00" y="63.50" class="janko-caption" font-size="7.00pt">row-to-row step is an identical 15pt, every notehead</text>
-    <text x="34.00" y="72.50" class="janko-caption" font-size="7.00pt">keeps 2.7pt of clear air to the rule, and not one glyph</text>
-    <text x="34.00" y="81.50" class="janko-caption" font-size="7.00pt">cuts the line — the 4-line control.</text>
+  <rect x="28.00" y="26.00" width="284.64" height="234.00" fill="#FFFFFF"/>
+    <text x="34.00" y="36.50" class="janko-caption" font-size="7.00pt">mm. 1–2</text>
+    <text x="34.00" y="45.50" class="janko-caption" font-size="7.00pt">The accumulated golden master: every note owns its own</text>
+    <text x="34.00" y="54.50" class="janko-caption" font-size="7.00pt">stem, RH up and LH down, and a five-note Brahms chord</text>
+    <text x="34.00" y="63.50" class="janko-caption" font-size="7.00pt">therefore paints one long vertical line chopped into</text>
+    <text x="34.00" y="72.50" class="janko-caption" font-size="7.00pt">segments by each knockout it passes. The control the</text>
+    <text x="34.00" y="81.50" class="janko-caption" font-size="7.00pt">clasp paradigms must beat.</text>
   <g class="janko-crop-body">
   <g id="system-1">
     <text class="janko-measure-num" x="48.00" y="96.00">1</text>
