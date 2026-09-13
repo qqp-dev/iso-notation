@@ -95,83 +95,102 @@ export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
  * the Klavarskribo beat grid, round 3 the Middle C corridor, round 4 the octave
- * framing, round 5 the external left clasp and round 6 the single-note
- * subdivision dialects with the per-hand clasp. Round 7 answers the operator's
- * verdict on that round: the subdivision mark must carry **diagonal kinetic
- * direction** instead of a static perpendicular tab (tested across 8th/16th/32nd
- * tiers), a hand's clean vertical chord is unified by gap-gated Option 3
- * chording, the horizontally spread `B - 2 - 8` cluster keeps its clasp through
- * the column solver, and the whole staff hierarchy is lightened.
+ * framing, round 5 the external left clasp, round 6 the single-note subdivision
+ * dialects with the per-hand clasp, and round 7 the kinetic subdivision tabs
+ * with gap-gated vertical chording. Round 8 answers the operator's verdict on
+ * that round: the clasp's lopsided upward spire is removed and four **mirror
+ * symmetrical** duration paradigms are tested (Candidates A–D), the kinetic
+ * subdivision tab is harmonized with the score's own beam slope (~12.4°), the
+ * staff hierarchy is uniformized, the accolade lightened to 0.65pt and the page
+ * margin widened to 24pt.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 7,
-  title: 'Kinetic Subdivision Tabs, Gap-Gated Chords & Staff Hierarchy',
+  round: 8,
+  title: 'Symmetrical Clasps, Beam-Harmonized Tabs & Uniform Staff Hierarchy',
   description:
-    'Angled kinetic tabs tested across 8th/16th/32nd subdivisions, with Option 3 gap-gated chording and lightened staff hierarchy.',
+    'Resolving clasp symmetry across 4 balanced duration paradigms, with 12° beam-harmonized kinetic tabs, 0.65pt accolade, and 24pt margins.',
 };
 
 /**
- * The two display windows every Round 7 candidate is engraved on: the Bach
- * opening (single-note 16ths/8ths that carry the kinetic tabs at every
- * subdivision tier) and the dense Brahms chords of mm. 7–8, where the `B - 2 - 8`
- * clasp and the `B - 4 - 7` gap-gated vertical chord live.
+ * The two display windows every Round 8 candidate is engraved on: the Bach
+ * opening (single-note 16ths/8ths that carry the beam-harmonized kinetic tabs)
+ * and the dense Brahms chords of mm. 7–8, where the symmetrical `B - 2 - 8`
+ * clasp and the `B - 4 - 7` 3-note bracket live.
  */
-const ROUND_7_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_8_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
-    title: 'Bach Goldberg Var. 1 · mm. 1–2 — opening counterpoint + single-note 16ths/8ths',
+    title: 'Bach Goldberg Var. 1 · mm. 1–2 — opening counterpoint + 12° beam-harmonized kinetic tabs',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 7,
     measureCount: 2,
     title:
-      'Brahms Op. 118 No. 1 · mm. 7–8 — B - 2 - 8 clasp + B - 4 - 7 Option 3 chording (macro crop)',
+      'Brahms Op. 118 No. 1 · mm. 7–8 — symmetrical B - 2 - 8 clasp + B - 4 - 7 3-note bracket (macro crop)',
   },
 ];
 
 /**
- * The active candidate set — the four Round 7 subdivision dialects. Order is
- * the display order in the Decision Candidates Matrix.
+ * The active candidate set — the four Round 8 symmetrical clasp-duration
+ * paradigms. Order is the display order in the Decision Candidates Matrix. All
+ * four share the settled beam-harmonized kinetic tab (`'kinetic-tab-beam'`), so
+ * the round varies exactly one variable: how the bracket carries its duration.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'kinetic-tab-30',
-    label: 'A · 30° Kinetic Architectural Tab',
+    id: 'center-ticks',
+    label: 'A · Balanced Center-Spine Ticks',
     description:
-      'The Round 6 perpendicular tab raked 30° off horizontal so it leads the eye along the stem’s own motion. Drawn as a 1.1pt monoline of exactly `flagWidth` reach: the calmest of the three kinetic concepts, and the one that stacks most cleanly at 2 and 3 marks.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'kinetic-tab-30' },
-    windows: ROUND_7_WINDOWS,
-    tags: ['kinetic', '30° rake', '1.1pt monoline'],
+      'The bracket stays a pure mirror-symmetrical `[` and carries its duration at the spine’s exact vertical midpoint: one notch for an 8th, two for a 16th, an open pip for a half. The calmest reading — the cluster’s value sits in the middle of its own span, exactly where the eye already rests.',
+    options: {
+      chordGrouping: 'per-hand-clasp',
+      claspDurationStyle: 'center-ticks',
+      subdivisionStyle: 'kinetic-tab-beam',
+    },
+    windows: ROUND_8_WINDOWS,
+    tags: ['symmetrical', 'center ticks', 'pips'],
   },
   {
-    id: 'kinetic-tab-45',
-    label: 'B · 45° Dynamic Chevron Tab',
+    id: 'cap-cuts',
+    label: 'B · Stacked Horizontal Cap Cuts',
     description:
-      'The same tab raked to the design system’s 45° French Guillemet angle, so the subdivision ink speaks the same directional language as the handedness chevrons. The boldest kinetic concept: maximum diagonal drive at the stem tip.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'kinetic-tab-45' },
-    windows: ROUND_7_WINDOWS,
-    tags: ['kinetic', '45° chevron', '1.1pt monoline'],
+      'Duration is tallied by parallel horizontal bars stacked inward from both caps — 1 bar for a quarter, 2 for an 8th (═), 3 for a 16th (≡) — so the value reads as a symmetric ladder growing inward from either end of the bracket. The most architectural of the four concepts.',
+    options: {
+      chordGrouping: 'per-hand-clasp',
+      claspDurationStyle: 'cap-cuts',
+      subdivisionStyle: 'kinetic-tab-beam',
+    },
+    windows: ROUND_8_WINDOWS,
+    tags: ['symmetrical', 'cap cuts', '═ / ≡'],
   },
   {
-    id: 'kinetic-tab-tapered',
-    label: 'C · Tapered Kinetic Wing Tab',
+    id: 'framing-only',
+    label: 'C · Pure Symmetrical Framing Bracket',
     description:
-      'The 30° rake drawn as a filled quad with an optical taper perpendicular to its own axis — a 1.4pt root at the stem narrowing to a 0.8pt tip. The kinetic direction of A with the calligraphic body weighting of the urtext flag.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'kinetic-tab-tapered' },
-    windows: ROUND_7_WINDOWS,
-    tags: ['kinetic', '30° rake', '1.4pt → 0.8pt taper'],
+      'The bracket is reduced to its pure function — framing the cluster — with zero duration ink of its own. Duration stays on the outermost notehead’s own stem mark or hold line, so the sonority is grouped without a second duration statement. The most austere, least redundant answer.',
+    options: {
+      chordGrouping: 'per-hand-clasp',
+      claspDurationStyle: 'framing-only',
+      subdivisionStyle: 'kinetic-tab-beam',
+    },
+    windows: ROUND_8_WINDOWS,
+    tags: ['symmetrical', 'zero duration ink', 'austere'],
   },
   {
-    id: 'classical-urtext',
-    label: 'D · Balanced Numeral-Urtext Flag',
+    id: 'bilateral-fins',
+    label: 'D · Bilateral Cap Fins',
     description:
-      'The refined classical control: a tapered burin hook whose sweep mirrors exactly when it flips onto a lower stem, so the flag keeps its numeral-balanced mass in either hand. The traditional Henle / Bärenreiter answer every kinetic tab must beat.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'classical-urtext' },
-    windows: ROUND_7_WINDOWS,
-    tags: ['classical', 'urtext', 'balanced flip'],
+      'Each cap grows a kinetic fin raked at the score’s own 12.4° beam slope, mirrored top and bottom: one fin per duration level (1 = quarter, 2 = 8th, 3 = 16th). The only paradigm that speaks the beam-harmonized kinetic language of the settled subdivision tab.',
+    options: {
+      chordGrouping: 'per-hand-clasp',
+      claspDurationStyle: 'bilateral-fins',
+      subdivisionStyle: 'kinetic-tab-beam',
+    },
+    windows: ROUND_8_WINDOWS,
+    tags: ['symmetrical', '12.4° fins', 'kinetic'],
   },
 ];
 

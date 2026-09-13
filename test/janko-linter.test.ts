@@ -691,10 +691,12 @@ test('Defect: a clasp cutting through a foreign notehead is caught', () => {
 test('Defect: a clasp pushed into the accolade column is caught', () => {
   const { layout, options } = claspSystem('left-clasp-spire');
   const target = layout.clasps[0];
-  // The accolade's column ends at `staffLeft − accoladeGap` = 43pt.
+  // The accolade's column ends at `staffLeft − accoladeGap` (Round 8 widens the
+  // page margin to 24pt, so the accolade sits just left of the staff edge).
+  const accoladeX1 = layout.geometry.staffLeft - TOKENS.accoladeGap;
   const broken: JankoSystemLayout = {
     ...layout,
-    clasps: layout.clasps.map((c) => (c.tick === target.tick ? { ...c, claspX: 40.0 } : c)),
+    clasps: layout.clasps.map((c) => (c.tick === target.tick ? { ...c, claspX: accoladeX1 - 2 } : c)),
   };
   const out = run((l, o) => checkClaspClearance(l, options, TOKENS, LINT, o), broken);
   assert.ok(
