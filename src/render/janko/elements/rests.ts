@@ -1,28 +1,28 @@
 /**
  * Rest symbols — the Round 12 question (how a hand's **silent span inside an
  * active measure** is written), carried into Round 13 by the four high-fidelity
- * finalists and the voice-contour anchor.
+ * finalists and the voice-contour anchor, and re-seated by Round 16 on the
+ * **rule-hang**: the rest hangs from the nearest staff rule to its voice and
+ * extends toward the Middle C corridor (see the engine's `computeJankoRests`).
  *
- * A rest is anchored on the **voice contour** of its own hand: the melodic
- * register of the notes that surround the silence (see the engine's
- * `computeJankoRests`), at the exact beat column of the silence's onset, so the
- * eye reads the gap inside the same proportional grid and the same register
- * band as the notes around it. Every dialect states the same four duration
- * classes, and every dialect is a *monoline* grammar: no heavy beads, no filled
- * picture-glyphs beyond the half/whole mark.
+ * Round 16 also scales the ink to 57.5% linear of Round 15 — smaller ink on
+ * standard-like proportions (not head-sized), with every dialect's shape
+ * language preserved exactly (every constant below is its Round 15 value times
+ * {@link REST_LINEAR_SCALE}).
  *
  * | style                | 16th                    | 8th                   | quarter                  | half / whole               |
  * | -------------------- | ----------------------- | --------------------- | ------------------------ | -------------------------- |
- * | `'kinetic-monoline'` | stem + two 12.4° tabs   | stem + one 12.4° tab  | central horizontal notch | hollow bar (W 7 × H 2.2pt) |
- * | `'classical-urtext'` | two calligraphic hooks  | one calligraphic hook | serpentine lightning     | solid block (W 6 × H 2.5pt)|
- * | `'geometric-node'`   | hollow diamond + 2 rays | hollow diamond + 1 ray| solid diamond (5 × 5pt)  | open capsule / lozenge     |
+ * | `'kinetic-monoline'` | stem + two 12.4° tabs   | stem + one 12.4° tab  | central horizontal notch | hollow bar (W 4.0 × H 1.3pt) |
+ * | `'classical-urtext'` | two calligraphic hooks  | one calligraphic hook | serpentine lightning     | solid block (W 3.5 × H 1.4pt)|
+ * | `'geometric-node'`   | hollow diamond + 2 rays | hollow diamond + 1 ray| solid diamond (2.9 × 2.9pt)| open capsule / lozenge     |
  * | `'bauhaus-slash'`    | 45° slash + two wings   | 45° slash + one wing  | minimalist reversed-Z    | thin hairline box          |
  * | `'phantom-notehead'` | dashed head + stem + two downward hooks | dashed head + stem + one hook | dashed head + bare stem | dashed head + hollow bar |
  *
  * The engine's `computeJankoRests` decides *where* a rest belongs (a clean
  * standard-value silence of one hand in a measure that hand is active in),
- * anchors it on the voice contour and drops any rest whose {@link restInkBox}
- * would collide with foreign ink; this module only paints what it is handed.
+ * hangs it from its rule and nudges it along the rule inside its beat cell; a
+ * rest with no clear slot is a named unwritten diagnostic, never a silent
+ * overlap. This module only paints what it is handed.
  */
 
 import { Hand } from '../../../model/types';
@@ -40,55 +40,73 @@ export const JANKO_REST_VALUES: readonly JankoRestValue[] = [
   'half',
 ];
 
+/**
+ * Round 16 linear rest-ink scale: every rest constant is its Round 15 value
+ * times this factor, so each dialect keeps its exact shape language at ~55–60%
+ * linear size (smaller ink on standard-like proportions, not head-sized).
+ */
+export const REST_LINEAR_SCALE = 0.575;
+
 /** Vertical rest-stem height (pt) of the kinetic monoline dialect. */
-export const REST_STEM_HEIGHT = 12.0;
+export const REST_STEM_HEIGHT = 12.0 * REST_LINEAR_SCALE;
 /** Stroke (pt) of every monoline rest element. */
-export const REST_STROKE = 0.90;
+export const REST_STROKE = 0.9 * REST_LINEAR_SCALE;
 /** Horizontal reach (pt) of a kinetic tab right of its stem. */
-export const REST_TAB_WIDTH = 4.0;
+export const REST_TAB_WIDTH = 4.0 * REST_LINEAR_SCALE;
 /** Half-width (pt) of the quarter rest's central notch. */
-export const REST_NOTCH_HALF = 2.2;
+export const REST_NOTCH_HALF = 2.2 * REST_LINEAR_SCALE;
 /** Hollow half/whole bar of the kinetic dialect: `W × H` in pt. */
-export const REST_BAR_WIDTH = 7.0;
-export const REST_BAR_HEIGHT = 2.2;
+export const REST_BAR_WIDTH = 7.0 * REST_LINEAR_SCALE;
+export const REST_BAR_HEIGHT = 2.2 * REST_LINEAR_SCALE;
 /** Solid half/whole block of the urtext dialect: `W × H` in pt. */
-export const REST_BLOCK_WIDTH = 6.0;
-export const REST_BLOCK_HEIGHT = 2.5;
+export const REST_BLOCK_WIDTH = 6.0 * REST_LINEAR_SCALE;
+export const REST_BLOCK_HEIGHT = 2.5 * REST_LINEAR_SCALE;
 /** Half-diagonal (pt) of the geometric node diamonds. */
-export const REST_NODE_HOLLOW_HALF = 2.0;
-export const REST_NODE_SOLID_HALF = 2.5;
+export const REST_NODE_HOLLOW_HALF = 2.0 * REST_LINEAR_SCALE;
+export const REST_NODE_SOLID_HALF = 2.5 * REST_LINEAR_SCALE;
 /** Horizontal reach (pt) of a geometric node's lateral tick ray. */
-export const REST_RAY_REACH = 4.2;
+export const REST_RAY_REACH = 4.2 * REST_LINEAR_SCALE;
+/** Air (pt) between a hollow node and its lateral tick ray. */
+export const REST_RAY_GAP = 0.4 * REST_LINEAR_SCALE;
 /** Half-extent (pt) of the bauhaus slash and its parallel wings. */
-export const REST_SLASH_HALF = 3.5;
-export const REST_WING_OFFSET = 2.2;
+export const REST_SLASH_HALF = 3.5 * REST_LINEAR_SCALE;
+export const REST_WING_OFFSET = 2.2 * REST_LINEAR_SCALE;
 /** Half-height (pt) of the bauhaus quarter reversed-Z. */
-export const REST_Z_HALF = 3.4;
+export const REST_Z_HALF = 3.4 * REST_LINEAR_SCALE;
+/** Half-height (pt) of the bauhaus half hairline box. */
+export const REST_BOX_HALF = 1.5 * REST_LINEAR_SCALE;
+/** Stroke (pt) of the bauhaus half hairline box. */
+export const REST_BOX_STROKE = 0.6 * REST_LINEAR_SCALE;
 /**
  * Round 13 phantom-notehead dialect: radius (pt) of the dashed open head that
  * stands where the unvoiced notehead would have been.
  */
-export const REST_PHANTOM_HEAD_RADIUS = 3.0;
+export const REST_PHANTOM_HEAD_RADIUS = 3.0 * REST_LINEAR_SCALE;
 /** Stroke (pt) of the phantom head's dashed outline and of its bare stem. */
-export const REST_PHANTOM_HEAD_STROKE = 0.80;
+export const REST_PHANTOM_HEAD_STROKE = 0.8 * REST_LINEAR_SCALE;
 /** Dash pattern (pt) of the phantom head — an open, unwritten notehead. */
-export const REST_PHANTOM_DASH = '1.8,1.5';
+export const REST_PHANTOM_DASH = `${(1.8 * REST_LINEAR_SCALE).toFixed(2)},${(1.5 * REST_LINEAR_SCALE).toFixed(2)}`;
 /** Horizontal reach (pt) of a phantom flag hook, right of its stem. */
-export const REST_PHANTOM_FLAG_REACH = 4.2;
+export const REST_PHANTOM_FLAG_REACH = 4.2 * REST_LINEAR_SCALE;
 /** Drop (pt) of a phantom flag hook below the stem point it leaves. */
-export const REST_PHANTOM_FLAG_DROP = 2.4;
+export const REST_PHANTOM_FLAG_DROP = 2.4 * REST_LINEAR_SCALE;
 /** Hollow half/whole bar of the phantom dialect: `W × H` in pt. */
-export const REST_PHANTOM_BAR_WIDTH = 7.0;
-export const REST_PHANTOM_BAR_HEIGHT = 2.4;
+export const REST_PHANTOM_BAR_WIDTH = 7.0 * REST_LINEAR_SCALE;
+export const REST_PHANTOM_BAR_HEIGHT = 2.4 * REST_LINEAR_SCALE;
 /**
  * Round 13 classical urtext: the calligraphic hook geometry. The stem is a
  * slightly slanted rule; every hook leaves it at the top and sweeps left into a
  * solid teardrop bulb.
  */
-export const REST_URTEXT_STEM_SLANT = 1.6;
-export const REST_URTEXT_HOOK_REACH = 4.4;
-export const REST_URTEXT_HOOK_DROP = 2.6;
-export const REST_URTEXT_BULB_RADIUS = 0.7;
+export const REST_URTEXT_STEM_SLANT = 1.6 * REST_LINEAR_SCALE;
+export const REST_URTEXT_STEM_FOOT = 0.6 * REST_LINEAR_SCALE;
+export const REST_URTEXT_HOOK_REACH = 4.4 * REST_LINEAR_SCALE;
+export const REST_URTEXT_HOOK_DROP = 2.6 * REST_LINEAR_SCALE;
+export const REST_URTEXT_BULB_RADIUS = 0.7 * REST_LINEAR_SCALE;
+/** Half-extents (pt) of the urtext quarter serpentine around the rest centre. */
+export const REST_URTEXT_LIGHTNING_HALF_WIDTH = 2.6 * REST_LINEAR_SCALE;
+export const REST_URTEXT_LIGHTNING_TOP = 5.4 * REST_LINEAR_SCALE;
+export const REST_URTEXT_LIGHTNING_BOTTOM = 5.8 * REST_LINEAR_SCALE;
 
 /** One resolved rest: where it stands, how long it is silent and in which dialect. */
 export interface JankoRestGeometry {
@@ -98,9 +116,9 @@ export interface JankoRestGeometry {
   durationTicks: number;
   /** Hand whose voice is silent. */
   hand: Hand;
-  /** Beat column of the rest (page pt). */
+  /** Beat column of the rest (page pt), possibly nudged along its rule. */
   x: number;
-  /** Voice equator of the rest's hand (page pt). */
+  /** Glyph centre (page pt): hung from the nearest staff rule toward Middle C. */
   y: number;
   /** Duration class painted. */
   value: JankoRestValue;
@@ -189,7 +207,7 @@ function renderKineticMonoline(rest: JankoRestGeometry, t: ResolvedJankoTokens):
  */
 function urtextStem(x: number, y: number, stroke: string): string {
   const top = y - REST_STEM_HEIGHT / 2;
-  const bot = y + REST_STEM_HEIGHT / 2 - 0.6;
+  const bot = y + REST_STEM_HEIGHT / 2 - REST_URTEXT_STEM_FOOT;
   const d =
     `M ${f(x + REST_URTEXT_STEM_SLANT * 0.5)} ${f(top)} ` +
     `L ${f(x - REST_URTEXT_STEM_SLANT * 0.5)} ${f(bot)}`;
@@ -231,13 +249,15 @@ function renderClassicalUrtext(rest: JankoRestGeometry, t: ResolvedJankoTokens):
 
   if (value === 'quarter') {
     // The serpentine `𝄽`: an upper arm sweeping down-right, a return stroke, a
-    // second arm and the long calligraphic tail curling down-left.
+    // second arm and the long calligraphic tail curling down-left — the Round 13
+    // gesture at the Round 16 linear scale.
+    const s = REST_LINEAR_SCALE;
     const d =
-      `M ${f(x - 2.1)} ${f(y - 4.8)} ` +
-      `C ${f(x - 0.6)} ${f(y - 4.4)} ${f(x + 1.2)} ${f(y - 3.6)} ${f(x + 2.1)} ${f(y - 2.6)} ` +
-      `C ${f(x + 0.6)} ${f(y - 1.9)} ${f(x - 1.5)} ${f(y - 1.2)} ${f(x - 2.1)} ${f(y - 0.4)} ` +
-      `C ${f(x - 0.5)} ${f(y + 0.3)} ${f(x + 1.1)} ${f(y + 1.1)} ${f(x + 1.9)} ${f(y + 2.1)} ` +
-      `C ${f(x + 0.4)} ${f(y + 3.3)} ${f(x - 1.4)} ${f(y + 4.4)} ${f(x - 2.5)} ${f(y + 5.2)}`;
+      `M ${f(x - 2.1 * s)} ${f(y - 4.8 * s)} ` +
+      `C ${f(x - 0.6 * s)} ${f(y - 4.4 * s)} ${f(x + 1.2 * s)} ${f(y - 3.6 * s)} ${f(x + 2.1 * s)} ${f(y - 2.6 * s)} ` +
+      `C ${f(x + 0.6 * s)} ${f(y - 1.9 * s)} ${f(x - 1.5 * s)} ${f(y - 1.2 * s)} ${f(x - 2.1 * s)} ${f(y - 0.4 * s)} ` +
+      `C ${f(x - 0.5 * s)} ${f(y + 0.3 * s)} ${f(x + 1.1 * s)} ${f(y + 1.1 * s)} ${f(x + 1.9 * s)} ${f(y + 2.1 * s)} ` +
+      `C ${f(x + 0.4 * s)} ${f(y + 3.3 * s)} ${f(x - 1.4 * s)} ${f(y + 4.4 * s)} ${f(x - 2.5 * s)} ${f(y + 5.2 * s)}`;
     out.push(
       `    <path class="janko-rest-lightning" d="${d}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`
     );
@@ -304,7 +324,7 @@ function hollowDiamond(x: number, y: number, stroke: string): string {
 
 /** One lateral tick ray of a pause node. */
 function nodeRay(x: number, y: number, side: -1 | 1, stroke: string): string {
-  return `    <line class="janko-rest-ray" x1="${f(x + side * (REST_NODE_HOLLOW_HALF + 0.4))}" y1="${f(y)}" x2="${f(x + side * REST_RAY_REACH)}" y2="${f(y)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`;
+  return `    <line class="janko-rest-ray" x1="${f(x + side * (REST_NODE_HOLLOW_HALF + REST_RAY_GAP))}" y1="${f(y)}" x2="${f(x + side * REST_RAY_REACH)}" y2="${f(y)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`;
 }
 
 /** The geometric node ink: hollow/solid diamonds, rays, open capsule. */
@@ -354,7 +374,7 @@ function renderBauhausSlash(rest: JankoRestGeometry): string[] {
 
   if (value === 'half') {
     out.push(
-      `    <rect class="janko-rest-box" x="${f(x - REST_BAR_WIDTH / 2)}" y="${f(y - 1.5)}" width="${f(REST_BAR_WIDTH)}" height="3" fill="none" stroke="#111111" stroke-width="0.60"/>`
+      `    <rect class="janko-rest-box" x="${f(x - REST_BAR_WIDTH / 2)}" y="${f(y - REST_BOX_HALF)}" width="${f(REST_BAR_WIDTH)}" height="${f(2 * REST_BOX_HALF)}" fill="none" stroke="#111111" stroke-width="${REST_BOX_STROKE.toFixed(2)}"/>`
     );
     return out;
   }
@@ -465,7 +485,14 @@ export function restInkBox(
         y
       );
     }
-    if (value === 'quarter') return box(x - 2.6, y - 5.4, x + 2.6, y + 5.8);
+    if (value === 'quarter') {
+      return box(
+        x - REST_URTEXT_LIGHTNING_HALF_WIDTH,
+        y - REST_URTEXT_LIGHTNING_TOP,
+        x + REST_URTEXT_LIGHTNING_HALF_WIDTH,
+        y + REST_URTEXT_LIGHTNING_BOTTOM
+      );
+    }
     const hooks = value === 'sixteenth' ? 2 : 1;
     const top = y - REST_STEM_HEIGHT / 2;
     const bulbBottom =
@@ -514,7 +541,7 @@ export function restInkBox(
 
   // bauhaus-slash
   if (value === 'half') {
-    return box(x - REST_BAR_WIDTH / 2, y - 1.5, x + REST_BAR_WIDTH / 2, y + 1.5);
+    return box(x - REST_BAR_WIDTH / 2, y - REST_BOX_HALF, x + REST_BAR_WIDTH / 2, y + REST_BOX_HALF);
   }
   if (value === 'quarter') {
     return box(x - REST_Z_HALF * 0.82, y - REST_Z_HALF, x + REST_Z_HALF * 0.82, y + REST_Z_HALF);

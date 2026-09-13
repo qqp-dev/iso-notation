@@ -32,22 +32,20 @@ import {
   PositionedJankoNote,
   computeCropExtents,
   computePageGeometry,
-  CROWDED_MICRO_AIR,
-  getChordalOffset,
   layoutJankoScore,
   renderJankoCrop,
 } from '../src/render/janko/engine';
+import { getClusterSpacingPreset } from '../src/render/janko/types';
 import { getPitchCoordinate } from '../src/render/janko/geometry';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const OPTIONS = BRAHMS_OP118_NO1_JANKO_OPTIONS;
 const TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
 const R = BRAHMS_OP118_NO1_JANKO_TOKENS.noteheadRadius!;
-const DELTA = getChordalOffset(TOKENS);
-/** Round 15 golden flank: the minimal asymmetric `2r + 0.4pt` (one head on the column). */
-const MICRO = 2 * R + CROWDED_MICRO_AIR;
-/** Round 15 control options: the Round 14 symmetric spread, kept as baseline. */
-const SYMMETRIC_OPTIONS = { ...OPTIONS, crowdedColumn: 'symmetric-spread' as const };
+/** Round 16 golden fan step: the judged `'balanced'` pair gap, 2·3.6 + 1.0 = 8.2pt. */
+const PAIR_GAP = getClusterSpacingPreset(OPTIONS.clusterSpacing).pairGap;
+/** The horizontal mask radius the fan step clears: two masks plus air. */
+const MASK_RX = getClusterSpacingPreset(OPTIONS.clusterSpacing).rx;
 /** The linter's minimum air between a notehead and a barline. */
 const MIN_BARLINE_AIR = 1.0;
 
@@ -200,56 +198,33 @@ test('Every same-row chord tone keeps its true whole-tone row', () => {
   }
 });
 
-test('Row collisions are spread by the minimal asymmetric flank (Round 15 golden)', () => {
+test('Row collisions are fanned at the judged pair gap (Round 16 golden)', () => {
   const groups = sameRowGroups();
   assert.ok(groups.size >= 10, `the Brahms chords collide on many rows (${groups.size})`);
   for (const [key, group] of groups) {
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
     const k = group.length;
-    // Round 15 golden: consecutive heads are exactly one minimal flank
-    // (`2r + 0.4pt` = 10.0pt) apart — never the Round 14 symmetric 11.0pt — and
-    // one head of every pair keeps its nominal column.
+    // Round 16 golden: consecutive heads step exactly one judged pair gap
+    // (8.2pt), and the anchored head of every cluster keeps its onset column —
+    // the column a different-row head of the same onset still occupies.
     for (let i = 1; i < k; i++) {
       assert.ok(
-        Math.abs(xs[i] - xs[i - 1] - MICRO) < 1e-9,
-        `${key}: heads keep Δx = ${MICRO}pt (got ${(xs[i] - xs[i - 1]).toFixed(3)})`
+        Math.abs(xs[i] - xs[i - 1] - PAIR_GAP) < 1e-9,
+        `${key}: heads keep Δx = ${PAIR_GAP}pt (got ${(xs[i] - xs[i - 1]).toFixed(3)})`
       );
-      assert.ok(xs[i] - xs[i - 1] >= 2 * R, `${key}: one full disc of air`);
+      assert.ok(
+        xs[i] - xs[i - 1] >= 2 * MASK_RX - 1e-9,
+        `${key}: two elliptical masks clear with air to spare`
+      );
     }
-    assert.ok(MICRO < DELTA, 'the golden flank discloses less than the Round 14 control');
     for (const p of group) {
       assert.equal(p.coord.rank, group[0].coord.rank, `${key}: one shared row`);
       assert.equal(p.coord.octave, group[0].coord.octave, `${key}: one shared octave`);
     }
   }
-  // The control policy still states the Round 14 symmetric arithmetic: the
-  // cluster straddles its column at ∓Δx/2.
-  const control = layoutJankoScore(SCORE, SYMMETRIC_OPTIONS, TOKENS);
-  const controlGroups = new Map<string, typeof control[number]['notes']>();
-  for (const layout of control) {
-    for (const p of layout.notes) {
-      const key = `${p.note.startTick}|${(p.y + 0).toFixed(3)}`;
-      const bucket = controlGroups.get(key);
-      if (bucket) bucket.push(p);
-      else controlGroups.set(key, [p]);
-    }
-  }
-  let checked = 0;
-  for (const [key, group] of controlGroups) {
-    if (group.length < 2) continue;
-    checked++;
-    const xs = group.map((p) => p.x).sort((a, b) => a - b);
-    const k = group.length;
-    for (let i = 1; i < k; i++) {
-      assert.ok(Math.abs(xs[i] - xs[i - 1] - DELTA) < 1e-9, `${key}: control keeps Δx = ${DELTA}pt`);
-    }
-    const centre = (xs[0] + xs[k - 1]) / 2;
-    assert.ok(Math.abs(xs[0] - centre + ((k - 1) * DELTA) / 2) < 1e-9, `${key}: centred control`);
-  }
-  assert.ok(checked > 0, 'the control still engraves the collisions');
 });
 
-test('mm. 8–9 stack three heads on one row and spread the triplet −Δ, 0, +Δ', () => {
+test('mm. 8–9 stack three heads on one row and fan the triplet at the judged pair gap', () => {
   const groups = sameRowGroups();
   const inMm89 = (tick: number): boolean => tick >= at(8, 0) && tick < at(10, 0);
   const triplets = [...groups.entries()].filter(
@@ -259,11 +234,18 @@ test('mm. 8–9 stack three heads on one row and spread the triplet −Δ, 0, +�
   for (const [key, group] of triplets) {
     assert.ok(key.startsWith(`${at(8, 0)}|`) || key.startsWith(`${at(9, 0)}|`), `triplet (${key})`);
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
-    // Round 15 golden: a three-note row cluster still fans symmetrically about
-    // its middle head — at the minimal 10.0pt flank, not the control's 11.0pt.
-    assert.ok(Math.abs(xs[1] - xs[0] - MICRO) < 1e-9, 'left head sits one flank below the middle');
-    assert.ok(Math.abs(xs[2] - xs[1] - MICRO) < 1e-9, 'right head sits one flank above the middle');
-    assert.equal(xs[1], group.find((p) => p.coord.pitchClass === 7)!.x, 'the middle head keeps the column');
+    // Round 16 golden: the single-hand triplet fans symmetrically about its
+    // middle head at the judged 8.2pt step, and the middle head shares the
+    // onset column with a different-row head of the same onset.
+    assert.ok(Math.abs(xs[1] - xs[0] - PAIR_GAP) < 1e-9, 'left head sits one gap below the middle');
+    assert.ok(Math.abs(xs[2] - xs[1] - PAIR_GAP) < 1e-9, 'right head sits one gap above the middle');
+    const middle = group.find((p) => p.coord.pitchClass === 7)!;
+    assert.equal(xs[1], middle.x, 'the middle head anchors the fan');
+    const tick = middle.note.startTick;
+    const fellowTraveller = allNotes().some(
+      (p) => p.note.startTick === tick && p.y !== middle.y && Math.abs(p.x - middle.x) < 1e-9
+    );
+    assert.ok(fellowTraveller, 'the anchored head shares its column with the onset');
     assert.deepEqual(
       group.map((p) => p.coord.pitchClass).sort((a, b) => a - b),
       [5, 7, 11],
@@ -334,16 +316,16 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   for (let i = 0; i < notes.length; i++) {
     for (let j = i + 1; j < notes.length; j++) {
       if (pageOf.get(notes[i].note.id) !== pageOf.get(notes[j].note.id)) continue;
-      if (notes[i].note.startTick === notes[j].note.startTick && notes[i].y === notes[j].y) {
-        // Same onset, same row: only legal when the row-snapped pair is spread.
-        if (Math.abs(notes[i].x - notes[j].x) < 2 * R - 1e-6) collisions++;
-      }
-      if (Math.hypot(notes[i].x - notes[j].x, notes[i].y - notes[j].y) < 2 * R - 1e-6) {
-        collisions++;
-      }
+      // Round 16: the knockout is an ellipse (tight `rx`, generous `ry`), so
+      // two masks overlap only when their normalized distance drops below 2 —
+      // a same-row pair at the 8.2pt judged gap clears where two 4.8pt discs
+      // would not.
+      const dx = (notes[i].x - notes[j].x) / MASK_RX;
+      const dy = (notes[i].y - notes[j].y) / R;
+      if (Math.hypot(dx, dy) < 2 - 1e-6) collisions++;
     }
   }
-  assert.equal(collisions, 0, 'no two notehead discs overlap anywhere in the score');
+  assert.equal(collisions, 0, 'no two elliptical notehead masks overlap anywhere in the score');
 });
 
 test('Brahms Op. 118 No. 1 lints completely clean', () => {

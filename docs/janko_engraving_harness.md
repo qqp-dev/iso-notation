@@ -32,7 +32,7 @@ Implementers verify the same engraving **without rendering anything**:
 
 ```bash
 npm run lint:engraving            # ~60 ms, JSON/strict/quiet flags available
-npm test                          # 188 tests, < 4 s, includes the linter + candidate/studio suites
+npm test                          # 261 tests, < 4 s, includes the linter + candidate/studio suites
 ```
 
 ---
@@ -256,8 +256,8 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 
 | Check | Invariant |
 | --- | --- |
-| Notehead clearance | discs never overlap (true centre distance, so near rows are measured as circles); chordal heads that share a row are **spread horizontally** by the row-snapped parity offset, and only a spread narrower than `2r` is warned |
-| Knockout coverage | the 5.8 pt digit's ink box fits the `r = 4.8 pt` mask with ≥ 1.2 pt of white on **every** side (top, bottom, left, right, corner) |
+| Notehead clearance | elliptical masks never overlap (normalized `(dx/rx, dy/ry)` distance); same-row clusters fan at the preset `pairGap = 2rx + air` about an anchored head inside hard beat-cell barriers |
+| Knockout coverage | the 5.8 pt digit's ink box stays fully inside the elliptical mask (`rx` per preset, `ry` = 4.8 pt) — pinned for all 12 glyphs |
 | Knockout paint order | every digit owns a mask, every mask owns a digit, and nothing painted later may cut through it |
 | Stem & beam validity | stems sit on the notehead centreline (`stemX === note.x`), attach **flush on the outside** of their glyph circle (`r + 0.2` / `haloR + 0.4`), land exactly on the beam centerline, slope ≤ 0.25 |
 | Stem/digit clearance | no stem comes within 1.2 pt of its own digit glyph box |
@@ -298,6 +298,34 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   `renderClaspGroup` engrave the Round 5 bracket layer beneath the noteheads; the
   layout model carries `clasps`, `claspRails` and `claspedStems`, so the
   renderer, the linter and the studio reason about the very same brackets.
+
+### Round 16 cluster doctrine
+
+- **Shared stems** — one onset + one duration + one hand shares a single stem
+  object, carried by the member nearest the nominal column (extremity/id
+  tie-breaks); mixed-duration stacks coincide on one visible line with each
+  voice's beam/flag at its own end. The stagger is deleted with
+  `crowdedColumn`; the linter's `split-stack-stems` violation guards against
+  its silent return. A clasped carrier keeps its stem — the one stem the
+  bracket does not replace. Coincident beams need no dedupe pass:
+  `partitionBeamGroups` excludes every same-hand simultaneity from all runs,
+  so two beam groups can never share an identical span (pinned by test).
+- **Anisotropic knockout + spacing presets** — the mask is an ellipse: tight
+  `rx` per the `clusterSpacing` preset (compact 3.2 / balanced 3.6 / airy 4.0),
+  generous `ry` = 4.8 fixed, digits 5.8 pt. Same-row clusters fan at
+  `pairGap = 2rx + air` (7.2 / 8.2 golden / 9.2) about an anchored head (the RH
+  head when mixed-hand, else the middle), inside beat-cell barriers that also
+  keep the linter's barline floor; tick-0 clusters widen to the halo step.
+  Clearance is axis-aware: same-row checks use `2rx + air`, stems still attach
+  flush at `ry` on the centreline.
+- **Dots** — always right of the head, always in the inter-row gap above (the
+  canonical lane half a row up, nudged off painted rules), tight to the
+  elliptical mask (`rx + gap`).
+- **Rests** — ink scaled to 57.5 % linear (`REST_LINEAR_SCALE`), hung from the
+  nearest staff rule with the glyph extending toward the Middle C corridor;
+  collisions nudge along the rule inside the beat cell, else a named
+  `rest-unwritable` diagnostic. Rest ink is identical across spacing presets
+  (the spacing question cannot move rest shapes).
 
 ### Two-view studio
 
@@ -342,9 +370,10 @@ fallback.
 ## 4. Verification
 
 ```bash
-npm test                          # 166 tests, < 4 s
+npm test                          # 261 tests, < 4 s
 npm run lint:engraving            # visual lint of the golden master
-npm run janko:export              # refresh the mobile-app PNG artifacts
+npm run janko:export              # refresh the mobile-app PNG artifacts (operator on main only:
+                                  # it mirrors into every checkout, never run it in a ticket worktree)
 npm run build                     # tsc + vite (index.html + janko.html entries)
 ```
 

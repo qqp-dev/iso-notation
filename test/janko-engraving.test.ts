@@ -31,6 +31,7 @@ import {
   JANKO_SUBDIVISION_STYLES,
   JANKO_SYSTEM_START_STYLES,
   JankoRestStyle,
+  getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -52,7 +53,6 @@ import {
   computePageGeometry,
   countJankoPages,
   countJankoSystems,
-  getChordalOffset,
   getSystemGeometry,
   getMarginFurniture,
   layoutJankoScore,
@@ -60,13 +60,11 @@ import {
   renderJankoPage,
   renderJankoVariantComparison,
   renderSystem,
-  resolveRestY,
   restClearsLayout,
   REST_FIT_MARGIN,
-  REST_POCKET_AIR,
+  REST_SEAT_AIR,
 } from '../src/render/janko/engine';
 import {
-  JANKO_STEM_STAGGER,
   JankoRhythmNote,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
@@ -83,13 +81,20 @@ import {
 } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
+  JANKO_HALO_STROKE_WIDTH,
   digitBaselineOffset,
   digitHalfExtents,
   isPositionOfHonor,
   renderHalo,
 } from '../src/render/janko/elements/notehead';
 import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
-import { restInkBox } from '../src/render/janko/elements/rests';
+import {
+  REST_PHANTOM_DASH,
+  REST_PHANTOM_HEAD_RADIUS,
+  REST_PHANTOM_HEAD_STROKE,
+  REST_URTEXT_STEM_SLANT,
+  restInkBox,
+} from '../src/render/janko/elements/rests';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -99,13 +104,19 @@ const MAIN_CHECKOUT = '/home/qqp/projects/iso-notation';
 const TOKENS = DEFAULT_JANKO_TOKENS;
 const OPTIONS = DEFAULT_JANKO_OPTIONS;
 /**
- * Round 15 policy deltas. The golden master is `'stem-anchored'` (the RH head
- * keeps the beat column, the displaced head takes the roomier side); the
- * Round 14 symmetric spread survives as the `'symmetric-spread'` control the
- * parity-offset arithmetic below is still stated against.
+ * Round 16 doctrine arithmetic. The golden master fans every row cluster at
+ * the `'balanced'` preset: one anchored head keeps the onset column and the
+ * rest step toward the roomier side at `pairGap = 2rx + air` per step. A
+ * tick-0 cluster wears the wider Position of Honor rings, so its step widens
+ * to two halo radii plus the same air.
  */
-const SYMMETRIC_OPTIONS = { ...OPTIONS, crowdedColumn: 'symmetric-spread' as const };
-const ASYMMETRIC_OPTIONS = { ...OPTIONS, crowdedColumn: 'asymmetric-micro' as const };
+const SPACING_PRESET = getClusterSpacingPreset('balanced');
+/** The judged golden pair gap: 2·3.6 + 1.0 = 8.2pt. */
+const PAIR_GAP = SPACING_PRESET.pairGap;
+/** The horizontal ring extent a tick-0 head actually wears. */
+const HALO_RX = Math.max(SPACING_PRESET.rx, TOKENS.haloRadius + JANKO_HALO_STROKE_WIDTH / 2);
+/** The widened tick-0 fan step: 2·6.575 + 1.0 = 14.15pt. */
+const HALO_GAP = 2 * HALO_RX + SPACING_PRESET.air;
 const HANDS: Hand[] = ['RH', 'LH'];
 
 const EXPORT_NAMES = [
@@ -652,35 +663,39 @@ function majorTriad(): QuantizedGridScore {
   );
 }
 
-test('Row-snapped parity offset (control): same-row chord tones spread symmetrically around the beat', () => {
-  const layout = layoutJankoScore(majorTriad(), SYMMETRIC_OPTIONS, TOKENS)[0];
+test('Row-snapped clusters (doctrine): the anchored head keeps the column, the follower fans one gap', () => {
+  const layout = layoutJankoScore(majorTriad(), OPTIONS, TOKENS)[0];
   const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
   const c = byId.get('triad-c')!;
   const e = byId.get('triad-e')!;
   const g = byId.get('triad-g')!;
-  const delta = getChordalOffset(TOKENS);
 
-  // C4 and E4 are both rank 0 of octave 4: one lattice point before the offset.
+  // C4 and E4 are both rank 0 of octave 4: one lattice point before the fan.
+  // At tick 0 both wear the Position of Honor ring, so the step is the widened
+  // halo gap, not the judged pair gap.
   assert.equal(c.coord.rank, 0);
   assert.equal(e.coord.rank, 0);
   assert.equal(c.y, e.y, 'the two heads keep one row y');
-  close(Math.abs(e.x - c.x), delta, 'the pair is spread by exactly one chordal offset');
-  assert.ok(delta >= 2 * TOKENS.noteheadRadius, 'Δx covers a full notehead disc');
+  close(Math.abs(e.x - c.x), HALO_GAP, 'the pair is fanned by exactly one halo gap');
+  assert.ok(
+    HALO_GAP >= 2 * HALO_RX,
+    'the halo step covers two full ring extents plus air'
+  );
 
-  // …and symmetrically: the pair straddles the untouched beat column, which the
-  // different-row third of the triad still occupies exactly.
+  // …asymmetrically: the lower head (index 0 of a single-hand pair) anchors the
+  // untouched onset column, which the different-row third of the triad still
+  // occupies exactly, while the follower steps into the open measure.
   const nominal = g.x;
-  close((c.x + e.x) / 2, nominal, 'the pair is centred on the beat column');
-  close(Math.min(c.x, e.x), nominal - delta / 2, 'the lower head sits half an offset left');
-  close(Math.max(c.x, e.x), nominal + delta / 2, 'the upper head sits half an offset right');
+  close(c.x, nominal, 'the anchored head keeps the onset column');
+  close(e.x, nominal + HALO_GAP, 'the follower steps one halo gap right');
 
-  // G4 is rank 1: a different row, so it never moves off the beat column, and
+  // G4 is rank 1: a different row, so it never moves off the onset column, and
   // the isomorphic Δ hand shape survives.
   assert.equal(g.coord.rank, 1);
   assert.notEqual(g.y, c.y);
 });
 
-test('Row-snapped parity offset: every note keeps its true row y and its beat column', () => {
+test('Row-snapped clusters: every note keeps its true row y and the RH head anchors the column', () => {
   const score = makeScore(
     [
       makeNote('chord-c', 0, 4, 48, 48, 'LH'),
@@ -690,7 +705,7 @@ test('Row-snapped parity offset: every note keeps its true row y and its beat co
     ],
     144
   );
-  const layout = layoutJankoScore(score, SYMMETRIC_OPTIONS, TOKENS)[0];
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
   const tickX = (tick: number): number =>
     layout.geometry.staffLeft +
     getTickX(tick, 0, tick, layout.geometry.measureWidth, TOKENS, {
@@ -711,21 +726,24 @@ test('Row-snapped parity offset: every note keeps its true row y and its beat co
     assert.equal(p.rhythm.y, p.y, `${p.note.id} rhythm layer follows the row`);
     assert.equal(p.rhythm.x, p.x, `${p.note.id} stem column follows the head`);
     if (p.note.id === 'chord-g' || p.note.id === 'next-d') {
-      // Off the measure opening there is room on both sides, so the row-snapped
-      // pair straddles the untouched beat column exactly; the different-row
-      // third and the later onset both stay on it.
+      // The different-row third and the later onset both stay on the nominal
+      // beat column exactly.
       close(p.x, tickX(p.note.startTick), `${p.note.id} stays on the nominal beat column`);
     }
   }
   const c = layout.notes.find((p) => p.note.id === 'chord-c')!;
   const e = layout.notes.find((p) => p.note.id === 'chord-e')!;
-  close((c.x + e.x) / 2, tickX(48), 'the spread pair is centred on the beat');
+  // The mixed-hand pair anchors its RH head on the beat and fans the LH head
+  // one judged pair gap aside (tick 48 wears no halo).
+  close(e.x, tickX(48), 'the RH head anchors the beat column');
+  close(Math.abs(c.x - e.x), PAIR_GAP, 'the pair is fanned by exactly one pair gap');
 });
 
-test('Row-snapped parity offset: a crowd at the barline slides the whole column, never shears it', () => {
-  // On a downbeat the measure band has no room to the left, so the column
-  // translates; every voice of the onset travels together, which is what keeps
-  // the isomorphic hand shape intact.
+test('Row-snapped clusters: a crowd at the barline fans right, never shears', () => {
+  // On a downbeat the beat cell has no room to the left, so the anchored RH
+  // head keeps the onset column and the follower steps into the open measure;
+  // every voice of the onset travels together, which is what keeps the
+  // isomorphic hand shape intact. At tick 0 the step is the widened halo gap.
   const layout = layoutJankoScore(
     makeScore(
       [
@@ -735,23 +753,24 @@ test('Row-snapped parity offset: a crowd at the barline slides the whole column,
       ],
       144
     ),
-    SYMMETRIC_OPTIONS,
+    OPTIONS,
     TOKENS
   )[0];
   const c = layout.notes.find((p) => p.note.id === 'open-c')!;
   const e = layout.notes.find((p) => p.note.id === 'open-e')!;
   const g = layout.notes.find((p) => p.note.id === 'open-g')!;
   assert.equal(layout.notes.length, 3);
-  close((c.x + e.x) / 2, g.x, 'the pair stays centred on its onset column');
-  close(Math.abs(e.x - c.x), getChordalOffset(TOKENS), 'the pair keeps its full spread');
+  close(e.x, g.x, 'the anchored RH head keeps the onset column');
+  close(Math.abs(e.x - c.x), HALO_GAP, 'the pair keeps its full halo spread');
   assert.ok(
     Math.min(c.x, e.x) - TOKENS.noteheadRadius >= layout.geometry.staffLeft + 1.0,
     'the slid column still clears the opening barline by >= 1pt'
   );
 });
 
-test('Row-snapped parity offset: a three-note row cluster spreads as −Δ, 0, +Δ', () => {
+test('Row-snapped clusters: a three-note row cluster fans symmetrically about its middle head', () => {
   // G7 without its fifth: [7, 11, 2, 5] → 7, 11 and 5 all rank 1 of one octave.
+  // At tick 0 every head wears the halo, so each step is the widened halo gap.
   const score = makeScore(
     [
       makeNote('g7-g', 7, 4, 0, 96, 'RH'),
@@ -760,19 +779,19 @@ test('Row-snapped parity offset: a three-note row cluster spreads as −Δ, 0, +
     ],
     144
   );
-  const layout = layoutJankoScore(score, SYMMETRIC_OPTIONS, TOKENS)[0];
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
   const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
-  const delta = getChordalOffset(TOKENS);
   assert.equal(xs.length, 3);
   for (const p of layout.notes) {
     assert.equal(p.coord.rank, 1, 'all three heads sit on row 1');
     assert.equal(p.y, layout.notes[0].y, 'and share one y');
   }
-  close(xs[1] - xs[0], delta, 'left pair separated by one offset');
-  close(xs[2] - xs[1], delta, 'right pair separated by one offset');
+  close(xs[1] - xs[0], HALO_GAP, 'left pair separated by one halo gap');
+  close(xs[2] - xs[1], HALO_GAP, 'right pair separated by one halo gap');
+  close((xs[0] + xs[2]) / 2, xs[1], 'the fan stays symmetric about the middle head');
 });
 
-test('Row-snapped parity offset: a spread downbeat chord never crosses its barline', () => {
+test('Row-snapped clusters: a fanned downbeat chord never crosses its barline', () => {
   const layout = layoutJankoScore(
     makeScore(
       [
@@ -782,7 +801,7 @@ test('Row-snapped parity offset: a spread downbeat chord never crosses its barli
       ],
       144
     ),
-    SYMMETRIC_OPTIONS,
+    OPTIONS,
     TOKENS
   )[0];
   const left = layout.geometry.staffLeft;
@@ -793,7 +812,8 @@ test('Row-snapped parity offset: a spread downbeat chord never crosses its barli
     );
   }
   const xs = layout.notes.map((p) => p.x).sort((a, b) => a - b);
-  close(xs[1] - xs[0], getChordalOffset(TOKENS), 'the cluster is still fully spread');
+  close(xs[1] - xs[0], HALO_GAP, 'the cluster is still fully spread at the halo step');
+  close(xs[2] - xs[1], HALO_GAP, 'both steps of the downbeat fan stay full');
 });
 
 test('Row-snapped parity offset: the canonical Bach score is unchanged on unaffected onsets', () => {
@@ -844,7 +864,7 @@ test('Token/option overrides flow through every renderer (pluggable design)', ()
   close(tokens.octaveStep, 30, 'octaveStep keeps its canonical default');
   const crop = renderJankoCrop(score, 1, 1, options, tokens);
   assert.match(crop, /r="6\.40"/, 'halo override');
-  assert.match(crop, /r="5\.00"/, 'notehead override');
+  assert.match(crop, /ry="5\.00"/, 'notehead override rides the ellipse vertical radius');
   const geo = computePageGeometry(options, tokens);
   close(geo.systems[0].equatorY('RH', 4) - geo.systems[0].middleCY, -30, 'interStaffGap override');
 });
@@ -1009,7 +1029,7 @@ test('Round 10 staff hierarchy: uniform equators, canonical start mark and light
 //     the refined architectural start symbols
 // ---------------------------------------------------------------------------
 
-test('Round 14 pocket-seated rests: the m. 4 silence sits beside the D3 it accompanies, never on the Octave 4 equator', () => {
+test('Round 16 rule-hung rests: the m. 4 silence hangs from the Octave 3 rule beside the D3 it accompanies', () => {
   const score = buildBachGoldbergVar1Score();
   assert.equal(DEFAULT_JANKO_OPTIONS.restStyle, 'kinetic-monoline', 'the settled rest dialect');
   const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
@@ -1042,24 +1062,37 @@ test('Round 14 pocket-seated rests: the m. 4 silence sits beside the D3 it accom
     m4.y > 158.5 && m4.y < 173.5,
     `the rest is nestled between digit 9 and digit 0 (y = ${m4.y.toFixed(2)})`
   );
-  // The 12pt kinetic stem is seated in the clear pocket above the LH D3 head
-  // that sounds at the same column: the guaranteed REST_POCKET_AIR (2.4pt) plus
-  // the float-safety solver margin, so the anchor slides just 5.72pt up the
-  // voice — never back to the hand's default equator and never onto the disc.
-  close(m4.y, 160.28, 'the pocket seat on the voice contour', 0.05);
+  // The kinetic glyph hangs from the nearest rule to the voice — the Octave 3
+  // equator itself — with its near edge exactly on the rule and its body
+  // reaching toward the Middle C corridor; the fit solver then only ever nudges
+  // along the rule, so the hang is stable and the pocket above the LH D3 head
+  // keeps at least the guaranteed seating air plus the solver margin.
   const m4Box = restInkBox(m4, TOKENS);
+  close(m4Box.y1, 166.0, 'the hung near edge sits exactly on the Octave 3 rule', 1e-6);
+  close(m4.y, 162.55, 'the hung glyph centre', 0.01);
   const d3 = layouts[0].notes.find((p) => p.note.startTick === 552)!;
-  close(d3.y - TOKENS.noteheadRadius - m4Box.y1, REST_POCKET_AIR + REST_FIT_MARGIN, 'the guaranteed pocket air', 5e-3);
+  assert.ok(
+    d3.y - TOKENS.noteheadRadius - m4Box.y1 >= REST_SEAT_AIR + REST_FIT_MARGIN - 1e-6,
+    `the pocket keeps the guaranteed seating air (got ${(d3.y - TOKENS.noteheadRadius - m4Box.y1).toFixed(3)}pt)`
+  );
 
-  // Every rest states a standard value, is anchored on the nearest legal
-  // position of its hand's own voice contour and never collides with a glyph.
+  // Every rest states a standard value, hangs from its voice's rule with its
+  // near edge exactly on a painted rule of the octave lattice, and never
+  // collides with a glyph.
   for (const rest of all) {
     assert.ok([12, 24, 48, 96, 192].includes(rest.durationTicks), `${rest.tick} standard value`);
     const system = layouts.find((l) => l.rests.includes(rest))!;
-    assert.equal(
-      resolveRestY(rest, system.notes, system.geometry, TOKENS),
-      rest.y,
-      `${rest.hand} rest at ${rest.tick} is a fixed point of the fit rule`
+    const box = restInkBox(rest, TOKENS);
+    let hung = false;
+    for (let octave = 0; octave <= 8 && !hung; octave++) {
+      const base = system.geometry.middleCY + getEquatorYForOctave(octave, 'RH', TOKENS, OPTIONS);
+      for (const rule of getEquatorRuleYs(base, OPTIONS, TOKENS)) {
+        if (Math.abs(box.y0 - rule) < 1e-6 || Math.abs(box.y1 - rule) < 1e-6) hung = true;
+      }
+    }
+    assert.ok(
+      hung,
+      `${rest.hand} rest at ${rest.tick} hangs a box edge exactly on its rule (y0=${box.y0.toFixed(2)}, y1=${box.y1.toFixed(2)})`
     );
     assert.ok(
       restClearsLayout(rest, system.notes, TOKENS),
@@ -1133,7 +1166,9 @@ test('Round 13 corrected kinetic tabs hook downward to the right of their stem',
   for (const [x1, y1, x2, y2] of tabs) {
     assert.ok(x2 > x1, 'the tab reaches right of its stem');
     assert.ok(y2 > y1, 'and hooks downward, like a note flag');
-    close((y2 - y1) / (x2 - x1), TOKENS.maxBeamSlope, 'at the score’s own 12.4° rake', 1e-6);
+    // The scaled tab is short, so two-decimal output rounding shows in the
+    // quotient; the rake itself is still the score's own 12.4°.
+    close((y2 - y1) / (x2 - x1), TOKENS.maxBeamSlope, 'at the score’s own 12.4° rake', 5e-3);
   }
 });
 
@@ -1144,7 +1179,12 @@ test('Round 13 authentic urtext rests: a slanted calligraphic stem with teardrop
   const stem = /<path class="janko-rest-stem-line" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)"/.exec(crop);
   assert.ok(stem, 'the calligraphic stem is painted');
   const [, sx1, , sx2] = stem!.map(Number);
-  assert.ok(Math.abs(sx2 - sx1) > 1.0, 'the stem is slanted, not a monoline rule');
+  close(
+    Math.abs(sx2 - sx1),
+    REST_URTEXT_STEM_SLANT,
+    'the stem is slanted, not a monoline rule',
+    0.01
+  );
   // A 16th rest carries two hooks, each ending in a solid teardrop bulb.
   assert.equal((crop.match(/class="janko-rest-hook"/g) ?? []).length, 2, 'two hooks for a 16th');
   assert.equal((crop.match(/class="janko-rest-hook-bulb"/g) ?? []).length, 2, 'two teardrop bulbs');
@@ -1162,9 +1202,11 @@ test('Round 13 phantom notehead rests stand exactly where the unvoiced note woul
   const score = buildBachGoldbergVar1Score();
   const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'phantom-notehead' });
   const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
-  const head = /<circle class="janko-rest-phantom-head" cx="([\d.-]+)" cy="([\d.-]+)" r="([\d.-]+)" fill="none" stroke="#111111" stroke-width="0.80" stroke-dasharray="1.8,1.5"\/>/.exec(crop);
+  const head = new RegExp(
+    `<circle class="janko-rest-phantom-head" cx="([\\d.-]+)" cy="([\\d.-]+)" r="([\\d.-]+)" fill="none" stroke="#111111" stroke-width="${REST_PHANTOM_HEAD_STROKE.toFixed(2)}" stroke-dasharray="${REST_PHANTOM_DASH}"\\/>`
+  ).exec(crop);
   assert.ok(head, 'the dashed open head is painted');
-  close(Number(head![3]), 3.0, 'at the ticket’s R = 3.0pt', 1e-9);
+  close(Number(head![3]), REST_PHANTOM_HEAD_RADIUS, 'at the scaled phantom radius', 0.01);
   const rest = layoutJankoScore(score, options, TOKENS)[0].rests.find((r) => r.tick === 552)!;
   close(Number(head![1]), rest.x, 'the head stands on the rest column', 0.01);
   close(Number(head![2]), rest.y, 'and on the rest’s voice contour', 0.01);
@@ -1562,7 +1604,7 @@ test('Zero horizontal dashed guidelines: the vertical beat grid is the only dott
   assert.match(withGuides, /stroke-dasharray="3,3"/);
 });
 
-test('Optical notehead: 5.8pt digits sit dead-centre in the 4.8pt knockout disc', () => {
+test('Optical notehead: 5.8pt digits sit dead-centre in the elliptical knockout mask', () => {
   const score = buildBachGoldbergVar1Score();
   close(TOKENS.noteheadRadius, 4.8, 'canonical knockout radius');
   close(TOKENS.digitFontSize, 5.8, 'canonical digit font size');
@@ -1576,8 +1618,10 @@ test('Optical notehead: 5.8pt digits sit dead-centre in the 4.8pt knockout disc'
 
   const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
   const knockouts = [
-    ...crop.matchAll(/class="janko-knockout" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g),
-  ].map((m) => ({ cx: Number(m[1]), cy: Number(m[2]), r: Number(m[3]) }));
+    ...crop.matchAll(
+      /class="janko-knockout" cx="([\d.]+)" cy="([\d.]+)" rx="([\d.]+)" ry="([\d.]+)"/g
+    ),
+  ].map((m) => ({ cx: Number(m[1]), cy: Number(m[2]), rx: Number(m[3]), ry: Number(m[4]) }));
   const digits = [
     ...crop.matchAll(
       /class="janko-digit" x="([\d.]+)" y="([\d.]+)" font-weight="\d+" font-size="([\d.]+)pt"/g
@@ -1586,7 +1630,8 @@ test('Optical notehead: 5.8pt digits sit dead-centre in the 4.8pt knockout disc'
   assert.ok(knockouts.length > 0, 'the crop engraves noteheads');
   assert.equal(digits.length, knockouts.length, 'every knockout carries exactly one digit');
   for (const disc of knockouts) {
-    close(disc.r, TOKENS.noteheadRadius, 'knockout radius');
+    close(disc.rx, SPACING_PRESET.rx, 'knockout horizontal radius is the preset');
+    close(disc.ry, TOKENS.noteheadRadius, 'knockout vertical radius is the head radius');
   }
   for (const d of digits) {
     close(d.size, TOKENS.digitFontSize, 'digit font size');
@@ -1747,16 +1792,11 @@ test('Stem centring: every note of every rhythm dialect centres its stem on the 
     let beamStems = 0;
     for (const layout of layouts) {
       for (const p of layout.notes) {
-        // Round 15: a stem sits on its head's centreline or on the documented
-        // ±JANKO_STEM_STAGGER anti-fusion offset — never anywhere else.
-        const declared = p.rhythm.stemDx ?? 0;
-        assert.ok(
-          Math.abs(declared) <= JANKO_STEM_STAGGER + 1e-9,
-          `${p.note.id} staggers only by the documented delta (${declared})`
-        );
+        // Round 16: a stem sits exactly on its head's centreline — fusion is
+        // solved by shared-stem suppression, never by a stagger offset.
         close(
           getStemGeometry(p.rhythm, TOKENS).stemX,
-          p.x + declared,
+          p.x,
           `stem column of ${p.note.id} (${rhythmStyle})`
         );
         notes++;
@@ -1765,7 +1805,7 @@ test('Stem centring: every note of every rhythm dialect centres its stem on the 
         for (let i = 0; i < beam.stems.length; i++) {
           close(
             beam.stems[i].stemX,
-            beam.notes[i].x + (beam.notes[i].stemDx ?? 0),
+            beam.notes[i].x,
             `beam stem column (${rhythmStyle})`
           );
           beamStems++;
@@ -1780,9 +1820,7 @@ test('Stem centring: every note of every rhythm dialect centres its stem on the 
   // a notehead centre — no perimeter offset survives into the document.
   const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
   const columns = new Set(
-    layoutJankoScore(score, OPTIONS, TOKENS)[0].notes.map((p) =>
-      (p.x + (p.rhythm.stemDx ?? 0)).toFixed(2)
-    )
+    layoutJankoScore(score, OPTIONS, TOKENS)[0].notes.map((p) => p.x.toFixed(2))
   );
   const stemLines = [
     ...crop.matchAll(/class="janko-stem" x1="([\d.]+)" y1="[\d.]+" x2="([\d.]+)"/g),
@@ -1853,19 +1891,30 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
   for (const n of opening) {
     const noteFlags = flags.filter((m) => Math.abs(Number(m[1]) - n.x) < 0.02);
     assert.equal(noteFlags.length, 1, `${n.id} carries exactly one flag`);
-    // Round 15: the dot is always right of its own head and lives in the
-    // inter-row lane (`n.dotY`), never on the notehead row.
+    // Round 16: the dot sits tight to the elliptical mask (`rx + gap`) and
+    // always in the inter-row gap above its head — the canonical lane half a
+    // row up, or the rule-nudged seat when the lane would graze a rule.
     const dotY = n.dotY ?? n.y;
-    assert.ok(
-      Math.abs(Math.abs(dotY - n.y) - TOKENS.augmentationDotRowOffset) < 1e-9,
-      `${n.id} dots ${TOKENS.augmentationDotRowOffset}pt off its own row`
+    close(
+      n.dotX ?? -1,
+      n.x + SPACING_PRESET.rx + TOKENS.augmentationDotGap,
+      `${n.id} dots tight to its mask`,
+      1e-9
     );
-    assert.ok(dotY !== n.y, `${n.id} never carries an on-row dot`);
+    assert.ok(dotY < n.y, `${n.id} dots above its head, never on its row`);
+    assert.ok(
+      n.y - dotY <=
+        TOKENS.augmentationDotRowOffset + TOKENS.augmentationDotRadius + 0.375 + 0.25 + 1e-9,
+      `${n.id} stays inside the gap above its head`
+    );
+    if (n.startTick === 24) {
+      close(n.y - dotY, TOKENS.augmentationDotRowOffset, 'the m. 1 dot keeps the canonical lane');
+    }
     assert.ok(
       crop.includes(
-        `class="janko-augmentation-dot" cx="${(n.x + TOKENS.noteheadRadius + TOKENS.augmentationDotGap).toFixed(2)}" cy="${dotY.toFixed(2)}" r="${TOKENS.augmentationDotRadius.toFixed(2)}"`
+        `class="janko-augmentation-dot" cx="${(n.dotX ?? -1).toFixed(2)}" cy="${dotY.toFixed(2)}" r="${TOKENS.augmentationDotRadius.toFixed(2)}"`
       ),
-      `${n.id} carries its augmentation dot right of its head, in the inter-row lane`
+      `${n.id} paints its dot above its head, tight to the mask`
     );
   }
 });
@@ -2193,10 +2242,23 @@ test('Round 11 beaming integrity: a simultaneity never forms a zero-width melodi
     TOKENS
   )[0];
   assert.equal(layout.beams.length, 0, 'the specimen forms no zero-width beam');
+  // Round 16 shared stems: one hand-onset shares a single stem object, and the
+  // carrier keeps its stem — the one stem the bracket does not replace — so
+  // every chord head either hands its duration to its bracket or carries the
+  // shared stem for its hand.
+  assert.equal(layout.sharedStems.length, 5, 'five hand-onsets share five stems');
+  for (const group of layout.sharedStems) {
+    assert.equal(group.suppressedIds.length, 3, 'each carrier speaks for its whole chord');
+  }
+  const carriers = layout.sharedStems.map((g) => g.carrierId);
   assert.equal(
-    layout.claspedStems.length,
+    layout.claspedStems.length + carriers.length,
     specimen.notes.length,
-    'every chord head hands its duration to its bracket'
+    'every chord head hands its duration to its bracket or carries the shared stem'
+  );
+  assert.ok(
+    carriers.every((id) => !layout.claspedStems.includes(id)),
+    'a carrier keeps its stem: the bracket never replaces it'
   );
 });
 

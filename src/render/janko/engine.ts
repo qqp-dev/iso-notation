@@ -14,10 +14,17 @@
  * `[7, 11, 2, 5]`, …). Every head keeps its **true row** — the row is the
  * instrument's physical row and may never be re-spelled — and the collision is
  * resolved *horizontally*: heads that share an onset, an octave and a row are
- * sorted by pitch and spread symmetrically around the beat column by
- * `tokens.chordalOffset` (see {@link resolveRowSnappedChordOffsets}). Heads on
+ * fanned out asymmetrically toward the roomier side at the active
+ * cluster-spacing preset (`2rx + air` per step — 8.2pt on the golden
+ * `'balanced'`), one head keeping the nominal beat column, behind the hard
+ * beat-cell barriers (see {@link resolveRowSnappedChordOffsets}). Heads on
  * *different* rows stay vertically aligned on the nominal beat column, so the
  * isomorphic ∇ / Δ hand shapes survive untouched.
+ *
+ * Shared stems (Round 16): one onset's same-duration voices share a single
+ * stem object on the nominal column (standard chord rule); mixed-duration
+ * stacks coincide there with each voice's beam/flag at its own end. Same-row
+ * seconds of mixed hands or mixed durations keep two stems at head-x.
  *
  * Public entry points
  * -------------------
@@ -54,6 +61,7 @@ import {
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
   channelsGridInk,
+  getClusterSpacingPreset,
   getGridNoteInset,
   protectsBarlineInk,
   resolveJankoOptions,
@@ -79,7 +87,6 @@ import {
   JankoVerticalChordGroup,
   CLASP_MARK_REACH,
   CLASP_MIN_VERTICAL_CHORD,
-  JANKO_STEM_STAGGER,
   claspInkBox,
   claspQualifies,
   computeBeamGroupGeometry,
@@ -91,6 +98,7 @@ import {
   renderChordBridges,
   renderClaspGroup,
   renderRhythm,
+  stemDirection,
   withClaspRail,
 } from './elements/rhythm';
 import {
@@ -477,8 +485,9 @@ export const COLUMN_BARLINE_AIR = 1.0;
  * back to the canonical margins instead of letting the engraving collide.
  *
  * Round 12: under the `'unified-transparent-grid'` policy the barline carries no
- * protected air at all — the music uses the full measure width and the circular
- * knockout erases whatever it crosses — so only the disc-to-disc rule remains.
+ * protected air at all — the music uses the full measure width and the
+ * elliptical knockout erases whatever it crosses — so only the disc-to-disc
+ * rule remains.
  */
 export function measuresWithColumnCollisions(
   notes: readonly PositionedJankoNote[],
@@ -827,7 +836,8 @@ export interface JankoSystemLayout {
   /**
    * Note ids whose standalone stem the clasp replaces. A clasp member that
    * belongs to a beam group keeps its stem: a real 16th-note beam is never cut
-   * to pieces by a grouping bracket.
+   * to pieces by a grouping bracket. A clasp member that carries its cluster's
+   * Round 16 shared stem likewise keeps it (see {@link JankoSharedStemGroup}).
    */
   claspedStems: string[];
   /**
@@ -838,6 +848,50 @@ export interface JankoSystemLayout {
   verticalChords: JankoVerticalChordGroup[];
   /** Round 7 (Option 3): every intentional bridge line of the system. */
   chordBridges: JankoChordBridge[];
+  /**
+   * Round 16 shared stems: one hand's same-duration voices of one onset share
+   * a single stem object on the nominal column (standard chord rule) — stacked
+   * or flanked, clasped or bare. Mixed-duration and cross-hand clusters keep
+   * their per-voice stems (coincident on the column for stacks, at head-x for
+   * flanked seconds).
+   */
+  sharedStems: JankoSharedStemGroup[];
+}
+
+/**
+ * Round 16: one hand's same-duration voices of one onset, unified under one
+ * stem object.
+ *
+ * The carrier stands on (or nearest) the nominal column, at the extremity in
+ * stem direction, and draws the shared duration; the members draw no stem of
+ * their own. A stacked onset and a flanked row cluster share the rule — the
+ * Brahms held-chord triples take one shared stem each exactly like a vertical
+ * chord does — and a clasped group keeps its bracket: the clasp still owns the
+ * cluster's duration paradigm, the shared stem is the one stem the bracket
+ * does not replace.
+ */
+export interface JankoSharedStemGroup {
+  /** Onset tick of the shared voices. */
+  tick: number;
+  /** Hand the shared stem belongs to. */
+  hand: Hand;
+  /** Id of the head that carries the shared stem. */
+  carrierId: string;
+  /** Ids of the member heads whose own stems are suppressed. */
+  suppressedIds: string[];
+}
+
+/**
+ * Every note id whose standalone stem is **not** painted: clasp-replaced stems,
+ * gap-gated vertical-chord interiors, and Round 16 shared-stem members. One
+ * helper so the renderer and the linter always agree on which stems exist.
+ */
+export function suppressedStemIds(layout: JankoSystemLayout): Set<string> {
+  return new Set([
+    ...layout.claspedStems,
+    ...layout.verticalChords.flatMap((chord) => chord.suppressedIds),
+    ...layout.sharedStems.flatMap((group) => group.suppressedIds),
+  ]);
 }
 
 function handForNote(note: QuantizedNote): Hand {
@@ -893,7 +947,7 @@ export function getMeasureInsets(
   const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
   // Round 12: the transparent grid withdraws the canonical measure inset, so
   // the music uses the full measure width and a downbeat column stands exactly
-  // on the barline, where its circular knockout erases it.
+  // on the barline, where its elliptical knockout erases it.
   const inset = getGridNoteInset(o, t);
   const base =
     isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
@@ -1006,36 +1060,30 @@ function getTickColumnX(
 }
 
 /**
- * Round 15 augmentation-dot lane: the page y of the dot that belongs to a
- * notehead at `y` whose own octave equator is `equatorY`.
+ * Round 16 augmentation-dot lane: the page y of the dot that belongs to a
+ * notehead at `y`.
  *
- * The dot always moves **off its own row** into inter-row space, on the side
- * away from the nearer staff rule: a Set A note (below its equator) dots
- * downward, a Set B note (above it) dots upward. The nearest painted rule is
- * therefore half an octave away (`rowHeight`), and the dot lands in the lane
- * between two rows where a 16th-note grid's neighbouring discs cannot reach it.
+ * The dot is **always in the inter-row gap above** its head (standard-analog:
+ * a line note dots the space above), half a whole-tone row up
+ * (`augmentationDotRowOffset`). The row-dependent above-or-below rule is
+ * deleted: consistent side, uniform sign, every bar. A 16th-note grid seats
+ * neighbouring columns only 10.2pt apart, so an on-row dot can never clear the
+ * next column's mask; the inter-row lane can.
  *
- * Deterministic tie-breaks, documented once:
- * - a row exactly **on** a rule (`'on-the-line'`, `'single-line-3row'` Set A,
- *   `'bounded-channel'` Set A) dots **downward**;
- * - a row exactly midway between two rules (a contour-resolved flank) resolves
- *   against its **own octave's** equator, so the choice is a pure function of
- *   the pitch.
- *
- * Where the canonical lane would still graze a painted rule (the bounded
- * channel's `equator ± channelHalfWidth` pair), the dot steps just far enough
- * off the rule to keep `dotRadius + halfStroke + 0.25pt` of air.
+ * Where the canonical lane would still graze a painted rule (a gap centre that
+ * coincides with an equator rule, or the bounded channel's
+ * `equator ± channelHalfWidth` pair), the dot steps just far enough off the
+ * rule to keep `dotRadius + halfStroke + 0.25pt` of air — staying above its
+ * head and inside the gap throughout.
  */
 function resolveAugmentationDotY(
   y: number,
-  equatorY: number,
   geo: JankoSystemGeometry,
   hand: Hand,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): number {
-  const dir = y > equatorY + EPS ? 1 : y < equatorY - EPS ? -1 : 1;
-  let dotY = y + dir * t.augmentationDotRowOffset;
+  let dotY = y - t.augmentationDotRowOffset;
   const clearance = t.augmentationDotRadius + 0.375 + 0.25;
   for (let octave = 0; octave <= 8; octave++) {
     const base = geo.middleCY + getEquatorYForOctave(octave, hand, t, o);
@@ -1046,7 +1094,9 @@ function resolveAugmentationDotY(
       }
     }
   }
-  return dotY;
+  // Structural uniform sign: the rule-graze steps fit the dot around painted
+  // rules, but the result may never drop to (or below) the head row itself.
+  return Math.min(dotY, y - EPS);
 }
 
 /**
@@ -1117,7 +1167,7 @@ export function positionJankoNote(
     flank ?? null
   );
   const y = geo.middleCY + coord.y;
-  const equatorY = geo.middleCY + getEquatorYForOctave(note.pitch.octave, hand, t, o);
+  const rx = getClusterSpacingPreset(o.clusterSpacing).rx;
   return {
     note,
     coord,
@@ -1130,13 +1180,15 @@ export function positionJankoNote(
       hand,
       x,
       y,
-      dotY: resolveAugmentationDotY(y, equatorY, geo, hand, o, t),
+      dotX: x + rx + t.augmentationDotGap,
+      dotY: resolveAugmentationDotY(y, geo, hand, o, t),
     },
   };
 }
 
 // ---------------------------------------------------------------------------
 // Round 12 — voice rests for the inactive spans of an active hand
+// (Round 16: fixed rule-hang placement with an along-the-rule slot search)
 // ---------------------------------------------------------------------------
 
 /**
@@ -1147,26 +1199,27 @@ export function positionJankoNote(
 export const REST_NOTEHEAD_AIR = 1.0;
 
 /**
- * Round 14 **guaranteed pocket air** (pt): the air the fit solver reserves
+ * Round 16 **guaranteed seating air** (pt): the air the slot solver reserves
  * between a rest's ink box and every foreign notehead disc.
  *
  * `REST_NOTEHEAD_AIR` is the linter's *hard floor* — the clearance below which
  * a painted rest is a violation. Seating a rest exactly on that floor is what
  * produced the Round 13 "slid into an unreadable spot" defect: the ink grazed
- * the disc it had been pushed against. The solver therefore seats a rest in a
- * **pocket** whose air is `2 × minClearance +` the rest stroke's half-width
- * (`2.0 + 0.45 ≈ 2.4pt`), so the silence reads as its own written sign and not
- * as a hairline touch on the head it stands beside. The linter's floor is
- * unchanged — a pocket fit always satisfies it with room to spare.
+ * the disc it had been pushed against. The solver therefore seats a rest with
+ * `2 × minClearance +` the rest stroke's half-width (`2.0 + 0.45 ≈ 2.4pt`) of
+ * air, so the silence reads as its own written sign and not as a hairline
+ * touch on the head it stands beside. The linter's floor is unchanged — a
+ * seated fit always satisfies it with room to spare.
  */
-export const REST_POCKET_AIR = 2.4;
+export const REST_SEAT_AIR = 2.4;
 
 /**
  * Effective clearance radius (pt) the rest fit keeps around one notehead: the
  * notehead disc — or the wider Position of Honor halo ring for the tick-0
  * opening sounds, exactly as `checkRestClearance` measures it — plus the
- * guaranteed {@link REST_POCKET_AIR} and the float-safety
- * {@link REST_FIT_MARGIN}.
+ * guaranteed {@link REST_SEAT_AIR} and the float-safety
+ * {@link REST_FIT_MARGIN}. Deliberately circular (conservative): the linter
+ * audits rests against the same circular bound.
  */
 function restClearanceRadius(
   p: PositionedJankoNote,
@@ -1175,7 +1228,7 @@ function restClearanceRadius(
   const glyph = isPositionOfHonor(p.note.startTick)
     ? Math.max(t.noteheadRadius, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
     : t.noteheadRadius;
-  return glyph + REST_POCKET_AIR + REST_FIT_MARGIN;
+  return glyph + REST_SEAT_AIR + REST_FIT_MARGIN;
 }
 
 /**
@@ -1243,42 +1296,20 @@ function voiceYAt(
 }
 
 /**
- * The **active octave equator** nearest a contour y — the register landmark a
- * one-sided rest snaps to. Octaves are walked over the full lattice (0…8), not
- * just the four staff rules, so a rest in a ledger register snaps to its own
- * ledger equator.
- */
-function snapToOctaveEquator(
-  y: number,
-  geo: JankoSystemGeometry,
-  t: ResolvedJankoTokens,
-  o: ResolvedJankoLayoutOptions
-): number {
-  let best = y;
-  let bestDistance = Infinity;
-  for (let octave = 0; octave <= 8; octave++) {
-    const equator = geo.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
-    const distance = Math.abs(equator - y);
-    if (distance < bestDistance - EPS) {
-      bestDistance = distance;
-      best = equator;
-    }
-  }
-  return best;
-}
-
-/**
- * Round 13: the vertical **voice contour** anchor of one rest, in page pt.
+ * Round 16: the **rule-hang reference** of one rest — the nearest staff rule to
+ * the voice at the gap, and the corridor side the glyph extends toward.
  *
- * The rest belongs to the melodic line of its own hand, so it is anchored
- * between the note that released it and the note that resumes it:
- * `y = (y_prev + y_next) / 2`. With only one neighbour (a silence that opens
- * the hand's system or closes it) the neighbour's own register speaks instead:
- * the rest snaps to its **active octave equator**. With no neighbour at all the
- * hand's canonical voice equator (RH Octave 4, LH Octave 3) is the last
- * reserve. Every value is a *target* — {@link resolveRestY} then fits it.
+ * The voice query is the melodic register of the rest's own hand at the gap:
+ * the mean of the releasing and resuming onsets, the single neighbour's exact
+ * y when the silence opens or closes the hand's system, or the hand's canonical
+ * voice equator (RH Octave 4, LH Octave 3) with no neighbour at all. The
+ * reference rule is the nearest painted equator rule to that query, enumerated
+ * deterministically over the whole lattice (staff octaves 2…5 plus the ledger
+ * registers 0, 1 and 6…8, via {@link getEquatorRuleYs}); an exact tie prefers
+ * the rule nearer Middle C, then the upper rule. The voice-contour anchor and
+ * the pocket slides are deleted: same voice, same rule, every bar.
  */
-function voiceContourTargetY(
+function restRuleReference(
   hand: Hand,
   releaseOnsetTick: number,
   resumeTick: number,
@@ -1286,58 +1317,120 @@ function voiceContourTargetY(
   geo: JankoSystemGeometry,
   t: ResolvedJankoTokens,
   o: ResolvedJankoLayoutOptions
-): number {
+): { ruleY: number; dir: 1 | -1 } {
   const prevY = voiceYAt(notes, hand, releaseOnsetTick);
   const nextY = voiceYAt(notes, hand, resumeTick);
-  if (prevY !== null && nextY !== null) return (prevY + nextY) / 2;
-  const single = prevY ?? nextY;
-  if (single !== null) return snapToOctaveEquator(single, geo, t, o);
-  return geo.middleCY + getEquatorYForOctave(hand === 'RH' ? 4 : 3, hand, t, o);
+  const query =
+    prevY !== null && nextY !== null
+      ? (prevY + nextY) / 2
+      : (prevY ?? nextY ?? geo.middleCY + getEquatorYForOctave(hand === 'RH' ? 4 : 3, hand, t, o));
+  let ruleY = query;
+  let bestDistance = Infinity;
+  let bestCorridor = Infinity;
+  for (let octave = 0; octave <= 8; octave++) {
+    const base = geo.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
+    for (const candidate of getEquatorRuleYs(base, o, t)) {
+      const distance = Math.abs(candidate - query);
+      const corridor = Math.abs(candidate - geo.middleCY);
+      if (
+        distance < bestDistance - EPS ||
+        (Math.abs(distance - bestDistance) <= EPS &&
+          (corridor < bestCorridor - EPS ||
+            (Math.abs(corridor - bestCorridor) <= EPS && candidate < ruleY - EPS)))
+      ) {
+        bestDistance = distance;
+        bestCorridor = corridor;
+        ruleY = candidate;
+      }
+    }
+  }
+  const dir: 1 | -1 = ruleY > geo.middleCY + EPS ? -1 : 1;
+  return { ruleY, dir };
+}
+
+/**
+ * Round 16: the glyph **centre** of a rest hung from its reference rule — the
+ * near edge of the dialect's ink box sits exactly on the rule and the glyph
+ * extends toward the Middle C corridor (`dir`), like a stem-analog mirror:
+ * same voice, same place, every bar. Dialect-agnostic: the box is probed at
+ * the origin, so symmetric and sitting glyphs (the classical half-block, the
+ * urtext quarter serpentine) all hang correctly with no per-dialect code.
+ */
+function restHangCenter(
+  ruleY: number,
+  dir: 1 | -1,
+  style: JankoRestGeometry['style'],
+  value: JankoRestGeometry['value'],
+  t: ResolvedJankoTokens
+): number {
+  const probe = restInkBox(
+    { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value, style },
+    t
+  );
+  return dir > 0 ? ruleY - probe.y0 : ruleY - probe.y1;
 }
 
 /**
  * Extra air (pt) the fit solver keeps beyond the guaranteed
- * {@link REST_POCKET_AIR}, so a solved position can never be reported by the
+ * {@link REST_SEAT_AIR}, so a solved position can never be reported by the
  * linter's float-exact `rest-clearance` audit.
  */
 export const REST_FIT_MARGIN = 0.02;
 
 /**
- * Round 14 rest fit: seat the contour anchor in the **nearest clear pocket**.
+ * Round 16 rest fit: nudge the hung rest **along its rule** inside its beat
+ * cell until its ink box stands clear.
  *
- * The ink box of a dialect is a fixed rectangle translated vertically with the
- * rest, so a notehead at `(px, py)` forbids exactly the y-interval in which the
- * box comes closer than {@link restClearanceRadius} — the glyph radius plus the
- * guaranteed {@link REST_POCKET_AIR}. The solver collects those intervals (only
- * the notes whose disc reaches the box's column band can contribute), merges
- * them and returns the legal y nearest the contour target — never the
- * sky-floating equator of Round 12, never an arbitrary snap, and never a
- * hairline graze of the very disc the pocket was carved around. Positions
- * outside the grand staff are refused, so a rest can only slide within the
- * staff it belongs to (unless its own voice sings outside it); `null` means the
- * column is walled in on both sides and the rest is **named** as unwritable
- * rather than silently dropped or slid into a collision (see
- * {@link computeJankoRestLayer}).
+ * The ink box of a dialect is a fixed rectangle translated horizontally with
+ * the rest, so a notehead at `(px, py)` forbids exactly the x-interval in which
+ * the box comes closer than {@link restClearanceRadius} — the glyph radius plus
+ * the guaranteed {@link REST_SEAT_AIR}. The solver collects those intervals
+ * (only the notes whose disc reaches the box's row band can contribute), merges
+ * them, adds the measure-edge windows the linter's barline audit would check
+ * (conservative: the rest keeps the linter's floor from any edge that could
+ * carry ink, under every grid policy), and returns the legal x nearest the
+ * canonical beat column — tie-break: the earlier slot, so the choice is a pure
+ * function of the layout. `null` means the cell offers no clear slot and the
+ * rest is **named** as unwritable rather than silently dropped or slid into a
+ * collision (see {@link computeJankoRestLayer}).
  */
-export function resolveRestY(
+export function resolveRestX(
   rest: JankoRestGeometry,
   notes: readonly PositionedJankoNote[],
   geo: JankoSystemGeometry,
+  systemIndex: number,
+  measureIdx: number,
+  cell: { left: number; right: number },
   t: ResolvedJankoTokens
 ): number | null {
-  const target = rest.y;
+  const target = rest.x;
   const probe = restInkBox(rest, t);
+  const relX0 = probe.x0 - rest.x;
+  const relX1 = probe.x1 - rest.x;
 
-  // Forbidden y-windows, relative to the target.
+  // Forbidden x-windows for the rest centre, relative to the canonical column
+  // (0 = the target): a notehead at `p.x` forbids exactly the centres whose
+  // box comes closer than the clearance radius.
   const forbidden: Array<[number, number]> = [];
   for (const p of notes) {
     const radius = restClearanceRadius(p, t);
-    const reach = p.x < probe.x0 ? probe.x0 - p.x : p.x > probe.x1 ? p.x - probe.x1 : 0;
+    const reach = p.y < probe.y0 ? probe.y0 - p.y : p.y > probe.y1 ? p.y - probe.y1 : 0;
     if (reach >= radius) continue;
     const half = Math.sqrt(Math.max(0, radius * radius - reach * reach));
-    forbidden.push([p.y - half - probe.y1, p.y + half - probe.y0]);
+    forbidden.push([p.x - half - relX1 - target, p.x + half - relX0 - target]);
   }
-  if (forbidden.length === 0) return target;
+  // Measure edges: the rest never straddles barline ink, so the box keeps the
+  // linter's floor from either edge of its measure (the edges are probed
+  // without a grid policy — conservative under `transparent`, where the linter
+  // only pushes a hairline the rest itself queues).
+  const barAir = REST_NOTEHEAD_AIR + REST_FIT_MARGIN;
+  for (const edge of [
+    getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t),
+    getMeasureClosingBarlineX(measureIdx, geo, systemIndex, t),
+  ]) {
+    if (edge === null) continue;
+    forbidden.push([edge - barAir - relX1 - target, edge + barAir - relX0 - target]);
+  }
   forbidden.sort((a, b) => a[0] - b[0]);
   const merged: Array<[number, number]> = [];
   for (const [lo, hi] of forbidden) {
@@ -1346,12 +1439,11 @@ export function resolveRestY(
     else merged.push([lo, hi]);
   }
 
-  // The legal set is the complement of the merged windows: choose its point
-  // nearest the contour target (0 in relative coordinates), clamped to the
-  // grand staff so a rest never migrates out of its own staff — unless the
-  // voice itself sings outside it, in which case the contour stays reachable.
-  const bandLo = Math.min(geo.staffTopY, target) - target;
-  const bandHi = Math.max(geo.staffBotY, target) - target;
+  // The legal set is the complement of the merged windows inside the beat
+  // cell: choose its point nearest the canonical column (0 in relative
+  // coordinates), the earlier slot on an exact tie.
+  const bandLo = cell.left - target;
+  const bandHi = cell.right - target;
   const segments: Array<[number, number]> = [];
   let cursor = bandLo;
   for (const [lo, hi] of merged) {
@@ -1372,6 +1464,36 @@ export function resolveRestY(
 }
 
 /**
+ * The beat cell of a rest's silence: the span between the two neighbouring
+ * painted grid lines on the **canonical** proportional grid (no clasp inset —
+ * the Round 5 widening shifts a measure's note field, never the absolute grid
+ * the rest belongs to). The along-the-rule nudge may never leave it.
+ */
+function restBeatCell(
+  tick: number,
+  measureIdx: number,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): { left: number; right: number } {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  let measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
+  let mWidth = geo.measureWidth;
+  if (systemIndex === 0 && anacrusis > 0) {
+    const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
+    if (tick < anacrusis) {
+      measureLeft = geo.staffLeft;
+      mWidth = upbeatWidth;
+    } else {
+      const m = measureIdx - 1;
+      measureLeft = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
+    }
+  }
+  return tickBeatCell(tick, geo, systemIndex, o, t, measureLeft, mWidth, null);
+}
+
+/**
  * One silence the engine **refused to write**, with the exact reason. Round 14:
  * a rest is never silently dropped any more — the refusal is a named
  * diagnostic the linter republishes as `rest-unwritable`, so a designer always
@@ -1388,14 +1510,14 @@ export interface JankoUnwrittenRest {
   value: JankoRestGeometry['value'];
   /** Canonical beat column of the silence (page pt). */
   x: number;
-  /** The voice-contour target the pocket could not honour (page pt). */
+  /** The rule-hang centre the slot search could not honour (page pt). */
   targetY: number;
   /**
-   * Why the silence is unwritten: the column is walled in on both sides
-   * (`'no-pocket'`), or it opens exactly on a barline the active grid policy
-   * protects (`'protected-barline'`).
+   * Why the silence is unwritten: the beat cell offers no clear slot along the
+   * rule (`'no-slot'`), or the silence opens on a barline the active grid
+   * policy protects and the nudge cannot escape it (`'protected-barline'`).
    */
-  reason: 'no-pocket' | 'protected-barline';
+  reason: 'no-slot' | 'protected-barline';
 }
 
 /** The written silences of one system plus every silence the fit rule refused. */
@@ -1407,8 +1529,8 @@ export interface JankoRestLayer {
 }
 
 /**
- * Round 12 voice rests, anchored on the Round 13 **voice contour** and seated
- * by the Round 14 **pocket** fit.
+ * Round 12 voice rests, hung by the Round 16 **rule-hang** and seated by the
+ * along-the-rule slot search.
  *
  * A hand's **inactive span inside an active measure** is written with the active
  * rest dialect: the engine walks one hand's onsets in the system, and wherever
@@ -1420,19 +1542,24 @@ export interface JankoRestLayer {
  * it stands beside: the Round 5 clasp-inset widening shifts a measure's note
  * field, never the absolute grid the rest belongs to.
  *
+ * Vertically the rest hangs from the nearest staff rule to its voice
+ * ({@link restRuleReference}) and extends toward the Middle C corridor — same
+ * voice, same place, every bar. Horizontally {@link resolveRestX} nudges it
+ * along the rule inside its beat cell until its ink stands clear of every
+ * notehead disc (either hand) with the guaranteed {@link REST_SEAT_AIR}.
+ *
  * - Bach Goldberg Var. 1 m. 4 is the canonical case: the RH plays 16ths up to
  *   tick 540 (digit `9`, `y = 158.5pt`), releases at 552 and resumes at 564
  *   (digit `0`, `y = 173.5pt`), while the LH enters at 552 — so a **16th rest**
- *   stands in the Right Hand at `x ≈ 545.0pt` (the tick-552 beat column) on the
- *   Octave 3 voice contour (`(158.5 + 173.5) / 2 = 166.0pt`), seated by
- *   {@link resolveRestY} in the clear pocket above the LH D3 head that shares
- *   its column, with the guaranteed {@link REST_POCKET_AIR} of air.
+ *   stands in the Right Hand at the tick-552 beat column, hung from the Octave
+ *   3 rule (`166.0pt`) toward Middle C, clearing the LH D3 head that shares
+ *   its column with room to spare.
  * - A silence that is not a standard value (a 2.5-beat gap, a tie artefact) is
  *   left unwritten rather than approximated — that is a **non-silence**, not a
  *   refusal, so it is not reported.
  * - A rest whose ink cannot clear the noteheads of the system (either hand) in
- *   any pocket inside the staff is returned in `unwritten` by
- *   {@link resolveRestY}, exactly like a bracket the fit rule refuses.
+ *   any slot inside its beat cell is returned in `unwritten` by
+ *   {@link resolveRestX}, exactly like a bracket the fit rule refuses.
  */
 export function computeJankoRestLayer(
   score: QuantizedGridScore,
@@ -1470,13 +1597,15 @@ export function computeJankoRestLayer(
       // at least one onset inside the measure the silence opens in.
       if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
       if (!activeMeasures.has(measureIdx)) continue;
+      const value = restValueForTicks(gap);
+      const { ruleY, dir } = restRuleReference(hand, ticks[i], ticks[i + 1], notes, geo, t, o);
       const candidate: JankoRestGeometry = {
         tick: releaseTick,
         durationTicks: gap,
         hand,
         x: getTickColumnX(releaseTick, geo, systemIndex, o, t),
-        y: voiceContourTargetY(hand, ticks[i], ticks[i + 1], notes, geo, t, o),
-        value: restValueForTicks(gap),
+        y: restHangCenter(ruleY, dir, o.restStyle, value, t),
+        value,
         style: o.restStyle,
       };
       const refused = (reason: JankoUnwrittenRest['reason']): void => {
@@ -1490,25 +1619,28 @@ export function computeJankoRestLayer(
           reason,
         });
       };
-      // A rest never straddles a protected barline: when a silence opens exactly
-      // on a measure boundary, that column belongs to the grid. The transparent
-      // policy reserves nothing, so there the rest is admitted like any glyph.
-      if (protectsBarlineInk(o.gridWritingPolicy)) {
-        const opening = getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t);
-        if (opening !== null && Math.abs(candidate.x - opening) < t.noteheadRadius + REST_NOTEHEAD_AIR) {
-          refused('protected-barline');
-          continue;
-        }
-      }
-      // Round 14: the contour target is the *musical* anchor; the pocket solver
-      // seats it in the nearest guaranteed-clear pocket along that voice, or
-      // names the column unwritable when it is walled in on both sides.
-      const y = resolveRestY(candidate, notes, geo, t);
-      if (y === null) {
-        refused('no-pocket');
+      // Round 16: the rule-hang is the *musical* anchor; the slot solver nudges
+      // it along the rule inside its beat cell, or names the silence unwritable
+      // when the cell offers no clear slot. A silence that opens on a barline
+      // the active grid policy protects — and whose nudge cannot escape it —
+      // is named `'protected-barline'` rather than `'no-slot'`, so the grid
+      // refusal stays distinguishable from a wall of heads.
+      const cell = restBeatCell(releaseTick, measureIdx, geo, systemIndex, o, t);
+      const x = resolveRestX(candidate, notes, geo, systemIndex, measureIdx, cell, t);
+      if (x === null) {
+        // A silence that opens within a head's air of a protected barline
+        // opened on the grid: it is named `'protected-barline'` rather than
+        // `'no-slot'`, so the grid refusal stays distinguishable from a wall
+        // of heads (the same threshold the Round 12 pre-check refused by).
+        const onGrid =
+          protectsBarlineInk(o.gridWritingPolicy) &&
+          [getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t)].some(
+            (edge) => edge !== null && Math.abs(candidate.x - edge) < t.noteheadRadius + REST_NOTEHEAD_AIR
+          );
+        refused(onGrid ? 'protected-barline' : 'no-slot');
         continue;
       }
-      candidate.y = y;
+      candidate.x = x;
       out.push(candidate);
     }
   }
@@ -1543,57 +1675,14 @@ export function computeJankoRests(
 const EPS = 1e-6;
 
 /**
- * Extra air (pt) a row-displaced chord tone keeps beyond the neighbouring
- * notehead disc: `Δx ≥ 2r + 1.2pt`, i.e. 10.8pt for the canonical 4.8pt mask.
- */
-export const CHORDAL_OFFSET_AIR = 1.2;
-
-/**
  * Air (pt) a row-snapped head keeps from the nearest head of a *different*
- * onset on its own row: exactly one notehead diameter, the hard rule the
- * visual linter audits (`dx >= 2r`). It is deliberately not inflated — a dense
- * 16th grid whose columns already sit at `2r + ε` must not be nudged by a
- * solver that thinks it is 0.05pt short.
+ * onset on its own row: exactly one notehead diameter, the hard conservative
+ * rule the visual linter audits (`dx >= 2r`). It is deliberately not inflated —
+ * a dense 16th grid whose columns already sit at `2r + ε` must not be nudged by
+ * a solver that thinks it is 0.05pt short. Same-onset same-row pairs instead
+ * stand at the active cluster-spacing preset (`2rx + air`).
  */
 export const CHORDAL_NEIGHBOUR_AIR = 0;
-
-/**
- * Round 15 extra air (pt) of the minimal **asymmetric** crowded flank: the
- * displaced head stands `2r + 0.4pt` from the head that keeps the column, so a
- * colliding pair discloses 10.0pt in total instead of the Round 14 symmetric
- * 11.0pt — the smallest honest fan that still clears the two discs.
- */
-export const CROWDED_MICRO_AIR = 0.4;
-
-/**
- * Round 15 minimum asymmetry (pt) of an `'asymmetric-micro'` flank: even when
- * both sides are equally roomy, the cluster slides by at least this much toward
- * the deterministic right-hand side, so the policy is **never symmetric by
- * default** (the Round 14 spread it exists to replace).
- */
-export const CROWDED_MIN_BIAS = 0.5;
-
-/**
- * Round 15 cap (pt) on that slide. The bias is a *micro*-offset: it spends the
- * spare asymmetry of the two sides without eating a neighbour's column, because
- * the neighbour relief (Phase 3 of the chord-column solve) has to absorb the
- * rest of the displaced head's reach.
- */
-export const CROWDED_MICRO_BIAS = 1.0;
-
-/**
- * Effective horizontal displacement (pt) between two same-row chord tones of
- * one onset.
- *
- * `tokens.chordalOffset` (11.0pt by default) is authoritative, but it is never
- * allowed to fall below `2 * noteheadRadius + 1.2pt`: a designer who enlarges
- * the knockout disc must not silently re-open the collision the offset exists
- * to remove.
- */
-export function getChordalOffset(tokens?: Partial<JankoTokens> | null): number {
-  const t = resolveJankoTokens(tokens);
-  return Math.max(t.chordalOffset, 2 * t.noteheadRadius + CHORDAL_OFFSET_AIR);
-}
 
 /** One whole-tone row of one onset: the heads that must share a horizontal slot. */
 interface RowCluster {
@@ -1605,9 +1694,9 @@ interface RowCluster {
   notes: PositionedJankoNote[];
   /**
    * Resolved horizontal offsets (page pt, signed) of this row's heads from the
-   * onset column: the symmetric `±(K-1)·Δx/2` fan under
-   * `'symmetric-spread'`, the policy's asymmetric flank under the two Round 15
-   * crowded-column policies (see {@link resolveCrowdedRowOffsets}).
+   * onset column: the single standard grammar's asymmetric fan — one head on
+   * the column, the rest stepping toward the roomier side at `2rx + air` per
+   * step (see {@link resolveChordColumns}).
    */
   minOffset: number;
   maxOffset: number;
@@ -1762,28 +1851,29 @@ function perHandDownbeatQualifies(notes: readonly QuantizedNote[]): boolean {
  * `(octave, rank)` share one lattice point: the same `y` by construction, and —
  * before this pass — the same `x` as well, so the later white knockout erases
  * the earlier digit. Every such group of `K ≥ 2` heads is sorted by pitch
- * ascending and spread symmetrically around its onset's column:
+ * ascending and fanned out asymmetrically around its onset's column: one head
+ * keeps the nominal beat-x and the rest step toward the roomier side at the
+ * active cluster-spacing preset:
  *
  * ```
- * x_i = x_onset + (i - (K - 1) / 2) · Δx_chord,   Δx_chord = getChordalOffset(tokens)
+ * x_i = x_onset + (i - anchor) · pairGap · d,   pairGap = 2rx + air
  * ```
  *
- * So a two-note collision becomes the symmetric pair `x ∓ Δx/2` and a three-note
- * collision the triplet `x − Δx, x, x + Δx`. Heads on **different** rows of the
- * same onset keep one shared column, which is what preserves the isomorphic
- * ∇ / Δ hand shapes of the staff.
+ * So a two-note collision becomes the pair `x, x + pairGap·d` (8.2pt apart on
+ * the golden `'balanced'`) and a three-note collision the triplet
+ * `x − pairGap, x, x + pairGap`. Heads on **different** rows of the same onset
+ * keep one shared column, which is what preserves the isomorphic ∇ / Δ hand
+ * shapes of the staff.
  *
  * **The column solve.** A displaced head claims real horizontal room, and in
  * dense writing the neighbouring onset of its own row is only one 16th away.
  * The onset is therefore treated as one unit whose column may be translated as
  * a whole — never sheared, so the chord keeps its shape — in two phases:
  *
- * 1. **Spread columns** place themselves against the *nominal* beat grid: the
- *    symmetric placement is kept (`shift = 0`) whenever every head still clears
- *    its row neighbours by `2r` and stays inside the measure's `measureInset`
- *    band; otherwise the column slides to the nearest legal position. In
- *    practice this makes a crowded chord take the air from whichever side has
- *    it (a spreading downbeat chord slides right, off the barline).
+ * 1. **Spread columns** never translate: the crowded column keeps the nominal
+ *    beat-x and every head stays inside its own beat cell, so a displaced head
+ *    can never cross a pulse or a barline. Only a **clasped** column steps
+ *    right for the air its bracket needs.
  * 2. **Plain columns** that the spread ones have crowded step away by exactly
  *    the missing air — the local spacing relief a real engraver applies around
  *    a displaced second.
@@ -1827,15 +1917,13 @@ export function resolveChordColumns(
   t: ResolvedJankoTokens,
   claspInsets?: JankoClaspInsetMap | null
 ): JankoChordColumnResolution {
-  const delta = getChordalOffset(t);
-  const gap = 2 * t.noteheadRadius + CHORDAL_NEIGHBOUR_AIR;
+  const spacing = getClusterSpacingPreset(o.clusterSpacing);
+  const rx = spacing.rx;
+  const presetAir = spacing.air;
+  const pairGap = spacing.pairGap;
   const claspsActive = usesChordClasps(o.chordGrouping);
   const perHandClasps = o.chordGrouping === 'per-hand-clasp';
   const claspReach = t.noteheadRadius + t.claspOffset;
-  // Round 15 crowded-column grammar (see `JankoCrowdedColumnPolicy`).
-  const asymmetricCrowding = o.crowdedColumn !== 'symmetric-spread';
-  const stemAnchored = o.crowdedColumn === 'stem-anchored';
-  const microGap = 2 * t.noteheadRadius + CROWDED_MICRO_AIR;
 
   // -------------------------------------------------------------------------
   // 1. Partition the system into onset units, each split into row clusters.
@@ -1918,25 +2006,21 @@ export function resolveChordColumns(
   const units = [...unitByTick.values()];
 
   // -------------------------------------------------------------------------
-  // 1a. Round 15 crowded-column placement.
+  // 1a. Crowded-row placement (single standard grammar, Round 16).
   //
-  //     A row that carries two heads of one onset must fan them out. Three
-  //     policies answer how (see `JankoCrowdedColumnPolicy`):
+  //     A row that carries two or more heads of one onset fans them out
+  //     asymmetrically: one head keeps the nominal beat-x (the RH head when
+  //     the row is mixed-hand, the middle head otherwise) and the rest step
+  //     toward the roomier neighbour at the preset `2rx + air` per step, so a
+  //     pair spans exactly the judged pair gap (8.2pt on the golden
+  //     `'balanced'`) and a triple twice it. The crowded column itself never
+  //     translates — a plain neighbour yields instead.
   //
-  //     * `'symmetric-spread'` — the Round 14 control: the heads straddle the
-  //       column at `∓Δx/2` and the whole column translates until they fit;
-  //     * `'stem-anchored'` — the RH head (when the row is mixed-hand) keeps
-  //       the nominal beat-x, the displaced head takes the roomier side at the
-  //       minimal `2r + 0.4pt` flank, and the column itself never translates:
-  //       a neighbour yields instead;
-  //     * `'asymmetric-micro'` — the same minimal flank, slid toward the roomy
-  //       side by a micro-bias (never symmetric by default); the column may
-  //       still take a small residual shift.
-  //
-  //     Hard barriers (both Round 15 policies): every head stays inside its
-  //     own **beat cell** — the span between the two neighbouring painted grid
-  //     lines — so a displaced head can never cross a beat pulse or a barline
-  //     into another beat's territory.
+  //     Hard barriers: every head stays inside its own **beat cell** — the
+  //     span between the two neighbouring painted grid lines — so a displaced
+  //     head can never cross a beat pulse or a barline into another beat's
+  //     territory; where the full fan will not fit, it mirrors, slides or
+  //     centres inside the cell.
   // -------------------------------------------------------------------------
   const offsetsById = new Map<string, number>();
   const byX = [...units].sort((a, b) => a.nominalX - b.nominalX || a.tick - b.tick);
@@ -1953,69 +2037,67 @@ export function resolveChordColumns(
         offsetsById.set(cluster.notes[0].note.id, 0);
         continue;
       }
-      let offsets: number[];
-      if (!asymmetricCrowding) {
-        offsets = cluster.notes.map((_, i) => (i - (k - 1) / 2) * delta);
-      } else {
-        // The head that keeps the nominal beat-x: an RH tone when the row is
-        // mixed-hand under `'stem-anchored'`, otherwise the middle head.
-        let anchor = Math.floor((k - 1) / 2);
-        if (stemAnchored) {
-          const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
-          if (rh >= 0) anchor = rh;
-        }
-        // The flank must clear whatever glyph the heads actually wear: a tick-0
-        // sound carries the wider Position of Honor ring, and two rings may
-        // never cut into each other's knockout either.
-        const glyphRadius = (p: PositionedJankoNote): number =>
-          isPositionOfHonor(p.note.startTick)
-            ? Math.max(t.noteheadRadius, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
-            : t.noteheadRadius;
-        let clusterGap = microGap;
-        for (let i = 1; i < k; i++) {
-          clusterGap = Math.max(
-            clusterGap,
-            glyphRadius(cluster.notes[i - 1]) + glyphRadius(cluster.notes[i]) + CROWDED_MICRO_AIR
-          );
-        }
-        // The fan extends toward the roomier side. When the anchor sits right of
-        // the cluster's centre the direction must mirror, so the *bulk* of the
-        // heads — not the raw index order — leans into the open space.
-        const roomier: 1 | -1 = rightReach >= leftReach ? 1 : -1;
-        const anchorLean = Math.sign((k - 1) / 2 - anchor);
-        let dir: 1 | -1 = anchorLean < 0 ? (-roomier as 1 | -1) : roomier;
-        let bias = 0;
-        if (!stemAnchored) {
-          bias = (rightReach - leftReach) / 2;
-          bias = Math.max(-CROWDED_MICRO_BIAS, Math.min(CROWDED_MICRO_BIAS, bias));
-          if (Math.abs(bias) < CROWDED_MIN_BIAS) bias = CROWDED_MIN_BIAS * roomier;
-        }
-        const fan = (d: 1 | -1, b: number): number[] =>
-          cluster.notes.map((_, i) => (i - anchor) * clusterGap * d + b);
-        offsets = fan(dir, bias);
-        // Hard barrier: mirror first (the exact fan about the anchor, so the
-        // anchored head keeps the column), then slide, then centre — never a
-        // head outside the beat cell.
-        const cellLo = unit.cellLeft - unit.nominalX;
-        const cellHi = unit.cellRight - unit.nominalX;
-        const lo = Math.min(...offsets);
-        const hi = Math.max(...offsets);
-        if (lo < cellLo - EPS || hi > cellHi + EPS) {
-          const mirrored = fan(-dir as 1 | -1, -bias);
-          const fLo = Math.min(...mirrored);
-          const fHi = Math.max(...mirrored);
-          if (fLo >= cellLo - EPS && fHi <= cellHi + EPS) {
-            offsets = mirrored;
-            dir = -dir as 1 | -1;
-          } else {
-            const width = hi - lo;
-            const room = cellHi - cellLo;
-            const target =
-              room >= width
-                ? Math.max(cellLo - lo, Math.min(cellHi - hi, 0))
-                : (room - width) / 2 - lo;
-            offsets = offsets.map((o) => o + target);
-          }
+      // The head that keeps the nominal beat-x: the RH tone when the row is
+      // mixed-hand, otherwise the middle head.
+      let anchor = Math.floor((k - 1) / 2);
+      const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
+      const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
+      if (hands.size > 1 && rh >= 0) anchor = rh;
+      // The flank must clear whatever glyph the heads actually wear: a tick-0
+      // sound carries the wider Position of Honor ring, and two rings may
+      // never cut into each other's knockout either. Horizontal radii — the
+      // fan is a horizontal question; regular heads step exactly pairGap.
+      const glyphRX = (p: PositionedJankoNote): number =>
+        isPositionOfHonor(p.note.startTick)
+          ? Math.max(rx, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
+          : rx;
+      let clusterGap = pairGap;
+      for (let i = 1; i < k; i++) {
+        clusterGap = Math.max(
+          clusterGap,
+          glyphRX(cluster.notes[i - 1]) + glyphRX(cluster.notes[i]) + presetAir
+        );
+      }
+      // The fan extends toward the roomier side. When the anchor sits right of
+      // the cluster's centre the direction must mirror, so the *bulk* of the
+      // heads — not the raw index order — leans into the open space.
+      const roomier: 1 | -1 = rightReach >= leftReach ? 1 : -1;
+      const anchorLean = Math.sign((k - 1) / 2 - anchor);
+      const dir: 1 | -1 = anchorLean < 0 ? (-roomier as 1 | -1) : roomier;
+      const fan = (d: 1 | -1): number[] =>
+        cluster.notes.map((_, i) => (i - anchor) * clusterGap * d);
+      let offsets = fan(dir);
+      // Hard barrier: mirror first (the exact fan about the anchor, so the
+      // anchored head keeps the column), then slide, then centre — never a
+      // head outside the beat cell. A cell edge that carries barline ink also
+      // carries the linter's floor, which the audit measures from the disc
+      // edge: the edge is inset by the head radius plus COLUMN_BARLINE_AIR
+      // plus the float-safety solver margin, so a downbeat fan slides right
+      // instead of painting a disc over its barline.
+      const openBarlineX = getMeasureOpeningBarlineX(unit.measureIdx, geo, systemIndex, t);
+      const closeBarlineX = getMeasureClosingBarlineX(unit.measureIdx, geo, systemIndex, t);
+      const barlineInset = t.noteheadRadius + COLUMN_BARLINE_AIR + REST_FIT_MARGIN;
+      const loAir =
+        openBarlineX !== null && Math.abs(unit.cellLeft - openBarlineX) < 1e-6 ? barlineInset : 0;
+      const hiAir = Math.abs(unit.cellRight - closeBarlineX) < 1e-6 ? barlineInset : 0;
+      const cellLo = unit.cellLeft + loAir - unit.nominalX;
+      const cellHi = unit.cellRight - hiAir - unit.nominalX;
+      const lo = Math.min(...offsets);
+      const hi = Math.max(...offsets);
+      if (lo < cellLo - EPS || hi > cellHi + EPS) {
+        const mirrored = fan(-dir as 1 | -1);
+        const fLo = Math.min(...mirrored);
+        const fHi = Math.max(...mirrored);
+        if (fLo >= cellLo - EPS && fHi <= cellHi + EPS) {
+          offsets = mirrored;
+        } else {
+          const width = hi - lo;
+          const room = cellHi - cellLo;
+          const target =
+            room >= width
+              ? Math.max(cellLo - lo, Math.min(cellHi - hi, 0))
+              : (room - width) / 2 - lo;
+          offsets = offsets.map((o) => o + target);
         }
       }
       cluster.minOffset = Math.min(...offsets);
@@ -2174,9 +2256,10 @@ export function resolveChordColumns(
   }
   const hasClasp = units.some((unit) => unit.clasp);
   // Fast path: a system with neither a same-row chord tone nor a clasp cannot
-  // move a single column, so the whole column solve is skipped. The Round 15
-  // stem-fusion guard still runs: a cross-hand pair may share its column
-  // without any row collision at all (the Round 14 bars 13/14 defect).
+  // move a single column, so the whole column solve is skipped. Coincidence on
+  // the nominal column is the doctrine now — cross-hand pairs share their
+  // column with no stagger, and the linter's `split-stack-stems` names any
+  // regression.
   if (!units.some((unit) => unit.spread || unit.clasp)) {
     const untouched = notes.map((p) => {
       const unit = unitByTick.get(p.note.startTick);
@@ -2188,7 +2271,6 @@ export function resolveChordColumns(
           }
         : p;
     });
-    if (asymmetricCrowding) applyStemFusionStagger(untouched, t);
     return { notes: untouched, claspTicks: new Set<number>() };
   }
 
@@ -2200,13 +2282,17 @@ export function resolveChordColumns(
   );
   /** Columns further apart than this can never touch, whatever their rows. */
   const reach =
-    2 * maxAbsOffset + 2 * r + delta + (hasClasp ? claspReach + CLASP_NOTEHEAD_AIR : 0);
+    2 * maxAbsOffset + 2 * r + 2 * pairGap + (hasClasp ? claspReach + CLASP_NOTEHEAD_AIR : 0);
 
   /**
-   * Horizontal air two clusters owe each other: `2r` when they share a row,
-   * less when their rows are close but distinct (the bounded channel puts two
-   * flanks only 4pt apart), and no constraint at all once the rows are a full
-   * disc apart — vertical separation alone then keeps the glyphs clear.
+   * Horizontal air two clusters of *different* onsets owe each other: `2r`
+   * when they share a row, less when their rows are close but distinct (the
+   * bounded channel puts two flanks only 4pt apart), and no constraint at all
+   * once the rows are a full disc apart — vertical separation alone then keeps
+   * the glyphs clear. Deliberately conservative (circular): the visual linter
+   * audits different-onset neighbours against the same circular `2r` bound, so
+   * the solver must seat them there. Same-onset pairs instead stand at the
+   * preset `2rx + air` fan built in Phase 1a.
    */
   const separation = (a: RowCluster, b: RowCluster): number | null => {
     const dy = Math.abs(a.y - b.y);
@@ -2332,18 +2418,14 @@ export function resolveChordColumns(
       }
     }
 
-    // The measure band and — under the two Round 15 policies — the beat cell
-    // are structural: a spread downbeat chord may never be driven onto the
-    // preceding barline, and no head may leave the beat cell of its own column.
-    // The `'symmetric-spread'` control keeps the Round 14 window verbatim so it
-    // stays the honest baseline the new checks exist to measure.
+    // The measure band and the beat cell are structural: a spread downbeat
+    // chord may never be driven onto the preceding barline, and no head may
+    // leave the beat cell of its own column.
     for (const cluster of unit.rows) {
       lo = Math.max(lo, unit.bandLeft - cluster.minOffset - unit.nominalX);
       hi = Math.min(hi, unit.bandRight - cluster.maxOffset - unit.nominalX);
-      if (asymmetricCrowding) {
-        lo = Math.max(lo, unit.cellLeft - cluster.minOffset - unit.nominalX);
-        hi = Math.min(hi, unit.cellRight - cluster.maxOffset - unit.nominalX);
-      }
+      lo = Math.max(lo, unit.cellLeft - cluster.minOffset - unit.nominalX);
+      hi = Math.min(hi, unit.cellRight - cluster.maxOffset - unit.nominalX);
     }
     return { lo, hi: Math.max(lo, hi) };
   };
@@ -2352,13 +2434,13 @@ export function resolveChordColumns(
 
   // -------------------------------------------------------------------------
   // 2. Spread and clasped columns first: keep the resolved placement whenever
-  //    it is legal. Under `'stem-anchored'` a spread column never translates —
-  //    the beat-x spine is the policy's whole point — while a clasped column
-  //    still takes the air its bracket needs.
+  //    it is legal. A spread column never translates — the beat-x spine is the
+  //    grammar's whole point — while a clasped column still takes the air its
+  //    bracket needs.
   // -------------------------------------------------------------------------
   for (const unit of ordered) {
     if (!unit.spread && !unit.clasp) continue;
-    if (stemAnchored && !unit.clasp) continue;
+    if (!unit.clasp) continue;
     const { lo, hi } = windowOf(unit);
     if (lo <= 0 && 0 <= hi) continue;
     // Over-constrained: split the residual displacement evenly rather than
@@ -2402,11 +2484,11 @@ export function resolveChordColumns(
       const minOff = unitMinOffset(unit);
       const bandLo = Math.max(
         unit.bandLeft - minOff - unit.nominalX,
-        asymmetricCrowding ? unit.cellLeft - minOff - unit.nominalX : Number.NEGATIVE_INFINITY
+        unit.cellLeft - minOff - unit.nominalX
       );
       const bandHi = Math.min(
         unit.bandRight - maxOff - unit.nominalX,
-        asymmetricCrowding ? unit.cellRight - maxOff - unit.nominalX : Number.POSITIVE_INFINITY
+        unit.cellRight - maxOff - unit.nominalX
       );
       const clamped = Math.max(bandLo, Math.min(bandHi, unit.shift + step));
       if (clamped !== unit.shift) {
@@ -2437,7 +2519,10 @@ export function resolveChordColumns(
     const unit = unitByTick.get(p.note.startTick);
     const cell = unit ? { left: unit.cellLeft, right: unit.cellRight } : undefined;
     if (x === undefined) return unit ? { ...p, nominalX: unit.nominalX, beatCell: cell } : p;
-    const rhythm = x === p.x ? p.rhythm : { ...p.rhythm, x };
+    // A moved head carries its rhythm stem and its augmentation dot with it:
+    // the dot stays tight to the elliptical mask (`x + rx + gap`).
+    const rhythm =
+      x === p.x ? p.rhythm : { ...p.rhythm, x, dotX: x + rx + t.augmentationDotGap };
     return {
       ...p,
       x,
@@ -2446,76 +2531,10 @@ export function resolveChordColumns(
     };
   });
 
-  // -------------------------------------------------------------------------
-  // 5. Round 15: no two opposing stems may fuse into one continuous rule.
-  //    Where the two hands still share a stem column and their spans overlap
-  //    (the Round 14 bars 13/14 defect), the RH stem steps left and the LH stem
-  //    right by the fixed `JANKO_STEM_STAGGER`, so the column reads as two
-  //    voices instead of one head-to-head connector. The control policy keeps
-  //    the Round 11 centerline doctrine verbatim.
-  // -------------------------------------------------------------------------
-  if (asymmetricCrowding) {
-    applyStemFusionStagger(placed, t);
-  }
-
   return {
     notes: placed,
     claspTicks: new Set(ordered.filter((unit) => unit.clasp).map((unit) => unit.tick)),
   };
-}
-
-/**
- * Round 15 stem-fusion guard: stagger the two stems of any **opposing-hand**
- * pair that shares one column with touching or overlapping vertical spans.
- *
- * `'stem-anchored'` and `'asymmetric-micro'` both call this, so the Round 14
- * bars 13/14 defect (two heads 15–30pt apart joined by one uninterrupted
- * vertical line) cannot survive the round. Heads further apart than two stem
- * lengths already point their stems away from each other and are untouched.
- */
-export function applyStemFusionStagger(
-  notes: readonly PositionedJankoNote[],
-  tokens?: Partial<JankoTokens> | null
-): void {
-  const t = resolveJankoTokens(tokens);
-  const byX = new Map<string, PositionedJankoNote[]>();
-  for (const p of notes) {
-    const key = p.x.toFixed(3);
-    const bucket = byX.get(key);
-    if (bucket) bucket.push(p);
-    else byX.set(key, [p]);
-  }
-  for (const bucket of byX.values()) {
-    if (bucket.length < 2) continue;
-    const span = (r: JankoRhythmNote): { lo: number; hi: number } => {
-      const dir = r.hand === 'RH' ? -1 : 1;
-      const attach = getStemAttachmentRadius(r, t);
-      const a = r.y + dir * attach;
-      const b = r.y + dir * t.stemLength;
-      return { lo: Math.min(a, b), hi: Math.max(a, b) };
-    };
-    for (let i = 0; i < bucket.length; i++) {
-      for (let j = i + 1; j < bucket.length; j++) {
-        const a = bucket[i];
-        const b = bucket[j];
-        if (a.rhythm.hand === b.rhythm.hand) continue;
-        const ra = a.rhythm;
-        const rb = b.rhythm;
-        const sa = span(ra);
-        const sb = span(rb);
-        // Pointing away (or clear) — the pair already reads as two voices.
-        if (sa.hi < sb.lo - EPS || sb.hi < sa.lo - EPS) continue;
-        a.rhythm = {
-          ...ra,
-          stemDx: ra.hand === 'RH' ? -JANKO_STEM_STAGGER : JANKO_STEM_STAGGER,
-        };
-        b.rhythm = {
-          ...rb,
-          stemDx: rb.hand === 'RH' ? -JANKO_STEM_STAGGER : JANKO_STEM_STAGGER,
-        };
-      }
-    }
-  }
 }
 
 /** Position every note of one system, in engraving order. */
@@ -2657,7 +2676,7 @@ export function layoutJankoSystem(
     claspRails = railed.rails;
   }
   const beamedIds = new Set(beams.flatMap((beam) => beam.notes.map((n) => n.id)));
-  const claspedStems = clasps
+  let claspedStems = clasps
     .flatMap((clasp) => clasp.notes.map((n) => n.id))
     .filter((id) => !beamedIds.has(id));
 
@@ -2701,6 +2720,73 @@ export function layoutJankoSystem(
     }
   }
 
+  // Round 16 shared stems (standard chord rule), under the same per-hand-clasp
+  // gate as the vertical chords: one hand's same-duration voices of one onset —
+  // stacked or flanked, clasped or bare — share a single stem object on the
+  // nominal column. A hand-onset already unified by a vertical chord is left to
+  // that grammar (identical outcome); mixed durations keep their per-voice
+  // stems (each voice's beam/flag at its own end), and a clasped mixed stack
+  // stays fully bracketed. The carrier stands on the column at the extremity
+  // in stem direction, so its stem always leaves outward and can never be
+  // painted through a fellow member's head (the `stem-through-simultaneity`
+  // defect). A clasped carrier keeps its stem — the one stem the bracket does
+  // not replace.
+  const sharedStems: JankoSharedStemGroup[] = [];
+  if (o.chordGrouping === 'per-hand-clasp') {
+    const chordedIds = new Set(
+      verticalChords.flatMap((chord) => [chord.carrier.id, ...chord.suppressedIds])
+    );
+    const byHandOnset = new Map<string, PositionedJankoNote[]>();
+    for (const p of notes) {
+      const key = `${p.note.startTick}|${p.rhythm.hand}`;
+      const bucket = byHandOnset.get(key);
+      if (bucket) bucket.push(p);
+      else byHandOnset.set(key, [p]);
+    }
+    for (const group of byHandOnset.values()) {
+      if (group.length < 2) continue;
+      if (group.every((p) => chordedIds.has(p.note.id))) continue;
+      if (group.some((p) => beamedIds.has(p.note.id))) continue;
+      if (!group.every((p) => p.note.durationTicks === group[0].note.durationTicks)) continue;
+      const hand = group[0].rhythm.hand;
+      const dir = stemDirection(hand);
+      const nominal =
+        group[0].nominalX ?? group.reduce((acc, p) => acc + p.x, 0) / group.length;
+      // Nearest the nominal column first, then the extremity in stem direction
+      // (topmost for RH, bottommost for LH), then id: deterministic, on-column
+      // whenever any member kept the column, and always outward-facing.
+      const rank = (p: PositionedJankoNote): [number, number, string] => [
+        Math.abs(p.x - nominal),
+        dir < 0 ? p.y : -p.y,
+        p.note.id,
+      ];
+      let carrier = group[0];
+      let best = rank(carrier);
+      for (const p of group) {
+        const r = rank(p);
+        if (
+          r[0] < best[0] - EPS ||
+          (Math.abs(r[0] - best[0]) <= EPS &&
+            (r[1] < best[1] - EPS ||
+              (Math.abs(r[1] - best[1]) <= EPS && r[2] < best[2])))
+        ) {
+          carrier = p;
+          best = r;
+        }
+      }
+      sharedStems.push({
+        tick: group[0].note.startTick,
+        hand,
+        carrierId: carrier.note.id,
+        suppressedIds: group.map((p) => p.note.id).filter((id) => id !== carrier.note.id),
+      });
+    }
+  }
+  if (sharedStems.length > 0) {
+    const carrierIds = new Set(sharedStems.map((group) => group.carrierId));
+    claspedStems = claspedStems.filter((id) => !carrierIds.has(id));
+  }
+
   const restLayer = computeJankoRestLayer(score, geometry, systemIndex, o, t, notes);
 
   return {
@@ -2717,6 +2803,7 @@ export function layoutJankoSystem(
     claspedStems,
     verticalChords,
     chordBridges,
+    sharedStems,
   };
 }
 
@@ -2802,9 +2889,9 @@ function renderNotesLayer(
   //    A clasp owns the duration of every member whose stem is not part of a
   //    beam, so those standalone stems are replaced by the bracket. Option 3
   //    suppresses the interior stems of a vertical hand chord the same way: the
-  //    group's outer extremity carries the whole hand's duration.
-  const clasped = new Set(layout.claspedStems);
-  const suppressed = new Set(layout.verticalChords.flatMap((chord) => chord.suppressedIds));
+  //    group's outer extremity carries the whole hand's duration. Round 16
+  //    shared stems suppress every member but the carrier the same way again.
+  const suppressed = suppressedStemIds(layout);
   const carrierDurations = new Map(
     layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks])
   );
@@ -2820,12 +2907,12 @@ function renderNotesLayer(
       out.push(renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle));
     }
     for (const n of layout.ungrouped) {
-      if (clasped.has(n.id) || suppressed.has(n.id)) continue;
+      if (suppressed.has(n.id)) continue;
       out.push(renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle));
     }
   } else {
     for (const p of layout.notes) {
-      if (clasped.has(p.rhythm.id) || suppressed.has(p.rhythm.id)) continue;
+      if (suppressed.has(p.rhythm.id)) continue;
       out.push(renderRhythm(asEngraved(p.rhythm), o.rhythmStyle, t, o.subdivisionStyle));
     }
   }
@@ -2848,8 +2935,8 @@ function renderNotesLayer(
 
   // 2d. Round 12 `'strict-protected-grid'`: the continuous vertical grid is
   //     painted here, on its dedicated white air channels, *above* the rhythm
-  //     layer — so no stem or beam may ever overwrite it — while the circular
-  //     notehead masks painted in step 3 still knock it out inside their disc.
+  //     layer — so no stem or beam may ever overwrite it — while the elliptical
+  //     notehead masks painted in step 3 still knock it out inside their mask.
   if (gridInk.length > 0) out.push(gridInk);
 
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.
@@ -2863,7 +2950,8 @@ function renderNotesLayer(
           hand: p.coord.hand,
           isPositionOfHonor: p.note.startTick === 0,
         },
-        t
+        t,
+        o
       )
     );
   }
