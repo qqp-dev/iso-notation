@@ -41,7 +41,8 @@ import {
   digitHalfExtents,
   isPositionOfHonor,
 } from '../src/render/janko/elements/notehead';
-import { getChordalOffset } from '../src/render/janko/engine';
+import { JANKO_STEM_STAGGER } from '../src/render/janko/elements/rhythm';
+import { CROWDED_MICRO_AIR, getChordalOffset } from '../src/render/janko/engine';
 import {
   DEFAULT_JANKO_LINT_OPTIONS,
   JANKO_LINT_CHECKS,
@@ -156,7 +157,9 @@ test('Row-snapped chord tones: every same-row pair is spread by one full disc', 
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const r = DEFAULT_JANKO_TOKENS.noteheadRadius;
-  const offset = getChordalOffset(DEFAULT_JANKO_TOKENS);
+  // Round 15: the golden `'stem-anchored'` flank is the minimal asymmetric
+  // 2r + 0.4pt (10.0pt), not the Round 14 symmetric `chordalOffset` (11.0pt).
+  const offset = 2 * r + CROWDED_MICRO_AIR;
   let pairs = 0;
   for (const layout of layouts) {
     const rows = new Map<string, typeof layout.notes>();
@@ -420,18 +423,28 @@ test('Defect: a Position of Honor stem driven through the halo ring is caught', 
   }
 });
 
-test('Golden master: every stem is engraved on its notehead centreline', () => {
+test('Golden master: every stem is engraved on its notehead centreline (or its declared stagger)', () => {
   const out: LintViolation[] = [];
+  let staggered = 0;
   for (const layout of systems()) {
     checkStemAndBeamValidity(layout, DEFAULT_JANKO_TOKENS, LINT, out);
     for (const p of layout.notes) {
+      const declared = p.rhythm.stemDx ?? 0;
+      if (declared !== 0) {
+        staggered++;
+        assert.ok(
+          Math.abs(declared) <= JANKO_STEM_STAGGER + 1e-9,
+          `${p.note.id} staggers by the documented anti-fusion delta`
+        );
+      }
       assert.equal(
         getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS).stemX,
-        p.x,
-        `${p.note.id} keeps stemX === note.x`
+        p.x + declared,
+        `${p.note.id} keeps stemX === note.x (+ its declared stagger)`
       );
     }
   }
+  assert.ok(staggered > 0, 'the Round 15 golden un-fuses at least one opposing-hand column');
   assert.deepEqual(out, [], 'centred stems attach inside the disc and span their beam');
 });
 

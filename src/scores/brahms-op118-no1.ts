@@ -12,10 +12,13 @@ import {
 
 /**
  * Johannes Brahms: Intermezzo in A minor, Op. 118 No. 1
- * Allegro non assai, ma molto appassionato — mm. 1–9 (+ upbeat)
+ * Allegro non assai, ma molto appassionato — the **complete** piece
+ * (upbeat + 70 full cut-time measures + the closing 144-tick measure).
  *
  * Ingested deterministically and losslessly from authentic LilyPond-compiled MIDI
- * (public/midi/brahms-op118-no1.mid).
+ * (public/midi/brahms-op118-no1.mid). Round 15 extends the ingest past m. 9 so
+ * the rest-dialect review can anchor on real bars (mm. 7, 17, 39, 66, 68): the
+ * full 70-bar MIDI was already vendored, and every earlier window is unchanged.
  */
 
 /** Quarter-note resolution shared with the rest of the repository. */
@@ -26,8 +29,14 @@ export const BRAHMS_OP118_NO1_TICKS_PER_MEASURE = 192;
 export const BRAHMS_OP118_NO1_ANACRUSIS_TICKS = 48;
 /** Eighth note, the resolution of every arpeggio in the piece. */
 const EIGHTH = TICKS_PER_BEAT / 2;
-/** Measures engraved (mm. 1–9). */
-export const BRAHMS_OP118_NO1_MEASURES = 9;
+/**
+ * Measures engraved: the complete Intermezzo. The upbeat (48 ticks) plus 70
+ * full 192-tick measures plus the closing 144-tick measure span exactly
+ * `71 × 192 = 13632` ticks, which is the vendored MIDI's own length.
+ */
+export const BRAHMS_OP118_NO1_MEASURES = 71;
+/** Total length of the complete score (ticks), straight from the MIDI. */
+export const BRAHMS_OP118_NO1_TOTAL_TICKS = 13632;
 
 /**
  * Jánko layout options for this score: authentic cut-time measure length and
@@ -38,6 +47,12 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   ticksPerMeasure: BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   anacrusisTicks: BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   measuresPerSystem: 3,
+  // Round 15 keeps the golden's 4 systems/page for Bach; this benchmark's
+  // four-octave arpeggios reach octave 1-0 ledger equators ~44pt below the
+  // staff, and a 180pt slot cannot hold two such systems without their ink
+  // overlapping (the full-piece slot-fit audit reports it). Its bespoke
+  // notation therefore keeps three taller systems per page.
+  systemsPerPage: 3,
   title: "J. Brahms: 6 Klavierstücke, Op. 118",
   subtitle: "No. 1. Intermezzo in A minor — Allegro non assai, ma molto appassionato",
   composer: "Johannes Brahms",
@@ -90,9 +105,7 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
     composer: "Johannes Brahms",
   });
 
-  const totalTicks =
-    BRAHMS_OP118_NO1_ANACRUSIS_TICKS +
-    BRAHMS_OP118_NO1_MEASURES * BRAHMS_OP118_NO1_TICKS_PER_MEASURE;
+  const totalTicks = BRAHMS_OP118_NO1_TOTAL_TICKS;
 
   const notes = parsed.notes
     .filter((n) => n.startTick < totalTicks)
@@ -101,14 +114,22 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
       id: `brahms-op118-no1-${idx + 1}`,
     }));
 
+  // One barline per measure opening plus the score's closing boundary. The
+  // final measure is 144 ticks long (the piece's own closing bar), so the last
+  // barline sits at the MIDI's true end rather than on the 192-tick lattice.
   const barlines: QuantizedGridScore["barlines"] = [];
-  for (let m = 1; m <= BRAHMS_OP118_NO1_MEASURES + 1; m++) {
+  for (let m = 1; m <= BRAHMS_OP118_NO1_MEASURES; m++) {
     barlines.push({
       barNumber: m,
       tick: BRAHMS_OP118_NO1_ANACRUSIS_TICKS + (m - 1) * BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
-      type: (m === BRAHMS_OP118_NO1_MEASURES + 1 ? "final" : "regular") as "final" | "regular",
+      type: "regular",
     });
   }
+  barlines.push({
+    barNumber: BRAHMS_OP118_NO1_MEASURES + 1,
+    tick: totalTicks,
+    type: "final",
+  });
 
   const score: QuantizedGridScore = {
     ...parsed,

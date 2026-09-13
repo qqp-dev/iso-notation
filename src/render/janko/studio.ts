@@ -29,6 +29,7 @@ import {
   buildBrahmsOp118No1Score,
 } from '../../scores/brahms-op118-no1';
 import { buildChordDurationSpecimenScore } from '../../scores/chord-duration-specimen';
+import { buildRestDurationSpecimenScore } from '../../scores/rest-duration-specimen';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -47,6 +48,7 @@ import {
   DEFAULT_STUDIO_SCORE_ID,
   JankoCandidate,
   JankoCandidateRound,
+  REST_SPECIMEN_STUDIO_SCORE_ID,
   SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   resolveCandidate,
@@ -157,6 +159,15 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       id: SPECIMEN_STUDIO_SCORE_ID,
       score: buildChordDurationSpecimenScore(),
       options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }),
+      tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
+    },
+    // Round 15: the curated rest-duration specimen. Four measures across the
+    // staff width — one genuine silence per value, each on a column no other
+    // hand's head can reach — so every dialect is judged at macro scale.
+    [REST_SPECIMEN_STUDIO_SCORE_ID]: {
+      id: REST_SPECIMEN_STUDIO_SCORE_ID,
+      score: buildRestDurationSpecimenScore(),
+      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 }),
       tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
     },
     ...(overrides.scores ?? {}),

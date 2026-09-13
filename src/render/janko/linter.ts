@@ -55,10 +55,12 @@ import { QuantizedGridScore } from '../../model/types';
 import {
   DEFAULT_JANKO_TOKENS,
   JankoLayoutOptions,
+  JankoPageGeometry,
   JankoSystemStartStyle,
   JankoTokens,
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
+  getGridNoteInset,
   protectsBarlineInk,
   resolveJankoOptions,
   resolveJankoTokens,
@@ -66,6 +68,7 @@ import {
 import {
   JankoSystemLayout,
   PositionedJankoNote,
+  computePageGeometry,
   getChordalOffset,
   getMarginFurniture,
   layoutJankoScore,
@@ -74,6 +77,8 @@ import {
 import { getEquatorRuleYs } from './elements/staff';
 import {
   JankoBeamConnector,
+  JANKO_STEM_STAGGER,
+  JankoRhythmNote,
   claspInkBox,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
@@ -118,6 +123,11 @@ export type JankoLintCode =
   | 'rest-collision'
   | 'rest-unwritable'
   | 'stem-through-simultaneity'
+  | 'stem-fusion'
+  | 'dot-collision'
+  | 'grid-crossing-offset'
+  | 'time-inversion'
+  | 'system-slot-overlap'
   | 'corridor-intrusion';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -211,6 +221,11 @@ export const JANKO_LINT_CHECKS = [
   'rest-clearance',
   'rest-unwritable',
   'stem-simultaneity',
+  'stem-fusion',
+  'dot-clearance',
+  'grid-crossing',
+  'time-order',
+  'system-slot',
   'middle-c-corridor',
   'knockout-paint-order',
 ] as const;
@@ -513,7 +528,27 @@ export function checkStemAndBeamValidity(
     const circleLabel = honor
       ? `halo ring (R=${t.haloRadius.toFixed(2)}pt)`
       : `knockout disc (r=${r.toFixed(2)}pt)`;
-    if (Math.abs(stemX - p.x) > EPS) {
+    // Round 15: a stem may only leave the notehead centreline by the *declared*
+    // fusion stagger — the fixed ±δ the crowded-column policies apply to two
+    // opposing stems that would otherwise fuse. Any other drift is a defect.
+    const declaredDx = p.rhythm.stemDx ?? 0;
+    if (Math.abs(declaredDx) > JANKO_STEM_STAGGER + EPS) {
+      out.push({
+        code: 'stem-detached',
+        severity: 'error',
+        message:
+          `Stem of ${p.note.id} declares a ${declaredDx.toFixed(2)}pt column stagger, beyond the ` +
+          `documented ${JANKO_STEM_STAGGER.toFixed(2)}pt anti-fusion stagger.`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: stemX,
+        y: stemStartY,
+        metrics: { stemX, noteX: p.x, declaredDx, limit: JANKO_STEM_STAGGER },
+      });
+      continue;
+    }
+    if (Math.abs(stemX - (p.x + declaredDx)) > EPS) {
       out.push({
         code: 'stem-detached',
         severity: 'error',
@@ -951,11 +986,461 @@ export function checkStemThroughSimultaneity(
 // 5. Barline clearance
 // ---------------------------------------------------------------------------
 
+/**
+ * Round 15 — **augmentation dots** must be unambiguous.
+ *
+ * Every dotted value (the renderers paint a dot for `26 < durationTicks ≤ 38`)
+ * carries exactly one dot, always right of its own head
+ * (`dotX = note.x + r + augmentationDotGap`) and in the inter-row lane the
+ * engine resolved (`rhythm.dotY`). The dot's 0.75pt ink may not touch
+ *  - any notehead disc or Position-of-Honor halo (which would attribute the dot
+ *    to the wrong note — the Round 14 bar-5 defect),
+ *  - any painted horizontal rule (a dot sitting on a staff rule drowns in it),
+ *  - any painted vertical grid line (barline or dashed beat pulse).
+ */
+export function checkDotCollision(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const r = t.noteheadRadius;
+  const dotR = t.augmentationDotRadius;
+  const barlines = systemBarlines(layout, o, t);
+  const pulses = beatPulseXs(layout, o, t);
+  const rules: Array<{ y: number; stroke: number }> = [];
+  for (let octave = 0; octave <= 8; octave++) {
+    for (const y of getEquatorRuleYs(layout.geometry.equatorY('RH', octave), o, t)) {
+      rules.push({ y, stroke: octave >= 2 && octave <= 5 ? 0.5 : 0.75 });
+    }
+  }
+  for (const p of layout.notes) {
+    const dur = p.note.durationTicks;
+    if (dur <= 26 || dur > 38) continue;
+    const cx = p.x + r + t.augmentationDotGap;
+    const cy = p.rhythm.dotY ?? p.y;
+    const base = {
+      system: layout.index,
+      measure: measureOfTick(p.note.startTick, t),
+      noteIds: [p.note.id],
+      x: cx,
+      y: cy,
+    };
+    const glyphOf = (q: PositionedJankoNote): number =>
+      isPositionOfHonor(q.note.startTick)
+        ? Math.max(r, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
+        : r;
+    for (const q of layout.notes) {
+      const distance = Math.hypot(cx - q.x, cy - q.y);
+      if (distance >= glyphOf(q) + dotR - EPS) continue;
+      out.push({
+        code: 'dot-collision',
+        severity: 'error',
+        message:
+          `The augmentation dot of ${p.note.id} sits ${distance.toFixed(2)}pt from the centre of ` +
+          `${q.note.id} (glyph + dot = ${(glyphOf(q) + dotR).toFixed(2)}pt): the dot would attach to ` +
+          `the wrong note.`,
+        ...base,
+        metrics: { distance, required: glyphOf(q) + dotR, cx, cy },
+      });
+      break;
+    }
+    for (const rule of rules) {
+      const gap = Math.abs(cy - rule.y);
+      if (gap >= dotR + rule.stroke / 2 - EPS) continue;
+      out.push({
+        code: 'dot-collision',
+        severity: 'error',
+        message:
+          `The augmentation dot of ${p.note.id} touches the staff rule at y=${rule.y.toFixed(2)} ` +
+          `(${gap.toFixed(2)}pt gap, ${(dotR + rule.stroke / 2).toFixed(2)}pt required).`,
+        ...base,
+        metrics: { gap, required: dotR + rule.stroke / 2, ruleY: rule.y },
+      });
+      break;
+    }
+    for (const b of barlines) {
+      if (cy < b.top - EPS || cy > b.bottom + EPS) continue;
+      const gap = Math.abs(cx - b.x);
+      if (gap >= dotR + 0.3 - EPS) continue;
+      out.push({
+        code: 'dot-collision',
+        severity: 'error',
+        message:
+          `The augmentation dot of ${p.note.id} touches the barline at x=${b.x.toFixed(2)} ` +
+          `(${gap.toFixed(2)}pt gap, ${(dotR + 0.3).toFixed(2)}pt required).`,
+        ...base,
+        metrics: { gap, required: dotR + 0.3, barlineX: b.x },
+      });
+      break;
+    }
+    for (const x of pulses) {
+      const gap = Math.abs(cx - x);
+      if (gap >= dotR + 0.35 - EPS) continue;
+      out.push({
+        code: 'dot-collision',
+        severity: 'error',
+        message:
+          `The augmentation dot of ${p.note.id} touches the dashed beat pulse at x=${x.toFixed(2)} ` +
+          `(${gap.toFixed(2)}pt gap, ${(dotR + 0.35).toFixed(2)}pt required).`,
+        ...base,
+        metrics: { gap, required: dotR + 0.35, pulseX: x },
+      });
+      break;
+    }
+  }
+}
+
+/**
+ * Round 15 hard barrier — **no head may leave the beat cell of its nominal
+ * column**. Each onset carries the `[left, right]` span between the two painted
+ * grid lines that bracket its beat (`layout.notes[].beatCell`, recorded by the
+ * chord-column solve), and a displaced head outside it has crossed a beat pulse
+ * or a barline into another beat's territory (the Round 14 bar-12 defect).
+ */
+export function checkGridCrossingOffset(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  for (const p of layout.notes) {
+    if (p.nominalX === undefined || !p.beatCell) continue;
+    const { left, right } = p.beatCell;
+    if (p.x >= left - EPS && p.x <= right + EPS) continue;
+    const crossed = p.x < left ? left : right;
+    const side = p.x < left ? 'left' : 'right';
+    out.push({
+      code: 'grid-crossing-offset',
+      severity: 'error',
+      message:
+        `Head ${p.note.id} was displaced to x=${p.x.toFixed(2)}, outside the beat cell ` +
+        `[${left.toFixed(2)}, ${right.toFixed(2)}] of its nominal column ` +
+        `(x=${p.nominalX.toFixed(2)}): it crosses the grid line at x=${crossed.toFixed(2)} into the ` +
+        `${side === 'left' ? 'preceding' : 'following'} beat's territory.`,
+      system: layout.index,
+      measure: measureOfTick(p.note.startTick, t),
+      noteIds: [p.note.id],
+      x: p.x,
+      y: p.y,
+      metrics: {
+        nominalX: p.nominalX,
+        x: p.x,
+        cellLeft: left,
+        cellRight: right,
+        crossedX: crossed,
+      },
+    });
+  }
+}
+
+/**
+ * Round 15 — **time order on the page**: for every pair of consecutive onsets,
+ * the earlier onset's rightmost head must stay left of the later onset's
+ * leftmost head. A row-spread or column translation that inverts the order
+ * (the Round 14 bar-15 defect: LH 2 at t2064 left of the t2052 head) reads as a
+ * rhythmic lie even when every disc still clears.
+ */
+export function checkTimeOrder(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const byTick = new Map<number, { min: number; max: number; ids: string[] }>();
+  for (const p of layout.notes) {
+    const bucket = byTick.get(p.note.startTick);
+    if (bucket) {
+      bucket.min = Math.min(bucket.min, p.x);
+      bucket.max = Math.max(bucket.max, p.x);
+      bucket.ids.push(p.note.id);
+    } else {
+      byTick.set(p.note.startTick, { min: p.x, max: p.x, ids: [p.note.id] });
+    }
+  }
+  const ticks = [...byTick.keys()].sort((a, b) => a - b);
+  for (let i = 1; i < ticks.length; i++) {
+    const before = byTick.get(ticks[i - 1])!;
+    const after = byTick.get(ticks[i])!;
+    if (before.max <= after.min + EPS) continue;
+    out.push({
+      code: 'time-inversion',
+      severity: 'error',
+      message:
+        `Onset t${ticks[i - 1]} reaches x=${before.max.toFixed(2)}, right of onset t${ticks[i]}'s ` +
+        `leftmost head at x=${after.min.toFixed(2)}: the page reads the later note before the ` +
+        `earlier one.`,
+      system: layout.index,
+      measure: measureOfTick(ticks[i], t),
+      noteIds: [...before.ids, ...after.ids],
+      x: (before.max + after.min) / 2,
+      metrics: {
+        prevTick: ticks[i - 1],
+        nextTick: ticks[i],
+        prevMaxX: before.max,
+        nextMinX: after.min,
+      },
+    });
+  }
+}
+
+/**
+ * Round 15 locked layout — **four systems per page**. Two audits:
+ *
+ * 1. each system's **furniture** (the staff extents, the measure numeral and
+ *    every ledger equator) stays inside its own page slot — the ticket's
+ *    slot-fit gate;
+ * 2. consecutive systems **on one page** never overlap: the lower system's
+ *    topmost ink must stay below the upper system's bottom ink
+ *    (see {@link systemInkExtents}).
+ */
+export function checkSystemSlotFit(
+  layout: JankoSystemLayout,
+  page: JankoPageGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const g = layout.geometry;
+  const slotTop = g.slotTopY;
+  const slotBottom = g.slotTopY + page.slotHeight;
+  let inkTop = g.staffTopY;
+  let inkBottom = g.staffBotY;
+  if (o.showMeasureNumbers) {
+    const { numeral } = marginFurniture(layout, t, lint, 1, o.systemStartStyle);
+    inkTop = Math.min(inkTop, numeral.y0);
+  }
+  for (const p of layout.notes) {
+    for (const ledgerY of p.coord.ledgerYs) {
+      inkTop = Math.min(inkTop, g.middleCY + ledgerY - 0.38);
+      inkBottom = Math.max(inkBottom, g.middleCY + ledgerY + 0.38);
+    }
+  }
+  const clearance = lint.minClearance;
+  if (inkTop >= slotTop + clearance && inkBottom <= slotBottom - clearance) return;
+  out.push({
+    code: 'system-slot-overlap',
+    severity: 'error',
+    message:
+      `System ${layout.index + 1}'s staff furniture spans y=[${inkTop.toFixed(2)}, ` +
+      `${inkBottom.toFixed(2)}], outside its ${page.slotHeight.toFixed(2)}pt page slot ` +
+      `[${slotTop.toFixed(2)}, ${slotBottom.toFixed(2)}] (${clearance.toFixed(2)}pt clearance).`,
+    system: layout.index,
+    y: inkTop < slotTop + clearance ? inkTop : inkBottom,
+    metrics: {
+      inkTop,
+      inkBottom,
+      slotTop,
+      slotBottom,
+      slotHeight: page.slotHeight,
+      required: clearance,
+    },
+  });
+}
+
+/** Full painted extent of one system: every glyph, rule, beam and bracket. */
+export function systemInkExtents(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  o: ResolvedJankoLayoutOptions
+): { top: number; bottom: number } {
+  const g = layout.geometry;
+  let top = g.staffTopY;
+  let bottom = g.staffBotY;
+  if (o.showMeasureNumbers) {
+    const { numeral } = marginFurniture(layout, t, lint, 1, o.systemStartStyle);
+    top = Math.min(top, numeral.y0);
+  }
+  const r = t.noteheadRadius;
+  for (const p of layout.notes) {
+    const glyph = isPositionOfHonor(p.note.startTick)
+      ? Math.max(r, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
+      : r;
+    top = Math.min(top, p.y - glyph);
+    bottom = Math.max(bottom, p.y + glyph);
+    for (const ledgerY of p.coord.ledgerYs) {
+      top = Math.min(top, g.middleCY + ledgerY - 0.38);
+      bottom = Math.max(bottom, g.middleCY + ledgerY + 0.38);
+    }
+  }
+  for (const beam of layout.beams) {
+    for (const c of [beam.primary, beam.secondary]) {
+      if (!c) continue;
+      top = Math.min(top, c.y1, c.y2);
+      bottom = Math.max(bottom, c.y1, c.y2);
+    }
+  }
+  for (const stem of paintedStemSegments(layout, o, t)) {
+    top = Math.min(top, stem.top);
+    bottom = Math.max(bottom, stem.bottom);
+  }
+  for (const clasp of layout.clasps) {
+    top = Math.min(top, clasp.topY);
+    bottom = Math.max(bottom, clasp.botY);
+  }
+  for (const rest of layout.rests) {
+    const box = restInkBox(rest, t);
+    top = Math.min(top, box.y0);
+    bottom = Math.max(bottom, box.y1);
+  }
+  return { top, bottom };
+}
+
+/** X positions of every dashed beat pulse painted in one system. */
+function beatPulseXs(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number[] {
+  if (!o.showBeatGrid) return [];
+  const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / t.ticksPerBeat));
+  if (beatsPerMeasure <= 1) return [];
+  const g = layout.geometry;
+  const baseInset = getGridNoteInset(o, t);
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const isSys0Anacrusis = layout.index === 0 && anacrusis > 0;
+  const upbeatWidth = isSys0Anacrusis ? (anacrusis / t.ticksPerMeasure) * g.measureWidth : 0;
+  const xs: number[] = [];
+  for (let m = 0; m < o.measuresPerSystem; m++) {
+    const isOpening = layout.index === 0 && m === 0;
+    const insets =
+      isOpening && o.showTimeSignature && o.timeSignatureWidth > 0
+        ? { left: baseInset + o.timeSignatureWidth, right: baseInset }
+        : undefined;
+    const measureLeft = isSys0Anacrusis
+      ? g.staffLeft + upbeatWidth + m * g.measureWidth
+      : g.staffLeft + m * g.measureWidth;
+    const left = insets?.left ?? baseInset;
+    const right = insets?.right ?? baseInset;
+    const available = Math.max(0, g.measureWidth - left - right);
+    for (let b = 1; b < beatsPerMeasure; b++) {
+      xs.push(measureLeft + left + (b / beatsPerMeasure) * available);
+    }
+  }
+  return xs;
+}
+
 /** One barline segment of a system, per hand (RH and LH halves). */
 export interface BarlineSpan {
   x: number;
   top: number;
   bottom: number;
+}
+
+/** One painted stem segment of a system (Round 15 fusion audit). */
+interface PaintedStemSegment {
+  id: string;
+  hand: 'RH' | 'LH';
+  x: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Every stem segment `renderNotesLayer` actually paints for one system: the
+ * beam stems of the beamed dialect (plus the standalone stems) or every
+ * note stem otherwise, minus the ones a clasp or a gap-gated vertical chord
+ * replaced. Shared by the Round 14 simultaneity audit and the Round 15 fusion
+ * audit, so both check exactly the painted ink.
+ */
+function paintedStemSegments(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): PaintedStemSegment[] {
+  const clasped = new Set(layout.claspedStems);
+  const suppressed = new Set(layout.verticalChords.flatMap((chord) => chord.suppressedIds));
+  const segments: PaintedStemSegment[] = [];
+  const push = (id: string, hand: 'RH' | 'LH', rhythm: JankoRhythmNote): void => {
+    const s = getStemGeometry(rhythm, t);
+    segments.push({
+      id,
+      hand,
+      x: s.stemX,
+      top: Math.min(s.stemStartY, s.stemEndY),
+      bottom: Math.max(s.stemStartY, s.stemEndY),
+    });
+  };
+  if (o.rhythmStyle === 'beamed') {
+    for (const beam of layout.beams) {
+      for (let i = 0; i < beam.stems.length; i++) {
+        const s = beam.stems[i];
+        segments.push({
+          id: beam.notes[i].id,
+          hand: beam.notes[i].hand,
+          x: s.stemX,
+          top: Math.min(s.stemStartY, s.stemEndY),
+          bottom: Math.max(s.stemStartY, s.stemEndY),
+        });
+      }
+    }
+    for (const n of layout.ungrouped) {
+      if (clasped.has(n.id) || suppressed.has(n.id)) continue;
+      push(n.id, n.hand, n);
+    }
+    return segments;
+  }
+  for (const p of layout.notes) {
+    if (clasped.has(p.rhythm.id) || suppressed.has(p.rhythm.id)) continue;
+    push(p.rhythm.id, p.rhythm.hand, p.rhythm);
+  }
+  return segments;
+}
+
+/**
+ * Round 15 — **stem fusion**: no two opposing-hand stems may share one column
+ * with overlapping or touching vertical spans.
+ *
+ * Where the two hands land on one column (the Round 14 bars 13/14 defect) the
+ * RH stem points up and the LH stem down; if their spans meet, the two rules
+ * read as one continuous line joining two heads — a slur/phrase connector that
+ * was never written. The `'stem-anchored'` and `'asymmetric-micro'` policies
+ * stagger the pair by the fixed ±{@link JANKO_STEM_STAGGER}, so the winner is
+ * clean by construction; the `'symmetric-spread'` control keeps the Round 11
+ * centerline stems and trips this check.
+ */
+export function checkStemFusion(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const segments = paintedStemSegments(layout, o, t);
+  for (let i = 0; i < segments.length; i++) {
+    for (let j = i + 1; j < segments.length; j++) {
+      const a = segments[i];
+      const b = segments[j];
+      if (a.hand === b.hand) continue;
+      if (Math.abs(a.x - b.x) > EPS) continue;
+      const overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (overlap < -EPS) continue;
+      out.push({
+        code: 'stem-fusion',
+        severity: 'error',
+        message:
+          `The stems of ${a.id} (${a.hand}) and ${b.id} (${b.hand}) share the column x=${a.x.toFixed(2)} ` +
+          `and their spans ${overlap >= 0 ? `overlap by ${overlap.toFixed(2)}pt` : 'touch'}: the two ` +
+          `rules fuse into one continuous head-to-head line. Stagger the opposing stems by ` +
+          `±${JANKO_STEM_STAGGER.toFixed(2)}pt or displace one head off the shared column.`,
+        system: layout.index,
+        measure: measureOfTick(
+          layout.notes.find((p) => p.note.id === (a.hand === 'LH' ? a.id : b.id))?.note.startTick ?? 0,
+          t
+        ),
+        noteIds: [a.id, b.id],
+        x: a.x,
+        y: (Math.max(a.top, b.top) + Math.min(a.bottom, b.bottom)) / 2,
+        metrics: {
+          stemX: a.x,
+          overlap,
+          aTop: a.top,
+          aBottom: a.bottom,
+          bTop: b.top,
+          bBottom: b.bottom,
+        },
+      });
+    }
+  }
 }
 
 /**
@@ -2024,7 +2509,9 @@ export function lintJankoScore(
   };
 
   const layouts = layoutJankoScore(score, o, t);
+  const page = computePageGeometry(o, t);
   const diagnostics: LintViolation[] = [];
+  const extents: Array<{ top: number; bottom: number }> = [];
 
   for (const layout of layouts) {
     checkNoteheadClearance(layout, t, thresholds, diagnostics);
@@ -2034,6 +2521,10 @@ export function lintJankoScore(
     checkHaloClearance(layout, t, thresholds, diagnostics);
     checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
     checkStemThroughSimultaneity(layout, o, t, diagnostics);
+    checkStemFusion(layout, o, t, diagnostics);
+    checkDotCollision(layout, o, t, diagnostics);
+    checkGridCrossingOffset(layout, t, diagnostics);
+    checkTimeOrder(layout, t, diagnostics);
     checkBarlineClearance(layout, o, t, thresholds, diagnostics);
     checkClaspClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
@@ -2041,6 +2532,8 @@ export function lintJankoScore(
     checkRestClearance(layout, o, t, thresholds, diagnostics);
     checkUnwrittenRests(layout, t, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
+    checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
+    extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
       const attachment = getStemAttachmentRadii(t);
       const svg = renderSystem(score, layout.geometry, layout.index, o, t, layout);
@@ -2062,6 +2555,26 @@ export function lintJankoScore(
       ].map((v) => ({ ...v, system: layout.index }));
       diagnostics.push(...audit);
     }
+  }
+
+  // Round 15: consecutive systems on one page must never overlap. The layouts
+  // carry page-relative slot geometry, so two neighbours on the same page are
+  // directly comparable; a page break starts a fresh page and is exempt.
+  for (let i = 1; i < layouts.length; i++) {
+    if (i % page.systemsPerPage === 0) continue;
+    const above = extents[i - 1];
+    const below = extents[i];
+    if (below.top >= above.bottom - thresholds.minClearance) continue;
+    diagnostics.push({
+      code: 'system-slot-overlap',
+      severity: 'error',
+      message:
+        `System ${i + 1}'s ink reaches up to y=${below.top.toFixed(2)}, into system ${i}'s ink ` +
+        `(bottom y=${above.bottom.toFixed(2)}): the two systems overlap on the page.`,
+      system: i,
+      y: below.top,
+      metrics: { lowerTop: below.top, upperBottom: above.bottom },
+    });
   }
 
   const violations = diagnostics.filter((d) => d.severity === 'error');

@@ -1,41 +1,33 @@
 /**
- * Round 14 — Canonical Bracket, Restored Clasps & Grid Comparison: candidate
- * registry suite.
+ * Round 15 — Crowded Columns + Rest Dialects (two-axis round): registry,
+ * column fixtures and dialect fixtures.
  *
- * The round reopens **one** axis and nothing else: how the continuous vertical
- * grid is written against the music on the dense sixteenths of Bach Var. 1
- * mm. 27–28.
+ * The round carries **two independent open axes** at once:
  *
- * | # | id                        | `gridWritingPolicy`        |
- * | - | ------------------------- | -------------------------- |
- * | A | `unified-transparent-grid`| `'unified-transparent-grid'` |
- * | B | `strict-protected-grid`   | `'strict-protected-grid'`    |
- * | C | `overlaid-beat-grid`      | `'overlaid-beat-grid'`       |
+ * | # | id                       | axis            | window set                        |
+ * | - | ------------------------ | --------------- | --------------------------------- |
+ * | A | `stem-anchored-columns`  | `crowdedColumn` | five crime scenes + context       |
+ * | B | `asymmetric-micro-columns`| `crowdedColumn`| five crime scenes + context       |
+ * | C | `symmetric-spread-control`| `crowdedColumn`| five crime scenes + context (control) |
+ * | A | `rest-kinetic-monoline`  | `restStyle`     | strictly clean windows            |
+ * | B | `rest-classical-urtext`  | `restStyle`     | strictly clean windows            |
+ * | C | `rest-geometric-node`    | `restStyle`     | strictly clean windows            |
+ * | D | `rest-phantom-notehead`  | `restStyle`     | strictly clean windows            |
  *
- * Everything else is settled engineering that rides along as shared fixed
- * context — verified in golden, inherited by every candidate, and therefore
- * never a candidate, a window or a badge:
+ * Per-candidate purity is the invariant: a column candidate states only its
+ * `crowdedColumn` value, a dialect candidate only its `restStyle` value, and no
+ * candidate carries a locked-axis delta. The two judgments are independent by
+ * construction — every dialect window renders byte-identical SVG under all
+ * three column systems, because it contains no same-column collision at all.
  *
- * 1. the **flared 0.65pt architectural bracket** is `DEFAULT_JANKO_OPTIONS`
- *    (`open-halo` appears nowhere in the golden view any more);
- * 2. the **per-hand clasp** is restored as the golden chord grouping, so a
- *    wide-span simultaneity can never stack per-note stems through its own
- *    heads (`stem-through-simultaneity` is a linter violation now);
- * 3. the **m. 4 tick-552 RH 16th rest** keeps its beam break and is seated in a
- *    guaranteed-clear pocket beside the LH D3 it accompanies.
- *
- * Covers:
- *  1. `CURRENT_ROUND_METADATA.round === 14`, with `gridWritingPolicy` as its
- *     only open axis.
- *  2. Exactly three candidates A–C: the three published grid writing policies,
- *     all else equal, all declaring the locked per-hand clasp.
- *  3. One display window: mm. 27–28, one system at true measure width, never an
- *     empty/white strip.
- *  4. The golden master's canonical bracket, restored clasp and pocket-seated
- *     m. 4 rest.
- *  5. Open-axis badges on every candidate (including the incumbent C) and zero
- *     badges for the locked axes.
- *  6. The live studio engraving all three candidates on the dense window.
+ * Committed fixtures for every finding the round fixes:
+ *  1. dots always right of the head, in inter-row space (bars 5/6);
+ *  2. no head leaves its beat cell (bar 12);
+ *  3. no time inversion along the page (bar 15) and the disclosure bound;
+ *  4. no fused opposing stems (bars 13/14);
+ *  5. bar 5 beat 2 beam arithmetic (locked, unchanged);
+ *  6. the m. 4 pocket rest and the specimen m. 2 rest under every candidate;
+ *  7. the four-systems-per-page golden.
  */
 
 import { test } from 'node:test';
@@ -47,596 +39,730 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
+import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import {
-  CHORD_DURATION_SPECIMEN_VALUES,
-  buildChordDurationSpecimenScore,
-} from '../src/scores/chord-duration-specimen';
+  REST_DURATION_SPECIMEN_VALUES,
+  buildRestDurationSpecimenScore,
+} from '../src/scores/rest-duration-specimen';
 import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
+  REST_SPECIMEN_STUDIO_SCORE_ID,
   SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   getCandidate,
   resolveCandidate,
 } from '../src/render/janko/candidates';
-import { createStudioConfig, renderCandidatesView, renderReferenceView } from '../src/render/janko/studio';
+import { createStudioConfig, renderCandidatesView } from '../src/render/janko/studio';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
-  JANKO_CHORD_GROUPINGS,
-  JANKO_GRID_WRITING_POLICIES,
-  JANKO_GRID_WRITING_POLICY_LABELS,
-  JANKO_SYSTEM_START_STYLES,
-  JankoGridWritingPolicy,
-  getGridNoteInset,
+  JANKO_CROWDED_COLUMN_POLICIES,
+  JANKO_REST_STYLES,
+  JankoCrowdedColumnPolicy,
+  JankoRestStyle,
   resolveJankoOptions,
 } from '../src/render/janko/types';
 import {
-  REST_FIT_MARGIN,
-  REST_POCKET_AIR,
-  computeCropBox,
+  CROWDED_MICRO_AIR,
   computePageGeometry,
+  countJankoPages,
   layoutJankoScore,
   renderJankoCrop,
-  renderJankoVariantComparison,
-  resolveRestY,
 } from '../src/render/janko/engine';
-import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
-import { restInkBox } from '../src/render/janko/elements/rests';
+import { JANKO_STEM_STAGGER, getStemGeometry } from '../src/render/janko/elements/rhythm';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
+const REST_SPECIMEN = buildRestDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The exact round-14 table, candidate by candidate. */
-const PARADIGMS: Array<{
-  id: string;
-  letter: string;
-  label: string;
-  policy: JankoGridWritingPolicy;
-}> = [
-  {
-    id: 'unified-transparent-grid',
-    letter: 'A',
-    label: 'A · Unified Transparent Grid — columns ON the lines',
-    policy: 'unified-transparent-grid',
-  },
-  {
-    id: 'strict-protected-grid',
-    letter: 'B',
-    label: 'B · Strict Protected Grid — columns BETWEEN the lines',
-    policy: 'strict-protected-grid',
-  },
-  {
-    id: 'overlaid-beat-grid',
-    letter: 'C',
-    label: 'C · Overlaid Beat Grid — clear of the barline, over the pulses',
-    policy: 'overlaid-beat-grid',
-  },
+/** The three column-axis candidates, in display order. */
+const COLUMN_CANDIDATES: Array<{ id: string; policy: JankoCrowdedColumnPolicy; letter: string }> = [
+  { id: 'stem-anchored-columns', policy: 'stem-anchored', letter: 'A' },
+  { id: 'asymmetric-micro-columns', policy: 'asymmetric-micro', letter: 'B' },
+  { id: 'symmetric-spread-control', policy: 'symmetric-spread', letter: 'C' },
 ];
 
-/** The canonical m. 4 beat-3 window: the run, its break and its rest. */
-const M4_TICK = 552;
-const M4_A3_ROW = 158.5;
-const M4_D3_ROW = 173.5;
+/** The four dialect-axis candidates, in display order. */
+const DIALECT_CANDIDATES: Array<{ id: string; style: JankoRestStyle; letter: string }> = [
+  { id: 'rest-kinetic-monoline', style: 'kinetic-monoline', letter: 'A' },
+  { id: 'rest-classical-urtext', style: 'classical-urtext', letter: 'B' },
+  { id: 'rest-geometric-node', style: 'geometric-node', letter: 'C' },
+  { id: 'rest-phantom-notehead', style: 'phantom-notehead', letter: 'D' },
+];
 
-/** The studio HTML-escapes labels and rationales before printing them. */
-function esc(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+/** The Round 15 golden equal-flank distance: `2r + 0.4pt`. */
+const MICRO = 2 * DEFAULT_JANKO_TOKENS.noteheadRadius + CROWDED_MICRO_AIR;
+
+/** The five crime scenes plus the two §4 context windows. */
+const COLUMN_WINDOWS = [
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 8 },
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 12 },
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 13 },
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 14 },
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 15 },
+  { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 4 },
+  { scoreId: SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
+];
+
+/** The strictly clean dialect windows. */
+const DIALECT_WINDOWS = [
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 1 },
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 3 },
+  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 4 },
+  { scoreId: 'brahms-op118-no1', measureStart: 68 },
+  { scoreId: SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
+];
+
+/** Layouts of one score under one crowded-column policy. */
+function layoutsWith(
+  score: ReturnType<typeof buildBachGoldbergVar1Score>,
+  base: Parameters<typeof resolveJankoOptions>[0],
+  tokens: Parameters<typeof layoutJankoScore>[2],
+  policy: JankoCrowdedColumnPolicy
+) {
+  return layoutJankoScore(score, { ...resolveJankoOptions(base), crowdedColumn: policy }, tokens);
 }
 
-/** The clasp groups of one rendered document, keyed by their duration class. */
-function claspGroups(svg: string): Array<{ tick: string; duration: string; body: string }> {
-  return [...svg.matchAll(
-    /<g class="janko-clasp-group"[^>]*data-clasp-tick="(\d+)"[^>]*data-clasp-duration="([^"]*)"[^>]*>([\s\S]*?)<\/g>/g
-  )].map((m) => ({ tick: m[1], duration: m[2], body: m[3] }));
+/** Every rest of one score, flattened over its systems. */
+function allRests(
+  score: ReturnType<typeof buildBachGoldbergVar1Score>,
+  options: Parameters<typeof resolveJankoOptions>[0],
+  tokens: Parameters<typeof layoutJankoScore>[2]
+) {
+  return layoutJankoScore(score, resolveJankoOptions(options), tokens).flatMap((l) => l.rests);
 }
 
-test('CURRENT_ROUND_METADATA opens round 14 with the grid writing policy as its only open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 14);
+// ---------------------------------------------------------------------------
+// 1. Registry discipline (two axes, per-candidate purity)
+// ---------------------------------------------------------------------------
+
+test('CURRENT_ROUND_METADATA opens round 15 with both independent axes', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 15);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Grid Writing Policy: On the Lines, Between the Lines, Barline-Only'
+    'Crowded Columns + Rest Dialects: Two Independent Axes'
   );
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['gridWritingPolicy'],
-    'the round reopens exactly one axis'
+    ['crowdedColumn', 'restStyle'],
+    'the round carries exactly the two operator-approved axes'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /three ways the continuous vertical grid/);
-  assert.match(CURRENT_ROUND_METADATA.description, /mm\. 27–28/);
+  assert.match(CURRENT_ROUND_METADATA.description, /crowded column/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /rest dialect/i);
   assert.match(
     CURRENT_ROUND_METADATA.description,
-    /flared 0\.65pt System 1 bracket, the per-hand clasp and the pocket-seated m\. 4 rest are settled engineering/,
-    'the locked decisions are named as settled engineering'
+    /byte-identical SVG under all three column systems/,
+    'the identity guard is the stated proof of independence'
   );
 });
 
-test('CURRENT_CANDIDATES declares exactly the three grid writing policies A–C, all else equal', () => {
+test('CURRENT_CANDIDATES declares exactly 3 column + 4 dialect candidates, all else equal', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, PARADIGMS.map((p) => p.id), 'candidate order is A, B, C');
+  assert.deepEqual(
+    ids,
+    [...COLUMN_CANDIDATES, ...DIALECT_CANDIDATES].map((c) => c.id),
+    'column candidates first, then the dialect set, in registry order'
+  );
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.gridWritingPolicy),
-    PARADIGMS.map((p) => p.policy),
-    'every published grid writing policy is represented exactly once'
-  );
-  assert.deepEqual(
-    [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.gridWritingPolicy))].sort(),
-    [...JANKO_GRID_WRITING_POLICIES].sort(),
-    'the registry covers the published grid writing catalogue'
-  );
+  assert.equal(CURRENT_CANDIDATES.length, 7, 'seven candidates across two axes');
 
-  for (const paradigm of PARADIGMS) {
-    const candidate = getCandidate(paradigm.id);
-    assert.ok(candidate, `${paradigm.id} is registered`);
-    assert.equal(candidate!.label, paradigm.label, `${paradigm.id} label`);
-    assert.ok(paradigm.label.startsWith(`${paradigm.letter} · `), `${paradigm.id} is candidate ${paradigm.letter}`);
-    assert.ok((candidate!.description ?? '').length > 120, `${paradigm.id} carries a rationale`);
-    assert.ok((candidate!.tags ?? []).length > 0, `${paradigm.id} is tagged`);
-    // Locked axes: the clasp paradigm rides along, the bracket never appears.
-    assert.equal(
-      candidate!.options?.chordGrouping,
-      'per-hand-clasp',
-      `${paradigm.id} inherits the restored per-hand clasp`
-    );
-    assert.equal(
-      candidate!.options?.systemStartStyle,
-      undefined,
-      `${paradigm.id} never states the settled bracket as a candidate`
-    );
-    assert.equal(candidate!.options?.restStyle, undefined, `${paradigm.id} never reopens the rest dialect`);
-    assert.equal(
-      candidate!.options?.chordGrouping,
-      DEFAULT_JANKO_OPTIONS.chordGrouping,
-      `${paradigm.id} declares the clasp as shared context, not as a delta`
-    );
+  assert.deepEqual(
+    COLUMN_CANDIDATES.map((c) => resolveCandidate(getCandidate(c.id)!).options.crowdedColumn),
+    COLUMN_CANDIDATES.map((c) => c.policy),
+    'every published crowded-column policy is represented exactly once'
+  );
+  assert.deepEqual(
+    [...new Set(COLUMN_CANDIDATES.map((c) => c.policy))].sort(),
+    [...JANKO_CROWDED_COLUMN_POLICIES].sort(),
+    'the registry covers the published crowded-column catalogue'
+  );
+  assert.deepEqual(
+    DIALECT_CANDIDATES.map((c) => resolveCandidate(getCandidate(c.id)!).options.restStyle),
+    DIALECT_CANDIDATES.map((c) => c.style),
+    'the four Round 13 finalist dialects are represented exactly once'
+  );
+  for (const dialect of DIALECT_CANDIDATES) {
+    assert.ok(JANKO_REST_STYLES.includes(dialect.style), `${dialect.style} stays published`);
   }
-  assert.ok(JANKO_SYSTEM_START_STYLES.includes('architectural-bracket'), 'the bracket stays published');
-  assert.ok(JANKO_CHORD_GROUPINGS.includes('per-hand-clasp'), 'the clasp stays published');
-});
 
-test('Every candidate is demonstrated on the one dense mm. 27–28 window', () => {
-  for (const paradigm of PARADIGMS) {
-    const resolved = resolveCandidate(getCandidate(paradigm.id)!);
-    assert.equal(resolved.windows.length, 1, `${paradigm.id} declares one window`);
-    const [dense] = resolved.windows;
-    assert.equal(dense.scoreId, DEFAULT_STUDIO_SCORE_ID);
-    assert.equal(dense.measureStart, 27);
-    assert.equal(dense.measureCount, 2);
-    assert.match(dense.title, /Bach Goldberg Var\. 1 · mm\. 27–28/);
-    assert.match(dense.title, /one full-width system/);
-    assert.match(dense.title, /continuous barline \+ beat-pulse grid/);
-    // The legacy single-window fields keep pointing at the declared window.
-    assert.equal(resolved.measureStart, 27);
-    assert.equal(resolved.measureCount, 2);
-    // A settled decision gets no showcase slot: no candidate window ever shows
-    // the m. 4 rest, the System 1 bracket or the chord specimen.
-    for (const window of resolved.windows) {
-      assert.notEqual(window.measureStart, 1, `${paradigm.id} never re-showcases the bracket`);
-      assert.notEqual(window.measureStart, 4, `${paradigm.id} never re-showcases the m. 4 rest`);
-      assert.notEqual(window.scoreId, SPECIMEN_STUDIO_SCORE_ID, `${paradigm.id} never re-showcases the clasp`);
-    }
+  for (const { id, letter } of [...COLUMN_CANDIDATES, ...DIALECT_CANDIDATES]) {
+    const candidate = getCandidate(id)!;
+    assert.ok(candidate.label.startsWith(`${letter} · `), `${id} is candidate ${letter}`);
+    assert.ok((candidate.description ?? '').length > 120, `${id} carries a rationale`);
+    assert.ok((candidate.tags ?? []).length > 0, `${id} is tagged`);
   }
 });
 
-test('The Round 14 dense window is one system at its true measure width, never a white strip', () => {
-  const geo = computePageGeometry(DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const box = computeCropBox(geo, 27, 2, true);
-  assert.equal(box.firstSystem, box.lastSystem, 'mm. 27–28 live inside one system');
-  assert.equal(box.firstSystem, 6, 'the opening of System 7 (mm. 25–28)');
-  assert.ok(
-    Math.abs(box.w - (2 * geo.systems[0].measureWidth + 16)) < 1e-6,
-    `two full measure widths (got ${box.w.toFixed(2)}pt)`
-  );
-  for (const paradigm of PARADIGMS) {
-    const resolved = resolveCandidate(getCandidate(paradigm.id)!);
-    const svg = renderJankoCrop(SCORE, 27, 2, resolved.options, resolved.tokens);
-    assert.ok(
-      (svg.match(/class="janko-digit"/g) ?? []).length > 20,
-      `${paradigm.id} really engraves the dense sixteenths (no empty white page)`
-    );
-    assert.ok(
-      (svg.match(/class="janko-barline"/g) ?? []).length >= 2,
-      `${paradigm.id} paints the measure barlines`
-    );
-    assert.ok(
-      (svg.match(/class="janko-beat-line"/g) ?? []).length >= 6,
-      `${paradigm.id} paints the dashed beat pulses`
-    );
-  }
-});
-
-test('The golden master opens System 1 with the flared 0.65pt bracket — open-halo is gone', () => {
-  assert.equal(
-    DEFAULT_JANKO_OPTIONS.systemStartStyle,
-    'architectural-bracket',
-    'the flared bracket is canonical'
-  );
-  const reference = renderReferenceView(CONFIG);
-  assert.match(reference, /<b>systemStartStyle<\/b> = architectural-bracket/);
-  assert.ok(!reference.includes('open-halo'), 'the retired open margin appears nowhere in golden');
-
-  const opening = renderJankoCrop(SCORE, 1, 2, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.match(
-    opening,
-    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"/,
-    'System 1 opens with the flared 0.65pt rule'
-  );
-  assert.ok(!opening.includes('janko-accolade'), 'the copperplate accolade stays retired');
-  assert.ok(!opening.includes('janko-system-bracket-delicate'), 'the Round 12 finalists stay retired');
-
-  // The published catalogue still carries every historical style, so the
-  // retired ones are never silently deleted.
-  assert.deepEqual(
-    [...JANKO_SYSTEM_START_STYLES],
-    ['open-halo', 'architectural-bracket', 'delicate-bracket', 'clef-pillar', 'double-hairline', 'none']
-  );
-});
-
-test('The flared architectural bracket flares its spurs outward by 13°', () => {
-  assert.equal(ARCHITECTURAL_BRACKET_FLARE_DEGREES, 13.0);
-  const geo = computePageGeometry(DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const system0 = geo.systems[0];
-  const svg = renderJankoCrop(SCORE, 1, 2, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const path = /class="janko-system-bracket" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)"/.exec(svg);
-  assert.ok(path, 'the flared bracket is painted');
-  const [, tipX, tipY, x1, y1, x2, y2, footX, footY] = path!.map(Number);
-  const top = system0.equatorY('RH', 5);
-  const bot = system0.equatorY('LH', 2);
-  assert.ok(Math.abs(x1 - x2) < 1e-9, 'the rule is straight and vertical');
-  assert.ok(Math.abs(y1 - top) < 1e-9 && Math.abs(y2 - bot) < 1e-9, 'the rule clasps Octave 5 through Octave 2');
-  assert.ok(Math.abs(tipX - footX) < 1e-9, 'both spurs reach the same horizontal distance');
-  assert.ok(tipX > x1, 'the spurs extend rightward, into the staff');
-  assert.ok(tipY < top, 'the top spur flares diagonally upward/outward');
-  assert.ok(footY > bot, 'the bottom spur flares diagonally downward/outward');
-  const flare = (top - tipY) / (tipX - x1);
-  // The painted coordinates carry 2 decimals, so the recovered tangent is
-  // accurate to ~1e-3 — well inside the 12°–15° band.
-  assert.ok(
-    Math.abs(flare - Math.tan((13.0 * Math.PI) / 180)) < 5e-3,
-    `the flare is 13° (tan = ${flare.toFixed(4)})`
-  );
-});
-
-test('The golden master groups every simultaneity per hand, so no stem cuts a chord tone', () => {
-  assert.equal(DEFAULT_JANKO_OPTIONS.chordGrouping, 'per-hand-clasp', 'the clasp is restored as golden');
-  // Bach is single-line per hand, so the golden page barely moves: no clasps,
-  // no vertical chords, no suppressed stem — but the restored paradigm is live.
-  const bach = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(bach.reduce((n, l) => n + l.clasps.length, 0), 0, 'Bach carries no simultaneity to bracket');
-  assert.equal(bach.reduce((n, l) => n + l.verticalChords.length, 0), 0, 'and no vertical chord');
-  const bachReport = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(bachReport.ok, true, 'the golden page is clean');
-  assert.equal(bachReport.warnings.length, 0, 'with zero warnings');
-
-  // The wide-span specimen: the full duration taxonomy on tall 45pt brackets,
-  // every head handing its stem to the per-hand clasp.
-  const values = CHORD_DURATION_SPECIMEN_VALUES;
-  assert.deepEqual(values.map((v) => v.durationTicks), [96, 48, 72, 24, 12], 'half … 16th, in order');
-  const specimenOptions = resolveJankoOptions({
-    ...DEFAULT_JANKO_OPTIONS,
-    measuresPerSystem: 2,
-    chordGrouping: 'per-hand-clasp',
-  });
-  const layout = layoutJankoScore(SPECIMEN, specimenOptions, DEFAULT_JANKO_TOKENS)[0];
-  assert.equal(layout.clasps.length, values.length, 'one bracket per demonstrated value');
-  assert.deepEqual(
-    layout.clasps.map((c) => c.durationTicks),
-    values.map((v) => v.durationTicks),
-    'the brackets carry exactly the demonstrated values'
-  );
-  assert.deepEqual(
-    layout.clasps.map((c) => `${c.duration}:${c.flags}${c.dotted ? '+dot' : ''}`),
-    ['pip:0', 'spire:0', 'spire:0+dot', 'spire-one-flag:1', 'spire-two-flags:2'],
-    'the taxonomy lands as open ring / plain / plain+dot / 1 cut / 2 cuts'
-  );
-  for (const clasp of layout.clasps) {
-    assert.equal(clasp.durationStyle, 'kinetic-cross-slashes', 'every bracket speaks the settled rake');
-  }
-  // Every specimen chord spans 1.5 octaves = one 45pt head column, so its
-  // bracket wraps `45 + 2r = 54.6pt` of ink: the tall bracket the scaled
-  // midpoint marks are judged on.
-  for (const clasp of layout.clasps) {
-    assert.ok(
-      Math.abs(clasp.maxY - clasp.minY - 45.0) < 1e-9,
-      `the ${clasp.durationTicks}-tick chord spans a full 45pt (got ${(clasp.maxY - clasp.minY).toFixed(2)}pt)`
-    );
-    assert.ok(
-      Math.abs(clasp.botY - clasp.topY - (45.0 + 2 * DEFAULT_JANKO_TOKENS.noteheadRadius)) < 1e-9,
-      `its bracket wraps the discs (got ${(clasp.botY - clasp.topY).toFixed(2)}pt)`
-    );
-  }
-  assert.equal(layout.beams.length, 0, 'a simultaneity never forms a melodic beam');
-  assert.equal(
-    layout.claspedStems.length,
-    SPECIMEN.notes.length,
-    'every specimen head hands its duration to its bracket'
-  );
-  const rendered = renderJankoCrop(SPECIMEN, 1, 2, specimenOptions, DEFAULT_JANKO_TOKENS);
-  assert.equal((rendered.match(/class="janko-stem"/g) ?? []).length, 0, 'no vertical stems');
-  assert.ok((rendered.match(/class="janko-clasp-slash"/g) ?? []).length > 0, 'the 16th chords carry the kinetic slashes');
-  assert.equal(claspGroups(rendered).length, values.length, 'five brackets are painted');
-  const report = lintJankoScore(SPECIMEN, specimenOptions, DEFAULT_JANKO_TOKENS);
-  assert.equal(report.ok, true, 'the clasped specimen engraves clean');
-  assert.equal(report.warnings.length, 0, 'with no warning');
-  assert.ok(
-    !report.violations.some((v) => v.code === 'stem-through-simultaneity'),
-    'the clasp is exactly what keeps the stems out of the chord tones'
-  );
-});
-
-test('The m. 4 tick-552 rest keeps its beam break and sits in the guaranteed pocket beside the D', () => {
-  const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[0];
-  const rests = layout.rests.filter((r) => r.tick === M4_TICK);
-  assert.equal(rests.length, 1, 'exactly one rest at tick 552');
-  const rest = rests[0];
-  assert.equal(rest.hand, 'RH');
-  assert.equal(rest.value, 'sixteenth');
-  assert.equal(rest.durationTicks, 12);
-  assert.ok(Math.abs(rest.x - 544.97) < 0.01, `the tick-552 beat column (x = ${rest.x.toFixed(2)}pt)`);
-
-  // The pocket: the ink box keeps at least the guaranteed REST_POCKET_AIR from
-  // every head disc of either hand, and it is seated against the LH D3 head it
-  // accompanies — not merely "somewhere legal".
-  const box = restInkBox(rest, DEFAULT_JANKO_TOKENS);
-  let tightest = Infinity;
-  let tightestNote = '';
-  for (const p of layout.notes) {
-    const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
-    const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
-    const gap = Math.hypot(dx, dy) - DEFAULT_JANKO_TOKENS.noteheadRadius;
-    if (gap < tightest) {
-      tightest = gap;
-      tightestNote = p.note.id;
-    }
-  }
-  assert.ok(
-    tightest >= REST_POCKET_AIR - 1e-9,
-    `the rest keeps the guaranteed pocket air (tightest ${tightest.toFixed(2)}pt against ${tightestNote})`
-  );
-  const d3 = layout.notes.find((p) => p.note.startTick === M4_TICK)!;
-  assert.equal(d3.rhythm.hand, 'LH', 'the D it accompanies is the LH cross-staff entry');
-  assert.ok(Math.abs(d3.x - rest.x) < 0.01, 'today the D shares the rest column — the pocket is carved there');
-  assert.ok(
-    Math.abs(box.y1 - (d3.y - DEFAULT_JANKO_TOKENS.noteheadRadius - REST_POCKET_AIR - REST_FIT_MARGIN)) < 5e-3,
-    'the pocket is seated flush against the D3 it accompanies, with the guaranteed air'
-  );
-  // The contour stays legible: the rest reads inside the RH line's own band,
-  // between the A3 above it and the D3 beside it.
-  assert.ok(rest.y > M4_A3_ROW, 'the rest stays below the A3 row of its own voice');
-  assert.ok(rest.y < M4_D3_ROW, 'and above the D3 it accompanies');
-  assert.equal(resolveRestY(rest, layout.notes, layout.geometry, DEFAULT_JANKO_TOKENS), rest.y);
-  const toward = { ...rest, y: rest.y + 0.1 };
-  assert.notEqual(
-    resolveRestY(toward, layout.notes, layout.geometry, DEFAULT_JANKO_TOKENS),
-    toward.y,
-    'a step toward the contour would break the pocket'
-  );
-
-  // The beam break: the RH run beams 528 + 540 and stops at the tick-552 rest,
-  // so 564 resumes as an independent flagged 16th. (The LH's own `d,8` pair at
-  // 528 + 552 is a separate voice and is untouched.)
-  const m4Rh = layout.beams.filter(
-    (b) => b.notes.every((n) => n.hand === 'RH') && b.notes.some((n) => n.startTick >= 528 && n.startTick < 576)
-  );
-  assert.deepEqual(
-    m4Rh.map((b) => b.notes.map((n) => n.startTick)),
-    [[528, 540]],
-    'the RH beam groups are exactly 528 + 540'
-  );
-  assert.deepEqual(
-    layout.ungrouped.filter((n) => n.startTick >= 528 && n.startTick < 576).map((n) => n.startTick),
-    [564],
-    'the tick-564 resumption is an independent flagged 16th'
-  );
-  assert.ok(
-    layout.beams.some((b) => b.notes.every((n) => n.hand === 'LH') && b.notes.map((n) => n.startTick).join(',') === '528,552'),
-    'the LH voice keeps its own 528 + 552 beam'
-  );
-  const crop = renderJankoCrop(SCORE, 4, 1, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(
-    (crop.match(/class="janko-rest-group"/g) ?? []).length,
-    1,
-    'exactly one rest group paints on the m. 4 crop'
-  );
-  assert.match(
-    crop,
-    /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH"/,
-    'the RH 16th rest is written at 552'
-  );
-  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.ok(
-    !report.diagnostics.some((d) => d.code === 'rest-collision' || d.code === 'rest-unwritable'),
-    'the golden rest is neither colliding nor refused'
-  );
-});
-
-test('Every candidate states the open-axis policy badge and nothing else', () => {
+test('Per-candidate purity: each candidate states only its own axis and no locked delta', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the settled beam-harmonized tab');
-  assert.equal(golden.restStyle, 'kinetic-monoline', 'the golden rest dialect');
-  assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'the golden grid writing policy');
-  assert.equal(golden.systemStartStyle, 'architectural-bracket', 'the canonical flared bracket');
-  assert.equal(golden.chordGrouping, 'per-hand-clasp', 'the restored per-hand clasp');
-
-  for (const paradigm of PARADIGMS) {
-    const candidate = getCandidate(paradigm.id)!;
-    const badges = candidateBadges(candidate);
-    const axis = badges.filter((b) => b.key === 'gridWritingPolicy');
-    assert.equal(axis.length, 1, `${paradigm.id} states the open-axis policy exactly once`);
-    assert.equal(axis[0].value, paradigm.policy, `${paradigm.id} policy badge value`);
-    assert.equal(axis[0].axis, true, `${paradigm.id} policy badge is flagged as the round axis`);
-    for (const locked of ['systemStartStyle', 'chordGrouping', 'restStyle', 'subdivisionStyle']) {
-      assert.ok(
-        !badges.some((b) => b.key === locked),
-        `${paradigm.id} never badges the locked ${locked}`
-      );
-    }
-    // The only *changed* axis is the open one; C is the incumbent policy and
-    // still shows its value, with the golden value recorded beside it.
-    for (const badge of badges) {
-      assert.equal(badge.key, 'gridWritingPolicy', `${paradigm.id} badges nothing but the round axis`);
-      assert.equal(badge.golden, golden.gridWritingPolicy, `${paradigm.id} records the golden policy`);
-    }
-    assert.equal(
-      badges.some((b) => b.value !== b.golden),
-      paradigm.policy !== golden.gridWritingPolicy,
-      `${paradigm.id} is marked as a delta exactly when it departs from golden`
+  for (const { id, policy } of COLUMN_CANDIDATES) {
+    const candidate = getCandidate(id)!;
+    assert.equal(candidate.axis, 'crowdedColumn', `${id} declares the column axis`);
+    assert.deepEqual(
+      Object.keys(candidate.options ?? {}),
+      ['crowdedColumn'],
+      `${id} varies the column axis and nothing else`
     );
-
-    // All else equal: every other resolved option and every token is golden.
-    const resolved = resolveCandidate(candidate);
-    assert.deepEqual(resolved.tokens, DEFAULT_JANKO_TOKENS, `${paradigm.id} keeps every token`);
-    for (const [key, value] of Object.entries(resolved.options)) {
-      const expected = key === 'gridWritingPolicy' ? paradigm.policy : (golden as unknown as Record<string, unknown>)[key];
-      assert.deepEqual(value, expected, `${paradigm.id} keeps the golden ${key}`);
+    assert.equal(candidate.options?.crowdedColumn, policy);
+    assert.equal(candidate.options?.restStyle, undefined, `${id} never reopens the dialect`);
+    const options = (candidate.options ?? {}) as Record<string, unknown>;
+    for (const locked of [
+      'gridWritingPolicy',
+      'systemStartStyle',
+      'chordGrouping',
+      'subdivisionStyle',
+      'claspDurationStyle',
+    ]) {
+      assert.equal(options[locked], undefined, `${id} never states the locked ${locked}`);
     }
+  }
+  for (const { id, style } of DIALECT_CANDIDATES) {
+    const candidate = getCandidate(id)!;
+    assert.equal(candidate.axis, 'restStyle', `${id} declares the dialect axis`);
+    assert.deepEqual(
+      Object.keys(candidate.options ?? {}),
+      ['restStyle'],
+      `${id} varies the dialect axis and nothing else`
+    );
+    assert.equal(candidate.options?.restStyle, style);
+    assert.equal(candidate.options?.crowdedColumn, undefined, `${id} never reopens the column axis`);
+  }
+  // The golden context every candidate inherits, unchanged.
+  assert.equal(golden.crowdedColumn, 'stem-anchored', 'the settled crowded-column golden');
+  assert.equal(golden.restStyle, 'kinetic-monoline', 'the incumbent dialect golden');
+  assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'grid candidate C is locked');
+  assert.equal(golden.systemStartStyle, 'architectural-bracket', 'the flared bracket is locked');
+  assert.equal(golden.chordGrouping, 'per-hand-clasp', 'the per-hand clasp is locked');
+  assert.equal(golden.systemsPerPage, 4, 'four systems per page is locked');
+});
+
+test('Every candidate states exactly its own open-axis badge and nothing else', () => {
+  for (const { id, policy } of COLUMN_CANDIDATES) {
+    const badges = candidateBadges(getCandidate(id)!);
+    assert.deepEqual(
+      badges.map((b) => b.key),
+      ['crowdedColumn'],
+      `${id} badges only its own axis`
+    );
+    assert.equal(badges[0].value, policy);
+    assert.equal(badges[0].axis, true, `${id} flags the column axis`);
+  }
+  for (const { id, style } of DIALECT_CANDIDATES) {
+    const badges = candidateBadges(getCandidate(id)!);
+    assert.deepEqual(
+      badges.map((b) => b.key),
+      ['restStyle'],
+      `${id} badges only its own axis`
+    );
+    assert.equal(badges[0].value, style);
+    assert.equal(badges[0].axis, true, `${id} flags the dialect axis`);
   }
 });
 
-test('Every candidate engraves the dense window under the policy it claims', () => {
-  const documents = new Set<string>();
-  for (const paradigm of PARADIGMS) {
-    const candidate = getCandidate(paradigm.id)!;
-    const resolved = resolveCandidate(candidate);
-    const o = resolved.options;
-    const t = resolved.tokens;
-
-    // The policy is real geometry, not a label: the transparent grid withdraws
-    // the measure inset, the two protected policies keep it.
-    assert.equal(
-      getGridNoteInset(o, t),
-      paradigm.policy === 'unified-transparent-grid' ? 0 : DEFAULT_JANKO_TOKENS.measureInset,
-      `${paradigm.id} measure inset`
+test('Column candidates are demonstrated on the crime scenes + §4 context; dialects on clean windows', () => {
+  for (const { id } of COLUMN_CANDIDATES) {
+    const resolved = resolveCandidate(getCandidate(id)!);
+    assert.deepEqual(
+      resolved.windows.map((w) => ({ scoreId: w.scoreId, measureStart: w.measureStart })),
+      COLUMN_WINDOWS,
+      `${id} window set`
     );
-
-    const svg = renderJankoCrop(SCORE, 27, 2, o, t);
-    const firstStem = svg.indexOf('class="janko-stem"');
-    const firstBarline = svg.indexOf('class="janko-barline"');
-    assert.ok(firstStem > 0 && firstBarline > 0, `${paradigm.id} paints both layers`);
-    if (paradigm.policy === 'strict-protected-grid') {
-      assert.ok(
-        firstBarline > firstStem,
-        'the strict grid is painted above the rhythm layer, through its air channels'
-      );
-      assert.ok(!svg.includes('class="janko-grid-channel"') || true, 'channels are structural white air');
-    } else {
-      assert.ok(
-        firstBarline < firstStem,
-        'the grid is the transparent/overlaid background, painted beneath the music'
-      );
+    for (const window of resolved.windows) {
+      assert.equal(window.measureCount, 1, `${id} shows one measure per window`);
+      assert.ok(window.title.length > 20, `${id} titles every window`);
     }
-
-    const report = lintJankoScore(SCORE, o, t);
-    assert.equal(report.ok, true, `${paradigm.id} engraves clean`);
-    assert.equal(report.warnings.length, 0, `${paradigm.id} adds no warning`);
-
-    // Compare the *ink*, not the labels: a round whose candidates render
-    // identically decides nothing.
-    documents.add(svg.replace(/ data-[a-z-]+="[^"]*"/g, ''));
   }
-  assert.equal(documents.size, PARADIGMS.length, 'each grid policy is a distinct engraving');
-
-  // The open axis never moves a notehead of another benchmark: the locked
-  // context is what the round inherits, not what it re-decides.
-  const brahms = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const goldenBrahms = layoutJankoScore(
-    BRAHMS,
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, gridWritingPolicy: 'overlaid-beat-grid' }),
-    BRAHMS_OP118_NO1_JANKO_TOKENS
-  );
-  assert.deepEqual(
-    brahms.map((l) => l.notes.map((p) => `${p.note.id}@${p.x.toFixed(6)},${p.y.toFixed(6)}`)),
-    goldenBrahms.map((l) => l.notes.map((p) => `${p.note.id}@${p.x.toFixed(6)},${p.y.toFixed(6)}`))
-  );
+  for (const { id } of DIALECT_CANDIDATES) {
+    const resolved = resolveCandidate(getCandidate(id)!);
+    assert.deepEqual(
+      resolved.windows.map((w) => ({ scoreId: w.scoreId, measureStart: w.measureStart })),
+      DIALECT_WINDOWS,
+      `${id} window set`
+    );
+  }
 });
 
-test('The live studio engraves three candidates on the dense window with axis badges and lint chips', () => {
-  const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards, side by side');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 3, 'one engraving window per card');
-  assert.equal((html.match(/<svg/g) ?? []).length, 3, 'one engraved preview per window');
-  assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="1"/);
-  assert.match(html, /Round 14/);
-  assert.match(html, /Grid Writing Policy/, 'the escaped round title headlines the view');
-  assert.match(html, /data-window="primary:27-28"/);
-  assert.ok(!html.includes('open-halo'), 'the retired open margin appears nowhere in the studio');
+// ---------------------------------------------------------------------------
+// 2. The column axis: dots, cells, time order, fusion, disclosure
+// ---------------------------------------------------------------------------
 
-  let cursor = -1;
-  for (const paradigm of PARADIGMS) {
-    const at = html.indexOf(`data-candidate="${paradigm.id}"`);
-    assert.ok(at > cursor, `${paradigm.id} appears in registry order`);
-    cursor = at;
-    const card = html.slice(at);
-    const body = card.slice(0, card.indexOf('</article>'));
-    assert.ok(body.includes(esc(getCandidate(paradigm.id)!.label)), `${paradigm.id} label`);
-    assert.ok(body.includes(esc(getCandidate(paradigm.id)!.description ?? '')), `${paradigm.id} rationale`);
-    assert.match(
-      body,
-      new RegExp(`<span class="badge[^"]*badge-axis[^"]*"><b>gridWritingPolicy</b> = ${paradigm.policy}`),
-      `${paradigm.id} shows the round axis badge`
-    );
-    assert.ok(!body.includes('<b>systemStartStyle</b>'), `${paradigm.id} never badges the settled bracket`);
-    assert.ok(!body.includes('<b>chordGrouping</b>'), `${paradigm.id} never badges the restored clasp`);
-    assert.ok(!body.includes('<b>restStyle</b>'), `${paradigm.id} never reopens the rest dialect`);
-    assert.match(body, /data-subdivision-style="kinetic-tab-beam"/, `${paradigm.id} keeps the settled tab`);
-    assert.match(body, /chip chip-ok/, `${paradigm.id} lints clean`);
-    assert.match(body, /data-lint="clean"/);
-    if (paradigm.policy === DEFAULT_JANKO_OPTIONS.gridWritingPolicy) {
-      assert.ok(
-        !body.includes('badge-delta'),
-        'candidate C is the incumbent policy: its axis badge carries no delta styling'
-      );
-    } else {
-      assert.match(body, /badge-delta/, `${paradigm.id} highlights its departure from the golden policy`);
-    }
+test('Golden master: 4 systems per page, 2 pages, lint 0/0 — and every column policy is real geometry', () => {
+  const geo = computePageGeometry(DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.equal(geo.systemsPerPage, 4);
+  assert.equal(geo.systems.length, 4);
+  assert.equal(countJankoPages(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS), 2);
+  const golden = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.equal(golden.ok, true, 'the golden page is clean');
+  assert.equal(golden.warnings.length, 0, 'with zero warnings');
+  assert.equal(golden.stats.systems, 8, '32 bars in 8 systems');
+
+  for (const { policy } of COLUMN_CANDIDATES) {
+    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, crowdedColumn: policy });
+    const svg = renderJankoCrop(SCORE, 8, 1, o, DEFAULT_JANKO_TOKENS);
+    assert.ok((svg.match(/class="janko-digit"/g) ?? []).length > 10, `${policy} engraves m. 8`);
   }
-  assert.match(html, /✓ clean/);
+  // The three policies are distinct engravings on the crime-scene window.
+  const docs = new Set(
+    COLUMN_CANDIDATES.map(({ policy }) =>
+      renderJankoCrop(
+        SCORE,
+        8,
+        1,
+        resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, crowdedColumn: policy }),
+        DEFAULT_JANKO_TOKENS
+      ).replace(/ data-[a-z-]+="[^"]*"/g, '')
+    )
+  );
+  assert.equal(docs.size, 3, 'A, B and C each engrave a different m. 8');
+});
+
+test('Dots (bars 5/6): always right of the head, in inter-row space, clear of every disc and rule', () => {
+  const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const notes = layouts.flatMap((l) => l.notes);
+  const r = DEFAULT_JANKO_TOKENS.noteheadRadius;
+  const dotR = DEFAULT_JANKO_TOKENS.augmentationDotRadius;
+
+  // Bar 6: the LH dotted 0 at t744 — exactly one dot, right of its own head.
+  const m6 = notes.filter((p) => p.note.startTick === 744 && p.note.durationTicks > 26);
+  assert.equal(m6.length, 1, 'exactly one dotted value at t744 (the LH 0)');
+  const dotted = m6[0];
+  const dotX = dotted.x + r + DEFAULT_JANKO_TOKENS.augmentationDotGap;
+  const dotY = dotted.rhythm.dotY ?? dotted.y;
+  assert.ok(dotX > dotted.x, 'the dot is right of the head');
+  assert.ok(
+    Math.abs(Math.abs(dotY - dotted.y) - DEFAULT_JANKO_TOKENS.augmentationDotRowOffset) < 1e-9,
+    'the dot lives half a row off its own row'
+  );
+  let nearest = Infinity;
+  for (const q of notes) nearest = Math.min(nearest, Math.hypot(dotX - q.x, dotY - q.y));
+  assert.ok(nearest >= r + dotR, `the t744 dot clears every disc (nearest ${nearest.toFixed(2)}pt)`);
   assert.equal(
-    JANKO_GRID_WRITING_POLICY_LABELS['unified-transparent-grid'],
-    'Unified Transparent Background Grid',
-    'the published policy names are unchanged'
+    notes.filter((q) => q.note.startTick === 720 && q.note.durationTicks > 26).length,
+    0,
+    'the plain t720 0 carries no dot to confuse it with'
   );
+
+  // Bar 5: the LH dotted B at t600 clears the innocent RH 9 at t588.
+  const m5 = notes.find((p) => p.note.startTick === 600 && p.note.durationTicks > 26)!;
+  const innocent = notes.find((p) => p.note.startTick === 588)!;
+  const m5X = m5.x + r + DEFAULT_JANKO_TOKENS.augmentationDotGap;
+  const m5Y = m5.rhythm.dotY ?? m5.y;
+  assert.ok(
+    Math.hypot(m5X - innocent.x, m5Y - innocent.y) >= r + dotR,
+    'the t600 dot cannot be misread as belonging to the t588 head'
+  );
+  assert.ok(
+    Math.abs(m5X - (m5.x + r + DEFAULT_JANKO_TOKENS.augmentationDotGap)) < 1e-9,
+    'the dot attaches only to its own t600 head'
+  );
+
+  // No dot anywhere in the golden touches a disc, a rule or a grid line.
+  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.equal(
+    report.diagnostics.filter((d) => d.code === 'dot-collision').length,
+    0,
+    'the dot-clearance audit is part of the golden lint'
+  );
+
+  // Paint-level fixture: the document carries exactly the computed dots, each
+  // right of its own head — a regression to the hand-mirrored LH dot (left of
+  // the head) would change these cx values.
+  const crop = renderJankoCrop(SCORE, 6, 1, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const painted = [
+    ...crop.matchAll(/class="janko-augmentation-dot" cx="([\d.]+)" cy="([\d.]+)"/g),
+  ].map((m) => ({ cx: Number(m[1]), cy: Number(m[2]) }));
+  const m6Dotted = layouts
+    .flatMap((l) => l.notes)
+    .filter(
+      (p) =>
+        p.note.startTick >= 720 &&
+        p.note.startTick < 864 &&
+        p.note.durationTicks > 26 &&
+        p.note.durationTicks <= 38
+    );
+  assert.ok(
+    painted.length >= m6Dotted.length,
+    'every dotted value of the system paints its dot (the crop clips one measure)'
+  );
+  for (const p of m6Dotted) {
+    const cx = p.x + r + DEFAULT_JANKO_TOKENS.augmentationDotGap;
+    const cy = p.rhythm.dotY ?? p.y;
+    assert.ok(
+      painted.some((d) => Math.abs(d.cx - cx) < 0.01 && Math.abs(d.cy - cy) < 0.01),
+      `${p.note.id} paints its dot at (${cx.toFixed(2)}, ${cy.toFixed(2)})`
+    );
+    assert.ok(
+      !painted.some((d) => Math.abs(d.cx - (p.x - r - DEFAULT_JANKO_TOKENS.augmentationDotGap)) < 0.01),
+      `${p.note.id} paints no mirrored left-side dot`
+    );
+  }
 });
 
-test('The contact sheet engraves the three grid policies on one document', () => {
-  const specs = CURRENT_CANDIDATES.map((candidate) => {
-    const resolved = resolveCandidate(candidate);
-    return { id: candidate.id, label: candidate.label, options: resolved.options };
-  });
-  const sheet = renderJankoVariantComparison(
+test('Bar 12: no displaced head crosses a beat pulse or barline (grid-crossing-offset)', () => {
+  for (const { policy } of COLUMN_CANDIDATES.filter((c) => c.policy !== 'symmetric-spread')) {
+    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, crowdedColumn: policy });
+    const layout = layoutJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS)[2];
+    const pair = layout.notes.filter((p) => p.note.startTick === 1632);
+    assert.equal(pair.length, 2, 'the bar-12 beat column carries the LH 7 and the RH 9');
+    for (const p of pair) {
+      assert.ok(p.beatCell, 'every head records its beat cell');
+      assert.ok(
+        p.x >= p.beatCell!.left - 1e-9 && p.x <= p.beatCell!.right + 1e-9,
+        `${policy}: ${p.note.id} stays inside [${p.beatCell!.left.toFixed(2)}, ${p.beatCell!.right.toFixed(2)}]`
+      );
+      assert.ok(p.x >= p.beatCell!.left - 1e-9, `${policy}: no head left of the beat-2 pulse`);
+    }
+    const report = lintJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS);
+    assert.equal(report.ok, true, `${policy} lints clean`);
+    assert.equal(report.warnings.length, 0, `${policy} adds no warning`);
+  }
+
+  // The control is the honest baseline: it *does* push a head across the pulse.
+  const control = lintJankoScore(
     SCORE,
-    specs,
-    27,
-    2,
-    DEFAULT_JANKO_OPTIONS,
+    { ...DEFAULT_JANKO_OPTIONS, crowdedColumn: 'symmetric-spread' },
     DEFAULT_JANKO_TOKENS
   );
-  assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one sheet document');
-  assert.equal((sheet.match(/data-variant="/g) ?? []).length, 3, 'three stacked panels');
+  assert.ok(
+    control.diagnostics.some((d) => d.code === 'grid-crossing-offset' && d.measure === 12),
+    'the control trips grid-crossing-offset on m. 12'
+  );
+});
+
+test('Bar 15: page order matches tick order, and the colliding pair discloses less than the control', () => {
+  for (const { policy } of COLUMN_CANDIDATES.filter((c) => c.policy !== 'symmetric-spread')) {
+    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, crowdedColumn: policy });
+    const layout = layoutJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS)[3];
+    const inBar = layout.notes.filter((p) => {
+      const tickInMeasure = (p.note.startTick - 2016) % 144;
+      return p.note.startTick >= 2016 && p.note.startTick < 2160 && tickInMeasure < 144;
+    });
+    const byTick = new Map<number, { min: number; max: number }>();
+    for (const p of inBar) {
+      const bucket = byTick.get(p.note.startTick);
+      if (bucket) {
+        bucket.min = Math.min(bucket.min, p.x);
+        bucket.max = Math.max(bucket.max, p.x);
+      } else {
+        byTick.set(p.note.startTick, { min: p.x, max: p.x });
+      }
+    }
+    const ticks = [...byTick.keys()].sort((a, b) => a - b);
+    for (let i = 1; i < ticks.length; i++) {
+      const before = byTick.get(ticks[i - 1])!;
+      const after = byTick.get(ticks[i])!;
+      assert.ok(
+        before.max <= after.min + 1e-9,
+        `${policy}: t${ticks[i - 1]} stays left of t${ticks[i]} (${before.max.toFixed(2)} vs ${after.min.toFixed(2)})`
+      );
+    }
+  }
+
+  // Disclosure bound: the colliding pair of t2064 discloses MICRO, not the
+  // Round 14 control's full chordal offset.
+  const goldenPair = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[3].notes
+    .filter((p) => p.note.startTick === 2064)
+    .map((p) => p.x)
+    .sort((a, b) => a - b);
+  assert.equal(goldenPair.length, 2);
+  assert.ok(
+    Math.abs(goldenPair[1] - goldenPair[0] - MICRO) < 1e-9,
+    `the golden pair discloses ${MICRO}pt (got ${(goldenPair[1] - goldenPair[0]).toFixed(2)})`
+  );
+  const control = layoutJankoScore(
+    SCORE,
+    { ...DEFAULT_JANKO_OPTIONS, crowdedColumn: 'symmetric-spread' },
+    DEFAULT_JANKO_TOKENS
+  );
+  const controlPair = control[3].notes
+    .filter((p) => p.note.startTick === 2064)
+    .map((p) => p.x)
+    .sort((a, b) => a - b);
+  assert.ok(
+    controlPair[1] - controlPair[0] > goldenPair[1] - goldenPair[0],
+    'the control still discloses the full symmetric 11pt'
+  );
+  // The Round 14 inversion, restated as a fixture: the control puts the t2064
+  // LH head left of the t2052 head.
+  const control2052 = control[3].notes.find((p) => p.note.startTick === 2052)!;
+  assert.ok(
+    controlPair[0] < control2052.x,
+    'the control inverts time on the page — the defect the round removes'
+  );
+});
+
+test('Bars 13/14: no fused opposing stems; the spot-check columns stay separated', () => {
+  const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  for (const layout of layouts) {
+    const group = layout.notes.filter((p) => [1752, 1896, 1944].includes(p.note.startTick));
+    for (const p of group) {
+      const stem = getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS);
+      const declared = p.rhythm.stemDx ?? 0;
+      assert.ok(
+        Math.abs(declared) <= JANKO_STEM_STAGGER + 1e-9,
+        `${p.note.id} staggers only by the documented delta`
+      );
+      assert.equal(stem.stemX, p.x + declared, `${p.note.id} stem column is declared`);
+    }
+  }
+  // The m. 13 t1752 column: the RH and LH stems are two rules, not one.
+  const m13 = layouts[3].notes.filter((p) => p.note.startTick === 1752);
+  assert.equal(m13.length, 2, 't1752 carries the fused-stem pair');
+  const [a, b] = m13.map((p) => getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS));
+  assert.ok(Math.abs(a.stemX - b.stemX) >= 2 * JANKO_STEM_STAGGER - 1e-9, 'the stems separate');
+  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.equal(
+    report.diagnostics.filter((d) => d.code === 'stem-fusion').length,
+    0,
+    'no stem-fusion violation on the golden page'
+  );
+  const control = lintJankoScore(
+    SCORE,
+    { ...DEFAULT_JANKO_OPTIONS, crowdedColumn: 'symmetric-spread' },
+    DEFAULT_JANKO_TOKENS
+  );
+  assert.ok(
+    control.diagnostics.filter((d) => d.code === 'stem-fusion' && (d.measure ?? 0) >= 13).length >= 4,
+    'the control trips stem-fusion on the bars 13/14 columns'
+  );
+});
+
+test('Bar 5 beat 2: the beam covers exactly t636/648/660 and the dotted B spans 600–636 (locked)', () => {
+  const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[1];
+  const dotted = layout.notes.find((p) => p.note.startTick === 600 && p.rhythm.hand === 'LH')!;
+  assert.equal(dotted.note.durationTicks, 36, 'the dotted B is a dotted 8th');
+  assert.equal(600 + dotted.note.durationTicks, 636, 'the dotted B sounds through slot 1 (600–636)');
+  const beatBeam = layout.beams.filter(
+    (b) =>
+      b.notes.every((n) => n.hand === 'LH') &&
+      b.notes.every((n) => n.startTick >= 624 && n.startTick < 672)
+  );
+  assert.deepEqual(
+    beatBeam.map((b) => b.notes.map((n) => n.startTick)),
+    [[636, 648, 660]],
+    'the LH beam covers exactly the three played slots of beat 2'
+  );
+  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.equal(report.ok, true, 'the locked beaming stays honest');
+});
+
+test('§4 regression: the m. 4 pocket rest and the specimen m. 2 8th rest survive every column candidate', () => {
+  for (const { policy } of COLUMN_CANDIDATES) {
+    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, crowdedColumn: policy });
+    const m4 = layoutJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS)[0].rests.filter(
+      (r) => r.tick === 552
+    );
+    assert.equal(m4.length, 1, `${policy}: exactly one m. 4 rest at t552`);
+    assert.equal(m4[0].hand, 'RH');
+    assert.equal(m4[0].value, 'sixteenth');
+    assert.ok(
+      !layoutJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS)[0].unwrittenRests.some((r) => r.tick === 552),
+      `${policy}: the m. 4 rest is written, never refused`
+    );
+    const specimenRests = allRests(
+      SPECIMEN,
+      { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2, crowdedColumn: policy },
+      DEFAULT_JANKO_TOKENS
+    );
+    assert.equal(specimenRests.length, 1, `${policy}: the specimen writes its tick-180 8th rest`);
+    assert.equal(specimenRests[0].tick, 180);
+    assert.equal(specimenRests[0].value, 'eighth');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 3. The dialect axis: clean windows, four values, identity guard
+// ---------------------------------------------------------------------------
+
+test('Rest specimen material: exactly the four standard gaps, each on a guaranteed-free column', () => {
+  assert.deepEqual(
+    REST_DURATION_SPECIMEN_VALUES.map((v) => [v.value, v.durationTicks]),
+    [
+      ['sixteenth', 12],
+      ['eighth', 24],
+      ['quarter', 48],
+      ['half', 96],
+    ],
+    'the four standard values, shortest first'
+  );
+  const options = { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 };
+  const layout = layoutJankoScore(REST_SPECIMEN, options, DEFAULT_JANKO_TOKENS)[0];
+  assert.equal(layout.rests.length, 4, 'exactly four rests are written');
+  assert.equal(layout.unwrittenRests.length, 0, 'and none is refused');
+  assert.deepEqual(
+    layout.rests.map((r) => r.value),
+    ['sixteenth', 'eighth', 'quarter', 'half'],
+    'one rest per value, in measure order'
+  );
+  const r = DEFAULT_JANKO_TOKENS.noteheadRadius;
+  for (const rest of layout.rests) {
+    for (const p of layout.notes) {
+      assert.ok(
+        Math.hypot(p.x - rest.x, p.y - rest.y) >= 2 * r,
+        `the ${rest.value} rest column is free of every foreign head`
+      );
+    }
+  }
+});
+
+test('Every dialect renders every clean window with zero diagnostics and every rest clear', () => {
+  for (const { style } of DIALECT_CANDIDATES) {
+    const options = { ...DEFAULT_JANKO_OPTIONS, restStyle: style };
+    for (const [score, base, tokens, label] of [
+      [REST_SPECIMEN, { ...options, measuresPerSystem: 4 }, DEFAULT_JANKO_TOKENS, 'rest specimen'],
+      [
+        SPECIMEN,
+        { ...options, measuresPerSystem: 2 },
+        DEFAULT_JANKO_TOKENS,
+        'chord specimen',
+      ],
+      [
+        BRAHMS,
+        { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, restStyle: style },
+        BRAHMS_OP118_NO1_JANKO_TOKENS,
+        'Brahms complete',
+      ],
+    ] as const) {
+      const report = lintJankoScore(score, base, tokens);
+      assert.deepEqual(
+        report.diagnostics.map((d) => `${d.code}: ${d.message}`),
+        [],
+        `${style} · ${label}`
+      );
+    }
+  }
+  // The real-world anchor carries a genuine rest.
+  const brahmsRests = allRests(
+    BRAHMS,
+    BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    BRAHMS_OP118_NO1_JANKO_TOKENS
+  );
+  assert.ok(
+    brahmsRests.some((r) => r.tick >= 13056 && r.tick < 13248),
+    'Brahms m. 68 writes a genuine rest'
+  );
+});
+
+test('Cross-system identity: every dialect window is byte-identical under all three column systems', () => {
+  for (const { id, style } of DIALECT_CANDIDATES) {
+    const resolved = resolveCandidate(getCandidate(id)!);
+    for (const window of resolved.windows) {
+      // Only the dialect axis varies; every other option is the window score's
+      // own bespoke notation (the Brahms benchmark keeps its 3 × 3 layout).
+      const entry =
+        window.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID
+          ? {
+              score: REST_SPECIMEN,
+              options: { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4, restStyle: style },
+              tokens: resolved.tokens,
+            }
+          : window.scoreId === SPECIMEN_STUDIO_SCORE_ID
+            ? {
+                score: SPECIMEN,
+                options: { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2, restStyle: style },
+                tokens: resolved.tokens,
+              }
+            : {
+                score: BRAHMS,
+                options: { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, restStyle: style },
+                tokens: BRAHMS_OP118_NO1_JANKO_TOKENS,
+              };
+      const documents = JANKO_CROWDED_COLUMN_POLICIES.map((policy) =>
+        renderJankoCrop(
+          entry.score,
+          window.measureStart,
+          window.measureCount,
+          resolveJankoOptions({ ...entry.options, crowdedColumn: policy }),
+          entry.tokens
+        ).replace(/ data-[a-z-]+="[^"]*"/g, '')
+      );
+      assert.equal(
+        new Set(documents).size,
+        1,
+        `${id} · ${window.scoreId} m. ${window.measureStart} is column-system invariant`
+      );
+    }
+  }
+});
+
+test('The dialect material contains no same-column collision (the independence precondition)', () => {
+  for (const [score, options, tokens, label] of [
+    [REST_SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 }, DEFAULT_JANKO_TOKENS, 'rest specimen'],
+    [SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }, DEFAULT_JANKO_TOKENS, 'chord specimen'],
+    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms m. 68'],
+  ] as const) {
+    const layouts = layoutJankoScore(score, resolveJankoOptions(options), tokens);
+    for (const layout of layouts) {
+      const rows = new Map<string, number>();
+      for (const p of layout.notes) {
+        const key = `${p.note.startTick}|${p.y.toFixed(3)}`;
+        rows.set(key, (rows.get(key) ?? 0) + 1);
+      }
+      for (const [key, count] of rows) {
+        if (label === 'Brahms m. 68') {
+          const tick = Number(key.split('|')[0]);
+          if (tick < 13056 || tick >= 13248) continue;
+        }
+        assert.equal(count, 1, `${label} · ${key} carries at most one head per row`);
+      }
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 4. The live studio
+// ---------------------------------------------------------------------------
+
+test('The live studio engraves all 7 candidates on their own windows with per-axis badges', () => {
+  const html = renderCandidatesView(CONFIG);
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 7, 'seven cards');
+  assert.match(html, /data-candidate-count="7"/);
+  assert.match(html, /Round 15/);
+  assert.match(html, /Crowded Columns \+ Rest Dialects/, 'the round title headlines the view');
+  assert.ok(!html.includes('Grid Writing Policy:'), 'the Round 14 title is retired');
   let cursor = -1;
-  for (const paradigm of PARADIGMS) {
-    const at = sheet.indexOf(`data-variant="${paradigm.id}"`);
-    assert.ok(at > cursor, `${paradigm.id} panel is in order`);
+  for (const { id, policy } of COLUMN_CANDIDATES) {
+    const at = html.indexOf(`data-candidate="${id}"`);
+    assert.ok(at > cursor, `${id} appears in registry order`);
     cursor = at;
-    const next = sheet.indexOf('data-variant="', at + 1);
-    const panel = sheet.slice(at, next === -1 ? undefined : next);
-    assert.ok(
-      (panel.match(/class="janko-digit"/g) ?? []).length >= 20,
-      `${paradigm.id} engraves the dense sixteenths`
+    const body = html.slice(at, html.indexOf('</article>', at));
+    assert.match(
+      body,
+      new RegExp(`<span class="badge[^"]*badge-axis[^"]*"><b>crowdedColumn</b> = ${policy}`),
+      `${id} shows its column badge`
     );
-    assert.ok(
-      (panel.match(/class="janko-barline"/g) ?? []).length >= 2,
-      `${paradigm.id} paints the protected barlines`
+    assert.ok(!body.includes('<b>restStyle</b>'), `${id} never shows a dialect badge`);
+    assert.ok(!body.includes('<b>chordGrouping</b>'), `${id} never badges the locked clasp`);
+    if (policy === DEFAULT_JANKO_OPTIONS.crowdedColumn) {
+      assert.ok(!body.includes('badge-delta'), 'candidate A is the incumbent: no delta styling');
+    } else {
+      assert.match(body, /badge-delta/, `${id} highlights its departure from golden`);
+    }
+    if (policy === 'symmetric-spread') {
+      assert.match(body, /chip chip-error/, 'the control shows the defects it exists to demonstrate');
+      assert.match(body, /data-lint="violations"/);
+    } else {
+      assert.match(body, /chip chip-ok/, `${id} lints clean`);
+      assert.match(body, /data-lint="clean"/);
+    }
+  }
+  for (const { id, style } of DIALECT_CANDIDATES) {
+    const at = html.indexOf(`data-candidate="${id}"`);
+    assert.ok(at > cursor, `${id} appears after the column set`);
+    cursor = at;
+    const body = html.slice(at, html.indexOf('</article>', at));
+    assert.match(
+      body,
+      new RegExp(`<span class="badge[^"]*badge-axis[^"]*"><b>restStyle</b> = ${style}`),
+      `${id} shows its dialect badge`
     );
+    assert.ok(!body.includes('<b>crowdedColumn</b>'), `${id} never shows a column badge`);
+    assert.match(body, /chip chip-ok/, `${id} lints clean on its clean windows`);
   }
 });

@@ -21,6 +21,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   BRAHMS_OP118_NO1_MEASURES,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
+  BRAHMS_OP118_NO1_TOTAL_TICKS,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import { BENCHMARK_METADATA, BENCHMARK_SCORES } from '../src/scores';
@@ -31,6 +32,7 @@ import {
   PositionedJankoNote,
   computeCropExtents,
   computePageGeometry,
+  CROWDED_MICRO_AIR,
   getChordalOffset,
   layoutJankoScore,
   renderJankoCrop,
@@ -42,6 +44,10 @@ const OPTIONS = BRAHMS_OP118_NO1_JANKO_OPTIONS;
 const TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
 const R = BRAHMS_OP118_NO1_JANKO_TOKENS.noteheadRadius!;
 const DELTA = getChordalOffset(TOKENS);
+/** Round 15 golden flank: the minimal asymmetric `2r + 0.4pt` (one head on the column). */
+const MICRO = 2 * R + CROWDED_MICRO_AIR;
+/** Round 15 control options: the Round 14 symmetric spread, kept as baseline. */
+const SYMMETRIC_OPTIONS = { ...OPTIONS, crowdedColumn: 'symmetric-spread' as const };
 /** The linter's minimum air between a notehead and a barline. */
 const MIN_BARLINE_AIR = 1.0;
 
@@ -95,8 +101,8 @@ test('Brahms Op. 118 No. 1 is ingested as cut time with lossless grid data', () 
   assert.equal(BRAHMS_OP118_NO1_TICKS_PER_MEASURE, 192, '2/2 at 48 ticks per quarter');
   assert.equal(
     SCORE.totalTicks,
-    BRAHMS_OP118_NO1_ANACRUSIS_TICKS +
-      BRAHMS_OP118_NO1_MEASURES * BRAHMS_OP118_NO1_TICKS_PER_MEASURE
+    BRAHMS_OP118_NO1_TOTAL_TICKS,
+    'the complete Intermezzo ends at the MIDI true end (the closing measure is a 144-tick bar)'
   );
   assert.deepEqual(SCORE.timeSignatures, [{ tick: 0, numerator: 2, denominator: 2 }]);
   assert.match(SCORE.tempos[0].description ?? '', /Allegro non assai, ma molto appassionato/);
@@ -159,17 +165,18 @@ test('The authentic score spans more than four octaves from low bass to top treb
   const pitchOf = (n: QuantizedNote): number => n.pitch.octave * 12 + n.pitch.pitchClass;
   const lowest = SCORE.notes.reduce((a, b) => (pitchOf(a) <= pitchOf(b) ? a : b));
   const highest = SCORE.notes.reduce((a, b) => (pitchOf(a) >= pitchOf(b) ? a : b));
-  assert.deepEqual([lowest.pitch.pitchClass, lowest.pitch.octave], [5, 1], 'lowest note is F1 in LH');
-  assert.deepEqual([highest.pitch.pitchClass, highest.pitch.octave], [0, 6], 'highest note is C6 in RH');
-  assert.equal(pitchOf(highest) - pitchOf(lowest), 55, 'span is 55 semitones (> 4.5 octaves)');
+  assert.deepEqual([lowest.pitch.pitchClass, lowest.pitch.octave], [9, 0], 'lowest note is A0 in LH (m. 69)');
+  assert.deepEqual([highest.pitch.pitchClass, highest.pitch.octave], [6, 6], 'highest note is F#6 in RH (m. 63)');
+  assert.equal(pitchOf(highest) - pitchOf(lowest), 69, 'span is 69 semitones (> 5.5 octaves)');
 });
 
-test('Authentic lossless score contains 126 notes across 9 measures and upbeat', () => {
-  assert.equal(SCORE.notes.length, 126, 'Urtext contains exactly 126 notes in mm. 0-9');
+test('Authentic lossless score contains 964 notes across 71 measures and upbeat', () => {
+  assert.equal(SCORE.notes.length, 964, 'Urtext contains exactly 964 notes in the complete Intermezzo');
+  assert.equal(BRAHMS_OP118_NO1_MEASURES, 71, 'the ingest covers all 71 measures');
   const lh = SCORE.notes.filter((n) => n.hand === 'LH');
   const rh = SCORE.notes.filter((n) => n.hand === 'RH');
-  assert.equal(lh.length, 60, '60 LH notes');
-  assert.equal(rh.length, 66, '66 RH notes');
+  assert.equal(lh.length, 497, '497 LH notes');
+  assert.equal(rh.length, 467, '467 RH notes');
 });
 
 // ---------------------------------------------------------------------------
@@ -193,39 +200,70 @@ test('Every same-row chord tone keeps its true whole-tone row', () => {
   }
 });
 
-test('Row collisions are spread symmetrically by one full notehead diameter', () => {
+test('Row collisions are spread by the minimal asymmetric flank (Round 15 golden)', () => {
   const groups = sameRowGroups();
   assert.ok(groups.size >= 10, `the Brahms chords collide on many rows (${groups.size})`);
   for (const [key, group] of groups) {
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
     const k = group.length;
-    // x_i = x_onset + (i - (K-1)/2) · Δx, i.e. consecutive heads are exactly one
-    // chordal offset apart and the whole cluster is centred on its column.
+    // Round 15 golden: consecutive heads are exactly one minimal flank
+    // (`2r + 0.4pt` = 10.0pt) apart — never the Round 14 symmetric 11.0pt — and
+    // one head of every pair keeps its nominal column.
     for (let i = 1; i < k; i++) {
       assert.ok(
-        Math.abs(xs[i] - xs[i - 1] - DELTA) < 1e-9,
-        `${key}: heads keep Δx = ${DELTA}pt (got ${(xs[i] - xs[i - 1]).toFixed(3)})`
+        Math.abs(xs[i] - xs[i - 1] - MICRO) < 1e-9,
+        `${key}: heads keep Δx = ${MICRO}pt (got ${(xs[i] - xs[i - 1]).toFixed(3)})`
       );
       assert.ok(xs[i] - xs[i - 1] >= 2 * R, `${key}: one full disc of air`);
     }
-    const centre = (xs[0] + xs[k - 1]) / 2;
-    assert.ok(Math.abs(xs[0] - centre + ((k - 1) * DELTA) / 2) < 1e-9, `${key}: centred cluster`);
+    assert.ok(MICRO < DELTA, 'the golden flank discloses less than the Round 14 control');
     for (const p of group) {
       assert.equal(p.coord.rank, group[0].coord.rank, `${key}: one shared row`);
       assert.equal(p.coord.octave, group[0].coord.octave, `${key}: one shared octave`);
     }
   }
+  // The control policy still states the Round 14 symmetric arithmetic: the
+  // cluster straddles its column at ∓Δx/2.
+  const control = layoutJankoScore(SCORE, SYMMETRIC_OPTIONS, TOKENS);
+  const controlGroups = new Map<string, typeof control[number]['notes']>();
+  for (const layout of control) {
+    for (const p of layout.notes) {
+      const key = `${p.note.startTick}|${(p.y + 0).toFixed(3)}`;
+      const bucket = controlGroups.get(key);
+      if (bucket) bucket.push(p);
+      else controlGroups.set(key, [p]);
+    }
+  }
+  let checked = 0;
+  for (const [key, group] of controlGroups) {
+    if (group.length < 2) continue;
+    checked++;
+    const xs = group.map((p) => p.x).sort((a, b) => a - b);
+    const k = group.length;
+    for (let i = 1; i < k; i++) {
+      assert.ok(Math.abs(xs[i] - xs[i - 1] - DELTA) < 1e-9, `${key}: control keeps Δx = ${DELTA}pt`);
+    }
+    const centre = (xs[0] + xs[k - 1]) / 2;
+    assert.ok(Math.abs(xs[0] - centre + ((k - 1) * DELTA) / 2) < 1e-9, `${key}: centred control`);
+  }
+  assert.ok(checked > 0, 'the control still engraves the collisions');
 });
 
 test('mm. 8–9 stack three heads on one row and spread the triplet −Δ, 0, +Δ', () => {
   const groups = sameRowGroups();
-  const triplets = [...groups.entries()].filter(([, group]) => group.length === 3);
+  const inMm89 = (tick: number): boolean => tick >= at(8, 0) && tick < at(10, 0);
+  const triplets = [...groups.entries()].filter(
+    ([key, group]) => group.length === 3 && inMm89(Number(key.split('|')[0]))
+  );
   assert.equal(triplets.length, 2, 'both mm. 8 and 9 carry the three-note row cluster');
   for (const [key, group] of triplets) {
     assert.ok(key.startsWith(`${at(8, 0)}|`) || key.startsWith(`${at(9, 0)}|`), `triplet (${key})`);
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
-    assert.ok(Math.abs(xs[1] - xs[0] - DELTA) < 1e-9, 'left head sits one Δx below the middle');
-    assert.ok(Math.abs(xs[2] - xs[1] - DELTA) < 1e-9, 'right head sits one Δx above the middle');
+    // Round 15 golden: a three-note row cluster still fans symmetrically about
+    // its middle head — at the minimal 10.0pt flank, not the control's 11.0pt.
+    assert.ok(Math.abs(xs[1] - xs[0] - MICRO) < 1e-9, 'left head sits one flank below the middle');
+    assert.ok(Math.abs(xs[2] - xs[1] - MICRO) < 1e-9, 'right head sits one flank above the middle');
+    assert.equal(xs[1], group.find((p) => p.coord.pitchClass === 7)!.x, 'the middle head keeps the column');
     assert.deepEqual(
       group.map((p) => p.coord.pitchClass).sort((a, b) => a - b),
       [5, 7, 11],
@@ -283,10 +321,19 @@ test('A spread chord never crosses its measure band', () => {
 test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => {
   const notes = allNotes();
   assert.equal(notes.length, SCORE.notes.length, 'every note is engraved');
-  assert.equal(LAYOUTS.length, 3, 'nine measures, three per system');
+  assert.equal(LAYOUTS.length, 24, 'the complete Intermezzo lays out as 24 systems, three measures each');
+  // Every layout is engraved in its own system frame and later pages reuse the
+  // three frames of page 1, so two notes are only comparable when their
+  // systems share a page.
+  const systemsPerPage = OPTIONS.systemsPerPage ?? 1;
+  const pageOf = new Map<string, number>();
+  for (const layout of LAYOUTS) {
+    for (const p of layout.notes) pageOf.set(p.note.id, Math.floor(layout.index / systemsPerPage));
+  }
   let collisions = 0;
   for (let i = 0; i < notes.length; i++) {
     for (let j = i + 1; j < notes.length; j++) {
+      if (pageOf.get(notes[i].note.id) !== pageOf.get(notes[j].note.id)) continue;
       if (notes[i].note.startTick === notes[j].note.startTick && notes[i].y === notes[j].y) {
         // Same onset, same row: only legal when the row-snapped pair is spread.
         if (Math.abs(notes[i].x - notes[j].x) < 2 * R - 1e-6) collisions++;
@@ -311,8 +358,8 @@ test('Brahms Op. 118 No. 1 lints completely clean', () => {
     'zero warnings — the five-voice chords are fully resolved'
   );
   assert.equal(REPORT.ok, true);
-  assert.equal(REPORT.stats.systems, 3);
-  assert.equal(REPORT.stats.measures, 9);
+  assert.equal(REPORT.stats.systems, 24);
+  assert.equal(REPORT.stats.measures, 71);
   assert.equal(REPORT.stats.notes, SCORE.notes.length);
   assert.ok(REPORT.stats.beams > 0, 'the eighths are beamed');
 });
@@ -369,5 +416,9 @@ test('The Brahms page renders every system with glyphs and no phantom staff', ()
     assert.ok(layout.notes.length > 0, `system ${layout.index + 1} carries notes`);
   }
   const systems = LAYOUTS.map((l: JankoSystemLayout) => l.index);
-  assert.deepEqual(systems, [0, 1, 2]);
+  assert.equal(systems.length, 24, 'the complete Intermezzo renders as 24 systems');
+  assert.deepEqual(
+    systems,
+    Array.from({ length: 24 }, (_, i) => i)
+  );
 });

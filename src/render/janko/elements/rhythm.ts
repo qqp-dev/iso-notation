@@ -16,7 +16,9 @@
  *
  * Every stem is engraved on the notehead's vertical centreline
  * (`stemX === note.x`), so a duration indicator always starts exactly on the
- * note column regardless of hand.
+ * note column regardless of hand. Round 15's one exception is the fixed
+ * `±JANKO_STEM_STAGGER` that separates two opposing-hand stems which would
+ * otherwise fuse into a single head-to-head rule (`JankoRhythmNote.stemDx`).
  */
 
 import { Hand } from '../../../model/types';
@@ -42,11 +44,37 @@ export interface JankoRhythmNote {
   x: number;
   /** Notehead centre y. */
   y: number;
+  /**
+   * Round 15: horizontal displacement (pt) of the **stem column** from the
+   * notehead centre, used only to un-fuse two opposing-hand stems that would
+   * otherwise share one x (see `JANKO_STEM_STAGGER`). The stem still attaches
+   * flush on its glyph circle, so the head keeps its own notehead centre.
+   */
+  stemDx?: number;
+  /**
+   * Round 15: page y of this note's **augmentation dot**, off the notehead row
+   * in inter-row space (see `JankoTokens.augmentationDotRowOffset`). Resolved
+   * by the engine, which knows the staff rules the dot must clear; the rhythm
+   * renderers only paint it.
+   */
+  dotY?: number;
 }
+
+/**
+ * Round 15 fixed half-stagger (pt) of two **opposing-hand** stems that would
+ * otherwise fuse into one continuous head-to-head rule. The RH stem steps left
+ * of the shared column and the LH stem right of it, so the two rules read as
+ * two voices and no vertical ink ever joins two heads of one column.
+ */
+export const JANKO_STEM_STAGGER = 1.2;
 
 /** Resolved stem geometry for one note. */
 export interface JankoStemGeometry {
-  /** Stem column: always the notehead's vertical centreline (`stemX === note.x`). */
+  /**
+   * Stem column: the notehead's vertical centreline (`stemX === note.x`), or
+   * that centreline plus the note's declared Round 15 anti-fusion stagger
+   * (`stemDx`, at most `±JANKO_STEM_STAGGER`).
+   */
   stemX: number;
   stemStartY: number;
   stemEndY: number;
@@ -119,10 +147,26 @@ export function getStemGeometry(
 ): JankoStemGeometry {
   const t = resolveJankoTokens(tokens);
   const dir = stemDirection(note.hand);
+  const dx = note.stemDx ?? 0;
+  const attachR = getStemAttachmentRadius(note, t);
+  if (dx === 0) {
+    return {
+      stemX: note.x,
+      stemStartY: note.y + dir * attachR,
+      stemEndY: note.y + dir * t.stemLength,
+      direction: dir,
+    };
+  }
+  // A staggered stem still starts flush on the glyph circle — at the chord of
+  // the attachment radius that its own column cuts — and keeps the canonical
+  // painted length (`stemLength − attachR`), so the stem/beam audit is
+  // unchanged by the stagger.
+  const attachY = Math.sqrt(Math.max(0, attachR * attachR - dx * dx));
+  const stemStartY = note.y + dir * attachY;
   return {
-    stemX: note.x,
-    stemStartY: note.y + dir * getStemAttachmentRadius(note, t),
-    stemEndY: note.y + dir * t.stemLength,
+    stemX: note.x + dx,
+    stemStartY,
+    stemEndY: stemStartY + dir * (t.stemLength - attachR),
     direction: dir,
   };
 }
@@ -136,11 +180,25 @@ export function renderStem(
   return `    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(s.stemEndY)}" stroke="#111111" stroke-width="0.90"/>`;
 }
 
-/** Augmentation dot for dotted durations. */
+/**
+ * Augmentation dot for dotted durations (Round 15).
+ *
+ * The dot is **always right of its own head**, for both hands:
+ * `dotX = note.x + noteheadRadius + augmentationDotGap`. The retired
+ * hand-mirrored placement put LH dots left of the head, where a dot floated
+ * between two columns and attached to the wrong note; standard practice is
+ * unambiguous.
+ *
+ * `cy` is the inter-row lane the engine resolved (`note.dotY`, half a
+ * whole-tone row away from the head, on the side away from the nearer staff
+ * rule). An on-row dot cannot clear the next column's disc in a 16th-note grid
+ * (columns 10.2pt apart, discs 9.6pt wide); the inter-row lane can. Falls back
+ * to the head row for callers that build a `JankoRhythmNote` by hand.
+ */
 function renderAugmentationDot(note: JankoRhythmNote, tokens: ResolvedJankoTokens): string {
-  const dir = stemDirection(note.hand);
-  const cx = dir === -1 ? note.x + tokens.noteheadRadius + 3.2 : note.x - tokens.noteheadRadius - 3.2;
-  return `    <circle class="janko-augmentation-dot" cx="${f(cx)}" cy="${f(note.y)}" r="${f(tokens.augmentationDotRadius)}" fill="#111111"/>`;
+  const cx = note.x + tokens.noteheadRadius + tokens.augmentationDotGap;
+  const cy = note.dotY ?? note.y;
+  return `    <circle class="janko-augmentation-dot" cx="${f(cx)}" cy="${f(cy)}" r="${f(tokens.augmentationDotRadius)}" fill="#111111"/>`;
 }
 
 /**
