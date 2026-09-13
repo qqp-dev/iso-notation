@@ -10,8 +10,11 @@
  *
  * - `'architectural-bracket'` — a straight 0.65pt rule with 3.0pt right-angled
  *   spurs clasping the Octave 5 and Octave 2 rules;
+ * - `'delicate-bracket'` (Round 12) — the same bracket drawn lighter: a 0.50pt
+ *   rule with 2.5pt spurs;
  * - `'clef-pillar'` — a slender 0.50pt pillar connecting the octave equators,
- *   ticked at Middle C and at every octave line;
+ *   ticked at every octave line (Round 12 removes the Middle C nib, so the
+ *   pillar is a pure registration landmark of the octave lattice);
  * - `'double-hairline'` — a modern double vertical bounding rule (0.75pt
  *   outer, 0.35pt inner, 2.5pt spacing) flush at the start of System 1;
  * - `'none'` — nothing at all.
@@ -34,9 +37,12 @@ import { f } from './style';
 export const ARCHITECTURAL_BRACKET_SPUR = 3.0;
 /** Stroke (pt) of the architectural bracket. */
 export const ARCHITECTURAL_BRACKET_STROKE = 0.65;
+/** Round 12: the delicate bracket — a lighter rule with shorter spurs. */
+export const DELICATE_BRACKET_SPUR = 2.5;
+export const DELICATE_BRACKET_STROKE = 0.50;
 /** Stroke (pt) of the clef pillar's slender lattice hairline. */
 export const CLEF_PILLAR_STROKE = 0.50;
-/** Horizontal reach (pt) of a clef pillar's octave / Middle C ticks. */
+/** Horizontal reach (pt) of a clef pillar's octave ticks. */
 export const CLEF_PILLAR_TICK = 2.4;
 /** Stroke (pt) of the double hairline frame's outer and inner rules. */
 export const DOUBLE_HAIRLINE_OUTER_STROKE = 0.75;
@@ -63,6 +69,25 @@ export function renderAccoladePath(
 }
 
 /**
+ * Round 12 delicate architectural bracket: the same right-angled clasp as
+ * {@link renderArchitecturalBracket}, drawn at 0.50pt with 2.5pt spurs. The
+ * lighter rule lets the opening margin read as a hairline registration mark
+ * rather than a structural frame.
+ */
+export function renderDelicateBracket(
+  geo: JankoSystemGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  return renderBracket(
+    geo,
+    tokens,
+    DELICATE_BRACKET_STROKE,
+    DELICATE_BRACKET_SPUR,
+    'janko-system-bracket-delicate'
+  );
+}
+
+/**
  * Straight 0.65pt system-start rule with 3.0pt right-angled spurs clasping the
  * Octave 5 and Octave 2 rules.
  */
@@ -70,17 +95,35 @@ export function renderArchitecturalBracket(
   geo: JankoSystemGeometry,
   tokens?: Partial<JankoTokens> | null
 ): string {
+  return renderBracket(
+    geo,
+    tokens,
+    ARCHITECTURAL_BRACKET_STROKE,
+    ARCHITECTURAL_BRACKET_SPUR,
+    'janko-system-bracket'
+  );
+}
+
+/** The shared right-angled bracket path of the two ruled bracket styles. */
+function renderBracket(
+  geo: JankoSystemGeometry,
+  tokens: Partial<JankoTokens> | null | undefined,
+  stroke: number,
+  spur: number,
+  cls: string
+): string {
   const t = resolveJankoTokens(tokens);
   const x = geo.staffLeft - t.accoladeGap - t.accoladeWidth;
-  const spur = ARCHITECTURAL_BRACKET_SPUR;
   const top = geo.equatorY('RH', 5);
   const bot = geo.equatorY('LH', 2);
-  return `    <path class="janko-system-bracket" d="M ${f(x + spur)} ${f(top)} L ${f(x)} ${f(top)} L ${f(x)} ${f(bot)} L ${f(x + spur)} ${f(bot)}" fill="none" stroke="#111827" stroke-width="${ARCHITECTURAL_BRACKET_STROKE.toFixed(2)}"/>`;
+  return `    <path class="${cls}" d="M ${f(x + spur)} ${f(top)} L ${f(x)} ${f(top)} L ${f(x)} ${f(bot)} L ${f(x + spur)} ${f(bot)}" fill="none" stroke="#111827" stroke-width="${stroke.toFixed(2)}"/>`;
 }
 
 /**
  * Slender 0.50pt clef pillar connecting the octave equators, with tick marks
- * at Middle C and at every octave line (o5 … o2).
+ * at every octave line (o5 … o2). Round 12 removes the Middle C nib: the pillar
+ * ticks the **octave lattice only**, so it reads as a registration landmark of
+ * the four equators and never as a half-way clef mark.
  */
 export function renderClefPillar(
   geo: JankoSystemGeometry,
@@ -93,7 +136,7 @@ export function renderClefPillar(
   const parts: string[] = [
     `    <line class="janko-clef-pillar" x1="${f(x)}" y1="${f(ys[0])}" x2="${f(x)}" y2="${f(ys[3])}" stroke="#111827" stroke-width="${CLEF_PILLAR_STROKE.toFixed(2)}"/>`,
   ];
-  for (const y of [geo.middleCY, ...ys]) {
+  for (const y of ys) {
     parts.push(
       `    <line class="janko-clef-pillar-tick" x1="${f(x)}" y1="${f(y)}" x2="${f(x + CLEF_PILLAR_TICK)}" y2="${f(y)}" stroke="#111827" stroke-width="${CLEF_PILLAR_STROKE.toFixed(2)}"/>`
     );
@@ -134,6 +177,8 @@ export function renderAccolade(
   switch (o.systemStartStyle) {
     case 'architectural-bracket':
       return renderArchitecturalBracket(geo, tokens);
+    case 'delicate-bracket':
+      return renderDelicateBracket(geo, tokens);
     case 'clef-pillar':
       return renderClefPillar(geo, tokens);
     case 'double-hairline':

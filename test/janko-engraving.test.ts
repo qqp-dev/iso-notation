@@ -26,9 +26,11 @@ import {
   DEFAULT_JANKO_TOKENS,
   JANKO_CHANNEL_LAYOUTS,
   JANKO_FINAL_BARLINE_STYLES,
+  JANKO_REST_STYLES,
   JANKO_STAFF_OCTAVES,
   JANKO_SUBDIVISION_STYLES,
   JANKO_SYSTEM_START_STYLES,
+  JankoRestStyle,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -844,16 +846,17 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   assert.ok(!page.includes('class="janko-hand-label"'));
   assert.ok(!page.includes('class="janko-time-signature"'));
 
-  // 3. Beat grid pulse lines are emitted for beats 2 and 3 in every measure
+  // 3. Beat grid pulse lines are emitted for beats 2 and 3 in every measure.
+  // Round 12 makes each pulse ONE continuous rule across the Middle C corridor
+  // (no more RH + LH halves): 3 systems * 4 measures/system * 2 beats = 24.
   const beatMatches = [...page.matchAll(/class="janko-beat-line"/g)];
-  // 3 systems * 4 measures/system * 2 beats/measure * 2 hands (RH + LH) = 48 lines
-  assert.equal(beatMatches.length, 3 * 4 * 2 * 2);
+  assert.equal(beatMatches.length, 3 * 4 * 2);
   assert.match(page, /stroke="#9CA3AF" stroke-width="0\.70" stroke-dasharray="2,3"/);
 
-  // 4. Macro crop mm. 1–2 carries beat lines on beats 2 and 3 (system 0 DOM has 4 mm * 4 lines = 16)
+  // 4. Macro crop mm. 1–2 carries beat lines on beats 2 and 3 (system 0 DOM has 4 mm * 2 lines = 8)
   const crop = renderJankoCrop(score, 1, 2, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const cropBeatLines = [...crop.matchAll(/class="janko-beat-line"/g)];
-  assert.equal(cropBeatLines.length, 4 * 2 * 2);
+  assert.equal(cropBeatLines.length, 4 * 2);
 
   // 5. Notes use beamed rhythm by default
   assert.match(crop, /class="janko-beam"/);
@@ -879,8 +882,15 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
   assert.equal(DEFAULT_JANKO_OPTIONS.finalBarlineStyle, 'unified', 'the unified final barline is the default');
   assert.deepEqual(
     [...JANKO_SYSTEM_START_STYLES],
-    ['open-halo', 'architectural-bracket', 'clef-pillar', 'double-hairline', 'none'],
-    'the published system-start catalogue'
+    [
+      'open-halo',
+      'architectural-bracket',
+      'delicate-bracket',
+      'clef-pillar',
+      'double-hairline',
+      'none',
+    ],
+    'the published system-start catalogue (Round 12 adds the delicate bracket)'
   );
   assert.deepEqual(
     [...JANKO_FINAL_BARLINE_STYLES],
@@ -952,13 +962,229 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
   }
 
   // Measure barlines fall to 0.60pt (the closing barline of the score stays
-  // authoritative and is covered by the system-openness test below).
+  // authoritative and is covered by the system-openness test below). Round 12
+  // paints one continuous rule per internal boundary (3 per system) instead of
+  // the two split hand halves.
   const pageBarlines = page.match(/<g class="janko-barlines">[\s\S]*?<\/g>/)![0];
-  assert.ok(
-    (pageBarlines.match(/stroke-width="0\.60"/g) ?? []).length >= 6,
+  assert.equal(
+    (pageBarlines.match(/stroke-width="0\.60"/g) ?? []).length,
+    3,
     'internal measure barlines are lighter'
   );
   assert.ok(!pageBarlines.includes('stroke-width="0.85"'), 'the 0.85pt measure barline is gone');
+});
+
+// ---------------------------------------------------------------------------
+// 2c. Round 12 — rests, the continuous vertical grid, its writing policies and
+//     the refined architectural start symbols
+// ---------------------------------------------------------------------------
+
+test('Round 12 rests: the m. 4 tick-552 silence is written in the RH on the Octave 4 equator', () => {
+  const score = buildBachGoldbergVar1Score();
+  assert.equal(DEFAULT_JANKO_OPTIONS.restStyle, 'kinetic-monoline', 'the settled rest dialect');
+  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  const all = layouts.flatMap((l) => l.rests);
+  assert.ok(all.length > 0, 'the score writes its silences');
+
+  // The canonical case: RH plays 16ths to tick 540, releases at 552 and resumes
+  // at 564 while the LH enters at 552 — so the silence is exactly one 16th.
+  const m4 = all.find((r) => r.tick === 552)!;
+  assert.ok(m4, 'the m. 4 tick-552 rest exists');
+  assert.equal(m4.hand, 'RH');
+  assert.equal(m4.value, 'sixteenth');
+  assert.equal(m4.durationTicks, 12);
+  close(m4.x, 544.97, 'the rest stands on the tick-552 beat column', 0.01);
+  const system0 = getSystemGeometry(computePageGeometry(OPTIONS, TOKENS), 0);
+  close(m4.y - system0.middleCY, -15.0, 'the rest hangs on the Octave 4 voice equator', 1e-9);
+
+  // Every rest states a standard value, sits on its hand's voice equator and
+  // never collides with a notehead (the engine's own fit rule).
+  for (const rest of all) {
+    assert.ok([12, 24, 48, 96, 192].includes(rest.durationTicks), `${rest.tick} standard value`);
+    const equator = rest.hand === 'RH' ? -15.0 : 15.0;
+    const system = layouts.find((l) => l.rests.includes(rest))!;
+    close(rest.y - system.geometry.middleCY, equator, `${rest.hand} voice equator`, 1e-9);
+    for (const p of system.notes) {
+      const dx = Math.max(Math.abs(p.x - rest.x) - 0, 0);
+      const dy = Math.abs(p.y - rest.y);
+      assert.ok(
+        Math.hypot(dx, dy) > 0,
+        `${rest.hand} rest at ${rest.tick} does not share a point with a glyph`
+      );
+    }
+  }
+
+  const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
+  assert.match(
+    crop,
+    /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="kinetic-monoline">/
+  );
+  assert.match(crop, /class="janko-rest-stem"/, 'the monoline stem is painted');
+  assert.equal(
+    (crop.match(/class="janko-rest-tab"/g) ?? []).length,
+    2,
+    'a 16th rest carries two 12.4° kinetic tabs'
+  );
+  const report = lintJankoScore(score, OPTIONS, TOKENS);
+  assert.equal(report.ok, true, 'the resting score stays clean');
+  assert.equal(report.warnings.length, 0);
+});
+
+test('Round 12 rest dialects: four distinct monoline grammars, all clean', () => {
+  const score = buildBachGoldbergVar1Score();
+  const signatures: Record<JankoRestStyle, RegExp> = {
+    'kinetic-monoline': /janko-rest-(stem|tab|notch|bar)/,
+    'classical-urtext': /janko-rest-(hook|lightning|block)/,
+    'geometric-node': /janko-rest-(node|ray|capsule)/,
+    'bauhaus-slash': /janko-rest-(slash|wing|z|box)/,
+  };
+  const documents = new Set<string>();
+  for (const style of JANKO_REST_STYLES) {
+    const options = resolveJankoOptions({ ...OPTIONS, restStyle: style });
+    const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
+    assert.match(crop, signatures[style], `${style} paints its own ink`);
+    for (const [other, pattern] of Object.entries(signatures)) {
+      if (other === style) continue;
+      assert.ok(!pattern.test(crop), `${style} never paints ${other} ink`);
+    }
+    const report = lintJankoScore(score, options, TOKENS);
+    assert.equal(report.ok, true, `${style} engraves clean`);
+    assert.equal(report.warnings.length, 0, `${style} adds no warning`);
+    documents.add(crop.replace(new RegExp(`data-rest-style="${style}"`, 'g'), ''));
+  }
+  assert.equal(documents.size, 4, 'the four dialects are four different engravings');
+});
+
+test('Round 12 continuous vertical grid: barlines and beat pulses cross Middle C unbroken', () => {
+  const score = buildBachGoldbergVar1Score();
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const system0 = getSystemGeometry(geo, 0);
+  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const rhTop = system0.equatorY('RH', 5) - 12;
+  const lhBot = system0.equatorY('LH', 2) + 12;
+  const spine = system0.middleCY;
+  close(rhTop, spine - 57.0, 'the grid opens 57pt above Middle C', 1e-9);
+  close(lhBot, spine + 57.0, 'and closes 57pt below it', 1e-9);
+
+  const verticals = [...crop.matchAll(/<line class="(janko-barline|janko-beat-line)" x1="([\d.-]+)" y1="([\d.-]+)" x2="[\d.-]+" y2="([\d.-]+)"/g)];
+  assert.ok(verticals.length > 0, 'the grid is painted');
+  for (const line of verticals) {
+    close(Number(line[3]), rhTop, `${line[1]} opens on the Octave 5 rule`, 1e-9);
+    close(Number(line[4]), lhBot, `${line[1]} closes on the Octave 2 rule`, 1e-9);
+    assert.ok(
+      Number(line[3]) < spine && Number(line[4]) > spine,
+      `${line[1]} crosses the Middle C corridor with no gap`
+    );
+  }
+  assert.match(
+    crop,
+    /class="janko-beat-line"[^>]*stroke="#9CA3AF" stroke-width="0\.70" stroke-dasharray="2,3"/
+  );
+});
+
+test('Round 12 grid writing policies: protected air, air channels and full-width transparency', () => {
+  const score = buildBachGoldbergVar1Score();
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const system0 = getSystemGeometry(geo, 0);
+
+  // 1. The golden overlaid policy: no channel ink, barlines keep their air.
+  const overlaid = renderJankoCrop(score, 27, 3, OPTIONS, TOKENS);
+  assert.ok(!overlaid.includes('janko-grid-channel'), 'the overlaid grid reserves no channel');
+
+  // 2. The strict policy: every grid line rides a dedicated white air channel,
+  //    and the channel is painted *above* the rhythm layer (after every stem).
+  const strictOptions = resolveJankoOptions({ ...OPTIONS, gridWritingPolicy: 'strict-protected-grid' });
+  const strict = renderJankoCrop(score, 27, 3, strictOptions, TOKENS);
+  const channels = (strict.match(/class="janko-grid-channel"/g) ?? []).length;
+  assert.ok(channels > 0, 'the strict grid paints its air channels');
+  assert.equal(
+    channels,
+    (strict.match(/class="janko-(barline|beat-line)"/g) ?? []).length,
+    'every grid line owns exactly one channel'
+  );
+  const lastStem = strict.lastIndexOf('class="janko-stem"');
+  const firstChannel = strict.indexOf('class="janko-grid-channel"');
+  // The mm. 27–29 window spans two systems, so the layer order is asserted on a
+  // single-system window: nothing but the noteheads may follow the channel.
+  const strictOneSystem = renderJankoCrop(score, 1, 2, strictOptions, TOKENS);
+  const stemInOneSystem = strictOneSystem.lastIndexOf('class="janko-stem"');
+  const channelInOneSystem = strictOneSystem.indexOf('class="janko-grid-channel"');
+  assert.ok(
+    stemInOneSystem !== -1 && channelInOneSystem > stemInOneSystem,
+    'the channelled grid is painted above the rhythm layer'
+  );
+  assert.ok(
+    strictOneSystem.lastIndexOf('class="janko-grid-channel"') <
+      strictOneSystem.indexOf('class="janko-knockout"'),
+    'and beneath the circular notehead masks'
+  );
+  assert.ok(lastStem !== -1 && firstChannel !== -1, 'both layers are present in the long window');
+
+  // 3. The transparent policy: the music uses the full measure width, so the
+  //    first 16th of a measure stands exactly on its opening barline.
+  const transparentOptions = resolveJankoOptions({
+    ...OPTIONS,
+    gridWritingPolicy: 'unified-transparent-grid',
+  });
+  const transparent = renderJankoCrop(score, 27, 3, transparentOptions, TOKENS);
+  assert.ok(!transparent.includes('janko-grid-channel'), 'the transparent grid reserves nothing');
+  // m. 29 opens system 8 — measure index 0 of its system — and its downbeat is a
+  // real tick-4032 onset, so with the inset withdrawn the head straddles the
+  // system's opening edge exactly where the barline would stand.
+  const systemIndex = Math.floor(28 / OPTIONS.measuresPerSystem);
+  const layout = layoutJankoScore(score, transparentOptions, TOKENS)[systemIndex];
+  const firstOfM29 = layout.notes
+    .filter((p) => p.note.startTick >= 28 * 144 && p.note.startTick < 29 * 144)
+    .sort((a, b) => a.note.startTick - b.note.startTick)[0];
+  assert.equal(firstOfM29.note.startTick, 28 * 144, 'm. 29 opens on its downbeat');
+  close(
+    firstOfM29.x,
+    layout.geometry.staffLeft,
+    'the transparent downbeat stands on the measure barline',
+    1e-6
+  );
+  assert.ok(
+    Math.abs(firstOfM29.y - layout.geometry.middleCY) < 60,
+    'and it is a real in-staff glyph'
+  );
+  for (const policy of ['overlaid-beat-grid', 'strict-protected-grid', 'unified-transparent-grid'] as const) {
+    const report = lintJankoScore(score, { ...OPTIONS, gridWritingPolicy: policy }, TOKENS);
+    assert.equal(report.ok, true, `${policy} is clean`);
+    assert.equal(report.warnings.length, 0, `${policy} adds no warning`);
+  }
+});
+
+test('Round 12 start symbols: 0.65pt / 0.50pt brackets and the nib-free clef pillar', () => {
+  const score = buildBachGoldbergVar1Score();
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const system0 = getSystemGeometry(geo, 0);
+
+  const bracket = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'architectural-bracket' }, TOKENS);
+  assert.match(
+    bracket,
+    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65"/
+  );
+
+  const delicate = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'delicate-bracket' }, TOKENS);
+  assert.match(delicate, /class="janko-system-bracket-delicate"[^>]*stroke-width="0\.50"/);
+  assert.ok(!delicate.includes('class="janko-system-bracket"'), 'the two brackets never co-paint');
+
+  const pillar = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'clef-pillar' }, TOKENS);
+  assert.match(pillar, /class="janko-clef-pillar" x1="[\d.-]+" y1="[\d.-]+" x2="[\d.-]+" y2="[\d.-]+" stroke="#111827" stroke-width="0\.50"/);
+  const ticks = [...pillar.matchAll(/class="janko-clef-pillar-tick" x1="[\d.-]+" y1="([\d.-]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(ticks.length, 4, 'the pillar ticks the four octave equators only (the nib is gone)');
+  for (const [i, octave] of ([5, 4, 3, 2] as const).entries()) {
+    close(ticks[i], system0.equatorY(octave >= 4 ? 'RH' : 'LH', octave), `tick at o${octave}`, 1e-9);
+  }
+  assert.ok(
+    !ticks.some((y) => Math.abs(y - system0.middleCY) < 1e-6),
+    'no Middle C nib survives'
+  );
+  for (const style of ['architectural-bracket', 'delicate-bracket', 'clef-pillar'] as const) {
+    const report = lintJankoScore(score, { ...OPTIONS, systemStartStyle: style }, TOKENS);
+    assert.equal(report.ok, true, `${style} engraves clean`);
+    assert.equal(report.warnings.length, 0, `${style} adds no warning`);
+  }
 });
 
 test('Round 10 system openness: open margin, unified final barline, no mid-piece marks', () => {
@@ -1526,7 +1752,7 @@ test('Round 9: the subdivision dialects dispatch at the stem tip and stack by fl
     ],
     TOKENS
   )!;
-  assert.equal(clasped.durationStyle, 'transverse-cross-bars', 'the clasp carries its own paradigm');
+  assert.equal(clasped.durationStyle, 'kinetic-cross-slashes', 'the clasp carries its own paradigm');
   const claspMarkup = renderChordClasp(clasped, TOKENS);
   assert.ok(!claspMarkup.includes('janko-flag'), 'no subdivision ink on the clasp');
 

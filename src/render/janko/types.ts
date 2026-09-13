@@ -90,6 +90,106 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
+ * Pluggable **rest symbol dialects** — the Round 12 question: how a hand's
+ * silent span inside an active measure is written (see
+ * `elements/rests.renderRest`).
+ *
+ * | style               | 16th / 8th                                  | quarter                     | half / whole            |
+ * | ------------------- | ------------------------------------------- | --------------------------- | ----------------------- |
+ * | `'kinetic-monoline'`| vertical stem + 12.4° kinetic tabs (`//`,`/`)| central horizontal notch    | hollow bar (7 × 2.2pt)  |
+ * | `'classical-urtext'`| calligraphic double / single hook (`𝄿`, `𝄾`) | serpentine lightning (`𝄽`)  | solid block (6 × 2.5pt) |
+ * | `'geometric-node'`  | hollow diamond + 2 / 1 lateral rays          | solid diamond (5 × 5pt)     | open capsule / lozenge  |
+ * | `'bauhaus-slash'`   | 45° beveled slash + 2 / 1 parallel wings     | minimalist reversed-Z       | thin hairline box       |
+ */
+export type JankoRestStyle =
+  | 'kinetic-monoline'
+  | 'classical-urtext'
+  | 'geometric-node'
+  | 'bauhaus-slash';
+
+/** Every rest dialect, in the canonical exploration order (A–D). */
+export const JANKO_REST_STYLES: readonly JankoRestStyle[] = [
+  'kinetic-monoline',
+  'classical-urtext',
+  'geometric-node',
+  'bauhaus-slash',
+];
+
+/** Human-readable names of the four rest dialects. */
+export const JANKO_REST_STYLE_LABELS: Record<JankoRestStyle, string> = {
+  'kinetic-monoline': 'Kinetic Monoline Rests (12.4° tabs)',
+  'classical-urtext': 'Classical Urtext Rest Glyphs',
+  'geometric-node': 'Geometric Pause Nodes',
+  'bauhaus-slash': 'Bauhaus Beveled Slashes',
+};
+
+/**
+ * How the **vertical grid** (measure barlines + dashed beat pulses) coexists
+ * with the music — the Round 12 three-way question, evaluated on dense
+ * sixteenth-note writing (Bach Var. 1 mm. 27 & 29).
+ *
+ * | policy                      | barline                                  | beat pulse                                        |
+ * | --------------------------- | ---------------------------------------- | ------------------------------------------------- |
+ * | `'overlaid-beat-grid'`      | protected: notes keep `COLUMN_BARLINE_AIR` | overlaid beneath the notes, knocked out by a disc |
+ * | `'strict-protected-grid'`   | protected **and** painted through a dedicated white air channel above the rhythm layer | same channel treatment: the grid is never written over |
+ * | `'unified-transparent-grid'`| transparent background coordinate: the note field uses the full measure width and a disc knocks the barline out exactly as it knocks out a beat pulse | transparent background coordinate |
+ *
+ * Round 12 makes the whole vertical grid **continuous across Middle C** under
+ * every policy (see `elements/barlines`), so the three policies differ only in
+ * who owns the overlap: the grid (policies 1–2) or the glyph mask (policy 3).
+ */
+export type JankoGridWritingPolicy =
+  | 'overlaid-beat-grid'
+  | 'strict-protected-grid'
+  | 'unified-transparent-grid';
+
+/** Every grid writing policy, in the canonical exploration order. */
+export const JANKO_GRID_WRITING_POLICIES: readonly JankoGridWritingPolicy[] = [
+  'overlaid-beat-grid',
+  'strict-protected-grid',
+  'unified-transparent-grid',
+];
+
+/** Human-readable names of the three grid writing policies. */
+export const JANKO_GRID_WRITING_POLICY_LABELS: Record<JankoGridWritingPolicy, string> = {
+  'overlaid-beat-grid': 'Protected Barlines / Overlaid Beat Grid',
+  'strict-protected-grid': 'Strict Non-Overwritten Grid (air channels)',
+  'unified-transparent-grid': 'Unified Transparent Background Grid',
+};
+
+/**
+ * Does the active policy reserve air around the measure barlines? Every policy
+ * but `'unified-transparent-grid'` does; the transparent grid lets the music
+ * pass across the barline and be knocked out by the circular glyph mask.
+ */
+export function protectsBarlineInk(policy: JankoGridWritingPolicy): boolean {
+  return policy !== 'unified-transparent-grid';
+}
+
+/**
+ * Does the active policy paint the vertical grid through **dedicated white air
+ * channels** above the rhythm layer (`'strict-protected-grid'`)? The grid is
+ * then never written over: a stem or beam crossing it is cut by the channel,
+ * while the circular notehead mask still erases the grid beneath it.
+ */
+export function channelsGridInk(policy: JankoGridWritingPolicy): boolean {
+  return policy === 'strict-protected-grid';
+}
+
+/**
+ * Canonical left/right inset (pt) of a measure's note field under the active
+ * grid writing policy. The transparent grid withdraws the canonical
+ * `measureInset`, so the music uses the full measure width and a downbeat
+ * column sits exactly on the barline, where its knockout erases it.
+ */
+export function getGridNoteInset(
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number {
+  return protectsBarlineInk(o.gridWritingPolicy) ? t.measureInset : 0;
+}
+
+/**
  * Midpoint clasp **duration** paradigms — the Round 11 question: how an
  * external per-hand bracket carries the cluster's duration at the exact
  * vertical midpoint of its own spine with **light transverse line cuts**
@@ -145,8 +245,11 @@ export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, 
  * |                          | the Position of Honor halo rings the opening tick-0 heads |
  * | `'architectural-bracket'`| a straight 0.65pt rule with 3.0pt right-angled spurs      |
  * |                          | clasping the Octave 5 and Octave 2 rules                  |
+ * | `'delicate-bracket'`     | the same bracket drawn lighter: a 0.50pt rule with 2.5pt  |
+ * |                          | right-angled spurs (Round 12)                             |
  * | `'clef-pillar'`          | a slender 0.50pt pillar connecting the octave equators    |
- * |                          | with tick marks at Middle C and the octave lines          |
+ * |                          | with tick marks at the octave lines (Round 12 removes the |
+ * |                          | Middle C nib)                                             |
  * | `'double-hairline'`      | a modern double vertical bounding rule (0.75pt outer,     |
  * |                          | 0.35pt inner, 2.5pt spacing) flush at the system start    |
  * | `'none'`                 | no system-start ink at all                                |
@@ -159,6 +262,7 @@ export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, 
 export type JankoSystemStartStyle =
   | 'open-halo'
   | 'architectural-bracket'
+  | 'delicate-bracket'
   | 'clef-pillar'
   | 'double-hairline'
   | 'none';
@@ -167,6 +271,7 @@ export type JankoSystemStartStyle =
 export const JANKO_SYSTEM_START_STYLES: readonly JankoSystemStartStyle[] = [
   'open-halo',
   'architectural-bracket',
+  'delicate-bracket',
   'clef-pillar',
   'double-hairline',
   'none',
@@ -176,7 +281,8 @@ export const JANKO_SYSTEM_START_STYLES: readonly JankoSystemStartStyle[] = [
 export const JANKO_SYSTEM_START_STYLE_LABELS: Record<JankoSystemStartStyle, string> = {
   'open-halo': 'Open Margin with Position-of-Honor Halo',
   'architectural-bracket': 'Architectural Bracket (0.65pt rule + 3.0pt spurs)',
-  'clef-pillar': 'Slender Clef Pillar (0.50pt lattice ticks)',
+  'delicate-bracket': 'Delicate Architectural Bracket (0.50pt rule + 2.5pt spurs)',
+  'clef-pillar': 'Nib-Free Clef Pillar (0.50pt lattice ticks)',
   'double-hairline': 'Double Hairline Frame (0.75pt / 0.35pt)',
   none: 'No System-Start Mark',
 };
@@ -492,12 +598,25 @@ export interface JankoLayoutOptions {
    */
   subdivisionStyle?: JankoSubdivisionStyle;
   /**
-   * Midpoint clasp-duration paradigm (Round 11): how an external per-hand
-   * bracket carries its cluster's duration at its spine midpoint with a light
-   * transverse line cut. Defaults to `'transverse-cross-bars'` (see
-   * {@link JankoClaspDurationStyle}).
+   * Midpoint clasp-duration paradigm (Round 11, standardized by Round 12): how
+   * an external per-hand bracket carries its cluster's duration at its spine
+   * midpoint with a light transverse line cut. Defaults to the settled
+   * `'kinetic-cross-slashes'` — up-raked 12.4° cuts that speak the score's own
+   * beam-harmonized kinetic language (see {@link JankoClaspDurationStyle}).
    */
   claspDurationStyle?: JankoClaspDurationStyle;
+  /**
+   * Rest symbol dialect (Round 12): how a hand's silent span inside an active
+   * measure is written. Defaults to `'kinetic-monoline'` (see
+   * {@link JankoRestStyle}).
+   */
+  restStyle?: JankoRestStyle;
+  /**
+   * Vertical grid writing policy (Round 12): how the continuous barlines and
+   * dashed beat pulses coexist with the music. Defaults to
+   * `'overlaid-beat-grid'` (see {@link JankoGridWritingPolicy}).
+   */
+  gridWritingPolicy?: JankoGridWritingPolicy;
   /**
    * System-start margin ink (Round 10, extended by Round 11): the copperplate
    * accolade is retired in favour of an open margin whose opening sounds are
@@ -569,7 +688,9 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   channelLayout: 'single-equator',
   chordGrouping: 'none',
   subdivisionStyle: 'kinetic-tab-beam',
-  claspDurationStyle: 'transverse-cross-bars',
+  claspDurationStyle: 'kinetic-cross-slashes',
+  restStyle: 'kinetic-monoline',
+  gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'open-halo',
   finalBarlineStyle: 'unified',
   systemsPerPage: 3,

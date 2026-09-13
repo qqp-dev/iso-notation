@@ -34,6 +34,8 @@
  *    acceptable threshold.
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
+ * 6. **Rest clearance** (Round 12) — a voice rest's own dialect ink box keeps
+ *    real air from every foreign notehead disc and from any protected barline.
  *
  * Usage
  * -----
@@ -51,6 +53,7 @@ import {
   JankoTokens,
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
+  protectsBarlineInk,
   resolveJankoOptions,
   resolveJankoTokens,
 } from './types';
@@ -77,6 +80,7 @@ import {
   digitHalfExtents,
   isPositionOfHonor,
 } from './elements/notehead';
+import { JankoRestGeometry, restInkBox } from './elements/rests';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -105,6 +109,7 @@ export type JankoLintCode =
   | 'clasp-rail-crossing'
   | 'measure-numeral-collision'
   | 'accolade-collision'
+  | 'rest-collision'
   | 'corridor-intrusion';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -195,6 +200,7 @@ export const JANKO_LINT_CHECKS = [
   'clasp-clearance',
   'measure-numeral-clearance',
   'accolade-clearance',
+  'rest-clearance',
   'middle-c-corridor',
   'knockout-paint-order',
 ] as const;
@@ -288,6 +294,17 @@ function handRuleSpans(
     { hand: 'RH', top: g.equatorY('RH', 5) - 12, bottom: g.equatorY('RH', 4) + 12 },
     { hand: 'LH', top: g.equatorY('LH', 3) - 12, bottom: g.equatorY('LH', 2) + 12 },
   ];
+}
+
+/**
+ * Round 12: the **continuous** vertical-grid span of one system — the top of the
+ * Octave 5 rule (`rhTop`) straight down to the bottom of the Octave 2 rule
+ * (`lhBot`), across the Middle C corridor. Every measure barline and dashed beat
+ * pulse is painted as one such rule (see `elements/barlines`).
+ */
+function gridRuleSpan(layout: JankoSystemLayout): { top: number; bottom: number } {
+  const g = layout.geometry;
+  return { top: g.equatorY('RH', 5) - 12, bottom: g.equatorY('LH', 2) + 12 };
 }
 
 // ---------------------------------------------------------------------------
@@ -772,8 +789,11 @@ export interface BarlineSpan {
  * (`layout.isFinalSystem`).
  *
  * Round 10: when `finalBarlineStyle === 'unified'` the score's closing boundary
- * is one continuous rule from the RH top to the LH bottom (it seals the Middle
- * C corridor), so it is modelled as a single span instead of two hand halves.
+ * is one continuous rule from the RH top to the LH bottom.
+ *
+ * Round 12 makes **every** measure barline continuous across the Middle C
+ * corridor, exactly as `renderBarlines` paints it. Only the closing boundary
+ * still honours `'split-corridor'`, which restores the two hand halves.
  */
 export function systemBarlines(
   layout: JankoSystemLayout,
@@ -782,15 +802,16 @@ export function systemBarlines(
 ): BarlineSpan[] {
   const g = layout.geometry;
   const spans = handRuleSpans(layout);
+  const grid = gridRuleSpan(layout);
   const barlines: BarlineSpan[] = [];
   const anacrusis = t.anacrusisTicks ?? 0;
   const unifiedFinal = o.finalBarlineStyle === 'unified' && layout.isFinalSystem;
   const push = (x: number, isSystemEnd: boolean = false): void => {
-    if (isSystemEnd && unifiedFinal) {
-      barlines.push({ x, top: spans[0].top, bottom: spans[spans.length - 1].bottom });
+    if (isSystemEnd && !unifiedFinal) {
+      for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
       return;
     }
-    for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+    barlines.push({ x, top: grid.top, bottom: grid.bottom });
   };
   if (layout.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
@@ -821,6 +842,11 @@ export function checkBarlineClearance(
   const r = t.noteheadRadius;
   const barlines = systemBarlines(layout, o, t);
   if (barlines.length === 0) return;
+  // Round 12: under the `'unified-transparent-grid'` policy the barline is a
+  // background coordinate. The music uses the full measure width and the
+  // circular knockout erases whatever it crosses, so there is no air to audit:
+  // the grid owns the overlap and the glyph mask takes it back.
+  if (!protectsBarlineInk(o.gridWritingPolicy)) return;
 
   for (const b of barlines) {
     for (const p of layout.notes) {
@@ -914,6 +940,9 @@ export function checkClaspClearance(
 ): void {
   if (layout.clasps.length === 0 && layout.claspRails.length === 0) return;
   const barlines = systemBarlines(layout, o, t);
+  // Round 12: the transparent grid reserves no barline air, so the bracket is
+  // judged against the glyphs alone (its barline is knocked out by the mask).
+  const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
   const r = t.noteheadRadius;
   const haloEdge = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
   const { numeral, accolade } = marginFurniture(
@@ -934,7 +963,11 @@ export function checkClaspClearance(
       if (b.x > clasp.claspX + EPS) continue;
       if (leftBarline === null || b.x > leftBarline) leftBarline = b.x;
     }
-    if (leftBarline !== null && clasp.claspX - leftBarline < t.claspMinBarlineAir - EPS) {
+    if (
+      barlineAir &&
+      leftBarline !== null &&
+      clasp.claspX - leftBarline < t.claspMinBarlineAir - EPS
+    ) {
       out.push({
         code: 'clasp-barline-collision',
         severity: 'error',
@@ -1047,6 +1080,79 @@ export function checkClaspClearance(
         y: p.y,
         metrics: { gap, required: lint.minClearance, railY: rail.y },
       });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4c. Rest clearance (Round 12)
+// ---------------------------------------------------------------------------
+
+/**
+ * A voice rest is **real musical ink**: its dialect's ink box must keep
+ * `minClearance` from every foreign notehead disc (of either hand — the other
+ * hand is exactly what plays while this one is silent) and, whenever the active
+ * grid writing policy protects the barlines, from the barline column it may
+ * never straddle. The engine's `restClearsLayout` uses the same box and the same
+ * air, so a rest the engine admits is guaranteed to pass this audit; the check
+ * exists to catch a regression that paints a rest where the fit rule never
+ * placed one.
+ */
+export function checkRestClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (layout.rests.length === 0) return;
+  const r = t.noteheadRadius;
+  const haloEdge = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
+  const barlines = barlineAir ? systemBarlines(layout, o, t) : [];
+
+  const report = (rest: JankoRestGeometry, message: string, extra: Partial<LintViolation>): void => {
+    out.push({
+      code: 'rest-collision',
+      severity: 'error',
+      message,
+      system: layout.index,
+      measure: measureOfTick(rest.tick, t),
+      x: rest.x,
+      y: rest.y,
+      ...extra,
+    });
+  };
+
+  for (const rest of layout.rests) {
+    const box = restInkBox(rest, t);
+    for (const p of layout.notes) {
+      const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
+      const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
+      const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
+      const gap = Math.hypot(dx, dy) - radius;
+      if (gap >= lint.minClearance - EPS) continue;
+      report(
+        rest,
+        `Rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) passes ${gap.toFixed(2)}pt from ` +
+          `notehead ${p.note.id} (${lint.minClearance.toFixed(1)}pt of air required).`,
+        {
+          noteIds: [p.note.id],
+          metrics: { gap, required: lint.minClearance, noteX: p.x, noteY: p.y },
+        }
+      );
+    }
+    for (const b of barlines) {
+      const horizontal = Math.max(box.x0 - b.x, 0, b.x - box.x1);
+      const vertical = Math.max(box.y0 - b.bottom, 0, b.top - box.y1);
+      const gap = Math.max(0, Math.hypot(horizontal, vertical));
+      if (gap >= lint.minClearance - EPS) continue;
+      report(
+        rest,
+        `Rest at tick ${rest.tick} straddles the protected barline at x=${b.x.toFixed(2)} ` +
+          `(${gap.toFixed(2)}pt of air, ${lint.minClearance.toFixed(1)}pt required).`,
+        { metrics: { gap, required: lint.minClearance, barlineX: b.x } }
+      );
     }
   }
 }
@@ -1231,14 +1337,16 @@ export function checkAccoladeClearance(
 // ---------------------------------------------------------------------------
 
 /**
- * The Middle C channel is a structural corridor: no internal barline, beat-grid
- * pulse, guideline or beam may run into or across the spine. Noteheads and
- * stems may legitimately cross the corridor (the hands share the register), but
- * anything painted after a notehead's knockout must not cut through it — that is
- * audited separately by {@link auditKnockoutProtection}.
+ * The Middle C channel is a structural corridor: no **horizontal** rule may run
+ * along it, no beam connector may slice across it and no hand label may be
+ * swallowed by it. Noteheads and stems may legitimately cross the corridor (the
+ * hands share the register), and since Round 12 the **vertical grid** does so on
+ * purpose: every measure barline and beat pulse is one continuous rule from
+ * `rhTop` to `lhBot`, so a corridor-crossing vertical rule is no longer a defect
+ * but the invariant itself (see `elements/barlines`).
  *
- * Round 10's `finalBarlineStyle: 'unified'` is the one deliberate exception: the
- * score's closing boundary seals the corridor on purpose, exactly as
+ * Round 10's `finalBarlineStyle: 'split-corridor'` is the deliberate opt-out:
+ * the score's closing boundary then stops at the corridor's edge, exactly as
  * `renderBarlines` draws it (see {@link systemBarlines}).
  */
 export function checkMiddleCCorridor(
@@ -1252,23 +1360,7 @@ export function checkMiddleCCorridor(
   const spineY = g.middleCY;
   const c = lint.corridorClearance;
 
-  // 1. Structural vertical rules must terminate clear of the spine.
-  for (const span of handRuleSpans(layout)) {
-    const lo = Math.min(span.top, span.bottom);
-    const hi = Math.max(span.top, span.bottom);
-    if (lo - c <= spineY && hi + c >= spineY) {
-      out.push({
-        code: 'corridor-intrusion',
-        severity: 'error',
-        message: `${span.hand} structural rules (${lo.toFixed(2)}..${hi.toFixed(2)}) intrude into the Middle C corridor at y=${spineY.toFixed(2)}.`,
-        system: layout.index,
-        y: spineY,
-        metrics: { ruleTop: lo, ruleBottom: hi, spineY, clearance: c },
-      });
-    }
-  }
-
-  // 2. Horizontal rules: nothing but the spine itself lives on the corridor.
+  // 1. Horizontal rules: nothing but the spine itself lives on the corridor.
   //    Row guidelines are only audited when they are actually painted, and the
   //    boundary rules of the bounded channel at their true `equator ± half`
   //    positions rather than the (empty) equator itself.
@@ -1297,7 +1389,7 @@ export function checkMiddleCCorridor(
     }
   }
 
-  // 3. A beam connector must never slice across the spine. A beam merely
+  // 2. A beam connector must never slice across the spine. A beam merely
   //    running parallel beside the corridor is legal; a crossing is not.
   for (const beam of layout.beams) {
     const lo = Math.min(beam.primary.y1, beam.primary.y2);
@@ -1317,7 +1409,7 @@ export function checkMiddleCCorridor(
     }
   }
 
-  // 4. Hand labels (when enabled) must not be swallowed by the corridor.
+  // 3. Hand labels (when enabled) must not be swallowed by the corridor.
   if (o.showHandLabels) {
     for (const p of layout.notes) {
       if (Math.abs(p.y - spineY) < t.digitFontSize) {
@@ -1717,6 +1809,7 @@ export function lintJankoScore(
     checkClaspClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
+    checkRestClearance(layout, o, t, thresholds, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     if (thresholds.auditPaintOrder) {
       const attachment = getStemAttachmentRadii(t);
