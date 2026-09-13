@@ -357,6 +357,35 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 - **Rest behaviour explicitly out (Round 17B)** — rests, beams, and the m4
   beam-break stay exactly Round 16; rest ink is identical under both gaps.
 
+### Round 17B rest behavior + rest-shape verdict (round 18)
+
+- **Gap verdict (direct)** — `tight` is the golden master (margin 0.6, air
+  0.4, G = 5.46); `snug` remains implemented and clean. No head-spacing code
+  changes — heads never move in this ticket.
+- **Rest weight (direct)** — every rest stroke width returns to its Round 15
+  pre-scale value (`REST_STROKE` = 0.90pt, exactly the note stem stroke; the
+  bauhaus box 0.6pt, phantom strokes 0.8pt) while extents keep the 0.575
+  scale. Size maxima recomputed per value × 4 dialects.
+- **Phrase rows (direct; replaces the rule-hang)** — the rest reference is
+  the phrase row (mean of the releasing/resuming rows, the single neighbour's
+  row, or the hand default), snapped to the nearest whole-tone row of the
+  phrase octave; the hang-toward-corridor mechanics stay (reference row in,
+  rule out), x keeps the in-cell nudge, and a new adjacent-row vertical
+  fallback precedes the named unwritten diagnostic. Row over corridor.
+- **Beam bridging (direct, narrow; qualifies Round 13)** — a run continues
+  across a rest iff it lasts ≤ a 16th, sits strictly inside one beat window
+  shared with both flanking beamable notes, and the flank is otherwise
+  contiguous (single rests only). The rest is still admitted and printed, and
+  the beam solver clears its ink; the new `beam-rest-clearance` linter check
+  is a violation. The Round 13 m4 beam break is retired with cause (bridging
+  is the intended musical rule, not a regression): m. 4 beats [528, 540, 564]
+  under one beam, and the only other qualifying span in either benchmark —
+  m. 24 [3408, 3420, 3444] — bridges with it. 8th rests and cross-beat gaps
+  still break runs; bar 5 beat 2 re-verifies green.
+- **Round 18 verdict setup** — four candidates (the carried dialects) on the
+  byte-identical R15 clean windows plus a Bach m4 fixed-context window per
+  card; `openAxes: ['restStyle']`; every card engraves under `tight`.
+
 ### Two-view studio
 
 ```ts
@@ -370,7 +399,7 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 ## 3. Verification
 
 ```bash
-npm test                          # 259 tests, < 4 s
+npm test                          # 273 tests, < 4 s
 npm run lint:engraving            # visual lint of the golden master
 npm run build                     # tsc + vite (index.html + janko.html entries)
 ```

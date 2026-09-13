@@ -35,10 +35,11 @@
  *    acceptable threshold.
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
- * 6. **Rest clearance** (Round 12, hung from the nearest staff rule by Round
- *    16) — a voice rest's own dialect ink box keeps real air from every
- *    foreign notehead disc and from any protected barline; a silence the
- *    fit rule refused is republished as the named `rest-unwritable` diagnostic.
+ * 6. **Rest clearance** (Round 12, hung from its phrase row by Round 17B) —
+ *    a voice rest's own dialect ink box keeps real air from every foreign
+ *    notehead disc and from any protected barline; a silence the fit rule
+ *    refused is republished as the named `rest-unwritable` diagnostic. A
+ *    bridged beam clears every printed rest's ink (`beam-rest-clearance`).
  * 7. **Simultaneity integrity** (Round 14) — no painted stem or beam connector
  *    of one chord tone may pass through the notehead disc of a **same-onset**
  *    tone (`stem-through-simultaneity`). The defect that a wide-span chord
@@ -116,6 +117,7 @@ export type JankoLintCode =
   | 'beam-slope'
   | 'beam-stem-gap'
   | 'beam-notehead-collision'
+  | 'beam-rest-clearance'
   | 'barline-collision'
   | 'clasp-barline-collision'
   | 'clasp-collision'
@@ -220,6 +222,7 @@ export const JANKO_LINT_CHECKS = [
   'stem-digit-clearance',
   'halo-clearance',
   'beam-notehead-clearance',
+  'beam-rest-clearance',
   'barline-clearance',
   'clasp-clearance',
   'measure-numeral-clearance',
@@ -868,6 +871,68 @@ export function checkBeamNoteheadClearance(
             required,
             radius: r,
             minStemClearance: air,
+            beamSlope: beam.slope,
+          },
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Round 17B: a beam connector is **real musical ink over a printed silence** —
+ * every connector (primary and 16th secondary) must keep the beam air from
+ * every printed rest's ink box. The engine's beam solver seats each connector
+ * against the same rest boxes with the same air, so a beam the engine admits
+ * is guaranteed to pass this audit; the check exists to catch a regression
+ * that paints a connector through a rest it bridges. A beam-rest clearance
+ * failure is a hard **violation**: a bridged beam may continue across a rest,
+ * never touch it.
+ */
+export function checkBeamRestClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (layout.beams.length === 0 || layout.rests.length === 0) return;
+  // The token's stem clearance, never below the linter's global air floor —
+  // the same air a beam keeps from a notehead disc.
+  const air = Math.max(t.minStemClearance, lint.minClearance);
+  for (const beam of layout.beams) {
+    const connectors: Array<{ label: string; connector: JankoBeamConnector }> = [
+      { label: 'primary beam', connector: beam.primary },
+    ];
+    if (beam.secondary) connectors.push({ label: 'secondary beam', connector: beam.secondary });
+    const beamIds = beam.notes.map((n) => n.id);
+
+    for (const { label, connector } of connectors) {
+      for (const rest of layout.rests) {
+        const ink = restInkBox(rest, t);
+        const gap = segmentToBoxDistance(
+          connector.x1,
+          connector.y1,
+          connector.x2,
+          connector.y2,
+          box(ink.x0, ink.y0, ink.x1, ink.y1)
+        );
+        if (gap + EPS >= air) continue;
+        out.push({
+          code: 'beam-rest-clearance',
+          severity: 'error',
+          message:
+            `${label} of [${beamIds.join(', ')}] passes ${gap.toFixed(2)}pt from the ` +
+            `${rest.value} rest at tick ${rest.tick} (${air.toFixed(2)}pt of air required: ` +
+            `a bridged beam may continue across a printed rest, never touch it).`,
+          system: layout.index,
+          measure: measureOfTick(rest.tick, t),
+          noteIds: beamIds,
+          x: rest.x,
+          y: rest.y,
+          metrics: {
+            gap,
+            required: air,
+            restTick: rest.tick,
             beamSlope: beam.slope,
           },
         });
@@ -1850,13 +1915,13 @@ export function checkClaspClearance(
  * `minClearance` from every foreign notehead disc (of either hand — the other
  * hand is exactly what plays while this one is silent) and, whenever the active
  * grid writing policy protects the barlines, from the barline column it may
- * never straddle. The engine's `resolveRestX` (Round 16, hung from the nearest
- * staff rule and seated along it with the guaranteed `REST_SEAT_AIR`) fits the
- * rule-hang with the same box and **more** air — plus the float-safety solver
- * margin — so a rest the engine admits is guaranteed to pass this audit; the
- * check exists to catch a regression that paints a rest where the fit rule
- * never placed one. A rest-notehead clearance failure is a hard **violation**:
- * a rest may never touch, let alone overlap, a head disc.
+ * never straddle. The engine's `resolveRestX` (hung from the phrase row and
+ * seated along it with the guaranteed `REST_SEAT_AIR`) fits the hang with the
+ * same box and **more** air — plus the float-safety solver margin — so a rest
+ * the engine admits is guaranteed to pass this audit; the check exists to
+ * catch a regression that paints a rest where the fit rule never placed one.
+ * A rest-notehead clearance failure is a hard **violation**: a rest may never
+ * touch, let alone overlap, a head disc.
  */
 export function checkRestClearance(
   layout: JankoSystemLayout,
@@ -1923,11 +1988,12 @@ export function checkRestClearance(
  * {@link JankoRestLayer} records every refusal with its reason, so a designer
  * always knows why a hand's silence carries no sign:
  *
- * - `'no-slot'` — the beat cell offers no clear slot along the rule: no
- *   horizontal position inside it keeps the guaranteed seating air from the
- *   foreign heads, so writing the rest would mean sliding it into a collision;
+ * - `'no-slot'` — the beat cell offers no clear slot along the row: no
+ *   horizontal position inside it, on either the reference or the adjacent
+ *   fallback row, keeps the guaranteed seating air from the foreign heads, so
+ *   writing the rest would mean sliding it into a collision;
  * - `'protected-barline'` — the silence opens on a barline the active grid
- *   writing policy protects and the along-the-rule nudge cannot escape it, so
+ *   writing policy protects and the along-the-row nudge cannot escape it, so
  *   the column belongs to the grid.
  *
  * A refusal is a **warning**, not a painted defect: the engraving is
@@ -1943,7 +2009,7 @@ export function checkUnwrittenRests(
   for (const rest of layout.unwrittenRests) {
     const why =
       rest.reason === 'no-slot'
-        ? 'no horizontal position along the rule inside the beat cell keeps the guaranteed seating air from the surrounding heads'
+        ? 'no horizontal position along the row inside the beat cell keeps the guaranteed seating air from the surrounding heads'
         : 'the silence opens on a barline the active grid writing policy protects and the nudge cannot escape it';
     out.push({
       code: 'rest-unwritable',
@@ -2641,6 +2707,7 @@ export function lintJankoScore(
     checkStemDigitClearance(layout, t, thresholds, diagnostics);
     checkHaloClearance(layout, t, thresholds, diagnostics);
     checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
+    checkBeamRestClearance(layout, t, thresholds, diagnostics);
     checkStemThroughSimultaneity(layout, o, t, diagnostics);
     checkSplitStackStems(layout, t, diagnostics);
     checkDotCollision(layout, o, t, diagnostics);

@@ -147,83 +147,117 @@ export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
  * pin-preserving shrink, local redistribution, multi-row interleave) and the
  * hugging dots go direct to golden, and the round judges only the gap amount —
  * snug (−30%) or tight (−35%). Rest behaviour is untouched (Round 17B).
+ * Round 17B then sets the verdict — `tight` is the golden master — restores
+ * the 0.90pt rest strokes, seats every rest on its phrase row and bridges the
+ * m4 16th rest under one beam; round 18 judges the rest-shape verdict on that
+ * fixed behavior.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 17,
-  title: 'Rect Knockout + Gap Amounts: Snug −30% vs Tight −35%',
+  round: 18,
+  title: 'Rest-Shape Verdict: Four Dialects on Fixed Behavior',
   description:
-    'The rectangular knockout goes direct to golden: a sharp fitted mask (digit ink box plus a uniform margin, no corner fudge), the v2 spacing solver (spread units centred in their free space, pin-preserving shrink where room runs short, disturbed local groups redistributed, multi-row onsets interleaved at the half-step), and augmentation dots hugging the mask corner. The round judges only the gap amount — snug (margin 0.8, air 0.4, pairs 5.86pt, the golden master) or tight (margin 0.6, air 0.4, pairs 5.46pt) — on the Round 16 cluster windows, so the verdict compares against what the operator already saw. Rest behaviour is explicitly out: rests, beams and the m4 beam-break stay exactly Round 16, and the spacing question cannot move rest ink. The settled grid policy C, the flared bracket, the per-hand clasp and the four-systems-per-page layout ride along as invisible fixed context.',
-  openAxes: ['clusterSpacing'],
+    'The rest behavior is fixed and goes direct to golden: the decided tight gap (margin 0.6, air 0.4, pairs 5.46pt), rest strokes at the full 0.90pt note-stem weight, every rest hung from its phrase row toward Middle C, and the m4 beat-3 run bridged across its printed 16th rest under one beam. The round judges only the shape — kinetic-monoline, classical-urtext, geometric-node or phantom-notehead — on the Round 15 clean windows (byte-identical fourth carry, so the verdict compares against everything the operator already saw) plus a Bach m4 fixed-context window on every card proving the bridging, the weight and the phrase rows. The settled grid policy C, the flared bracket, the per-hand clasp, the v2 spacing solver, the hugging dots and the four-systems-per-page layout ride along as invisible fixed context.',
+  openAxes: ['restStyle'],
 };
 
 /**
- * The Round 17 spacing window set, carried from Round 16 for continuity: real
- * two- and three-note clusters in real music. Bach m. 8 (the t1032 pair in a
- * 16th-note run, now centred), m. 12 (the pulse-edge t1632 pair, pinned) and
- * m. 15 (the double pair t2040/t2064, evened and still in time order) show
- * pairs that must read grouped at a glance; Brahms mm. 8–9 (the held triples
- * t1392/t1584, interleaved rows, one shared stem each) show how much air a
- * three-note fan needs.
+ * The Round 18 verdict window set: the Round 15 clean windows, byte-identical
+ * (fourth carry — the verdict compares against everything the operator already
+ * saw), plus the Bach m. 4 fixed-context window proving the Round 17B behavior
+ * — the bridged beat-3 beam, the 0.90pt weight and the phrase-row seat — on
+ * every card.
  */
-const ROUND_17_SPACING_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_18_VERDICT_WINDOWS: JankoCandidateWindow[] = [
   {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 8,
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 1,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 8 — the t1032 same-row pair in a 16th-note run: grouped at a glance?',
+    title: 'Rest specimen · m. 1 — the genuine 16th silence in a stepwise contour, free column',
   },
   {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 12,
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 2,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 12 — the pulse-edge t1632 pair: grouped, in-cell, in order?',
+    title: 'Rest specimen · m. 2 — the genuine 8th silence',
   },
   {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 15,
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 3,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 15 — the double pair t2040/t2064: grouped and still in time order?',
+    title: 'Rest specimen · m. 3 — the genuine quarter silence',
+  },
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 4,
+    measureCount: 1,
+    title: 'Rest specimen · m. 4 — the genuine half silence',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 8,
+    measureStart: 68,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 8 — the t1392 held triple on one shared stem: how much air?',
+    title: 'Brahms Op. 118/1 · m. 68 — the one real-world bar with a writable rest and no crowded column',
   },
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 9,
+    scoreId: SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 2,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 9 — the t1584 held triple on one shared stem under a new span',
+    title: 'Chord specimen · m. 2 — the genuine tick-180 8th rest among the clasped chords',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 4,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 4 — fixed context: the bridged beat-3 beam over the printed 16th rest',
   },
 ];
 
 /**
- * The active candidate set — Round 17's **single judged axis**, in display
- * order: the snug golden (A) and the tight challenger (B), both on the
- * carried cluster windows. Each candidate states only the spacing axis; the
- * rest dialects return in Round 17B.
+ * The active candidate set — Round 18's **single judged axis**, in display
+ * order: the four carried rest dialects (A–D) on the verdict windows, every
+ * card engraved under the decided `tight` golden. Each candidate states only
+ * the rest-shape axis.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'spacing-snug',
-    label: 'A · Snug Spacing — margin 0.8, air 0.4 (golden)',
-    axis: 'clusterSpacing',
+    id: 'rest-kinetic-monoline',
+    label: 'A · Kinetic Monoline Rests — stem + 12.4° tabs',
+    axis: 'restStyle',
     description:
-      'The recommended golden amount: same-row pairs stand 5.86pt apart, triples 11.72pt — grouped at a glance with honest white everywhere. Fixed context is the direct-to-golden Round 17A doctrine — the sharp rectangular mask, the v2 spacing solver (centring, pin-preserving shrink, redistribution, interleave), hugging dots, Round 16 rests and beams — so only the gap amount is judged.',
-    options: { clusterSpacing: 'snug' },
-    windows: ROUND_17_SPACING_WINDOWS,
-    tags: ['golden amount', '5.86pt pairs', '11.72pt triples'],
+      'The incumbent dialect: a vertical rest stem with the score’s own beam-harmonized 12.4° kinetic tabs (two for a 16th, one for an 8th), a central horizontal notch for the quarter and a hollow bar for the half. Monoline, architectural, and still the golden master choice — the verdict judges whether it keeps the crown.',
+    options: { restStyle: 'kinetic-monoline' },
+    windows: ROUND_18_VERDICT_WINDOWS,
+    tags: ['incumbent dialect', '12.4° kinetic tabs', 'hollow half bar'],
   },
   {
-    id: 'spacing-tight',
-    label: 'B · Tight Spacing — margin 0.6, air 0.4',
-    axis: 'clusterSpacing',
+    id: 'rest-classical-urtext',
+    label: 'B · Classical Urtext Rest Glyphs — calligraphic hooks',
+    axis: 'restStyle',
     description:
-      'The challenger: same-row pairs stand 5.46pt apart, triples 10.92pt. The digit breathing room gets thin; the eye judges. Fixed context is the direct-to-golden Round 17A doctrine — the sharp rectangular mask, the v2 spacing solver (centring, pin-preserving shrink, redistribution, interleave), hugging dots, Round 16 rests and beams — so only the gap amount is judged.',
-    options: { clusterSpacing: 'tight' },
-    windows: ROUND_17_SPACING_WINDOWS,
-    tags: ['5.46pt pairs', '10.92pt triples', 'thin breathing room'],
+      'The engraved-urtext alternative: calligraphic hooks with solid teardrop bulbs for the 16th and 8th, the serpentine lightning stroke for the quarter and a solid block for the half. Organic, hand-cut, and the most traditional reading of a silence.',
+    options: { restStyle: 'classical-urtext' },
+    windows: ROUND_18_VERDICT_WINDOWS,
+    tags: ['calligraphic hooks', 'serpentine quarter', 'solid half block'],
+  },
+  {
+    id: 'rest-geometric-node',
+    label: 'C · Geometric Pause Nodes — diamonds and rays',
+    axis: 'restStyle',
+    description:
+      'A pure-geometry answer: a hollow diamond with two lateral rays for the 16th, one ray for the 8th, a solid diamond for the quarter and an open capsule for the half. Zero calligraphy — the silence reads as a plotted node on the lattice.',
+    options: { restStyle: 'geometric-node' },
+    windows: ROUND_18_VERDICT_WINDOWS,
+    tags: ['hollow diamond + rays', 'solid quarter node', 'open capsule half'],
+  },
+  {
+    id: 'rest-phantom-notehead',
+    label: 'D · Phantom Notehead Rests — the unwritten head',
+    axis: 'restStyle',
+    description:
+      'The finalist that states a silence as the note that is not there: a dashed open notehead with its bare stem, plus two downward-hooked flags for the 16th and one for the 8th, and a dashed head with a hollow bar for the half. The most semantically literal and the most unconventional of the four.',
+    options: { restStyle: 'phantom-notehead' },
+    windows: ROUND_18_VERDICT_WINDOWS,
+    tags: ['dashed open head', 'hooked phantom flags', 'semantic silence'],
   },
 ];
 

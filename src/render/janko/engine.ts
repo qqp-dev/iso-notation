@@ -15,8 +15,8 @@
  * instrument's physical row and may never be re-spelled — and the collision is
  * resolved *horizontally*: heads that share an onset, an octave and a row are
  * fanned out asymmetrically toward the roomier side at the active
- * cluster-spacing preset (`2wx + air` per step — 5.86pt on the golden
- * `'snug'`), the pinned head keeping its column, behind the hard beat-cell
+ * cluster-spacing preset (`2wx + air` per step — 5.46pt on the golden
+ * `'tight'`), the pinned head keeping its column, behind the hard beat-cell
  * barriers (see {@link resolveRowSnappedChordOffsets}). The v2 solver then
  * centres each spread unit in its free space, shrinks the fan pin-preservingly
  * where room runs short, redistributes disturbed local groups and interleaves
@@ -88,6 +88,7 @@ import {
   CLASP_TRANSVERSE_WIDTH,
   HONOR_STEM_ATTACHMENT_AIR,
   STEM_ATTACHMENT_AIR,
+  bridgeBeamGroupsAcrossRests,
   claspInkBox,
   claspQualifies,
   computeBeamGroupGeometry,
@@ -1231,7 +1232,8 @@ export function resolveDotHighLane(
 
 // ---------------------------------------------------------------------------
 // Round 12 — voice rests for the inactive spans of an active hand
-// (Round 16: fixed rule-hang placement with an along-the-rule slot search)
+// (Round 17B: phrase-row hang with an along-the-row slot search and an
+// adjacent-row vertical fallback)
 // ---------------------------------------------------------------------------
 
 /**
@@ -1339,20 +1341,60 @@ function voiceYAt(
 }
 
 /**
- * Round 16: the **rule-hang reference** of one rest — the nearest staff rule to
- * the voice at the gap, and the corridor side the glyph extends toward.
+ * Signed offsets from an octave equator that are **real note positions** under
+ * the active channel layout — the whole-tone rows a rest may hang from
+ * ("actual places": a row is where a note would go).
+ */
+export function wholeToneRowOffsets(
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number[] {
+  if (o.channelLayout === 'on-the-line') return [0, -t.rowHeight];
+  if (o.channelLayout === 'single-line-3row') return [0, -t.rowHeight, t.rowHeight];
+  if (o.channelLayout === 'bounded-channel') {
+    return [0, -t.channelFlankOffset, t.channelFlankOffset];
+  }
+  return [t.rowHeight / 2, -t.rowHeight / 2];
+}
+
+/**
+ * The rest-seating tie-break: nearer the query wins; an exact tie prefers the
+ * candidate nearer Middle C, then the upper candidate. Deterministic, so the
+ * same voice always seats the same row.
+ */
+function prefersRowCandidate(
+  candidate: number,
+  best: number,
+  query: number,
+  middleCY: number
+): boolean {
+  const distance = Math.abs(candidate - query);
+  const bestDistance = Math.abs(best - query);
+  if (distance < bestDistance - EPS) return true;
+  if (Math.abs(distance - bestDistance) > EPS) return false;
+  const corridor = Math.abs(candidate - middleCY);
+  const bestCorridor = Math.abs(best - middleCY);
+  if (corridor < bestCorridor - EPS) return true;
+  if (Math.abs(corridor - bestCorridor) > EPS) return false;
+  return candidate < best - EPS;
+}
+
+/**
+ * Round 17B: the **phrase-row reference** of one rest — the nearest whole-tone
+ * row of the phrase octave, and the corridor side the glyph extends toward.
  *
  * The voice query is the melodic register of the rest's own hand at the gap:
- * the mean of the releasing and resuming onsets, the single neighbour's exact
- * y when the silence opens or closes the hand's system, or the hand's canonical
- * voice equator (RH Octave 4, LH Octave 3) with no neighbour at all. The
- * reference rule is the nearest painted equator rule to that query, enumerated
- * deterministically over the whole lattice (staff octaves 2…5 plus the ledger
- * registers 0, 1 and 6…8, via {@link getEquatorRuleYs}); an exact tie prefers
- * the rule nearer Middle C, then the upper rule. The voice-contour anchor and
- * the pocket slides are deleted: same voice, same rule, every bar.
+ * the mean of the releasing and resuming rows, the single neighbour's exact
+ * row when the silence opens or closes the hand's system, or the hand's
+ * canonical voice equator (RH Octave 4, LH Octave 3) with no neighbour at all.
+ * The phrase octave is the octave whose equator stands nearest that query, and
+ * the reference row is the nearest whole-tone row of that octave (staff
+ * octaves 2…5 plus the ledger registers 0, 1 and 6…8) — a real note position,
+ * never a rule between rows. Precedence is row over corridor: the phrase row
+ * decides the seat, the corridor only the hang side. Same voice, same row,
+ * every bar.
  */
-function restRuleReference(
+function restPhraseRowReference(
   hand: Hand,
   releaseOnsetTick: number,
   resumeTick: number,
@@ -1360,47 +1402,63 @@ function restRuleReference(
   geo: JankoSystemGeometry,
   t: ResolvedJankoTokens,
   o: ResolvedJankoLayoutOptions
-): { ruleY: number; dir: 1 | -1 } {
+): { rowY: number; dir: 1 | -1 } {
   const prevY = voiceYAt(notes, hand, releaseOnsetTick);
   const nextY = voiceYAt(notes, hand, resumeTick);
   const query =
     prevY !== null && nextY !== null
       ? (prevY + nextY) / 2
       : (prevY ?? nextY ?? geo.middleCY + getEquatorYForOctave(hand === 'RH' ? 4 : 3, hand, t, o));
-  let ruleY = query;
-  let bestDistance = Infinity;
-  let bestCorridor = Infinity;
+  let phraseEquator = geo.middleCY + getEquatorYForOctave(0, 'RH', t, o);
   for (let octave = 0; octave <= 8; octave++) {
-    const base = geo.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
-    for (const candidate of getEquatorRuleYs(base, o, t)) {
-      const distance = Math.abs(candidate - query);
-      const corridor = Math.abs(candidate - geo.middleCY);
-      if (
-        distance < bestDistance - EPS ||
-        (Math.abs(distance - bestDistance) <= EPS &&
-          (corridor < bestCorridor - EPS ||
-            (Math.abs(corridor - bestCorridor) <= EPS && candidate < ruleY - EPS)))
-      ) {
-        bestDistance = distance;
-        bestCorridor = corridor;
-        ruleY = candidate;
-      }
+    const candidate = geo.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
+    if (prefersRowCandidate(candidate, phraseEquator, query, geo.middleCY)) {
+      phraseEquator = candidate;
     }
   }
-  const dir: 1 | -1 = ruleY > geo.middleCY + EPS ? -1 : 1;
-  return { ruleY, dir };
+  const offsets = wholeToneRowOffsets(o, t);
+  let rowY = phraseEquator + offsets[0];
+  for (const offset of offsets) {
+    const candidate = phraseEquator + offset;
+    if (prefersRowCandidate(candidate, rowY, query, geo.middleCY)) rowY = candidate;
+  }
+  const dir: 1 | -1 = rowY > geo.middleCY + EPS ? -1 : 1;
+  return { rowY, dir };
 }
 
 /**
- * Round 16: the glyph **centre** of a rest hung from its reference rule — the
- * near edge of the dialect's ink box sits exactly on the rule and the glyph
- * extends toward the Middle C corridor (`dir`), like a stem-analog mirror:
- * same voice, same place, every bar. Dialect-agnostic: the box is probed at
- * the origin, so symmetric and sitting glyphs (the classical half-block, the
- * urtext quarter serpentine) all hang correctly with no per-dialect code.
+ * Round 17B: snap an absolute y to the nearest whole-tone row of the lattice
+ * (same tie-breaks as the phrase reference) — the vertical fallback seats the
+ * adjacent row toward the corridor through this snap.
+ */
+function nearestLatticeRow(
+  y: number,
+  geo: JankoSystemGeometry,
+  t: ResolvedJankoTokens,
+  o: ResolvedJankoLayoutOptions
+): number {
+  const offsets = wholeToneRowOffsets(o, t);
+  let best = geo.middleCY + getEquatorYForOctave(0, 'RH', t, o) + offsets[0];
+  for (let octave = 0; octave <= 8; octave++) {
+    const base = geo.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
+    for (const offset of offsets) {
+      const candidate = base + offset;
+      if (prefersRowCandidate(candidate, best, y, geo.middleCY)) best = candidate;
+    }
+  }
+  return best;
+}
+
+/**
+ * The glyph **centre** of a rest hung from its reference row — the near edge
+ * of the dialect's ink box sits exactly on the row and the glyph extends
+ * toward the Middle C corridor (`dir`), like a stem-analog mirror: same voice,
+ * same place, every bar. Dialect-agnostic: the box is probed at the origin, so
+ * symmetric and sitting glyphs (the classical half-block, the urtext quarter
+ * serpentine) all hang correctly with no per-dialect code.
  */
 function restHangCenter(
-  ruleY: number,
+  referenceY: number,
   dir: 1 | -1,
   style: JankoRestGeometry['style'],
   value: JankoRestGeometry['value'],
@@ -1410,7 +1468,7 @@ function restHangCenter(
     { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value, style },
     t
   );
-  return dir > 0 ? ruleY - probe.y0 : ruleY - probe.y1;
+  return dir > 0 ? referenceY - probe.y0 : referenceY - probe.y1;
 }
 
 /**
@@ -1421,8 +1479,8 @@ function restHangCenter(
 export const REST_FIT_MARGIN = 0.02;
 
 /**
- * Round 16 rest fit: nudge the hung rest **along its rule** inside its beat
- * cell until its ink box stands clear.
+ * Rest fit: nudge the hung rest **along its row** inside its beat cell until
+ * its ink box stands clear.
  *
  * The ink box of a dialect is a fixed rectangle translated horizontally with
  * the rest, so a notehead at `(px, py)` forbids exactly the x-interval in which
@@ -1433,8 +1491,9 @@ export const REST_FIT_MARGIN = 0.02;
  * (conservative: the rest keeps the linter's floor from any edge that could
  * carry ink, under every grid policy), and returns the legal x nearest the
  * canonical beat column — tie-break: the earlier slot, so the choice is a pure
- * function of the layout. `null` means the cell offers no clear slot and the
- * rest is **named** as unwritable rather than silently dropped or slid into a
+ * function of the layout. `null` means the cell offers no clear slot at this
+ * height: the caller falls back to the adjacent row before the rest is
+ * **named** as unwritable rather than silently dropped or slid into a
  * collision (see {@link computeJankoRestLayer}).
  */
 export function resolveRestX(
@@ -1510,7 +1569,7 @@ export function resolveRestX(
  * The beat cell of a rest's silence: the span between the two neighbouring
  * painted grid lines on the **canonical** proportional grid (no clasp inset —
  * the Round 5 widening shifts a measure's note field, never the absolute grid
- * the rest belongs to). The along-the-rule nudge may never leave it.
+ * the rest belongs to). The along-the-row nudge may never leave it.
  */
 function restBeatCell(
   tick: number,
@@ -1553,11 +1612,11 @@ export interface JankoUnwrittenRest {
   value: JankoRestGeometry['value'];
   /** Canonical beat column of the silence (page pt). */
   x: number;
-  /** The rule-hang centre the slot search could not honour (page pt). */
+  /** The phrase-row hang centre the slot search could not honour (page pt). */
   targetY: number;
   /**
    * Why the silence is unwritten: the beat cell offers no clear slot along the
-   * rule (`'no-slot'`), or the silence opens on a barline the active grid
+   * row (`'no-slot'`), or the silence opens on a barline the active grid
    * policy protects and the nudge cannot escape it (`'protected-barline'`).
    */
   reason: 'no-slot' | 'protected-barline';
@@ -1572,8 +1631,8 @@ export interface JankoRestLayer {
 }
 
 /**
- * Round 12 voice rests, hung by the Round 16 **rule-hang** and seated by the
- * along-the-rule slot search.
+ * Round 12 voice rests, hung by the Round 17B **phrase row** and seated by the
+ * along-the-row slot search with an adjacent-row vertical fallback.
  *
  * A hand's **inactive span inside an active measure** is written with the active
  * rest dialect: the engine walks one hand's onsets in the system, and wherever
@@ -1585,24 +1644,28 @@ export interface JankoRestLayer {
  * it stands beside: the Round 5 clasp-inset widening shifts a measure's note
  * field, never the absolute grid the rest belongs to.
  *
- * Vertically the rest hangs from the nearest staff rule to its voice
- * ({@link restRuleReference}) and extends toward the Middle C corridor — same
- * voice, same place, every bar. Horizontally {@link resolveRestX} nudges it
- * along the rule inside its beat cell until its ink stands clear of every
- * notehead disc (either hand) with the guaranteed {@link REST_SEAT_AIR}.
+ * Vertically the rest hangs from the nearest whole-tone row of its phrase
+ * octave ({@link restPhraseRowReference}) and extends toward the Middle C
+ * corridor — same voice, same place, every bar. Horizontally
+ * {@link resolveRestX} nudges it along the row inside its beat cell until its
+ * ink stands clear of every notehead disc (either hand) with the guaranteed
+ * {@link REST_SEAT_AIR}; when the reference row offers no clear slot, the
+ * adjacent row toward the corridor gets its own in-cell solve before the
+ * silence is named unwritable.
  *
  * - Bach Goldberg Var. 1 m. 4 is the canonical case: the RH plays 16ths up to
  *   tick 540 (digit `9`, `y = 158.5pt`), releases at 552 and resumes at 564
  *   (digit `0`, `y = 173.5pt`), while the LH enters at 552 — so a **16th rest**
- *   stands in the Right Hand at the tick-552 beat column, hung from the Octave
- *   3 rule (`166.0pt`) toward Middle C, clearing the LH D3 head that shares
- *   its column with room to spare.
+ *   stands in the Right Hand at the tick-552 beat column, hung from the digit
+ *   `9` phrase row (`158.5pt`) toward Middle C, clearing the LH D3 head that
+ *   shares its column with room to spare.
  * - A silence that is not a standard value (a 2.5-beat gap, a tie artefact) is
  *   left unwritten rather than approximated — that is a **non-silence**, not a
  *   refusal, so it is not reported.
  * - A rest whose ink cannot clear the noteheads of the system (either hand) in
- *   any slot inside its beat cell is returned in `unwritten` by
- *   {@link resolveRestX}, exactly like a bracket the fit rule refuses.
+ *   any slot inside its beat cell, on either the reference row or the adjacent
+ *   fallback row, is returned in `unwritten`, exactly like a bracket the fit
+ *   rule refuses.
  */
 export function computeJankoRestLayer(
   score: QuantizedGridScore,
@@ -1641,13 +1704,14 @@ export function computeJankoRestLayer(
       if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
       if (!activeMeasures.has(measureIdx)) continue;
       const value = restValueForTicks(gap);
-      const { ruleY, dir } = restRuleReference(hand, ticks[i], ticks[i + 1], notes, geo, t, o);
+      const { rowY, dir } = restPhraseRowReference(hand, ticks[i], ticks[i + 1], notes, geo, t, o);
+      const targetY = restHangCenter(rowY, dir, o.restStyle, value, t);
       const candidate: JankoRestGeometry = {
         tick: releaseTick,
         durationTicks: gap,
         hand,
         x: getTickColumnX(releaseTick, geo, systemIndex, o, t),
-        y: restHangCenter(ruleY, dir, o.restStyle, value, t),
+        y: targetY,
         value,
         style: o.restStyle,
       };
@@ -1658,18 +1722,30 @@ export function computeJankoRestLayer(
           hand: candidate.hand,
           value: candidate.value,
           x: candidate.x,
-          targetY: candidate.y,
+          targetY,
           reason,
         });
       };
-      // Round 16: the rule-hang is the *musical* anchor; the slot solver nudges
-      // it along the rule inside its beat cell, or names the silence unwritable
+      // The phrase-row hang is the *musical* anchor; the slot solver nudges it
+      // along the row inside its beat cell, or names the silence unwritable
       // when the cell offers no clear slot. A silence that opens on a barline
       // the active grid policy protects — and whose nudge cannot escape it —
       // is named `'protected-barline'` rather than `'no-slot'`, so the grid
       // refusal stays distinguishable from a wall of heads.
       const cell = restBeatCell(releaseTick, measureIdx, geo, systemIndex, o, t);
-      const x = resolveRestX(candidate, notes, geo, systemIndex, measureIdx, cell, t);
+      const solveAt = (y: number): number | null => {
+        candidate.y = y;
+        return resolveRestX(candidate, notes, geo, systemIndex, measureIdx, cell, t);
+      };
+      let x = solveAt(targetY);
+      if (x === null) {
+        // Round 17B vertical fallback: the adjacent row toward the corridor
+        // gets its own in-cell solve before the silence is named unwritable.
+        const fallbackRow = nearestLatticeRow(rowY + dir * t.rowHeight, geo, t, o);
+        if (Math.abs(fallbackRow - rowY) > EPS) {
+          x = solveAt(restHangCenter(fallbackRow, dir, o.restStyle, value, t));
+        }
+      }
       if (x === null) {
         // A silence that opens within a head's air of a protected barline
         // opened on the grid: it is named `'protected-barline'` rather than
@@ -1940,8 +2016,8 @@ function perHandDownbeatQualifies(notes: readonly QuantizedNote[]): boolean {
  * x_i = x_onset + (i - anchor) · pairGap · d,   pairGap = 2wx + air
  * ```
  *
- * So a two-note collision becomes the pair `x, x + pairGap·d` (5.86pt apart on
- * the golden `'snug'`) and a three-note collision the triplet
+ * So a two-note collision becomes the pair `x, x + pairGap·d` (5.46pt apart on
+ * the golden `'tight'`) and a three-note collision the triplet
  * `x − pairGap, x, x + pairGap`. Alternate fanned rows of one onset nest at
  * the half-step (`pairGap / 2`), while single-head rows keep one shared
  * column, which is what preserves the isomorphic ∇ / Δ hand shapes of the
@@ -2115,7 +2191,7 @@ export function resolveChordColumns(
   //     asymmetrically: the pinned head keeps its column (the RH tone when
   //     the row is mixed-hand, the middle head otherwise) and the rest step
   //     toward the roomier neighbour at the preset `2wx + air` per step, so a
-  //     pair spans exactly the judged pair gap (5.86pt on the golden `'snug'`)
+  //     pair spans exactly the judged pair gap (5.46pt on the golden `'tight'`)
   //     and a triple twice it.
   //
   //     Pin-preserving shrink: the fan takes the full judged gap whenever
@@ -2900,17 +2976,27 @@ export function layoutJankoSystem(
   // same-row neighbours sit at their final x.
   const notes = resolveDotHighLane(chordColumns.notes, geometry, o, t);
 
+  // Round 17B: rests resolve before beams — bridging re-joins runs across the
+  // admitted printed rests, and every connector clears their ink.
+  const restLayer = computeJankoRestLayer(score, geometry, systemIndex, o, t, notes);
+
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
   if (o.rhythmStyle === 'beamed') {
     // Every notehead of the system is an obstacle for every beam group: the
     // shared lattice lets one hand's beam cross the other hand's staff lines.
     // The Middle C spine is handed to the solver as well, so no connector can
-    // ever slice across the corridor.
+    // ever slice across the corridor — and the printed rest ink boxes join
+    // the obstacles, so a bridged beam clears the rest it spans.
     const rhythmNotes = notes.map((p) => p.rhythm);
-    const partition = partitionBeamGroups(rhythmNotes, t, geometry.middleCY);
+    const partition = bridgeBeamGroupsAcrossRests(
+      partitionBeamGroups(rhythmNotes, t, geometry.middleCY),
+      restLayer.rests,
+      t
+    );
+    const restInk = restLayer.rests.map((r) => restInkBox(r, t));
     beams = partition.groups
-      .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY))
+      .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY, restInk))
       .filter((g): g is JankoBeamGroupGeometry => g !== null);
     ungrouped = partition.ungrouped;
   }
@@ -3096,8 +3182,6 @@ export function layoutJankoSystem(
     const carrierIds = new Set(sharedStems.map((group) => group.carrierId));
     claspedStems = claspedStems.filter((id) => !carrierIds.has(id));
   }
-
-  const restLayer = computeJankoRestLayer(score, geometry, systemIndex, o, t, notes);
 
   return {
     index: systemIndex,

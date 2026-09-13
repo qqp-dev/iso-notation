@@ -1,14 +1,18 @@
 /**
  * Rest symbols — the Round 12 question (how a hand's **silent span inside an
  * active measure** is written), carried into Round 13 by the four high-fidelity
- * finalists and the voice-contour anchor, and re-seated by Round 16 on the
- * **rule-hang**: the rest hangs from the nearest staff rule to its voice and
- * extends toward the Middle C corridor (see the engine's `computeJankoRests`).
+ * finalists and the voice-contour anchor, re-seated by Round 16 on the
+ * rule-hang, and re-seated again by Round 17B on the **phrase row**: the rest
+ * hangs from the nearest whole-tone row of its phrase octave and extends
+ * toward the Middle C corridor (see the engine's `computeJankoRests`).
  *
- * Round 16 also scales the ink to 57.5% linear of Round 15 — smaller ink on
+ * Round 16 scales the ink to 57.5% linear of Round 15 — smaller ink on
  * standard-like proportions (not head-sized), with every dialect's shape
- * language preserved exactly (every constant below is its Round 15 value times
- * {@link REST_LINEAR_SCALE}).
+ * language preserved exactly (every extent below is its Round 15 value times
+ * {@link REST_LINEAR_SCALE}). Round 17B restores every **stroke width** to its
+ * Round 15 pre-scale value instead — `REST_STROKE` is exactly the 0.90pt note
+ * stem stroke — so the small ink reads as thick as the regular notes. Bulb
+ * radii and dash lengths are extents and stay scaled.
  *
  * | style                | 16th                    | 8th                   | quarter                  | half / whole               |
  * | -------------------- | ----------------------- | --------------------- | ------------------------ | -------------------------- |
@@ -20,9 +24,9 @@
  *
  * The engine's `computeJankoRests` decides *where* a rest belongs (a clean
  * standard-value silence of one hand in a measure that hand is active in),
- * hangs it from its rule and nudges it along the rule inside its beat cell; a
- * rest with no clear slot is a named unwritten diagnostic, never a silent
- * overlap. This module only paints what it is handed.
+ * hangs it from its phrase row and nudges it along the row inside its beat
+ * cell; a rest with no clear slot is a named unwritten diagnostic, never a
+ * silent overlap. This module only paints what it is handed.
  */
 
 import { Hand } from '../../../model/types';
@@ -49,8 +53,11 @@ export const REST_LINEAR_SCALE = 0.575;
 
 /** Vertical rest-stem height (pt) of the kinetic monoline dialect. */
 export const REST_STEM_HEIGHT = 12.0 * REST_LINEAR_SCALE;
-/** Stroke (pt) of every monoline rest element. */
-export const REST_STROKE = 0.9 * REST_LINEAR_SCALE;
+/**
+ * Stroke (pt) of every monoline rest element. Round 17B restores the Round 15
+ * pre-scale 0.90pt — exactly the note stem stroke — while extents stay scaled.
+ */
+export const REST_STROKE = 0.9;
 /** Horizontal reach (pt) of a kinetic tab right of its stem. */
 export const REST_TAB_WIDTH = 4.0 * REST_LINEAR_SCALE;
 /** Half-width (pt) of the quarter rest's central notch. */
@@ -75,15 +82,15 @@ export const REST_WING_OFFSET = 2.2 * REST_LINEAR_SCALE;
 export const REST_Z_HALF = 3.4 * REST_LINEAR_SCALE;
 /** Half-height (pt) of the bauhaus half hairline box. */
 export const REST_BOX_HALF = 1.5 * REST_LINEAR_SCALE;
-/** Stroke (pt) of the bauhaus half hairline box. */
-export const REST_BOX_STROKE = 0.6 * REST_LINEAR_SCALE;
+/** Stroke (pt) of the bauhaus half hairline box (Round 17B: pre-scale 0.6pt). */
+export const REST_BOX_STROKE = 0.6;
 /**
  * Round 13 phantom-notehead dialect: radius (pt) of the dashed open head that
  * stands where the unvoiced notehead would have been.
  */
 export const REST_PHANTOM_HEAD_RADIUS = 3.0 * REST_LINEAR_SCALE;
-/** Stroke (pt) of the phantom head's dashed outline and of its bare stem. */
-export const REST_PHANTOM_HEAD_STROKE = 0.8 * REST_LINEAR_SCALE;
+/** Stroke (pt) of the phantom head's dashed outline and of its bare stem (Round 17B: pre-scale 0.8pt). */
+export const REST_PHANTOM_HEAD_STROKE = 0.8;
 /** Dash pattern (pt) of the phantom head — an open, unwritten notehead. */
 export const REST_PHANTOM_DASH = `${(1.8 * REST_LINEAR_SCALE).toFixed(2)},${(1.5 * REST_LINEAR_SCALE).toFixed(2)}`;
 /** Horizontal reach (pt) of a phantom flag hook, right of its stem. */
@@ -116,9 +123,9 @@ export interface JankoRestGeometry {
   durationTicks: number;
   /** Hand whose voice is silent. */
   hand: Hand;
-  /** Beat column of the rest (page pt), possibly nudged along its rule. */
+  /** Beat column of the rest (page pt), possibly nudged along its row. */
   x: number;
-  /** Glyph centre (page pt): hung from the nearest staff rule toward Middle C. */
+  /** Glyph centre (page pt): hung from its phrase row toward Middle C. */
   y: number;
   /** Duration class painted. */
   value: JankoRestValue;

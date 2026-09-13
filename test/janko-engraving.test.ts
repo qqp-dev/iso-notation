@@ -92,13 +92,13 @@ const TOKENS = DEFAULT_JANKO_TOKENS;
 const OPTIONS = DEFAULT_JANKO_OPTIONS;
 /**
  * Round 17 doctrine arithmetic. The golden master fans every row cluster at
- * the `'snug'` preset: the pinned head keeps its column and the rest step
- * toward the roomier side at `pairGap = 2wx + air` per step. A tick-0 cluster
- * wears the wider Position of Honor rings, so its step widens to two halo
- * half-widths plus the same air.
+ * the decided `'tight'` preset (Round 17B verdict): the pinned head keeps its
+ * column and the rest step toward the roomier side at `pairGap = 2wx + air`
+ * per step. A tick-0 cluster wears the wider Position of Honor rings, so its
+ * step widens to two halo half-widths plus the same air.
  */
-const SPACING_PRESET = getClusterSpacingPreset('snug');
-/** The judged golden pair gap: 2·2.73 + 0.4 = 5.86pt. */
+const SPACING_PRESET = getClusterSpacingPreset('tight');
+/** The decided golden pair gap: 2·2.53 + 0.4 = 5.46pt. */
 const PAIR_GAP = SPACING_PRESET.pairGap;
 /** The horizontal ring extent a tick-0 head actually wears. */
 const HALO_WX = Math.max(SPACING_PRESET.wx, TOKENS.haloRadius + JANKO_HALO_STROKE_WIDTH / 2);
@@ -821,7 +821,7 @@ test('Token/option overrides flow through every renderer (pluggable design)', ()
   assert.match(crop, /r="6\.40"/, 'halo override');
   assert.match(
     crop,
-    /class="janko-knockout"[^>]*width="5\.46"[^>]*height="7\.32"/,
+    /class="janko-knockout"[^>]*width="5\.06"[^>]*height="6\.92"/,
     'the rectangular mask is preset-owned: the notehead override cannot resize it'
   );
   const geo = computePageGeometry(options, tokens);
@@ -988,105 +988,6 @@ test('Round 10 staff hierarchy: uniform equators, canonical start mark and light
 //     the refined architectural start symbols
 // ---------------------------------------------------------------------------
 
-test('Round 16 rule-hung rests: the m. 4 silence hangs from the Octave 3 rule beside the D3 it accompanies', () => {
-  const score = buildBachGoldbergVar1Score();
-  assert.equal(DEFAULT_JANKO_OPTIONS.restStyle, 'kinetic-monoline', 'the settled rest dialect');
-  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
-  const all = layouts.flatMap((l) => l.rests);
-  assert.ok(all.length > 0, 'the score writes its silences');
-
-  // The canonical case: RH plays 16ths to tick 540 (digit `9`, y = 158.5),
-  // releases at 552 and resumes at 564 (digit `0`, y = 173.5) while the LH
-  // enters at 552 — so the silence is exactly one 16th.
-  const m4 = all.find((r) => r.tick === 552)!;
-  assert.ok(m4, 'the m. 4 tick-552 rest exists');
-  assert.equal(m4.hand, 'RH');
-  assert.equal(m4.value, 'sixteenth');
-  assert.equal(m4.durationTicks, 12);
-  close(m4.x, 544.97, 'the rest stands on the tick-552 beat column', 0.01);
-  const system0 = getSystemGeometry(computePageGeometry(OPTIONS, TOKENS), 0);
-  close(system0.equatorY('RH', 4), 136.0, 'the retired Round 12 sky-floating equator', 1e-9);
-  close(system0.equatorY('LH', 3), 166.0, 'the Octave 3 contour of the m. 4 writing', 1e-9);
-
-  // The contour target is the midpoint of the two RH digits that surround the
-  // silence: (158.5 + 173.5) / 2 = 166.0 — the Octave 3 equator itself.
-  const surround = layouts[0].notes.filter(
-    (p) => p.rhythm.hand === 'RH' && (p.note.startTick === 540 || p.note.startTick === 564)
-  );
-  assert.equal(surround.length, 2, 'digit 9 and digit 0 surround the silence');
-  const target = surround.reduce((sum, p) => sum + p.y, 0) / surround.length;
-  close(target, 166.0, 'the voice contour midpoint', 1e-9);
-  assert.ok(Math.abs(m4.y - 136.0) > 20, 'the rest no longer floats on the Octave 4 equator');
-  assert.ok(
-    m4.y > 158.5 && m4.y < 173.5,
-    `the rest is nestled between digit 9 and digit 0 (y = ${m4.y.toFixed(2)})`
-  );
-  // The kinetic glyph hangs from the nearest rule to the voice — the Octave 3
-  // equator itself — with its near edge exactly on the rule and its body
-  // reaching toward the Middle C corridor; the fit solver then only ever nudges
-  // along the rule, so the hang is stable and the pocket above the LH D3 head
-  // keeps at least the guaranteed seating air plus the solver margin.
-  const m4Box = restInkBox(m4, TOKENS);
-  close(m4Box.y1, 166.0, 'the hung near edge sits exactly on the Octave 3 rule', 1e-6);
-  close(m4.y, 162.55, 'the hung glyph centre', 0.01);
-  const d3 = layouts[0].notes.find((p) => p.note.startTick === 552)!;
-  assert.ok(
-    d3.y - TOKENS.noteheadRadius - m4Box.y1 >= REST_SEAT_AIR + REST_FIT_MARGIN - 1e-6,
-    `the pocket keeps the guaranteed seating air (got ${(d3.y - TOKENS.noteheadRadius - m4Box.y1).toFixed(3)}pt)`
-  );
-
-  // Every rest states a standard value, hangs from its voice's rule with its
-  // near edge exactly on a painted rule of the octave lattice, and never
-  // collides with a glyph.
-  for (const rest of all) {
-    assert.ok([12, 24, 48, 96, 192].includes(rest.durationTicks), `${rest.tick} standard value`);
-    const system = layouts.find((l) => l.rests.includes(rest))!;
-    const box = restInkBox(rest, TOKENS);
-    let hung = false;
-    for (let octave = 0; octave <= 8 && !hung; octave++) {
-      const base = system.geometry.middleCY + getEquatorYForOctave(octave, 'RH', TOKENS, OPTIONS);
-      for (const rule of getEquatorRuleYs(base, OPTIONS, TOKENS)) {
-        if (Math.abs(box.y0 - rule) < 1e-6 || Math.abs(box.y1 - rule) < 1e-6) hung = true;
-      }
-    }
-    assert.ok(
-      hung,
-      `${rest.hand} rest at ${rest.tick} hangs a box edge exactly on its rule (y0=${box.y0.toFixed(2)}, y1=${box.y1.toFixed(2)})`
-    );
-    assert.ok(
-      restClearsLayout(rest, system.notes, TOKENS),
-      `${rest.hand} rest at ${rest.tick} keeps 1.0pt of air from every notehead`
-    );
-    assert.ok(
-      rest.y >= system.geometry.staffTopY && rest.y <= system.geometry.staffBotY,
-      `${rest.hand} rest at ${rest.tick} stays inside the grand staff`
-    );
-    for (const p of system.notes) {
-      const dx = Math.max(Math.abs(p.x - rest.x) - 0, 0);
-      const dy = Math.abs(p.y - rest.y);
-      assert.ok(
-        Math.hypot(dx, dy) > 0,
-        `${rest.hand} rest at ${rest.tick} does not share a point with a glyph`
-      );
-    }
-  }
-
-  const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
-  assert.match(
-    crop,
-    /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH" data-rest-style="kinetic-monoline">/
-  );
-  assert.match(crop, /class="janko-rest-stem"/, 'the monoline stem is painted');
-  assert.equal(
-    (crop.match(/class="janko-rest-tab"/g) ?? []).length,
-    2,
-    'a 16th rest carries two 12.4° kinetic tabs'
-  );
-  const report = lintJankoScore(score, OPTIONS, TOKENS);
-  assert.equal(report.ok, true, 'the resting score stays clean');
-  assert.equal(report.warnings.length, 0);
-});
-
 test('Round 13 rest dialects: five distinct monoline grammars, all clean', () => {
   const score = buildBachGoldbergVar1Score();
   const signatures: Record<JankoRestStyle, RegExp> = {
@@ -1176,64 +1077,6 @@ test('Round 13 phantom notehead rests stand exactly where the unvoiced note woul
   for (const [, fy1, , , , fy2] of flags) {
     assert.ok(fy2 > fy1, 'every flag hooks downward');
   }
-});
-
-test('Round 13 beam discontinuity: no beam ever bridges the rest that interrupts it', () => {
-  const score = buildBachGoldbergVar1Score();
-  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
-  const groups = layout.beams.map((b) => b.notes.map((n) => n.startTick).join(','));
-  // Bach m. 4 beat 3: the RH 16ths at 528 and 540 beam together, the tick-552
-  // rest (a 12-tick hole) breaks the run, and 564 resumes as a flagged 16th.
-  assert.ok(groups.includes('528,540'), `the 528 + 540 pair beams (got ${groups.join(' | ')})`);
-  assert.ok(
-    !layout.beams.some((b) => b.notes.some((n) => n.startTick === 564)),
-    'no beam reaches the tick-564 resumption across the rest'
-  );
-  assert.deepEqual(
-    layout.ungrouped
-      .filter((n) => n.startTick >= 528 && n.startTick < 576)
-      .map((n) => n.startTick),
-    [564],
-    'the resumption falls back to a standard flag'
-  );
-  const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
-  assert.match(
-    crop,
-    /class="janko-flag"[^>]*data-subdivision-style="kinetic-tab-beam"/,
-    'the orphaned 16th really paints its flag'
-  );
-
-  // Partition level: a one-16th hole splits the run even though the onset gap
-  // (24 ticks) is not greater than half a beat. A legato overlap does not.
-  const note = (id: string, startTick: number, durationTicks: number): JankoRhythmNote => ({
-    id,
-    startTick,
-    durationTicks,
-    hand: 'RH',
-    x: startTick,
-    y: 0,
-  });
-  const holed = partitionBeamGroups([
-    note('a', 0, 12),
-    note('b', 12, 12),
-    note('c', 36, 12),
-  ]);
-  assert.deepEqual(
-    holed.groups.map((g) => g.map((n) => n.startTick)),
-    [[0, 12]],
-    'the rest at tick 24 breaks the beam'
-  );
-  assert.deepEqual(holed.ungrouped.map((n) => n.startTick), [36]);
-  const legato = partitionBeamGroups([
-    note('a', 0, 24),
-    note('b', 12, 12),
-    note('c', 24, 12),
-  ]);
-  assert.deepEqual(
-    legato.groups.map((g) => g.map((n) => n.startTick)),
-    [[0, 12, 24]],
-    'a sounding overlap is still one continuous gesture'
-  );
 });
 
 test('Round 13 multi-system crops span the staff column instead of collapsing to an empty page', () => {
@@ -1565,8 +1408,8 @@ test('Zero horizontal dashed guidelines: the vertical beat grid is the only dott
 
 test('Optical notehead: 5.8pt digits sit dead-centre in the rectangular knockout mask', () => {
   const score = buildBachGoldbergVar1Score();
-  close(SPACING_PRESET.wx, 2.73, 'canonical mask half-width');
-  close(SPACING_PRESET.hy, 3.66, 'canonical mask half-height');
+  close(SPACING_PRESET.wx, 2.53, 'canonical mask half-width');
+  close(SPACING_PRESET.hy, 3.46, 'canonical mask half-height');
   close(TOKENS.digitFontSize, 5.8, 'canonical digit font size');
   const { halfWidth, halfHeight } = digitHalfExtents(TOKENS.digitFontSize);
   assert.ok(

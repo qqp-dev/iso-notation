@@ -43,7 +43,7 @@ import { lintJankoScore } from '../src/render/janko/linter';
 const OPTIONS = BRAHMS_OP118_NO1_JANKO_OPTIONS;
 const TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
 const R = BRAHMS_OP118_NO1_JANKO_TOKENS.noteheadRadius!;
-/** Round 17 golden fan step: the judged `'snug'` pair gap, 2·2.73 + 0.4 = 5.86pt. */
+/** Decided golden fan step (Round 17B verdict `'tight'`): 2·2.53 + 0.4 = 5.46pt. */
 const PAIR_GAP = getClusterSpacingPreset(OPTIONS.clusterSpacing).pairGap;
 /** The mask half-width the fan step clears: two half-widths plus air. */
 const MASK_WX = getClusterSpacingPreset(OPTIONS.clusterSpacing).wx;
@@ -207,8 +207,8 @@ test('Row collisions are fanned at the judged pair gap (Round 17 golden)', () =>
   for (const [key, group] of groups) {
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
     const k = group.length;
-    // Round 17 golden: consecutive heads step exactly one judged pair gap
-    // (5.86pt), and the pinned head of every cluster keeps its column — the
+    // Decided golden: consecutive heads step exactly one judged pair gap
+    // (5.46pt), and the pinned head of every cluster keeps its column — the
     // column a different-row head of the same onset still occupies.
     for (let i = 1; i < k; i++) {
       assert.ok(
@@ -237,8 +237,8 @@ test('mm. 8–9 stack three heads on one row and fan the triplet at the judged p
   for (const [key, group] of triplets) {
     assert.ok(key.startsWith(`${at(8, 0)}|`) || key.startsWith(`${at(9, 0)}|`), `triplet (${key})`);
     const xs = group.map((p) => p.x).sort((a, b) => a - b);
-    // Round 17 golden: the single-hand triplet fans symmetrically about its
-    // middle head at the judged 5.86pt step, and the middle head shares the
+    // Decided golden: the single-hand triplet fans symmetrically about its
+    // middle head at the judged 5.46pt step, and the middle head shares the
     // onset column with a different-row head of the same onset.
     assert.ok(Math.abs(xs[1] - xs[0] - PAIR_GAP) < 1e-9, 'left head sits one gap below the middle');
     assert.ok(Math.abs(xs[2] - xs[1] - PAIR_GAP) < 1e-9, 'right head sits one gap above the middle');
@@ -321,7 +321,7 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
       if (pageOf.get(notes[i].note.id) !== pageOf.get(notes[j].note.id)) continue;
       // Round 17: the knockout is a sharp rectangle, so two masks overlap
       // only when their boxes intersect on both axes — a same-row pair at the
-      // 5.86pt judged gap clears with air to spare.
+      // 5.46pt judged gap clears with air to spare.
       const a = knockoutHalfExtents(resolvedOptions, resolvedTokens, notes[i].note.startTick);
       const b = knockoutHalfExtents(resolvedOptions, resolvedTokens, notes[j].note.startTick);
       const dx = Math.abs(notes[i].x - notes[j].x);

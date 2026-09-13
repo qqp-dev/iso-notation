@@ -1082,6 +1082,11 @@ export function renderChordBridges(
  * own heads) until it clears the spine by {@link BEAM_SPINE_CLEARANCE}. Both
  * constraints push along the stem direction, so a single bounded loop settles
  * them together.
+ *
+ * `restInk`, when supplied, hands the solver the system's printed rest ink
+ * boxes: a Round 17B bridged beam continues across the rest it spans, so the
+ * connector must clear that ink by `minStemClearance` (see
+ * `checkBeamRestClearance`).
  */
 export interface JankoBeamGroupGeometry {
   /** Group notes sorted by start tick. */
@@ -1135,6 +1140,82 @@ function pointToSegmentDistance(
   return Math.hypot(px - (x1 + t * vx), py - (y1 + t * vy));
 }
 
+/** Distance from a point to an axis-aligned box (0 when inside). */
+function pointToRestBoxDistance(
+  px: number,
+  py: number,
+  b: JankoBeamRestObstacle
+): number {
+  const dx = Math.max(b.x0 - px, 0, px - b.x1);
+  const dy = Math.max(b.y0 - py, 0, py - b.y1);
+  return Math.hypot(dx, dy);
+}
+
+/** True when two line segments intersect (proper crossing, excl. parallel). */
+function restSegmentsIntersect(
+  p1x: number,
+  p1y: number,
+  p2x: number,
+  p2y: number,
+  p3x: number,
+  p3y: number,
+  p4x: number,
+  p4y: number
+): boolean {
+  const d = (p2x - p1x) * (p4y - p3y) - (p2y - p1y) * (p4x - p3x);
+  if (Math.abs(d) < 1e-12) return false;
+  const t = ((p3x - p1x) * (p4y - p3y) - (p3y - p1y) * (p4x - p3x)) / d;
+  const u = ((p3x - p1x) * (p2y - p1y) - (p3y - p1y) * (p2x - p1x)) / d;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+/** Distance from a line segment to an axis-aligned rest ink box (0 on touch). */
+function segmentToRestBoxDistance(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  b: JankoBeamRestObstacle
+): number {
+  if (pointToRestBoxDistance(x1, y1, b) === 0 || pointToRestBoxDistance(x2, y2, b) === 0) {
+    return 0;
+  }
+  const edges: Array<[number, number, number, number]> = [
+    [b.x0, b.y0, b.x1, b.y0],
+    [b.x1, b.y0, b.x1, b.y1],
+    [b.x1, b.y1, b.x0, b.y1],
+    [b.x0, b.y1, b.x0, b.y0],
+  ];
+  for (const [ex1, ey1, ex2, ey2] of edges) {
+    if (restSegmentsIntersect(x1, y1, x2, y2, ex1, ey1, ex2, ey2)) return 0;
+  }
+  let best = Math.min(
+    pointToRestBoxDistance(x1, y1, b),
+    pointToRestBoxDistance(x2, y2, b)
+  );
+  for (const [cx, cy] of [
+    [b.x0, b.y0],
+    [b.x1, b.y0],
+    [b.x1, b.y1],
+    [b.x0, b.y1],
+  ]) {
+    best = Math.min(best, pointToSegmentDistance(cx, cy, x1, y1, x2, y2));
+  }
+  return best;
+}
+
+/**
+ * One printed rest's ink box as seen by the beam solver: a bridged beam must
+ * clear the rest it continues across. Structural on purpose — `restInkBox`
+ * satisfies it — so the rhythm layer never imports the rest painter.
+ */
+export interface JankoBeamRestObstacle {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 /**
  * Resolve the beam geometry of a group. Returns null for groups shorter than
  * two notes (a solitary short note is engraved with standard flags instead).
@@ -1142,12 +1223,14 @@ function pointToSegmentDistance(
  * @param obstacles other noteheads of the system the connector must avoid
  * @param spineY    absolute y of the Middle C spine, when the corridor is a
  *                  declared no-fly line for beams
+ * @param restInk   printed rest ink boxes of the system the connector clears
  */
 export function computeBeamGroupGeometry(
   group: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
   obstacles?: readonly JankoRhythmNote[] | null,
-  spineY?: number | null
+  spineY?: number | null,
+  restInk?: readonly JankoBeamRestObstacle[] | null
 ): JankoBeamGroupGeometry | null {
   const t = resolveJankoTokens(tokens);
   if (group.length < 2) return null;
@@ -1235,6 +1318,10 @@ export function computeBeamGroupGeometry(
   const required = t.noteheadRadius + t.minStemClearance;
   const own = new Set(sorted.map((n) => n.id));
   const foreign = obstacles && obstacles.length > 0 ? obstacles.filter((o) => !own.has(o.id)) : [];
+  // Round 17B: a bridged beam continues across its printed rest, so the rest's
+  // own ink box is an obstacle too (air measured from the ink itself).
+  const restAir = t.minStemClearance;
+  const restBoxes = restInk ?? [];
   const cos = 1 / Math.sqrt(1 + slope * slope);
   const spine = typeof spineY === 'number' && Number.isFinite(spineY) ? spineY : null;
   /** Amount (pt) the spine forces the anchor to move along the stem direction. */
@@ -1265,6 +1352,18 @@ export function computeBeamGroupGeometry(
         // obstacles that only graze a connector endpoint.
         const need = direction * (o.y - yAtX) + (required + OBSTACLE_AIR_MARGIN) / cos;
         push = Math.max(push, need, required - distance + OBSTACLE_AIR_MARGIN);
+      }
+      for (const ink of restBoxes) {
+        if (ink.x1 < lo || ink.x0 > hi) continue;
+        const gap = segmentToRestBoxDistance(line.x1, line.y1, line.x2, line.y2, ink);
+        if (gap >= restAir) continue;
+        const spanLo = Math.min(line.x1, line.x2);
+        const spanHi = Math.max(line.x1, line.x2);
+        const cx = Math.max(spanLo, Math.min((ink.x0 + ink.x1) / 2, spanHi));
+        const restYAtX = run === 0 ? line.y1 : line.y1 + ((cx - line.x1) / run) * (line.y2 - line.y1);
+        const cy = (ink.y0 + ink.y1) / 2;
+        const need = direction * (cy - restYAtX) + (restAir + OBSTACLE_AIR_MARGIN) / cos;
+        push = Math.max(push, need, restAir - gap + OBSTACLE_AIR_MARGIN);
       }
       push = Math.max(push, spinePush(line));
     }
@@ -1404,6 +1503,10 @@ export interface JankoBeamPartition {
  *
  * `middleCY` is kept for call-site compatibility; the corridor is protected by
  * the beam solver, not by the partition.
+ *
+ * Round 17B re-joins exactly the single-16th-rest boundaries through the
+ * post-merge {@link bridgeBeamGroupsAcrossRests} (standard beam bridging); the
+ * partition itself still splits at every hole.
  */
 export function partitionBeamGroups(
   notes: JankoRhythmNote[],
@@ -1470,5 +1573,179 @@ export function partitionBeamGroups(
   for (const n of notes) {
     if (!grouped.has(n.id)) ungrouped.push(n);
   }
+  return { groups, ungrouped };
+}
+
+/**
+ * A printed rest as seen by the beam bridge: the musical span a beam run may
+ * continue across. Structural on purpose — `JankoRestGeometry` satisfies it —
+ * so the rhythm layer never imports the rest painter.
+ */
+export interface JankoBeamBridgeRest {
+  /** Absolute onset tick of the silence. */
+  tick: number;
+  /** Length of the silence (ticks). */
+  durationTicks: number;
+  /** Hand whose voice is silent. */
+  hand: Hand;
+}
+
+/**
+ * Round 17B beam bridging: post-merge the Round 13 partition across a single
+ * printed 16th rest strictly inside one beat.
+ *
+ * Standard practice beams together across a short silence: Bach Var. 1 m. 4
+ * beat 3 plays `6 9 rest 0`, and the run is one gesture, not two notes plus
+ * an orphan. The partition above still splits at every hole (Round 13
+ * contiguity stands — a silence is never silently absorbed); this pass then
+ * re-joins exactly the boundaries where ALL hold:
+ *
+ * - the rest lasts at most a 16th (`durationTicks ≤ ticksPerBeat / 4`);
+ * - the rest sits strictly inside one beat window shared with both flanking
+ *   beamable notes (same hand, same measure, same beat bucket, and
+ *   `beatStart < rest.tick` with `rest end < beatEnd`);
+ * - the flank is otherwise contiguous: the previous note releases exactly on
+ *   the rest (`prev.release == rest.tick`), the rest ends exactly on the next
+ *   onset (`rest end == next.startTick`), and no other note of the hand starts
+ *   strictly between the flanks.
+ *
+ * Single rests only — no chains: the two equalities admit exactly one rest
+ * record spanning the boundary, so two consecutive rests (or a rest plus any
+ * other silence) never bridge. Rests of an 8th or more, and any cross-beat
+ * gap, still break the run. Merged notes leave `ungrouped` (their flags are
+ * gone — the beam carries them); every other note keeps its partition side.
+ */
+export function bridgeBeamGroupsAcrossRests(
+  partition: JankoBeamPartition,
+  rests: readonly JankoBeamBridgeRest[],
+  tokens?: Partial<JankoTokens> | null
+): JankoBeamPartition {
+  const t = resolveJankoTokens(tokens);
+  const beat = t.ticksPerBeat;
+  const measure = t.ticksPerMeasure;
+  const restMax = beat / 4;
+  // The partition's own bucket math, matched exactly (no anacrusis shift).
+  const bucketOf = (startTick: number, hand: Hand): string =>
+    `${hand}|${Math.floor(startTick / measure)}|${Math.floor((startTick % measure) / beat)}`;
+
+  const all = [...partition.groups.flat(), ...partition.ungrouped];
+  const onsetCount = new Map<string, number>();
+  for (const n of all) {
+    const key = `${n.hand}|${n.startTick}`;
+    onsetCount.set(key, (onsetCount.get(key) ?? 0) + 1);
+  }
+  // Only a melodic beamable note may flank a bridge: a simultaneity keeps its
+  // clasp (Round 11) and a longer value breaks the run (Round 13).
+  const melodic = (n: JankoRhythmNote): boolean =>
+    n.durationTicks <= beat / 2 && onsetCount.get(`${n.hand}|${n.startTick}`) === 1;
+
+  // One run id per partition group plus one per melodic single; union-find
+  // joins the runs a printed rest bridges.
+  const runOf = new Map<string, number>();
+  partition.groups.forEach((group, i) => {
+    for (const n of group) runOf.set(n.id, i);
+  });
+  let nextRun = partition.groups.length;
+  for (const n of partition.ungrouped) {
+    if (melodic(n) && !runOf.has(n.id)) runOf.set(n.id, nextRun++);
+  }
+  const parent = new Map<number, number>();
+  const find = (r: number): number => {
+    let root = r;
+    while (parent.get(root) !== undefined) root = parent.get(root)!;
+    let cursor = r;
+    while (cursor !== root) {
+      const next = parent.get(cursor)!;
+      parent.set(cursor, root);
+      cursor = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(Math.max(ra, rb), Math.min(ra, rb));
+  };
+
+  const byId = new Map(all.map((n) => [n.id, n]));
+  const buckets = new Map<string, JankoRhythmNote[]>();
+  for (const n of all) {
+    if (!melodic(n)) continue;
+    const key = bucketOf(n.startTick, n.hand);
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(n);
+    else buckets.set(key, [n]);
+  }
+  // Same-hand onset ticks, for the otherwise-contiguous flank check.
+  const handTicks = new Map<Hand, number[]>();
+  for (const n of all) {
+    const list = handTicks.get(n.hand);
+    if (list) list.push(n.startTick);
+    else handTicks.set(n.hand, [n.startTick]);
+  }
+  for (const list of handTicks.values()) list.sort((a, b) => a - b);
+
+  const bridges = (a: JankoRhythmNote, b: JankoRhythmNote, key: string): boolean => {
+    const release = a.startTick + a.durationTicks;
+    const [, m, beatIdx] = key.split('|').map(Number);
+    const beatStart = m * measure + beatIdx * beat;
+    const beatEnd = beatStart + beat;
+    const spanned = rests.some(
+      (r) =>
+        r.hand === a.hand &&
+        r.durationTicks > 0 &&
+        r.durationTicks <= restMax &&
+        r.tick === release &&
+        r.tick + r.durationTicks === b.startTick &&
+        r.tick > beatStart &&
+        r.tick + r.durationTicks < beatEnd
+    );
+    if (!spanned) return false;
+    return !(handTicks.get(a.hand) ?? []).some(
+      (tick) => tick > a.startTick && tick < b.startTick
+    );
+  };
+
+  for (const [key, bucket] of buckets) {
+    const ordered = [...bucket].sort((a, b) => a.startTick - b.startTick);
+    for (let i = 1; i < ordered.length; i++) {
+      const a = ordered[i - 1];
+      const b = ordered[i];
+      const ra = runOf.get(a.id)!;
+      const rb = runOf.get(b.id)!;
+      if (ra === rb || find(ra) === find(rb)) continue;
+      if (bridges(a, b, key)) union(ra, rb);
+    }
+  }
+
+  // Rebuild: every merged run of two or more notes beams; each original group
+  // keeps its position (replaced in place by its merged run) and all-single
+  // merges append in tick order. Ungrouped keeps partition order minus the
+  // notes the bridges carried into beams.
+  const members = new Map<number, JankoRhythmNote[]>();
+  for (const [id, run] of runOf) {
+    const root = find(run);
+    const list = members.get(root);
+    const note = byId.get(id)!;
+    if (list) list.push(note);
+    else members.set(root, [note]);
+  }
+  for (const list of members.values()) list.sort((a, b) => a.startTick - b.startTick);
+  const emitted = new Set<number>();
+  const groups: JankoRhythmNote[][] = [];
+  for (const group of partition.groups) {
+    const root = find(runOf.get(group[0].id)!);
+    if (emitted.has(root)) continue;
+    emitted.add(root);
+    const run = members.get(root)!;
+    if (run.length >= 2) groups.push(run);
+  }
+  const singleMerges = [...members.entries()]
+    .filter(([root, run]) => !emitted.has(root) && run.length >= 2)
+    .map(([, run]) => run)
+    .sort((a, b) => a[0].startTick - b[0].startTick);
+  groups.push(...singleMerges);
+  const beamed = new Set(groups.flat().map((n) => n.id));
+  const ungrouped = partition.ungrouped.filter((n) => !beamed.has(n.id));
   return { groups, ungrouped };
 }
