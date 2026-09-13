@@ -1,27 +1,29 @@
 /**
- * Round 8 — Symmetrical Clasps, Beam-Harmonized Tabs & Uniform Staff Hierarchy:
- * candidate registry suite.
+ * Round 9 — Midpoint Symmetrical Clasps, Chord Duration Taxonomy & Slender
+ * Accolade: candidate registry suite.
  *
- * The round removes the clasp's lopsided upward spire and tests four **mirror
- * symmetrical** duration paradigms, all sharing the settled beam-harmonized
- * kinetic subdivision tab and the widened per-hand bracket scope:
+ * The round anchors every clasp's duration ink on the exact vertical midpoint of
+ * the bracket spine and tests four **midpoint** paradigms, all sharing the
+ * settled beam-harmonized kinetic subdivision tab:
  *
- * | # | id              | `claspDurationStyle` | duration ink                        |
- * | - | --------------- | -------------------- | ----------------------------------- |
- * | A | `center-ticks`  | `'center-ticks'`     | 1/2 ticks or a pip at the midpoint  |
- * | B | `cap-cuts`      | `'cap-cuts'`         | 1/2/3 bars stacked inside both caps |
- * | C | `framing-only`  | `'framing-only'`     | pure `[` bracket, no duration ink   |
- * | D | `bilateral-fins`| `'bilateral-fins'`   | 12.4° fins flaring off both caps    |
+ * | # | id                      | `claspDurationStyle`     | 8th / 16th mark           |
+ * | - | ----------------------- | ------------------------ | ------------------------- |
+ * | A | `center-kinetic-ticks`  | `'center-kinetic-ticks'` | 12° ticks, 1 / 2 mirrored |
+ * | B | `center-chevron-notch`  | `'center-chevron-notch'` | guillemet, 1 / 2 nested   |
+ * | C | `center-pip-rays`       | `'center-pip-rays'`      | hub + 1 / 2 rays          |
+ * | D | `center-sculpted-wedge` | `'center-sculpted-wedge'`| barb, 1 / 2 mirrored      |
  *
  * Covers:
- *  1. `CURRENT_ROUND_METADATA.round === 8` and the round question.
- *  2. `CURRENT_CANDIDATES` declares exactly the four paradigms A–D.
+ *  1. `CURRENT_ROUND_METADATA.round === 9` and the round question.
+ *  2. `CURRENT_CANDIDATES` declares exactly the four midpoint paradigms A–D.
  *  3. Each candidate's deltas against the golden master are `chordGrouping`
- *     (`'per-hand-clasp'`), its own `claspDurationStyle` and the settled
- *     `'kinetic-tab-beam'` subdivision.
- *  4. Both display windows (Bach mm. 1–2 and Brahms mm. 7–8) are declared.
- *  5. The live studio engraves all four candidates on both windows with option
- *     deltas, the clasp layer, distinct duration ink and a live lint chip.
+ *     (`'per-hand-clasp'`) and its own `claspDurationStyle`.
+ *  4. All three display windows (Bach mm. 1–2, Brahms mm. 7–8 and the curated
+ *     chord-duration specimen) are declared and really engraved.
+ *  5. The specimen carries the whole taxonomy — half, quarter, dotted quarter,
+ *     8th, 16th — so every paradigm's midpoint ink is visible on screen.
+ *  6. The live studio engraves all four candidates on all three windows with
+ *     option deltas, the clasp layer, distinct duration ink and a lint chip.
  */
 
 import { test } from 'node:test';
@@ -34,10 +36,15 @@ import {
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import {
+  CHORD_DURATION_SPECIMEN_VALUES,
+  buildChordDurationSpecimenScore,
+} from '../src/scores/chord-duration-specimen';
+import {
   BRAHMS_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
+  SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   getCandidate,
   resolveCandidate,
@@ -56,56 +63,77 @@ import { lintJankoScore } from '../src/render/janko/linter';
 
 const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
+const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The exact round-8 table, candidate by candidate. */
+/** The exact round-9 table, candidate by candidate. */
 const PARADIGMS: Array<{
   id: string;
   letter: string;
+  label: string;
   style: JankoClaspDurationStyle;
-  /** The duration ink the paradigm paints on a quarter-value clasp. */
-  quarterInk: { must: RegExp | null; mustNot: RegExp };
+  /** The mark class the paradigm paints for an 8th / 16th. */
+  mark: string;
 }> = [
   {
-    id: 'center-ticks',
+    id: 'center-kinetic-ticks',
     letter: 'A',
-    style: 'center-ticks',
-    quarterInk: { must: null, mustNot: /janko-clasp-(tick|cap-cut|fin|pip)/ },
+    label: 'A · Center-Spine 12° Kinetic Ticks',
+    style: 'center-kinetic-ticks',
+    mark: 'janko-clasp-tick',
   },
   {
-    id: 'cap-cuts',
+    id: 'center-chevron-notch',
     letter: 'B',
-    style: 'cap-cuts',
-    quarterInk: { must: /janko-clasp-cap-cut/, mustNot: /janko-clasp-(tick|fin|pip)/ },
+    label: 'B · Center French Guillemet Chevron',
+    style: 'center-chevron-notch',
+    mark: 'janko-clasp-chevron',
   },
   {
-    id: 'framing-only',
+    id: 'center-pip-rays',
     letter: 'C',
-    style: 'framing-only',
-    quarterInk: { must: null, mustNot: /janko-clasp-(tick|cap-cut|fin|pip)/ },
+    label: 'C · Center Circular Hub & Rays',
+    style: 'center-pip-rays',
+    mark: 'janko-clasp-ray',
   },
   {
-    id: 'bilateral-fins',
+    id: 'center-sculpted-wedge',
     letter: 'D',
-    style: 'bilateral-fins',
-    quarterInk: { must: /janko-clasp-fin/, mustNot: /janko-clasp-(tick|cap-cut|pip)/ },
+    label: 'D · Center Sculpted Wedge',
+    style: 'center-sculpted-wedge',
+    mark: 'janko-clasp-barb',
   },
 ];
 
-test('CURRENT_ROUND_METADATA opens round 8 of the symmetrical-clasp exploration', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 8);
+/** The studio HTML-escapes labels and rationales before printing them. */
+function esc(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** The clasp groups of one rendered document, keyed by their duration class. */
+function claspGroups(svg: string): Array<{ tick: string; duration: string; body: string }> {
+  return [...svg.matchAll(
+    /<g class="janko-clasp-group"[^>]*data-clasp-tick="(\d+)"[^>]*data-clasp-duration="([^"]*)"[^>]*>([\s\S]*?)<\/g>/g
+  )].map((m) => ({ tick: m[1], duration: m[2], body: m[3] }));
+}
+
+test('CURRENT_ROUND_METADATA opens round 9 of the midpoint-clasp exploration', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 9);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Symmetrical Clasps, Beam-Harmonized Tabs & Uniform Staff Hierarchy'
+    'Midpoint Symmetrical Clasps, Chord Duration Taxonomy & Slender Accolade'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /symmetr/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /4 balanced duration paradigms/);
-  assert.match(CURRENT_ROUND_METADATA.description, /12° beam-harmonized/);
-  assert.match(CURRENT_ROUND_METADATA.description, /0\.65pt accolade/);
-  assert.match(CURRENT_ROUND_METADATA.description, /24pt margins/);
+  assert.match(CURRENT_ROUND_METADATA.description, /4 variations of midpoint-anchored clasp duration/);
+  assert.match(CURRENT_ROUND_METADATA.description, /half, quarter, dotted, 8th, and 16th/);
+  assert.match(CURRENT_ROUND_METADATA.description, /4\.8pt accolade/);
+  assert.match(CURRENT_ROUND_METADATA.description, /0\.75pt dots/);
 });
 
-test('CURRENT_CANDIDATES declares the four symmetrical duration paradigms A–D', () => {
+test('CURRENT_CANDIDATES declares the four midpoint duration paradigms A–D', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, PARADIGMS.map((p) => p.id), 'candidate order is A, B, C, D');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
@@ -117,17 +145,14 @@ test('CURRENT_CANDIDATES declares the four symmetrical duration paradigms A–D'
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id);
     assert.ok(candidate, `${paradigm.id} is registered`);
+    assert.equal(candidate!.label, paradigm.label, `${paradigm.id} label`);
     assert.ok(
-      candidate!.label.startsWith(`${paradigm.letter} · `),
-      `${paradigm.id} is labelled candidate ${paradigm.letter}`
+      (candidate!.description ?? '').length > 120,
+      `${paradigm.id} carries a rationale`
     );
-    assert.ok((candidate!.description ?? '').length > 120, `${paradigm.id} carries a rationale`);
     assert.ok((candidate!.tags ?? []).length > 0, `${paradigm.id} is tagged`);
+    assert.ok(paradigm.label.startsWith(`${paradigm.letter} · `), `${paradigm.id} is candidate ${paradigm.letter}`);
   }
-  assert.equal(getCandidate('center-ticks')!.label, 'A · Balanced Center-Spine Ticks');
-  assert.equal(getCandidate('cap-cuts')!.label, 'B · Stacked Horizontal Cap Cuts');
-  assert.equal(getCandidate('framing-only')!.label, 'C · Pure Symmetrical Framing Bracket');
-  assert.equal(getCandidate('bilateral-fins')!.label, 'D · Bilateral Cap Fins');
   assert.deepEqual(
     [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.claspDurationStyle))].sort(),
     [...JANKO_CLASP_DURATION_STYLES].sort(),
@@ -135,11 +160,11 @@ test('CURRENT_CANDIDATES declares the four symmetrical duration paradigms A–D'
   );
 });
 
-test('Every candidate is demonstrated on the Bach and Brahms windows', () => {
+test('Every candidate is demonstrated on the Bach, Brahms and specimen windows', () => {
   for (const paradigm of PARADIGMS) {
     const resolved = resolveCandidate(getCandidate(paradigm.id)!);
-    assert.equal(resolved.windows.length, 2, `${paradigm.id} declares two windows`);
-    const [bach, brahms] = resolved.windows;
+    assert.equal(resolved.windows.length, 3, `${paradigm.id} declares three windows`);
+    const [bach, brahms, specimen] = resolved.windows;
     assert.equal(bach.scoreId, DEFAULT_STUDIO_SCORE_ID);
     assert.equal(bach.measureStart, 1);
     assert.equal(bach.measureCount, 2);
@@ -153,36 +178,70 @@ test('Every candidate is demonstrated on the Bach and Brahms windows', () => {
     assert.match(brahms.title, /symmetrical B - 2 - 8 clasp/);
     assert.match(brahms.title, /B - 4 - 7 3-note bracket/);
     assert.match(brahms.title, /macro crop/i);
+    assert.equal(specimen.scoreId, SPECIMEN_STUDIO_SCORE_ID);
+    assert.equal(specimen.measureStart, 1);
+    assert.equal(specimen.measureCount, 2);
+    assert.match(specimen.title, /Chord Duration Specimen/);
+    assert.match(specimen.title, /half \(ring\)/);
+    assert.match(specimen.title, /dotted quarter \(plain \+ 0\.75pt dot\)/);
+    assert.match(specimen.title, /8th \(1 mark\)/);
+    assert.match(specimen.title, /16th \(2 marks\)/);
     // The legacy single-window fields keep pointing at the first window.
     assert.equal(resolved.measureStart, 1);
     assert.equal(resolved.measureCount, 2);
   }
 });
 
-test('The Brahms window really contains the dense block chords the round targets', () => {
-  const onsets = new Map<number, number>();
-  for (const n of BRAHMS.notes) onsets.set(n.startTick, (onsets.get(n.startTick) ?? 0) + 1);
-  // Cut time: the anacrusis is 48 ticks, mm. 7–8 span ticks 1200..1584.
-  const window = [...onsets.entries()].filter(([tick]) => tick >= 1200 && tick < 1584);
-  const chords = window.filter(([, size]) => size >= 2);
-  assert.ok(chords.length >= 4, `mm. 7–8 carry the dense chord onsets (${chords.length})`);
-  assert.ok(Math.max(...chords.map(([, size]) => size)) >= 5, 'one of them is a five-voice chord');
-  const massive = chords.filter(([, size]) => size >= 4);
-  assert.ok(massive.length >= 2, 'at least two four-plus-voice sonorities');
+test('The chord duration specimen really carries the whole duration taxonomy', () => {
+  const values = CHORD_DURATION_SPECIMEN_VALUES;
+  assert.deepEqual(
+    values.map((v) => v.durationTicks),
+    [96, 48, 72, 24, 12],
+    'half, quarter, dotted quarter, 8th, 16th — in order'
+  );
+  const options = resolveJankoOptions({
+    ...DEFAULT_JANKO_OPTIONS,
+    chordGrouping: 'per-hand-clasp',
+    measuresPerSystem: 2,
+  });
+  const layout = layoutJankoScore(SPECIMEN, options, DEFAULT_JANKO_TOKENS)[0];
+  assert.equal(layout.clasps.length, values.length, 'one bracket per demonstrated value');
+  assert.deepEqual(
+    layout.clasps.map((c) => c.durationTicks),
+    values.map((v) => v.durationTicks),
+    'the brackets carry exactly the demonstrated values'
+  );
+  assert.deepEqual(
+    layout.clasps.map((c) => `${c.duration}:${c.flags}${c.dotted ? '+dot' : ''}`),
+    ['pip:0', 'spire:0', 'spire:0+dot', 'spire-one-flag:1', 'spire-two-flags:2'],
+    'the taxonomy lands as ring / plain / plain+dot / 1 mark / 2 marks'
+  );
+  // Every chord is one hand's three-note chord, i.e. exactly what the per-hand
+  // bracket exists for, and the specimen engraves clean under every grouping.
+  for (const clasp of layout.clasps) {
+    assert.equal(new Set(clasp.notes.map((n) => n.hand)).size, 1, 'one hand per bracket');
+    assert.equal(clasp.notes.length, 3, 'three-voice chords');
+  }
+  for (const value of values) {
+    assert.ok(
+      SPECIMEN.notes.some((n) => n.startTick === value.startTick && n.durationTicks === value.durationTicks),
+      `${value.label} is present`
+    );
+  }
+  const report = lintJankoScore(SPECIMEN, options, DEFAULT_JANKO_TOKENS);
+  assert.equal(report.ok, true, 'the specimen engraves clean');
 });
 
 test('Every candidate states its deltas against the golden master', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the Round 9 golden tab');
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id)!;
     // Candidate A *is* the golden duration paradigm, so it departs only in the
-    // per-hand bracket scope and the settled beam-harmonized tab.
+    // per-hand bracket scope; the settled kinetic tab is no longer a delta.
     const expected =
       paradigm.style === golden.claspDurationStyle
-        ? [
-            { key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' },
-            { key: 'subdivisionStyle', value: 'kinetic-tab-beam', golden: golden.subdivisionStyle },
-          ]
+        ? [{ key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' }]
         : [
             { key: 'chordGrouping', value: 'per-hand-clasp', golden: 'none' },
             {
@@ -190,12 +249,11 @@ test('Every candidate states its deltas against the golden master', () => {
               value: paradigm.style,
               golden: golden.claspDurationStyle,
             },
-            { key: 'subdivisionStyle', value: 'kinetic-tab-beam', golden: golden.subdivisionStyle },
           ];
     assert.deepEqual(
       candidateBadges(candidate),
       expected,
-      `${paradigm.id} departs in the per-hand clasp, its duration paradigm and the kinetic tab`
+      `${paradigm.id} departs in the per-hand clasp and its own midpoint paradigm`
     );
     const resolved = resolveCandidate(candidate);
     for (const [key, value] of Object.entries(resolved.options)) {
@@ -205,10 +263,6 @@ test('Every candidate states its deltas against the golden master', () => {
       }
       if (key === 'claspDurationStyle') {
         assert.equal(value, paradigm.style);
-        continue;
-      }
-      if (key === 'subdivisionStyle') {
-        assert.equal(value, 'kinetic-tab-beam');
         continue;
       }
       assert.deepEqual(
@@ -225,7 +279,7 @@ test('Every candidate states its deltas against the golden master', () => {
   );
 });
 
-test('Every paradigm engraves both benchmarks with the bracket scope and lint it claims', () => {
+test('Every paradigm engraves both benchmarks and the specimen with the scope and lint it claims', () => {
   for (const paradigm of PARADIGMS) {
     const resolved = resolveCandidate(getCandidate(paradigm.id)!);
     // The Bach opening is melodic: no hand carries a row-snapped cluster or a
@@ -281,7 +335,7 @@ test('Every paradigm engraves both benchmarks with the bracket scope and lint it
   }
 });
 
-test('Every paradigm paints its own symmetrical duration ink and the settled kinetic tab', () => {
+test('Every paradigm paints its own midpoint duration ink and the settled kinetic tab', () => {
   const documents = new Set<string>();
   for (const paradigm of PARADIGMS) {
     const candidate = getCandidate(paradigm.id)!;
@@ -292,49 +346,97 @@ test('Every paradigm paints its own symmetrical duration ink and the settled kin
       /data-subdivision-style="kinetic-tab-beam"/,
       `${paradigm.id} dispatches the beam-harmonized tab`
     );
-    const brahmsOptions = resolveJankoOptions({
-      ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+
+    // The specimen carries the whole taxonomy side by side: the ring, the plain
+    // bracket, the dotted quarter, the 8th and the 16th.
+    const specimenOptions = resolveJankoOptions({
+      ...CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID].options,
       ...(candidate.options ?? {}),
     });
-    const brahms = renderJankoCrop(BRAHMS, 7, 2, brahmsOptions, BRAHMS_OP118_NO1_JANKO_TOKENS);
-    // Compare the *ink*, not the paradigm tag: strip the style attribute so two
-    // paradigms that painted identical ink could never count as distinct.
-    documents.add(brahms.replace(/ data-clasp-duration-style="[^"]*"/g, ''));
-    assert.match(brahms, /<g class="janko-clasp-layer">/, `${paradigm.id} paints its clasps`);
+    const specimen = renderJankoCrop(
+      SPECIMEN,
+      1,
+      2,
+      specimenOptions,
+      CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID].tokens
+    );
+    const groups = claspGroups(specimen);
+    assert.equal(groups.length, 5, `${paradigm.id} paints five specimen brackets`);
+    const byDuration = new Map(groups.map((g) => [g.duration, g.body]));
+    assert.equal(
+      (byDuration.get('pip')!.match(/janko-clasp-pip/g) ?? []).length,
+      1,
+      `${paradigm.id} half: one open ring`
+    );
+    const plains = groups.filter((g) => g.duration === 'spire');
+    assert.equal(plains.length, 2, `${paradigm.id} paints a quarter and a dotted quarter`);
+    assert.ok(
+      !/janko-clasp-(tick|chevron|ray|hub|barb|dot|pip)/.test(plains[0].body),
+      `${paradigm.id} quarter: the plain bracket`
+    );
+    assert.equal(
+      (plains[1].body.match(/janko-clasp-dot/g) ?? []).length,
+      1,
+      `${paradigm.id} dotted quarter: the plain bracket + one dot`
+    );
+    assert.ok(
+      !new RegExp(paradigm.mark).test(plains[1].body),
+      `${paradigm.id} keeps the dotted quarter plain apart from its dot`
+    );
+    assert.equal(
+      (byDuration.get('spire-one-flag')!.match(new RegExp(paradigm.mark, 'g')) ?? []).length,
+      1,
+      `${paradigm.id} 8th: one midpoint mark`
+    );
+    assert.equal(
+      (byDuration.get('spire-two-flags')!.match(new RegExp(paradigm.mark, 'g')) ?? []).length,
+      2,
+      `${paradigm.id} 16th: two midpoint marks`
+    );
+    // Every specimen bracket is tagged with the paradigm and anchored on the
+    // exact spine midpoint of its own cluster.
     assert.match(
-      brahms,
+      specimen,
       new RegExp(`data-clasp-duration-style="${paradigm.style}"`),
       `${paradigm.id} tags its duration ink`
     );
-    assert.ok(!brahms.includes('janko-clasp-spire'), 'the lopsided spire is gone');
-    // The quarter-value clasps of the window carry the paradigm's own ink.
-    const quarter = [
-      ...brahms.matchAll(
-        /<g class="janko-clasp-group"[^>]*data-clasp-duration="spire"[^>]*>([\s\S]*?)<\/g>/g
-      ),
-    ][0][1].replace(/<path class="janko-clasp"[^>]*\/>/, '');
-    assert.ok(quarter.length > 0, `${paradigm.id} paints a quarter clasp`);
-    if (paradigm.quarterInk.must) {
-      assert.match(quarter, paradigm.quarterInk.must, `${paradigm.id} quarter ink`);
+    const layout = layoutJankoScore(SPECIMEN, specimenOptions, CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID].tokens)[0];
+    for (const clasp of layout.clasps) {
+      const yMid = (clasp.topY + clasp.botY) / 2;
+      const group = groups.find((g) => g.tick === String(clasp.tick))!;
+      for (const mark of group.body.matchAll(/(?:y1|y2|cy)="([\d.-]+)"/g)) {
+        // The shared pip/whole ink rides the midpoint; the 16th pair mirrors
+        // about it, so no mark may leave the bracket's own span.
+        const y = Number(mark[1]);
+        assert.ok(y >= clasp.topY - 0.01 && y <= clasp.botY + 0.01, `${paradigm.id} mark inside the bracket`);
+        assert.ok(
+          Math.abs(y - yMid) <= clasp.botY - clasp.topY,
+          `${paradigm.id} mark belongs to the midpoint band`
+        );
+      }
     }
-    assert.doesNotMatch(quarter, paradigm.quarterInk.mustNot, `${paradigm.id} paints no foreign ink`);
+
+    // Compare the *ink*, not the paradigm tag: strip the style attribute so two
+    // paradigms that painted identical ink could never count as distinct.
+    documents.add(specimen.replace(/ data-clasp-duration-style="[^"]*"/g, ''));
   }
   // The four paradigms must be four *different* engravings of the same window:
   // a decision round whose candidates render identically decides nothing.
   assert.equal(documents.size, PARADIGMS.length, 'each paradigm is a distinct engraving');
 });
 
-test('The live studio engraves four candidates on two windows with deltas and lint chips', () => {
+test('The live studio engraves four candidates on three windows with deltas and lint chips', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards, side by side');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 8, 'two engraving windows per card');
-  assert.equal((html.match(/<svg/g) ?? []).length, 8, 'one engraved preview per window');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'three engraving windows per card');
+  assert.equal((html.match(/<svg/g) ?? []).length, 12, 'one engraved preview per window');
   assert.match(html, /data-candidate-count="4"/);
-  assert.match(html, /data-window-count="2"/);
-  assert.match(html, /Round 8/);
-  assert.match(html, /Symmetrical Clasps/, 'the escaped round title headlines the view');
+  assert.match(html, /data-window-count="3"/);
+  assert.match(html, /Round 9/);
+  assert.match(html, /Midpoint Symmetrical Clasps/, 'the escaped round title headlines the view');
   assert.match(html, /data-window="primary:1-2"/);
   assert.match(html, /data-window="brahms-op118-no1:7-8"/);
+  assert.match(html, /data-window="chord-duration-specimen:1-2"/);
 
   let cursor = -1;
   for (const paradigm of PARADIGMS) {
@@ -343,8 +445,11 @@ test('The live studio engraves four candidates on two windows with deltas and li
     cursor = at;
     const card = html.slice(at);
     const body = card.slice(0, card.indexOf('</article>'));
-    assert.ok(body.includes(getCandidate(paradigm.id)!.label), `${paradigm.id} label`);
-    assert.ok(body.includes(getCandidate(paradigm.id)!.description ?? ''), `${paradigm.id} rationale`);
+    assert.ok(body.includes(esc(getCandidate(paradigm.id)!.label)), `${paradigm.id} label`);
+    assert.ok(
+      body.includes(esc(getCandidate(paradigm.id)!.description ?? '')),
+      `${paradigm.id} rationale`
+    );
     assert.match(body, /<b>chordGrouping<\/b> = per-hand-clasp/, `${paradigm.id} grouping badge`);
     assert.match(body, /<s>none<\/s>/, `${paradigm.id} shows the golden grouping it departs from`);
     if (paradigm.style === DEFAULT_JANKO_OPTIONS.claspDurationStyle) {
@@ -360,24 +465,20 @@ test('The live studio engraves four candidates on two windows with deltas and li
       );
       assert.match(
         body,
-        /<s>center-ticks<\/s>/,
+        /<s>center-kinetic-ticks<\/s>/,
         `${paradigm.id} shows the golden duration it departs from`
       );
     }
-    assert.match(
-      body,
-      /<b>subdivisionStyle<\/b> = kinetic-tab-beam/,
-      `${paradigm.id} carries the settled kinetic tab`
-    );
     assert.match(body, /badge-delta/, `${paradigm.id} highlights its delta`);
     assert.match(body, /class="janko-clasp-layer"/, `${paradigm.id} renders its clasp layer`);
+    assert.match(body, /data-subdivision-style="kinetic-tab-beam"/, `${paradigm.id} settled tab`);
     assert.match(body, /chip chip-ok/, `${paradigm.id} lints clean`);
     assert.match(body, /data-lint="clean"/);
   }
   assert.match(html, /✓ clean/);
 });
 
-test('The contact sheet engraves the four symmetrical clasp paradigms on one document', () => {
+test('The contact sheet engraves the four midpoint clasp paradigms on one document', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => {
     const resolved = resolveCandidate(candidate);
     return { id: candidate.id, label: candidate.label, options: resolved.options };

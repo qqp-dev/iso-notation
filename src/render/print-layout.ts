@@ -171,6 +171,117 @@ const LILY_BRACE_CMDS: Array<{ type: 'M' | 'c' | 's'; args: number[] }> = [
   { type: 'c', args: [0, 861, 266, 1568, 266, 2324] },
 ];
 
+/** One point of the master outline, in font units. */
+type BracePoint = [number, number];
+
+/**
+ * The master outline as cubic curves (font units). Both the path builder and
+ * the Round 9 ink-weight pass read this one table, so the shape that is painted
+ * and the shape that is measured can never drift apart.
+ */
+const LILY_BRACE_CURVES: ReadonlyArray<readonly [BracePoint, BracePoint, BracePoint, BracePoint]> =
+  (() => {
+    const curves: Array<[BracePoint, BracePoint, BracePoint, BracePoint]> = [];
+    let curr: BracePoint = [LILY_BRACE_CMDS[0].args[0], LILY_BRACE_CMDS[0].args[1]];
+    let prevCp: BracePoint = [curr[0], curr[1]];
+    for (let i = 1; i < LILY_BRACE_CMDS.length; i++) {
+      const cmd = LILY_BRACE_CMDS[i];
+      let p1: BracePoint;
+      let p2: BracePoint;
+      let p3: BracePoint;
+      if (cmd.type === 'c') {
+        p1 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
+        p2 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
+        p3 = [curr[0] + cmd.args[4], curr[1] + cmd.args[5]];
+      } else {
+        p1 = [2 * curr[0] - prevCp[0], 2 * curr[1] - prevCp[1]];
+        p2 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
+        p3 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
+      }
+      curves.push([curr, p1, p2, p3]);
+      prevCp = p2;
+      curr = p3;
+    }
+    return curves;
+  })();
+
+/** The outline's `M` anchor (the first point of the first curve). */
+const LILY_BRACE_START: BracePoint = [LILY_BRACE_CMDS[0].args[0], LILY_BRACE_CMDS[0].args[1]];
+
+/** Samples per curve when the outline is measured for its ink weight. */
+const LILY_BRACE_SAMPLES = 32;
+
+/** Sample one cubic Bézier at `t`. */
+function bracePointAt(
+  [p0, p1, p2, p3]: readonly [BracePoint, BracePoint, BracePoint, BracePoint],
+  t: number
+): BracePoint {
+  const u = 1 - t;
+  const a = u * u * u;
+  const b = 3 * u * u * t;
+  const c = 3 * u * t * t;
+  const d = t * t * t;
+  return [
+    a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0],
+    a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1],
+  ];
+}
+
+/** Flattened master outline (font units) — the reference of the thinning pass. */
+const LILY_BRACE_OUTLINE: readonly BracePoint[] = (() => {
+  const points: BracePoint[] = [];
+  for (const curve of LILY_BRACE_CURVES) points.push([curve[0][0], curve[0][1]]);
+  for (const curve of LILY_BRACE_CURVES) {
+    for (let s = 1; s <= LILY_BRACE_SAMPLES; s++) points.push(bracePointAt(curve, s / LILY_BRACE_SAMPLES));
+  }
+  return points;
+})();
+
+/** The `[left, right]` ink intervals of the master outline at font height `y`. */
+function braceInkIntervalsAt(y: number): Array<[number, number]> {
+  const outline = LILY_BRACE_OUTLINE;
+  const crossings: number[] = [];
+  for (let i = 0; i < outline.length; i++) {
+    const a = outline[i];
+    const b = outline[(i + 1) % outline.length];
+    if ((a[1] - y) * (b[1] - y) >= 0) continue;
+    const t = (y - a[1]) / (b[1] - a[1]);
+    crossings.push(a[0] + t * (b[0] - a[0]));
+  }
+  crossings.sort((a, b) => a - b);
+  const intervals: Array<[number, number]> = [];
+  for (let i = 0; i + 1 < crossings.length; i += 2) {
+    intervals.push([crossings[i], crossings[i + 1]]);
+  }
+  return intervals;
+}
+
+/**
+ * Round 9 — thin one outline point toward its section's outer edge until the
+ * local ink is at most `thick` font units wide. A point on the outer contour is
+ * fixed (the requested reach is never touched) and a section already thinner
+ * than `thick` — the feather-tapered tips and the cusp needle — stays exactly as
+ * drawn, so the master curve keeps its silhouette and taper while shedding the
+ * weight the `accoladeThick` token does not want.
+ */
+function thinBracePoint(p: BracePoint, thick: number): BracePoint {
+  const intervals = braceInkIntervalsAt(p[1]);
+  if (intervals.length === 0) return [p[0], p[1]];
+  let best = intervals[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const interval of intervals) {
+    const distance = Math.max(interval[0] - p[0], 0, p[0] - interval[1]);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = interval;
+    }
+  }
+  const width = best[1] - best[0];
+  if (width <= 0 || width <= thick) return [p[0], p[1]];
+  const k = thick / width;
+  return [best[0] + (p[0] - best[0]) * k, p[1]];
+}
+
 /**
  * Authentic classical vertical accolade (curly brace) for the left margin of a
  * horizontal system. It clasps the full 4-octave staff from yTop (o5) to yBot (o1)
@@ -181,6 +292,11 @@ const LILY_BRACE_CMDS: Array<{ type: 'M' | 'c' | 's'; args: number[] }> = [
  * - Delicate, graceful waist inflections
  * - Sculptural, organic swelling bellies
  * - Feather-tapered tips clasping the staff edges at staffLeft
+ *
+ * Round 9 makes the slimming *genuine*: `reach` drives `scaleX`, and `thick` is
+ * the ink weight the master outline is thinned to (see {@link thinBracePoint}),
+ * so the Jánko token pair (`4.8pt` / `0.55pt`) paints a truly hairline brace
+ * instead of a fixed-weight glyph.
  */
 export function getVerticalAccoladePath(
   staffLeft: number,
@@ -190,13 +306,13 @@ export function getVerticalAccoladePath(
   cuspOrThick: number = ACCOLADE_THICKNESS_PT,
   maybeThick?: number
 ): string {
-  let reach = ACCOLADE_WIDTH_PT;
-
-  if (maybeThick !== undefined) {
-    reach = cuspOrThick;
-  } else if (reachOrBelly > 0) {
-    reach = reachOrBelly;
-  }
+  // Round 9 — both positional forms resolve to an explicit (reach, thick) pair.
+  // `reach` drives `scaleX` (the glyph's horizontal extent, so `accoladeWidth`
+  // can never be hijacked by the thickness argument) and `thick` is the brace's
+  // own ink weight, which the master outline is thinned to below.
+  const requestedReach = maybeThick !== undefined ? cuspOrThick : reachOrBelly;
+  const reach = requestedReach > 0 ? requestedReach : ACCOLADE_WIDTH_PT;
+  const thick = maybeThick !== undefined ? maybeThick : cuspOrThick;
 
   const ym = (yTop + yBot) / 2;
   const h = yBot - yTop;
@@ -206,32 +322,23 @@ export function getVerticalAccoladePath(
 
   const scaleY = (h / 2) / FONT_MAX_Y;
   const scaleX = reach / (FONT_MAX_X - FONT_MIN_X);
+  // The requested thickness expressed in font units: the outline is measured in
+  // its own coordinate system and the result scaled back, so the painted spine
+  // is exactly `thick` pt whatever the reach is.
+  const thin = scaleX > 0 && thick > 0 ? thick / scaleX : 0;
+  const fix = (p: BracePoint): BracePoint => (thin > 0 ? thinBracePoint(p, thin) : p);
 
   const toS = (x: number, y: number): string =>
     `${(staffLeft + (x - FONT_MAX_X) * scaleX).toFixed(2)} ${(ym - y * scaleY).toFixed(2)}`;
 
-  let curr: [number, number] = [LILY_BRACE_CMDS[0].args[0], LILY_BRACE_CMDS[0].args[1]];
-  let prevCp: [number, number] = [curr[0], curr[1]];
-  const parts = [`M ${toS(curr[0], curr[1])}`];
+  const start = fix(LILY_BRACE_START);
+  const parts = [`M ${toS(start[0], start[1])}`];
 
-  for (let i = 1; i < LILY_BRACE_CMDS.length; i++) {
-    const cmd = LILY_BRACE_CMDS[i];
-    let p1: [number, number];
-    let p2: [number, number];
-    let p3: [number, number];
-
-    if (cmd.type === 'c') {
-      p1 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
-      p2 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
-      p3 = [curr[0] + cmd.args[4], curr[1] + cmd.args[5]];
-    } else {
-      p1 = [2 * curr[0] - prevCp[0], 2 * curr[1] - prevCp[1]];
-      p2 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
-      p3 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
-    }
+  for (const curve of LILY_BRACE_CURVES) {
+    const p1 = fix([curve[1][0], curve[1][1]]);
+    const p2 = fix([curve[2][0], curve[2][1]]);
+    const p3 = fix([curve[3][0], curve[3][1]]);
     parts.push(`C ${toS(p1[0], p1[1])}, ${toS(p2[0], p2[1])}, ${toS(p3[0], p3[1])}`);
-    prevCp = p2;
-    curr = p3;
   }
   parts.push('Z');
   return parts.join(' ');

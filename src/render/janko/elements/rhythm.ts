@@ -351,13 +351,32 @@ export const CLASP_PIP_RADIUS = 1.5;
 /** Vertical gap (pt) between the two pips of a whole-note clasp. */
 export const CLASP_PIP_GAP = 1.0;
 /**
- * Round 8 symmetrical duration ink. A `'center-ticks'` notch crosses the spine
- * by `±CLASP_CENTER_TICK_HALF`; `'cap-cuts'` stack their parallel bars
- * `CLASP_CAP_CUT_GAP` inside each cap; `'bilateral-fins'` flare the cap's own
- * reach at the beam-harmonized rake.
+ * Round 9 midpoint duration ink (`elements/rhythm.renderClaspDurationInk`).
+ * Every paradigm anchors on the spine's exact midpoint `yMid`:
+ *
+ * - `'center-kinetic-ticks'` — a `±CLASP_CENTER_TICK_HALF` tick raked at the
+ *   score's own beam slope (1 = 8th, 2 mirrored = 16th);
+ * - `'center-chevron-notch'` — a calligraphic guillemet notch reaching
+ *   `CLASP_NOTCH_REACH` into the cup (1 = 8th, 2 nested = 16th);
+ * - `'center-pip-rays'` — a compact `CLASP_HUB_RADIUS` hub with lateral rays
+ *   (1 = 8th, 2 mirrored = 16th);
+ * - `'center-sculpted-wedge'` — a filled barb (1 = 8th, 2 mirrored = 16th).
  */
 export const CLASP_CENTER_TICK_HALF = 1.1;
-export const CLASP_CAP_CUT_GAP = 1.4;
+export const CLASP_NOTCH_REACH = 2.0;
+export const CLASP_NOTCH_HALF = 0.9;
+export const CLASP_HUB_RADIUS = 1.6;
+export const CLASP_RAY_REACH = 3.0;
+/** Half-angle (rad) between the two rays of a 16th `'center-pip-rays'`. */
+export const CLASP_RAY_SPREAD = 0.62;
+/** Horizontal offset (pt) of a dotted value's dot from the clasp spine. */
+export const CLASP_DOT_OFFSET = 1.55;
+/**
+ * Plain note values (ticks) of the duration grammar: 16th … double whole. A
+ * value of exactly 1.5× one of them is *dotted* and carries the shared
+ * augmentation dot beside the spine (see {@link claspDurationDotted}).
+ */
+const CLASP_PLAIN_VALUES: readonly number[] = [12, 24, 48, 96, 192, 384];
 /**
  * Minimum horizontal spread (pt) that makes an onset a *horizontally displaced*
  * cluster (Round 6). Heads that share one clean vertical column spread by 0pt
@@ -403,9 +422,9 @@ export function claspQualifies(
 }
 
 /**
- * Duration grammar of a clasp — the value the bracket carries (Round 8
- * reinterprets the classes as *notch counts*: the bracket no longer draws a
- * lopsided spire, it paints its duration symmetrically).
+ * Duration grammar of a clasp — the value the bracket carries. Round 9 keeps the
+ * Round 8 classes (they are *mark counts*, not a lopsided spire: the bracket
+ * paints every duration at its own spine midpoint).
  *
  * | class               | value            | ink                                     |
  * | ------------------- | ---------------- | --------------------------------------- |
@@ -434,6 +453,18 @@ export function claspDurationClass(durationTicks: number): JankoClaspDuration {
   return 'spire-two-flags';
 }
 
+/**
+ * Is a clasp's carried value **dotted** — exactly 1.5× a plain note value?
+ * (72 = dotted quarter, 36 = dotted 8th, 144 = dotted half …). A dotted value
+ * keeps its plain paradigm's midpoint ink and adds the canonical
+ * {@link JankoTokens.augmentationDotRadius} dot beside the spine, so a dotted
+ * quarter reads as "plain bracket + dot" under every Round 9 paradigm.
+ */
+export function claspDurationDotted(durationTicks: number): boolean {
+  const plain = durationTicks / 1.5;
+  return Number.isInteger(plain) && CLASP_PLAIN_VALUES.includes(plain);
+}
+
 /** One resolved left clasp: bracket geometry plus its symmetrical duration ink. */
 export interface JankoClaspGroupGeometry {
   /** Onset tick shared by every member of the cluster. */
@@ -459,12 +490,14 @@ export interface JankoClaspGroupGeometry {
   durationTicks: number;
   /** Resolved duration grammar. */
   duration: JankoClaspDuration;
-  /** Round 8: the symmetrical duration paradigm the bracket paints. */
+  /** Round 9: the midpoint duration paradigm the bracket paints. */
   durationStyle: JankoClaspDurationStyle;
   /** Duration notches (0 = quarter, 1 = 8th, 2 = 16th). */
   flags: number;
   /** Open pips (0–2) drawn at the spine midpoint. */
   pips: number;
+  /** Round 9: a dotted value adds the 0.75pt augmentation dot at the midpoint. */
+  dotted: boolean;
   /** The bracket itself: `M cap topY L claspX topY L claspX botY L cap botY`. */
   path: string;
 }
@@ -484,8 +517,8 @@ export interface JankoClaspOptions {
    */
   requireBracketScope?: boolean;
   /**
-   * Round 8: the symmetrical duration paradigm the bracket paints. Defaults to
-   * `'center-ticks'`.
+   * Round 9: the midpoint duration paradigm the bracket paints. Defaults to
+   * `'center-kinetic-ticks'`.
    */
   claspDurationStyle?: JankoClaspDurationStyle;
 }
@@ -536,6 +569,7 @@ export function computeClaspGeometry(
   const flags =
     duration === 'spire-two-flags' ? 2 : duration === 'spire-one-flag' ? 1 : 0;
   const pips = duration === 'double-pip' ? 2 : duration === 'pip' ? 1 : 0;
+  const dotted = claspDurationDotted(durationTicks);
   const cap = t.claspWidth;
   return {
     tick: notes[0].startTick,
@@ -551,9 +585,10 @@ export function computeClaspGeometry(
     strokeWidth: t.claspStrokeWidth,
     durationTicks,
     duration,
-    durationStyle: options?.claspDurationStyle ?? 'center-ticks',
+    durationStyle: options?.claspDurationStyle ?? 'center-kinetic-ticks',
     flags,
     pips,
+    dotted,
     path: claspBracketPath(claspX, topY, botY, cap),
   };
 }
@@ -580,80 +615,126 @@ export function withClaspRail(
 }
 
 /**
- * The duration ink of one clasp in the active symmetrical paradigm. The rendered
- * marks and {@link claspInkBox} share this switch, so the audited box can never
- * drift from the painted ink.
+ * The duration ink of one clasp in the active Round 9 midpoint paradigm. Every
+ * mark is anchored on `yMid = (topY + botY) / 2`, so the bracket stays a mirror
+ * symmetrical `[` whatever value it carries. The rendered marks and
+ * {@link claspInkBox} share this switch, so the audited box can never drift from
+ * the painted ink.
  *
- * - `'center-ticks'`: 1 notch (8th) or 2 notches (16th) crossing the spine at
- *   its exact midpoint, or the half/whole open pip there.
- * - `'cap-cuts'`: 1/2/3 parallel horizontal bars stacked inward from **both**
- *   caps (quarter / 8th / 16th).
- * - `'framing-only'`: nothing — the pure `[` bracket.
- * - `'bilateral-fins'`: 12.4° kinetic fins flaring outward from both caps.
+ * | value        | shared ink                            | midpoint subdivision ink |
+ * | ------------ | ------------------------------------- | ------------------------ |
+ * | half / whole | 1 / 2 open rings on the spine          | —                        |
+ * | quarter      | the plain bracket                      | —                        |
+ * | dotted       | + the 0.75pt augmentation dot          | —                        |
+ * | 8th          | —                                      | 1 mark                   |
+ * | 16th         | —                                      | 2 mirrored marks         |
  */
 function renderClaspDurationInk(
   group: JankoClaspGroupGeometry,
   t: ResolvedJankoTokens
 ): string[] {
   const out: string[] = [];
-  if (group.durationStyle === 'framing-only') return out;
   const yMid = (group.topY + group.botY) / 2;
+  const claspX = group.claspX;
   const stroke = group.strokeWidth.toFixed(2);
 
-  // Halves and wholes carry their open pips at the exact spine midpoint, so the
-  // bracket stays mirror-symmetrical in every paradigm.
+  // 1. Halves and wholes carry their open pips at the exact spine midpoint, so
+  //    the bracket stays mirror-symmetrical in every paradigm.
   for (let i = 0; i < group.pips; i++) {
     const offset =
       group.pips === 1 ? 0 : (i === 0 ? -1 : 1) * (CLASP_PIP_RADIUS + CLASP_PIP_GAP / 2);
     const cy = yMid + offset;
     out.push(
-      `    <circle class="janko-clasp-pip" cx="${f(group.claspX)}" cy="${f(cy)}" r="${f(CLASP_PIP_RADIUS)}" fill="none" stroke="#111111" stroke-width="${stroke}"/>`
+      `    <circle class="janko-clasp-pip" cx="${f(claspX)}" cy="${f(cy)}" r="${f(CLASP_PIP_RADIUS)}" fill="none" stroke="#111111" stroke-width="${stroke}"/>`
     );
   }
-  if (group.pips > 0) return out;
 
-  const notches = group.flags;
-  if (group.durationStyle === 'center-ticks') {
-    for (let i = 0; i < notches; i++) {
-      const offset = notches === 1 ? 0 : (i === 0 ? -1 : 1) * (t.flagSpacing / 2);
-      const cy = yMid + offset;
-      out.push(
-        `    <line class="janko-clasp-tick" x1="${f(group.claspX - CLASP_CENTER_TICK_HALF)}" y1="${f(cy)}" x2="${f(group.claspX + CLASP_CENTER_TICK_HALF)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-      );
-    }
-    return out;
+  // 2. A dotted value adds the canonical augmentation dot just right of the
+  //    spine — inside the cup, where it can touch neither a barline nor a
+  //    foreign glyph.
+  if (group.dotted) {
+    out.push(
+      `    <circle class="janko-clasp-dot" cx="${f(claspX + CLASP_DOT_OFFSET)}" cy="${f(yMid)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
+    );
   }
+  if (group.pips > 0 || group.flags === 0) return out;
 
-  if (group.durationStyle === 'cap-cuts') {
-    // A quarter carries one cut, an 8th two, a 16th three — parallel bars
-    // stacked inward from **both** caps, so the tally reads symmetrically from
-    // either end of the bracket.
-    for (let k = 1; k <= notches + 1; k++) {
-      for (const cy of [group.topY + k * CLASP_CAP_CUT_GAP, group.botY - k * CLASP_CAP_CUT_GAP]) {
+  switch (group.durationStyle) {
+    case 'center-chevron-notch': {
+      // A calligraphic guillemet notch: its apex sits on the spine and its two
+      // arms reach into the cup. A 16th nests a second, smaller chevron inside
+      // the first, so the tally reads 1 / 2 without leaving the midpoint.
+      const chevron = (reach: number, half: number): string =>
+        `    <path class="janko-clasp-chevron" d="M ${f(claspX + reach)} ${f(yMid - half)} L ${f(claspX)} ${f(yMid)} L ${f(claspX + reach)} ${f(yMid + half)}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="round"/>`;
+      if (group.flags === 1) {
+        out.push(chevron(CLASP_NOTCH_REACH, CLASP_NOTCH_HALF));
+      } else {
+        out.push(chevron(CLASP_NOTCH_REACH, CLASP_NOTCH_HALF * 1.35));
+        out.push(chevron(CLASP_NOTCH_REACH * 0.62, CLASP_NOTCH_HALF * 0.72));
+      }
+      return out;
+    }
+
+    case 'center-pip-rays': {
+      // A compact hub on the spine with lateral rays: one ray for an 8th, a
+      // mirrored pair for a 16th.
+      out.push(
+        `    <circle class="janko-clasp-hub" cx="${f(claspX)}" cy="${f(yMid)}" r="${f(CLASP_HUB_RADIUS)}" fill="#111111"/>`
+      );
+      const tips: Array<[number, number]> =
+        group.flags === 1
+          ? [[claspX - CLASP_RAY_REACH, yMid]]
+          : [
+              [
+                claspX - CLASP_RAY_REACH * Math.cos(CLASP_RAY_SPREAD),
+                yMid - CLASP_RAY_REACH * Math.sin(CLASP_RAY_SPREAD),
+              ],
+              [
+                claspX - CLASP_RAY_REACH * Math.cos(CLASP_RAY_SPREAD),
+                yMid + CLASP_RAY_REACH * Math.sin(CLASP_RAY_SPREAD),
+              ],
+            ];
+      for (const [x, y] of tips) {
         out.push(
-          `    <line class="janko-clasp-cap-cut" x1="${f(group.claspX)}" y1="${f(cy)}" x2="${f(group.claspX + group.capWidth)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+          `    <line class="janko-clasp-ray" x1="${f(claspX)}" y1="${f(yMid)}" x2="${f(x)}" y2="${f(y)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
         );
       }
+      return out;
     }
-    return out;
-  }
 
-  // 'bilateral-fins': one fin per duration level flares outward from each cap,
-  // raked at the beam-harmonized slope. The fin spans the cap's own horizontal
-  // reach and rises above (top) or falls below (bottom) it, so the paradigm
-  // adds flare without ever reaching toward the note column.
-  const drop = group.capWidth * t.maxBeamSlope;
-  for (let k = 0; k <= notches; k++) {
-    for (const [cy, sign] of [
-      [group.topY + k * t.flagSpacing, -1],
-      [group.botY - k * t.flagSpacing, 1],
-    ] as const) {
-      out.push(
-        `    <line class="janko-clasp-fin" x1="${f(group.claspX)}" y1="${f(cy)}" x2="${f(group.claspX + group.capWidth)}" y2="${f(cy + sign * drop)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-      );
+    case 'center-sculpted-wedge': {
+      // A sculpted fin: a filled barb whose base rides the spine and whose
+      // sharp apex points into the margin. A 16th mirrors a smaller pair of
+      // barbs about the midpoint.
+      const barb = (cy: number, half: number): string =>
+        `    <path class="janko-clasp-barb" d="M ${f(claspX)} ${f(cy - half)} L ${f(claspX - CLASP_NOTCH_REACH)} ${f(cy)} L ${f(claspX)} ${f(cy + half)} Z" fill="#111111" stroke="none"/>`;
+      if (group.flags === 1) {
+        out.push(barb(yMid, CLASP_NOTCH_HALF));
+      } else {
+        out.push(barb(yMid - CLASP_NOTCH_HALF * 1.25, CLASP_NOTCH_HALF * 0.7));
+        out.push(barb(yMid + CLASP_NOTCH_HALF * 1.25, CLASP_NOTCH_HALF * 0.7));
+      }
+      return out;
+    }
+
+    case 'center-kinetic-ticks':
+    default: {
+      // 12° beam-harmonized kinetic ticks straddling the spine. A single 8th
+      // tick rakes with the score's own beams; the 16th pair is mirrored about
+      // the midpoint, so the bracket never reads as lopsided.
+      const half = CLASP_CENTER_TICK_HALF;
+      const rake = t.maxBeamSlope;
+      for (let i = 0; i < group.flags; i++) {
+        const offset = group.flags === 1 ? 0 : (i === 0 ? -1 : 1) * (t.flagSpacing / 2);
+        const mirror = group.flags === 1 ? 1 : i === 0 ? -1 : 1;
+        const cy = yMid + offset;
+        out.push(
+          `    <line class="janko-clasp-tick" x1="${f(claspX - half)}" y1="${f(cy - mirror * half * rake)}" x2="${f(claspX + half)}" y2="${f(cy + mirror * half * rake)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+        );
+      }
+      return out;
     }
   }
-  return out;
 }
 
 /**
@@ -670,26 +751,54 @@ export function claspInkBox(
   let x1 = group.claspX + group.capWidth;
   let y0 = group.topY;
   let y1 = group.botY;
+  const yMid = (group.topY + group.botY) / 2;
 
-  if (group.durationStyle !== 'framing-only' && group.pips > 0) {
-    x0 = Math.min(x0, group.claspX - CLASP_PIP_RADIUS);
+  if (group.pips > 0) x0 = Math.min(x0, group.claspX - CLASP_PIP_RADIUS);
+  if (group.dotted) {
+    x1 = Math.max(x1, group.claspX + CLASP_DOT_OFFSET + t.augmentationDotRadius);
   }
-  if (group.durationStyle === 'center-ticks' && group.pips === 0 && group.flags > 0) {
-    x0 = Math.min(x0, group.claspX - CLASP_CENTER_TICK_HALF);
-    x1 = Math.max(x1, group.claspX + CLASP_CENTER_TICK_HALF);
+  if (group.pips === 0 && group.flags > 0) {
+    switch (group.durationStyle) {
+      case 'center-chevron-notch':
+        x1 = Math.max(x1, group.claspX + CLASP_NOTCH_REACH);
+        y0 = Math.min(y0, yMid - CLASP_NOTCH_HALF * 1.35);
+        y1 = Math.max(y1, yMid + CLASP_NOTCH_HALF * 1.35);
+        break;
+      case 'center-pip-rays': {
+        const spread = Math.max(
+          CLASP_HUB_RADIUS,
+          CLASP_RAY_REACH * Math.sin(CLASP_RAY_SPREAD)
+        );
+        x0 = Math.min(x0, group.claspX - CLASP_RAY_REACH);
+        x1 = Math.max(x1, group.claspX + CLASP_HUB_RADIUS);
+        y0 = Math.min(y0, yMid - spread);
+        y1 = Math.max(y1, yMid + spread);
+        break;
+      }
+      case 'center-sculpted-wedge':
+        x0 = Math.min(x0, group.claspX - CLASP_NOTCH_REACH);
+        y0 = Math.min(y0, yMid - CLASP_NOTCH_HALF * 1.95);
+        y1 = Math.max(y1, yMid + CLASP_NOTCH_HALF * 1.95);
+        break;
+      case 'center-kinetic-ticks':
+      default: {
+        const half = CLASP_CENTER_TICK_HALF;
+        const span =
+          (group.flags === 1 ? 0 : t.flagSpacing / 2) + half * t.maxBeamSlope;
+        x0 = Math.min(x0, group.claspX - half);
+        x1 = Math.max(x1, group.claspX + half);
+        y0 = Math.min(y0, yMid - span);
+        y1 = Math.max(y1, yMid + span);
+        break;
+      }
+    }
   }
-  if (group.durationStyle === 'bilateral-fins' && group.pips === 0) {
-    const drop = group.capWidth * t.maxBeamSlope;
-    y0 = Math.min(y0, group.topY - drop);
-    y1 = Math.max(y1, group.botY + drop);
-  }
-  // 'cap-cuts' stack strictly inside the bracket, so they add no extent.
   return { x0, y0, x1, y1 };
 }
 
 /**
  * Paint one left clasp: the symmetrical `[` bracket plus the duration ink of the
- * active `claspDurationStyle` (Round 8). The group is engraved in the rhythm
+ * active `claspDurationStyle` (Round 9). The group is engraved in the rhythm
  * layer (beneath the noteheads), so a knockout always erases whatever a clasp
  * should never have touched.
  */
@@ -737,7 +846,7 @@ export function renderClaspRail(
 /**
  * Paint a whole clasp layer: every bracket, then the rails of
  * `'beamed-clasp-rail'` (which are painted after the spines they join).
- * Round 8 carries the duration paradigm on each resolved group, so the layer
+ * Round 9 carries the duration paradigm on each resolved group, so the layer
  * needs no extra style parameter.
  */
 export function renderClaspGroup(

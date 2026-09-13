@@ -91,33 +91,41 @@ export const DEFAULT_STUDIO_SCORE_ID = 'primary';
 export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
 
 /**
+ * Score id of the curated multi-duration chord specimen (Round 9): five
+ * three-voice chords, one per value of the duration taxonomy.
+ */
+export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
+
+/**
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
  * the Klavarskribo beat grid, round 3 the Middle C corridor, round 4 the octave
  * framing, round 5 the external left clasp, round 6 the single-note subdivision
- * dialects with the per-hand clasp, and round 7 the kinetic subdivision tabs
- * with gap-gated vertical chording. Round 8 answers the operator's verdict on
- * that round: the clasp's lopsided upward spire is removed and four **mirror
- * symmetrical** duration paradigms are tested (Candidates A–D), the kinetic
- * subdivision tab is harmonized with the score's own beam slope (~12.4°), the
- * staff hierarchy is uniformized, the accolade lightened to 0.65pt and the page
- * margin widened to 24pt.
+ * dialects with the per-hand clasp, round 7 the kinetic subdivision tabs with
+ * gap-gated vertical chording, and round 8 the symmetrical clasp with the
+ * beam-harmonized tab. Round 9 answers the operator's verdict on that round:
+ * the clasp's duration ink moves to the **exact midpoint of the bracket spine**
+ * and four midpoint paradigms are tested (Candidates A–D) across a curated
+ * specimen that carries every duration — half, quarter, dotted quarter, 8th and
+ * 16th — while the accolade slims to 4.8pt / 0.55pt and the augmentation dot to
+ * 0.75pt.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 8,
-  title: 'Symmetrical Clasps, Beam-Harmonized Tabs & Uniform Staff Hierarchy',
+  round: 9,
+  title: 'Midpoint Symmetrical Clasps, Chord Duration Taxonomy & Slender Accolade',
   description:
-    'Resolving clasp symmetry across 4 balanced duration paradigms, with 12° beam-harmonized kinetic tabs, 0.65pt accolade, and 24pt margins.',
+    'Comparing 4 variations of midpoint-anchored clasp duration, tested across half, quarter, dotted, 8th, and 16th chords with slender 4.8pt accolade and 0.75pt dots.',
 };
 
 /**
- * The two display windows every Round 8 candidate is engraved on: the Bach
- * opening (single-note 16ths/8ths that carry the beam-harmonized kinetic tabs)
- * and the dense Brahms chords of mm. 7–8, where the symmetrical `B - 2 - 8`
- * clasp and the `B - 4 - 7` 3-note bracket live.
+ * The three display windows every Round 9 candidate is engraved on: the Bach
+ * opening (single-note 16ths/8ths that carry the beam-harmonized kinetic tabs),
+ * the dense Brahms chords of mm. 7–8 (where the `B - 2 - 8` and `B - 4 - 7`
+ * clasps live) and the **chord duration specimen**, whose five chords carry the
+ * full duration taxonomy so every paradigm's midpoint marks are on screen.
  */
-const ROUND_8_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_9_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
@@ -131,66 +139,74 @@ const ROUND_8_WINDOWS: JankoCandidateWindow[] = [
     title:
       'Brahms Op. 118 No. 1 · mm. 7–8 — symmetrical B - 2 - 8 clasp + B - 4 - 7 3-note bracket (macro crop)',
   },
+  {
+    scoreId: SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 1,
+    measureCount: 2,
+    title:
+      'Chord Duration Specimen · half (ring) → quarter (plain) → dotted quarter (plain + 0.75pt dot) → 8th (1 mark) → 16th (2 marks)',
+  },
 ];
 
 /**
- * The active candidate set — the four Round 8 symmetrical clasp-duration
+ * The active candidate set — the four Round 9 midpoint clasp-duration
  * paradigms. Order is the display order in the Decision Candidates Matrix. All
  * four share the settled beam-harmonized kinetic tab (`'kinetic-tab-beam'`), so
- * the round varies exactly one variable: how the bracket carries its duration.
+ * the round varies exactly one variable: the ink a subdivision value leaves at
+ * the bracket spine's exact midpoint.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'center-ticks',
-    label: 'A · Balanced Center-Spine Ticks',
+    id: 'center-kinetic-ticks',
+    label: 'A · Center-Spine 12° Kinetic Ticks',
     description:
-      'The bracket stays a pure mirror-symmetrical `[` and carries its duration at the spine’s exact vertical midpoint: one notch for an 8th, two for a 16th, an open pip for a half. The calmest reading — the cluster’s value sits in the middle of its own span, exactly where the eye already rests.',
+      'At the spine’s exact midpoint, 12° ticks raked at the score’s own beam slope project out of the bracket — one for an 8th, a mirrored pair for a 16th. The paradigm speaks the settled kinetic language of the subdivision tab, so a clasped chord and a flagged melody move at the same rake.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'center-ticks',
+      claspDurationStyle: 'center-kinetic-ticks',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_8_WINDOWS,
-    tags: ['symmetrical', 'center ticks', 'pips'],
+    windows: ROUND_9_WINDOWS,
+    tags: ['midpoint', '12° kinetic ticks', 'beam-harmonized'],
   },
   {
-    id: 'cap-cuts',
-    label: 'B · Stacked Horizontal Cap Cuts',
+    id: 'center-chevron-notch',
+    label: 'B · Center French Guillemet Chevron',
     description:
-      'Duration is tallied by parallel horizontal bars stacked inward from both caps — 1 bar for a quarter, 2 for an 8th (═), 3 for a 16th (≡) — so the value reads as a symmetric ladder growing inward from either end of the bracket. The most architectural of the four concepts.',
+      'A calligraphic guillemet notch is cut into the spine’s midpoint: its apex rides the spine and its two burin arms open into the cup. A 16th nests a second, smaller chevron inside the first, so the value counts 1 / 2 without ever leaving the centre.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'cap-cuts',
+      claspDurationStyle: 'center-chevron-notch',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_8_WINDOWS,
-    tags: ['symmetrical', 'cap cuts', '═ / ≡'],
+    windows: ROUND_9_WINDOWS,
+    tags: ['midpoint', 'guillemet chevron', 'calligraphic'],
   },
   {
-    id: 'framing-only',
-    label: 'C · Pure Symmetrical Framing Bracket',
+    id: 'center-pip-rays',
+    label: 'C · Center Circular Hub & Rays',
     description:
-      'The bracket is reduced to its pure function — framing the cluster — with zero duration ink of its own. Duration stays on the outermost notehead’s own stem mark or hold line, so the sonority is grouped without a second duration statement. The most austere, least redundant answer.',
+      'A compact circular hub (R = 1.6pt) sits on the spine’s midpoint and fires lateral rays into the margin — one ray for an 8th, a mirrored pair for a 16th. The most radial and instrument-like of the four: the value reads as a hub with spokes rather than as a tally.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'framing-only',
+      claspDurationStyle: 'center-pip-rays',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_8_WINDOWS,
-    tags: ['symmetrical', 'zero duration ink', 'austere'],
+    windows: ROUND_9_WINDOWS,
+    tags: ['midpoint', 'hub & rays', 'R = 1.6pt'],
   },
   {
-    id: 'bilateral-fins',
-    label: 'D · Bilateral Cap Fins',
+    id: 'center-sculpted-wedge',
+    label: 'D · Center Sculpted Wedge',
     description:
-      'Each cap grows a kinetic fin raked at the score’s own 12.4° beam slope, mirrored top and bottom: one fin per duration level (1 = quarter, 2 = 8th, 3 = 16th). The only paradigm that speaks the beam-harmonized kinetic language of the settled subdivision tab.',
+      'A sculpted fin is carved into the midpoint: one sharp barb for an 8th, a mirrored pair of smaller barbs for a 16th. Solid, frontal and unambiguous — the only paradigm whose mark is a filled wedge rather than a stroke.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'bilateral-fins',
+      claspDurationStyle: 'center-sculpted-wedge',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_8_WINDOWS,
-    tags: ['symmetrical', '12.4° fins', 'kinetic'],
+    windows: ROUND_9_WINDOWS,
+    tags: ['midpoint', 'sculpted wedge', 'solid barbs'],
   },
 ];
 
