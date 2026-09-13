@@ -595,27 +595,27 @@
     <line class="janko-beam-secondary" x1="524.45" y1="183.90" x2="543.67" y2="188.13" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
     <line class="janko-stem" x1="75.22" y1="135.50" x2="75.22" y2="124.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="75.22" data-flag-index="1" d="M 75.22 124.50 C 77.42 125.29 79.22 128.59 77.02 131.10" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="75.22" data-flag-index="1" d="M 75.22 124.50 C 77.42 125.16 79.22 128.59 76.90 131.10 C 76.42 128.86 75.78 129.12 75.22 127.93 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <circle class="janko-augmentation-dot" cx="83.22" cy="140.50" r="1.30" fill="#111111"/>
     <line class="janko-stem" x1="202.54" y1="120.50" x2="202.54" y2="109.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="202.54" data-flag-index="1" d="M 202.54 109.50 C 204.74 110.29 206.54 113.59 204.34 116.10" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="202.54" data-flag-index="1" d="M 202.54 109.50 C 204.74 110.16 206.54 113.59 204.22 116.10 C 203.74 113.86 203.10 114.12 202.54 112.93 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <circle class="janko-augmentation-dot" cx="210.54" cy="125.50" r="1.30" fill="#111111"/>
     <line class="janko-stem" x1="329.86" y1="105.50" x2="329.86" y2="94.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="329.86" data-flag-index="1" d="M 329.86 94.50 C 332.06 95.29 333.86 98.59 331.66 101.10" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="329.86" data-flag-index="1" d="M 329.86 94.50 C 332.06 95.16 333.86 98.59 331.54 101.10 C 331.06 98.86 330.42 99.12 329.86 97.93 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <circle class="janko-augmentation-dot" cx="337.86" cy="110.50" r="1.30" fill="#111111"/>
     <line class="janko-stem" x1="387.52" y1="231.50" x2="387.52" y2="242.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="387.52" data-flag-index="1" d="M 387.52 242.50 C 389.72 241.71 391.52 238.41 389.32 235.90" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="387.52" data-flag-index="1" d="M 387.52 242.50 C 389.72 241.84 391.52 238.41 389.20 235.90 C 388.72 238.14 388.08 237.88 387.52 239.07 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <line class="janko-stem" x1="401.24" y1="145.50" x2="401.24" y2="156.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="401.24" data-flag-index="1" d="M 401.24 156.50 C 403.44 155.71 405.24 152.41 403.04 149.90" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="401.24" data-flag-index="1" d="M 401.24 156.50 C 403.44 155.84 405.24 152.41 402.92 149.90 C 402.44 152.14 401.80 151.88 401.24 153.07 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <line class="janko-stem" x1="495.62" y1="191.50" x2="495.62" y2="180.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="495.62" data-flag-index="1" d="M 495.62 180.50 C 497.82 181.29 499.62 184.59 497.42 187.10" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
-    <path class="janko-flag" data-stem-x="495.62" data-flag-index="2" d="M 495.62 183.90 C 497.82 184.69 499.62 187.99 497.42 190.50" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="495.62" data-flag-index="1" d="M 495.62 180.50 C 497.82 181.16 499.62 184.59 497.30 187.10 C 496.82 184.86 496.18 185.12 495.62 183.93 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
+    <path class="janko-flag" data-stem-x="495.62" data-flag-index="2" d="M 495.62 183.90 C 497.82 184.56 499.62 187.99 497.30 190.50 C 496.82 188.26 496.18 188.52 495.62 187.33 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <line class="janko-stem" x1="505.23" y1="191.50" x2="505.23" y2="180.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="505.23" data-flag-index="1" d="M 505.23 180.50 C 507.43 181.29 509.23 184.59 507.03 187.10" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
-    <path class="janko-flag" data-stem-x="505.23" data-flag-index="2" d="M 505.23 183.90 C 507.43 184.69 509.23 187.99 507.03 190.50" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="505.23" data-flag-index="1" d="M 505.23 180.50 C 507.43 181.16 509.23 184.59 506.91 187.10 C 506.43 184.86 505.79 185.12 505.23 183.93 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
+    <path class="janko-flag" data-stem-x="505.23" data-flag-index="2" d="M 505.23 183.90 C 507.43 184.56 509.23 187.99 506.91 190.50 C 506.43 188.26 505.79 188.52 505.23 187.33 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <line class="janko-stem" x1="514.84" y1="206.50" x2="514.84" y2="195.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="514.84" data-flag-index="1" d="M 514.84 195.50 C 517.04 196.29 518.84 199.59 516.64 202.10" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
-    <path class="janko-flag" data-stem-x="514.84" data-flag-index="2" d="M 514.84 198.90 C 517.04 199.69 518.84 202.99 516.64 205.50" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="514.84" data-flag-index="1" d="M 514.84 195.50 C 517.04 196.16 518.84 199.59 516.52 202.10 C 516.04 199.86 515.40 200.12 514.84 198.93 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
+    <path class="janko-flag" data-stem-x="514.84" data-flag-index="2" d="M 514.84 198.90 C 517.04 199.56 518.84 202.99 516.52 205.50 C 516.04 203.26 515.40 203.52 514.84 202.33 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <circle class="janko-halo" cx="56.00" cy="226.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
     <circle class="janko-knockout" cx="56.00" cy="226.50" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="56.00" y="229.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>

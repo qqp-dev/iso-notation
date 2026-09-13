@@ -1812,7 +1812,6 @@ test('npm run janko:export produces all twelve PNGs everywhere in under 3 second
   const elapsed = Date.now() - started;
 
   const mirrors = (root: string): string[] => [
-    path.join(root, ''),
     path.join(root, 'public'),
     path.join(root, 'docs', 'img'),
   ];
@@ -1833,13 +1832,13 @@ test('npm run janko:export produces all twelve PNGs everywhere in under 3 second
 
   // The unified domain sheet is the round's headline artifact: four panels at
   // 3× (216 DPI) on the same two measures.
-  const sheet = fs.readFileSync(path.join(REPO_ROOT, 'janko_domain_exploration.png'));
+  const sheet = fs.readFileSync(path.join(REPO_ROOT, 'public', 'janko_domain_exploration.png'));
   assert.ok(sheet.length > 10_000, 'the four-paradigm contact sheet is a real rasterization');
   assert.deepEqual([...sheet.subarray(1, 4)], [...Buffer.from('PNG')], 'the sheet is a PNG');
 
   // The Brahms pressure benchmark ships as a full page plus the mm. 7–8 macro
   // crop of the two five-voice chords.
-  const brahms = fs.readFileSync(path.join(REPO_ROOT, 'janko_brahms_m7_m8.png'));
+  const brahms = fs.readFileSync(path.join(REPO_ROOT, 'public', 'janko_brahms_m7_m8.png'));
   assert.ok(brahms.length > 10_000, 'the Brahms chord crop is a real rasterization');
   assert.deepEqual([...brahms.subarray(1, 4)], [...Buffer.from('PNG')], 'the crop is a PNG');
 

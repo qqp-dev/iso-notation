@@ -122,11 +122,10 @@ async function inParallel<T>(
   await Promise.all(runners);
 }
 
-/** Copy one artifact to every delivery location (checkout + main checkout). */
+/** Copy one artifact to delivery locations (public/ and docs/img/). Never root. */
 function copyEverywhere(name: string, source: string): string[] {
   const checkoutReal = fs.realpathSync(CHECKOUT_ROOT);
   const targets = [
-    path.join(CHECKOUT_ROOT, name),
     path.join(PUBLIC_DIR, name),
     path.join(DOCS_IMG, name),
   ];
@@ -134,7 +133,6 @@ function copyEverywhere(name: string, source: string): string[] {
     const mainReal = fs.realpathSync(MAIN_CHECKOUT);
     if (mainReal !== checkoutReal) {
       targets.push(
-        path.join(MAIN_CHECKOUT, name),
         path.join(MAIN_CHECKOUT, 'public', name),
         path.join(MAIN_CHECKOUT, 'docs', 'img', name)
       );

@@ -25,19 +25,12 @@
 
 ---
 
-## 2. Orca Mobile Remote App & File Format Invariants
-- **Checkout Root Placement is MANDATORY**:
-  - The user operates through the **Orca mobile remote app**, which only exposes a button to view files **directly in the checkout root**.
-  - Any artifact the user is expected to inspect MUST be placed directly in `./` (e.g. `./janko_variants.png`, `./janko_m1_m2.png`) AND mirrored to `/home/qqp/projects/iso-notation/`.
-  - Never place review files exclusively in `/tmp`, `docs/`, `public/`, or subdirectories; the user cannot navigate arbitrary filesystem paths on mobile.
-- **Supported Formats**:
-  - **ONLY PNG images and HTML web pages**.
-  - **NEVER present raw SVG or PDF files** for review. The user cannot view them.
-- **No-Zoom Viewing Limitation**:
-  - The mobile viewer **cannot zoom into PNG images**.
-  - Never expect the user to inspect fine typography, line weights, or note collisions on a shrunk full-page image.
-  - When evaluating details, **always provide pre-enlarged 4× macro crops** (288 DPI, e.g. `janko_m1_m2.png`, `janko_m4.png`, `janko_m8.png`).
-  - Recommend the web studio (`http://100.102.70.49:5175/janko.html`) as the primary medium since it includes in-browser zoom buttons (`+`, `−`, `Reset`, 50%–300%).
+## 2. Zero Images at Root & Clean Asset Organization Invariants
+- **Root Cleanliness Invariant**:
+  - **NEVER place generated images, PNGs, SVGs, or temporary review files in the checkout root (`./`)**. The root directory must remain clean and uncluttered, containing only project source, configuration, and documentation files.
+  - All generated review images and static score previews belong strictly in `public/` and `docs/img/`.
+- **Primary Design Review Medium**:
+  - Review happens exclusively in the **live web studio** (`http://100.102.70.49:5175/janko.html`), which renders SVG directly in the browser with full zoom controls (50%–300%) and instant Vite HMR.
 
 ---
 
@@ -47,12 +40,13 @@ Whenever the user refers to **"the previous design"**, **"the old layout"**, **"
 
 This design is the standard of beauty for this repository. When taking inspiration or pulling ideas into new designs, reference these assets directly:
 
-### Reference Files in Checkout Root
-- `reference_landscape_page1.png` — Full Page 1 spread (Systems 1–3, mm. 1–12)
-- `reference_m1_m2.png` — Accolade, title heading, Position of Honor halo, and Measure 1 start
-- `reference_m4.png` — Handedness chevrons in action
-- `reference_m6.png` — Continuous flush staff-line duration hold lines
-- `reference_m30.png` — Rapid LH crossing run in treble register
+### Reference Benchmark Files
+- Full landscape golden master assets are located in `docs/img/` and `public/img/`:
+  - `docs/img/definitive_m1_m2.png` — Accolade, title heading, Position of Honor halo, and Measure 1 start
+  - `docs/img/definitive_m4.png` — Handedness chevrons in action
+  - `docs/img/definitive_m6.png` — Continuous flush staff-line duration hold lines
+  - `docs/img/definitive_m30.png` — Rapid LH crossing run in treble register
+  - `public/img/page1_4.25.png` — Full Page 1 spread (Systems 1–3, mm. 1–12)
 
 ### Reference Documentation & Implementation
 - **Full Dossier**: `docs/reference/definitive_landscape_engraving.md`

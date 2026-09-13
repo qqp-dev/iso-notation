@@ -15,11 +15,11 @@
   </defs>
   <rect x="28.00" y="26.00" width="284.64" height="234.00" fill="#FFFFFF"/>
     <text x="34.00" y="36.50" class="janko-caption" font-size="7.00pt">mm. 1–2</text>
-    <text x="34.00" y="45.50" class="janko-caption" font-size="7.00pt">Early European copperplate engraving: a straight-edged</text>
-    <text x="34.00" y="54.50" class="janko-caption" font-size="7.00pt">triangular wedge tapering off the stem tip, cut with</text>
-    <text x="34.00" y="63.50" class="janko-caption" font-size="7.00pt">three straight strokes and no calligraphic swell. Crisper</text>
-    <text x="34.00" y="72.50" class="janko-caption" font-size="7.00pt">and more geometric than the urtext hook, but visibly</text>
-    <text x="34.00" y="81.50" class="janko-caption" font-size="7.00pt">stiffer at small sizes.</text>
+    <text x="34.00" y="45.50" class="janko-caption" font-size="7.00pt">A sleek modern fin: a straight vertical spine on the</text>
+    <text x="34.00" y="54.50" class="janko-caption" font-size="7.00pt">outer edge with a sharp diagonal cutback returning to the</text>
+    <text x="34.00" y="63.50" class="janko-caption" font-size="7.00pt">stem, giving the subdivision a swept, aerodynamic</text>
+    <text x="34.00" y="72.50" class="janko-caption" font-size="7.00pt">silhouette. The most sculptural of the modern concepts</text>
+    <text x="34.00" y="81.50" class="janko-caption" font-size="7.00pt">and the closest in mass to the classical hook.</text>
   <g class="janko-crop-body">
   <g id="system-1">
     <text class="janko-measure-num" x="48.00" y="96.00">1</text>
@@ -209,27 +209,27 @@
     <line class="janko-beam-secondary" x1="530.05" y1="183.90" x2="549.27" y2="188.13" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
     <line class="janko-stem" x1="80.82" y1="135.50" x2="80.82" y2="124.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="80.82" data-flag-index="1" d="M 80.82 124.50 L 84.82 127.80 L 80.82 131.10 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="80.82" data-flag-index="1" d="M 80.82 124.50 L 84.82 126.48 L 84.82 131.10 L 80.82 128.13 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <circle class="janko-augmentation-dot" cx="88.82" cy="140.50" r="1.30" fill="#111111"/>
     <line class="janko-stem" x1="208.14" y1="120.50" x2="208.14" y2="109.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="208.14" data-flag-index="1" d="M 208.14 109.50 L 212.14 112.80 L 208.14 116.10 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="208.14" data-flag-index="1" d="M 208.14 109.50 L 212.14 111.48 L 212.14 116.10 L 208.14 113.13 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <circle class="janko-augmentation-dot" cx="216.14" cy="125.50" r="1.30" fill="#111111"/>
     <line class="janko-stem" x1="329.86" y1="105.50" x2="329.86" y2="94.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="329.86" data-flag-index="1" d="M 329.86 94.50 L 333.86 97.80 L 329.86 101.10 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="329.86" data-flag-index="1" d="M 329.86 94.50 L 333.86 96.48 L 333.86 101.10 L 329.86 98.13 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <circle class="janko-augmentation-dot" cx="337.86" cy="110.50" r="1.30" fill="#111111"/>
     <line class="janko-stem" x1="387.52" y1="231.50" x2="387.52" y2="242.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="387.52" data-flag-index="1" d="M 387.52 242.50 L 391.52 239.20 L 387.52 235.90 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="387.52" data-flag-index="1" d="M 387.52 242.50 L 391.52 240.52 L 391.52 235.90 L 387.52 238.87 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <line class="janko-stem" x1="401.24" y1="145.50" x2="401.24" y2="156.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="401.24" data-flag-index="1" d="M 401.24 156.50 L 405.24 153.20 L 401.24 149.90 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="401.24" data-flag-index="1" d="M 401.24 156.50 L 405.24 154.52 L 405.24 149.90 L 401.24 152.87 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <line class="janko-stem" x1="501.22" y1="191.50" x2="501.22" y2="180.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="501.22" data-flag-index="1" d="M 501.22 180.50 L 505.22 183.80 L 501.22 187.10 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
-    <path class="janko-flag" data-stem-x="501.22" data-flag-index="2" d="M 501.22 183.90 L 505.22 187.20 L 501.22 190.50 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="501.22" data-flag-index="1" d="M 501.22 180.50 L 505.22 182.48 L 505.22 187.10 L 501.22 184.13 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
+    <path class="janko-flag" data-stem-x="501.22" data-flag-index="2" d="M 501.22 183.90 L 505.22 185.88 L 505.22 190.50 L 501.22 187.53 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <line class="janko-stem" x1="510.83" y1="191.50" x2="510.83" y2="180.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="510.83" data-flag-index="1" d="M 510.83 180.50 L 514.83 183.80 L 510.83 187.10 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
-    <path class="janko-flag" data-stem-x="510.83" data-flag-index="2" d="M 510.83 183.90 L 514.83 187.20 L 510.83 190.50 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="510.83" data-flag-index="1" d="M 510.83 180.50 L 514.83 182.48 L 514.83 187.10 L 510.83 184.13 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
+    <path class="janko-flag" data-stem-x="510.83" data-flag-index="2" d="M 510.83 183.90 L 514.83 185.88 L 514.83 190.50 L 510.83 187.53 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <line class="janko-stem" x1="520.44" y1="206.50" x2="520.44" y2="195.50" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="520.44" data-flag-index="1" d="M 520.44 195.50 L 524.44 198.80 L 520.44 202.10 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
-    <path class="janko-flag" data-stem-x="520.44" data-flag-index="2" d="M 520.44 198.90 L 524.44 202.20 L 520.44 205.50 Z" fill="#111111" stroke="none" data-subdivision-style="copperplate-pennant"/>
+    <path class="janko-flag" data-stem-x="520.44" data-flag-index="1" d="M 520.44 195.50 L 524.44 197.48 L 524.44 202.10 L 520.44 199.13 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
+    <path class="janko-flag" data-stem-x="520.44" data-flag-index="2" d="M 520.44 198.90 L 524.44 200.88 L 524.44 205.50 L 520.44 202.53 Z" fill="#111111" stroke="none" data-subdivision-style="aerodynamic-winglet"/>
     <circle class="janko-halo" cx="61.60" cy="226.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
     <circle class="janko-knockout" cx="61.60" cy="226.50" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="61.60" y="229.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>

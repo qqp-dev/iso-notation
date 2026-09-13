@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "printer": {
+    "model": "Brother HL-L3300CDW",
+    "hardwareIp": "192.168.4.62",
+    "rawPort": 9100,
+    "relayHost": "nacho@100.118.214.29",
+    "defaultPaper": "letter",
+    "defaultOrientation": "landscape",
+    "defaultColorMode": "color",
+    "defaultMorphology": "duodecimal",
+    "feedOrientation": "portrait-short-edge",
+    "laserResolutionDpi": 600,
+    "notes": "Brother HL-L3300CDW is a 600 DPI native color laser engine fed short-edge. Landscape scores are rotated 90 degrees via pdftops -paper letter to fit perfectly on the 8.5 x 11 in sheet with uniform 6mm side margins and no corner clipping. Do NOT pass PJL ORIENTATION=LANDSCAPE or RESOLUTION=1200 as they conflict with PostScript setpagedevice rotation."
+  }
+}

@@ -119,11 +119,11 @@
     <line class="janko-stem" x1="140.38" y1="615.76" x2="140.38" y2="604.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="134.88" y1="656.76" x2="134.88" y2="645.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="154.60" y1="696.76" x2="154.60" y2="707.76" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="154.60" data-flag-index="1" d="M 154.60 707.76 C 156.80 706.97 158.60 703.67 156.40 701.16" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="154.60" data-flag-index="1" d="M 154.60 707.76 C 156.80 707.10 158.60 703.67 156.28 701.16 C 155.80 703.40 155.16 703.14 154.60 704.33 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <line class="janko-stem" x1="174.32" y1="681.76" x2="174.32" y2="692.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="174.32" y1="615.76" x2="174.32" y2="604.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="194.04" y1="696.76" x2="194.04" y2="707.76" stroke="#111111" stroke-width="0.90"/>
-    <path class="janko-flag" data-stem-x="194.04" data-flag-index="1" d="M 194.04 707.76 C 196.24 706.97 198.04 703.67 195.84 701.16" fill="none" stroke="#111111" stroke-width="1.05" stroke-linecap="round"/>
+    <path class="janko-flag" data-stem-x="194.04" data-flag-index="1" d="M 194.04 707.76 C 196.24 707.10 198.04 703.67 195.72 701.16 C 195.24 703.40 194.60 703.14 194.04 704.33 Z" fill="#111111" stroke="none" data-subdivision-style="classical-urtext"/>
     <line class="janko-stem" x1="225.76" y1="656.76" x2="225.76" y2="645.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="231.26" y1="600.76" x2="231.26" y2="589.76" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-stem" x1="236.76" y1="656.76" x2="236.76" y2="645.76" stroke="#111111" stroke-width="0.90"/>
