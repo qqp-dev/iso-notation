@@ -90,48 +90,111 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
- * Midpoint clasp **duration** paradigms — the Round 9 question: how an external
- * per-hand bracket carries the cluster's duration at the exact vertical
- * midpoint of its own spine.
+ * Midpoint clasp **duration** paradigms — the Round 10 question: how an
+ * external per-hand bracket carries the cluster's duration at the exact
+ * vertical midpoint of its own spine with marks that cut *across* the spine.
  *
- * Round 8 removed the lopsided upward spire and tested four *symmetrical*
- * duration paradigms, but the specimen window only carried quarter-value
- * chords, so the duration marks themselves were never on screen. Round 9
- * anchors every paradigm at `yMid = (topY + botY) / 2` and demonstrates all
- * four across the full duration taxonomy — half, quarter, dotted quarter, 8th
- * and 16th (see `elements/rhythm.renderChordClasp`):
+ * Round 9 anchored the marks on `yMid = (topY + botY) / 2`, but the marks hung
+ * off one side of the spine and were too small to read at 100% zoom. Round 10
+ * retires the two rejected paradigms (`'center-chevron-notch'`,
+ * `'center-pip-rays'`) and scales the remaining four so every mark is a
+ * symmetrical transverse gesture across the spine, with hollow marks knocking
+ * the spine cleanly out of their interior (see
+ * `elements/rhythm.renderChordClasp`):
  *
- * | style                    | duration ink at the spine midpoint                            |
- * | ------------------------ | ------------------------------------------------------------- |
- * | `'center-kinetic-ticks'` | 12° beam-harmonized kinetic ticks (1 = 8th, 2 = 16th)         |
- * | `'center-chevron-notch'` | calligraphic guillemet notches (1 = 8th, 2 nested = 16th)      |
- * | `'center-pip-rays'`      | a compact hub with lateral rays (1 = 8th, 2 = 16th)           |
- * | `'center-sculpted-wedge'`| a sculpted barb (1 = 8th, 2 = 16th)                           |
+ * | style                      | duration ink at the spine midpoint                            |
+ * | -------------------------- | ------------------------------------------------------------- |
+ * | `'transverse-cross-bars'`  | crisp horizontal cross-bars, W = 7.5pt, stroke 1.2pt          |
+ * | `'kinetic-cross-slashes'`  | 12.4° beam-harmonized cross-slashes, W = 7.5pt, stroke 1.2pt  |
+ * | `'interrupted-spine-node'` | an emphatic white-interior node: ring R = 3.0pt / beads       |
+ * | `'faceted-diamond-bands'`  | sculpted transverse diamond bands, W = 8.0pt × H = 4.5pt      |
  *
- * Every paradigm shares the same half/whole open ring, the same plain quarter
- * bracket and the same 0.75pt dotted-quarter dot, so the round varies exactly
- * one variable: the ink a subdivision value leaves at the midpoint.
+ * Every paradigm shares the same plain quarter bracket (a continuous solid
+ * spine), the same open half/whole knockout and the same 0.75pt dotted-quarter
+ * dot, so the round varies exactly one variable: the ink a value leaves at the
+ * midpoint.
  */
 export type JankoClaspDurationStyle =
-  | 'center-kinetic-ticks'
-  | 'center-chevron-notch'
-  | 'center-pip-rays'
-  | 'center-sculpted-wedge';
+  | 'transverse-cross-bars'
+  | 'kinetic-cross-slashes'
+  | 'interrupted-spine-node'
+  | 'faceted-diamond-bands';
 
 /** Every clasp-duration paradigm, in the canonical exploration order (A–D). */
 export const JANKO_CLASP_DURATION_STYLES: readonly JankoClaspDurationStyle[] = [
-  'center-kinetic-ticks',
-  'center-chevron-notch',
-  'center-pip-rays',
-  'center-sculpted-wedge',
+  'transverse-cross-bars',
+  'kinetic-cross-slashes',
+  'interrupted-spine-node',
+  'faceted-diamond-bands',
 ];
 
-/** Human-readable names of the four midpoint clasp-duration paradigms. */
+/** Human-readable names of the four scaled midpoint clasp-duration paradigms. */
 export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, string> = {
-  'center-kinetic-ticks': 'Center-Spine 12° Kinetic Ticks',
-  'center-chevron-notch': 'Center French Guillemet Chevron',
-  'center-pip-rays': 'Center Circular Hub & Rays',
-  'center-sculpted-wedge': 'Center Sculpted Wedge',
+  'transverse-cross-bars': 'Transverse 7.5pt Cross-Bars',
+  'kinetic-cross-slashes': 'Kinetic 12.4° Cross-Slashes',
+  'interrupted-spine-node': 'Interrupted-Spine Node',
+  'faceted-diamond-bands': 'Faceted Diamond Bands',
+};
+
+/**
+ * How a system opens at its left margin — the Round 10 retirement of the
+ * copperplate accolade.
+ *
+ * | style                   | margin ink at the system start                             |
+ * | ----------------------- | ---------------------------------------------------------- |
+ * | `'open-halo'`           | none: the staff lines emerge openly from the margin, and   |
+ * |                         | the Position of Honor halo rings the opening tick-0 heads  |
+ * | `'architectural-bracket'`| a straight 0.65pt rule with 3.0pt right-angled spurs       |
+ * | `'clef-pillar'`         | the same straight 0.65pt rule, without spurs                |
+ * | `'none'`                | no system-start ink at all                                 |
+ *
+ * The curlicue copperplate accolade no longer belongs to the modern design
+ * language, so `'open-halo'` is the golden-master default. The Position of
+ * Honor halo itself is a notehead decoration rather than system-start ink, so
+ * it rings the opening tick-0 sounds under every style.
+ */
+export type JankoSystemStartStyle =
+  | 'open-halo'
+  | 'architectural-bracket'
+  | 'clef-pillar'
+  | 'none';
+
+/** Every system-start style, in the canonical exploration order. */
+export const JANKO_SYSTEM_START_STYLES: readonly JankoSystemStartStyle[] = [
+  'open-halo',
+  'architectural-bracket',
+  'clef-pillar',
+  'none',
+];
+
+/** Human-readable names of the system-start styles. */
+export const JANKO_SYSTEM_START_STYLE_LABELS: Record<JankoSystemStartStyle, string> = {
+  'open-halo': 'Open Margin with Position-of-Honor Halo',
+  'architectural-bracket': 'Architectural Bracket (0.65pt rule + 3.0pt spurs)',
+  'clef-pillar': 'Slender Clef Pillar (0.65pt rule)',
+  none: 'No System-Start Mark',
+};
+
+/**
+ * How the **final** barline of the score closes the grand staff.
+ *
+ * `'unified'` draws one continuous double barline from `rhTop` straight down to
+ * `lhBot`, sealing the Middle C corridor; `'split-corridor'` draws the two
+ * hand segments separately and leaves the corridor open, exactly like every
+ * internal measure boundary.
+ */
+export type JankoFinalBarlineStyle = 'unified' | 'split-corridor';
+
+/** Every final-barline style, in the canonical exploration order. */
+export const JANKO_FINAL_BARLINE_STYLES: readonly JankoFinalBarlineStyle[] = [
+  'unified',
+  'split-corridor',
+];
+
+/** Human-readable names of the final-barline styles. */
+export const JANKO_FINAL_BARLINE_STYLE_LABELS: Record<JankoFinalBarlineStyle, string> = {
+  unified: 'Unified Final Barline (seals the Middle C corridor)',
+  'split-corridor': 'Split Final Barline (open corridor)',
 };
 
 /**
@@ -423,11 +486,23 @@ export interface JankoLayoutOptions {
    */
   subdivisionStyle?: JankoSubdivisionStyle;
   /**
-   * Midpoint clasp-duration paradigm (Round 9): how an external per-hand
+   * Midpoint clasp-duration paradigm (Round 10): how an external per-hand
    * bracket carries its cluster's duration at its spine midpoint. Defaults to
-   * `'center-kinetic-ticks'` (see {@link JankoClaspDurationStyle}).
+   * `'transverse-cross-bars'` (see {@link JankoClaspDurationStyle}).
    */
   claspDurationStyle?: JankoClaspDurationStyle;
+  /**
+   * System-start margin ink (Round 10): the copperplate accolade is retired in
+   * favour of an open margin whose opening sounds are ringed by the Position of
+   * Honor halo. Defaults to `'open-halo'` (see {@link JankoSystemStartStyle}).
+   */
+  systemStartStyle?: JankoSystemStartStyle;
+  /**
+   * Final barline of the score (Round 10): `'unified'` seals the Middle C
+   * corridor with one continuous boundary, `'split-corridor'` leaves it open.
+   * Defaults to `'unified'` (see {@link JankoFinalBarlineStyle}).
+   */
+  finalBarlineStyle?: JankoFinalBarlineStyle;
   /** Horizontal systems stacked on one page. */
   systemsPerPage?: number;
   /** Ticks in one measure. */
@@ -486,7 +561,9 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   channelLayout: 'single-equator',
   chordGrouping: 'none',
   subdivisionStyle: 'kinetic-tab-beam',
-  claspDurationStyle: 'center-kinetic-ticks',
+  claspDurationStyle: 'transverse-cross-bars',
+  systemStartStyle: 'open-halo',
+  finalBarlineStyle: 'unified',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   anacrusisTicks: 0,

@@ -103,110 +103,116 @@ export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
  * the Klavarskribo beat grid, round 3 the Middle C corridor, round 4 the octave
  * framing, round 5 the external left clasp, round 6 the single-note subdivision
  * dialects with the per-hand clasp, round 7 the kinetic subdivision tabs with
- * gap-gated vertical chording, and round 8 the symmetrical clasp with the
- * beam-harmonized tab. Round 9 answers the operator's verdict on that round:
- * the clasp's duration ink moves to the **exact midpoint of the bracket spine**
- * and four midpoint paradigms are tested (Candidates A–D) across a curated
- * specimen that carries every duration — half, quarter, dotted quarter, 8th and
- * 16th — while the accolade slims to 4.8pt / 0.55pt and the augmentation dot to
- * 0.75pt.
+ * gap-gated vertical chording, round 8 the symmetrical clasp with the
+ * beam-harmonized tab, and round 9 the midpoint duration taxonomy. Round 10
+ * answers the operator's verdict on that round: the copperplate accolade is
+ * retired for an open System 1 start with the Position of Honor halo, the final
+ * barline unifies across the Middle C corridor, the brittle cross-register beam
+ * break is gone (the Bach Var. 1 m. 4 run beams continuously into octave 3),
+ * the page furniture lightens (running headers, unbolded numerals and footer)
+ * and four **scaled** clasp-duration paradigms — marks that cut symmetrically
+ * across the spine at 2–3× the Round 9 size — are tested on wide-span chords.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 9,
-  title: 'Midpoint Symmetrical Clasps, Chord Duration Taxonomy & Slender Accolade',
+  round: 10,
+  title: 'Scaled Midpoint Clasps, Beaming Integrity, Accolade Retirement & Page Furniture Polish',
   description:
-    'Comparing 4 variations of midpoint-anchored clasp duration, tested across half, quarter, dotted, 8th, and 16th chords with slender 4.8pt accolade and 0.75pt dots.',
+    'Comparing 4 scaled clasp-duration paradigms cutting across the spine on wide-span chords, with continuous run beaming, open System 1 start, unified final barline, and uncluttered multi-page headers.',
 };
 
 /**
- * The three display windows every Round 9 candidate is engraved on: the Bach
- * opening (single-note 16ths/8ths that carry the beam-harmonized kinetic tabs),
- * the dense Brahms chords of mm. 7–8 (where the `B - 2 - 8` and `B - 4 - 7`
- * clasps live) and the **chord duration specimen**, whose five chords carry the
- * full duration taxonomy so every paradigm's midpoint marks are on screen.
+ * The three display windows every Round 10 candidate is engraved on: the Bach
+ * opening (open margin start, Position of Honor halo and the beam-harmonized
+ * kinetic subdivision tabs), the Bach Var. 1 m. 4 RH run that now beams
+ * continuously across Middle C into octave 3, and the **wide-span chord
+ * specimen**, whose 1.5-octave brackets carry the full duration taxonomy so
+ * every paradigm's scaled marks are on screen.
  */
-const ROUND_9_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_10_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
-    title: 'Bach Goldberg Var. 1 · mm. 1–2 — opening counterpoint + 12° beam-harmonized kinetic tabs',
+    title:
+      'Bach Goldberg Var. 1 · mm. 1–2 — open margin start + Position of Honor halo + 12° kinetic tabs',
   },
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 7,
-    measureCount: 2,
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 4,
+    measureCount: 1,
     title:
-      'Brahms Op. 118 No. 1 · mm. 7–8 — symmetrical B - 2 - 8 clasp + B - 4 - 7 3-note bracket (macro crop)',
+      'Bach Goldberg Var. 1 · m. 4 — continuous RH run beaming across Middle C into Octave 3 (no orphaned 9 · 7 · 6 flags)',
   },
   {
     scoreId: SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
     title:
-      'Chord Duration Specimen · half (ring) → quarter (plain) → dotted quarter (plain + 0.75pt dot) → 8th (1 mark) → 16th (2 marks)',
+      'Wide-Span Chord Specimen · half → quarter → dotted quarter (0.75pt dot) → 8th (1 mark) → 16th (2 marks) on 1.5-octave brackets',
   },
 ];
 
 /**
- * The active candidate set — the four Round 9 midpoint clasp-duration
- * paradigms. Order is the display order in the Decision Candidates Matrix. All
- * four share the settled beam-harmonized kinetic tab (`'kinetic-tab-beam'`), so
- * the round varies exactly one variable: the ink a subdivision value leaves at
- * the bracket spine's exact midpoint.
+ * The active candidate set — the four Round 10 scaled clasp-duration paradigms
+ * that cut symmetrically across the spine. Order is the display order in the
+ * Decision Candidates Matrix. All four share the settled beam-harmonized
+ * kinetic tab (`'kinetic-tab-beam'`) and the golden open-halo start, continuous
+ * beaming, unified final barline and running headers, so the round varies
+ * exactly one variable: the scaled ink a duration leaves at the bracket spine's
+ * midpoint.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'center-kinetic-ticks',
-    label: 'A · Center-Spine 12° Kinetic Ticks',
+    id: 'transverse-cross-bars',
+    label: 'A · Transverse Cross-Bars',
     description:
-      'At the spine’s exact midpoint, 12° ticks raked at the score’s own beam slope project out of the bracket — one for an 8th, a mirrored pair for a 16th. The paradigm speaks the settled kinetic language of the subdivision tab, so a clasped chord and a flagged melody move at the same rake.',
+      'Crisp 7.5pt bars cut straight across the spine at 1.2pt: a clean 4×7pt rectangular knockout gap for a half, a bare spine for a quarter, one bar for an 8th and two parallel bars for a 16th. The most architectural of the four — a value reads as a tally crossing the bracket, impossible to miss at 100% zoom.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'center-kinetic-ticks',
+      claspDurationStyle: 'transverse-cross-bars',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_9_WINDOWS,
-    tags: ['midpoint', '12° kinetic ticks', 'beam-harmonized'],
+    windows: ROUND_10_WINDOWS,
+    tags: ['scaled 7.5pt', 'cross-bars', 'open gap half'],
   },
   {
-    id: 'center-chevron-notch',
-    label: 'B · Center French Guillemet Chevron',
+    id: 'kinetic-cross-slashes',
+    label: 'B · Kinetic 12.4° Cross-Slashes',
     description:
-      'A calligraphic guillemet notch is cut into the spine’s midpoint: its apex rides the spine and its two burin arms open into the cup. A 16th nests a second, smaller chevron inside the first, so the value counts 1 / 2 without ever leaving the centre.',
+      'The same transverse bars raked at the score’s own beam-harmonized 12.4°: a hollow raked lozenge knocks the spine out for a half, one slash carries an 8th and a parallel pair carries a 16th. The paradigm speaks the settled kinetic language of the subdivision tab, so a clasped chord and a flagged melody rake at exactly the same angle.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'center-chevron-notch',
+      claspDurationStyle: 'kinetic-cross-slashes',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_9_WINDOWS,
-    tags: ['midpoint', 'guillemet chevron', 'calligraphic'],
+    windows: ROUND_10_WINDOWS,
+    tags: ['scaled 7.5pt', '12.4° raked', 'beam-harmonized'],
   },
   {
-    id: 'center-pip-rays',
-    label: 'C · Center Circular Hub & Rays',
+    id: 'interrupted-spine-node',
+    label: 'C · Interrupted-Spine Node',
     description:
-      'A compact circular hub (R = 1.6pt) sits on the spine’s midpoint and fires lateral rays into the margin — one ray for an 8th, a mirrored pair for a 16th. The most radial and instrument-like of the four: the value reads as a hub with spokes rather than as a tally.',
+      'The spine stops flush into an emphatic node with a 100% white knockout interior: a bold open ring (R = 3.0pt, stroke 1.1pt) for a half, and solid circular beads (R = 2.8pt, or a stacked pair at 2.2pt) for the subdivisions. Zero quadrants, zero crosshairs — the most instrument-like of the four, a bead threaded on the bracket.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'center-pip-rays',
+      claspDurationStyle: 'interrupted-spine-node',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_9_WINDOWS,
-    tags: ['midpoint', 'hub & rays', 'R = 1.6pt'],
+    windows: ROUND_10_WINDOWS,
+    tags: ['scaled R = 3.0pt', 'white knockout', 'solid beads'],
   },
   {
-    id: 'center-sculpted-wedge',
-    label: 'D · Center Sculpted Wedge',
+    id: 'faceted-diamond-bands',
+    label: 'D · Faceted Diamond Bands',
     description:
-      'A sculpted fin is carved into the midpoint: one sharp barb for an 8th, a mirrored pair of smaller barbs for a 16th. Solid, frontal and unambiguous — the only paradigm whose mark is a filled wedge rather than a stroke.',
+      'Sculpted 8.0 × 4.5pt diamond lozenges cut symmetrically across the spine: a hollow white diamond knocks the spine out for a half, one solid filled band carries an 8th and a stacked pair carries a 16th. Solid, frontal and unambiguous — the widest and loudest of the four paradigms.',
     options: {
       chordGrouping: 'per-hand-clasp',
-      claspDurationStyle: 'center-sculpted-wedge',
+      claspDurationStyle: 'faceted-diamond-bands',
       subdivisionStyle: 'kinetic-tab-beam',
     },
-    windows: ROUND_9_WINDOWS,
-    tags: ['midpoint', 'sculpted wedge', 'solid barbs'],
+    windows: ROUND_10_WINDOWS,
+    tags: ['scaled 8.0 × 4.5pt', 'diamond bands', 'hollow to solid'],
   },
 ];
 

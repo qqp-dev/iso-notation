@@ -47,6 +47,7 @@ import { QuantizedGridScore } from '../../model/types';
 import {
   DEFAULT_JANKO_TOKENS,
   JankoLayoutOptions,
+  JankoSystemStartStyle,
   JankoTokens,
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
@@ -769,6 +770,10 @@ export interface BarlineSpan {
  * no barline; Round 7 opens every **intermediate** system at its right edge as
  * well, so the closing system boundary is audited only for the final system
  * (`layout.isFinalSystem`).
+ *
+ * Round 10: when `finalBarlineStyle === 'unified'` the score's closing boundary
+ * is one continuous rule from the RH top to the LH bottom (it seals the Middle
+ * C corridor), so it is modelled as a single span instead of two hand halves.
  */
 export function systemBarlines(
   layout: JankoSystemLayout,
@@ -779,20 +784,27 @@ export function systemBarlines(
   const spans = handRuleSpans(layout);
   const barlines: BarlineSpan[] = [];
   const anacrusis = t.anacrusisTicks ?? 0;
-  const push = (x: number): void => {
+  const unifiedFinal = o.finalBarlineStyle === 'unified' && layout.isFinalSystem;
+  const push = (x: number, isSystemEnd: boolean = false): void => {
+    if (isSystemEnd && unifiedFinal) {
+      barlines.push({ x, top: spans[0].top, bottom: spans[spans.length - 1].bottom });
+      return;
+    }
     for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
   };
   if (layout.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
     push(g.staffLeft + upbeatWidth);
     for (let m = 1; m <= o.measuresPerSystem; m++) {
-      if (m === o.measuresPerSystem && !layout.isFinalSystem) continue;
-      push(g.staffLeft + upbeatWidth + m * g.measureWidth);
+      const isSystemEnd = m === o.measuresPerSystem;
+      if (isSystemEnd && !layout.isFinalSystem) continue;
+      push(g.staffLeft + upbeatWidth + m * g.measureWidth, isSystemEnd);
     }
   } else {
     for (let m = 0; m < o.measuresPerSystem; m++) {
-      if (m === o.measuresPerSystem - 1 && !layout.isFinalSystem) continue;
-      push(g.staffLeft + (m + 1) * g.measureWidth);
+      const isSystemEnd = m === o.measuresPerSystem - 1;
+      if (isSystemEnd && !layout.isFinalSystem) continue;
+      push(g.staffLeft + (m + 1) * g.measureWidth, isSystemEnd);
     }
   }
   return barlines;
@@ -908,7 +920,8 @@ export function checkClaspClearance(
     layout,
     t,
     lint,
-    layout.index * o.measuresPerSystem + 1
+    layout.index * o.measuresPerSystem + 1,
+    o.systemStartStyle
   );
 
   for (const clasp of layout.clasps) {
@@ -977,6 +990,7 @@ export function checkClaspClearance(
       ['accolade', accolade],
       ['measure numeral', numeral],
     ] as const) {
+      if (furniture === null) continue;
       if (label === 'accolade' && layout.index !== 0) continue;
       if (label === 'measure numeral' && !o.showMeasureNumbers) continue;
       if (!boxesOverlap(disk, furniture, lint.minClearance)) continue;
@@ -1041,13 +1055,18 @@ export function checkClaspClearance(
 // 5. Left-margin furniture: measure numeral & accolade
 // ---------------------------------------------------------------------------
 
-/** Boxes of the measure numeral and the accolade of one system. */
+/**
+ * Boxes of the measure numeral and the system-start mark of one system. The
+ * Round 10 `'open-halo'` default paints no margin ink, so `accolade` is `null`
+ * whenever no ruled system-start style is active.
+ */
 export function marginFurniture(
   layout: JankoSystemLayout,
   t: ResolvedJankoTokens,
   lint: JankoLintOptions,
-  measureNumber: number
-): { numeral: Box; accolade: Box } {
+  measureNumber: number,
+  systemStartStyle: JankoSystemStartStyle = 'open-halo'
+): { numeral: Box; accolade: Box | null } {
   // The furniture geometry lives in the engine, where the Round 5 clasp fit
   // rule reserves against the very same boxes (see `engine.getMarginFurniture`);
   // the linter's job is only to audit it.
@@ -1055,7 +1074,8 @@ export function marginFurniture(
     layout.geometry,
     t,
     measureNumber,
-    lint.digitAdvance
+    lint.digitAdvance,
+    systemStartStyle
   );
   return { numeral, accolade };
 }
@@ -1075,12 +1095,14 @@ export function checkMeasureNumeralClearance(
     layout,
     t,
     lint,
-    layout.index * o.measuresPerSystem + 1
+    layout.index * o.measuresPerSystem + 1,
+    o.systemStartStyle
   );
   // The numeral opens the measure-number column: it must start to the right of
-  // the accolade's column, never above/inside it. Round 7 paints the accolade
-  // only at the start of the piece, so intermediate systems have a free column.
-  if (layout.index === 0 && numeral.x0 < accolade.x1) {
+  // the system-start mark's column, never above/inside it. Round 7 paints the
+  // mark only at the start of the piece, and Round 10's `'open-halo'` default
+  // paints none at all, so the column is normally free.
+  if (layout.index === 0 && accolade !== null && numeral.x0 < accolade.x1) {
     out.push({
       code: 'measure-numeral-collision',
       severity: 'error',
@@ -1130,7 +1152,7 @@ export function checkMeasureNumeralClearance(
   }
 }
 
-/** The accolade must stay on the page and clear the music column. */
+/** The system-start mark must stay on the page and clear the music column. */
 export function checkAccoladeClearance(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
@@ -1138,15 +1160,18 @@ export function checkAccoladeClearance(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  // Round 7 paints the accolade strictly at the start of the piece: an
-  // intermediate system has no accolade ink to audit.
+  // Round 7 paints the system-start mark strictly at the start of the piece: an
+  // intermediate system has no margin ink to audit. Round 10's `'open-halo'`
+  // default paints none at all, so there is nothing to audit anywhere.
   if (layout.index !== 0) return;
   const { numeral, accolade } = marginFurniture(
     layout,
     t,
     lint,
-    layout.index * o.measuresPerSystem + 1
+    layout.index * o.measuresPerSystem + 1,
+    o.systemStartStyle
   );
+  if (accolade === null) return;
   const g = layout.geometry;
   if (accolade.x0 < 0 || accolade.x1 > g.staffLeft - EPS) {
     out.push({
@@ -1204,11 +1229,15 @@ export function checkAccoladeClearance(
 // ---------------------------------------------------------------------------
 
 /**
- * The Middle C channel is a structural corridor: no barline, beat-grid pulse,
- * guideline or beam may run into or across the spine. Noteheads and stems may
- * legitimately cross the corridor (the hands share the register), but anything
- * painted after a notehead's knockout must not cut through it — that is audited
- * separately by {@link auditKnockoutProtection}.
+ * The Middle C channel is a structural corridor: no internal barline, beat-grid
+ * pulse, guideline or beam may run into or across the spine. Noteheads and
+ * stems may legitimately cross the corridor (the hands share the register), but
+ * anything painted after a notehead's knockout must not cut through it — that is
+ * audited separately by {@link auditKnockoutProtection}.
+ *
+ * Round 10's `finalBarlineStyle: 'unified'` is the one deliberate exception: the
+ * score's closing boundary seals the corridor on purpose, exactly as
+ * `renderBarlines` draws it (see {@link systemBarlines}).
  */
 export function checkMiddleCCorridor(
   layout: JankoSystemLayout,
