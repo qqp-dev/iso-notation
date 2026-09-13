@@ -34,8 +34,9 @@
  *    acceptable threshold.
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
- * 6. **Rest clearance** (Round 12) — a voice rest's own dialect ink box keeps
- *    real air from every foreign notehead disc and from any protected barline.
+ * 6. **Rest clearance** (Round 12, contour-anchored by Round 13) — a voice
+ *    rest's own dialect ink box keeps real air from every foreign notehead disc
+ *    and from any protected barline.
  *
  * Usage
  * -----
@@ -1093,10 +1094,10 @@ export function checkClaspClearance(
  * `minClearance` from every foreign notehead disc (of either hand — the other
  * hand is exactly what plays while this one is silent) and, whenever the active
  * grid writing policy protects the barlines, from the barline column it may
- * never straddle. The engine's `restClearsLayout` uses the same box and the same
- * air, so a rest the engine admits is guaranteed to pass this audit; the check
- * exists to catch a regression that paints a rest where the fit rule never
- * placed one.
+ * never straddle. The engine's `resolveRestY` (Round 13) fits the voice-contour
+ * anchor with the same box and the same air — plus a 0.02pt solver margin — so a
+ * rest the engine admits is guaranteed to pass this audit; the check exists to
+ * catch a regression that paints a rest where the fit rule never placed one.
  */
 export function checkRestClearance(
   layout: JankoSystemLayout,

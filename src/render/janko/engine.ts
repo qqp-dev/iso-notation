@@ -1078,7 +1078,155 @@ export function restClearsLayout(
 }
 
 /**
- * Round 12 voice rests.
+ * Round 13 voice contour: the page-y an onset of one hand occupies.
+ *
+ * A chord's tones are one vertical gesture, so their **mean** y is the voice's
+ * centre at that onset; a single note is exact. `null` means the hand does not
+ * sound there at all (the silence opens before the hand's first note or runs
+ * past its last).
+ */
+function voiceYAt(
+  notes: readonly PositionedJankoNote[],
+  hand: Hand,
+  tick: number
+): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const p of notes) {
+    if (p.note.startTick !== tick || handForNote(p.note) !== hand) continue;
+    sum += p.y;
+    count++;
+  }
+  return count > 0 ? sum / count : null;
+}
+
+/**
+ * The **active octave equator** nearest a contour y — the register landmark a
+ * one-sided rest snaps to. Octaves are walked over the full lattice (0…8), not
+ * just the four staff rules, so a rest in a ledger register snaps to its own
+ * ledger equator.
+ */
+function snapToOctaveEquator(
+  y: number,
+  geo: JankoSystemGeometry,
+  t: ResolvedJankoTokens,
+  o: ResolvedJankoLayoutOptions
+): number {
+  let best = y;
+  let bestDistance = Infinity;
+  for (let octave = 0; octave <= 8; octave++) {
+    const equator = geo.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
+    const distance = Math.abs(equator - y);
+    if (distance < bestDistance - EPS) {
+      bestDistance = distance;
+      best = equator;
+    }
+  }
+  return best;
+}
+
+/**
+ * Round 13: the vertical **voice contour** anchor of one rest, in page pt.
+ *
+ * The rest belongs to the melodic line of its own hand, so it is anchored
+ * between the note that released it and the note that resumes it:
+ * `y = (y_prev + y_next) / 2`. With only one neighbour (a silence that opens
+ * the hand's system or closes it) the neighbour's own register speaks instead:
+ * the rest snaps to its **active octave equator**. With no neighbour at all the
+ * hand's canonical voice equator (RH Octave 4, LH Octave 3) is the last
+ * reserve. Every value is a *target* — {@link resolveRestY} then fits it.
+ */
+function voiceContourTargetY(
+  hand: Hand,
+  releaseOnsetTick: number,
+  resumeTick: number,
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  t: ResolvedJankoTokens,
+  o: ResolvedJankoLayoutOptions
+): number {
+  const prevY = voiceYAt(notes, hand, releaseOnsetTick);
+  const nextY = voiceYAt(notes, hand, resumeTick);
+  if (prevY !== null && nextY !== null) return (prevY + nextY) / 2;
+  const single = prevY ?? nextY;
+  if (single !== null) return snapToOctaveEquator(single, geo, t, o);
+  return geo.middleCY + getEquatorYForOctave(hand === 'RH' ? 4 : 3, hand, t, o);
+}
+
+/**
+ * Extra air (pt) the fit solver keeps beyond the hard
+ * `noteheadRadius + REST_NOTEHEAD_AIR` rule, so a solved position can never be
+ * reported by the linter's float-exact `rest-clearance` audit.
+ */
+export const REST_FIT_MARGIN = 0.02;
+
+/**
+ * Round 13 rest fit: slide the contour anchor to the **nearest legal y**.
+ *
+ * The ink box of a dialect is a fixed rectangle translated vertically with the
+ * rest, so a notehead at `(px, py)` forbids exactly the y-interval in which the
+ * box comes closer than `noteheadRadius + REST_NOTEHEAD_AIR`. The solver
+ * collects those intervals (only the notes whose disc reaches the box's column
+ * band can contribute), merges them and returns the legal y nearest the contour
+ * target — never the sky-floating equator of Round 12 and never an arbitrary
+ * snap. Positions outside the grand staff are refused, so a rest can only slide
+ * within the staff it belongs to; `null` means the column is walled in and the
+ * rest is left unwritten (exactly like a clasp the fit rule refuses).
+ */
+export function resolveRestY(
+  rest: JankoRestGeometry,
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  t: ResolvedJankoTokens
+): number | null {
+  const target = rest.y;
+  const probe = restInkBox(rest, t);
+  const radius = t.noteheadRadius + REST_NOTEHEAD_AIR + REST_FIT_MARGIN;
+
+  // Forbidden y-windows, relative to the target.
+  const forbidden: Array<[number, number]> = [];
+  for (const p of notes) {
+    const reach = p.x < probe.x0 ? probe.x0 - p.x : p.x > probe.x1 ? p.x - probe.x1 : 0;
+    if (reach >= radius) continue;
+    const half = Math.sqrt(Math.max(0, radius * radius - reach * reach));
+    forbidden.push([p.y - half - probe.y1, p.y + half - probe.y0]);
+  }
+  if (forbidden.length === 0) return target;
+  forbidden.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const [lo, hi] of forbidden) {
+    const last = merged[merged.length - 1];
+    if (last && lo <= last[1]) last[1] = Math.max(last[1], hi);
+    else merged.push([lo, hi]);
+  }
+
+  // The legal set is the complement of the merged windows: choose its point
+  // nearest the contour target (0 in relative coordinates), clamped to the
+  // grand staff so a rest never migrates out of its own staff — unless the
+  // voice itself sings outside it, in which case the contour stays reachable.
+  const bandLo = Math.min(geo.staffTopY, target) - target;
+  const bandHi = Math.max(geo.staffBotY, target) - target;
+  const segments: Array<[number, number]> = [];
+  let cursor = bandLo;
+  for (const [lo, hi] of merged) {
+    if (hi <= cursor) continue;
+    if (lo >= bandHi) break;
+    if (lo > cursor + EPS) segments.push([cursor, Math.min(lo, bandHi)]);
+    cursor = Math.max(cursor, hi);
+  }
+  if (cursor < bandHi - EPS) segments.push([cursor, bandHi]);
+
+  let best: number | null = null;
+  for (const [a, b] of segments) {
+    const candidate = a > 0 ? a : b < 0 ? b : 0;
+    if (best === null || Math.abs(candidate) < Math.abs(best) - EPS) best = candidate;
+  }
+  if (best === null) return null;
+  return target + best;
+}
+
+/**
+ * Round 12 voice rests, anchored on the Round 13 **voice contour**.
  *
  * A hand's **inactive span inside an active measure** is written with the active
  * rest dialect: the engine walks one hand's onsets in the system, and wherever
@@ -1091,15 +1239,20 @@ export function restClearsLayout(
  * field, never the absolute grid the rest belongs to.
  *
  * - Bach Goldberg Var. 1 m. 4 is the canonical case: the RH plays 16ths up to
- *   tick 540, releases at 552 and resumes at 564, while the LH enters at 552 —
- *   so a **16th rest** stands in the Right Hand at `x ≈ 545.0pt` (the tick-552
- *   beat column) on the Octave 4 voice equator (`y = −15.0pt`), turning the
- *   invisible void into a written silence.
+ *   tick 540 (digit `9`, `y = 158.5pt`), releases at 552 and resumes at 564
+ *   (digit `0`, `y = 173.5pt`), while the LH enters at 552 — so a **16th rest**
+ *   stands in the Right Hand at `x ≈ 545.0pt` (the tick-552 beat column) on the
+ *   Octave 3 voice contour (`(158.5 + 173.5) / 2 = 166.0pt`), nestled between
+ *   the two notes instead of floating on the Octave 4 equator 30pt above them.
+ *   The LH's own D3 head at that same column then decides how far the contour
+ *   can be honoured: {@link resolveRestY} slides the anchor to the nearest legal
+ *   y of the voice, so the written rest never collides with the ink it stands
+ *   beside.
  * - A silence that is not a standard value (a 2.5-beat gap, a tie artefact) is
  *   left unwritten rather than approximated.
- * - A rest whose ink would collide with any notehead of the system (either hand)
- *   is dropped by {@link restClearsLayout}, exactly like a bracket the fit rule
- *   refuses.
+ * - A rest whose ink cannot clear the noteheads of the system (either hand) at
+ *   any position inside the staff is dropped by {@link resolveRestY}, exactly
+ *   like a bracket the fit rule refuses.
  */
 export function computeJankoRests(
   score: QuantizedGridScore,
@@ -1141,7 +1294,7 @@ export function computeJankoRests(
         durationTicks: gap,
         hand,
         x: getTickColumnX(releaseTick, geo, systemIndex, o, t),
-        y: geo.middleCY + getEquatorYForOctave(hand === 'RH' ? 4 : 3, hand, t, o),
+        y: voiceContourTargetY(hand, ticks[i], ticks[i + 1], notes, geo, t, o),
         value: restValueForTicks(gap),
         style: o.restStyle,
       };
@@ -1154,7 +1307,13 @@ export function computeJankoRests(
           continue;
         }
       }
-      if (restClearsLayout(candidate, notes, t)) out.push(candidate);
+      // Round 13: the contour target is the *musical* anchor; the fit solver
+      // then slides it to the nearest legal position along that voice (or drops
+      // the rest when the column is walled in on both sides).
+      const y = resolveRestY(candidate, notes, geo, t);
+      if (y === null) continue;
+      candidate.y = y;
+      out.push(candidate);
     }
   }
 
@@ -2390,6 +2549,15 @@ export function computeCropExtents(
  * {@link renderJankoCrop} for its caption (comparison panels omit it), and
  * `extents` (see {@link computeCropExtents}) widens the box for music that
  * leaves the grand staff.
+ *
+ * Round 13 fixes the multi-system crop: a window that crosses a system break
+ * (e.g. mm. 27–29 with four measures per system) has a *first* measure in one
+ * system and a *last* measure in the next, so the two measure-relative x
+ * anchors belong to different columns — subtracting them produced a negative
+ * width clamped to the 1pt minimum, i.e. an empty white page. A system-spanning
+ * window is therefore anchored on the **staff column itself**
+ * (`margin − CROP_PAD_X … staffRight + CROP_PAD_X`), exactly like a window that
+ * opens on a measure 1.
  */
 export function computeCropBox(
   geo: JankoPageGeometry,
@@ -2406,6 +2574,7 @@ export function computeCropBox(
   const lastSystem = Math.floor((endIdx - 1) / mps);
   const startMIdx = startIdx % mps;
   const endMIdx = (endIdx - 1) % mps;
+  const spansSystems = firstSystem !== lastSystem;
 
   const anacrusis = geo.tokens.anacrusisTicks ?? 0;
   const sysGeo = getSystemGeometry(geo, firstSystem);
@@ -2415,10 +2584,12 @@ export function computeCropBox(
     : 0;
 
   const x0 =
-    startMIdx === 0
+    spansSystems || startMIdx === 0
       ? geo.margin - CROP_PAD_X
       : geo.staffLeft + upbeatWidth + startMIdx * sysGeo.measureWidth - CROP_PAD_X;
-  const x1 = geo.staffLeft + upbeatWidth + (endMIdx + 1) * sysGeo.measureWidth + CROP_PAD_X;
+  const x1 = spansSystems
+    ? geo.staffRight + CROP_PAD_X
+    : geo.staffLeft + upbeatWidth + (endMIdx + 1) * sysGeo.measureWidth + CROP_PAD_X;
 
   let staffTop = Infinity;
   let staffBottom = -Infinity;

@@ -60,6 +60,8 @@ import {
   renderJankoPage,
   renderJankoVariantComparison,
   renderSystem,
+  resolveRestY,
+  restClearsLayout,
 } from '../src/render/janko/engine';
 import {
   JankoRhythmNote,
@@ -83,6 +85,7 @@ import {
   isPositionOfHonor,
   renderHalo,
 } from '../src/render/janko/elements/notehead';
+import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -979,15 +982,16 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
 //     the refined architectural start symbols
 // ---------------------------------------------------------------------------
 
-test('Round 12 rests: the m. 4 tick-552 silence is written in the RH on the Octave 4 equator', () => {
+test('Round 13 voice contour rests: the m. 4 silence nestles in the Octave 3 line, not on the Octave 4 equator', () => {
   const score = buildBachGoldbergVar1Score();
   assert.equal(DEFAULT_JANKO_OPTIONS.restStyle, 'kinetic-monoline', 'the settled rest dialect');
   const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
   const all = layouts.flatMap((l) => l.rests);
   assert.ok(all.length > 0, 'the score writes its silences');
 
-  // The canonical case: RH plays 16ths to tick 540, releases at 552 and resumes
-  // at 564 while the LH enters at 552 — so the silence is exactly one 16th.
+  // The canonical case: RH plays 16ths to tick 540 (digit `9`, y = 158.5),
+  // releases at 552 and resumes at 564 (digit `0`, y = 173.5) while the LH
+  // enters at 552 — so the silence is exactly one 16th.
   const m4 = all.find((r) => r.tick === 552)!;
   assert.ok(m4, 'the m. 4 tick-552 rest exists');
   assert.equal(m4.hand, 'RH');
@@ -995,15 +999,45 @@ test('Round 12 rests: the m. 4 tick-552 silence is written in the RH on the Octa
   assert.equal(m4.durationTicks, 12);
   close(m4.x, 544.97, 'the rest stands on the tick-552 beat column', 0.01);
   const system0 = getSystemGeometry(computePageGeometry(OPTIONS, TOKENS), 0);
-  close(m4.y - system0.middleCY, -15.0, 'the rest hangs on the Octave 4 voice equator', 1e-9);
+  close(system0.equatorY('RH', 4), 136.0, 'the retired Round 12 sky-floating equator', 1e-9);
+  close(system0.equatorY('LH', 3), 166.0, 'the Octave 3 contour of the m. 4 writing', 1e-9);
 
-  // Every rest states a standard value, sits on its hand's voice equator and
-  // never collides with a notehead (the engine's own fit rule).
+  // The contour target is the midpoint of the two RH digits that surround the
+  // silence: (158.5 + 173.5) / 2 = 166.0 — the Octave 3 equator itself.
+  const surround = layouts[0].notes.filter(
+    (p) => p.rhythm.hand === 'RH' && (p.note.startTick === 540 || p.note.startTick === 564)
+  );
+  assert.equal(surround.length, 2, 'digit 9 and digit 0 surround the silence');
+  const target = surround.reduce((sum, p) => sum + p.y, 0) / surround.length;
+  close(target, 166.0, 'the voice contour midpoint', 1e-9);
+  assert.ok(Math.abs(m4.y - 136.0) > 20, 'the rest no longer floats on the Octave 4 equator');
+  assert.ok(
+    m4.y > 158.5 && m4.y < 173.5,
+    `the rest is nestled between digit 9 and digit 0 (y = ${m4.y.toFixed(2)})`
+  );
+  // The 12pt kinetic stem keeps 1.0pt of air from the LH D3 head that sounds at
+  // the same column, so the anchor slides just 4.32pt up the voice — never back
+  // to the hand's default equator.
+  close(m4.y, 161.68, 'the nearest legal position on the voice contour', 0.05);
+
+  // Every rest states a standard value, is anchored on the nearest legal
+  // position of its hand's own voice contour and never collides with a glyph.
   for (const rest of all) {
     assert.ok([12, 24, 48, 96, 192].includes(rest.durationTicks), `${rest.tick} standard value`);
-    const equator = rest.hand === 'RH' ? -15.0 : 15.0;
     const system = layouts.find((l) => l.rests.includes(rest))!;
-    close(rest.y - system.geometry.middleCY, equator, `${rest.hand} voice equator`, 1e-9);
+    assert.equal(
+      resolveRestY(rest, system.notes, system.geometry, TOKENS),
+      rest.y,
+      `${rest.hand} rest at ${rest.tick} is a fixed point of the fit rule`
+    );
+    assert.ok(
+      restClearsLayout(rest, system.notes, TOKENS),
+      `${rest.hand} rest at ${rest.tick} keeps 1.0pt of air from every notehead`
+    );
+    assert.ok(
+      rest.y >= system.geometry.staffTopY && rest.y <= system.geometry.staffBotY,
+      `${rest.hand} rest at ${rest.tick} stays inside the grand staff`
+    );
     for (const p of system.notes) {
       const dx = Math.max(Math.abs(p.x - rest.x) - 0, 0);
       const dy = Math.abs(p.y - rest.y);
@@ -1030,13 +1064,14 @@ test('Round 12 rests: the m. 4 tick-552 silence is written in the RH on the Octa
   assert.equal(report.warnings.length, 0);
 });
 
-test('Round 12 rest dialects: four distinct monoline grammars, all clean', () => {
+test('Round 13 rest dialects: five distinct monoline grammars, all clean', () => {
   const score = buildBachGoldbergVar1Score();
   const signatures: Record<JankoRestStyle, RegExp> = {
-    'kinetic-monoline': /janko-rest-(stem|tab|notch|bar)/,
-    'classical-urtext': /janko-rest-(hook|lightning|block)/,
+    'kinetic-monoline': /janko-rest-(tab|notch|bar)"/,
+    'classical-urtext': /janko-rest-(hook|hook-bulb|lightning|block|stem-line)/,
     'geometric-node': /janko-rest-(node|ray|capsule)/,
     'bauhaus-slash': /janko-rest-(slash|wing|z|box)/,
+    'phantom-notehead': /janko-rest-phantom-(head|stem|flag|bar)/,
   };
   const documents = new Set<string>();
   for (const style of JANKO_REST_STYLES) {
@@ -1052,7 +1087,163 @@ test('Round 12 rest dialects: four distinct monoline grammars, all clean', () =>
     assert.equal(report.warnings.length, 0, `${style} adds no warning`);
     documents.add(crop.replace(new RegExp(`data-rest-style="${style}"`, 'g'), ''));
   }
-  assert.equal(documents.size, 4, 'the four dialects are four different engravings');
+  assert.equal(documents.size, 5, 'the five dialects are five different engravings');
+});
+
+test('Round 13 corrected kinetic tabs hook downward to the right of their stem', () => {
+  const score = buildBachGoldbergVar1Score();
+  const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
+  const tabs = [
+    ...crop.matchAll(
+      /<line class="janko-rest-tab"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
+    ),
+  ].map((m) => m.slice(1).map(Number));
+  assert.equal(tabs.length, 2, 'the m. 4 16th rest carries two tabs');
+  for (const [x1, y1, x2, y2] of tabs) {
+    assert.ok(x2 > x1, 'the tab reaches right of its stem');
+    assert.ok(y2 > y1, 'and hooks downward, like a note flag');
+    close((y2 - y1) / (x2 - x1), TOKENS.maxBeamSlope, 'at the score’s own 12.4° rake', 1e-6);
+  }
+});
+
+test('Round 13 authentic urtext rests: a slanted calligraphic stem with teardrop bulbs', () => {
+  const score = buildBachGoldbergVar1Score();
+  const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'classical-urtext' });
+  const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
+  const stem = /<path class="janko-rest-stem-line" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)"/.exec(crop);
+  assert.ok(stem, 'the calligraphic stem is painted');
+  const [, sx1, , sx2] = stem!.map(Number);
+  assert.ok(Math.abs(sx2 - sx1) > 1.0, 'the stem is slanted, not a monoline rule');
+  // A 16th rest carries two hooks, each ending in a solid teardrop bulb.
+  assert.equal((crop.match(/class="janko-rest-hook"/g) ?? []).length, 2, 'two hooks for a 16th');
+  assert.equal((crop.match(/class="janko-rest-hook-bulb"/g) ?? []).length, 2, 'two teardrop bulbs');
+  const bulbs = [...crop.matchAll(/<circle class="janko-rest-hook-bulb" cx="[\d.-]+" cy="[\d.-]+" r="([\d.-]+)"/g)];
+  for (const bulb of bulbs) {
+    assert.ok(Number(bulb[1]) > 0, 'teardrop bulbs are solid ink, not hollow rings');
+  }
+  // The quarter rest is the serpentine lightning, and it is a curve (C commands).
+  const m4Quarter = renderJankoCrop(score, 2, 1, options, TOKENS);
+  const lightning = /<path class="janko-rest-lightning" d="([^"]+)"/.exec(m4Quarter);
+  if (lightning) assert.match(lightning[1], /C /, 'the serpentine is calligraphic, not a polyline');
+});
+
+test('Round 13 phantom notehead rests stand exactly where the unvoiced note would have been', () => {
+  const score = buildBachGoldbergVar1Score();
+  const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'phantom-notehead' });
+  const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
+  const head = /<circle class="janko-rest-phantom-head" cx="([\d.-]+)" cy="([\d.-]+)" r="([\d.-]+)" fill="none" stroke="#111111" stroke-width="0.80" stroke-dasharray="1.8,1.5"\/>/.exec(crop);
+  assert.ok(head, 'the dashed open head is painted');
+  close(Number(head![3]), 3.0, 'at the ticket’s R = 3.0pt', 1e-9);
+  const rest = layoutJankoScore(score, options, TOKENS)[0].rests.find((r) => r.tick === 552)!;
+  close(Number(head![1]), rest.x, 'the head stands on the rest column', 0.01);
+  close(Number(head![2]), rest.y, 'and on the rest’s voice contour', 0.01);
+  assert.equal((crop.match(/class="janko-rest-phantom-flag"/g) ?? []).length, 2, 'two flags for a 16th');
+  const flags = [
+    ...crop.matchAll(/<path class="janko-rest-phantom-flag"[^>]*d="M ([\d.-]+) ([\d.-]+) Q ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)"/g),
+  ].map((m) => m.slice(1).map(Number));
+  for (const [, fy1, , , , fy2] of flags) {
+    assert.ok(fy2 > fy1, 'every flag hooks downward');
+  }
+});
+
+test('Round 13 beam discontinuity: no beam ever bridges the rest that interrupts it', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const groups = layout.beams.map((b) => b.notes.map((n) => n.startTick).join(','));
+  // Bach m. 4 beat 3: the RH 16ths at 528 and 540 beam together, the tick-552
+  // rest (a 12-tick hole) breaks the run, and 564 resumes as a flagged 16th.
+  assert.ok(groups.includes('528,540'), `the 528 + 540 pair beams (got ${groups.join(' | ')})`);
+  assert.ok(
+    !layout.beams.some((b) => b.notes.some((n) => n.startTick === 564)),
+    'no beam reaches the tick-564 resumption across the rest'
+  );
+  assert.deepEqual(
+    layout.ungrouped
+      .filter((n) => n.startTick >= 528 && n.startTick < 576)
+      .map((n) => n.startTick),
+    [564],
+    'the resumption falls back to a standard flag'
+  );
+  const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
+  assert.match(
+    crop,
+    /class="janko-flag"[^>]*data-subdivision-style="kinetic-tab-beam"/,
+    'the orphaned 16th really paints its flag'
+  );
+
+  // Partition level: a one-16th hole splits the run even though the onset gap
+  // (24 ticks) is not greater than half a beat. A legato overlap does not.
+  const note = (id: string, startTick: number, durationTicks: number): JankoRhythmNote => ({
+    id,
+    startTick,
+    durationTicks,
+    hand: 'RH',
+    x: startTick,
+    y: 0,
+  });
+  const holed = partitionBeamGroups([
+    note('a', 0, 12),
+    note('b', 12, 12),
+    note('c', 36, 12),
+  ]);
+  assert.deepEqual(
+    holed.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12]],
+    'the rest at tick 24 breaks the beam'
+  );
+  assert.deepEqual(holed.ungrouped.map((n) => n.startTick), [36]);
+  const legato = partitionBeamGroups([
+    note('a', 0, 24),
+    note('b', 12, 12),
+    note('c', 24, 12),
+  ]);
+  assert.deepEqual(
+    legato.groups.map((g) => g.map((n) => n.startTick)),
+    [[0, 12, 24]],
+    'a sounding overlap is still one continuous gesture'
+  );
+});
+
+test('Round 13 multi-system crops span the staff column instead of collapsing to an empty page', () => {
+  const score = buildBachGoldbergVar1Score();
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const measureWidth = geo.systems[0].measureWidth;
+
+  // Round 13 window 3: mm. 27–28 live inside System 7, at their true width.
+  const single = computeCropBox(geo, 27, 2, true);
+  assert.equal(single.firstSystem, single.lastSystem, 'one system');
+  assert.equal(single.firstSystem, 6);
+  close(single.w, 2 * measureWidth + 16, 'two true measure widths plus padding', 1e-6);
+  const dense = renderJankoCrop(score, 27, 2, OPTIONS, TOKENS);
+  assert.ok(
+    (dense.match(/class="janko-digit"/g) ?? []).length > 20,
+    'the dense sixteenths are engraved'
+  );
+
+  // The defect the ticket reports: a window that crosses a system break used to
+  // subtract anchors from two different systems and clamp to a 1pt strip.
+  const multi = computeCropBox(geo, 27, 3, true);
+  assert.equal(multi.firstSystem, 6);
+  assert.equal(multi.lastSystem, 7);
+  close(multi.x, geo.margin - 8.0, 'a system-spanning crop opens at the page margin', 1e-9);
+  close(
+    multi.w,
+    geo.staffRight - geo.margin + 16.0,
+    'and spans the whole staff column',
+    1e-9
+  );
+  assert.ok(multi.w > 500, `the crop is a full page width, not a 1pt strip (${multi.w.toFixed(1)}pt)`);
+  assert.ok(multi.h > 350, 'and tall enough to hold both systems');
+  const wide = renderJankoCrop(score, 27, 3, OPTIONS, TOKENS);
+  assert.match(wide, new RegExp(`viewBox="${multi.x.toFixed(2)} `), 'the viewBox carries the fixed box');
+  assert.ok(
+    (wide.match(/class="janko-digit"/g) ?? []).length > 40,
+    'both systems are engraved inside the wide crop'
+  );
+  assert.ok(
+    (wide.match(/id="system-/g) ?? []).length >= 2,
+    'the crop really contains two systems'
+  );
 });
 
 test('Round 12 continuous vertical grid: barlines and beat pulses cross Middle C unbroken', () => {
@@ -1154,15 +1345,23 @@ test('Round 12 grid writing policies: protected air, air channels and full-width
   }
 });
 
-test('Round 12 start symbols: 0.65pt / 0.50pt brackets and the nib-free clef pillar', () => {
+test('Round 13 start symbols: the flared 0.65pt bracket, the 0.50pt bracket and the nib-free clef pillar', () => {
   const score = buildBachGoldbergVar1Score();
   const geo = computePageGeometry(OPTIONS, TOKENS);
   const system0 = getSystemGeometry(geo, 0);
 
   const bracket = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'architectural-bracket' }, TOKENS);
-  assert.match(
-    bracket,
-    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65"/
+  const flared = /class="janko-system-bracket" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"\/>/.exec(bracket);
+  assert.ok(flared, 'the flared architectural bracket is painted');
+  const [, tipX, tipY, x1, y1, , , footX, footY] = flared!.map(Number);
+  close(y1, system0.equatorY('RH', 5), 'the rule clasps the Octave 5 rule', 1e-9);
+  assert.ok(tipY < y1 && footY > system0.equatorY('LH', 2), 'both spurs flare diagonally outward');
+  close(footX - tipX, 0, 'the spurs reach the same horizontal distance', 1e-9);
+  close(
+    (y1 - tipY) / (tipX - x1),
+    Math.tan((ARCHITECTURAL_BRACKET_FLARE_DEGREES * Math.PI) / 180),
+    'the flare is 13°',
+    5e-3
   );
 
   const delicate = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'delicate-bracket' }, TOKENS);
@@ -1204,8 +1403,8 @@ test('Round 10 system openness: open margin, unified final barline, no mid-piece
   const bracketed = renderSystem(score, getSystemGeometry(geo, 0), 0, bracketOptions, TOKENS);
   assert.match(
     bracketed,
-    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65"/,
-    'the architectural bracket is a 0.65pt rule with right-angled spurs'
+    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"/,
+    'the architectural bracket is a 0.65pt rule with 13° flared spurs'
   );
   const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, bracketOptions, TOKENS);
   assert.equal((middle.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length, 0, 'no mid-piece mark');

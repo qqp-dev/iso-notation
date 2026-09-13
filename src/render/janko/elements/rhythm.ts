@@ -1341,6 +1341,14 @@ export interface JankoBeamPartition {
  * notes sharing an onset are left to their clasp brackets (the sole grouping
  * and duration carrier of a simultaneity) and receive no melodic beam.
  *
+ * Round 13 closes the rest-bridging defect: a run is **contiguous** only while
+ * every onset falls exactly on the previous note's release
+ * (`n.startTick ≤ prev.startTick + prev.durationTicks`). The old
+ * `> ticksPerBeat / 2` spacing test admitted a one-16th hole — Bach Var. 1
+ * m. 4 beamed `528 540 564` straight across the tick-552 rest, because
+ * `564 − 540 = 24` was not *greater* than 24. The rest at 552 now splits the
+ * beat into a `528 540` two-note beam and an independent flagged 16th at 564.
+ *
  * `middleCY` is kept for call-site compatibility; the corridor is protected by
  * the beam solver, not by the partition.
  */
@@ -1393,10 +1401,14 @@ export function partitionBeamGroups(
       const prev = run[run.length - 1];
       if (prev) {
         const gap = n.startTick - prev.startTick > t.ticksPerBeat / 2;
+        // Round 13: a beam is a **continuous** gesture. A rest (or any silence)
+        // in this hand's voice breaks it, so the connector may never bridge a
+        // gap: the next onset must fall exactly on the previous note's release.
+        const discontinuous = n.startTick > prev.startTick + prev.durationTicks;
         const straddled = (unbeamable.get(n.hand) ?? []).some(
           (b) => b.startTick > prev.startTick && b.startTick < n.startTick
         );
-        if (gap || straddled) flush();
+        if (gap || discontinuous || straddled) flush();
       }
       run.push(n);
     }
