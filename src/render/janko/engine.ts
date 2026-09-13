@@ -84,7 +84,12 @@ import {
   withClaspRail,
 } from './elements/rhythm';
 import { renderAccolade, renderCaptionLines, wrapCaptionText } from './elements/accolade';
-import { renderBarlines, renderBeatGrid, renderMeasureNumber } from './elements/barlines';
+import {
+  getMeasureNumberBaselineY,
+  renderBarlines,
+  renderBeatGrid,
+  renderMeasureNumber,
+} from './elements/barlines';
 
 /** Vertical reserve above a crop for its caption band (pt). */
 const CROP_CAPTION_HEIGHT = 15.0;
@@ -476,7 +481,9 @@ export function getMarginFurniture(
   digitAdvance: number = MARGIN_DIGIT_ADVANCE
 ): { numeral: JankoBox; accolade: JankoBox } {
   const numeralX = geometry.staffLeft - 2;
-  const numeralBaseline = geometry.staffTopY - 6;
+  // Round 9: the numeral's reserved box shares the painted baseline (14pt above
+  // the top rule), so the linter audits exactly the ink the renderer draws.
+  const numeralBaseline = getMeasureNumberBaselineY(geometry);
   const numeral: JankoBox = {
     x0: numeralX,
     y0: numeralBaseline - t.digitFontSize * 1.2,
@@ -2245,6 +2252,11 @@ export function normalizeJankoVariant(
   };
 }
 
+/** Escape text for an SVG `<text>` node (a label may carry `&`, `<` or `>`). */
+function escapeXmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /**
  * Multi-variant comparative contact sheet: every variant engraves the exact
  * same measures, stacked vertically with an identifying label. The default
@@ -2293,10 +2305,10 @@ export function renderJankoVariantComparison(
       `    <rect x="${f(pad)}" y="${f(top)}" width="${f(contentW)}" height="${f(panelH)}" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.60"/>`
     );
     out.push(
-      `    <text x="${f(pad + 6)}" y="${f(top + 11)}" class="janko-caption">${panel.variant.label}</text>`
+      `    <text x="${f(pad + 6)}" y="${f(top + 11)}" class="janko-caption">${escapeXmlText(panel.variant.label)}</text>`
     );
     out.push(
-      `    <text x="${f(pad + contentW - 6)}" y="${f(top + 11)}" class="janko-caption-sub" text-anchor="end">mm. ${panel.box.firstMeasure}–${panel.box.lastMeasure} · ${panel.variant.options.rhythmStyle}</text>`
+      `    <text x="${f(pad + contentW - 6)}" y="${f(top + 11)}" class="janko-caption-sub" text-anchor="end">mm. ${panel.box.firstMeasure}–${panel.box.lastMeasure} · ${escapeXmlText(panel.variant.options.rhythmStyle)}</text>`
     );
     out.push(`    <clipPath id="janko-panel-clip-${i}">`);
     out.push(

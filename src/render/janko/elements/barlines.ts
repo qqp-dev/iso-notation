@@ -84,6 +84,23 @@ export function renderBarlines(
   return out.join('\n');
 }
 
+/** Vertical clearance (pt) a measure numeral keeps above the staff's top rule. */
+export const MEASURE_NUMBER_CLEARANCE = 14.0;
+
+/**
+ * Baseline y of a system's measure numeral.
+ *
+ * Round 9 elevates the numeral from `staffTopY − 6` to a full
+ * {@link MEASURE_NUMBER_CLEARANCE} above the top rule: a high treble note in
+ * octave 5 (whose Set B row sits only 7.5pt above the o5 equator) can no longer
+ * reach the figures. The engine's margin-furniture box (which the linter
+ * audits) shares this function, so the reserved ink and the painted ink can
+ * never drift apart.
+ */
+export function getMeasureNumberBaselineY(geo: JankoSystemGeometry): number {
+  return geo.staffTopY - MEASURE_NUMBER_CLEARANCE;
+}
+
 /** A measure number above the first measure of a system. */
 export function renderMeasureNumber(
   geo: JankoSystemGeometry,
@@ -92,7 +109,7 @@ export function renderMeasureNumber(
 ): string {
   void tokens;
   const x = geo.staffLeft - 2;
-  const y = geo.staffTopY - 6;
+  const y = getMeasureNumberBaselineY(geo);
   return `    <text class="janko-measure-num" x="${f(x)}" y="${f(y)}">${measureNumber}</text>`;
 }
 

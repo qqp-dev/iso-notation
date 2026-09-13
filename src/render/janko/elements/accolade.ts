@@ -3,7 +3,7 @@
  *
  * Geometry is delegated to the shared Emmentaler/LilyPond brace outline in
  * `print-layout.ts`, so the Jánko engraving and the legacy print pipeline use
- * exactly the same master-engraved curve (w = 7.0pt, thick = 0.65pt).
+ * exactly the same master-engraved curve (Round 9: w = 4.8pt, thick = 0.55pt).
  */
 
 import { getVerticalAccoladePath } from '../../print-layout';

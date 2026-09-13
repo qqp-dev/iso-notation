@@ -78,6 +78,7 @@ import {
   renderHalo,
 } from '../src/render/janko/elements/notehead';
 import { lintJankoScore } from '../src/render/janko/linter';
+import { getVerticalAccoladePath } from '../src/render/print-layout';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -815,7 +816,7 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   assert.match(crop, /class="janko-beam"/);
 });
 
-test('Round 8 staff hierarchy: four uniform equators, light accolade and widened margins', () => {
+test('Round 9 staff hierarchy: four uniform equators, slender accolade and delicate dots', () => {
   const score = buildBachGoldbergVar1Score();
   const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
 
@@ -828,11 +829,38 @@ test('Round 8 staff hierarchy: four uniform equators, light accolade and widened
   );
   assert.ok(!staff.includes('#0F172A'), 'the 0.65pt inner-equator discrepancy is gone');
 
-  // The lightened accolade and the widened page margin (Round 8 tokens).
-  assert.equal(DEFAULT_JANKO_TOKENS.accoladeThick, 0.65, 'the accolade falls to 0.65pt');
+  // The genuinely slender accolade and the widened page margin (Round 8/9 tokens).
+  assert.equal(DEFAULT_JANKO_TOKENS.accoladeWidth, 4.8, 'the accolade slimmed to 4.8pt');
+  assert.equal(DEFAULT_JANKO_TOKENS.accoladeThick, 0.55, 'the accolade hairline is 0.55pt');
+  assert.equal(DEFAULT_JANKO_TOKENS.augmentationDotRadius, 0.75, 'the dot falls to 0.75pt');
   assert.equal(DEFAULT_JANKO_OPTIONS.pageMargin, 24.0, 'the page margin widens to 24pt');
   assert.match(page, /class="janko-accolade"/, 'the accolade is drawn once at the start');
   const geo = computePageGeometry(OPTIONS, TOKENS);
+  // Round 9: the accolade is the shared master outline at the Jánko token pair,
+  // and both tokens genuinely control the painted path — the reach drives the
+  // horizontal scale, the thickness the ink weight.
+  const renderedAccolade = /class="janko-accolade" d="([^"]+)"/.exec(page)![1];
+  assert.equal(
+    renderedAccolade,
+    getVerticalAccoladePath(
+      geo.staffLeft - DEFAULT_JANKO_TOKENS.accoladeGap - DEFAULT_JANKO_TOKENS.accoladeWidth,
+      geo.systems[0].staffTopY,
+      geo.systems[0].staffBotY,
+      DEFAULT_JANKO_TOKENS.accoladeWidth,
+      DEFAULT_JANKO_TOKENS.accoladeThick
+    ),
+    'the accolade is the shared master outline at the Jánko token pair'
+  );
+  assert.notEqual(
+    getVerticalAccoladePath(100, 0, 300, DEFAULT_JANKO_TOKENS.accoladeWidth, DEFAULT_JANKO_TOKENS.accoladeThick),
+    getVerticalAccoladePath(100, 0, 300, DEFAULT_JANKO_TOKENS.accoladeWidth, 1.5),
+    'a heavier thick token genuinely paints a heavier brace'
+  );
+  assert.notEqual(
+    getVerticalAccoladePath(100, 0, 300, DEFAULT_JANKO_TOKENS.accoladeWidth, DEFAULT_JANKO_TOKENS.accoladeThick),
+    getVerticalAccoladePath(100, 0, 300, 7.0, DEFAULT_JANKO_TOKENS.accoladeThick),
+    'a wider reach token genuinely widens the brace'
+  );
   assert.equal(geo.margin, 24.0, 'the page geometry uses the widened margin');
   assert.equal(
     geo.staffLeft,
@@ -842,6 +870,30 @@ test('Round 8 staff hierarchy: four uniform equators, light accolade and widened
 
   // The beat grid is the structural layer above the lightened staff rules.
   assert.match(page, /class="janko-beat-line"[^>]*stroke="#9CA3AF" stroke-width="0\.70"/);
+
+  // Round 9: the measure numeral is elevated to a full 14pt above the top rule
+  // (it used to sit 6pt above and crowded the high octave-5 treble notes), the
+  // painted baseline and the linter's margin-furniture box agree, and the
+  // canonical score keeps more than the guaranteed clearance.
+  const painted = /<text class="janko-measure-num" x="([\d.-]+)" y="([\d.-]+)"/.exec(page)!;
+  const system0 = geo.systems[0];
+  assert.equal(
+    Number(painted[2]),
+    system0.staffTopY - 14.0,
+    'the numeral keeps a full 14pt above the staff top rule'
+  );
+  const furniture = getMarginFurniture(system0, TOKENS, 1);
+  assert.equal(furniture.numeral.y1, Number(painted[2]), 'painted and audited baselines agree');
+  const layout0 = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  for (const p of layout0.notes) {
+    const dx = Math.max(furniture.numeral.x0 - p.x, 0, p.x - furniture.numeral.x1);
+    const dy = Math.max(furniture.numeral.y0 - p.y, 0, p.y - furniture.numeral.y1);
+    const air = Math.hypot(dx, dy) - TOKENS.noteheadRadius;
+    assert.ok(
+      air >= 14.0 - 1e-9,
+      `${p.note.id} keeps 14pt of numeral air (got ${air.toFixed(2)}pt)`
+    );
+  }
 
   // Measure barlines fall to 0.60pt (the closing barline of the score stays
   // authoritative and is covered by the system-openness test below).
@@ -1188,30 +1240,35 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
   ).length;
   const flags = [
     ...crop.matchAll(
-      /class="janko-flag" data-stem-x="([\d.]+)" data-flag-index="(\d)" d="([^"]+)"/g
+      /<(?:line|path) class="janko-flag" data-stem-x="([\d.]+)" data-flag-index="(\d)"[^>]*>/g
     ),
   ];
-  assert.equal(flags.length, expectedFlags, 'one flag per 8th, two flags per 16th');
+  assert.equal(flags.length, expectedFlags, 'one mark per 8th, two per 16th');
   assert.equal(
     (crop.match(/class="janko-augmentation-dot"/g) ?? []).length,
     expectedDots,
     'one augmentation dot per dotted solitary value'
   );
 
-  // Standard flag geometry: the hook starts on the stem, stays strictly right
-  // of it, and never reaches beyond its tokenised width.
+  // Standard flag geometry: the mark starts on the stem, stays strictly right
+  // of it and never reaches beyond its tokenised width. Round 9 dispatches the
+  // settled beam-harmonized kinetic tab as the golden master, so the mark is a
+  // 1.1pt monoline raked at the score's own beam slope.
   for (const m of flags) {
     const stemX = Number(m[1]);
-    const numbers = [...m[3].matchAll(/-?\d+(?:\.\d+)?/g)].map((x) => Number(x[0]));
-    const xs = numbers.filter((_, i) => i % 2 === 0);
-    assert.ok(numbers.length >= 2 && numbers.length % 2 === 0, 'flag path samples come in x/y pairs');
-    assert.equal(xs[0], stemX, 'the flag latches onto the stem tip');
-    for (const x of xs) {
-      assert.ok(x >= stemX - 1e-9, `flag sample x=${x} must not cross the stem at ${stemX}`);
-    }
+    const element = m[0];
+    assert.ok(element.startsWith('<line'), 'the settled kinetic tab is a monoline');
+    const x1 = Number(/ x1="([\d.-]+)"/.exec(element)![1]);
+    const y1 = Number(/ y1="([\d.-]+)"/.exec(element)![1]);
+    const x2 = Number(/ x2="([\d.-]+)"/.exec(element)![1]);
+    const y2 = Number(/ y2="([\d.-]+)"/.exec(element)![1]);
+    assert.equal(x1, stemX, 'the tab latches onto the stem column');
+    assert.ok(x2 >= stemX - 1e-9, `tab tip x=${x2} must not cross the stem at ${stemX}`);
+    assert.ok(x2 - stemX <= TOKENS.flagWidth + 1e-9, 'the tab keeps its tokenised reach');
+    assert.match(element, /stroke-width="1\.10"/, 'the tab is a 1.1pt monoline');
     assert.ok(
-      Math.max(...xs) - stemX <= TOKENS.flagWidth + 1e-9,
-      'the flag keeps its tokenised horizontal reach'
+      Math.abs(Math.abs((y2 - y1) / (x2 - x1)) - TOKENS.maxBeamSlope) < 5e-3,
+      'the tab rakes at the beam-harmonized slope'
     );
   }
 
@@ -1225,7 +1282,7 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
     assert.equal(noteFlags.length, 1, `${n.id} carries exactly one flag`);
     assert.ok(
       crop.includes(
-        `class="janko-augmentation-dot" cx="${(n.x + TOKENS.noteheadRadius + 3.2).toFixed(2)}" cy="${n.y.toFixed(2)}"`
+        `class="janko-augmentation-dot" cx="${(n.x + TOKENS.noteheadRadius + 3.2).toFixed(2)}" cy="${n.y.toFixed(2)}" r="${TOKENS.augmentationDotRadius.toFixed(2)}"`
       ),
       `${n.id} carries its augmentation dot`
     );
@@ -1243,11 +1300,11 @@ function subdivisionAnchorY(markup: string): number {
   return Number(/ y1="([\d.]+)"/.exec(markup)![1]);
 }
 
-test('Round 8: the subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
+test('Round 9: the subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
   assert.equal(
     DEFAULT_JANKO_OPTIONS.subdivisionStyle,
-    'classical-urtext',
-    'the golden master keeps the slender urtext hairline'
+    'kinetic-tab-beam',
+    'the golden master settles the beam-harmonized kinetic tab'
   );
   assert.deepEqual(
     [...JANKO_SUBDIVISION_STYLES],
@@ -1381,19 +1438,19 @@ test('Round 8: the subdivision dialects dispatch at the stem tip and stack by fl
     ],
     TOKENS
   )!;
-  assert.equal(clasped.durationStyle, 'center-ticks', 'the clasp carries its own paradigm');
+  assert.equal(clasped.durationStyle, 'center-kinetic-ticks', 'the clasp carries its own paradigm');
   const claspMarkup = renderChordClasp(clasped, TOKENS);
   assert.ok(!claspMarkup.includes('janko-flag'), 'no subdivision ink on the clasp');
 
-  // End to end: the default render dispatches the open urtext hairline, and the
-  // settled Round 8 tab dispatches on request.
+  // End to end: the golden default dispatches the settled beam-harmonized tab,
+  // and the control dialect still dispatches on request.
   const golden = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, OPTIONS, TOKENS);
-  assert.match(golden, /data-subdivision-style="classical-urtext"/);
-  const settled = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, {
+  assert.match(golden, /data-subdivision-style="kinetic-tab-beam"/);
+  const control = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, {
     ...OPTIONS,
-    subdivisionStyle: 'kinetic-tab-beam',
+    subdivisionStyle: 'classical-urtext',
   }, TOKENS);
-  assert.match(settled, /data-subdivision-style="kinetic-tab-beam"/);
+  assert.match(control, /data-subdivision-style="classical-urtext"/);
 });
 
 test('Beam clearance: every notehead keeps a full stem length to its beam (mm. 2 & 4 ascents)', () => {
@@ -1886,11 +1943,13 @@ test('Anchored and 3-row layouts surface their real cost: high notes crowd the n
   // cap height down to the baseline), so the decision matrix shows the real cost
   // of the paradigm without inventing a collision that is not painted.
   const score = buildBachGoldbergVar1Score();
+  // Round 9 elevates the numeral 8pt further (a full 14pt above the top rule),
+  // so every paradigm gains exactly that much air over its previous reading.
   const CLEARANCE: Record<string, number> = {
-    'single-equator': 9.7,
-    'on-the-line': 2.2,
-    'single-line-3row': 2.2,
-    'bounded-channel': 4.2,
+    'single-equator': 17.7,
+    'on-the-line': 10.2,
+    'single-line-3row': 10.2,
+    'bounded-channel': 12.2,
   };
   for (const c of LAYOUT_CASES) {
     const report = lintJankoScore(score, c.options, TOKENS);

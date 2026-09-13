@@ -28,6 +28,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
 } from '../../scores/brahms-op118-no1';
+import { buildChordDurationSpecimenScore } from '../../scores/chord-duration-specimen';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -46,6 +47,7 @@ import {
   DEFAULT_STUDIO_SCORE_ID,
   JankoCandidate,
   JankoCandidateRound,
+  SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   resolveCandidate,
 } from './candidates';
@@ -147,6 +149,15 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildBrahmsOp118No1Score(),
       options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
       tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
+    },
+    // Round 9: the curated multi-duration specimen. Two measures across the
+    // staff width, so the five chords and their midpoint marks stay large
+    // enough to judge at a glance.
+    [SPECIMEN_STUDIO_SCORE_ID]: {
+      id: SPECIMEN_STUDIO_SCORE_ID,
+      score: buildChordDurationSpecimenScore(),
+      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }),
+      tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
     },
     ...(overrides.scores ?? {}),
   };

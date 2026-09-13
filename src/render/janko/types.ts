@@ -90,42 +90,48 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
- * Symmetrical clasp **duration** paradigms — the Round 8 question: how an
- * external per-hand bracket carries the cluster's duration without breaking its
- * mirror symmetry.
+ * Midpoint clasp **duration** paradigms — the Round 9 question: how an external
+ * per-hand bracket carries the cluster's duration at the exact vertical
+ * midpoint of its own spine.
  *
- * Round 7 hung the duration off a lopsided upward spire at the bracket's top
- * corner, which made the bracket read as asymmetric. Round 8 removes the spire
- * and tests four balanced solutions (see
- * `elements/rhythm.renderChordClasp`):
+ * Round 8 removed the lopsided upward spire and tested four *symmetrical*
+ * duration paradigms, but the specimen window only carried quarter-value
+ * chords, so the duration marks themselves were never on screen. Round 9
+ * anchors every paradigm at `yMid = (topY + botY) / 2` and demonstrates all
+ * four across the full duration taxonomy — half, quarter, dotted quarter, 8th
+ * and 16th (see `elements/rhythm.renderChordClasp`):
  *
- * | style              | duration ink                                                     |
- * | ------------------ | ---------------------------------------------------------------- |
- * | `'center-ticks'`   | 1/2 horizontal ticks (or pips) at the spine's exact midpoint      |
- * | `'cap-cuts'`       | 1/2/3 parallel horizontal bars stacked inside both caps           |
- * | `'framing-only'`   | pure bracket `[` — duration stays on the notehead's own ink       |
- * | `'bilateral-fins'` | 12.4° kinetic fins flaring symmetrically off both caps            |
+ * | style                    | duration ink at the spine midpoint                            |
+ * | ------------------------ | ------------------------------------------------------------- |
+ * | `'center-kinetic-ticks'` | 12° beam-harmonized kinetic ticks (1 = 8th, 2 = 16th)         |
+ * | `'center-chevron-notch'` | calligraphic guillemet notches (1 = 8th, 2 nested = 16th)      |
+ * | `'center-pip-rays'`      | a compact hub with lateral rays (1 = 8th, 2 = 16th)           |
+ * | `'center-sculpted-wedge'`| a sculpted barb (1 = 8th, 2 = 16th)                           |
+ *
+ * Every paradigm shares the same half/whole open ring, the same plain quarter
+ * bracket and the same 0.75pt dotted-quarter dot, so the round varies exactly
+ * one variable: the ink a subdivision value leaves at the midpoint.
  */
 export type JankoClaspDurationStyle =
-  | 'center-ticks'
-  | 'cap-cuts'
-  | 'framing-only'
-  | 'bilateral-fins';
+  | 'center-kinetic-ticks'
+  | 'center-chevron-notch'
+  | 'center-pip-rays'
+  | 'center-sculpted-wedge';
 
 /** Every clasp-duration paradigm, in the canonical exploration order (A–D). */
 export const JANKO_CLASP_DURATION_STYLES: readonly JankoClaspDurationStyle[] = [
-  'center-ticks',
-  'cap-cuts',
-  'framing-only',
-  'bilateral-fins',
+  'center-kinetic-ticks',
+  'center-chevron-notch',
+  'center-pip-rays',
+  'center-sculpted-wedge',
 ];
 
-/** Human-readable names of the four symmetrical clasp-duration paradigms. */
+/** Human-readable names of the four midpoint clasp-duration paradigms. */
 export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, string> = {
-  'center-ticks': 'Balanced Center-Spine Ticks',
-  'cap-cuts': 'Stacked Horizontal Cap Cuts',
-  'framing-only': 'Pure Symmetrical Framing Bracket',
-  'bilateral-fins': 'Bilateral Cap Fins',
+  'center-kinetic-ticks': 'Center-Spine 12° Kinetic Ticks',
+  'center-chevron-notch': 'Center French Guillemet Chevron',
+  'center-pip-rays': 'Center Circular Hub & Rays',
+  'center-sculpted-wedge': 'Center Sculpted Wedge',
 };
 
 /**
@@ -357,8 +363,8 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   digitFontSize: 5.8,
   haloRadius: 6.2,
   octaveStep: 30.0,
-  accoladeWidth: 7.0,
-  accoladeThick: 0.65,
+  accoladeWidth: 4.8,
+  accoladeThick: 0.55,
   fontFamily: '"URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif',
   stemLength: 16.0,
   slashDx: 2.8,
@@ -371,7 +377,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   beamThickness: 1.8,
   maxBeamSlope: 0.22,
   accoladeGap: 7.0,
-  augmentationDotRadius: 1.3,
+  augmentationDotRadius: 0.75,
   flagWidth: 4.0,
   flagHeight: 6.6,
   flagSpacing: 3.4,
@@ -411,15 +417,15 @@ export interface JankoLayoutOptions {
 
   // --- Optional page/layout refinements (resolved from defaults) ---
   /**
-   * Single-note subdivision style (Round 7, settled by Round 8): how an
+   * Single-note subdivision style (Round 7, settled by Round 9): how an
    * isolated 8th/16th/32nd draws its duration at the stem tip. Defaults to the
-   * classical `'classical-urtext'` flag (see {@link JankoSubdivisionStyle}).
+   * settled `'kinetic-tab-beam'` tab (see {@link JankoSubdivisionStyle}).
    */
   subdivisionStyle?: JankoSubdivisionStyle;
   /**
-   * Symmetrical clasp-duration paradigm (Round 8): how an external per-hand
-   * bracket carries its cluster's duration. Defaults to `'center-ticks'` (see
-   * {@link JankoClaspDurationStyle}).
+   * Midpoint clasp-duration paradigm (Round 9): how an external per-hand
+   * bracket carries its cluster's duration at its spine midpoint. Defaults to
+   * `'center-kinetic-ticks'` (see {@link JankoClaspDurationStyle}).
    */
   claspDurationStyle?: JankoClaspDurationStyle;
   /** Horizontal systems stacked on one page. */
@@ -479,8 +485,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   middleCSpine: 'none',
   channelLayout: 'single-equator',
   chordGrouping: 'none',
-  subdivisionStyle: 'classical-urtext',
-  claspDurationStyle: 'center-ticks',
+  subdivisionStyle: 'kinetic-tab-beam',
+  claspDurationStyle: 'center-kinetic-ticks',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   anacrusisTicks: 0,
