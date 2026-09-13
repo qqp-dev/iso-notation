@@ -3,7 +3,7 @@
  *
  * Covers:
  *  1. `renderCandidatesView()` renders every candidate declared in the
- *     registry, on **every engraving window it declares** (Round 6 judges a
+ *     registry, on **every engraving window it declares** (Round 7 judges a
  *     candidate on the Bach opening and the dense Brahms chords at once), with
  *     labels, option-delta badges, lint chips and SVG previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
@@ -88,22 +88,22 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 6/);
-  assert.match(html, /Single-Note Subdivisions/);
+  assert.match(html, /Round 7/);
+  assert.match(html, /Kinetic Subdivision Tabs/);
 });
 
-test('Round 6 registry declares the five subdivision dialects on refined per-hand clasps', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 6);
-  assert.match(CURRENT_ROUND_METADATA.title, /Subdivisions/);
+test('Round 7 registry declares the four kinetic subdivision dialects on per-hand clasps', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 7);
+  assert.match(CURRENT_ROUND_METADATA.title, /Kinetic Subdivision Tabs/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['classical-urtext', 'copperplate-pennant', 'architectural-tab', 'beveled-slash', 'aerodynamic-winglet'],
-    'candidates A–E in display order'
+    ['kinetic-tab-30', 'kinetic-tab-45', 'kinetic-tab-tapered', 'classical-urtext'],
+    'candidates A–D in display order'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.chordGrouping),
-    ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp']
+    ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp']
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
@@ -125,12 +125,12 @@ test('Round 6 registry declares the five subdivision dialects on refined per-han
     'the classical control is the golden subdivision itself'
   );
   assert.deepEqual(
-    candidateBadges(getCandidate('beveled-slash')!).map((b) => b.key),
+    candidateBadges(getCandidate('kinetic-tab-45')!).map((b) => b.key),
     ['chordGrouping', 'subdivisionStyle']
   );
 });
 
-test('Round 6 candidates export cleanly to the contact sheet', () => {
+test('Round 7 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
@@ -158,20 +158,46 @@ test('Round 6 candidates export cleanly to the contact sheet', () => {
   };
   /** The stem-tip element each dialect paints (and only that dialect). */
   const SIGNATURES: Record<string, RegExp> = {
+    'kinetic-tab-30': /<line class="janko-flag"[^>]*stroke-width="1\.10"/,
+    'kinetic-tab-45': /<line class="janko-flag"[^>]*stroke-width="1\.10"/,
+    'kinetic-tab-tapered': /<path class="janko-flag"[^>]*d="M [^"]* L [^"]* L [^"]* L [^"]* Z"/,
     'classical-urtext': /class="janko-flag"[^>]*d="M [^"]* C /,
-    'copperplate-pennant': /class="janko-flag"[^>]*d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ Z"/,
-    'architectural-tab': /<rect class="janko-flag"/,
-    'beveled-slash': /<line class="janko-flag"[^>]*stroke-width="1\.20"/,
-    'aerodynamic-winglet': /class="janko-flag"[^>]*d="M [^"]* L [^"]* L [^"]* L [^"]* Z"/,
+  };
+  /** The kinetic rake of a panel's tab ink: 30° (`tan = √3/3`) or exactly 45°. */
+  const rakes = (body: string): number[] =>
+    [
+      ...body.matchAll(
+        /<line class="janko-flag"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
+      ),
+    ].map((m) => Math.abs((Number(m[4]) - Number(m[2])) / (Number(m[3]) - Number(m[1]))));
+  const RAKES: Record<string, number> = {
+    'kinetic-tab-30': Math.tan(Math.PI / 6),
+    'kinetic-tab-45': 1,
   };
   for (const candidate of CURRENT_CANDIDATES) {
     const body = panelBody(candidate.id);
     for (const [style, signature] of Object.entries(SIGNATURES)) {
+      // The two monoline tabs share an element shape; their rake tells them
+      // apart, so the plain signature is only asserted for the other dialects.
+      if (style === 'kinetic-tab-45' || style === 'kinetic-tab-30') continue;
       assert.equal(
         signature.test(body),
         style === candidate.id,
         `${candidate.id} panel paints ${style === candidate.id ? 'only' : 'no'} ${style} ink`
       );
+    }
+    const expected = RAKES[candidate.id];
+    const panelRakes = rakes(body);
+    if (expected === undefined) {
+      assert.equal(panelRakes.length, 0, `${candidate.id} paints no monoline tab`);
+    } else {
+      assert.ok(panelRakes.length > 0, `${candidate.id} paints its kinetic tab`);
+      for (const rake of panelRakes) {
+        assert.ok(
+          Math.abs(rake - expected) < 5e-3,
+          `${candidate.id} rakes at ${expected} (got ${rake})`
+        );
+      }
     }
   }
 });
@@ -391,7 +417,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 6);
+  assert.equal(CURRENT_ROUND_METADATA.round, 7);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');

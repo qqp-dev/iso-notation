@@ -87,7 +87,7 @@ export interface JankoCandidate {
 /** Score id of the studio's primary benchmark (Bach Goldberg Var. 1). */
 export const DEFAULT_STUDIO_SCORE_ID = 'primary';
 
-/** Score id of the Brahms Intermezzo benchmark, used by the Round 5/6 windows. */
+/** Score id of the Brahms Intermezzo benchmark, used by the Round 5–7 windows. */
 export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
 
 /**
@@ -95,91 +95,83 @@ export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
  * the Klavarskribo beat grid, round 3 the Middle C corridor, round 4 the octave
- * framing and round 5 the external left clasp. Round 6 refines the two pieces of
- * ink the operator still finds clumsy: the **isolated single-note flag** (five
- * competing subdivision dialects — two classical traditions and three modern
- * concepts) and the **clasp grouping unit**, now strictly one hand and strictly
- * for horizontally displaced (row-snapped) clusters.
+ * framing, round 5 the external left clasp and round 6 the single-note
+ * subdivision dialects with the per-hand clasp. Round 7 answers the operator's
+ * verdict on that round: the subdivision mark must carry **diagonal kinetic
+ * direction** instead of a static perpendicular tab (tested across 8th/16th/32nd
+ * tiers), a hand's clean vertical chord is unified by gap-gated Option 3
+ * chording, the horizontally spread `B - 2 - 8` cluster keeps its clasp through
+ * the column solver, and the whole staff hierarchy is lightened.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 6,
-  title: 'Single-Note Subdivisions & Refined Hand-Cluster Clasps',
+  round: 7,
+  title: 'Kinetic Subdivision Tabs, Gap-Gated Chords & Staff Hierarchy',
   description:
-    'Balancing 2 classical traditions (Sculpted Urtext Flag, Copperplate Pennant) with 3 creative modern concepts ' +
-    '(Architectural Tab, Beveled Slash, Aerodynamic Winglet) on isolated notes, alongside refined per-hand clasps ' +
-    'strictly for non-vertical clusters.',
+    'Angled kinetic tabs tested across 8th/16th/32nd subdivisions, with Option 3 gap-gated chording and lightened staff hierarchy.',
 };
 
 /**
- * The two display windows every Round 6 candidate is engraved on: the Bach
- * opening (melodic flow and the isolated subdivision notes that carry the round)
- * and the dense Brahms chords of mm. 7–8, where the non-vertical (`2-5-9`)
- * clusters the refined per-hand clasp targets are at their densest.
+ * The two display windows every Round 7 candidate is engraved on: the Bach
+ * opening (single-note 16ths/8ths that carry the kinetic tabs at every
+ * subdivision tier) and the dense Brahms chords of mm. 7–8, where the `B - 2 - 8`
+ * clasp and the `B - 4 - 7` gap-gated vertical chord live.
  */
-const ROUND_6_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_7_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 2,
-    title: 'Bach Goldberg Var. 1 · mm. 1–2 — opening chord + 16th counterpoint',
+    title: 'Bach Goldberg Var. 1 · mm. 1–2 — opening counterpoint + single-note 16ths/8ths',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 7,
     measureCount: 2,
-    title: 'Brahms Op. 118 No. 1 · mm. 7–8 — dense block chords (macro crop)',
+    title:
+      'Brahms Op. 118 No. 1 · mm. 7–8 — B - 2 - 8 clasp + B - 4 - 7 Option 3 chording (macro crop)',
   },
 ];
 
 /**
- * The active candidate set — the five Round 6 subdivision dialects. Order is
+ * The active candidate set — the four Round 7 subdivision dialects. Order is
  * the display order in the Decision Candidates Matrix.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
+    id: 'kinetic-tab-30',
+    label: 'A · 30° Kinetic Architectural Tab',
+    description:
+      'The Round 6 perpendicular tab raked 30° off horizontal so it leads the eye along the stem’s own motion. Drawn as a 1.1pt monoline of exactly `flagWidth` reach: the calmest of the three kinetic concepts, and the one that stacks most cleanly at 2 and 3 marks.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'kinetic-tab-30' },
+    windows: ROUND_7_WINDOWS,
+    tags: ['kinetic', '30° rake', '1.1pt monoline'],
+  },
+  {
+    id: 'kinetic-tab-45',
+    label: 'B · 45° Dynamic Chevron Tab',
+    description:
+      'The same tab raked to the design system’s 45° French Guillemet angle, so the subdivision ink speaks the same directional language as the handedness chevrons. The boldest kinetic concept: maximum diagonal drive at the stem tip.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'kinetic-tab-45' },
+    windows: ROUND_7_WINDOWS,
+    tags: ['kinetic', '45° chevron', '1.1pt monoline'],
+  },
+  {
+    id: 'kinetic-tab-tapered',
+    label: 'C · Tapered Kinetic Wing Tab',
+    description:
+      'The 30° rake drawn as a filled quad with an optical taper perpendicular to its own axis — a 1.4pt root at the stem narrowing to a 0.8pt tip. The kinetic direction of A with the calligraphic body weighting of the urtext flag.',
+    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'kinetic-tab-tapered' },
+    windows: ROUND_7_WINDOWS,
+    tags: ['kinetic', '30° rake', '1.4pt → 0.8pt taper'],
+  },
+  {
     id: 'classical-urtext',
-    label: 'A · Sculpted Classical Urtext Flag',
+    label: 'D · Balanced Numeral-Urtext Flag',
     description:
-      'The Henle / Bärenreiter lineage: a tapered calligraphic burin curve latched to the stem tip, drawn as a filled path with optical body weighting — thick where the stroke turns, tapering to a hairline at the tail. The classical control every modern concept must beat.',
+      'The refined classical control: a tapered burin hook whose sweep mirrors exactly when it flips onto a lower stem, so the flag keeps its numeral-balanced mass in either hand. The traditional Henle / Bärenreiter answer every kinetic tab must beat.',
     options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'classical-urtext' },
-    windows: ROUND_6_WINDOWS,
-    tags: ['classical', 'urtext', 'tapered burin'],
-  },
-  {
-    id: 'copperplate-pennant',
-    label: 'B · Historic Copperplate Pennant',
-    description:
-      'Early European copperplate engraving: a straight-edged triangular wedge tapering off the stem tip, cut with three straight strokes and no calligraphic swell. Crisper and more geometric than the urtext hook, but visibly stiffer at small sizes.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'copperplate-pennant' },
-    windows: ROUND_6_WINDOWS,
-    tags: ['classical', 'copperplate', 'straight wedge'],
-  },
-  {
-    id: 'architectural-tab',
-    label: 'C · Architectural Lateral Tab',
-    description:
-      'A modern architectural alternative: crisp horizontal rectangular tabs perpendicular to the stem (one tab for 8ths, two for 16ths), grid-aligned and drawn at a constant 1.1pt weight. It reads as duration data rather than calligraphy, and it never crosses its own notehead.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'architectural-tab' },
-    windows: ROUND_6_WINDOWS,
-    tags: ['modern', 'grid-aligned tab', '1.1pt'],
-  },
-  {
-    id: 'beveled-slash',
-    label: 'D · Beveled Burin Slash',
-    description:
-      'Sharp 45° beveled cuts across the stem tip at the design system’s 1.20pt French Guillemet chevron weight, so the subdivision ink speaks the same handedness language as the exception chevrons. The boldest and most directional of the five dialects.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'beveled-slash' },
-    windows: ROUND_6_WINDOWS,
-    tags: ['modern', '45° bevel', 'chevron weight'],
-  },
-  {
-    id: 'aerodynamic-winglet',
-    label: 'E · Modernist Aerodynamic Winglet',
-    description:
-      'A sleek modern fin: a straight vertical spine on the outer edge with a sharp diagonal cutback returning to the stem, giving the subdivision a swept, aerodynamic silhouette. The most sculptural of the modern concepts and the closest in mass to the classical hook.',
-    options: { chordGrouping: 'per-hand-clasp', subdivisionStyle: 'aerodynamic-winglet' },
-    windows: ROUND_6_WINDOWS,
-    tags: ['modern', 'vertical spine', 'cutback'],
+    windows: ROUND_7_WINDOWS,
+    tags: ['classical', 'urtext', 'balanced flip'],
   },
 ];
 

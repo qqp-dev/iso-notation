@@ -764,9 +764,11 @@ export interface BarlineSpan {
 
 /**
  * Every barline segment painted in one system: the measure boundaries of both
- * hands — including the barline that closes the upbeat of an anacrusis system
- * and the closing system boundary. The staff lines of a system open from the
- * left margin, so slot 0 contributes no barline.
+ * hands — including the barline that closes the upbeat of an anacrusis system.
+ * The staff lines of a system open from the left margin, so slot 0 contributes
+ * no barline; Round 7 opens every **intermediate** system at its right edge as
+ * well, so the closing system boundary is audited only for the final system
+ * (`layout.isFinalSystem`).
  */
 export function systemBarlines(
   layout: JankoSystemLayout,
@@ -784,10 +786,12 @@ export function systemBarlines(
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
     push(g.staffLeft + upbeatWidth);
     for (let m = 1; m <= o.measuresPerSystem; m++) {
+      if (m === o.measuresPerSystem && !layout.isFinalSystem) continue;
       push(g.staffLeft + upbeatWidth + m * g.measureWidth);
     }
   } else {
     for (let m = 0; m < o.measuresPerSystem; m++) {
+      if (m === o.measuresPerSystem - 1 && !layout.isFinalSystem) continue;
       push(g.staffLeft + (m + 1) * g.measureWidth);
     }
   }
@@ -884,7 +888,10 @@ export function checkBarlineClearance(
  * The thresholds are deliberately *weaker* than the engine's fit rule
  * (`CLASP_NOTEHEAD_AIR` = 1.2pt, `claspMinBarlineAir` = 4.0pt), so every clasp
  * the engine admits is guaranteed to pass this audit; the check exists to catch
- * a regression that paints a bracket where the solver never placed one.
+ * a regression that paints a bracket where the solver never placed one. Round 7
+ * adds one shared exception: the other hand's heads of the clasp's **own onset**
+ * travel with the solved column and only owe the bracket non-overlap (see
+ * `engine.claspForeignAir`).
  */
 export function checkClaspClearance(
   layout: JankoSystemLayout,
@@ -935,34 +942,42 @@ export function checkClaspClearance(
       });
     }
 
-    // 2. Every foreign glyph keeps real air from the bracket.
+    // 2. Every foreign glyph keeps real air from the bracket. Round 7: the other
+    // hand's heads of the clasp's own onset travel with the same solved column
+    // and only have to stay clear of the bracket's ink (see
+    // `engine.claspForeignAir`), exactly as the engine's own fit rule measures
+    // them.
     for (const p of layout.notes) {
       if (own.has(p.note.id)) continue;
       const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
+      const required = p.note.startTick === clasp.tick ? 0 : lint.minClearance;
       const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
       const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
       const gap = Math.hypot(dx, dy) - radius;
-      if (gap >= lint.minClearance - EPS) continue;
+      if (gap >= required - EPS) continue;
       out.push({
         code: 'clasp-collision',
         severity: 'error',
         message:
           `Clasp at tick ${clasp.tick} passes ${gap.toFixed(2)}pt from notehead ${p.note.id} ` +
-          `(${lint.minClearance.toFixed(1)}pt of air required): the bracket collides with the glyph.`,
+          `(${required.toFixed(1)}pt of air required): the bracket collides with the glyph.`,
         system: layout.index,
         measure: measureOfTick(clasp.tick, t),
         noteIds: [p.note.id, ...clasp.notes.map((n) => n.id)],
         x: p.x,
         y: p.y,
-        metrics: { gap, required: lint.minClearance, noteX: p.x, noteY: p.y },
+        metrics: { gap, required, noteX: p.x, noteY: p.y },
       });
     }
 
-    // 3. Left-margin furniture (accolade, measure numeral).
+    // 3. Left-margin furniture (accolade, measure numeral). Round 7 paints the
+    // accolade only at the start of the piece, so intermediate systems only owe
+    // the measure numeral its air.
     for (const [label, furniture] of [
       ['accolade', accolade],
       ['measure numeral', numeral],
     ] as const) {
+      if (label === 'accolade' && layout.index !== 0) continue;
       if (label === 'measure numeral' && !o.showMeasureNumbers) continue;
       if (!boxesOverlap(disk, furniture, lint.minClearance)) continue;
       out.push({
@@ -1063,8 +1078,9 @@ export function checkMeasureNumeralClearance(
     layout.index * o.measuresPerSystem + 1
   );
   // The numeral opens the measure-number column: it must start to the right of
-  // the accolade's column, never above/inside it.
-  if (numeral.x0 < accolade.x1) {
+  // the accolade's column, never above/inside it. Round 7 paints the accolade
+  // only at the start of the piece, so intermediate systems have a free column.
+  if (layout.index === 0 && numeral.x0 < accolade.x1) {
     out.push({
       code: 'measure-numeral-collision',
       severity: 'error',
@@ -1122,6 +1138,9 @@ export function checkAccoladeClearance(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
+  // Round 7 paints the accolade strictly at the start of the piece: an
+  // intermediate system has no accolade ink to audit.
+  if (layout.index !== 0) return;
   const { numeral, accolade } = marginFurniture(
     layout,
     t,
