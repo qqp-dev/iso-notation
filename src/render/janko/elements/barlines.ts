@@ -107,41 +107,43 @@ export function renderBarlines(
 }
 
 /** Vertical clearance (pt) a measure numeral keeps above the staff's top rule. */
-export const MEASURE_NUMBER_CLEARANCE = 14.0;
+export const MEASURE_NUMBER_CLEARANCE = 3.0;
 
 /**
  * Horizontal offset (pt) of a measure numeral left of the staff column
- * (Round 10): `x = staffLeft − 6.0`. The engine's margin-furniture box shares
- * the same offset, so the reserved ink and the painted ink can never drift.
+ * (Round 11): `x = staffLeft − 10.0`, right-aligned into the true left margin
+ * (Henle / Bärenreiter practice). The engine's margin-furniture box shares the
+ * same anchor, so the reserved ink and the painted ink can never drift.
  */
-export const MEASURE_NUMBER_LEFT_OFFSET = 6.0;
+export const MEASURE_NUMBER_LEFT_OFFSET = 10.0;
 
 /**
  * Baseline y of a system's measure numeral.
  *
- * Round 9 elevates the numeral from `staffTopY − 6` to a full
- * {@link MEASURE_NUMBER_CLEARANCE} above the top rule: a high treble note in
- * octave 5 (whose Set B row sits only 7.5pt above the o5 equator) can no longer
- * reach the figures. The engine's margin-furniture box (which the linter
- * audits) shares this function, so the reserved ink and the painted ink can
- * never drift apart.
+ * Round 11 sets the numeral snug just above the top staff rule
+ * (`staffTopY − 3.0`): pushed into the left margin it clears high Octave 6
+ * notes in m. 29 while still reading naturally at m. 5. The engine's
+ * margin-furniture box (which the linter audits) shares this function, so the
+ * reserved ink and the painted ink can never drift apart.
  */
 export function getMeasureNumberBaselineY(geo: JankoSystemGeometry): number {
   return geo.staffTopY - MEASURE_NUMBER_CLEARANCE;
 }
 
-/** A measure number above the first measure of a system. */
+/**
+ * A measure number in the left margin above the first measure of a system
+ * (Round 11): `x = staffLeft − 10.0pt`, `text-anchor="end"`,
+ * `y = staffTopY − 3.0pt`.
+ */
 export function renderMeasureNumber(
   geo: JankoSystemGeometry,
   measureNumber: number,
   tokens?: Partial<JankoTokens> | null
 ): string {
   void tokens;
-  // Round 10: the numeral moves a further 4pt into the margin (`staffLeft − 6`),
-  // so it never crowds the opening beat column.
   const x = geo.staffLeft - MEASURE_NUMBER_LEFT_OFFSET;
   const y = getMeasureNumberBaselineY(geo);
-  return `    <text class="janko-measure-num" x="${f(x)}" y="${f(y)}">${measureNumber}</text>`;
+  return `    <text class="janko-measure-num" x="${f(x)}" y="${f(y)}" text-anchor="end">${measureNumber}</text>`;
 }
 
 /**

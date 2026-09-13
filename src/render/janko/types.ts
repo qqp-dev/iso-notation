@@ -22,13 +22,13 @@
  *   `'bounded-channel'` (two boundary rules at `equator ± channelHalfWidth`
  *   with Set B contour-resolved to `±channelFlankOffset`). See
  *   {@link JankoChannelLayout} for the full table.
- * - The four equators o5 (−58pt), o4 (−28pt), o3 (+28pt) and o2 (+58pt) form
+ * - The four equators o5 (−45pt), o4 (−15pt), o3 (+15pt) and o2 (+45pt) form
  *   the *grand staff*: one **absolute, hand-independent** coordinate lattice
- *   shared by both hands. Octaves step by exactly `octaveStep`
- *   (2 * rowHeight = 30pt) away from the corridor, whose negative breathing
- *   space is `interStaffGap` (56pt by default) between o4 and o3 — the
- *   *spacious corridor* holds the Middle C channel open without any artificial
- *   rule dividing the hands.
+ *   shared by both hands. Every octave steps by exactly `octaveStep`
+ *   (2 * rowHeight = 30pt) away from Middle C (`y = 0`), because Round 11
+ *   equalizes `interStaffGap` to that same 30pt — the lattice is uniformly
+ *   spaced everywhere, so octave equators are equidistant across the corridor
+ *   and the hands are framed with true melodic symmetry.
  * - Only pitches **outside** the staff span (`octave < 2` or `octave > 5`)
  *   emit dynamic ledger equators; every note in octaves 2–5 already sits on a
  *   continuous staff line.
@@ -90,63 +90,66 @@ export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, strin
 };
 
 /**
- * Midpoint clasp **duration** paradigms — the Round 10 question: how an
+ * Midpoint clasp **duration** paradigms — the Round 11 question: how an
  * external per-hand bracket carries the cluster's duration at the exact
- * vertical midpoint of its own spine with marks that cut *across* the spine.
+ * vertical midpoint of its own spine with **light transverse line cuts**
+ * across the spine.
  *
- * Round 9 anchored the marks on `yMid = (topY + botY) / 2`, but the marks hung
- * off one side of the spine and were too small to read at 100% zoom. Round 10
- * retires the two rejected paradigms (`'center-chevron-notch'`,
- * `'center-pip-rays'`) and scales the remaining four so every mark is a
- * symmetrical transverse gesture across the spine, with hollow marks knocking
- * the spine cleanly out of their interior (see
+ * Round 10's heavy solid marks (beads, diamond blocks) are eliminated. All
+ * four paradigms are now line-based and share one grammar (see
  * `elements/rhythm.renderChordClasp`):
  *
- * | style                      | duration ink at the spine midpoint                            |
- * | -------------------------- | ------------------------------------------------------------- |
- * | `'transverse-cross-bars'`  | crisp horizontal cross-bars, W = 7.5pt, stroke 1.2pt          |
- * | `'kinetic-cross-slashes'`  | 12.4° beam-harmonized cross-slashes, W = 7.5pt, stroke 1.2pt  |
- * | `'interrupted-spine-node'` | an emphatic white-interior node: ring R = 3.0pt / beads       |
- * | `'faceted-diamond-bands'`  | sculpted transverse diamond bands, W = 8.0pt × H = 4.5pt      |
+ * - an **open white circular ring** (`R = 3.0pt`, stroke `1.0pt`) for half
+ *   notes, knocking the spine cleanly out (zero crosshairs);
+ * - a continuous solid plain bracket `[` for quarter notes;
+ * - the plain bracket plus the crisp 0.75pt dot for dotted quarters;
+ * - light transverse cuts for subdivisions — 1 mark for an 8th, 2 parallel
+ *   marks mirrored about the midpoint for a 16th.
  *
- * Every paradigm shares the same plain quarter bracket (a continuous solid
- * spine), the same open half/whole knockout and the same 0.75pt dotted-quarter
- * dot, so the round varies exactly one variable: the ink a value leaves at the
- * midpoint.
+ * | style                     | subdivision ink at the spine midpoint                       |
+ * | ------------------------- | ----------------------------------------------------------- |
+ * | `'transverse-cross-bars'` | horizontal rungs, W = 7.5pt, stroke 1.0pt                   |
+ * | `'kinetic-cross-slashes'` | up-raked 12.4° slashes, W = 7.5pt, stroke 1.0pt             |
+ * | `'down-raked-slashes'`    | down-raked −12.4° slashes, W = 7.5pt, stroke 1.0pt          |
+ * | `'cross-hatch-stitches'`  | symmetrical cross-stitches (`×`), stroke 1.0pt              |
  */
 export type JankoClaspDurationStyle =
   | 'transverse-cross-bars'
   | 'kinetic-cross-slashes'
-  | 'interrupted-spine-node'
-  | 'faceted-diamond-bands';
+  | 'down-raked-slashes'
+  | 'cross-hatch-stitches';
 
 /** Every clasp-duration paradigm, in the canonical exploration order (A–D). */
 export const JANKO_CLASP_DURATION_STYLES: readonly JankoClaspDurationStyle[] = [
   'transverse-cross-bars',
   'kinetic-cross-slashes',
-  'interrupted-spine-node',
-  'faceted-diamond-bands',
+  'down-raked-slashes',
+  'cross-hatch-stitches',
 ];
 
-/** Human-readable names of the four scaled midpoint clasp-duration paradigms. */
+/** Human-readable names of the four light transverse clasp-duration paradigms. */
 export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, string> = {
-  'transverse-cross-bars': 'Transverse 7.5pt Cross-Bars',
-  'kinetic-cross-slashes': 'Kinetic 12.4° Cross-Slashes',
-  'interrupted-spine-node': 'Interrupted-Spine Node',
-  'faceted-diamond-bands': 'Faceted Diamond Bands',
+  'transverse-cross-bars': 'Horizontal Cross-Rungs (7.5pt)',
+  'kinetic-cross-slashes': 'Up-Raked 12.4° Kinetic Slashes',
+  'down-raked-slashes': 'Down-Raked −12.4° Slashes',
+  'cross-hatch-stitches': 'Symmetrical Cross-Hatch Stitches',
 };
 
 /**
  * How a system opens at its left margin — the Round 10 retirement of the
- * copperplate accolade.
+ * copperplate accolade, refined by Round 11 with a modern double frame.
  *
- * | style                   | margin ink at the system start                             |
- * | ----------------------- | ---------------------------------------------------------- |
- * | `'open-halo'`           | none: the staff lines emerge openly from the margin, and   |
- * |                         | the Position of Honor halo rings the opening tick-0 heads  |
- * | `'architectural-bracket'`| a straight 0.65pt rule with 3.0pt right-angled spurs       |
- * | `'clef-pillar'`         | the same straight 0.65pt rule, without spurs                |
- * | `'none'`                | no system-start ink at all                                 |
+ * | style                    | margin ink at the system start                            |
+ * | ------------------------ | --------------------------------------------------------- |
+ * | `'open-halo'`            | none: the staff lines emerge openly from the margin, and  |
+ * |                          | the Position of Honor halo rings the opening tick-0 heads |
+ * | `'architectural-bracket'`| a straight 0.65pt rule with 3.0pt right-angled spurs      |
+ * |                          | clasping the Octave 5 and Octave 2 rules                  |
+ * | `'clef-pillar'`          | a slender 0.50pt pillar connecting the octave equators    |
+ * |                          | with tick marks at Middle C and the octave lines          |
+ * | `'double-hairline'`      | a modern double vertical bounding rule (0.75pt outer,     |
+ * |                          | 0.35pt inner, 2.5pt spacing) flush at the system start    |
+ * | `'none'`                 | no system-start ink at all                                |
  *
  * The curlicue copperplate accolade no longer belongs to the modern design
  * language, so `'open-halo'` is the golden-master default. The Position of
@@ -157,6 +160,7 @@ export type JankoSystemStartStyle =
   | 'open-halo'
   | 'architectural-bracket'
   | 'clef-pillar'
+  | 'double-hairline'
   | 'none';
 
 /** Every system-start style, in the canonical exploration order. */
@@ -164,6 +168,7 @@ export const JANKO_SYSTEM_START_STYLES: readonly JankoSystemStartStyle[] = [
   'open-halo',
   'architectural-bracket',
   'clef-pillar',
+  'double-hairline',
   'none',
 ];
 
@@ -171,7 +176,8 @@ export const JANKO_SYSTEM_START_STYLES: readonly JankoSystemStartStyle[] = [
 export const JANKO_SYSTEM_START_STYLE_LABELS: Record<JankoSystemStartStyle, string> = {
   'open-halo': 'Open Margin with Position-of-Honor Halo',
   'architectural-bracket': 'Architectural Bracket (0.65pt rule + 3.0pt spurs)',
-  'clef-pillar': 'Slender Clef Pillar (0.65pt rule)',
+  'clef-pillar': 'Slender Clef Pillar (0.50pt lattice ticks)',
+  'double-hairline': 'Double Hairline Frame (0.75pt / 0.35pt)',
   none: 'No System-Start Mark',
 };
 
@@ -486,15 +492,17 @@ export interface JankoLayoutOptions {
    */
   subdivisionStyle?: JankoSubdivisionStyle;
   /**
-   * Midpoint clasp-duration paradigm (Round 10): how an external per-hand
-   * bracket carries its cluster's duration at its spine midpoint. Defaults to
-   * `'transverse-cross-bars'` (see {@link JankoClaspDurationStyle}).
+   * Midpoint clasp-duration paradigm (Round 11): how an external per-hand
+   * bracket carries its cluster's duration at its spine midpoint with a light
+   * transverse line cut. Defaults to `'transverse-cross-bars'` (see
+   * {@link JankoClaspDurationStyle}).
    */
   claspDurationStyle?: JankoClaspDurationStyle;
   /**
-   * System-start margin ink (Round 10): the copperplate accolade is retired in
-   * favour of an open margin whose opening sounds are ringed by the Position of
-   * Honor halo. Defaults to `'open-halo'` (see {@link JankoSystemStartStyle}).
+   * System-start margin ink (Round 10, extended by Round 11): the copperplate
+   * accolade is retired in favour of an open margin whose opening sounds are
+   * ringed by the Position of Honor halo. Defaults to `'open-halo'` (see
+   * {@link JankoSystemStartStyle}).
    */
   systemStartStyle?: JankoSystemStartStyle;
   /**
@@ -556,7 +564,7 @@ export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   measuresPerSystem: 4,
   rhythmStyle: 'beamed',
-  interStaffGap: 56.0,
+  interStaffGap: 30.0,
   middleCSpine: 'none',
   channelLayout: 'single-equator',
   chordGrouping: 'none',
@@ -581,7 +589,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   showTimeSignature: false,
   showBeatGrid: true,
   showRowGuidelines: false,
-  title: 'J.S. Bach: Goldberg Variations, BWV 988',
+  title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
 };
