@@ -7,7 +7,7 @@
  * - `angled-cuts`      — 35° slash cuts on the stem (default, Jánko dialect)
  * - `horizontal-ticks` — neutral horizontal duration ticks (unified lattice)
  * - `beamed`           — traditional connected beams inside each beat, with
- *                        pluggable subdivision marks (Round 6) for solitary /
+ *                        pluggable subdivision marks (Round 7) for solitary /
  *                        unbeamed notes
  *
  * Duration mapping (48 ticks per quarter note):
@@ -197,15 +197,16 @@ export interface JankoBeamConnector {
 }
 
 // ---------------------------------------------------------------------------
-// Round 6 — single-note subdivision grammar (five engraving dialects)
+// Round 7 — single-note subdivision grammar (kinetic tabs + urtext flag)
 // ---------------------------------------------------------------------------
 
-/** Thickness (pt) of one architectural lateral tab. */
+/** Thickness (pt) of the kinetic monoline tabs (`'kinetic-tab-30'`/`-45'`). */
 export const SUBDIVISION_TAB_THICKNESS = 1.1;
-/** Half-reach (pt) of one beveled burin slash (45°, so `dx === dy`). */
-export const SUBDIVISION_BEVEL_REACH = 2.4;
-/** Stroke (pt) of one beveled burin slash — the design system's chevron weight. */
-export const SUBDIVISION_BEVEL_STROKE = 1.2;
+/** Optical taper (pt) of `'kinetic-tab-tapered'`: root at the stem → tip. */
+export const SUBDIVISION_TAPER_ROOT = 1.4;
+export const SUBDIVISION_TAPER_TIP = 0.8;
+/** Tangent of the 30° kinetic rake (the 45° tab rakes at exactly 1). */
+export const SUBDIVISION_TAB_30_TAN = Math.tan(Math.PI / 6);
 
 /**
  * Number of subdivision marks stacked at a stem tip: three for a 32nd, two for
@@ -220,21 +221,22 @@ export function subdivisionMarkCount(durationTicks: number): number {
 }
 
 /**
- * Paint one subdivision mark latched to a stem tip, in the active Round 6
+ * Paint one subdivision mark latched to a stem tip, in the active Round 7
  * dialect. `stemX`/`tipY` are the stem column and anchor, `direction` the stem
  * direction (−1 up, +1 down) and `index` the 1-based stack position: mark `k`
  * sits `(k − 1) · flagSpacing` further along the flag drop (`−direction`).
  *
- * Every dialect reaches at most `flagWidth` right of the stem — four of them
- * stay strictly right of it (a mark can never dagger its own notehead), while
- * the beveled slash cuts symmetrically across the tip — so the shared
- * `claspInkBox` audit covers all five without a per-style box:
+ * **Kinetic direction.** The tab rakes diagonally *with* the stem's motion:
+ * a lower stem (going down from its note) draws its tab angled **upward**, an
+ * upper stem (going up) draws it angled **downward** — the shared
+ * `sign = −direction` rake. Every dialect reaches at most `flagWidth` right of
+ * the stem, and a single mark never drops further than `flagHeight`, so the
+ * shared `claspInkBox` audit covers all four without a per-style box:
  *
- * - `classical-urtext`    tapered filled burin hook (optical body weighting)
- * - `copperplate-pennant` straight-edged triangular wedge
- * - `architectural-tab`   horizontal rectangular tab, `tabW = flagWidth`
- * - `beveled-slash`       45° cut across the stem tip at chevron weight
- * - `aerodynamic-winglet` tapered fin with a vertical spine and cutback
+ * - `kinetic-tab-30`     30° diagonal tab, 1.1pt monoline
+ * - `kinetic-tab-45`     45° diagonal tab, 1.1pt monoline (chevron rake)
+ * - `kinetic-tab-tapered` 30° diagonal tab, 1.4pt root tapering to 0.8pt tip
+ * - `classical-urtext`   refined numeral-balanced urtext flag
  */
 export function renderSubdivisionMark(
   stemX: number,
@@ -253,29 +255,33 @@ export function renderSubdivisionMark(
   const head = `class="${cls}" data-stem-x="${f(stemX)}" data-flag-index="${index}"`;
   const tail = ` data-subdivision-style="${style}"`;
   switch (style) {
-    case 'copperplate-pennant': {
-      const d =
-        `M ${f(stemX)} ${f(cy)} L ${f(stemX + w)} ${f(cy + sign * 0.5 * h)} ` +
-        `L ${f(stemX)} ${f(cy + sign * h)} Z`;
-      return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
-    }
-    case 'architectural-tab':
+    case 'kinetic-tab-30':
+    case 'kinetic-tab-45': {
+      const rake = style === 'kinetic-tab-45' ? 1 : SUBDIVISION_TAB_30_TAN;
       return (
-        `    <rect ${head} x="${f(stemX)}" y="${f(cy - SUBDIVISION_TAB_THICKNESS / 2)}" ` +
-        `width="${f(w)}" height="${f(SUBDIVISION_TAB_THICKNESS)}" fill="#111111"${tail}/>`
-      );
-    case 'beveled-slash': {
-      const b = SUBDIVISION_BEVEL_REACH;
-      return (
-        `    <line ${head} x1="${f(stemX - b)}" y1="${f(cy - sign * b)}" ` +
-        `x2="${f(stemX + b)}" y2="${f(cy + sign * b)}" stroke="#111111" ` +
-        `stroke-width="${SUBDIVISION_BEVEL_STROKE.toFixed(2)}" stroke-linecap="butt"${tail}/>`
+        `    <line ${head} x1="${f(stemX)}" y1="${f(cy)}" ` +
+        `x2="${f(stemX + w)}" y2="${f(cy + sign * w * rake)}" stroke="#111111" ` +
+        `stroke-width="${SUBDIVISION_TAB_THICKNESS.toFixed(2)}" stroke-linecap="butt"${tail}/>`
       );
     }
-    case 'aerodynamic-winglet': {
+    case 'kinetic-tab-tapered': {
+      // The same 30° rake, drawn as a filled quad whose thickness tapers
+      // perpendicular to its own axis: a 1.4pt root at the stem narrowing to a
+      // 0.8pt tip. The tip is pulled in by its own normal half-extent so the
+      // dialect still reaches exactly `flagWidth` right of the stem.
+      const angle = Math.atan(SUBDIVISION_TAB_30_TAN);
+      const nx = -sign * Math.sin(angle);
+      const ny = Math.cos(angle);
+      const tip = SUBDIVISION_TAPER_TIP / 2;
+      const root = SUBDIVISION_TAPER_ROOT / 2;
+      const reach = w - tip * Math.abs(nx);
+      const tipX = stemX + reach;
+      const tabTipY = cy + sign * reach * SUBDIVISION_TAB_30_TAN;
       const d =
-        `M ${f(stemX)} ${f(cy)} L ${f(stemX + w)} ${f(cy + sign * 0.30 * h)} ` +
-        `L ${f(stemX + w)} ${f(cy + sign * h)} L ${f(stemX)} ${f(cy + sign * 0.55 * h)} Z`;
+        `M ${f(stemX + root * nx)} ${f(cy + root * ny)} ` +
+        `L ${f(tipX + tip * nx)} ${f(tabTipY + tip * ny)} ` +
+        `L ${f(tipX - tip * nx)} ${f(tabTipY - tip * ny)} ` +
+        `L ${f(stemX - root * nx)} ${f(cy - root * ny)} Z`;
       return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
     }
     case 'classical-urtext':
@@ -529,7 +535,7 @@ export function claspInkBox(
  * Paint one left clasp: the bracket, its duration spire, subdivision marks or
  * pips. The group is engraved in the rhythm layer (beneath the noteheads), so a
  * knockout always erases whatever a clasp should never have touched. The tip
- * draws its 8th/16th marks in the active `subdivisionStyle` (Round 6), so a
+ * draws its 8th/16th marks in the active `subdivisionStyle` (Round 7), so a
  * clasped cluster and a flagged stem of the same value can never disagree.
  */
 export function renderChordClasp(
@@ -613,6 +619,122 @@ export function renderClaspGroup(
   for (const group of groups) parts.push(renderChordClasp(group, t, subdivisionStyle));
   for (const rail of rails) parts.push(renderClaspRail(rail, t));
   parts.push('  </g>');
+  return parts.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Round 7 — Option 3: gap-gated vertical chording
+// ---------------------------------------------------------------------------
+
+/**
+ * Vertical distance (pt) at or below which two adjacent heads of one hand form
+ * a **tight cluster**: no connecting ink is drawn between them, because a stem
+ * there would only dagger the neighbouring notehead.
+ */
+export const CHORD_BRIDGE_MIN_GAP = 20.0;
+/** Air (pt) a bridge line keeps from the two discs it connects. */
+export const CHORD_BRIDGE_DISC_AIR = 0.2;
+
+/** One intentional vertical bridge unifying a wide leap inside one hand. */
+export interface JankoChordBridge {
+  /** Column of the two heads (identical by definition). */
+  x: number;
+  /** Upper end of the bridge (below the upper disc). */
+  y1: number;
+  /** Lower end of the bridge (above the lower disc). */
+  y2: number;
+  /** Ids of the two heads the bridge unifies. */
+  noteIds: string[];
+}
+
+/**
+ * One hand's vertically aligned chord, resolved by Option 3.
+ *
+ * The hand's heads share a single column, so the external clasp refuses them
+ * (`claspNotesHorizontallySpread` is false). Option 3 instead gives the column
+ * a gap-gated stem grammar:
+ *
+ * - every adjacent pair closer than {@link CHORD_BRIDGE_MIN_GAP} is a tight
+ *   cluster — its internal connecting stem is **suppressed**, so nothing
+ *   daggers the neighbouring notehead;
+ * - every adjacent pair further apart is a wide leap — an intentional
+ *   {@link JankoChordBridge} line connects the two heads and unifies the hand's
+ *   reach;
+ * - the **outer extremity** of the group (topmost head for an up-stem hand,
+ *   bottommost for a down-stem hand) carries the group's rhythmic duration —
+ *   its stem, plus one mark per 8th/16th/32nd level of the hand's shortest
+ *   member value.
+ */
+export interface JankoVerticalChordGroup {
+  /** The head that carries the whole hand's duration, at the group's extremity. */
+  carrier: JankoRhythmNote;
+  /** Duration (ticks) the carrier draws — the hand's shortest member value. */
+  durationTicks: number;
+  /** Ids of the interior heads whose own stems are suppressed. */
+  suppressedIds: string[];
+  /** Intentional bridge lines across the group's wide leaps, top to bottom. */
+  bridges: JankoChordBridge[];
+}
+
+/**
+ * Resolve Option 3 for one hand's vertical cluster: two or more heads of the
+ * same hand sharing one column. Returns null for a lone note and for a
+ * horizontally spread (row-snapped) cluster, which the per-hand clasp groups
+ * instead.
+ */
+export function computeVerticalChordGroup(
+  notes: readonly JankoRhythmNote[],
+  tokens?: Partial<JankoTokens> | null
+): JankoVerticalChordGroup | null {
+  const t = resolveJankoTokens(tokens);
+  if (notes.length < 2) return null;
+  if (claspNotesHorizontallySpread(notes)) return null;
+  const sorted = [...notes].sort(
+    (a, b) => a.y - b.y || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+  const direction = stemDirection(sorted[0].hand);
+  // The extremity in the stem direction carries the duration: an up-stem hand
+  // (RH) hands it to its topmost head, a down-stem hand (LH) to its bottommost.
+  const carrier = direction === -1 ? sorted[0] : sorted[sorted.length - 1];
+  const suppressedIds = sorted.filter((n) => n.id !== carrier.id).map((n) => n.id);
+  const bridges: JankoChordBridge[] = [];
+  for (let i = 0; i + 1 < sorted.length; i++) {
+    const upper = sorted[i];
+    const lower = sorted[i + 1];
+    if (lower.y - upper.y <= CHORD_BRIDGE_MIN_GAP) continue;
+    bridges.push({
+      x: upper.x,
+      y1: upper.y + t.noteheadRadius + CHORD_BRIDGE_DISC_AIR,
+      y2: lower.y - t.noteheadRadius - CHORD_BRIDGE_DISC_AIR,
+      noteIds: [upper.id, lower.id],
+    });
+  }
+  return {
+    carrier,
+    durationTicks: Math.min(...notes.map((n) => n.durationTicks)),
+    suppressedIds,
+    bridges,
+  };
+}
+
+/**
+ * Paint the bridge lines of every gap-gated vertical chord. They are engraved
+ * in the rhythm layer — beneath the noteheads — so a white knockout always
+ * erases any overlap with a glyph, and they keep
+ * {@link CHORD_BRIDGE_DISC_AIR} of air from the two discs they connect.
+ */
+export function renderChordBridges(
+  bridges: readonly JankoChordBridge[],
+  strokeWidth: number = 0.90
+): string {
+  if (bridges.length === 0) return '';
+  const parts: string[] = ['    <g class="janko-chord-bridges">'];
+  for (const b of bridges) {
+    parts.push(
+      `      <line class="janko-chord-bridge" data-bridge-notes="${b.noteIds.join(',')}" x1="${f(b.x)}" y1="${f(b.y1)}" x2="${f(b.x)}" y2="${f(b.y2)}" stroke="#111111" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="butt"/>`
+    );
+  }
+  parts.push('    </g>');
   return parts.join('\n');
 }
 

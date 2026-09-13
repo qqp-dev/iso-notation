@@ -21,7 +21,7 @@ export function renderStaffBarline(
   x: number,
   yTop: number,
   yBot: number,
-  strokeWidth: number = 0.85,
+  strokeWidth: number = 0.60,
   stroke: string = '#111111'
 ): string {
   return `    <line class="janko-barline" x1="${f(x)}" y1="${f(yTop)}" x2="${f(x)}" y2="${f(yBot)}" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(2)}"/>`;
@@ -30,11 +30,17 @@ export function renderStaffBarline(
 /**
  * All internal measure barlines of one system, plus the closing system
  * boundary. Measure numbers are the caller's responsibility (see engine).
+ *
+ * Round 7 lightens the measure barlines to 0.60pt and opens the intermediate
+ * systems at their right edge: only the **final measure of the final system**
+ * (`isFinalScoreMeasure`) draws the closing vertical barline. Every other
+ * system simply stops in open negative space, matching its open left start.
  */
 export function renderBarlines(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  isFinalScoreMeasure: boolean = true
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -49,23 +55,26 @@ export function renderBarlines(
   if (geo.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
     // 1. Barline ending the upbeat
-    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, rhTop, rhBot, 0.85));
-    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, lhTop, lhBot, 0.85));
+    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, rhTop, rhBot, 0.60));
+    out.push(renderStaffBarline(geo.staffLeft + upbeatWidth, lhTop, lhBot, 0.60));
 
     // 2. Measure barlines for mm. 1..measuresPerSystem
     for (let m = 1; m <= o.measuresPerSystem; m++) {
+      const isSystemEnd = m === o.measuresPerSystem;
+      if (isSystemEnd && !isFinalScoreMeasure) continue;
       const x = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
-      const isFinal = m === o.measuresPerSystem;
-      const width = isFinal ? 1.05 : 0.85;
+      const width = isSystemEnd ? 1.05 : 0.60;
       out.push(renderStaffBarline(x, rhTop, rhBot, width));
       out.push(renderStaffBarline(x, lhTop, lhBot, width));
     }
   } else {
-    // Internal boundaries: every measure end, including the system end.
+    // Internal boundaries: every measure end; the system end only closes the
+    // score.
     for (let m = 0; m < o.measuresPerSystem; m++) {
+      const isSystemEnd = m === o.measuresPerSystem - 1;
+      if (isSystemEnd && !isFinalScoreMeasure) continue;
       const x = geo.staffLeft + (m + 1) * geo.measureWidth;
-      const isFinal = m === o.measuresPerSystem - 1;
-      const width = isFinal ? 1.05 : 0.85;
+      const width = isSystemEnd ? 1.05 : 0.60;
       out.push(renderStaffBarline(x, rhTop, rhBot, width));
       out.push(renderStaffBarline(x, lhTop, lhBot, width));
     }
@@ -89,8 +98,10 @@ export function renderMeasureNumber(
 
 /**
  * Vertical dashed pulse lines for beats 2, 3, … (Klavarskribo beat grid).
- * Replaces the heavy time signature numerals with subtle subdivision guidance,
- * matching the prior perfected landscape engraving benchmark (stroke="#D1D5DB", width 0.50pt, dash 2,3).
+ * Replaces the heavy time signature numerals with subtle subdivision guidance.
+ * Round 7 steps the grid up to 0.70pt `#9CA3AF`: the beat pulses stay clearly
+ * subordinate to the music but now read as a real structural layer above the
+ * lightened staff rules.
  */
 export function renderBeatGrid(
   geo: JankoSystemGeometry,
@@ -134,10 +145,10 @@ export function renderBeatGrid(
       const frac = b / beatsPerMeasure;
       const x = measureLeft + left + frac * available;
       out.push(
-        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(rhBot)}" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>`
+        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(rhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
       );
       out.push(
-        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(lhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>`
+        `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(lhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
       );
     }
   }

@@ -78,11 +78,14 @@ export function renderStaffLines(
 
   // Outer equators (o5, o2): lighter hairline.
   // Inner equators (o4, o3): the definitive octave boundaries of each hand.
+  // Round 7 lightens the whole hierarchy: the outer equators fall to a 0.50pt
+  // hairline and the inner octave boundaries to 0.65pt, so the staff reads as
+  // four quiet rules behind the music instead of two competing weights.
   const equators: Array<[Hand, number, string, number]> = [
-    ['RH', 5, '#1E293B', 0.70],
-    ['LH', 2, '#1E293B', 0.70],
-    ['RH', 4, '#0F172A', 0.90],
-    ['LH', 3, '#0F172A', 0.90],
+    ['RH', 5, '#1E293B', 0.50],
+    ['LH', 2, '#1E293B', 0.50],
+    ['RH', 4, '#0F172A', 0.65],
+    ['LH', 3, '#0F172A', 0.65],
   ];
   for (const [hand, oct, stroke, width] of equators) {
     for (const y of getEquatorRuleYs(geo.equatorY(hand, oct), o, t)) {

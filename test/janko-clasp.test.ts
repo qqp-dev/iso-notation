@@ -59,6 +59,8 @@ import {
   renderJankoCrop,
 } from '../src/render/janko/engine';
 import {
+  CHORD_BRIDGE_DISC_AIR,
+  CHORD_BRIDGE_MIN_GAP,
   CLASP_MIN_HORIZONTAL_SPREAD,
   CLASP_PIP_RADIUS,
   CLASP_SPIRE_LENGTH,
@@ -66,6 +68,7 @@ import {
   claspDurationClass,
   claspInkBox,
   computeClaspGeometry,
+  computeVerticalChordGroup,
   renderChordClasp,
 } from '../src/render/janko/elements/rhythm';
 import { JANKO_LINT_CHECKS, lintJankoScore, systemBarlines } from '../src/render/janko/linter';
@@ -245,10 +248,13 @@ test('renderChordClasp paints bracket, spire and tip with the engine classes', (
 test('The fit rule: only actual chords are clasped, and only where the bracket stands clear', () => {
   // Bach Var. 1 is a two-voice 16th-note texture: its measure-opening dyads are
   // clasped, while an interior dyad — whose predecessor sits exactly one disc
-  // away — cannot host a 7.6pt bracket and keeps its traditional stems.
+  // away — cannot host a 7.6pt bracket and keeps its traditional stems. Round 7
+  // adds a third admission route: m. 3's downbeat, whose measure widening cannot
+  // be absorbed, steps its column right until the bracket clears the barline
+  // instead of being silently dropped.
   const system0 = layouts('left-clasp-spire')[0];
   const ticks = system0.clasps.map((c) => c.tick);
-  assert.deepEqual(ticks, [0, 144, 432, 504], 'measure downbeats and the one interior dyad with room');
+  assert.deepEqual(ticks, [0, 144, 288, 432, 504], 'measure downbeats and the interior dyads with room');
   assert.ok(!ticks.includes(24), 'the 16th-grid dyad at tick 24 is not clasped');
   for (const clasp of system0.clasps) {
     assert.ok(clasp.notes.length >= 2, 'a clasp always groups a vertical simultaneity');
@@ -416,6 +422,96 @@ test('Round 6 per-hand clasp: one hand only, only for horizontally displaced clu
 });
 
 // ---------------------------------------------------------------------------
+// 4c. Round 7 — the B - 2 - 8 clasp and Option 3 gap-gated vertical chording
+// ---------------------------------------------------------------------------
+
+test('Round 7 Option 3 grammar: tight pairs stay silent, a wide leap gets its bridge', () => {
+  // The ticket chord B – 4 – 7 as one vertical RH column: Δy = 15pt then 41pt.
+  const group = computeVerticalChordGroup(
+    [rn('top', 100, 605.76, 48), rn('mid', 100, 620.76, 84), rn('low', 100, 661.76, 84)],
+    T
+  )!;
+  assert.equal(group.carrier.id, 'top', 'an up-stem hand hands its duration to the topmost head');
+  assert.equal(group.durationTicks, 48, 'the carrier draws the hand’s shortest member value');
+  assert.deepEqual(group.suppressedIds, ['mid', 'low'], 'the interior heads draw no stem');
+  assert.equal(group.bridges.length, 1, 'only the wide leap earns a bridge');
+  const bridge = group.bridges[0];
+  assert.equal(bridge.x, 100, 'the bridge runs on the shared column');
+  assert.equal(bridge.y1, 620.76 + T.noteheadRadius + CHORD_BRIDGE_DISC_AIR);
+  assert.equal(bridge.y2, 661.76 - T.noteheadRadius - CHORD_BRIDGE_DISC_AIR);
+  assert.ok(
+    bridge.y2 - bridge.y1 > CHORD_BRIDGE_MIN_GAP - 2 * T.noteheadRadius,
+    'the bridge spans the leap, not just the discs'
+  );
+  assert.deepEqual(bridge.noteIds, ['mid', 'low']);
+
+  // A down-stem (LH) hand mirrors the grammar: the bottommost head carries it.
+  const lh = computeVerticalChordGroup(
+    [
+      { ...rn('lh-top', 100, 700, 24), hand: 'LH' as const },
+      { ...rn('lh-bot', 100, 730, 24), hand: 'LH' as const },
+    ],
+    T
+  )!;
+  assert.equal(lh.carrier.id, 'lh-bot');
+  assert.deepEqual(lh.suppressedIds, ['lh-top']);
+  assert.equal(lh.bridges.length, 1, 'Δy = 30pt is a wide leap');
+
+  // Vertical only: a row-snapped cluster belongs to the external clasp instead.
+  assert.equal(
+    computeVerticalChordGroup([rn('a', 94.5, 100, 24), rn('b', 105.5, 130, 24)], T),
+    null,
+    'a horizontally spread hand cluster is never gap-gated'
+  );
+});
+
+test('Round 7: the B - 2 - 8 clasp survives, and B - 4 - 7 is engraved by Option 3', () => {
+  const o = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    chordGrouping: 'per-hand-clasp',
+  });
+  const systems = layoutJankoScore(BRAHMS, o, BRAHMS_T);
+
+  // B - 2 - 8 (m. 7, tick 1296): the RH cluster is row-snapped while its LH
+  // partner shares one whole-tone row. The same-onset partner travels with the
+  // solved column, so the bracket is admitted instead of silently dropped.
+  const b28 = systems.flatMap((l) => l.clasps).find((c) => c.tick === 1296);
+  assert.ok(b28, 'the B - 2 - 8 cluster carries its clasp');
+  assert.equal(new Set(b28!.notes.map((n) => n.hand)).size, 1, 'strictly one hand');
+  assert.ok(
+    BRAHMS.notes.some((n) => n.startTick === 1296 && n.hand === 'LH'),
+    'the concurrent LH partner is present'
+  );
+
+  // B - 4 - 7 (m. 8, tick 1488): one vertical RH column, gap-gated.
+  const system2 = systems[2];
+  const group = system2.verticalChords.find((c) => c.carrier.startTick === 1488);
+  assert.ok(group, 'the B - 4 - 7 vertical hand chord is gap-gated');
+  assert.equal(group!.carrier.hand, 'RH');
+  assert.equal(group!.suppressedIds.length, 2, 'the two interior heads draw no stem');
+  assert.equal(group!.bridges.length, 1, 'the 41pt leap is unified by exactly one bridge');
+
+  const svg = renderJankoCrop(BRAHMS, 8, 1, o, BRAHMS_T);
+  for (const id of group!.suppressedIds) {
+    const p = system2.notes.find((n) => n.note.id === id)!;
+    const stemStart = p.y - (BRAHMS_T.noteheadRadius + 0.2);
+    assert.ok(
+      !svg.includes(`class="janko-stem" x1="${p.x.toFixed(2)}" y1="${stemStart.toFixed(2)}"`),
+      `${id} draws no collision stem into its neighbour`
+    );
+  }
+  const carrier = system2.notes.find((n) => n.note.id === group!.carrier.id)!;
+  assert.ok(
+    svg.includes(
+      `class="janko-stem" x1="${carrier.x.toFixed(2)}" y1="${(carrier.y - BRAHMS_T.noteheadRadius - 0.2).toFixed(2)}"`
+    ),
+    'the outer extremity carries the hand’s stem and duration'
+  );
+  assert.equal((svg.match(/class="janko-chord-bridge"/g) ?? []).length, 1, 'exactly one bridge in m. 8');
+  assert.match(svg, /class="janko-chord-bridge" data-bridge-notes="[^"]+"/);
+});
+
+// ---------------------------------------------------------------------------
 // 5. Barline clearance & the inset budget
 // ---------------------------------------------------------------------------
 
@@ -470,15 +566,21 @@ test('The admission loop demotes a measure whose own content cannot absorb the s
   const system0 = getSystemGeometry(geo, 0);
   const insets = computeClaspInsetMap(BACH, system0, 0, o, T);
   assert.ok(insets.has(2), 'm. 3 opens on a chord and asks for the inset');
-  // m. 3's row-snapped pair on beat 3 leaves no room for the shift: the engine
-  // withdraws the widening there, so m. 3 keeps the canonical margins and no
-  // bracket, and the engraved system reports no column collision at all.
+  // m. 3's row-snapped pair on beat 3 leaves no room for the widening: the
+  // engine withdraws the inset, so m. 3 keeps the canonical margins. Round 7
+  // then steps the clasped column right until the bracket clears the barline,
+  // so the bracket survives the demotion instead of being dropped with it.
   const layout = layouts('left-clasp-spire')[0];
-  assert.equal(
-    layout.clasps.some((c) => c.tick >= 288 && c.tick < 432),
-    false,
-    'm. 3 is demoted'
-  );
+  const m3 = layout.clasps.filter((c) => c.tick >= 288 && c.tick < 432);
+  assert.equal(m3.length, 1, 'm. 3 keeps its bracket through the column shift');
+  const opening = getMeasureOpeningBarlineX(2, system0, 0, T);
+  assert.ok(opening !== null, 'm. 3 follows a barline');
+  for (const clasp of m3) {
+    assert.ok(
+      claspInkBox(clasp, T).x0 - opening! >= T.claspMinBarlineAir - 1e-6,
+      'the shifted bracket keeps its full barline air'
+    );
+  }
   const collisions = measuresWithColumnCollisions(
     layout.notes,
     layout.geometry,

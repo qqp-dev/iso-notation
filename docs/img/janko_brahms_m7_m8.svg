@@ -18,39 +18,38 @@
   <g class="janko-crop-body">
   <g id="system-3">
     <text class="janko-measure-num" x="48.00" y="561.26">7</text>
-    <path class="janko-accolade" d="M 33.35 657.73 C 33.35 646.71, 29.00 641.47, 29.00 641.26 C 29.00 640.73, 33.35 636.23, 33.35 624.79 C 33.35 613.24, 29.32 602.44, 29.32 589.29 C 29.32 581.59, 30.80 574.10, 35.05 567.69 C 35.36 567.26, 36.00 567.79, 35.68 568.22 C 32.39 573.14, 31.33 578.70, 31.33 584.58 C 31.33 596.03, 35.26 606.72, 35.26 619.66 C 35.26 627.36, 33.88 634.84, 29.64 641.26 C 33.88 647.68, 35.26 655.16, 35.26 662.86 C 35.26 675.80, 31.33 686.49, 31.33 697.94 C 31.33 703.82, 32.39 709.38, 35.68 714.30 C 36.00 714.73, 35.36 715.26, 35.05 714.83 C 30.80 708.42, 29.32 700.93, 29.32 693.23 C 29.32 680.08, 33.35 669.28, 33.35 657.73 Z" fill="#111827"/>
 
   <g class="janko-staff-lines">
-    <line x1="50.00" y1="583.26" x2="559.28" y2="583.26" stroke="#1E293B" stroke-width="0.70"/>
-    <line x1="50.00" y1="699.26" x2="559.28" y2="699.26" stroke="#1E293B" stroke-width="0.70"/>
-    <line x1="50.00" y1="613.26" x2="559.28" y2="613.26" stroke="#0F172A" stroke-width="0.90"/>
-    <line x1="50.00" y1="669.26" x2="559.28" y2="669.26" stroke="#0F172A" stroke-width="0.90"/>
+    <line x1="50.00" y1="583.26" x2="559.28" y2="583.26" stroke="#1E293B" stroke-width="0.50"/>
+    <line x1="50.00" y1="699.26" x2="559.28" y2="699.26" stroke="#1E293B" stroke-width="0.50"/>
+    <line x1="50.00" y1="613.26" x2="559.28" y2="613.26" stroke="#0F172A" stroke-width="0.65"/>
+    <line x1="50.00" y1="669.26" x2="559.28" y2="669.26" stroke="#0F172A" stroke-width="0.65"/>
   </g>
   <g class="janko-beat-grid">
-    <line class="janko-beat-line" x1="95.44" y1="571.26" x2="95.44" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="95.44" y1="657.26" x2="95.44" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="134.88" y1="571.26" x2="134.88" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="134.88" y1="657.26" x2="134.88" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="174.32" y1="571.26" x2="174.32" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="174.32" y1="657.26" x2="174.32" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="265.20" y1="571.26" x2="265.20" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="265.20" y1="657.26" x2="265.20" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="304.64" y1="571.26" x2="304.64" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="304.64" y1="657.26" x2="304.64" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="344.08" y1="571.26" x2="344.08" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="344.08" y1="657.26" x2="344.08" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="434.96" y1="571.26" x2="434.96" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="434.96" y1="657.26" x2="434.96" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="474.40" y1="571.26" x2="474.40" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="474.40" y1="657.26" x2="474.40" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="513.84" y1="571.26" x2="513.84" y2="625.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
-    <line class="janko-beat-line" x1="513.84" y1="657.26" x2="513.84" y2="711.26" stroke="#D1D5DB" stroke-width="0.50" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="95.44" y1="571.26" x2="95.44" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="95.44" y1="657.26" x2="95.44" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="134.88" y1="571.26" x2="134.88" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="134.88" y1="657.26" x2="134.88" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="174.32" y1="571.26" x2="174.32" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="174.32" y1="657.26" x2="174.32" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="265.20" y1="571.26" x2="265.20" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="265.20" y1="657.26" x2="265.20" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="304.64" y1="571.26" x2="304.64" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="304.64" y1="657.26" x2="304.64" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="344.08" y1="571.26" x2="344.08" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="344.08" y1="657.26" x2="344.08" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="434.96" y1="571.26" x2="434.96" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="434.96" y1="657.26" x2="434.96" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="474.40" y1="571.26" x2="474.40" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="474.40" y1="657.26" x2="474.40" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="513.84" y1="571.26" x2="513.84" y2="625.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
+    <line class="janko-beat-line" x1="513.84" y1="657.26" x2="513.84" y2="711.26" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>
   </g>
   <g class="janko-barlines">
-    <line class="janko-barline" x1="219.76" y1="571.26" x2="219.76" y2="625.26" stroke="#111111" stroke-width="0.85"/>
-    <line class="janko-barline" x1="219.76" y1="657.26" x2="219.76" y2="711.26" stroke="#111111" stroke-width="0.85"/>
-    <line class="janko-barline" x1="389.52" y1="571.26" x2="389.52" y2="625.26" stroke="#111111" stroke-width="0.85"/>
-    <line class="janko-barline" x1="389.52" y1="657.26" x2="389.52" y2="711.26" stroke="#111111" stroke-width="0.85"/>
+    <line class="janko-barline" x1="219.76" y1="571.26" x2="219.76" y2="625.26" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="219.76" y1="657.26" x2="219.76" y2="711.26" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="389.52" y1="571.26" x2="389.52" y2="625.26" stroke="#111111" stroke-width="0.60"/>
+    <line class="janko-barline" x1="389.52" y1="657.26" x2="389.52" y2="711.26" stroke="#111111" stroke-width="0.60"/>
     <line class="janko-barline" x1="559.28" y1="571.26" x2="559.28" y2="625.26" stroke="#111111" stroke-width="1.05"/>
     <line class="janko-barline" x1="559.28" y1="657.26" x2="559.28" y2="711.26" stroke="#111111" stroke-width="1.05"/>
   </g>

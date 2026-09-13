@@ -1,29 +1,26 @@
 /**
- * Round 6 — Single-Note Subdivisions & Refined Hand-Cluster Clasps: candidate
- * registry suite.
+ * Round 7 — Kinetic Subdivision Tabs, Gap-Gated Chords & Staff Hierarchy:
+ * candidate registry suite.
  *
- * The round balances two classical engraving traditions against three creative
- * modern concepts for the isolated single-note subdivision, and refines the
- * Round 5 clasp into a strictly per-hand bracket that exists only for
- * horizontally displaced (row-snapped) hand clusters:
+ * The round rakes the isolated single-note subdivision ink into a **diagonal
+ * kinetic** direction, tests it across all three subdivision tiers, and pairs it
+ * with Option 3 gap-gated vertical chording under the per-hand clasp:
  *
- * | # | id                    | `subdivisionStyle`     | tradition |
- * | - | --------------------- | ---------------------- | --------- |
- * | A | `classical-urtext`    | `'classical-urtext'`   | classical |
- * | B | `copperplate-pennant` | `'copperplate-pennant'`| classical |
- * | C | `architectural-tab`   | `'architectural-tab'`  | modern    |
- * | D | `beveled-slash`       | `'beveled-slash'`      | modern    |
- * | E | `aerodynamic-winglet` | `'aerodynamic-winglet'`| modern    |
+ * | # | id                     | `subdivisionStyle`      | ink                       |
+ * | - | ---------------------- | ----------------------- | ------------------------- |
+ * | A | `kinetic-tab-30`       | `'kinetic-tab-30'`      | 30° tab, 1.1pt monoline   |
+ * | B | `kinetic-tab-45`       | `'kinetic-tab-45'`      | 45° tab, 1.1pt monoline   |
+ * | C | `kinetic-tab-tapered`  | `'kinetic-tab-tapered'` | 30° tab, 1.4 → 0.8pt      |
+ * | D | `classical-urtext`     | `'classical-urtext'`    | balanced urtext flag      |
  *
  * Covers:
- *  1. `CURRENT_ROUND_METADATA.round === 6` and the round question.
- *  2. `CURRENT_CANDIDATES` declares exactly the five dialects A–E.
+ *  1. `CURRENT_ROUND_METADATA.round === 7` and the round question.
+ *  2. `CURRENT_CANDIDATES` declares exactly the four dialects A–D.
  *  3. Each candidate's deltas against the golden master are `chordGrouping`
  *     (`'per-hand-clasp'`) and its own `subdivisionStyle`.
  *  4. Both display windows (Bach mm. 1–2 and Brahms mm. 7–8) are declared.
- *  5. The live studio engraves all five candidates on both windows with option
- *     deltas, the refined clasp layer, distinct subdivision ink and a live lint
- *     chip each.
+ *  5. The live studio engraves all four candidates on both windows with option
+ *     deltas, the clasp layer, distinct subdivision ink and a live lint chip.
  */
 
 import { test } from 'node:test';
@@ -59,7 +56,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The exact round-6 table, candidate by candidate. */
+/** The exact round-7 table, candidate by candidate. */
 const PARADIGMS: Array<{
   id: string;
   letter: string;
@@ -67,28 +64,27 @@ const PARADIGMS: Array<{
   /** Clasps the paradigm paints across the canonical Brahms score. */
   brahmsClasps: number;
 }> = [
-  { id: 'classical-urtext', letter: 'A', style: 'classical-urtext', brahmsClasps: 3 },
-  { id: 'copperplate-pennant', letter: 'B', style: 'copperplate-pennant', brahmsClasps: 3 },
-  { id: 'architectural-tab', letter: 'C', style: 'architectural-tab', brahmsClasps: 3 },
-  { id: 'beveled-slash', letter: 'D', style: 'beveled-slash', brahmsClasps: 3 },
-  { id: 'aerodynamic-winglet', letter: 'E', style: 'aerodynamic-winglet', brahmsClasps: 3 },
+  { id: 'kinetic-tab-30', letter: 'A', style: 'kinetic-tab-30', brahmsClasps: 6 },
+  { id: 'kinetic-tab-45', letter: 'B', style: 'kinetic-tab-45', brahmsClasps: 6 },
+  { id: 'kinetic-tab-tapered', letter: 'C', style: 'kinetic-tab-tapered', brahmsClasps: 6 },
+  { id: 'classical-urtext', letter: 'D', style: 'classical-urtext', brahmsClasps: 6 },
 ];
 
-test('CURRENT_ROUND_METADATA opens round 6 of the subdivision/clasp exploration', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 6);
+test('CURRENT_ROUND_METADATA opens round 7 of the kinetic-tab exploration', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 7);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Single-Note Subdivisions & Refined Hand-Cluster Clasps'
+    'Kinetic Subdivision Tabs, Gap-Gated Chords & Staff Hierarchy'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /classical/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /modern/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /per-hand/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /non-vertical/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /kinetic/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /8th\/16th\/32nd/);
+  assert.match(CURRENT_ROUND_METADATA.description, /gap-gated/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /hierarchy/i);
 });
 
-test('CURRENT_CANDIDATES declares the five subdivision dialects A–E', () => {
+test('CURRENT_CANDIDATES declares the four kinetic subdivision dialects A–D', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, PARADIGMS.map((p) => p.id), 'candidate order is A, B, C, D, E');
+  assert.deepEqual(ids, PARADIGMS.map((p) => p.id), 'candidate order is A, B, C, D');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
@@ -105,11 +101,10 @@ test('CURRENT_CANDIDATES declares the five subdivision dialects A–E', () => {
     assert.ok((candidate!.description ?? '').length > 120, `${paradigm.id} carries a rationale`);
     assert.ok((candidate!.tags ?? []).length > 0, `${paradigm.id} is tagged`);
   }
-  assert.equal(getCandidate('classical-urtext')!.label, 'A · Sculpted Classical Urtext Flag');
-  assert.equal(getCandidate('copperplate-pennant')!.label, 'B · Historic Copperplate Pennant');
-  assert.equal(getCandidate('architectural-tab')!.label, 'C · Architectural Lateral Tab');
-  assert.equal(getCandidate('beveled-slash')!.label, 'D · Beveled Burin Slash');
-  assert.equal(getCandidate('aerodynamic-winglet')!.label, 'E · Modernist Aerodynamic Winglet');
+  assert.equal(getCandidate('kinetic-tab-30')!.label, 'A · 30° Kinetic Architectural Tab');
+  assert.equal(getCandidate('kinetic-tab-45')!.label, 'B · 45° Dynamic Chevron Tab');
+  assert.equal(getCandidate('kinetic-tab-tapered')!.label, 'C · Tapered Kinetic Wing Tab');
+  assert.equal(getCandidate('classical-urtext')!.label, 'D · Balanced Numeral-Urtext Flag');
   assert.deepEqual(
     [...new Set(CURRENT_CANDIDATES.map((c) => c.options?.subdivisionStyle))].sort(),
     [...JANKO_SUBDIVISION_STYLES].sort(),
@@ -126,12 +121,14 @@ test('Every candidate is demonstrated on the Bach and Brahms windows', () => {
     assert.equal(bach.measureStart, 1);
     assert.equal(bach.measureCount, 2);
     assert.match(bach.title, /Bach Goldberg Var\. 1 · mm\. 1–2/);
-    assert.match(bach.title, /opening chord/i);
+    assert.match(bach.title, /opening counterpoint/i);
     assert.match(bach.title, /16th/i);
     assert.equal(brahms.scoreId, BRAHMS_STUDIO_SCORE_ID);
     assert.equal(brahms.measureStart, 7);
     assert.equal(brahms.measureCount, 2);
     assert.match(brahms.title, /Brahms Op\. 118 No\. 1 · mm\. 7–8/);
+    assert.match(brahms.title, /B - 2 - 8 clasp/);
+    assert.match(brahms.title, /B - 4 - 7 Option 3 chording/);
     assert.match(brahms.title, /macro crop/i);
     // The legacy single-window fields keep pointing at the first window.
     assert.equal(resolved.measureStart, 1);
@@ -189,11 +186,11 @@ test('Every candidate states its deltas against the golden master', () => {
   }
 });
 
-test('Every dialect engraves both benchmarks with the refined per-hand clasp counts it claims', () => {
+test('Every dialect engraves both benchmarks with the clasp and Option 3 counts it claims', () => {
   for (const paradigm of PARADIGMS) {
     const resolved = resolveCandidate(getCandidate(paradigm.id)!);
     // The Bach opening is melodic: no hand carries a row-snapped cluster, so the
-    // refined clasp never appears there.
+    // per-hand clasp never appears there.
     const bach = layoutJankoScore(SCORE, resolved.options, resolved.tokens);
     assert.equal(bach.reduce((n, l) => n + l.clasps.length, 0), 0, `${paradigm.id} Bach clasps`);
     // The Brahms block chords carry the row-snapped hand clusters.
@@ -206,6 +203,19 @@ test('Every dialect engraves both benchmarks with the refined per-hand clasp cou
     assert.equal(clasps.length, paradigm.brahmsClasps, `${paradigm.id} Brahms clasp count`);
     for (const clasp of clasps) {
       assert.equal(new Set(clasp.notes.map((n) => n.hand)).size, 1, 'one hand per bracket');
+    }
+    // The Round 7 `B - 2 - 8` bracket is among them.
+    assert.ok(clasps.some((c) => c.tick === 1296), `${paradigm.id} keeps the B - 2 - 8 clasp`);
+    // Option 3 gap-gates the vertical hand columns: every group suppresses its
+    // interior stems and bridges only its wide leaps.
+    const chords = brahms.flatMap((l) => l.verticalChords);
+    assert.ok(chords.length > 0, `${paradigm.id} gap-gates vertical hand chords`);
+    for (const chord of chords) {
+      assert.ok(chord.suppressedIds.length >= 1, 'the interior heads lose their stems');
+      for (const bridge of chord.bridges) {
+        assert.ok(bridge.y2 > bridge.y1, 'a bridge spans real air');
+        assert.equal(bridge.noteIds.length, 2, 'a bridge unifies exactly two heads');
+      }
     }
     // The melodic writing is untouched: beams are identical in every paradigm.
     const golden = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
@@ -253,15 +263,15 @@ test('Every dialect paints its own subdivision ink, and the tips carry the activ
   }
 });
 
-test('The live studio engraves five candidates on two windows with deltas and lint chips', () => {
+test('The live studio engraves four candidates on two windows with deltas and lint chips', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 5, 'five cards, side by side');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 10, 'two engraving windows per card');
-  assert.equal((html.match(/<svg/g) ?? []).length, 10, 'one engraved preview per window');
-  assert.match(html, /data-candidate-count="5"/);
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards, side by side');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 8, 'two engraving windows per card');
+  assert.equal((html.match(/<svg/g) ?? []).length, 8, 'one engraved preview per window');
+  assert.match(html, /data-candidate-count="4"/);
   assert.match(html, /data-window-count="2"/);
-  assert.match(html, /Round 6/);
-  assert.match(html, /Single-Note Subdivisions/, 'the escaped round title headlines the view');
+  assert.match(html, /Round 7/);
+  assert.match(html, /Kinetic Subdivision Tabs/, 'the escaped round title headlines the view');
   assert.match(html, /data-window="primary:1-2"/);
   assert.match(html, /data-window="brahms-op118-no1:7-8"/);
 
@@ -301,7 +311,7 @@ test('The live studio engraves five candidates on two windows with deltas and li
   assert.match(html, /✓ clean/);
 });
 
-test('The contact sheet engraves the five dialects on one document', () => {
+test('The contact sheet engraves the four kinetic dialects on one document', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => {
     const resolved = resolveCandidate(candidate);
     return { id: candidate.id, label: candidate.label, options: resolved.options };
@@ -315,7 +325,7 @@ test('The contact sheet engraves the five dialects on one document', () => {
     DEFAULT_JANKO_TOKENS
   );
   assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one sheet document');
-  assert.equal((sheet.match(/data-variant="/g) ?? []).length, 5, 'five stacked panels');
+  assert.equal((sheet.match(/data-variant="/g) ?? []).length, 4, 'four stacked panels');
   let cursor = -1;
   for (const paradigm of PARADIGMS) {
     const at = sheet.indexOf(`data-variant="${paradigm.id}"`);

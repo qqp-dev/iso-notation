@@ -66,15 +66,19 @@ import {
 import { renderNotehead } from './elements/notehead';
 import {
   JankoBeamGroupGeometry,
+  JankoChordBridge,
   JankoClaspGroupGeometry,
   JankoClaspRailGeometry,
   JankoRhythmNote,
+  JankoVerticalChordGroup,
   claspInkBox,
   claspNotesHorizontallySpread,
   computeBeamGroupGeometry,
   computeClaspGeometry,
+  computeVerticalChordGroup,
   partitionBeamGroups,
   renderBeamGroup,
+  renderChordBridges,
   renderClaspGroup,
   renderRhythm,
   withClaspRail,
@@ -488,9 +492,13 @@ export function getMarginFurniture(
 }
 
 /**
- * Every left-margin furniture box painted in one system (the accolade always,
- * the measure numeral only where the engine draws it), in the order the linter
- * audits them.
+ * Every left-margin furniture box painted in one system (the accolade only at
+ * the start of the piece, the measure numeral only where the engine draws it),
+ * in the order the linter audits them.
+ *
+ * Round 7 draws the accolade **strictly at the start of the piece**
+ * (`systemIndex === 0`); an intermediate system opens from the bare left
+ * margin, so it neither paints nor reserves an accolade box.
  */
 export function systemFurniture(
   geometry: JankoSystemGeometry,
@@ -504,7 +512,7 @@ export function systemFurniture(
     t,
     systemIndex * o.measuresPerSystem + 1
   );
-  const boxes: JankoBox[] = [accolade];
+  const boxes: JankoBox[] = systemIndex === 0 ? [accolade] : [];
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) boxes.push(numeral);
   return boxes;
 }
@@ -512,6 +520,23 @@ export function systemFurniture(
 /** Do two boxes overlap (or come closer than `clearance`)? */
 export function boxesWithin(a: JankoBox, b: JankoBox, clearance: number = 0): boolean {
   return a.x0 - clearance < b.x1 && b.x0 - clearance < a.x1 && a.y0 - clearance < b.y1 && b.y0 - clearance < a.y1;
+}
+
+/**
+ * Air (pt) a *foreign* head must keep from a clasp's ink box.
+ *
+ * A head of the **other hand on the clasp's own onset** travels with the same
+ * solved column and is therefore not foreign ink at all: it only has to stay
+ * clear of the bracket's actual spine and caps (zero nominal air, i.e. no
+ * overlap). A head of any other onset — including the preceding LH 16ths — is
+ * real foreign ink and keeps the full {@link CLASP_NOTEHEAD_AIR}.
+ *
+ * Round 7: measuring the same-onset hand partner with the full air used to
+ * silently drop the `B - 2 - 8` bracket of Brahms m. 7, whose LH head shares a
+ * whole-tone row with an RH member of the same onset.
+ */
+export function claspForeignAir(group: JankoClaspGroupGeometry, startTick: number): number {
+  return startTick === group.tick ? 0 : CLASP_NOTEHEAD_AIR;
 }
 
 /**
@@ -538,7 +563,8 @@ export function claspClearsLayout(
     if (own.has(p.note.id)) continue;
     const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
     const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
-    if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR - CLASP_EPS) return false;
+    const air = claspForeignAir(geometry, p.note.startTick);
+    if (Math.hypot(dx, dy) < t.noteheadRadius + air - CLASP_EPS) return false;
   }
   return true;
 }
@@ -648,6 +674,12 @@ export function railClearsLayout(
 export interface JankoSystemLayout {
   /** Zero-based global system index. */
   index: number;
+  /**
+   * True for the last system of the score. Round 7 opens every intermediate
+   * system at its right edge, so only the final system paints the closing
+   * vertical barline (see `elements/barlines.renderBarlines`).
+   */
+  isFinalSystem: boolean;
   /** Absolute page geometry of the system's slot. */
   geometry: JankoSystemGeometry;
   /** Notes of this system, in engraving order (tick, then pitch class). */
@@ -666,6 +698,14 @@ export interface JankoSystemLayout {
    * to pieces by a grouping bracket.
    */
   claspedStems: string[];
+  /**
+   * Round 7 (Option 3): the hand's vertically aligned chords. The interior
+   * heads of each group draw no stem of their own, the wide leaps carry an
+   * intentional bridge, and the group's outer extremity carries the duration.
+   */
+  verticalChords: JankoVerticalChordGroup[];
+  /** Round 7 (Option 3): every intentional bridge line of the system. */
+  chordBridges: JankoChordBridge[];
 }
 
 function handForNote(note: QuantizedNote): Hand {
@@ -918,6 +958,12 @@ interface OnsetUnit {
   clasp: boolean;
   /** Distance (pt) from the unit's leftmost head centre to the clasp spine. */
   claspReach: number;
+  /**
+   * Offset (pt) from the onset's column to the left edge of the clasp's ink box
+   * (`claspInkBox.x0 − columnX`): the barline-air constraint of
+   * {@link windowOf} steps the column right by exactly this much.
+   */
+  claspInkLeft: number;
   /** Top edge (page pt) of the clasp bracket. */
   claspTop: number;
   /** Bottom edge (page pt) of the clasp bracket. */
@@ -1100,6 +1146,7 @@ export function resolveChordColumns(
         measureLeft,
         clasp: false,
         claspReach,
+        claspInkLeft: -claspReach,
         claspTop: p.y - t.noteheadRadius,
         claspBot: p.y + t.noteheadRadius,
       };
@@ -1170,6 +1217,19 @@ export function resolveChordColumns(
         const members = groups.flat();
         unit.claspTop = Math.min(...members.map((p) => p.y)) - t.noteheadRadius;
         unit.claspBot = Math.max(...members.map((p) => p.y)) + t.noteheadRadius;
+        const offsets = rowOffsetOf(unit);
+        for (const group of groups) {
+          const geometry = computeClaspGeometry(
+            group.map((p) => ({ ...p.rhythm, x: p.x + (offsets.get(p.note.id) ?? 0) })),
+            t
+          );
+          if (geometry) {
+            unit.claspInkLeft = Math.min(
+              unit.claspInkLeft,
+              claspInkBox(geometry, t).x0 - unit.nominalX
+            );
+          }
+        }
       }
       continue;
     }
@@ -1180,6 +1240,11 @@ export function resolveChordColumns(
     if (unit.clasp) {
       unit.claspTop = unit.rows.reduce((min, c) => Math.min(min, c.y), Infinity) - t.noteheadRadius;
       unit.claspBot = unit.rows.reduce((max, c) => Math.max(max, c.y), -Infinity) + t.noteheadRadius;
+      const geometry = computeClaspGeometry(
+        unit.rows.flatMap((cluster) => cluster.notes.map((p) => p.rhythm)),
+        t
+      );
+      if (geometry) unit.claspInkLeft = claspInkBox(geometry, t).x0 - unit.nominalX;
     }
   }
 
@@ -1187,10 +1252,18 @@ export function resolveChordColumns(
   // 1b. Fit rule. An external bracket protrudes `r + claspOffset` (7.6pt) to
   //     the left of its cluster, which a continuous 16th-note grid — whose
   //     columns sit exactly one disc diameter apart — cannot host. A clasp is
-  //     therefore engraved only where it stands clear of every foreign disc by
-  //     `CLASP_NOTEHEAD_AIR` and of its opening barline by `claspMinBarlineAir`;
-  //     everywhere else the cluster keeps its traditional stems. This is what
-  //     "only actual chords receive clasps, never feathers" means in practice.
+  //     therefore engraved only where it stands clear of every foreign disc and
+  //     of its opening barline; everywhere else the cluster keeps its
+  //     traditional stems. This is what "only actual chords receive clasps,
+  //     never feathers" means in practice.
+  //
+  //     Round 7 refines two points:
+  //     * the bracket's barline air is a **column constraint**, not a veto — a
+  //       downbeat clasp whose measure inset had to be withdrawn steps its whole
+  //       column right (see `windowOf`) instead of silently losing the bracket;
+  //     * the other hand's heads **of the same onset** travel with that column
+  //       and are not foreign ink: they only have to stay clear of the bracket
+  //       (no overlap, see `claspForeignAir`).
   // -------------------------------------------------------------------------
   const claspFits = (unit: OnsetUnit): boolean => {
     // The Round 6 per-hand paradigm audits each hand's own bracket — a bracket
@@ -1212,16 +1285,6 @@ export function resolveChordColumns(
         t
       );
       if (!geometry) return false;
-      // Slot 0 of a system opens from the left margin: there is no barline to
-      // clear, only the accolade (which the fit test below covers as a foreign
-      // glyph-free zone). The bracket's barline air is a property of the solved
-      // column — the measure's clasp inset and the spread band pay for it (see
-      // `windowOf`) — so it is measured against the nominal column, exactly as
-      // the Round 5 rule does.
-      if (unit.measureIdx > 0) {
-        const disk = claspInkBox(geometry, t);
-        if (disk.x0 - unit.measureLeft < t.claspMinBarlineAir - CLASP_EPS) return false;
-      }
       // Disc clearance is relative ink: every head of one onset moves with the
       // same column shift, so the row-snapped spread is measured directly.
       const spreadGeometry =
@@ -1236,12 +1299,14 @@ export function resolveChordColumns(
         for (const cluster of other.rows) {
           for (const p of cluster.notes) {
             // A per-hand bracket treats the other hand's heads of its own onset
-            // as foreign ink, exactly as the linter does.
+            // as positioned ink that travels with the column, never as a
+            // foreign collision (unless the discs actually overlap).
             if (other === unit && members.includes(p)) continue;
             const px = other === unit ? displacedX(p) : p.x;
             const dx = Math.max(disk.x0 - px, 0, px - disk.x1);
             const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
-            if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR) return false;
+            const air = other === unit ? 0 : CLASP_NOTEHEAD_AIR;
+            if (Math.hypot(dx, dy) < t.noteheadRadius + air - CLASP_EPS) return false;
           }
         }
       }
@@ -1366,6 +1431,17 @@ export function resolveChordColumns(
             rightEdge + r + CLASP_NOTEHEAD_AIR + myH + unit.claspReach - unit.nominalX
           );
         }
+      }
+      // Round 7: the bracket's own barline air is a column constraint too. When
+      // a downbeat clasp could not keep its measure inset (the demotion loop in
+      // `layoutJankoSystem` withdrew the widening), the column steps right just
+      // far enough for the spine to clear the opening barline instead of the
+      // bracket being silently dropped.
+      if (unit.measureIdx > 0) {
+        lo = Math.max(
+          lo,
+          unit.measureLeft + t.claspMinBarlineAir - (unit.nominalX + unit.claspInkLeft)
+        );
       }
     }
 
@@ -1616,8 +1692,40 @@ export function layoutJankoSystem(
     .flatMap((clasp) => clasp.notes.map((n) => n.id))
     .filter((id) => !beamedIds.has(id));
 
+  // Round 7 (Option 3): gap-gated vertical chording. Under the per-hand clasp
+  // paradigm a horizontally spread hand cluster takes the external bracket,
+  // while a clean vertical column of one hand — which `computeClaspGeometry`
+  // refuses — is unified by the gap-gated stem grammar instead: a tight pair
+  // draws no internal stem, a wide leap gets an explicit bridge, and the outer
+  // extremity carries the hand's duration. A head that belongs to a real beam
+  // keeps its stem and is left untouched.
+  const verticalChords: JankoVerticalChordGroup[] = [];
+  const chordBridges: JankoChordBridge[] = [];
+  if (o.chordGrouping === 'per-hand-clasp') {
+    const byHandOnset = new Map<string, PositionedJankoNote[]>();
+    for (const p of notes) {
+      const key = `${p.note.startTick}|${p.rhythm.hand}`;
+      const bucket = byHandOnset.get(key);
+      if (bucket) bucket.push(p);
+      else byHandOnset.set(key, [p]);
+    }
+    for (const group of byHandOnset.values()) {
+      if (group.length < 2) continue;
+      const standalone = group.filter((p) => !beamedIds.has(p.note.id));
+      if (standalone.length < 2) continue;
+      const resolved = computeVerticalChordGroup(
+        standalone.map((p) => p.rhythm),
+        t
+      );
+      if (!resolved) continue;
+      verticalChords.push(resolved);
+      chordBridges.push(...resolved.bridges);
+    }
+  }
+
   return {
     index: systemIndex,
+    isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
     geometry,
     notes,
     beams,
@@ -1625,6 +1733,8 @@ export function layoutJankoSystem(
     clasps,
     claspRails,
     claspedStems,
+    verticalChords,
+    chordBridges,
   };
 }
 
@@ -1673,26 +1783,43 @@ function renderNotesLayer(
   //    painted *beneath* the noteheads so the white knockouts erase whatever
   //    stem or beam passes behind a glyph — the invariant the linter audits.
   //    A clasp owns the duration of every member whose stem is not part of a
-  //    beam, so those standalone stems are replaced by the bracket.
+  //    beam, so those standalone stems are replaced by the bracket. Option 3
+  //    suppresses the interior stems of a vertical hand chord the same way: the
+  //    group's outer extremity carries the whole hand's duration.
   const clasped = new Set(layout.claspedStems);
+  const suppressed = new Set(layout.verticalChords.flatMap((chord) => chord.suppressedIds));
+  const carrierDurations = new Map(
+    layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks])
+  );
+  /** The rhythm note as engraved: the carrier draws its group's duration. */
+  const asEngraved = (n: JankoRhythmNote): JankoRhythmNote => {
+    const durationTicks = carrierDurations.get(n.id);
+    return durationTicks === undefined || durationTicks === n.durationTicks
+      ? n
+      : { ...n, durationTicks };
+  };
   if (o.rhythmStyle === 'beamed') {
     for (const beam of layout.beams) {
       out.push(renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle));
     }
     for (const n of layout.ungrouped) {
-      if (clasped.has(n.id)) continue;
-      out.push(renderRhythm(n, 'beamed', t, o.subdivisionStyle));
+      if (clasped.has(n.id) || suppressed.has(n.id)) continue;
+      out.push(renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle));
     }
   } else {
     for (const p of layout.notes) {
-      if (clasped.has(p.rhythm.id)) continue;
-      out.push(renderRhythm(p.rhythm, o.rhythmStyle, t, o.subdivisionStyle));
+      if (clasped.has(p.rhythm.id) || suppressed.has(p.rhythm.id)) continue;
+      out.push(renderRhythm(asEngraved(p.rhythm), o.rhythmStyle, t, o.subdivisionStyle));
     }
   }
 
+  // 2a. Option 3 bridge lines: the intentional vertical ink across a hand's
+  //     wide leaps, painted with the rhythm layer and beneath the noteheads.
+  if (layout.chordBridges.length > 0) out.push(renderChordBridges(layout.chordBridges));
+
   // 2b. External left clasps + their rails (Round 5), painted above the stems
   //     they replace and beneath the noteheads they must never touch. Their
-  //     duration tips carry the active Round 6 subdivision style.
+  //     duration tips carry the active Round 7 subdivision style.
   if (layout.clasps.length > 0 || layout.claspRails.length > 0) {
     out.push(renderClaspGroup(layout.clasps, layout.claspRails, t, o.subdivisionStyle));
   }
@@ -1741,15 +1868,18 @@ export function renderSystem(
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) {
     out.push(renderMeasureNumber(geo, startMeasureOffset + 1, t));
   }
-  out.push(renderAccolade(geo, o, t));
+  // Round 7: the accolade is drawn strictly at the start of the piece. Every
+  // intermediate system opens from the bare left margin with no bounding
+  // barline.
   if (systemIndex === 0) {
+    out.push(renderAccolade(geo, o, t));
     out.push(renderHandLabels(geo, o, t));
     out.push(renderTimeSignature(geo, o, t));
   }
   out.push(renderOctaveLabels(geo, o, t));
   out.push(renderStaffLines(geo, o, t));
   out.push(renderBeatGrid(geo, systemIndex, o, t));
-  out.push(renderBarlines(geo, o, t));
+  out.push(renderBarlines(geo, o, t, resolved.isFinalSystem));
   out.push(renderNotesLayer(resolved, o, t));
   out.push('  </g>');
   return out.join('\n');

@@ -44,41 +44,41 @@ import { Hand } from '../../model/types';
 export type JankoRhythmStyle = 'angled-cuts' | 'horizontal-ticks' | 'beamed';
 
 /**
- * Pluggable single-note **subdivision** styles — the Round 6 question: how an
+ * Pluggable single-note **subdivision** styles — the Round 7 question: how an
  * isolated 8th/16th/32nd draws its duration at the stem tip (see
  * `elements/rhythm.renderSubdivisionMark`).
  *
- * | style                 | tradition  | ink at the stem tip                                  |
- * | --------------------- | ---------- | ---------------------------------------------------- |
- * | `'classical-urtext'`  | Henle / Bärenreiter | tapered filled calligraphic burin hook        |
- * | `'copperplate-pennant'` | early copperplate | straight-edged triangular wedge               |
- * | `'architectural-tab'` | modern     | crisp horizontal rectangular tab, grid-aligned        |
- * | `'beveled-slash'`     | modern     | sharp 45° beveled cut, guillemet chevron weight      |
- * | `'aerodynamic-winglet'` | modern   | tapered fin with a vertical spine and cutback         |
+ * The round replaces Round 6's static perpendicular tab with **diagonal kinetic
+ * direction** — the mark rakes away from the stem tip, leading the eye along the
+ * stem's motion — and keeps the classical flag as the balanced control.
+ *
+ * | style                   | ink at the stem tip                                  |
+ * | ----------------------- | ---------------------------------------------------- |
+ * | `'kinetic-tab-30'`      | 30° diagonal tab, 1.1pt monoline                     |
+ * | `'kinetic-tab-45'`      | 45° diagonal tab, 1.1pt monoline (chevron harmony)   |
+ * | `'kinetic-tab-tapered'` | 30° diagonal tab, optical taper 1.4pt root → 0.8pt   |
+ * | `'classical-urtext'`    | refined numeral-balanced urtext flag                 |
  */
 export type JankoSubdivisionStyle =
-  | 'classical-urtext'
-  | 'copperplate-pennant'
-  | 'architectural-tab'
-  | 'beveled-slash'
-  | 'aerodynamic-winglet';
+  | 'kinetic-tab-30'
+  | 'kinetic-tab-45'
+  | 'kinetic-tab-tapered'
+  | 'classical-urtext';
 
-/** Every subdivision style, in the canonical exploration order (A–E). */
+/** Every subdivision style, in the canonical exploration order (A–D). */
 export const JANKO_SUBDIVISION_STYLES: readonly JankoSubdivisionStyle[] = [
+  'kinetic-tab-30',
+  'kinetic-tab-45',
+  'kinetic-tab-tapered',
   'classical-urtext',
-  'copperplate-pennant',
-  'architectural-tab',
-  'beveled-slash',
-  'aerodynamic-winglet',
 ];
 
-/** Human-readable names of the five subdivision styles. */
+/** Human-readable names of the four subdivision styles. */
 export const JANKO_SUBDIVISION_STYLE_LABELS: Record<JankoSubdivisionStyle, string> = {
-  'classical-urtext': 'Sculpted Classical Urtext Flag',
-  'copperplate-pennant': 'Historic Copperplate Pennant',
-  'architectural-tab': 'Architectural Lateral Tab',
-  'beveled-slash': 'Beveled Burin Slash',
-  'aerodynamic-winglet': 'Modernist Aerodynamic Winglet',
+  'kinetic-tab-30': '30° Kinetic Architectural Tab',
+  'kinetic-tab-45': '45° Dynamic Chevron Tab',
+  'kinetic-tab-tapered': 'Tapered Kinetic Wing Tab',
+  'classical-urtext': 'Balanced Numeral-Urtext Flag',
 };
 
 /**
@@ -364,7 +364,7 @@ export interface JankoLayoutOptions {
 
   // --- Optional page/layout refinements (resolved from defaults) ---
   /**
-   * Single-note subdivision style (Round 6): how an isolated 8th/16th/32nd
+   * Single-note subdivision style (Round 7): how an isolated 8th/16th/32nd
    * draws its duration at the stem tip. Defaults to the classical
    * `'classical-urtext'` flag (see {@link JankoSubdivisionStyle}).
    */

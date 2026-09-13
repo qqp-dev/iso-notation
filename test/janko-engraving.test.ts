@@ -46,12 +46,15 @@ import {
   computeCropBox,
   computePageGeometry,
   countJankoPages,
+  countJankoSystems,
   getChordalOffset,
+  getSystemGeometry,
   getMarginFurniture,
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
   renderJankoVariantComparison,
+  renderSystem,
 } from '../src/render/janko/engine';
 import {
   getStemAttachmentRadii,
@@ -63,8 +66,8 @@ import {
   renderSubdivisionMark,
   subdivisionMarkCount,
   computeClaspGeometry,
-  SUBDIVISION_BEVEL_REACH,
-  SUBDIVISION_TAB_THICKNESS,
+  SUBDIVISION_TAB_30_TAN,
+  SUBDIVISION_TAPER_ROOT,
 } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -800,7 +803,7 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   const beatMatches = [...page.matchAll(/class="janko-beat-line"/g)];
   // 3 systems * 4 measures/system * 2 beats/measure * 2 hands (RH + LH) = 48 lines
   assert.equal(beatMatches.length, 3 * 4 * 2 * 2);
-  assert.match(page, /stroke="#D1D5DB" stroke-width="0\.50" stroke-dasharray="2,3"/);
+  assert.match(page, /stroke="#9CA3AF" stroke-width="0\.70" stroke-dasharray="2,3"/);
 
   // 4. Macro crop mm. 1–2 carries beat lines on beats 2 and 3 (system 0 DOM has 4 mm * 4 lines = 16)
   const crop = renderJankoCrop(score, 1, 2, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
@@ -811,10 +814,69 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   assert.match(crop, /class="janko-beam"/);
 });
 
+test('Round 7 staff hierarchy: lightened equators, heavier beat grid, lighter measure barlines', () => {
+  const score = buildBachGoldbergVar1Score();
+  const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
+
+  const staff = page.match(/<g class="janko-staff-lines">[\s\S]*?<\/g>/)![0];
+  assert.equal(
+    (staff.match(/stroke="#1E293B" stroke-width="0\.50"/g) ?? []).length,
+    2,
+    'the outer equators (RH 5, LH 2) fall to a 0.50pt hairline'
+  );
+  assert.equal(
+    (staff.match(/stroke="#0F172A" stroke-width="0\.65"/g) ?? []).length,
+    2,
+    'the inner equators (RH 4, LH 3) fall to 0.65pt'
+  );
+
+  // The beat grid is the structural layer above the lightened staff rules.
+  assert.match(page, /class="janko-beat-line"[^>]*stroke="#9CA3AF" stroke-width="0\.70"/);
+
+  // Measure barlines fall to 0.60pt (the closing barline of the score stays
+  // authoritative and is covered by the system-openness test below).
+  const pageBarlines = page.match(/<g class="janko-barlines">[\s\S]*?<\/g>/)![0];
+  assert.ok(
+    (pageBarlines.match(/stroke-width="0\.60"/g) ?? []).length >= 6,
+    'internal measure barlines are lighter'
+  );
+  assert.ok(!pageBarlines.includes('stroke-width="0.85"'), 'the 0.85pt measure barline is gone');
+});
+
+test('Round 7 system openness: accolade opens the piece, intermediate systems stay open', () => {
+  const score = buildBachGoldbergVar1Score();
+  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const total = countJankoSystems(score, OPTIONS, TOKENS);
+  const barlineXs = (svg: string): Set<number> =>
+    new Set(
+      [...svg.matchAll(/class="janko-barline" x1="([\d.]+)"/g)].map((m) => Number(m[1]))
+    );
+
+  // The accolade is drawn strictly at the start of the piece.
+  const first = renderSystem(score, getSystemGeometry(geo, 0), 0, OPTIONS, TOKENS);
+  assert.equal((first.match(/class="janko-accolade"/g) ?? []).length, 1, 'accolade at the start');
+  const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, OPTIONS, TOKENS);
+  assert.equal((middle.match(/class="janko-accolade"/g) ?? []).length, 0, 'no accolade mid-piece');
+
+  // Intermediate systems have no barline at either edge; only the final measure
+  // of the final system closes the score.
+  const middleX = barlineXs(middle);
+  const middleRight = Number(getSystemGeometry(geo, 1).staffRight.toFixed(2));
+  assert.ok(!middleX.has(middleRight), 'an intermediate system ends in open negative space');
+
+  const last = renderSystem(score, getSystemGeometry(geo, total - 1), total - 1, OPTIONS, TOKENS);
+  const lastX = barlineXs(last);
+  assert.ok(
+    lastX.has(Number(getSystemGeometry(geo, total - 1).staffRight.toFixed(2))),
+    'the final system draws the closing barline'
+  );
+  assert.match(last, /class="janko-barline"[^>]*stroke-width="1\.05"/, 'the closing barline stays firm');
+  assert.match(first, /class="janko-barline"[^>]*stroke-width="0\.60"/, 'measure barlines are lighter');
+});
+
 // ---------------------------------------------------------------------------
 // 2b. Spacious corridor, dotted-line elimination, notehead optics & stem air
 // ---------------------------------------------------------------------------
-
 const MIDDLE_C_SPINE_GROUP = 'class="janko-middle-c-spine"';
 const ROW_GUIDELINES_GROUP = 'class="janko-row-guidelines"';
 
@@ -1161,28 +1223,26 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
 });
 
 // ---------------------------------------------------------------------------
-// 3b. Round 6 — the five single-note subdivision dialects
+// 3b. Round 7 — the four single-note subdivision dialects (kinetic tabs)
 // ---------------------------------------------------------------------------
 
-/** Anchor y of one rendered subdivision mark (its `M` / rect / line anchor). */
+/** Anchor y of one rendered subdivision mark (its `M` / line anchor). */
 function subdivisionAnchorY(markup: string): number {
   const path = /d="M [\d.-]+ ([\d.-]+)/.exec(markup);
   if (path) return Number(path[1]);
-  const rect = / y="([\d.]+)"/.exec(markup);
-  if (rect) return Number(rect[1]) + SUBDIVISION_TAB_THICKNESS / 2;
-  return Number(/ y1="([\d.]+)"/.exec(markup)![1]) + SUBDIVISION_BEVEL_REACH;
+  return Number(/ y1="([\d.]+)"/.exec(markup)![1]);
 }
 
-test('Round 6: the five subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
+test('Round 7: the four subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
   assert.equal(
     DEFAULT_JANKO_OPTIONS.subdivisionStyle,
     'classical-urtext',
-    'the golden master keeps the sculpted urtext flag'
+    'the golden master keeps the balanced urtext flag'
   );
   assert.deepEqual(
     [...JANKO_SUBDIVISION_STYLES],
-    ['classical-urtext', 'copperplate-pennant', 'architectural-tab', 'beveled-slash', 'aerodynamic-winglet'],
-    'the two classical traditions precede the three modern concepts'
+    ['kinetic-tab-30', 'kinetic-tab-45', 'kinetic-tab-tapered', 'classical-urtext'],
+    'the three kinetic tabs precede the classical control'
   );
   // Stack grammar: 32nd → 3 marks, 16th → 2, 8th/dotted 8th → 1.
   assert.equal(subdivisionMarkCount(6), 3);
@@ -1203,7 +1263,14 @@ test('Round 6: the five subdivision dialects dispatch at the stem tip and stack 
   const ink = new Set<string>();
   for (const style of JANKO_SUBDIVISION_STYLES) {
     const markup = renderFlags(sixteenth, TOKENS, style);
-    ink.add(markup.replace(/[\d.-]+/g, '#'));
+    // The ink *shape* is the comparison key: the style tag and the shared stem
+    // anchor are stripped, the geometry is kept — the two monoline tabs differ
+    // by their rake alone.
+    ink.add(
+      markup
+        .replace(/ data-subdivision-style="[^"]*"/g, '')
+        .replace(/ data-stem-x="[\d.]+" data-flag-index="\d"/g, '')
+    );
     assert.match(markup, /class="janko-stem"/, `${style} keeps the stem`);
     assert.ok(
       !markup.includes('janko-tick') && !markup.includes('janko-cut'),
@@ -1225,31 +1292,55 @@ test('Round 6: the five subdivision dialects dispatch at the stem tip and stack 
       `${style} stacks by flagSpacing`
     );
 
-    // Stem safety: four dialects stay strictly right of the stem, the bevel
-    // cuts symmetrically across it — none reaches beyond `flagWidth`.
+    // Stem safety: every dialect reaches at most `flagWidth` right of the stem.
     const element = /<(path|rect|line) class="janko-flag"[^>]*\/>/.exec(markup)![0];
-    if (element.startsWith('<rect')) {
-      const x = Number(/ x="([\d.]+)"/.exec(element)![1]);
-      const w = Number(/ width="([\d.]+)"/.exec(element)![1]);
-      assert.equal(x, stem.stemX, `${style} tab starts on the stem`);
-      assert.ok(w <= TOKENS.flagWidth + 1e-9, `${style} tab keeps its tokenised reach`);
-    } else if (element.startsWith('<line')) {
+    if (element.startsWith('<line')) {
       const x1 = Number(/ x1="([\d.]+)"/.exec(element)![1]);
       const x2 = Number(/ x2="([\d.]+)"/.exec(element)![1]);
-      assert.equal(stem.stemX - x1, x2 - stem.stemX, `${style} cuts symmetrically through the tip`);
-      assert.ok(x2 - stem.stemX <= TOKENS.flagWidth + 1e-9);
-    } else {
-      const xs = [.../d="([^"]+)"/.exec(element)![1].matchAll(/-?\d+(?:\.\d+)?/g)]
-        .map((n) => Number(n[0]))
-        .filter((_, i) => i % 2 === 0);
-      assert.equal(xs[0], stem.stemX, `${style} latches onto the stem tip`);
-      for (const x of xs) {
-        assert.ok(x >= stem.stemX - 1e-9, `${style} sample x=${x} must not cross its stem`);
-      }
-      assert.ok(Math.max(...xs) - stem.stemX <= TOKENS.flagWidth + 1e-9);
+      assert.equal(x1, stem.stemX, `${style} tab is rooted on the stem`);
+      assert.ok(x2 - stem.stemX <= TOKENS.flagWidth + 1e-9, `${style} tab keeps its tokenised reach`);
+      assert.match(element, /stroke-width="1\.10"/, `${style} is a 1.1pt monoline`);
+      // The kinetic rake itself: 30° or exactly 45° off horizontal.
+      const rake = Math.abs(
+        (Number(/ y2="([\d.-]+)"/.exec(element)![1]) - Number(/ y1="([\d.-]+)"/.exec(element)![1])) /
+          (x2 - x1)
+      );
+      const expected = style === 'kinetic-tab-45' ? 1 : SUBDIVISION_TAB_30_TAN;
+      assert.ok(Math.abs(rake - expected) < 5e-3, `${style} rakes at ${expected}`);
+      continue;
     }
+    const xs = [.../d="([^"]+)"/.exec(element)![1].matchAll(/-?\d+(?:\.\d+)?/g)]
+      .map((n) => Number(n[0]))
+      .filter((_, i) => i % 2 === 0);
+    if (style === 'kinetic-tab-tapered') {
+      // The tapered wing is rooted *on* the stem: its 1.4pt root straddles the
+      // column by half its thickness, then reaches exactly `flagWidth` right.
+      assert.ok(
+        Math.abs(xs[0] - stem.stemX) <= SUBDIVISION_TAPER_ROOT / 2 + 1e-9,
+        `${style} roots on the stem column`
+      );
+      assert.ok(
+        Math.max(...xs) - stem.stemX <= TOKENS.flagWidth + 1e-9,
+        `${style} keeps its tokenised reach`
+      );
+      continue;
+    }
+    assert.equal(xs[0], stem.stemX, `${style} latches onto the stem tip`);
+    for (const x of xs) {
+      assert.ok(x >= stem.stemX - 1e-9, `${style} sample x=${x} must not cross its stem`);
+    }
+    assert.ok(Math.max(...xs) - stem.stemX <= TOKENS.flagWidth + 1e-9);
   }
   assert.equal(ink.size, JANKO_SUBDIVISION_STYLES.length, 'every dialect paints distinct ink');
+
+  // The multi-tier grammar: 8th → 1 tab, 16th → 2 tabs, 32nd → 3 tabs.
+  const marksFor = (durationTicks: number): number => {
+    const note = { ...sixteenth, durationTicks };
+    return (renderFlags(note, TOKENS, 'kinetic-tab-30').match(/class="janko-flag"/g) ?? []).length;
+  };
+  assert.equal(marksFor(24), 1, '8th = one kinetic tab');
+  assert.equal(marksFor(12), 2, '16th = two kinetic tabs');
+  assert.equal(marksFor(6), 3, '32nd = three kinetic tabs');
 
   // The refined clasp tip carries the active dialect too, so a clasped cluster
   // and a flagged stem of the same value can never disagree.
