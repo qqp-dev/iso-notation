@@ -346,31 +346,60 @@ export function renderFlags(
 // Round 5 — the external left clasp: cluster bracket + duration carrier
 // ---------------------------------------------------------------------------
 
-/** Radius (pt) of the open pip a half/whole-note clasp carries. */
-export const CLASP_PIP_RADIUS = 1.5;
-/** Vertical gap (pt) between the two pips of a whole-note clasp. */
-export const CLASP_PIP_GAP = 1.0;
 /**
- * Round 9 midpoint duration ink (`elements/rhythm.renderClaspDurationInk`).
- * Every paradigm anchors on the spine's exact midpoint `yMid`:
+ * Round 10 scaled midpoint duration ink (`elements/rhythm.renderClaspDurationInk`).
+ * Every paradigm anchors on the spine's exact midpoint `yMid` and cuts
+ * *symmetrically across* the spine, so the bracket stays a mirror-symmetrical
+ * `[` whatever value it carries:
  *
- * - `'center-kinetic-ticks'` — a `±CLASP_CENTER_TICK_HALF` tick raked at the
- *   score's own beam slope (1 = 8th, 2 mirrored = 16th);
- * - `'center-chevron-notch'` — a calligraphic guillemet notch reaching
- *   `CLASP_NOTCH_REACH` into the cup (1 = 8th, 2 nested = 16th);
- * - `'center-pip-rays'` — a compact `CLASP_HUB_RADIUS` hub with lateral rays
- *   (1 = 8th, 2 mirrored = 16th);
- * - `'center-sculpted-wedge'` — a filled barb (1 = 8th, 2 mirrored = 16th).
+ * - `'transverse-cross-bars'` — crisp horizontal cross-bars (`W = 7.5pt`,
+ *   stroke `1.2pt`); the half note leaves a clean open `4 × 7pt` rectangular
+ *   knockout gap in the spine;
+ * - `'kinetic-cross-slashes'` — the same bars raked at the score's own
+ *   beam-harmonized 12.4° (`maxBeamSlope`), with a hollow raked lozenge for the
+ *   half note;
+ * - `'interrupted-spine-node'` — an emphatic node: a bold open ring
+ *   (`R = 3.0pt`, stroke `1.1pt`) whose 100% white interior knocks the spine
+ *   out, or solid circular beads for the subdivisions;
+ * - `'faceted-diamond-bands'` — sculpted transverse diamond bands
+ *   (`W = 8.0pt × H = 4.5pt`), hollow for the half note and filled for the
+ *   subdivisions.
+ *
+ * Every hollow mark is painted with a white fill, so the spine (and whatever
+ * rule passes behind it) is knocked cleanly out of the mark's interior: no
+ * quadrant/crosshair defect can appear inside a ring, lozenge or diamond.
  */
-export const CLASP_CENTER_TICK_HALF = 1.1;
-export const CLASP_NOTCH_REACH = 2.0;
-export const CLASP_NOTCH_HALF = 0.9;
-export const CLASP_HUB_RADIUS = 1.6;
-export const CLASP_RAY_REACH = 3.0;
-/** Half-angle (rad) between the two rays of a 16th `'center-pip-rays'`. */
-export const CLASP_RAY_SPREAD = 0.62;
+/** Width (pt) of a transverse cross-bar / cross-slash (Candidates A and B). */
+export const CLASP_TRANSVERSE_WIDTH = 7.5;
+/** Stroke thickness (pt) of every Round 10 midpoint mark. */
+export const CLASP_TRANSVERSE_STROKE = 1.2;
+/** Vertical spacing (pt) between the two parallel bars/slashes of a 16th. */
+export const CLASP_CROSS_SPACING = 2.5;
+/** Clean open rectangular knockout gap of a half note: 4pt tall × 7pt wide. */
+export const CLASP_GAP_HEIGHT = 4.0;
+export const CLASP_GAP_WIDTH = 7.0;
+/** Diagonals (pt) of the raked 12.4° kinetic lozenge (along / across the rake). */
+export const CLASP_LOZENGE_LENGTH = 7.5;
+export const CLASP_LOZENGE_THICKNESS = 4.0;
+/** Bold open ring of the interrupted-spine node (R = 3.0pt, stroke 1.1pt). */
+export const CLASP_RING_RADIUS = 3.0;
+export const CLASP_RING_STROKE = 1.1;
+/** Solid circular beads of the interrupted-spine node (8th / 16th). */
+export const CLASP_BEAD_RADIUS = 2.8;
+export const CLASP_BEAD_STACK_RADIUS = 2.2;
+/** Faceted transverse diamond band: W = 8.0pt, H = 4.5pt. */
+export const CLASP_DIAMOND_WIDTH = 8.0;
+export const CLASP_DIAMOND_HEIGHT = 4.5;
+/** Air (pt) between the two stacked marks of a doubled (whole / 16th) value. */
+export const CLASP_MARK_STACK_GAP = 0.5;
 /** Horizontal offset (pt) of a dotted value's dot from the clasp spine. */
-export const CLASP_DOT_OFFSET = 1.55;
+export const CLASP_DOT_OFFSET = 3.2;
+/**
+ * Widest horizontal reach (pt) any Round 10 mark paints on either side of the
+ * spine. The engine's downbeat-inset budget reserves it, so a scaled mark can
+ * never be driven into the barline it follows.
+ */
+export const CLASP_MARK_REACH = CLASP_DIAMOND_WIDTH / 2;
 /**
  * Plain note values (ticks) of the duration grammar: 16th … double whole. A
  * value of exactly 1.5× one of them is *dotted* and carries the shared
@@ -422,17 +451,17 @@ export function claspQualifies(
 }
 
 /**
- * Duration grammar of a clasp — the value the bracket carries. Round 9 keeps the
- * Round 8 classes (they are *mark counts*, not a lopsided spire: the bracket
- * paints every duration at its own spine midpoint).
+ * Duration grammar of a clasp — the value the bracket carries. Round 10 keeps
+ * the Round 8 classes (they are *mark counts*, not a lopsided spire: the
+ * bracket paints every duration at its own spine midpoint).
  *
- * | class               | value            | ink                                     |
- * | ------------------- | ---------------- | --------------------------------------- |
- * | `'double-pip'`      | whole (≥ 192 t)  | two open circles at the spine midpoint   |
- * | `'pip'`             | half (≥ 96 t)    | one open circle at the spine midpoint    |
- * | `'spire'`           | quarter (≥ 39 t) | bare bracket (no duration notch)         |
- * | `'spire-one-flag'`  | 8th (15–38 t)    | one duration notch / stronger cap        |
- * | `'spire-two-flags'` | 16th (≤ 14 t)    | two duration notches / stronger cap      |
+ * | class               | value            | ink                                      |
+ * | ------------------- | ---------------- | ---------------------------------------- |
+ * | `'double-pip'`      | whole (≥ 192 t)  | two open knockout marks at the midpoint  |
+ * | `'pip'`             | half (≥ 96 t)    | one open knockout mark at the midpoint   |
+ * | `'spire'`           | quarter (≥ 39 t) | bare bracket (no duration mark)          |
+ * | `'spire-one-flag'`  | 8th (15–38 t)    | one transverse mark                      |
+ * | `'spire-two-flags'` | 16th (≤ 14 t)    | two parallel transverse marks            |
  *
  * The thresholds mirror the flag grammar of {@link renderFlags}, so a clasped
  * cluster and a flagged stem of the same value can never disagree.
@@ -458,7 +487,7 @@ export function claspDurationClass(durationTicks: number): JankoClaspDuration {
  * (72 = dotted quarter, 36 = dotted 8th, 144 = dotted half …). A dotted value
  * keeps its plain paradigm's midpoint ink and adds the canonical
  * {@link JankoTokens.augmentationDotRadius} dot beside the spine, so a dotted
- * quarter reads as "plain bracket + dot" under every Round 9 paradigm.
+ * quarter reads as "plain bracket + dot" under every Round 10 paradigm.
  */
 export function claspDurationDotted(durationTicks: number): boolean {
   const plain = durationTicks / 1.5;
@@ -490,13 +519,13 @@ export interface JankoClaspGroupGeometry {
   durationTicks: number;
   /** Resolved duration grammar. */
   duration: JankoClaspDuration;
-  /** Round 9: the midpoint duration paradigm the bracket paints. */
+  /** Round 10: the scaled midpoint duration paradigm the bracket paints. */
   durationStyle: JankoClaspDurationStyle;
   /** Duration notches (0 = quarter, 1 = 8th, 2 = 16th). */
   flags: number;
-  /** Open pips (0–2) drawn at the spine midpoint. */
+  /** Open knockout marks (0–2) painted at the spine midpoint. */
   pips: number;
-  /** Round 9: a dotted value adds the 0.75pt augmentation dot at the midpoint. */
+  /** Round 10: a dotted value adds the 0.75pt augmentation dot at the midpoint. */
   dotted: boolean;
   /** The bracket itself: `M cap topY L claspX topY L claspX botY L cap botY`. */
   path: string;
@@ -517,8 +546,8 @@ export interface JankoClaspOptions {
    */
   requireBracketScope?: boolean;
   /**
-   * Round 9: the midpoint duration paradigm the bracket paints. Defaults to
-   * `'center-kinetic-ticks'`.
+   * Round 10: the scaled midpoint duration paradigm the bracket paints.
+   * Defaults to `'transverse-cross-bars'`.
    */
   claspDurationStyle?: JankoClaspDurationStyle;
 }
@@ -585,7 +614,7 @@ export function computeClaspGeometry(
     strokeWidth: t.claspStrokeWidth,
     durationTicks,
     duration,
-    durationStyle: options?.claspDurationStyle ?? 'center-kinetic-ticks',
+    durationStyle: options?.claspDurationStyle ?? 'transverse-cross-bars',
     flags,
     pips,
     dotted,
@@ -615,19 +644,145 @@ export function withClaspRail(
 }
 
 /**
- * The duration ink of one clasp in the active Round 9 midpoint paradigm. Every
- * mark is anchored on `yMid = (topY + botY) / 2`, so the bracket stays a mirror
- * symmetrical `[` whatever value it carries. The rendered marks and
- * {@link claspInkBox} share this switch, so the audited box can never drift from
- * the painted ink.
+ * Extents of one Round 10 midpoint mark, measured from its own centre:
+ * `halfWidth`/`halfHeight` bound the painted ink, `stack` is the distance of
+ * the mark's centre from the bracket midpoint (`0` for a single mark, the
+ * mirrored offset for the two marks of a whole / 16th value).
+ */
+interface JankoClaspMarkExtents {
+  halfWidth: number;
+  halfHeight: number;
+  stack: number;
+}
+
+/** Half-extents of the open (half / whole) knockout mark of one paradigm. */
+function claspOpenMark(
+  style: JankoClaspDurationStyle,
+  count: number,
+  rake: number
+): JankoClaspMarkExtents {
+  switch (style) {
+    case 'kinetic-cross-slashes': {
+      const cos = 1 / Math.sqrt(1 + rake * rake);
+      const sin = rake * cos;
+      const half = CLASP_TRANSVERSE_STROKE / 2;
+      const halfWidth =
+        (CLASP_LOZENGE_LENGTH / 2) * cos + (CLASP_LOZENGE_THICKNESS / 2) * sin + half;
+      const halfHeight =
+        (CLASP_LOZENGE_LENGTH / 2) * sin + (CLASP_LOZENGE_THICKNESS / 2) * cos + half;
+      return {
+        halfWidth,
+        halfHeight,
+        stack: count <= 1 ? 0 : CLASP_LOZENGE_THICKNESS / 2 + CLASP_MARK_STACK_GAP,
+      };
+    }
+    case 'interrupted-spine-node': {
+      const r = CLASP_RING_RADIUS + CLASP_RING_STROKE / 2;
+      return {
+        halfWidth: r,
+        halfHeight: r,
+        stack: count <= 1 ? 0 : CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP,
+      };
+    }
+    case 'faceted-diamond-bands': {
+      const half = CLASP_TRANSVERSE_STROKE / 2;
+      return {
+        halfWidth: CLASP_DIAMOND_WIDTH / 2 + half,
+        halfHeight: CLASP_DIAMOND_HEIGHT / 2 + half,
+        stack: count <= 1 ? 0 : CLASP_DIAMOND_HEIGHT / 2 + CLASP_MARK_STACK_GAP,
+      };
+    }
+    case 'transverse-cross-bars':
+    default:
+      // A whole note simply doubles the clean rectangular gap: nothing is
+      // painted inside it, so the spine stays knocked out over 8pt instead of 4.
+      return {
+        halfWidth: CLASP_GAP_WIDTH / 2,
+        halfHeight: (CLASP_GAP_HEIGHT * count) / 2,
+        stack: 0,
+      };
+  }
+}
+
+/** Half-extents of one transverse subdivision mark (8th / 16th). */
+function claspFlagMark(
+  style: JankoClaspDurationStyle,
+  count: number,
+  rake: number
+): JankoClaspMarkExtents {
+  switch (style) {
+    case 'kinetic-cross-slashes': {
+      const cos = 1 / Math.sqrt(1 + rake * rake);
+      return {
+        halfWidth: CLASP_TRANSVERSE_WIDTH / 2 + CLASP_TRANSVERSE_STROKE / 2,
+        halfHeight: (CLASP_TRANSVERSE_WIDTH / 2) * rake * cos + CLASP_TRANSVERSE_STROKE / 2,
+        stack: count <= 1 ? 0 : CLASP_CROSS_SPACING / 2,
+      };
+    }
+    case 'interrupted-spine-node': {
+      const r = count === 1 ? CLASP_BEAD_RADIUS : CLASP_BEAD_STACK_RADIUS;
+      return {
+        halfWidth: r,
+        halfHeight: r,
+        stack: count <= 1 ? 0 : CLASP_BEAD_STACK_RADIUS + CLASP_MARK_STACK_GAP,
+      };
+    }
+    case 'faceted-diamond-bands': {
+      const half = CLASP_TRANSVERSE_STROKE / 2;
+      return {
+        halfWidth: CLASP_DIAMOND_WIDTH / 2 + half,
+        halfHeight: CLASP_DIAMOND_HEIGHT / 2 + half,
+        stack: count <= 1 ? 0 : CLASP_DIAMOND_HEIGHT / 2 + CLASP_MARK_STACK_GAP,
+      };
+    }
+    case 'transverse-cross-bars':
+    default:
+      return {
+        halfWidth: CLASP_TRANSVERSE_WIDTH / 2,
+        halfHeight: CLASP_TRANSVERSE_STROKE / 2,
+        stack: count <= 1 ? 0 : CLASP_CROSS_SPACING / 2,
+      };
+  }
+}
+
+/** The raked rhombus of a 12.4° kinetic lozenge centred at `(cx, cy)`. */
+function claspLozengePath(cx: number, cy: number, rake: number): string {
+  const cos = 1 / Math.sqrt(1 + rake * rake);
+  const sin = rake * cos;
+  const lx = (CLASP_LOZENGE_LENGTH / 2) * cos;
+  const ly = (CLASP_LOZENGE_LENGTH / 2) * sin;
+  const tx = (CLASP_LOZENGE_THICKNESS / 2) * sin;
+  const ty = (CLASP_LOZENGE_THICKNESS / 2) * cos;
+  return (
+    `M ${f(cx + lx)} ${f(cy + ly)} L ${f(cx - tx)} ${f(cy + ty)} ` +
+    `L ${f(cx - lx)} ${f(cy - ly)} L ${f(cx + tx)} ${f(cy - ty)} Z`
+  );
+}
+
+/** The faceted transverse diamond band centred at `(cx, cy)`. */
+function claspDiamondPath(cx: number, cy: number): string {
+  const w = CLASP_DIAMOND_WIDTH / 2;
+  const h = CLASP_DIAMOND_HEIGHT / 2;
+  return (
+    `M ${f(cx)} ${f(cy - h)} L ${f(cx + w)} ${f(cy)} ` +
+    `L ${f(cx)} ${f(cy + h)} L ${f(cx - w)} ${f(cy)} Z`
+  );
+}
+
+/**
+ * The duration ink of one clasp in the active Round 10 midpoint paradigm. Every
+ * mark is anchored on `yMid = (topY + botY) / 2` and cuts symmetrically across
+ * the spine, so the bracket stays a mirror-symmetrical `[` whatever value it
+ * carries. The rendered marks and {@link claspInkBox} share the same mark
+ * geometry, so the audited box can never drift from the painted ink.
  *
- * | value        | shared ink                            | midpoint subdivision ink |
- * | ------------ | ------------------------------------- | ------------------------ |
- * | half / whole | 1 / 2 open rings on the spine          | —                        |
- * | quarter      | the plain bracket                      | —                        |
- * | dotted       | + the 0.75pt augmentation dot          | —                        |
- * | 8th          | —                                      | 1 mark                   |
- * | 16th         | —                                      | 2 mirrored marks         |
+ * | value        | ink                                                      |
+ * | ------------ | -------------------------------------------------------- |
+ * | half / whole | 1 / 2 open knockout marks across the spine                |
+ * | quarter      | the plain bracket (a continuous solid spine)              |
+ * | dotted       | + the 0.75pt augmentation dot right of the mark           |
+ * | 8th          | 1 transverse mark                                         |
+ * | 16th         | 2 parallel transverse marks, mirrored about the midpoint  |
  */
 function renderClaspDurationInk(
   group: JankoClaspGroupGeometry,
@@ -636,105 +791,84 @@ function renderClaspDurationInk(
   const out: string[] = [];
   const yMid = (group.topY + group.botY) / 2;
   const claspX = group.claspX;
-  const stroke = group.strokeWidth.toFixed(2);
+  const stroke = CLASP_TRANSVERSE_STROKE.toFixed(2);
+  const rake = t.maxBeamSlope;
+  const open = group.pips > 0;
+  const hasMark = open || group.flags > 0;
+  const mark = open
+    ? claspOpenMark(group.durationStyle, group.pips, rake)
+    : claspFlagMark(group.durationStyle, group.flags, rake);
+  const centers =
+    mark.stack === 0 ? [yMid] : [yMid - mark.stack, yMid + mark.stack];
 
-  // 1. Halves and wholes carry their open pips at the exact spine midpoint, so
-  //    the bracket stays mirror-symmetrical in every paradigm.
-  for (let i = 0; i < group.pips; i++) {
-    const offset =
-      group.pips === 1 ? 0 : (i === 0 ? -1 : 1) * (CLASP_PIP_RADIUS + CLASP_PIP_GAP / 2);
-    const cy = yMid + offset;
-    out.push(
-      `    <circle class="janko-clasp-pip" cx="${f(claspX)}" cy="${f(cy)}" r="${f(CLASP_PIP_RADIUS)}" fill="none" stroke="#111111" stroke-width="${stroke}"/>`
-    );
+  for (const cy of hasMark ? centers : []) {
+    if (open) {
+      switch (group.durationStyle) {
+        case 'kinetic-cross-slashes':
+          out.push(
+            `    <path class="janko-clasp-lozenge" d="${claspLozengePath(claspX, cy, rake)}" fill="#FFFFFF" stroke="#111111" stroke-width="${stroke}" stroke-linejoin="miter"/>`
+          );
+          break;
+        case 'interrupted-spine-node':
+          out.push(
+            `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(CLASP_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"/>`
+          );
+          break;
+        case 'faceted-diamond-bands':
+          out.push(
+            `    <path class="janko-clasp-diamond" d="${claspDiamondPath(claspX, cy)}" fill="#FFFFFF" stroke="#111111" stroke-width="${stroke}" stroke-linejoin="miter"/>`
+          );
+          break;
+        case 'transverse-cross-bars':
+        default:
+          // A clean rectangular knockout: the spine simply stops for 4pt (8pt
+          // for a whole note) and nothing is painted inside the gap.
+          out.push(
+            `    <rect class="janko-clasp-gap" x="${f(claspX - CLASP_GAP_WIDTH / 2)}" y="${f(cy - mark.halfHeight)}" width="${f(CLASP_GAP_WIDTH)}" height="${f(mark.halfHeight * 2)}" fill="#FFFFFF" stroke="none"/>`
+          );
+          break;
+      }
+      continue;
+    }
+
+    switch (group.durationStyle) {
+      case 'kinetic-cross-slashes': {
+        const half = CLASP_TRANSVERSE_WIDTH / 2;
+        const dy = half * rake;
+        out.push(
+          `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy - dy)}" x2="${f(claspX + half)}" y2="${f(cy + dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+        );
+        break;
+      }
+      case 'interrupted-spine-node': {
+        const r = group.flags === 1 ? CLASP_BEAD_RADIUS : CLASP_BEAD_STACK_RADIUS;
+        out.push(
+          `    <circle class="janko-clasp-bead" cx="${f(claspX)}" cy="${f(cy)}" r="${f(r)}" fill="#111111"/>`
+        );
+        break;
+      }
+      case 'faceted-diamond-bands':
+        out.push(
+          `    <path class="janko-clasp-band" d="${claspDiamondPath(claspX, cy)}" fill="#111111" stroke="none"/>`
+        );
+        break;
+      case 'transverse-cross-bars':
+      default:
+        out.push(
+          `    <line class="janko-clasp-bar" x1="${f(claspX - CLASP_TRANSVERSE_WIDTH / 2)}" y1="${f(cy)}" x2="${f(claspX + CLASP_TRANSVERSE_WIDTH / 2)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+        );
+        break;
+    }
   }
 
-  // 2. A dotted value adds the canonical augmentation dot just right of the
-  //    spine — inside the cup, where it can touch neither a barline nor a
-  //    foreign glyph.
+  // A dotted value adds the canonical 0.75pt augmentation dot just right of the
+  // mark, painted last so a white knockout can never erase it.
   if (group.dotted) {
     out.push(
       `    <circle class="janko-clasp-dot" cx="${f(claspX + CLASP_DOT_OFFSET)}" cy="${f(yMid)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
     );
   }
-  if (group.pips > 0 || group.flags === 0) return out;
-
-  switch (group.durationStyle) {
-    case 'center-chevron-notch': {
-      // A calligraphic guillemet notch: its apex sits on the spine and its two
-      // arms reach into the cup. A 16th nests a second, smaller chevron inside
-      // the first, so the tally reads 1 / 2 without leaving the midpoint.
-      const chevron = (reach: number, half: number): string =>
-        `    <path class="janko-clasp-chevron" d="M ${f(claspX + reach)} ${f(yMid - half)} L ${f(claspX)} ${f(yMid)} L ${f(claspX + reach)} ${f(yMid + half)}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="round"/>`;
-      if (group.flags === 1) {
-        out.push(chevron(CLASP_NOTCH_REACH, CLASP_NOTCH_HALF));
-      } else {
-        out.push(chevron(CLASP_NOTCH_REACH, CLASP_NOTCH_HALF * 1.35));
-        out.push(chevron(CLASP_NOTCH_REACH * 0.62, CLASP_NOTCH_HALF * 0.72));
-      }
-      return out;
-    }
-
-    case 'center-pip-rays': {
-      // A compact hub on the spine with lateral rays: one ray for an 8th, a
-      // mirrored pair for a 16th.
-      out.push(
-        `    <circle class="janko-clasp-hub" cx="${f(claspX)}" cy="${f(yMid)}" r="${f(CLASP_HUB_RADIUS)}" fill="#111111"/>`
-      );
-      const tips: Array<[number, number]> =
-        group.flags === 1
-          ? [[claspX - CLASP_RAY_REACH, yMid]]
-          : [
-              [
-                claspX - CLASP_RAY_REACH * Math.cos(CLASP_RAY_SPREAD),
-                yMid - CLASP_RAY_REACH * Math.sin(CLASP_RAY_SPREAD),
-              ],
-              [
-                claspX - CLASP_RAY_REACH * Math.cos(CLASP_RAY_SPREAD),
-                yMid + CLASP_RAY_REACH * Math.sin(CLASP_RAY_SPREAD),
-              ],
-            ];
-      for (const [x, y] of tips) {
-        out.push(
-          `    <line class="janko-clasp-ray" x1="${f(claspX)}" y1="${f(yMid)}" x2="${f(x)}" y2="${f(y)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-        );
-      }
-      return out;
-    }
-
-    case 'center-sculpted-wedge': {
-      // A sculpted fin: a filled barb whose base rides the spine and whose
-      // sharp apex points into the margin. A 16th mirrors a smaller pair of
-      // barbs about the midpoint.
-      const barb = (cy: number, half: number): string =>
-        `    <path class="janko-clasp-barb" d="M ${f(claspX)} ${f(cy - half)} L ${f(claspX - CLASP_NOTCH_REACH)} ${f(cy)} L ${f(claspX)} ${f(cy + half)} Z" fill="#111111" stroke="none"/>`;
-      if (group.flags === 1) {
-        out.push(barb(yMid, CLASP_NOTCH_HALF));
-      } else {
-        out.push(barb(yMid - CLASP_NOTCH_HALF * 1.25, CLASP_NOTCH_HALF * 0.7));
-        out.push(barb(yMid + CLASP_NOTCH_HALF * 1.25, CLASP_NOTCH_HALF * 0.7));
-      }
-      return out;
-    }
-
-    case 'center-kinetic-ticks':
-    default: {
-      // 12° beam-harmonized kinetic ticks straddling the spine. A single 8th
-      // tick rakes with the score's own beams; the 16th pair is mirrored about
-      // the midpoint, so the bracket never reads as lopsided.
-      const half = CLASP_CENTER_TICK_HALF;
-      const rake = t.maxBeamSlope;
-      for (let i = 0; i < group.flags; i++) {
-        const offset = group.flags === 1 ? 0 : (i === 0 ? -1 : 1) * (t.flagSpacing / 2);
-        const mirror = group.flags === 1 ? 1 : i === 0 ? -1 : 1;
-        const cy = yMid + offset;
-        out.push(
-          `    <line class="janko-clasp-tick" x1="${f(claspX - half)}" y1="${f(cy - mirror * half * rake)}" x2="${f(claspX + half)}" y2="${f(cy + mirror * half * rake)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-        );
-      }
-      return out;
-    }
-  }
+  return out;
 }
 
 /**
@@ -753,52 +887,25 @@ export function claspInkBox(
   let y1 = group.botY;
   const yMid = (group.topY + group.botY) / 2;
 
-  if (group.pips > 0) x0 = Math.min(x0, group.claspX - CLASP_PIP_RADIUS);
+  if (group.pips > 0 || group.flags > 0) {
+    const mark =
+      group.pips > 0
+        ? claspOpenMark(group.durationStyle, group.pips, t.maxBeamSlope)
+        : claspFlagMark(group.durationStyle, group.flags, t.maxBeamSlope);
+    x0 = Math.min(x0, group.claspX - mark.halfWidth);
+    x1 = Math.max(x1, group.claspX + mark.halfWidth);
+    y0 = Math.min(y0, yMid - mark.stack - mark.halfHeight);
+    y1 = Math.max(y1, yMid + mark.stack + mark.halfHeight);
+  }
   if (group.dotted) {
     x1 = Math.max(x1, group.claspX + CLASP_DOT_OFFSET + t.augmentationDotRadius);
-  }
-  if (group.pips === 0 && group.flags > 0) {
-    switch (group.durationStyle) {
-      case 'center-chevron-notch':
-        x1 = Math.max(x1, group.claspX + CLASP_NOTCH_REACH);
-        y0 = Math.min(y0, yMid - CLASP_NOTCH_HALF * 1.35);
-        y1 = Math.max(y1, yMid + CLASP_NOTCH_HALF * 1.35);
-        break;
-      case 'center-pip-rays': {
-        const spread = Math.max(
-          CLASP_HUB_RADIUS,
-          CLASP_RAY_REACH * Math.sin(CLASP_RAY_SPREAD)
-        );
-        x0 = Math.min(x0, group.claspX - CLASP_RAY_REACH);
-        x1 = Math.max(x1, group.claspX + CLASP_HUB_RADIUS);
-        y0 = Math.min(y0, yMid - spread);
-        y1 = Math.max(y1, yMid + spread);
-        break;
-      }
-      case 'center-sculpted-wedge':
-        x0 = Math.min(x0, group.claspX - CLASP_NOTCH_REACH);
-        y0 = Math.min(y0, yMid - CLASP_NOTCH_HALF * 1.95);
-        y1 = Math.max(y1, yMid + CLASP_NOTCH_HALF * 1.95);
-        break;
-      case 'center-kinetic-ticks':
-      default: {
-        const half = CLASP_CENTER_TICK_HALF;
-        const span =
-          (group.flags === 1 ? 0 : t.flagSpacing / 2) + half * t.maxBeamSlope;
-        x0 = Math.min(x0, group.claspX - half);
-        x1 = Math.max(x1, group.claspX + half);
-        y0 = Math.min(y0, yMid - span);
-        y1 = Math.max(y1, yMid + span);
-        break;
-      }
-    }
   }
   return { x0, y0, x1, y1 };
 }
 
 /**
  * Paint one left clasp: the symmetrical `[` bracket plus the duration ink of the
- * active `claspDurationStyle` (Round 9). The group is engraved in the rhythm
+ * active `claspDurationStyle` (Round 10). The group is engraved in the rhythm
  * layer (beneath the noteheads), so a knockout always erases whatever a clasp
  * should never have touched.
  */
@@ -846,7 +953,7 @@ export function renderClaspRail(
 /**
  * Paint a whole clasp layer: every bracket, then the rails of
  * `'beamed-clasp-rail'` (which are painted after the spines they join).
- * Round 9 carries the duration paradigm on each resolved group, so the layer
+ * Round 10 carries the duration paradigm on each resolved group, so the layer
  * needs no extra style parameter.
  */
 export function renderClaspGroup(
@@ -1306,6 +1413,18 @@ export interface JankoBeamPartition {
  * A longer value of the same hand (dotted 8th or more) interrupts a run even
  * though it is not itself beamable: a beam may never straddle a notehead that
  * is not part of it, or the connector would cut through that glyph.
+ *
+ * Round 10 removed the brittle *cross-register* heuristic that used to sever a
+ * run whenever it leapt an octave across Middle C while the other hand sounded
+ * a temporally coincident note. It orphaned authentic gestures — the Bach
+ * Goldberg Var. 1 m. 4 RH descent `6 4 2 1 2 6 9 7 6 9 0` lost its `9 7 6`
+ * tail to solitary flags — and it is unnecessary: the 16-pass obstacle solver
+ * of {@link computeBeamGroupGeometry} already pushes every connector clear of
+ * foreign noteheads and of the Middle C corridor, so a run beams continuously
+ * across the spine as one musical gesture.
+ *
+ * `middleCY` is kept for call-site compatibility; the corridor is protected by
+ * the beam solver, not by the partition.
  */
 export function partitionBeamGroups(
   notes: JankoRhythmNote[],
@@ -1313,29 +1432,7 @@ export function partitionBeamGroups(
   middleCY?: number | null
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
-
-  // Fallback middleCY if not provided
-  let refMiddleCY = middleCY ?? null;
-  if (refMiddleCY === null && notes.length > 0) {
-    const rhYs = notes.filter((n) => n.hand === 'RH').map((n) => n.y);
-    const lhYs = notes.filter((n) => n.hand === 'LH').map((n) => n.y);
-    if (rhYs.length > 0 && lhYs.length > 0) {
-      refMiddleCY = (Math.max(...rhYs) + Math.min(...lhYs)) / 2;
-    }
-  }
-
-  // Precompute which notes form mixed-hand clusters (same tick, different hands, close vertically)
-  const mixedHandClusterNotes = new Set<string>();
-  for (const a of notes) {
-    for (const b of notes) {
-      if (a.id !== b.id && a.hand !== b.hand && a.startTick === b.startTick) {
-        if (Math.abs(a.y - b.y) <= 2 * t.rowHeight + 1e-3) {
-          mixedHandClusterNotes.add(a.id);
-          mixedHandClusterNotes.add(b.id);
-        }
-      }
-    }
-  }
+  void middleCY;
 
   const buckets = new Map<string, JankoRhythmNote[]>();
   const unbeamable = new Map<Hand, JankoRhythmNote[]>();
@@ -1376,29 +1473,7 @@ export function partitionBeamGroups(
         const straddled = (unbeamable.get(n.hand) ?? []).some(
           (b) => b.startTick > prev.startTick && b.startTick < n.startTick
         );
-
-        // Break beam runs when an octave leap crosses the Middle C corridor into the opposite hand's register,
-        // or when a note coincides temporally with notes in the other hand to form a mixed-hand cluster.
-        let crossRegisterBreak = false;
-        if (refMiddleCY !== null) {
-          const prevDy = prev.y - refMiddleCY;
-          const nDy = n.y - refMiddleCY;
-          const crossesCorridor = prevDy * nDy < 0;
-          const isOctaveLeap = Math.abs(prev.y - n.y) >= t.octaveStep - 1e-3;
-          const isOppositeRegister = (n.hand === 'LH' && nDy < 0) || (n.hand === 'RH' && nDy > 0);
-          const prevOppositeRegister = (prev.hand === 'LH' && prevDy < 0) || (prev.hand === 'RH' && prevDy > 0);
-
-          if (crossesCorridor && isOctaveLeap && (isOppositeRegister || prevOppositeRegister)) {
-            crossRegisterBreak = true;
-          } else if (
-            (isOppositeRegister && mixedHandClusterNotes.has(n.id)) ||
-            (prevOppositeRegister && mixedHandClusterNotes.has(prev.id))
-          ) {
-            crossRegisterBreak = true;
-          }
-        }
-
-        if (gap || straddled || crossRegisterBreak) flush();
+        if (gap || straddled) flush();
       }
       run.push(n);
     }

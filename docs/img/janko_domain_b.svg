@@ -1,10 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="16.00 14.00 295.54 234.00" width="295.54pt" height="234.00pt" style="background:#FFFFFF;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16.00 -4.00 295.54 252.00" width="295.54pt" height="252.00pt" style="background:#FFFFFF;">
   <defs>
     <style>
       .janko-title { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }
       .janko-subtitle { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 8.5pt; fill: #333333; }
       .janko-meta { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 8pt; fill: #222222; }
-      .janko-measure-num { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 8.5pt; fill: #444444; font-weight: bold; }
+      .janko-running-head { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; }
+      .janko-page-num { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 8pt; fill: #666666; font-weight: 400; }
+      .janko-measure-num { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 8.5pt; fill: #555555; font-weight: normal; }
       .janko-octave-label { font-family: "DejaVu Sans Mono", monospace; font-size: 7.5pt; font-weight: bold; fill: #6B7280; }
       .janko-hand-label { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-style: italic; font-size: 8pt; fill: #555555; }
       .janko-ts-num { font-family: "Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif; font-weight: bold; font-size: 14pt; fill: #111111; text-anchor: middle; }
@@ -13,17 +15,18 @@
       .janko-digit { font-family: "URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif; text-anchor: middle; font-weight: bold; }
     </style>
   </defs>
-  <rect x="16.00" y="14.00" width="295.54" height="234.00" fill="#FFFFFF"/>
-    <text x="22.00" y="24.50" class="janko-caption" font-size="7.00pt">mm. 1–2</text>
-    <text x="22.00" y="33.50" class="janko-caption" font-size="7.00pt">A calligraphic guillemet notch is cut into the spine’s</text>
-    <text x="22.00" y="42.50" class="janko-caption" font-size="7.00pt">midpoint: its apex rides the spine and its two burin arms</text>
-    <text x="22.00" y="51.50" class="janko-caption" font-size="7.00pt">open into the cup. A 16th nests a second, smaller chevron</text>
-    <text x="22.00" y="60.50" class="janko-caption" font-size="7.00pt">inside the first, so the value counts 1 / 2 without ever</text>
-    <text x="22.00" y="69.50" class="janko-caption" font-size="7.00pt">leaving the centre.</text>
+  <rect x="16.00" y="-4.00" width="295.54" height="252.00" fill="#FFFFFF"/>
+    <text x="22.00" y="6.50" class="janko-caption" font-size="7.00pt">mm. 1–2</text>
+    <text x="22.00" y="15.50" class="janko-caption" font-size="7.00pt">The same transverse bars raked at the score’s own</text>
+    <text x="22.00" y="24.50" class="janko-caption" font-size="7.00pt">beam-harmonized 12.4°: a hollow raked lozenge knocks the</text>
+    <text x="22.00" y="33.50" class="janko-caption" font-size="7.00pt">spine out for a half, one slash carries an 8th and a</text>
+    <text x="22.00" y="42.50" class="janko-caption" font-size="7.00pt">parallel pair carries a 16th. The paradigm speaks the</text>
+    <text x="22.00" y="51.50" class="janko-caption" font-size="7.00pt">settled kinetic language of the subdivision tab, so a</text>
+    <text x="22.00" y="60.50" class="janko-caption" font-size="7.00pt">clasped chord and a flagged melody rake at exactly the same</text>
+    <text x="22.00" y="69.50" class="janko-caption" font-size="7.00pt">angle.</text>
   <g class="janko-crop-body">
   <g id="system-1">
-    <text class="janko-measure-num" x="33.80" y="76.00">1</text>
-    <path class="janko-accolade" d="M 22.18 180.47 C 22.12 169.45, 19.20 164.21, 19.20 164.00 C 19.20 163.47, 22.18 158.97, 22.29 147.53 C 22.18 135.98, 19.42 125.18, 19.42 112.03 C 19.59 104.33, 20.59 96.84, 23.35 90.43 C 23.56 90.00, 24.00 90.53, 23.78 90.96 C 21.50 95.88, 20.55 101.44, 20.51 107.32 C 20.80 118.77, 23.49 129.46, 23.49 142.40 C 22.88 150.10, 22.44 157.58, 19.64 164.00 C 22.39 170.42, 22.87 177.90, 23.49 185.60 C 23.49 198.54, 20.80 209.23, 20.51 220.68 C 20.55 226.56, 21.50 232.12, 23.78 237.04 C 24.00 237.47, 23.56 238.00, 23.35 237.57 C 20.59 231.16, 19.59 223.67, 19.42 215.97 C 19.42 202.82, 22.18 192.02, 22.18 180.47 Z" fill="#111827"/>
+    <text class="janko-measure-num" x="29.80" y="76.00">1</text>
 
 
 
@@ -61,80 +64,80 @@
   </g>
   <g class="janko-notes">
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="47.40" y1="221.10" x2="47.40" y2="230.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="67.71" y1="189.50" x2="67.71" y2="226.03" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="77.87" y1="189.50" x2="77.87" y2="223.80" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="47.40" y1="230.50" x2="77.87" y2="223.80" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="67.71" y1="222.63" x2="77.87" y2="220.40" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="51.40" y1="221.10" x2="51.40" y2="230.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="71.11" y1="189.50" x2="71.11" y2="226.16" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="80.97" y1="189.50" x2="80.97" y2="224.00" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="51.40" y1="230.50" x2="80.97" y2="224.00" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="71.11" y1="222.76" x2="80.97" y2="220.60" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="47.40" y1="121.90" x2="47.40" y2="112.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="57.56" y1="138.50" x2="57.56" y2="114.73" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="47.40" y1="112.50" x2="57.56" y2="114.73" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="47.40" y1="115.90" x2="57.56" y2="118.13" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="51.40" y1="121.90" x2="51.40" y2="112.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="61.26" y1="138.50" x2="61.26" y2="114.67" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="51.40" y1="112.50" x2="61.26" y2="114.67" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="51.40" y1="115.90" x2="61.26" y2="118.07" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="88.02" y1="189.50" x2="88.02" y2="200.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="108.33" y1="189.50" x2="108.33" y2="200.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="88.02" y1="200.50" x2="108.33" y2="200.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="90.82" y1="189.50" x2="90.82" y2="200.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="110.53" y1="189.50" x2="110.53" y2="200.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="90.82" y1="200.50" x2="110.53" y2="200.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="98.18" y1="138.50" x2="98.18" y2="127.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="108.33" y1="138.50" x2="108.33" y2="127.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="118.49" y1="138.50" x2="118.49" y2="127.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="98.18" y1="127.50" x2="118.49" y2="127.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="98.18" y1="130.90" x2="118.49" y2="130.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="100.68" y1="138.50" x2="100.68" y2="127.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="110.53" y1="138.50" x2="110.53" y2="127.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="120.39" y1="138.50" x2="120.39" y2="127.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="100.68" y1="127.50" x2="120.39" y2="127.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="100.68" y1="130.90" x2="120.39" y2="130.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="128.65" y1="219.50" x2="128.65" y2="230.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="148.96" y1="189.50" x2="148.96" y2="226.03" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="128.65" y1="230.50" x2="148.96" y2="226.03" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="130.25" y1="219.50" x2="130.25" y2="230.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="149.96" y1="189.50" x2="149.96" y2="226.16" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="130.25" y1="230.50" x2="149.96" y2="226.16" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="128.65" y1="123.50" x2="128.65" y2="89.20" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="138.80" y1="123.50" x2="138.80" y2="86.97" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="148.96" y1="123.50" x2="148.96" y2="84.73" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="159.11" y1="93.50" x2="159.11" y2="82.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="128.65" y1="89.20" x2="159.11" y2="82.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="128.65" y1="92.60" x2="159.11" y2="85.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="130.25" y1="123.50" x2="130.25" y2="89.00" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="140.10" y1="123.50" x2="140.10" y2="86.84" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="149.96" y1="123.50" x2="149.96" y2="84.67" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="159.81" y1="93.50" x2="159.81" y2="82.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="130.25" y1="89.00" x2="159.81" y2="82.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="130.25" y1="92.40" x2="159.81" y2="85.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="181.27" y1="108.50" x2="181.27" y2="84.73" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="191.43" y1="93.50" x2="191.43" y2="82.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="181.27" y1="84.73" x2="191.43" y2="82.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="181.27" y1="88.13" x2="191.43" y2="85.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="185.27" y1="108.50" x2="185.27" y2="84.67" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="195.13" y1="93.50" x2="195.13" y2="82.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="185.27" y1="84.67" x2="195.13" y2="82.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="185.27" y1="88.07" x2="195.13" y2="85.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="181.27" y1="234.50" x2="181.27" y2="245.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="201.58" y1="204.50" x2="201.58" y2="241.03" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="211.74" y1="204.50" x2="211.74" y2="238.80" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="181.27" y1="245.50" x2="211.74" y2="238.80" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="201.58" y1="237.63" x2="211.74" y2="235.40" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="185.27" y1="234.50" x2="185.27" y2="245.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="204.98" y1="204.50" x2="204.98" y2="241.16" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="214.84" y1="204.50" x2="214.84" y2="239.00" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="185.27" y1="245.50" x2="214.84" y2="239.00" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="204.98" y1="237.76" x2="214.84" y2="235.60" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="221.89" y1="204.50" x2="221.89" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="242.20" y1="204.50" x2="242.20" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="221.89" y1="215.50" x2="242.20" y2="215.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="224.69" y1="204.50" x2="224.69" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="244.41" y1="204.50" x2="244.41" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="224.69" y1="215.50" x2="244.41" y2="215.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="232.05" y1="123.50" x2="232.05" y2="86.97" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="242.20" y1="123.50" x2="242.20" y2="84.73" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="252.36" y1="93.50" x2="252.36" y2="82.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="232.05" y1="86.97" x2="252.36" y2="82.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="232.05" y1="90.37" x2="252.36" y2="85.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="234.55" y1="123.50" x2="234.55" y2="86.84" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="244.41" y1="123.50" x2="244.41" y2="84.67" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="254.26" y1="93.50" x2="254.26" y2="82.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="234.55" y1="86.84" x2="254.26" y2="82.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="234.55" y1="90.24" x2="254.26" y2="85.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="262.52" y1="108.50" x2="262.52" y2="97.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="272.67" y1="108.50" x2="272.67" y2="97.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="282.83" y1="108.50" x2="282.83" y2="97.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="292.98" y1="108.50" x2="292.98" y2="97.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="262.52" y1="97.50" x2="292.98" y2="97.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="262.52" y1="100.90" x2="292.98" y2="100.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="264.12" y1="108.50" x2="264.12" y2="97.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="273.97" y1="108.50" x2="273.97" y2="97.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="283.83" y1="108.50" x2="283.83" y2="97.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="293.68" y1="108.50" x2="293.68" y2="97.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="264.12" y1="97.50" x2="293.68" y2="97.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="264.12" y1="100.90" x2="293.68" y2="100.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="262.52" y1="234.50" x2="262.52" y2="245.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="282.83" y1="204.50" x2="282.83" y2="241.03" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="262.52" y1="245.50" x2="282.83" y2="241.03" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="264.12" y1="234.50" x2="264.12" y2="245.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="283.83" y1="204.50" x2="283.83" y2="241.16" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="264.12" y1="245.50" x2="283.83" y2="241.16" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
     <line class="janko-stem" x1="309.54" y1="234.50" x2="309.54" y2="245.50" stroke="#111111" stroke-width="0.90"/>
@@ -170,134 +173,129 @@
     <line class="janko-beam-secondary" x1="390.79" y1="85.90" x2="426.20" y2="93.69" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="449.01" y1="204.50" x2="449.01" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="469.32" y1="204.50" x2="469.32" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="479.48" y1="204.50" x2="479.48" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="449.01" y1="215.50" x2="479.48" y2="215.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="469.32" y1="212.10" x2="479.48" y2="212.10" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="390.79" y1="219.50" x2="390.79" y2="230.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="405.60" y1="133.50" x2="405.60" y2="227.24" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="390.79" y1="230.50" x2="405.60" y2="227.24" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="449.01" y1="138.50" x2="449.01" y2="119.20" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="459.17" y1="138.50" x2="459.17" y2="116.97" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="469.32" y1="138.50" x2="469.32" y2="114.73" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="479.48" y1="123.50" x2="479.48" y2="112.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="449.01" y1="119.20" x2="479.48" y2="112.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="449.01" y1="122.60" x2="479.48" y2="115.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="453.01" y1="204.50" x2="453.01" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="472.72" y1="204.50" x2="472.72" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="482.58" y1="204.50" x2="482.58" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="453.01" y1="215.50" x2="482.58" y2="215.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="472.72" y1="212.10" x2="482.58" y2="212.10" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="489.63" y1="138.50" x2="489.63" y2="127.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="499.79" y1="138.50" x2="499.79" y2="127.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="489.63" y1="127.50" x2="499.79" y2="127.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="489.63" y1="130.90" x2="499.79" y2="130.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="453.01" y1="138.50" x2="453.01" y2="119.00" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="462.87" y1="138.50" x2="462.87" y2="116.84" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="472.72" y1="138.50" x2="472.72" y2="114.67" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="482.58" y1="123.50" x2="482.58" y2="112.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="453.01" y1="119.00" x2="482.58" y2="112.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="453.01" y1="122.40" x2="482.58" y2="115.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="489.63" y1="204.50" x2="489.63" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="509.95" y1="204.50" x2="509.95" y2="215.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="489.63" y1="215.50" x2="509.95" y2="215.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="492.43" y1="138.50" x2="492.43" y2="125.33" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="502.29" y1="138.50" x2="502.29" y2="127.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="512.14" y1="179.50" x2="512.14" y2="129.67" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="522.00" y1="179.50" x2="522.00" y2="131.84" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="492.43" y1="125.33" x2="522.00" y2="131.84" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="492.43" y1="128.73" x2="522.00" y2="135.24" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="530.26" y1="234.50" x2="530.26" y2="245.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="550.57" y1="204.50" x2="550.57" y2="241.03" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="530.26" y1="245.50" x2="550.57" y2="241.03" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="492.43" y1="204.50" x2="492.43" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="512.14" y1="204.50" x2="512.14" y2="215.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="492.43" y1="215.50" x2="512.14" y2="215.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
   <g class="janko-beam-group">
-    <line class="janko-stem" x1="540.41" y1="179.50" x2="540.41" y2="168.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-stem" x1="560.72" y1="194.50" x2="560.72" y2="172.97" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-beam" x1="540.41" y1="168.50" x2="560.72" y2="172.97" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
-    <line class="janko-beam-secondary" x1="540.41" y1="171.90" x2="560.72" y2="176.37" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-stem" x1="531.86" y1="234.50" x2="531.86" y2="245.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="551.57" y1="204.50" x2="551.57" y2="241.16" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="531.86" y1="245.50" x2="551.57" y2="241.16" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
   </g>
-    <line class="janko-stem" x1="67.71" y1="123.50" x2="67.71" y2="112.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="67.71" data-flag-index="1" x1="67.71" y1="112.50" x2="71.71" y2="113.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <circle class="janko-augmentation-dot" cx="75.71" cy="128.50" r="0.75" fill="#111111"/>
-    <line class="janko-stem" x1="201.58" y1="108.50" x2="201.58" y2="97.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="201.58" data-flag-index="1" x1="201.58" y1="97.50" x2="205.58" y2="98.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <circle class="janko-augmentation-dot" cx="209.58" cy="113.50" r="0.75" fill="#111111"/>
+  <g class="janko-beam-group">
+    <line class="janko-stem" x1="531.86" y1="194.50" x2="531.86" y2="168.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="541.71" y1="179.50" x2="541.71" y2="168.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-stem" x1="561.42" y1="194.50" x2="561.42" y2="168.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-beam" x1="531.86" y1="168.50" x2="561.42" y2="168.50" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+    <line class="janko-beam-secondary" x1="531.86" y1="171.90" x2="561.42" y2="171.90" stroke="#111111" stroke-width="1.80" stroke-linecap="butt"/>
+  </g>
+    <line class="janko-stem" x1="71.11" y1="123.50" x2="71.11" y2="112.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-flag" data-stem-x="71.11" data-flag-index="1" x1="71.11" y1="112.50" x2="75.11" y2="113.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
+    <circle class="janko-augmentation-dot" cx="79.11" cy="128.50" r="0.75" fill="#111111"/>
+    <line class="janko-stem" x1="204.98" y1="108.50" x2="204.98" y2="97.50" stroke="#111111" stroke-width="0.90"/>
+    <line class="janko-flag" data-stem-x="204.98" data-flag-index="1" x1="204.98" y1="97.50" x2="208.98" y2="98.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
+    <circle class="janko-augmentation-dot" cx="212.98" cy="113.50" r="0.75" fill="#111111"/>
     <line class="janko-stem" x1="329.85" y1="93.50" x2="329.85" y2="82.50" stroke="#111111" stroke-width="0.90"/>
     <line class="janko-flag" data-stem-x="329.85" data-flag-index="1" x1="329.85" y1="82.50" x2="333.85" y2="83.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
     <circle class="janko-augmentation-dot" cx="337.85" cy="98.50" r="0.75" fill="#111111"/>
-    <line class="janko-stem" x1="390.79" y1="219.50" x2="390.79" y2="230.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="390.79" data-flag-index="1" x1="390.79" y1="230.50" x2="394.79" y2="229.62" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-stem" x1="405.60" y1="133.50" x2="405.60" y2="144.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="405.60" data-flag-index="1" x1="405.60" y1="144.50" x2="409.60" y2="143.62" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-stem" x1="509.95" y1="179.50" x2="509.95" y2="168.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="509.95" data-flag-index="1" x1="509.95" y1="168.50" x2="513.95" y2="169.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-flag" data-stem-x="509.95" data-flag-index="2" x1="509.95" y1="171.90" x2="513.95" y2="172.78" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-stem" x1="520.10" y1="179.50" x2="520.10" y2="168.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="520.10" data-flag-index="1" x1="520.10" y1="168.50" x2="524.10" y2="169.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-flag" data-stem-x="520.10" data-flag-index="2" x1="520.10" y1="171.90" x2="524.10" y2="172.78" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-stem" x1="530.26" y1="194.50" x2="530.26" y2="183.50" stroke="#111111" stroke-width="0.90"/>
-    <line class="janko-flag" data-stem-x="530.26" data-flag-index="1" x1="530.26" y1="183.50" x2="534.26" y2="184.38" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <line class="janko-flag" data-stem-x="530.26" data-flag-index="2" x1="530.26" y1="186.90" x2="534.26" y2="187.78" stroke="#111111" stroke-width="1.10" stroke-linecap="butt" data-subdivision-style="kinetic-tab-beam"/>
-    <circle class="janko-halo" cx="47.40" cy="214.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
-    <circle class="janko-knockout" cx="47.40" cy="214.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="47.40" y="217.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-halo" cx="47.40" cy="128.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
-    <circle class="janko-knockout" cx="47.40" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="47.40" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="57.56" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="57.56" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="67.71" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="67.71" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="67.71" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="67.71" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
-    <circle class="janko-knockout" cx="77.87" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="77.87" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
-    <circle class="janko-knockout" cx="88.02" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="88.02" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
-    <circle class="janko-knockout" cx="98.18" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="98.18" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="108.33" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="108.33" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
-    <circle class="janko-knockout" cx="108.33" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="108.33" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="118.49" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="118.49" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="128.65" cy="214.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="128.65" y="217.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="128.65" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="128.65" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="138.80" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="138.80" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
-    <circle class="janko-knockout" cx="148.96" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="148.96" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="148.96" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="148.96" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
-    <circle class="janko-knockout" cx="159.11" cy="98.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="159.11" y="101.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
-    <circle class="janko-knockout" cx="181.27" cy="113.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="181.27" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="181.27" cy="229.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="181.27" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="191.43" cy="98.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="191.43" y="101.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
-    <circle class="janko-knockout" cx="201.58" cy="113.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="201.58" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="201.58" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="201.58" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="211.74" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="211.74" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
-    <circle class="janko-knockout" cx="221.89" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="221.89" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="232.05" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="232.05" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
-    <circle class="janko-knockout" cx="242.20" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="242.20" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="242.20" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="242.20" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
-    <circle class="janko-knockout" cx="252.36" cy="98.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="252.36" y="101.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
-    <circle class="janko-knockout" cx="262.52" cy="113.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="262.52" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="262.52" cy="229.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="262.52" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="272.67" cy="113.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="272.67" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
-    <circle class="janko-knockout" cx="282.83" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="282.83" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="282.83" cy="113.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="282.83" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="292.98" cy="113.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="292.98" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-halo" cx="51.40" cy="214.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
+    <circle class="janko-knockout" cx="51.40" cy="214.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="51.40" y="217.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-halo" cx="51.40" cy="128.50" r="6.20" fill="none" stroke="#111111" stroke-width="0.75"/>
+    <circle class="janko-knockout" cx="51.40" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="51.40" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="61.26" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="61.26" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="71.11" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="71.11" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="71.11" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="71.11" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
+    <circle class="janko-knockout" cx="80.97" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="80.97" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
+    <circle class="janko-knockout" cx="90.82" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="90.82" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
+    <circle class="janko-knockout" cx="100.68" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="100.68" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="110.53" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="110.53" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
+    <circle class="janko-knockout" cx="110.53" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="110.53" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="120.39" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="120.39" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="130.25" cy="214.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="130.25" y="217.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="130.25" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="130.25" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="140.10" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="140.10" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
+    <circle class="janko-knockout" cx="149.96" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="149.96" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="149.96" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="149.96" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
+    <circle class="janko-knockout" cx="159.81" cy="98.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="159.81" y="101.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
+    <circle class="janko-knockout" cx="185.27" cy="113.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="185.27" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="185.27" cy="229.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="185.27" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="195.13" cy="98.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="195.13" y="101.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
+    <circle class="janko-knockout" cx="204.98" cy="113.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="204.98" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="204.98" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="204.98" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="214.84" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="214.84" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
+    <circle class="janko-knockout" cx="224.69" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="224.69" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="234.55" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="234.55" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
+    <circle class="janko-knockout" cx="244.41" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="244.41" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="244.41" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="244.41" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">B</text>
+    <circle class="janko-knockout" cx="254.26" cy="98.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="254.26" y="101.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
+    <circle class="janko-knockout" cx="264.12" cy="113.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="264.12" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="264.12" cy="229.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="264.12" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="273.97" cy="113.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="273.97" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
+    <circle class="janko-knockout" cx="283.83" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="283.83" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="283.83" cy="113.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="283.83" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="293.68" cy="113.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="293.68" y="116.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
     <circle class="janko-knockout" cx="309.54" cy="229.50" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="309.54" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
     <circle class="janko-knockout" cx="309.54" cy="98.50" r="4.80" fill="#FFFFFF"/>
@@ -332,42 +330,42 @@
     <text class="janko-digit" x="416.60" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
     <circle class="janko-knockout" cx="426.20" cy="128.50" r="4.80" fill="#FFFFFF"/>
     <text class="janko-digit" x="426.20" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="449.01" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="449.01" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="449.01" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="449.01" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="459.17" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="459.17" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
-    <circle class="janko-knockout" cx="469.32" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="469.32" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="469.32" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="469.32" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="479.48" cy="128.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="479.48" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
-    <circle class="janko-knockout" cx="479.48" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="479.48" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
-    <circle class="janko-knockout" cx="489.63" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="489.63" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="489.63" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="489.63" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="499.79" cy="143.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="499.79" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="509.95" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="509.95" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="509.95" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="509.95" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
-    <circle class="janko-knockout" cx="520.10" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="520.10" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
-    <circle class="janko-knockout" cx="530.26" cy="229.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="530.26" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="530.26" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="530.26" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
-    <circle class="janko-knockout" cx="540.41" cy="184.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="540.41" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
-    <circle class="janko-knockout" cx="550.57" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="550.57" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
-    <circle class="janko-knockout" cx="560.72" cy="199.50" r="4.80" fill="#FFFFFF"/>
-    <text class="janko-digit" x="560.72" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">0</text>
+    <circle class="janko-knockout" cx="453.01" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="453.01" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="453.01" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="453.01" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="462.87" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="462.87" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
+    <circle class="janko-knockout" cx="472.72" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="472.72" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="472.72" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="472.72" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="482.58" cy="128.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="482.58" y="131.36" font-weight="700" font-size="5.8pt" fill="#111111">1</text>
+    <circle class="janko-knockout" cx="482.58" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="482.58" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">4</text>
+    <circle class="janko-knockout" cx="492.43" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="492.43" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="492.43" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="492.43" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="502.29" cy="143.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="502.29" y="146.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="512.14" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="512.14" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="512.14" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="512.14" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
+    <circle class="janko-knockout" cx="522.00" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="522.00" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">7</text>
+    <circle class="janko-knockout" cx="531.86" cy="229.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="531.86" y="232.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="531.86" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="531.86" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">6</text>
+    <circle class="janko-knockout" cx="541.71" cy="184.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="541.71" y="187.36" font-weight="700" font-size="5.8pt" fill="#111111">9</text>
+    <circle class="janko-knockout" cx="551.57" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="551.57" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">2</text>
+    <circle class="janko-knockout" cx="561.42" cy="199.50" r="4.80" fill="#FFFFFF"/>
+    <text class="janko-digit" x="561.42" y="202.36" font-weight="800" font-size="5.8pt" fill="#111111">0</text>
   </g>
   </g>
   </g>

@@ -108,17 +108,22 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 9/);
-  assert.match(html, /Midpoint Symmetrical Clasps/);
+  assert.match(html, /Round 10/);
+  assert.match(html, /Scaled Midpoint Clasps/);
 });
 
-test('Round 9 registry declares the four midpoint clasp-duration paradigms on per-hand clasps', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 9);
-  assert.match(CURRENT_ROUND_METADATA.title, /Midpoint Symmetrical Clasps/);
+test('Round 10 registry declares the four scaled clasp-duration paradigms on per-hand clasps', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 10);
+  assert.match(CURRENT_ROUND_METADATA.title, /Scaled Midpoint Clasps/);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['center-kinetic-ticks', 'center-chevron-notch', 'center-pip-rays', 'center-sculpted-wedge'],
+    [
+      'transverse-cross-bars',
+      'kinetic-cross-slashes',
+      'interrupted-spine-node',
+      'faceted-diamond-bands',
+    ],
     'candidates A–D in display order'
   );
   assert.deepEqual(
@@ -130,7 +135,8 @@ test('Round 9 registry declares the four midpoint clasp-duration paradigms on pe
     ids,
     'each candidate carries its own duration paradigm'
   );
-  // The settled Round 9 tab is shared by all four: the round varies one variable.
+  // The settled beam-harmonized tab is shared by all four: the round varies one
+  // variable.
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
     ['kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam']
@@ -149,17 +155,17 @@ test('Round 9 registry declares the four midpoint clasp-duration paradigms on pe
     assert.equal(resolved.options.pageMargin, 24.0, 'the widened page margin');
   }
   assert.deepEqual(
-    candidateBadges(getCandidate('center-kinetic-ticks')!).map((b) => b.key),
+    candidateBadges(getCandidate('transverse-cross-bars')!).map((b) => b.key),
     ['chordGrouping'],
     'candidate A is the golden duration paradigm itself'
   );
   assert.deepEqual(
-    candidateBadges(getCandidate('center-sculpted-wedge')!).map((b) => b.key),
+    candidateBadges(getCandidate('faceted-diamond-bands')!).map((b) => b.key),
     ['chordGrouping', 'claspDurationStyle']
   );
 });
 
-test('Round 9 candidates export cleanly to the contact sheet', () => {
+test('Round 10 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
@@ -189,16 +195,16 @@ test('Round 9 candidates export cleanly to the contact sheet', () => {
   };
   /** The mark each paradigm paints on the specimen's 8th / 16th chord. */
   const SIGNATURES: Record<string, RegExp> = {
-    'center-kinetic-ticks': /janko-clasp-tick/,
-    'center-chevron-notch': /janko-clasp-chevron/,
-    'center-pip-rays': /janko-clasp-ray/,
-    'center-sculpted-wedge': /janko-clasp-barb/,
+    'transverse-cross-bars': /janko-clasp-bar/,
+    'kinetic-cross-slashes': /janko-clasp-slash/,
+    'interrupted-spine-node': /janko-clasp-bead/,
+    'faceted-diamond-bands': /janko-clasp-band/,
   };
   const FOREIGN: Record<string, RegExp> = {
-    'center-kinetic-ticks': /janko-clasp-(chevron|ray|hub|barb|pip|dot)/,
-    'center-chevron-notch': /janko-clasp-(tick|ray|hub|barb|pip|dot)/,
-    'center-pip-rays': /janko-clasp-(tick|chevron|barb|pip|dot)/,
-    'center-sculpted-wedge': /janko-clasp-(tick|chevron|ray|hub|pip|dot)/,
+    'transverse-cross-bars': /janko-clasp-(gap|lozenge|ring|diamond|slash|bead|band|dot|pip)/,
+    'kinetic-cross-slashes': /janko-clasp-(gap|lozenge|ring|diamond|bar|bead|band|dot|pip)/,
+    'interrupted-spine-node': /janko-clasp-(gap|lozenge|ring|diamond|bar|slash|band|dot|pip)/,
+    'faceted-diamond-bands': /janko-clasp-(gap|lozenge|ring|diamond|bar|slash|bead|dot|pip)/,
   };
   for (const candidate of CURRENT_CANDIDATES) {
     const body = panelBody(candidate.id);
@@ -255,7 +261,7 @@ test('Candidate previews honour their own option deltas', () => {
   assert.match(html, /<s>none<\/s>/, 'the golden grouping value every candidate departs from');
   assert.match(
     html,
-    /<s>center-kinetic-ticks<\/s>/,
+    /<s>transverse-cross-bars<\/s>/,
     'the golden duration value the three modern candidates depart from'
   );
   assert.doesNotMatch(
@@ -430,7 +436,7 @@ test('studio.ts wires Vite HMR and re-mounts in place', () => {
   }
 });
 
-test('The studio score library exposes the benchmarks and the Round 9 specimen to windows', () => {
+test('The studio score library exposes the benchmarks and the wide-span specimen to windows', () => {
   const ids = Object.keys(CONFIG.scores);
   assert.ok(ids.includes(DEFAULT_STUDIO_SCORE_ID), 'the primary benchmark is registered');
   assert.ok(ids.includes(BRAHMS_STUDIO_SCORE_ID), 'the Brahms pressure benchmark is registered');
@@ -439,13 +445,14 @@ test('The studio score library exposes the benchmarks and the Round 9 specimen t
   assert.equal(brahms.options.anacrusisTicks, 48, 'cut-time upbeat preserved');
   assert.equal(brahms.options.ticksPerMeasure, 192);
   assert.equal(brahms.tokens.ticksPerMeasure, 192);
-  // Round 9: the curated multi-duration specimen is a first-class window score,
-  // two measures wide so its five chords and their midpoint marks stay legible.
+  // Round 10: the curated wide-span specimen is a first-class window score,
+  // two measures wide so its five 1.5-octave chords and their scaled marks stay
+  // legible.
   assert.ok(ids.includes(SPECIMEN_STUDIO_SCORE_ID), 'the chord-duration specimen is registered');
   const specimen = CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID];
   assert.equal(specimen.id, SPECIMEN_STUDIO_SCORE_ID);
   assert.equal(specimen.options.measuresPerSystem, 2);
-  assert.equal(specimen.score.notes.length, 15, 'five three-voice chords');
+  assert.equal(specimen.score.notes.length, 20, 'five four-voice wide-span chords');
   assert.deepEqual(
     [...new Set(specimen.score.notes.map((n) => n.durationTicks))].sort((a, b) => b - a),
     [96, 72, 48, 24, 12],
@@ -476,7 +483,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 9);
+  assert.equal(CURRENT_ROUND_METADATA.round, 10);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');

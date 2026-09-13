@@ -22,9 +22,9 @@
  *     benchmark scores engrave every clasp mode with zero diagnostics;
  *  8. the Round 6 per-hand refinement, the Round 8 bracketing scope (a
  *     horizontally displaced cluster **or** a 3-or-more-note vertical chord; a
- *     clean 2-note column stays unbracketed) and the four **midpoint**
- *     duration paradigms of Round 9 that anchor every mark on the bracket
- *     spine's exact vertical centre.
+ *     clean 2-note column stays unbracketed) and the four **scaled** midpoint
+ *     duration paradigms of Round 10, whose marks cut symmetrically across the
+ *     bracket spine at 2–3× the Round 9 size.
  */
 
 import { test } from 'node:test';
@@ -65,15 +65,22 @@ import {
 import {
   CHORD_BRIDGE_DISC_AIR,
   CHORD_BRIDGE_MIN_GAP,
-  CLASP_CENTER_TICK_HALF,
+  CLASP_BEAD_RADIUS,
+  CLASP_BEAD_STACK_RADIUS,
+  CLASP_CROSS_SPACING,
+  CLASP_DIAMOND_HEIGHT,
+  CLASP_DIAMOND_WIDTH,
   CLASP_DOT_OFFSET,
-  CLASP_HUB_RADIUS,
+  CLASP_GAP_HEIGHT,
+  CLASP_GAP_WIDTH,
+  CLASP_MARK_REACH,
+  CLASP_MARK_STACK_GAP,
   CLASP_MIN_HORIZONTAL_SPREAD,
   CLASP_MIN_VERTICAL_CHORD,
-  CLASP_NOTCH_REACH,
-  CLASP_PIP_GAP,
-  CLASP_PIP_RADIUS,
-  CLASP_RAY_REACH,
+  CLASP_RING_RADIUS,
+  CLASP_RING_STROKE,
+  CLASP_TRANSVERSE_STROKE,
+  CLASP_TRANSVERSE_WIDTH,
   JankoRhythmNote,
   claspDurationClass,
   claspDurationDotted,
@@ -123,8 +130,8 @@ test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays
   assert.equal(DEFAULT_JANKO_OPTIONS.chordGrouping, 'none', 'the golden master keeps per-note stems');
   assert.equal(
     DEFAULT_JANKO_OPTIONS.claspDurationStyle,
-    'center-kinetic-ticks',
-    'the golden master keeps the midpoint kinetic ticks'
+    'transverse-cross-bars',
+    'the golden master keeps the scaled transverse cross-bars'
   );
   assert.deepEqual(
     [...JANKO_CHORD_GROUPINGS],
@@ -134,12 +141,12 @@ test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays
   assert.deepEqual(
     [...JANKO_CLASP_DURATION_STYLES],
     [
-      'center-kinetic-ticks',
-      'center-chevron-notch',
-      'center-pip-rays',
-      'center-sculpted-wedge',
+      'transverse-cross-bars',
+      'kinetic-cross-slashes',
+      'interrupted-spine-node',
+      'faceted-diamond-bands',
     ],
-    'the four midpoint duration paradigms in exploration order'
+    'the four scaled midpoint duration paradigms in exploration order'
   );
   for (const mode of JANKO_CHORD_GROUPINGS) {
     assert.ok(JANKO_CHORD_GROUPING_LABELS[mode].length > 0, `${mode} is labelled`);
@@ -147,9 +154,11 @@ test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays
   for (const style of JANKO_CLASP_DURATION_STYLES) {
     assert.ok(JANKO_CLASP_DURATION_STYLE_LABELS[style].length > 0, `${style} is labelled`);
   }
-  // A downbeat clasp needs `r + claspOffset + claspMinBarlineAir` from the
-  // measure's left edge — 11.6pt with the canonical tokens.
-  assert.equal(getClaspDownbeatInset(T), 4.8 + 2.8 + 4.0);
+  // A downbeat clasp needs `r + claspOffset + CLASP_MARK_REACH +
+  // claspMinBarlineAir` from the measure's left edge — 15.6pt with the
+  // canonical tokens, because the scaled marks reach 4pt left of the spine.
+  assert.equal(getClaspDownbeatInset(T), 4.8 + 2.8 + CLASP_MARK_REACH + 4.0);
+  assert.equal(CLASP_MARK_REACH, 4.0, 'the widest scaled mark is the 8pt diamond band');
   assert.equal(resolveJankoOptions({ chordGrouping: 'left-clasp-spire' }).chordGrouping, 'left-clasp-spire');
   assert.equal(resolveJankoOptions({ chordGrouping: 'per-hand-clasp' }).chordGrouping, 'per-hand-clasp');
 });
@@ -174,7 +183,7 @@ test('Clasp duration grammar: pip for halves/wholes, notches for 8ths/16ths, a b
 
   const pip = computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!;
   assert.equal(pip.duration, 'pip');
-  assert.equal(pip.durationStyle, 'center-kinetic-ticks', 'the default midpoint paradigm');
+  assert.equal(pip.durationStyle, 'transverse-cross-bars', 'the default midpoint paradigm');
   assert.equal(pip.pips, 1);
   assert.equal(pip.flags, 0);
   assert.equal(pip.dotted, false);
@@ -245,10 +254,10 @@ test('Clasp geometry: the bracket is drawn outside the cluster and bounds every 
   const ink = claspInkBox(clasp, T);
   assert.equal(
     ink.x0,
-    clasp.claspX - CLASP_CENTER_TICK_HALF,
-    'a 16th center-tick straddles the spine by its half-length'
+    clasp.claspX - CLASP_TRANSVERSE_WIDTH / 2,
+    'a 16th cross-bar straddles the spine by its half-width'
   );
-  assert.equal(ink.y0, clasp.topY, 'a 16th center-tick rides the spine, never above it');
+  assert.equal(ink.y0, clasp.topY, 'a 16th cross-bar rides the spine, never above it');
   assert.equal(ink.y1, clasp.botY);
   assert.ok(
     clasp.claspX + clasp.capWidth <= clasp.minX - T.noteheadRadius - 0.6 + 1e-9,
@@ -257,7 +266,7 @@ test('Clasp geometry: the bracket is drawn outside the cluster and bounds every 
   assert.equal(computeClaspGeometry([rn('solo', 100, 100, 12)], T), null, 'a lone note is never clasped');
 });
 
-test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical brackets', () => {
+test('Round 10 scaled paradigms paint four distinct brackets cutting across the spine', () => {
   const quarter = () => computeClaspGeometry([rn('a', 100, 100, 48), rn('b', 100, 130, 48)], T)!;
   const eighth = () => computeClaspGeometry([rn('a', 100, 100, 24), rn('b', 100, 130, 24)], T)!;
   const sixteenth = () => computeClaspGeometry([rn('a', 100, 100, 12), rn('b', 100, 130, 12)], T)!;
@@ -271,21 +280,27 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
   const yMid = (group: Group): number => (group.topY + group.botY) / 2;
   const docs = (markup: string): string => markup.replace(/data-clasp-[a-z-]+="[^"]*"/g, '');
 
-  /** The subdivision mark class and per-value count of each paradigm. */
-  const INK: Record<Style, { klass: string; eighth: number; sixteenth: number }> = {
-    'center-kinetic-ticks': { klass: 'janko-clasp-tick', eighth: 1, sixteenth: 2 },
-    'center-chevron-notch': { klass: 'janko-clasp-chevron', eighth: 1, sixteenth: 2 },
-    'center-pip-rays': { klass: 'janko-clasp-ray', eighth: 1, sixteenth: 2 },
-    'center-sculpted-wedge': { klass: 'janko-clasp-barb', eighth: 1, sixteenth: 2 },
+  /** The scaled mark class, the open mark class and the per-value counts. */
+  const INK: Record<
+    Style,
+    { klass: string; open: string; eighth: number; sixteenth: number }
+  > = {
+    'transverse-cross-bars': { klass: 'bar', open: 'gap', eighth: 1, sixteenth: 2 },
+    'kinetic-cross-slashes': { klass: 'slash', open: 'lozenge', eighth: 1, sixteenth: 2 },
+    'interrupted-spine-node': { klass: 'bead', open: 'ring', eighth: 1, sixteenth: 2 },
+    'faceted-diamond-bands': { klass: 'band', open: 'diamond', eighth: 1, sixteenth: 2 },
   };
+  const MARKS = '(?:gap|lozenge|ring|diamond|bar|slash|bead|band)';
   /** Every y coordinate the paradigm's duration ink paints. */
   const markYs = (markup: string): number[] => {
     const ys: number[] = [];
     for (const element of markup.matchAll(
-      /<(?:line|circle|path) class="janko-clasp-(?:tick|chevron|ray|hub|barb)"[^>]*>/g
+      new RegExp(`<(?:line|circle|path|rect) class="janko-clasp-${MARKS}"[^>]*>`, 'g')
     )) {
       const tag = element[0];
       for (const attr of tag.matchAll(/(?:y1|y2|cy)="([\d.-]+)"/g)) ys.push(Number(attr[1]));
+      const rect = / y="([\d.-]+)" height="([\d.-]+)"/.exec(tag);
+      if (rect) ys.push(Number(rect[1]) + Number(rect[2]) / 2);
       const path = / d="([^"]+)"/.exec(tag);
       if (path) {
         [...path[1].matchAll(/-?\d+(?:\.\d+)?/g)]
@@ -296,6 +311,31 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
       }
     }
     return ys;
+  };
+  /** Every x coordinate the paradigm's duration ink paints. */
+  const markXs = (markup: string): number[] => {
+    const xs: number[] = [];
+    for (const element of markup.matchAll(
+      new RegExp(`class="janko-clasp-${MARKS}"[^>]*`, 'g')
+    )) {
+      const tag = element[0];
+      for (const attr of tag.matchAll(/(?:x1|x2|cx)="([\d.-]+)"/g)) xs.push(Number(attr[1]));
+      const circle = / cx="([\d.-]+)" cy="[\d.-]+" r="([\d.-]+)"/.exec(tag);
+      if (circle) {
+        xs.push(Number(circle[1]) - Number(circle[2]), Number(circle[1]) + Number(circle[2]));
+      }
+      const rect = / x="([\d.-]+)" width="([\d.-]+)"/.exec(tag);
+      if (rect) xs.push(Number(rect[1]), Number(rect[1]) + Number(rect[2]));
+      const path = / d="([^"]+)"/.exec(tag);
+      if (path) {
+        [...path[1].matchAll(/-?\d+(?:\.\d+)?/g)]
+          .map((n) => Number(n[0]))
+          .forEach((value, index) => {
+            if (index % 2 === 0) xs.push(value);
+          });
+      }
+    }
+    return xs;
   };
 
   for (const s of JANKO_CLASP_DURATION_STYLES) {
@@ -308,19 +348,24 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
       assert.ok(!markup.includes('janko-flag'), `${s} never borrows the subdivision dialect`);
     }
 
-    // Quarter: the plain bracket — zero duration ink of any kind.
+    // Quarter: the continuous solid spine — zero duration ink of any kind.
     const plain = style(quarter(), s);
     assert.ok(
-      !/janko-clasp-(tick|chevron|ray|hub|barb|dot|pip)/.test(plain),
-      `${s} leaves a quarter as a bare bracket`
+      !new RegExp(`janko-clasp-(${MARKS}|dot|pip)`).test(plain),
+      `${s} leaves a quarter as a continuous solid spine`
     );
 
-    // 8th / 16th: one mark, then two mirrored marks, all at the exact midpoint.
-    const { klass, eighth: one, sixteenth: two } = INK[s];
+    // 8th / 16th: one mark, then two parallel marks, all symmetric about the
+    // spine's exact midpoint.
+    const { klass, open: openKlass, eighth: one, sixteenth: two } = INK[s];
     const eight = style(eighth(), s);
     const sixteen = style(sixteenth(), s);
-    assert.equal((eight.match(new RegExp(klass, 'g')) ?? []).length, one, `${s} 8th: one mark`);
-    assert.equal((sixteen.match(new RegExp(klass, 'g')) ?? []).length, two, `${s} 16th: two marks`);
+    assert.equal((eight.match(new RegExp(`janko-clasp-${klass}`, 'g')) ?? []).length, one, `${s} 8th: one mark`);
+    assert.equal(
+      (sixteen.match(new RegExp(`janko-clasp-${klass}`, 'g')) ?? []).length,
+      two,
+      `${s} 16th: two marks`
+    );
     const anchor = yMid(eighth());
     const marks = markYs(eight);
     assert.ok(marks.length > 0, `${s} paints its 8th ink`);
@@ -329,6 +374,7 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
       `${s} anchors its 8th mark on the spine midpoint`
     );
     const ys = markYs(sixteen);
+    assert.ok(ys.length >= 2, `${s} paints both 16th marks`);
     for (const y of ys) {
       assert.ok(
         ys.some((other) => Math.abs(y + other - 2 * yMid(sixteenth())) < 0.011),
@@ -336,12 +382,33 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
       );
     }
 
-    // Half: the shared open pip sits on the midpoint under every paradigm.
-    const pipped = style(half(), s);
-    assert.equal((pipped.match(/janko-clasp-pip/g) ?? []).length, 1, `${s} half: one open pip`);
-    assert.ok(pipped.includes(`cy="${yMid(half()).toFixed(2)}"`), `${s} pip on the midpoint`);
+    // The marks are *scaled*: every paradigm's 8th mark reaches at least 2.8pt
+    // on each side of the spine (Round 9's ticks reached 1.1pt), the transverse
+    // paradigms a full 3.75pt and the diamond band 4pt.
+    const REACH: Record<Style, number> = {
+      'transverse-cross-bars': CLASP_TRANSVERSE_WIDTH / 2,
+      'kinetic-cross-slashes': CLASP_TRANSVERSE_WIDTH / 2,
+      'interrupted-spine-node': CLASP_BEAD_RADIUS,
+      'faceted-diamond-bands': CLASP_DIAMOND_WIDTH / 2,
+    };
+    const markReach = Math.max(...markXs(eight).map((x) => Math.abs(x - eighth().claspX)));
+    assert.ok(
+      markReach >= REACH[s] - 1e-9,
+      `${s} 8th mark reaches ${markReach.toFixed(2)}pt across the spine (${REACH[s]}pt expected)`
+    );
+    const opened = style(half(), s);
+    assert.equal(
+      (opened.match(new RegExp(`janko-clasp-${openKlass}`, 'g')) ?? []).length,
+      1,
+      `${s} half: one open knockout mark`
+    );
+    assert.ok(
+      opened.includes(`fill="#FFFFFF"`) || openKlass === 'janko-clasp-gap',
+      `${s} half mark carries a white knockout interior`
+    );
 
-    // Dotted quarter: the plain bracket plus the 0.75pt augmentation dot.
+    // Dotted quarter: the plain spine plus the 0.75pt augmentation dot, which
+    // keeps a real ≥ 2.0pt clearance from the spine's own ink.
     const dotted = style(dottedQuarter(), s);
     const group = dottedQuarter();
     assert.equal((dotted.match(/janko-clasp-dot/g) ?? []).length, 1, `${s} dotted: one dot`);
@@ -352,20 +419,28 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
       `${s} dot is the canonical 0.75pt token at the midpoint`
     );
     assert.ok(
-      !new RegExp(klass).test(dotted),
+      CLASP_DOT_OFFSET - group.strokeWidth / 2 - T.augmentationDotRadius >= 2.0 - 1e-9,
+      `${s} dot keeps ≥ 2.0pt clear of the spine ink`
+    );
+    assert.ok(
+      !new RegExp(`janko-clasp-${klass}`).test(dotted),
       `${s} keeps a dotted quarter plain apart from its dot`
     );
 
     // The audited ink box covers every mark the paradigm paints.
     const ink = claspInkBox({ ...sixteenth(), durationStyle: s }, T);
-    for (const element of sixteen.matchAll(/class="janko-clasp-(?:tick|chevron|ray|hub|barb)"[^>]*/g)) {
-      for (const x of element[0].matchAll(/(?:x1|x2|cx)="([\d.-]+)"/g)) {
-        const value = Number(x[1]);
-        assert.ok(value >= ink.x0 - 1e-9 && value <= ink.x1 + 1e-9, `${s} ink box covers x=${value}`);
-      }
+    for (const x of markXs(sixteen)) {
+      assert.ok(x >= ink.x0 - 1e-9 && x <= ink.x1 + 1e-9, `${s} ink box covers x=${x}`);
     }
     for (const y of ys) {
       assert.ok(y >= ink.y0 - 1e-9 && y <= ink.y1 + 1e-9, `${s} ink box covers y=${y}`);
+    }
+    const openInk = claspInkBox({ ...half(), durationStyle: s }, T);
+    for (const x of markXs(opened)) {
+      assert.ok(x >= openInk.x0 - 1e-9 && x <= openInk.x1 + 1e-9, `${s} half ink box covers x=${x}`);
+    }
+    for (const y of markYs(opened)) {
+      assert.ok(y >= openInk.y0 - 1e-9 && y <= openInk.y1 + 1e-9, `${s} half ink box covers y=${y}`);
     }
   }
 
@@ -373,114 +448,142 @@ test('Round 9 midpoint paradigms paint four distinct, mirror-symmetrical bracket
   const documents = new Set(JANKO_CLASP_DURATION_STYLES.map((s) => docs(style(sixteenth(), s))));
   assert.equal(documents.size, 4, 'each paradigm is visually distinct');
 
-  // The 12° kinetic tick is the settled beam-harmonized rake.
-  const tick = /class="janko-clasp-tick" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(
-    style(sixteenth(), 'center-kinetic-ticks')
+  // The 12.4° kinetic slash is the settled beam-harmonized rake.
+  const slash = /class="janko-clasp-slash" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(
+    style(sixteenth(), 'kinetic-cross-slashes')
   )!;
   assert.ok(
     Math.abs(
-      Math.abs((Number(tick[4]) - Number(tick[2])) / (Number(tick[3]) - Number(tick[1]))) -
+      Math.abs((Number(slash[4]) - Number(slash[2])) / (Number(slash[3]) - Number(slash[1]))) -
         T.maxBeamSlope
     ) < 5e-3,
-    'the kinetic tick rakes at the score’s own beam slope'
+    'the kinetic slash rakes at the score’s own beam slope'
   );
   assert.ok(
-    Math.abs(Number(tick[3]) - Number(tick[1]) - 2 * CLASP_CENTER_TICK_HALF) < 1e-9,
-    'the tick straddles the spine'
+    Math.abs(Number(slash[3]) - Number(slash[1]) - CLASP_TRANSVERSE_WIDTH) < 1e-9,
+    'the slash is the scaled 7.5pt transverse mark'
   );
 
-  // The hub paradigm is the only one with a filled hub; the chevron and barb
-  // reach into the cup, the ray fans into the margin.
+  // Each paradigm's named geometry is exactly the ticket's.
+  assert.ok(
+    style(eighth(), 'transverse-cross-bars').includes(
+      `x1="${(eighth().claspX - CLASP_TRANSVERSE_WIDTH / 2).toFixed(2)}"`
+    ),
+    'the cross-bar straddles the spine by 7.5 / 2'
+  );
   assert.match(
-    style(eighth(), 'center-pip-rays'),
-    new RegExp(`class="janko-clasp-hub"[^>]*r="${CLASP_HUB_RADIUS.toFixed(2)}"`)
+    style(half(), 'transverse-cross-bars'),
+    new RegExp(`class="janko-clasp-gap" x="[\\d.-]+" y="[\\d.-]+" width="${CLASP_GAP_WIDTH.toFixed(2)}" height="${CLASP_GAP_HEIGHT.toFixed(2)}"`),
+    'the half note leaves the clean 4 × 7pt knockout gap'
+  );
+  assert.match(
+    style(half(), 'kinetic-cross-slashes'),
+    new RegExp(`class="janko-clasp-lozenge" d="M [\\d.-]+ [\\d.-]+ L [\\d.-]+ [\\d.-]+ L [\\d.-]+ [\\d.-]+ L [\\d.-]+ [\\d.-]+ Z" fill="#FFFFFF"`)
+  );
+  assert.match(
+    style(half(), 'interrupted-spine-node'),
+    new RegExp(`class="janko-clasp-ring"[^>]*r="${CLASP_RING_RADIUS.toFixed(2)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"`),
+    'the bold open ring is R = 3.0pt at 1.1pt with a 100% white interior'
+  );
+  assert.match(
+    style(eighth(), 'interrupted-spine-node'),
+    new RegExp(`class="janko-clasp-bead"[^>]*r="${CLASP_BEAD_RADIUS.toFixed(2)}" fill="#111111"`),
+    'the 8th is one solid bead'
+  );
+  assert.match(
+    style(sixteenth(), 'interrupted-spine-node'),
+    new RegExp(`class="janko-clasp-bead"[^>]*r="${CLASP_BEAD_STACK_RADIUS.toFixed(2)}" fill="#111111"`),
+    'the 16th stacks two smaller beads'
+  );
+  assert.match(
+    style(half(), 'faceted-diamond-bands'),
+    new RegExp(`class="janko-clasp-diamond" d="M [\\d.-]+ [\\d.-]+ L [\\d.-]+ [\\d.-]+ L [\\d.-]+ [\\d.-]+ L [\\d.-]+ [\\d.-]+ Z" fill="#FFFFFF"`),
+    'the half note is a hollow white diamond'
   );
   assert.ok(
-    style(eighth(), 'center-chevron-notch').includes(
-      `class="janko-clasp-chevron" d="M ${(eighth().claspX + CLASP_NOTCH_REACH).toFixed(2)}`
+    style(eighth(), 'faceted-diamond-bands').includes(
+      `L ${(eighth().claspX + CLASP_DIAMOND_WIDTH / 2).toFixed(2)}`
     ),
-    'the chevron apex rides the spine and its arms open into the cup'
+    'the diamond band is the scaled 8.0pt transverse mark'
   );
   assert.ok(
-    style(eighth(), 'center-sculpted-wedge').includes(
-      `L ${(eighth().claspX - CLASP_NOTCH_REACH).toFixed(2)}`
+    style(sixteenth(), 'faceted-diamond-bands').includes(
+      `M ${sixteenth().claspX.toFixed(2)} ${(
+        yMid(sixteenth()) -
+        (CLASP_DIAMOND_HEIGHT / 2 + CLASP_MARK_STACK_GAP + CLASP_DIAMOND_HEIGHT / 2)
+      ).toFixed(2)}`
     ),
-    'the barb reaches into the margin'
-  );
-  assert.ok(
-    style(eighth(), 'center-pip-rays').includes(
-      `x2="${(eighth().claspX - CLASP_RAY_REACH).toFixed(2)}"`
-    ),
-    'the eighth ray fans the full reach into the margin'
+    'the 16th stacks two diamond bands'
   );
 });
 
-test('renderChordClasp paints the symmetrical bracket and its duration paradigm', () => {
+test('renderChordClasp paints the symmetrical bracket and its scaled duration paradigm', () => {
   const markup = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 48), rn('b', 100, 130, 48)], T)!,
     T
   );
   assert.match(
     markup,
-    /class="janko-clasp-group" data-clasp-tick="0" data-clasp-duration="spire" data-clasp-duration-style="center-kinetic-ticks"/
+    /class="janko-clasp-group" data-clasp-tick="0" data-clasp-duration="spire" data-clasp-duration-style="transverse-cross-bars"/
   );
   assert.match(markup, /class="janko-clasp" d="M 94\.60 95\.20 L 92\.40 95\.20 L 92\.40 134\.80 L 94\.60 134\.80"/);
   assert.match(markup, /stroke-width="0\.85"/);
   assert.ok(!markup.includes('janko-clasp-spire'), 'the lopsided spire is never painted');
   assert.ok(!markup.includes('janko-flag'), 'the clasp carries no subdivision flags');
-  assert.ok(!markup.includes('janko-clasp-pip'), 'a quarter carries no pip');
-  assert.ok(!markup.includes('janko-clasp-tick'), 'a quarter is a bare bracket');
+  assert.ok(!/janko-clasp-(gap|bar|lozenge|slash|ring|bead|diamond|band|dot|pip)/.test(markup), 'a quarter is a bare spine');
 
   const eighthGroup = computeClaspGeometry([rn('a', 100, 100, 24), rn('b', 100, 130, 24)], T)!;
   const eighth = renderChordClasp(eighthGroup, T);
   const yMid = (eighthGroup.topY + eighthGroup.botY) / 2;
-  const half = CLASP_CENTER_TICK_HALF;
-  assert.equal((eighth.match(/janko-clasp-tick/g) ?? []).length, 1, '8th: one midpoint kinetic tick');
+  assert.equal((eighth.match(/janko-clasp-bar/g) ?? []).length, 1, '8th: one transverse cross-bar');
   assert.ok(
     eighth.includes(
-      `x1="${(eighthGroup.claspX - half).toFixed(2)}" y1="${(yMid - half * T.maxBeamSlope).toFixed(2)}" ` +
-        `x2="${(eighthGroup.claspX + half).toFixed(2)}" y2="${(yMid + half * T.maxBeamSlope).toFixed(2)}"`
+      `x1="${(eighthGroup.claspX - CLASP_TRANSVERSE_WIDTH / 2).toFixed(2)}" y1="${yMid.toFixed(2)}" ` +
+        `x2="${(eighthGroup.claspX + CLASP_TRANSVERSE_WIDTH / 2).toFixed(2)}" y2="${yMid.toFixed(2)}"`
     ),
-    'the tick straddles the spine at yMid, raked at the beam slope'
+    'the cross-bar cuts symmetrically across the spine at yMid'
   );
 
   const sixteenth = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 12), rn('b', 100, 130, 12)], T)!,
     T
   );
-  assert.equal((sixteenth.match(/janko-clasp-tick/g) ?? []).length, 2, '16th: two midpoint ticks');
-  const rakes = [
-    ...sixteenth.matchAll(
-      /class="janko-clasp-tick" x1="[\d.-]+" y1="([\d.-]+)" x2="[\d.-]+" y2="([\d.-]+)"/g
-    ),
-  ].map((m) => Math.sign(Number(m[2]) - Number(m[1])));
-  assert.deepEqual(rakes, [-1, 1], 'the 16th pair is raked as a mirror image');
-
-  const pipped = renderChordClasp(
-    computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!,
-    T
+  assert.equal((sixteenth.match(/janko-clasp-bar/g) ?? []).length, 2, '16th: two parallel cross-bars');
+  const bars = [
+    ...sixteenth.matchAll(/class="janko-clasp-bar" x1="[\d.-]+" y1="([\d.-]+)"/g),
+  ].map((m) => Number(m[1]));
+  assert.deepEqual(
+    bars,
+    [yMid - CLASP_CROSS_SPACING / 2, yMid + CLASP_CROSS_SPACING / 2],
+    'the 16th pair straddles the midpoint at the ticket’s 2.5pt spacing'
   );
-  assert.equal((pipped.match(/janko-clasp-pip/g) ?? []).length, 1, 'half: one open pip');
-  assert.ok(pipped.includes(`r="${CLASP_PIP_RADIUS.toFixed(2)}"`), 'the pip is open, not filled');
+
+  // The half note leaves the clean rectangular knockout gap: the spine simply
+  // stops for 4pt and nothing is painted inside it.
+  const halfGroup = computeClaspGeometry([rn('a', 100, 100, 96), rn('b', 100, 130, 96)], T)!;
+  const half = renderChordClasp(halfGroup, T);
+  const halfMid = (halfGroup.topY + halfGroup.botY) / 2;
+  assert.equal((half.match(/janko-clasp-gap/g) ?? []).length, 1, 'half: one clean gap');
   assert.ok(
-    pipped.includes(`cy="${((95.2 + 134.8) / 2).toFixed(2)}"`),
-    'the pip is centred on the spine'
+    half.includes(
+      `class="janko-clasp-gap" x="${(halfGroup.claspX - CLASP_GAP_WIDTH / 2).toFixed(2)}" ` +
+        `y="${(halfMid - CLASP_GAP_HEIGHT / 2).toFixed(2)}" width="${CLASP_GAP_WIDTH.toFixed(2)}" ` +
+        `height="${CLASP_GAP_HEIGHT.toFixed(2)}" fill="#FFFFFF" stroke="none"`
+    ),
+    'the gap is the ticket’s 4 × 7pt knockout centred on the spine'
   );
+  assert.ok(!half.includes('janko-clasp-bar'), 'a half note carries no transverse bar');
 
-  // A whole note doubles the pip, symmetric about the midpoint.
+  // A whole note doubles the clean gap, still symmetric about the midpoint.
   const whole = renderChordClasp(
     computeClaspGeometry([rn('a', 100, 100, 384), rn('b', 100, 130, 384)], T)!,
     T
   );
-  const pips = [...whole.matchAll(/class="janko-clasp-pip" cx="[\d.]+" cy="([\d.]+)"/g)].map((m) =>
-    Number(m[1])
-  );
-  assert.equal(pips.length, 2, 'whole: two pips');
-  const wholeMid = (95.2 + 134.8) / 2;
-  assert.ok(
-    Math.abs(pips[0] - (wholeMid - CLASP_PIP_RADIUS - CLASP_PIP_GAP / 2)) < 1e-9 &&
-      Math.abs(pips[1] - (wholeMid + CLASP_PIP_RADIUS + CLASP_PIP_GAP / 2)) < 1e-9,
-    'the twin pips mirror about the spine midpoint'
+  assert.equal((whole.match(/janko-clasp-gap/g) ?? []).length, 1, 'whole: one doubled gap');
+  assert.match(
+    whole,
+    new RegExp(`height="${(CLASP_GAP_HEIGHT * 2).toFixed(2)}"`),
+    'the whole-note gap is 8pt tall'
   );
 });
 
@@ -491,15 +594,15 @@ test('renderChordClasp paints the symmetrical bracket and its duration paradigm'
 test('The fit rule: only actual chords are clasped, and only where the bracket stands clear', () => {
   // Bach Var. 1 is a two-voice 16th-note texture: its measure-opening dyads are
   // clasped, while an interior dyad — whose predecessor sits exactly one disc
-  // away — cannot host a 7.6pt bracket and keeps its traditional stems. Round 8
-  // widens the page margin to 24pt, so more of the interior dyads now have the
-  // air a bracket needs; m. 3's downbeat still steps its column right until the
-  // bracket clears the barline instead of being silently dropped.
+  // away — cannot host a 7.6pt bracket and keeps its traditional stems. Round 10
+  // scales the duration marks to a 4pt reach across the spine, so a downbeat
+  // bracket now needs 15.6pt of opening air; m. 3's dyad no longer fits and its
+  // cluster keeps its traditional stems instead of colliding.
   const system0 = layouts('left-clasp-spire')[0];
   const ticks = system0.clasps.map((c) => c.tick);
   assert.deepEqual(
     ticks,
-    [0, 144, 168, 240, 288, 408, 432, 504, 528],
+    [0, 144, 168, 240, 408, 432, 504, 528],
     'measure downbeats and the interior dyads with room'
   );
   assert.ok(!ticks.includes(24), 'the 16th-grid dyad at tick 24 is not clasped');
@@ -800,12 +903,12 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
     'no bridge is drawn inside the bracketed chord'
   );
   assert.equal(
-    (svg.match(/class="janko-clasp-barb"/g) ?? []).length,
+    (svg.match(/class="janko-clasp-band"/g) ?? []).length,
     0,
-    'the default paradigm is not the sculpted wedge'
+    'the default paradigm is not the diamond band'
   );
   assert.ok(
-    svg.includes('data-clasp-duration-style="center-kinetic-ticks"'),
+    svg.includes('data-clasp-duration-style="transverse-cross-bars"'),
     'the golden duration paradigm'
   );
 });
@@ -824,8 +927,11 @@ test('Downbeat clasps keep their barline air — the measure pays for it out of 
     assert.equal(required, getClaspDownbeatInset(T), `measure ${measureIdx} reserves the clasp inset`);
   }
 
-  // The budget rule: `left + right` stays at `2 × measureInset`, so the note
-  // field keeps its canonical width and no downstream beat is squeezed.
+  // The budget rule: `left + right` stays at `2 × measureInset` while the air a
+  // downbeat bracket needs fits inside that budget. Round 10's scaled marks
+  // reach 4pt across the spine, so a downbeat clasp asks for 15.6pt — more than
+  // the canonical 12pt budget — and the opening measure's field is *uniformly*
+  // scaled by the shortfall instead of shearing any single beat.
   const canonical = getMeasureOpeningBarlineX(1, system0, 0, T)! - system0.staffLeft;
   assert.equal(canonical, system0.measureWidth, 'measure 2 opens one measure width in');
   const layoutsWithClasps = layouts('left-clasp-spire');
@@ -850,10 +956,20 @@ test('Downbeat clasps keep their barline air — the measure pays for it out of 
     .filter((p) => p.note.startTick < o.ticksPerMeasure)
     .sort((a, b) => a.note.startTick - b.note.startTick)
     .map((p, i, all) => (i === 0 ? 0 : p.x - all[i - 1].x));
-  assert.deepEqual(
-    claspGrid.map((v) => v.toFixed(6)),
-    goldenGrid.map((v) => v.toFixed(6)),
-    'the measure keeps its canonical proportional spacing'
+  const ratios = claspGrid
+    .map((v, i) => (goldenGrid[i] === 0 ? null : v / goldenGrid[i]))
+    .filter((v): v is number => v !== null);
+  assert.ok(ratios.length > 0, 'the measure really carries a grid');
+  for (const ratio of ratios) {
+    assert.ok(
+      Math.abs(ratio - ratios[0]) < 1e-9,
+      'the measure keeps a proportional (uniformly scaled) grid, never a sheared one'
+    );
+  }
+  assert.ok(ratios[0] <= 1 + 1e-9, 'the scaled marks never stretch the measure');
+  assert.ok(
+    ratios[0] >= 0.9,
+    `the scaled marks cost at most the budget shortfall (scale ${ratios[0].toFixed(4)})`
   );
   assert.ok(measureWidth > 0);
   assert.ok(widths.size > 0);

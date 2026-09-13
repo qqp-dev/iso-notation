@@ -545,23 +545,33 @@ test('Defect: noteheads driven into a barline are caught', () => {
   assert.ok(out.every((v) => v.code === 'barline-collision'));
 });
 
-test('Defect: an accolade pushed off the page and into the numeral is caught', () => {
-  const offPage = { ...DEFAULT_JANKO_OPTIONS, pageMargin: -20.0 };
+test('Defect: a system-start mark pushed off the page and into the numeral is caught', () => {
+  // Round 10 retires the copperplate accolade by default, so the audit is
+  // exercised on a ruled system start (`'architectural-bracket'`), which paints
+  // the same reserved margin column.
+  const ruled = { ...DEFAULT_JANKO_OPTIONS, systemStartStyle: 'architectural-bracket' as const };
+  const offPage = { ...ruled, pageMargin: -20.0 };
   const out: LintViolation[] = [];
   const layout = systems(offPage)[0];
   checkAccoladeClearance(layout, offPage, DEFAULT_JANKO_TOKENS, LINT, out);
   assert.ok(
     out.some((v) => v.code === 'accolade-collision' && /leaves the left margin/.test(v.message)),
-    'off-page accolade reported'
+    'off-page system-start mark reported'
   );
+
+  // …and the default open margin paints no ink, so there is nothing to report.
+  const open: LintViolation[] = [];
+  const openLayout = systems(DEFAULT_JANKO_OPTIONS)[0];
+  checkAccoladeClearance(openLayout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, open);
+  assert.deepEqual(open, [], 'the open margin has no mark to audit');
 
   const tight = { ...DEFAULT_JANKO_TOKENS, accoladeGap: 1.0 };
   const out2: LintViolation[] = [];
-  const tightLayout = systems(DEFAULT_JANKO_OPTIONS, tight)[0];
-  checkMeasureNumeralClearance(tightLayout, DEFAULT_JANKO_OPTIONS, tight, LINT, out2);
+  const tightLayout = systems(ruled, tight)[0];
+  checkMeasureNumeralClearance(tightLayout, ruled, tight, LINT, out2);
   assert.ok(
     out2.some((v) => v.code === 'measure-numeral-collision' && /accolade/.test(v.message)),
-    'numeral/accolade collision reported'
+    'numeral/system-start collision reported'
   );
 });
 
@@ -688,11 +698,18 @@ test('Defect: a clasp cutting through a foreign notehead is caught', () => {
   assert.ok((hits[0].metrics?.gap ?? 99) < LINT.minClearance);
 });
 
-test('Defect: a clasp pushed into the accolade column is caught', () => {
-  const { layout, options } = claspSystem('left-clasp-spire');
+test('Defect: a clasp pushed into the system-start column is caught', () => {
+  // Round 10 audits the ruled system start (the default open margin paints no
+  // left-margin ink for a clasp to collide with).
+  const options = resolveJankoOptions({
+    ...DEFAULT_JANKO_OPTIONS,
+    chordGrouping: 'left-clasp-spire',
+    systemStartStyle: 'architectural-bracket',
+  });
+  const layout = systems(options)[0];
   const target = layout.clasps[0];
-  // The accolade's column ends at `staffLeft − accoladeGap` (Round 8 widens the
-  // page margin to 24pt, so the accolade sits just left of the staff edge).
+  // The ruled column spans `staffLeft − accoladeGap − accoladeWidth … + spur`,
+  // so a clasp driven to `staffLeft − accoladeGap − 2` lands inside it.
   const accoladeX1 = layout.geometry.staffLeft - TOKENS.accoladeGap;
   const broken: JankoSystemLayout = {
     ...layout,

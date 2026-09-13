@@ -35,6 +35,12 @@ export function renderStaffBarline(
  * systems at their right edge: only the **final measure of the final system**
  * (`isFinalScoreMeasure`) draws the closing vertical barline. Every other
  * system simply stops in open negative space, matching its open left start.
+ *
+ * Round 10 gives that closing boundary two paradigms
+ * ({@link JankoLayoutOptions.finalBarlineStyle}): `'unified'` (the default)
+ * draws one continuous double barline from `rhTop` down to `lhBot`, sealing the
+ * Middle C corridor; `'split-corridor'` keeps the two independent hand
+ * segments and leaves the corridor open.
  */
 export function renderBarlines(
   geo: JankoSystemGeometry,
@@ -51,6 +57,16 @@ export function renderBarlines(
   const lhTop = geo.equatorY('LH', 3) - 12;
   const lhBot = geo.equatorY('LH', 2) + 12;
 
+  /** The authoritative final boundary of the score. */
+  const pushFinal = (x: number): void => {
+    if (o.finalBarlineStyle === 'split-corridor') {
+      out.push(renderStaffBarline(x, rhTop, rhBot, 1.05));
+      out.push(renderStaffBarline(x, lhTop, lhBot, 1.05));
+      return;
+    }
+    out.push(renderStaffBarline(x, rhTop, lhBot, 1.05));
+  };
+
   const anacrusis = t.anacrusisTicks ?? 0;
   if (geo.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
@@ -63,9 +79,12 @@ export function renderBarlines(
       const isSystemEnd = m === o.measuresPerSystem;
       if (isSystemEnd && !isFinalScoreMeasure) continue;
       const x = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
-      const width = isSystemEnd ? 1.05 : 0.60;
-      out.push(renderStaffBarline(x, rhTop, rhBot, width));
-      out.push(renderStaffBarline(x, lhTop, lhBot, width));
+      if (isSystemEnd) {
+        pushFinal(x);
+        continue;
+      }
+      out.push(renderStaffBarline(x, rhTop, rhBot, 0.60));
+      out.push(renderStaffBarline(x, lhTop, lhBot, 0.60));
     }
   } else {
     // Internal boundaries: every measure end; the system end only closes the
@@ -74,9 +93,12 @@ export function renderBarlines(
       const isSystemEnd = m === o.measuresPerSystem - 1;
       if (isSystemEnd && !isFinalScoreMeasure) continue;
       const x = geo.staffLeft + (m + 1) * geo.measureWidth;
-      const width = isSystemEnd ? 1.05 : 0.60;
-      out.push(renderStaffBarline(x, rhTop, rhBot, width));
-      out.push(renderStaffBarline(x, lhTop, lhBot, width));
+      if (isSystemEnd) {
+        pushFinal(x);
+        continue;
+      }
+      out.push(renderStaffBarline(x, rhTop, rhBot, 0.60));
+      out.push(renderStaffBarline(x, lhTop, lhBot, 0.60));
     }
   }
 
@@ -86,6 +108,13 @@ export function renderBarlines(
 
 /** Vertical clearance (pt) a measure numeral keeps above the staff's top rule. */
 export const MEASURE_NUMBER_CLEARANCE = 14.0;
+
+/**
+ * Horizontal offset (pt) of a measure numeral left of the staff column
+ * (Round 10): `x = staffLeft − 6.0`. The engine's margin-furniture box shares
+ * the same offset, so the reserved ink and the painted ink can never drift.
+ */
+export const MEASURE_NUMBER_LEFT_OFFSET = 6.0;
 
 /**
  * Baseline y of a system's measure numeral.
@@ -108,7 +137,9 @@ export function renderMeasureNumber(
   tokens?: Partial<JankoTokens> | null
 ): string {
   void tokens;
-  const x = geo.staffLeft - 2;
+  // Round 10: the numeral moves a further 4pt into the margin (`staffLeft − 6`),
+  // so it never crowds the opening beat column.
+  const x = geo.staffLeft - MEASURE_NUMBER_LEFT_OFFSET;
   const y = getMeasureNumberBaselineY(geo);
   return `    <text class="janko-measure-num" x="${f(x)}" y="${f(y)}">${measureNumber}</text>`;
 }

@@ -47,6 +47,7 @@ import {
   JankoPageGeometry,
   JankoRhythmStyle,
   JankoSystemGeometry,
+  JankoSystemStartStyle,
   JankoTokens,
   JankoVariant,
   JankoVariantSpec,
@@ -71,6 +72,7 @@ import {
   JankoClaspRailGeometry,
   JankoRhythmNote,
   JankoVerticalChordGroup,
+  CLASP_MARK_REACH,
   claspInkBox,
   claspQualifies,
   computeBeamGroupGeometry,
@@ -83,8 +85,15 @@ import {
   renderRhythm,
   withClaspRail,
 } from './elements/rhythm';
-import { renderAccolade, renderCaptionLines, wrapCaptionText } from './elements/accolade';
 import {
+  ARCHITECTURAL_BRACKET_SPUR,
+  ARCHITECTURAL_BRACKET_STROKE,
+  renderAccolade,
+  renderCaptionLines,
+  wrapCaptionText,
+} from './elements/accolade';
+import {
+  MEASURE_NUMBER_LEFT_OFFSET,
   getMeasureNumberBaselineY,
   renderBarlines,
   renderBeatGrid,
@@ -193,27 +202,43 @@ function svgOpen(box: SvgBox): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(box.x)} ${f(box.y)} ${f(box.w)} ${f(box.h)}" width="${f(box.w)}pt" height="${f(box.h)}pt" style="background:#FFFFFF;">`;
 }
 
+/**
+ * Page header (Round 10): classical Urtext practice. Page 1 carries the full
+ * title, subtitle and composer block; every later page carries only a discreet
+ * running header at `margin + 10` (`composer · title · subtitle`, 7.0pt serif
+ * italic `#555555`) and reclaims the vertical space the title block used.
+ */
 function renderPageHeader(geo: JankoPageGeometry, pageIndex: number, totalPages: number): string {
   const o = geo.options;
-  void pageIndex;
   void totalPages;
   const y = geo.margin;
-  const cx = geo.pageWidth / 2;
+  if (pageIndex === 0) {
+    const cx = geo.pageWidth / 2;
+    return [
+      '  <g id="page-header">',
+      `    <text x="${f(cx)}" y="${f(y + 14)}" class="janko-title" text-anchor="middle">${o.title}</text>`,
+      `    <text x="${f(cx)}" y="${f(y + 27)}" class="janko-subtitle" text-anchor="middle">${o.subtitle}</text>`,
+      `    <text x="${f(geo.pageWidth - geo.margin)}" y="${f(y + 27)}" class="janko-meta" text-anchor="end">${o.composer}</text>`,
+      '  </g>',
+    ].join('\n');
+  }
+  const running = [o.composer, o.title, o.subtitle].filter((part) => part.length > 0).join(' · ');
   return [
     '  <g id="page-header">',
-    `    <text x="${f(cx)}" y="${f(y + 14)}" class="janko-title" text-anchor="middle">${o.title}</text>`,
-    `    <text x="${f(cx)}" y="${f(y + 27)}" class="janko-subtitle" text-anchor="middle">${o.subtitle}</text>`,
-    `    <text x="${f(geo.pageWidth - geo.margin)}" y="${f(y + 27)}" class="janko-meta" text-anchor="end">${o.composer}</text>`,
+    `    <text x="${f(geo.margin)}" y="${f(y + 10)}" class="janko-running-head">${running}</text>`,
     '  </g>',
   ].join('\n');
 }
 
+/**
+ * Page footer (Round 10): the page numbering alone, at normal weight. The
+ * repetitive "Pure 12-TET Jánko Two-Row Grand Staff" slogan is gone.
+ */
 function renderPageFooter(geo: JankoPageGeometry, pageIndex: number, totalPages: number): string {
   const y = geo.pageHeight - geo.margin + 12;
   return [
     '  <g id="page-footer">',
-    `    <text x="${f(geo.margin)}" y="${f(y)}" class="janko-meta">Pure 12-TET Jánko Two-Row Grand Staff</text>`,
-    `    <text x="${f(geo.pageWidth - geo.margin)}" y="${f(y)}" class="janko-meta" text-anchor="end" font-weight="bold">Page ${pageIndex + 1} of ${totalPages}</text>`,
+    `    <text x="${f(geo.pageWidth - geo.margin)}" y="${f(y)}" class="janko-page-num" text-anchor="end">Page ${pageIndex + 1} of ${totalPages}</text>`,
     '  </g>',
   ].join('\n');
 }
@@ -468,8 +493,19 @@ export const MARGIN_DIGIT_ADVANCE = 0.35;
 export const MARGIN_NUMERAL_FONT_SIZE = 8.5;
 
 /**
+ * Does a system-start style paint any margin ink? `'open-halo'` (the golden
+ * default) and `'none'` leave the margin empty, so nothing is painted — and
+ * nothing is reserved — for them.
+ */
+export function paintsSystemStartInk(style: JankoSystemStartStyle): boolean {
+  return style === 'architectural-bracket' || style === 'clef-pillar';
+}
+
+/**
  * Boxes of the left-margin furniture of one system: the measure numeral and the
- * accolade. Shared by the engine's clasp fit rule and the visual linter's
+ * system-start mark (Round 10: the copperplate accolade is retired, so the
+ * accolade box is `null` unless a ruled system-start style is active). Shared
+ * by the engine's clasp fit rule and the visual linter's
  * `measure-numeral-clearance` / `accolade-clearance` audits, so a bracket can
  * never be admitted into furniture the linter would report — and the audits can
  * never drift from the geometry the engine reserved.
@@ -478,9 +514,10 @@ export function getMarginFurniture(
   geometry: JankoSystemGeometry,
   t: ResolvedJankoTokens,
   measureNumber: number,
-  digitAdvance: number = MARGIN_DIGIT_ADVANCE
-): { numeral: JankoBox; accolade: JankoBox } {
-  const numeralX = geometry.staffLeft - 2;
+  digitAdvance: number = MARGIN_DIGIT_ADVANCE,
+  systemStartStyle: JankoSystemStartStyle = 'open-halo'
+): { numeral: JankoBox; accolade: JankoBox | null } {
+  const numeralX = geometry.staffLeft - MEASURE_NUMBER_LEFT_OFFSET;
   // Round 9: the numeral's reserved box shares the painted baseline (14pt above
   // the top rule), so the linter audits exactly the ink the renderer draws.
   const numeralBaseline = getMeasureNumberBaselineY(geometry);
@@ -492,23 +529,31 @@ export function getMarginFurniture(
     x1: numeralX + String(measureNumber).length * MARGIN_NUMERAL_FONT_SIZE * digitAdvance * 1.5,
     y1: numeralBaseline,
   };
-  const accolade: JankoBox = {
-    x0: geometry.staffLeft - t.accoladeGap - t.accoladeWidth,
-    y0: geometry.staffTopY,
-    x1: geometry.staffLeft - t.accoladeGap,
-    y1: geometry.staffBotY,
-  };
+  let accolade: JankoBox | null = null;
+  if (paintsSystemStartInk(systemStartStyle)) {
+    const x = geometry.staffLeft - t.accoladeGap - t.accoladeWidth;
+    const half = ARCHITECTURAL_BRACKET_STROKE / 2;
+    const spur = systemStartStyle === 'architectural-bracket' ? ARCHITECTURAL_BRACKET_SPUR : 0;
+    accolade = {
+      x0: x - half,
+      y0: geometry.staffTopY,
+      x1: x + spur + half,
+      y1: geometry.staffBotY,
+    };
+  }
   return { numeral, accolade };
 }
 
 /**
- * Every left-margin furniture box painted in one system (the accolade only at
- * the start of the piece, the measure numeral only where the engine draws it),
- * in the order the linter audits them.
+ * Every left-margin furniture box painted in one system (the system-start mark
+ * only at the start of the piece, the measure numeral only where the engine
+ * draws it), in the order the linter audits them.
  *
  * Round 7 draws the accolade **strictly at the start of the piece**
  * (`systemIndex === 0`); an intermediate system opens from the bare left
- * margin, so it neither paints nor reserves an accolade box.
+ * margin, so it neither paints nor reserves a system-start box. Round 10
+ * retires the copperplate accolade by default: `'open-halo'` paints no margin
+ * ink at all.
  */
 export function systemFurniture(
   geometry: JankoSystemGeometry,
@@ -520,9 +565,11 @@ export function systemFurniture(
   const { numeral, accolade } = getMarginFurniture(
     geometry,
     t,
-    systemIndex * o.measuresPerSystem + 1
+    systemIndex * o.measuresPerSystem + 1,
+    MARGIN_DIGIT_ADVANCE,
+    o.systemStartStyle
   );
-  const boxes: JankoBox[] = systemIndex === 0 ? [accolade] : [];
+  const boxes: JankoBox[] = systemIndex === 0 && accolade ? [accolade] : [];
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) boxes.push(numeral);
   return boxes;
 }
@@ -604,8 +651,8 @@ export type JankoClaspRailVerdict = (run: JankoClaspRailRun) => boolean;
  * (Round 8 removed the lopsided spire: the spine itself is extended); duration
  * notches are dropped exactly as a traditional beam replaces them. A second rail
  * `flagSpacing` below carries the 16th-note level whenever the run holds two or
- * more 16th-class clasps. A half/whole clasp carries a pip rather than a notch
- * and never joins a run.
+ * more 16th-class clasps. A half/whole clasp carries an open knockout mark
+ * rather than a transverse subdivision mark and never joins a run.
  *
  * `verdict`, when supplied, sees the tentatively railed run — extended spines
  * and rails — and may reject it; the clasps are then engraved unrailed rather
@@ -726,13 +773,16 @@ function handForNote(note: QuantizedNote): Hand {
 /**
  * Left inset (pt) a measure must reserve when its **downbeat** carries a left
  * clasp: `claspX = noteLeft − r − claspOffset` has to keep
- * `claspMinBarlineAir` clear of the measure's opening barline, so
- * `noteLeft ≥ r + claspOffset + claspMinBarlineAir` (11.6pt with the canonical
- * tokens — nearly twice the 6pt measure inset).
+ * `claspMinBarlineAir` clear of the measure's opening barline, and Round 10's
+ * scaled marks reach {@link CLASP_MARK_REACH} further left of the spine, so
+ * `noteLeft ≥ r + claspOffset + CLASP_MARK_REACH + claspMinBarlineAir` (15.6pt
+ * with the canonical tokens). The budget is deliberately conservative — the
+ * widest mark is the 8pt diamond band — so no paradigm's mark can be driven
+ * into the barline it follows.
  */
 export function getClaspDownbeatInset(tokens?: Partial<JankoTokens> | null): number {
   const t = resolveJankoTokens(tokens);
-  return t.noteheadRadius + t.claspOffset + t.claspMinBarlineAir;
+  return t.noteheadRadius + t.claspOffset + CLASP_MARK_REACH + t.claspMinBarlineAir;
 }
 
 /**
@@ -753,7 +803,11 @@ export type JankoClaspInsetMap = ReadonlyMap<number, number>;
  * needs is taken from the measure's closing margin, so the note field keeps its
  * canonical width and every downstream beat keeps its natural proportional
  * spacing. Nothing is compressed, nothing is distorted — the whole measure
- * simply stands a little further right of its barline.
+ * simply stands a little further right of its barline. When the air a bracket
+ * needs exceeds the whole canonical budget (`2 × measureInset`), as Round 10's
+ * scaled marks can on a downbeat (15.6pt against a 12pt budget), the closing
+ * margin is already zero and the field is **uniformly scaled** by the remaining
+ * shortfall: the proportional grid is compressed, never sheared.
  */
 export function getMeasureInsets(
   systemIndex: number,
@@ -1895,11 +1949,13 @@ export function renderSystem(
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) {
     out.push(renderMeasureNumber(geo, startMeasureOffset + 1, t));
   }
-  // Round 7: the accolade is drawn strictly at the start of the piece. Every
-  // intermediate system opens from the bare left margin with no bounding
-  // barline.
+  // Round 7: the system-start mark is drawn strictly at the start of the piece.
+  // Every intermediate system opens from the bare left margin with no bounding
+  // barline. Round 10 retires the copperplate accolade: the default
+  // `'open-halo'` paints no margin ink at all.
   if (systemIndex === 0) {
-    out.push(renderAccolade(geo, o, t));
+    const systemStart = renderAccolade(geo, o, t);
+    if (systemStart.length > 0) out.push(systemStart);
     out.push(renderHandLabels(geo, o, t));
     out.push(renderTimeSignature(geo, o, t));
   }

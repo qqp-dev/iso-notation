@@ -24,8 +24,10 @@ import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   JANKO_CHANNEL_LAYOUTS,
+  JANKO_FINAL_BARLINE_STYLES,
   JANKO_STAFF_OCTAVES,
   JANKO_SUBDIVISION_STYLES,
+  JANKO_SYSTEM_START_STYLES,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -78,7 +80,6 @@ import {
   renderHalo,
 } from '../src/render/janko/elements/notehead';
 import { lintJankoScore } from '../src/render/janko/linter';
-import { getVerticalAccoladePath } from '../src/render/print-layout';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -517,9 +518,51 @@ test('Clean Urtext subtitle: the page header carries no system branding', () => 
     'the branding is gone from the engraving'
   );
 
-  // The system is still credited in the bottom attribution footer.
+  // Round 10: the footer is the page numbering alone — the repetitive
+  // "Pure 12-TET Jánko Two-Row Grand Staff" slogan is gone, the figures are
+  // unbolded and the only ink left is `Page N of M`.
   const footer = page.match(/<g id="page-footer">[\s\S]*?<\/g>/)?.[0] ?? '';
-  assert.match(footer, /Pure 12-TET Jánko Two-Row Grand Staff/);
+  assert.ok(!footer.includes('Pure 12-TET'), 'the footer slogan is retired');
+  assert.match(footer, /class="janko-page-num"[^>]*>Page 1 of 3<\/text>/);
+  assert.ok(!footer.includes('font-weight="bold"'), 'the page number is not bolded');
+  const css = page.match(/<style>[\s\S]*?<\/style>/)?.[0] ?? '';
+  assert.match(
+    css,
+    /\.janko-page-num \{[^}]*fill: #666666; font-weight: 400; \}/,
+    'the page number is normal weight in #666666'
+  );
+});
+
+test('Round 10 multi-page headers: full title block on page 1, running header after', () => {
+  const score = buildBachGoldbergVar1Score();
+  const first = renderJankoPage(score, 0, OPTIONS, TOKENS);
+  const firstHeader = first.match(/<g id="page-header">[\s\S]*?<\/g>/)?.[0] ?? '';
+  assert.match(firstHeader, /class="janko-title"/, 'page 1 carries the full title');
+
+  for (const pageIndex of [1, 2]) {
+    const page = renderJankoPage(score, pageIndex, OPTIONS, TOKENS);
+    const header = page.match(/<g id="page-header">[\s\S]*?<\/g>/)?.[0] ?? '';
+    assert.ok(header.length > 0, `page ${pageIndex + 1} carries a header group`);
+    assert.ok(!header.includes('class="janko-title"'), 'no large title block after page 1');
+    assert.ok(!header.includes('class="janko-subtitle"'), 'no subtitle block after page 1');
+    assert.ok(!header.includes('class="janko-meta"'), 'no composer block after page 1');
+    const geo = computePageGeometry(OPTIONS, TOKENS);
+    assert.match(
+      header,
+      new RegExp(
+        `<text x="${geo.margin.toFixed(2)}" y="${(geo.margin + 10).toFixed(2)}" class="janko-running-head">` +
+          'Johann Sebastian Bach · J\\.S\\. Bach: Goldberg Variations, BWV 988 · Variatio 1\\. a 1 Clav\\.</text>'
+      ),
+      `page ${pageIndex + 1} carries the discreet running header at margin + 10`
+    );
+    assert.match(page, new RegExp(`Page ${pageIndex + 1} of 3`));
+  }
+  const css = first.match(/<style>[\s\S]*?<\/style>/)?.[0] ?? '';
+  assert.match(
+    css,
+    /\.janko-running-head \{[^}]*font-style: italic; font-size: 7pt; fill: #555555; \}/,
+    'the running header is 7pt serif italic #555555'
+  );
 });
 
 test('renderJankoCrop: crops are exact viewBox narrowings of the full page', () => {
@@ -816,7 +859,7 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   assert.match(crop, /class="janko-beam"/);
 });
 
-test('Round 9 staff hierarchy: four uniform equators, slender accolade and delicate dots', () => {
+test('Round 10 staff hierarchy: uniform equators, open margin and lightened numerals', () => {
   const score = buildBachGoldbergVar1Score();
   const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
 
@@ -829,61 +872,66 @@ test('Round 9 staff hierarchy: four uniform equators, slender accolade and delic
   );
   assert.ok(!staff.includes('#0F172A'), 'the 0.65pt inner-equator discrepancy is gone');
 
-  // The genuinely slender accolade and the widened page margin (Round 8/9 tokens).
-  assert.equal(DEFAULT_JANKO_TOKENS.accoladeWidth, 4.8, 'the accolade slimmed to 4.8pt');
-  assert.equal(DEFAULT_JANKO_TOKENS.accoladeThick, 0.55, 'the accolade hairline is 0.55pt');
+  // Round 10 retires the copperplate accolade: the golden default opens the
+  // staff from the bare margin and the tokens stay reserved for the ruled
+  // system-start alternatives.
+  assert.equal(DEFAULT_JANKO_OPTIONS.systemStartStyle, 'open-halo', 'the open margin is the default');
+  assert.equal(DEFAULT_JANKO_OPTIONS.finalBarlineStyle, 'unified', 'the unified final barline is the default');
+  assert.deepEqual(
+    [...JANKO_SYSTEM_START_STYLES],
+    ['open-halo', 'architectural-bracket', 'clef-pillar', 'none'],
+    'the published system-start catalogue'
+  );
+  assert.deepEqual(
+    [...JANKO_FINAL_BARLINE_STYLES],
+    ['unified', 'split-corridor'],
+    'the published final-barline catalogue'
+  );
+  assert.equal(DEFAULT_JANKO_TOKENS.accoladeWidth, 4.8, 'the reserved margin column is 4.8pt');
+  assert.equal(DEFAULT_JANKO_TOKENS.accoladeThick, 0.55, 'the reserved hairline is 0.55pt');
   assert.equal(DEFAULT_JANKO_TOKENS.augmentationDotRadius, 0.75, 'the dot falls to 0.75pt');
   assert.equal(DEFAULT_JANKO_OPTIONS.pageMargin, 24.0, 'the page margin widens to 24pt');
-  assert.match(page, /class="janko-accolade"/, 'the accolade is drawn once at the start');
+  assert.ok(!page.includes('janko-accolade'), 'the curlicue accolade is never painted');
+  assert.ok(!page.includes('janko-system-bracket'), 'nor is any other system-start mark');
   const geo = computePageGeometry(OPTIONS, TOKENS);
-  // Round 9: the accolade is the shared master outline at the Jánko token pair,
-  // and both tokens genuinely control the painted path — the reach drives the
-  // horizontal scale, the thickness the ink weight.
-  const renderedAccolade = /class="janko-accolade" d="([^"]+)"/.exec(page)![1];
-  assert.equal(
-    renderedAccolade,
-    getVerticalAccoladePath(
-      geo.staffLeft - DEFAULT_JANKO_TOKENS.accoladeGap - DEFAULT_JANKO_TOKENS.accoladeWidth,
-      geo.systems[0].staffTopY,
-      geo.systems[0].staffBotY,
-      DEFAULT_JANKO_TOKENS.accoladeWidth,
-      DEFAULT_JANKO_TOKENS.accoladeThick
-    ),
-    'the accolade is the shared master outline at the Jánko token pair'
-  );
-  assert.notEqual(
-    getVerticalAccoladePath(100, 0, 300, DEFAULT_JANKO_TOKENS.accoladeWidth, DEFAULT_JANKO_TOKENS.accoladeThick),
-    getVerticalAccoladePath(100, 0, 300, DEFAULT_JANKO_TOKENS.accoladeWidth, 1.5),
-    'a heavier thick token genuinely paints a heavier brace'
-  );
-  assert.notEqual(
-    getVerticalAccoladePath(100, 0, 300, DEFAULT_JANKO_TOKENS.accoladeWidth, DEFAULT_JANKO_TOKENS.accoladeThick),
-    getVerticalAccoladePath(100, 0, 300, 7.0, DEFAULT_JANKO_TOKENS.accoladeThick),
-    'a wider reach token genuinely widens the brace'
-  );
-  assert.equal(geo.margin, 24.0, 'the page geometry uses the widened margin');
   assert.equal(
     geo.staffLeft,
     24.0 + DEFAULT_JANKO_TOKENS.accoladeWidth + DEFAULT_JANKO_TOKENS.accoladeGap,
-    'the staff column keeps its accolade-anchored inset'
+    'the staff column keeps its reserved margin inset'
+  );
+  const openFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1);
+  assert.equal(openFurniture.accolade, null, 'the open margin reserves no accolade box');
+  const bracketFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1, undefined, 'architectural-bracket');
+  assert.ok(bracketFurniture.accolade, 'the architectural bracket reserves its own box');
+  assert.ok(
+    bracketFurniture.accolade!.x1 <= geo.systems[0].staffLeft,
+    'the bracket stays left of the staff column'
   );
 
   // The beat grid is the structural layer above the lightened staff rules.
   assert.match(page, /class="janko-beat-line"[^>]*stroke="#9CA3AF" stroke-width="0\.70"/);
 
-  // Round 9: the measure numeral is elevated to a full 14pt above the top rule
-  // (it used to sit 6pt above and crowded the high octave-5 treble notes), the
-  // painted baseline and the linter's margin-furniture box agree, and the
-  // canonical score keeps more than the guaranteed clearance.
+  // Round 10 lightens the measure numeral to a normal-weight italic #555555 and
+  // pushes it 6pt into the margin; the painted baseline and the linter's
+  // margin-furniture box agree, and the canonical score keeps 14pt+ of air.
   const painted = /<text class="janko-measure-num" x="([\d.-]+)" y="([\d.-]+)"/.exec(page)!;
   const system0 = geo.systems[0];
-  assert.equal(
+  close(Number(painted[1]), system0.staffLeft - 6.0, 'the numeral sits 6pt left of the staff column', 1e-6);
+  close(
     Number(painted[2]),
     system0.staffTopY - 14.0,
-    'the numeral keeps a full 14pt above the staff top rule'
+    'the numeral keeps a full 14pt above the staff top rule',
+    1e-6
+  );
+  const css = page.match(/<style>[\s\S]*?<\/style>/)?.[0] ?? '';
+  assert.match(
+    css,
+    /\.janko-measure-num \{[^}]*font-style: italic; font-size: 8\.5pt; fill: #555555; font-weight: normal; \}/,
+    'the numeral is a normal-weight #555555 italic'
   );
   const furniture = getMarginFurniture(system0, TOKENS, 1);
-  assert.equal(furniture.numeral.y1, Number(painted[2]), 'painted and audited baselines agree');
+  close(furniture.numeral.y1, Number(painted[2]), 'painted and audited baselines agree', 1e-6);
+  close(furniture.numeral.x0, Number(painted[1]), 'painted and audited x agree', 1e-6);
   const layout0 = layoutJankoScore(score, OPTIONS, TOKENS)[0];
   for (const p of layout0.notes) {
     const dx = Math.max(furniture.numeral.x0 - p.x, 0, p.x - furniture.numeral.x1);
@@ -905,7 +953,7 @@ test('Round 9 staff hierarchy: four uniform equators, slender accolade and delic
   assert.ok(!pageBarlines.includes('stroke-width="0.85"'), 'the 0.85pt measure barline is gone');
 });
 
-test('Round 7 system openness: accolade opens the piece, intermediate systems stay open', () => {
+test('Round 10 system openness: open margin, unified final barline, no mid-piece marks', () => {
   const score = buildBachGoldbergVar1Score();
   const geo = computePageGeometry(OPTIONS, TOKENS);
   const total = countJankoSystems(score, OPTIONS, TOKENS);
@@ -914,11 +962,19 @@ test('Round 7 system openness: accolade opens the piece, intermediate systems st
       [...svg.matchAll(/class="janko-barline" x1="([\d.]+)"/g)].map((m) => Number(m[1]))
     );
 
-  // The accolade is drawn strictly at the start of the piece.
+  // The golden default paints no system-start ink at all; the ruled styles are
+  // opt-in and still open the piece strictly at System 1.
   const first = renderSystem(score, getSystemGeometry(geo, 0), 0, OPTIONS, TOKENS);
-  assert.equal((first.match(/class="janko-accolade"/g) ?? []).length, 1, 'accolade at the start');
-  const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, OPTIONS, TOKENS);
-  assert.equal((middle.match(/class="janko-accolade"/g) ?? []).length, 0, 'no accolade mid-piece');
+  assert.equal((first.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length, 0, 'open margin at the start');
+  const bracketOptions = { ...OPTIONS, systemStartStyle: 'architectural-bracket' as const };
+  const bracketed = renderSystem(score, getSystemGeometry(geo, 0), 0, bracketOptions, TOKENS);
+  assert.match(
+    bracketed,
+    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65"/,
+    'the architectural bracket is a 0.65pt rule with right-angled spurs'
+  );
+  const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, bracketOptions, TOKENS);
+  assert.equal((middle.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length, 0, 'no mid-piece mark');
 
   // Intermediate systems have no barline at either edge; only the final measure
   // of the final system closes the score.
@@ -934,6 +990,30 @@ test('Round 7 system openness: accolade opens the piece, intermediate systems st
   );
   assert.match(last, /class="janko-barline"[^>]*stroke-width="1\.05"/, 'the closing barline stays firm');
   assert.match(first, /class="janko-barline"[^>]*stroke-width="0\.60"/, 'measure barlines are lighter');
+
+  // Round 10: the default final barline is unified — one continuous rule from
+  // the RH top to the LH bottom that seals the Middle C corridor.
+  const finalBar = new RegExp(
+    `<line class="janko-barline" x1="${getSystemGeometry(geo, total - 1).staffRight.toFixed(2)}" ` +
+      `y1="${(getSystemGeometry(geo, total - 1).equatorY('RH', 5) - 12).toFixed(2)}" ` +
+      `x2="${getSystemGeometry(geo, total - 1).staffRight.toFixed(2)}" ` +
+      `y2="${(getSystemGeometry(geo, total - 1).equatorY('LH', 2) + 12).toFixed(2)}" ` +
+      'stroke="#111111" stroke-width="1.05"'
+  );
+  assert.match(last, finalBar, 'the unified final barline spans both hands across the corridor');
+  assert.equal(
+    (last.match(/class="janko-barline"[^>]*stroke-width="1\.05"/g) ?? []).length,
+    1,
+    'the unified boundary is one single rule'
+  );
+
+  const splitOptions = { ...OPTIONS, finalBarlineStyle: 'split-corridor' as const };
+  const split = renderSystem(score, getSystemGeometry(geo, total - 1), total - 1, splitOptions, TOKENS);
+  assert.equal(
+    (split.match(/class="janko-barline"[^>]*stroke-width="1\.05"/g) ?? []).length,
+    2,
+    'the split final barline keeps two hand segments with an open corridor'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1438,7 +1518,7 @@ test('Round 9: the subdivision dialects dispatch at the stem tip and stack by fl
     ],
     TOKENS
   )!;
-  assert.equal(clasped.durationStyle, 'center-kinetic-ticks', 'the clasp carries its own paradigm');
+  assert.equal(clasped.durationStyle, 'transverse-cross-bars', 'the clasp carries its own paradigm');
   const claspMarkup = renderChordClasp(clasped, TOKENS);
   assert.ok(!claspMarkup.includes('janko-flag'), 'no subdivision ink on the clasp');
 
@@ -1943,13 +2023,14 @@ test('Anchored and 3-row layouts surface their real cost: high notes crowd the n
   // cap height down to the baseline), so the decision matrix shows the real cost
   // of the paradigm without inventing a collision that is not painted.
   const score = buildBachGoldbergVar1Score();
-  // Round 9 elevates the numeral 8pt further (a full 14pt above the top rule),
-  // so every paradigm gains exactly that much air over its previous reading.
+  // Round 9 elevated the numeral to a full 14pt above the top rule; Round 10
+  // pushes it a further 4pt into the margin (`staffLeft − 6`), so every
+  // paradigm's air grows by that much again.
   const CLEARANCE: Record<string, number> = {
-    'single-equator': 17.7,
-    'on-the-line': 10.2,
-    'single-line-3row': 10.2,
-    'bounded-channel': 12.2,
+    'single-equator': 17.91,
+    'on-the-line': 10.51,
+    'single-line-3row': 10.51,
+    'bounded-channel': 12.48,
   };
   for (const c of LAYOUT_CASES) {
     const report = lintJankoScore(score, c.options, TOKENS);

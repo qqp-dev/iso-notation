@@ -1,16 +1,43 @@
 /**
- * System accolade: the slender copperplate brace that clasps both hands.
+ * System-start margin ink: the incumbent copperplate accolade and the Round 10
+ * replacements.
  *
- * Geometry is delegated to the shared Emmentaler/LilyPond brace outline in
- * `print-layout.ts`, so the Jánko engraving and the legacy print pipeline use
- * exactly the same master-engraved curve (Round 9: w = 4.8pt, thick = 0.55pt).
+ * The curlicue copperplate brace does not match the modern design language, so
+ * the golden master retires it (`'open-halo'`): the staff lines emerge openly
+ * from the left margin and the Position of Honor halo rings the opening
+ * sounds. The two ruled alternatives keep a structural mark at the same
+ * reserved margin column:
+ *
+ * - `'architectural-bracket'` — a straight 0.65pt rule with 3.0pt right-angled
+ *   spurs at the staff's top and bottom rules;
+ * - `'clef-pillar'` — the same straight 0.65pt rule without spurs;
+ * - `'none'` — nothing at all.
+ *
+ * The copperplate path itself is still exported (and shared with the legacy
+ * print pipeline in `print-layout.ts`) for the historical golden masters.
  */
 
 import { getVerticalAccoladePath } from '../../print-layout';
-import { JankoLayoutOptions, JankoSystemGeometry, JankoTokens, resolveJankoTokens } from '../types';
+import {
+  JankoLayoutOptions,
+  JankoSystemGeometry,
+  JankoTokens,
+  resolveJankoOptions,
+  resolveJankoTokens,
+} from '../types';
 import { f } from './style';
 
-/** Accolade path at explicit coordinates. */
+/** Horizontal reach (pt) of an architectural bracket's right-angled spurs. */
+export const ARCHITECTURAL_BRACKET_SPUR = 3.0;
+/** Stroke (pt) of the architectural bracket and the clef pillar. */
+export const ARCHITECTURAL_BRACKET_STROKE = 0.65;
+
+/**
+ * Accolade path at explicit coordinates — the historical copperplate master
+ * outline (w = 4.8pt, thick = 0.55pt), retained for the archived golden masters
+ * and shared with the legacy print pipeline in `print-layout.ts`. Round 10
+ * retires it from the Jánko system start (`JankoSystemStartStyle`).
+ */
 export function renderAccoladePath(
   x: number,
   yTop: number,
@@ -23,15 +50,48 @@ export function renderAccoladePath(
   return `    <path class="janko-accolade" d="${d}" fill="${fill}"/>`;
 }
 
-/** Accolade for one resolved system geometry. */
-export function renderAccolade(
+/** Straight 0.65pt system-start rule with 3.0pt right-angled spurs. */
+export function renderArchitecturalBracket(
   geo: JankoSystemGeometry,
-  _options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null
 ): string {
   const t = resolveJankoTokens(tokens);
   const x = geo.staffLeft - t.accoladeGap - t.accoladeWidth;
-  return renderAccoladePath(x, geo.staffTopY, geo.staffBotY, t.accoladeWidth, t.accoladeThick);
+  const spur = ARCHITECTURAL_BRACKET_SPUR;
+  return `    <path class="janko-system-bracket" d="M ${f(x + spur)} ${f(geo.staffTopY)} L ${f(x)} ${f(geo.staffTopY)} L ${f(x)} ${f(geo.staffBotY)} L ${f(x + spur)} ${f(geo.staffBotY)}" fill="none" stroke="#111827" stroke-width="${ARCHITECTURAL_BRACKET_STROKE.toFixed(2)}"/>`;
+}
+
+/** Straight 0.65pt system-start rule without spurs. */
+export function renderClefPillar(
+  geo: JankoSystemGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const x = geo.staffLeft - t.accoladeGap - t.accoladeWidth;
+  return `    <line class="janko-clef-pillar" x1="${f(x)}" y1="${f(geo.staffTopY)}" x2="${f(x)}" y2="${f(geo.staffBotY)}" stroke="#111827" stroke-width="${ARCHITECTURAL_BRACKET_STROKE.toFixed(2)}"/>`;
+}
+
+/**
+ * Margin ink for one resolved system geometry in the active
+ * `systemStartStyle` (Round 10). `'open-halo'` and `'none'` paint nothing: the
+ * opening sounds carry the Position of Honor halo, the staff needs no brace.
+ */
+export function renderAccolade(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const o = resolveJankoOptions(options);
+  switch (o.systemStartStyle) {
+    case 'architectural-bracket':
+      return renderArchitecturalBracket(geo, tokens);
+    case 'clef-pillar':
+      return renderClefPillar(geo, tokens);
+    case 'open-halo':
+    case 'none':
+    default:
+      return '';
+  }
 }
 
 /** Greedy word wrap for crop captions (approximate serif advances). */
