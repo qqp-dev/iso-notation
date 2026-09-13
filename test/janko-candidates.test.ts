@@ -1,41 +1,44 @@
 /**
- * Round 16 — Cluster Doctrine (Shared Stems Direct) + Horizontal-Spacing
- * Candidates + Dots + Rests (two-axis round): registry, spacing fixtures,
- * shared-stem fixtures, dot fixtures and rest fixtures.
+ * Round 17A — Rect Knockout + Spacing Solver v2 + Dot Hug: registry, gap
+ * fixtures, solver fixtures, dot fixtures and rest-ink identity.
  *
- * The round carries **two independent open axes** at once:
+ * Single judged axis — the gap amount:
  *
- * | # | id                       | axis             | window set                        |
- * | - | ------------------------ | ---------------- | --------------------------------- |
- * | A | `spacing-compact`        | `clusterSpacing` | real 2- and 3-note clusters     |
- * | B | `spacing-balanced`       | `clusterSpacing` | real 2- and 3-note clusters     |
- * | C | `spacing-airy`           | `clusterSpacing` | real 2- and 3-note clusters     |
- * | A | `rest-kinetic-monoline`  | `restStyle`      | strictly clean windows (carried)  |
- * | B | `rest-classical-urtext`  | `restStyle`      | strictly clean windows (carried)  |
- * | C | `rest-geometric-node`    | `restStyle`      | strictly clean windows (carried)  |
- * | D | `rest-phantom-notehead`  | `restStyle`      | strictly clean windows (carried)  |
+ * | # | id               | `clusterSpacing` | window set                    |
+ * | - | ---------------- | ---------------- | ----------------------------- |
+ * | A | `spacing-snug`   | `snug` (golden)  | the carried cluster windows   |
+ * | B | `spacing-tight`  | `tight`          | the carried cluster windows   |
  *
- * Per-candidate purity is the invariant: a spacing candidate states only its
- * `clusterSpacing` value, a dialect candidate only its `restStyle` value, and no
- * candidate carries a locked-axis delta. The two judgments are independent by
- * construction — the spacing question cannot move rest ink, so every rest SVG
- * group is identical under all three spacing presets.
+ * Everything else goes direct: the sharp rectangular mask, the v2 solver
+ * (unit centering, pin-preserving shrink, local redistribution, multi-row
+ * interleave) and the hugging dots. Rest behaviour is explicitly out —
+ * rests, beams and the m4 beam-break stay exactly Round 16, so every rest
+ * SVG group is identical under both spacing presets (and byte-identical to
+ * the Round 16 golden, verified at implementation time).
  *
  * Committed fixtures for every directive the round fixes:
- *  1. the preset table (rx / air / pair gap) and the rx + ry + digit paint pin;
- *  2. pair spans, beat-cell containment and time order under every preset;
- *  3. the Brahms triples: span plus one shared stem each;
- *  4. the mixed t1752 stack: one stem-x, both beams, each drawn once;
- *  5. synthetic same-duration stacks: one painted stem;
- *  6. zero split-stack-stems golden-wide, plus the defect;
- *  7. dots always above, tight to the mask, bar 6 attaching only to t744;
- *  8. the digit inside the knockout for all 12 glyphs, every preset evaluated;
- *  9. rest size maxima per value over the four carried dialects;
- * 10. rule-hung rests, corridor-side, on m. 4, the specimens and Brahms m. 68;
- * 11. rest-ink identity across spacing (replaces the Round 15 byte-identity
- *     guard, retired with `crowdedColumn`);
- * 12. bar 5 beat 2 beam arithmetic (locked, unchanged);
- * 13. the four-systems-per-page golden.
+ *  1. the preset table (margin / air / pair gap / wx / hy) and the gap
+ *     identity G = 2(1.93 + m) + air, pinned per preset;
+ *  2. the rect paint pin: every mask a sharp rect with the preset wx/hy,
+ *     every digit 5.8pt;
+ *  3. pair spans (G ±0.1), triple spans (2G ±0.2), beat-cell containment and
+ *     time order — every preset, every ticketed tick;
+ *  4. unit centering (t1032 free-space symmetry ≤1.5pt);
+ *  5. the pin (m12: the 9 holds ±0.3, gap = min(G, room)) plus a synthetic
+ *     shrink proof;
+ *  6. redistribution (t2052..t2076 gap spread ≤2.0);
+ *  7. interleave (t1392 row offset G/2 ±0.2, one shared stem) and the t1584
+ *     triple;
+ *  8. the mixed t1752 stack: one stem-x, both beams, each drawn once;
+ *  9. synthetic same-duration stacks: one painted stem;
+ * 10. zero split-stack-stems golden-wide, plus the defect;
+ * 11. dots hug the mask corner (offsets, clearance proof, uniform sign) and
+ *     bar 6 attaches only to t744;
+ * 12. the digit inside the rect for all 12 glyphs, every preset evaluated;
+ * 13. rest size maxima, rule-hang and rest-ink identity (Round 16 behaviour,
+ *     untouched);
+ * 14. bar 5 beat 2 beam arithmetic (locked, unchanged);
+ * 15. the four-systems-per-page golden.
  */
 
 import { test } from 'node:test';
@@ -58,8 +61,6 @@ import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
-  REST_SPECIMEN_STUDIO_SCORE_ID,
-  SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   getCandidate,
   resolveCandidate,
@@ -69,7 +70,8 @@ import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   JANKO_CLUSTER_SPACINGS,
-  JANKO_REST_STYLES,
+  JANKO_DIGIT_HALF_HEIGHT,
+  JANKO_DIGIT_HALF_WIDTH,
   JankoClusterSpacing,
   JankoRestStyle,
   getClusterSpacingPreset,
@@ -103,22 +105,21 @@ const SPECIMEN = buildChordDurationSpecimenScore();
 const REST_SPECIMEN = buildRestDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 
-/** The three spacing-axis candidates, in display order. */
+/** The two spacing candidates, in display order. */
 const SPACING_CANDIDATES: Array<{ id: string; spacing: JankoClusterSpacing; letter: string }> = [
-  { id: 'spacing-compact', spacing: 'compact', letter: 'A' },
-  { id: 'spacing-balanced', spacing: 'balanced', letter: 'B' },
-  { id: 'spacing-airy', spacing: 'airy', letter: 'C' },
+  { id: 'spacing-snug', spacing: 'snug', letter: 'A' },
+  { id: 'spacing-tight', spacing: 'tight', letter: 'B' },
 ];
 
-/** The four dialect-axis candidates, in display order. */
-const DIALECT_CANDIDATES: Array<{ id: string; style: JankoRestStyle; letter: string }> = [
-  { id: 'rest-kinetic-monoline', style: 'kinetic-monoline', letter: 'A' },
-  { id: 'rest-classical-urtext', style: 'classical-urtext', letter: 'B' },
-  { id: 'rest-geometric-node', style: 'geometric-node', letter: 'C' },
-  { id: 'rest-phantom-notehead', style: 'phantom-notehead', letter: 'D' },
+/** The four rest dialects whose Round 16 behaviour stays untouched. */
+const REST_STYLES: JankoRestStyle[] = [
+  'kinetic-monoline',
+  'classical-urtext',
+  'geometric-node',
+  'phantom-notehead',
 ];
 
-/** The Round 16 spacing windows: real 2- and 3-note clusters in real music. */
+/** The carried cluster windows: real 2- and 3-note clusters in real music. */
 const SPACING_WINDOWS = [
   { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 8 },
   { scoreId: DEFAULT_STUDIO_SCORE_ID, measureStart: 12 },
@@ -127,15 +128,34 @@ const SPACING_WINDOWS = [
   { scoreId: BRAHMS_STUDIO_SCORE_ID, measureStart: 9 },
 ];
 
-/** The strictly clean dialect windows, carried byte-identical from Round 15. */
-const DIALECT_WINDOWS = [
-  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 1 },
-  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
-  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 3 },
-  { scoreId: REST_SPECIMEN_STUDIO_SCORE_ID, measureStart: 4 },
-  { scoreId: 'brahms-op118-no1', measureStart: 68 },
-  { scoreId: SPECIMEN_STUDIO_SCORE_ID, measureStart: 2 },
-];
+/** One synthetic note: pitch class + octave address the Jánko rows directly. */
+function note(
+  id: string,
+  pitchClass: number,
+  octave: number,
+  startTick: number,
+  durationTicks: number,
+  hand: Hand = 'RH'
+): QuantizedNote {
+  return { id, pitch: { pitchClass, octave }, startTick, durationTicks, hand };
+}
+
+/** One synthetic one-measure score in 3/4. */
+function score(id: string, notes: QuantizedNote[]): QuantizedGridScore {
+  return {
+    id,
+    title: id,
+    composer: 'test',
+    ticksPerBeat: 48,
+    totalTicks: 144,
+    timeSignatures: [{ tick: 0, numerator: 3, denominator: 4 }],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes,
+  };
+}
 
 /** Every rest of one score, flattened over its systems. */
 function allRests(
@@ -189,23 +209,22 @@ function restInkOf(
 }
 
 // ---------------------------------------------------------------------------
-// 1. Registry discipline (two axes, per-candidate purity)
+// 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 16 with both independent axes', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 16);
+test('CURRENT_ROUND_METADATA opens round 17 with the single gap-amount axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 17);
   assert.equal(
     CURRENT_ROUND_METADATA.title,
-    'Cluster Spacing + Rest Dialects: Two Independent Axes'
+    'Rect Knockout + Gap Amounts: Snug −30% vs Tight −35%'
   );
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['clusterSpacing', 'restStyle'],
-    'the round carries exactly the two operator-approved axes'
+    ['clusterSpacing'],
+    'the round carries exactly the operator-approved axis'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /shared stem/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /spacing amount/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /rest dialect/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /rectangular knockout/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /gap amount/i);
   assert.match(
     CURRENT_ROUND_METADATA.description,
     /cannot move rest ink/,
@@ -213,15 +232,15 @@ test('CURRENT_ROUND_METADATA opens round 16 with both independent axes', () => {
   );
 });
 
-test('CURRENT_CANDIDATES declares exactly 3 spacing + 4 dialect candidates, all else equal', () => {
+test('CURRENT_CANDIDATES declares exactly the snug golden and the tight challenger', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    [...SPACING_CANDIDATES, ...DIALECT_CANDIDATES].map((c) => c.id),
-    'spacing candidates first, then the dialect set, in registry order'
+    SPACING_CANDIDATES.map((c) => c.id),
+    'golden first, then the challenger, in registry order'
   );
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  assert.equal(CURRENT_CANDIDATES.length, 7, 'seven candidates across two axes');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two candidates on one axis');
 
   assert.deepEqual(
     SPACING_CANDIDATES.map((c) => resolveCandidate(getCandidate(c.id)!).options.clusterSpacing),
@@ -233,16 +252,8 @@ test('CURRENT_CANDIDATES declares exactly 3 spacing + 4 dialect candidates, all 
     [...JANKO_CLUSTER_SPACINGS].sort(),
     'the registry covers the published spacing catalogue'
   );
-  assert.deepEqual(
-    DIALECT_CANDIDATES.map((c) => resolveCandidate(getCandidate(c.id)!).options.restStyle),
-    DIALECT_CANDIDATES.map((c) => c.style),
-    'the four Round 13 finalist dialects are represented exactly once'
-  );
-  for (const dialect of DIALECT_CANDIDATES) {
-    assert.ok(JANKO_REST_STYLES.includes(dialect.style), `${dialect.style} stays published`);
-  }
 
-  for (const { id, letter } of [...SPACING_CANDIDATES, ...DIALECT_CANDIDATES]) {
+  for (const { id, letter } of SPACING_CANDIDATES) {
     const candidate = getCandidate(id)!;
     assert.ok(candidate.label.startsWith(`${letter} · `), `${id} is candidate ${letter}`);
     assert.ok((candidate.description ?? '').length > 120, `${id} carries a rationale`);
@@ -250,7 +261,7 @@ test('CURRENT_CANDIDATES declares exactly 3 spacing + 4 dialect candidates, all 
   }
 });
 
-test('Per-candidate purity: each candidate states only its own axis and no locked delta', () => {
+test('Per-candidate purity: each candidate states only the spacing axis and no locked delta', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   for (const { id, spacing } of SPACING_CANDIDATES) {
     const candidate = getCandidate(id)!;
@@ -261,9 +272,9 @@ test('Per-candidate purity: each candidate states only its own axis and no locke
       `${id} varies the spacing axis and nothing else`
     );
     assert.equal(candidate.options?.clusterSpacing, spacing);
-    assert.equal(candidate.options?.restStyle, undefined, `${id} never reopens the dialect`);
     const options = (candidate.options ?? {}) as Record<string, unknown>;
     for (const locked of [
+      'restStyle',
       'gridWritingPolicy',
       'systemStartStyle',
       'chordGrouping',
@@ -274,20 +285,8 @@ test('Per-candidate purity: each candidate states only its own axis and no locke
     }
     assert.equal(candidate.tokens, undefined, `${id} carries no token delta`);
   }
-  for (const { id, style } of DIALECT_CANDIDATES) {
-    const candidate = getCandidate(id)!;
-    assert.equal(candidate.axis, 'restStyle', `${id} declares the dialect axis`);
-    assert.deepEqual(
-      Object.keys(candidate.options ?? {}),
-      ['restStyle'],
-      `${id} varies the dialect axis and nothing else`
-    );
-    assert.equal(candidate.options?.restStyle, style);
-    assert.equal(candidate.options?.clusterSpacing, undefined, `${id} never reopens the spacing axis`);
-    assert.equal(candidate.tokens, undefined, `${id} carries no token delta`);
-  }
   // The golden context every candidate inherits, unchanged.
-  assert.equal(golden.clusterSpacing, 'balanced', 'the agreed spacing golden');
+  assert.equal(golden.clusterSpacing, 'snug', 'the recommended spacing golden');
   assert.equal(golden.restStyle, 'kinetic-monoline', 'the incumbent dialect golden');
   assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'grid candidate C is locked');
   assert.equal(golden.systemStartStyle, 'architectural-bracket', 'the flared bracket is locked');
@@ -295,7 +294,7 @@ test('Per-candidate purity: each candidate states only its own axis and no locke
   assert.equal(golden.systemsPerPage, 4, 'four systems per page is locked');
 });
 
-test('Every candidate states exactly its own open-axis badge and nothing else', () => {
+test('Every candidate states exactly its open-axis badge and nothing else', () => {
   for (const { id, spacing } of SPACING_CANDIDATES) {
     const badges = candidateBadges(getCandidate(id)!);
     assert.deepEqual(
@@ -306,25 +305,15 @@ test('Every candidate states exactly its own open-axis badge and nothing else', 
     assert.equal(badges[0].value, spacing);
     assert.equal(badges[0].axis, true, `${id} flags the spacing axis`);
   }
-  for (const { id, style } of DIALECT_CANDIDATES) {
-    const badges = candidateBadges(getCandidate(id)!);
-    assert.deepEqual(
-      badges.map((b) => b.key),
-      ['restStyle'],
-      `${id} badges only its own axis`
-    );
-    assert.equal(badges[0].value, style);
-    assert.equal(badges[0].axis, true, `${id} flags the dialect axis`);
-  }
-  // Departures from golden: compact + airy on the spacing axis, the three
-  // non-incumbent dialects on the dialect axis.
+  // Departures from golden: the tight challenger alone.
   const departures = CURRENT_CANDIDATES.flatMap((c) =>
     candidateBadges(c).filter((b) => b.value !== b.golden)
   );
-  assert.equal(departures.length, 5, 'two spacing departures plus three dialect departures');
+  assert.equal(departures.length, 1, 'one spacing departure');
+  assert.equal(departures[0].value, 'tight');
 });
 
-test('Spacing candidates share the cluster windows; dialects share the clean windows', () => {
+test('Both candidates share the carried cluster windows', () => {
   for (const { id } of SPACING_CANDIDATES) {
     const resolved = resolveCandidate(getCandidate(id)!);
     assert.deepEqual(
@@ -337,220 +326,469 @@ test('Spacing candidates share the cluster windows; dialects share the clean win
       assert.ok(window.title.length > 20, `${id} titles every window`);
     }
   }
-  const dialectSets = DIALECT_CANDIDATES.map((d) =>
-    resolveCandidate(getCandidate(d.id)!).windows.map((w) => ({ ...w }))
-  );
-  for (const [i, set] of dialectSets.entries()) {
-    assert.deepEqual(
-      set.map((w) => ({ scoreId: w.scoreId, measureStart: w.measureStart })),
-      DIALECT_WINDOWS,
-      `${DIALECT_CANDIDATES[i].id} window set`
+});
+
+// ---------------------------------------------------------------------------
+// 2. The golden is real geometry: both presets engrave, nothing is symbolic
+// ---------------------------------------------------------------------------
+
+test('The golden page layout is four systems per page and two pages — every preset', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS);
+    assert.equal(layouts.length, 8, `${spacing}: eight systems of music`);
+    assert.equal(
+      computePageGeometry(options, DEFAULT_JANKO_TOKENS).systems.length,
+      4,
+      `${spacing}: four systems per page`
     );
-  }
-  for (let i = 1; i < dialectSets.length; i++) {
-    assert.deepEqual(
-      dialectSets[i],
-      dialectSets[0],
-      'the carried dialect windows are one shared set, byte-identical across dialects'
+    assert.equal(
+      countJankoPages(SCORE, options, DEFAULT_JANKO_TOKENS),
+      2,
+      `${spacing}: two pages`
     );
   }
 });
 
-// ---------------------------------------------------------------------------
-// 2. The spacing axis: preset table, pair spans, cells, time order, triples
-// ---------------------------------------------------------------------------
-
-test('Golden master: 4 systems per page, 2 pages, lint 0/0 — and every spacing preset is real geometry', () => {
-  const geo = computePageGeometry(DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(geo.systemsPerPage, 4);
-  assert.equal(geo.systems.length, 4);
-  assert.equal(countJankoPages(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS), 2);
-  const golden = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(golden.ok, true, 'the golden page is clean');
-  assert.equal(golden.warnings.length, 0, 'with zero warnings');
-  assert.equal(golden.stats.systems, 8, '32 bars in 8 systems');
-
-  for (const { spacing } of SPACING_CANDIDATES) {
-    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing });
-    const svg = renderJankoCrop(SCORE, 8, 1, o, DEFAULT_JANKO_TOKENS);
-    assert.ok((svg.match(/class="janko-digit"/g) ?? []).length > 10, `${spacing} engraves m. 8`);
+test('Snug passes every gate; tight is reported through the real engine (trippable)', () => {
+  const snug = resolveJankoOptions({
+    ...DEFAULT_JANKO_OPTIONS,
+    clusterSpacing: 'snug',
+  });
+  const report = lintJankoScore(SCORE, snug, DEFAULT_JANKO_TOKENS);
+  assert.equal(report.violations.length, 0, 'snug: zero violations on Bach');
+  assert.equal(report.warnings.length, 0, 'snug: zero warnings on Bach');
+  const brahms = lintJankoScore(
+    BRAHMS,
+    resolveJankoOptions({
+      ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      clusterSpacing: 'snug',
+    }),
+    BRAHMS_OP118_NO1_JANKO_TOKENS
+  );
+  assert.equal(brahms.violations.length, 0, 'snug: zero violations on Brahms');
+  assert.equal(brahms.warnings.length, 0, 'snug: zero warnings on Brahms');
+  // Tight is REPORTED, not gated: its lint chip carries whatever the engine
+  // finds, and a trip is judging input, not failure. The suite pins only that
+  // the report runs on both scores — never its counts.
+  const tightCases = [
+    [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
+    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
+  ] as const;
+  for (const [score, base, tokens, label] of tightCases) {
+    const tight = lintJankoScore(
+      score,
+      { ...base, clusterSpacing: 'tight' },
+      tokens
+    );
+    assert.equal(typeof tight.ok, 'boolean', `tight ${label}: the report runs`);
+    assert.ok(
+      Array.isArray(tight.violations) && Array.isArray(tight.warnings),
+      `tight ${label}: the report carries violation and warning counts`
+    );
   }
-  // The three presets are distinct engravings on the cluster window.
-  const docs = new Set(
-    SPACING_CANDIDATES.map(({ spacing }) =>
-      renderJankoCrop(
-        SCORE,
-        8,
-        1,
-        resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing }),
-        DEFAULT_JANKO_TOKENS
-      ).replace(/ data-[a-z-]+="[^"]*"/g, '')
+});
+
+test('A and B are genuinely different engravings of the same score', () => {
+  const crops = SPACING_CANDIDATES.map(({ spacing }) =>
+    renderJankoCrop(
+      SCORE,
+      8,
+      1,
+      { ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing },
+      DEFAULT_JANKO_TOKENS
     )
   );
-  assert.equal(docs.size, 3, 'A, B and C each engrave a different m. 8');
+  assert.notEqual(crops[0], crops[1], 'snug and tight paint different m. 8 columns');
+  for (const [i, { spacing }] of SPACING_CANDIDATES.entries()) {
+    assert.ok(
+      crops[i].includes('janko-knockout'),
+      `${spacing} engraves real notehead masks`
+    );
+    assert.ok(crops[i].includes('janko-stem'), `${spacing} engraves real stems`);
+    assert.ok(crops[i].includes('janko-digit'), `${spacing} engraves real digits`);
+  }
 });
 
-test('Preset table: rx / air / pair gap exactly as ticketed, consistent in every row', () => {
-  assert.deepEqual(getClusterSpacingPreset('compact'), { rx: 3.2, air: 0.8, pairGap: 7.2 });
-  assert.deepEqual(getClusterSpacingPreset('balanced'), { rx: 3.6, air: 1.0, pairGap: 8.2 });
-  assert.deepEqual(getClusterSpacingPreset('airy'), { rx: 4.0, air: 1.2, pairGap: 9.2 });
-  assert.deepEqual(getClusterSpacingPreset(undefined), getClusterSpacingPreset('balanced'));
+// ---------------------------------------------------------------------------
+// 3. The preset table and the gap identity (pinned per preset)
+// ---------------------------------------------------------------------------
+
+test('Preset table: margin / air / pair gap / wx / hy, exactly as ticketed', () => {
+  const table: Record<JankoClusterSpacing, { margin: number; air: number; pairGap: number; wx: number; hy: number }> = {
+    snug: { margin: 0.8, air: 0.4, pairGap: 5.86, wx: 2.73, hy: 3.66 },
+    tight: { margin: 0.6, air: 0.4, pairGap: 5.46, wx: 2.53, hy: 3.46 },
+  };
+  for (const spacing of JANKO_CLUSTER_SPACINGS) {
+    assert.deepEqual(
+      getClusterSpacingPreset(spacing),
+      table[spacing],
+      `${spacing} geometry, verbatim`
+    );
+  }
+});
+
+test('Gap identity G = 2(1.93 + m) + air, pinned per preset', () => {
+  assert.equal(JANKO_DIGIT_HALF_WIDTH, 1.93, 'measured digit half-width base');
+  assert.equal(JANKO_DIGIT_HALF_HEIGHT, 2.86, 'measured digit half-height base');
   for (const spacing of JANKO_CLUSTER_SPACINGS) {
     const preset = getClusterSpacingPreset(spacing);
-    assert.ok(
-      Math.abs(preset.pairGap - (2 * preset.rx + preset.air)) < 1e-9,
-      `${spacing}: pairGap is 2rx + air`
+    assert.equal(
+      preset.wx,
+      JANKO_DIGIT_HALF_WIDTH + preset.margin,
+      `${spacing}: wx = 1.93 + m`
+    );
+    assert.equal(
+      preset.hy,
+      JANKO_DIGIT_HALF_HEIGHT + preset.margin,
+      `${spacing}: hy = 2.86 + m`
+    );
+    assert.equal(
+      preset.pairGap,
+      2 * preset.wx + preset.air,
+      `${spacing}: G = 2wx + air`
+    );
+    assert.equal(
+      preset.pairGap,
+      2 * (JANKO_DIGIT_HALF_WIDTH + preset.margin) + preset.air,
+      `${spacing}: G = 2(1.93 + m) + air`
     );
   }
 });
 
-test('Paint pin: rx + ry + digit size per preset, straight off the engraved page', () => {
-  assert.equal(DEFAULT_JANKO_TOKENS.noteheadRadius, 4.8, 'ry is fixed at 4.8');
-  assert.equal(DEFAULT_JANKO_TOKENS.digitFontSize, 5.8, 'the digit is fixed at 5.8');
+// ---------------------------------------------------------------------------
+// 4. The rect paint pin: every mask a sharp rect with the preset wx/hy
+// ---------------------------------------------------------------------------
+
+test('Rect paint pin: every mask a sharp rect with the preset wx/hy, every digit 5.8pt', () => {
   for (const { spacing } of SPACING_CANDIDATES) {
-    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing });
-    const svg = renderJankoCrop(SCORE, 8, 1, o, DEFAULT_JANKO_TOKENS);
-    const masks = [...svg.matchAll(/<(circle|ellipse) class="janko-knockout" cx="([\d.]+)" cy="([\d.]+)" rx="([\d.]+)" ry="([\d.]+)"/g)];
-    assert.ok(masks.length > 10, `${spacing} paints elliptical knockouts`);
-    const { rx } = getClusterSpacingPreset(spacing);
-    for (const m of masks) {
-      assert.equal(m[1], 'ellipse', `${spacing}: every mask is an ellipse, never a legacy circle`);
-      assert.equal(Number(m[4]), rx, `${spacing}: every mask carries rx ${rx}`);
-      assert.equal(Number(m[5]), 4.8, `${spacing}: every mask carries ry 4.8`);
+    const preset = getClusterSpacingPreset(spacing);
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    for (const page of [1, 2]) {
+      const svg =
+        page === 1
+          ? renderJankoCrop(SCORE, 1, 16, options, DEFAULT_JANKO_TOKENS)
+          : renderJankoCrop(SCORE, 17, 16, options, DEFAULT_JANKO_TOKENS);
+      assert.ok(
+        !/<ellipse class="janko-knockout"/.test(svg),
+        `${spacing} p${page}: no legacy elliptical mask survives`
+      );
+      const masks = [
+        ...svg.matchAll(
+          /<rect class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="#FFFFFF"\/>/g
+        ),
+      ];
+      assert.ok(masks.length > 200, `${spacing} p${page}: paints real masks`);
+      for (const m of masks) {
+        const wx = Number(m[3]) / 2;
+        const hy = Number(m[4]) / 2;
+        assert.ok(
+          Math.abs(wx - preset.wx) < 0.011,
+          `${spacing}: mask half-width ${wx} is the preset ${preset.wx}`
+        );
+        assert.ok(
+          Math.abs(hy - preset.hy) < 0.011,
+          `${spacing}: mask half-height ${hy} is the preset ${preset.hy}`
+        );
+      }
+      const sizes = [
+        ...svg.matchAll(/class="janko-digit"[^>]*font-size="([\d.]+)pt"/g),
+      ].map((m) => Number(m[1]));
+      assert.equal(sizes.length, masks.length, `${spacing} p${page}: one digit per mask`);
+      for (const size of sizes) {
+        assert.equal(size, 5.8, `${spacing} p${page}: the digit stays 5.8pt`);
+      }
     }
-    const digits = [...svg.matchAll(/class="janko-digit"[^>]*font-size="([\d.]+)pt"/g)];
-    assert.ok(digits.length > 10, `${spacing} paints digits`);
-    for (const d of digits) assert.equal(Number(d[1]), 5.8, `${spacing}: every digit is 5.8pt`);
   }
 });
 
-test('Pairs (mm. 8/12/15): preset span, beat-cell containment, time order — every preset', () => {
+// ---------------------------------------------------------------------------
+// 5. Spans: pairs G ±0.1, triples 2G ±0.2, cells firm, time ordered
+// ---------------------------------------------------------------------------
+
+test('Pairs stand at the judged gap ±0.1, inside their beat cell, in time order — every preset', () => {
+  // Bach's same-row pairs: t1032 (m8), t1632 (m12), t2040/t2064 (m15).
+  const pairTicks = [1032, 1632, 2040, 2064];
   for (const { spacing } of SPACING_CANDIDATES) {
-    const { pairGap } = getClusterSpacingPreset(spacing);
-    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing });
-    const layouts = layoutJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS);
-    const notes = layouts.flatMap((l) => l.notes);
-    for (const tick of [1032, 1632, 2040, 2064]) {
-      const pair = notes.filter((p) => p.note.startTick === tick).sort((a, b) => a.x - b.x);
-      assert.equal(pair.length, 2, `${spacing}: t${tick} is a same-row pair`);
+    const G = getClusterSpacingPreset(spacing).pairGap;
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
+    for (const tick of pairTicks) {
+      const pair = notes.filter((p) => p.note.startTick === tick);
+      assert.equal(pair.length, 2, `${spacing} t${tick}: the ticketed pair`);
+      const span = Math.abs(pair[1].x - pair[0].x);
       assert.ok(
-        Math.abs(pair[1].x - pair[0].x - pairGap) < 0.05,
-        `${spacing}: t${tick} spans ${pairGap}pt (got ${(pair[1].x - pair[0].x).toFixed(2)})`
+        Math.abs(span - G) < 0.1,
+        `${spacing} t${tick}: pair spans ${span.toFixed(2)} (G = ${G})`
       );
       for (const p of pair) {
-        assert.ok(p.beatCell, `${spacing}: every head records its beat cell`);
         assert.ok(
-          p.x >= p.beatCell!.left - 1e-9 && p.x <= p.beatCell!.right + 1e-9,
-          `${spacing}: t${tick} stays inside [${p.beatCell!.left.toFixed(2)}, ${p.beatCell!.right.toFixed(2)}]`
+          p.x >= (p.beatCell?.left ?? 0) - 1e-9 && p.x <= (p.beatCell?.right ?? 0) + 1e-9,
+          `${spacing} t${tick}: ${p.note.id} stays in its beat cell`
         );
       }
     }
-    // Time order across bar 15: every onset stays left of every later onset.
-    const byTick = new Map<number, { min: number; max: number }>();
-    for (const p of notes.filter((p) => p.note.startTick >= 2016 && p.note.startTick < 2160)) {
-      const bucket = byTick.get(p.note.startTick);
-      if (bucket) {
-        bucket.min = Math.min(bucket.min, p.x);
-        bucket.max = Math.max(bucket.max, p.x);
-      } else {
-        byTick.set(p.note.startTick, { min: p.x, max: p.x });
+    // Time order across the ticketed neighbourhoods: no later onset may sit
+    // left of an earlier one.
+    for (const [a, b] of [[1020, 1032], [1032, 1044], [1620, 1632], [1632, 1644], [2028, 2040], [2040, 2052], [2052, 2064], [2064, 2076]] as const) {
+      const maxA = Math.max(...notes.filter((p) => p.note.startTick === a).map((p) => p.x));
+      const minB = Math.min(...notes.filter((p) => p.note.startTick === b).map((p) => p.x));
+      assert.ok(maxA <= minB + 1e-9, `${spacing}: t${a} stays left of t${b}`);
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6. Unit centering: t1032 free-space symmetry ≤1.5pt
+// ---------------------------------------------------------------------------
+
+test('Unit centering: the t1032 pair sits symmetric in its free space — every preset', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const { wx } = getClusterSpacingPreset(spacing);
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
+    const pair = notes
+      .filter((p) => p.note.startTick === 1032)
+      .sort((a, b) => a.x - b.x);
+    // The fixed nominal neighbours both sides (the 10.1/2.0 split is gone).
+    const prevX = Math.max(
+      ...notes.filter((p) => (p.nominalX ?? p.x) < (pair[0].nominalX ?? 0)).map((p) => p.nominalX ?? p.x)
+    );
+    const nextX = Math.min(
+      ...notes.filter((p) => (p.nominalX ?? p.x) > (pair[0].nominalX ?? 0)).map((p) => p.nominalX ?? p.x)
+    );
+    const leftAir = pair[0].x - wx - (prevX + wx);
+    const rightAir = nextX - wx - (pair[1].x + wx);
+    assert.ok(
+      Math.abs(leftAir - rightAir) <= 1.5,
+      `${spacing}: t1032 free-space symmetry |${leftAir.toFixed(2)} − ${rightAir.toFixed(2)}| ≤ 1.5`
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 7. The pin: m12's 9 holds, the gap is min(G, room)
+// ---------------------------------------------------------------------------
+
+test('Pin: m12 pins the 9 on its column while the 7 walks in — every preset', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const G = getClusterSpacingPreset(spacing).pairGap;
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
+    const pair = notes
+      .filter((p) => p.note.startTick === 1632)
+      .sort((a, b) => a.x - b.x);
+    const nine = pair.find((p) => p.coord.pitchClass === 9)!;
+    assert.ok(nine, `${spacing}: the ticketed 9 exists`);
+    assert.ok(
+      Math.abs(nine.x - (nine.nominalX ?? nine.x)) <= 0.3,
+      `${spacing}: the 9 holds its column (Δ${Math.abs(nine.x - (nine.nominalX ?? 0)).toFixed(2)})`
+    );
+    const span = Math.abs(pair[1].x - pair[0].x);
+    // Free room here exceeds G on the roomy side, so the walked-in gap is G.
+    assert.ok(
+      Math.abs(span - G) < 0.1,
+      `${spacing}: the 7 walks in to the judged gap (${span.toFixed(2)} = min(G, room))`
+    );
+  }
+});
+
+test('Pin-preserving shrink: a pair starved of room narrows to the room with the pin held', () => {
+  // 5-tick onsets: the pair at tick 43 faces a 5-tick room to its beat pulse
+  // — inside [touching, G) — so the gap shrinks to the room instead of
+  // hiding the overflow by sliding the anchor.
+  const shrink = score('synthetic-pin-shrink', [
+    note('shrink-a', 0, 5, 38, 12),
+    note('shrink-lo', 0, 5, 43, 12),
+    note('shrink-hi', 4, 5, 43, 12),
+    note('shrink-b', 1, 5, 48, 12),
+  ]);
+  const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 3 });
+  const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const placed = layoutJankoScore(shrink, options, tokens).flatMap((l) => l.notes);
+  const lo = placed.find((p) => p.note.id === 'shrink-lo')!;
+  const hi = placed.find((p) => p.note.id === 'shrink-hi')!;
+  const room = (lo.beatCell?.right ?? 0) - (lo.nominalX ?? 0);
+  assert.ok(
+    room >= 2 * getClusterSpacingPreset('snug').wx && room < getClusterSpacingPreset('snug').pairGap,
+    `the room (${room.toFixed(2)}pt) sits inside [touching, G)`
+  );
+  assert.ok(
+    Math.abs(lo.x - (lo.nominalX ?? 0)) < 1e-9,
+    'the pinned head holds its column exactly'
+  );
+  const span = Math.abs(hi.x - lo.x);
+  assert.ok(
+    Math.abs(span - room) < 0.05,
+    `the gap shrinks to the room (${span.toFixed(2)} = min(G, room))`
+  );
+  assert.ok(span < getClusterSpacingPreset('snug').pairGap, 'and stays under the judged gap');
+  const report = lintJankoScore(shrink, options, tokens);
+  assert.equal(report.violations.length, 0, 'the shrunk pair still lints clean');
+  assert.equal(report.warnings.length, 0, '... with no warnings either');
+});
+
+// ---------------------------------------------------------------------------
+// 8. Redistribution: m15's four evened, still in time order
+// ---------------------------------------------------------------------------
+
+test('Redistribution: t2052..t2076 gaps spread ≤2.0 — every preset', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
+    const edge = (tick: number, which: 'min' | 'max'): number => {
+      const xs = notes.filter((p) => p.note.startTick === tick).map((p) => p.x);
+      return which === 'min' ? Math.min(...xs) : Math.max(...xs);
+    };
+    const g1 = edge(2064, 'min') - edge(2052, 'max');
+    const g2 = edge(2076, 'min') - edge(2064, 'max');
+    assert.ok(
+      Math.abs(g1 - g2) <= 2.0,
+      `${spacing}: m15 gap spread |${g1.toFixed(2)} − ${g2.toFixed(2)}| ≤ 2.0`
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 9. Mixed-hand seconds keep their two stems at head-x
+// ---------------------------------------------------------------------------
+
+test('Seconds keep two stems at head-x: the m12 rule on the t1632 pair — every preset', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS);
+    const pair = layouts.flatMap((l) => l.notes).filter((p) => p.note.startTick === 1632);
+    assert.equal(pair.length, 2, `${spacing}: t1632 is a same-row pair`);
+    assert.notEqual(pair[0].rhythm.hand, pair[1].rhythm.hand, `${spacing}: t1632 is cross-hand`);
+    for (const layout of layouts) {
+      const hidden = suppressedStemIds(layout);
+      for (const p of pair.filter((q) => layout.notes.some((n) => n.note.id === q.note.id))) {
+        assert.ok(!hidden.has(p.note.id), `${spacing}: ${p.note.id} keeps its own stem`);
+        const stem = getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS);
+        assert.equal(stem.stemX, p.x, `${spacing}: ${p.note.id} stems exactly at head-x`);
       }
     }
-    const ticks = [...byTick.keys()].sort((a, b) => a - b);
-    for (let i = 1; i < ticks.length; i++) {
-      const before = byTick.get(ticks[i - 1])!;
-      const after = byTick.get(ticks[i])!;
+    // Paint-level: two stem rules stand on the two head columns.
+    const crop = renderJankoCrop(
+      SCORE,
+      12,
+      1,
+      { ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing },
+      DEFAULT_JANKO_TOKENS
+    );
+    const stems = [...crop.matchAll(/class="janko-stem" x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/g)];
+    for (const p of pair) {
       assert.ok(
-        before.max <= after.min + 1e-9,
-        `${spacing}: t${ticks[i - 1]} stays left of t${ticks[i]}`
+        stems.some((s) => Math.abs(Number(s[1]) - p.x) < 0.01 && Math.abs(Number(s[3]) - p.x) < 0.01),
+        `${spacing}: a painted stem stands on ${p.note.id} at x=${p.x.toFixed(2)}`
       );
     }
-    const report = lintJankoScore(SCORE, o, DEFAULT_JANKO_TOKENS);
-    assert.equal(report.ok, true, `${spacing} lints clean on Bach`);
-    assert.equal(report.warnings.length, 0, `${spacing} adds no warning on Bach`);
-    const brahms = lintJankoScore(
-      BRAHMS,
-      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, clusterSpacing: spacing },
-      BRAHMS_OP118_NO1_JANKO_TOKENS
-    );
-    assert.equal(brahms.ok, true, `${spacing} lints clean on Brahms`);
-    assert.equal(brahms.warnings.length, 0, `${spacing} adds no warning on Brahms`);
   }
 });
 
-test('Seconds keep two stems at head-x: the m12 rule on the t1632 pair', () => {
-  const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const pair = layouts.flatMap((l) => l.notes).filter((p) => p.note.startTick === 1632);
-  assert.equal(pair.length, 2, 't1632 is a same-row pair');
-  assert.notEqual(pair[0].rhythm.hand, pair[1].rhythm.hand, 't1632 is cross-hand');
-  for (const layout of layouts) {
-    const hidden = suppressedStemIds(layout);
-    for (const p of pair.filter((q) => layout.notes.some((n) => n.note.id === q.note.id))) {
-      assert.ok(!hidden.has(p.note.id), `${p.note.id} keeps its own stem`);
-      const stem = getStemGeometry(p.rhythm, DEFAULT_JANKO_TOKENS);
-      assert.equal(stem.stemX, p.x, `${p.note.id} stems exactly at head-x`);
-    }
-  }
-  // Paint-level: two stem rules stand on the two head columns.
-  const crop = renderJankoCrop(SCORE, 12, 1, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const stems = [...crop.matchAll(/class="janko-stem" x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/g)];
-  for (const p of pair) {
-    assert.ok(
-      stems.some((s) => Math.abs(Number(s[1]) - p.x) < 0.01 && Math.abs(Number(s[3]) - p.x) < 0.01),
-      `a painted stem stands on ${p.note.id} at x=${p.x.toFixed(2)}`
-    );
-  }
-});
+// ---------------------------------------------------------------------------
+// 10. Held triples: 2G spans, interleaved rows, one shared stem (t1392)
+// ---------------------------------------------------------------------------
 
-test('Triples (Brahms mm. 8/9): twice the pair gap and one shared stem each — every preset', () => {
+test('Brahms held triples span 2G with interleaved rows — every preset', () => {
   for (const { spacing } of SPACING_CANDIDATES) {
-    const { pairGap } = getClusterSpacingPreset(spacing);
-    const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, clusterSpacing: spacing });
-    const layouts = layoutJankoScore(BRAHMS, o, BRAHMS_OP118_NO1_JANKO_TOKENS);
+    const G = getClusterSpacingPreset(spacing).pairGap;
+    const options = resolveJankoOptions({
+      ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(BRAHMS, options, BRAHMS_OP118_NO1_JANKO_TOKENS);
     const notes = layouts.flatMap((l) => l.notes);
     for (const tick of [1392, 1584]) {
-      const triple = notes
-        .filter((p) => p.note.startTick === tick && p.rhythm.hand === 'RH' && p.note.pitch.octave === 3)
-        .sort((a, b) => a.x - b.x);
-      assert.equal(triple.length, 3, `${spacing}: t${tick} carries the o3r1 triple`);
-      assert.ok(
-        Math.abs(triple[2].x - triple[0].x - 2 * pairGap) < 0.05,
-        `${spacing}: t${tick} spans ${(2 * pairGap).toFixed(1)}pt (got ${(triple[2].x - triple[0].x).toFixed(2)})`
-      );
-      for (const p of triple) {
-        assert.ok(
-          p.x >= p.beatCell!.left - 1e-9 && p.x <= p.beatCell!.right + 1e-9,
-          `${spacing}: the triple stays in its beat cell`
-        );
+      const heads = notes.filter((p) => p.note.startTick === tick);
+      // The RH held triple on its row: three heads, 2G end to end.
+      const rows = new Map<number, typeof heads>();
+      for (const h of heads) {
+        const key = Math.round(h.y * 1000);
+        if (!rows.has(key)) rows.set(key, []);
+        rows.get(key)!.push(h);
       }
+      const triple = [...rows.values()].find((hs) => hs.length === 3)!;
+      assert.ok(triple, `${spacing} t${tick}: the held triple`);
+      const xs = triple.map((p) => p.x).sort((a, b) => a - b);
+      assert.ok(
+        Math.abs(xs[2] - xs[0] - 2 * G) < 0.2,
+        `${spacing} t${tick}: triple spans ${(xs[2] - xs[0]).toFixed(2)} (2G = ${(2 * G).toFixed(2)})`
+      );
     }
-    // One shared stem serves the whole same-duration RH onset: the carrier is
-    // exempt from the clasp's stem suppression, every member is suppressed.
-    const layout = layouts.find((l) => l.notes.some((p) => p.note.startTick === 1392))!;
-    const groups = layout.sharedStems.filter((g) => g.tick === 1392 && g.hand === 'RH');
-    assert.equal(groups.length, 1, `${spacing}: the t1392 RH onset shares one stem`);
-    const carrier = layout.notes.find((p) => p.note.id === groups[0].carrierId)!;
+  }
+});
+
+test('t1392 interleaves its rows at the half-step and shares one stem', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const G = getClusterSpacingPreset(spacing).pairGap;
+    const options = resolveJankoOptions({
+      ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(BRAHMS, options, BRAHMS_OP118_NO1_JANKO_TOKENS);
+    const notes = layouts.flatMap((l) => l.notes);
+    const heads = notes.filter((p) => p.note.startTick === 1392);
+    const rows = new Map<number, typeof heads>();
+    for (const h of heads) {
+      const key = Math.round(h.y * 1000);
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key)!.push(h);
+    }
+    const byY = [...rows.values()].sort((a, b) => a[0].y - b[0].y);
+    const fanned = byY.filter((hs) => hs.length >= 2);
+    assert.ok(fanned.length >= 2, `${spacing}: t1392 carries 2+ fanned rows`);
+    const widest = fanned.reduce((a, b) => (b.length > a.length ? b : a));
+    assert.equal(widest.length, 3, `${spacing}: the widest row is the triple`);
+    // The widest row anchors: its middle head on the (clasp-shifted) column —
+    // the same column the lone LH head stands on.
+    const middle = widest.map((p) => p.x).sort((a, b) => a - b)[1];
+    const lone = byY.find((hs) => hs.length === 1)![0];
     assert.ok(
-      Math.abs(carrier.x - carrier.nominalX!) < 0.05,
-      `${spacing}: the carrier stands on the nominal column`
+      Math.abs(middle - lone.x) < 0.05,
+      `${spacing}: the triple middle anchors the shifted column`
     );
-    const hidden = suppressedStemIds(layout);
-    assert.ok(!hidden.has(carrier.note.id), `${spacing}: the carrier keeps its stem`);
-    for (const id of groups[0].suppressedIds) {
-      assert.ok(hidden.has(id), `${spacing}: ${id} is served by the shared stem`);
-    }
-    const rhIds = layout.notes.filter((p) => p.note.startTick === 1392 && p.rhythm.hand === 'RH');
-    const painted = rhIds.filter((p) => !hidden.has(p.note.id));
-    assert.equal(painted.length, 1, `${spacing}: exactly one painted RH stem on t1392`);
-    assert.equal(painted[0].note.id, carrier.note.id);
+    // The alternate fanned row nests at the half-step.
+    const other = fanned.find((hs) => hs !== widest)!;
+    const nest = Math.min(...other.map((p) => p.x)) - Math.min(...widest.map((p) => p.x));
+    assert.ok(
+      Math.abs(nest - G / 2) < 0.2,
+      `${spacing}: t1392 nests at ${nest.toFixed(2)} (G/2 = ${(G / 2).toFixed(2)})`
+    );
+    // One shared stem for the whole one-duration onset, nearest the nominal.
+    const layout = layouts.find((l) => l.notes.some((p) => p.note.startTick === 1392))!;
+    const groups = layout.sharedStems.filter((g) => g.tick === 1392);
+    assert.equal(groups.length, 1, `${spacing}: t1392 shares one stem`);
+    assert.equal(groups[0].carrierId, 'brahms-op118-no1-96', `${spacing}: the carrier is 96`);
   }
 });
 
 // ---------------------------------------------------------------------------
-// 3. Shared stems: the mixed t1752 stack, synthetic stacks, split-stack-stems
+// 11. Mixed stacks coincide: the t1752 three-voice chord (locked)
 // ---------------------------------------------------------------------------
 
-test('Mixed stack t1752: exactly one stem-x, both beams present, each drawn once', () => {
+test('Mixed stack t1752: exactly one stem-x, both beams present, each drawn once (locked)', () => {
   const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const heads = layouts.flatMap((l) => l.notes).filter((p) => p.note.startTick === 1752);
   assert.equal(heads.length, 2, 't1752 carries the mixed-duration stacked pair');
@@ -599,36 +837,20 @@ test('Mixed stack t1752: exactly one stem-x, both beams present, each drawn once
   );
 });
 
+// ---------------------------------------------------------------------------
+// 12. Synthetic same-duration stacks: one painted stem
+// ---------------------------------------------------------------------------
+
 test('Synthetic same-duration stacks: one painted stem — stacked and flanked', () => {
-  const note = (
-    id: string,
-    pitchClass: number,
-    octave: number,
-    startTick: number,
-    durationTicks: number,
-    hand: Hand = 'RH'
-  ): QuantizedNote => ({ id, pitch: { pitchClass, octave }, startTick, durationTicks, hand });
-  const score: QuantizedGridScore = {
-    id: 'synthetic-shared-stem',
-    title: 'Synthetic Shared Stem',
-    composer: 'test',
-    ticksPerBeat: 48,
-    totalTicks: 144,
-    timeSignatures: [{ tick: 0, numerator: 3, denominator: 4 }],
-    barlines: [],
-    tempos: [],
-    dynamics: [],
-    pedals: [],
-    notes: [
-      // A stacked same-hand same-duration pair (two rows, one column).
-      note('stack-lo', 2, 3, 0, 48),
-      note('stack-hi', 2, 4, 0, 48),
-      // A flanked same-hand same-duration pair (one row, two heads).
-      note('flank-lo', 4, 4, 48, 48),
-      note('flank-hi', 6, 4, 48, 48),
-    ],
-  };
-  const layouts = layoutJankoScore(score, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const stack = score('synthetic-shared-stem', [
+    // A stacked same-hand same-duration pair (two rows, one column).
+    note('stack-lo', 2, 3, 0, 48),
+    note('stack-hi', 2, 4, 0, 48),
+    // A flanked same-hand same-duration pair (one row, two heads).
+    note('flank-lo', 4, 4, 48, 48),
+    note('flank-hi', 6, 4, 48, 48),
+  ]);
+  const layouts = layoutJankoScore(stack, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.equal(layouts.length, 1);
   const layout = layouts[0];
   const hidden = suppressedStemIds(layout);
@@ -637,17 +859,18 @@ test('Synthetic same-duration stacks: one painted stem — stacked and flanked',
   const stackPainted = ['stack-lo', 'stack-hi'].filter((id) => !hidden.has(id));
   assert.equal(stackPainted.length, 1, 'the stack paints one shared stem');
 
-  // The flanked pair shares one stem on the nominal column.
+  // The flanked pair spans the golden gap and shares one stem on the column.
   const flank = layout.notes.filter((p) => p.note.startTick === 48).sort((a, b) => a.x - b.x);
   assert.equal(flank.length, 2);
+  const G = getClusterSpacingPreset('snug').pairGap;
   assert.ok(
-    Math.abs(flank[1].x - flank[0].x - 8.2) < 0.05,
-    `the flanked pair spans the golden 8.2pt (got ${(flank[1].x - flank[0].x).toFixed(2)})`
+    Math.abs(flank[1].x - flank[0].x - G) < 0.05,
+    `the flanked pair spans the golden ${G}pt (got ${(flank[1].x - flank[0].x).toFixed(2)})`
   );
   const groups = layout.sharedStems.filter((g) => g.tick === 48 && g.hand === 'RH');
   assert.equal(groups.length, 1, 'the flanked pair forms one shared-stem group');
   const carrier = layout.notes.find((p) => p.note.id === groups[0].carrierId)!;
-  assert.ok(Math.abs(carrier.x - carrier.nominalX!) < 0.05, 'the carrier stands on the nominal column');
+  assert.ok(Math.abs(carrier.x - carrier.nominalX!) < 0.05, 'the carrier stands on the column');
   const flankPainted = ['flank-lo', 'flank-hi'].filter((id) => !hidden.has(id));
   assert.deepEqual(flankPainted, [carrier.note.id], 'the flanked pair paints one shared stem');
 
@@ -655,7 +878,7 @@ test('Synthetic same-duration stacks: one painted stem — stacked and flanked',
   const split: Parameters<typeof checkSplitStackStems>[2] = [];
   checkSplitStackStems(layout, resolveJankoTokens(DEFAULT_JANKO_TOKENS), split);
   assert.deepEqual(split, [], 'no split-stack-stems on the synthetic stacks');
-  const report = lintJankoScore(score, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const report = lintJankoScore(stack, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.equal(report.ok, true, 'the synthetic stacks lint clean');
 });
 
@@ -695,167 +918,260 @@ test('Zero split-stack-stems golden-wide; a staggered column is named', () => {
   assert.match(out[0].message, /different stem columns/);
 });
 
-test('Beam spans are drawn once: no two groups of one system ever share an identical span', () => {
-  // partitionBeamGroups excludes every same-hand simultaneity from all runs, so
-  // two beam groups can never coincide: the Round 16 dedupe directive holds by
-  // construction, and this test pins the structure instead of dead code.
-  for (const [score, options, tokens, label] of [
-    [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
-    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
-    [SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }, DEFAULT_JANKO_TOKENS, 'chord specimen'],
-    [REST_SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 }, DEFAULT_JANKO_TOKENS, 'rest specimen'],
-  ] as const) {
-    for (const layout of layoutJankoScore(score, options, tokens)) {
-      const seen = new Set<string>();
-      for (const beam of layout.beams) {
-        const ticks = beam.notes.map((n) => n.startTick);
-        assert.equal(
-          new Set(ticks).size,
-          ticks.length,
-          `${label}: no group ever beams two notes of one onset`
+// ---------------------------------------------------------------------------
+// 13. Beam spans are drawn exactly once per voice
+// ---------------------------------------------------------------------------
+
+test('Shared stems draw one beam span per beamed voice — none fused, none doubled', () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const crop = renderJankoCrop(
+      SCORE,
+      1,
+      32,
+      { ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing },
+      DEFAULT_JANKO_TOKENS
+    );
+    const stems = (crop.match(/class="janko-stem"/g) ?? []).length;
+    const beams = (crop.match(/class="janko-beam"/g) ?? []).length;
+    const layouts = layoutJankoScore(
+      SCORE,
+      resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing }),
+      DEFAULT_JANKO_TOKENS
+    );
+    const expectedBeams = layouts.reduce((acc, l) => acc + l.beams.length, 0);
+    assert.equal(beams, expectedBeams, `${spacing}: every beam span is drawn exactly once`);
+    assert.ok(stems > beams, `${spacing}: stems outnumber beams (flags share nothing)`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 14. Dots hug the mask corner (offsets, clearance proof, uniform sign)
+// ---------------------------------------------------------------------------
+
+test('Dots hug the mask corner on both scores — every preset', () => {
+  const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const preset = getClusterSpacingPreset(spacing);
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(SCORE, options, tokens);
+    const dotted = layouts.flatMap((l) => l.notes).filter(
+      (p) => p.note.durationTicks > 26 && p.note.durationTicks <= 38
+    );
+    assert.equal(dotted.length, 19, `${spacing}: Bach carries 19 dotted values`);
+    for (const p of dotted) {
+      // Hug offsets: tight to the mask edge, low lane above the head.
+      assert.ok(
+        Math.abs((p.rhythm.dotX ?? -1) - (p.x + preset.wx + tokens.augmentationDotGap)) < 1e-9,
+        `${spacing}: ${p.note.id} hugs its mask edge`
+      );
+      assert.ok(
+        Math.abs(p.y - (p.rhythm.dotY ?? -1) - tokens.augmentationDotRowOffset) < 1e-9,
+        `${spacing}: ${p.note.id} sits the hug lane above its head`
+      );
+      // Uniform sign, every bar.
+      assert.ok(
+        (p.rhythm.dotY ?? p.y) < p.y,
+        `${spacing}: ${p.note.id} dots above its head`
+      );
+      // The high-lane fallback stays vacuous: no same-row neighbour crowds.
+      const layout = layouts.find((l) => l.notes.includes(p))!;
+      for (const q of layout.notes) {
+        if (q === p || Math.abs(q.y - p.y) >= 1e-9) continue;
+        assert.ok(
+          Math.abs(q.x - p.x) >= 2 * preset.wx + tokens.augmentationDotGap + tokens.augmentationDotRadius,
+          `${spacing}: ${p.note.id} clears its same-row neighbour ${q.note.id}`
         );
-        const key = `${beam.notes[0].hand}|${ticks.join(',')}|${beam.secondary ? '2' : '1'}`;
-        assert.ok(!seen.has(key), `${label}: span ${key} is drawn once`);
-        seen.add(key);
+      }
+    }
+    const brahmsLayouts = layoutJankoScore(
+      BRAHMS,
+      resolveJankoOptions({
+        ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+        clusterSpacing: spacing,
+      }),
+      BRAHMS_OP118_NO1_JANKO_TOKENS
+    );
+    for (const l of brahmsLayouts) {
+      for (const p of l.notes) {
+        if (p.note.durationTicks <= 26 || p.note.durationTicks > 38) continue;
+        assert.ok(
+          Math.abs((p.rhythm.dotX ?? -1) - (p.x + preset.wx + tokens.augmentationDotGap)) < 1e-9,
+          `${spacing}: Brahms ${p.note.id} hugs its mask edge`
+        );
+        assert.ok(
+          (p.rhythm.dotY ?? p.y) < p.y,
+          `${spacing}: Brahms ${p.note.id} dots above its head`
+        );
       }
     }
   }
-
-  // Synthetic doubled run: two same-hand voices sharing every onset stay out of
-  // every beam group — simultaneities are never melodic beams.
-  const doubled: QuantizedGridScore = {
-    id: 'synthetic-doubled-run',
-    title: 'Synthetic Doubled Run',
-    composer: 'test',
-    ticksPerBeat: 48,
-    totalTicks: 144,
-    timeSignatures: [{ tick: 0, numerator: 3, denominator: 4 }],
-    barlines: [],
-    tempos: [],
-    dynamics: [],
-    pedals: [],
-    notes: [0, 12, 24, 36].flatMap((startTick, i) => [
-      { id: `a${i}`, pitch: { pitchClass: 2, octave: 3 }, startTick, durationTicks: 12, hand: 'RH' as Hand },
-      { id: `b${i}`, pitch: { pitchClass: 2, octave: 4 }, startTick, durationTicks: 12, hand: 'RH' as Hand },
-    ]),
-  };
-  const layouts = layoutJankoScore(doubled, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(layouts.length, 1);
-  assert.equal(layouts[0].beams.length, 0, 'the doubled run forms no beam group');
-  assert.deepEqual(
-    layouts[0].ungrouped.map((n) => n.id).sort(),
-    ['a0', 'a1', 'a2', 'a3', 'b0', 'b1', 'b2', 'b3'],
-    'every doubled onset stays ungrouped'
-  );
 });
 
-// ---------------------------------------------------------------------------
-// 4. Dots: always above, tight to the mask
-// ---------------------------------------------------------------------------
-
-test('Dots: every golden dot sits above its head, tight to the elliptical mask', () => {
-  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  // Bach carries the dotted values (19 of them); the Brahms loop below audits
-  // vacuously today and pins the rule for any dotted value it ever gains.
-  for (const [score, options, tokens, label, minDots] of [
-    [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach', 1],
-    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms', 0],
-  ] as const) {
-    const layouts = layoutJankoScore(score, options, tokens);
-    const dotted = layouts
-      .flatMap((l) => l.notes)
-      .filter((p) => p.note.durationTicks > 26 && p.note.durationTicks <= 38);
-    assert.ok(dotted.length >= minDots, `${label} has dotted values to audit`);
+test('Dot clearance proof: every Bach dot clears its mask, rules and grid', () => {
+  const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const preset = getClusterSpacingPreset(spacing);
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(SCORE, options, tokens);
+    const dotted = layouts.flatMap((l) => l.notes).filter(
+      (p) => p.note.durationTicks > 26 && p.note.durationTicks <= 38
+    );
     for (const p of dotted) {
+      const cx = p.rhythm.dotX!;
+      const cy = p.rhythm.dotY!;
+      // Own mask: the dot hugs the top-right corner with real air.
+      const dx = Math.max(p.x - preset.wx - cx, 0, cx - (p.x + preset.wx));
+      const dy = Math.max(p.y - preset.hy - cy, 0, cy - (p.y + preset.hy));
       assert.ok(
-        p.rhythm.dotY! < p.y - 1e-9,
-        `${label}: the ${p.note.id} dot sits above its head (uniform sign)`
+        Math.hypot(dx, dy) >= tokens.augmentationDotRadius,
+        `${spacing}: ${p.note.id} clears its own mask corner`
       );
-      assert.ok(
-        Math.abs(p.rhythm.dotX! - (p.x + 3.6 + t.augmentationDotGap)) < 0.01,
-        `${label}: the ${p.note.id} dot hugs the mask at x + rx + gap`
+      // Rules: the hug lane sits 4.0pt from the nearest rule.
+      const layout = layouts.find((l) => l.notes.includes(p))!;
+      for (let octave = 0; octave <= 8; octave++) {
+        for (const ry of getEquatorRuleYs(layout.geometry.equatorY('RH', octave), options, tokens)) {
+          assert.ok(
+            Math.abs(cy - ry) >= tokens.augmentationDotRadius + 0.375,
+            `${spacing}: ${p.note.id} clears the o${octave} rule`
+          );
+        }
+      }
+      // Same-row neighbours: the linter's own collision audit stays silent.
+      const collisions = lintJankoScore(SCORE, options, tokens).diagnostics.filter(
+        (d) => d.code === 'dot-collision'
       );
+      assert.deepEqual(collisions, [], `${spacing}: zero dot collisions Bach-wide`);
     }
   }
-  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(
-    report.diagnostics.filter((d) => d.code === 'dot-collision').length,
-    0,
-    'no dot touches a disc, a rule or a grid line'
-  );
 });
 
-test("Bar 6's dot attaches only to t744", () => {
-  const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const notes = layouts.flatMap((l) => l.notes);
-  const dotted = notes.filter(
-    (p) => p.note.startTick >= 720 && p.note.startTick < 864 && p.note.durationTicks > 26 && p.note.durationTicks <= 38
-  );
-  assert.equal(dotted.length, 1, 'bar 6 carries exactly one dotted value');
-  assert.equal(dotted[0].note.startTick, 744, 'the dotted value is the LH 0 at t744');
-  const dot = { x: dotted[0].rhythm.dotX!, y: dotted[0].rhythm.dotY! };
-  let nearest = notes[0];
-  let nearestDistance = Infinity;
-  for (const q of notes) {
-    const distance = Math.hypot(dot.x - q.x, dot.y - q.y);
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearest = q;
+test("Bar 6's dot attaches only to t744 — every preset", () => {
+  for (const { spacing } of SPACING_CANDIDATES) {
+    const options = resolveJankoOptions({
+      ...DEFAULT_JANKO_OPTIONS,
+      clusterSpacing: spacing,
+    });
+    const layouts = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS);
+    const notes = layouts.flatMap((l) => l.notes);
+    const dotted = notes.filter(
+      (p) => p.note.startTick >= 720 && p.note.startTick < 864 && p.note.durationTicks > 26 && p.note.durationTicks <= 38
+    );
+    assert.equal(dotted.length, 1, `${spacing}: bar 6 carries exactly one dotted value`);
+    assert.equal(dotted[0].note.startTick, 744, `${spacing}: the dotted value is the LH 0 at t744`);
+    const dot = { x: dotted[0].rhythm.dotX!, y: dotted[0].rhythm.dotY! };
+    let nearest = notes[0];
+    let nearestDistance = Infinity;
+    for (const q of notes) {
+      const distance = Math.hypot(dot.x - q.x, dot.y - q.y);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = q;
+      }
     }
-  }
-  assert.equal(nearest.note.id, dotted[0].note.id, 'the nearest head to the dot is its own t744 head');
+    assert.equal(nearest.note.id, dotted[0].note.id, `${spacing}: the nearest head to the dot is its own t744 head`);
 
-  // Paint-level: the engraved dot sits at the resolved position, above and
-  // right — never mirrored, never on-row.
-  const crop = renderJankoCrop(SCORE, 6, 1, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const painted = [...crop.matchAll(/class="janko-augmentation-dot" cx="([\d.]+)" cy="([\d.]+)"/g)].map(
-    (m) => ({ cx: Number(m[1]), cy: Number(m[2]) })
-  );
+    // Paint-level: the engraved dot sits at the resolved hug position, above
+    // and right — never mirrored, never on-row.
+    const crop = renderJankoCrop(
+      SCORE,
+      6,
+      1,
+      { ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing },
+      DEFAULT_JANKO_TOKENS
+    );
+    const painted = [...crop.matchAll(/class="janko-augmentation-dot" cx="([\d.]+)" cy="([\d.]+)"/g)].map(
+      (m) => ({ cx: Number(m[1]), cy: Number(m[2]) })
+    );
+    assert.ok(
+      painted.some((d) => Math.abs(d.cx - dot.x) < 0.01 && Math.abs(d.cy - dot.y) < 0.01),
+      `${spacing}: the t744 dot paints at (${dot.x.toFixed(2)}, ${dot.y.toFixed(2)})`
+    );
+    assert.ok(dot.y < dotted[0].y, `${spacing}: above the head`);
+    assert.ok(dot.x > dotted[0].x, `${spacing}: right of the head`);
+  }
+});
+
+test('Dot high-lane fallback: a crowded same-row neighbour lifts the dot', () => {
+  // A dotted head with a same-row neighbour 7 ticks away: the heads clear
+  // (5.93pt apart) but the low dot would sit inside the neighbour's mask, so
+  // the fallback lifts it to the high lane (half a row up, grazing no rule
+  // from the Set B row).
+  const crowded = score('synthetic-dot-fallback', [
+    note('dot-head', 1, 4, 24, 36),
+    note('dot-neighbour', 3, 4, 31, 12),
+  ]);
+  const options = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const placed = layoutJankoScore(crowded, options, tokens).flatMap((l) => l.notes);
+  const head = placed.find((p) => p.note.id === 'dot-head')!;
   assert.ok(
-    painted.some((d) => Math.abs(d.cx - dot.x) < 0.01 && Math.abs(d.cy - dot.y) < 0.01),
-    `the t744 dot paints at (${dot.x.toFixed(2)}, ${dot.y.toFixed(2)})`
+    Math.abs(head.y - head.rhythm.dotY! - tokens.rowHeight / 2) < 1e-9,
+    'the crowded dot takes the high lane'
   );
-  assert.ok(dot.y < dotted[0].y, 'above the head');
-  assert.ok(dot.x > dotted[0].x, 'right of the head');
+  assert.ok(head.rhythm.dotY! < head.y, '... still above its head');
+  const report = lintJankoScore(crowded, options, tokens);
+  assert.equal(report.violations.length, 0, 'the lifted dot lints clean');
 });
 
-test('The digit sits inside the knockout for all 12 glyphs — golden plus both evaluations', () => {
-  const { halfWidth, halfHeight } = digitHalfExtents(DEFAULT_JANKO_TOKENS.digitFontSize);
-  const ry = DEFAULT_JANKO_TOKENS.noteheadRadius;
-  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[0];
+// ---------------------------------------------------------------------------
+// 15. The digit inside the rect: all 12 glyphs, every preset evaluated
+// ---------------------------------------------------------------------------
+
+test('All 12 pitch-class digits sit inside the rect with the preset margin — every spacing', () => {
+  const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const { halfWidth, halfHeight } = digitHalfExtents(tokens.digitFontSize);
   for (const spacing of JANKO_CLUSTER_SPACINGS) {
-    const { rx } = getClusterSpacingPreset(spacing);
-    const oo = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing });
-    // All 12 glyphs share the renderer's optical box; every one is measured.
+    const preset = getClusterSpacingPreset(spacing);
+    const digitNotes: QuantizedNote[] = [];
     for (let pc = 0; pc < 12; pc++) {
-      const horizontal = rx - halfWidth;
-      const vertical = ry - halfHeight;
-      const corner = 1 - (halfWidth / rx) ** 2 - (halfHeight / ry) ** 2;
+      digitNotes.push(note(`all-pc-${pc}`, pc, 4, pc * 12, 12));
+    }
+    const layouts = layoutJankoScore(
+      score(`synthetic-all-digits-${spacing}`, digitNotes),
+      { ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing },
+      DEFAULT_JANKO_TOKENS
+    );
+    assert.equal(layouts.length, 1, `${spacing}: the digit row engraves`);
+    assert.equal(layouts[0].notes.length, 12, `${spacing}: all 12 pitch classes`);
+    for (const p of layouts[0].notes) {
       assert.ok(
-        horizontal >= DEFAULT_JANKO_LINT_OPTIONS.digitClearance,
-        `${spacing}: glyph ${pc} keeps left/right white`
+        preset.wx - halfWidth >= preset.margin - 0.01,
+        `${spacing}: pc${p.coord.pitchClass} keeps its left/right margin`
       );
       assert.ok(
-        vertical >= DEFAULT_JANKO_LINT_OPTIONS.digitClearance,
-        `${spacing}: glyph ${pc} keeps top/bottom white`
-      );
-      assert.ok(
-        corner >= DEFAULT_JANKO_LINT_OPTIONS.knockoutMargin,
-        `${spacing}: glyph ${pc} keeps the ellipse corner budget (${corner.toFixed(3)})`
+        preset.hy - halfHeight >= preset.margin - 0.01,
+        `${spacing}: pc${p.coord.pitchClass} keeps its top/bottom margin`
       );
     }
-    const out: Parameters<typeof checkKnockoutCoverage>[4] = [];
-    checkKnockoutCoverage(layout, oo, t, DEFAULT_JANKO_LINT_OPTIONS, out);
-    assert.deepEqual(out, [], `${spacing}: the coverage audit stays silent`);
+    const coverage = lintJankoScore(
+      score(`synthetic-all-digits-${spacing}`, digitNotes),
+      { ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing },
+      DEFAULT_JANKO_TOKENS
+    ).diagnostics.filter((d) => d.code === 'knockout-undersized');
+    assert.deepEqual(coverage, [], `${spacing}: the coverage audit stays silent`);
+    const direct: Parameters<typeof checkKnockoutCoverage>[4] = [];
+    checkKnockoutCoverage(
+      layouts[0],
+      resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, clusterSpacing: spacing }),
+      tokens,
+      DEFAULT_JANKO_LINT_OPTIONS,
+      direct
+    );
+    assert.deepEqual(direct, [], `${spacing}: direct coverage check stays silent`);
   }
 });
 
 // ---------------------------------------------------------------------------
-// 5. Rests: size maxima, rule-hang, rest-ink identity
+// 16. Rests: Round 16 behaviour, untouched (locked, verbatim)
 // ---------------------------------------------------------------------------
 
-test('Rest size maxima: pinned per value over the four carried dialects', () => {
+test('Rest size maxima: pinned per value over the four carried dialects (locked)', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const expected: Record<string, { w: number; h: number }> = {
     sixteenth: { w: 4.83, h: 7.3025 },
@@ -866,7 +1182,7 @@ test('Rest size maxima: pinned per value over the four carried dialects', () => 
   for (const [value, max] of Object.entries(expected)) {
     let w = 0;
     let h = 0;
-    for (const { style } of DIALECT_CANDIDATES) {
+    for (const style of REST_STYLES) {
       const box = restInkBox(
         { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value: value as 'quarter', style },
         t
@@ -882,7 +1198,7 @@ test('Rest size maxima: pinned per value over the four carried dialects', () => 
   }
 });
 
-test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-side, clear — every dialect', () => {
+test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-side, clear — every dialect (locked)', () => {
   const cases = [
     {
       label: 'Bach m. 4',
@@ -913,7 +1229,7 @@ test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-sid
       ticks: [13092],
     },
   ] as const;
-  for (const { style } of DIALECT_CANDIDATES) {
+  for (const style of REST_STYLES) {
     for (const c of cases) {
       const o = resolveJankoOptions({ ...c.options, restStyle: style });
       const t = resolveJankoTokens(c.tokens);
@@ -969,21 +1285,19 @@ test('Rule-hang: m. 4, the specimens and Brahms m. 68 hang on-rule, corridor-sid
   }
 });
 
-test('Rest-ink identity: extracted rest SVG groups are equal across all three spacing presets', () => {
+test('Rest-ink identity: extracted rest SVG groups are equal across both spacing presets', () => {
   for (const [score, options, tokens, label, minGroups] of [
     [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach', 9],
     [REST_SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 }, DEFAULT_JANKO_TOKENS, 'rest specimen', 4],
     [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms', 1],
   ] as const) {
-    const golden = restInkOf(score, options, tokens, 'balanced');
+    const golden = restInkOf(score, options, tokens, 'snug');
     assert.ok(golden.length >= minGroups, `${label} writes its rests (${golden.length} groups)`);
-    for (const spacing of ['compact', 'airy'] as const) {
-      assert.deepEqual(
-        restInkOf(score, options, tokens, spacing),
-        golden,
-        `${label}: the spacing question cannot move rest ink (${spacing} vs balanced)`
-      );
-    }
+    assert.deepEqual(
+      restInkOf(score, options, tokens, 'tight'),
+      golden,
+      `${label}: the spacing question cannot move rest ink (tight vs snug)`
+    );
   }
 });
 
@@ -1026,11 +1340,7 @@ test('The m. 4 rest and the specimen m. 2 rest survive every spacing preset', ()
   }
 });
 
-// ---------------------------------------------------------------------------
-// 6. The dialect axis: clean windows, four values, carried set
-// ---------------------------------------------------------------------------
-
-test('Rest specimen material: exactly the four standard gaps, each on a guaranteed-free column', () => {
+test('Rest specimen material: exactly the four standard gaps, each on a guaranteed-free column (locked)', () => {
   assert.deepEqual(
     REST_DURATION_SPECIMEN_VALUES.map((v) => [v.value, v.durationTicks]),
     [
@@ -1061,8 +1371,8 @@ test('Rest specimen material: exactly the four standard gaps, each on a guarante
   }
 });
 
-test('Every dialect renders every clean window with zero diagnostics and every rest clear', () => {
-  for (const { style } of DIALECT_CANDIDATES) {
+test('Every dialect renders every clean window with zero diagnostics and every rest clear (locked)', () => {
+  for (const style of REST_STYLES) {
     const options = { ...DEFAULT_JANKO_OPTIONS, restStyle: style };
     for (const [score, base, tokens, label] of [
       [REST_SPECIMEN, { ...options, measuresPerSystem: 4 }, DEFAULT_JANKO_TOKENS, 'rest specimen'],
@@ -1099,7 +1409,7 @@ test('Every dialect renders every clean window with zero diagnostics and every r
   );
 });
 
-test('The dialect material contains no same-column collision (the independence precondition)', () => {
+test('The dialect material contains no same-column collision (the independence precondition, locked)', () => {
   for (const [score, options, tokens, label] of [
     [REST_SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 }, DEFAULT_JANKO_TOKENS, 'rest specimen'],
     [SPECIMEN, { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }, DEFAULT_JANKO_TOKENS, 'chord specimen'],
@@ -1124,16 +1434,16 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 7. The live studio
+// 17. Studio: two cards, snug clean, tight reported
 // ---------------------------------------------------------------------------
 
-test('The live studio engraves all 7 candidates on their own windows with per-axis badges', () => {
+test('The live studio engraves both candidates on their own windows with spacing badges', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 7, 'seven cards');
-  assert.match(html, /data-candidate-count="7"/);
-  assert.match(html, /Round 16/);
-  assert.match(html, /Cluster Spacing \+ Rest Dialects/, 'the round title headlines the view');
-  assert.ok(!html.includes('Crowded Columns'), 'the Round 15 title is retired');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /Round 17/);
+  assert.match(html, /Rect Knockout \+ Gap Amounts/, 'the round title headlines the view');
+  assert.ok(!html.includes('Cluster Spacing + Rest Dialects'), 'the Round 16 title is retired');
   let cursor = -1;
   for (const { id, spacing } of SPACING_CANDIDATES) {
     const at = html.indexOf(`data-candidate="${id}"`);
@@ -1148,26 +1458,16 @@ test('The live studio engraves all 7 candidates on their own windows with per-ax
     assert.ok(!body.includes('<b>restStyle</b>'), `${id} never shows a dialect badge`);
     assert.ok(!body.includes('<b>chordGrouping</b>'), `${id} never badges the locked clasp`);
     if (spacing === DEFAULT_JANKO_OPTIONS.clusterSpacing) {
-      assert.ok(!body.includes('badge-delta'), 'candidate B is the incumbent: no delta styling');
+      assert.ok(!body.includes('badge-delta'), 'candidate A is the incumbent: no delta styling');
     } else {
       assert.match(body, /badge-delta/, `${id} highlights its departure from golden`);
     }
-    // All three spacing verdicts are reported; compact and airy are judging
-    // input, not gates — today all three lint clean on Bach + Brahms.
-    assert.match(body, /chip chip-ok/, `${id} reports its lint verdict`);
-    assert.match(body, /data-lint="clean"/, `${id} is clean today`);
-  }
-  for (const { id, style } of DIALECT_CANDIDATES) {
-    const at = html.indexOf(`data-candidate="${id}"`);
-    assert.ok(at > cursor, `${id} appears after the spacing set`);
-    cursor = at;
-    const body = html.slice(at, html.indexOf('</article>', at));
-    assert.match(
-      body,
-      new RegExp(`<span class="badge[^"]*badge-axis[^"]*"><b>restStyle</b> = ${style}`),
-      `${id} shows its dialect badge`
-    );
-    assert.ok(!body.includes('<b>clusterSpacing</b>'), `${id} never shows a spacing badge`);
-    assert.match(body, /chip chip-ok/, `${id} lints clean on its clean windows`);
+    // Snug is clean; tight is reported through its chip — a trip would be
+    // judging input, not failure.
+    assert.match(body, /chip chip-(ok|error)/, `${id} reports its lint verdict`);
+    assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint chip`);
+    if (spacing === 'snug') {
+      assert.match(body, /data-lint="clean"/, 'snug is clean');
+    }
   }
 });

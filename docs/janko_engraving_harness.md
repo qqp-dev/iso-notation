@@ -327,6 +327,36 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   `rest-unwritable` diagnostic. Rest ink is identical across spacing presets
   (the spacing question cannot move rest shapes).
 
+### Round 17A rect knockout + spacing solver v2 + dot hug
+
+- **Rect knockout (replaces the ellipse; direct)** — the mask is a sharp
+  rectangle: the 5.8 pt digit ink box (half-extents 1.93 × 2.86) grown by a
+  uniform margin `m` on all four sides (`wx = 1.93 + m`, `hy = 2.86 + m`), no
+  rounding fudge. The 4.8 vertical inheritance ends with the ellipse; stems
+  attach flush on the centreline at `hy`; the halo ring is drawn ink,
+  untouched. Rows sit 15 pt apart, so only the head's own row line ever
+  crosses the hole. Linter: box-based clearance + paint audit (box-vs-box
+  containment + margin).
+- **Gap amounts (the judged axis)** — `clusterSpacing` is `snug | tight`:
+  snug (golden) margin 0.8 / air 0.4 → G = 5.86; tight margin 0.6 / air 0.4 →
+  G = 5.46. Gap identity G = 2(1.93 + m) + air, pinned per preset. Judged on
+  the carried Round 16 cluster windows (Bach m8/m12/m15, Brahms m8/m9); snug
+  passes every gate, tight is reported via its lint chip.
+- **Spacing solver v2 (direct)** — (a) unit centring in free space between
+  fixed neighbours, clamped to the beat cell (t1032); (b) pin-preserving
+  shrink, pair gap = min(G, free room), pinned side holds (m12); (c) local
+  spring-relaxation over a ~4-onset sliding window, cells as hard clamps,
+  place-then-relax (m15); (d) multi-row interleave at the half-step G/2 with
+  the widest row anchoring (Brahms t1392/t1584), shared-stem carrier rule
+  unchanged; (e) clasp-shifted anchor-on-shifted-column, beat-cell +
+  barline-floor barriers unchanged, still violations.
+- **Dot hug (direct)** — the dot hugs its mask's corner (gap 1.2, lane 3.5
+  above the head), always right, uniform sign (`dotY < head`); rule-graze
+  stepping stays with high-lane fallback; `dot-collision` stays a
+  violation, bar-6 t744 attachment stays.
+- **Rest behaviour explicitly out (Round 17B)** — rests, beams, and the m4
+  beam-break stay exactly Round 16; rest ink is identical under both gaps.
+
 ### Two-view studio
 
 ```ts

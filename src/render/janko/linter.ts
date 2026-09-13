@@ -11,22 +11,22 @@
  * Checked invariants
  * ------------------
  * 1. **Knockout protection** — every duodecimal digit owns an opaque white
- *    knockout ellipse, the glyph's ink box fits inside that ellipse with real
- *    white breathing room on every side, and nothing painted after the mask
+ *    rectangular mask, the glyph's ink box fits inside that box with the
+ *    preset margin of white on every side, and nothing painted after the mask
  *    (staff rules, row guidelines, ledger equators, beat grid, stems, beams,
  *    barlines) may cut through it. This is the invariant that guarantees
  *    "zero staff/beat line pass-through".
- * 2. **Collision & clearance** — notehead *masks* may not overlap: a chord is
- *    allowed to stack on different whole-tone rows, and two tones that share
+ * 2. **Collision & clearance** — notehead *mask boxes* may not overlap: a chord
+ *    is allowed to stack on different whole-tone rows, and two tones that share
  *    one row of one octave are resolved by the engine's Row-Snapped Parity
  *    Offset (Approach 2), which fans them horizontally at the active
- *    cluster-spacing preset. A same-row pair that is still narrower than
- *    `2rx + air` is surfaced as `chordal-overlap`; every other pair keeps the
- *    conservative circular `2r` bound, and nothing may collide with a barline.
+ *    cluster-spacing preset. Same-onset mask neighbours whose boxes still
+ *    overlap are surfaced as `chordal-overlap`; every other overlapping pair
+ *    is a hard `notehead-overlap`, and nothing may collide with a barline.
  * 3. **Corridor & guideline integrity** — the Middle C channel stays free of
  *    structural rules and beams, and the spine is never cut by a glyph.
  * 4. **Beam & stem validity** — stems attach *flush on the outside* of their
- *    glyph circle (the halo ring at tick 0, the knockout disc otherwise), stay
+ *    glyph (the halo ring at tick 0, the rectangular mask edge otherwise), stay
  *    clear of their own digit by a real margin, never pierce the Position of
  *    Honor halo, sit on their notehead's vertical centreline (`stemX ===
  *    note.x`) and reach the beam centerline exactly (no overshoot, no gap);
@@ -72,6 +72,7 @@ import {
   PositionedJankoNote,
   computePageGeometry,
   getMarginFurniture,
+  knockoutHalfExtents,
   layoutJankoScore,
   renderSystem,
   suppressedStemIds,
@@ -183,18 +184,19 @@ export interface JankoLintOptions {
   /** Approximate advance width of a digit as a fraction of its font size. */
   digitAdvance: number;
   /**
-   * Minimum white margin (pt) the knockout ellipse must leave on **every side**
-   * (top, bottom, left, right) of the digit's ink box: horizontally against
-   * `rx`, vertically against `ry`.
+   * Absolute floor (pt) of white the rectangular knockout must leave on
+   * **every side** (top, bottom, left, right) of the digit's ink box. The
+   * coverage audit requires the preset's own margin above this floor, so the
+   * golden 0.8 and the tight 0.6 both pass while a digit-size regression is
+   * still caught.
    */
   digitClearance: number;
-  /** Minimum air (pt) between a stem and its own digit glyph box. */
-  stemDigitClearance: number;
   /**
-   * Minimum corner budget (unitless ellipse fraction) the knockout must leave
-   * around the digit: `1 − (hw/rx)² − (hh/ry)²`.
+   * Minimum air (pt) between a stem and its own digit glyph box. The
+   * construction gap is the preset margin plus the 0.2pt stem air (≈1.0pt
+   * golden, ≈0.8pt tight); the floor guards both.
    */
-  knockoutMargin: number;
+  stemDigitClearance: number;
   /** Run the SVG paint-order audit (slower, catches layer regressions). */
   auditPaintOrder: boolean;
 }
@@ -205,9 +207,8 @@ export const DEFAULT_JANKO_LINT_OPTIONS: JankoLintOptions = {
   minClearance: 1.0,
   corridorClearance: 2.0,
   digitAdvance: 0.35,
-  digitClearance: 1.2,
-  stemDigitClearance: 1.2,
-  knockoutMargin: 0.25,
+  digitClearance: 0.6,
+  stemDigitClearance: 0.7,
   auditPaintOrder: true,
 };
 
@@ -266,6 +267,54 @@ function pointToBoxDistance(px: number, py: number, b: Box): number {
   const dx = Math.max(b.x0 - px, 0, px - b.x1);
   const dy = Math.max(b.y0 - py, 0, py - b.y1);
   return Math.hypot(dx, dy);
+}
+
+/** True when two line segments intersect (proper crossing, excl. parallel). */
+function segmentsIntersect(
+  p1x: number,
+  p1y: number,
+  p2x: number,
+  p2y: number,
+  p3x: number,
+  p3y: number,
+  p4x: number,
+  p4y: number
+): boolean {
+  const d = (p2x - p1x) * (p4y - p3y) - (p2y - p1y) * (p4x - p3x);
+  if (Math.abs(d) < 1e-12) return false;
+  const t = ((p3x - p1x) * (p4y - p3y) - (p3y - p1y) * (p4x - p3x)) / d;
+  const u = ((p3x - p1x) * (p2y - p1y) - (p3y - p1y) * (p2x - p1x)) / d;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+/** Distance from a line segment to an axis-aligned box (0 when they touch). */
+function segmentToBoxDistance(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  b: Box
+): number {
+  if (pointToBoxDistance(x1, y1, b) === 0 || pointToBoxDistance(x2, y2, b) === 0) return 0;
+  const edges: Array<[number, number, number, number]> = [
+    [b.x0, b.y0, b.x1, b.y0],
+    [b.x1, b.y0, b.x1, b.y1],
+    [b.x1, b.y1, b.x0, b.y1],
+    [b.x0, b.y1, b.x0, b.y0],
+  ];
+  if (edges.some(([ax, ay, cx, cy]) => segmentsIntersect(x1, y1, x2, y2, ax, ay, cx, cy))) {
+    return 0;
+  }
+  let d = Math.min(pointToBoxDistance(x1, y1, b), pointToBoxDistance(x2, y2, b));
+  for (const [cx, cy] of [
+    [b.x0, b.y0],
+    [b.x1, b.y0],
+    [b.x1, b.y1],
+    [b.x0, b.y1],
+  ]) {
+    d = Math.min(d, pointToSegmentDistance(cx, cy, x1, y1, x2, y2));
+  }
+  return d;
 }
 
 /** Distance from a point to a line segment. */
@@ -342,31 +391,31 @@ function gridRuleSpan(layout: JankoSystemLayout): { top: number; bottom: number 
 // ---------------------------------------------------------------------------
 
 /**
- * Notehead masks may never overlap.
+ * Notehead mask boxes may never overlap.
  *
- * The clearance model is axis-aware (Round 16), matching the anisotropic
- * knockout: the binding case — two heads of one onset sharing one row — stands
- * at the active cluster-spacing preset (`dx >= 2rx + air`), while every other
- * pair (different onsets, diagonal neighbours) is audited against the
- * conservative circular `2r` bound. Conservative is the safe direction: the
- * check may over-flag a diagonal near-miss, never under-flag a real touch.
+ * The clearance model is box-based (Round 17), matching the rectangular
+ * knockout: every head owns its halo-aware mask box (`wx × hy` from the
+ * active cluster-spacing preset, grown to the halo ring for tick-0 sounds),
+ * and two boxes may touch but never overlap. The row-snapped fan stands
+ * same-row pairs at the preset pair gap (`2wx + air`) with real air to spare;
+ * the audit fires only where boxes truly intersect — the later knockout would
+ * erase the earlier digit.
  *
  * Three cases are distinguished, and they are exactly the three musical
  * situations a two-row whole-tone staff can produce:
  *
- * 1. **Row-snapped chord tones** (`a.startTick === b.startTick`, same `y`) — the
- *    engine keeps every head on its true whole-tone row and resolves the
+ * 1. **Row-snapped chord tones** (`a.startTick === b.startTick`, same `y`) —
+ *    the engine keeps every head on its true whole-tone row and resolves the
  *    collision *horizontally* (Approach 2, Row-Snapped Parity Offset, see
- *    `engine.resolveRowSnappedChordOffsets`). A horizontal displacement of at
- *    least the preset pair gap (`dx >= 2rx + air − ε`) therefore clears the
- *    pair — this is the check that certifies the fan is real and wide enough. A
- *    pair that still shares a page point is reported as `chordal-overlap`.
- * 2. **Chordal heads on different rows** (`dy >= 2r`) — legal by construction:
- *    the two whole-tone rows of an octave are one `rowHeight` (15pt) apart, so a
+ *    `engine.resolveRowSnappedChordOffsets`). Boxes that still overlap are
+ *    reported as `chordal-overlap`.
+ * 2. **Chordal heads on different rows** — legal by construction: the two
+ *    whole-tone rows of an octave are one `rowHeight` (15pt) apart, so a
  *    stacked chord never touches, and the ∇ / Δ hand shapes stay vertically
  *    aligned on one beat column.
- * 3. **Different onsets** — nothing may collapse onto one point: a hard
- *    `notehead-overlap`, because two independent beats must never share a glyph.
+ * 3. **Different onsets** — boxes may never intersect: a hard
+ *    `notehead-overlap`, because two independent beats must never share a
+ *    glyph.
  */
 export function checkNoteheadClearance(
   layout: JankoSystemLayout,
@@ -375,35 +424,43 @@ export function checkNoteheadClearance(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  const r = t.noteheadRadius;
-  const required = 2 * r;
+  void lint;
   const pairGap = getClusterSpacingPreset(o.clusterSpacing).pairGap;
+  const boxOf = (p: PositionedJankoNote): Box => {
+    const { wx, hy } = knockoutHalfExtents(o, t, p.note.startTick);
+    return box(p.x - wx, p.y - hy, p.x + wx, p.y + hy);
+  };
+  const boxes = new Map<string, Box>(layout.notes.map((p) => [p.note.id, boxOf(p)]));
+  const maxHalf = Math.max(
+    ...layout.notes.map((p) => {
+      const { wx } = knockoutHalfExtents(o, t, p.note.startTick);
+      return wx;
+    }),
+    0
+  );
   const sorted = [...layout.notes].sort((a, b) => a.x - b.x || a.y - b.y);
   for (let i = 0; i < sorted.length; i++) {
     const a = sorted[i];
+    const boxA = boxes.get(a.note.id)!;
     for (let j = i + 1; j < sorted.length; j++) {
       const b = sorted[j];
       const dx = Math.abs(b.x - a.x);
-      // x-sorted, so nothing further right can reach either bound: the preset
-      // pair gap is always tighter than the circular diameter.
-      if (dx >= required) break;
+      // x-sorted, so nothing further right can intersect this box.
+      if (dx >= 2 * maxHalf) break;
+      const boxB = boxes.get(b.note.id)!;
+      const overlapX = Math.min(boxA.x1, boxB.x1) - Math.max(boxA.x0, boxB.x0);
+      const overlapY = Math.min(boxA.y1, boxB.y1) - Math.max(boxA.y0, boxB.y0);
+      if (overlapX <= EPS || overlapY <= EPS) continue;
       const dy = Math.abs(b.y - a.y);
       const chordal = a.note.startTick === b.note.startTick;
       const sameRow = dy < EPS;
-      // The binding case stands at the preset fan; everything else keeps the
-      // conservative circular bound (the true test is the centre distance, not
-      // a bounding box: two heads on rows 4pt apart — the bounded channel's
-      // two octave flanks — are already clear at dx = √((2r)² − dy²) < 2r).
-      const pairRequired = chordal && sameRow ? pairGap : required;
-      const distance = chordal && sameRow ? dx : Math.hypot(dx, dy);
-      if (distance >= pairRequired - EPS) continue;
+      const distance = Math.hypot(dx, dy);
       const detail = {
         dx,
         dy,
         distance,
-        required: pairRequired,
-        /** Horizontal displacement still missing to clear the pair. */
-        missingOffset: Math.max(0, pairRequired - distance),
+        /** Penetration depth (pt) of the two mask boxes. */
+        overlap: Math.min(overlapX, overlapY),
         /** Canonical row-snapped displacement the engine aims for. */
         canonicalOffset: sameRow && chordal ? pairGap : 0,
       };
@@ -416,17 +473,18 @@ export function checkNoteheadClearance(
         metrics: detail,
       };
       if (chordal && sameRow) {
-        // Case 1: the row-snapped fan did not happen, or was narrower than the
-        // preset pair gap. The later knockout would erase the earlier digit, so
-        // the pair is surfaced instead of being silently accepted.
+        // Case 1: the row-snapped fan did not happen, or the pin-preserving
+        // shrink ran past touching masks. The later knockout erases the
+        // earlier digit, so the pair is surfaced instead of silently accepted.
         out.push({
           code: 'chordal-overlap',
           severity: 'warning',
           message:
             `Chordal noteheads ${a.note.id} (${a.coord.hand} pc${a.coord.pitchClass} o${a.coord.octave}) and ` +
             `${b.note.id} (${b.coord.hand} pc${b.coord.pitchClass} o${b.coord.octave}) share row ${a.coord.rank} of ` +
-            `octave ${a.coord.octave} only ${dx.toFixed(2)}pt apart (${pairGap.toFixed(2)}pt required): the later ` +
-            `knockout erases the earlier digit. Row-snap one head by Δx = ${pairGap.toFixed(2)}pt.`,
+            `octave ${a.coord.octave} only ${dx.toFixed(2)}pt apart: their mask boxes overlap by ` +
+            `${Math.min(overlapX, overlapY).toFixed(2)}pt, so the later knockout erases the earlier digit. ` +
+            `Row-snap one head by Δx = ${pairGap.toFixed(2)}pt.`,
           ...base,
         });
       } else if (chordal) {
@@ -436,7 +494,8 @@ export function checkNoteheadClearance(
           message:
             `Chordal noteheads ${a.note.id} (${a.coord.hand} pc${a.coord.pitchClass} o${a.coord.octave}) and ` +
             `${b.note.id} (${b.coord.hand} pc${b.coord.pitchClass} o${b.coord.octave}) are ${distance.toFixed(2)}pt apart: ` +
-            `the later knockout erases the earlier digit. Displace the voices or merge the heads.`,
+            `their mask boxes overlap, so the later knockout erases the earlier digit. ` +
+            `Displace the voices or merge the heads.`,
           ...base,
         });
       } else {
@@ -444,8 +503,8 @@ export function checkNoteheadClearance(
           code: 'notehead-overlap',
           severity: 'error',
           message:
-            `Noteheads ${a.note.id} and ${b.note.id} overlap (${distance.toFixed(2)}pt apart, ` +
-            `${required.toFixed(2)}pt required; dx=${dx.toFixed(2)}, dy=${dy.toFixed(2)}).`,
+            `Noteheads ${a.note.id} and ${b.note.id} overlap (mask boxes intersect by ` +
+            `${Math.min(overlapX, overlapY).toFixed(2)}pt; dx=${dx.toFixed(2)}, dy=${dy.toFixed(2)}).`,
           ...base,
         });
       }
@@ -459,16 +518,18 @@ export function checkNoteheadClearance(
 
 /**
  * The white knockout must be large enough that the duodecimal glyph's ink box
- * keeps a real white margin **on every side** — otherwise the digit pokes out
- * of its own mask and staff lines graze the glyph.
+ * keeps the preset margin of white **on every side** — otherwise the digit
+ * pokes out of its own mask and staff lines graze the glyph.
  *
- * The mask is the Round 16 **ellipse** (`rx` from the active cluster-spacing
- * preset, `ry = noteheadRadius`): the digit is shielded when its ink box sits
- * fully inside the ellipse with the required white on every side, and the
- * corner test is the ellipse equation itself. The digit box is derived from the
- * renderer's own metrics ({@link digitHalfExtents}: URW Gothic cap height and
- * widest-glyph half width, resolved against the CSS `pt` → user-unit factor),
- * so the check can never drift from what is actually painted.
+ * The mask is the Round 17 **sharp rectangle** (`wx × hy` from the active
+ * cluster-spacing preset): the digit box must sit fully inside it with the
+ * required white on every side — box-vs-box containment plus the margin. The
+ * required margin is the preset's own above the linter's absolute floor. The
+ * digit box is derived from the renderer's own metrics
+ * ({@link digitHalfExtents}: URW Gothic cap height and widest-glyph half
+ * width, resolved against the CSS `pt` → user-unit factor), so the check can
+ * never drift from what is actually painted. The ellipse metric and its corner
+ * budget are deleted with the ellipse.
  */
 export function checkKnockoutCoverage(
   layout: JankoSystemLayout,
@@ -477,46 +538,40 @@ export function checkKnockoutCoverage(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  const rx = getClusterSpacingPreset(o.clusterSpacing).rx;
-  const ry = t.noteheadRadius;
+  const { wx, hy, margin } = getClusterSpacingPreset(o.clusterSpacing);
   const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize);
-  const horizontal = rx - halfWidth;
-  const vertical = ry - halfHeight;
-  const corner = 1 - (halfWidth / rx) ** 2 - (halfHeight / ry) ** 2;
-  const requiredRx = halfWidth + lint.digitClearance;
-  const requiredRy = halfHeight + lint.digitClearance;
+  const horizontal = wx - halfWidth;
+  const vertical = hy - halfHeight;
+  // The preset's construction bases are rounded to two decimals for humans
+  // (1.93/2.86 vs the exact 1.9333/2.8577 optical box), so the containment
+  // carries a hundredth-point construction tolerance.
+  const required = Math.max(margin, lint.digitClearance);
+  const TOL = 0.01;
   for (const p of layout.notes) {
-    if (
-      horizontal + EPS >= lint.digitClearance &&
-      vertical + EPS >= lint.digitClearance &&
-      corner + EPS >= lint.knockoutMargin
-    ) {
+    if (horizontal + TOL >= required && vertical + TOL >= required) {
       continue;
     }
     out.push({
       code: 'knockout-undersized',
       severity: 'error',
       message:
-        `Knockout rx=${rx.toFixed(2)}pt ry=${ry.toFixed(2)}pt cannot shield the ${t.digitFontSize}pt digit ` +
-        `(needs rx>=${requiredRx.toFixed(2)}pt ry>=${requiredRy.toFixed(2)}pt for ${lint.digitClearance.toFixed(1)}pt of white on ` +
-        `every side; left/right ${horizontal.toFixed(2)}pt, top/bottom ${vertical.toFixed(2)}pt, ` +
-        `ellipse corner budget ${corner.toFixed(2)}): staff lines would graze the glyph.`,
+        `Knockout ${wx.toFixed(2)}×${hy.toFixed(2)}pt cannot shield the ${t.digitFontSize}pt digit ` +
+        `(needs ${required.toFixed(2)}pt of white on every side; left/right ${horizontal.toFixed(2)}pt, ` +
+        `top/bottom ${vertical.toFixed(2)}pt): staff lines would graze the glyph.`,
       system: layout.index,
       measure: measureOfTick(p.note.startTick, t),
       noteIds: [p.note.id],
       x: p.x,
       y: p.y,
       metrics: {
-        rx,
-        ry,
-        requiredRx,
-        requiredRy,
+        wx,
+        hy,
+        required,
         digitFontSize: t.digitFontSize,
         digitHalfWidth: halfWidth,
         digitHalfHeight: halfHeight,
         horizontal,
         vertical,
-        corner,
       },
     });
   }
@@ -528,9 +583,9 @@ export function checkKnockoutCoverage(
 
 /**
  * Stems must be engraved on their notehead's vertical centreline
- * (`stemX === note.x`), attach **flush on the outside** of their glyph circle
- * — the wider Position of Honor halo ring for tick-0 sounds, the knockout disc
- * otherwise — and reach the beam centerline exactly (no overshoot, no
+ * (`stemX === note.x`), attach **flush on the outside** of their glyph — the
+ * wider Position of Honor halo ring for tick-0 sounds, the rectangular mask
+ * edge otherwise — and reach the beam centerline exactly (no overshoot, no
  * shortfall). Beam slopes must stay inside the acceptable threshold, no matter
  * how wide the leap.
  */
@@ -547,11 +602,11 @@ export function checkStemAndBeamValidity(
     const stemX = stem.stemX;
     const stemStartY = stem.stemStartY;
     const honor = isPositionOfHonor(p.note.startTick);
-    // The radius of the circle the stem must start flush against.
+    // The distance from the centre at which the stem must start flush.
     const effectiveRadius = getStemAttachmentRadius(p.rhythm, t);
-    const circleLabel = honor
+    const glyphLabel = honor
       ? `halo ring (R=${t.haloRadius.toFixed(2)}pt)`
-      : `knockout disc (r=${r.toFixed(2)}pt)`;
+      : `mask edge (hy + 0.2 = ${effectiveRadius.toFixed(2)}pt)`;
     // Round 16: the anti-fusion stagger is deleted — a stem stands exactly on
     // its notehead's centreline, and any drift is a defect (`split-stack-stems`
     // names the onset-wide regression separately).
@@ -579,7 +634,7 @@ export function checkStemAndBeamValidity(
         severity: 'error',
         message:
           `Stem of ${p.note.id} starts ${attach.toFixed(2)}pt from the notehead centre, inside the ` +
-          `${circleLabel}: the stem would cut through it and crowd the digit ` +
+          `${glyphLabel}: the stem would cut through it and crowd the digit ` +
           `(${effectiveRadius.toFixed(2)}pt required).`,
         system: layout.index,
         measure: measureOfTick(p.note.startTick, t),
@@ -594,7 +649,7 @@ export function checkStemAndBeamValidity(
         severity: 'error',
         message:
           `Stem of ${p.note.id} attaches ${attach.toFixed(2)}pt from the notehead centre ` +
-          `(${circleLabel} perimeter at ${effectiveRadius.toFixed(2)}pt): the stem floats off the head.`,
+          `(${glyphLabel} at ${effectiveRadius.toFixed(2)}pt): the stem floats off the head.`,
         system: layout.index,
         measure: measureOfTick(p.note.startTick, t),
         noteIds: [p.note.id],
@@ -658,11 +713,11 @@ export function checkStemAndBeamValidity(
 /**
  * No stem may encroach on its own digit glyph.
  *
- * The stem starts flush on the glyph circle's perimeter, so the air between
- * the stem column and the digit's ink box is a pure consequence of the disc
- * radius, the digit font size and the optical centring. It must stay at least
+ * The stem starts flush on the mask edge, so the air between the stem start
+ * and the digit's ink box is a pure consequence of the preset margin, the
+ * stem air and the optical centring. It must stay at least
  * {@link JankoLintOptions.stemDigitClearance} — with the canonical tokens the
- * real margin is ≈2.1pt.
+ * real margin is ≈1.0pt golden (≈0.8pt tight).
  *
  * Scope: each stem is audited against *its own* digit. A stem that crosses a
  * foreign glyph is invisible anyway (the rhythm layer is painted beneath the
@@ -997,11 +1052,11 @@ export function checkStemThroughSimultaneity(
  * Round 15 — **augmentation dots** must be unambiguous.
  *
  * Every dotted value (the renderers paint a dot for `26 < durationTicks ≤ 38`)
- * carries exactly one dot, always right of its own head and tight to the
- * elliptical mask (`dotX = note.x + rx + augmentationDotGap`) and always in
- * the inter-row gap above (`rhythm.dotY`). The dot's 0.75pt ink may not touch
- *  - any notehead disc or Position-of-Honor halo (which would attribute the dot
- *    to the wrong note — the Round 14 bar-5 defect),
+ * carries exactly one dot, always right of its own head and hugging its mask's
+ * top-right corner (`dotX = note.x + wx + augmentationDotGap`, `rhythm.dotY`
+ * in the hug lane). The dot's 0.75pt ink may not touch
+ *  - any notehead mask box or Position-of-Honor halo (which would attribute
+ *    the dot to the wrong note — the Round 14 bar-5 defect),
  *  - any painted horizontal rule (a dot sitting on a staff rule drowns in it),
  *  - any painted vertical grid line (barline or dashed beat pulse).
  */
@@ -1011,7 +1066,6 @@ export function checkDotCollision(
   t: ResolvedJankoTokens,
   out: LintViolation[]
 ): void {
-  const r = t.noteheadRadius;
   const dotR = t.augmentationDotRadius;
   const barlines = systemBarlines(layout, o, t);
   const pulses = beatPulseXs(layout, o, t);
@@ -1024,10 +1078,10 @@ export function checkDotCollision(
   for (const p of layout.notes) {
     const dur = p.note.durationTicks;
     if (dur <= 26 || dur > 38) continue;
-    // The dot the engine resolved: tight to the elliptical mask, in the
-    // inter-row gap above. Hand-built rhythm notes fall back to the head row
-    // and the circular offset, exactly as the renderer paints them.
-    const cx = p.rhythm.dotX ?? p.x + r + t.augmentationDotGap;
+    // The dot the engine resolved: hugging the rectangular mask. Hand-built
+    // rhythm notes fall back to the head row and the golden mask offset,
+    // exactly as the renderer paints them.
+    const cx = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + t.augmentationDotGap;
     const cy = p.rhythm.dotY ?? p.y;
     const base = {
       system: layout.index,
@@ -1036,22 +1090,26 @@ export function checkDotCollision(
       x: cx,
       y: cy,
     };
-    const glyphOf = (q: PositionedJankoNote): number =>
-      isPositionOfHonor(q.note.startTick)
-        ? Math.max(r, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
-        : r;
+    const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+    const maskOf = (q: PositionedJankoNote): Box => {
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      return box(q.x - wx, q.y - hy, q.x + wx, q.y + hy);
+    };
     for (const q of layout.notes) {
-      const distance = Math.hypot(cx - q.x, cy - q.y);
-      if (distance >= glyphOf(q) + dotR - EPS) continue;
+      // Mask boxes for regular heads; the halo ring's outer edge for tick-0
+      // honour sounds, exactly as the engine seats them.
+      const distance = isPositionOfHonor(q.note.startTick)
+        ? Math.hypot(cx - q.x, cy - q.y) - haloOuter
+        : pointToBoxDistance(cx, cy, maskOf(q));
+      if (distance >= dotR - EPS) continue;
       out.push({
         code: 'dot-collision',
         severity: 'error',
         message:
-          `The augmentation dot of ${p.note.id} sits ${distance.toFixed(2)}pt from the centre of ` +
-          `${q.note.id} (glyph + dot = ${(glyphOf(q) + dotR).toFixed(2)}pt): the dot would attach to ` +
-          `the wrong note.`,
+          `The augmentation dot of ${p.note.id} sits ${distance.toFixed(2)}pt from the mask of ` +
+          `${q.note.id} (dot r=${dotR.toFixed(2)}pt): the dot would attach to the wrong note.`,
         ...base,
-        metrics: { distance, required: glyphOf(q) + dotR, cx, cy },
+        metrics: { distance, required: dotR, cx, cy },
       });
       break;
     }
@@ -2212,17 +2270,17 @@ function num(attrs: Record<string, string>, key: string): number {
 
 /** Options accepted by the paint-order audit. */
 export interface KnockoutAuditOptions {
-  /** Notehead (knockout) vertical radius `ry` in pt. */
-  noteheadRadius: number;
-  /** Knockout horizontal radius `rx` in pt (defaults to the vertical radius). */
-  knockoutRx?: number;
+  /** Knockout mask half-width `wx` in pt (the active spacing preset). */
+  knockoutWx: number;
+  /** Knockout mask half-height `hy` in pt (the active spacing preset). */
+  knockoutHy: number;
   /** Position of Honor halo ring radius in pt (audited for stem piercing). */
   haloRadius?: number;
   /** Absolute y of the Middle C spine, used to name the offending rule. */
   spineY?: number;
   /** Optical baseline shift of the digit relative to the notehead centre. */
   digitBaselineOffset?: number;
-  /** Intersection tolerance: a line must come this close to count as a cut. */
+  /** Intersection tolerance: ink must come this close to count as a cut. */
   tolerance?: number;
 }
 
@@ -2230,47 +2288,57 @@ export interface KnockoutAuditOptions {
  * Paint-order audit of one rendered system.
  *
  * Verifies four document-level invariants that pure geometry cannot express:
- * 1. every duodecimal digit owns a knockout ellipse painted immediately before
- *    it (legacy circle masks match too);
- * 2. every knockout ellipse actually carries a digit (no blank white holes);
- * 3. nothing painted *after* a knockout ellipse may cut through that ellipse —
+ * 1. every duodecimal digit owns a rectangular knockout mask painted before
+ *    it;
+ * 2. every knockout mask actually carries a digit (no blank white holes);
+ * 3. nothing painted *after* a knockout mask may cut through that box —
  *    this is what "zero staff/beat line pass-through" means in practice;
  * 4. no stem may pierce a Position of Honor halo ring, whichever layer it is
  *    painted in (the ring is stroked on top of the rhythm layer, so a stem
  *    emerging inside it reads as a radial cut through the halo).
  *
- * Lines are audited in the ellipse's own normalized metric (exact for any
- * `rx`/`ry`); circles and rects keep the conservative circular bound at `ry`.
- * A notehead's own stem is legal exactly when it starts flush on the outer edge
- * of its mask — `ry + 0.2` for a regular head, `haloRadius + 0.4` for a tick-0
- * Position of Honor sound; any deeper attachment is a violation.
+ * Lines are audited against the mask box with an exact segment-to-box
+ * distance; circles keep the conservative disc-vs-box bound. A notehead's own
+ * stem is legal exactly when it starts flush on the outer edge of its mask —
+ * `hy + 0.2` for a regular head, `haloRadius + 0.4` for a tick-0 Position of
+ * Honor sound; any deeper attachment is a violation.
  */
 export function auditKnockoutProtection(
   svg: string,
   options: KnockoutAuditOptions
 ): LintViolation[] {
   const out: LintViolation[] = [];
-  const r = options.noteheadRadius;
-  const fallbackRx = options.knockoutRx ?? r;
-  const haloRadius = options.haloRadius ?? r;
+  const haloRadius = options.haloRadius ?? options.knockoutHy;
   const tol = options.tolerance ?? 0.05;
   const baseline = options.digitBaselineOffset ?? JANKO_DIGIT_BASELINE_OFFSET;
   const nodes = parseSvgNodes(svg);
 
   const knockouts = nodes.filter(
-    (n) => (n.tag === 'circle' || n.tag === 'ellipse') && n.cls.includes('janko-knockout')
+    (n) => n.tag === 'rect' && n.cls.includes('janko-knockout')
   );
   const digits = nodes.filter((n) => n.tag === 'text' && n.cls.includes('janko-digit'));
+
+  /** Mask box and centre of one painted knockout rect (null when malformed). */
+  const maskOf = (k: SvgNode): { cx: number; cy: number; wx: number; hy: number; mask: Box } | null => {
+    const x = num(k.attrs, 'x');
+    const y = num(k.attrs, 'y');
+    const w = num(k.attrs, 'width');
+    const h = num(k.attrs, 'height');
+    if (![x, y, w, h].every(Number.isFinite)) return null;
+    return { cx: x + w / 2, cy: y + h / 2, wx: w / 2, hy: h / 2, mask: box(x, y, x + w, y + h) };
+  };
 
   // 1. Every digit must be shielded by a knockout painted before it.
   for (const digit of digits) {
     const dx = num(digit.attrs, 'x');
     const dy = num(digit.attrs, 'y') - baseline;
     const shield = knockouts.find((k) => {
+      const m = maskOf(k);
       return (
+        m !== null &&
         k.index < digit.index &&
-        Math.abs(num(k.attrs, 'cx') - dx) < 0.02 &&
-        Math.abs(num(k.attrs, 'cy') - dy) < 0.02
+        Math.abs(m.cx - dx) < 0.02 &&
+        Math.abs(m.cy - dy) < 0.02
       );
     });
     if (!shield) {
@@ -2286,10 +2354,11 @@ export function auditKnockoutProtection(
     }
   }
 
-  // 2. Every knockout must carry a digit (a blank disc erases staff lines).
+  // 2. Every knockout must carry a digit (a blank mask erases staff lines).
   for (const k of knockouts) {
-    const cx = num(k.attrs, 'cx');
-    const cy = num(k.attrs, 'cy');
+    const m = maskOf(k);
+    if (m === null) continue;
+    const { cx, cy } = m;
     const digit = digits.find(
       (d) =>
         d.index > k.index &&
@@ -2311,27 +2380,20 @@ export function auditKnockoutProtection(
 
   // 3. Nothing painted after a knockout may cut through it.
   for (const k of knockouts) {
-    const cx = num(k.attrs, 'cx');
-    const cy = num(k.attrs, 'cy');
-    const kr = num(k.attrs, 'r');
-    const krx = num(k.attrs, 'rx');
-    const kry = num(k.attrs, 'ry');
-    const rx = Number.isFinite(krx) ? krx : Number.isFinite(kr) ? kr : fallbackRx;
-    const ry = Number.isFinite(kry) ? kry : Number.isFinite(kr) ? kr : r;
+    const m = maskOf(k);
+    if (m === null) continue;
+    const { cx, cy, wx, hy, mask } = m;
     // The notehead's own stem: a centred column that starts flush on the outer
     // edge of its mask. The 0.4pt halo air also covers the tick-0 sounds.
     const ownStemAnchors = [
-      { x: cx, y: cy - (ry + 0.2) },
-      { x: cx, y: cy + (ry + 0.2) },
+      { x: cx, y: cy - (hy + 0.2) },
+      { x: cx, y: cy + (hy + 0.2) },
       { x: cx, y: cy - (haloRadius + 0.4) },
       { x: cx, y: cy + (haloRadius + 0.4) },
     ];
     for (const node of nodes) {
       if (node.index <= k.index) continue;
-      // The mask boundary is 1 in normalized units; every `rx`/`ry` shares it,
-      // and circles reduce exactly to the legacy `distance < r − tol`.
       let distance = Number.POSITIVE_INFINITY;
-      let limit = 1;
       if (node.tag === 'line') {
         const x1 = num(node.attrs, 'x1');
         const y1 = num(node.attrs, 'y1');
@@ -2345,31 +2407,33 @@ export function auditKnockoutProtection(
           );
           if (attached) continue;
         }
-        distance = pointToSegmentDistance(
-          0, 0, (x1 - cx) / rx, (y1 - cy) / ry, (x2 - cx) / rx, (y2 - cy) / ry
-        );
-        limit = 1 - tol / Math.min(rx, ry);
+        distance = segmentToBoxDistance(x1, y1, x2, y2, mask);
       } else if (node.tag === 'circle' && !node.cls.includes('janko-knockout')) {
         const ox = num(node.attrs, 'cx');
         const oy = num(node.attrs, 'cy');
         const or = num(node.attrs, 'r');
         if (![ox, oy, or].every(Number.isFinite)) continue;
-        // Conservative circular bound at `ry` (may over-flag, never under).
-        distance = (Math.hypot(ox - cx, oy - cy) - or) / ry;
-        limit = 1 - tol / ry;
+        // Conservative disc-vs-box bound (may over-flag, never under).
+        distance = pointToBoxDistance(ox, oy, mask) - or;
       } else if (node.tag === 'rect') {
+        // A later knockout mask intersecting this one is the geometry audit's
+        // job (`checkNoteheadClearance` owns mask-vs-mask on exact
+        // coordinates): paint-level rounding dust would false-positive here.
+        if (node.cls.includes('janko-knockout')) continue;
         const x0 = num(node.attrs, 'x');
         const y0 = num(node.attrs, 'y');
         const w = num(node.attrs, 'width');
         const h = num(node.attrs, 'height');
         if (![x0, y0, w, h].every(Number.isFinite)) continue;
-        distance = pointToBoxDistance(cx, cy, box(x0, y0, x0 + w, y0 + h)) / ry;
-        limit = 1 - tol / ry;
+        // Box-vs-box: touching ink is legal, intersecting ink is a cut.
+        const overlapX = Math.min(mask.x1, x0 + w) - Math.max(mask.x0, x0);
+        const overlapY = Math.min(mask.y1, y0 + h) - Math.max(mask.y0, y0);
+        distance = Math.min(overlapX, overlapY) > 0 ? 0 : Infinity;
       } else {
         continue;
       }
-      if (distance < limit) {
-        const overlapPt = (limit - distance) * Math.min(rx, ry);
+      if (distance < tol) {
+        const overlapPt = Math.max(0, tol - distance);
         const spineHit =
           options.spineY !== undefined &&
           node.tag === 'line' &&
@@ -2385,7 +2449,7 @@ export function auditKnockoutProtection(
           system: -1,
           x: cx,
           y: cy,
-          metrics: { distance, rx, ry, overlap: overlapPt },
+          metrics: { distance, wx, hy, overlap: overlapPt },
         });
       }
     }
@@ -2434,7 +2498,7 @@ export interface StemBeamAuditOptions {
   stemLength: number;
   /** Maximum acceptable |slope| of a beam connector. */
   maxBeamSlope: number;
-  /** Attachment radius (pt) of a regular stem (default `noteheadRadius + 0.2`). */
+  /** Attachment radius (pt) of a regular stem (default golden `hy + 0.2`). */
   stemAttachmentRadius?: number;
   /** Attachment radius (pt) of a tick-0 Position of Honor stem (default `haloRadius + 0.4`). */
   honorStemAttachmentRadius?: number;
@@ -2447,8 +2511,8 @@ export interface StemBeamAuditOptions {
  *
  * A rendered stem is legal when it is either a standalone stem of exactly the
  * canonical length — `stemLength` minus its flush attachment radius, measured
- * from the outer edge of its glyph circle — or when its tip lands on a beam
- * connector. Every beam connector must also honour the slope clamp.
+ * from the outer edge of its mask (or halo ring) — or when its tip lands on a
+ * beam connector. Every beam connector must also honour the slope clamp.
  */
 export function auditStemBeamConnections(
   svg: string,
@@ -2462,7 +2526,8 @@ export function auditStemBeamConnections(
   const beams = lines.filter(
     (n) => n.cls.includes('janko-beam') || n.cls.includes('janko-beam-secondary')
   );
-  const regularAttachment = options.stemAttachmentRadius ?? DEFAULT_JANKO_TOKENS.noteheadRadius + 0.2;
+  const regularAttachment =
+    options.stemAttachmentRadius ?? getClusterSpacingPreset().hy + 0.2;
   const honorAttachment = options.honorStemAttachmentRadius ?? DEFAULT_JANKO_TOKENS.haloRadius + 0.4;
   const standaloneLengths = [
     options.stemLength - regularAttachment,
@@ -2591,12 +2656,13 @@ export function lintJankoScore(
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
-      const attachment = getStemAttachmentRadii(t);
+      const attachment = getStemAttachmentRadii(t, o);
+      const preset = getClusterSpacingPreset(o.clusterSpacing);
       const svg = renderSystem(score, layout.geometry, layout.index, o, t, layout);
       const audit = [
         ...auditKnockoutProtection(svg, {
-          noteheadRadius: t.noteheadRadius,
-          knockoutRx: getClusterSpacingPreset(o.clusterSpacing).rx,
+          knockoutWx: preset.wx,
+          knockoutHy: preset.hy,
           haloRadius: t.haloRadius,
           // The audit recovers the notehead centre from the digit's baseline,
           // so it must know the offset the renderer actually used.

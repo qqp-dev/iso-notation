@@ -15,14 +15,16 @@
  * instrument's physical row and may never be re-spelled — and the collision is
  * resolved *horizontally*: heads that share an onset, an octave and a row are
  * fanned out asymmetrically toward the roomier side at the active
- * cluster-spacing preset (`2rx + air` per step — 8.2pt on the golden
- * `'balanced'`), one head keeping the nominal beat column, behind the hard
- * beat-cell barriers (see {@link resolveRowSnappedChordOffsets}). Heads on
- * *different* rows stay vertically aligned on the nominal beat column, so the
- * isomorphic ∇ / Δ hand shapes survive untouched.
+ * cluster-spacing preset (`2wx + air` per step — 5.86pt on the golden
+ * `'snug'`), the pinned head keeping its column, behind the hard beat-cell
+ * barriers (see {@link resolveRowSnappedChordOffsets}). The v2 solver then
+ * centres each spread unit in its free space, shrinks the fan pin-preservingly
+ * where room runs short, redistributes disturbed local groups and interleaves
+ * multi-row onsets at the half-step — single-head rows stay vertically aligned
+ * on their column, so the isomorphic ∇ / Δ hand shapes survive untouched.
  *
  * Shared stems (Round 16): one onset's same-duration voices share a single
- * stem object on the nominal column (standard chord rule); mixed-duration
+ * stem object nearest the nominal column (standard chord rule); mixed-duration
  * stacks coincide there with each voice's beam/flag at its own end. Same-row
  * seconds of mixed hands or mixed durations keep two stems at head-x.
  *
@@ -83,6 +85,9 @@ import {
   JankoVerticalChordGroup,
   CLASP_MARK_REACH,
   CLASP_MIN_VERTICAL_CHORD,
+  CLASP_TRANSVERSE_WIDTH,
+  HONOR_STEM_ATTACHMENT_AIR,
+  STEM_ATTACHMENT_AIR,
   claspInkBox,
   claspQualifies,
   computeBeamGroupGeometry,
@@ -943,7 +948,7 @@ export function getMeasureInsets(
   const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
   // Round 12: the transparent grid withdraws the canonical measure inset, so
   // the music uses the full measure width and a downbeat column stands exactly
-  // on the barline, where its elliptical knockout erases it.
+  // on the barline, where its rectangular mask erases it.
   const inset = getGridNoteInset(o, t);
   const base =
     isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
@@ -1056,30 +1061,30 @@ function getTickColumnX(
 }
 
 /**
- * Round 16 augmentation-dot lane: the page y of the dot that belongs to a
+ * Round 17 augmentation-dot lane: the page y of the dot that belongs to a
  * notehead at `y`.
  *
- * The dot is **always in the inter-row gap above** its head (standard-analog:
- * a line note dots the space above), half a whole-tone row up
- * (`augmentationDotRowOffset`). The row-dependent above-or-below rule is
- * deleted: consistent side, uniform sign, every bar. A 16th-note grid seats
- * neighbouring columns only 10.2pt apart, so an on-row dot can never clear the
- * next column's mask; the inter-row lane can.
+ * The dot hugs its mask's top-right corner in the low lane
+ * (`augmentationDotRowOffset`, 3.5pt above the head), always right of its head
+ * with a uniform sign (`dotY < head`), every bar. The high lane (half a
+ * whole-tone row up) survives only as the fallback when a same-row neighbour
+ * sits inside the mask band (see {@link resolveDotHighLane}).
  *
- * Where the canonical lane would still graze a painted rule (a gap centre that
+ * Where the canonical lane would still graze a painted rule (a lane that
  * coincides with an equator rule, or the bounded channel's
  * `equator ± channelHalfWidth` pair), the dot steps just far enough off the
  * rule to keep `dotRadius + halfStroke + 0.25pt` of air — staying above its
- * head and inside the gap throughout.
+ * head throughout.
  */
 function resolveAugmentationDotY(
   y: number,
   geo: JankoSystemGeometry,
   hand: Hand,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  highLane: boolean = false
 ): number {
-  let dotY = y - t.augmentationDotRowOffset;
+  let dotY = y - (highLane ? t.rowHeight / 2 : t.augmentationDotRowOffset);
   const clearance = t.augmentationDotRadius + 0.375 + 0.25;
   for (let octave = 0; octave <= 8; octave++) {
     const base = geo.middleCY + getEquatorYForOctave(octave, hand, t, o);
@@ -1163,7 +1168,8 @@ export function positionJankoNote(
     flank ?? null
   );
   const y = geo.middleCY + coord.y;
-  const rx = getClusterSpacingPreset(o.clusterSpacing).rx;
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  const honor = isPositionOfHonor(note.startTick);
   return {
     note,
     coord,
@@ -1176,10 +1182,51 @@ export function positionJankoNote(
       hand,
       x,
       y,
-      dotX: x + rx + t.augmentationDotGap,
+      dotX: x + preset.wx + t.augmentationDotGap,
       dotY: resolveAugmentationDotY(y, geo, hand, o, t),
+      stemAttachR: honor
+        ? t.haloRadius + HONOR_STEM_ATTACHMENT_AIR
+        : preset.hy + STEM_ATTACHMENT_AIR,
     },
   };
+}
+
+/**
+ * Round 17 dot high-lane fallback: after the chord-column solve, a dotted head
+ * whose low-lane dot would sit inside a same-row neighbour's mask (grown by
+ * the dot radius) is lifted to the high lane. Vacuous on Bach's 19 dots —
+ * every same-row neighbour stands at least a 16th column (10.2pt) away — but
+ * the fallback keeps a crowded same-row onset honest instead of painting a
+ * dot-collision.
+ */
+export function resolveDotHighLane(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): PositionedJankoNote[] {
+  const dotR = t.augmentationDotRadius;
+  return notes.map((p) => {
+    const dur = p.note.durationTicks;
+    if (dur <= 26 || dur > 38) return p;
+    const dotX = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx;
+    const dotY = p.rhythm.dotY ?? p.y;
+    for (const q of notes) {
+      if (q === p || Math.abs(q.y - p.y) >= EPS) continue;
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const dx = Math.max(q.x - wx - dotX, 0, dotX - (q.x + wx));
+      const dy = Math.max(q.y - hy - dotY, 0, dotY - (q.y + hy));
+      if (Math.hypot(dx, dy) >= dotR - EPS) continue;
+      return {
+        ...p,
+        rhythm: {
+          ...p.rhythm,
+          dotY: resolveAugmentationDotY(p.y, geo, p.rhythm.hand, o, t, true),
+        },
+      };
+    }
+    return p;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1672,13 +1719,50 @@ const EPS = 1e-6;
 
 /**
  * Air (pt) a row-snapped head keeps from the nearest head of a *different*
- * onset on its own row: exactly one notehead diameter, the hard conservative
- * rule the visual linter audits (`dx >= 2r`). It is deliberately not inflated —
- * a dense 16th grid whose columns already sit at `2r + ε` must not be nudged by
- * a solver that thinks it is 0.05pt short. Same-onset same-row pairs instead
- * stand at the active cluster-spacing preset (`2rx + air`).
+ * onset on its own row beyond touching masks: exactly zero, the hard box rule
+ * the visual linter audits (mask boxes may touch, never overlap). It is
+ * deliberately not inflated — a dense 16th grid whose columns already clear
+ * must not be nudged by a solver that thinks it is 0.05pt short. Same-onset
+ * same-row pairs instead stand at the active cluster-spacing preset
+ * (`2wx + air`).
  */
 export const CHORDAL_NEIGHBOUR_AIR = 0;
+
+/**
+ * Round 17 redistribution gate (pt): a four-onset window whose head gaps
+ * already spread within this amount is left on its proportional columns —
+ * only a real disturbance (a fanned pair crowding its neighbours past the
+ * gate) earns redistribution. Undisturbed ink, and the rests seated beside
+ * it, never moves.
+ */
+export const RELAX_DISTURBANCE_GATE = 4.0;
+/** Damping of one redistribution sweep (half the spring correction). */
+export const RELAX_DAMPING = 0.5;
+/** Redistribution sweeps before the pass settles unconditionally. */
+export const RELAX_MAX_SWEEPS = 8;
+/** Largest single shift (pt) below which redistribution stops early. */
+export const RELAX_SETTLE = 0.005;
+
+/**
+ * Rectangular mask half-extents (pt) of one head under the active spacing
+ * preset — the halo-aware box every Round 17 clearance test shares.
+ *
+ * A regular head owns exactly its preset box (`wx × hy`); a tick-0 Position of
+ * Honor sound owns the box grown to its halo ring's outer edge on both axes
+ * (the ring is drawn ink, so two rings may never cut into each other's box).
+ */
+export function knockoutHalfExtents(
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  startTick?: number
+): { wx: number; hy: number } {
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  if (startTick !== undefined && isPositionOfHonor(startTick)) {
+    const halo = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+    return { wx: Math.max(preset.wx, halo), hy: Math.max(preset.hy, halo) };
+  }
+  return { wx: preset.wx, hy: preset.hy };
+}
 
 /** One whole-tone row of one onset: the heads that must share a horizontal slot. */
 interface RowCluster {
@@ -1691,8 +1775,9 @@ interface RowCluster {
   /**
    * Resolved horizontal offsets (page pt, signed) of this row's heads from the
    * onset column: the single standard grammar's asymmetric fan — one head on
-   * the column, the rest stepping toward the roomier side at `2rx + air` per
-   * step (see {@link resolveChordColumns}).
+   * the column, the rest stepping toward the roomier side at `2wx + air` per
+   * step — plus the multi-row interleave half-step, where one applies (see
+   * {@link resolveChordColumns}).
    */
   minOffset: number;
   maxOffset: number;
@@ -1852,33 +1937,39 @@ function perHandDownbeatQualifies(notes: readonly QuantizedNote[]): boolean {
  * active cluster-spacing preset:
  *
  * ```
- * x_i = x_onset + (i - anchor) · pairGap · d,   pairGap = 2rx + air
+ * x_i = x_onset + (i - anchor) · pairGap · d,   pairGap = 2wx + air
  * ```
  *
- * So a two-note collision becomes the pair `x, x + pairGap·d` (8.2pt apart on
- * the golden `'balanced'`) and a three-note collision the triplet
- * `x − pairGap, x, x + pairGap`. Heads on **different** rows of the same onset
- * keep one shared column, which is what preserves the isomorphic ∇ / Δ hand
- * shapes of the staff.
+ * So a two-note collision becomes the pair `x, x + pairGap·d` (5.86pt apart on
+ * the golden `'snug'`) and a three-note collision the triplet
+ * `x − pairGap, x, x + pairGap`. Alternate fanned rows of one onset nest at
+ * the half-step (`pairGap / 2`), while single-head rows keep one shared
+ * column, which is what preserves the isomorphic ∇ / Δ hand shapes of the
+ * staff.
  *
  * **The column solve.** A displaced head claims real horizontal room, and in
  * dense writing the neighbouring onset of its own row is only one 16th away.
  * The onset is therefore treated as one unit whose column may be translated as
- * a whole — never sheared, so the chord keeps its shape — in two phases:
+ * a whole — never sheared, so the chord keeps its shape:
  *
- * 1. **Spread columns** never translate: the crowded column keeps the nominal
- *    beat-x and every head stays inside its own beat cell, so a displaced head
- *    can never cross a pulse or a barline. Only a **clasped** column steps
- *    right for the air its bracket needs.
- * 2. **Plain columns** that the spread ones have crowded step away by exactly
+ * 1. **Spread columns** centre their mask bbox in the free space between
+ *    their fixed nominal neighbours (clipped to the beat cell), holding the
+ *    column only where the bbox refuses the space — the pin. A **clasped**
+ *    column instead steps right for the air its bracket needs, keeping its
+ *    anchor on the shifted column.
+ * 2. **Plain columns** inside a disturbed four-onset window ease toward equal
+ *    head gaps (local redistribution); undisturbed windows stay exactly on
+ *    their proportional columns.
+ * 3. **Plain columns** that the spread ones have crowded step away by exactly
  *    the missing air — the local spacing relief a real engraver applies around
  *    a displaced second.
  *
  * Every step is one-directional (a column only ever moves away from a
- * violation), so the pass is deterministic, order-stable and terminating.
- * Whatever still cannot fit — a three-note row cluster squeezed between two
- * 16ths that are themselves out of room — is left for the visual linter to
- * name (`chordal-overlap` / `notehead-overlap`) instead of being hidden.
+ * violation) or damped and bounded, so the pass is deterministic, order-stable
+ * and terminating. Whatever still cannot fit — a three-note row cluster
+ * squeezed between two 16ths that are themselves out of room — is left for
+ * the visual linter to name (`chordal-overlap` / `notehead-overlap`) instead
+ * of being hidden.
  *
  * Round 5 adds a third kind of column: a **clasped** cluster (two or more
  * simultaneous heads) claims the `r + claspOffset` its external bracket needs on
@@ -1914,9 +2005,7 @@ export function resolveChordColumns(
   claspInsets?: JankoClaspInsetMap | null
 ): JankoChordColumnResolution {
   const spacing = getClusterSpacingPreset(o.clusterSpacing);
-  const rx = spacing.rx;
-  const presetAir = spacing.air;
-  const pairGap = spacing.pairGap;
+  const { wx, air: presetAir, pairGap } = spacing;
   const claspsActive = usesChordClasps(o.chordGrouping);
   const perHandClasps = o.chordGrouping === 'per-hand-clasp';
   const claspReach = t.noteheadRadius + t.claspOffset;
@@ -2001,22 +2090,46 @@ export function resolveChordColumns(
   }
   const units = [...unitByTick.values()];
 
+  /**
+   * Barline air (pt) each beat-cell edge of one unit carries: a cell edge that
+   * carries barline ink also carries the linter's floor, measured from the
+   * disc edge — the edge is inset by the head radius plus COLUMN_BARLINE_AIR
+   * plus the float-safety solver margin, so a downbeat fan holds right of its
+   * barline instead of painting a mask over it.
+   */
+  const barlineInset = t.noteheadRadius + COLUMN_BARLINE_AIR + REST_FIT_MARGIN;
+  const cellAirs = (unit: OnsetUnit): { loAir: number; hiAir: number } => {
+    const openBarlineX = getMeasureOpeningBarlineX(unit.measureIdx, geo, systemIndex, t);
+    const closeBarlineX = getMeasureClosingBarlineX(unit.measureIdx, geo, systemIndex, t);
+    return {
+      loAir:
+        openBarlineX !== null && Math.abs(unit.cellLeft - openBarlineX) < 1e-6 ? barlineInset : 0,
+      hiAir: Math.abs(unit.cellRight - closeBarlineX) < 1e-6 ? barlineInset : 0,
+    };
+  };
+
   // -------------------------------------------------------------------------
-  // 1a. Crowded-row placement (single standard grammar, Round 16).
+  // 1a. Crowded-row placement (single standard grammar, Round 17).
   //
   //     A row that carries two or more heads of one onset fans them out
-  //     asymmetrically: one head keeps the nominal beat-x (the RH head when
+  //     asymmetrically: the pinned head keeps its column (the RH tone when
   //     the row is mixed-hand, the middle head otherwise) and the rest step
-  //     toward the roomier neighbour at the preset `2rx + air` per step, so a
-  //     pair spans exactly the judged pair gap (8.2pt on the golden
-  //     `'balanced'`) and a triple twice it. The crowded column itself never
-  //     translates — a plain neighbour yields instead.
+  //     toward the roomier neighbour at the preset `2wx + air` per step, so a
+  //     pair spans exactly the judged pair gap (5.86pt on the golden `'snug'`)
+  //     and a triple twice it.
   //
-  //     Hard barriers: every head stays inside its own **beat cell** — the
-  //     span between the two neighbouring painted grid lines — so a displaced
-  //     head can never cross a beat pulse or a barline into another beat's
-  //     territory; where the full fan will not fit, it mirrors, slides or
-  //     centres inside the cell.
+  //     Pin-preserving shrink: the fan takes the full judged gap whenever
+  //     either side fits it (mirroring keeps the anchor), and only when
+  //     neither side fits does the gap shrink to the roomier side's free
+  //     room — `min(G, room)` — floored at touching masks. The pinned head
+  //     holds its column throughout: the Round 16 slide/centre backstop,
+  //     which dragged the anchor off its column to hide an overflow, is
+  //     deleted — whatever still overflows is honest residue for the linter.
+  //
+  //     Hard barriers: beat and measure lines stay firm — no head may leave
+  //     its own **beat cell**, the span between the two neighbouring painted
+  //     grid lines, so a displaced head can never cross a beat pulse or a
+  //     barline into another beat's territory.
   // -------------------------------------------------------------------------
   const offsetsById = new Map<string, number>();
   const byX = [...units].sort((a, b) => a.nominalX - b.nominalX || a.tick - b.tick);
@@ -2025,6 +2138,21 @@ export function resolveChordColumns(
     const nextX = index + 1 < byX.length ? byX[index + 1].nominalX : Number.POSITIVE_INFINITY;
     const leftReach = Math.min(unit.nominalX - prevX, unit.nominalX - unit.cellLeft);
     const rightReach = Math.min(nextX - unit.nominalX, unit.cellRight - unit.nominalX);
+    const { loAir, hiAir } = cellAirs(unit);
+    /**
+     * Free room (pt) for the fan's outermost head centre in direction `d`:
+     * the nearer of the nominal neighbour column and the beat-cell edge,
+     * minus the neighbour's mask half-width — or the barline inset the edge
+     * carries. Columnar and uniform: the fan head's centre always clears
+     * fixed ink, and mask-vs-mask separation stays the column solver's job.
+     */
+    const roomFor = (d: 1 | -1): number => {
+      const toCellEdge =
+        d > 0 ? unit.cellRight - unit.nominalX : unit.nominalX - unit.cellLeft;
+      const toNeighbour = d > 0 ? nextX - unit.nominalX : unit.nominalX - prevX;
+      if (toCellEdge <= toNeighbour) return toCellEdge - (d > 0 ? hiAir : loAir);
+      return toNeighbour - wx;
+    };
     for (const cluster of unit.rows) {
       const k = cluster.notes.length;
       if (k < 2) {
@@ -2033,25 +2161,23 @@ export function resolveChordColumns(
         offsetsById.set(cluster.notes[0].note.id, 0);
         continue;
       }
-      // The head that keeps the nominal beat-x: the RH tone when the row is
+      // The head that keeps its column: the RH tone when the row is
       // mixed-hand, otherwise the middle head.
       let anchor = Math.floor((k - 1) / 2);
       const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
       const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
       if (hands.size > 1 && rh >= 0) anchor = rh;
       // The flank must clear whatever glyph the heads actually wear: a tick-0
-      // sound carries the wider Position of Honor ring, and two rings may
-      // never cut into each other's knockout either. Horizontal radii — the
-      // fan is a horizontal question; regular heads step exactly pairGap.
-      const glyphRX = (p: PositionedJankoNote): number =>
-        isPositionOfHonor(p.note.startTick)
-          ? Math.max(rx, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
-          : rx;
+      // sound carries the wider halo box, and two rings may never cut into
+      // each other's box either. Box half-widths — the fan is a horizontal
+      // question; regular heads step exactly pairGap.
       let clusterGap = pairGap;
       for (let i = 1; i < k; i++) {
         clusterGap = Math.max(
           clusterGap,
-          glyphRX(cluster.notes[i - 1]) + glyphRX(cluster.notes[i]) + presetAir
+          knockoutHalfExtents(o, t, cluster.notes[i - 1].note.startTick).wx +
+            knockoutHalfExtents(o, t, cluster.notes[i].note.startTick).wx +
+            presetAir
         );
       }
       // The fan extends toward the roomier side. When the anchor sits right of
@@ -2060,47 +2186,81 @@ export function resolveChordColumns(
       const roomier: 1 | -1 = rightReach >= leftReach ? 1 : -1;
       const anchorLean = Math.sign((k - 1) / 2 - anchor);
       const dir: 1 | -1 = anchorLean < 0 ? (-roomier as 1 | -1) : roomier;
-      const fan = (d: 1 | -1): number[] =>
-        cluster.notes.map((_, i) => (i - anchor) * clusterGap * d);
-      let offsets = fan(dir);
-      // Hard barrier: mirror first (the exact fan about the anchor, so the
-      // anchored head keeps the column), then slide, then centre — never a
-      // head outside the beat cell. A cell edge that carries barline ink also
-      // carries the linter's floor, which the audit measures from the disc
-      // edge: the edge is inset by the head radius plus COLUMN_BARLINE_AIR
-      // plus the float-safety solver margin, so a downbeat fan slides right
-      // instead of painting a disc over its barline.
-      const openBarlineX = getMeasureOpeningBarlineX(unit.measureIdx, geo, systemIndex, t);
-      const closeBarlineX = getMeasureClosingBarlineX(unit.measureIdx, geo, systemIndex, t);
-      const barlineInset = t.noteheadRadius + COLUMN_BARLINE_AIR + REST_FIT_MARGIN;
-      const loAir =
-        openBarlineX !== null && Math.abs(unit.cellLeft - openBarlineX) < 1e-6 ? barlineInset : 0;
-      const hiAir = Math.abs(unit.cellRight - closeBarlineX) < 1e-6 ? barlineInset : 0;
-      const cellLo = unit.cellLeft + loAir - unit.nominalX;
-      const cellHi = unit.cellRight - hiAir - unit.nominalX;
-      const lo = Math.min(...offsets);
-      const hi = Math.max(...offsets);
-      if (lo < cellLo - EPS || hi > cellHi + EPS) {
-        const mirrored = fan(-dir as 1 | -1);
-        const fLo = Math.min(...mirrored);
-        const fHi = Math.max(...mirrored);
-        if (fLo >= cellLo - EPS && fHi <= cellHi + EPS) {
-          offsets = mirrored;
+      const fan = (d: 1 | -1, gap: number): number[] =>
+        cluster.notes.map((_, i) => (i - anchor) * gap * d);
+      // Fan steps reaching toward each side for one fan direction (a
+      // middle-anchored triple reaches one step each way; an end-anchored pair
+      // reaches one way only — and mirroring swaps the two reaches).
+      const stepsToward = (u: 1 | -1, side: 1 | -1): number =>
+        u === side ? k - 1 - anchor : anchor;
+      const fits = (u: 1 | -1, gap: number): boolean =>
+        (stepsToward(u, 1) === 0 || roomFor(1) + EPS >= stepsToward(u, 1) * gap) &&
+        (stepsToward(u, -1) === 0 || roomFor(-1) + EPS >= stepsToward(u, -1) * gap);
+      let useDir = dir;
+      let gap = clusterGap;
+      if (!fits(dir, clusterGap)) {
+        if (fits((-dir as 1 | -1), clusterGap)) {
+          // Mirror: the exact fan about the anchor on the other side, so the
+          // judged gap survives where the roomier side cannot host it.
+          useDir = -dir as 1 | -1;
         } else {
-          const width = hi - lo;
-          const room = cellHi - cellLo;
-          const target =
-            room >= width
-              ? Math.max(cellLo - lo, Math.min(cellHi - hi, 0))
-              : (room - width) / 2 - lo;
-          offsets = offsets.map((o) => o + target);
+          // Pin-preserving shrink: narrow the gap to the roomier side's free
+          // room, the pinned head holding its column while the free side
+          // walks in. Floored at touching masks; whatever still overflows is
+          // honest residue for the linter.
+          const fitGap = Math.min(
+            stepsToward(dir, 1) === 0 ? Infinity : roomFor(1) / stepsToward(dir, 1),
+            stepsToward(dir, -1) === 0 ? Infinity : roomFor(-1) / stepsToward(dir, -1)
+          );
+          gap = Math.min(clusterGap, fitGap);
+          if (!(gap >= 2 * wx)) gap = 2 * wx;
         }
       }
+      const offsets = fan(useDir, gap);
       cluster.minOffset = Math.min(...offsets);
       cluster.maxOffset = Math.max(...offsets);
       cluster.notes.forEach((p, i) => offsetsById.set(p.note.id, offsets[i]));
     }
   });
+
+  // -------------------------------------------------------------------------
+  // 1a2. Multi-row interleave: one onset with two or more fanned rows nests
+  //      alternate rows at the half-step (`pairGap / 2` toward the roomier
+  //      side), so upper heads sit over lower gaps instead of phase-aligning
+  //      on the column. The widest row anchors (its middle head on the
+  //      column); single-head rows stay on the column. A row whose half-step
+  //      would leave the beat cell keeps its unshifted fan — the interleave
+  //      never buys nesting with a grid crossing.
+  // -------------------------------------------------------------------------
+  for (const unit of units) {
+    const fanned = unit.rows.filter((c) => c.notes.length >= 2);
+    if (fanned.length < 2) continue;
+    let widest = fanned[0];
+    for (const row of fanned) {
+      if (row.notes.length > widest.notes.length) widest = row;
+    }
+    const order = [...unit.rows].sort((a, b) => a.y - b.y);
+    const home = order.indexOf(widest);
+    const idx = byX.indexOf(unit);
+    const leftReach = unit.nominalX - (idx > 0 ? byX[idx - 1].nominalX : unit.cellLeft);
+    const rightReach = (idx + 1 < byX.length ? byX[idx + 1].nominalX : unit.cellRight) - unit.nominalX;
+    const d: 1 | -1 = rightReach >= leftReach ? 1 : -1;
+    const { loAir, hiAir } = cellAirs(unit);
+    const cellLo = unit.cellLeft + loAir - unit.nominalX;
+    const cellHi = unit.cellRight - hiAir - unit.nominalX;
+    for (const row of fanned) {
+      if (Math.abs(order.indexOf(row) - home) % 2 === 0) continue;
+      const shift = (pairGap / 2) * d;
+      const lo = row.minOffset + shift;
+      const hi = row.maxOffset + shift;
+      if (lo < cellLo - EPS || hi > cellHi + EPS) continue;
+      row.minOffset = lo;
+      row.maxOffset = hi;
+      for (const p of row.notes) {
+        offsetsById.set(p.note.id, (offsetsById.get(p.note.id) ?? 0) + shift);
+      }
+    }
+  }
 
   /** Row-snapped horizontal offset (page pt) of every head of one onset unit. */
   const rowOffsetOf = (unit: OnsetUnit): Map<string, number> => {
@@ -2270,6 +2430,150 @@ export function resolveChordColumns(
     return { notes: untouched, claspTicks: new Set<number>() };
   }
 
+  /** Extreme resolved offsets of one unit's heads (page pt, signed). */
+  const unitMinOffset = (u: OnsetUnit): number =>
+    u.rows.reduce((acc, c) => Math.min(acc, c.minOffset), 0);
+  const unitMaxOffset = (u: OnsetUnit): number =>
+    u.rows.reduce((acc, c) => Math.max(acc, c.maxOffset), 0);
+  /** Halo-aware mask half-extents of one unit's widest/tallest member. */
+  const unitMaskWX = (u: OnsetUnit): number =>
+    Math.max(
+      ...u.rows.flatMap((c) => c.notes.map((p) => knockoutHalfExtents(o, t, p.note.startTick).wx))
+    );
+  const unitMaskHY = (u: OnsetUnit): number =>
+    Math.max(
+      ...u.rows.flatMap((c) => c.notes.map((p) => knockoutHalfExtents(o, t, p.note.startTick).hy))
+    );
+  const ordered = [...units].sort((a, b) => a.tick - b.tick);
+  /** Minimum head-to-head air (pt) two consecutive onsets keep in time order. */
+  const MIN_TIME_AIR = 1.0;
+
+  // -------------------------------------------------------------------------
+  // 1b. Unit centering: after fanning, a spread (non-clasped) unit's mask bbox
+  //     is centred in the free space between its fixed nominal neighbours,
+  //     clipped to the beat cell. Centring needs two bounds: a unit with fewer
+  //     than two neighbours, or whose bbox does not fit the clipped space,
+  //     holds its column — the pin (m12: the pulse-edge pair's bbox refuses
+  //     the clipped space, so the 9 holds while the 7 walks in beside it).
+  //     Brackets extend left from their clasped unit, so a unit immediately
+  //     left of one holds whenever centring would enter the bracket zone —
+  //     the bracket air the clasp was admitted with survives the solve and no
+  //     clasp is ever demoted by spacing. Motion right of a clasp is
+  //     bracket-safe (its own heads block the way, and the column solver caps
+  //     the clasp's shift against spread neighbours).
+  // -------------------------------------------------------------------------
+  /**
+   * Rightmost page x a unit immediately left of the clasped `clasp` may place
+   * its heads: the bracket's worst-case ink edge (spine plus the widest
+   * duration mark) minus the foreign-head air the clears predicate demands.
+   * The bound assumes the clasp holds its column; clasp shifts are
+   * right-or-zero on the corpus (bracket air pushes right), so any shift only
+   * moves the bracket further from the neighbour.
+   */
+  const bracketSafeBound = (clasp: OnsetUnit): number =>
+    clasp.nominalX +
+    unitMinOffset(clasp) -
+    (t.noteheadRadius +
+      t.claspOffset +
+      CLASP_TRANSVERSE_WIDTH / 2 +
+      t.noteheadRadius +
+      CLASP_NOTEHEAD_AIR);
+  /** The clasped unit immediately right of `unit` in nominal order, if any. */
+  const claspedRightOf = (unit: OnsetUnit): OnsetUnit | null => {
+    const at = byX.indexOf(unit);
+    return at + 1 < byX.length && byX[at + 1].clasp ? byX[at + 1] : null;
+  };
+  for (const unit of units) {
+    if (!unit.spread || unit.clasp) continue;
+    const at = byX.indexOf(unit);
+    if (at <= 0 || at + 1 >= byX.length) continue;
+    const prev = byX[at - 1];
+    const next = byX[at + 1];
+    const { loAir, hiAir } = cellAirs(unit);
+    const spaceLo = Math.max(
+      prev.nominalX + unitMaxOffset(prev) + unitMaskWX(prev),
+      unit.cellLeft + loAir
+    );
+    const spaceHi = Math.min(
+      next.nominalX + unitMinOffset(next) - unitMaskWX(next),
+      unit.cellRight - hiAir
+    );
+    const w = unitMaskWX(unit);
+    const bboxLo = unit.nominalX + unitMinOffset(unit) - w;
+    const bboxHi = unit.nominalX + unitMaxOffset(unit) + w;
+    if (bboxHi - bboxLo > spaceHi - spaceLo + EPS) continue;
+    const shift = (spaceLo + spaceHi) / 2 - (bboxLo + bboxHi) / 2;
+    const clasp = claspedRightOf(unit);
+    if (clasp !== null && unit.nominalX + shift + unitMaxOffset(unit) > bracketSafeBound(clasp)) {
+      continue;
+    }
+    unit.shift = shift;
+  }
+
+  // -------------------------------------------------------------------------
+  // 1c. Local redistribution: spring-relaxation over a sliding four-onset
+  //     window — never whole-measure, or proportional rhythm dies. Only a
+  //     window that holds a spread or clasped unit (a real disturbance, not
+  //     rhythmic unevenness like a dotted value) and whose gaps spread past
+  //     the gate earns redistribution. Spread and clasped units are
+  //     placed-and-pinned (centering is their placement); the plain interior
+  //     units of each disturbed window ease toward equal head gaps. Every
+  //     other window stays exactly on its proportional columns, so
+  //     undisturbed ink — and the rests seated beside it — never moves. Cells
+  //     are hard clamps and time order is never crossed. Pass order pinned:
+  //     place units first, then relax — damped and bounded, so the pass
+  //     cannot oscillate.
+  // -------------------------------------------------------------------------
+  const minHead = (u: OnsetUnit): number => u.nominalX + u.shift + unitMinOffset(u);
+  const maxHead = (u: OnsetUnit): number => u.nominalX + u.shift + unitMaxOffset(u);
+  const disturbed: OnsetUnit[][] = [];
+  for (let i = 0; i + 3 < ordered.length; i++) {
+    const w = ordered.slice(i, i + 4);
+    if (!w.some((u) => u.spread || u.clasp)) continue;
+    const gaps = [minHead(w[1]) - maxHead(w[0]), minHead(w[2]) - maxHead(w[1]), minHead(w[3]) - maxHead(w[2])];
+    // A window earns redistribution when its gaps are both uneven (past the
+    // disturbance gate) and crowded (some gap narrower than one judged pair
+    // gap): a merely wide gap is structure — an inset jump, a dotted value —
+    // never a disturbance, and evening one would fight the grid that built it.
+    if (Math.max(...gaps) - Math.min(...gaps) <= RELAX_DISTURBANCE_GATE) continue;
+    if (Math.min(...gaps) >= pairGap) continue;
+    disturbed.push(w);
+  }
+  for (let sweep = 0; sweep < RELAX_MAX_SWEEPS; sweep++) {
+    let moved = 0;
+    for (const w of disturbed) {
+      const middles: Array<{ u: OnsetUnit; left: OnsetUnit; right: OnsetUnit }> = [
+        { u: w[1], left: w[0], right: w[2] },
+        { u: w[2], left: w[1], right: w[3] },
+      ];
+      for (const { u, left, right } of middles) {
+        if (u.spread || u.clasp) continue;
+        const gapLeft = minHead(u) - maxHead(left);
+        const gapRight = minHead(right) - maxHead(u);
+        const step = ((gapRight - gapLeft) / 2) * RELAX_DAMPING;
+        if (step === 0) continue;
+        // Hard clamps: the beat cell (barline-aware, like the fan), strict
+        // time order against both neighbours — and the bracket zone of a
+        // clasped right neighbour, so relaxation never demotes a clasp.
+        const { loAir, hiAir } = cellAirs(u);
+        const clasp = claspedRightOf(u);
+        const lo =
+          Math.max(u.cellLeft + loAir - unitMinOffset(u), maxHead(left) + MIN_TIME_AIR - unitMinOffset(u)) -
+          u.nominalX;
+        let hi =
+          Math.min(u.cellRight - hiAir - unitMaxOffset(u), minHead(right) - MIN_TIME_AIR - unitMaxOffset(u)) -
+          u.nominalX;
+        if (clasp !== null) {
+          hi = Math.min(hi, bracketSafeBound(clasp) - unitMaxOffset(u) - u.nominalX);
+        }
+        const clamped = Math.max(lo, Math.min(hi, u.shift + step));
+        moved = Math.max(moved, Math.abs(clamped - u.shift));
+        u.shift = clamped;
+      }
+    }
+    if (moved < RELAX_SETTLE) break;
+  }
+
   const r = t.noteheadRadius;
   const maxAbsOffset = units.reduce(
     (acc, unit) =>
@@ -2277,23 +2581,39 @@ export function resolveChordColumns(
     0
   );
   /** Columns further apart than this can never touch, whatever their rows. */
+  const maxHalf = units.reduce(
+    (acc, unit) => Math.max(acc, unitMaskWX(unit), unitMaskHY(unit)),
+    0
+  );
   const reach =
-    2 * maxAbsOffset + 2 * r + 2 * pairGap + (hasClasp ? claspReach + CLASP_NOTEHEAD_AIR : 0);
+    2 * maxAbsOffset + 2 * maxHalf + 2 * pairGap + (hasClasp ? claspReach + CLASP_NOTEHEAD_AIR : 0);
+
+  /** Halo-aware mask half-extents of one row's widest/tallest member. */
+  const rowBox = (c: RowCluster): { wx: number; hy: number } => {
+    let wx = 0;
+    let hy = 0;
+    for (const p of c.notes) {
+      const e = knockoutHalfExtents(o, t, p.note.startTick);
+      wx = Math.max(wx, e.wx);
+      hy = Math.max(hy, e.hy);
+    }
+    return { wx, hy };
+  };
 
   /**
-   * Horizontal air two clusters of *different* onsets owe each other: `2r`
-   * when they share a row, less when their rows are close but distinct (the
-   * bounded channel puts two flanks only 4pt apart), and no constraint at all
-   * once the rows are a full disc apart — vertical separation alone then keeps
-   * the glyphs clear. Deliberately conservative (circular): the visual linter
-   * audits different-onset neighbours against the same circular `2r` bound, so
-   * the solver must seat them there. Same-onset pairs instead stand at the
-   * preset `2rx + air` fan built in Phase 1a.
+   * Horizontal air two clusters of *different* onsets owe each other, box to
+   * box: `wxA + wxB` while their rows' mask bands still overlap vertically,
+   * and no constraint at all once vertical separation alone keeps the glyphs
+   * clear. The visual linter audits different-onset neighbours against these
+   * same boxes, so the solver must seat them there. Same-onset pairs instead
+   * stand at the preset `2wx + air` fan built in Phase 1a.
    */
   const separation = (a: RowCluster, b: RowCluster): number | null => {
+    const A = rowBox(a);
+    const B = rowBox(b);
     const dy = Math.abs(a.y - b.y);
-    if (dy >= 2 * r - EPS) return null;
-    return Math.sqrt(Math.max(0, 4 * r * r - dy * dy)) + CHORDAL_NEIGHBOUR_AIR;
+    if (dy + EPS >= A.hy + B.hy) return null;
+    return A.wx + B.wx + CHORDAL_NEIGHBOUR_AIR;
   };
 
   /**
@@ -2343,13 +2663,6 @@ export function resolveChordColumns(
     }
     return worst;
   };
-
-  /** Extreme resolved offsets of one unit's heads (page pt, signed). */
-  const unitMinOffset = (u: OnsetUnit): number =>
-    u.rows.reduce((acc, c) => Math.min(acc, c.minOffset), 0);
-  const unitMaxOffset = (u: OnsetUnit): number =>
-    u.rows.reduce((acc, c) => Math.max(acc, c.maxOffset), 0);
-  const MIN_TIME_AIR = 1.0;
 
   /** Legal translation window of one column against the *current* neighbours. */
   const windowOf = (unit: OnsetUnit): { lo: number; hi: number } => {
@@ -2426,13 +2739,12 @@ export function resolveChordColumns(
     return { lo, hi: Math.max(lo, hi) };
   };
 
-  const ordered = [...units].sort((a, b) => a.tick - b.tick);
-
   // -------------------------------------------------------------------------
   // 2. Spread and clasped columns first: keep the resolved placement whenever
-  //    it is legal. A spread column never translates — the beat-x spine is the
-  //    grammar's whole point — while a clasped column still takes the air its
-  //    bracket needs.
+  //    it is legal. A spread column keeps its centring shift — the placed
+  //    position is the grammar's whole point — while a clasped column still
+  //    takes the air its bracket needs (clasp-shifted columns keep their
+  //    anchor on the shifted column).
   // -------------------------------------------------------------------------
   for (const unit of ordered) {
     if (!unit.spread && !unit.clasp) continue;
@@ -2516,9 +2828,9 @@ export function resolveChordColumns(
     const cell = unit ? { left: unit.cellLeft, right: unit.cellRight } : undefined;
     if (x === undefined) return unit ? { ...p, nominalX: unit.nominalX, beatCell: cell } : p;
     // A moved head carries its rhythm stem and its augmentation dot with it:
-    // the dot stays tight to the elliptical mask (`x + rx + gap`).
+    // the dot stays hugging the rectangular mask (`x + wx + gap`).
     const rhythm =
-      x === p.x ? p.rhythm : { ...p.rhythm, x, dotX: x + rx + t.augmentationDotGap };
+      x === p.x ? p.rhythm : { ...p.rhythm, x, dotX: x + wx + t.augmentationDotGap };
     return {
       ...p,
       x,
@@ -2584,7 +2896,9 @@ export function layoutJankoSystem(
     if (demoted.length === 0) break;
     for (const m of demoted) claspInsets.delete(m);
   }
-  const notes = chordColumns.notes;
+  // Round 17: the dot high-lane fallback resolves on the solved columns, where
+  // same-row neighbours sit at their final x.
+  const notes = resolveDotHighLane(chordColumns.notes, geometry, o, t);
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
@@ -2931,8 +3245,9 @@ function renderNotesLayer(
 
   // 2d. Round 12 `'strict-protected-grid'`: the continuous vertical grid is
   //     painted here, on its dedicated white air channels, *above* the rhythm
-  //     layer — so no stem or beam may ever overwrite it — while the elliptical
-  //     notehead masks painted in step 3 still knock it out inside their mask.
+  //     layer — so no stem or beam may ever overwrite it — while the
+  //     rectangular notehead masks painted in step 3 still knock it out inside
+  //     their mask.
   if (gridInk.length > 0) out.push(gridInk);
 
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.

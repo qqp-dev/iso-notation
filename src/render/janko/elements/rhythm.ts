@@ -26,10 +26,13 @@
 import { Hand } from '../../../model/types';
 import {
   JankoClaspDurationStyle,
+  JankoLayoutOptions,
   JankoRhythmStyle,
   JankoSubdivisionStyle,
   JankoTokens,
   ResolvedJankoTokens,
+  getClusterSpacingPreset,
+  resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
 import { isPositionOfHonor } from './notehead';
@@ -47,20 +50,29 @@ export interface JankoRhythmNote {
   /** Notehead centre y. */
   y: number;
   /**
-   * Round 16: page x of this note's **augmentation dot**, right of its own
-   * head (`note.x + rx + augmentationDotGap`). Resolved by the engine, which
-   * knows the active cluster-spacing preset; the rhythm renderers only paint
-   * it. Callers that build a rhythm note by hand fall back to the circular
-   * `note.x + noteheadRadius + augmentationDotGap`.
+   * Round 17: page x of this note's **augmentation dot**, hugging its mask's
+   * top-right corner (`note.x + wx + augmentationDotGap`). Resolved by the
+   * engine, which knows the active cluster-spacing preset; the rhythm
+   * renderers only paint it. Callers that build a rhythm note by hand fall
+   * back to the golden `note.x + wx + augmentationDotGap`.
    */
   dotX?: number;
   /**
-   * Page y of this note's **augmentation dot**: the inter-row gap above the
-   * head (see `JankoTokens.augmentationDotRowOffset`). Resolved by the engine,
+   * Page y of this note's **augmentation dot**: the hug lane above the head
+   * (see `JankoTokens.augmentationDotRowOffset`), or the high lane when a
+   * same-row neighbour sits inside the mask band. Resolved by the engine,
    * which knows the staff rules the dot must clear; the rhythm renderers only
    * paint it.
    */
   dotY?: number;
+  /**
+   * Round 17: distance (pt) from the notehead centre at which this note's stem
+   * begins — flush on the mask edge (`hy + 0.2`) or on the halo ring
+   * (`haloRadius + 0.4`) for a tick-0 honour sound. Resolved by the engine,
+   * which knows the active cluster-spacing preset; callers that build a
+   * rhythm note by hand fall back to the golden preset.
+   */
+  stemAttachR?: number;
 }
 
 /** Resolved stem geometry for one note. */
@@ -86,19 +98,28 @@ export function stemDirection(hand: Hand): -1 | 1 {
   return hand === 'RH' ? -1 : 1;
 }
 
-/** Air (pt) between a regular knockout disc and its stem start. */
+/** Air (pt) between a regular mask edge and its stem start. */
 export const STEM_ATTACHMENT_AIR = 0.2;
 /** Air (pt) between the Position of Honor halo ring and its stem start. */
 export const HONOR_STEM_ATTACHMENT_AIR = 0.4;
 
-/** Canonical stem attachment radii (regular heads, tick-0 honor sounds). */
-export function getStemAttachmentRadii(tokens?: Partial<JankoTokens> | null): {
+/**
+ * Canonical stem attachment radii (regular heads, tick-0 honor sounds).
+ *
+ * A regular stem starts flush on the mask edge: the preset's `hy + 0.2`
+ * (3.86pt golden). The layout options select the preset, defaulting to golden.
+ */
+export function getStemAttachmentRadii(
+  tokens?: Partial<JankoTokens> | null,
+  layoutOptions?: Partial<JankoLayoutOptions> | null
+): {
   regular: number;
   honor: number;
 } {
   const t = resolveJankoTokens(tokens);
+  const { hy } = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
   return {
-    regular: t.noteheadRadius + STEM_ATTACHMENT_AIR,
+    regular: hy + STEM_ATTACHMENT_AIR,
     honor: t.haloRadius + HONOR_STEM_ATTACHMENT_AIR,
   };
 }
@@ -106,16 +127,20 @@ export function getStemAttachmentRadii(tokens?: Partial<JankoTokens> | null): {
 /**
  * Distance (pt) from the notehead centre at which its stem begins.
  *
- * A stem starts flush on the **outside** of the glyph's own circle: the wider
- * Position of Honor halo ring for the tick-0 opening sounds, the white knockout
- * disc otherwise. The stem can therefore never cut through the halo ring, and
- * it never emerges inside the mask where it would crowd the duodecimal digit.
+ * A stem starts flush on the **outside** of its glyph: the wider Position of
+ * Honor halo ring for the tick-0 opening sounds, the rectangular mask edge
+ * (`hy + 0.2`) otherwise. The stem can therefore never cut through the halo
+ * ring, and it never emerges inside the mask where it would crowd the
+ * duodecimal digit. The engine resolves the preset-correct radius onto every
+ * rhythm note it positions; hand-built notes fall back to the golden preset.
  */
 export function getStemAttachmentRadius(
   note: JankoRhythmNote,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  layoutOptions?: Partial<JankoLayoutOptions> | null
 ): number {
-  const radii = getStemAttachmentRadii(tokens);
+  if (note.stemAttachR !== undefined) return note.stemAttachR;
+  const radii = getStemAttachmentRadii(tokens, layoutOptions);
   return isPositionOfHonor(note.startTick) ? radii.honor : radii.regular;
 }
 
@@ -128,9 +153,9 @@ export function getStemAttachmentRadius(
  * duodecimal digit for the LH and right of it for the RH.
  *
  * Vertically the stem starts at `note.y + dir * effectiveRadius` — flush on the
- * outer edge of the knockout disc (or of the halo ring at tick 0) — and runs to
- * the canonical `stemLength` measured from the notehead centre, so the visible
- * stem stays substantial while never touching the glyph or the halo.
+ * outer edge of the rectangular mask (or of the halo ring at tick 0) — and
+ * runs to the canonical `stemLength` measured from the notehead centre, so the
+ * visible stem stays substantial while never touching the glyph or the halo.
  */
 export function getStemGeometry(
   note: JankoRhythmNote,
@@ -157,19 +182,16 @@ export function renderStem(
 }
 
 /**
- * Augmentation dot for dotted durations (Round 16).
+ * Augmentation dot for dotted durations (Round 17 hug fit).
  *
- * The dot is **always right of its own head**, for both hands, tight to the
- * elliptical mask (`note.dotX = note.x + rx + augmentationDotGap`, resolved by
- * the engine), and **always in the inter-row gap above** (`note.dotY`, half a
- * whole-tone row above the head — standard-analog: a line note dots the space
- * above). An on-row dot cannot clear the next column's mask in a 16th-note
- * grid (columns 10.2pt apart); the inter-row lane can. Falls back to the head
- * row and the circular offset for callers that build a `JankoRhythmNote` by
- * hand.
+ * The dot is **always right of its own head**, for both hands, hugging the
+ * mask's top-right corner (`note.dotX = note.x + wx + augmentationDotGap`,
+ * `note.dotY` in the hug lane above the head — both resolved by the engine).
+ * Falls back to the head row and the golden mask offset for callers that build
+ * a `JankoRhythmNote` by hand.
  */
 function renderAugmentationDot(note: JankoRhythmNote, tokens: ResolvedJankoTokens): string {
-  const cx = note.dotX ?? note.x + tokens.noteheadRadius + tokens.augmentationDotGap;
+  const cx = note.dotX ?? note.x + getClusterSpacingPreset().wx + tokens.augmentationDotGap;
   const cy = note.dotY ?? note.y;
   return `    <circle class="janko-augmentation-dot" cx="${f(cx)}" cy="${f(cy)}" r="${f(tokens.augmentationDotRadius)}" fill="#111111"/>`;
 }
