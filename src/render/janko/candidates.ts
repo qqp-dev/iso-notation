@@ -42,6 +42,16 @@ export interface JankoCandidateRound {
   title: string;
   /** One-paragraph design question the candidates are answering. */
   description: string;
+  /**
+   * The round's **open axes**: the option keys the candidates exist to decide.
+   *
+   * Every candidate states its value on an open axis as a badge, even when that
+   * value happens to be the incumbent golden one — the axis itself is the
+   * question on the table. Every other key keeps the strict *delta* rule, so a
+   * locked decision (the flared bracket, the clasp paradigm, the rest dialect)
+   * rides along as shared fixed context and never appears as a candidate badge.
+   */
+  openAxes?: string[];
 }
 
 /** One engraving window a candidate is demonstrated on. */
@@ -106,120 +116,86 @@ export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
  * gap-gated vertical chording, round 8 the symmetrical clasp with the
  * beam-harmonized tab, round 9 the midpoint duration taxonomy, round 10 the
  * scaled midpoint clasps with the retired accolade, round 11 the four System 1
- * start replacements with the light transverse cuts, and round 12 the rest
- * symbol dialects on the continuous vertical grid. Round 13 answers the
- * operator's verdict on that round: the rest **moves onto the voice contour**
- * of its own hand (no more sky-floating Octave 4 equator), the System 1 start
- * is standardized to the **flared 0.65pt architectural bracket**, a beam may no
- * longer bridge the rest that interrupts it, and the four high-fidelity rest
- * finalists — authentic Urtext, phantom notehead, geometric node and the
- * corrected downward-hooked kinetic monoline — are compared side by side.
+ * start replacements with the light transverse cuts, round 12 the rest symbol
+ * dialects on the continuous vertical grid, and round 13 the voice-contour
+ * rests under the flared 0.65pt bracket. Round 14 answers the operator's
+ * verdict on those three: the flared bracket is **canonical** (no longer a
+ * candidate), the **per-hand clasp is restored** so a wide-span chord can never
+ * stack per-note stems through its own heads, the m. 4 rest keeps its beam
+ * break and gains a **guaranteed-clear pocket** — and the whole round is one
+ * question again: how the continuous vertical grid is written against the
+ * music, on the dense 16ths of mm. 27–28.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 13,
-  title: 'Voice Contour Rests, Flared 0.65pt Bracket & Beam Discontinuity',
+  round: 14,
+  title: 'Grid Writing Policy: On the Lines, Between the Lines, Barline-Only',
   description:
-    'Comparing 4 high-fidelity rest dialects anchored on the melodic voice contour, under the standardized flared 0.65pt architectural bracket, with beams that break across rests and multi-system crops that no longer collapse to an empty white page.',
+    'The three ways the continuous vertical grid can meet the music, compared all else equal on the dense 16th-note run of mm. 27–28 in one full-width system: start the columns ON the barline and the beat pulses and let the glyph masks knock the grid out (unified transparent), keep every column BETWEEN the lines and paint the grid through dedicated white air channels that no stem may overwrite (strict protected), or clear the barlines but write the pulses over the beat columns (overlaid). The flared 0.65pt System 1 bracket, the per-hand clasp and the pocket-seated m. 4 rest are settled engineering, identical in every candidate.',
+  openAxes: ['gridWritingPolicy'],
 };
 
 /**
- * The four display windows every Round 13 candidate is engraved on: the Bach
- * opening (the standardized flared 0.65pt architectural bracket), the Bach
- * Var. 1 m. 4 silence (the four rest dialects at tick 552, resolving the RH
- * syncopation on the Octave 3 voice contour, plus the `528 540 | 564` beam
- * break), the Bach Var. 1 mm. 27–28 dense-sixteenth run (**one** system, full
- * measure width — the Round 12 window straddled Systems 6 and 7 and collapsed
- * to a 1pt white strip), and the **wide-span chord specimen**, whose dense
- * four-voice chords carry the contour-anchored silence of their m. 2 measure.
+ * The one display window every Round 14 candidate is engraved on: Bach
+ * Goldberg Var. 1 mm. 27–28, the dense sixteenth-note run, in **one** system at
+ * its true measure width. The grid-writing question is only legible where the
+ * grid and the music actually meet on every 16th, so the locked decisions
+ * (bracket, clasp, rest placement) deliberately get no showcase slot here.
  */
-const ROUND_13_WINDOWS: JankoCandidateWindow[] = [
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 2,
-    title:
-      'Bach Goldberg Var. 1 · mm. 1–2 — the standardized System 1 start: one 0.65pt architectural rule clasping Octaves 5 … 2, its 3.0pt spurs flaring 13° diagonally outward',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 4,
-    measureCount: 1,
-    title:
-      'Bach Goldberg Var. 1 · m. 4 — the 4 rest dialects at tick 552, anchored on the RH voice contour (target y = 166pt, the midpoint of digit 9 at 158.5pt and digit 0 at 173.5pt, fitted to the nearest legal position beside the LH D3 head), with the beam breaking at the rest: 528 + 540 beamed, 564 an independent flagged 16th',
-  },
+const ROUND_14_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
     measureStart: 27,
     measureCount: 2,
     title:
-      'Bach Goldberg Var. 1 · mm. 27–28 — one system at full width: the dense sixteenths under the continuous barline + beat-pulse grid across Middle C (the Round 12 cross-system window collapsed to an empty white page)',
-  },
-  {
-    scoreId: SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 2,
-    title:
-      'Wide-Span Chord Specimen · the m. 2 voice-contour 8th rest anchored on the mean register of the four-voice chords that surround it (y = 121pt) — the written silence inside a dense chordal texture',
+      'Bach Goldberg Var. 1 · mm. 27–28 — the dense sixteenths in one full-width system: who owns the overlap where the continuous barline + beat-pulse grid meets the note columns',
   },
 ];
 
 /**
- * The active candidate set — the four Round 13 rest finalists, all engraved
- * under the **standardized** flared 0.65pt architectural bracket and the golden
- * chord grouping. Order is the display order in the Decision Candidates Matrix.
- * A candidate therefore varies the round's **single** question — the ink a
- * silent span leaves on its hand's voice contour: authentic calligraphic
- * Urtext, phantom notehead, geometric pause node, or the corrected
- * downward-hooked kinetic monoline.
+ * The active candidate set — the three grid writing policies, all else equal.
+ * Order is the display order in the Decision Candidates Matrix.
+ *
+ * Each candidate states the round's **open axis** (`gridWritingPolicy`) and
+ * nothing else: the flared 0.65pt bracket and the per-hand clasp are declared
+ * as the shared fixed context they now are (both equal the golden master, so
+ * neither ever shows as a delta badge).
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'classical-urtext-flared-bracket',
-    label: 'A · Authentic Classical Urtext Rest / Flared Bracket',
+    id: 'unified-transparent-grid',
+    label: 'A · Unified Transparent Grid — columns ON the lines',
     description:
-      'The timeless calligraphic Urtext rest, redrawn with true SMuFL vector grammar: a slightly slanted calligraphic stem whose single hook (8th) or double hook (16th) sweeps left into a solid teardrop bulb, the serpentine 𝄽 lightning for a quarter and a solid 6 × 2.5pt block sitting on the contour for a half. Instantly recognizable to any reader, and anchored exactly where the missing note would have been. The system opens on the standardized flared 0.65pt architectural bracket.',
+      'The vertical grid becomes a pure background coordinate: the note field withdraws the measure inset, so a downbeat column starts exactly ON the barline and every beat pulse runs straight through the beat columns. The glyph masks then own the overlap — a circular knockout erases the barline exactly as it erases a beat pulse, and no stem or beam is ever asked to step aside. The music reads as one uninterrupted line of sixteenths; the grid survives only in the air between the notes.',
     options: {
-      restStyle: 'classical-urtext',
-      systemStartStyle: 'architectural-bracket',
+      gridWritingPolicy: 'unified-transparent-grid',
+      chordGrouping: 'per-hand-clasp',
     },
-    windows: ROUND_13_WINDOWS,
-    tags: ['calligraphic 𝄿 𝄾 𝄽', 'teardrop bulbs', 'flared 0.65pt bracket'],
+    windows: ROUND_14_WINDOWS,
+    tags: ['columns ON barline + pulses', 'glyph masks own the overlap', 'full measure width'],
   },
   {
-    id: 'phantom-notehead-flared-bracket',
-    label: 'B · Phantom Notehead Rest / Flared Bracket',
+    id: 'strict-protected-grid',
+    label: 'B · Strict Protected Grid — columns BETWEEN the lines',
     description:
-      'An open dashed notehead (R = 3.0pt) standing exactly where the unvoiced note would have been, carrying the score’s own duration grammar: a monoline stem with one downward-hooked flag for an 8th, two for a 16th, the bare stem for a quarter and a calm hollow dashed bar for a half. The silence keeps the melodic contour of the line it interrupts — the eye reads the missing note, not an abstract pause. The system opens on the standardized flared 0.65pt architectural bracket.',
+      'The grid is never overwritten. Every barline and every beat pulse is painted above the rhythm layer through its own dedicated white air channel, so a stem or beam that would cross a grid line is cut by the channel instead — the line stays unbroken from the Octave 5 rule to the Octave 2 rule. The columns keep the canonical measure inset and stay clear of the barlines. Nothing in the engraving may touch the grid; the cost is the air the channels take out of the stems.',
     options: {
-      restStyle: 'phantom-notehead',
-      systemStartStyle: 'architectural-bracket',
+      gridWritingPolicy: 'strict-protected-grid',
+      chordGrouping: 'per-hand-clasp',
     },
-    windows: ROUND_13_WINDOWS,
-    tags: ['dashed phantom head R 3.0pt', 'downward-hooked flags', 'voice-contour anchor'],
+    windows: ROUND_14_WINDOWS,
+    tags: ['white air channels', 'grid never overwritten', 'protected measure inset'],
   },
   {
-    id: 'geometric-node-flared-bracket',
-    label: 'C · Geometric Pause Node / Flared Bracket',
+    id: 'overlaid-beat-grid',
+    label: 'C · Overlaid Beat Grid — clear of the barline, over the pulses',
     description:
-      'Minimalist pause nodes centred on the voice contour: a hollow 4 × 4pt diamond with two lateral tick rays for a 16th, one ray for an 8th, a solid 5 × 5pt diamond for a quarter and an open capsule for a half — pure geometry, zero calligraphy, the smallest footprint of the four so it nestles deepest into the contour. The system opens on the standardized flared 0.65pt architectural bracket.',
+      'The incumbent balance: the barlines are protected — every column keeps a real inset and no glyph may approach them — while the dashed beat pulses are painted first, beneath the rhythm layer, and are simply written over by the notes. The barline reads as a hard structural boundary and the beat pulses as a soft background pulse that the music owns wherever the two meet. This is the policy the golden master has carried since Round 12.',
     options: {
-      restStyle: 'geometric-node',
-      systemStartStyle: 'architectural-bracket',
+      gridWritingPolicy: 'overlaid-beat-grid',
+      chordGrouping: 'per-hand-clasp',
     },
-    windows: ROUND_13_WINDOWS,
-    tags: ['geometric nodes', 'smallest footprint', 'flared 0.65pt bracket'],
-  },
-  {
-    id: 'kinetic-monoline-flared-bracket',
-    label: 'D · Corrected Kinetic Monoline Rest / Flared Bracket',
-    description:
-      'The golden rest dialect with its kinetic tabs corrected: a slender 12pt monoline stem on the voice contour whose 12.4° tabs now hook **downward** to the right, exactly like the score’s own beam-harmonized flags — two for a 16th, one for an 8th — a central horizontal notch for a quarter and a hollow 7 × 2.2pt bar for a half. The silence speaks the kinetic language of the subdivision tab and the clasp slash. The system opens on the standardized flared 0.65pt architectural bracket.',
-    options: {
-      restStyle: 'kinetic-monoline',
-      systemStartStyle: 'architectural-bracket',
-    },
-    windows: ROUND_13_WINDOWS,
-    tags: ['downward 12.4° kinetic tabs', 'voice-contour anchor', 'flared 0.65pt bracket'],
+    windows: ROUND_14_WINDOWS,
+    tags: ['protected barlines', 'pulses overlaid beneath the notes', 'incumbent policy'],
   },
 ];
 
@@ -268,24 +244,44 @@ export interface CandidateOptionBadge {
   value: string;
   /** The golden-master value this candidate departs from. */
   golden: string;
+  /**
+   * True when the key is one of the round's **open axes** (see
+   * {@link JankoCandidateRound.openAxes}). An open-axis badge is always shown,
+   * even when the candidate's value equals the golden master, because the axis
+   * itself is the question on the table.
+   */
+  axis?: boolean;
 }
 
-/** Option/token deltas of a candidate versus the golden master. */
-export function candidateBadges(candidate: JankoCandidate): CandidateOptionBadge[] {
+/**
+ * Option/token deltas of a candidate versus the golden master.
+ *
+ * A key is badged when the candidate's value **differs** from the golden
+ * master, or when the key is one of the round's open axes — so every candidate
+ * states its value on the round's question (including the incumbent one) while
+ * a locked decision that rides along as shared context never shows up.
+ */
+export function candidateBadges(
+  candidate: JankoCandidate,
+  round: JankoCandidateRound = CURRENT_ROUND_METADATA
+): CandidateOptionBadge[] {
   const badges: CandidateOptionBadge[] = [];
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const goldenTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const openAxes = new Set(round.openAxes ?? []);
 
   for (const [key, value] of Object.entries(candidate.options ?? {})) {
     const gold = (golden as unknown as Record<string, unknown>)[key];
-    if (gold !== value) {
-      badges.push({ key, value: String(value), golden: String(gold) });
+    const axis = openAxes.has(key);
+    if (gold !== value || axis) {
+      badges.push({ key, value: String(value), golden: String(gold), ...(axis ? { axis } : {}) });
     }
   }
   for (const [key, value] of Object.entries(candidate.tokens ?? {})) {
     const gold = (goldenTokens as unknown as Record<string, unknown>)[key];
-    if (gold !== value) {
-      badges.push({ key, value: String(value), golden: String(gold) });
+    const axis = openAxes.has(key);
+    if (gold !== value || axis) {
+      badges.push({ key, value: String(value), golden: String(gold), ...(axis ? { axis } : {}) });
     }
   }
   if (badges.length === 0) {

@@ -7,7 +7,7 @@
  * suite covers, in order:
  *
  *  1. the token grammar (clasp width / stroke / offset / barline air) and the
- *     golden-master default (`chordGrouping: 'none'`);
+ *     Round 14 golden-master default (`chordGrouping: 'per-hand-clasp'`);
  *  2. the duration grammar (pip, notch counts, the dotted-value dot);
  *  3. the bracket geometry — `claspX = minX − r − claspOffset`,
  *     `topY = minY − r`, `botY = maxY + r`, caps of `claspWidth`;
@@ -116,12 +116,16 @@ function layouts(
 // 1. Tokens & options
 // ---------------------------------------------------------------------------
 
-test('Clasp tokens: geometry lands on the ticket defaults, golden grouping stays none', () => {
+test('Clasp tokens: geometry lands on the ticket defaults, and Round 14 restores the per-hand clasp', () => {
   assert.equal(DEFAULT_JANKO_TOKENS.claspWidth, 2.2, 'cap reach');
   assert.equal(DEFAULT_JANKO_TOKENS.claspStrokeWidth, 0.85, 'bracket stroke');
   assert.equal(DEFAULT_JANKO_TOKENS.claspOffset, 2.8, 'disc-to-spine air');
   assert.equal(DEFAULT_JANKO_TOKENS.claspMinBarlineAir, 4.0, 'downbeat barline air');
-  assert.equal(DEFAULT_JANKO_OPTIONS.chordGrouping, 'none', 'the golden master keeps per-note stems');
+  assert.equal(
+    DEFAULT_JANKO_OPTIONS.chordGrouping,
+    'per-hand-clasp',
+    'the golden master groups every hand simultaneity so no stem can cut a chord tone'
+  );
   assert.equal(
     DEFAULT_JANKO_OPTIONS.claspDurationStyle,
     'kinetic-cross-slashes',
@@ -1169,14 +1173,16 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the spines, in
 // ---------------------------------------------------------------------------
 
 test('Engine integrity: a real 16th-note beam is never cut, only standalone chord stems are replaced', () => {
-  const golden = layouts('none');
+  // The unclasped paradigm is the historical baseline of this comparison, not
+  // the golden master any more (Round 14 restored the per-hand clasp).
+  const unclasped = layouts('none');
   for (const mode of ['left-clasp-spire', 'beamed-clasp-rail', 'bounding-phrase'] as const) {
     const withClasps = layouts(mode);
     // Beams are byte-identical in count and geometry: the clasp groups clusters,
     // it never re-partitions melodic writing.
     assert.deepEqual(
       withClasps.map((l) => l.beams.map((b) => b.notes.map((n) => n.id).join(','))),
-      golden.map((l) => l.beams.map((b) => b.notes.map((n) => n.id).join(','))),
+      unclasped.map((l) => l.beams.map((b) => b.notes.map((n) => n.id).join(','))),
       `${mode} keeps every beam group`
     );
     // Only notes that are NOT part of a beam may lose their standalone stem, and
@@ -1197,12 +1203,13 @@ test('Engine integrity: a real 16th-note beam is never cut, only standalone chor
       }
     }
   }
-  // The golden master replaces nothing.
-  assert.deepEqual(golden.flatMap((l) => l.claspedStems), []);
-  assert.deepEqual(golden.flatMap((l) => l.clasps), []);
+  // The unclasped paradigm replaces nothing (and paints every stem straight
+  // through its chord tones — the defect `stem-through-simultaneity` names).
+  assert.deepEqual(unclasped.flatMap((l) => l.claspedStems), []);
+  assert.deepEqual(unclasped.flatMap((l) => l.clasps), []);
 });
 
-test('Every chord-grouping paradigm engraves both benchmarks with zero diagnostics', () => {
+test('Every clasping paradigm engraves both benchmarks with zero diagnostics', () => {
   for (const mode of JANKO_CHORD_GROUPINGS) {
     const bach = lintJankoScore(BACH, { ...DEFAULT_JANKO_OPTIONS, chordGrouping: mode }, T);
     assert.deepEqual(
@@ -1215,6 +1222,23 @@ test('Every chord-grouping paradigm engraves both benchmarks with zero diagnosti
       { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: mode },
       BRAHMS_T
     );
+    if (mode === 'none') {
+      // Round 14: the unclasped paradigm is exactly the regression the new
+      // simultaneity audit exists to catch — it paints one full-length stem per
+      // chord tone, straight through the discs of its own simultaneity. It is
+      // the only diagnostic the unclasped rendering may produce.
+      assert.ok(brahms.diagnostics.length > 0, 'Brahms · none trips the simultaneity audit');
+      assert.deepEqual(
+        [...new Set(brahms.diagnostics.map((d) => d.code))],
+        ['stem-through-simultaneity'],
+        'the unclasped paradigm fails on nothing but the stems through its chord tones'
+      );
+      assert.ok(
+        brahms.diagnostics.every((d) => d.severity === 'error'),
+        'a painted stem through a chord tone is a violation, never a warning'
+      );
+      continue;
+    }
     assert.deepEqual(
       brahms.diagnostics.map((d) => `${d.code}: ${d.message}`),
       [],
@@ -1224,6 +1248,10 @@ test('Every chord-grouping paradigm engraves both benchmarks with zero diagnosti
   assert.ok(
     JANKO_LINT_CHECKS.includes('clasp-clearance'),
     'the clasp audit is part of the published check list'
+  );
+  assert.ok(
+    JANKO_LINT_CHECKS.includes('stem-simultaneity'),
+    'the Round 14 simultaneity audit is part of the published check list'
   );
 });
 

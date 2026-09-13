@@ -68,7 +68,7 @@ import {
   renderStaffLines,
   renderTimeSignature,
 } from './elements/staff';
-import { renderNotehead } from './elements/notehead';
+import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, renderNotehead } from './elements/notehead';
 import {
   JankoBeamGroupGeometry,
   JankoChordBridge,
@@ -77,6 +77,7 @@ import {
   JankoRhythmNote,
   JankoVerticalChordGroup,
   CLASP_MARK_REACH,
+  CLASP_MIN_VERTICAL_CHORD,
   claspInkBox,
   claspQualifies,
   computeBeamGroupGeometry,
@@ -517,9 +518,10 @@ export const MARGIN_DIGIT_ADVANCE = 0.35;
 export const MARGIN_NUMERAL_FONT_SIZE = 7.0;
 
 /**
- * Does a system-start style paint any margin ink? `'open-halo'` (the golden
- * default) and `'none'` leave the margin empty, so nothing is painted — and
- * nothing is reserved — for them.
+ * Does a system-start style paint any margin ink? `'open-halo'` and `'none'`
+ * leave the margin empty, so nothing is painted — and nothing is reserved —
+ * for them. The golden master's `'architectural-bracket'` does paint (and
+ * reserve) the flared 0.65pt rule.
  */
 export function paintsSystemStartInk(style: JankoSystemStartStyle): boolean {
   return (
@@ -544,7 +546,7 @@ export function getMarginFurniture(
   t: ResolvedJankoTokens,
   measureNumber: number,
   digitAdvance: number = MARGIN_DIGIT_ADVANCE,
-  systemStartStyle: JankoSystemStartStyle = 'open-halo'
+  systemStartStyle: JankoSystemStartStyle = 'architectural-bracket'
 ): { numeral: JankoBox; accolade: JankoBox | null } {
   // Round 11: the numeral moves into the true left margin
   // (`x = staffLeft − 10.0pt`) and is set flush right against the staff column,
@@ -597,8 +599,9 @@ export function getMarginFurniture(
  * Round 7 draws the accolade **strictly at the start of the piece**
  * (`systemIndex === 0`); an intermediate system opens from the bare left
  * margin, so it neither paints nor reserves a system-start box. Round 10
- * retires the copperplate accolade by default: `'open-halo'` paints no margin
- * ink at all.
+ * retires the copperplate accolade; Round 14 settles the flared
+ * `'architectural-bracket'` as the golden system start, so System 1 normally
+ * reserves (and paints) the 0.65pt rule.
  */
 export function systemFurniture(
   geometry: JankoSystemGeometry,
@@ -794,9 +797,15 @@ export interface JankoSystemLayout {
   /**
    * Round 12 voice rests: the written silences of this system, one per inactive
    * span of a hand inside a measure that hand is active in (see
-   * {@link computeJankoRests}).
+   * {@link computeJankoRestLayer}).
    */
   rests: JankoRestGeometry[];
+  /**
+   * Round 14: silences the rest fit rule **refused to write**, each with its
+   * reason. The linter republishes them as `rest-unwritable` diagnostics, so a
+   * refused rest is never a silent omission.
+   */
+  unwrittenRests: JankoUnwrittenRest[];
   /** External left clasps of the chord-grouping paradigm ([] for `'none'`). */
   clasps: JankoClaspGroupGeometry[];
   /** Rails joining contiguous clasps (`'beamed-clasp-rail'` only). */
@@ -1037,6 +1046,38 @@ export function positionJankoNote(
 export const REST_NOTEHEAD_AIR = 1.0;
 
 /**
+ * Round 14 **guaranteed pocket air** (pt): the air the fit solver reserves
+ * between a rest's ink box and every foreign notehead disc.
+ *
+ * `REST_NOTEHEAD_AIR` is the linter's *hard floor* — the clearance below which
+ * a painted rest is a violation. Seating a rest exactly on that floor is what
+ * produced the Round 13 "slid into an unreadable spot" defect: the ink grazed
+ * the disc it had been pushed against. The solver therefore seats a rest in a
+ * **pocket** whose air is `2 × minClearance +` the rest stroke's half-width
+ * (`2.0 + 0.45 ≈ 2.4pt`), so the silence reads as its own written sign and not
+ * as a hairline touch on the head it stands beside. The linter's floor is
+ * unchanged — a pocket fit always satisfies it with room to spare.
+ */
+export const REST_POCKET_AIR = 2.4;
+
+/**
+ * Effective clearance radius (pt) the rest fit keeps around one notehead: the
+ * notehead disc — or the wider Position of Honor halo ring for the tick-0
+ * opening sounds, exactly as `checkRestClearance` measures it — plus the
+ * guaranteed {@link REST_POCKET_AIR} and the float-safety
+ * {@link REST_FIT_MARGIN}.
+ */
+function restClearanceRadius(
+  p: PositionedJankoNote,
+  t: ResolvedJankoTokens
+): number {
+  const glyph = isPositionOfHonor(p.note.startTick)
+    ? Math.max(t.noteheadRadius, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
+    : t.noteheadRadius;
+  return glyph + REST_POCKET_AIR + REST_FIT_MARGIN;
+}
+
+/**
  * System-local measure index of an absolute tick (mirrors
  * {@link getMeasureIndexOfTick}, which needs a note).
  */
@@ -1154,24 +1195,28 @@ function voiceContourTargetY(
 }
 
 /**
- * Extra air (pt) the fit solver keeps beyond the hard
- * `noteheadRadius + REST_NOTEHEAD_AIR` rule, so a solved position can never be
- * reported by the linter's float-exact `rest-clearance` audit.
+ * Extra air (pt) the fit solver keeps beyond the guaranteed
+ * {@link REST_POCKET_AIR}, so a solved position can never be reported by the
+ * linter's float-exact `rest-clearance` audit.
  */
 export const REST_FIT_MARGIN = 0.02;
 
 /**
- * Round 13 rest fit: slide the contour anchor to the **nearest legal y**.
+ * Round 14 rest fit: seat the contour anchor in the **nearest clear pocket**.
  *
  * The ink box of a dialect is a fixed rectangle translated vertically with the
  * rest, so a notehead at `(px, py)` forbids exactly the y-interval in which the
- * box comes closer than `noteheadRadius + REST_NOTEHEAD_AIR`. The solver
- * collects those intervals (only the notes whose disc reaches the box's column
- * band can contribute), merges them and returns the legal y nearest the contour
- * target — never the sky-floating equator of Round 12 and never an arbitrary
- * snap. Positions outside the grand staff are refused, so a rest can only slide
- * within the staff it belongs to; `null` means the column is walled in and the
- * rest is left unwritten (exactly like a clasp the fit rule refuses).
+ * box comes closer than {@link restClearanceRadius} — the glyph radius plus the
+ * guaranteed {@link REST_POCKET_AIR}. The solver collects those intervals (only
+ * the notes whose disc reaches the box's column band can contribute), merges
+ * them and returns the legal y nearest the contour target — never the
+ * sky-floating equator of Round 12, never an arbitrary snap, and never a
+ * hairline graze of the very disc the pocket was carved around. Positions
+ * outside the grand staff are refused, so a rest can only slide within the
+ * staff it belongs to (unless its own voice sings outside it); `null` means the
+ * column is walled in on both sides and the rest is **named** as unwritable
+ * rather than silently dropped or slid into a collision (see
+ * {@link computeJankoRestLayer}).
  */
 export function resolveRestY(
   rest: JankoRestGeometry,
@@ -1181,11 +1226,11 @@ export function resolveRestY(
 ): number | null {
   const target = rest.y;
   const probe = restInkBox(rest, t);
-  const radius = t.noteheadRadius + REST_NOTEHEAD_AIR + REST_FIT_MARGIN;
 
   // Forbidden y-windows, relative to the target.
   const forbidden: Array<[number, number]> = [];
   for (const p of notes) {
+    const radius = restClearanceRadius(p, t);
     const reach = p.x < probe.x0 ? probe.x0 - p.x : p.x > probe.x1 ? p.x - probe.x1 : 0;
     if (reach >= radius) continue;
     const half = Math.sqrt(Math.max(0, radius * radius - reach * reach));
@@ -1226,7 +1271,43 @@ export function resolveRestY(
 }
 
 /**
- * Round 12 voice rests, anchored on the Round 13 **voice contour**.
+ * One silence the engine **refused to write**, with the exact reason. Round 14:
+ * a rest is never silently dropped any more — the refusal is a named
+ * diagnostic the linter republishes as `rest-unwritable`, so a designer always
+ * sees why a hand's silence carries no sign.
+ */
+export interface JankoUnwrittenRest {
+  /** Absolute tick the silence opens on. */
+  tick: number;
+  /** Duration (ticks) of the silence. */
+  durationTicks: number;
+  /** Hand the silence belongs to. */
+  hand: Hand;
+  /** Standard value the silence has. */
+  value: JankoRestGeometry['value'];
+  /** Canonical beat column of the silence (page pt). */
+  x: number;
+  /** The voice-contour target the pocket could not honour (page pt). */
+  targetY: number;
+  /**
+   * Why the silence is unwritten: the column is walled in on both sides
+   * (`'no-pocket'`), or it opens exactly on a barline the active grid policy
+   * protects (`'protected-barline'`).
+   */
+  reason: 'no-pocket' | 'protected-barline';
+}
+
+/** The written silences of one system plus every silence the fit rule refused. */
+export interface JankoRestLayer {
+  /** The rests actually painted, in engraving order. */
+  rests: JankoRestGeometry[];
+  /** The silences refused by the fit rule, with the reason for each. */
+  unwritten: JankoUnwrittenRest[];
+}
+
+/**
+ * Round 12 voice rests, anchored on the Round 13 **voice contour** and seated
+ * by the Round 14 **pocket** fit.
  *
  * A hand's **inactive span inside an active measure** is written with the active
  * rest dialect: the engine walks one hand's onsets in the system, and wherever
@@ -1242,32 +1323,31 @@ export function resolveRestY(
  *   tick 540 (digit `9`, `y = 158.5pt`), releases at 552 and resumes at 564
  *   (digit `0`, `y = 173.5pt`), while the LH enters at 552 — so a **16th rest**
  *   stands in the Right Hand at `x ≈ 545.0pt` (the tick-552 beat column) on the
- *   Octave 3 voice contour (`(158.5 + 173.5) / 2 = 166.0pt`), nestled between
- *   the two notes instead of floating on the Octave 4 equator 30pt above them.
- *   The LH's own D3 head at that same column then decides how far the contour
- *   can be honoured: {@link resolveRestY} slides the anchor to the nearest legal
- *   y of the voice, so the written rest never collides with the ink it stands
- *   beside.
+ *   Octave 3 voice contour (`(158.5 + 173.5) / 2 = 166.0pt`), seated by
+ *   {@link resolveRestY} in the clear pocket above the LH D3 head that shares
+ *   its column, with the guaranteed {@link REST_POCKET_AIR} of air.
  * - A silence that is not a standard value (a 2.5-beat gap, a tie artefact) is
- *   left unwritten rather than approximated.
- * - A rest whose ink cannot clear the noteheads of the system (either hand) at
- *   any position inside the staff is dropped by {@link resolveRestY}, exactly
- *   like a bracket the fit rule refuses.
+ *   left unwritten rather than approximated — that is a **non-silence**, not a
+ *   refusal, so it is not reported.
+ * - A rest whose ink cannot clear the noteheads of the system (either hand) in
+ *   any pocket inside the staff is returned in `unwritten` by
+ *   {@link resolveRestY}, exactly like a bracket the fit rule refuses.
  */
-export function computeJankoRests(
+export function computeJankoRestLayer(
   score: QuantizedGridScore,
   geo: JankoSystemGeometry,
   systemIndex: number,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
   notes: readonly PositionedJankoNote[]
-): JankoRestGeometry[] {
+): JankoRestLayer {
   const anacrusis = t.anacrusisTicks ?? 0;
   const startTick =
     systemIndex === 0 ? 0 : anacrusis + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure;
   const endTick = anacrusis + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure;
   const sysNotes = score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick);
   const out: JankoRestGeometry[] = [];
+  const unwritten: JankoUnwrittenRest[] = [];
 
   for (const hand of ['RH', 'LH'] as const) {
     // One release per onset: a chord is silent only when every member is.
@@ -1298,26 +1378,60 @@ export function computeJankoRests(
         value: restValueForTicks(gap),
         style: o.restStyle,
       };
+      const refused = (reason: JankoUnwrittenRest['reason']): void => {
+        unwritten.push({
+          tick: candidate.tick,
+          durationTicks: candidate.durationTicks,
+          hand: candidate.hand,
+          value: candidate.value,
+          x: candidate.x,
+          targetY: candidate.y,
+          reason,
+        });
+      };
       // A rest never straddles a protected barline: when a silence opens exactly
       // on a measure boundary, that column belongs to the grid. The transparent
       // policy reserves nothing, so there the rest is admitted like any glyph.
       if (protectsBarlineInk(o.gridWritingPolicy)) {
         const opening = getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t);
         if (opening !== null && Math.abs(candidate.x - opening) < t.noteheadRadius + REST_NOTEHEAD_AIR) {
+          refused('protected-barline');
           continue;
         }
       }
-      // Round 13: the contour target is the *musical* anchor; the fit solver
-      // then slides it to the nearest legal position along that voice (or drops
-      // the rest when the column is walled in on both sides).
+      // Round 14: the contour target is the *musical* anchor; the pocket solver
+      // seats it in the nearest guaranteed-clear pocket along that voice, or
+      // names the column unwritable when it is walled in on both sides.
       const y = resolveRestY(candidate, notes, geo, t);
-      if (y === null) continue;
+      if (y === null) {
+        refused('no-pocket');
+        continue;
+      }
       candidate.y = y;
       out.push(candidate);
     }
   }
 
-  return out.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1));
+  return {
+    rests: out.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1)),
+    unwritten: unwritten.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1)),
+  };
+}
+
+/**
+ * The written silences of one system (the `rests` half of
+ * {@link computeJankoRestLayer}). Kept as the ergonomic read-only entry point
+ * for callers that only need the painted ink.
+ */
+export function computeJankoRests(
+  score: QuantizedGridScore,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  notes: readonly PositionedJankoNote[]
+): JankoRestGeometry[] {
+  return computeJankoRestLayer(score, geo, systemIndex, o, t, notes).rests;
 }
 
 // ---------------------------------------------------------------------------
@@ -1417,6 +1531,15 @@ export const CLASP_EPS = 1e-6;
  * `tokens.claspMinBarlineAir` of air from the barline it follows
  * (`claspX ≥ measureLeft + claspMinBarlineAir`).
  *
+ * The reservation is **per paradigm**: the union paradigms
+ * (`'left-clasp-spire'` / `'beamed-clasp-rail'` / `'bounding-phrase'`) bracket
+ * the whole onset, so any two simultaneous heads drive it; the Round 6
+ * `'per-hand-clasp'` brackets **one hand's** qualifying group, so a cross-hand
+ * downbeat — the ordinary two-voice opening of a measure — reserves nothing.
+ * Counting the cross-hand pair would shift the whole measure right for a
+ * bracket that is never engraved (the Round 14 golden-master defect this
+ * predicate exists to prevent).
+ *
  * The map is keyed by the system-local measure index used by
  * {@link getMeasureIndexOfTick} (0-based, except on an anacrusis system where
  * the upbeat occupies slot 0 and the first full measure slot 1).
@@ -1434,28 +1557,62 @@ export function computeClaspInsetMap(
   const startTick =
     systemIndex === 0 ? 0 : anacrusis + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure;
   const endTick = anacrusis + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure;
+  const perHand = o.chordGrouping === 'per-hand-clasp';
 
   // Every onset of the system, bucketed by its system-local measure index.
-  const byMeasure = new Map<number, Map<number, number>>();
+  const byMeasure = new Map<number, Map<number, QuantizedNote[]>>();
   for (const note of score.notes) {
     if (note.startTick < startTick || note.startTick >= endTick) continue;
     const measureIdx = getMeasureIndexOfTick(note, geo, systemIndex, t);
     let ticks = byMeasure.get(measureIdx);
     if (!ticks) {
-      ticks = new Map<number, number>();
+      ticks = new Map<number, QuantizedNote[]>();
       byMeasure.set(measureIdx, ticks);
     }
-    ticks.set(note.startTick, (ticks.get(note.startTick) ?? 0) + 1);
+    const bucket = ticks.get(note.startTick);
+    if (bucket) bucket.push(note);
+    else ticks.set(note.startTick, [note]);
   }
 
   for (const [measureIdx, ticks] of byMeasure) {
     const firstTick = Math.min(...ticks.keys());
-    if ((ticks.get(firstTick) ?? 0) < 2) continue;
+    const onset = ticks.get(firstTick) ?? [];
+    const qualifies = perHand
+      ? perHandDownbeatQualifies(onset)
+      : onset.length >= 2;
+    if (!qualifies) continue;
     // Only a true downbeat can drive the clasp onto the opening barline.
     if (splitTick(firstTick, t).tickInMeasure !== 0) continue;
     map.set(measureIdx, getClaspDownbeatInset(t));
   }
   return map;
+}
+
+/**
+ * Does one hand of this downbeat onset qualify for a
+ * `'per-hand-clasp'` bracket — the same predicate `handClaspGroups` applies
+ * after the row-snapped solve, evaluated on the raw score: a hand's group needs
+ * {@link CLASP_MIN_VERTICAL_CHORD} heads, or two heads sharing one whole-tone
+ * row (which the parity offset will spread, making the bracket reach for the
+ * displaced pair). A clean two-note vertical stack and a lone melodic note
+ * never qualify.
+ */
+function perHandDownbeatQualifies(notes: readonly QuantizedNote[]): boolean {
+  const byHand = new Map<Hand, QuantizedNote[]>();
+  for (const note of notes) {
+    const hand = handForNote(note);
+    const bucket = byHand.get(hand);
+    if (bucket) bucket.push(note);
+    else byHand.set(hand, [note]);
+  }
+  for (const group of byHand.values()) {
+    if (group.length >= CLASP_MIN_VERTICAL_CHORD) return true;
+    // Two heads share a whole-tone row iff they share the octave and the
+    // pitch-class parity (the row's `(octave, rank)` identity).
+    const rows = new Set(group.map((n) => `${n.pitch.octave}|${n.pitch.pitchClass % 2}`));
+    if (rows.size < group.length) return true;
+  }
+  return false;
 }
 
 /**
@@ -2175,6 +2332,8 @@ export function layoutJankoSystem(
     }
   }
 
+  const restLayer = computeJankoRestLayer(score, geometry, systemIndex, o, t, notes);
+
   return {
     index: systemIndex,
     isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
@@ -2182,7 +2341,8 @@ export function layoutJankoSystem(
     notes,
     beams,
     ungrouped,
-    rests: computeJankoRests(score, geometry, systemIndex, o, t, notes),
+    rests: restLayer.rests,
+    unwrittenRests: restLayer.unwritten,
     clasps,
     claspRails,
     claspedStems,
@@ -2369,8 +2529,8 @@ export function renderSystem(
   }
   // Round 7: the system-start mark is drawn strictly at the start of the piece.
   // Every intermediate system opens from the bare left margin with no bounding
-  // barline. Round 10 retires the copperplate accolade: the default
-  // `'open-halo'` paints no margin ink at all.
+  // barline. Round 10 retires the copperplate accolade; Round 14 settles the
+  // flared 0.65pt architectural bracket as the golden System 1 start.
   if (systemIndex === 0) {
     const systemStart = renderAccolade(geo, o, t);
     if (systemStart.length > 0) out.push(systemStart);

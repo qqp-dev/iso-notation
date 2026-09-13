@@ -62,6 +62,8 @@ import {
   renderSystem,
   resolveRestY,
   restClearsLayout,
+  REST_FIT_MARGIN,
+  REST_POCKET_AIR,
 } from '../src/render/janko/engine';
 import {
   JankoRhythmNote,
@@ -86,6 +88,7 @@ import {
   renderHalo,
 } from '../src/render/janko/elements/notehead';
 import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
+import { restInkBox } from '../src/render/janko/elements/rests';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -865,7 +868,7 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
   assert.match(crop, /class="janko-beam"/);
 });
 
-test('Round 10 staff hierarchy: uniform equators, open margin and lightened numerals', () => {
+test('Round 10 staff hierarchy: uniform equators, canonical start mark and lightened numerals', () => {
   const score = buildBachGoldbergVar1Score();
   const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
 
@@ -878,10 +881,13 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
   );
   assert.ok(!staff.includes('#0F172A'), 'the 0.65pt inner-equator discrepancy is gone');
 
-  // Round 10 retires the copperplate accolade: the golden default opens the
-  // staff from the bare margin and the tokens stay reserved for the ruled
-  // system-start alternatives.
-  assert.equal(DEFAULT_JANKO_OPTIONS.systemStartStyle, 'open-halo', 'the open margin is the default');
+  // Round 10 retires the copperplate accolade; Round 14 settles the flared
+  // 0.65pt architectural bracket as the golden System 1 start.
+  assert.equal(
+    DEFAULT_JANKO_OPTIONS.systemStartStyle,
+    'architectural-bracket',
+    'the flared architectural bracket is the default'
+  );
   assert.equal(DEFAULT_JANKO_OPTIONS.finalBarlineStyle, 'unified', 'the unified final barline is the default');
   assert.deepEqual(
     [...JANKO_SYSTEM_START_STYLES],
@@ -905,17 +911,24 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
   assert.equal(DEFAULT_JANKO_TOKENS.augmentationDotRadius, 0.75, 'the dot falls to 0.75pt');
   assert.equal(DEFAULT_JANKO_OPTIONS.pageMargin, 24.0, 'the page margin widens to 24pt');
   assert.ok(!page.includes('janko-accolade'), 'the curlicue accolade is never painted');
-  assert.ok(!page.includes('janko-system-bracket'), 'nor is any other system-start mark');
+  // Only the very first system of the very first page opens with the bracket:
+  // the page object carries exactly one system-start mark.
+  assert.equal(
+    (page.match(/janko-system-bracket/g) ?? []).length,
+    1,
+    'the golden page paints exactly one system-start mark (System 1)'
+  );
+  assert.ok(!page.includes('janko-clef-pillar'), 'the Round 12 start finalists stay retired');
   const geo = computePageGeometry(OPTIONS, TOKENS);
   assert.equal(
     geo.staffLeft,
     24.0 + DEFAULT_JANKO_TOKENS.accoladeWidth + DEFAULT_JANKO_TOKENS.accoladeGap,
     'the staff column keeps its reserved margin inset'
   );
-  const openFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1);
-  assert.equal(openFurniture.accolade, null, 'the open margin reserves no accolade box');
-  const bracketFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1, undefined, 'architectural-bracket');
-  assert.ok(bracketFurniture.accolade, 'the architectural bracket reserves its own box');
+  const openFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1, undefined, 'open-halo');
+  assert.equal(openFurniture.accolade, null, 'the retired open margin reserves no accolade box');
+  const bracketFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1);
+  assert.ok(bracketFurniture.accolade, 'the golden architectural bracket reserves its own box');
   assert.ok(
     bracketFurniture.accolade!.x1 <= geo.systems[0].staffLeft,
     'the bracket stays left of the staff column'
@@ -982,7 +995,7 @@ test('Round 10 staff hierarchy: uniform equators, open margin and lightened nume
 //     the refined architectural start symbols
 // ---------------------------------------------------------------------------
 
-test('Round 13 voice contour rests: the m. 4 silence nestles in the Octave 3 line, not on the Octave 4 equator', () => {
+test('Round 14 pocket-seated rests: the m. 4 silence sits beside the D3 it accompanies, never on the Octave 4 equator', () => {
   const score = buildBachGoldbergVar1Score();
   assert.equal(DEFAULT_JANKO_OPTIONS.restStyle, 'kinetic-monoline', 'the settled rest dialect');
   const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
@@ -1015,10 +1028,14 @@ test('Round 13 voice contour rests: the m. 4 silence nestles in the Octave 3 lin
     m4.y > 158.5 && m4.y < 173.5,
     `the rest is nestled between digit 9 and digit 0 (y = ${m4.y.toFixed(2)})`
   );
-  // The 12pt kinetic stem keeps 1.0pt of air from the LH D3 head that sounds at
-  // the same column, so the anchor slides just 4.32pt up the voice — never back
-  // to the hand's default equator.
-  close(m4.y, 161.68, 'the nearest legal position on the voice contour', 0.05);
+  // The 12pt kinetic stem is seated in the clear pocket above the LH D3 head
+  // that sounds at the same column: the guaranteed REST_POCKET_AIR (2.4pt) plus
+  // the float-safety solver margin, so the anchor slides just 5.72pt up the
+  // voice — never back to the hand's default equator and never onto the disc.
+  close(m4.y, 160.28, 'the pocket seat on the voice contour', 0.05);
+  const m4Box = restInkBox(m4, TOKENS);
+  const d3 = layouts[0].notes.find((p) => p.note.startTick === 552)!;
+  close(d3.y - TOKENS.noteheadRadius - m4Box.y1, REST_POCKET_AIR + REST_FIT_MARGIN, 'the guaranteed pocket air', 5e-3);
 
   // Every rest states a standard value, is anchored on the nearest legal
   // position of its hand's own voice contour and never collides with a glyph.
@@ -1386,7 +1403,7 @@ test('Round 13 start symbols: the flared 0.65pt bracket, the 0.50pt bracket and 
   }
 });
 
-test('Round 10 system openness: open margin, unified final barline, no mid-piece marks', () => {
+test('Round 14 system openness: the canonical flared bracket opens System 1, no mid-piece marks', () => {
   const score = buildBachGoldbergVar1Score();
   const geo = computePageGeometry(OPTIONS, TOKENS);
   const total = countJankoSystems(score, OPTIONS, TOKENS);
@@ -1395,18 +1412,29 @@ test('Round 10 system openness: open margin, unified final barline, no mid-piece
       [...svg.matchAll(/class="janko-barline" x1="([\d.]+)"/g)].map((m) => Number(m[1]))
     );
 
-  // The golden default paints no system-start ink at all; the ruled styles are
-  // opt-in and still open the piece strictly at System 1.
+  // The golden default opens the piece with the flared 0.65pt architectural
+  // bracket — strictly at System 1; every other system stays an open margin.
   const first = renderSystem(score, getSystemGeometry(geo, 0), 0, OPTIONS, TOKENS);
-  assert.equal((first.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length, 0, 'open margin at the start');
-  const bracketOptions = { ...OPTIONS, systemStartStyle: 'architectural-bracket' as const };
-  const bracketed = renderSystem(score, getSystemGeometry(geo, 0), 0, bracketOptions, TOKENS);
   assert.match(
-    bracketed,
+    first,
     /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"/,
-    'the architectural bracket is a 0.65pt rule with 13° flared spurs'
+    'System 1 opens with the canonical flared 0.65pt bracket'
   );
-  const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, bracketOptions, TOKENS);
+  assert.ok(!first.includes('janko-accolade'), 'the copperplate accolade stays retired');
+  assert.ok(!first.includes('janko-clef-pillar'), 'the Round 12 finalists stay retired');
+  const bare = renderSystem(
+    score,
+    getSystemGeometry(geo, 0),
+    0,
+    { ...OPTIONS, systemStartStyle: 'none' as const },
+    TOKENS
+  );
+  assert.equal(
+    (bare.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length,
+    0,
+    'the inkless styles still paint no margin mark at all'
+  );
+  const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, OPTIONS, TOKENS);
   assert.equal((middle.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length, 0, 'no mid-piece mark');
 
   // Intermediate systems have no barline at either edge; only the final measure

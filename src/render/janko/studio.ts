@@ -72,7 +72,7 @@ export const DEFAULT_STUDIO_CROPS: StudioCrop[] = [
     count: 2,
     title: 'mm. 1–2 · Inception',
     caption:
-      'Accolade, Position of Honor halo, the spacious spine-free Middle C corridor and the opening m.d./m.s. dialogue.',
+      'The flared 0.65pt architectural bracket clasping Octaves 5 … 2, the Position of Honor halo, the spacious spine-free Middle C corridor and the opening m.d./m.s. dialogue.',
   },
   {
     start: 4,
@@ -266,8 +266,11 @@ export function describeChannelLayout(
 
 function badgeHtml(badge: CandidateOptionBadge): string {
   const changed = badge.value !== badge.golden;
+  const classes = ['badge', changed ? 'badge-delta' : '', badge.axis ? 'badge-axis' : '']
+    .filter(Boolean)
+    .join(' ');
   return (
-    `<span class="badge${changed ? ' badge-delta' : ''}">` +
+    `<span class="${classes}">` +
     `<b>${escapeHtml(badge.key)}</b> = ${escapeHtml(badge.value)}` +
     (changed ? ` <s>${escapeHtml(badge.golden)}</s>` : '') +
     '</span>'
@@ -322,6 +325,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const facts =
       `${opts.rhythmStyle} · chord grouping ${opts.chordGrouping} · spine ${opts.middleCSpine} · ` +
       `gap ${opts.interStaffGap.toFixed(1)}pt · ${describeChannelLayout(opts, toks)} · ` +
+      `grid ${opts.gridWritingPolicy} · system start ${opts.systemStartStyle} · ` +
       `clasp ${toks.claspOffset.toFixed(1)}pt offset / ${toks.claspMinBarlineAir.toFixed(1)}pt barline air · ` +
       `beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
     return [
@@ -412,6 +416,10 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
     `    <p>${escapeHtml(options.subtitle ?? 'Variatio 1. a 1 Clav.')} — the accumulated state of the engraving: ${report.stats.measures} measures, ${systems} systems, ${report.stats.notes} noteheads, ${report.stats.beams} beams.</p>`,
     '    <div class="badges">',
     `      <span class="badge"><b>rhythmStyle</b> = ${escapeHtml(options.rhythmStyle)}</span>`,
+    `      <span class="badge"><b>chordGrouping</b> = ${escapeHtml(options.chordGrouping)}</span>`,
+    `      <span class="badge"><b>systemStartStyle</b> = ${escapeHtml(options.systemStartStyle)}</span>`,
+    `      <span class="badge"><b>gridWritingPolicy</b> = ${escapeHtml(options.gridWritingPolicy)}</span>`,
+    `      <span class="badge"><b>restStyle</b> = ${escapeHtml(options.restStyle)}</span>`,
     `      <span class="badge"><b>middleCSpine</b> = ${escapeHtml(options.middleCSpine)}</span>`,
     `      <span class="badge"><b>channelLayout</b> = ${escapeHtml(options.channelLayout)} · ${channelSpec.staffRules} lines</span>`,
     `      <span class="badge"><b>interStaffGap</b> = ${options.interStaffGap.toFixed(1)}pt</span>`,

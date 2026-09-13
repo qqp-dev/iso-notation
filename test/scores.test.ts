@@ -53,6 +53,70 @@ test('Deterministic MIDI ingestion pipeline parses .mid losslessly into quantize
   }
 });
 
+/**
+ * Bach pitch regression fixture (Round 14, §Testing plan).
+ *
+ * The canonical `src/scores/bach-goldberg-var1.ts` data is locked against the
+ * **Bach-Gesellschaft** reading as typeset by JD Erickson for Mutopia and
+ * vendored here as `public/midi/bach-goldberg-var1.mid`
+ * (<https://www.mutopiaproject.org/ftp/BachJS/BWV988/bwv-988-v01/>, public
+ * domain). The comparison is per **16th-note onset slot** — the 384 slots of
+ * the 32 bars — so a single dropped, added or respelled pitch anywhere in the
+ * canonical data fails the suite instead of rotting silently.
+ */
+test('Bach pitch regression: 0 onset-slot mismatches against the vendored Bach-Gesellschaft MIDI', () => {
+  const repo = buildBachGoldbergVar1Score();
+  const reading = parseMidiToScore(fs.readFileSync('public/midi/bach-goldberg-var1.mid'), {
+    id: 'bach-goldberg-var1',
+    title: 'Goldberg Variations, BWV 988: Variatio 1. a 1 Clav.',
+    composer: 'Johann Sebastian Bach',
+  });
+
+  assert.equal(repo.totalTicks, 4608, '32 bars of 3/4 at 48 ticks per beat');
+  assert.equal(reading.totalTicks, repo.totalTicks, 'the reading spans the same 32 bars');
+
+  // Every onset + pitch + duration of the reading exists in the repo score.
+  const key = (n: { startTick: number; durationTicks: number; pitch: { pitchClass: number; octave: number } }) =>
+    `${n.startTick}|${n.durationTicks}|${linearIndex(n.pitch)}`;
+  const repoNotes = new Set(repo.notes.map(key));
+  const readingNotes = new Set(reading.notes.map(key));
+  assert.deepEqual(
+    [...readingNotes].filter((k) => !repoNotes.has(k)),
+    [],
+    'no note of the Bach-Gesellschaft reading is missing from the canonical score'
+  );
+  assert.deepEqual(
+    [...repoNotes].filter((k) => !readingNotes.has(k)),
+    [],
+    'and the canonical score adds no note the reading does not carry'
+  );
+
+  // The per-slot comparison: the exact pitch set sounding at each 16th.
+  const slots = repo.totalTicks / 12;
+  assert.equal(slots, 384, '384 sixteenth-note slots');
+  const pitchesAt = (notes: typeof repo.notes, tick: number): number[] =>
+    notes
+      .filter((n) => n.startTick === tick)
+      .map((n) => linearIndex(n.pitch))
+      .sort((a, b) => a - b);
+  const mismatches: Array<{ measure: number; slot: number; tick: number }> = [];
+  for (let measure = 0; measure < 32; measure++) {
+    for (let slot = 0; slot < 12; slot++) {
+      const tick = measure * 144 + slot * 12;
+      const a = pitchesAt(repo.notes, tick);
+      const b = pitchesAt(reading.notes, tick);
+      if (a.length !== b.length || a.some((p, i) => p !== b[i])) {
+        mismatches.push({ measure: measure + 1, slot, tick });
+      }
+    }
+  }
+  assert.deepEqual(
+    mismatches,
+    [],
+    `0 onset-slot mismatches over the 384 slots (mismatches: ${JSON.stringify(mismatches.slice(0, 5))})`
+  );
+});
+
 test('Authentic Hand Attribution Invariants: BWV 988 mm. 4 & 24 and playable hand spans', () => {
   const score = buildBachGoldbergVar1Score();
 

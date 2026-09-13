@@ -171,10 +171,11 @@ grouped **and** how it carries its duration:
 
 | Mode | Grouping unit | Ink |
 | --- | --- | --- |
-| `'none'` (golden) | — | per-note stems, RH up / LH down |
+| `'none'` | — | per-note stems, RH up / LH down (paints a stem of one chord tone through the discs of the others) |
 | `'left-clasp-spire'` | one chord / cluster | one external bracket per cluster |
 | `'beamed-clasp-rail'` | one chord / cluster | + a measure-bounded rail joining the spire tips |
 | `'bounding-phrase'` | one measure (the phrase) | one bracket bounding every note of the measure |
+| `'per-hand-clasp'` (golden) | one hand of one onset | one external bracket per hand cluster (a row-snapped spread, or a vertical chord of 3+ heads) |
 
 - **Geometry** — `computeClaspGeometry` draws the bracket outside the cluster:
   `claspX = minX − r − claspOffset`, `topY = minY − r`, `botY = maxY + r`, and the
@@ -196,7 +197,9 @@ grouped **and** how it carries its duration:
   the cluster keeps its traditional stems. Only actual chords are clasped — a
   lone melodic note never is.
 - **Barline clearance & the inset budget** — a measure whose downbeat carries a
-  clasp reserves `r + claspOffset + claspMinBarlineAir` = 11.6 pt on the left, and
+  clasp reserves `r + claspOffset + CLASP_MARK_REACH + claspMinBarlineAir` =
+  15.35 pt on the left (the widest Round 11 transverse cut reaches 3.75 pt left
+  of the spine), and
   **takes it out of its closing margin**: `left + right` stays at
   `2 × measureInset`, so the note field keeps its canonical width and every
   downstream beat keeps its natural proportional spacing. A measure whose own
@@ -220,7 +223,8 @@ grouped **and** how it carries its duration:
 and `JankoLayoutOptions` (`measuresPerSystem`, `rhythmStyle`, `interStaffGap`,
 `middleCSpine`, `channelLayout` = `'single-equator' | 'on-the-line' |
 'single-line-3row' | 'bounded-channel'`, `chordGrouping` = `'none' |
-'left-clasp-spire' | 'beamed-clasp-rail' | 'bounding-phrase'`,
+'left-clasp-spire' | 'beamed-clasp-rail' | 'bounding-phrase' |
+'per-hand-clasp'`,
 `showRowGuidelines`, page/header/footer geometry) are the **only**
 places layout constants live. Every renderer accepts partial overrides and
 resolves them against `DEFAULT_JANKO_TOKENS` / `DEFAULT_JANKO_OPTIONS`.
