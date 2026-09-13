@@ -108,59 +108,45 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       );
     }
   }
-  assert.match(html, /Round 13/);
-  assert.match(html, /Voice Contour Rests/);
+  assert.match(html, /Round 14/);
+  assert.match(html, /Grid Writing Policy/);
 });
 
-test('Round 13 registry pairs the four rest finalists with the flared bracket', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 13);
-  assert.match(CURRENT_ROUND_METADATA.title, /Voice Contour Rests/);
+test('Round 14 registry compares the three grid writing policies, all else equal', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 14);
+  assert.match(CURRENT_ROUND_METADATA.title, /Grid Writing Policy/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridWritingPolicy'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    [
-      'classical-urtext-flared-bracket',
-      'phantom-notehead-flared-bracket',
-      'geometric-node-flared-bracket',
-      'kinetic-monoline-flared-bracket',
-    ],
-    'candidates A–D in display order'
-  );
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.restStyle),
-    ['classical-urtext', 'phantom-notehead', 'geometric-node', 'kinetic-monoline'],
-    'each candidate demonstrates one high-fidelity rest dialect'
-  );
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
-    [
-      'architectural-bracket',
-      'architectural-bracket',
-      'architectural-bracket',
-      'architectural-bracket',
-    ],
-    'the flared 0.65pt bracket is standardized for the whole round'
-  );
-  // Round 13 keeps the settled clasp, the settled grid and the settled glide:
-  // the round varies exactly one variable — the rest dialect.
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.chordGrouping),
-    ['none', 'none', 'none', 'none'],
-    'the golden chord grouping stays golden'
-  );
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
-    ['kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam']
+    ['unified-transparent-grid', 'strict-protected-grid', 'overlaid-beat-grid'],
+    'candidates A–C in display order'
   );
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.gridWritingPolicy),
-    [
-      'overlaid-beat-grid',
-      'overlaid-beat-grid',
-      'overlaid-beat-grid',
-      'overlaid-beat-grid',
-    ],
-    'the settled golden grid policy'
+    ['unified-transparent-grid', 'strict-protected-grid', 'overlaid-beat-grid'],
+    'each candidate demonstrates one published grid writing policy'
+  );
+  // Round 14 keeps the settled clasp, the canonical bracket, the settled tab
+  // and the settled rest dialect: the round varies exactly one variable.
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.chordGrouping),
+    ['per-hand-clasp', 'per-hand-clasp', 'per-hand-clasp'],
+    'the restored per-hand clasp is shared fixed context'
+  );
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.systemStartStyle),
+    ['architectural-bracket', 'architectural-bracket', 'architectural-bracket'],
+    'the flared 0.65pt bracket is canonical, never a candidate delta'
+  );
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.restStyle),
+    ['kinetic-monoline', 'kinetic-monoline', 'kinetic-monoline'],
+    'the rest dialect question stays closed until Round 15'
+  );
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.subdivisionStyle),
+    ['kinetic-tab-beam', 'kinetic-tab-beam', 'kinetic-tab-beam']
   );
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
@@ -178,44 +164,46 @@ test('Round 13 registry pairs the four rest finalists with the flared bracket', 
     assert.equal(resolved.tokens.claspMinBarlineAir, DEFAULT_JANKO_TOKENS.claspMinBarlineAir);
     assert.equal(resolved.tokens.rowHeight, DEFAULT_JANKO_TOKENS.rowHeight);
     assert.equal(resolved.tokens.flagSpacing, DEFAULT_JANKO_TOKENS.flagSpacing);
-    assert.equal(resolved.tokens.accoladeThick, 0.55, 'the slender accolade');
-    assert.equal(resolved.tokens.accoladeWidth, 4.8, 'the slender accolade reach');
     assert.equal(resolved.tokens.augmentationDotRadius, 0.75, 'the delicate dot');
     assert.equal(resolved.options.pageMargin, 24.0, 'the widened page margin');
     assert.equal(resolved.options.interStaffGap, 30.0, 'the symmetrical octave lattice');
   }
+  // Every candidate states the open axis — including the incumbent C — and
+  // never a locked one.
+  for (const candidate of CURRENT_CANDIDATES) {
+    assert.deepEqual(
+      candidateBadges(candidate).map((b) => b.key),
+      ['gridWritingPolicy'],
+      `${candidate.id} badges the round's single open axis`
+    );
+  }
   assert.deepEqual(
-    candidateBadges(getCandidate('kinetic-monoline-flared-bracket')!).map((b) => b.key),
-    ['systemStartStyle'],
-    'candidate D is the golden rest dialect itself'
-  );
-  assert.deepEqual(
-    candidateBadges(getCandidate('classical-urtext-flared-bracket')!).map((b) => b.key),
-    ['restStyle', 'systemStartStyle']
-  );
-  assert.deepEqual(
-    candidateBadges(getCandidate('phantom-notehead-flared-bracket')!).map((b) => b.key),
-    ['restStyle', 'systemStartStyle']
+    candidateBadges(getCandidate('overlaid-beat-grid')!)[0],
+    {
+      key: 'gridWritingPolicy',
+      value: 'overlaid-beat-grid',
+      golden: 'overlaid-beat-grid',
+      axis: true,
+    },
+    'the incumbent policy still states its value on the axis'
   );
 });
 
-test('Round 13 candidates export cleanly to the contact sheet', () => {
+test('Round 14 candidates export cleanly to the contact sheet', () => {
   const specs = CURRENT_CANDIDATES.map((candidate) => ({
     id: candidate.id,
     label: candidate.label,
     options: resolveCandidate(candidate).options,
   }));
-  // The specimen is the contact sheet's window: five dense four-voice chords
-  // with their m. 2 silence written in each candidate's own dialect, so the
-  // rest ink is countable side by side.
-  const specimen = CONFIG.scores[SPECIMEN_STUDIO_SCORE_ID];
+  // The dense mm. 27–28 run is the contact sheet's window: the one place the
+  // round's question — who owns the grid overlap — is legible on every 16th.
   const sheet = renderJankoVariantComparison(
-    SPECIMEN,
+    SCORE,
     specs,
-    1,
+    27,
     2,
-    specimen.options,
-    specimen.tokens
+    DEFAULT_JANKO_OPTIONS,
+    DEFAULT_JANKO_TOKENS
   );
   assert.equal((sheet.match(/<svg/g) ?? []).length, 1, 'one contact sheet document');
   for (const candidate of CURRENT_CANDIDATES) {
@@ -231,30 +219,25 @@ test('Round 13 candidates export cleanly to the contact sheet', () => {
   const seen = new Set<string>();
   for (const candidate of CURRENT_CANDIDATES) {
     const body = panelBody(candidate.id);
-    // One rest per panel — the specimen's m. 2 silence, in this dialect.
-    const rests = [...body.matchAll(/<g class="janko-rest-group"[^>]*data-rest-style="([^"]*)"/g)];
-    assert.equal(rests.length, 1, `${candidate.id} writes exactly the specimen silence`);
-    assert.equal(rests[0][1], resolveCandidate(candidate).options.restStyle, `${candidate.id} dialect`);
-    assert.match(body, /class="janko-system-bracket"/, `${candidate.id} paints the flared bracket`);
-    seen.add(body.replace(/ data-rest-style="[^"]*"/g, ''));
+    assert.ok(
+      (body.match(/class="janko-digit"/g) ?? []).length >= 20,
+      `${candidate.id} engraves the dense sixteenths`
+    );
+    assert.ok(
+      (body.match(/class="janko-barline"/g) ?? []).length >= 2,
+      `${candidate.id} paints the measure barlines`
+    );
+    seen.add(body);
   }
-  assert.equal(seen.size, CURRENT_CANDIDATES.length, 'four distinct specimen engravings');
+  assert.equal(seen.size, CURRENT_CANDIDATES.length, 'three distinct grid-policy engravings');
   // The Bach window keeps the shared beam-harmonized rake and the continuous
   // vertical grid.
-  const bachSheet = renderJankoVariantComparison(
-    SCORE,
-    specs,
-    1,
-    2,
-    DEFAULT_JANKO_OPTIONS,
-    DEFAULT_JANKO_TOKENS
-  );
   const rakes = [
-    ...bachSheet.matchAll(
+    ...sheet.matchAll(
       /<line class="janko-flag"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
     ),
   ].map((m) => Math.abs((Number(m[4]) - Number(m[2])) / (Number(m[3]) - Number(m[1]))));
-  assert.ok(rakes.length > 0, 'the Bach window carries subdivision marks');
+  assert.ok(rakes.length > 0, 'the dense window carries subdivision marks');
   for (const rake of rakes) {
     assert.ok(Math.abs(rake - DEFAULT_JANKO_TOKENS.maxBeamSlope) < 5e-3, `beam rake ${rake}`);
   }
@@ -265,34 +248,38 @@ test('Candidate previews honour their own option deltas', () => {
   for (const candidate of CURRENT_CANDIDATES) {
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['restStyle', 'systemStartStyle'],
-      `${candidate.id} declares its rest dialect and the standardized flared bracket`
+      ['gridWritingPolicy', 'chordGrouping'],
+      `${candidate.id} states the open axis and the locked clasp it inherits`
     );
   }
   assert.ok(
     !html.includes('<b>chordGrouping</b>'),
-    'the golden chord grouping is not a Round 13 question'
-  );
-  assert.match(
-    html,
-    /<s>kinetic-monoline<\/s>/,
-    'the golden rest dialect the three replacement candidates depart from'
-  );
-  assert.match(
-    html,
-    /<s>open-halo<\/s>/,
-    'the golden System 1 start every candidate departs from'
+    'the restored per-hand clasp is shared context, never a Round 14 question'
   );
   assert.ok(
-    !html.includes('<b>gridWritingPolicy</b>'),
-    'the settled golden grid policy is not a Round 13 question'
+    !html.includes('<b>systemStartStyle</b>'),
+    'the canonical flared bracket is shared context, never a Round 14 question'
   );
+  assert.ok(
+    !html.includes('<b>restStyle</b>'),
+    'the rest dialect question stays closed until Round 15'
+  );
+  assert.match(html, /<b>gridWritingPolicy<\/b> = unified-transparent-grid/, 'candidate A policy');
+  assert.match(html, /<b>gridWritingPolicy<\/b> = strict-protected-grid/, 'candidate B policy');
+  assert.match(html, /<b>gridWritingPolicy<\/b> = overlaid-beat-grid/, 'candidate C policy');
+  assert.match(html, /badge-delta/, 'the two departures from the golden policy are highlighted');
+  assert.match(html, /badge-axis/, "the round's open axis is flagged on every candidate");
   assert.doesNotMatch(
     html,
     /<b>subdivisionStyle<\/b>/,
     'the settled kinetic tab is the golden master, no longer a candidate delta'
   );
-  assert.match(html, /badge-delta/, 'deltas against the golden master are highlighted');
+  assert.doesNotMatch(
+    html,
+    /<b>claspDurationStyle<\/b>/,
+    'the settled kinetic clasp is the golden master, no longer a candidate delta'
+  );
+  assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
   assert.match(html, /chip chip-ok/, 'every candidate lints clean in this round');
 
   const cardOf = (id: string): string => {
@@ -301,46 +288,29 @@ test('Candidate previews honour their own option deltas', () => {
   };
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
-    // Candidate D *is* the golden rest dialect, so only the three replacement
-    // dialects show that badge.
-    if (resolved.options.restStyle === DEFAULT_JANKO_OPTIONS.restStyle) {
-      assert.ok(
-        !cardOf(candidate.id).includes('<b>restStyle</b>'),
-        'candidate D is the golden rest dialect itself'
-      );
-    } else {
-      assert.match(
-        cardOf(candidate.id),
-        new RegExp(`<b>restStyle</b> = ${resolved.options.restStyle}`),
-        `${candidate.id} rest badge`
-      );
-    }
     assert.match(
       cardOf(candidate.id),
-      /<b>systemStartStyle<\/b> = architectural-bracket/,
-      `${candidate.id} always shows the flared-bracket delta`
+      new RegExp(`<b>gridWritingPolicy</b> = ${resolved.options.gridWritingPolicy}`),
+      `${candidate.id} policy badge`
     );
-    // Round 12 standardizes the up-raked 12.4° kinetic clasp: it is the golden
-    // duration paradigm now, so no candidate ever shows a duration badge.
+    // The candidate window is the dense Bach run: it carries the grid and the
+    // settled per-hand clasp context without re-showcasing a locked decision.
+    assert.match(cardOf(candidate.id), /data-window="primary:27-28"/, `${candidate.id} window`);
     assert.ok(
-      !cardOf(candidate.id).includes('<b>claspDurationStyle</b>'),
-      `${candidate.id} carries the settled kinetic clasp without a badge`
+      !cardOf(candidate.id).includes('janko-system-bracket'),
+      `${candidate.id} never re-showcases the settled bracket`
     );
+    assert.match(cardOf(candidate.id), /data-lint="clean"/);
   }
   // The clasp grammar is stated in the card facts.
   for (const candidate of CURRENT_CANDIDATES) {
     assert.match(cardOf(candidate.id), /clasp 2\.8pt offset \/ 4\.0pt barline air/, `${candidate.id} tokens`);
-    assert.match(cardOf(candidate.id), /chord grouping none/, `${candidate.id} grouping fact`);
-    // Every candidate paints the flared bracket and its own rest layer.
-    assert.ok(
-      cardOf(candidate.id).includes('janko-system-bracket'),
-      `${candidate.id} renders the flared bracket`
+    assert.match(cardOf(candidate.id), /chord grouping per-hand-clasp/, `${candidate.id} grouping fact`);
+    assert.match(
+      cardOf(candidate.id),
+      new RegExp(`grid ${resolveCandidate(candidate).options.gridWritingPolicy} · system start architectural-bracket`),
+      `${candidate.id} states its policy and the canonical start`
     );
-    assert.ok(
-      cardOf(candidate.id).includes('janko-rest-group'),
-      `${candidate.id} renders its rest layer`
-    );
-    assert.match(cardOf(candidate.id), /data-lint="clean"/);
   }
 });
 
@@ -522,7 +492,7 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 13);
+  assert.equal(CURRENT_ROUND_METADATA.round, 14);
   assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.ok(CURRENT_CANDIDATES.length >= 2 && CURRENT_CANDIDATES.length <= 5, '2–5 candidates');

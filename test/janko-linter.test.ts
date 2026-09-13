@@ -19,6 +19,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
+import { QuantizedGridScore } from '../src/model/types';
 import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
@@ -58,6 +60,8 @@ import {
   checkRestClearance,
   checkStemAndBeamValidity,
   checkStemDigitClearance,
+  checkStemThroughSimultaneity,
+  checkUnwrittenRests,
   formatLintReport,
   lintJankoScore,
   systemBarlines,
@@ -67,6 +71,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
 
 const SCORE = buildBachGoldbergVar1Score();
+const SPECIMEN = buildChordDurationSpecimenScore();
 const LINT = DEFAULT_JANKO_LINT_OPTIONS;
 const TOKENS = DEFAULT_JANKO_TOKENS;
 const BRAHMS_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
@@ -552,9 +557,9 @@ test('Defect: noteheads driven into a barline are caught', () => {
 });
 
 test('Defect: a system-start mark pushed off the page and into the numeral is caught', () => {
-  // Round 10 retires the copperplate accolade by default, so the audit is
-  // exercised on a ruled system start (`'architectural-bracket'`), which paints
-  // the same reserved margin column.
+  // Round 14's golden default *is* the ruled system start
+  // (`'architectural-bracket'`), so the audit is exercised on the canonical
+  // reserved margin column itself.
   const ruled = { ...DEFAULT_JANKO_OPTIONS, systemStartStyle: 'architectural-bracket' as const };
   const offPage = { ...ruled, pageMargin: -20.0 };
   const out: LintViolation[] = [];
@@ -565,11 +570,15 @@ test('Defect: a system-start mark pushed off the page and into the numeral is ca
     'off-page system-start mark reported'
   );
 
-  // …and the default open margin paints no ink, so there is nothing to report.
+  // …and the inkless styles paint no mark, so there is nothing to report.
   const open: LintViolation[] = [];
-  const openLayout = systems(DEFAULT_JANKO_OPTIONS)[0];
-  checkAccoladeClearance(openLayout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, open);
+  const openOptions = { ...DEFAULT_JANKO_OPTIONS, systemStartStyle: 'open-halo' as const };
+  const openLayout = systems(openOptions)[0];
+  checkAccoladeClearance(openLayout, openOptions, DEFAULT_JANKO_TOKENS, LINT, open);
   assert.deepEqual(open, [], 'the open margin has no mark to audit');
+  const goldenAudit: LintViolation[] = [];
+  checkAccoladeClearance(systems()[0], DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, goldenAudit);
+  assert.deepEqual(goldenAudit, [], 'the canonical flared bracket clears its own audit');
 
   // Round 11 sets the numeral snug above the top rule and right-aligned 10pt
   // into the margin, so the ruled column and the numeral coexist: the audit
@@ -643,6 +652,169 @@ test('Defect: a rest driven into a foreign notehead is caught', () => {
   const clean: LintViolation[] = [];
   checkRestClearance(layout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, LINT, clean);
   assert.deepEqual(clean, []);
+});
+
+// ---------------------------------------------------------------------------
+// 3c. Round 14 — simultaneity integrity and named rest refusals
+// ---------------------------------------------------------------------------
+
+/** A minimal two-hand score fixture (3/4, 48 ticks per beat). */
+function fixtureScore(notes: QuantizedGridScore['notes'], measures: number): QuantizedGridScore {
+  return {
+    id: 'linter-fixture',
+    title: 'Linter fixture',
+    composer: 'Harness',
+    ticksPerBeat: 48,
+    gridResolution: 12,
+    totalTicks: measures * 144,
+    timeSignatures: [{ tick: 0, numerator: 3, denominator: 4 }],
+    barlines: Array.from({ length: measures + 1 }, (_, m) => ({
+      barNumber: m + 1,
+      tick: m * 144,
+      type: (m === measures ? 'final' : 'regular') as 'final' | 'regular',
+    })),
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes,
+  };
+}
+
+test('Defect: an unclasped four-voice simultaneity paints its stems through its own chord tones', () => {
+  // The Round 14 linter fixture from the ticket: the wide-span specimen under
+  // the historical unclasped paradigm versus the restored per-hand clasp.
+  const unclasped = resolveJankoOptions({
+    ...DEFAULT_JANKO_OPTIONS,
+    chordGrouping: 'none',
+    measuresPerSystem: 2,
+  });
+  const clasped = resolveJankoOptions({
+    ...DEFAULT_JANKO_OPTIONS,
+    chordGrouping: 'per-hand-clasp',
+    measuresPerSystem: 2,
+  });
+  const broken = layoutJankoScore(SPECIMEN, unclasped, TOKENS)[0];
+  const hits = run((l, out) => checkStemThroughSimultaneity(l, unclasped, TOKENS, out), broken);
+  // Five 4-voice columns; in each, the three lower stems run through the heads
+  // above them (one, two and three heads respectively): 3 pairs per column.
+  assert.equal(hits.length, 15, 'every stem painted through a chord tone is named');
+  assert.ok(
+    hits.every((v) => v.code === 'stem-through-simultaneity' && v.severity === 'error'),
+    'a stem through a same-onset chord tone is a hard violation, never a warning'
+  );
+  assert.match(hits[0].message, /same-onset chord tone/);
+  assert.match(hits[0].message, /per-hand clasp/);
+  assert.ok((JANKO_LINT_CHECKS as readonly string[]).includes('stem-simultaneity'));
+
+  const report = lintJankoScore(SPECIMEN, unclasped, TOKENS);
+  assert.equal(report.ok, false, 'the unclasped specimen is rejected');
+  assert.deepEqual(
+    [...new Set(report.violations.map((v) => v.code))],
+    ['stem-through-simultaneity'],
+    'and it is rejected for exactly this defect'
+  );
+
+  // The same chord with the restored per-hand clasp is clean: every stem is
+  // replaced by the bracket, so nothing is painted through a head.
+  const fixed = layoutJankoScore(SPECIMEN, clasped, TOKENS)[0];
+  assert.deepEqual(
+    run((l, out) => checkStemThroughSimultaneity(l, clasped, TOKENS, out), fixed),
+    [],
+    'the clasped simultaneity is clean'
+  );
+  const fixedReport = lintJankoScore(SPECIMEN, clasped, TOKENS);
+  assert.equal(fixedReport.ok, true, 'the clasped specimen engraves clean');
+  assert.equal(fixedReport.warnings.length, 0, 'with no warning');
+
+  // A cross-hand simultaneity is not a chord: the settled opposing stem
+  // directions must never be reported (Bach m. 14 / m. 16 and Brahms m. 4).
+  const bach = systems()[4];
+  assert.ok(
+    bach.notes.some((p) => p.note.startTick === bach.notes[0].note.startTick),
+    'the fixture really carries simultaneities'
+  );
+  assert.deepEqual(
+    run((l, out) => checkStemThroughSimultaneity(l, DEFAULT_JANKO_OPTIONS, TOKENS, out), bach),
+    [],
+    'cross-hand voices are audited by the channel and parity rules, not by this one'
+  );
+});
+
+test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', () => {
+  // A disc wide enough to wall the m. 4 column shut: no staff position keeps
+  // the guaranteed pocket air from the LH D3 head that shares the column.
+  const fat = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 60.0 };
+  const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, fat)[0];
+  assert.ok(!layout.rests.some((r) => r.tick === 552), 'the refused rest is not painted');
+  const refusal = layout.unwrittenRests.find((r) => r.tick === 552);
+  assert.ok(refusal, 'the refusal is recorded instead of being dropped silently');
+  assert.equal(refusal!.reason, 'no-pocket');
+  assert.equal(refusal!.hand, 'RH');
+  assert.equal(refusal!.value, 'sixteenth');
+  assert.ok(
+    Math.abs(refusal!.x - 544.97) < 0.01,
+    `the refusal keeps the canonical tick-552 beat column (x = ${refusal!.x.toFixed(2)}pt)`
+  );
+  assert.ok(Number.isFinite(refusal!.targetY), 'and records the contour target it could not honour');
+
+  const out: LintViolation[] = [];
+  checkUnwrittenRests(layout, DEFAULT_JANKO_TOKENS, out);
+  const named = out.filter((v) => v.code === 'rest-unwritable');
+  assert.equal(named.length, layout.unwrittenRests.length, 'every refusal is republished');
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('rest-unwritable'),
+    'the refusal audit is part of the published check list'
+  );
+  assert.ok(named.every((v) => v.severity === 'warning'), 'an omitted sign is a named risk, not painted ink');
+  assert.ok(
+    named.some((v) => v.measure === 4 && /never dropped silently/.test(v.message)),
+    'the m. 4 refusal is named with its measure'
+  );
+
+  // The canonical tokens refuse nothing.
+  for (const system of systems()) {
+    assert.deepEqual(system.unwrittenRests, [], `system ${system.index + 1} refuses no silence`);
+  }
+
+  // A silence that opens exactly on a protected barline is refused **by name**
+  // too, and admitted under the transparent policy that reserves no barline.
+  const crossing = fixtureScore(
+    [
+      { id: 'rh-1', pitch: { pitchClass: 0, octave: 5 }, startTick: 0, durationTicks: 144, hand: 'RH', velocity: 80 },
+      { id: 'rh-2', pitch: { pitchClass: 4, octave: 5 }, startTick: 192, durationTicks: 12, hand: 'RH', velocity: 80 },
+      { id: 'rh-3', pitch: { pitchClass: 7, octave: 4 }, startTick: 288, durationTicks: 144, hand: 'RH', velocity: 80 },
+      { id: 'lh-1', pitch: { pitchClass: 2, octave: 3 }, startTick: 0, durationTicks: 144, hand: 'LH', velocity: 80 },
+      { id: 'lh-2', pitch: { pitchClass: 9, octave: 2 }, startTick: 192, durationTicks: 12, hand: 'LH', velocity: 80 },
+      { id: 'lh-3', pitch: { pitchClass: 5, octave: 3 }, startTick: 288, durationTicks: 144, hand: 'LH', velocity: 80 },
+    ],
+    3
+  );
+  // A tight measure inset puts the downbeat column within the rest's own air of
+  // the opening barline: that column belongs to the grid, so the silence is
+  // refused by name rather than straddling it.
+  const tightTokens = { ...TOKENS, measureInset: 4.0 };
+  const protectedLayout = layoutJankoScore(crossing, DEFAULT_JANKO_OPTIONS, tightTokens)[0];
+  const barlineRefusal = protectedLayout.unwrittenRests.find((r) => r.tick === 144);
+  assert.ok(barlineRefusal, 'the barline-crossing silence is refused, not swallowed');
+  assert.equal(barlineRefusal!.reason, 'protected-barline');
+  assert.ok(
+    !protectedLayout.rests.some((r) => r.tick === 144),
+    'and no rest is painted on the protected barline column'
+  );
+  const transparentLayout = layoutJankoScore(
+    crossing,
+    { ...DEFAULT_JANKO_OPTIONS, gridWritingPolicy: 'unified-transparent-grid' },
+    tightTokens
+  )[0];
+  assert.ok(
+    transparentLayout.rests.some((r) => r.tick === 144),
+    'the transparent policy reserves no barline, so there the rest is written'
+  );
+  assert.deepEqual(
+    transparentLayout.unwrittenRests,
+    [],
+    'and nothing is refused under the transparent policy'
+  );
 });
 
 test('Corridor audit reads the true rule positions of the bounded channel', () => {
@@ -759,12 +931,11 @@ test('Defect: a clasp cutting through a foreign notehead is caught', () => {
 });
 
 test('Defect: a clasp pushed into the system-start column is caught', () => {
-  // Round 10 audits the ruled system start (the default open margin paints no
-  // left-margin ink for a clasp to collide with).
+  // Round 10 audits the ruled system start — Round 14's canonical golden
+  // default — so a clasp driven into the reserved margin column is caught.
   const options = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
     chordGrouping: 'left-clasp-spire',
-    systemStartStyle: 'architectural-bracket',
   });
   const layout = systems(options)[0];
   const target = layout.clasps[0];

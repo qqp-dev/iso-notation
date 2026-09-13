@@ -34,9 +34,14 @@
  *    acceptable threshold.
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
- * 6. **Rest clearance** (Round 12, contour-anchored by Round 13) — a voice
- *    rest's own dialect ink box keeps real air from every foreign notehead disc
- *    and from any protected barline.
+ * 6. **Rest clearance** (Round 12, contour-anchored by Round 13, pocket-seated
+ *    by Round 14) — a voice rest's own dialect ink box keeps real air from
+ *    every foreign notehead disc and from any protected barline; a silence the
+ *    fit rule refused is republished as the named `rest-unwritable` diagnostic.
+ * 7. **Simultaneity integrity** (Round 14) — no painted stem or beam connector
+ *    of one chord tone may pass through the notehead disc of a **same-onset**
+ *    tone (`stem-through-simultaneity`). The defect that a wide-span chord
+ *    falls into whenever the chord-grouping paradigm stops unifying it.
  *
  * Usage
  * -----
@@ -111,6 +116,8 @@ export type JankoLintCode =
   | 'measure-numeral-collision'
   | 'accolade-collision'
   | 'rest-collision'
+  | 'rest-unwritable'
+  | 'stem-through-simultaneity'
   | 'corridor-intrusion';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -202,6 +209,8 @@ export const JANKO_LINT_CHECKS = [
   'measure-numeral-clearance',
   'accolade-clearance',
   'rest-clearance',
+  'rest-unwritable',
+  'stem-simultaneity',
   'middle-c-corridor',
   'knockout-paint-order',
 ] as const;
@@ -771,7 +780,175 @@ export function checkBeamNoteheadClearance(
 }
 
 // ---------------------------------------------------------------------------
-// 4. Barline clearance
+// 4b. Simultaneity integrity: no stem or beam through a same-onset chord tone
+// ---------------------------------------------------------------------------
+
+/** One painted segment of the system's rhythm ink. */
+interface PaintedSegment {
+  /** Note ids the ink belongs to (one stem, or every member of a beam group). */
+  ids: string[];
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  /** The note id whose stem this segment is, when it is a single stem. */
+  stemOf: string | null;
+  label: string;
+}
+
+/**
+ * Round 14: **no painted stem or beam segment may pass through the notehead
+ * disc of a same-onset chord tone of its own hand**
+ * (`stem-through-simultaneity`).
+ *
+ * A two-row whole-tone staff stacks a hand's chord tones on different rows of
+ * one shared column, so unless the chord-grouping paradigm unifies them
+ * (Round 6/8 `'per-hand-clasp'` bracket or the gap-gated vertical-chord
+ * grammar), every tone draws its own full-length stem on the same column — and
+ * each of those stems is then painted straight through the discs of the tones
+ * above or below it, to be chopped into segments by their white knockouts. That
+ * is the exact defect the clasp was invented to kill, and it is invisible to
+ * every other check because each stem *is* attached to its own head.
+ *
+ * The scope is deliberately **one hand's chord**: a cross-hand simultaneity is
+ * two independent voices sharing the lattice (Round 4/11 resolve their
+ * collisions through the channel layout and the row-snapped parity offset), and
+ * its opposing stem directions are the settled engraving, not a chord defect.
+ *
+ * Only **painted** ink is audited: a member whose stem the clasp replaced or
+ * the vertical-chord grammar suppressed is skipped, exactly as
+ * `renderNotesLayer` skips it. Beam members always keep their stems.
+ *
+ * A tone's own stem starts on the outside of its own glyph circle, so it can
+ * never trip this check; only a *foreign* same-onset head of the same hand can.
+ */
+export function checkStemThroughSimultaneity(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const r = t.noteheadRadius;
+  const clasped = new Set(layout.claspedStems);
+  const suppressed = new Set(layout.verticalChords.flatMap((chord) => chord.suppressedIds));
+  const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
+
+  // Every segment `renderNotesLayer` actually paints for this system.
+  const segments: PaintedSegment[] = [];
+  if (o.rhythmStyle === 'beamed') {
+    for (const beam of layout.beams) {
+      const ids = beam.notes.map((n) => n.id);
+      for (let i = 0; i < beam.stems.length; i++) {
+        const s = beam.stems[i];
+        segments.push({
+          ids: [ids[i]],
+          x1: s.stemX,
+          y1: s.stemStartY,
+          x2: s.stemX,
+          y2: s.stemEndY,
+          stemOf: ids[i],
+          label: 'stem',
+        });
+      }
+      const connectors: Array<{ label: string; c: JankoBeamConnector }> = [
+        { label: 'primary beam', c: beam.primary },
+      ];
+      if (beam.secondary) connectors.push({ label: '16th secondary beam', c: beam.secondary });
+      for (const { label, c } of connectors) {
+        segments.push({ ids, x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2, stemOf: null, label });
+      }
+    }
+    for (const n of layout.ungrouped) {
+      if (clasped.has(n.id) || suppressed.has(n.id)) continue;
+      const s = getStemGeometry(n, t);
+      segments.push({
+        ids: [n.id],
+        x1: s.stemX,
+        y1: s.stemStartY,
+        x2: s.stemX,
+        y2: s.stemEndY,
+        stemOf: n.id,
+        label: 'stem',
+      });
+    }
+  } else {
+    for (const p of layout.notes) {
+      if (clasped.has(p.rhythm.id) || suppressed.has(p.rhythm.id)) continue;
+      const s = getStemGeometry(p.rhythm, t);
+      segments.push({
+        ids: [p.rhythm.id],
+        x1: s.stemX,
+        y1: s.stemStartY,
+        x2: s.stemX,
+        y2: s.stemEndY,
+        stemOf: p.rhythm.id,
+        label: 'stem',
+      });
+    }
+  }
+  if (segments.length === 0) return;
+
+  // One hand's chord tones bucketed by tick, so a segment only tests the
+  // simultaneities its own notes belong to instead of the whole system.
+  const byHandTick = new Map<string, PositionedJankoNote[]>();
+  for (const p of layout.notes) {
+    const key = `${p.rhythm.hand}|${p.note.startTick}`;
+    const bucket = byHandTick.get(key);
+    if (bucket) bucket.push(p);
+    else byHandTick.set(key, [p]);
+  }
+
+  for (const seg of segments) {
+    const owned = new Set(seg.ids);
+    const tested = new Set<string>();
+    for (const id of seg.ids) {
+      const note = byId.get(id);
+      if (!note) continue;
+      const simultaneity = byHandTick.get(`${note.rhythm.hand}|${note.note.startTick}`) ?? [];
+      if (simultaneity.length < 2) continue;
+      for (const other of simultaneity) {
+        if (owned.has(other.note.id) || tested.has(other.note.id)) continue;
+        tested.add(other.note.id);
+        const distance = pointToSegmentDistance(
+          other.x,
+          other.y,
+          seg.x1,
+          seg.y1,
+          seg.x2,
+          seg.y2
+        );
+        if (distance + EPS >= r) continue;
+        const source = seg.stemOf === null ? `${seg.label} of [${seg.ids.join(', ')}]` : `stem of notehead ${seg.stemOf}`;
+        out.push({
+          code: 'stem-through-simultaneity',
+          severity: 'error',
+          message:
+            `The ${source} passes ${distance.toFixed(2)}pt from the centre of same-onset chord tone ` +
+            `${other.note.id} (disc r=${r.toFixed(2)}pt): the ink is painted through the glyph and ` +
+            `chopped by its knockout. Group the simultaneity (per-hand clasp / gap-gated vertical ` +
+            `chord) or suppress the interior stem.`,
+          system: layout.index,
+          measure: measureOfTick(other.note.startTick, t),
+          noteIds: [...seg.ids, other.note.id],
+          x: other.x,
+          y: other.y,
+          metrics: {
+            distance,
+            radius: r,
+            tick: other.note.startTick,
+            segmentX1: seg.x1,
+            segmentY1: seg.y1,
+            segmentX2: seg.x2,
+            segmentY2: seg.y2,
+          },
+        });
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. Barline clearance
 // ---------------------------------------------------------------------------
 
 /** One barline segment of a system, per hand (RH and LH halves). */
@@ -1094,10 +1271,13 @@ export function checkClaspClearance(
  * `minClearance` from every foreign notehead disc (of either hand — the other
  * hand is exactly what plays while this one is silent) and, whenever the active
  * grid writing policy protects the barlines, from the barline column it may
- * never straddle. The engine's `resolveRestY` (Round 13) fits the voice-contour
- * anchor with the same box and the same air — plus a 0.02pt solver margin — so a
- * rest the engine admits is guaranteed to pass this audit; the check exists to
- * catch a regression that paints a rest where the fit rule never placed one.
+ * never straddle. The engine's `resolveRestY` (Round 13, pocket-seated by
+ * Round 14 with the guaranteed `REST_POCKET_AIR`) fits the voice-contour anchor
+ * with the same box and **more** air — plus the float-safety solver margin — so
+ * a rest the engine admits is guaranteed to pass this audit; the check exists to
+ * catch a regression that paints a rest where the fit rule never placed one. A
+ * rest-notehead clearance failure is a hard **violation**: a rest may never
+ * touch, let alone overlap, a head disc.
  */
 export function checkRestClearance(
   layout: JankoSystemLayout,
@@ -1158,21 +1338,68 @@ export function checkRestClearance(
   }
 }
 
+/**
+ * Round 14: a silence the rest fit rule **refused to write** is republished as a
+ * named `rest-unwritable` diagnostic, never swallowed. The engine's
+ * {@link JankoRestLayer} records every refusal with its reason, so a designer
+ * always knows why a hand's silence carries no sign:
+ *
+ * - `'no-pocket'` — the beat column is walled in on both sides: no vertical
+ *   position inside the staff keeps the guaranteed pocket air from the foreign
+ *   heads, so writing the rest would mean sliding it into a collision;
+ * - `'protected-barline'` — the silence opens exactly on a barline the active
+ *   grid writing policy protects, so the column belongs to the grid.
+ *
+ * A refusal is a **warning**, not a painted defect: the engraving is
+ * collision-free by construction, and the omitted sign is a known risk the
+ * designer may resolve (wider measure, different grid policy, different
+ * grouping) rather than an error in the ink.
+ */
+export function checkUnwrittenRests(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  for (const rest of layout.unwrittenRests) {
+    const why =
+      rest.reason === 'no-pocket'
+        ? 'no vertical position inside the staff keeps the guaranteed pocket air from the surrounding heads'
+        : 'the silence opens exactly on a barline the active grid writing policy protects';
+    out.push({
+      code: 'rest-unwritable',
+      severity: 'warning',
+      message:
+        `Silence at tick ${rest.tick} (${rest.value}, ${rest.hand}, ${rest.durationTicks} ticks) is ` +
+        `left unwritten: ${why}. Anchor the voice differently or widen the measure — the rest is ` +
+        `never dropped silently and never slid into a collision.`,
+      system: layout.index,
+      measure: measureOfTick(rest.tick, t),
+      x: rest.x,
+      y: rest.targetY,
+      metrics: {
+        tick: rest.tick,
+        durationTicks: rest.durationTicks,
+        targetY: rest.targetY,
+      },
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 5. Left-margin furniture: measure numeral & accolade
 // ---------------------------------------------------------------------------
 
 /**
  * Boxes of the measure numeral and the system-start mark of one system. The
- * Round 10 `'open-halo'` default paints no margin ink, so `accolade` is `null`
- * whenever no ruled system-start style is active.
+ * golden Round 14 `'architectural-bracket'` paints margin ink, so `accolade`
+ * is a real box there (and `null` only for the inkless styles).
  */
 export function marginFurniture(
   layout: JankoSystemLayout,
   t: ResolvedJankoTokens,
   lint: JankoLintOptions,
   measureNumber: number,
-  systemStartStyle: JankoSystemStartStyle = 'open-halo'
+  systemStartStyle: JankoSystemStartStyle = 'architectural-bracket'
 ): { numeral: Box; accolade: Box | null } {
   // The furniture geometry lives in the engine, where the Round 5 clasp fit
   // rule reserves against the very same boxes (see `engine.getMarginFurniture`);
@@ -1267,8 +1494,8 @@ export function checkAccoladeClearance(
   out: LintViolation[]
 ): void {
   // Round 7 paints the system-start mark strictly at the start of the piece: an
-  // intermediate system has no margin ink to audit. Round 10's `'open-halo'`
-  // default paints none at all, so there is nothing to audit anywhere.
+  // intermediate system has no margin ink to audit. Round 14's golden flared
+  // `'architectural-bracket'` is audited here; inkless styles return no box.
   if (layout.index !== 0) return;
   const { numeral, accolade } = marginFurniture(
     layout,
@@ -1806,11 +2033,13 @@ export function lintJankoScore(
     checkStemDigitClearance(layout, t, thresholds, diagnostics);
     checkHaloClearance(layout, t, thresholds, diagnostics);
     checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
+    checkStemThroughSimultaneity(layout, o, t, diagnostics);
     checkBarlineClearance(layout, o, t, thresholds, diagnostics);
     checkClaspClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
     checkRestClearance(layout, o, t, thresholds, diagnostics);
+    checkUnwrittenRests(layout, t, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     if (thresholds.auditPaintOrder) {
       const attachment = getStemAttachmentRadii(t);

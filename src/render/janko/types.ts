@@ -260,9 +260,13 @@ export const JANKO_CLASP_DURATION_STYLE_LABELS: Record<JankoClaspDurationStyle, 
  * | `'none'`                 | no system-start ink at all                                |
  *
  * The curlicue copperplate accolade no longer belongs to the modern design
- * language, so `'open-halo'` is the golden-master default. The Position of
- * Honor halo itself is a notehead decoration rather than system-start ink, so
- * it rings the opening tick-0 sounds under every style.
+ * language. Round 11/12 narrowed the field to the three architectural
+ * finalists and Round 14 rules the flared
+ * `'architectural-bracket'` canonical: the golden master opens System 1 with
+ * the 0.65pt rule and its 13° spurs. `'open-halo'` keeps the geometry (and the
+ * history) of the open margin that preceded it, but paints no margin ink. The
+ * Position of Honor halo itself is a notehead decoration rather than
+ * system-start ink, so it rings the opening tick-0 sounds under every style.
  */
 export type JankoSystemStartStyle =
   | 'open-halo'
@@ -378,7 +382,12 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
  * `'per-hand-clasp'` is the Round 6 refinement: the grouping unit is strictly
  * one hand (`RH` or `LH`), never the grand staff, and a bracket is drawn **only**
  * for a horizontally displaced (row-snapped) hand cluster — a clean vertical
- * column and a lone melodic note keep their stems.
+ * column and a lone melodic note keep their stems. Round 8 widened its scope to
+ * a vertical hand chord of three or more heads. Round 14 makes it the
+ * golden-master default: a same-onset cluster inside one hand is always either
+ * bracketed or unified by the gap-gated stem grammar, so no stem of one chord
+ * tone can ever be painted through the notehead disc of another (the defect the
+ * linter now names `stem-through-simultaneity`).
  */
 export type JankoChordGrouping =
   | 'none'
@@ -590,8 +599,9 @@ export interface JankoLayoutOptions {
   channelLayout: JankoChannelLayout;
   /**
    * Vertical chord/cluster grouping and duration carrier (Round 5, refined by
-   * Round 6). `'none'` keeps the incumbent per-note stems; the clasp paradigms
-   * draw an external left bracket per cluster (see {@link JankoChordGrouping}).
+   * Round 6, standardized by Round 14). `'none'` keeps the incumbent per-note
+   * stems; the clasp paradigms draw an external left bracket per cluster (see
+   * {@link JankoChordGrouping}). Defaults to the settled `'per-hand-clasp'`.
    */
   chordGrouping: JankoChordGrouping;
 
@@ -624,9 +634,9 @@ export interface JankoLayoutOptions {
    */
   gridWritingPolicy?: JankoGridWritingPolicy;
   /**
-   * System-start margin ink (Round 10, extended by Round 11): the copperplate
-   * accolade is retired in favour of an open margin whose opening sounds are
-   * ringed by the Position of Honor halo. Defaults to `'open-halo'` (see
+   * System-start margin ink (Round 10, extended by Round 11, settled by
+   * Round 14): the copperplate accolade is retired in favour of the flared
+   * 0.65pt architectural bracket. Defaults to `'architectural-bracket'` (see
    * {@link JankoSystemStartStyle}).
    */
   systemStartStyle?: JankoSystemStartStyle;
@@ -692,12 +702,12 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   interStaffGap: 30.0,
   middleCSpine: 'none',
   channelLayout: 'single-equator',
-  chordGrouping: 'none',
+  chordGrouping: 'per-hand-clasp',
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',
   gridWritingPolicy: 'overlaid-beat-grid',
-  systemStartStyle: 'open-halo',
+  systemStartStyle: 'architectural-bracket',
   finalBarlineStyle: 'unified',
   systemsPerPage: 3,
   ticksPerMeasure: 144,

@@ -3,10 +3,11 @@
  * Round 10/11 replacements.
  *
  * The curlicue copperplate brace does not match the modern design language, so
- * the golden master retires it (`'open-halo'`): the staff lines emerge openly
- * from the left margin and the Position of Honor halo rings the opening
- * sounds. The ruled alternatives keep a structural mark at the same reserved
- * margin column:
+ * the golden master retires it. Round 14 settles the flared 0.65pt
+ * `'architectural-bracket'` as the canonical System 1 start; the alternative
+ * ruled marks are kept as the published catalogue, and `'open-halo'` keeps the
+ * open margin (no margin ink at all) that preceded the ruling. The ruled
+ * alternatives keep a structural mark at the same reserved margin column:
  *
  * - `'architectural-bracket'` — a straight 0.65pt rule whose 3.0pt spurs clasp
  *   the Octave 5 and Octave 2 rules and **flare diagonally outward** by
@@ -198,9 +199,10 @@ export function renderDoubleHairline(
 
 /**
  * Margin ink for one resolved system geometry in the active
- * `systemStartStyle` (Round 10/11, refined by Round 13). `'open-halo'` and
+ * `systemStartStyle` (Round 10/11, settled by Round 14). `'open-halo'` and
  * `'none'` paint nothing: the opening sounds carry the Position of Honor halo,
- * the staff needs no brace.
+ * the staff needs no brace; the golden `'architectural-bracket'` paints the
+ * flared 0.65pt rule.
  */
 export function renderAccolade(
   geo: JankoSystemGeometry,
