@@ -94,6 +94,13 @@ Headless implementers must not render images to see a defect. Run the mathematic
 - CLI: `npm run lint:engraving` (add `--json`, `--strict`, `--quiet`). Exit code 1 on violations; `--strict` also fails on warnings.
 - The canonical Bach score with `DEFAULT_JANKO_OPTIONS` must report **zero violations**. Any new defect class gets a matching assertion in `test/janko-linter.test.ts`.
 - `npm test` covers unit tests, engraving invariants, the visual linter and the studio architecture in **under 1 second**; run it before every hand-off. `npm run build` must stay clean.
+- **Canonical Validation Commands ONLY (No Unconfigured Linters / No Scope Creep)**:
+  - Implementers MUST validate code using ONLY the official test commands:
+    - `npm test`
+    - `npm run lint:engraving --strict`
+    - `npm run build`
+  - **NEVER** run ad-hoc or unconfigured compiler flags (e.g. `tsc --noEmit --noUnusedLocals --noUnusedParameters`) that are not enabled in `tsconfig.json` or `package.json`.
+  - **NEVER** embark on rabbit holes attempting to fix pre-existing unused parameters, dead code, or refactor functions outside the ticket's explicit scope. Keep diffs strictly minimal and bounded to the ticket requirements.
 
 ---
 
