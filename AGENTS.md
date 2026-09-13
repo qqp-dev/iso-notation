@@ -3,6 +3,17 @@
 > **Audience**: All AI coding assistants, agents, and subagents operating in this repository.  
 > **Status**: Mandatory Invariants (Must be strictly followed on every turn).
 
+## 0. Mandatory Pre-Delegation User Alignment & Two-Surface Invariant (Architect Invariant)
+> **Note**: This invariant specifically governs the lead Architect agent responsible for shaping requirements, planning, and delegating. The implementer subagent focuses solely on executing verified tickets.
+
+- **ALWAYS check in with the user first**: Before delegating any work, launching implementer/subagent tasks, or embarking on implementation cycles, the architect agent MUST explicitly check in with the user to articulate and verify mutual understanding of the user's intent, requirements, and design direction.
+- **NEVER assume and execute blindly**: If a user request has architectural, aesthetic, or requirements implications, summarize the understanding, propose the concrete approach, and confirm with the user before delegating or executing code changes.
+- **Epistemic Coherence & The Two Consistent Surfaces**:
+  - We operate with exactly **two consistent surfaces**:
+    1. **Surface 1 · The Canonical State**: The design as it currently stands, incorporating all settled improvements and golden-master rules (View 2 on the web page).
+    2. **Surface 2 · The Decision Candidates**: The next round of design ideas, rendered side-by-side with **complete accuracy** using the *real engraving engine* (View 1 on the web page).
+  - **NEVER create throwaway sketch renderers or toy mockup scripts**: Bypassing the real engine or faking elements (like replacing beams with individual flagged notes) destroys epistemic coherence. The user must be evaluating the real change on real score snippets with 100% engine accuracy, never a vague, broken sketch.
+
 ---
 
 ## 1. Network & Link Invariants
@@ -59,17 +70,17 @@ This design is the standard of beauty for this repository. When taking inspirati
 
 ---
 
-## 4. Primary Design Review Loop: The Two-View Live Studio (No PNG Round-Trips)
+## 4. Primary Design Review Loop: The Two-View Live Studio (No PNG Round-Trips, No Goose Chases)
 
-Design review happens **exclusively on the live website** — never by hand-navigating static PNGs:
+Design review happens **exclusively on the live website** — never by sending the user on goose chases looking for files, PNGs, or ad-hoc HTML pages:
 
 - **Live Studio (primary medium)**: `http://100.102.70.49:5175/janko.html`
-  - The page is a **Vite entry** (`janko.html`, mirrored byte-for-byte to `public/janko.html`) that renders inline SVG straight from the TypeScript engine in `src/render/janko/`. There is no PNG in the review loop.
+  - The page is a **Vite entry** (`janko.html`, mirrored byte-for-byte to `public/janko.html`) that renders inline SVG straight from the TypeScript engine in `src/render/janko/`. There is no PNG in the review loop, and no standalone temporary HTML files.
   - **Vite HMR**: any edit under `src/render/janko/` re-renders both views in place (`import.meta.hot`), with **zero user action** and no browser refresh.
   - **View 1 · Decision Candidates Matrix**: the 2–4 exploratory candidates for the *current decision round*, engraved side by side on the same measures with option-delta badges, rationale and a live lint chip per candidate (`#candidates`, or `janko.html#candidates`).
   - **View 2 · Golden Reference Object**: the accumulated golden master — full page spread (all pages) plus 288-DPI-equivalent macro focus crops and the live lint diagnostics list (`janko.html#reference`).
   - **In-browser zoom**: `+` / `−` / `Reset` buttons, `+`/`−`/`0` keys, or `Ctrl/⌘ + wheel`, 50%–300%. Mobile-safe: 100% fits the card width.
-- **Declarative Candidate Registry**: `src/render/janko/candidates.ts` is the *only* file to touch when opening a round. `CURRENT_ROUND_METADATA` holds the round number/title/question, `CURRENT_CANDIDATES` holds the variants as 5-line option deltas against `DEFAULT_JANKO_OPTIONS`. The studio template never changes.
+- **Declarative Candidate Registry**: `src/render/janko/candidates.ts` is the *only* file to touch when opening a round. `CURRENT_ROUND_METADATA` holds the round number/title/question, `CURRENT_CANDIDATES` holds the variants as 5-line option deltas against `DEFAULT_JANKO_OPTIONS`. The studio template never changes. Never invent separate HTML viewers or script files for candidate reviews.
 - **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`**; the Reference view is always the canonical Bach Goldberg Var. 1 engraving under those options.
 
 ---
