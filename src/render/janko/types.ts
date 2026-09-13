@@ -82,6 +82,48 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
   'bounded-channel',
 ];
 
+/**
+ * How a **vertical chord / cluster** of one onset is grouped and how it carries
+ * its duration — the Round 5 question.
+ *
+ * A two-row whole-tone staff spreads a chord's tones over several rows, so a
+ * multi-note onset used to be engraved as N independent stems that overlap into
+ * one long vertical line, chopped into segments by every white knockout it
+ * passes. The four paradigms under review:
+ *
+ * | mode                 | grouping unit            | ink                                   |
+ * | -------------------- | ------------------------ | ------------------------------------- |
+ * | `'none'`             | — (per-note stems)       | incumbent golden master                |
+ * | `'left-clasp-spire'` | one chord / cluster      | one external bracket per cluster       |
+ * | `'beamed-clasp-rail'`| one chord / cluster      | + a measure-bounded rail joining tips  |
+ * | `'bounding-phrase'`  | one measure (the phrase) | one bracket bounding every note        |
+ *
+ * The clasp is drawn **outside** the cluster (`claspX = minX − r − claspOffset`)
+ * and carries the cluster's shortest duration at its tip: an open pip for
+ * halves/wholes, a clean spire for quarters and flag hooks for 8ths/16ths.
+ */
+export type JankoChordGrouping =
+  | 'none'
+  | 'left-clasp-spire'
+  | 'beamed-clasp-rail'
+  | 'bounding-phrase';
+
+/** Every chord-grouping paradigm, in the canonical exploration order (A–D). */
+export const JANKO_CHORD_GROUPINGS: readonly JankoChordGrouping[] = [
+  'none',
+  'left-clasp-spire',
+  'beamed-clasp-rail',
+  'bounding-phrase',
+];
+
+/** Human-readable names of the four chord-grouping paradigms. */
+export const JANKO_CHORD_GROUPING_LABELS: Record<JankoChordGrouping, string> = {
+  none: 'Traditional Stems (no clasp)',
+  'left-clasp-spire': 'Independent Left Clasp',
+  'beamed-clasp-rail': 'Beamed Clasp Rail',
+  'bounding-phrase': 'Bounding Phrase Clasp',
+};
+
 /** Human-readable names of the four channel layouts. */
 export const JANKO_CHANNEL_LAYOUT_LABELS: Record<JankoChannelLayout, string> = {
   'single-equator': 'Single Equator (floating rows)',
@@ -178,6 +220,29 @@ export interface JankoTokens {
    * larger notehead can never silently re-open the collision.
    */
   chordalOffset?: number;
+
+  // --- Optional chord-clasp refinements (Round 5, resolved from defaults) ---
+  /**
+   * Horizontal reach (pt) of a clasp's two caps — the short horizontal serifs
+   * that turn the vertical spine into a bracket. The canonical 2.2pt leaves
+   * ≈0.6pt of clean air between a cap's inner end and the knockout disc it
+   * clasps (the spine already stands `claspOffset` clear of that disc).
+   */
+  claspWidth?: number;
+  /** Stroke thickness (pt) of the clasp bracket and its spire. */
+  claspStrokeWidth?: number;
+  /**
+   * Distance (pt) from the outermost notehead disc of a cluster to the clasp
+   * spine: `claspX = minX − r − claspOffset`.
+   */
+  claspOffset?: number;
+  /**
+   * Minimum air (pt) a **downbeat** clasp keeps from the preceding barline.
+   * The measure's left inset is widened until
+   * `claspX >= measureLeft + claspMinBarlineAir`, so a downbeat bracket never
+   * touches, let alone slices through, the barline it follows.
+   */
+  claspMinBarlineAir?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -219,6 +284,10 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   channelHalfWidth: 6.5,
   channelFlankOffset: 13.0,
   chordalOffset: 11.0,
+  claspWidth: 2.2,
+  claspStrokeWidth: 0.85,
+  claspOffset: 2.8,
+  claspMinBarlineAir: 4.0,
 };
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */
@@ -238,6 +307,12 @@ export interface JankoLayoutOptions {
    * {@link JankoChannelLayout}.
    */
   channelLayout: JankoChannelLayout;
+  /**
+   * Vertical chord/cluster grouping and duration carrier (Round 5). `'none'`
+   * keeps the incumbent per-note stems; the three clasp paradigms draw an
+   * external left bracket per cluster (see {@link JankoChordGrouping}).
+   */
+  chordGrouping: JankoChordGrouping;
 
   // --- Optional page/layout refinements (resolved from defaults) ---
   /** Horizontal systems stacked on one page. */
@@ -296,6 +371,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   interStaffGap: 56.0,
   middleCSpine: 'none',
   channelLayout: 'single-equator',
+  chordGrouping: 'none',
   systemsPerPage: 3,
   ticksPerMeasure: 144,
   anacrusisTicks: 0,

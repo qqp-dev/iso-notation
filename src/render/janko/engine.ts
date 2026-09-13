@@ -42,6 +42,7 @@ import {
 import {
   DEFAULT_JANKO_VARIANTS,
   JANKO_RHYTHM_STYLE_LABELS,
+  JankoChordGrouping,
   JankoLayoutOptions,
   JankoPageGeometry,
   JankoRhythmStyle,
@@ -65,11 +66,17 @@ import {
 import { renderNotehead } from './elements/notehead';
 import {
   JankoBeamGroupGeometry,
+  JankoClaspGroupGeometry,
+  JankoClaspRailGeometry,
   JankoRhythmNote,
+  claspInkBox,
   computeBeamGroupGeometry,
+  computeClaspGeometry,
   partitionBeamGroups,
   renderBeamGroup,
+  renderClaspGroup,
   renderRhythm,
+  withClaspRail,
 } from './elements/rhythm';
 import { renderAccolade, renderCaptionLines, wrapCaptionText } from './elements/accolade';
 import { renderBarlines, renderBeatGrid, renderMeasureNumber } from './elements/barlines';
@@ -247,6 +254,376 @@ export interface PositionedJankoNote {
   rhythm: JankoRhythmNote;
 }
 
+/** One clasp cluster of a system: the notes a single bracket groups. */
+export interface JankoClaspCluster {
+  /** Member notes of the cluster. */
+  notes: PositionedJankoNote[];
+  /** Measure index inside the system (drives the rail grouping). */
+  measureIdx: number;
+  /**
+   * Duration the clasp carries, when it is not simply the shortest member
+   * value (the `'bounding-phrase'` paradigm carries its opening value).
+   */
+  durationTicks?: number;
+}
+
+/**
+ * Collect the chord/cluster groups of one system.
+ *
+ * - `'left-clasp-spire'` / `'beamed-clasp-rail'`: one group per onset carrying
+ *   **two or more** simultaneous heads — the vertical simultaneity a two-row
+ *   whole-tone staff spreads over several rows. A lone melodic note is never
+ *   grouped, so running 16th-note writing keeps its stems and beams untouched.
+ *   `claspTicks`, when supplied, keeps only the onsets the fit rule accepted.
+ * - `'bounding-phrase'`: one group per measure that contains a chord, bounding
+ *   **every** note of the measure. The bracket carries the measure's opening
+ *   duration.
+ */
+export function collectClaspClusters(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  claspTicks?: ReadonlySet<number> | null
+): JankoClaspCluster[] {
+  if (!usesChordClasps(o.chordGrouping)) return [];
+  const byTick = new Map<number, PositionedJankoNote[]>();
+  for (const p of notes) {
+    const bucket = byTick.get(p.note.startTick);
+    if (bucket) bucket.push(p);
+    else byTick.set(p.note.startTick, [p]);
+  }
+  const onsets = [...byTick.entries()]
+    .filter(([, group]) => group.length >= 2)
+    .sort((a, b) => a[0] - b[0]);
+  const measureOf = (p: PositionedJankoNote): number =>
+    getMeasureIndexOfTick(p.note, geo, systemIndex, t);
+
+  if (o.chordGrouping !== 'bounding-phrase') {
+    return onsets
+      .filter(([tick]) => !claspTicks || claspTicks.has(tick))
+      .map(([, group]) => ({ notes: group, measureIdx: measureOf(group[0]) }));
+  }
+
+  // The phrase bracket sits at the measure's opening edge, where the air is a
+  // property of the measure itself, not of the chord that provoked it: every
+  // measure carrying a simultaneity is a candidate, and the fit rule below
+  // decides whether its bracket can stand.
+  const chordMeasures = new Set(onsets.map(([, group]) => measureOf(group[0])));
+  const byMeasure = new Map<number, PositionedJankoNote[]>();
+  for (const p of notes) {
+    const m = measureOf(p);
+    const bucket = byMeasure.get(m);
+    if (bucket) bucket.push(p);
+    else byMeasure.set(m, [p]);
+  }
+  return [...byMeasure.entries()]
+    .filter(([m, group]) => chordMeasures.has(m) && group.length >= 2)
+    .sort((a, b) => a[0] - b[0])
+    .map(([measureIdx, group]) => {
+      const firstTick = Math.min(...group.map((p) => p.note.startTick));
+      const opening = group.filter((p) => p.note.startTick === firstTick);
+      return {
+        notes: group,
+        measureIdx,
+        durationTicks: Math.min(...opening.map((p) => p.note.durationTicks)),
+      };
+    });
+}
+
+/**
+ * Absolute x of the barline that opens a measure — the closing barline of the
+ * measure (or upbeat) before it — or null when the measure opens its system.
+ * The staff lines of a system emerge openly from the left margin, so a bracket
+ * there has no barline to clear.
+ */
+export function getMeasureOpeningBarlineX(
+  measureIdx: number,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  t: ResolvedJankoTokens
+): number | null {
+  if (measureIdx <= 0) return null;
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const upbeatSystem0 = systemIndex === 0 && anacrusis > 0;
+  const firstMeasureLeft = upbeatSystem0
+    ? geo.staffLeft + (anacrusis / t.ticksPerMeasure) * geo.measureWidth
+    : geo.staffLeft;
+  const offset = upbeatSystem0 ? measureIdx - 1 : measureIdx;
+  return firstMeasureLeft + offset * geo.measureWidth;
+}
+
+/** Absolute x of the barline that closes a measure (always painted). */
+export function getMeasureClosingBarlineX(
+  measureIdx: number,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  t: ResolvedJankoTokens
+): number {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const upbeatSystem0 = systemIndex === 0 && anacrusis > 0;
+  const upbeatWidth = upbeatSystem0 ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth : 0;
+  if (upbeatSystem0 && measureIdx === 0) return geo.staffLeft + upbeatWidth;
+  const offset = upbeatSystem0 ? measureIdx - 1 : measureIdx;
+  return geo.staffLeft + upbeatWidth + (offset + 1) * geo.measureWidth;
+}
+
+/**
+ * Air (pt) a notehead keeps from a barline. Mirrors
+ * `DEFAULT_JANKO_LINT_OPTIONS.minClearance`, so the engine's own admission test
+ * agrees with the visual linter.
+ */
+export const COLUMN_BARLINE_AIR = 1.0;
+
+/**
+ * Measures of a solved system whose columns break a hard rule: two noteheads of
+ * different onsets closer than one disc diameter, or a notehead driven into its
+ * closing barline.
+ *
+ * A measure that carries a downbeat clasp stands further right of its barline
+ * (see {@link getMeasureInsets}); where the measure's own content is too dense
+ * to absorb that shift, this test is what demotes it — and with it the bracket —
+ * back to the canonical margins instead of letting the engraving collide.
+ */
+export function measuresWithColumnCollisions(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  t: ResolvedJankoTokens
+): Set<number> {
+  const bad = new Set<number>();
+  const r = t.noteheadRadius;
+  const measureOf = (p: PositionedJankoNote): number =>
+    getMeasureIndexOfTick(p.note, geo, systemIndex, t);
+  const sorted = [...notes].sort((a, b) => a.x - b.x);
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i];
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j];
+      if (b.x - a.x >= 2 * r) break;
+      if (a.note.startTick === b.note.startTick) continue;
+      if (Math.hypot(b.x - a.x, b.y - a.y) < 2 * r - EPS) {
+        bad.add(measureOf(a));
+        bad.add(measureOf(b));
+      }
+    }
+  }
+  for (const p of notes) {
+    const m = measureOf(p);
+    const barlineX = getMeasureClosingBarlineX(m, geo, systemIndex, t);
+    if (Math.abs(p.x - barlineX) - r < COLUMN_BARLINE_AIR - EPS) bad.add(m);
+  }
+  return bad;
+}
+
+/** A rectangle in page pt coordinates, in box (min/max) form. */
+export interface JankoBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Approximate advance width of a measure numeral as a fraction of its font
+ * size. Mirrors `DEFAULT_JANKO_LINT_OPTIONS.digitAdvance`, so the engine's clasp
+ * fit rule and the linter's furniture audit agree on the same box.
+ */
+export const MARGIN_DIGIT_ADVANCE = 0.35;
+
+/** Font size (pt) of the measure numeral (see `elements/barlines`). */
+export const MARGIN_NUMERAL_FONT_SIZE = 8.5;
+
+/**
+ * Boxes of the left-margin furniture of one system: the measure numeral and the
+ * accolade. Shared by the engine's clasp fit rule and the visual linter's
+ * `measure-numeral-clearance` / `accolade-clearance` audits, so a bracket can
+ * never be admitted into furniture the linter would report — and the audits can
+ * never drift from the geometry the engine reserved.
+ */
+export function getMarginFurniture(
+  geometry: JankoSystemGeometry,
+  t: ResolvedJankoTokens,
+  measureNumber: number,
+  digitAdvance: number = MARGIN_DIGIT_ADVANCE
+): { numeral: JankoBox; accolade: JankoBox } {
+  const numeralX = geometry.staffLeft - 2;
+  const numeralBaseline = geometry.staffTopY - 6;
+  const numeral: JankoBox = {
+    x0: numeralX,
+    y0: numeralBaseline - t.digitFontSize * 1.2,
+    // The numeral is set on an alphabetic baseline and figures carry no
+    // descender: the ink stops at the baseline.
+    x1: numeralX + String(measureNumber).length * MARGIN_NUMERAL_FONT_SIZE * digitAdvance * 1.5,
+    y1: numeralBaseline,
+  };
+  const accolade: JankoBox = {
+    x0: geometry.staffLeft - t.accoladeGap - t.accoladeWidth,
+    y0: geometry.staffTopY,
+    x1: geometry.staffLeft - t.accoladeGap,
+    y1: geometry.staffBotY,
+  };
+  return { numeral, accolade };
+}
+
+/**
+ * Every left-margin furniture box painted in one system (the accolade always,
+ * the measure numeral only where the engine draws it), in the order the linter
+ * audits them.
+ */
+export function systemFurniture(
+  geometry: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  systemIndex: number
+): JankoBox[] {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const { numeral, accolade } = getMarginFurniture(
+    geometry,
+    t,
+    systemIndex * o.measuresPerSystem + 1
+  );
+  const boxes: JankoBox[] = [accolade];
+  if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) boxes.push(numeral);
+  return boxes;
+}
+
+/** Do two boxes overlap (or come closer than `clearance`)? */
+export function boxesWithin(a: JankoBox, b: JankoBox, clearance: number = 0): boolean {
+  return a.x0 - clearance < b.x1 && b.x0 - clearance < a.x1 && a.y0 - clearance < b.y1 && b.y0 - clearance < a.y1;
+}
+
+/**
+ * Does a resolved clasp stand clear of its opening barline, of every foreign
+ * disc and of the left-margin furniture? The engine's fit rule (see
+ * {@link resolveChordColumns}) and the visual linter's `clasp-clearance` audit
+ * share this predicate, so a bracket that the engine engraves can never be
+ * reported as a collision.
+ */
+export function claspClearsLayout(
+  geometry: JankoClaspGroupGeometry,
+  barlineX: number | null,
+  notes: readonly PositionedJankoNote[],
+  t: ResolvedJankoTokens,
+  furniture: readonly JankoBox[] = []
+): boolean {
+  const disk = claspInkBox(geometry, t);
+  if (barlineX !== null && disk.x0 - barlineX < t.claspMinBarlineAir - CLASP_EPS) return false;
+  for (const box of furniture) {
+    if (boxesWithin(disk, box, CLASP_NOTEHEAD_AIR)) return false;
+  }
+  const own = new Set(geometry.notes.map((n) => n.id));
+  for (const p of notes) {
+    if (own.has(p.note.id)) continue;
+    const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
+    const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
+    if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR - CLASP_EPS) return false;
+  }
+  return true;
+}
+
+/** One candidate rail run, offered to the caller's verdict before it is engraved. */
+export interface JankoClaspRailRun {
+  /** Indices into the `groups` array {@link computeClaspRails} received. */
+  indexes: number[];
+  /** The run's railed clasps, in onset order. */
+  groups: JankoClaspGroupGeometry[];
+  /** The rails that would join them. */
+  rails: JankoClaspRailGeometry[];
+}
+
+/** Verdict on one candidate rail run (`false` leaves the clasps unrailed). */
+export type JankoClaspRailVerdict = (run: JankoClaspRailRun) => boolean;
+
+/**
+ * Join the spire tips of contiguous clasps with a horizontal rail
+ * (`'beamed-clasp-rail'`).
+ *
+ * Two clasps are *contiguous* when they are consecutive clasps of one measure —
+ * the measure is the phrase unit of this notation, so the rail is always a
+ * measure-bounded beam: it spans only its own measure's spire columns and
+ * therefore can never approach, let alone cross, a barline. The primary rail
+ * runs at the **topmost** tip, so every joined spire is extended up to it (the
+ * run's beam); flag hooks are dropped exactly as a traditional beam replaces
+ * them. A second rail `flagSpacing` below carries the 16th-note level whenever
+ * the run holds two or more 16th-class clasps. A half/whole clasp carries a pip
+ * rather than a spire and never joins a run.
+ *
+ * `verdict`, when supplied, sees the tentatively railed run — extended spires
+ * and rails — and may reject it; the clasps are then engraved unrailed rather
+ * than letting a rail cut through a foreign glyph.
+ */
+export function computeClaspRails(
+  groups: readonly JankoClaspGroupGeometry[],
+  clusters: readonly JankoClaspCluster[],
+  t: ResolvedJankoTokens,
+  verdict?: JankoClaspRailVerdict
+): { groups: JankoClaspGroupGeometry[]; rails: JankoClaspRailGeometry[] } {
+  const resolved = [...groups];
+  const rails: JankoClaspRailGeometry[] = [];
+  if (groups.length === 0 || clusters.length !== groups.length) {
+    return { groups: resolved, rails };
+  }
+  const buckets = new Map<number, number[]>();
+  clusters.forEach((cluster, index) => {
+    if (resolved[index].spireTipY === null) return;
+    const bucket = buckets.get(cluster.measureIdx);
+    if (bucket) bucket.push(index);
+    else buckets.set(cluster.measureIdx, [index]);
+  });
+
+  for (const bucket of buckets.values()) {
+    if (bucket.length < 2) continue;
+    const run = bucket.sort((a, b) => resolved[a].tick - resolved[b].tick);
+    const railY = Math.min(...run.map((i) => resolved[i].spireTipY as number));
+    const railed = run.map((i) => withClaspRail(resolved[i], railY));
+    const ids = (indexes: readonly number[]): string[] =>
+      indexes.flatMap((i) => resolved[i].notes.map((n) => n.id));
+    const railsFor = (indexes: readonly number[], level: 1 | 2): JankoClaspRailGeometry => ({
+      x1: Math.min(...indexes.map((i) => resolved[i].claspX)),
+      x2: Math.max(...indexes.map((i) => resolved[i].claspX)),
+      y: level === 1 ? railY : railY + t.flagSpacing,
+      thickness: t.beamThickness,
+      level,
+      noteIds: ids(indexes),
+    });
+    const candidate: JankoClaspRailRun = {
+      indexes: [...run],
+      groups: railed,
+      rails: [railsFor(run, 1)],
+    };
+    const sixteenths = run.filter((i) => resolved[i].duration === 'spire-two-flags');
+    if (sixteenths.length >= 2) candidate.rails.push(railsFor(sixteenths, 2));
+    if (verdict && !verdict(candidate)) continue;
+    run.forEach((i, k) => {
+      resolved[i] = railed[k];
+    });
+    rails.push(...candidate.rails);
+  }
+  return { groups: resolved, rails };
+}
+
+/**
+ * Does a rail stand clear of every foreign disc? A rail is a beam: it may pass
+ * over the cluster it joins, but never through another glyph.
+ */
+export function railClearsLayout(
+  rail: JankoClaspRailGeometry,
+  notes: readonly PositionedJankoNote[],
+  t: ResolvedJankoTokens
+): boolean {
+  const joined = new Set(rail.noteIds);
+  const half = rail.thickness / 2;
+  for (const p of notes) {
+    if (joined.has(p.note.id)) continue;
+    const dx = Math.max(rail.x1 - p.x, 0, p.x - rail.x2);
+    const dy = Math.max(rail.y - half - p.y, 0, p.y - (rail.y + half));
+    if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR - CLASP_EPS) return false;
+  }
+  return true;
+}
+
 /** Every geometric fact one engraved system is built from. */
 export interface JankoSystemLayout {
   /** Zero-based global system index. */
@@ -259,6 +636,16 @@ export interface JankoSystemLayout {
   beams: JankoBeamGroupGeometry[];
   /** Short notes engraved with a standalone tick instead of a beam. */
   ungrouped: JankoRhythmNote[];
+  /** External left clasps of the chord-grouping paradigm ([] for `'none'`). */
+  clasps: JankoClaspGroupGeometry[];
+  /** Rails joining contiguous clasps (`'beamed-clasp-rail'` only). */
+  claspRails: JankoClaspRailGeometry[];
+  /**
+   * Note ids whose standalone stem the clasp replaces. A clasp member that
+   * belongs to a beam group keeps its stem: a real 16th-note beam is never cut
+   * to pieces by a grouping bracket.
+   */
+  claspedStems: string[];
 }
 
 function handForNote(note: QuantizedNote): Hand {
@@ -266,20 +653,56 @@ function handForNote(note: QuantizedNote): Hand {
 }
 
 /**
+ * Left inset (pt) a measure must reserve when its **downbeat** carries a left
+ * clasp: `claspX = noteLeft − r − claspOffset` has to keep
+ * `claspMinBarlineAir` clear of the measure's opening barline, so
+ * `noteLeft ≥ r + claspOffset + claspMinBarlineAir` (11.6pt with the canonical
+ * tokens — nearly twice the 6pt measure inset).
+ */
+export function getClaspDownbeatInset(tokens?: Partial<JankoTokens> | null): number {
+  const t = resolveJankoTokens(tokens);
+  return t.noteheadRadius + t.claspOffset + t.claspMinBarlineAir;
+}
+
+/**
+ * Required absolute left inset (pt) per **system-local measure index** when a
+ * downbeat clasp widens the measure's opening margin. Measures without a
+ * downbeat clasp are absent from the map (and keep `tokens.measureInset`).
+ */
+export type JankoClaspInsetMap = ReadonlyMap<number, number>;
+
+/**
  * Horizontal insets of one measure of a system: the canonical
  * `tokens.measureInset` on both sides, widened on the left of the very first
- * measure of the page when a time signature has to be cleared.
+ * measure of the page when a time signature has to be cleared, and widened
+ * again when the measure's downbeat carries a left clasp
+ * (`claspLeftInset`, see {@link getClaspDownbeatInset}).
+ *
+ * The two side margins form a **fixed budget**: the air a downbeat bracket
+ * needs is taken from the measure's closing margin, so the note field keeps its
+ * canonical width and every downstream beat keeps its natural proportional
+ * spacing. Nothing is compressed, nothing is distorted — the whole measure
+ * simply stands a little further right of its barline.
  */
 export function getMeasureInsets(
   systemIndex: number,
   measureIdx: number,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  claspLeftInset: number = 0
 ): JankoTickInsets {
   const isOpeningMeasure = systemIndex === 0 && measureIdx === 0;
-  return isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
-    ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
-    : { left: t.measureInset, right: t.measureInset };
+  const base =
+    isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
+      ? { left: t.measureInset + o.timeSignatureWidth, right: t.measureInset }
+      : { left: t.measureInset, right: t.measureInset };
+  const extra = Math.max(0, claspLeftInset - base.left);
+  return { left: base.left + extra, right: Math.max(0, base.right - extra) };
+}
+
+/** Does this chord-grouping mode draw an external left clasp at all? */
+export function usesChordClasps(mode: JankoChordGrouping): boolean {
+  return mode !== 'none';
 }
 
 /** Measure index (inside its system) of a note's onset. */
@@ -310,13 +733,15 @@ function getNominalNoteX(
   geo: JankoSystemGeometry,
   systemIndex: number,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  claspInsets?: JankoClaspInsetMap | null
 ): number {
+  const claspInset = (measureIdx: number): number => claspInsets?.get(measureIdx) ?? 0;
   const anacrusis = t.anacrusisTicks ?? 0;
   if (systemIndex === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
     if (note.startTick < anacrusis) {
-      const insets = getMeasureInsets(0, 0, o, t);
+      const insets = getMeasureInsets(0, 0, o, t, claspInset(0));
       const left = insets.left ?? t.measureInset;
       const right = insets.right ?? t.measureInset;
       const available = Math.max(0, upbeatWidth - left - right);
@@ -325,7 +750,7 @@ function getNominalNoteX(
     const elapsed = note.startTick - anacrusis;
     const m = Math.floor(elapsed / t.ticksPerMeasure);
     const tickInMeasure = elapsed % t.ticksPerMeasure;
-    const insets = getMeasureInsets(0, m + 1, o, t);
+    const insets = getMeasureInsets(0, m + 1, o, t, claspInset(m + 1));
     const left = insets.left ?? t.measureInset;
     const right = insets.right ?? t.measureInset;
     const available = Math.max(0, geo.measureWidth - left - right);
@@ -338,7 +763,7 @@ function getNominalNoteX(
     const measureOffset = Math.floor(elapsed / t.ticksPerMeasure);
     const m = measureOffset - systemIndex * geo.measuresPerSystem;
     const tickInMeasure = elapsed % t.ticksPerMeasure;
-    const insets = getMeasureInsets(systemIndex, m, o, t);
+    const insets = getMeasureInsets(systemIndex, m, o, t, claspInset(m));
     const left = insets.left ?? t.measureInset;
     const right = insets.right ?? t.measureInset;
     const available = Math.max(0, geo.measureWidth - left - right);
@@ -356,7 +781,7 @@ function getNominalNoteX(
       tickInMeasure,
       geo.measureWidth,
       t,
-      getMeasureInsets(systemIndex, measureIdx, o, t)
+      getMeasureInsets(systemIndex, measureIdx, o, t, claspInset(measureIdx))
     )
   );
 }
@@ -374,9 +799,10 @@ export function positionJankoNote(
   systemIndex: number,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
-  flank?: JankoChannelFlank | null
+  flank?: JankoChannelFlank | null,
+  claspInsets?: JankoClaspInsetMap | null
 ): PositionedJankoNote {
-  const x = getNominalNoteX(note, geo, systemIndex, o, t);
+  const x = getNominalNoteX(note, geo, systemIndex, o, t, claspInsets);
   const hand = handForNote(note);
   const coord = getPitchCoordinate(
     note.pitch.pitchClass,
@@ -466,6 +892,73 @@ interface OnsetUnit {
   /** Left/right edge (page pt) the column's heads must stay inside. */
   bandLeft: number;
   bandRight: number;
+  /** Absolute x of the measure's left edge (its opening barline, when any). */
+  measureLeft: number;
+  /** True when this onset carries an external left clasp (chord grouping). */
+  clasp: boolean;
+  /** Distance (pt) from the unit's leftmost head centre to the clasp spine. */
+  claspReach: number;
+  /** Top edge (page pt) of the clasp bracket. */
+  claspTop: number;
+  /** Bottom edge (page pt) of the clasp bracket. */
+  claspBot: number;
+}
+
+/**
+ * Air (pt) a clasp spine keeps from a foreign notehead disc. Greater than the
+ * linter's `minClearance`, so every layout the solver settles is also
+ * linter-clean.
+ */
+export const CLASP_NOTEHEAD_AIR = 1.2;
+
+/** Floating-point tolerance (pt) of the clasp's barline-air tests. */
+export const CLASP_EPS = 1e-6;
+
+/**
+ * Measures whose **downbeat onset** carries a chord/cluster reserve a wider
+ * left inset, so the external clasp of that downbeat keeps
+ * `tokens.claspMinBarlineAir` of air from the barline it follows
+ * (`claspX ≥ measureLeft + claspMinBarlineAir`).
+ *
+ * The map is keyed by the system-local measure index used by
+ * {@link getMeasureIndexOfTick} (0-based, except on an anacrusis system where
+ * the upbeat occupies slot 0 and the first full measure slot 1).
+ */
+export function computeClaspInsetMap(
+  score: QuantizedGridScore,
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): JankoClaspInsetMap {
+  const map = new Map<number, number>();
+  if (!usesChordClasps(o.chordGrouping)) return map;
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const startTick =
+    systemIndex === 0 ? 0 : anacrusis + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure;
+  const endTick = anacrusis + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure;
+
+  // Every onset of the system, bucketed by its system-local measure index.
+  const byMeasure = new Map<number, Map<number, number>>();
+  for (const note of score.notes) {
+    if (note.startTick < startTick || note.startTick >= endTick) continue;
+    const measureIdx = getMeasureIndexOfTick(note, geo, systemIndex, t);
+    let ticks = byMeasure.get(measureIdx);
+    if (!ticks) {
+      ticks = new Map<number, number>();
+      byMeasure.set(measureIdx, ticks);
+    }
+    ticks.set(note.startTick, (ticks.get(note.startTick) ?? 0) + 1);
+  }
+
+  for (const [measureIdx, ticks] of byMeasure) {
+    const firstTick = Math.min(...ticks.keys());
+    if ((ticks.get(firstTick) ?? 0) < 2) continue;
+    // Only a true downbeat can drive the clasp onto the opening barline.
+    if (splitTick(firstTick, t).tickInMeasure !== 0) continue;
+    map.set(measureIdx, getClaspDownbeatInset(t));
+  }
+  return map;
 }
 
 /**
@@ -506,16 +999,44 @@ interface OnsetUnit {
  * Whatever still cannot fit — a three-note row cluster squeezed between two
  * 16ths that are themselves out of room — is left for the visual linter to
  * name (`chordal-overlap` / `notehead-overlap`) instead of being hidden.
+ *
+ * Round 5 adds a third kind of column: a **clasped** cluster (two or more
+ * simultaneous heads) claims the `r + claspOffset` its external bracket needs on
+ * the left, and the fit rule (see {@link resolveChordColumns}) drops any bracket
+ * that cannot stand clear of its neighbours.
  */
 export function resolveRowSnappedChordOffsets(
   notes: readonly PositionedJankoNote[],
   geo: JankoSystemGeometry,
   systemIndex: number,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  claspInsets?: JankoClaspInsetMap | null
 ): PositionedJankoNote[] {
+  return resolveChordColumns(notes, geo, systemIndex, o, t, claspInsets).notes;
+}
+
+/** Result of the chord-column solve: the notes plus the clasps that survived. */
+export interface JankoChordColumnResolution {
+  /** Notes with their final horizontal positions. */
+  notes: PositionedJankoNote[];
+  /** Ticks of the onsets whose cluster carries a left clasp after the fit rule. */
+  claspTicks: ReadonlySet<number>;
+}
+
+/** Full result of the chord-column solve (see {@link resolveRowSnappedChordOffsets}). */
+export function resolveChordColumns(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  claspInsets?: JankoClaspInsetMap | null
+): JankoChordColumnResolution {
   const delta = getChordalOffset(t);
   const gap = 2 * t.noteheadRadius + CHORDAL_NEIGHBOUR_AIR;
+  const claspsActive = usesChordClasps(o.chordGrouping);
+  const claspReach = t.noteheadRadius + t.claspOffset;
 
   // -------------------------------------------------------------------------
   // 1. Partition the system into onset units, each split into row clusters.
@@ -526,7 +1047,13 @@ export function resolveRowSnappedChordOffsets(
     let unit = unitByTick.get(p.note.startTick);
     if (!unit) {
       const measureIdx = getMeasureIndexOfTick(p.note, geo, systemIndex, t);
-      const insets = getMeasureInsets(systemIndex, measureIdx, o, t);
+      const insets = getMeasureInsets(
+        systemIndex,
+        measureIdx,
+        o,
+        t,
+        claspInsets?.get(measureIdx) ?? 0
+      );
       const anacrusis = t.anacrusisTicks ?? 0;
       let measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
       let mWidth = geo.measureWidth;
@@ -549,6 +1076,11 @@ export function resolveRowSnappedChordOffsets(
         spread: false,
         bandLeft: measureLeft + (insets.left ?? t.measureInset),
         bandRight: measureLeft + mWidth - (insets.right ?? t.measureInset),
+        measureLeft,
+        clasp: false,
+        claspReach,
+        claspTop: p.y - t.noteheadRadius,
+        claspBot: p.y + t.noteheadRadius,
       };
       unitByTick.set(p.note.startTick, unit);
     }
@@ -575,10 +1107,62 @@ export function resolveRowSnappedChordOffsets(
   const units = [...unitByTick.values()];
   for (const unit of units) {
     unit.spread = unit.rows.some((cluster) => cluster.halfSpan > 0);
+    // A chord/cluster (two or more simultaneous heads) is clasped; a lone
+    // melodic note never is.
+    const size = unit.rows.reduce((sum, cluster) => sum + cluster.notes.length, 0);
+    unit.clasp = claspsActive && size >= 2;
+    if (unit.clasp) {
+      unit.claspTop = unit.rows.reduce((min, c) => Math.min(min, c.y), Infinity) - t.noteheadRadius;
+      unit.claspBot = unit.rows.reduce((max, c) => Math.max(max, c.y), -Infinity) + t.noteheadRadius;
+    }
   }
-  // Fast path: a system with no same-row chord tone anywhere cannot move a
-  // single column, so the whole solve is skipped.
-  if (!units.some((unit) => unit.spread)) return [...notes];
+
+  // -------------------------------------------------------------------------
+  // 1b. Fit rule. An external bracket protrudes `r + claspOffset` (7.6pt) to
+  //     the left of its cluster, which a continuous 16th-note grid — whose
+  //     columns sit exactly one disc diameter apart — cannot host. A clasp is
+  //     therefore engraved only where it stands clear of every foreign disc by
+  //     `CLASP_NOTEHEAD_AIR` and of its opening barline by `claspMinBarlineAir`;
+  //     everywhere else the cluster keeps its traditional stems. This is what
+  //     "only actual chords receive clasps, never feathers" means in practice.
+  // -------------------------------------------------------------------------
+  const claspFits = (unit: OnsetUnit): boolean => {
+    const members = unit.rows.flatMap((cluster) => cluster.notes);
+    const geometry = computeClaspGeometry(
+      members.map((p) => p.rhythm),
+      t
+    );
+    if (!geometry) return false;
+    const disk = claspInkBox(geometry, t);
+    // Slot 0 of a system opens from the left margin: there is no barline to
+    // clear, only the accolade (which the fit test below covers as a foreign
+    // glyph-free zone).
+    if (unit.measureIdx > 0 && disk.x0 - unit.measureLeft < t.claspMinBarlineAir - CLASP_EPS) {
+      return false;
+    }
+    for (const other of units) {
+      if (other === unit) continue;
+      for (const cluster of other.rows) {
+        for (const p of cluster.notes) {
+          const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
+          const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
+          if (Math.hypot(dx, dy) < t.noteheadRadius + CLASP_NOTEHEAD_AIR) return false;
+        }
+      }
+    }
+    return true;
+  };
+  if (units.some((unit) => unit.clasp)) {
+    for (const unit of units) {
+      if (unit.clasp && !claspFits(unit)) unit.clasp = false;
+    }
+  }
+  const hasClasp = units.some((unit) => unit.clasp);
+  // Fast path: a system with neither a same-row chord tone nor a clasp cannot
+  // move a single column, so the whole solve is skipped.
+  if (!units.some((unit) => unit.spread || unit.clasp)) {
+    return { notes: [...notes], claspTicks: new Set<number>() };
+  }
 
   const r = t.noteheadRadius;
   const maxHalfSpan = units.reduce(
@@ -586,7 +1170,8 @@ export function resolveRowSnappedChordOffsets(
     0
   );
   /** Columns further apart than this can never touch, whatever their rows. */
-  const reach = 2 * maxHalfSpan + 2 * r + delta;
+  const reach =
+    2 * maxHalfSpan + 2 * r + delta + (hasClasp ? claspReach + CLASP_NOTEHEAD_AIR : 0);
 
   /**
    * Horizontal air two clusters owe each other: `2r` when they share a row,
@@ -670,6 +1255,24 @@ export function resolveRowSnappedChordOffsets(
       }
     }
 
+    // The external clasp hangs left of this cluster: its spine must clear every
+    // glyph of a left-hand column that shares the clasp's vertical band. The
+    // whole column then steps right just far enough to give the bracket air —
+    // the same one-directional relief a row-snapped pair receives.
+    if (unit.clasp) {
+      for (const other of neighboursByUnit.get(unit)!) {
+        if (other.nominalX >= unit.nominalX) continue;
+        for (const cluster of other.rows) {
+          if (cluster.y + r < unit.claspTop || cluster.y - r > unit.claspBot) continue;
+          const rightEdge = columnX(other) + cluster.halfSpan;
+          lo = Math.max(
+            lo,
+            rightEdge + r + CLASP_NOTEHEAD_AIR + myH + unit.claspReach - unit.nominalX
+          );
+        }
+      }
+    }
+
     // Strict horizontal time monotonicity: a note at a later onset must never be placed to the left of an earlier onset
     for (const prev of ordered) {
       if (prev.tick >= unit.tick) break;
@@ -680,7 +1283,7 @@ export function resolveRowSnappedChordOffsets(
     for (let i = ordered.length - 1; i >= 0; i--) {
       const next = ordered[i];
       if (next.tick <= unit.tick) break;
-      if (next.spread) {
+      if (next.spread || next.clasp) {
         const nextH = unitHalfSpan(next);
         const nextXLeft = columnX(next) - nextH;
         hi = Math.min(hi, nextXLeft - MIN_TIME_AIR - myH - unit.nominalX);
@@ -699,10 +1302,11 @@ export function resolveRowSnappedChordOffsets(
   const ordered = [...units].sort((a, b) => a.tick - b.tick);
 
   // -------------------------------------------------------------------------
-  // 2. Spread columns first: keep the symmetric placement whenever it is legal.
+  // 2. Spread and clasped columns first: keep the symmetric placement whenever
+  //    it is legal.
   // -------------------------------------------------------------------------
   for (const unit of ordered) {
-    if (!unit.spread) continue;
+    if (!unit.spread && !unit.clasp) continue;
     const { lo, hi } = windowOf(unit);
     if (lo <= 0 && 0 <= hi) continue;
     // Over-constrained: split the residual displacement evenly rather than
@@ -711,13 +1315,15 @@ export function resolveRowSnappedChordOffsets(
   }
 
   // -------------------------------------------------------------------------
-  // 3. Plain columns yield the air a spread neighbour needs. A column only ever
-  //    steps *away* from a violation, so this cannot oscillate.
+  // 3. Plain columns yield the air a spread or clasped neighbour needs. A
+  //    column only ever steps *away* from a violation, so this cannot
+  //    oscillate; a clasped column was already placed against its bracket air
+  //    in Phase 2 and is never nudged back onto a glyph.
   // -------------------------------------------------------------------------
   for (let pass = 0; pass < 5; pass++) {
     let moved = false;
     for (const unit of ordered) {
-      if (unit.spread) continue;
+      if (unit.spread || unit.clasp) continue;
       let pushRight = 0;
       let pushLeft = 0;
       for (const other of neighboursByUnit.get(unit)!) {
@@ -768,11 +1374,14 @@ export function resolveRowSnappedChordOffsets(
     }
   }
 
-  return notes.map((p) => {
-    const x = resolved.get(p.note.id);
-    if (x === undefined || x === p.x) return p;
-    return { ...p, x, rhythm: { ...p.rhythm, x } };
-  });
+  return {
+    notes: notes.map((p) => {
+      const x = resolved.get(p.note.id);
+      if (x === undefined || x === p.x) return p;
+      return { ...p, x, rhythm: { ...p.rhythm, x } };
+    }),
+    claspTicks: new Set(ordered.filter((unit) => unit.clasp).map((unit) => unit.tick)),
+  };
 }
 
 /** Position every note of one system, in engraving order. */
@@ -799,12 +1408,33 @@ export function layoutJankoSystem(
   const flanks = usesContourFlanks(o.channelLayout)
     ? resolveChannelFlanks(score.notes, o, t)
     : null;
-  const positioned = sysNotes.map((n) =>
-    positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null)
-  );
-  // Approach 2: heads that share an onset, an octave and a whole-tone row are
-  // spread horizontally around the beat column instead of being merged.
-  const notes = resolveRowSnappedChordOffsets(positioned, geometry, systemIndex, o, t);
+  // A measure whose downbeat carries a chord reserves the air its external
+  // clasp needs from the opening barline (Round 5). Where a measure is too
+  // dense to absorb that shift, the widening — and with it the bracket — is
+  // withdrawn until the engraving is collision-free.
+  const claspInsets = new Map(computeClaspInsetMap(score, geometry, systemIndex, o, t));
+  let positioned: PositionedJankoNote[] = [];
+  let chordColumns: JankoChordColumnResolution = { notes: [], claspTicks: new Set<number>() };
+  for (let attempt = 0; ; attempt++) {
+    positioned = sysNotes.map((n) =>
+      positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets)
+    );
+    // Approach 2: heads that share an onset, an octave and a whole-tone row are
+    // spread horizontally around the beat column instead of being merged. A
+    // clasped column additionally claims the air its bracket needs on the left.
+    chordColumns = resolveChordColumns(positioned, geometry, systemIndex, o, t, claspInsets);
+    if (claspInsets.size === 0 || attempt > geometry.measuresPerSystem) break;
+    const colliding = measuresWithColumnCollisions(
+      chordColumns.notes,
+      geometry,
+      systemIndex,
+      t
+    );
+    const demoted = [...claspInsets.keys()].filter((m) => colliding.has(m));
+    if (demoted.length === 0) break;
+    for (const m of demoted) claspInsets.delete(m);
+  }
+  const notes = chordColumns.notes;
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
@@ -821,7 +1451,80 @@ export function layoutJankoSystem(
     ungrouped = partition.ungrouped;
   }
 
-  return { index: systemIndex, geometry, notes, beams, ungrouped };
+  // Round 5: external left clasps group every vertical simultaneity and carry
+  // its duration. A clasp member that is part of a beam keeps its stem, so no
+  // real 16th-note beam is ever broken by the grouping. Every bracket is
+  // re-audited against the *solved* columns: a clasp the engine cannot engrave
+  // cleanly is dropped and its cluster falls back to traditional stems.
+  const clusters = collectClaspClusters(
+    notes,
+    geometry,
+    systemIndex,
+    o,
+    t,
+    o.chordGrouping === 'bounding-phrase' ? null : chordColumns.claspTicks
+  )
+    .map((cluster) => ({
+      cluster,
+      geometry: computeClaspGeometry(
+        cluster.notes.map((p) => p.rhythm),
+        t,
+        cluster.durationTicks === undefined ? undefined : { durationTicks: cluster.durationTicks }
+      ),
+    }))
+    .filter(
+      (entry): entry is { cluster: JankoClaspCluster; geometry: JankoClaspGroupGeometry } =>
+        entry.geometry !== null
+    );
+  const furnitureLaid = clusters.length > 0 ? systemFurniture(geometry, o, t, systemIndex) : [];
+  let clasps: JankoClaspGroupGeometry[] = clusters
+    .filter((entry) =>
+      claspClearsLayout(
+        entry.geometry,
+        getMeasureOpeningBarlineX(entry.cluster.measureIdx, geometry, systemIndex, t),
+        notes,
+        t,
+        furnitureLaid
+      )
+    )
+    .map((entry) => entry.geometry);
+  let claspRails: JankoClaspRailGeometry[] = [];
+  if (o.chordGrouping === 'beamed-clasp-rail') {
+    const clusterList = clusters.map((entry) => entry.cluster);
+    const barlineOf = (measureIdx: number): number | null =>
+      getMeasureOpeningBarlineX(measureIdx, geometry, systemIndex, t);
+    const railed = computeClaspRails(clasps, clusterList, t, (run) => {
+      for (let i = 0; i < run.groups.length; i++) {
+        const cluster = clusterList[run.indexes[i]];
+        if (
+          !claspClearsLayout(run.groups[i], barlineOf(cluster.measureIdx), notes, t, furnitureLaid)
+        ) {
+          return false;
+        }
+      }
+      for (const rail of run.rails) {
+        if (!railClearsLayout(rail, notes, t)) return false;
+      }
+      return true;
+    });
+    clasps = railed.groups;
+    claspRails = railed.rails;
+  }
+  const beamedIds = new Set(beams.flatMap((beam) => beam.notes.map((n) => n.id)));
+  const claspedStems = clasps
+    .flatMap((clasp) => clasp.notes.map((n) => n.id))
+    .filter((id) => !beamedIds.has(id));
+
+  return {
+    index: systemIndex,
+    geometry,
+    notes,
+    beams,
+    ungrouped,
+    clasps,
+    claspRails,
+    claspedStems,
+  };
 }
 
 /** Position every system of a score (used by the linter and the studio). */
@@ -868,13 +1571,28 @@ function renderNotesLayer(
   // 2. Rhythm layer (the beamed dialect renders its stems group-wise). It is
   //    painted *beneath* the noteheads so the white knockouts erase whatever
   //    stem or beam passes behind a glyph — the invariant the linter audits.
+  //    A clasp owns the duration of every member whose stem is not part of a
+  //    beam, so those standalone stems are replaced by the bracket.
+  const clasped = new Set(layout.claspedStems);
   if (o.rhythmStyle === 'beamed') {
     for (const beam of layout.beams) {
       out.push(renderBeamGroup(beam.notes, t, beam));
     }
-    for (const n of layout.ungrouped) out.push(renderRhythm(n, 'beamed', t));
+    for (const n of layout.ungrouped) {
+      if (clasped.has(n.id)) continue;
+      out.push(renderRhythm(n, 'beamed', t));
+    }
   } else {
-    for (const p of layout.notes) out.push(renderRhythm(p.rhythm, o.rhythmStyle, t));
+    for (const p of layout.notes) {
+      if (clasped.has(p.rhythm.id)) continue;
+      out.push(renderRhythm(p.rhythm, o.rhythmStyle, t));
+    }
+  }
+
+  // 2b. External left clasps + their rails (Round 5), painted above the stems
+  //     they replace and beneath the noteheads they must never touch.
+  if (layout.clasps.length > 0 || layout.claspRails.length > 0) {
+    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t));
   }
 
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.

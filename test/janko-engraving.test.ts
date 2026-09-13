@@ -46,6 +46,7 @@ import {
   computePageGeometry,
   countJankoPages,
   getChordalOffset,
+  getMarginFurniture,
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
@@ -1633,27 +1634,48 @@ test('Dynamic layouts: the canonical Bach score never contradicts the pitch cont
   }
 });
 
-test('Anchored and 3-row layouts surface their real cost: high notes hit the numeral margin', () => {
+test('Anchored and 3-row layouts surface their real cost: high notes crowd the numeral margin', () => {
   // Anchoring Set A on the rule pushes the outer Set B row one half-row higher
-  // than the golden master, which is enough for two o5 notes at system openings
-  // to reach into the measure-numeral column. The linter reports it instead of
-  // hiding it, so the decision matrix shows the real cost of the paradigm.
+  // than the golden master, so the topmost o5 notes come within 2.2pt of the
+  // measure numeral's baseline — 4× tighter than the golden master's 9.7pt. The
+  // linter measures that air (the numeral box is the figures' real ink box, from
+  // cap height down to the baseline), so the decision matrix shows the real cost
+  // of the paradigm without inventing a collision that is not painted.
   const score = buildBachGoldbergVar1Score();
+  const CLEARANCE: Record<string, number> = {
+    'single-equator': 9.7,
+    'on-the-line': 2.2,
+    'single-line-3row': 2.2,
+    'bounded-channel': 4.2,
+  };
   for (const c of LAYOUT_CASES) {
     const report = lintJankoScore(score, c.options, TOKENS);
     assert.deepEqual(
       report.violations.map((v) => `${v.code}: ${v.message}`),
-      c.setAOnRule
-        ? [
-            'measure-numeral-collision: Measure numeral collides with notehead bach-var1-139.',
-            'measure-numeral-collision: Measure numeral collides with notehead bach-var1-481.',
-          ]
-        : [],
+      [],
       `${c.id} lint verdict`
     );
     assert.ok(
-      report.diagnostics.every((d) => d.code === 'chordal-overlap' || d.code === 'measure-numeral-collision'),
+      report.diagnostics.every((d) => d.code === 'chordal-overlap'),
       `${c.id} produces no unexpected diagnostic class`
+    );
+    const layouts = layoutJankoScore(score, c.options, TOKENS);
+    let air = Number.POSITIVE_INFINITY;
+    for (const layout of layouts) {
+      const { numeral } = getMarginFurniture(
+        layout.geometry,
+        TOKENS,
+        layout.index * c.options.measuresPerSystem + 1
+      );
+      for (const p of layout.notes) {
+        const dx = Math.max(numeral.x0 - p.x, 0, p.x - numeral.x1);
+        const dy = Math.max(numeral.y0 - p.y, 0, p.y - numeral.y1);
+        air = Math.min(air, Math.hypot(dx, dy) - TOKENS.noteheadRadius);
+      }
+    }
+    assert.ok(
+      Math.abs(air - CLEARANCE[c.id]) < 0.05,
+      `${c.id} keeps ${CLEARANCE[c.id]}pt of numeral air (measured ${air.toFixed(2)}pt)`
     );
   }
 });

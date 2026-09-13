@@ -11,11 +11,11 @@
  *   3. janko_m4.png                  — macro crop m. 4 (4× = 288 DPI)
  *   4. janko_m8.png                  — macro crop m. 8 (4× = 288 DPI)
  *   5. janko_variants.png            — rhythm-dialect contact sheet, mm. 1–4 (2×)
- *   6. janko_domain_exploration.png  — Round 4 four-paradigm contact sheet (3×)
- *   7. janko_domain_a.png            — Candidate A · floating single equator (4×)
- *   8. janko_domain_b.png            — Candidate B · base row on the line (4×)
- *   9. janko_domain_c.png            — Candidate C · single line, three rows (4×)
- *  10. janko_domain_d.png            — Candidate D · bounded center channel (4×)
+ *   6. janko_domain_exploration.png  — Round 5 four-paradigm clasp contact sheet (3×)
+ *   7. janko_domain_a.png            — Candidate A · traditional stems (golden) (4×)
+ *   8. janko_domain_b.png            — Candidate B · independent left clasp (4×)
+ *   9. janko_domain_c.png            — Candidate C · beamed clasp rail (4×)
+ *  10. janko_domain_d.png            — Candidate D · bounding phrase clasp (4×)
  *  11. janko_brahms_page1.png        — Brahms Op. 118 No. 1, mm. 1–9, 3 systems (2×)
  *  12. janko_brahms_m7_m8.png        — the two five-voice chords, mm. 7–8 (4×)
  *
@@ -171,8 +171,9 @@ async function main(): Promise<void> {
   const BRAHMS_TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
   const rasterizer = findRasterizer();
 
-  // Round 4 domain exploration: every candidate of the live registry, engraved
-  // from its own option delta — the artifacts can never drift from the studio.
+  // Round 5 chord-duration exploration: every candidate of the live registry,
+  // engraved from its own option delta — the artifacts can never drift from the
+  // studio.
   const candidates = CURRENT_CANDIDATES.map((candidate) => resolveCandidate(candidate));
 
   const jobs: ExportJob[] = [
@@ -246,7 +247,7 @@ async function main(): Promise<void> {
       ),
       zoom: 3,
       description:
-        'Unified domain exploration mm. 1–2 at 3×: A floating equator vs B anchored base row vs C three-row single line vs D bounded channel — line density against interval proportionality',
+        'Unified chord-duration exploration mm. 1–2 at 3×: A traditional stems vs B independent left clasp vs C beamed clasp rail vs D bounding phrase clasp — grouping bracket against through-stem',
     },
     ...candidates.map((c, i) => ({
       name: `janko_domain_${CANDIDATE_LETTERS[i] ?? String(i + 1)}.png`,

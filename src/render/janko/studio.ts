@@ -24,6 +24,11 @@
 import { QuantizedGridScore } from '../../model/types';
 import { buildBachGoldbergVar1Score } from '../../scores/bach-goldberg-var1';
 import {
+  BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  BRAHMS_OP118_NO1_JANKO_TOKENS,
+  buildBrahmsOp118No1Score,
+} from '../../scores/brahms-op118-no1';
+import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   ResolvedJankoLayoutOptions,
@@ -34,9 +39,11 @@ import {
 import { renderJankoCrop, renderJankoPage, countJankoSystems } from './engine';
 import { getChannelLayoutSpec } from './geometry';
 import {
+  BRAHMS_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   CandidateOptionBadge,
+  DEFAULT_STUDIO_SCORE_ID,
   JankoCandidate,
   JankoCandidateRound,
   candidateBadges,
@@ -92,6 +99,18 @@ export const DEFAULT_STUDIO_CROPS: StudioCrop[] = [
   },
 ];
 
+/**
+ * One benchmark score a candidate window may name, with the layout options and
+ * tokens its own notation needs (anacrusis, cut-time measure, systems per page).
+ */
+export interface StudioScore {
+  /** Registry id (matched against `JankoCandidateWindow.scoreId`). */
+  id: string;
+  score: QuantizedGridScore;
+  options: ResolvedJankoLayoutOptions;
+  tokens: ResolvedJankoTokens;
+}
+
 /** Everything the studio needs to render; all fields default to the golden master. */
 export interface JankoStudioConfig {
   score: QuantizedGridScore;
@@ -102,6 +121,11 @@ export interface JankoStudioConfig {
   crops: StudioCrop[];
   /** Page indices rendered in the reference view (0-based). */
   pages: number[];
+  /**
+   * Benchmark scores a candidate window may be engraved from, keyed by id. The
+   * primary entry is always present under `DEFAULT_STUDIO_SCORE_ID`.
+   */
+  scores: Record<string, StudioScore>;
 }
 
 /** Build a studio configuration, defaulting to the golden master + current round. */
@@ -116,6 +140,16 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     1,
     Math.ceil(countJankoSystems(score, options, tokens) / Math.max(1, options.systemsPerPage))
   );
+  const scores: Record<string, StudioScore> = {
+    [DEFAULT_STUDIO_SCORE_ID]: { id: DEFAULT_STUDIO_SCORE_ID, score, options, tokens },
+    [BRAHMS_STUDIO_SCORE_ID]: {
+      id: BRAHMS_STUDIO_SCORE_ID,
+      score: buildBrahmsOp118No1Score(),
+      options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
+    },
+    ...(overrides.scores ?? {}),
+  };
   return {
     score,
     options,
@@ -124,6 +158,31 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     round: overrides.round ?? CURRENT_ROUND_METADATA,
     crops: overrides.crops ?? DEFAULT_STUDIO_CROPS,
     pages: overrides.pages ?? Array.from({ length: totalPages }, (_, i) => i),
+    scores,
+  };
+}
+
+/** Merge per-window lint reports into the single verdict a card displays. */
+export function combineLintReports(reports: readonly LintReport[]): LintReport {
+  const violations = reports.flatMap((r) => r.violations);
+  const warnings = reports.flatMap((r) => r.warnings);
+  const sum = (pick: (s: LintReport['stats']) => number): number =>
+    reports.reduce((acc, r) => acc + pick(r.stats), 0);
+  return {
+    ok: violations.length === 0,
+    violations,
+    warnings,
+    diagnostics: [...violations, ...warnings],
+    stats: {
+      systems: sum((s) => s.systems),
+      measures: sum((s) => s.measures),
+      notes: sum((s) => s.notes),
+      beams: sum((s) => s.beams),
+      checks: reports.reduce((acc, r) => Math.max(acc, r.stats.checks), 0),
+      violations: violations.length,
+      warnings: warnings.length,
+      durationMs: sum((s) => s.durationMs),
+    },
   };
 }
 
@@ -210,21 +269,39 @@ function badgeHtml(badge: CandidateOptionBadge): string {
 
 /**
  * Render the Decision Candidates Matrix: every candidate declared in the
- * registry, engraved on the same measures, with option-delta badges and a live
- * lint verdict.
+ * registry, engraved on the same windows, with option-delta badges and a live
+ * lint verdict **over every score the candidate is demonstrated on**.
  */
 export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig()): string {
-  const { score, candidates, round } = config;
+  const { candidates, round, scores } = config;
   const cards = candidates.map((candidate) => {
     const resolved = resolveCandidate(candidate);
-    const svg = renderJankoCrop(
-      score,
-      resolved.measureStart,
-      resolved.measureCount,
-      resolved.options,
-      resolved.tokens
-    );
-    const report = lintJankoScore(score, resolved.options, resolved.tokens);
+    const reports: LintReport[] = [];
+    const seen = new Set<string>();
+    const panels = resolved.windows.map((window) => {
+      const entry = scores[window.scoreId] ?? scores[DEFAULT_STUDIO_SCORE_ID];
+      const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
+      const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
+      if (!seen.has(entry.id)) {
+        seen.add(entry.id);
+        reports.push(lintJankoScore(entry.score, options, tokens));
+      }
+      const svg = renderJankoCrop(
+        entry.score,
+        window.measureStart,
+        window.measureCount,
+        options,
+        tokens
+      );
+      const lastMeasure = window.measureStart + window.measureCount - 1;
+      return [
+        `<figure class="candidate-window" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}">`,
+        `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b></figcaption>`,
+        `  <div class="canvas-frame">${canvas(svg)}</div>`,
+        '</figure>',
+      ].join('\n');
+    });
+    const report = combineLintReports(reports);
     const badges = candidateBadges(candidate).map(badgeHtml).join('');
     const tags = (candidate.tags ?? [])
       .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
@@ -232,9 +309,10 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const opts = resolved.options;
     const toks = resolved.tokens;
     const facts =
-      `mm. ${resolved.measureStart}–${resolved.measureStart + resolved.measureCount - 1} · ` +
-      `${opts.rhythmStyle} · spine ${opts.middleCSpine} · gap ${opts.interStaffGap.toFixed(1)}pt · ` +
-      `${describeChannelLayout(opts, toks)} · beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
+      `${opts.rhythmStyle} · chord grouping ${opts.chordGrouping} · spine ${opts.middleCSpine} · ` +
+      `gap ${opts.interStaffGap.toFixed(1)}pt · ${describeChannelLayout(opts, toks)} · ` +
+      `clasp ${toks.claspOffset.toFixed(1)}pt offset / ${toks.claspMinBarlineAir.toFixed(1)}pt barline air · ` +
+      `beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
     return [
       `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="${report.ok ? 'clean' : 'violations'}">`,
       '  <header class="candidate-head">',
@@ -245,7 +323,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         ? `  <p class="rationale">${escapeHtml(candidate.description)}</p>`
         : '',
       `  <div class="badges">${badges}</div>`,
-      `  <div class="canvas-frame">${canvas(svg)}</div>`,
+      `  <div class="candidate-windows">${panels.join('\n')}</div>`,
       `  <footer class="candidate-foot">${escapeHtml(facts)}</footer>`,
       '</article>',
     ]
@@ -253,15 +331,16 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .join('\n');
   });
 
+  const windowCount = resolveCandidate(candidates[0] ?? CURRENT_CANDIDATES[0]).windows.length;
   return [
     '<section class="view-panel" id="view-candidates" data-view="candidates">',
     '  <div class="round-card">',
     `    <span class="round-badge">Round ${round.round}</span>`,
     `    <h2>${escapeHtml(round.title)}</h2>`,
     `    <p>${escapeHtml(round.description)}</p>`,
-    `    <p class="round-meta">${candidates.length} candidates · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
+    `    <p class="round-meta">${candidates.length} candidates × ${windowCount} engraving window${windowCount === 1 ? '' : 's'} · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
-    `  <div class="candidate-grid" data-candidate-count="${candidates.length}">`,
+    `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}">`,
     cards.join('\n'),
     '  </div>',
     '</section>',

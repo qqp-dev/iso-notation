@@ -57,12 +57,14 @@ import {
   JankoSystemLayout,
   PositionedJankoNote,
   getChordalOffset,
+  getMarginFurniture,
   layoutJankoScore,
   renderSystem,
 } from './engine';
 import { getEquatorRuleYs } from './elements/staff';
 import {
   JankoBeamConnector,
+  claspInkBox,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
@@ -97,6 +99,9 @@ export type JankoLintCode =
   | 'beam-stem-gap'
   | 'beam-notehead-collision'
   | 'barline-collision'
+  | 'clasp-barline-collision'
+  | 'clasp-collision'
+  | 'clasp-rail-crossing'
   | 'measure-numeral-collision'
   | 'accolade-collision'
   | 'corridor-intrusion';
@@ -186,6 +191,7 @@ export const JANKO_LINT_CHECKS = [
   'halo-clearance',
   'beam-notehead-clearance',
   'barline-clearance',
+  'clasp-clearance',
   'measure-numeral-clearance',
   'accolade-clearance',
   'middle-c-corridor',
@@ -255,11 +261,6 @@ function verticalSegmentToBoxDistance(x: number, ya: number, yb: number, b: Box)
 function digitBox(p: PositionedJankoNote, fontSize: number): Box {
   const { halfWidth, halfHeight } = digitHalfExtents(fontSize);
   return box(p.x - halfWidth, p.y - halfHeight, p.x + halfWidth, p.y + halfHeight);
-}
-
-/** Approximate advance width of a short text run. */
-function textWidth(text: string, fontSize: number, advance: number): number {
-  return text.length * fontSize * advance;
 }
 
 /** One-based measure number of an absolute tick. */
@@ -754,6 +755,45 @@ export function checkBeamNoteheadClearance(
 // 4. Barline clearance
 // ---------------------------------------------------------------------------
 
+/** One barline segment of a system, per hand (RH and LH halves). */
+export interface BarlineSpan {
+  x: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Every barline segment painted in one system: the measure boundaries of both
+ * hands — including the barline that closes the upbeat of an anacrusis system
+ * and the closing system boundary. The staff lines of a system open from the
+ * left margin, so slot 0 contributes no barline.
+ */
+export function systemBarlines(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): BarlineSpan[] {
+  const g = layout.geometry;
+  const spans = handRuleSpans(layout);
+  const barlines: BarlineSpan[] = [];
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const push = (x: number): void => {
+    for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+  };
+  if (layout.index === 0 && anacrusis > 0) {
+    const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
+    push(g.staffLeft + upbeatWidth);
+    for (let m = 1; m <= o.measuresPerSystem; m++) {
+      push(g.staffLeft + upbeatWidth + m * g.measureWidth);
+    }
+  } else {
+    for (let m = 0; m < o.measuresPerSystem; m++) {
+      push(g.staffLeft + (m + 1) * g.measureWidth);
+    }
+  }
+  return barlines;
+}
+
 /** No glyph (head, stem or beam) may collide with a barline. */
 export function checkBarlineClearance(
   layout: JankoSystemLayout,
@@ -762,26 +802,8 @@ export function checkBarlineClearance(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  const g = layout.geometry;
   const r = t.noteheadRadius;
-  const spans = handRuleSpans(layout);
-  const barlines: Array<{ x: number; top: number; bottom: number }> = [];
-  const anacrusis = t.anacrusisTicks ?? 0;
-  if (layout.index === 0 && anacrusis > 0) {
-    const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
-    for (const span of spans) {
-      barlines.push({ x: g.staffLeft + upbeatWidth, top: span.top, bottom: span.bottom });
-    }
-    for (let m = 1; m <= o.measuresPerSystem; m++) {
-      const x = g.staffLeft + upbeatWidth + m * g.measureWidth;
-      for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
-    }
-  } else {
-    for (let m = 0; m < o.measuresPerSystem; m++) {
-      const x = g.staffLeft + (m + 1) * g.measureWidth;
-      for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
-    }
-  }
+  const barlines = systemBarlines(layout, o, t);
   if (barlines.length === 0) return;
 
   for (const b of barlines) {
@@ -850,6 +872,157 @@ export function checkBarlineClearance(
 }
 
 // ---------------------------------------------------------------------------
+// 4b. Clasp clearance (Round 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * External left clasps are structural ink: they may never touch a barline, a
+ * foreign notehead (or its Position of Honor halo) or the left-margin furniture
+ * (accolade, measure numeral), and a rail may never reach a barline — it
+ * strictly terminates inside its own measure.
+ *
+ * The thresholds are deliberately *weaker* than the engine's fit rule
+ * (`CLASP_NOTEHEAD_AIR` = 1.2pt, `claspMinBarlineAir` = 4.0pt), so every clasp
+ * the engine admits is guaranteed to pass this audit; the check exists to catch
+ * a regression that paints a bracket where the solver never placed one.
+ */
+export function checkClaspClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (layout.clasps.length === 0 && layout.claspRails.length === 0) return;
+  const barlines = systemBarlines(layout, o, t);
+  const r = t.noteheadRadius;
+  const haloEdge = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  const { numeral, accolade } = marginFurniture(
+    layout,
+    t,
+    lint,
+    layout.index * o.measuresPerSystem + 1
+  );
+
+  for (const clasp of layout.clasps) {
+    const disk = claspInkBox(clasp, t);
+    const own = new Set(clasp.notes.map((n) => n.id));
+
+    // 1. Strict barline non-intersection: claspX - barlineX >= claspMinBarlineAir.
+    let leftBarline: number | null = null;
+    for (const b of barlines) {
+      if (b.x > clasp.claspX + EPS) continue;
+      if (leftBarline === null || b.x > leftBarline) leftBarline = b.x;
+    }
+    if (leftBarline !== null && clasp.claspX - leftBarline < t.claspMinBarlineAir - EPS) {
+      out.push({
+        code: 'clasp-barline-collision',
+        severity: 'error',
+        message:
+          `Clasp at tick ${clasp.tick} clears the barline at x=${leftBarline.toFixed(2)} by only ` +
+          `${(clasp.claspX - leftBarline).toFixed(2)}pt (${t.claspMinBarlineAir.toFixed(1)}pt required): ` +
+          `the bracket touches or slices through the barline.`,
+        system: layout.index,
+        measure: measureOfTick(clasp.tick, t),
+        noteIds: clasp.notes.map((n) => n.id),
+        x: clasp.claspX,
+        y: clasp.topY,
+        metrics: {
+          gap: clasp.claspX - leftBarline,
+          required: t.claspMinBarlineAir,
+          barlineX: leftBarline,
+        },
+      });
+    }
+
+    // 2. Every foreign glyph keeps real air from the bracket.
+    for (const p of layout.notes) {
+      if (own.has(p.note.id)) continue;
+      const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
+      const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
+      const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
+      const gap = Math.hypot(dx, dy) - radius;
+      if (gap >= lint.minClearance - EPS) continue;
+      out.push({
+        code: 'clasp-collision',
+        severity: 'error',
+        message:
+          `Clasp at tick ${clasp.tick} passes ${gap.toFixed(2)}pt from notehead ${p.note.id} ` +
+          `(${lint.minClearance.toFixed(1)}pt of air required): the bracket collides with the glyph.`,
+        system: layout.index,
+        measure: measureOfTick(clasp.tick, t),
+        noteIds: [p.note.id, ...clasp.notes.map((n) => n.id)],
+        x: p.x,
+        y: p.y,
+        metrics: { gap, required: lint.minClearance, noteX: p.x, noteY: p.y },
+      });
+    }
+
+    // 3. Left-margin furniture (accolade, measure numeral).
+    for (const [label, furniture] of [
+      ['accolade', accolade],
+      ['measure numeral', numeral],
+    ] as const) {
+      if (label === 'measure numeral' && !o.showMeasureNumbers) continue;
+      if (!boxesOverlap(disk, furniture, lint.minClearance)) continue;
+      out.push({
+        code: 'clasp-collision',
+        severity: 'error',
+        message: `Clasp at tick ${clasp.tick} collides with the ${label}.`,
+        system: layout.index,
+        measure: measureOfTick(clasp.tick, t),
+        noteIds: clasp.notes.map((n) => n.id),
+        x: disk.x0,
+        y: disk.y0,
+        metrics: { claspX0: disk.x0, furnitureX1: furniture.x1 },
+      });
+    }
+  }
+
+  // 4. A rail strictly terminates inside its measure: it never reaches a barline.
+  for (const rail of layout.claspRails) {
+    for (const b of barlines) {
+      if (rail.x1 - lint.minClearance < b.x && b.x < rail.x2 + lint.minClearance) {
+        out.push({
+          code: 'clasp-rail-crossing',
+          severity: 'error',
+          message:
+            `Clasp rail ${rail.x1.toFixed(2)}..${rail.x2.toFixed(2)} reaches the barline at ` +
+            `x=${b.x.toFixed(2)}: a rail must terminate inside its own measure.`,
+          system: layout.index,
+          noteIds: rail.noteIds,
+          x: b.x,
+          y: rail.y,
+          metrics: { railX1: rail.x1, railX2: rail.x2, barlineX: b.x },
+        });
+      }
+    }
+    const joined = new Set(rail.noteIds);
+    const half = rail.thickness / 2;
+    for (const p of layout.notes) {
+      if (joined.has(p.note.id)) continue;
+      const dx = Math.max(rail.x1 - p.x, 0, p.x - rail.x2);
+      const dy = Math.max(rail.y - half - p.y, 0, p.y - (rail.y + half));
+      const gap = Math.hypot(dx, dy) - r;
+      if (gap >= lint.minClearance - EPS) continue;
+      out.push({
+        code: 'clasp-collision',
+        severity: 'error',
+        message:
+          `Clasp rail passes ${gap.toFixed(2)}pt from notehead ${p.note.id} ` +
+          `(${lint.minClearance.toFixed(1)}pt of air required).`,
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id, ...rail.noteIds],
+        x: p.x,
+        y: p.y,
+        metrics: { gap, required: lint.minClearance, railY: rail.y },
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 5. Left-margin furniture: measure numeral & accolade
 // ---------------------------------------------------------------------------
 
@@ -860,21 +1033,14 @@ export function marginFurniture(
   lint: JankoLintOptions,
   measureNumber: number
 ): { numeral: Box; accolade: Box } {
-  const g = layout.geometry;
-  const numeralText = String(measureNumber);
-  const numeralX = g.staffLeft - 2;
-  const numeralBaseline = g.staffTopY - 6;
-  const numeral = box(
-    numeralX,
-    numeralBaseline - t.digitFontSize * 1.2,
-    numeralX + textWidth(numeralText, 8.5, lint.digitAdvance * 1.5),
-    numeralBaseline + 2
-  );
-  const accolade = box(
-    g.staffLeft - t.accoladeGap - t.accoladeWidth,
-    g.staffTopY,
-    g.staffLeft - t.accoladeGap,
-    g.staffBotY
+  // The furniture geometry lives in the engine, where the Round 5 clasp fit
+  // rule reserves against the very same boxes (see `engine.getMarginFurniture`);
+  // the linter's job is only to audit it.
+  const { numeral, accolade } = getMarginFurniture(
+    layout.geometry,
+    t,
+    measureNumber,
+    lint.digitAdvance
   );
   return { numeral, accolade };
 }
@@ -1498,6 +1664,7 @@ export function lintJankoScore(
     checkHaloClearance(layout, t, thresholds, diagnostics);
     checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
     checkBarlineClearance(layout, o, t, thresholds, diagnostics);
+    checkClaspClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);

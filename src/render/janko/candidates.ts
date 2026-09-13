@@ -44,6 +44,21 @@ export interface JankoCandidateRound {
   description: string;
 }
 
+/** One engraving window a candidate is demonstrated on. */
+export interface JankoCandidateWindow {
+  /**
+   * Studio score id the window is engraved from. Defaults to the studio's
+   * primary score (`'primary'` = the Bach Goldberg Var. 1 benchmark).
+   */
+  scoreId?: string;
+  /** First measure of the window (1-based). */
+  measureStart: number;
+  /** Measures shown in the window. */
+  measureCount: number;
+  /** Short label shown above the panel. */
+  title: string;
+}
+
 /** One exploratory engraving candidate for the current decision round. */
 export interface JankoCandidate {
   /** Stable slug (used as DOM id / data attribute in the studio). */
@@ -60,32 +75,60 @@ export interface JankoCandidate {
   measureStart?: number;
   /** Measures shown in the comparison window (default 1). */
   measureCount?: number;
+  /**
+   * Every engraving window the candidate is demonstrated on (defaults to the
+   * single `measureStart` / `measureCount` window on the primary score).
+   */
+  windows?: JankoCandidateWindow[];
   /** Free-form tags rendered as badges next to the label. */
   tags?: string[];
 }
+
+/** Score id of the studio's primary benchmark (Bach Goldberg Var. 1). */
+export const DEFAULT_STUDIO_SCORE_ID = 'primary';
+
+/** Score id of the Brahms Intermezzo benchmark, used by the Round 5 windows. */
+export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
 
 /**
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
- * settled the Klavarskribo beat grid and round 3 the Middle C corridor. Round 4
- * opened the octave framing question with the bounded center channel; this
- * expansion interrogates the two variables the operator isolated in Candidate
- * B — **line density** and **interval proportionality** — by engraving the four
- * comparative paradigms of the channel domain side by side.
+ * the Klavarskribo beat grid, round 3 the Middle C corridor and round 4 the
+ * octave framing. Round 5 interrogates the one piece of ink the operator still
+ * finds noisy: the **long vertical stems that run through multi-note chords and
+ * cluster sonorities**. Four paradigms now test the external left clasp — the
+ * bracket that groups a vertical cluster and carries its duration — against the
+ * incumbent per-note stems.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 4,
-  title: 'Domain Exploration — Line Density vs Interval Proportionality',
+  round: 5,
+  title: 'Chord & Cluster Duration — Left Clasp with Barline Clearance',
   description:
-    'Candidate B doubled the staff rules (8 lines across the grand staff) and its dynamic 3-row flanks ' +
-    'turned a descending 4th into a 43pt canyon followed by a 26pt whole step. Four paradigms now isolate ' +
-    'the two variables: A keeps the pristine 4-line floating equator (+7.5/−7.5pt, static parity), B anchors ' +
-    'Set A directly ON the 4-line rule with Set B statically one row above, C keeps the single 4-line rule but ' +
-    'lets Set B swing to the upper or lower ±15pt flank by contour, and D keeps the 8-line bounded channel with ' +
-    'Set B at ±13pt. Compare mm. 1–2: the opening ascent and the m. 2 neighbour 2–1–2 turn expose exactly how ' +
-    'much interval truth each paradigm can preserve per unit of ink.',
+    'Testing external left-side clasps as simultaneous grouping brackets and duration carriers. Downbeat clasps maintain ' +
+    'clear air from the preceding barline, eliminating through-stems without visual collision.',
 };
+
+/**
+ * The two display windows every Round 5 candidate is engraved on: the Bach
+ * opening (the tick-0 chord plus continuous 16th-note counterpoint, where the
+ * clasp must prove it never breaks a real beam) and the dense Brahms chords of
+ * mm. 7–8, where the through-stems it replaces are at their worst.
+ */
+const ROUND_5_WINDOWS: JankoCandidateWindow[] = [
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 1,
+    measureCount: 2,
+    title: 'Bach Goldberg Var. 1 · mm. 1–2 — opening chord + 16th counterpoint',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 7,
+    measureCount: 2,
+    title: 'Brahms Op. 118 No. 1 · mm. 7–8 — dense block chords (macro crop)',
+  },
+];
 
 /**
  * The active candidate set — 2–4 exploratory variants for the current round.
@@ -93,44 +136,40 @@ export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'equator-floating',
-    label: 'A · Single Equator (Golden)',
+    id: 'traditional-stems',
+    label: 'A · Traditional Stems (Golden Master)',
     description:
-      'The accumulated golden master: one rule per octave through the gap between the rows, whole-tone Set A floating 7.5pt below it and Set B 7.5pt above it. Every row-to-row step is an identical 15pt, every notehead keeps 2.7pt of clear air to the rule, and not one glyph cuts the line — the 4-line control.',
-    options: { channelLayout: 'single-equator' },
-    measureStart: 1,
-    measureCount: 2,
-    tags: ['incumbent', '4 lines', 'static'],
+      'The accumulated golden master: every note owns its own stem, RH up and LH down, and a five-note Brahms chord therefore paints one long vertical line chopped into segments by each knockout it passes. The control the clasp paradigms must beat.',
+    options: { chordGrouping: 'none' },
+    windows: ROUND_5_WINDOWS,
+    tags: ['incumbent', 'per-note stems'],
   },
   {
-    id: 'equator-anchored',
-    label: 'B · Base Row On the Line',
+    id: 'independent-left-clasp',
+    label: 'B · Independent Left Clasp',
     description:
-      'One rule per octave, and whole-tone Set A is centred directly ON it (y = 0), with Set B anchored one whole-tone row above (y = −15pt) and no lower row at all. The contour is stable by construction — but every Set A glyph now knocks a hole in the rule it sits on, all Set B pitches of an octave collapse onto one row, and the raised outer row grazes the measure-numeral margin (2 lint violations on the canonical score).',
-    options: { channelLayout: 'on-the-line' },
-    measureStart: 1,
-    measureCount: 2,
-    tags: ['4 lines', 'static', 'anchored'],
+      'One external bracket per vertical simultaneity, drawn clear of the outermost disc (claspX = minX − r − 2.8pt), bounding the whole cluster from minY − r to maxY + r and carrying its duration at the tip: an open pip for halves and wholes, a clean 8.5pt spire for quarters, single and double flag hooks for 8ths and 16ths. It replaces the standalone stems of a block chord, keeps every beamed 16th intact, and is engraved only where the bracket stands clear of its barline, its neighbours and the margin furniture — the opening Bach chord is clasped, the running counterpoint is not.',
+    options: { chordGrouping: 'left-clasp-spire' },
+    windows: ROUND_5_WINDOWS,
+    tags: ['per chord', 'duration carrier', 'barline air 4pt'],
   },
   {
-    id: 'single-line-3row',
-    label: 'C · Single Line, Three Rows',
+    id: 'beamed-clasp-rail',
+    label: 'C · Beamed Clasp Rail',
     description:
-      'Half the ink of the bounded channel: one rule per octave (4 lines total) with Set A on the line and Set B contour-resolved to the upper (−15pt) or lower (+15pt) flank, so a rising step never moves down the page. Measures whether a single rule removes the visual noise without re-opening the 2-to-9 canyon; its raised outer row also grazes the measure-numeral margin (2 lint violations).',
-    options: { channelLayout: 'single-line-3row' },
-    measureStart: 1,
-    measureCount: 2,
-    tags: ['4 lines', 'dynamic', 'contour'],
+      'Every clasp of B, plus a measure-bounded rail that joins the spire tips of the contiguous clasps inside one measure: the topmost tip sets the rail, every joined spire is extended up to it and the flag hooks are dropped exactly as a traditional beam replaces them (a second rail carries the 16th level). The rail spans only its own measure’s spire columns, so it terminates inside the measure and never reaches a barline; a run whose extended spire or rail would touch a glyph is engraved unrailed instead.',
+    options: { chordGrouping: 'beamed-clasp-rail' },
+    windows: ROUND_5_WINDOWS,
+    tags: ['chord sequence', 'measure-bounded rail'],
   },
   {
-    id: 'channel-bounded',
-    label: 'D · Bounded Center Channel',
+    id: 'bounding-phrase-clasp',
+    label: 'D · Bounding Phrase Clasp',
     description:
-      'Two boundary rules at ±6.5pt frame an open 13pt channel: whole-tone Set A rides the negative space with zero line knockouts, and every Set B note takes the upper or lower ±13pt flank the melodic contour asks for. The 8-line datum that provoked this round — maximal line separation at twice the ink.',
-    options: { channelLayout: 'bounded-channel' },
-    measureStart: 1,
-    measureCount: 2,
-    tags: ['8 lines', 'dynamic', 'contour'],
+      'One bracket per measure: the phrase itself is the grouping unit. The clasp bounds every note of the measure — minY − r to maxY + r over the whole phrase, drawn at the measure’s opening edge — and carries the phrase’s opening duration at its tip, while the beats inside keep their traditional stems and beams. It groups the harmony of a bar at a single stroke instead of decorating each simultaneity, at the cost of one tall bracket in front of every chord-bearing measure.',
+    options: { chordGrouping: 'bounding-phrase' },
+    windows: ROUND_5_WINDOWS,
+    tags: ['per measure', 'phrase bracket'],
   },
 ];
 
@@ -141,16 +180,35 @@ export interface ResolvedJankoCandidate {
   tokens: ResolvedJankoTokens;
   measureStart: number;
   measureCount: number;
+  /** Every window the candidate is demonstrated on (never empty). */
+  windows: Required<JankoCandidateWindow>[];
 }
 
 /** Fill a candidate's deltas in against the golden master. */
 export function resolveCandidate(candidate: JankoCandidate): ResolvedJankoCandidate {
+  const windows: Required<JankoCandidateWindow>[] =
+    candidate.windows && candidate.windows.length > 0
+      ? candidate.windows.map((w) => ({
+          scoreId: w.scoreId ?? DEFAULT_STUDIO_SCORE_ID,
+          measureStart: w.measureStart,
+          measureCount: w.measureCount,
+          title: w.title,
+        }))
+      : [
+          {
+            scoreId: DEFAULT_STUDIO_SCORE_ID,
+            measureStart: candidate.measureStart ?? 1,
+            measureCount: candidate.measureCount ?? 1,
+            title: '',
+          },
+        ];
   return {
     candidate,
     options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, ...(candidate.options ?? {}) }),
     tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ...(candidate.tokens ?? {}) }),
-    measureStart: candidate.measureStart ?? 1,
-    measureCount: candidate.measureCount ?? 1,
+    measureStart: candidate.measureStart ?? windows[0].measureStart,
+    measureCount: candidate.measureCount ?? windows[0].measureCount,
+    windows,
   };
 }
 
