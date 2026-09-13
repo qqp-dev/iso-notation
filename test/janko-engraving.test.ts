@@ -654,16 +654,20 @@ test('Row-snapped clusters (doctrine): the anchored head keeps the column, the f
   );
 
   // …asymmetrically: the lower head (index 0 of a single-hand pair) anchors the
-  // untouched onset column, which the different-row third of the triad still
-  // occupies exactly, while the follower steps into the open measure.
-  const nominal = g.x;
-  close(c.x, nominal, 'the anchored head keeps the onset column');
-  close(e.x, nominal + HALO_GAP, 'the follower steps one halo gap right');
+  // column the whole unit was translated to, while the follower steps into the
+  // open measure.
+  const column = (c.x + e.x) / 2;
+  close(c.x, column - HALO_GAP / 2, 'the anchored head keeps the unit column');
+  close(e.x, column + HALO_GAP / 2, 'the follower steps one halo gap right');
 
-  // G4 is rank 1: a different row, so it never moves off the onset column, and
-  // the isomorphic Δ hand shape survives.
+  // Round 19 symmetric tuck: G4 is rank 1 — a single-head row — so it is
+  // centred on the fan's own middle instead of keeping the column, and the
+  // whole triad mirrors about `column` (the isomorphic ∇/Δ rationale of the
+  // deleted interleave is gone).
   assert.equal(g.coord.rank, 1);
   assert.notEqual(g.y, c.y);
+  close(g.x, column, 'the lone different-row head tucks to the fan middle');
+  close(c.x + e.x, 2 * g.x, 'the cluster mirrors about its own centre');
 });
 
 test('Row-snapped clusters: every note keeps its true row y and the RH head anchors the column', () => {
@@ -696,25 +700,28 @@ test('Row-snapped clusters: every note keeps its true row y and the RH head anch
     assert.equal(p.y, layout.geometry.middleCY + expected.y, `${p.note.id} absolute y`);
     assert.equal(p.rhythm.y, p.y, `${p.note.id} rhythm layer follows the row`);
     assert.equal(p.rhythm.x, p.x, `${p.note.id} stem column follows the head`);
-    if (p.note.id === 'chord-g' || p.note.id === 'next-d') {
-      // The different-row third and the later onset both stay on the nominal
-      // beat column exactly.
+    if (p.note.id === 'next-d') {
+      // The later onset stays on the nominal beat column exactly.
       close(p.x, tickX(p.note.startTick), `${p.note.id} stays on the nominal beat column`);
     }
   }
   const c = layout.notes.find((p) => p.note.id === 'chord-c')!;
   const e = layout.notes.find((p) => p.note.id === 'chord-e')!;
+  const g = layout.notes.find((p) => p.note.id === 'chord-g')!;
   // The mixed-hand pair anchors its RH head on the beat and fans the LH head
   // one judged pair gap aside (tick 48 wears no halo).
   close(e.x, tickX(48), 'the RH head anchors the beat column');
   close(Math.abs(c.x - e.x), PAIR_GAP, 'the pair is fanned by exactly one pair gap');
+  // Round 19 symmetric tuck: G4's single-head row centres on the pair's own
+  // middle (not on the beat column).
+  close(g.x, (e.x + c.x) / 2, 'the lone head tucks to the pair middle');
 });
 
 test('Row-snapped clusters: a crowd at the barline fans right, never shears', () => {
   // On a downbeat the beat cell has no room to the left, so the anchored RH
-  // head keeps the onset column and the follower steps into the open measure;
-  // every voice of the onset travels together, which is what keeps the
-  // isomorphic hand shape intact. At tick 0 the step is the widened halo gap.
+  // head keeps the column and the follower steps into the open measure; every
+  // voice of the onset travels together. At tick 0 the step is the widened halo
+  // gap, and the lone different-row head tucks to the pair's own middle.
   const layout = layoutJankoScore(
     makeScore(
       [
@@ -731,10 +738,10 @@ test('Row-snapped clusters: a crowd at the barline fans right, never shears', ()
   const e = layout.notes.find((p) => p.note.id === 'open-e')!;
   const g = layout.notes.find((p) => p.note.id === 'open-g')!;
   assert.equal(layout.notes.length, 3);
-  close(e.x, g.x, 'the anchored RH head keeps the onset column');
   close(Math.abs(e.x - c.x), HALO_GAP, 'the pair keeps its full halo spread');
+  close(g.x, (e.x + c.x) / 2, 'the lone RH head tucks to the pair middle');
   assert.ok(
-    Math.min(c.x, e.x) - TOKENS.noteheadRadius >= layout.geometry.staffLeft + 1.0,
+    Math.min(c.x, e.x, g.x) - TOKENS.noteheadRadius >= layout.geometry.staffLeft + 1.0,
     'the slid column still clears the opening barline by >= 1pt'
   );
 });

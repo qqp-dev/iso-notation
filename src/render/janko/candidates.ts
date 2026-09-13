@@ -131,133 +131,90 @@ export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
  * beam-harmonized tab, round 9 the midpoint duration taxonomy, round 10 the
  * scaled midpoint clasps with the retired accolade, round 11 the four System 1
  * start replacements with the light transverse cuts, round 12 the rest symbol
- * dialects on the continuous vertical grid, and round 13 the voice-contour
- * rests under the flared 0.65pt bracket. Round 14 answers the operator's
- * verdict on those three: the flared bracket is **canonical** (no longer a
- * candidate), the **per-hand clasp is restored** so a wide-span chord can never
- * stack per-note stems through its own heads, the m. 4 rest keeps its beam
- * break and gains a **guaranteed-clear pocket** — and the whole round is one
- * question again: how the continuous vertical grid is written against the
- * music, on the dense 16ths of mm. 27–28. Round 15 settled the crowded column
- * (stem-anchored flanks behind hard beat-cell barriers) and compared the four
- * rest dialects on strictly clean material. Round 16 engraved the cluster
- * doctrine direct and judged the horizontal spacing amount (compact / balanced
- * / airy) on real two- and three-note clusters. Round 17A goes rectangular and
- * much tighter: the sharp fitted mask, the v2 spacing solver (unit centering,
- * pin-preserving shrink, local redistribution, multi-row interleave) and the
- * hugging dots go direct to golden, and the round judges only the gap amount —
- * snug (−30%) or tight (−35%). Rest behaviour is untouched (Round 17B).
- * Round 17B then sets the verdict — `tight` is the golden master — restores
- * the 0.90pt rest strokes, seats every rest on its phrase row and bridges the
- * m4 16th rest under one beam; round 18 judges the rest-shape verdict on that
- * fixed behavior.
+ * dialects on the continuous vertical grid, round 13 the voice-contour rests
+ * under the flared 0.65pt bracket, round 14 the restored per-hand clasp on the
+ * dense 16ths of mm. 27–28, round 15 the crowded column behind hard beat-cell
+ * barriers with the four rest dialects, round 16 the cluster doctrine with the
+ * judged horizontal spacing, round 17A the rectangular mask with the v2 spacing
+ * solver and the hugging dots, round 17B the `tight` verdict with the phrase-row
+ * rests, and round 18 the rest-shape verdict.
+ *
+ * Round 19 (mini) is the **cluster-shape + anchor round**. Four score-wide
+ * behaviors go direct to golden as fixed context — the **symmetric tuck** (an
+ * onset with uneven row counts re-centres every smaller row on the widest row's
+ * middle; even clusters coincide), the **stem joinery** (no painted stem ever
+ * crosses a same-onset chord tone: Brahms m. 46 and m. 17 are clean), the
+ * **overlap-conditional unification** (interlocking hands share one bracket;
+ * a gapped onset keeps Round 6's per-hand brackets) and the **beat grid that
+ * follows the columns** (an occupied beat's dashed pulse stands on its note
+ * column, an empty beat keeps the proportional line) — and the round judges
+ * **one** axis: which head of a fanned mixed-hand row keeps the beat column.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 18,
-  title: 'Rest-Shape Verdict: Four Dialects on Fixed Behavior',
+  round: 19,
+  title: 'Symmetric-Tuck Clusters: RH Anchor vs Lower-First',
   description:
-    'The rest behavior is fixed and goes direct to golden: the decided tight gap (margin 0.6, air 0.4, pairs 5.46pt), rest strokes at the full 0.90pt note-stem weight, every rest hung from its phrase row toward Middle C, and the m4 beat-3 run bridged across its printed 16th rest under one beam. The round judges only the shape — kinetic-monoline, classical-urtext, geometric-node or phantom-notehead — on the Round 15 clean windows (byte-identical fourth carry, so the verdict compares against everything the operator already saw) plus a Bach m4 fixed-context window on every card proving the bridging, the weight and the phrase rows. The settled grid policy C, the flared bracket, the per-hand clasp, the v2 spacing solver, the hugging dots and the four-systems-per-page layout ride along as invisible fixed context.',
-  openAxes: ['restStyle'],
+    'The cluster shape is fixed and goes direct to golden: the symmetric tuck (m. 46’s F5/D3 tuck onto the pair columns’ midpoint 53.88, F4/G♯4 hold 51.15, B4/D4 fan to 56.61 — mirror-symmetric about 53.88), the stem joinery that keeps every tucked cluster stem-clean, the overlap-conditional unification (one bracket spanning both hands where their spans interlock, Round 6’s per-hand brackets where a gap separates them), and the beat grid that follows the laid-out note columns (m. 3’s pulses land on 459.22 / 496.57 / 533.93, and the m. 3 pair’s bracket spine clears its pulse by 7.6pt instead of grazing it). The round judges only the anchor — which head of a fanned mixed-hand row keeps the beat column — on the case windows (Brahms m. 46 and m. 26), the Round 6 split guard (Brahms m. 3, where the axis is inert and both cards are identical) and the chord specimen’s triples. The `tight` preset, the flared bracket, the v2 solver, the hugging dots and the four-systems-per-page layout ride along as invisible fixed context; the mega-vs-split bracket evidence rides the served PNGs, not a candidate.',
+  openAxes: ['clusterAnchor'],
 };
 
 /**
- * The Round 18 verdict window set: the Round 15 clean windows, byte-identical
- * (fourth carry — the verdict compares against everything the operator already
- * saw), plus the Bach m. 4 fixed-context window proving the Round 17B behavior
- * — the bridged beat-3 beam, the 0.90pt weight and the phrase-row seat — on
- * every card.
+ * The Round 19 window set: the case (m. 46), the second instance (m. 26), the
+ * Round 6 split guard (m. 3) and the chord specimen's triples — the same four
+ * windows on both cards.
  */
-const ROUND_18_VERDICT_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_19_WINDOWS: JankoCandidateWindow[] = [
   {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 1,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 46,
     measureCount: 1,
-    title: 'Rest specimen · m. 1 — the genuine 16th silence in a stepwise contour, free column',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 2,
-    measureCount: 1,
-    title: 'Rest specimen · m. 2 — the genuine 8th silence',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 3,
-    measureCount: 1,
-    title: 'Rest specimen · m. 3 — the genuine quarter silence',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 4,
-    measureCount: 1,
-    title: 'Rest specimen · m. 4 — the genuine half silence',
+    title: 'Brahms Op. 118/1 · m. 46 — the six-head downbeat: the tuck, the unified bracket and the anchor',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 68,
+    measureStart: 26,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 68 — the one real-world bar with a writable rest and no crowded column',
+    title: 'Brahms Op. 118/1 · m. 26 — the second interlocking-hands instance',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 3,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 3 — the Round 6 guard: the 90pt hand gap keeps its split (both cards identical)',
   },
   {
     scoreId: SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 2,
     measureCount: 1,
-    title: 'Chord specimen · m. 2 — the genuine tick-180 8th rest among the clasped chords',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 4,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 4 — fixed context: the bridged beat-3 beam over the printed 16th rest',
+    title: 'Chord specimen · m. 2 — triples and clusters under the symmetric tuck',
   },
 ];
 
 /**
- * The active candidate set — Round 18's **single judged axis**, in display
- * order: the four carried rest dialects (A–D) on the verdict windows, every
- * card engraved under the decided `tight` golden. Each candidate states only
- * the rest-shape axis.
+ * The active candidate set — Round 19's **single judged axis**, in display
+ * order: the incumbent RH anchor (A) and the naive lower-first demonstrator (B)
+ * on the shared windows, every card engraved under the fixed Round 19 context.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'rest-kinetic-monoline',
-    label: 'A · Kinetic Monoline Rests — stem + 12.4° tabs',
-    axis: 'restStyle',
+    id: 'cluster-anchor-rh',
+    label: 'A · RH Anchor (incumbent)',
+    axis: 'clusterAnchor',
     description:
-      'The incumbent dialect: a vertical rest stem with the score’s own beam-harmonized 12.4° kinetic tabs (two for a 16th, one for an 8th), a central horizontal notch for the quarter and a hollow bar for the half. Monoline, architectural, and still the golden master choice — the verdict judges whether it keeps the crown.',
-    options: { restStyle: 'kinetic-monoline' },
-    windows: ROUND_18_VERDICT_WINDOWS,
-    tags: ['incumbent dialect', '12.4° kinetic tabs', 'hollow half bar'],
+      'The incumbent rule: on a row that carries both hands, the RH tone keeps the beat column and the LH tone fans aside (m. 46: G♯4 holds 51.15, D4 fans to 56.61); a single-hand row anchors its middle head. Every uneven cluster then tucks its smaller rows onto the widest row’s middle, so the onset reads as one mirror-symmetric shape and the two hands interlock without sharing a stem.',
+    options: { clusterAnchor: 'rh' },
+    windows: ROUND_19_WINDOWS,
+    tags: ['incumbent', 'RH tone holds the column', 'm. 46: G♯4 left, D4 right'],
   },
   {
-    id: 'rest-classical-urtext',
-    label: 'B · Classical Urtext Rest Glyphs — calligraphic hooks',
-    axis: 'restStyle',
+    id: 'cluster-anchor-lower-first',
+    label: 'B · Lower-First (demonstrator)',
+    axis: 'clusterAnchor',
     description:
-      'The engraved-urtext alternative: calligraphic hooks with solid teardrop bulbs for the 16th and 8th, the serpentine lightning stroke for the quarter and a solid block for the half. Organic, hand-cut, and the most traditional reading of a silence.',
-    options: { restStyle: 'classical-urtext' },
-    windows: ROUND_18_VERDICT_WINDOWS,
-    tags: ['calligraphic hooks', 'serpentine quarter', 'solid half block'],
-  },
-  {
-    id: 'rest-geometric-node',
-    label: 'C · Geometric Pause Nodes — diamonds and rays',
-    axis: 'restStyle',
-    description:
-      'A pure-geometry answer: a hollow diamond with two lateral rays for the 16th, one ray for the 8th, a solid diamond for the quarter and an open capsule for the half. Zero calligraphy — the silence reads as a plotted node on the lattice.',
-    options: { restStyle: 'geometric-node' },
-    windows: ROUND_18_VERDICT_WINDOWS,
-    tags: ['hollow diamond + rays', 'solid quarter node', 'open capsule half'],
-  },
-  {
-    id: 'rest-phantom-notehead',
-    label: 'D · Phantom Notehead Rests — the unwritten head',
-    axis: 'restStyle',
-    description:
-      'The finalist that states a silence as the note that is not there: a dashed open notehead with its bare stem, plus two downward-hooked flags for the 16th and one for the 8th, and a dashed head with a hollow bar for the half. The most semantically literal and the most unconventional of the four.',
-    options: { restStyle: 'phantom-notehead' },
-    windows: ROUND_18_VERDICT_WINDOWS,
-    tags: ['dashed open head', 'hooked phantom flags', 'semantic silence'],
+      'The naive uniform variant: the lowest-pitched head of every row keeps the beat column, so the mixed row’s LH tone takes the column and the RH tone fans aside (m. 46: D4 holds 51.15, G♯4 fans to 56.61). Judge the head order itself: with the fixed Round 19 joinery the unified bracket owns the whole onset’s duration, so this card is lint-clean too — the anchor’s formerly colliding stem is now the bracket’s business, and a yield mechanism would only be specified if lower-first lives.',
+    options: { clusterAnchor: 'lower-first' },
+    windows: ROUND_19_WINDOWS,
+    tags: ['demonstrator', 'lowest pitch holds the column', 'm. 46: D4 left, G♯4 right'],
   },
 ];
 
