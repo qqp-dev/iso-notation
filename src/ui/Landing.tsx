@@ -11,12 +11,15 @@ import { tickToMeasureBeat } from '../model/grid';
 import { parseMidiToScore } from '../model/midi';
 import { synth } from '../audio/synth';
 import { JankoPages, useJankoPages } from './JankoPages';
+import { SolfegeGuide } from './SolfegeGuide';
 import { checkMidiReadiness, locateTick, tickAtPoint } from './playhead';
 
 const BACH_ID = 'bach-goldberg-var1';
 const PDF_URL = `${import.meta.env.BASE_URL}goldberg-variation-1.pdf`;
 
-type View = 'play' | 'sheet';
+type View = 'play' | 'sheet' | 'guide';
+
+const VIEW_LABELS = { play: 'Play', sheet: 'Sheet', guide: 'Guide' } as const;
 
 export const Landing: React.FC = () => {
   const [view, setView] = useState<View>('play');
@@ -210,7 +213,7 @@ export const Landing: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-white font-sans text-neutral-900 antialiased">
+    <div className="landing-root fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden bg-white font-sans text-neutral-900 antialiased">
       {/* Drag & drop overlay */}
       {isDraggingFile && (
         <div className="no-print pointer-events-none fixed inset-0 z-50 flex flex-col items-center justify-center border-2 border-dashed border-neutral-400 bg-white/95">
@@ -247,18 +250,18 @@ export const Landing: React.FC = () => {
           </div>
 
           <div className="flex overflow-hidden rounded-full border border-neutral-300 text-sm">
-            {(['play', 'sheet'] as const).map((v) => (
+            {(['play', 'sheet', 'guide'] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-4 py-1.5 capitalize transition ${
+                className={`px-4 py-1.5 transition ${
                   view === v
                     ? 'bg-neutral-900 font-semibold text-white'
                     : 'bg-white text-neutral-600 hover:bg-neutral-100'
                 }`}
                 aria-pressed={view === v}
               >
-                {v === 'play' ? 'Play' : 'Sheet'}
+                {VIEW_LABELS[v]}
               </button>
             ))}
           </div>
@@ -269,12 +272,6 @@ export const Landing: React.FC = () => {
           >
             Upload MIDI
           </button>
-          <a
-            href="classic.html"
-            className="text-sm text-neutral-400 underline-offset-4 transition hover:text-neutral-700 hover:underline"
-          >
-            Classic
-          </a>
         </div>
         <div className="mx-auto max-w-5xl px-4 pb-2">
           <div className="truncate text-sm">
@@ -346,7 +343,7 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Score with playhead */}
-          <div ref={scrollRef} className="landing-scroll flex-1 overflow-y-auto">
+          <div ref={scrollRef} className="landing-scroll min-h-0 flex-1 overflow-y-auto">
             <div className="landing-pages relative mx-auto max-w-3xl px-4 py-6">
               <div className="flex flex-col gap-8">
                 <JankoPages
@@ -379,7 +376,7 @@ export const Landing: React.FC = () => {
             </div>
           </div>
         </>
-      ) : (
+      ) : view === 'sheet' ? (
         <>
           {/* Sheet toolbar */}
           <div className="landing-chrome border-b border-neutral-200 bg-neutral-50">
@@ -410,7 +407,7 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Printable pages */}
-          <div className="landing-scroll flex-1 overflow-y-auto bg-neutral-100">
+          <div className="landing-scroll min-h-0 flex-1 overflow-y-auto bg-neutral-100">
             <div className="landing-pages mx-auto max-w-3xl px-4 py-6">
               <div className="flex flex-col gap-8">
                 <JankoPages
@@ -421,13 +418,66 @@ export const Landing: React.FC = () => {
             </div>
           </div>
         </>
+      ) : (
+        <>
+          {/* Guide */}
+          <div className="landing-scroll min-h-0 flex-1 overflow-y-auto">
+            <div className="landing-pages mx-auto max-w-3xl px-4 py-6">
+              <h2 className="font-serif text-2xl font-bold tracking-tight">
+                How to read the sheet
+              </h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Six facts; everything else reads like standard notation.
+              </p>
+              <ol className="mt-4 list-decimal space-y-3 pl-5 text-[15px] leading-relaxed marker:font-semibold">
+                <li>
+                  <strong>Digits are pitch names.</strong> 0–9, A, B count the
+                  twelve semitones up from C — 0 is C, 7 is G, A is B♭, B is B.
+                </li>
+                <li>
+                  <strong>Rows are octaves.</strong> Pitch climbs upward across
+                  octave rows, 2–5 on the staff, with ledger rows beyond.
+                </li>
+                <li>
+                  <strong>Even and odd live on twin rows.</strong> Each octave
+                  spans two whole-tone rows; even digits print bolder, so rows
+                  read at a glance.
+                </li>
+                <li>
+                  <strong>The middle is middle C.</strong> The corridor through
+                  the staff&apos;s center is C4 — everything above it sounds
+                  higher, everything below lower.
+                </li>
+                <li>
+                  <strong>Stems name the hands.</strong> Stems up, right hand;
+                  stems down, left hand.
+                </li>
+                <li>
+                  <strong>Rhythm reads as usual.</strong> Beams group 8ths and
+                  16ths, single shorts carry flags, rests sit on their rows;
+                  solid barlines bound each measure, dashed lines mark the
+                  beats, and numerals open each system.
+                </li>
+              </ol>
+              <p className="mt-4 text-sm text-neutral-500">
+                In Play view, the red line follows the music — click any
+                measure to jump to it.
+              </p>
+
+              <p className="mb-3 mt-10 text-sm text-neutral-500">
+                Sing the digits — every pitch class has a one-syllable name.
+                Click to audition.
+              </p>
+              <div className="overflow-hidden rounded-2xl">
+                <SolfegeGuide onClose={() => setView('play')} />
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       <footer className="landing-chrome border-t border-neutral-200 py-3 text-center text-xs text-neutral-400">
-        Engraved live by the Jánko engine ·{' '}
-        <a href="classic.html" className="underline-offset-4 hover:underline">
-          Classic workbench
-        </a>
+        Engraved live by the Jánko engine
       </footer>
     </div>
   );

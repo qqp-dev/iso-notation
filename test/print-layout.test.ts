@@ -891,14 +891,17 @@ test('Web Print CSS & @media print Invariants', () => {
   // Must define @page { size: A4 portrait; margin: 0; }
   assert.match(css, /@page\s*\{\s*size:\s*A4\s*portrait;\s*margin:\s*0;\s*\}/i);
 
-  // Must define @media print with .no-print and .print-only
+  // Must define @media print with .no-print, a flowing app shell, hidden
+  // overlays and one engraved page per sheet.
   assert.match(css, /@media\s*print/);
   assert.match(css, /\.no-print\s*\{\s*display:\s*none\s*!important;\s*\}/);
-  assert.match(css, /\.print-page\s*\{[^}]*width:\s*210mm\s*!important/);
-  assert.match(css, /\.print-page\s*\{[^}]*height:\s*297mm\s*!important/);
-  assert.match(css, /\.print-page\s*\{[^}]*overflow:\s*hidden\s*!important/);
-  assert.match(css, /\.print-page\s*\{[^}]*break-after:\s*page/);
-  assert.match(css, /\.print-preview-card\s*svg\s*\{[^}]*width:\s*100%\s*!important/);
+  assert.match(css, /\.landing-root\s*\{[^}]*position:\s*static/);
+  assert.match(css, /\.landing-root\s*\{[^}]*overflow:\s*visible/);
+  assert.match(css, /\.janko-overlay\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.janko-page\s*\{[^}]*break-inside:\s*avoid/);
+  assert.match(css, /\.janko-page\s*\{[^}]*break-after:\s*page/);
+  assert.match(css, /\.janko-page svg\s*\{[^}]*width:\s*100%\s*!important/);
+  assert.match(css, /\.janko-page svg\s*\{[^}]*height:\s*auto\s*!important/);
 });
 
 test('Network Laser Printing Pipeline: 4-page landscape PostScript & PJL wrapping', async () => {

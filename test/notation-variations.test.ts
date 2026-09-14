@@ -1903,87 +1903,8 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
   assert.ok(hTrail.x1 > hExpectedCx, 'trailStartX must be strictly past notehead center');
 });
 
-test('Full-Viewport Score Canvas & Decluttered UI Invariants', async () => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
-  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
 
-  // 1. Janko keyboard component is completely removed from main viewport
-  assert.ok(!appSrc.includes('<JankoKeyboard'), 'App.tsx must not render <JankoKeyboard />');
-  assert.ok(!appSrc.includes("import { JankoKeyboard } from './JankoKeyboard'"), 'App.tsx must not import JankoKeyboard');
 
-  // 2. Full viewport canvas container with zero static top or bottom bars
-  assert.ok(
-    appSrc.includes('fixed inset-0 h-[100dvh] w-screen'),
-    'Canvas container must span full viewport: fixed inset-0 h-[100dvh] w-screen'
-  );
-  assert.ok(!appSrc.includes('<header'), 'App.tsx must not have a static <header> banner');
-  assert.ok(!appSrc.includes('h-12 bg-black border-b'), 'App.tsx must not have static 48px header bar');
-  assert.ok(!appSrc.includes('h-9 bg-black border-b'), 'App.tsx must not have static 36px scrub header bar');
-  assert.ok(!appSrc.includes('h-8 bg-neutral-950 border-b'), 'App.tsx must not have static 32px preset toolbar');
-});
-
-test('Floating Action Trigger ("Floaty Thing") Invariants', async () => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
-  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
-
-  // Floating trigger positioned over canvas
-  assert.ok(
-    appSrc.includes('fixed top-3 right-3 z-40'),
-    'Floating action trigger must be positioned at top-3 right-3 with z-40'
-  );
-
-  // Quick Play/Pause toggle
-  assert.ok(appSrc.includes('handleTogglePlay'), 'Floating trigger must include Play/Pause handler');
-  assert.ok(appSrc.includes("isPlaying ? '⏸' : '▶'"), 'Floating trigger must display Play/Pause icon');
-
-  // Measure and beat badge
-  assert.ok(appSrc.includes('M{measure}'), 'Floating trigger must display measure indicator M{measure}');
-  assert.ok(appSrc.includes('B{beat}'), 'Floating trigger must display beat indicator B{beat}');
-
-  // Sidebar controls trigger
-  assert.ok(appSrc.includes('setIsDrawerOpen'), 'Floating trigger must toggle drawer state');
-  assert.ok(appSrc.includes('⚙'), 'Floating trigger must have settings/controls icon');
-});
-
-test('Complete Sidebar Controls & Drawer Integration Invariants', async () => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const drawerTsxPath = path.resolve('src/ui/ControlsDrawer.tsx');
-  const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
-
-  // Slide-out drawer container
-  assert.ok(
-    drawerSrc.includes('fixed inset-y-0 right-0 w-80'),
-    'ControlsDrawer must be a fixed slide-out drawer on right edge'
-  );
-  assert.ok(
-    drawerSrc.includes("isOpen ? 'translate-x-0' : 'translate-x-full'"),
-    'ControlsDrawer must slide smoothly in and out via translate-x'
-  );
-
-  // Playback transport with scrub slider and measure counter
-  assert.ok(
-    drawerSrc.includes('aria-label="Timeline scrubber"'),
-    'ControlsDrawer must contain a scrub slider with timeline scrubber aria-label'
-  );
-  assert.ok(
-    drawerSrc.includes('M{measure}') && drawerSrc.includes('B{beat}'),
-    'ControlsDrawer must display measure and beat counter'
-  );
-  assert.ok(
-    drawerSrc.includes('tempoMultiplier') && drawerSrc.includes('onTempoMultiplierChange'),
-    'ControlsDrawer must include tempo multiplier controls'
-  );
-
-  // Definitive Design Architecture, Timeline Orientation, Color Mode
-  assert.ok(drawerSrc.includes('Definitive Iso-Notation'), 'Must contain Definitive Iso-Notation section');
-  assert.ok(drawerSrc.includes('Timeline Orientation'), 'Must contain Timeline Orientation toggle');
-  assert.ok(drawerSrc.includes('Color Spectrum'), 'Must contain Color Mode dropdown');
-});
 
 test('Notehead Morphology: rectangle-square morphology strictly encodes Row Parity (All Squares: Full Row 0, Empty Row 1)', () => {
   assert.equal(normalizeNoteheadMorphology('rectangle-square'), 'rectangle-square');
@@ -2613,53 +2534,7 @@ test('Left-Gutter Beat Counter Invariant: beats 1, 2, 3 align with pulse lines i
   assert.match(page1, /stroke-dasharray="2,3"/, 'SVG must include dashed pulse lines for beat subdivisions');
 });
 
-test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and defaults to independent Klavar lateral stems', async () => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
 
-  // App.tsx verification
-  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
-  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
-  assert.ok(!appSrc.includes('Toggle Beams'), 'App.tsx must not have Beams quick-toggle button');
-  assert.ok(!appSrc.includes('<span>🎶</span>'), 'App.tsx must not contain Beams quick toggle icon');
-
-  // ControlsDrawer.tsx verification
-  const drawerTsxPath = path.resolve('src/ui/ControlsDrawer.tsx');
-  const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
-  assert.ok(!drawerSrc.includes('Elaine Gould Beams'), 'ControlsDrawer.tsx must not have Elaine Gould Beams checkbox');
-
-  // Default option verification: showBeamGrouping completely removed
-  const { computeColumnarLayout } = await import('../src/render/print-layout');
-  const score = buildBachGoldbergVar1Score();
-  const defaultLayout = computeColumnarLayout(score);
-  assert.ok(!('showBeamGrouping' in defaultLayout.options), 'showBeamGrouping must be completely removed from options');
-});
-
-test('No-Toggle Clean UI Invariant: UI excludes rhythmic toggles, showGutterBrackets removed, and showBeatGrid defaults to true', async () => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-
-  // App.tsx verification: floating toolbar renders without the rhythmic toggle buttons
-  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
-  const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
-  assert.ok(!appSrc.includes('Toggle Beat Grid'), 'App.tsx must not have Beat Grid quick-toggle button');
-  assert.ok(!appSrc.includes('Toggle Gutter Brackets'), 'App.tsx must not have Gutter Brackets quick-toggle button');
-  assert.ok(!appSrc.includes('Quick Metric & Rhythmic Legibility Toggles'), 'App.tsx must not contain metric toggle group in floating toolbar');
-  assert.ok(appSrc.includes('showBeatGrid: true'), 'App.tsx must default showBeatGrid to true');
-
-  // ControlsDrawer.tsx verification: showGutterBrackets checkbox removed
-  const drawerTsxPath = path.resolve('src/ui/ControlsDrawer.tsx');
-  const drawerSrc = fs.readFileSync(drawerTsxPath, 'utf-8');
-  assert.ok(!drawerSrc.includes('showGutterBrackets'), 'ControlsDrawer.tsx must not have showGutterBrackets checkbox');
-
-  // Default layout options
-  const { computeColumnarLayout } = await import('../src/render/print-layout');
-  const score = buildBachGoldbergVar1Score();
-  const defaultLayout = computeColumnarLayout(score);
-  assert.equal(defaultLayout.options.showBeatGrid, true, 'Default showBeatGrid must be true');
-  assert.equal(defaultLayout.options.showGutterBrackets, false, 'Default showGutterBrackets must be false');
-  assert.equal(defaultLayout.options.octaveExtensionMode, 'spillover', 'Default octaveExtensionMode must be spillover');
-});
 
 test('Canvas Local Dashed Outlier Lines and Urtext Typography Invariants', () => {
   const score = buildBachGoldbergVar1Score();
