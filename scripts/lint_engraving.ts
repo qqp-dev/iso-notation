@@ -24,6 +24,11 @@ import {
   buildRestDurationSpecimenScore,
 } from '../src/scores/rest-duration-specimen';
 import {
+  DURATION_SPECIMEN_JANKO_OPTIONS,
+  DURATION_SPECIMEN_JANKO_TOKENS,
+  buildDurationSpecimenScore,
+} from '../src/scores/duration-specimen';
+import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
@@ -60,12 +65,21 @@ const restSpecimenReport = lintJankoScore(
   REST_DURATION_SPECIMEN_JANKO_OPTIONS,
   REST_DURATION_SPECIMEN_JANKO_TOKENS
 );
+// Round 21 §E: the constructed working-set specimen — 32nd/64th runs, mixed
+// beam levels, lone partial beams and solo flags. The corpus states none of
+// this material, so the complete set is gated here.
+const durationSpecimenReport = lintJankoScore(
+  buildDurationSpecimenScore(),
+  DURATION_SPECIMEN_JANKO_OPTIONS,
+  DURATION_SPECIMEN_JANKO_TOKENS
+);
 
 const allReports = [
   { score: 'Bach Goldberg Var 1', report: bachReport },
   { score: 'Brahms Op. 118 No. 1', report: brahmsReport },
   { score: 'Chord Duration Specimen', report: chordSpecimenReport },
   { score: 'Rest Duration Specimen', report: restSpecimenReport },
+  { score: 'Duration Working-Set Specimen', report: durationSpecimenReport },
 ];
 
 const totalViolations = allReports.reduce((n, r) => n + r.report.violations.length, 0);
@@ -79,6 +93,7 @@ if (asJson) {
         brahms: brahmsReport,
         chordSpecimen: chordSpecimenReport,
         restSpecimen: restSpecimenReport,
+        durationSpecimen: durationSpecimenReport,
       },
       null,
       2

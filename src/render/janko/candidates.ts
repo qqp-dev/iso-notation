@@ -121,6 +121,12 @@ export const SPECIMEN_STUDIO_SCORE_ID = 'chord-duration-specimen';
 export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
 
 /**
+ * Score id of the curated duration working-set specimen (Round 21 §E): 32nd and
+ * 64th runs, mixed levels, lone partial beams and solo flags.
+ */
+export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
+
+/**
  * The round currently under review.
  *
  * Round 1 settled the rhythm dialect (Variant B — traditional beamed), round 2
@@ -164,138 +170,144 @@ export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
  * single digits with their beams whole, and no nib fuses with its ring.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 20,
-  title: 'Verification — Rest Seats · Urtext Re-cut · Unison Merge · Nib',
+  round: 21,
+  title: 'Measured Duration Ink · Slabs on Lines · Lower-First',
   description:
-    'The settled golden master on the round’s own evidence. Rest seats: the rest specimen’s five values — 16th, 8th, quarter, half and the new 192-tick whole bar — read with the ink centroid on the phrase row, the half slab atop its row and the whole slab hanging below it, beside the three genuine Brahms seats (mm. 7, 17, 68) and the canonical Bach m. 4. Urtext re-cut: every rest glyph and every flag hook is the classical cut at the house 0.90pt weight, judged on Bach’s 8th-flag window (m. 1) and its 16th-double window (m. 22). Unison merge: the Goldberg’s final bar and the three Brahms measures that double a pitch (mm. 60, 65, 66) paint one digit per sound, with every beam and flag of the mixed-duration voices intact. Nib: Brahms m. 3’s dotted clasp — the tick-432 ring the operator caught, now a clean satellite of its mark — plus the specimen’s whole-bar measure. No axis is open: every card is the golden master itself, and the live linter stands in for the implementer’s eye.',
+    'The round that stops drawing and starts measuring. Every rest constant now traces to a fontTools outline extraction of **Bravura** (SMuFL reference, v1.482) corroborated by **Noto Music** (v2.003), through one explicit scale: 1 staff space = 18.4pt / 4.732sp, because the working set’s tallest glyph (the 64th rest, 4.732 spaces) exactly fills the lattice’s measured inter-row headroom. The half slab now sits **on** a drawn staff rule and the whole slab hangs **from** one — touching, zero gap — with the whole bar centred in its measure; the anchor rule is **lower-first** on all sixteen corpus rows and the unison survivor is the lower voice; and the working set walks `whole → 64th` complete, on constructed specimen windows for every new part. No axis is open: every card is the golden master itself.',
   openAxes: [],
 };
 
 /**
- * The Round 20 verification windows: the rest specimen (all five values,
- * including the whole bar), Bach’s single- and double-flag measures, Brahms’s
- * genuine rest seats, the merged unisons on both scores, and the nib case.
+ * The Round 21 verification windows: the five rest cuts + slab seats, the two
+ * corpus rest windows, the sixteen lower-first rows, the mixed-level beam
+ * groups, the constructed 32nd/64th windows, the nib guard and the final-bar
+ * unison guard.
  */
-const ROUND_20_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_21_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 1,
     measureCount: 3,
-    title: 'Rest specimen · mm. 1–3 — 16th, 8th and quarter: ink centroid on the phrase row',
+    title: 'Rest specimen · mm. 1–3 — the measured cuts: 16th, 8th, quarter',
   },
   {
     scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 4,
     measureCount: 3,
-    title: 'Rest specimen · mm. 4–6 — the half sits atop its row, the whole bar hangs below it',
+    title: 'Rest specimen · mm. 4–6 — the half slab sits ON a drawn rule, the whole bar hangs FROM one and is centred',
+  },
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 7,
+    measureCount: 2,
+    title: 'Rest specimen · mm. 7–8 — the two new values: 32nd and 64th silences',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 1 — the classical 8th-flag hook, single',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 22,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 22 — the 16th doubles, stacked by flagSpacing',
+    measureStart: 4,
+    measureCount: 3,
+    title: 'Bach Var. 1 · mm. 4–6 — the canonical 16th seat, re-cut',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 7,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 7 — a genuine 16th seat beside the other hand’s entry',
-  },
-  {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 17,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 17 — the second seat, 109 flags in the same window',
-  },
-  {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 68,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 68 — the closing seat',
+    title: 'Brahms Op. 118/1 · m. 7 — a measured 16th seat beside the lower-first row',
   },
   {
     scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 32,
+    measureStart: 3,
     measureCount: 1,
-    title: 'Bach Var. 1 · m. 32 — the final bar: one digit where two “7”s stood',
+    title: 'Bach Var. 1 · m. 3 — lower-first: the LH C♯4 holds the column, the RH A4 fans',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 60,
+    measureStart: 46,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 60 — merged unison 84/24: one head, both rhythm voices',
+    title: 'Brahms Op. 118/1 · m. 46 — lower-first on the dense pair rows (D4 holds, G♯4 fans)',
   },
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 65,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 65 — three merged unisons in one measure, beams whole',
+    scoreId: DURATION_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 1,
+    measureCount: 2,
+    title: 'Duration specimen · mm. 1–2 — the tertiary 32nd run and the quaternary 64th run',
   },
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 66,
+    scoreId: DURATION_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 3,
+    measureCount: 2,
+    title: 'Duration specimen · mm. 3–4 — mixed levels in one beat, and the lone-16th partial beams',
+  },
+  {
+    scoreId: DURATION_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 5,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 66 — unison 21/132 and the same-duration pair 21/21',
+    title: 'Duration specimen · m. 5 — solo 32nd and 64th flags (triple and quad)',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 3,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 3 — the tick-432 dotted clasp: the dot now a clean satellite',
+    title: 'Brahms Op. 118/1 · m. 3 — the nib guard: the dot still a clean satellite',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 32,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 32 — the final-bar unison guard: one digit, now the lower voice’s',
   },
 ];
 
 /** The round’s verification cards, one per settled change, in display order. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'verify-rest-seats',
-    label: '1 · Optical Rest Seats — the ink centroid on the phrase row',
+    id: 'verify-measured-cuts',
+    label: '1 · Measured Cuts — every part traced to the outlines',
     description:
-      'Rests are no longer seated by the near edge of a geometric box: the glyph is placed so its **ink centroid** stands on the phrase row (both axes), so the row the eye reads is the row the engine chose. Every value is here — the specimen’s 16th/8th/quarter, its half slab sitting atop its row, its new whole slab hanging below it — beside the three genuine Brahms seats and the canonical Bach m. 4 16th. The linter audits the seat as a violation, never a warning.',
-    windows: ROUND_20_WINDOWS.filter((w) => w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID).concat(
-      ROUND_20_WINDOWS.filter((w) => w.scoreId === BRAHMS_STUDIO_SCORE_ID && [7, 17, 68].includes(w.measureStart))
-    ),
-    tags: ['seats', 'centroid-on-row', 'rest-centroid-off-row'],
-  },
-  {
-    id: 'verify-urtext-recut',
-    label: '2 · Urtext Re-cut — classical rests and the classical flag hook',
-    description:
-      'Every rest glyph and every flag hook is cut against the classical standard at the house 0.90pt weight: slanted stems with oval heads for the 8th/16th, the true serpentine quarter, wide solid slabs for the half and whole bar — and the classical tapered hook (U+1D160-class) for every flag, single or double. Bach’s 8th-flag window and its 16th-double window judge the hooks; the specimen judges the rests.',
-    windows: ROUND_20_WINDOWS.filter(
-      (w) => w.scoreId === DEFAULT_STUDIO_SCORE_ID && [1, 22].includes(w.measureStart)
-    ),
-    tags: ['re-cut', 'classical taper', 'whole bar'],
-  },
-  {
-    id: 'verify-unison-merge',
-    label: '3 · Unison Merge — one sound, one digit',
-    description:
-      'One onset + one pitch = one sound event = **one digit**, on the anchor-winner’s column (the RH head), with no duration veto. The Goldberg’s final bar paints a single “7”; the seven Brahms unisons paint one digit each, and the six mixed-duration ones keep both rhythm voices — each voice’s stem, beam and flag at its own end, so no beam group loses a member. The linter makes a double digit a violation.',
-    windows: ROUND_20_WINDOWS.filter(
+      'Nothing is hand-drawn any more. The quarter is the **traced measured contour** of Bravura `restQuarter` (44 arc-length samples: three crossings, a hairline neck, a 165u belly, two tapered hooks) painted as one filled calligraphic path. The 8th … 64th are the measured **wedge stem + lobe** construction — lobe radius 65u, pitch 249u, stem 65u → 46u → a point — with each lobe’s contour starting and ending on the stem’s own spine, so the hook is *grown from* the stem. The slab pair is the measured 282 × 144u.',
+    windows: ROUND_21_WINDOWS.filter(
       (w) =>
-        (w.scoreId === DEFAULT_STUDIO_SCORE_ID && w.measureStart === 32) ||
-        (w.scoreId === BRAHMS_STUDIO_SCORE_ID && [60, 65, 66].includes(w.measureStart))
+        w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID ||
+        (w.scoreId === DEFAULT_STUDIO_SCORE_ID && w.measureStart === 4)
     ),
-    tags: ['unison', 'one digit', 'unison-double-digit'],
+    tags: ['measured', 'Bravura 1.482', 'serpentine', 'grown lobes'],
   },
   {
-    id: 'verify-clasp-nib',
-    label: '4 · Clasp Nib Fix — the dot as a clean satellite',
+    id: 'verify-slab-lines',
+    label: '2 · Slabs on Lines — half sits ON, whole hangs FROM, whole centred',
     description:
-      'A dotted clasp’s 0.75pt dot is placed up-and-right of its mark, tracking the mark’s edge, so it keeps the house dot hug against the spine, the open ring and every transverse cut — and against every neighbouring ink box, the cluster’s own member discs included. Brahms m. 3’s tick-432 ring (the ~1.05pt fusion the operator caught) is the case window; the linter reports any future fusion.',
-    windows: ROUND_20_WINDOWS.filter(
-      (w) => w.scoreId === BRAHMS_STUDIO_SCORE_ID && w.measureStart === 3
+      'A bar rest derives its meaning from touching a line. The half slab’s bottom edge and the whole slab’s top edge now stand **exactly on a drawn staff rule** (zero gap, measured — the seat no longer snaps to an invisible phrase row), and the whole bar is **centred in its measure** on the barline midpoint (Gould; LilyPond NR §§2.2.1/2.2.3), exempt from the beat-cell nudge and cleared vertically by row separation. The linter names a slab that touches nothing: `rest-slab-off-line`.',
+    windows: ROUND_21_WINDOWS.filter(
+      (w) =>
+        (w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID && w.measureStart >= 4) ||
+        (w.scoreId === BRAHMS_STUDIO_SCORE_ID && w.measureStart === 3)
     ),
-    tags: ['nib', 'clasp dot', 'clasp-dot-fusion'],
+    tags: ['slab-on-line', 'whole centred', 'rest-slab-off-line', 'nib guard'],
+  },
+  {
+    id: 'verify-lower-first',
+    label: '3 · Lower-First — the lowest head holds the column',
+    description:
+      'The anchor rule is **lower-first**, and it is a rule, not an option: on a mixed-hand row the lowest-pitched head keeps the column and the other fans; on a single-hand row the middle head does, exactly as before. All **sixteen** corpus rows flip — Bach’s eight (bar3:t408 … bar31:t4368) and Brahms’s eight (bar7:t1296 … bar49:t9432) — with the stem-x set inside each row preserved by the pure swap. A cross-hand unison ties on pitch, so the **lower voice** (LH) keeps the digit.',
+    windows: ROUND_21_WINDOWS.filter(
+      (w) =>
+        (w.scoreId === DEFAULT_STUDIO_SCORE_ID && [3, 32].includes(w.measureStart)) ||
+        w.scoreId === BRAHMS_STUDIO_SCORE_ID
+    ),
+    tags: ['lower-first', 'anchor', 'unison survivor'],
+  },
+  {
+    id: 'verify-working-set',
+    label: '4 · The Working Set — whole → 64th, complete, on constructed windows',
+    description:
+      'This is a notation **system**, not two pieces: the standard set `whole → 64th` is stated whether or not Bach or Brahms happens to use it. The corpus has no 32nds or 64ths at all, so §E **constructs** the specimens — the rest specimen’s new 32nd and 64th silences, and the duration specimen’s tertiary 32nd run, quaternary 64th run, mixed levels in one beat, lone-16th partial beams and solo triple/quad flags. `beamLevel = f(duration)` builds the levels generically: a 128th would be data, not architecture.',
+    windows: ROUND_21_WINDOWS.filter(
+      (w) => w.scoreId === DURATION_SPECIMEN_STUDIO_SCORE_ID
+    ),
+    tags: ['32nd', '64th', 'stubs', 'beam levels'],
   },
 ];
+
 
 /** A fully resolved candidate, ready to engrave. */
 export interface ResolvedJankoCandidate {

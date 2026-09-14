@@ -56,8 +56,15 @@ import {
 const TICKS_PER_BEAT = 48;
 /** One 4/4 measure — the meter that can state a 192-tick whole bar. */
 export const REST_DURATION_SPECIMEN_TICKS_PER_MEASURE = 192;
-/** Measures engraved in the specimen: five values + the whole bar's resume. */
-export const REST_DURATION_SPECIMEN_MEASURES = 6;
+/**
+ * Measures engraved in the specimen.
+ *
+ * Round 21 §E completes the working set: the five original windows (mm. 1–5),
+ * the whole bar's resume measure (m. 6), and the two values the corpus never
+ * states — the **32nd** (m. 7) and the **64th** (m. 8) — so the specimen walks
+ * the whole `64th … whole` taxonomy.
+ */
+export const REST_DURATION_SPECIMEN_MEASURES = 8;
 /** Total length of the specimen score. */
 export const REST_DURATION_SPECIMEN_TOTAL_TICKS =
   REST_DURATION_SPECIMEN_MEASURES * REST_DURATION_SPECIMEN_TICKS_PER_MEASURE;
@@ -114,6 +121,23 @@ export const REST_DURATION_SPECIMEN_VALUES: ReadonlyArray<{
     restTick: 4 * REST_DURATION_SPECIMEN_TICKS_PER_MEASURE,
     measure: 5,
   },
+  // Round 21 §E — the two values the corpus never states. Both open on the
+  // measure's third 16th, exactly like the four short windows, so the cut is
+  // compared at one and the same page position.
+  {
+    label: '32nd',
+    value: 'thirty-second',
+    durationTicks: 6,
+    restTick: 6 * REST_DURATION_SPECIMEN_TICKS_PER_MEASURE + REST_TICK_IN_MEASURE,
+    measure: 7,
+  },
+  {
+    label: '64th',
+    value: 'sixty-fourth',
+    durationTicks: 3,
+    restTick: 7 * REST_DURATION_SPECIMEN_TICKS_PER_MEASURE + REST_TICK_IN_MEASURE,
+    measure: 8,
+  },
 ];
 
 /**
@@ -127,6 +151,8 @@ export const REST_DURATION_SPECIMEN_VALUES: ReadonlyArray<{
 export const REST_DURATION_SPECIMEN_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   ...DEFAULT_JANKO_OPTIONS,
   ticksPerMeasure: REST_DURATION_SPECIMEN_TICKS_PER_MEASURE,
+  // Three per system, unchanged: every rest is read at the same macro scale as
+  // the original five windows (the Round 21 windows simply extend the run).
   measuresPerSystem: 3,
   title: 'Rest Duration Specimen',
   subtitle: 'one silence per value, 16th … whole bar',
@@ -186,6 +212,27 @@ const RH_LINE: ReadonlyArray<SpecimenRow> = [
   [1008, 9, 4, 48], // A4
   [1056, 11, 4, 48], // B4
   [1104, 7, 4, 48], // G4
+  // m. 7 — 32nd silence between F4 and G4.
+  [1152, 4, 4, 12], // E4
+  [1164, 5, 4, 12], // F4 → releases on the rest
+  [1182, 8, 4, 6], // G#4 resumes (a 32nd) on the *other* row, so the rest's phrase
+  //                 row is not the row the 6-tick neighbour sits on
+  [1188, 7, 4, 24], // G4
+  [1212, 11, 4, 24], // B4
+  [1236, 9, 4, 24], // A4
+  [1260, 7, 4, 24], // G4
+  [1284, 5, 4, 60], // F4 → releases on the next downbeat
+  // m. 8 — 64th silence between F4 and G4.
+  [1344, 4, 4, 12], // E4
+  [1356, 5, 4, 12], // F4 → releases on the rest
+  [1371, 8, 4, 3], // G#4 resumes (a 64th) on the other row, so the 3-tick
+  //                 neighbour never shares the rest's row
+  [1374, 7, 4, 24], // G4
+  [1398, 9, 4, 18], // A4
+  [1416, 11, 4, 24], // B4
+  [1440, 9, 4, 24], // A4
+  [1464, 7, 4, 36], // G4
+  [1500, 5, 4, 36], // F4 → releases on the closing barline
 ];
 
 /**
@@ -208,6 +255,10 @@ const LH_LINE: ReadonlyArray<SpecimenRow> = [
   [864, 0, 3, 96], // C3
   [960, 5, 3, 24], // F3 · m. 6 downbeat
   [1056, 7, 3, 96], // G3
+  [1152, 0, 3, 24], // C3 · m. 7 downbeat
+  [1248, 7, 2, 96], // G2 · m. 7 beat 3
+  [1344, 2, 3, 24], // D3 · m. 8 downbeat
+  [1440, 9, 2, 96], // A2 · m. 8 beat 3
 ];
 
 /** One authored voice of the specimen, in engraving order. */
@@ -240,7 +291,9 @@ export function buildRestDurationSpecimenScore(): QuantizedGridScore {
     title: 'Rest Duration Specimen',
     composer: 'Jánko Engraving Harness',
     ticksPerBeat: TICKS_PER_BEAT,
-    gridResolution: TICKS_PER_BEAT / 2,
+    // Round 21 §E: the specimen now states 64th silences (3 ticks), so the
+    // score's grid resolution is their GCD, not a half-beat.
+    gridResolution: 3,
     totalTicks: REST_DURATION_SPECIMEN_TOTAL_TICKS,
     timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
     barlines,

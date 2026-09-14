@@ -60,6 +60,7 @@ import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
+  DURATION_SPECIMEN_STUDIO_SCORE_ID,
   REST_SPECIMEN_STUDIO_SCORE_ID,
   SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
@@ -99,6 +100,9 @@ import {
   partitionBeamGroups,
 } from '../src/render/janko/elements/rhythm';
 import {
+  REST_SIXTY_FOURTH_HEIGHT,
+  REST_SLAB_WIDTH,
+  REST_SLAB_HEIGHT,
   JANKO_REST_VALUES,
   JankoRestValue,
   REST_BOX_STROKE,
@@ -140,14 +144,14 @@ const REST_STYLES: JankoRestStyle[] = [
 ];
 
 /**
- * The Round 20 **verification cards** — no open axis, one card per settled
+ * The Round 21 **verification cards** — no open axis, one card per settled
  * change, in display order.
  */
 const VERIFICATION_CARDS: string[] = [
-  'verify-rest-seats',
-  'verify-urtext-recut',
-  'verify-unison-merge',
-  'verify-clasp-nib',
+  'verify-measured-cuts',
+  'verify-slab-lines',
+  'verify-lower-first',
+  'verify-working-set',
 ];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
@@ -234,15 +238,15 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 20 as a verification round with no open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 20);
-  assert.match(CURRENT_ROUND_METADATA.title, /Verification/);
-  assert.match(CURRENT_ROUND_METADATA.title, /Rest Seats/);
+test('CURRENT_ROUND_METADATA opens round 21 as a verification round with no open axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 21);
+  assert.match(CURRENT_ROUND_METADATA.title, /Measured/);
+  assert.match(CURRENT_ROUND_METADATA.title, /Lower-First/);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'a verification round opens no axis');
-  assert.match(CURRENT_ROUND_METADATA.description, /ink centroid/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /classical/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /one digit/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /satellite/i, 'the nib fix is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /Bravura/);
+  assert.match(CURRENT_ROUND_METADATA.description, /staff space/i, 'the explicit scale is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /lower-first/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /whole → 64th/i, 'the complete working set is stated');
 });
 
 test('CURRENT_CANDIDATES declares the round’s four verification cards', () => {
@@ -293,21 +297,22 @@ test('Every verification card carries its own non-empty window set, titled and o
       seen.add(`${window.scoreId}:${window.measureStart}-${window.measureStart + window.measureCount - 1}`);
     }
   }
-  // The round's evidence: the rest specimen (with the whole bar), the Bach
-  // flag measures, the final-bar unison, the Brahms unisons, the nib case.
+  // The round's evidence: the measured cuts on the rest specimen, the slab
+  // seats and the whole bar, the lower-first rows, the constructed 32nd/64th
+  // windows, the nib guard and the final-bar unison guard.
   for (const expected of [
     `${REST_SPECIMEN_STUDIO_SCORE_ID}:1-3`,
     `${REST_SPECIMEN_STUDIO_SCORE_ID}:4-6`,
-    `${DEFAULT_STUDIO_SCORE_ID}:1-1`,
-    `${DEFAULT_STUDIO_SCORE_ID}:22-22`,
+    `${REST_SPECIMEN_STUDIO_SCORE_ID}:7-8`,
+    `${DEFAULT_STUDIO_SCORE_ID}:3-3`,
+    `${DEFAULT_STUDIO_SCORE_ID}:4-6`,
     `${DEFAULT_STUDIO_SCORE_ID}:32-32`,
     `${BRAHMS_STUDIO_SCORE_ID}:3-3`,
     `${BRAHMS_STUDIO_SCORE_ID}:7-7`,
-    `${BRAHMS_STUDIO_SCORE_ID}:17-17`,
-    `${BRAHMS_STUDIO_SCORE_ID}:60-60`,
-    `${BRAHMS_STUDIO_SCORE_ID}:65-65`,
-    `${BRAHMS_STUDIO_SCORE_ID}:66-66`,
-    `${BRAHMS_STUDIO_SCORE_ID}:68-68`,
+    `${BRAHMS_STUDIO_SCORE_ID}:46-46`,
+    `${DURATION_SPECIMEN_STUDIO_SCORE_ID}:1-2`,
+    `${DURATION_SPECIMEN_STUDIO_SCORE_ID}:3-4`,
+    `${DURATION_SPECIMEN_STUDIO_SCORE_ID}:5-5`,
   ]) {
     assert.ok(seen.has(expected), `the round shows ${expected}`);
   }
@@ -569,11 +574,14 @@ test('Pin: m12 pins the 9 on its column while the 7 walks in — every preset', 
     const pair = notes
       .filter((p) => p.note.startTick === 1632)
       .sort((a, b) => a.x - b.x);
+    // Round 21 §D: the **lower** head holds the column (pc7, the LH tone); the
+    // pc9 RH tone walks in beside it.
     const nine = pair.find((p) => p.coord.pitchClass === 9)!;
-    assert.ok(nine, `${spacing}: the ticketed 9 exists`);
+    const seven = pair.find((p) => p.coord.pitchClass === 7)!;
+    assert.ok(nine && seven, `${spacing}: the ticketed pair exists`);
     assert.ok(
-      Math.abs(nine.x - (nine.nominalX ?? nine.x)) <= 0.3,
-      `${spacing}: the 9 holds its column (Δ${Math.abs(nine.x - (nine.nominalX ?? 0)).toFixed(2)})`
+      Math.abs(seven.x - (seven.nominalX ?? seven.x)) <= 0.3,
+      `${spacing}: the lower head holds its column (Δ${Math.abs(seven.x - (seven.nominalX ?? 0)).toFixed(2)})`
     );
     const span = Math.abs(pair[1].x - pair[0].x);
     // Free room here exceeds G on the roomy side, so the walked-in gap is G.
@@ -1205,12 +1213,35 @@ test('Rest weight: every rest stroke is the note-stem weight with scaled extents
     assert.ok(groups.length >= 13, `${style} prints its rests (${groups.length} groups)`);
     return [...groups.join('\n').matchAll(/stroke-width="([\d.]+)"/g)].map((m) => m[1]);
   };
-  for (const style of ['kinetic-monoline', 'classical-urtext', 'geometric-node'] as const) {
-    const widths = widthsOf(style);
-    assert.ok(widths.length > 0, `${style} paints stroked ink`);
+  // Round 21 §B: the two classical cuts are **filled calligraphic contours**
+  // (the measured serpentine and the measured hooked wedge) — a monoline stroke
+  // cannot carry their contrast — so they paint no `stroke-width` at all, and
+  // every contour is filled with the rest ink. The demonstrator dialects keep
+  // their strokes.
+  const groupsOf = (style: JankoRestStyle): string[] => [
+    ...restInkOf(SCORE, { ...DEFAULT_JANKO_OPTIONS, restStyle: style }, DEFAULT_JANKO_TOKENS, 'tight'),
+    ...restInkOf(
+      REST_SPECIMEN,
+      { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4, restStyle: style },
+      DEFAULT_JANKO_TOKENS,
+      'tight'
+    ),
+  ];
+  for (const style of ['kinetic-monoline', 'classical-urtext'] as const) {
+    const groups = groupsOf(style);
+    const svg = groups.join('\n');
+    assert.ok(svg.includes('fill="#111111"'), `${style} paints filled contour ink`);
+    assert.ok(
+      !svg.includes('stroke-width'),
+      `${style}: the classical cut is one filled contour per part, never a stroked rule`
+    );
+  }
+  {
+    const widths = widthsOf('geometric-node');
+    assert.ok(widths.length > 0, 'geometric-node paints stroked ink');
     assert.ok(
       widths.every((w) => w === '0.90'),
-      `${style}: every rest stroke is 0.90pt (saw ${[...new Set(widths)].join(', ')})`
+      `geometric-node: every rest stroke is 0.90pt (saw ${[...new Set(widths)].join(', ')})`
     );
   }
   const phantom = widthsOf('phantom-notehead');
@@ -1226,14 +1257,19 @@ test('Rest weight: every rest stroke is the note-stem weight with scaled extents
   assert.ok(bauhaus.includes('0.60'), 'the bauhaus half box really paints its 0.60pt hairline');
 });
 
-test('Rest size maxima: pinned per value over the four carried dialects', () => {
+test('Rest size maxima: the measured working set, pinned per value', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  // Round 21 §A: every extent is the measured Bravura envelope through
+  // `REST_SPACE_PT`; the maximum over the five dialects is the classical cut's
+  // own box (the demonstrators are all smaller), so this table *is* the cut.
   const expected: Record<string, { w: number; h: number }> = {
-    sixteenth: { w: 5.73, h: 7.7 },
-    eighth: { w: 4.94, h: 7.7 },
-    quarter: { w: 4.25, h: 7.7 },
-    half: { w: 6.075, h: 4.25 },
-    whole: { w: 6.075, h: 4.25 },
+    'sixty-fourth': { w: 6.602, h: 18.429 },
+    'thirty-second': { w: 5.73, h: 14.354 },
+    sixteenth: { w: 5.73, h: 10.458 },
+    eighth: { w: 4.94, h: 7.41 },
+    quarter: { w: 4.25, h: 11.559 },
+    half: { w: 5.286, h: 4.25 },
+    whole: { w: 5.286, h: 4.25 },
   };
   for (const [value, max] of Object.entries(expected)) {
     let w = 0;
@@ -1246,20 +1282,51 @@ test('Rest size maxima: pinned per value over the four carried dialects', () => 
       w = Math.max(w, box.x1 - box.x0);
       h = Math.max(h, box.y1 - box.y0);
     }
-    assert.ok(Math.abs(w - max.w) < 1e-6, `${value}: max width ${max.w}pt (got ${w})`);
-    assert.ok(Math.abs(h - max.h) < 1e-6, `${value}: max height ${max.h}pt (got ${h})`);
-    // Smaller ink on standard-like proportions — never head-sized.
-    assert.ok(w < 2 * t.noteheadRadius, `${value}: narrower than one head`);
-    assert.ok(h < 2 * t.noteheadRadius, `${value}: shorter than one head`);
+    assert.ok(Math.abs(w - max.w) < 1e-3, `${value}: max width ${max.w}pt (got ${w.toFixed(3)})`);
+    assert.ok(Math.abs(h - max.h) < 1e-3, `${value}: max height ${max.h}pt (got ${h.toFixed(3)})`);
   }
-  // The two bar forms are the same wide slab, mirrored about their seat row:
-  // the half sits atop it, the whole hangs below it.
+  // Round 21 §A/§E: the family **grows with the duration** — the classical
+  // signature the R16 constant-size cut could not state — and the tallest glyph
+  // of the working set exactly fills the lattice's inter-row headroom.
+  // `JANKO_REST_VALUES` runs shortest first, so the hooked family's heights must
+  // fall monotonically from the 64th (the longest glyph) to the 8th.
+  const heights = JANKO_REST_VALUES.map((value) => expected[value].h);
+  const hooked = heights.slice(0, 4); // 64th, 32nd, 16th, 8th
+  assert.deepEqual(
+    [...hooked].sort((a, b) => b - a),
+    hooked,
+    'the hooked family grows monotonically from the 8th to the 64th'
+  );
+  // The scale derivation itself: the working set's tallest measured envelope is
+  // exactly the lattice's inter-row headroom (2 × (rowHeight − r − minClearance)).
+  const headroom = 2 * (t.rowHeight - t.noteheadRadius - 1.0);
+  assert.ok(
+    Math.abs(REST_SIXTY_FOURTH_HEIGHT - headroom) < 1e-9,
+    `the 64th envelope is the measured headroom (${headroom}pt)`
+  );
+  assert.ok(
+    Math.abs(hooked[0] - headroom) < headroom * 0.01,
+    `the painted 64th cut keeps the envelope within 1% (${hooked[0].toFixed(3)}pt)`
+  );
+  assert.ok(heights[4] > heights[3] * 0.6, 'the quarter rest is the tall serpentine');
+  // The two bar forms are the same wide slab, mirrored about their seat line:
+  // the half sits on it, the whole hangs from it.
   assert.equal(expected.half.w, expected.whole.w, 'the bar pair shares one slab width');
   assert.equal(expected.half.h, expected.whole.h, 'and one slab thickness');
-  assert.deepEqual(
-    JANKO_REST_VALUES.map((value) => expected[value].h),
-    [7.7, 7.7, 7.7, 4.25, 4.25],
-    'the classical cut keeps every extent under one head'
+  // The classical cut's own slab (not the cross-dialect maxima) keeps the
+  // measured 282:144 proportion.
+  const slab = restInkBox(
+    { tick: 0, durationTicks: 96, hand: 'RH', x: 0, y: 0, value: 'half', style: 'kinetic-monoline' },
+    t
+  );
+  assert.ok(
+    Math.abs((slab.x1 - slab.x0) / (slab.y1 - slab.y0) - 282 / 144) < 1e-6,
+    'the slab keeps the measured 282:144 proportion (1.96)'
+  );
+  assert.ok(
+    Math.abs(slab.x1 - slab.x0 - REST_SLAB_WIDTH) < 1e-9 &&
+      Math.abs(slab.y1 - slab.y0 - REST_SLAB_HEIGHT) < 1e-9,
+    'and the measured 282 × 144u envelope exactly'
   );
 });
 
@@ -1325,12 +1392,32 @@ test('Phrase rows: the showcase rests seat their ink centroid on a phrase row �
           const base = layout!.geometry.middleCY + getEquatorYForOctave(octave, 'RH', t, o);
           for (const offset of wholeToneRowOffsets(o, t)) rows.push(base + offset);
         }
-        const row = rest.y - restSeatOffsetY(rest.value, style, t);
-        const rowDistance = Math.min(...rows.map((candidate) => Math.abs(row - candidate)));
-        assert.ok(
-          rowDistance < 1e-6,
-          `${style} · ${c.label} t${tick}: the ink centroid seats on a phrase row (off by ${rowDistance.toFixed(6)})`
-        );
+        if (rest.value === 'half' || rest.value === 'whole') {
+          // Round 21 §C: a bar form's seat point is the **drawn staff rule** it
+          // touches — the half slab's bottom edge, the whole slab's top edge —
+          // never a phrase row.
+          const rules: number[] = [];
+          for (const [hand, octave] of [
+            ['RH', 5],
+            ['LH', 2],
+            ['RH', 4],
+            ['LH', 3],
+          ] as const) {
+            rules.push(...getEquatorRuleYs(layout!.geometry.equatorY(hand, octave), o, t));
+          }
+          const ruleDistance = Math.min(...rules.map((candidate) => Math.abs(rest.y - candidate)));
+          assert.ok(
+            ruleDistance < 1e-6,
+            `${style} · ${c.label} t${tick}: the slab touches a drawn staff rule (off by ${ruleDistance.toFixed(6)})`
+          );
+        } else {
+          const row = rest.y - restSeatOffsetY(rest.value, style, t);
+          const rowDistance = Math.min(...rows.map((candidate) => Math.abs(row - candidate)));
+          assert.ok(
+            rowDistance < 1e-6,
+            `${style} · ${c.label} t${tick}: the ink centroid seats on a phrase row (off by ${rowDistance.toFixed(6)})`
+          );
+        }
         // The painted glyph is drawn about that seat: the origin is exactly the
         // centroid offset from the seat point.
         const origin = restGlyphOrigin(rest, t);
@@ -1631,7 +1718,7 @@ test('The m. 4 rest and the specimen m. 2 rest survive every spacing preset', ()
   }
 });
 
-test('Rest specimen material: exactly the five standard gaps, each on a guaranteed-free column (locked)', () => {
+test('Rest specimen material: the complete working set, each on a guaranteed-free column (locked)', () => {
   assert.deepEqual(
     REST_DURATION_SPECIMEN_VALUES.map((v) => [v.value, v.durationTicks]),
     [
@@ -1640,16 +1727,18 @@ test('Rest specimen material: exactly the five standard gaps, each on a guarante
       ['quarter', 48],
       ['half', 96],
       ['whole', 192],
+      ['thirty-second', 6],
+      ['sixty-fourth', 3],
     ],
-    'the five standard values, shortest first — the whole bar included (Round 20)'
+    'the five original values, then the two Round 21 §E constructions (32nd, 64th)'
   );
   const options = resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS);
   const tokens = resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS);
   const rests = layoutJankoScore(REST_SPECIMEN, options, tokens).flatMap((l) => l.rests);
-  assert.equal(rests.length, 5, 'exactly five rests are written');
+  assert.equal(rests.length, 7, 'exactly seven rests are written — the whole working set');
   assert.deepEqual(
     rests.map((r) => r.value),
-    ['sixteenth', 'eighth', 'quarter', 'half', 'whole'],
+    ['sixteenth', 'eighth', 'quarter', 'half', 'whole', 'thirty-second', 'sixty-fourth'],
     'one rest per value, in measure order'
   );
   const r = tokens.noteheadRadius;
@@ -1746,8 +1835,8 @@ test('The live studio engraves every verification card on its own windows, all g
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
   assert.match(html, /data-candidate-count="4"/);
   assert.match(html, /data-verification="true"/);
-  assert.match(html, /Round 20/);
-  assert.match(html, /Verification/, 'the round title headlines the view');
+  assert.match(html, /Round 21/);
+  assert.match(html, /Measured/, 'the round title headlines the view');
   assert.ok(!html.includes('Symmetric-Tuck Clusters'), 'the Round 19 title is retired');
   let cursor = -1;
   for (const id of VERIFICATION_CARDS) {

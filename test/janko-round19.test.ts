@@ -128,8 +128,10 @@ test('m. 46 tucks to the ticket positions: single heads on the pair columns’ m
   // … while the two pair rows fan from the column exactly as before.
   assert.equal(x('brahms-op118-no1-634').toFixed(2), '51.15', 'F4 holds the column');
   assert.equal(x('brahms-op118-no1-636').toFixed(2), '56.61', 'B4 fans one pair gap');
-  assert.equal(x('brahms-op118-no1-635').toFixed(2), '51.15', 'G#4 holds the column');
-  assert.equal(x('brahms-op118-no1-633').toFixed(2), '56.61', 'D4 fans one pair gap');
+  // Round 21 §D lower-first: on the mixed-hand row the **lower** head (D4, LH)
+  // holds the column and G#4 (RH) fans.
+  assert.equal(x('brahms-op118-no1-633').toFixed(2), '51.15', 'D4 holds the column');
+  assert.equal(x('brahms-op118-no1-635').toFixed(2), '56.61', 'G#4 fans one pair gap');
   // The whole cluster mirrors about 53.88 (the ticket's "symmetric about 53.88").
   const xs = [...n.values()].map((p) => p.x);
   const centre = 53.88;
@@ -296,11 +298,12 @@ test('A unified bracket paints one duration group per hand', () => {
 // 4. The anchor axis
 // ---------------------------------------------------------------------------
 
-test('The RH anchor holds the mixed row: G#4 keeps the column, D4 fans right', () => {
+test('The lower-first anchor holds the mixed row: D4 keeps the column, G#4 fans right', () => {
   const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
-  // The golden (and now only) rule: G#4 (RH) holds the column, D4 (LH) fans right.
-  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '51.15');
-  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '56.61');
+  // Round 21 §D (the golden, and now only, rule): the lower head — D4 (LH) —
+  // holds the column, and G#4 (RH) fans one pair gap right.
+  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '51.15');
+  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '56.61');
   // The tuck is anchor-free: F5/D3 stay on the pair columns' midpoint.
   assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '53.88');
   assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '53.88');
