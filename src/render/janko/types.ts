@@ -1077,6 +1077,24 @@ export interface JankoSystemGeometry {
   extensionLines?: readonly number[];
   /** Full drawn staff line set (core + extensions, sorted linear pitch). */
   staffLines?: readonly number[];
+  /** Need-based staff line segments for this system. */
+  staffSegments?: readonly StaffLineSegment[];
+}
+
+/** One continuous segment of a need-based staff line over consecutive earning bars. */
+export interface StaffLineSegment {
+  /** Linear pitch of this line. */
+  lin: number;
+  /** Center-out row number: 1 center (0/4), 2 above (0/5), 3 below (0/3), 4 outer-above (0/6), 5 outer-below (0/2). */
+  rowId?: number;
+  /** Inclusive 0-based index of the first measure in this consecutive run. */
+  mStart: number;
+  /** Inclusive 0-based index of the last measure in this consecutive run. */
+  mEnd: number;
+  /** Absolute page x where the rule starts. */
+  x1: number;
+  /** Absolute page x where the rule ends. */
+  x2: number;
 }
 
 /** Absolute page geometry for a Jánko Two-Row page. */

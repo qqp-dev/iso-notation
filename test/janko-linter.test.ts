@@ -62,6 +62,7 @@ import {
   checkOttavaCoverage,
   checkOttavaExtensions,
   checkRestClearance,
+  checkStaffSegments,
   checkSplitStackStems,
   checkStemAndBeamValidity,
   checkStemDigitClearance,
@@ -1542,6 +1543,73 @@ test('checkOttavaExtensions catches lines and written notes exceeding core±1 ra
   const v3: LintViolation[] = [];
   checkOttavaExtensions(cleanLayout, o, v3);
   assert.equal(v3.length, 0);
+});
+
+test('checkStaffSegments flags missing anchors, gaps, and degenerate segments', () => {
+  const o = resolveJankoOptions({ core: 'fixed-3' });
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+
+  // 1. Missing anchor: measure 0 has no row 1 (lin 48)
+  const missingAnchorLayout: any = {
+    index: 0,
+    geometry: {
+      measuresPerSystem: 2,
+      staffSegments: [
+        { lin: 60, rowId: 2, mStart: 0, mEnd: 1, x1: 50, x2: 250 },
+      ],
+    },
+    notes: [],
+  };
+  const vAnchor: LintViolation[] = [];
+  checkStaffSegments(missingAnchorLayout, o, t, vAnchor);
+  assert.ok(vAnchor.some((v) => v.code === 'staff-anchor-missing'));
+
+  // 2. Gaps: row 4 (72) present without row 2 (60)
+  const gappyLayout: any = {
+    index: 0,
+    geometry: {
+      measuresPerSystem: 2,
+      staffSegments: [
+        { lin: 48, rowId: 1, mStart: 0, mEnd: 1, x1: 50, x2: 250 },
+        { lin: 72, rowId: 4, mStart: 0, mEnd: 0, x1: 50, x2: 150 }, // missing row 2
+      ],
+    },
+    notes: [],
+  };
+  const vGap: LintViolation[] = [];
+  checkStaffSegments(gappyLayout, o, t, vGap);
+  assert.ok(vGap.some((v) => v.code === 'staff-segment-gap'));
+
+  // 3. Degenerate: x2 <= x1
+  const degenerateLayout: any = {
+    index: 0,
+    geometry: {
+      measuresPerSystem: 2,
+      staffSegments: [
+        { lin: 48, rowId: 1, mStart: 0, mEnd: 1, x1: 250, x2: 50 }, // reversed x
+      ],
+    },
+    notes: [],
+  };
+  const vDegen: LintViolation[] = [];
+  checkStaffSegments(degenerateLayout, o, t, vDegen);
+  assert.ok(vDegen.some((v) => v.code === 'staff-segment-degenerate'));
+
+  // 4. Degenerate: overlapping segments for same line
+  const overlapLayout: any = {
+    index: 0,
+    geometry: {
+      measuresPerSystem: 2,
+      staffSegments: [
+        { lin: 48, rowId: 1, mStart: 0, mEnd: 1, x1: 50, x2: 250 },
+        { lin: 48, rowId: 1, mStart: 1, mEnd: 1, x1: 150, x2: 250 },
+      ],
+    },
+    notes: [],
+  };
+  const vOverlap: LintViolation[] = [];
+  checkStaffSegments(overlapLayout, o, t, vOverlap);
+  assert.ok(vOverlap.some((v) => v.code === 'staff-segment-degenerate'));
 });
 
 // ---------------------------------------------------------------------------
