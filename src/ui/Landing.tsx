@@ -319,7 +319,7 @@ export const Landing: React.FC = () => {
                 }`}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
-                <span aria-hidden="true">{isPlaying ? '❚❚' : '▶'}</span>
+                <span aria-hidden="true">{isPlaying ? '❚❚' : '▶︎'}</span>
                 <span>{isPlaying ? 'Pause' : 'Play'}</span>
               </button>
               <span className="font-mono text-sm text-neutral-600">

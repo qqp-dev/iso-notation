@@ -167,8 +167,10 @@ export function renderNoteheadDigit(
 ): string {
   const t = resolveJankoTokens(tokens);
   const digit = digitOverride ?? getDuodecimalDigit(pitchClass);
-  // Whole-tone rank 0 (evens) gets the heavier cut for instant row legibility.
-  const weight = pitchClass % 2 === 0 ? '800' : '700';
+  // One weight for every digit: the old even/odd 800/700 split was
+  // indistinguishable (single-face fonts render both the same) and read as
+  // inconsistent printing under zoom rather than as row information.
+  const weight = '700';
   void hand;
   // The digit is positioned by its alphabetic baseline (not by
   // `dominant-baseline`), so the optical centring is renderer-independent.
