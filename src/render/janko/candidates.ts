@@ -136,85 +136,164 @@ export const REST_SPECIMEN_STUDIO_SCORE_ID = 'rest-duration-specimen';
  * dense 16ths of mm. 27–28, round 15 the crowded column behind hard beat-cell
  * barriers with the four rest dialects, round 16 the cluster doctrine with the
  * judged horizontal spacing, round 17A the rectangular mask with the v2 spacing
- * solver and the hugging dots, round 17B the `tight` verdict with the phrase-row
- * rests, and round 18 the rest-shape verdict.
+ * solver and the hugging dots, round 17B the `tight` verdict with the
+ * phrase-row rests, round 18 the rest-shape verdict, and round 19 the
+ * symmetric-tuck clusters with the RH anchor approved.
  *
- * Round 19 (mini) is the **cluster-shape + anchor round**. Four score-wide
- * behaviors go direct to golden as fixed context — the **symmetric tuck** (an
- * onset with uneven row counts re-centres every smaller row on the widest row's
- * middle; even clusters coincide), the **stem joinery** (no painted stem ever
- * crosses a same-onset chord tone: Brahms m. 46 and m. 17 are clean), the
- * **overlap-conditional unification** (interlocking hands share one bracket;
- * a gapped onset keeps Round 6's per-hand brackets) and the **beat grid that
- * follows the columns** (an occupied beat's dashed pulse stands on its note
- * column, an empty beat keeps the proportional line) — and the round judges
- * **one** axis: which head of a fanned mixed-hand row keeps the beat column.
+ * **Round 20 is a VERIFICATION round: no open axis.** Every card below is the
+ * fixed golden master — {@link DEFAULT_JANKO_OPTIONS} /
+ * {@link DEFAULT_JANKO_TOKENS}, no option delta at all — engraved on one
+ * verification window of the round's four settled changes:
+ *
+ * 1. **Optical rest seats** — every rest glyph is placed so its **ink
+ *    centroid** stands on its phrase row (the half slab atop it, the whole slab
+ *    hanging below), and the linter audits the seat
+ *    (`rest-centroid-off-row`);
+ * 2. **The urtext re-cut** — every rest glyph and every flag hook is cut
+ *    against the classical standard at the house 0.90pt weight, and the
+ *    **whole-bar** form (192 ticks, one complete measure) exists;
+ * 3. **The unison merge** — one onset + one pitch = one sound event = **one
+ *    digit**, on the anchor-winner's column, with every mixed-duration rhythm
+ *    voice intact (`unison-double-digit`);
+ * 4. **The clasp-dot fix** — a dotted clasp's dot is a clean satellite of its
+ *    mark, with hug air against the mark and every neighbour
+ *    (`clasp-dot-fusion`).
+ *
+ * The operator's verdict is read off the windows, not off a candidate axis:
+ * rests sit where the notes are, the cuts read classical, the unisons are
+ * single digits with their beams whole, and no nib fuses with its ring.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 19,
-  title: 'Symmetric-Tuck Clusters: RH Anchor vs Lower-First',
+  round: 20,
+  title: 'Verification — Rest Seats · Urtext Re-cut · Unison Merge · Nib',
   description:
-    'The cluster shape is fixed and goes direct to golden: the symmetric tuck (m. 46’s F5/D3 tuck onto the pair columns’ midpoint 53.88, F4/G♯4 hold 51.15, B4/D4 fan to 56.61 — mirror-symmetric about 53.88), the stem joinery that keeps every tucked cluster stem-clean, the overlap-conditional unification (one bracket spanning both hands where their spans interlock, Round 6’s per-hand brackets where a gap separates them), and the beat grid that follows the laid-out note columns (m. 3’s pulses land on 459.22 / 496.57 / 533.93, and the m. 3 pair’s bracket spine clears its pulse by 7.6pt instead of grazing it). The round judges only the anchor — which head of a fanned mixed-hand row keeps the beat column — on the case windows (Brahms m. 46 and m. 26), the Round 6 split guard (Brahms m. 3, where the axis is inert and both cards are identical) and the chord specimen’s triples. The `tight` preset, the flared bracket, the v2 solver, the hugging dots and the four-systems-per-page layout ride along as invisible fixed context; the mega-vs-split bracket evidence rides the served PNGs, not a candidate.',
-  openAxes: ['clusterAnchor'],
+    'The settled golden master on the round’s own evidence. Rest seats: the rest specimen’s five values — 16th, 8th, quarter, half and the new 192-tick whole bar — read with the ink centroid on the phrase row, the half slab atop its row and the whole slab hanging below it, beside the three genuine Brahms seats (mm. 7, 17, 68) and the canonical Bach m. 4. Urtext re-cut: every rest glyph and every flag hook is the classical cut at the house 0.90pt weight, judged on Bach’s 8th-flag window (m. 1) and its 16th-double window (m. 22). Unison merge: the Goldberg’s final bar and the three Brahms measures that double a pitch (mm. 60, 65, 66) paint one digit per sound, with every beam and flag of the mixed-duration voices intact. Nib: Brahms m. 3’s dotted clasp — the tick-432 ring the operator caught, now a clean satellite of its mark — plus the specimen’s whole-bar measure. No axis is open: every card is the golden master itself, and the live linter stands in for the implementer’s eye.',
+  openAxes: [],
 };
 
 /**
- * The Round 19 window set: the case (m. 46), the second instance (m. 26), the
- * Round 6 split guard (m. 3) and the chord specimen's triples — the same four
- * windows on both cards.
+ * The Round 20 verification windows: the rest specimen (all five values,
+ * including the whole bar), Bach’s single- and double-flag measures, Brahms’s
+ * genuine rest seats, the merged unisons on both scores, and the nib case.
  */
-const ROUND_19_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_20_WINDOWS: JankoCandidateWindow[] = [
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 46,
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 1,
+    measureCount: 3,
+    title: 'Rest specimen · mm. 1–3 — 16th, 8th and quarter: ink centroid on the phrase row',
+  },
+  {
+    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: 4,
+    measureCount: 3,
+    title: 'Rest specimen · mm. 4–6 — the half sits atop its row, the whole bar hangs below it',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 1,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 46 — the six-head downbeat: the tuck, the unified bracket and the anchor',
+    title: 'Bach Var. 1 · m. 1 — the classical 8th-flag hook, single',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 22,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 22 — the 16th doubles, stacked by flagSpacing',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 26,
+    measureStart: 7,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 26 — the second interlocking-hands instance',
+    title: 'Brahms Op. 118/1 · m. 7 — a genuine 16th seat beside the other hand’s entry',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 17,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 17 — the second seat, 109 flags in the same window',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 68,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 68 — the closing seat',
+  },
+  {
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 32,
+    measureCount: 1,
+    title: 'Bach Var. 1 · m. 32 — the final bar: one digit where two “7”s stood',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 60,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 60 — merged unison 84/24: one head, both rhythm voices',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 65,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 65 — three merged unisons in one measure, beams whole',
+  },
+  {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 66,
+    measureCount: 1,
+    title: 'Brahms Op. 118/1 · m. 66 — unison 21/132 and the same-duration pair 21/21',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 3,
     measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 3 — the Round 6 guard: the 90pt hand gap keeps its split (both cards identical)',
-  },
-  {
-    scoreId: SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 2,
-    measureCount: 1,
-    title: 'Chord specimen · m. 2 — triples and clusters under the symmetric tuck',
+    title: 'Brahms Op. 118/1 · m. 3 — the tick-432 dotted clasp: the dot now a clean satellite',
   },
 ];
 
-/**
- * The active candidate set — Round 19's **single judged axis**, in display
- * order: the incumbent RH anchor (A) and the naive lower-first demonstrator (B)
- * on the shared windows, every card engraved under the fixed Round 19 context.
- */
+/** The round’s verification cards, one per settled change, in display order. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'cluster-anchor-rh',
-    label: 'A · RH Anchor (incumbent)',
-    axis: 'clusterAnchor',
+    id: 'verify-rest-seats',
+    label: '1 · Optical Rest Seats — the ink centroid on the phrase row',
     description:
-      'The incumbent rule: on a row that carries both hands, the RH tone keeps the beat column and the LH tone fans aside (m. 46: G♯4 holds 51.15, D4 fans to 56.61); a single-hand row anchors its middle head. Every uneven cluster then tucks its smaller rows onto the widest row’s middle, so the onset reads as one mirror-symmetric shape and the two hands interlock without sharing a stem.',
-    options: { clusterAnchor: 'rh' },
-    windows: ROUND_19_WINDOWS,
-    tags: ['incumbent', 'RH tone holds the column', 'm. 46: G♯4 left, D4 right'],
+      'Rests are no longer seated by the near edge of a geometric box: the glyph is placed so its **ink centroid** stands on the phrase row (both axes), so the row the eye reads is the row the engine chose. Every value is here — the specimen’s 16th/8th/quarter, its half slab sitting atop its row, its new whole slab hanging below it — beside the three genuine Brahms seats and the canonical Bach m. 4 16th. The linter audits the seat as a violation, never a warning.',
+    windows: ROUND_20_WINDOWS.filter((w) => w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID).concat(
+      ROUND_20_WINDOWS.filter((w) => w.scoreId === BRAHMS_STUDIO_SCORE_ID && [7, 17, 68].includes(w.measureStart))
+    ),
+    tags: ['seats', 'centroid-on-row', 'rest-centroid-off-row'],
   },
   {
-    id: 'cluster-anchor-lower-first',
-    label: 'B · Lower-First (demonstrator)',
-    axis: 'clusterAnchor',
+    id: 'verify-urtext-recut',
+    label: '2 · Urtext Re-cut — classical rests and the classical flag hook',
     description:
-      'The naive uniform variant: the lowest-pitched head of every row keeps the beat column, so the mixed row’s LH tone takes the column and the RH tone fans aside (m. 46: D4 holds 51.15, G♯4 fans to 56.61). Judge the head order itself: with the fixed Round 19 joinery the unified bracket owns the whole onset’s duration, so this card is lint-clean too — the anchor’s formerly colliding stem is now the bracket’s business, and a yield mechanism would only be specified if lower-first lives.',
-    options: { clusterAnchor: 'lower-first' },
-    windows: ROUND_19_WINDOWS,
-    tags: ['demonstrator', 'lowest pitch holds the column', 'm. 46: D4 left, G♯4 right'],
+      'Every rest glyph and every flag hook is cut against the classical standard at the house 0.90pt weight: slanted stems with oval heads for the 8th/16th, the true serpentine quarter, wide solid slabs for the half and whole bar — and the classical tapered hook (U+1D160-class) for every flag, single or double. Bach’s 8th-flag window and its 16th-double window judge the hooks; the specimen judges the rests.',
+    windows: ROUND_20_WINDOWS.filter(
+      (w) => w.scoreId === DEFAULT_STUDIO_SCORE_ID && [1, 22].includes(w.measureStart)
+    ),
+    tags: ['re-cut', 'classical taper', 'whole bar'],
+  },
+  {
+    id: 'verify-unison-merge',
+    label: '3 · Unison Merge — one sound, one digit',
+    description:
+      'One onset + one pitch = one sound event = **one digit**, on the anchor-winner’s column (the RH head), with no duration veto. The Goldberg’s final bar paints a single “7”; the seven Brahms unisons paint one digit each, and the six mixed-duration ones keep both rhythm voices — each voice’s stem, beam and flag at its own end, so no beam group loses a member. The linter makes a double digit a violation.',
+    windows: ROUND_20_WINDOWS.filter(
+      (w) =>
+        (w.scoreId === DEFAULT_STUDIO_SCORE_ID && w.measureStart === 32) ||
+        (w.scoreId === BRAHMS_STUDIO_SCORE_ID && [60, 65, 66].includes(w.measureStart))
+    ),
+    tags: ['unison', 'one digit', 'unison-double-digit'],
+  },
+  {
+    id: 'verify-clasp-nib',
+    label: '4 · Clasp Nib Fix — the dot as a clean satellite',
+    description:
+      'A dotted clasp’s 0.75pt dot is placed up-and-right of its mark, tracking the mark’s edge, so it keeps the house dot hug against the spine, the open ring and every transverse cut — and against every neighbouring ink box, the cluster’s own member discs included. Brahms m. 3’s tick-432 ring (the ~1.05pt fusion the operator caught) is the case window; the linter reports any future fusion.',
+    windows: ROUND_20_WINDOWS.filter(
+      (w) => w.scoreId === BRAHMS_STUDIO_SCORE_ID && w.measureStart === 3
+    ),
+    tags: ['nib', 'clasp dot', 'clasp-dot-fusion'],
   },
 ];
 

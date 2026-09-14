@@ -29,7 +29,11 @@ import {
   buildBrahmsOp118No1Score,
 } from '../../scores/brahms-op118-no1';
 import { buildChordDurationSpecimenScore } from '../../scores/chord-duration-specimen';
-import { buildRestDurationSpecimenScore } from '../../scores/rest-duration-specimen';
+import {
+  REST_DURATION_SPECIMEN_JANKO_OPTIONS,
+  REST_DURATION_SPECIMEN_JANKO_TOKENS,
+  buildRestDurationSpecimenScore,
+} from '../../scores/rest-duration-specimen';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -161,14 +165,15 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }),
       tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
     },
-    // Round 15: the curated rest-duration specimen. Four measures across the
-    // staff width — one genuine silence per value, each on a column no other
-    // hand's head can reach — so every dialect is judged at macro scale.
+    // Round 15/20: the curated rest-duration specimen. Six 4/4 measures — one
+    // genuine silence per value (16th … whole bar), each on a column no other
+    // hand's head can reach — so every seat and every cut is judged at macro
+    // scale on strictly clean material.
     [REST_SPECIMEN_STUDIO_SCORE_ID]: {
       id: REST_SPECIMEN_STUDIO_SCORE_ID,
       score: buildRestDurationSpecimenScore(),
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 }),
-      tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
+      options: resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS),
     },
     ...(overrides.scores ?? {}),
   };
@@ -357,16 +362,28 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .join('\n');
   });
 
-  const windowCount = resolveCandidate(candidates[0] ?? CURRENT_CANDIDATES[0]).windows.length;
+  // Round 20: a **verification round** (no open axis) states every card's own
+  // window set instead of one shared candidate window count, so the header
+  // counts the round's whole evidence.
+  const verification = (round.openAxes ?? []).length === 0;
+  const windowCount = candidates.reduce(
+    (sum, candidate) => sum + resolveCandidate(candidate).windows.length,
+    0
+  );
   return [
     '<section class="view-panel" id="view-candidates" data-view="candidates">',
     '  <div class="round-card">',
     `    <span class="round-badge">Round ${round.round}</span>`,
     `    <h2>${escapeHtml(round.title)}</h2>`,
     `    <p>${escapeHtml(round.description)}</p>`,
-    `    <p class="round-meta">${candidates.length} candidates × ${windowCount} engraving window${windowCount === 1 ? '' : 's'} · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
+    `    <p class="round-meta">${
+      verification
+        ? `${candidates.length} verification card${candidates.length === 1 ? '' : 's'} · ` +
+          `${windowCount} engraving window${windowCount === 1 ? '' : 's'} · fixed golden master, no open axis`
+        : `${candidates.length} candidates × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
+    } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
-    `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}">`,
+    `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}">`,
     cards.join('\n'),
     '  </div>',
     '</section>',

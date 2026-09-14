@@ -128,7 +128,11 @@ test('lintJankoScore returns structured diagnostics for the canonical score', ()
   assert.equal(report.ok, report.violations.length === 0);
   assert.equal(report.stats.systems, 8, 'four measures x eight systems of Bach Var. 1');
   assert.equal(report.stats.measures, 32);
-  assert.equal(report.stats.notes, SCORE.notes.length);
+  assert.equal(
+    report.stats.notes,
+    SCORE.notes.length - 1,
+    'the Goldberg’s one cross-hand unison paints one head (Round 20)'
+  );
   assert.ok(report.stats.beams > 100, 'beamed dialect produces beam groups');
   assert.equal(report.stats.checks, JANKO_LINT_CHECKS.length);
   for (const v of report.diagnostics) {
@@ -189,7 +193,11 @@ test('Row-snapped chord tones: every same-row pair is fanned by the preset pair 
       for (const p of group) assert.equal(p.coord.rank, group[0].coord.rank, 'true row preserved');
     }
   }
-  assert.equal(pairs, 9, 'the nine canonical cross-hand coincidences are all spread');
+  // Round 20: eight of the nine canonical same-row coincidences are true
+  // cross-hand doublings of *different* pitches (fanned); the ninth was the
+  // final bar's unison 550/551, whose one sound now merges to one digit instead
+  // of fanning into two.
+  assert.equal(pairs, 8, 'the eight remaining cross-hand coincidences are all spread');
   assert.equal(report.stats.warnings, 0);
 });
 
@@ -233,7 +241,7 @@ test('formatLintReport renders a human-readable summary', () => {
   const text = formatLintReport(lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
   assert.match(text, /Jánko visual lint/);
   assert.match(text, /8 systems · 32 measures/);
-  assert.match(text, /551 noteheads/);
+  assert.match(text, /550 noteheads/);
   assert.match(text, /✓ clean/, 'the golden master reports clean with no diagnostic lines');
 });
 
@@ -341,7 +349,11 @@ test('Defect: a digit grown past its mask margin is caught', () => {
   const big = { ...DEFAULT_JANKO_TOKENS, digitFontSize: 9.0 };
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, big);
   const undersized = report.violations.filter((v) => v.code === 'knockout-undersized');
-  assert.equal(undersized.length, SCORE.notes.length, 'every notehead reports its undersized mask');
+  assert.equal(
+    undersized.length,
+    SCORE.notes.length - 1,
+    'every painted notehead reports its undersized mask (the merged unison paints one)'
+  );
   assert.match(undersized[0].message, /cannot shield the 9pt digit/);
   assert.ok(undersized[0].metrics!.horizontal < undersized[0].metrics!.required);
   assert.ok(undersized[0].metrics!.vertical < undersized[0].metrics!.required);

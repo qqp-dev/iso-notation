@@ -436,35 +436,6 @@ export const JANKO_CHANNEL_LAYOUTS: readonly JankoChannelLayout[] = [
 ];
 
 /**
- * Which head of a same-onset row cluster keeps the beat column when the row is
- * fanned out (Round 19).
- *
- * A row that carries two or more heads of one onset fans them out around the
- * column (see `resolveRowSnappedChordOffsets`); exactly one head keeps the
- * column and the rest step toward the roomier side. `clusterAnchor` names that
- * head:
- *
- * | value          | anchor head                                          |
- * | -------------- | ---------------------------------------------------- |
- * | `'rh'`         | the RH tone on a mixed-hand row, otherwise the row's middle head (Round 16/17 incumbent) |
- * | `'lower-first'`| the lowest-pitched head of **every** row — the naive uniform rule |
- *
- * The Round 19 axis is deliberately one question: `'lower-first'` is the
- * **demonstrator** (a knowingly lint-dirty variant that shows the same-onset
- * stem collision the RH anchor avoids), never a golden candidate.
- */
-export type JankoClusterAnchor = 'rh' | 'lower-first';
-
-/** Every cluster-anchor rule, in the canonical exploration order (A, B). */
-export const JANKO_CLUSTER_ANCHORS: readonly JankoClusterAnchor[] = ['rh', 'lower-first'];
-
-/** Human-readable names of the two cluster-anchor rules. */
-export const JANKO_CLUSTER_ANCHOR_LABELS: Record<JankoClusterAnchor, string> = {
-  rh: 'RH Anchor (incumbent)',
-  'lower-first': 'Lower-First (lowest pitch anchors)',
-};
-
-/**
  * How a **vertical chord / cluster** of one onset is grouped and how it carries
  * its duration — the Round 5 question, refined by Round 6 with
  * `'per-hand-clasp'`.
@@ -718,13 +689,6 @@ export interface JankoLayoutOptions {
    * {@link JankoChordGrouping}). Defaults to the settled `'per-hand-clasp'`.
    */
   chordGrouping: JankoChordGrouping;
-  /**
-   * Which head of a fanned same-onset row keeps the beat column (Round 19):
-   * the incumbent RH-anchored rule or the naive lower-first demonstrator. See
-   * {@link JankoClusterAnchor}. Defaults to the settled `'rh'`.
-   */
-  clusterAnchor?: JankoClusterAnchor;
-
   // --- Optional page/layout refinements (resolved from defaults) ---
   /**
    * Single-note subdivision style (Round 7, settled by Round 9): how an
@@ -830,7 +794,6 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   middleCSpine: 'none',
   channelLayout: 'single-equator',
   chordGrouping: 'per-hand-clasp',
-  clusterAnchor: 'rh',
   subdivisionStyle: 'kinetic-tab-beam',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'kinetic-monoline',

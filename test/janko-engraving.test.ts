@@ -66,9 +66,7 @@ import {
   renderSubdivisionMark,
   subdivisionMarkCount,
   computeClaspGeometry,
-  SUBDIVISION_TAB_30_TAN,
-  SUBDIVISION_TAPER_ROOT,
-  SUBDIVISION_URTEXT_STROKE,
+  SUBDIVISION_TAB_THICKNESS,
 } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -80,12 +78,24 @@ import {
 } from '../src/render/janko/elements/notehead';
 import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
 import {
+  REST_HEAD_RX,
+  REST_HEAD_RY,
   REST_PHANTOM_DASH,
   REST_PHANTOM_HEAD_RADIUS,
   REST_PHANTOM_HEAD_STROKE,
+  REST_SLAB_WIDTH,
+  REST_STEM_LEAN,
+  REST_STROKE,
   REST_URTEXT_STEM_SLANT,
+  restGlyphOrigin,
   restInkBox,
+  restSeatOffsetY,
 } from '../src/render/janko/elements/rests';
+import {
+  REST_DURATION_SPECIMEN_JANKO_OPTIONS,
+  REST_DURATION_SPECIMEN_JANKO_TOKENS,
+  buildRestDurationSpecimenScore,
+} from '../src/scores/rest-duration-specimen';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const TOKENS = DEFAULT_JANKO_TOKENS;
@@ -995,11 +1005,14 @@ test('Round 10 staff hierarchy: uniform equators, canonical start mark and light
 //     the refined architectural start symbols
 // ---------------------------------------------------------------------------
 
-test('Round 13 rest dialects: five distinct monoline grammars, all clean', () => {
+test('Round 20 rest cuts: five distinct monoline grammars, all clean', () => {
   const score = buildBachGoldbergVar1Score();
+  // The unique ink marker of every dialect: the golden cut shares the classical
+  // hook and serpentine class names with the urtext control, so the exclusion
+  // check keys on what only that dialect paints.
   const signatures: Record<JankoRestStyle, RegExp> = {
-    'kinetic-monoline': /janko-rest-(tab|notch|bar)"/,
-    'classical-urtext': /janko-rest-(hook|hook-bulb|lightning|block|stem-line)/,
+    'kinetic-monoline': /janko-rest-(hook-head|slab)"/,
+    'classical-urtext': /janko-rest-(hook-bulb|block|stem-line)/,
     'geometric-node': /janko-rest-(node|ray|capsule)/,
     'bauhaus-slash': /janko-rest-(slash|wing|z|box)/,
     'phantom-notehead': /janko-rest-phantom-(head|stem|flag|bar)/,
@@ -1021,33 +1034,75 @@ test('Round 13 rest dialects: five distinct monoline grammars, all clean', () =>
   assert.equal(documents.size, 5, 'the five dialects are five different engravings');
 });
 
-test('Round 13 corrected kinetic tabs hook downward to the right of their stem', () => {
+test('Round 20 classical cut: a slanted stem, oval-headed hooks and a true serpentine', () => {
   const score = buildBachGoldbergVar1Score();
   const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
-  const tabs = [
+  // The m. 4 16th rest: a slanted stem carrying two hooks, each ending in a
+  // solid oval head.
+  const stem = /<line class="janko-rest-stem" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(
+    crop
+  );
+  assert.ok(stem, 'the slanted classical stem is painted');
+  close(Math.abs(Number(stem![1]) - Number(stem![3])), REST_STEM_LEAN, 'the stem leans', 0.01);
+  assert.ok(Number(stem![4]) > Number(stem![2]), 'and runs top to foot');
+  assert.equal((crop.match(/class="janko-rest-hook"/g) ?? []).length, 2, 'two hooks for a 16th');
+  assert.equal((crop.match(/class="janko-rest-hook-head"/g) ?? []).length, 2, 'two oval heads');
+  const heads = [
     ...crop.matchAll(
-      /<line class="janko-rest-tab"[^>]*x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/g
+      /<ellipse class="janko-rest-hook-head" cx="([\d.-]+)" cy="([\d.-]+)" rx="([\d.-]+)" ry="([\d.-]+)"/g
     ),
   ].map((m) => m.slice(1).map(Number));
-  assert.equal(tabs.length, 2, 'the m. 4 16th rest carries two tabs');
-  for (const [x1, y1, x2, y2] of tabs) {
-    assert.ok(x2 > x1, 'the tab reaches right of its stem');
-    assert.ok(y2 > y1, 'and hooks downward, like a note flag');
-    // The scaled tab is short, so two-decimal output rounding shows in the
-    // quotient; the rake itself is still the score's own 12.4°.
-    close((y2 - y1) / (x2 - x1), TOKENS.maxBeamSlope, 'at the score’s own 12.4° rake', 5e-3);
+  for (const [cx, , rx, ry] of heads) {
+    close(rx, REST_HEAD_RX, 'the head is an oval, wider than tall', 0.01);
+    close(ry, REST_HEAD_RY, 'with the classical blob proportions', 0.01);
+    assert.ok(cx < Number(stem![1]), 'and it sits left of the stem, where the hook sweeps');
   }
+  // The quarter rest is the true serpentine: one calligraphic curve, stroked at
+  // the house 0.90pt weight. The specimen's m. 3 is the clean quarter context.
+  const specimenScore = buildRestDurationSpecimenScore();
+  const specimenTokens = resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS);
+  const quarterCrop = renderJankoCrop(
+    specimenScore,
+    3,
+    1,
+    resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS),
+    specimenTokens
+  );
+  const lightning = /<path class="janko-rest-lightning" d="([^"]+)"[^>]*stroke-width="([\d.]+)"/.exec(
+    quarterCrop
+  );
+  assert.ok(lightning, 'the serpentine quarter is painted');
+  assert.match(lightning![1], /C /, 'the serpentine is calligraphic, not a polyline');
+  close(Number(lightning![2]), REST_STROKE, 'at the house 0.90pt weight', 1e-9);
+  // The half / whole bar pair on the specimen: the half slab *sits atop* its
+  // seat row, the whole slab *hangs below* its own (Round 20's classical pair).
+  const specimenOptions = resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS);
+  const restLayouts = layoutJankoScore(specimenScore, specimenOptions, specimenTokens);
+  const half = restLayouts.flatMap((s) => s.rests).find((r) => r.value === 'half')!;
+  const whole = restLayouts.flatMap((s) => s.rests).find((r) => r.value === 'whole')!;
+  const halfBox = restInkBox(half, specimenTokens);
+  const wholeBox = restInkBox(whole, specimenTokens);
+  assert.ok(
+    halfBox.y1 <= half.y - restSeatOffsetY('half', 'kinetic-monoline', specimenTokens) + 1e-9,
+    'half sits atop'
+  );
+  assert.ok(
+    wholeBox.y0 >= whole.y - restSeatOffsetY('whole', 'kinetic-monoline', specimenTokens) - 1e-9,
+    'whole hangs below'
+  );
+  close(halfBox.x1 - halfBox.x0, REST_SLAB_WIDTH, 'the slabs are wide', 1e-9);
 });
 
-test('Round 13 authentic urtext rests: a slanted calligraphic stem with teardrop bulbs', () => {
+test('Round 20 urtext control: a slanted calligraphic stem with teardrop bulbs', () => {
   const score = buildBachGoldbergVar1Score();
   const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'classical-urtext' });
   const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
-  const stem = /<path class="janko-rest-stem-line" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)"/.exec(crop);
+  const stem = /<line class="janko-rest-stem-line" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(
+    crop
+  );
   assert.ok(stem, 'the calligraphic stem is painted');
-  const [, sx1, , sx2] = stem!.map(Number);
   close(
-    Math.abs(sx2 - sx1),
+    Math.abs(Number(stem![1]) - Number(stem![3])),
     REST_URTEXT_STEM_SLANT,
     'the stem is slanted, not a monoline rule',
     0.01
@@ -1055,7 +1110,7 @@ test('Round 13 authentic urtext rests: a slanted calligraphic stem with teardrop
   // A 16th rest carries two hooks, each ending in a solid teardrop bulb.
   assert.equal((crop.match(/class="janko-rest-hook"/g) ?? []).length, 2, 'two hooks for a 16th');
   assert.equal((crop.match(/class="janko-rest-hook-bulb"/g) ?? []).length, 2, 'two teardrop bulbs');
-  const bulbs = [...crop.matchAll(/<circle class="janko-rest-hook-bulb" cx="[\d.-]+" cy="[\d.-]+" r="([\d.-]+)"/g)];
+  const bulbs = [...crop.matchAll(/<ellipse class="janko-rest-hook-bulb" cx="[\d.-]+" cy="[\d.-]+" rx="([\d.-]+)"/g)];
   for (const bulb of bulbs) {
     assert.ok(Number(bulb[1]) > 0, 'teardrop bulbs are solid ink, not hollow rings');
   }
@@ -1065,23 +1120,27 @@ test('Round 13 authentic urtext rests: a slanted calligraphic stem with teardrop
   if (lightning) assert.match(lightning[1], /C /, 'the serpentine is calligraphic, not a polyline');
 });
 
-test('Round 13 phantom notehead rests stand exactly where the unvoiced note would have been', () => {
+test('Round 20 phantom notehead rests stand exactly where the unvoiced note would have been', () => {
   const score = buildBachGoldbergVar1Score();
   const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'phantom-notehead' });
   const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
   const head = new RegExp(
-    `<circle class="janko-rest-phantom-head" cx="([\\d.-]+)" cy="([\\d.-]+)" r="([\\d.-]+)" fill="none" stroke="#111111" stroke-width="${REST_PHANTOM_HEAD_STROKE.toFixed(2)}" stroke-dasharray="${REST_PHANTOM_DASH}"\\/>`
+    `<ellipse class="janko-rest-phantom-head" cx="([\\d.-]+)" cy="([\\d.-]+)" rx="([\\d.-]+)" ry="([\\d.-]+)" fill="none" stroke="#111111" stroke-width="${REST_PHANTOM_HEAD_STROKE.toFixed(2)}" stroke-dasharray="${REST_PHANTOM_DASH}"\\/>`
   ).exec(crop);
   assert.ok(head, 'the dashed open head is painted');
   close(Number(head![3]), REST_PHANTOM_HEAD_RADIUS, 'at the scaled phantom radius', 0.01);
   const rest = layoutJankoScore(score, options, TOKENS)[0].rests.find((r) => r.tick === 552)!;
-  close(Number(head![1]), rest.x, 'the head stands on the rest column', 0.01);
-  close(Number(head![2]), rest.y, 'and on the rest’s voice contour', 0.01);
+  // The glyph is drawn about its optical origin: the head stands where the
+  // unvoiced note would have been, half a glyph from the seat point.
+  const origin = restGlyphOrigin(rest, TOKENS);
+  close(Number(head![1]), origin.x, 'the head stands on the rest column', 0.01);
+  close(Number(head![2]), origin.y, 'and on the rest’s voice row', 0.01);
   assert.equal((crop.match(/class="janko-rest-phantom-flag"/g) ?? []).length, 2, 'two flags for a 16th');
   const flags = [
-    ...crop.matchAll(/<path class="janko-rest-phantom-flag"[^>]*d="M ([\d.-]+) ([\d.-]+) Q ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)"/g),
+    ...crop.matchAll(/<path class="janko-rest-phantom-flag"[^>]*d="M ([\d.-]+) ([\d.-]+) C ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)"/g),
   ].map((m) => m.slice(1).map(Number));
-  for (const [, fy1, , , , fy2] of flags) {
+  assert.equal(flags.length, 2, 'both phantom flags are painted');
+  for (const [, fy1, , , , , , fy2] of flags) {
     assert.ok(fy2 > fy1, 'every flag hooks downward');
   }
 });
@@ -1679,26 +1738,39 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
     'one augmentation dot per dotted solitary value'
   );
 
-  // Standard flag geometry: the mark starts on the stem, stays strictly right
-  // of it and never reaches beyond its tokenised width. Round 9 dispatches the
-  // settled beam-harmonized kinetic tab as the golden master, so the mark is a
-  // 1.1pt monoline raked at the score's own beam slope.
+  // Standard flag geometry (Round 20): the classical tapered hook. It is rooted
+  // on the stem with a ~1.1pt root, sweeps to the stem's own side and never
+  // reaches beyond its tokenised width or drop.
   for (const m of flags) {
     const stemX = Number(m[1]);
     const element = m[0];
-    assert.ok(element.startsWith('<line'), 'the settled kinetic tab is a monoline');
-    const x1 = Number(/ x1="([\d.-]+)"/.exec(element)![1]);
-    const y1 = Number(/ y1="([\d.-]+)"/.exec(element)![1]);
-    const x2 = Number(/ x2="([\d.-]+)"/.exec(element)![1]);
-    const y2 = Number(/ y2="([\d.-]+)"/.exec(element)![1]);
-    assert.equal(x1, stemX, 'the tab latches onto the stem column');
-    assert.ok(x2 >= stemX - 1e-9, `tab tip x=${x2} must not cross the stem at ${stemX}`);
-    assert.ok(x2 - stemX <= TOKENS.flagWidth + 1e-9, 'the tab keeps its tokenised reach');
-    assert.match(element, /stroke-width="1\.10"/, 'the tab is a 1.1pt monoline');
+    assert.ok(element.startsWith('<path'), 'the classical flag is a filled taper');
+    assert.match(element, /fill="#111111" stroke="none"/, 'a solid tapered hook');
+    const d = / d="([^"]+)"/.exec(element)![1];
+    const points = [...d.matchAll(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)].map((pair) => [
+      Number(pair[1]),
+      Number(pair[2]),
+    ]);
+    const anchor = points[0];
+    const rootFoot = points[points.length - 1];
+    const tip = points[3];
+    assert.equal(anchor[0], stemX, 'the hook roots on the stem column');
+    assert.equal(rootFoot[0], stemX, 'and closes on the same column');
     assert.ok(
-      Math.abs(Math.abs((y2 - y1) / (x2 - x1)) - TOKENS.maxBeamSlope) < 5e-3,
-      'the tab rakes at the beam-harmonized slope'
+      Math.abs(Math.abs(rootFoot[1] - anchor[1]) - SUBDIVISION_TAB_THICKNESS) < 0.02,
+      'the root is the 1.1pt cut'
     );
+    assert.ok(
+      Math.max(...points.map((p) => p[0])) - stemX <= TOKENS.flagWidth + 1e-9,
+      'the hook keeps its tokenised reach'
+    );
+    assert.ok(
+      Math.max(...points.map((p) => p[1])) - anchor[1] <= TOKENS.flagHeight + 1e-9,
+      'and its tokenised drop'
+    );
+    // The sweep follows the stem: an up-stem (RH) hooks downward to its tip.
+    assert.ok(tip[1] > anchor[1], 'the up-stem hook sweeps downward');
+    assert.ok(tip[0] > stemX, 'and reaches right of the stem');
   }
 
   // mm. 1–2: the solitary dotted 8ths of pitch 7 (m. 1) and pitch 2 (m. 2).
@@ -1748,16 +1820,16 @@ function subdivisionAnchorY(markup: string): number {
   return Number(/ y1="([\d.]+)"/.exec(markup)![1]);
 }
 
-test('Round 9: the subdivision dialects dispatch at the stem tip and stack by flagSpacing', () => {
+test('Round 9/20: every subdivision dialect dispatches the classical taper at the stem tip', () => {
   assert.equal(
     DEFAULT_JANKO_OPTIONS.subdivisionStyle,
     'kinetic-tab-beam',
-    'the golden master settles the beam-harmonized kinetic tab'
+    'the golden master settles the beam-anchored cut'
   );
   assert.deepEqual(
     [...JANKO_SUBDIVISION_STYLES],
     ['kinetic-tab-30', 'kinetic-tab-45', 'kinetic-tab-tapered', 'classical-urtext', 'kinetic-tab-beam'],
-    'the exploratory rakes precede the settled beam-harmonized tab'
+    'the recorded Round 7–9 exploration order is preserved'
   );
   // Stack grammar: 32nd → 3 marks, 16th → 2, 8th/dotted 8th → 1.
   assert.equal(subdivisionMarkCount(6), 3);
@@ -1775,17 +1847,9 @@ test('Round 9: the subdivision dialects dispatch at the stem tip and stack by fl
     y: 200,
   };
   const stem = getStemGeometry(sixteenth, TOKENS);
-  const ink = new Set<string>();
+  const roots = new Set<string>();
   for (const style of JANKO_SUBDIVISION_STYLES) {
     const markup = renderFlags(sixteenth, TOKENS, style);
-    // The ink *shape* is the comparison key: the style tag and the shared stem
-    // anchor are stripped, the geometry is kept — the monoline tabs differ by
-    // their rake alone.
-    ink.add(
-      markup
-        .replace(/ data-subdivision-style="[^"]*"/g, '')
-        .replace(/ data-stem-x="[\d.]+" data-flag-index="\d"/g, '')
-    );
     assert.match(markup, /class="janko-stem"/, `${style} keeps the stem`);
     assert.ok(
       !markup.includes('janko-tick') && !markup.includes('janko-cut'),
@@ -1799,6 +1863,26 @@ test('Round 9: the subdivision dialects dispatch at the stem tip and stack by fl
     assert.equal(marks[0][1], stem.stemX.toFixed(2), `${style} latches onto the stem column`);
     assert.deepEqual(marks.map((m) => m[2]), ['1', '2'], `${style} stacks in order`);
 
+    // Every dialect paints the one classical taper: a filled crescent, rooted
+    // on the stem, tapering to a point that curls back inside `flagWidth`.
+    const elements = [...markup.matchAll(/<path class="janko-flag"[^>]*\/>/g)].map((m) => m[0]);
+    assert.equal(elements.length, 2, `${style} paints two hooks`);
+    for (const element of elements) {
+      assert.match(element, /fill="#111111" stroke="none"/, `${style} is a solid tapered cut`);
+      const d = / d="([^"]+)"/.exec(element)![1];
+      assert.match(d, /Z$/, `${style} closes the crescent`);
+      const points = [...d.matchAll(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)].map((pair) => [
+        Number(pair[1]),
+        Number(pair[2]),
+      ]);
+      assert.equal(points[0][0], stem.stemX, `${style} roots on the stem`);
+      for (const [x] of points) {
+        assert.ok(x >= stem.stemX - 1e-9, `${style} sample x=${x} must not cross its stem`);
+        assert.ok(x - stem.stemX <= TOKENS.flagWidth + 1e-9, `${style} keeps its tokenised reach`);
+      }
+    }
+    roots.add(/ d="([^"]+)"/.exec(elements[0])![1]);
+
     // The stack is spaced by `flagSpacing` along the flag drop.
     const first = renderSubdivisionMark(stem.stemX, stem.stemEndY, -1, 1, style, TOKENS);
     const second = renderSubdivisionMark(stem.stemX, stem.stemEndY, -1, 2, style, TOKENS);
@@ -1806,79 +1890,23 @@ test('Round 9: the subdivision dialects dispatch at the stem tip and stack by fl
       Math.abs(subdivisionAnchorY(second) - subdivisionAnchorY(first) - TOKENS.flagSpacing) < 1e-9,
       `${style} stacks by flagSpacing`
     );
-
-    // Stem safety: every dialect reaches at most `flagWidth` right of the stem.
-    const element = /<(path|rect|line) class="janko-flag"[^>]*\/>/.exec(markup)![0];
-    if (element.startsWith('<line')) {
-      const x1 = Number(/ x1="([\d.]+)"/.exec(element)![1]);
-      const x2 = Number(/ x2="([\d.]+)"/.exec(element)![1]);
-      assert.equal(x1, stem.stemX, `${style} tab is rooted on the stem`);
-      assert.ok(x2 - stem.stemX <= TOKENS.flagWidth + 1e-9, `${style} tab keeps its tokenised reach`);
-      assert.match(element, /stroke-width="1\.10"/, `${style} is a 1.1pt monoline`);
-      // The kinetic rake itself: 30°, exactly 45°, or the beam-harmonized slope.
-      const rake = Math.abs(
-        (Number(/ y2="([\d.-]+)"/.exec(element)![1]) - Number(/ y1="([\d.-]+)"/.exec(element)![1])) /
-          (x2 - x1)
-      );
-      const expected =
-        style === 'kinetic-tab-45'
-          ? 1
-          : style === 'kinetic-tab-beam'
-            ? TOKENS.maxBeamSlope
-            : SUBDIVISION_TAB_30_TAN;
-      assert.ok(Math.abs(rake - expected) < 5e-3, `${style} rakes at ${expected}`);
-      continue;
-    }
-    const xs = [.../d="([^"]+)"/.exec(element)![1].matchAll(/-?\d+(?:\.\d+)?/g)]
-      .map((n) => Number(n[0]))
-      .filter((_, i) => i % 2 === 0);
-    if (style === 'kinetic-tab-tapered') {
-      // The tapered wing is rooted *on* the stem: its 1.4pt root straddles the
-      // column by half its thickness, then reaches exactly `flagWidth` right.
-      assert.ok(
-        Math.abs(xs[0] - stem.stemX) <= SUBDIVISION_TAPER_ROOT / 2 + 1e-9,
-        `${style} roots on the stem column`
-      );
-      assert.ok(
-        Math.max(...xs) - stem.stemX <= TOKENS.flagWidth + 1e-9,
-        `${style} keeps its tokenised reach`
-      );
-      continue;
-    }
-    // Round 8: the urtext control is a slender **open hairline** — never a
-    // filled solid shape — stroked at the stem's own weight.
-    assert.match(element, /fill="none"/, `${style} is an open stroke`);
-    assert.match(
-      element,
-      new RegExp(`stroke-width="${SUBDIVISION_URTEXT_STROKE.toFixed(2)}"`),
-      `${style} matches the 0.90pt stem weight`
-    );
-    assert.ok(!/d="[^"]*Z"/.test(element), `${style} never closes into a filled shape`);
-    assert.equal(xs[0], stem.stemX, `${style} latches onto the stem tip`);
-    for (const x of xs) {
-      assert.ok(x >= stem.stemX - 1e-9, `${style} sample x=${x} must not cross its stem`);
-    }
-    assert.ok(Math.max(...xs) - stem.stemX <= TOKENS.flagWidth + 1e-9);
   }
-  assert.equal(ink.size, JANKO_SUBDIVISION_STYLES.length, 'every dialect paints distinct ink');
+  // The only recorded difference between the dialects is the root weight: the
+  // kinetic family cuts 1.1pt, the tapered demonstrator 1.4pt, the urtext
+  // control 0.9pt — one shared classical hook, three root weights.
+  assert.equal(roots.size, 3, 'the taper is shared; only the root weight distinguishes the styles');
 
-  // The beam-harmonized tab is the settled Round 8 rake: atan(0.22) ≈ 12.4°.
-  assert.ok(
-    Math.abs(Math.atan(TOKENS.maxBeamSlope) * (180 / Math.PI) - 12.4) < 0.1,
-    'the beam-harmonized tab rakes at ~12.4°'
-  );
-
-  // The multi-tier grammar: 8th → 1 tab, 16th → 2 tabs, 32nd → 3 tabs.
+  // The multi-tier grammar: 8th → 1 hook, 16th → 2 hooks, 32nd → 3 hooks.
   const marksFor = (durationTicks: number): number => {
     const note = { ...sixteenth, durationTicks };
     return (renderFlags(note, TOKENS, 'kinetic-tab-beam').match(/class="janko-flag"/g) ?? []).length;
   };
-  assert.equal(marksFor(24), 1, '8th = one kinetic tab');
-  assert.equal(marksFor(12), 2, '16th = two kinetic tabs');
-  assert.equal(marksFor(6), 3, '32nd = three kinetic tabs');
+  assert.equal(marksFor(24), 1, '8th = one hook');
+  assert.equal(marksFor(12), 2, '16th = two hooks');
+  assert.equal(marksFor(6), 3, '32nd = three hooks');
 
-  // Round 8: the clasp no longer borrows the subdivision dialect — its duration
-  // ink is the bracket's own symmetrical paradigm (see test/janko-clasp.test.ts).
+  // The clasp no longer borrows the subdivision dialect — its duration ink is
+  // the bracket's own symmetrical paradigm (see test/janko-clasp.test.ts).
   const clasped = computeClaspGeometry(
     [
       { id: 'tip-a', startTick: 0, durationTicks: 24, hand: 'RH' as const, x: 100, y: 100 },
@@ -1890,8 +1918,8 @@ test('Round 9: the subdivision dialects dispatch at the stem tip and stack by fl
   const claspMarkup = renderChordClasp(clasped, TOKENS);
   assert.ok(!claspMarkup.includes('janko-flag'), 'no subdivision ink on the clasp');
 
-  // End to end: the golden default dispatches the settled beam-harmonized tab,
-  // and the control dialect still dispatches on request.
+  // End to end: the golden default dispatches the settled cut, and the control
+  // dialect still dispatches on request.
   const golden = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, OPTIONS, TOKENS);
   assert.match(golden, /data-subdivision-style="kinetic-tab-beam"/);
   const control = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, {
