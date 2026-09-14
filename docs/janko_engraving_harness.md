@@ -615,6 +615,31 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
   7–8, Bach mm. 3 / 4–6 / 32, Brahms mm. 3 / 7 / 46, and the duration specimen
   mm. 1–2 / 3–4 / 5).
 
+### Round 22 verbatim urtext transplant (classical cut + flags)
+
+- **Transcribe, don't redraw** — the one-to-one sheet (Bravura beside the live
+  engine at true relative scale) showed R21's envelopes exact and its ink
+  mirrored: the quarter left-right flipped, hooked rests flipped with beaded
+  lobes and fin feet, flags as stacked crescents instead of nested sweeps.
+  R22 deletes the re-authorship: `src/render/janko/elements/urtext-paths.ts`
+  (generated, OFL — see `licenses/OFL-Bravura.txt`) carries the Bravura 1.482
+  contours verbatim (Y-flip + the one `REST_SPACE_PT` scalar, lineTo as the
+  exactly-equivalent cubic), and the `'classical-urtext'` cut consumes them —
+  one closed solid per hooked rest and quarter, one nested-contour glyph with
+  `evenodd` counters per flag, anchored by the SMuFL stem-tip origin.
+- **What moved and what didn't** — the golden `restStyle` and
+  `subdivisionStyle` flip to `'classical-urtext'`; slabs (already exact rects),
+  the dot (already exact), beams, seating, lower-first and the other four rest
+  dialects plus the crescent subdivision styles are untouched. The measurement
+  table and scale derivation stand — only the ink changed hands from the
+  tracer to the font.
+- **Proof** — the transplant is verified by regeneration, not eyeballing: the
+  one-to-one sheet (`urtext-vs-ours-rests/flags.png`) re-renders pairs that
+  match, and the test pins assert contour identity (segment counts against the
+  baked table, painted box equals baked box translated to the anchor).
+- **Round 22 registry** — same four verification cards (card 1 retitled to the
+  transplant), no open axis, same twelve windows re-rendered.
+
 ## 3. Verification
 
 ```bash

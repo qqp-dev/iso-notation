@@ -119,13 +119,13 @@ test('renderCandidatesView renders every verification card on every declared win
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 21/);
-  assert.match(html, /Measured/);
+  assert.match(html, /Round 22/);
+  assert.match(html, /Verbatim/);
 });
 
-test('Round 21 is a verification round: no open axis, every card the golden master', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 21);
-  assert.match(CURRENT_ROUND_METADATA.title, /Measured/);
+test('Round 22 is a verification round: no open axis, every card the golden master', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 22);
+  assert.match(CURRENT_ROUND_METADATA.title, /Verbatim/);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'a verification round opens no axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
@@ -152,8 +152,8 @@ test('Round 21 is a verification round: no open axis, every card the golden mast
   // The golden context every card inherits, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   assert.equal(golden.clusterSpacing, 'tight', 'the decided spacing golden');
-  assert.equal(golden.restStyle, 'kinetic-monoline', 'the settled rest dialect');
-  assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the settled flag cut');
+  assert.equal(golden.restStyle, 'classical-urtext', 'the settled rest dialect');
+  assert.equal(golden.subdivisionStyle, 'classical-urtext', 'the settled flag cut');
   assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'grid candidate C is locked');
   assert.equal(golden.systemStartStyle, 'architectural-bracket', 'the flared bracket is locked');
   assert.equal(golden.chordGrouping, 'per-hand-clasp', 'the per-hand clasp is locked');
@@ -199,7 +199,7 @@ test('Candidate previews honour their own option deltas', () => {
     'restStyle',
     'clusterAnchor',
   ]) {
-    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 21 question`);
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 22 question`);
   }
   assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
 
@@ -474,8 +474,8 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 21);
-  assert.match(CURRENT_ROUND_METADATA.title, /Measured/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 22);
+  assert.match(CURRENT_ROUND_METADATA.title, /Verbatim/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,

@@ -123,18 +123,18 @@ test('m. 46 tucks to the ticket positions: single heads on the pair columns’ m
   const n = onset(layout, M46);
   const x = (id: string): number => n.get(id)!.x;
   // F5 / D3 (the single-head rows) tuck onto the pair columns' midpoint …
-  assert.equal(x('brahms-op118-no1-637').toFixed(2), '53.88', 'F5 tucks to 53.88');
-  assert.equal(x('brahms-op118-no1-632').toFixed(2), '53.88', 'D3 tucks to 53.88');
+  assert.equal(x('brahms-op118-no1-637').toFixed(2), '49.88', 'F5 tucks to 49.88');
+  assert.equal(x('brahms-op118-no1-632').toFixed(2), '49.88', 'D3 tucks to 49.88');
   // … while the two pair rows fan from the column exactly as before.
-  assert.equal(x('brahms-op118-no1-634').toFixed(2), '51.15', 'F4 holds the column');
-  assert.equal(x('brahms-op118-no1-636').toFixed(2), '56.61', 'B4 fans one pair gap');
+  assert.equal(x('brahms-op118-no1-634').toFixed(2), '47.15', 'F4 holds the column');
+  assert.equal(x('brahms-op118-no1-636').toFixed(2), '52.61', 'B4 fans one pair gap');
   // Round 21 §D lower-first: on the mixed-hand row the **lower** head (D4, LH)
   // holds the column and G#4 (RH) fans.
-  assert.equal(x('brahms-op118-no1-633').toFixed(2), '51.15', 'D4 holds the column');
-  assert.equal(x('brahms-op118-no1-635').toFixed(2), '56.61', 'G#4 fans one pair gap');
-  // The whole cluster mirrors about 53.88 (the ticket's "symmetric about 53.88").
+  assert.equal(x('brahms-op118-no1-633').toFixed(2), '47.15', 'D4 holds the column');
+  assert.equal(x('brahms-op118-no1-635').toFixed(2), '52.61', 'G#4 fans one pair gap');
+  // The whole cluster mirrors about 49.88 (the ticket's "symmetric about 53.88", shifted by the 20pt margin).
   const xs = [...n.values()].map((p) => p.x);
-  const centre = 53.88;
+  const centre = 49.88;
   for (const v of xs) {
     assert.ok(
       xs.some((w) => Math.abs(w + v - 2 * centre) < 1e-9),
@@ -220,8 +220,9 @@ test('The tuck respects the beat cell: no head of either score leaves its own be
 test('Overlapping hands unify: m. 46 and m. 26 carry one bracket spanning both hands', () => {
   const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   for (const [tick, top, bot, mid] of [
-    [M46, 93.7, 178.3, 136.0],
-    [M26, 574.96, 659.56, 617.26],
+    [M46, 99.7, 184.3, 142.0],
+    // m. 26 sits in system 2: +6 top margin + 2·(14/3) slot spread.
+    [M26, 590.29, 674.89, 632.59],
   ] as const) {
     const system = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
     const clasps = system.clasps.filter((c) => c.tick === tick);
@@ -236,7 +237,7 @@ test('Overlapping hands unify: m. 46 and m. 26 carry one bracket spanning both h
     assert.equal(Number(clasp.topY.toFixed(2)), top, `t${tick}: the unified top`);
     assert.equal(Number(clasp.botY.toFixed(2)), bot, `t${tick}: the unified bottom`);
     // The double-pip / pip ring of the hand that carries one sits at the
-    // unified bracket's own midpoint (the ticket's "ring cy ≈ 136" for m. 46).
+    // unified bracket's own midpoint (the ticket's "ring cy ≈ 136" for m. 46, +6 for the 30pt top margin).
     const open = clasp.durationInk.filter((ink) => ink.pips > 0);
     assert.equal(open.length, 1, `t${tick}: one open duration group`);
     assert.equal(Number(open[0].centerY.toFixed(2)), mid, `t${tick}: the ring sits at the new midpoint`);
@@ -302,11 +303,11 @@ test('The lower-first anchor holds the mixed row: D4 keeps the column, G#4 fans 
   const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
   // Round 21 §D (the golden, and now only, rule): the lower head — D4 (LH) —
   // holds the column, and G#4 (RH) fans one pair gap right.
-  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '51.15');
-  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '56.61');
+  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '47.15');
+  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '52.61');
   // The tuck is anchor-free: F5/D3 stay on the pair columns' midpoint.
-  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '53.88');
-  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '53.88');
+  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '49.88');
+  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '49.88');
 });
 
 test('The former anchor collision is owned by the unified bracket', () => {
@@ -339,7 +340,7 @@ test('m. 3’s pulses move onto their own note columns', () => {
   // Brahms is cut time: 4 pulses per measure, 3 dashed lines each. System 0 is
   // the anacrusis + mm. 1–3, so the last three pulses are m. 3's.
   const m3 = pulses.slice(-3).map((x) => Number(x.toFixed(2)));
-  assert.deepEqual(m3, [459.22, 496.57, 533.93], 'the dotted quarter lines follow the columns');
+  assert.deepEqual(m3, [461.37, 499.34, 537.31], 'the dotted quarter lines follow the columns');
   // The pre-Round-19 grid drew m. 3's pulses proportionally inside the
   // anacrusis system's third cell (after the 48-tick upbeat), 8.51 / 7.67 /
   // 6.84pt left of their own note columns.

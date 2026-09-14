@@ -37,6 +37,7 @@ import {
 } from '../types';
 import { isPositionOfHonor } from './notehead';
 import { f } from './style';
+import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
 
 /** One note as seen by the rhythm renderers (already positioned in page pt). */
 export interface JankoRhythmNote {
@@ -98,16 +99,21 @@ export function stemDirection(hand: Hand): -1 | 1 {
   return hand === 'RH' ? -1 : 1;
 }
 
-/** Air (pt) between a regular mask edge and its stem start. */
-export const STEM_ATTACHMENT_AIR = 0.2;
 /** Air (pt) between the Position of Honor halo ring and its stem start. */
 export const HONOR_STEM_ATTACHMENT_AIR = 0.4;
 
 /**
+ * Painted stem stroke width (pt). The stem-vs-digit audits measure from the
+ * stem's ink edge, so they share this constant instead of restating it.
+ */
+export const JANKO_STEM_STROKE_WIDTH = 0.9;
+
+/**
  * Canonical stem attachment radii (regular heads, tick-0 honor sounds).
  *
- * A regular stem starts flush on the mask edge: the preset's `hy + 0.2`
- * (3.86pt golden). The layout options select the preset, defaulting to golden.
+ * A regular stem starts outside the mask edge: the preset's
+ * `hy + stemAttachmentAir` (`hy + 0.2` at the golden default). The layout
+ * options select the preset, defaulting to golden.
  */
 export function getStemAttachmentRadii(
   tokens?: Partial<JankoTokens> | null,
@@ -119,7 +125,7 @@ export function getStemAttachmentRadii(
   const t = resolveJankoTokens(tokens);
   const { hy } = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
   return {
-    regular: hy + STEM_ATTACHMENT_AIR,
+    regular: hy + t.stemAttachmentAir,
     honor: t.haloRadius + HONOR_STEM_ATTACHMENT_AIR,
   };
 }
@@ -127,9 +133,9 @@ export function getStemAttachmentRadii(
 /**
  * Distance (pt) from the notehead centre at which its stem begins.
  *
- * A stem starts flush on the **outside** of its glyph: the wider Position of
+ * A stem starts on the **outside** of its glyph: the wider Position of
  * Honor halo ring for the tick-0 opening sounds, the rectangular mask edge
- * (`hy + 0.2`) otherwise. The stem can therefore never cut through the halo
+ * (`hy + stemAttachmentAir`) otherwise. The stem can therefore never cut through the halo
  * ring, and it never emerges inside the mask where it would crowd the
  * duodecimal digit. The engine resolves the preset-correct radius onto every
  * rhythm note it positions; hand-built notes fall back to the golden preset.
@@ -178,7 +184,7 @@ export function renderStem(
   tokens?: Partial<JankoTokens> | null
 ): string {
   const s = getStemGeometry(note, tokens);
-  return `    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(s.stemEndY)}" stroke="#111111" stroke-width="0.90"/>`;
+  return `    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(s.stemEndY)}" stroke="#111111" stroke-width="${JANKO_STEM_STROKE_WIDTH.toFixed(2)}"/>`;
 }
 
 /**
@@ -384,12 +390,36 @@ export function renderSubdivisionMark(
 }
 
 /**
- * Solitary / unbeamed short note: bare stem plus the active subdivision style
- * (see {@link renderSubdivisionMark}) and the augmentation dot for dotted
- * values. Every dialect latches onto the stem tip and reaches no further right
- * than `flagWidth`, so the duration grammar replaces the neutral perpendicular
- * tick used by the `horizontal-ticks` lattice dialect without ever crossing the
- * stem.
+ * Round 22: one transcribed Bravura flag glyph at the stem tip. Bravura nests
+ * inner flags inside a single sweep with open counters, so one glyph per note
+ * (selected by mark count and stem direction) — never a stack. The glyph
+ * origin is the SMuFL stem-tip attach point, placed exactly on
+ * (`stemX`, `tipY`); all contours share one path with `evenodd` counters.
+ */
+function verbatimFlagPath(stemX: number, tipY: number, direction: -1 | 1, marks: number): string {
+  const table = direction === -1 ? URTEXT_FLAGS_UP : URTEXT_FLAGS_DOWN;
+  const g = table[Math.min(Math.max(marks, 1), 4) - 1];
+  const p = (q: readonly [number, number]): string => `${f(stemX + q[0])} ${f(tipY + q[1])}`;
+  const d = g.contours
+    .map(
+      (c) =>
+        `M ${p(c.start)} ` +
+        c.segments.map(([a, b, e]) => `C ${p(a)} ${p(b)} ${p(e)}`).join(' ') +
+        ' Z'
+    )
+    .join(' ');
+  return (
+    `    <path class="janko-flag" data-stem-x="${f(stemX)}" data-flag-count="${marks}" ` +
+    `d="${d}" fill="#111111" stroke="none" fill-rule="evenodd" data-subdivision-style="classical-urtext"/>`
+  );
+}
+
+/**
+ * Solitary / unbeamed short note: bare stem plus duration ink plus the
+ * augmentation dot for dotted values. Crescent dialects stack one mark per
+ * subdivision at the stem tip within the tokenised reach; `'classical-urtext'`
+ * paints one transcribed Bravura glyph per note (see `verbatimFlagPath`) at
+ * the baked extents. Neither grammar crosses the stem.
  */
 export function renderFlags(
   note: JankoRhythmNote,
@@ -401,8 +431,12 @@ export function renderFlags(
   const parts: string[] = [renderStem(note, t)];
 
   const marks = subdivisionMarkCount(note.durationTicks);
-  for (let i = 1; i <= marks; i++) {
-    parts.push(renderSubdivisionMark(s.stemX, s.stemEndY, s.direction, i, style, t));
+  if (style === 'classical-urtext') {
+    if (marks >= 1) parts.push(verbatimFlagPath(s.stemX, s.stemEndY, s.direction, marks));
+  } else {
+    for (let i = 1; i <= marks; i++) {
+      parts.push(renderSubdivisionMark(s.stemX, s.stemEndY, s.direction, i, style, t));
+    }
   }
   if (note.durationTicks > 26 && note.durationTicks <= 38) {
     parts.push(renderAugmentationDot(note, t));
@@ -1748,6 +1782,41 @@ export function computeBeamGroupGeometry(
 }
 
 /**
+ * Filled beam-rail path with vertical end faces.
+ *
+ * A stroked `<line>` ends in a butt cap perpendicular to the rail direction,
+ * so on a sloped beam the end face is slanted and the rail's top corner stops
+ * mid-stem. The Urtext rail is a filled parallelogram instead: the connector
+ * runs stem-centre to stem-centre, extended here by one stem half-width at
+ * each end along the beam slope (so the rail angle is unchanged), and the end
+ * faces are vertical, coinciding with the outer edges of the end stems. A stub
+ * end floating in mid-air grows by the same half-width so every rail shares
+ * one rule. Corner order is `M ax ayT L bx byT L bx byB L ax ayB Z`.
+ */
+export function beamRailPathD(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  thickness: number,
+): string {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ex = (dx / len) * (JANKO_STEM_STROKE_WIDTH / 2);
+  const ey = (dy / len) * (JANKO_STEM_STROKE_WIDTH / 2);
+  const ax = x1 - ex;
+  const ay = y1 - ey;
+  const bx = x2 + ex;
+  const by = y2 + ey;
+  const half = thickness / 2;
+  return (
+    `M ${f(ax)} ${f(ay - half)} L ${f(bx)} ${f(by - half)} ` +
+    `L ${f(bx)} ${f(by + half)} L ${f(ax)} ${f(ay + half)} Z`
+  );
+}
+
+/**
  * Traditional connected beam over one beat-sized group of 8ths/16ths.
  *
  * `geometry` is the group's already resolved beam (as carried by the system
@@ -1776,12 +1845,13 @@ export function renderBeamGroup(
 
   // Every stem grows from its notehead to the (clamped) beam centerline.
   for (const s of stems) {
-    parts.push(`    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(beam.beamY(s.stemX))}" stroke="#111111" stroke-width="0.90"/>`);
+    parts.push(`    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(beam.beamY(s.stemX))}" stroke="#111111" stroke-width="${JANKO_STEM_STROKE_WIDTH.toFixed(2)}"/>`);
   }
 
-  // Primary beam: clamped straight connector across the stem tips.
+  // Primary beam: clamped straight connector across the stem tips, painted as
+  // a stem-flush filled rail (beamRailPathD) rather than a stroked line.
   parts.push(
-    `    <line class="janko-beam" x1="${f(primary.x1)}" y1="${f(primary.y1)}" x2="${f(primary.x2)}" y2="${f(primary.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
+    `    <path class="janko-beam" d="${beamRailPathD(primary.x1, primary.y1, primary.x2, primary.y2, t.beamThickness)}" fill="#111111"/>`
   );
 
   // Every higher beam level, closer to the noteheads: the 16th secondary, the
@@ -1800,7 +1870,7 @@ export function renderBeamGroup(
       : (LEVEL_CLASS[strip.level] ?? 'janko-beam-secondary');
     const c = strip.connector;
     parts.push(
-      `    <line class="${cls}" data-beam-level="${strip.level}"${strip.stub ? ' data-beam-stub="1"' : ''} x1="${f(c.x1)}" y1="${f(c.y1)}" x2="${f(c.x2)}" y2="${f(c.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
+      `    <path class="${cls}" data-beam-level="${strip.level}"${strip.stub ? ' data-beam-stub="1"' : ''} d="${beamRailPathD(c.x1, c.y1, c.x2, c.y2, t.beamThickness)}" fill="#111111"/>`
     );
   }
 
