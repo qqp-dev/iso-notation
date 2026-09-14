@@ -53,7 +53,7 @@ function getInitialRenderOptions(): RenderOptions {
   return DEFINITIVE_RENDER_OPTIONS;
 }
 
-export const App: React.FC = () => {
+export const ClassicApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<'score' | 'phonetics'>('score');
   const [selectedScoreId, setSelectedScoreId] = useState<string>('bach-goldberg-var1');
   const [score, setScore] = useState<QuantizedGridScore>(() => BENCHMARK_SCORES['bach-goldberg-var1']());

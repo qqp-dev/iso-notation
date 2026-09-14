@@ -1906,7 +1906,7 @@ test('Unified Euclidean Duration Lattice: Faint Dotted Continuation Trails for A
 test('Full-Viewport Score Canvas & Decluttered UI Invariants', async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
   const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
 
   // 1. Janko keyboard component is completely removed from main viewport
@@ -1927,7 +1927,7 @@ test('Full-Viewport Score Canvas & Decluttered UI Invariants', async () => {
 test('Floating Action Trigger ("Floaty Thing") Invariants', async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
   const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
 
   // Floating trigger positioned over canvas
@@ -2618,7 +2618,7 @@ test('Beams Abandonment in Toggle UI Invariant: UI excludes Beams toggle and def
   const path = await import('node:path');
 
   // App.tsx verification
-  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
   const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
   assert.ok(!appSrc.includes('Toggle Beams'), 'App.tsx must not have Beams quick-toggle button');
   assert.ok(!appSrc.includes('<span>🎶</span>'), 'App.tsx must not contain Beams quick toggle icon');
@@ -2640,7 +2640,7 @@ test('No-Toggle Clean UI Invariant: UI excludes rhythmic toggles, showGutterBrac
   const path = await import('node:path');
 
   // App.tsx verification: floating toolbar renders without the rhythmic toggle buttons
-  const appTsxPath = path.resolve('src/ui/App.tsx');
+  const appTsxPath = path.resolve('src/ui/ClassicApp.tsx');
   const appSrc = fs.readFileSync(appTsxPath, 'utf-8');
   assert.ok(!appSrc.includes('Toggle Beat Grid'), 'App.tsx must not have Beat Grid quick-toggle button');
   assert.ok(!appSrc.includes('Toggle Gutter Brackets'), 'App.tsx must not have Gutter Brackets quick-toggle button');
