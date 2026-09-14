@@ -27,6 +27,7 @@
  */
 
 import { getVerticalAccoladePath } from '../../print-layout';
+import { continuousPitchY } from '../geometry';
 import {
   JankoLayoutOptions,
   JankoSystemGeometry,
@@ -40,6 +41,14 @@ import { f } from './style';
 export const ARCHITECTURAL_BRACKET_SPUR = 3.0;
 /** Stroke (pt) of the architectural bracket. */
 export const ARCHITECTURAL_BRACKET_STROKE = 0.65;
+/** Horizontal reach (pt) of System 1 architectural bracket's spurs (slightly grander). */
+export const SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR = 3.5;
+/** Stroke (pt) of System 1 architectural bracket (slightly grander). */
+export const SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE = 0.75;
+/** Delta between System 1 bracket stroke and Systems 2+ stroke. */
+export const SYSTEM_1_BRACKET_STROKE_DELTA = 0.10;
+/** Delta between System 1 bracket spur reach and Systems 2+ spur reach. */
+export const SYSTEM_1_BRACKET_SPUR_DELTA = 0.50;
 /**
  * Round 13: outward diagonal flare (degrees) of the architectural bracket's
  * spurs. The top spur leaves the Octave 5 rule rising away from the staff and
@@ -113,14 +122,18 @@ export function renderDelicateBracket(
  */
 export function renderFlaredArchitecturalBracket(
   geo: JankoSystemGeometry,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  isSystem1?: boolean
 ): string {
   const t = resolveJankoTokens(tokens);
   const x = geo.staffLeft - t.accoladeGap - t.accoladeWidth;
-  const top = geo.equatorY('RH', 5);
-  const bot = geo.equatorY('LH', 2);
-  const flare = ARCHITECTURAL_BRACKET_SPUR * ARCHITECTURAL_BRACKET_FLARE_TAN;
-  return `    <path class="janko-system-bracket" d="M ${f(x + ARCHITECTURAL_BRACKET_SPUR)} ${f(top - flare)} L ${f(x)} ${f(top)} L ${f(x)} ${f(bot)} L ${f(x + ARCHITECTURAL_BRACKET_SPUR)} ${f(bot + flare)}" fill="none" stroke="#111827" stroke-width="${ARCHITECTURAL_BRACKET_STROKE.toFixed(2)}" stroke-linecap="butt" stroke-linejoin="miter"/>`;
+  const top = geo.middleCY + continuousPitchY(60, t.semitoneScale);
+  const bot = geo.middleCY + continuousPitchY(36, t.semitoneScale);
+  const isSys1 = isSystem1 ?? ((geo.index ?? 0) === 0);
+  const spur = isSys1 ? SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR : ARCHITECTURAL_BRACKET_SPUR;
+  const stroke = isSys1 ? SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE : ARCHITECTURAL_BRACKET_STROKE;
+  const flare = spur * ARCHITECTURAL_BRACKET_FLARE_TAN;
+  return `    <path class="janko-system-bracket" d="M ${f(x + spur)} ${f(top - flare)} L ${f(x)} ${f(top)} L ${f(x)} ${f(bot)} L ${f(x + spur)} ${f(bot + flare)}" fill="none" stroke="#111827" stroke-width="${stroke.toFixed(2)}" stroke-linecap="butt" stroke-linejoin="miter"/>`;
 }
 
 /**
@@ -130,9 +143,10 @@ export function renderFlaredArchitecturalBracket(
  */
 export function renderArchitecturalBracket(
   geo: JankoSystemGeometry,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  isSystem1?: boolean
 ): string {
-  return renderFlaredArchitecturalBracket(geo, tokens);
+  return renderFlaredArchitecturalBracket(geo, tokens, isSystem1);
 }
 
 /**
@@ -149,8 +163,8 @@ function renderBracket(
 ): string {
   const t = resolveJankoTokens(tokens);
   const x = geo.staffLeft - t.accoladeGap - t.accoladeWidth;
-  const top = geo.equatorY('RH', 5);
-  const bot = geo.equatorY('LH', 2);
+  const top = geo.middleCY + continuousPitchY(60, t.semitoneScale);
+  const bot = geo.middleCY + continuousPitchY(36, t.semitoneScale);
   return `    <path class="${cls}" d="M ${f(x + spur)} ${f(top)} L ${f(x)} ${f(top)} L ${f(x)} ${f(bot)} L ${f(x + spur)} ${f(bot)}" fill="none" stroke="#111827" stroke-width="${stroke.toFixed(2)}"/>`;
 }
 
@@ -189,8 +203,8 @@ export function renderDoubleHairline(
 ): string {
   const t = resolveJankoTokens(tokens);
   const x = geo.staffLeft - t.accoladeGap - t.accoladeWidth;
-  const top = geo.equatorY('RH', 5);
-  const bot = geo.equatorY('LH', 2);
+  const top = geo.middleCY + continuousPitchY(60, t.semitoneScale);
+  const bot = geo.middleCY + continuousPitchY(36, t.semitoneScale);
   return [
     `    <line class="janko-double-hairline-outer" x1="${f(x)}" y1="${f(top)}" x2="${f(x)}" y2="${f(bot)}" stroke="#111827" stroke-width="${DOUBLE_HAIRLINE_OUTER_STROKE.toFixed(2)}"/>`,
     `    <line class="janko-double-hairline-inner" x1="${f(x + DOUBLE_HAIRLINE_SPACING)}" y1="${f(top)}" x2="${f(x + DOUBLE_HAIRLINE_SPACING)}" y2="${f(bot)}" stroke="#111827" stroke-width="${DOUBLE_HAIRLINE_INNER_STROKE.toFixed(2)}"/>`,
@@ -207,12 +221,14 @@ export function renderDoubleHairline(
 export function renderAccolade(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  systemIndex?: number
 ): string {
   const o = resolveJankoOptions(options);
+  const isSys1 = (systemIndex ?? geo.index ?? 0) === 0;
   switch (o.systemStartStyle) {
     case 'architectural-bracket':
-      return renderFlaredArchitecturalBracket(geo, tokens);
+      return renderFlaredArchitecturalBracket(geo, tokens, isSys1);
     case 'delicate-bracket':
       return renderDelicateBracket(geo, tokens);
     case 'clef-pillar':

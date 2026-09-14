@@ -34,6 +34,7 @@ import {
   PITCH_GRID_DIVIDER_STROKE,
   PITCH_GRID_OCTAVE_INK,
   PITCH_GRID_OCTAVE_STROKE,
+  PITCH_GRID_C4_STROKE,
   PitchGridRule,
   pitchGridRules,
   renderPitchLabels,
@@ -169,12 +170,17 @@ test('Equal boundaries: golden hairlines at the C boundaries, C4 included', () =
     expected,
     'one boundary per in-window C, ascending'
   );
+  const c4 = geo.middleCY + continuousPitchY(48, t.semitoneScale);
   for (const rule of rules) {
-    assert.equal(rule.width, PITCH_GRID_OCTAVE_STROKE, '0.50pt golden weight');
+    const isC4 = Math.abs(rule.y - c4) < 1e-9;
+    assert.equal(
+      rule.width,
+      isC4 ? PITCH_GRID_C4_STROKE : PITCH_GRID_OCTAVE_STROKE,
+      isC4 ? '0.65pt C4 anchor weight' : '0.50pt golden weight'
+    );
     assert.equal(rule.ink, PITCH_GRID_OCTAVE_INK, 'golden equator ink');
     assert.equal(rule.cls, 'janko-pitch-lane janko-pitch-clane', 'C-lane classes');
   }
-  const c4 = geo.middleCY + continuousPitchY(48, t.semitoneScale);
   assert.ok(
     rules.some((r) => Math.abs(r.y - c4) < 1e-9),
     'the C4 line stands — with no divider there is nothing to defer to'
@@ -186,21 +192,32 @@ test('Equal boundaries: golden hairlines at the C boundaries, C4 included', () =
   );
 });
 
-test('No privilege: every equal-scheme line shares one ink and one weight', () => {
-  for (const scheme of ['equal-centers', 'equal-boundaries'] as const) {
-    const { o, t, geo } = systemZero(scheme);
-    const rules = pitchGridRules(geo, o, t);
-    assert.deepEqual(
-      [...new Set(rules.map((r) => r.width))],
-      [PITCH_GRID_OCTAVE_STROKE],
-      `${scheme}: one weight`
-    );
-    assert.deepEqual(
-      [...new Set(rules.map((r) => r.ink))],
-      [PITCH_GRID_OCTAVE_INK],
-      `${scheme}: one ink`
-    );
-  }
+test('Weights: centers keep one weight; boundaries weight C4 at 0.65pt', () => {
+  const centers = systemZero('equal-centers');
+  const centerRules = pitchGridRules(centers.geo, centers.o, centers.t);
+  assert.deepEqual(
+    [...new Set(centerRules.map((r) => r.width))],
+    [PITCH_GRID_OCTAVE_STROKE],
+    'equal-centers: one weight'
+  );
+  assert.deepEqual(
+    [...new Set(centerRules.map((r) => r.ink))],
+    [PITCH_GRID_OCTAVE_INK],
+    'equal-centers: one ink'
+  );
+
+  const boundaries = systemZero('equal-boundaries');
+  const boundaryRules = pitchGridRules(boundaries.geo, boundaries.o, boundaries.t);
+  assert.deepEqual(
+    [...new Set(boundaryRules.map((r) => r.width))].sort(),
+    [PITCH_GRID_OCTAVE_STROKE, PITCH_GRID_C4_STROKE].sort(),
+    'equal-boundaries: 0.50pt hairlines with 0.65pt C4 anchor'
+  );
+  assert.deepEqual(
+    [...new Set(boundaryRules.map((r) => r.ink))],
+    [PITCH_GRID_OCTAVE_INK],
+    'equal-boundaries: one ink'
+  );
 });
 
 // ---------------------------------------------------------------------------

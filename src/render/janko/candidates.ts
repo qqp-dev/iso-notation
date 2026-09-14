@@ -177,7 +177,7 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * **Round 27 is a CORE round: one open axis, two answers to one question.**
  * Window-following octave lines cannot look centered: each line count has
  * exactly one middle-C-centered grammar (3 ⟺ C-lines C3–C5; 4 ⟺ middles o2–o5),
- * plus a per-system extension rule (core±1 max) and ottava beyond extensions.
+ * plus per-bar need-based rows (core±1 max) and ottava beyond extensions.
  * Judged on Brahms Op. 118/1 (lin 9–78, 964 notes) with real Bravura ottava
  * glyphs and Gould dashed spanners.
  *
@@ -189,7 +189,7 @@ export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 27,
   title: 'Fixed Cores 3-vs-4 on Brahms, with Ottava',
   description:
-    'Window-following octave lines cannot look centered, so the design reframes as fixed cores: each line count has one middle-C-centered grammar (3 ⟺ C3–C5 C-lines; 4 ⟺ o2–o5 middles), with per-system extensions and real Gould ottava brackets beyond. Can we drop to 3, or does 4\u2019s floor earn its ink? Judge total visual weight on page 1, flick the strip for mm. 33–34, and pick the core.',
+    'Window-following octave lines cannot look centered, so the design reframes as fixed cores: each line count has one middle-C-centered grammar (3 ⟺ C3–C5 C-lines; 4 ⟺ o2–o5 middles), with per-bar need-based rows and real Gould ottava brackets beyond. Can we drop to 3, or does 4\u2019s floor earn its ink? Judge total visual weight on page 1, flick the strip for mm. 33–34, and pick the core.',
   openAxes: ['core'],
   compareStrip: {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
@@ -224,7 +224,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     id: 'core-fixed-4',
     label: '0 · Control — Fixed-4 (o2–o5 middles)',
     description:
-      'Four middle-centered hairlines at o2–o5 (lin 29.5/41.5/53.5/65.5) — the coverage-safe incumbent with equal weights. Covers 96.2% of Brahms; only 1 folded note (8vb) in m. 69 (A0, lin 9). Extensions fire at o1/o6.',
+      'Four middle-centered hairlines at o2–o5 (lin 29.5/41.5/53.5/65.5) — the coverage-safe incumbent with equal weights. Covers 96.2% of Brahms; only 1 folded note (8vb) in m. 69 (A0, lin 9). Per-bar need-based rows fire at o1/o6.',
     axis: 'core',
     options: { core: 'fixed-4' },
     windows: ROUND_27_WINDOWS,
@@ -234,7 +234,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     id: 'core-fixed-3',
     label: '1 · Contender — Fixed-3 (C3–C5 C-lines)',
     description:
-      'Three middle-C-centered hairlines at C3–C5 (lin 36/48/60) — the efficiency challenger with equal weights. Covers 83.7% of Brahms; 9 folded notes (8vb) across mm. 5, 15, 23, 33, 43, 53, 67, 69. Extensions fire at C2/C6.',
+      'Three middle-C-centered hairlines at C3–C5 (lin 36/48/60) — the efficiency challenger with equal weights. Covers 83.7% of Brahms; 9 folded notes (8vb) across mm. 5, 15, 23, 33, 43, 53, 67, 69. Per-bar need-based rows fire at C2/C6.',
     axis: 'core',
     options: { core: 'fixed-3' },
     windows: ROUND_27_WINDOWS,

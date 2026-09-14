@@ -28,6 +28,7 @@ import {
   resolveJankoTokens,
 } from '../src/render/janko/types';
 import {
+  continuousPitchY,
   getChannelLayoutSpec,
   getEquatorYForOctave,
   getFlankOffset,
@@ -1040,12 +1041,11 @@ test('Round 10 staff hierarchy: uniform equators, canonical start mark and light
   assert.equal(DEFAULT_JANKO_TOKENS.augmentationDotRadius, 0.75, 'the dot falls to 0.75pt');
   assert.equal(DEFAULT_JANKO_OPTIONS.pageMargin, 24.0, 'the page margin widens to 24pt');
   assert.ok(!page.includes('janko-accolade'), 'the curlicue accolade is never painted');
-  // Only the very first system of the very first page opens with the bracket:
-  // the page object carries exactly one system-start mark.
+  // Every system of the page opens with the start bracket:
   assert.equal(
     (page.match(/janko-system-bracket/g) ?? []).length,
-    1,
-    'the golden page paints exactly one system-start mark (System 1)'
+    4,
+    'the golden page paints the start bracket on every system'
   );
   assert.ok(!page.includes('janko-clef-pillar'), 'the Round 12 start finalists stay retired');
   const geo = computePageGeometry(OPTIONS, TOKENS);
@@ -1440,11 +1440,13 @@ test('Round 13 start symbols: the flared 0.65pt bracket, the 0.50pt bracket and 
   const system0 = getSystemGeometry(geo, 0);
 
   const bracket = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'architectural-bracket' }, TOKENS);
-  const flared = /class="janko-system-bracket" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"\/>/.exec(bracket);
+  const flared = /class="janko-system-bracket" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)" fill="none" stroke="#111827" stroke-width="0\.75" stroke-linecap="butt" stroke-linejoin="miter"\/>/.exec(bracket);
   assert.ok(flared, 'the flared architectural bracket is painted');
   const [, tipX, tipY, x1, y1, , , footX, footY] = flared!.map(Number);
-  close(y1, system0.equatorY('RH', 5), 'the rule clasps the Octave 5 rule', 1e-9);
-  assert.ok(tipY < y1 && footY > system0.equatorY('LH', 2), 'both spurs flare diagonally outward');
+  const c5 = system0.middleCY + continuousPitchY(60, TOKENS.semitoneScale);
+  const c3 = system0.middleCY + continuousPitchY(36, TOKENS.semitoneScale);
+  close(y1, c5, 'the rule clasps the C5 rule', 1e-9);
+  assert.ok(tipY < y1 && footY > c3, 'both spurs flare diagonally outward');
   close(footX - tipX, 0, 'the spurs reach the same horizontal distance', 1e-9);
   close(
     (y1 - tipY) / (tipX - x1),
@@ -1475,7 +1477,7 @@ test('Round 13 start symbols: the flared 0.65pt bracket, the 0.50pt bracket and 
   }
 });
 
-test('Round 14 system openness: the canonical flared bracket opens System 1, no mid-piece marks', () => {
+test('Round 14 system openness: the canonical flared bracket opens System 1 grandly, intermediate systems open with core-marking bracket', () => {
   const score = buildBachGoldbergVar1Score();
   const geo = computePageGeometry(OPTIONS, TOKENS);
   const total = countJankoSystems(score, OPTIONS, TOKENS);
@@ -1484,13 +1486,12 @@ test('Round 14 system openness: the canonical flared bracket opens System 1, no 
       [...svg.matchAll(/class="janko-barline" x1="([\d.]+)"/g)].map((m) => Number(m[1]))
     );
 
-  // The golden default opens the piece with the flared 0.65pt architectural
-  // bracket — strictly at System 1; every other system stays an open margin.
+  // The golden default opens the piece with the grander 0.75pt architectural bracket:
   const first = renderSystem(score, getSystemGeometry(geo, 0), 0, OPTIONS, TOKENS);
   assert.match(
     first,
-    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"/,
-    'System 1 opens with the canonical flared 0.65pt bracket'
+    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.75" stroke-linecap="butt" stroke-linejoin="miter"/,
+    'System 1 opens with the grander flared bracket'
   );
   assert.ok(!first.includes('janko-accolade'), 'the copperplate accolade stays retired');
   assert.ok(!first.includes('janko-clef-pillar'), 'the Round 12 finalists stay retired');
@@ -1507,7 +1508,11 @@ test('Round 14 system openness: the canonical flared bracket opens System 1, no 
     'the inkless styles still paint no margin mark at all'
   );
   const middle = renderSystem(score, getSystemGeometry(geo, 1), 1, OPTIONS, TOKENS);
-  assert.equal((middle.match(/janko-accolade|janko-system-bracket|janko-clef-pillar/g) ?? []).length, 0, 'no mid-piece mark');
+  assert.match(
+    middle,
+    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.65" stroke-linecap="butt" stroke-linejoin="miter"/,
+    'intermediate systems open with the core-marking 0.65pt bracket'
+  );
 
   // Intermediate systems have no barline at either edge; only the final measure
   // of the final system closes the score.

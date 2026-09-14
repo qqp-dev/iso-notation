@@ -81,6 +81,7 @@ import {
   suppressedStemIds,
 } from './engine';
 import { getEquatorRuleYs, pitchGridRules } from './elements/staff';
+import { continuousPitchY } from './geometry';
 import { resolveBeatPulseXs } from './elements/barlines';
 import {
   JankoBeamConnector,
@@ -2356,7 +2357,6 @@ export function checkClaspClearance(
       ['measure numeral', numeral],
     ] as const) {
       if (furniture === null) continue;
-      if (label === 'accolade' && layout.index !== 0) continue;
       if (label === 'measure numeral' && !o.showMeasureNumbers) continue;
       if (!boxesOverlap(disk, furniture, lint.minClearance)) continue;
       out.push({
@@ -2826,12 +2826,14 @@ export function marginFurniture(
   // The furniture geometry lives in the engine, where the Round 5 clasp fit
   // rule reserves against the very same boxes (see `engine.getMarginFurniture`);
   // the linter's job is only to audit it.
+  const isSystem1 = layout.index === 0;
   const { numeral, accolade } = getMarginFurniture(
     layout.geometry,
     t,
     measureNumber,
     lint.digitAdvance,
-    systemStartStyle
+    systemStartStyle,
+    isSystem1
   );
   return { numeral, accolade };
 }
@@ -2857,7 +2859,7 @@ export function checkMeasureNumeralClearance(
   // The numeral is right-aligned into the true left margin, so it may share the
   // system-start mark's x-column as long as the two boxes never actually meet
   // (the numeral rides snug above the top rule, the mark spans the staff).
-  if (layout.index === 0 && accolade !== null && boxesOverlap(numeral, accolade, 0)) {
+  if (accolade !== null && boxesOverlap(numeral, accolade, 0)) {
     out.push({
       code: 'measure-numeral-collision',
       severity: 'error',
@@ -2915,10 +2917,7 @@ export function checkAccoladeClearance(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  // Round 7 paints the system-start mark strictly at the start of the piece: an
-  // intermediate system has no margin ink to audit. Round 14's golden flared
-  // `'architectural-bracket'` is audited here; inkless styles return no box.
-  if (layout.index !== 0) return;
+  // The start bracket marks the core triple across every system. Inkless styles return no box.
   const { numeral, accolade } = marginFurniture(
     layout,
     t,
@@ -2939,14 +2938,16 @@ export function checkAccoladeClearance(
       metrics: { accoladeX0: accolade.x0, accoladeX1: accolade.x1, staffLeft: g.staffLeft },
     });
   }
+  const expectedTop = g.middleCY + continuousPitchY(60, t.semitoneScale);
+  const expectedBot = g.middleCY + continuousPitchY(36, t.semitoneScale);
   if (
-    Math.abs(accolade.y0 - g.equatorY('RH', 5)) > EPS ||
-    Math.abs(accolade.y1 - g.equatorY('LH', 2)) > EPS
+    Math.abs(accolade.y0 - expectedTop) > EPS ||
+    Math.abs(accolade.y1 - expectedBot) > EPS
   ) {
     out.push({
       code: 'accolade-collision',
       severity: 'error',
-      message: 'Accolade does not clasp the full staff height (top/bottom rules must meet the octave rules).',
+      message: 'Accolade does not clasp the core triple (top/bottom rules must meet the C5 and C3 rules).',
       system: layout.index,
       x: accolade.x0,
       y: accolade.y0,
