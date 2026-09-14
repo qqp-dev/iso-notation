@@ -67,7 +67,7 @@ import {
   getCandidate,
   resolveCandidate,
 } from '../src/render/janko/candidates';
-import { createStudioConfig, renderCandidatesView } from '../src/render/janko/studio';
+import { createStudioConfig, renderCandidatesView, renderCompareStrip } from '../src/render/janko/studio';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -144,15 +144,9 @@ const REST_STYLES: JankoRestStyle[] = [
 ];
 
 /**
- * The Round 22 **verification cards** — no open axis, one card per settled
- * change, in display order.
+ * The Round 27 cards — control (fixed-4) and contender (fixed-3).
  */
-const VERIFICATION_CARDS: string[] = [
-  'verify-measured-cuts',
-  'verify-slab-lines',
-  'verify-lower-first',
-  'verify-working-set',
-];
+const ROUND_27_CARDS: string[] = ['core-fixed-4', 'core-fixed-3'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -238,83 +232,81 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 22 as a verification round with no open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 22);
-  assert.match(CURRENT_ROUND_METADATA.title, /Verbatim/);
-  assert.match(CURRENT_ROUND_METADATA.title, /Transcribed/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'a verification round opens no axis');
-  assert.match(CURRENT_ROUND_METADATA.description, /Bravura/);
-  assert.match(CURRENT_ROUND_METADATA.description, /staff space/i, 'the explicit scale is stated');
-  assert.match(CURRENT_ROUND_METADATA.description, /transcrib/i, 'the round thesis is stated');
-  assert.match(CURRENT_ROUND_METADATA.description, /OFL/, 'the font license is stated');
+test('CURRENT_ROUND_METADATA opens round 27 on the core axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 27);
+  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['core'],
+    'one axis, two cards'
+  );
+  assert.match(CURRENT_ROUND_METADATA.description, /visual weight/, 'the page-1 verdict is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /fixed cores/, 'the fixed cores reframing is stated');
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.compareStrip,
+    {
+      scoreId: BRAHMS_STUDIO_SCORE_ID,
+      measureStart: 33,
+      measureCount: 2,
+      title: 'mm. 33–34 · densest macro with folded bass under fixed-4 vs fixed-3',
+    },
+    'the strip declares the shared macro'
+  );
 });
 
-test('CURRENT_CANDIDATES declares the round’s four verification cards', () => {
+test('CURRENT_CANDIDATES declares the round’s control (fixed-4) plus contender (fixed-3)', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, VERIFICATION_CARDS, 'the settled changes, in display order');
+  assert.deepEqual(ids, ROUND_27_CARDS, 'the control and the contender, in display order');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'four cards on four settled changes');
-  for (const id of VERIFICATION_CARDS) {
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'one control plus one contender');
+  for (const id of ROUND_27_CARDS) {
     const candidate = getCandidate(id)!;
-    assert.match(candidate.label, /^[1-4] · /, `${id} is numbered`);
-    assert.ok((candidate.description ?? '').length > 120, `${id} carries a rationale`);
+    assert.match(candidate.label, /^[0-1] · /, `${id} is numbered`);
+    assert.ok((candidate.description ?? '').length > 100, `${id} carries a rationale`);
     assert.ok((candidate.tags ?? []).length > 0, `${id} is tagged`);
-    assert.equal(candidate.axis, undefined, `${id} declares no axis`);
+    assert.equal(candidate.axis, 'core', `${id} owns the core axis`);
   }
 });
 
-test('Verification cards state no delta at all: every card is the fixed golden master', () => {
+test('Candidates state only their core option delta', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  for (const id of VERIFICATION_CARDS) {
+  for (const id of ROUND_27_CARDS) {
     const candidate = getCandidate(id)!;
-    assert.equal(candidate.options, undefined, `${id} states no macro option`);
+    assert.deepEqual(
+      Object.keys(candidate.options ?? {}),
+      ['core'],
+      `${id} states only the core axis`
+    );
     assert.equal(candidate.tokens, undefined, `${id} states no micro token`);
     const resolved = resolveCandidate(candidate);
     for (const key of Object.keys(golden)) {
+      if (key === 'core') continue;
       assert.equal(
         (resolved.options as unknown as Record<string, unknown>)[key],
         (golden as unknown as Record<string, unknown>)[key],
         `${id} keeps ${key} at the golden value`
       );
     }
-    // The badge is the plain golden-master baseline, never an axis.
-    assert.deepEqual(
-      candidateBadges(candidate),
-      [{ key: 'baseline', value: 'golden master', golden: 'golden master' }],
-      `${id} badges only the golden baseline`
-    );
+    const badges = candidateBadges(candidate);
+    assert.equal(badges.length, 1, `${id} badges only its axis`);
+    assert.equal(badges[0].key, 'core');
+    assert.equal(badges[0].axis, true);
   }
 });
 
-test('Every verification card carries its own non-empty window set, titled and one measure each', () => {
-  const seen = new Set<string>();
-  for (const id of VERIFICATION_CARDS) {
+test('Every card shares the round’s two windows: Brahms page 1 plus the mm. 33–34 macro', () => {
+  for (const id of ROUND_27_CARDS) {
     const resolved = resolveCandidate(getCandidate(id)!);
-    assert.ok(resolved.windows.length > 0, `${id} shows at least one window`);
-    for (const window of resolved.windows) {
-      assert.ok(window.title.length > 20, `${id} titles every window`);
-      assert.ok(window.measureCount >= 1, `${id} shows real music`);
-      seen.add(`${window.scoreId}:${window.measureStart}-${window.measureStart + window.measureCount - 1}`);
-    }
-  }
-  // The round's evidence: the measured cuts on the rest specimen, the slab
-  // seats and the whole bar, the lower-first rows, the constructed 32nd/64th
-  // windows, the nib guard and the final-bar unison guard.
-  for (const expected of [
-    `${REST_SPECIMEN_STUDIO_SCORE_ID}:1-3`,
-    `${REST_SPECIMEN_STUDIO_SCORE_ID}:4-6`,
-    `${REST_SPECIMEN_STUDIO_SCORE_ID}:7-8`,
-    `${DEFAULT_STUDIO_SCORE_ID}:3-3`,
-    `${DEFAULT_STUDIO_SCORE_ID}:4-6`,
-    `${DEFAULT_STUDIO_SCORE_ID}:32-32`,
-    `${BRAHMS_STUDIO_SCORE_ID}:3-3`,
-    `${BRAHMS_STUDIO_SCORE_ID}:7-7`,
-    `${BRAHMS_STUDIO_SCORE_ID}:46-46`,
-    `${DURATION_SPECIMEN_STUDIO_SCORE_ID}:1-2`,
-    `${DURATION_SPECIMEN_STUDIO_SCORE_ID}:3-4`,
-    `${DURATION_SPECIMEN_STUDIO_SCORE_ID}:5-5`,
-  ]) {
-    assert.ok(seen.has(expected), `the round shows ${expected}`);
+    assert.equal(resolved.windows.length, 2, `${id} shows both windows`);
+    const [page, macro] = resolved.windows;
+    assert.equal(page.scoreId, BRAHMS_STUDIO_SCORE_ID, `${id} pages the Brahms score`);
+    assert.equal(page.measureStart, 1, `${id} opens page 1 at m. 1`);
+    assert.equal(page.measureCount, 9, `${id} shows the whole first page (9 measures)`);
+    assert.ok(page.title.length > 20, `${id} titles the page window`);
+    assert.equal(macro.scoreId, BRAHMS_STUDIO_SCORE_ID, `${id} macros the Brahms score`);
+    assert.equal(macro.measureStart, 33, `${id} opens the macro at m. 33`);
+    assert.equal(macro.measureCount, 2, `${id} shows mm. 33–34 up close`);
+    assert.ok(macro.title.length > 20, `${id} titles the macro window`);
   }
 });
 
@@ -1846,32 +1838,56 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: two verdict cards, every card clean
+// 17. Studio: four cards, every card clean, one strip
 // ---------------------------------------------------------------------------
 
-test('The live studio engraves every verification card on its own windows, all gold', () => {
+test('The live studio engraves every candidate card on the shared windows', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
-  assert.match(html, /data-candidate-count="4"/);
-  assert.match(html, /data-verification="true"/);
-  assert.match(html, /Round 22/);
-  assert.match(html, /Verbatim/, 'the round title headlines the view');
-  assert.ok(!html.includes('Symmetric-Tuck Clusters'), 'the Round 19 title is retired');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /data-window-count="4"/, 'two cards × two shared windows');
+  assert.match(html, /data-verification="false"/, 'a candidate round is not verification');
+  assert.match(html, /Round 27/);
+  assert.match(html, /Fixed Cores/, 'the round title headlines the view');
   let cursor = -1;
-  for (const id of VERIFICATION_CARDS) {
+  for (const id of ROUND_27_CARDS) {
     const at = html.indexOf(`data-candidate="${id}"`);
     assert.ok(at > cursor, `${id} appears in registry order`);
     cursor = at;
     const body = html.slice(at, html.indexOf('</article>', at));
-    assert.match(body, /<b>baseline<\/b> = golden master/, `${id} states the golden baseline`);
-    assert.ok(!body.includes('badge-axis'), `${id} opens no axis`);
-    assert.ok(!body.includes('badge-delta'), `${id} departs from nothing`);
-    assert.match(body, /data-lint="clean"/, `${id} carries a clean lint chip`);
-    assert.match(body, /chip chip-ok/, `${id} reports its clean chip`);
+    assert.ok(body.includes('badge-axis'), `${id} badges its axis`);
+    assert.ok(body.includes('badge-delta'), `${id} departs from the golden`);
+    assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint verdict`);
     assert.equal(
       (body.match(/data-window="/g) ?? []).length,
-      resolveCandidate(getCandidate(id)!).windows.length,
-      `${id} engraves exactly its declared windows`
+      2,
+      `${id} engraves exactly the two shared windows`
     );
   }
+});
+
+test('The closer-comparison strip engraves the shared macro under every card', () => {
+  const html = renderCompareStrip(CONFIG);
+  assert.match(html, /data-strip="brahms-op118-no1:33-34"/, 'the strip declares its window');
+  assert.match(html, /densest macro with folded bass/, 'the strip carries its headline');
+  assert.equal((html.match(/data-strip-panel="/g) ?? []).length, 2, 'one panel per card');
+  let cursor = -1;
+  for (const id of ROUND_27_CARDS) {
+    const at = html.indexOf(`data-strip-panel="${id}"`);
+    assert.ok(at > cursor, `${id} appears in registry order`);
+    cursor = at;
+  }
+  for (const id of ROUND_27_CARDS) {
+    const panel = html.slice(
+      html.indexOf(`data-strip-panel="${id}"`),
+      html.indexOf('</figure>', html.indexOf(`data-strip-panel="${id}"`))
+    );
+    assert.match(panel, /<svg/, `${id} engraves the macro`);
+    assert.ok(panel.includes(getCandidate(id)!.label), `${id} is labelled`);
+  }
+  const view = renderCandidatesView(CONFIG);
+  assert.ok(
+    view.indexOf('data-strip="brahms-op118-no1:33-34"') < view.indexOf('data-candidate-count="2"'),
+    'the strip stands above the cards'
+  );
 });

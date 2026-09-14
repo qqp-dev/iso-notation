@@ -58,6 +58,9 @@ import {
   checkMeasureNumeralClearance,
   checkMiddleCCorridor,
   checkNoteheadClearance,
+  checkOttavaClearance,
+  checkOttavaCoverage,
+  checkOttavaExtensions,
   checkRestClearance,
   checkSplitStackStems,
   checkStemAndBeamValidity,
@@ -1342,6 +1345,201 @@ test('Paint audit honours the digit baseline of a custom token set', () => {
     }),
     []
   );
+});
+
+// ---------------------------------------------------------------------------
+// 4b. Round 27 ottava spanner & core extension invariants
+// ---------------------------------------------------------------------------
+
+test('checkOttavaClearance catches brackets too close to noteheads', () => {
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const fakeNote: any = {
+    note: { id: 'n1', startTick: 0, durationTicks: 48, pitch: { pitchClass: 0, octave: 4 } },
+    x: 100,
+    y: 100,
+    rhythm: { id: 'n1', startTick: 0, durationTicks: 48, hand: 'LH', x: 100, y: 100 },
+  };
+
+  // 8vb bracket (shift > 0, below note) with 2pt clearance (requires 6pt)
+  const tightLayout: any = {
+    index: 0,
+    notes: [fakeNote],
+    ottavaBrackets: [
+      {
+        kind: '8vb',
+        shift: 12,
+        numeral: '8vb',
+        glyph: '8vb',
+        x0: 80,
+        x1: 120,
+        dashStartX: 100,
+        dashEndX: 120,
+        lineY: 100 + t.noteheadRadius + 2.0, // 2pt clearance < 6pt
+        hookLength: 4.0,
+        hookDirection: -1,
+        noteIds: ['n1'],
+      },
+    ],
+  };
+
+  const violations: LintViolation[] = [];
+  checkOttavaClearance(tightLayout, t, violations);
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0].code, 'ottava-clearance');
+
+  // Adequate clearance (8pt >= 6pt)
+  const okLayout: any = {
+    ...tightLayout,
+    ottavaBrackets: [
+      {
+        ...tightLayout.ottavaBrackets[0],
+        lineY: 100 + t.noteheadRadius + 8.0,
+      },
+    ],
+  };
+  const okViolations: LintViolation[] = [];
+  checkOttavaClearance(okLayout, t, okViolations);
+  assert.equal(okViolations.length, 0);
+});
+
+test('checkOttavaCoverage catches unbracketed folded notes and unfolded bracketed notes', () => {
+  const fakeFoldedNote: any = {
+    note: { id: 'folded-1', startTick: 0, durationTicks: 48, pitch: { pitchClass: 9, octave: 0 } },
+    x: 100,
+    y: 100,
+    ottavaShift: 12,
+  };
+  const fakePlainNote: any = {
+    note: { id: 'plain-1', startTick: 0, durationTicks: 48, pitch: { pitchClass: 0, octave: 4 } },
+    x: 150,
+    y: 100,
+    ottavaShift: undefined,
+  };
+
+  // Note is folded, but no bracket exists
+  const unbracketedLayout: any = {
+    index: 0,
+    notes: [fakeFoldedNote],
+    ottavaBrackets: [],
+  };
+  const v1: LintViolation[] = [];
+  checkOttavaCoverage(unbracketedLayout, v1);
+  assert.equal(v1.length, 1);
+  assert.equal(v1[0].code, 'ottava-unbracketed');
+
+  // Bracket exists covering an unfolded note
+  const unfoldedBracketLayout: any = {
+    index: 0,
+    notes: [fakePlainNote],
+    ottavaBrackets: [
+      {
+        kind: '8vb',
+        shift: 12,
+        numeral: '8vb',
+        glyph: '8vb',
+        x0: 130,
+        x1: 170,
+        dashStartX: 150,
+        dashEndX: 170,
+        lineY: 120,
+        hookLength: 4.0,
+        hookDirection: -1,
+        noteIds: ['plain-1'],
+      },
+    ],
+  };
+  const v2: LintViolation[] = [];
+  checkOttavaCoverage(unfoldedBracketLayout, v2);
+  assert.equal(v2.length, 1);
+  assert.equal(v2[0].code, 'ottava-unfolded');
+
+  // Bracket covers folded note: clean
+  const cleanLayout: any = {
+    index: 0,
+    notes: [fakeFoldedNote],
+    ottavaBrackets: [
+      {
+        kind: '8vb',
+        shift: 12,
+        numeral: '8vb',
+        glyph: '8vb',
+        x0: 80,
+        x1: 120,
+        dashStartX: 100,
+        dashEndX: 120,
+        lineY: 120,
+        hookLength: 4.0,
+        hookDirection: -1,
+        noteIds: ['folded-1'],
+      },
+    ],
+  };
+  const v3: LintViolation[] = [];
+  checkOttavaCoverage(cleanLayout, v3);
+  assert.equal(v3.length, 0);
+});
+
+test('checkOttavaExtensions catches lines and written notes exceeding core±1 range', () => {
+  const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3' });
+
+  // Extension line lin=12 is outside core±1 range [24, 72] for fixed-3
+  const badExtLayout: any = {
+    index: 0,
+    geometry: {
+      extensionLines: [12],
+    },
+    notes: [
+      {
+        note: { id: 'n1', startTick: 0, durationTicks: 48, pitch: { pitchClass: 0, octave: 4 } },
+        x: 100,
+        y: 100,
+        writtenLin: 48,
+      },
+    ],
+  };
+  const v1: LintViolation[] = [];
+  checkOttavaExtensions(badExtLayout, o, v1);
+  assert.equal(v1.length, 1);
+  assert.equal(v1[0].code, 'extension-beyond-core');
+
+  // Written note lin=82 is outside written range [18, 78] for fixed-3
+  const badNoteLayout: any = {
+    index: 0,
+    geometry: {
+      extensionLines: [24],
+    },
+    notes: [
+      {
+        note: { id: 'n2', startTick: 0, durationTicks: 48, pitch: { pitchClass: 10, octave: 6 } },
+        x: 100,
+        y: 100,
+        writtenLin: 82,
+      },
+    ],
+  };
+  const v2: LintViolation[] = [];
+  checkOttavaExtensions(badNoteLayout, o, v2);
+  assert.equal(v2.length, 1);
+  assert.equal(v2[0].code, 'extension-beyond-core');
+
+  // Clean fixed-3 layout within bounds
+  const cleanLayout: any = {
+    index: 0,
+    geometry: {
+      extensionLines: [24],
+    },
+    notes: [
+      {
+        note: { id: 'n3', startTick: 0, durationTicks: 48, pitch: { pitchClass: 0, octave: 4 } },
+        x: 100,
+        y: 100,
+        writtenLin: 48,
+      },
+    ],
+  };
+  const v3: LintViolation[] = [];
+  checkOttavaExtensions(cleanLayout, o, v3);
+  assert.equal(v3.length, 0);
 });
 
 // ---------------------------------------------------------------------------

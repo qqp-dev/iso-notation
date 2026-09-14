@@ -441,17 +441,25 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 22 verification, four cards, every window resolvable', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 22);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis');
+test('§F registry: round 27 fixed cores, control plus contender, every window resolvable', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 27);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['core'],
+    'one axis, two cards'
+  );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['verify-measured-cuts', 'verify-slab-lines', 'verify-lower-first', 'verify-working-set']);
+  assert.deepEqual(ids, ['core-fixed-4', 'core-fixed-3']);
   const windows = CURRENT_CANDIDATES.flatMap((c) => c.windows ?? []);
-  assert.ok(windows.length >= 12, 'the round shows its evidence windows');
+  assert.equal(windows.length, 4, 'two cards × two shared windows');
   for (const candidate of CURRENT_CANDIDATES) {
-    assert.equal(candidate.options, undefined, `${candidate.id}: the golden master, no delta`);
+    assert.deepEqual(
+      Object.keys(candidate.options ?? {}),
+      ['core'],
+      `${candidate.id}: states only core axis`
+    );
     assert.equal(candidate.tokens, undefined, `${candidate.id}: no token delta`);
-    assert.ok((candidate.windows ?? []).length > 0, `${candidate.id}: at least one window`);
+    assert.equal((candidate.windows ?? []).length, 2, `${candidate.id}: both windows`);
   }
 });
 

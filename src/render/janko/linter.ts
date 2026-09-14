@@ -80,7 +80,7 @@ import {
   renderSystem,
   suppressedStemIds,
 } from './engine';
-import { getEquatorRuleYs } from './elements/staff';
+import { getEquatorRuleYs, pitchGridRules } from './elements/staff';
 import { resolveBeatPulseXs } from './elements/barlines';
 import {
   JankoBeamConnector,
@@ -107,6 +107,24 @@ import {
   restInkBox,
   restSeatOffsetY,
 } from './elements/rests';
+import {
+  ContourTick,
+  buildContourStrip,
+  buildContourThreads,
+  buildContourTicks,
+  contourGlobalSequence,
+  contourPenLifts,
+  contourPieceRange,
+  contourSilence,
+  contourStripY,
+  contourSystemAttacks,
+  contourSystemInkBottom,
+  contourThreadHands,
+  contourThreadY,
+  contourTickBlockers,
+  contourTickKind,
+  placeContourTick,
+} from './elements/contour';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -149,7 +167,20 @@ export type JankoLintCode =
   | 'grid-crossing-offset'
   | 'time-inversion'
   | 'system-slot-overlap'
-  | 'corridor-intrusion';
+  | 'corridor-intrusion'
+  | 'contour-thread-vertex'
+  | 'contour-thread-pen-lift'
+  | 'contour-thread-coverage'
+  | 'contour-tick-geometry'
+  | 'contour-tick-clearance'
+  | 'contour-strip-placement'
+  | 'contour-strip-scale'
+  | 'contour-strip-geometry'
+  | 'contour-strip-clearance'
+  | 'ottava-clearance'
+  | 'ottava-unbracketed'
+  | 'ottava-unfolded'
+  | 'extension-beyond-core';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -258,6 +289,12 @@ export const JANKO_LINT_CHECKS = [
   'system-slot',
   'middle-c-corridor',
   'knockout-paint-order',
+  'contour-thread',
+  'contour-ticks',
+  'contour-strip',
+  'ottava-clearance',
+  'ottava-coverage',
+  'ottava-extensions',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -1195,10 +1232,19 @@ export function checkDotCollision(
   const dotR = t.augmentationDotRadius;
   const barlines = systemBarlines(layout, o, t);
   const pulses = beatPulseXs(layout, o, t);
-  const rules: Array<{ y: number; stroke: number }> = [];
-  for (let octave = 0; octave <= 8; octave++) {
-    for (const y of getEquatorRuleYs(layout.geometry.equatorY('RH', octave), o, t)) {
-      rules.push({ y, stroke: octave >= 2 && octave <= 5 ? 0.5 : 0.75 });
+  const rules: Array<{ y: number; stroke: number; x1?: number; x2?: number }> = [];
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+    for (const rule of pitchGridRules(layout.geometry, o, t)) {
+      // Texture lanes are background, not structure: a dot may touch a
+      // 0.3pt hairline it cannot avoid, but never a landmark line.
+      if (rule.cls === 'janko-pitch-lane') continue;
+      rules.push({ y: rule.y, stroke: rule.width, x1: rule.x1, x2: rule.x2 });
+    }
+  } else {
+    for (let octave = 0; octave <= 8; octave++) {
+      for (const y of getEquatorRuleYs(layout.geometry.equatorY('RH', octave), o, t)) {
+        rules.push({ y, stroke: octave >= 2 && octave <= 5 ? 0.5 : 0.75 });
+      }
     }
   }
   for (const p of layout.notes) {
@@ -1240,7 +1286,14 @@ export function checkDotCollision(
       break;
     }
     for (const rule of rules) {
-      const gap = Math.abs(cy - rule.y);
+      // Full-width rules are audited by vertical gap; the short clef tick by
+      // true segment distance, so a far-away dot never trips on 20pt of ink.
+      const span = layout.geometry.staffRight - layout.geometry.staffLeft;
+      const short =
+        rule.x1 !== undefined && rule.x2 !== undefined && rule.x2 - rule.x1 < span - EPS;
+      const gap = short
+        ? pointToSegmentDistance(cx, cy, rule.x1!, rule.y, rule.x2!, rule.y)
+        : Math.abs(cy - rule.y);
       if (gap >= dotR + rule.stroke / 2 - EPS) continue;
       out.push({
         code: 'dot-collision',
@@ -1431,6 +1484,410 @@ export function checkSystemSlotFit(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Contour round: thread, ticks, strip
+// ---------------------------------------------------------------------------
+
+/**
+ * Contour thread audit: every vertex stands at its attack's exact column at
+ * the formula's exact height, inside the system's page slot; no segment
+ * bridges a pen-lifting silence; and every melody attack of a voiced hand
+ * appears in exactly one run.
+ */
+export function checkContourThread(
+  score: QuantizedGridScore,
+  layout: JankoSystemLayout,
+  page: JankoPageGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const hands = contourThreadHands(o);
+  if (hands.length === 0) return;
+  const middleCY = layout.geometry.middleCY;
+  const slotTop = layout.geometry.slotTopY + 2;
+  const slotBottom = layout.geometry.slotTopY + page.slotHeight - 2;
+  for (const hand of hands) {
+    const attacks = contourSystemAttacks(score, layout, hand, t);
+    const runs = buildContourThreads(attacks, middleCY, t.contourThreadScale, hand, t);
+    const byTick = new Map(attacks.map((a) => [a.tick, a]));
+    const seen: number[] = [];
+    for (const run of runs) {
+      for (let i = 0; i < run.points.length; i++) {
+        const a = byTick.get(run.ticks[i]);
+        const p = run.points[i];
+        seen.push(run.ticks[i]);
+        if (p.y < slotTop || p.y > slotBottom) {
+          out.push({
+            code: 'contour-thread-vertex',
+            severity: 'error',
+            message:
+              `Thread vertex for tick ${run.ticks[i]} stands at y=${p.y.toFixed(2)}, outside its ` +
+              `${page.slotHeight.toFixed(2)}pt page slot — the piece's range overflows the thread scale.`,
+            system: layout.index,
+            measure: measureOfTick(run.ticks[i], t),
+            x: p.x,
+            y: p.y,
+            metrics: { vertexY: p.y, slotTop, slotBottom },
+          });
+        }
+        if (!a) continue;
+        const ey = contourThreadY(middleCY, a.lin, t.contourThreadScale);
+        if (Math.abs(p.x - a.x) > 0.01 || Math.abs(p.y - ey) > 0.01) {
+          out.push({
+            code: 'contour-thread-vertex',
+            severity: 'error',
+            message:
+              `Thread vertex for tick ${a.tick} stands at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}), ` +
+              `off its attack column (${a.x.toFixed(2)}, ${ey.toFixed(2)}).`,
+            system: layout.index,
+            measure: measureOfTick(a.tick, t),
+            x: p.x,
+            y: p.y,
+            metrics: { vertexX: p.x, vertexY: p.y, attackX: a.x, expectedY: ey },
+          });
+        }
+      }
+      for (let i = 1; i < run.ticks.length; i++) {
+        const prev = byTick.get(run.ticks[i - 1])!;
+        const cur = byTick.get(run.ticks[i])!;
+        const silence = contourSilence(prev, cur);
+        if (!contourPenLifts(silence, t)) continue;
+        out.push({
+          code: 'contour-thread-pen-lift',
+          severity: 'error',
+          message:
+            `Thread segment bridges ticks ${prev.tick}–${cur.tick} across ${silence}t of silence ` +
+            `(≥ ${t.ticksPerBeat}t lifts the pen).`,
+          system: layout.index,
+          measure: measureOfTick(cur.tick, t),
+          metrics: { silenceTicks: silence, liftAt: t.ticksPerBeat },
+        });
+      }
+    }
+    if (seen.length !== attacks.length || new Set(seen).size !== attacks.length) {
+      out.push({
+        code: 'contour-thread-coverage',
+        severity: 'error',
+        message:
+          `Thread covers ${new Set(seen).size} of ${attacks.length} ${hand} attacks: ` +
+          `every melody attack carries exactly one vertex.`,
+        system: layout.index,
+        metrics: { covered: new Set(seen).size, attacks: attacks.length },
+      });
+    }
+  }
+}
+
+/** True-ink horizontal span of one tick (stroke included, box pad excluded). */
+function contourTickInkSpan(tick: ContourTick): { x0: number; x1: number } {
+  if (tick.kind === 'breathe') {
+    return { x0: tick.cx - tick.r - 0.3, x1: tick.cx + tick.r + 0.3 };
+  }
+  return { x0: Math.min(tick.x1, tick.x2), x1: Math.max(tick.x1, tick.x2) };
+}
+
+/**
+ * Contour tick audit. Geometry: the kind and the mirrored placement are
+ * re-derived from the doctrine and must match exactly. Clearance: the padded
+ * ink box clears every mask, dot and staff rule at floor 0, and the true-ink
+ * span keeps the mirror rule's air from every *painted* barline, beat pulse
+ * and clasp spine — the audit reads painted columns, not the analytic list
+ * the construction mirrored against, so a divergence is caught, not assumed.
+ */
+export function checkContourTicks(
+  score: QuantizedGridScore,
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (!o.contourTicks) return;
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  const masks = layout.notes.map((q) => {
+    // The audited mask matches the paint: halo-sized only when the halo ring
+    // is actually drawn, tall only for stem-crossed heads.
+    const { wx, hy } = knockoutHalfExtents(o, t, o.showHonorHalo ? q.note.startTick : undefined);
+    const hyEff = q.tallKnockout ? hy + (t.stemAttachmentAir ?? 1.0) : hy;
+    return box(q.x - wx, q.y - hyEff, q.x + wx, q.y + hyEff);
+  });
+  const dots: Array<{ x: number; y: number; r: number }> = [];
+  for (const p of layout.notes) {
+    const dur = p.note.durationTicks;
+    if (dur <= 26 || dur > 38) continue;
+    dots.push({
+      x: p.rhythm.dotX ?? p.x + preset.wx + t.augmentationDotGap,
+      y: p.rhythm.dotY ?? p.y,
+      r: t.augmentationDotRadius,
+    });
+  }
+  const rules: number[] = [];
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+    for (const rule of pitchGridRules(layout.geometry, o, t)) rules.push(rule.y);
+  } else {
+    for (let octave = 0; octave <= 8; octave++) {
+      rules.push(...getEquatorRuleYs(layout.geometry.equatorY('RH', octave), o, t));
+    }
+  }
+  const painted: Array<{ x: number; air: number; label: string }> = [
+    ...systemBarlines(layout, o, t).map((b) => ({ x: b.x, air: 1.0, label: 'barline' })),
+    ...beatPulseXs(layout, o, t).map((x) => ({ x, air: 0.5, label: 'beat pulse' })),
+  ];
+  const blockers = contourTickBlockers(layout, o, t);
+  for (const hand of ['RH', 'LH'] as const) {
+    const attacks = contourSystemAttacks(score, layout, hand, t);
+    const global = contourGlobalSequence(score, hand);
+    const ticks = buildContourTicks(attacks, global, layout, o, t);
+    const globalAt = new Map(global.map((g, i) => [g.tick, i]));
+    for (const tick of ticks) {
+      const a = attacks.find((q) => q.tick === tick.tick)!;
+      const where = {
+        system: layout.index,
+        measure: measureOfTick(tick.tick, t),
+        x: (tick.box.x0 + tick.box.x1) / 2,
+        y: (tick.box.y0 + tick.box.y1) / 2,
+      };
+      const next = global[globalAt.get(a.tick)! + 1];
+      const expectedKind = contourTickKind(next.lin - a.lin, contourSilence(a, next), t);
+      const expected = placeContourTick(a, expectedKind, preset.wx, preset.hy, blockers, t);
+      const placed =
+        tick.kind === expected.kind &&
+        tick.mirrored === expected.mirrored &&
+        Math.abs(tick.x1 - expected.x1) < 0.01 &&
+        Math.abs(tick.y1 - expected.y1) < 0.01 &&
+        Math.abs(tick.x2 - expected.x2) < 0.01 &&
+        Math.abs(tick.y2 - expected.y2) < 0.01 &&
+        Math.abs(tick.cx - expected.cx) < 0.01 &&
+        Math.abs(tick.cy - expected.cy) < 0.01;
+      if (!placed) {
+        out.push({
+          code: 'contour-tick-geometry',
+          severity: 'error',
+          message:
+            `Tick at tick ${tick.tick} paints ${tick.kind}${tick.mirrored ? ' (mirrored)' : ''}, ` +
+            `doctrine says ${expected.kind}${expected.mirrored ? ' (mirrored)' : ''}.`,
+          ...where,
+          metrics: {},
+        });
+      }
+      const tb = box(tick.box.x0, tick.box.y0, tick.box.x1, tick.box.y1);
+      for (const m of masks) {
+        if (!boxesOverlap(tb, m, 0)) continue;
+        out.push({
+          code: 'contour-tick-clearance',
+          severity: 'error',
+          message: `Tick at tick ${tick.tick} overlaps a notehead mask — the padded ink box must clear every mask.`,
+          ...where,
+          metrics: { boxX0: tb.x0, boxY0: tb.y0, boxX1: tb.x1, boxY1: tb.y1 },
+        });
+        break;
+      }
+      for (const d of dots) {
+        if (pointToBoxDistance(d.x, d.y, tb) >= d.r - EPS) continue;
+        out.push({
+          code: 'contour-tick-clearance',
+          severity: 'error',
+          message: `Tick at tick ${tick.tick} touches an augmentation dot at (${d.x.toFixed(2)}, ${d.y.toFixed(2)}).`,
+          ...where,
+          metrics: { dotX: d.x, dotY: d.y },
+        });
+        break;
+      }
+      for (const y of rules) {
+        if (y < tb.y0 || y > tb.y1) continue;
+        out.push({
+          code: 'contour-tick-clearance',
+          severity: 'error',
+          message: `Tick at tick ${tick.tick} touches the staff rule at y=${y.toFixed(2)}.`,
+          ...where,
+          metrics: { ruleY: y },
+        });
+        break;
+      }
+      const span = contourTickInkSpan(tick);
+      for (const p of painted) {
+        if (!(p.x > span.x0 && p.x < span.x1 + p.air)) continue;
+        out.push({
+          code: 'contour-tick-clearance',
+          severity: 'error',
+          message:
+            `Tick at tick ${tick.tick} spans [${span.x0.toFixed(2)}, ${span.x1.toFixed(2)}] ` +
+            `across the painted ${p.label} at x=${p.x.toFixed(2)} (${p.air.toFixed(1)}pt air required).`,
+          ...where,
+          metrics: { blockerX: p.x, requiredAir: p.air },
+        });
+        break;
+      }
+      for (const clasp of layout.clasps) {
+        const distance = verticalSegmentToBoxDistance(clasp.claspX, clasp.topY, clasp.botY, tb);
+        if (distance >= 1.5) continue;
+        out.push({
+          code: 'contour-tick-clearance',
+          severity: 'error',
+          message:
+            `Tick at tick ${tick.tick} stands ${distance.toFixed(2)}pt from a clasp spine ` +
+            `(1.5pt required against the padded box).`,
+          ...where,
+          metrics: { distance, claspX: clasp.claspX },
+        });
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * Contour strip audit. Placement: the strip top clears the staff and the
+ * system's lowest ink by the token air (0.5pt tolerance). Scale: the range
+ * and the pt-per-semitone slope are the score's own, identical on every
+ * system. Curves: every attack carries exactly one vertex at its exact
+ * column and the formula's exact height, and runs break exactly at
+ * pen-lifting silences. Below: the strip clears the next system's ink (or
+ * the page body) with room to spare.
+ */
+export function checkContourStrip(
+  score: QuantizedGridScore,
+  layout: JankoSystemLayout,
+  layouts: readonly JankoSystemLayout[],
+  page: JankoPageGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  thresholds: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (!o.contourStrip) return;
+  const strip = buildContourStrip(score, layout, t);
+  if (!strip) return;
+  const inkBottom = contourSystemInkBottom(layout, t);
+  const airTol = t.contourStripAir - 0.5;
+  if (strip.top < layout.geometry.staffBotY + airTol || strip.top < inkBottom + airTol) {
+    out.push({
+      code: 'contour-strip-placement',
+      severity: 'error',
+      message:
+        `Strip top y=${strip.top.toFixed(2)} violates the clearance line below the staff ` +
+        `(y=${(layout.geometry.staffBotY + airTol).toFixed(2)}) or the lowest ink ` +
+        `(y=${(inkBottom + airTol).toFixed(2)}).`,
+      system: layout.index,
+      y: strip.top,
+      metrics: { stripTop: strip.top, staffBotY: layout.geometry.staffBotY, inkBottom },
+    });
+  }
+  const { min, max } = contourPieceRange(score);
+  const height = t.contourStripHeight;
+  const expectedK = height / Math.max(1, max - min);
+  const expectedCs: number[] = [];
+  for (let c = Math.ceil(min / 12) * 12; c <= max; c += 12) expectedCs.push(c);
+  if (
+    strip.rangeMin !== min ||
+    strip.rangeMax !== max ||
+    strip.height !== height ||
+    Math.abs(strip.k - expectedK) > 1e-9 ||
+    strip.gridCs.length !== expectedCs.length ||
+    strip.gridCs.some((c, i) => c !== expectedCs[i])
+  ) {
+    out.push({
+      code: 'contour-strip-scale',
+      severity: 'error',
+      message:
+        `Strip scale [${strip.rangeMin}, ${strip.rangeMax}] k=${strip.k.toFixed(4)} is not the ` +
+        `score's own [${min}, ${max}] k=${expectedK.toFixed(4)}.`,
+      system: layout.index,
+      metrics: { rangeMin: strip.rangeMin, rangeMax: strip.rangeMax, k: strip.k },
+    });
+  }
+  for (const curve of strip.curves) {
+    const attacks = contourSystemAttacks(score, layout, curve.hand, t);
+    const flat = curve.runs.flat();
+    if (flat.length !== attacks.length) {
+      out.push({
+        code: 'contour-strip-geometry',
+        severity: 'error',
+        message:
+          `Strip ${curve.hand} curve carries ${flat.length} vertices for ${attacks.length} attacks: ` +
+          `every attack carries exactly one vertex.`,
+        system: layout.index,
+        metrics: { vertices: flat.length, attacks: attacks.length },
+      });
+      continue;
+    }
+    for (let i = 0; i < flat.length; i++) {
+      const v = flat[i];
+      const a = attacks[i];
+      const ey = contourStripY(strip.top, strip.height, strip.rangeMin, strip.rangeMax, a.lin);
+      if (Math.abs(v.x - a.x) > 0.01 || Math.abs(v.y - ey) > 0.01) {
+        out.push({
+          code: 'contour-strip-geometry',
+          severity: 'error',
+          message:
+            `Strip vertex for tick ${a.tick} stands at (${v.x.toFixed(2)}, ${v.y.toFixed(2)}), ` +
+            `off its attack column (${a.x.toFixed(2)}, ${ey.toFixed(2)}).`,
+          system: layout.index,
+          measure: measureOfTick(a.tick, t),
+          x: v.x,
+          y: v.y,
+          metrics: { vertexX: v.x, vertexY: v.y, attackX: a.x, expectedY: ey },
+        });
+      }
+    }
+    const expectedLens: number[] = [];
+    let runLen = 0;
+    for (let i = 0; i < attacks.length; i++) {
+      if (i > 0 && contourPenLifts(contourSilence(attacks[i - 1], attacks[i]), t)) {
+        expectedLens.push(runLen);
+        runLen = 0;
+      }
+      runLen++;
+    }
+    expectedLens.push(runLen);
+    const actualLens = curve.runs.map((r) => r.length);
+    if (
+      actualLens.length !== expectedLens.length ||
+      actualLens.some((len, i) => len !== expectedLens[i])
+    ) {
+      out.push({
+        code: 'contour-strip-geometry',
+        severity: 'error',
+        message:
+          `Strip ${curve.hand} runs [${actualLens.join(', ')}] break at different silences than the ` +
+          `doctrine's [${expectedLens.join(', ')}].`,
+        system: layout.index,
+        metrics: {},
+      });
+    }
+  }
+  const bottom = strip.top + strip.height;
+  const lastOnPage = layout.index % page.systemsPerPage === page.systemsPerPage - 1;
+  if (!lastOnPage && layout.index + 1 < layouts.length) {
+    const nextTop = systemInkExtents(layouts[layout.index + 1], t, thresholds, o).top;
+    if (bottom > nextTop - 2.5) {
+      out.push({
+        code: 'contour-strip-clearance',
+        severity: 'error',
+        message:
+          `Strip bottom y=${bottom.toFixed(2)} reaches into system ${layout.index + 2}'s ink ` +
+          `(top y=${nextTop.toFixed(2)}, 2.5pt required).`,
+        system: layout.index,
+        y: bottom,
+        metrics: { stripBottom: bottom, nextTop },
+      });
+    }
+  } else {
+    const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
+    if (bottom > bodyBottom - 2) {
+      out.push({
+        code: 'contour-strip-clearance',
+        severity: 'error',
+        message:
+          `Strip bottom y=${bottom.toFixed(2)} reaches into the page footer (body ends y=${bodyBottom.toFixed(2)}).`,
+        system: layout.index,
+        y: bottom,
+        metrics: { stripBottom: bottom, bodyBottom },
+      });
+    }
+  }
+}
+
 /** Full painted extent of one system: every glyph, rule, beam and bracket. */
 export function systemInkExtents(
   layout: JankoSystemLayout,
@@ -1476,6 +1933,13 @@ export function systemInkExtents(
     const box = restInkBox(rest, t);
     top = Math.min(top, box.y0);
     bottom = Math.max(bottom, box.y1);
+  }
+  if (layout.ottavaBrackets) {
+    for (const b of layout.ottavaBrackets) {
+      const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
+      top = Math.min(top, b.lineY, hookY);
+      bottom = Math.max(bottom, b.lineY, hookY);
+    }
   }
   return { top, bottom };
 }
@@ -2184,15 +2648,41 @@ export function checkRestSeat(
     // stands off the nearest drawn rule is the "floating brick" defect this
     // round exists to kill — a hard violation.
     if (isBarRestValue(rest.value)) {
-      const rules: number[] = [];
-      for (const [hand, octave] of [
-        ['RH', 5],
-        ['LH', 2],
-        ['RH', 4],
-        ['LH', 3],
-      ] as const) {
-        rules.push(...getEquatorRuleYs(layout.geometry.equatorY(hand, octave), o, t));
+      if (o.pitchMapping === 'twin-rows' && o.core !== 'fixed-3' && o.core !== 'fixed-4') {
+        const rules: number[] = [];
+        for (const [hand, octave] of [
+          ['RH', 5],
+          ['LH', 2],
+          ['RH', 4],
+          ['LH', 3],
+        ] as const) {
+          rules.push(...getEquatorRuleYs(layout.geometry.equatorY(hand, octave), o, t));
+        }
+        const nearest = rules.reduce(
+          (best, rule) => (Math.abs(rule - rest.y) < Math.abs(best - rest.y) ? rule : best),
+          rules[0]
+        );
+        if (Math.abs(nearest - rest.y) <= EPS) continue;
+        out.push({
+          code: 'rest-slab-off-line',
+          severity: 'error',
+          message:
+            `Bar rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) touches no drawn staff line: ` +
+            `its contact edge stands on y=${rest.y.toFixed(2)}, ${Math.abs(nearest - rest.y).toFixed(2)}pt ` +
+            `from the nearest drawn rule (y=${nearest.toFixed(2)}). A half slab sits ON a line and a ` +
+            `whole slab hangs FROM one — a slab that touches nothing means nothing.`,
+          system: layout.index,
+          measure: measureOfTick(rest.tick, t),
+          x: rest.x,
+          y: rest.y,
+          metrics: { contactY: rest.y, nearestRule: nearest, offLine: Math.abs(nearest - rest.y) },
+        });
+        continue;
       }
+      // Every continuous mapping snaps slabs to drawn lines (see `restSeatY`),
+      // so the touch audit keeps its teeth: exact contact with a painted
+      // lane, C-line, octave line or divider.
+      const rules = pitchGridRules(layout.geometry, o, t).map((rule) => rule.y);
       const nearest = rules.reduce(
         (best, rule) => (Math.abs(rule - rest.y) < Math.abs(best - rest.y) ? rule : best),
         rules[0]
@@ -2202,10 +2692,10 @@ export function checkRestSeat(
         code: 'rest-slab-off-line',
         severity: 'error',
         message:
-          `Bar rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) touches no drawn staff line: ` +
+          `Bar rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) touches no drawn grid line: ` +
           `its contact edge stands on y=${rest.y.toFixed(2)}, ${Math.abs(nearest - rest.y).toFixed(2)}pt ` +
-          `from the nearest drawn rule (y=${nearest.toFixed(2)}). A half slab sits ON a line and a ` +
-          `whole slab hangs FROM one — a slab that touches nothing means nothing.`,
+          `from the nearest drawn line (y=${nearest.toFixed(2)}). A snapped slab that touches ` +
+          `nothing means the seat left the grid.`,
         system: layout.index,
         measure: measureOfTick(rest.tick, t),
         x: rest.x,
@@ -2503,17 +2993,32 @@ export function checkMiddleCCorridor(
   // 1. Horizontal rules: nothing but the spine itself lives on the corridor.
   //    Row guidelines are only audited when they are actually painted, and the
   //    boundary rules of the bounded channel at their true `equator ± half`
-  //    positions rather than the (empty) equator itself.
+  //    positions rather than the (empty) equator itself. The continuous grids
+  //    audit the painter's own line set (the divider excepted — it IS the
+  //    spine); the equal schemes draw no divider, so there is no corridor.
   const horizontalRules: Array<{ label: string; y: number }> = [];
-  for (const hand of ['RH', 'LH'] as const) {
-    for (const oct of hand === 'RH' ? [5, 4] : [3, 2]) {
-      const eq = g.equatorY(hand, oct);
-      for (const ruleY of getEquatorRuleYs(eq, o, t)) {
-        horizontalRules.push({ label: `${hand} o${oct} equator rule`, y: ruleY });
+  if (o.pitchMapping === 'twin-rows' && o.core !== 'fixed-3' && o.core !== 'fixed-4') {
+    for (const hand of ['RH', 'LH'] as const) {
+      for (const oct of hand === 'RH' ? [5, 4] : [3, 2]) {
+        const eq = g.equatorY(hand, oct);
+        for (const ruleY of getEquatorRuleYs(eq, o, t)) {
+          horizontalRules.push({ label: `${hand} o${oct} equator rule`, y: ruleY });
+        }
+        if (!o.showRowGuidelines) continue;
+        horizontalRules.push({ label: `${hand} o${oct} upper guideline`, y: eq - t.rowHeight / 2 });
+        horizontalRules.push({ label: `${hand} o${oct} lower guideline`, y: eq + t.rowHeight / 2 });
       }
-      if (!o.showRowGuidelines) continue;
-      horizontalRules.push({ label: `${hand} o${oct} upper guideline`, y: eq - t.rowHeight / 2 });
-      horizontalRules.push({ label: `${hand} o${oct} lower guideline`, y: eq + t.rowHeight / 2 });
+    }
+  } else {
+    // The middle's own rule (divider, clef tick, or the C4 boundary) is the
+    // spine; every other drawn rule must clear the corridor. A grid with no
+    // rule at the middle (equal centers) has no corridor at all.
+    const grid = pitchGridRules(g, o, t);
+    if (grid.some((rule) => Math.abs(rule.y - spineY) < EPS)) {
+      for (const rule of grid) {
+        if (Math.abs(rule.y - spineY) < EPS) continue;
+        horizontalRules.push({ label: 'pitch grid rule', y: rule.y });
+      }
     }
   }
   for (const rule of horizontalRules) {
@@ -2959,6 +3464,177 @@ export function auditStemBeamConnections(
 }
 
 // ---------------------------------------------------------------------------
+// Ottava & extension checks (Round 27)
+// ---------------------------------------------------------------------------
+
+/**
+ * Enforce bracket↔notehead clearance for every ottava spanner bracket.
+ * Any notehead horizontally within [b.x0, b.x1] must clear the bracket line
+ * by at least `t.ottavaClearance`.
+ */
+export function checkOttavaClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (!layout.ottavaBrackets || layout.ottavaBrackets.length === 0) return;
+  const clearance = t.ottavaClearance ?? 6.0;
+  const r = t.noteheadRadius;
+
+  for (const b of layout.ottavaBrackets) {
+    for (const p of layout.notes) {
+      if (p.x + r < b.x0 - EPS || p.x - r > b.x1 + EPS) continue;
+
+      if (b.shift > 0) {
+        // Below staff (8vb/15mb): bracket line should be >= note bottom + clearance
+        const noteBottom = p.y + r;
+        const actualClearance = b.lineY - noteBottom;
+        if (actualClearance < clearance - EPS) {
+          out.push({
+            code: 'ottava-clearance',
+            severity: 'error',
+            message:
+              `Ottava ${b.kind} bracket at lineY=${b.lineY.toFixed(2)} has clearance ` +
+              `${actualClearance.toFixed(2)}pt to note ${p.note.id} (bottom=${noteBottom.toFixed(2)}), ` +
+              `less than required ${clearance.toFixed(2)}pt.`,
+            system: layout.index,
+            noteIds: [p.note.id],
+            x: p.x,
+            y: b.lineY,
+            metrics: { actualClearance, requiredClearance: clearance },
+          });
+        }
+      } else {
+        // Above staff (8va/15ma): bracket line should be <= note top - clearance
+        const noteTop = p.y - r;
+        const actualClearance = noteTop - b.lineY;
+        if (actualClearance < clearance - EPS) {
+          out.push({
+            code: 'ottava-clearance',
+            severity: 'error',
+            message:
+              `Ottava ${b.kind} bracket at lineY=${b.lineY.toFixed(2)} has clearance ` +
+              `${actualClearance.toFixed(2)}pt to note ${p.note.id} (top=${noteTop.toFixed(2)}), ` +
+              `less than required ${clearance.toFixed(2)}pt.`,
+            system: layout.index,
+            noteIds: [p.note.id],
+            x: p.x,
+            y: b.lineY,
+            metrics: { actualClearance, requiredClearance: clearance },
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Enforce bracket coverage: every folded note must be covered by a bracket,
+ * and every bracketed note must actually be folded.
+ */
+export function checkOttavaCoverage(
+  layout: JankoSystemLayout,
+  out: LintViolation[]
+): void {
+  const brackets = layout.ottavaBrackets ?? [];
+  const coveredIds = new Set<string>();
+  for (const b of brackets) {
+    for (const id of b.noteIds) {
+      coveredIds.add(id);
+    }
+  }
+
+  for (const p of layout.notes) {
+    if (p.ottavaShift !== undefined && p.ottavaShift !== 0) {
+      if (!coveredIds.has(p.note.id)) {
+        out.push({
+          code: 'ottava-unbracketed',
+          severity: 'error',
+          message:
+            `Note ${p.note.id} has ottavaShift=${p.ottavaShift} but is not covered by any ottava bracket.`,
+          system: layout.index,
+          noteIds: [p.note.id],
+          x: p.x,
+          y: p.y,
+        });
+      }
+    }
+  }
+
+  const notesById = new Map<string, PositionedJankoNote>();
+  for (const p of layout.notes) {
+    notesById.set(p.note.id, p);
+  }
+  for (const b of brackets) {
+    for (const id of b.noteIds) {
+      const p = notesById.get(id);
+      if (p && (p.ottavaShift === undefined || p.ottavaShift === 0)) {
+        out.push({
+          code: 'ottava-unfolded',
+          severity: 'error',
+          message:
+            `Ottava bracket covers note ${id}, but note is not folded (ottavaShift=0).`,
+          system: layout.index,
+          noteIds: [id],
+          x: p.x,
+          y: p.y,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Enforce core±1 extensions: extensions must not exceed core±1 octave,
+ * and notes beyond core±1 must fold instead of extending further.
+ */
+export function checkOttavaExtensions(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  out: LintViolation[]
+): void {
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') return;
+
+  const g = layout.geometry;
+  const isFixed3 = o.core === 'fixed-3';
+  const minExt = isFixed3 ? 24 : 17.5;
+  const maxExt = isFixed3 ? 72 : 77.5;
+  const minWritten = isFixed3 ? 18 : 12;
+  const maxWritten = isFixed3 ? 78 : 83.5;
+
+  if (g.extensionLines) {
+    for (const ext of g.extensionLines) {
+      if (ext < minExt || ext > maxExt) {
+        out.push({
+          code: 'extension-beyond-core',
+          severity: 'error',
+          message:
+            `Extension line at lin=${ext} exceeds core±1 range [${minExt}, ${maxExt}].`,
+          system: layout.index,
+        });
+      }
+    }
+  }
+
+  for (const p of layout.notes) {
+    const wLin = p.writtenLin;
+    if (wLin !== undefined && (wLin < minWritten || wLin > maxWritten)) {
+      out.push({
+        code: 'extension-beyond-core',
+        severity: 'error',
+        message:
+          `Note ${p.note.id} has written linear pitch ${wLin}, exceeding core±1 coverage ` +
+          `[${minWritten}, ${maxWritten}]. It must fold instead.`,
+        system: layout.index,
+        noteIds: [p.note.id],
+        x: p.x,
+        y: p.y,
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -2985,7 +3661,7 @@ export function lintJankoScore(
   };
 
   const layouts = layoutJankoScore(score, o, t);
-  const page = computePageGeometry(o, t);
+  const page = computePageGeometry(o, t, score);
   const diagnostics: LintViolation[] = [];
   const extents: Array<{ top: number; bottom: number }> = [];
 
@@ -3016,6 +3692,17 @@ export function lintJankoScore(
     checkUnisonDigits(score, layout, t, diagnostics);
     checkClaspDotFusion(layout, t, thresholds, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
+    // The contour round: each paradigm audits itself, gated by its option —
+    // with every contour option off these are no-ops and the golden master
+    // lints exactly as before.
+    if (o.contourThread !== 'none') checkContourThread(score, layout, page, o, t, diagnostics);
+    if (o.contourTicks) checkContourTicks(score, layout, o, t, diagnostics);
+    if (o.contourStrip) {
+      checkContourStrip(score, layout, layouts, page, o, t, thresholds, diagnostics);
+    }
+    checkOttavaClearance(layout, t, diagnostics);
+    checkOttavaCoverage(layout, diagnostics);
+    checkOttavaExtensions(layout, o, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {

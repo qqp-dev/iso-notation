@@ -52,6 +52,27 @@ export interface JankoCandidateRound {
    * rides along as shared fixed context and never appears as a candidate badge.
    */
   openAxes?: string[];
+  /** Closer-comparison strip (absent: no strip, cards only). */
+  compareStrip?: JankoCompareStrip;
+}
+
+/**
+ * The closer-comparison strip: one macro window engraved under every card's
+ * options and laid side by side above the full-page cards, so the eye can
+ * flick between schemes without scrolling.
+ */
+export interface JankoCompareStrip {
+  /**
+   * Studio score id the strip is engraved from. Defaults to the studio's
+   * primary score (`'primary'` = the Bach Goldberg Var. 1 benchmark).
+   */
+  scoreId?: string;
+  /** First measure of the strip window (1-based). */
+  measureStart: number;
+  /** Measures shown in the strip window. */
+  measureCount: number;
+  /** Short label shown above the strip. */
+  title: string;
 }
 
 /** One engraving window a candidate is demonstrated on. */
@@ -143,168 +164,81 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * barriers with the four rest dialects, round 16 the cluster doctrine with the
  * judged horizontal spacing, round 17A the rectangular mask with the v2 spacing
  * solver and the hugging dots, round 17B the `tight` verdict with the
- * phrase-row rests, round 18 the rest-shape verdict, and round 19 the
- * symmetric-tuck clusters with the RH anchor approved.
+ * phrase-row rests, round 18 the rest-shape verdict, round 19 the
+ * symmetric-tuck clusters with the RH anchor approved, round 20 the
+ * verification of the optical seats / urtext re-cut / unison merge /
+ * clasp-dot fix, round 21 the measured duration ink with the slab seats and
+ * the whole→64th working set, round 22 the verbatim Bravura transcription,
+ * round 23 the three pitch-contour paradigms, round 24 the continuous
+ * pitch-mapping paradigms, round 25 the grand grid's octave-line schemes,
+ * round 26 the 0-line decision, and round 27 the fixed cores 3-vs-4 decision
+ * on Brahms with real Gould ottava brackets.
  *
- * **Round 20 is a VERIFICATION round: no open axis.** Every card below is the
- * fixed golden master — {@link DEFAULT_JANKO_OPTIONS} /
- * {@link DEFAULT_JANKO_TOKENS}, no option delta at all — engraved on one
- * verification window of the round's four settled changes:
+ * **Round 27 is a CORE round: one open axis, two answers to one question.**
+ * Window-following octave lines cannot look centered: each line count has
+ * exactly one middle-C-centered grammar (3 ⟺ C-lines C3–C5; 4 ⟺ middles o2–o5),
+ * plus a per-system extension rule (core±1 max) and ottava beyond extensions.
+ * Judged on Brahms Op. 118/1 (lin 9–78, 964 notes) with real Bravura ottava
+ * glyphs and Gould dashed spanners.
  *
- * 1. **Optical rest seats** — every rest glyph is placed so its **ink
- *    centroid** stands on its phrase row (the half slab atop it, the whole slab
- *    hanging below), and the linter audits the seat
- *    (`rest-centroid-off-row`);
- * 2. **The urtext re-cut** — every rest glyph and every flag hook is cut
- *    against the classical standard at the house 0.90pt weight, and the
- *    **whole-bar** form (192 ticks, one complete measure) exists;
- * 3. **The unison merge** — one onset + one pitch = one sound event = **one
- *    digit**, on the anchor-winner's column, with every mixed-duration rhythm
- *    voice intact (`unison-double-digit`);
- * 4. **The clasp-dot fix** — a dotted clasp's dot is a clean satellite of its
- *    mark, with hug air against the mark and every neighbour
- *    (`clasp-dot-fusion`).
- *
- * The operator's verdict is read off the windows, not off a candidate axis:
- * rests sit where the notes are, the cuts read classical, the unisons are
- * single digits with their beams whole, and no nib fuses with its ring.
+ * Can we drop to 3, or does 4's floor earn its ink? Control is fixed-4
+ * (o2–o5 middles, 1 folded note in m. 69), contender is fixed-3 (C3–C5 C-lines,
+ * 9 folded notes across mm. 5, 15, 23, 33, 43, 53, 67, 69).
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 22,
-  title: 'Verbatim Duration Ink — Bravura Contours Transcribed 1:1',
+  round: 27,
+  title: 'Fixed Cores 3-vs-4 on Brahms, with Ottava',
   description:
-    'Round 21 measured the reference but redrew it — and the redraw mirrored the quarter, flipped the hooked rests and stacked crescent flags. This round transcribes instead: every hooked rest and flag contour is Bravura 1.482 **byte-for-byte** (fontTools outlines into generated constants, same round scale of 1 staff space = 3.8884pt, zero re-authorship; OFL, see `urtext-paths.ts`). Envelopes identical, ink exact. Seating, slabs, dots, beams and lower-first are untouched. No axis is open: every card is the golden master itself.',
-  openAxes: [],
+    'Window-following octave lines cannot look centered, so the design reframes as fixed cores: each line count has one middle-C-centered grammar (3 ⟺ C3–C5 C-lines; 4 ⟺ o2–o5 middles), with per-system extensions and real Gould ottava brackets beyond. Can we drop to 3, or does 4\u2019s floor earn its ink? Judge total visual weight on page 1, flick the strip for mm. 33–34, and pick the core.',
+  openAxes: ['core'],
+  compareStrip: {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 33,
+    measureCount: 2,
+    title: 'mm. 33–34 · densest macro with folded bass under fixed-4 vs fixed-3',
+  },
 };
 
 /**
- * The Round 22 verification windows (the Round 21 set, reused: the five rest
- * cuts + slab seats, the two corpus rest windows, the sixteen lower-first
- * rows, the mixed-level beam groups, the constructed 32nd/64th windows, the
- * nib guard and the final-bar unison guard).
+ * The Round 27 windows, shared by every card: the whole of page 1 for total
+ * visual weight, and the densest 2-measure macro with folded bass up close.
  */
-const ROUND_22_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_27_WINDOWS: JankoCandidateWindow[] = [
   {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 1,
-    measureCount: 3,
-    title: 'Rest specimen · mm. 1–3 — the measured cuts: 16th, 8th, quarter',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 4,
-    measureCount: 3,
-    title: 'Rest specimen · mm. 4–6 — the half slab sits ON a drawn rule, the whole bar hangs FROM one and is centred',
-  },
-  {
-    scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 7,
-    measureCount: 2,
-    title: 'Rest specimen · mm. 7–8 — the two new values: 32nd and 64th silences',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 4,
-    measureCount: 3,
-    title: 'Bach Var. 1 · mm. 4–6 — the canonical 16th seat, re-cut',
+    measureCount: 9,
+    title: 'Brahms Op. 118/1 · Page 1 (mm. 1–9) — full-page visual weight',
   },
   {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 7,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 7 — a measured 16th seat beside the lower-first row',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 3,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 3 — lower-first: the LH C♯4 holds the column, the RH A4 fans',
-  },
-  {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 46,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 46 — lower-first on the dense pair rows (D4 holds, G♯4 fans)',
-  },
-  {
-    scoreId: DURATION_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 1,
+    measureStart: 33,
     measureCount: 2,
-    title: 'Duration specimen · mm. 1–2 — the tertiary 32nd run and the quaternary 64th run',
-  },
-  {
-    scoreId: DURATION_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 3,
-    measureCount: 2,
-    title: 'Duration specimen · mm. 3–4 — mixed levels in one beat, and the lone-16th partial beams',
-  },
-  {
-    scoreId: DURATION_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: 5,
-    measureCount: 1,
-    title: 'Duration specimen · m. 5 — solo 32nd and 64th flags (triple and quad)',
-  },
-  {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 3,
-    measureCount: 1,
-    title: 'Brahms Op. 118/1 · m. 3 — the nib guard: the dot still a clean satellite',
-  },
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 32,
-    measureCount: 1,
-    title: 'Bach Var. 1 · m. 32 — the final-bar unison guard: one digit, now the lower voice’s',
+    title: 'Brahms Op. 118/1 · mm. 33–34 — densest macro with folded bass',
   },
 ];
 
-/** The round’s verification cards, one per settled change, in display order. */
+/** The round’s cards: control (fixed-4) and contender (fixed-3), in display order. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'verify-measured-cuts',
-    label: '1 · Verbatim Cuts — the reference contours, transcribed 1:1',
+    id: 'core-fixed-4',
+    label: '0 · Control — Fixed-4 (o2–o5 middles)',
     description:
-      'The classical cut is no longer drawn — it is **transcribed**. Quarter, 8th … 64th and all eight flags are the Bravura 1.482 outlines verbatim: one closed solid per rest, one nested-contour glyph with `evenodd` counters per flag, anchored by the SMuFL stem-tip origin. What you see here is the reference itself at the round scale. Slabs, dots and the other four dialects are untouched.',
-    windows: ROUND_22_WINDOWS.filter(
-      (w) =>
-        w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID ||
-        (w.scoreId === DEFAULT_STUDIO_SCORE_ID && w.measureStart === 4)
-    ),
-    tags: ['verbatim', 'Bravura 1.482', 'transcribed 1:1', 'OFL'],
+      'Four middle-centered hairlines at o2–o5 (lin 29.5/41.5/53.5/65.5) — the coverage-safe incumbent with equal weights. Covers 96.2% of Brahms; only 1 folded note (8vb) in m. 69 (A0, lin 9). Extensions fire at o1/o6.',
+    axis: 'core',
+    options: { core: 'fixed-4' },
+    windows: ROUND_27_WINDOWS,
+    tags: ['control', 'fixed-4'],
   },
   {
-    id: 'verify-slab-lines',
-    label: '2 · Slabs on Lines — half sits ON, whole hangs FROM, whole centred',
+    id: 'core-fixed-3',
+    label: '1 · Contender — Fixed-3 (C3–C5 C-lines)',
     description:
-      'A bar rest derives its meaning from touching a line. The half slab’s bottom edge and the whole slab’s top edge now stand **exactly on a drawn staff rule** (zero gap, measured — the seat no longer snaps to an invisible phrase row), and the whole bar is **centred in its measure** on the barline midpoint (Gould; LilyPond NR §§2.2.1/2.2.3), exempt from the beat-cell nudge and cleared vertically by row separation. The linter names a slab that touches nothing: `rest-slab-off-line`.',
-    windows: ROUND_22_WINDOWS.filter(
-      (w) =>
-        (w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID && w.measureStart >= 4) ||
-        (w.scoreId === BRAHMS_STUDIO_SCORE_ID && w.measureStart === 3)
-    ),
-    tags: ['slab-on-line', 'whole centred', 'rest-slab-off-line', 'nib guard'],
-  },
-  {
-    id: 'verify-lower-first',
-    label: '3 · Lower-First — the lowest head holds the column',
-    description:
-      'The anchor rule is **lower-first**, and it is a rule, not an option: on a mixed-hand row the lowest-pitched head keeps the column and the other fans; on a single-hand row the middle head does, exactly as before. All **sixteen** corpus rows flip — Bach’s eight (bar3:t408 … bar31:t4368) and Brahms’s eight (bar7:t1296 … bar49:t9432) — with the stem-x set inside each row preserved by the pure swap. A cross-hand unison ties on pitch, so the **lower voice** (LH) keeps the digit.',
-    windows: ROUND_22_WINDOWS.filter(
-      (w) =>
-        (w.scoreId === DEFAULT_STUDIO_SCORE_ID && [3, 32].includes(w.measureStart)) ||
-        w.scoreId === BRAHMS_STUDIO_SCORE_ID
-    ),
-    tags: ['lower-first', 'anchor', 'unison survivor'],
-  },
-  {
-    id: 'verify-working-set',
-    label: '4 · The Working Set — whole → 64th, complete, on constructed windows',
-    description:
-      'This is a notation **system**, not two pieces: the standard set `whole → 64th` is stated whether or not Bach or Brahms happens to use it. The corpus has no 32nds or 64ths at all, so §E **constructs** the specimens — the rest specimen’s new 32nd and 64th silences, and the duration specimen’s tertiary 32nd run, quaternary 64th run, mixed levels in one beat, lone-16th partial beams and solo triple/quad flags. `beamLevel = f(duration)` builds the levels generically: a 128th would be data, not architecture.',
-    windows: ROUND_22_WINDOWS.filter(
-      (w) => w.scoreId === DURATION_SPECIMEN_STUDIO_SCORE_ID
-    ),
-    tags: ['32nd', '64th', 'stubs', 'beam levels'],
+      'Three middle-C-centered hairlines at C3–C5 (lin 36/48/60) — the efficiency challenger with equal weights. Covers 83.7% of Brahms; 9 folded notes (8vb) across mm. 5, 15, 23, 33, 43, 53, 67, 69. Extensions fire at C2/C6.',
+    axis: 'core',
+    options: { core: 'fixed-3' },
+    windows: ROUND_27_WINDOWS,
+    tags: ['contender', 'fixed-3'],
   },
 ];
 

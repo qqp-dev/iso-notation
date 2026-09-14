@@ -309,6 +309,41 @@ function badgeHtml(badge: CandidateOptionBadge): string {
 }
 
 // ---------------------------------------------------------------------------
+// View 1 · Closer-Comparison Strip
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the closer-comparison strip: the round's declared macro window
+ * engraved under every card's options and laid side by side, so the eye can
+ * flick between schemes without scrolling. No lint chips — the strip is pure
+ * comparison; the verdicts live on the cards below.
+ */
+export function renderCompareStrip(config: JankoStudioConfig = createStudioConfig()): string {
+  const { candidates, round, scores } = config;
+  const strip = round.compareStrip;
+  if (!strip) return '';
+  const entry = scores[strip.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
+  const lastMeasure = strip.measureStart + strip.measureCount - 1;
+  const panels = candidates.map((candidate) => {
+    const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
+    const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
+    const svg = renderJankoCrop(entry.score, strip.measureStart, strip.measureCount, options, tokens);
+    return [
+      `<figure class="strip-panel" data-strip-panel="${escapeHtml(candidate.id)}">`,
+      `  <figcaption><b>${escapeHtml(candidate.label)}</b></figcaption>`,
+      `  <div class="canvas-frame">${canvas(svg)}</div>`,
+      '</figure>',
+    ].join('\n');
+  });
+  return [
+    `<div class="compare-strip" data-strip="${escapeHtml(entry.id)}:${strip.measureStart}-${lastMeasure}">`,
+    `  <div class="strip-head section-title">${escapeHtml(strip.title)} — every scheme side by side</div>`,
+    panels.join('\n'),
+    '</div>',
+  ].join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // View 1 · Decision Candidates Matrix
 // ---------------------------------------------------------------------------
 
@@ -398,11 +433,14 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         : `${candidates.length} candidates × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
+    renderCompareStrip(config),
     `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}">`,
     cards.join('\n'),
     '  </div>',
     '</section>',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 // ---------------------------------------------------------------------------
