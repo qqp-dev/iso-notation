@@ -190,6 +190,16 @@
     .janko-canvas .janko-svg { display: block; width: 100%; height: auto; }
     /* Round 5: a candidate is judged on several engraving windows at once. */
     .candidate-windows { display: flex; flex-direction: column; gap: 10px; }
+    /* Round 26: the closer-comparison strip — one macro window per card in a row. */
+    .compare-strip { display: grid; gap: 12px; margin: 6px 0 22px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+    .compare-strip .strip-head { grid-column: 1 / -1; }
+    .strip-panel { display: flex; flex-direction: column; gap: 5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+    .strip-panel figcaption { font-size: 11.5px; color: #e2e8f0; }
+    .strip-panel figcaption b { font-size: 12px; font-weight: 600; }
+    @media (max-width: 700px) {
+      .compare-strip { grid-auto-flow: column; grid-auto-columns: 86%; grid-template-columns: none; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
+      .strip-panel { scroll-snap-align: start; }
+    }
     .candidate-window { display: flex; flex-direction: column; gap: 5px; }
     .candidate-window figcaption { font-size: 11.5px; color: #e2e8f0; line-height: 1.4; }
     .candidate-window figcaption b { font-size: 12px; font-weight: 600; }

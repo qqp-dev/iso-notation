@@ -1,4 +1,4 @@
-# Ticket: Round 20 — Rest Seats + Urtext Re-cut (rests + ALL flags + whole) + Unison Merge + Nib Fix
+# Ticket: Round 21 — Measured Duration Ink (complete parts whole→64th) + Slabs Onto Lines + Lower-First
 
 ## Kind
 
@@ -6,189 +6,202 @@ bounded
 
 ## Scope of this delegation
 
-Round 20 ONLY (§§A–F + testing plan). This ticket ABSORBS
-`.architect/tickets/da81a560-d651-4348-ac80-d7ac413d9aa8.md` (nib fix —
-do not dispatch separately). Explicitly OUT (deferred, named so nothing
-is lost): Middle-C kills + needs-round definitions; stack-yield mechanism
-is DEAD (R19 approved golden/RH — record its death, do not build it).
-
-Standing corrections to the R19 ticket's scope notes (both verified
-against the code this round — the R19 notes were wrong):
-
-- "Isolated 16th flags never render" is FALSE. Bach renders 11
-  double-hook flags (all `kinetic-tab-beam`); Brahms 109 singles, 0
-  doubles. ALL flags are in scope: 8th singles + 16th doubles, every
-  live subdivision style.
-- "Whole rests do NOT exist in the engine" is FALSE as stated. The glyph
-  value set tops out at `'half'`, but 192-tick silences are statable
-  (`REST_STANDARD_VALUES`) and paint through the half/whole bar path.
-  The whole-bar FORM is fully in scope (re-cut + seat + specimen).
+Round 21 ONLY (§§A–F + testing plan). Explicitly OUT (operator-ruled):
+spacing/justification tightening (Gould-governed; dedicated round —
+see operator ruling on scope item 6); 128th-note glyphs/machinery and
+beyond (past the working set); breve/longa (past the working set);
+retired rest dialects (leave their shapes alone); clasp ring/slash
+SHAPES (our own paradigm invention — no classical source exists to
+measure them against; weights verified only, §B).
 
 ## Problem
 
-1. **Rests don't sit where the notes are.** Operator fact, undisputed:
-   rests read displaced from their rows. Root (operator's diagnosis,
-   adopted): the seating math centers geometric boxes while the eye
-   centers ink gravity — when box math and ink weights disagree, the
-   boxes are wrong.
-2. **Our rests/flags are from-memory interpretations, never measured
-   against a cut.** Operator verdict after side-by-side review: "ours
-   all worse." Every rest glyph + every flag hook gets re-cut to the
-   classical standard. Served comparisons: `public/img/rest16-orig-vs-
-   ours.png`, `sbs_resteighth.png`, `sbs_restquarter.png`,
-   `sbs_resthalf.png`, `sbs_flag8.png` (8th). No 16th-flag comparison
-   exists — the 11 Bach doubles are judged live.
-3. **The Goldberg ends in duplicate.** `bach-var1-550` (RH) +
-   `bach-var1-551` (LH): identical pc7/oct3, tick 4560, dur 48 — two
-   "7"s side by side. Absurd; merge to one. Census: Bach unisons = 1
-   (this one). Brahms = 7 (1 same-dur, implementer locates it; 6 with
-   differing durations — see §D). Operator rule: one onset + one pitch
-   = one sound event = ONE digit, always — no one draws the same note
-   twice, on piano or anywhere else.
-4. **Dotted-clasp nib** (absorbed ticket): the clasp dot fuses with its
-   own mark (m.3 tick 432: ~1.05pt overlap of dot into ring stroke;
-   10 dotted-ring + 2 dotted-slash cases in Brahms, all fused). Clasp
-   dots are unaudited today.
-5. **R19 verdict close-out.** R19 golden (RH anchor) APPROVED by the
-   operator. The `clusterAnchor` demonstrator axis is dead: RH behavior
-   becomes the only path.
+R20's rest work was judged by the operator: nib fix good, everything
+else rejected ("just as bad", "must be structural"). Verified causes:
+
+1. **Nothing was measured.** R20's shapes were hand-drawn from verbal
+   descriptions ("U+1D13B-class proportions") plus eyeballed PNGs of
+   Noto Music. Zero font-outline extraction, zero source citations in
+   code. The quarter is literally a monoline zigzag in code
+   (`REST_URTEXT_LIGHTNING_*`, class `janko-rest-lightning`) — a
+   lightning bolt next to Noto's calligraphic squiggle (contrast,
+   hooks, crossing stroke). The 8th/16th read as ovals stuck on a
+   stick, not hooks grown from a stem.
+2. **Slabs seat to invisible rows.** Half/whole slabs (5.2×1.4pt) sit on
+   phrase-row pitch positions while the drawn staff lines pass 4–5pt
+   away, touching nothing. Classical slabs derive their MEANING from
+   touching a line (half sits ON, whole hangs FROM). No shape polish
+   can fix a slab that touches nothing — RestSpec m.4/m.5 read as
+   floating bricks. (RestSpec m.1/m.2 16th/8th approved as-is; Bach
+   m.4/m.6 seats measure dead-on (x ≤0.2pt, y on voice rows) — their
+   strangeness is glyph quality, fixed by §B.)
+3. **RH-anchor violates lower-first in 16 rows.** The shipped rule puts
+   RH left regardless of pitch (R19 incumbent kept through a
+   misread approval; R20 deleted the alternative). The operator's
+   standing rule is lower-note-first. Disagreements: Bach 8
+   (bar3:t408, bar5:t672, bar8:t1032, bar12:t1632, bar15:t2040,
+   bar15:t2064, bar23:t3216, bar31:t4368 — LH always lower, always
+   right) + Brahms 8 (bar7:t1296, bar17:t3216, bar26:t4848, bar28:t5400,
+   bar29:t5592, bar46:t8688, bar48:t9240, bar49:t9432).
+4. **Completeness = the working set, not the corpus (operator ruling).**
+   This is a notation SYSTEM, not two pieces: the standard working
+   set whole→64th must be complete whether or not Bach/Brahms
+   exercise it. Census (context, NOT scope): the engine paints stems,
+   primary beams, secondary (16th) beams (Bach 106; Brahms 0),
+   solitary flags single (8th) + double (16th) (Bach 34+11, Brahms
+   109+0), augmentation dots (Bach 19), clasp rings/slashes/dots
+   (37/2/12), rest stems/hooks/slabs/serpentine; the corpus has no
+   32nds or 64ths (min durs Bach 12 / Brahms 18) and no lone-16th
+   groups. So §E CONSTRUCTS the missing specimens (RestSpec
+   precedent) and builds: 32nd + 64th rests + triple/quad flags +
+   tertiary/quaternary beam levels + lone-16th/lone-32nd/lone-64th
+   stubs. One verify-item (exhibit, NOT a defect): sys0 secondary
+   span 41.80–51.96 — prove which group owns it and that every
+   secondary span covers 16th stems only.
 
 ## Change
 
-### A. Optical rest seats (the boxes were wrong)
+### A. Measure first (step 0 — gates everything else)
 
-- Rests stay on phrase rows. Seating is OPTICAL: the glyph's
-  ink-centroid sits on the seat point, both axes. Per-glyph boxes carry
-  their gravity point (the centroid is data, computed from the glyph's
-  ink, not from its bounding box).
-- Linter asserts centroid-on-row (violation, not warning).
-- Applies to every rest value incl. the whole-bar form.
+- Fetch **Bravura OTF** (the SMuFL reference font, OFL —
+  github.com/steinbergmedia/bravura, releases/redist) and **Noto
+  Music** (Google Fonts, OFL — the repo's existing "original").
+  Extract outlines (fontTools) for: restQuarter, rest8th, rest16th,
+  restHalf, restWhole, flag8thUp/Down, flag16thUp/Down,
+  augmentationDot (+ noteheadBlack for weight reference; + rest32nd,
+  flag32ndUp/Down, rest64th, flag64thUp/Down for §E). Reuse
+  /tmp/fontenv + already-downloaded font files if present (a prior
+  run staged them).
+- Record the MEASUREMENT TABLE in code comments + hand-off: font
+  file versions, glyph names, units-per-em, bbox, height/width,
+  max/min stroke, hook reach/drop/curvature extrema, stem lean,
+  slab W/H.
+- DEFINE the space→pt scale mapping explicitly (our lattice has no
+  staff-space — the mapping is the crux; no silent scaling).
+- STOP: if the fonts are unobtainable, STOP and report — do not fall
+  back to eyeballing.
 
-### B. Urtext re-cut — rests + ALL flags + whole bar
+### B. Cut every part to the numbers
 
-- Re-cut to classical standard shapes, keeping our 0.90pt weights and
-  the §A optical seats: 16th / 8th / quarter / half-bar / whole-bar
-  rests (reference U+1D13B–U+1D140-class proportions: slanted stems
-  with oval heads, true serpentine quarter, wide slabs) and EVERY flag
-  hook the engine paints — 8th singles, 16th doubles, all live
-  subdivision styles (implementer inventories ALL flag paint sites;
-  reference U+1D160-class taper curve). No per-glyph special rules; no
-  grid relaxation.
-- Half vs whole bar: implementer FIRST verifies how 96- vs 192-tick
-  silences paint today, then cuts both forms to classical standard
-  (whole hangs below its seat row, half sits atop its own) under the
-  optical seats. If the two forms paint identically today, that is part
-  of this defect, not a separate ticket.
-- Rest-duration-specimen gains a 192-tick whole-silence context (no
-  whole form renders anywhere in the corpus today — Bach 16th×3/8th×3/
-  qtr×3, Brahms 16th×3, RestSpec one each 16th/8th/qtr/half). Mirrors
-  the Round 9/10 specimen precedent: the whole bar is judged on clean
-  material.
+- Quarter: measured serpentine (contrast + hooks + crossing per the
+  outlines); the lightning polyline is DELETED.
+- 8th/16th rests: stem + grown hooks per outlines (kill the stuck-on
+  oval joints); slabs: measured W/H.
+- Flags (single + double): verify the R20 taper against the measured
+  outlines; adjust IFF off (no churn for its own sake). Dots: verify
+  r=0.75 against measured; adjust IFF off. Stems/beams weights:
+  verify-only.
+- Clasp rings/slashes: keep shapes (no source exists); verify weights
+  sit in the family; adjust IFF off.
+- NO freelancing: every constant traces to the measurement table.
 
-### C. Flags — same bar as rests
+### C. Slabs onto visible lines
 
-Covered by §B (listed separately so it can never be scoped back out):
-every `janko-flag` the renderer emits, single or double hook, re-cut to
-the classical taper. Judged live on Bach (34 singles + 11 doubles) and
-Brahms (109 singles).
+- Half sits ON / whole hangs FROM the nearest DRAWN staff line
+  (touching). Tie → toward middle C. Measure current slab-to-line
+  gaps first; STOP if any slab must travel an absurd distance
+  (implementer justifies the bound from the measured distribution in
+  the hand-off).
+- Linter violation: slab edge off its line (+ fixture). Whole centered
+  in its measure per Gould (resolves R20's open point); half x stays
+  on its beat column.
+- Whole-centering implementation notes (measured R20 live, RestSpec
+  m.5, 4/4, tpm=192): barlines 214.29/392.79, center 303.54; current
+  slab centroid 220.29 (6.0pt after the opening barline — 83pt off).
+  `isWholeBarSilence` ⇒ x = barline midpoint, EXEMPT from the
+  beat-cell nudge (a centered whole sits outside its onset beat cell
+  by design). Caution: the center column coincides with the LH C3
+  onset column (tick 864 → x=303.54) — clears vertically by row
+  separation; the linter must confirm, never shift the slab to dodge.
+  Verified citation (LilyPond Notation Reference §§2.2.1/2.2.3,
+  v2.19–v2.25): "Whole measure rests, centered in the middle of the
+  measure" / "A full-measure rest is printed as either a whole or
+  breve rest, centered in the measure, depending on the time
+  signature."
 
-### D. Unison merge (one sound → one digit; rhythm stays per-voice)
+### D. Lower-first THE rule
 
-- Same onset + same pitch + both hands → ONE digit at the
-  anchor-winner's column x (golden: the RH head's x). NO duration veto
-  (the architect's veto idea is withdrawn — the operator is right: one
-  onset+pitch is one sound event, it can only be produced once, and no
-  one draws it twice). All 8 corpus unisons merge: Bach final 550/551,
-  Brahms same-dur ×1, and the 6 Brahms differing-duration unisons
-  (11376:6:2 84/24, 11472:3:2 84/24, 12360:9:2 21/156, 12384:2:3
-  21/132, 12552:9:2 21/156, 12576:2:3 21/132).
-- Exact duplicates (Bach final + Brahms same-dur): voices identical →
-  one digit + one rhythm voice.
-- Differing durations: one digit + BOTH rhythm voices via the EXISTING
-  mixed-duration machinery (coincident stems, each voice's beam/flag at
-  its own end — the R16 rule; clasp duration groups are already
-  per-hand per R19). Rationale: heads merge because there is one sound;
-  rhythm voices stay per-voice because beams carry meter and phrasing —
-  longest-only would punch holes in beam groups. No new doctrine: the
-  merged head is an ordinary two-voice mixed-duration unit. Same deal
-  as traditional notation's one-head-two-stems.
-- STOP: if the mixed-duration machinery assumes single-hand somewhere
-  load-bearing, STOP and report — do not fork the doctrine silently.
-- Linter: same-onset+same-pitch both-hands rendering two digits is a
-  violation after this ticket, no duration exception (the defect class
-  may never return silently).
+- Re-add the anchor with lower-first canonical; RH path REMOVED
+  (mirror of R20's retirement — a rule, not an option). Unison
+  survivor = the LOWER head's x (updates R20). Un-record the
+  stack-yield death in the harness doc: yield lives ONLY if the STOP
+  below trips.
+- Bach: all 8 rows flip (proven safe — max one head per hand per
+  onset corpus-wide, so swapping x within a row preserves the stem-x
+  set; no stem can meet a new disc; no brackets/dots; beams re-fit
+  under the linter).
+- Brahms: all 8 flip via full sweep. STOP: the exact R19 stem
+  signatures (0.00/2.73pt stem-through-simultaneity in golden
+  paradigms) → STOP + report; never a silent hybrid.
 
-### E. Nib fix (absorbed — result binding, mechanism free)
+### E. 32nd + 64th completeness (the system, not the specimen)
 
-- Dotted clasps (all 12 Brahms cases): the dot reads as a clean
-  satellite of its mark — daylight ≥ hug air vs mark ink AND vs every
-  neighbor ink box, in 2D. Recommended (NOT binding): up-and-right of
-  the mark tracking its edge, through a shared helper with note dots.
-  Firmly rejected with reason: wedging at `yMid` (channel infeasible).
-  Hug air from existing dot tokens; no new magic numbers; note-dot
-  pixels byte-identical (guard it — unification with note dots is
-  optional, only if zero-move).
-- `claspInkBox` / `CLASP_MARK_REACH` follow the paint exactly.
-- New linter violation on clasp-dot/mark fusion (kebab-case, existing
-  style). STOP CONDITION: if hug air can't be met in 2D on any corpus
-  case, STOP and report numbers — no graze, no unilateral air shrink,
-  no spine move.
+- 32nd rest (stem + three grown hooks per §A outlines) + 64th rest
+  (stem + four hooks), 32nd solitary flags (triple hooks up/down) +
+  64th flags (quad hooks), TERTIARY + QUATERNARY beam levels (build
+  beam levels GENERICALLY: level = f(duration) — full spans +
+  partial inner spans exactly like 16ths; 128th later = data, not
+  architecture), lone-16th + lone-32nd + lone-64th beamlet stubs
+  per Gould (backward stubs; cite the clause; direction rule
+  tested).
+- CONSTRUCTED SPECIMENS (RestSpec precedent — no unproven parts):
+  extend the specimen suite with 32nd/64th runs, mixed groups,
+  lone 16ths/32nds/64ths in coarser groups, solo 32nd/64th flags.
+  Every §E part renders on a specimen window.
 
-### F. Verdict close-out + Round 20 registry
+### F. Round 21 registry (verification, no open axis)
 
-- Retire `clusterAnchor`: RH behavior canonical, demonstrator + option
-  removed, tests/registry updated. Record the stack-yield's death in
-  the harness doc (one line: decided against by R19 approval, not
-  deferred).
-- Registry: Round 20 is a VERIFICATION round — no open axis. Windows on
-  fixed golden (implementer follows the studio's no-open-axis form per
-  `test/janko-studio.test.ts` + studio arch): rest specimen incl. new
-  whole context; Bach 8th-flag + 16th-flag windows; Brahms seat
-  windows; unison windows (Bach final + Brahms merges, beams visible);
-  m.3 nib window.
-- Record seats + re-cut + unison + nib in `docs/janko_engraving_harness.md`.
+Windows on fixed golden (studio no-open-axis form): rest specimen
+(all 5, new cuts + slab seats), Bach m.4/m.6 + Brahms rest bars,
+all 16 anchor rows (before/after order pinned), the 9 mixed-level
+beam groups (incl. the sys0 exhibit), 32nd/64th specimen windows
+(runs, mixed groups, lone stubs, solo flags), m.3 nib guard,
+Bach-final unison guard. Harness doc: measurements + Gould cites +
+lower-first.
 
 ## Testing plan
 
 - `npm test` — green. `npm run lint:engraving --strict` — clean on
-  Bach + Brahms (+ specimens) golden. `npm run build` — clean.
-- Seats: centroid-on-row pinned per value (incl. whole-bar form).
-- Re-cut: shape-proportion pins where the reference gives numbers;
-  everything else judged live (macro windows) — no fake-precision
-  assertions on curves.
-- Whole: hang-vs-sit pinned (whole hangs below seat row, half sits
-  atop); RestSpec whole context renders exactly one whole bar.
-- Unison: 550/551 render one digit; all 7 Brahms unisons render one
-  digit with both beams/flags intact (no beam holes); violation
-  fixture on same-pitch doubling.
-- Nib: m.3 satellite daylight (mechanism-free pin + recorded position);
-  score-wide sweep all 12 dotted clasps; note-dot no-move guard;
-  violation fixture on old fused geometry.
-- Full-score visual sweep (/tmp renders, never committed): every moved
-  rest, every re-cut flag, both merges, all 12 moved dots — both
-  scores + specimens. Rest/flag ink moves score-wide; the sweep is the
-  gate, not the windows.
-- `public/img/` + checkout root untouched.
+  all scores incl. new specimens. `npm run build` — clean.
+- Table-pinned proportions per part (bbox/weight/hook numbers from
+  §A; curves judged live, no fake-precision curve assertions).
+- Slab-touch + whole-centering pins (slab x == barline midpoint —
+  R20 live RestSpec m.5: 220.29 → 303.54; half x unchanged on its beat
+  column). Lower-first order pins (all 16
+  rows) + stem tripwire (R19 signatures absent — the test FAILS if
+  they occur). Violation fixtures (slab-off-line; same-pitch
+  doubling stays green).
+- 32nd/64th completeness: rest/flag/stub/tertiary/quaternary pins
+  from the §A table; every new part renders on its specimen window;
+  beam-level generality (level-3/4 spans mirror level-2 rules);
+  lone-stub direction pin (Gould backward rule).
+- No-move guards: noteheads/digits/stems/beams coordinates
+  byte-identical except the prescribed moves (rest ink, slab seats,
+  16 row swaps, flag/dot adjustments IFF measurements demand —
+  each move listed in the hand-off).
+- Full-score sweep (/tmp, never committed). `public/img/` + root
+  untouched.
+- Test-first on the behavior pins: observe each pin FAIL on the
+  unmodified worktree (e.g. whole-centering sees 220.29) before
+  implementing; run the focused test after the final relevant edit.
 
 ## Risks
 
-- Seats move every rest; re-cut moves every rest + flag. Blast radius
-  is total ink, judgment is the operator's eye on live macros — the
-  implementer's sweep must be genuinely full-score, not window-deep.
-- Whole-bar hang must not collide with the row below (linter + sweep).
-- Unison merge touches Bach's final bar + 7 Brahms onsets. The
-  differing-duration six keep both rhythm voices — the sweep must
-  confirm every beam group survives whole.
-- Dots move toward heads: the digit side is the tight side (see §E
-  STOP). Spine never moves.
-- Registry form: no-open-axis rounds must still satisfy the studio
-  architecture tests — implementer reads those tests before writing the
-  registry.
+- The space→pt scale mapping is the crux of the round — explicit,
+  recorded, reviewed; a wrong scale repeats R20.
+- Slab travel distribution unknown until measured (§C STOP covers).
+- Tertiary/quaternary beam levels must generalize level-2 rules
+  (spans, gaps, obstacle passes) — no forked beam-code paths.
+- Downbeat-rest presence (Bach m.6) must be re-judged live; residual
+  void = spacing follow-up (Gould-governed, operator-ruled),
+  never a rest-slide in this ticket.
+- Retired dialects untouched.
 
 ## Review
 
-Post-land studio `http://100.102.70.49:5175/janko.html` — Round 20
-verification windows. Operator verdicts: (1) seats read — rests sit
-where the notes are; (2) urtext cuts approved — rests, ALL flags,
-whole bar; (3) unisons merged — Bach final single 7, all 7 Brahms
-single digits with beams intact; (4) nib gone.
+Post-land studio `http://100.102.70.49:5175/janko.html` — Round 21
+verification windows. Operator verdicts: (1) quarter reads classical;
+(2) slabs touch their lines; (3) hooks grown, not stuck on; (4)
+lower-first in all 16 rows; (5) the complete parts walk whole→64th
+(every mark traces to a measurement; stubs + tertiary/quaternary
+beams on specimen windows).

@@ -53,7 +53,7 @@
  * (below the lower rule).
  */
 
-import { Hand } from '../../model/types';
+import { Hand, QuantizedGridScore } from '../../model/types';
 import {
   JANKO_CHANNEL_LAYOUT_LABELS,
   JANKO_STAFF_OCTAVES,
@@ -237,6 +237,51 @@ export interface JankoPitchCoordinate {
 export function getWholeToneRank(pitchClass: number): JankoWholeToneRank {
   const pc = ((pitchClass % 12) + 12) % 12;
   return (pc % 2) as JankoWholeToneRank;
+}
+
+// ---------------------------------------------------------------------------
+// Continuous pitch height (the pitch-mapping round)
+// ---------------------------------------------------------------------------
+
+/**
+ * Linear pitch of the staff's Middle C line: middle C the note (linear 48).
+ * Every continuous mapping pins C4 exactly onto `middleCY` — the landscape
+ * benchmark's spine-at-pitch-48 — so C4 heads are pierced by the anchor with
+ * knockout holes (standard middle-C ledger behavior) and B3 stands a full
+ * semitone below it.
+ */
+export const CONTINUOUS_PITCH_ANCHOR_LIN = 48;
+
+/**
+ * Fallback pitch window (semitones) when a score is unavailable: C2–C6, the
+ * four-octave grand span. Score-aware callers always use the score's own
+ * range instead (see {@link pitchWindowForScore}).
+ */
+export const DEFAULT_PITCH_WINDOW: { readonly min: number; readonly max: number } = {
+  min: 24,
+  max: 72,
+};
+
+/**
+ * Continuous pitch height of one linear pitch, relative to the Middle C
+ * line: every semitone higher stands exactly `scale` pt higher on the page.
+ */
+export function continuousPitchY(lin: number, scale: number): number {
+  return -(lin - CONTINUOUS_PITCH_ANCHOR_LIN) * scale;
+}
+
+/** Exact linear-pitch range of a score: the continuous window. */
+export function pitchWindowForScore(score: QuantizedGridScore): { min: number; max: number } {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const n of score.notes) {
+    const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
+    const lin = n.pitch.octave * 12 + pc;
+    if (lin < min) min = lin;
+    if (lin > max) max = lin;
+  }
+  if (!Number.isFinite(min)) return { min: 48, max: 48 };
+  return { min, max };
 }
 
 /**
@@ -449,6 +494,12 @@ export function getEquatorYForOctave(
   void hand;
   const t = resolveJankoTokens(tokens);
   const o = resolveJankoOptions(options);
+  if (o.pitchMapping !== 'twin-rows') {
+    // Vestigial under the continuous mappings (the grid has no equators):
+    // the octave-center height, so head-relative furniture that still asks
+    // for an equator degrades gracefully instead of landing on stale rows.
+    return continuousPitchY(octave * 12 + 5.5, t.semitoneScale);
+  }
   const halfGap = o.interStaffGap / 2;
   return octave >= 4
     ? -halfGap - (octave - 4) * t.octaveStep
@@ -516,6 +567,29 @@ export function getPitchCoordinate(
 ): JankoPitchCoordinate {
   const o = resolveJankoOptions(options);
   const pc = ((pitchClass % 12) + 12) % 12;
+  if (o.pitchMapping !== 'twin-rows') {
+    // Continuous height: the head stands at its exact pitch, its own
+    // equator (offset 0), with no rows, no ledgers and nothing out of staff.
+    // Rank/row/side stay parity facts so head-relative consumers keep working.
+    const t = resolveJankoTokens(tokens);
+    const y = continuousPitchY(octave * 12 + pc, t.semitoneScale);
+    const rank = getWholeToneRank(pc);
+    return {
+      pitchClass: pc,
+      octave,
+      hand,
+      rank,
+      row: rank,
+      side: rank === 0 ? 'below' : 'above',
+      flank: null,
+      offsetFromEquator: 0,
+      equatorY: y,
+      y,
+      isOutOfStaff: false,
+      ledgerYs: [],
+      ledgerY: null,
+    };
+  }
   const rank = getWholeToneRank(pc);
   const layout = o.channelLayout;
   const dynamic = usesContourFlanks(layout);

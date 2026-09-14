@@ -26,6 +26,7 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
+import { DEFAULT_PITCH_WINDOW, continuousPitchY } from '../geometry';
 import { f } from './style';
 
 type Hand = 'RH' | 'LH';
@@ -74,6 +75,7 @@ export function renderStaffLines(
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
+  if (o.pitchMapping !== 'twin-rows') return renderPitchGrid(geo, o, t);
   const out: string[] = ['  <g class="janko-staff-lines">'];
 
   // Round 8 uniformizes the hierarchy: all four octave equators (RH 5, LH 2,
@@ -102,11 +104,199 @@ export function renderStaffLines(
   return out.join('\n');
 }
 
+/** Ink of the Middle C divider (the landscape benchmark's dark spine). */
+export const PITCH_GRID_DIVIDER_INK = '#0F172A';
+/** Weight of the Middle C divider: firm, not bold (2x the faint C-lines). */
+export const PITCH_GRID_DIVIDER_STROKE = 0.65;
+/** Ink of the grand grid's faint C-lines. */
+export const PITCH_GRID_C_LINE_INK = '#64748B';
+/** Weight of the grand grid's faint C-lines. */
+export const PITCH_GRID_C_LINE_STROKE = 0.35;
+/** Ink of the lanes' strengthened C-lanes. */
+export const PITCH_GRID_C_LANE_INK = '#334155';
+/** Weight of the lanes' strengthened C-lanes. */
+export const PITCH_GRID_C_LANE_STROKE = 0.6;
+/** Ink of the lanes' semitone hairlines. */
+export const PITCH_GRID_LANE_INK = '#94A3B8';
+/** Weight of the lanes' semitone hairlines. */
+export const PITCH_GRID_LANE_STROKE = 0.3;
+/** Ink of the equal-scheme octave lines: the golden equator spec, exactly. */
+export const PITCH_GRID_OCTAVE_INK = '#1E293B';
+/** Weight of the equal-scheme octave lines: the golden equator spec, exactly. */
+export const PITCH_GRID_OCTAVE_STROKE = 0.5;
+/** Length (pt) of the clef-marker anchor tick at each system start. */
+export const PITCH_GRID_MARKER_LENGTH = 20;
+
+/** One horizontal rule of a continuous pitch grid, paint-ready. */
+export interface PitchGridRule {
+  /** Absolute page y of the rule. */
+  y: number;
+  /** Absolute page x where the rule starts. */
+  x1: number;
+  /** Absolute page x where the rule ends. */
+  x2: number;
+  /** Stroke ink. */
+  ink: string;
+  /** Stroke width (pt). */
+  width: number;
+  /** SVG class list (without the `class=""` wrapper). */
+  cls: string;
+}
+
+/**
+ * The line set of a continuous pitch grid, in paint order (the divider first,
+ * then ascending pitch) — the single source the painter, the engine's drawn
+ * rule list and the linter all read, so "a drawn line" can never mean
+ * something the page does not show. Empty under `'twin-rows'` (the equators
+ * are not pitch-grid rules).
+ *
+ * The grand grid draws one faint C-line per octave plus the middle-C
+ * anchor; the chromatic lanes one lane per semitone (C-lanes strengthened)
+ * plus the divider — lines within 2pt of the middle are omitted, since the
+ * anchor owns it. The equal schemes draw no anchor at all: golden-weight
+ * hairlines at the octave middles (`'equal-centers'`) or at the C boundaries
+ * (`'equal-boundaries'`, the C4 line included — with no anchor there is
+ * nothing to defer to). `'clef-marker'` keeps the divider grid's C-lines
+ * with a short anchor tick at each system start instead of the full rule.
+ */
+export function pitchGridRules(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): PitchGridRule[] {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  if (o.pitchMapping === 'twin-rows') return [];
+  const window = geo.pitchWindow ?? DEFAULT_PITCH_WINDOW;
+  const yOf = (lin: number): number => geo.middleCY + continuousPitchY(lin, t.semitoneScale);
+  const x1 = geo.staffLeft;
+  const x2 = geo.staffRight;
+  if (o.pitchMapping === 'chromatic-lanes') {
+    const out: PitchGridRule[] = [
+      {
+        y: geo.middleCY,
+        x1,
+        x2,
+        ink: PITCH_GRID_DIVIDER_INK,
+        width: PITCH_GRID_DIVIDER_STROKE,
+        cls: 'janko-pitch-divider',
+      },
+    ];
+    for (let lin = window.min; lin <= window.max; lin++) {
+      const y = yOf(lin);
+      if (Math.abs(y - geo.middleCY) < 2.0) continue;
+      const isC = ((lin % 12) + 12) % 12 === 0;
+      out.push({
+        y,
+        x1,
+        x2,
+        ink: isC ? PITCH_GRID_C_LANE_INK : PITCH_GRID_LANE_INK,
+        width: isC ? PITCH_GRID_C_LANE_STROKE : PITCH_GRID_LANE_STROKE,
+        cls: `janko-pitch-lane${isC ? ' janko-pitch-clane' : ''}`,
+      });
+    }
+    return out;
+  }
+  if (o.octaveLineScheme === 'equal-centers') {
+    const out: PitchGridRule[] = [];
+    for (let n = Math.floor(window.min / 12); n <= Math.floor(window.max / 12); n++) {
+      const c = n * 12 + 5.5;
+      if (c < window.min || c > window.max) continue;
+      out.push({
+        y: yOf(c),
+        x1,
+        x2,
+        ink: PITCH_GRID_OCTAVE_INK,
+        width: PITCH_GRID_OCTAVE_STROKE,
+        cls: 'janko-pitch-octave',
+      });
+    }
+    return out;
+  }
+  if (o.octaveLineScheme === 'equal-boundaries') {
+    const out: PitchGridRule[] = [];
+    for (let c = Math.ceil(window.min / 12) * 12; c <= window.max; c += 12) {
+      out.push({
+        y: yOf(c),
+        x1,
+        x2,
+        ink: PITCH_GRID_OCTAVE_INK,
+        width: PITCH_GRID_OCTAVE_STROKE,
+        cls: 'janko-pitch-lane janko-pitch-clane',
+      });
+    }
+    return out;
+  }
+  const clines: PitchGridRule[] = [];
+  for (let lin = window.min; lin <= window.max; lin++) {
+    const isC = ((lin % 12) + 12) % 12 === 0;
+    if (!isC) continue;
+    const y = yOf(lin);
+    if (Math.abs(y - geo.middleCY) < 2.0) continue;
+    clines.push({
+      y,
+      x1,
+      x2,
+      ink: PITCH_GRID_C_LINE_INK,
+      width: PITCH_GRID_C_LINE_STROKE,
+      cls: 'janko-pitch-lane janko-pitch-clane',
+    });
+  }
+  if (o.octaveLineScheme === 'clef-marker') {
+    return [
+      {
+        y: geo.middleCY,
+        x1,
+        x2: x1 + PITCH_GRID_MARKER_LENGTH,
+        ink: PITCH_GRID_DIVIDER_INK,
+        width: PITCH_GRID_DIVIDER_STROKE,
+        cls: 'janko-pitch-marker',
+      },
+      ...clines,
+    ];
+  }
+  return [
+    {
+      y: geo.middleCY,
+      x1,
+      x2,
+      ink: PITCH_GRID_DIVIDER_INK,
+      width: PITCH_GRID_DIVIDER_STROKE,
+      cls: 'janko-pitch-divider',
+    },
+    ...clines,
+  ];
+}
+
+/**
+ * The continuous pitch grid (the pitch-mapping round): every rule of
+ * {@link pitchGridRules} in paint order. Notehead knockouts cut the rules
+ * cleanly behind heads.
+ */
+export function renderPitchGrid(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const out: string[] = ['  <g class="janko-pitch-grid">'];
+  for (const rule of pitchGridRules(geo, options, tokens)) {
+    out.push(
+      renderRule(rule.x1, rule.x2, rule.y, rule.ink, rule.width).replace(
+        '<line',
+        `<line class="${rule.cls}"`
+      )
+    );
+  }
+  out.push('  </g>');
+  return out.join('\n');
+}
+
 /**
  * Subtle dashed guidelines showing the two whole-tone row lanes (odd rank
  * above / even rank below each staff equator). They are intentionally faint:
  * pure registration aids, never musical content — and **off by default**, so
- * the score keeps zero horizontal dotted lines.
+ * the score keeps zero horizontal dotted lines. Under the continuous mappings
+ * there are no rows, so there is nothing to guide.
  */
 export function renderRowGuidelines(
   geo: JankoSystemGeometry,
@@ -115,6 +305,7 @@ export function renderRowGuidelines(
 ): string {
   const o = resolveJankoOptions(options);
   if (!o.showRowGuidelines) return '';
+  if (o.pitchMapping !== 'twin-rows') return '';
   const t = resolveJankoTokens(tokens);
   const halfRow = t.rowHeight / 2;
   const out: string[] = ['  <g class="janko-row-guidelines" opacity="0.45">'];
@@ -147,6 +338,8 @@ export function renderMiddleCSpine(
 ): string {
   const o = resolveJankoOptions(options);
   if (o.middleCSpine === 'none') return '';
+  // Under the continuous mappings the grid's own divider owns the middle.
+  if (o.pitchMapping !== 'twin-rows') return '';
   const t = resolveJankoTokens(tokens);
   const y = geo.middleCY;
   const x1 = geo.staffLeft + t.measureInset;
@@ -207,6 +400,11 @@ export function renderOctaveLabels(
   _tokens?: Partial<JankoTokens> | null
 ): string {
   const o = resolveJankoOptions(options);
+  // The continuous grids read by shape and position; their margin landmarks
+  // are opt-in, like the twin octave labels.
+  if (o.pitchMapping !== 'twin-rows') {
+    return o.showPitchLabels ? renderPitchLabels(geo, o, _tokens) : '';
+  }
   if (!o.showOctaveLabels) return '';
   const x = geo.staffLeft - 5;
   const out: string[] = ['  <g class="janko-octave-labels">'];
@@ -219,6 +417,45 @@ export function renderOctaveLabels(
   for (const [hand, oct] of staffEquators) {
     out.push(
       `    <text x="${f(x)}" y="${f(geo.equatorY(hand, oct) + 2.5)}" class="janko-octave-label" text-anchor="end">${oct}</text>`
+    );
+  }
+  out.push('  </g>');
+  return out.join('\n');
+}
+
+/**
+ * Left-margin pitch landmarks for the continuous grids, ending left of the
+ * system-1 bracket's outer rule. Opt-in (`showPitchLabels`): one small serif
+ * `C` label per C in the window (`C3` … `C6`) — except under
+ * `'equal-centers'`, where the lines mark octave middles, so each line
+ * carries its bare octave digit (the twin equator labels reborn).
+ */
+export function renderPitchLabels(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  const window = geo.pitchWindow ?? DEFAULT_PITCH_WINDOW;
+  const x = geo.staffLeft - 13.5;
+  const out: string[] = ['  <g class="janko-pitch-labels">'];
+  if (o.pitchMapping === 'continuous' && o.octaveLineScheme === 'equal-centers') {
+    for (let n = Math.floor(window.min / 12); n <= Math.floor(window.max / 12); n++) {
+      const c = n * 12 + 5.5;
+      if (c < window.min || c > window.max) continue;
+      const y = geo.middleCY + continuousPitchY(c, t.semitoneScale);
+      out.push(
+        `    <text x="${f(x)}" y="${f(y + 1.75)}" class="janko-pitch-label" text-anchor="end">${n}</text>`
+      );
+    }
+    out.push('  </g>');
+    return out.join('\n');
+  }
+  for (let c = Math.ceil(window.min / 12) * 12; c <= window.max; c += 12) {
+    const y = geo.middleCY + continuousPitchY(c, t.semitoneScale);
+    out.push(
+      `    <text x="${f(x)}" y="${f(y + 1.75)}" class="janko-pitch-label" text-anchor="end">C${c / 12}</text>`
     );
   }
   out.push('  </g>');

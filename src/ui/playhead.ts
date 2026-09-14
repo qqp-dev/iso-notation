@@ -58,7 +58,7 @@ export function locateTick(
   const s = Math.min(Math.floor(m / o.measuresPerSystem), totalSystems - 1);
   const page = Math.floor(s / o.systemsPerPage);
   const systemInPage = s % o.systemsPerPage;
-  const geo = computePageGeometry(o, t);
+  const geo = computePageGeometry(o, t, score);
   const sys = geo.systems[Math.min(systemInPage, geo.systems.length - 1)];
   const slot = Math.min(
     Math.max(0, m - s * o.measuresPerSystem),
@@ -97,7 +97,7 @@ export function tickAtPoint(
   const totalSystems = Math.max(1, countJankoSystems(score, o, t));
   const pages = Math.max(1, Math.ceil(totalSystems / o.systemsPerPage));
   const p = Math.min(Math.max(0, page), pages - 1);
-  const geo = computePageGeometry(o, t);
+  const geo = computePageGeometry(o, t, score);
   let systemInPage = 0;
   for (let i = 0; i < geo.systems.length; i++) {
     if (ptY >= geo.systems[i].slotTopY) systemInPage = i;

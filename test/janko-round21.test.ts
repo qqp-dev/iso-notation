@@ -441,17 +441,26 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 22 verification, four cards, every window resolvable', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 22);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis');
+test('§F registry: round 26 schemes, control plus three, every window resolvable', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 26);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['octaveLineScheme'],
+    'one axis, one card per scheme'
+  );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['verify-measured-cuts', 'verify-slab-lines', 'verify-lower-first', 'verify-working-set']);
+  assert.deepEqual(ids, ['scheme-control', 'scheme-centers', 'scheme-boundaries', 'scheme-clef']);
   const windows = CURRENT_CANDIDATES.flatMap((c) => c.windows ?? []);
-  assert.ok(windows.length >= 12, 'the round shows its evidence windows');
+  assert.equal(windows.length, 8, 'four cards × two shared windows');
+  const control = CURRENT_CANDIDATES[0];
+  assert.deepEqual(
+    Object.keys(control.options ?? {}),
+    ['pitchMapping'],
+    'the control: the firm anchor grid, mapping only'
+  );
+  assert.equal(control.tokens, undefined, 'the control: no token delta');
   for (const candidate of CURRENT_CANDIDATES) {
-    assert.equal(candidate.options, undefined, `${candidate.id}: the golden master, no delta`);
-    assert.equal(candidate.tokens, undefined, `${candidate.id}: no token delta`);
-    assert.ok((candidate.windows ?? []).length > 0, `${candidate.id}: at least one window`);
+    assert.equal((candidate.windows ?? []).length, 2, `${candidate.id}: both windows`);
   }
 });
 

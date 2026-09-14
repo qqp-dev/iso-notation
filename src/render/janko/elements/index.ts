@@ -9,3 +9,4 @@ export * from './rhythm';
 export * from './accolade';
 export * from './barlines';
 export * from './rests';
+export * from './contour';

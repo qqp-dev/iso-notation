@@ -504,6 +504,89 @@ export const JANKO_CHANNEL_LAYOUT_LABELS: Record<JankoChannelLayout, string> = {
   'bounded-channel': 'Bounded Channel (dynamic flanks)',
 };
 
+/**
+ * Pitch-contour thread (the contour round): a hairline melodic thread woven
+ * beneath the noteheads at true pitch height, so stepwise motion reads as
+ * motion even where the twin whole-tone rows draw it flat or backwards.
+ * `'none'` paints no thread, `'rh'` threads the right hand's melody only,
+ * `'both'` threads both hands.
+ */
+export type JankoContourThread = 'none' | 'rh' | 'both';
+
+/** Every contour-thread voice, in the canonical exploration order. */
+export const JANKO_CONTOUR_THREADS: readonly JankoContourThread[] = ['none', 'rh', 'both'];
+
+/** Human-readable names of the contour-thread voices. */
+export const JANKO_CONTOUR_THREAD_LABELS: Record<JankoContourThread, string> = {
+  none: 'No Contour Thread',
+  rh: 'Contour Thread (right hand)',
+  both: 'Contour Thread (both hands)',
+};
+
+/**
+ * Pitch-to-height mapping (the pitch-mapping round): how a pitch becomes a
+ * vertical position.
+ *
+ * - `'twin-rows'` — the golden master: two whole-tone rows per octave on four
+ *   equator rules. Exact, but melodic contour reads flat or backwards.
+ * - `'continuous'` — true pitch height on a sparse grand grid: every semitone
+ *   higher stands strictly higher on the page (`semitoneScale` pt per
+ *   semitone, middle C the note exactly on the Middle C line), so contour
+ *   and transpositional shape read by construction. Faint C-lines, a firm
+ *   middle-C anchor, margin landmarks on request.
+ * - `'chromatic-lanes'` — the same true heights on a dense Klavar-style grid:
+ *   one lane per semitone, C-lanes strengthened, every head grounded on its
+ *   own line.
+ *
+ * The mapping replaces the row framings: `channelLayout` is ignored unless
+ * `'twin-rows'`. The window (which semitones get lanes) is the score's own
+ * range, so every system of a score shares one absolute grid.
+ */
+export type JankoPitchMapping = 'twin-rows' | 'continuous' | 'chromatic-lanes';
+
+/** Every pitch mapping, in the canonical exploration order. */
+export const JANKO_PITCH_MAPPINGS: readonly JankoPitchMapping[] = [
+  'twin-rows',
+  'continuous',
+  'chromatic-lanes',
+];
+
+/** Human-readable names of the pitch mappings. */
+export const JANKO_PITCH_MAPPING_LABELS: Record<JankoPitchMapping, string> = {
+  'twin-rows': 'Twin Rows (golden master)',
+  continuous: 'Continuous Height (grand grid)',
+  'chromatic-lanes': 'Chromatic Lanes (Klavar grid)',
+};
+
+/**
+ * Octave-line scheme (the line-scheme round): which horizontal rules the
+ * grand grid draws. Only meaningful under `pitchMapping: 'continuous'` —
+ * the twin rows keep their equators and the lanes keep their full grid.
+ *
+ * - `'grand-divider'` — the shipped grid: the dark Middle C divider plus one
+ *   faint C-line per octave.
+ * - `'equal-centers'` — one golden-weight hairline per octave middle, no
+ *   divider: the equator grammar reborn in chromatic space.
+ * - `'equal-boundaries'` — one golden-weight hairline per C boundary, no
+ *   divider: lines sit between octaves where fewer heads touch them.
+ * - `'clef-marker'` — the faint C-lines of the divider grid, but the anchor
+ *   is a short clef-like tick at each system start instead of a full-width
+ *   rule: the minimal pair that asks whether the anchor must run full width.
+ */
+export type JankoOctaveLineScheme =
+  | 'grand-divider'
+  | 'equal-centers'
+  | 'equal-boundaries'
+  | 'clef-marker';
+
+/** Every octave-line scheme, in the canonical exploration order. */
+export const JANKO_OCTAVE_LINE_SCHEMES: readonly JankoOctaveLineScheme[] = [
+  'grand-divider',
+  'equal-centers',
+  'equal-boundaries',
+  'clef-marker',
+];
+
 /** Engraving token set: geometric and styling constants (all in pt). */
 export interface JankoTokens {
   /** Vertical distance between the two whole-tone rows. */
@@ -619,6 +702,19 @@ export interface JankoTokens {
    * touches, let alone slices through, the barline it follows.
    */
   claspMinBarlineAir?: number;
+  // --- Contour-round refinements (resolved from defaults) ---
+  /** Vertical scale (pt per semitone) of the contour thread. */
+  contourThreadScale?: number;
+  /** Stroke thickness (pt) of the contour thread. */
+  contourThreadStroke?: number;
+  /** Stroke thickness (pt) of the contour departure ticks. */
+  contourTickStroke?: number;
+  /** Height (pt) of the contour strip below each system. */
+  contourStripHeight?: number;
+  /** Air (pt) between a system's lowest ink and its contour strip. */
+  contourStripAir?: number;
+  /** Vertical scale (pt per semitone) of the continuous pitch mappings. */
+  semitoneScale?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -666,6 +762,12 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   claspStrokeWidth: 0.85,
   claspOffset: 2.8,
   claspMinBarlineAir: 4.0,
+  contourThreadScale: 2.5,
+  contourThreadStroke: 0.5,
+  contourTickStroke: 0.7,
+  contourStripHeight: 24,
+  contourStripAir: 3,
+  semitoneScale: 2.5,
 };
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */
@@ -776,6 +878,12 @@ export interface JankoLayoutOptions {
   showHonorHalo?: boolean;
   /** Draw octave labels at the left margin. */
   showOctaveLabels?: boolean;
+  /**
+   * Draw pitch landmarks at the left margin of the continuous grids (C per C
+   * under most schemes, the bare octave digit under `'equal-centers'`).
+   * Defaults to `false`: the grids read by shape and position.
+   */
+  showPitchLabels?: boolean;
   /** Draw m.d./m.s. hand labels. */
   showHandLabels?: boolean;
   /** Draw stacked time signature numerals (e.g. 3/4) on opening measure. */
@@ -788,6 +896,36 @@ export interface JankoLayoutOptions {
    * beat-grid pulses, so the staff is never cluttered with horizontal dashes.
    */
   showRowGuidelines?: boolean;
+  /**
+   * Pitch-contour thread (the contour round): which hands' melodies carry the
+   * true-pitch hairline. Defaults to `'none'` (see {@link JankoContourThread}).
+   */
+  contourThread?: JankoContourThread;
+  /**
+   * Pitch-contour departure ticks (the contour round): every melody notehead
+   * carries a tiny slash on its outer side (odd rank above, even rank below)
+   * showing where the line goes next (`/` up, `\` down, `–` same, `°`
+   * breath). Defaults to `false`.
+   */
+  contourTicks?: boolean;
+  /**
+   * Pitch-contour strip (the contour round): a narrow absolute-pitch graph
+   * below each system, x-aligned with the music (solid = RH, dashed = LH).
+   * Defaults to `false`.
+   */
+  contourStrip?: boolean;
+  /**
+   * Pitch-to-height mapping (the pitch-mapping round): the twin whole-tone
+   * rows, true continuous height, or true height on chromatic lanes.
+   * Defaults to `'twin-rows'` (see {@link JankoPitchMapping}).
+   */
+  pitchMapping?: JankoPitchMapping;
+  /**
+   * Octave-line scheme (the line-scheme round): which rules the grand grid
+   * draws. Ignored unless `pitchMapping` is `'continuous'`.
+   * Defaults to `'grand-divider'` (see {@link JankoOctaveLineScheme}).
+   */
+  octaveLineScheme?: JankoOctaveLineScheme;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -832,10 +970,16 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   showMeasureNumbers: true,
   showHonorHalo: false,
   showOctaveLabels: false,
+  showPitchLabels: false,
   showHandLabels: false,
   showTimeSignature: false,
   showBeatGrid: true,
   showRowGuidelines: false,
+  contourThread: 'none',
+  contourTicks: false,
+  contourStrip: false,
+  pitchMapping: 'twin-rows',
+  octaveLineScheme: 'grand-divider',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
@@ -892,6 +1036,11 @@ export interface JankoSystemGeometry {
   measureWidth: number;
   /** Absolute y of the global octave equator for `octave` (hand-independent). */
   equatorY(hand: Hand, octave: number): number;
+  /**
+   * Inclusive linear-pitch window (semitones) of the continuous mappings —
+   * the score's own range, shared by every system. Absent under `'twin-rows'`.
+   */
+  pitchWindow?: { min: number; max: number };
 }
 
 /** Absolute page geometry for a Jánko Two-Row page. */
@@ -916,6 +1065,11 @@ export interface JankoPageGeometry {
   staffWidth: number;
   measureWidth: number;
   systems: JankoSystemGeometry[];
+  /**
+   * Inclusive linear-pitch window (semitones) of the continuous mappings —
+   * the score's own range, shared by every system. Absent under `'twin-rows'`.
+   */
+  pitchWindow?: { min: number; max: number };
 }
 
 /** Inclusive octave span of one staff region: [minOctave, maxOctave]. */
