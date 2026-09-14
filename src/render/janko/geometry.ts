@@ -53,7 +53,7 @@
  * (below the lower rule).
  */
 
-import { Hand, QuantizedGridScore } from '../../model/types';
+import { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
 import {
   JANKO_CHANNEL_LAYOUT_LABELS,
   JANKO_STAFF_OCTAVES,
@@ -62,6 +62,7 @@ import {
   JankoStaffOctaveRange,
   JankoTokens,
   JankoLayoutOptions,
+  ResolvedJankoTokens,
   resolveJankoOptions,
   resolveJankoTokens,
 } from './types';
@@ -736,6 +737,28 @@ export function splitTick(
   const measureOffset = Math.floor(tick / t.ticksPerMeasure);
   const tickInMeasure = ((tick % t.ticksPerMeasure) + t.ticksPerMeasure) % t.ticksPerMeasure;
   return { measureOffset, tickInMeasure };
+}
+
+/** Measure index (inside its system) of a note's onset. */
+export function getMeasureIndexOfTick(
+  note: QuantizedNote,
+  geo: { measuresPerSystem: number },
+  systemIndex: number,
+  t: ResolvedJankoTokens
+): number {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (anacrusis > 0) {
+    if (systemIndex === 0) {
+      if (note.startTick < anacrusis) return 0;
+      const elapsed = note.startTick - anacrusis;
+      return 1 + Math.floor(elapsed / t.ticksPerMeasure);
+    }
+    const elapsed = note.startTick - anacrusis;
+    const measureOffset = Math.floor(elapsed / t.ticksPerMeasure);
+    return measureOffset - systemIndex * geo.measuresPerSystem;
+  }
+  const { measureOffset } = splitTick(note.startTick, t);
+  return measureOffset - systemIndex * geo.measuresPerSystem;
 }
 
 export type { JankoStaffOctaveRange };

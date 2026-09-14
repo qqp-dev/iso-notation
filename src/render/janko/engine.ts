@@ -46,6 +46,7 @@ import {
   computeFoldShift,
   continuousPitchY,
   getEquatorYForOctave,
+  getMeasureIndexOfTick,
   getNoteHand,
   getPitchCoordinate,
   getTickX,
@@ -87,6 +88,10 @@ import {
   renderTimeSignature,
   getEquatorRuleYs,
   pitchGridRules,
+  computeBarStaffRows,
+  computeSystemStaffSegments,
+  getBarStaffSegments,
+  getBarStaffRows,
 } from './elements/staff';
 import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, renderNotehead } from './elements/notehead';
 import {
@@ -228,6 +233,28 @@ export function computePageGeometry(
         ? score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick)
         : [];
 
+      const isSys0Anacrusis = s === 0 && (t.anacrusisTicks ?? 0) > 0;
+      const effectiveMeasures = isSys0Anacrusis
+        ? measuresPerSystem + t.anacrusisTicks! / t.ticksPerMeasure
+        : measuresPerSystem;
+      const measureWidth = staffWidth / effectiveMeasures;
+
+      const {
+        segments: staffSegments,
+        staffLines,
+        coreLines,
+        extensionLines,
+      } = computeSystemStaffSegments(
+        sysNotes,
+        s,
+        measuresPerSystem,
+        staffLeft,
+        staffRight,
+        measureWidth,
+        o.core,
+        t
+      );
+
       const writtenLins: number[] = [];
       for (const n of sysNotes) {
         const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
@@ -236,19 +263,7 @@ export function computePageGeometry(
         writtenLins.push(lin + shift);
       }
 
-      let coreLines: readonly number[];
-      const extensionLines: number[] = [];
-      if (o.core === 'fixed-3') {
-        coreLines = [36, 48, 60];
-        if (writtenLins.some((lin) => lin < 30)) extensionLines.push(24);
-        if (writtenLins.some((lin) => lin > 66)) extensionLines.push(72);
-      } else {
-        coreLines = [29.5, 41.5, 53.5, 65.5];
-        if (writtenLins.some((lin) => lin < 23.5)) extensionLines.push(17.5);
-        if (writtenLins.some((lin) => lin > 71.5)) extensionLines.push(77.5);
-      }
-      const staffLines = [...coreLines, ...extensionLines].sort((a, b) => a - b);
-      const allLins = [...staffLines, ...writtenLins];
+      const allLins = [...coreLines, ...staffLines, ...writtenLins];
       const effMin = Math.min(...allLins);
       const effMax = Math.max(...allLins);
       const staffTopY = middleCY + continuousPitchY(effMax, scale) - 16.0;
@@ -256,10 +271,6 @@ export function computePageGeometry(
 
       const equatorY = (hand: Hand, octave: number): number =>
         middleCY + getEquatorYForOctave(octave, hand, t, o);
-      const isSys0Anacrusis = s === 0 && (t.anacrusisTicks ?? 0) > 0;
-      const effectiveMeasures = isSys0Anacrusis
-        ? measuresPerSystem + t.anacrusisTicks! / t.ticksPerMeasure
-        : measuresPerSystem;
 
       systems.push({
         index: s,
@@ -271,12 +282,13 @@ export function computePageGeometry(
         staffBotY,
         staffLeft,
         staffRight,
-        measureWidth: staffWidth / effectiveMeasures,
+        measureWidth,
         equatorY,
         pitchWindow: { min: effMin, max: effMax },
         coreLines,
         extensionLines,
         staffLines,
+        staffSegments,
       });
       continue;
     }
@@ -1234,28 +1246,6 @@ export function usesChordClasps(mode: JankoChordGrouping): boolean {
   return mode !== 'none';
 }
 
-/** Measure index (inside its system) of a note's onset. */
-export function getMeasureIndexOfTick(
-  note: QuantizedNote,
-  geo: JankoSystemGeometry,
-  systemIndex: number,
-  t: ResolvedJankoTokens
-): number {
-  const anacrusis = t.anacrusisTicks ?? 0;
-  if (anacrusis > 0) {
-    if (systemIndex === 0) {
-      if (note.startTick < anacrusis) return 0;
-      const elapsed = note.startTick - anacrusis;
-      return 1 + Math.floor(elapsed / t.ticksPerMeasure);
-    }
-    const elapsed = note.startTick - anacrusis;
-    const measureOffset = Math.floor(elapsed / t.ticksPerMeasure);
-    return measureOffset - systemIndex * geo.measuresPerSystem;
-  }
-  const { measureOffset } = splitTick(note.startTick, t);
-  return measureOffset - systemIndex * geo.measuresPerSystem;
-}
-
 /** Beat column of one note inside its system (page pt, before any chord offset). */
 function getNominalNoteX(
   note: QuantizedNote,
@@ -1775,14 +1765,21 @@ export function nearestLatticeRow(
 export function drawnStaffRuleYs(
   geo: JankoSystemGeometry,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  x?: number
 ): number[] {
   const out: number[] = [];
   // The truthful drawn-lines list under each mapping: the continuous grids
   // read the painter's own line set (every lane on the Klavar grid, the
   // scheme's lines on the grand grid), so the list cannot drift from the ink.
   if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-    return pitchGridRules(geo, o, t)
+    const allRules = pitchGridRules(geo, o, t);
+    const rules =
+      x !== undefined
+        ? allRules.filter((r) => r.x1 <= x + 0.01 && x <= r.x2 + 0.01)
+        : allRules;
+    const pool = rules.length > 0 ? rules : allRules;
+    return pool
       .map((rule) => rule.y)
       .sort((a, b) => a - b);
   }
@@ -1805,9 +1802,10 @@ export function nearestDrawnStaffRule(
   y: number,
   geo: JankoSystemGeometry,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  x?: number
 ): number {
-  const rules = drawnStaffRuleYs(geo, o, t);
+  const rules = drawnStaffRuleYs(geo, o, t, x);
   let best = rules[0];
   for (const rule of rules) {
     const d = Math.abs(rule - y);
@@ -1846,12 +1844,13 @@ function restSeatY(
   value: JankoRestGeometry['value'],
   t: ResolvedJankoTokens,
   geo: JankoSystemGeometry,
-  o: ResolvedJankoLayoutOptions
+  o: ResolvedJankoLayoutOptions,
+  x?: number
 ): number {
   if (isBarRestValue(value)) {
     // Every mapping snaps slabs to drawn lines: bar rests are measure
     // furniture, seated on landmarks rather than tracing the voice.
-    return nearestDrawnStaffRule(rowY, geo, o, t);
+    return nearestDrawnStaffRule(rowY, geo, o, t, x);
   }
   return rowY + restSeatOffsetY(value, style, t);
 }
@@ -2127,12 +2126,16 @@ export function computeJankoRestLayer(
       if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
       if (value !== 'whole' && !activeMeasures.has(measureIdx)) continue;
       const { rowY, dir } = restPhraseRowReference(hand, ticks[i], ticks[i + 1], notes, geo, t, o);
-      const targetY = restSeatY(rowY, o.restStyle, value, t, geo, o);
+      const colX = getTickColumnX(releaseTick, geo, systemIndex, o, t);
+      const open = value === 'whole' ? getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t) : null;
+      const close = value === 'whole' ? getMeasureClosingBarlineX(measureIdx, geo, systemIndex, t) : null;
+      const restX = value === 'whole' && open !== null && close !== null ? (open + close) / 2 : colX;
+      const targetY = restSeatY(rowY, o.restStyle, value, t, geo, o, restX);
       const candidate: JankoRestGeometry = {
         tick: releaseTick,
         durationTicks: gap,
         hand,
-        x: getTickColumnX(releaseTick, geo, systemIndex, o, t),
+        x: restX,
         y: targetY,
         value,
         style: o.restStyle,
@@ -2166,10 +2169,9 @@ export function computeJankoRestLayer(
       // slab holds the barline midpoint and the linter *confirms* the
       // clearance there — it is never shifted to dodge a neighbour.
       if (value === 'whole') {
-        const open = getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t);
-        const close = getMeasureClosingBarlineX(measureIdx, geo, systemIndex, t);
         if (open !== null && close !== null) {
-          candidate.x = (open + close) / 2;
+          candidate.x = restX;
+          candidate.y = targetY;
           out.push(candidate);
           continue;
         }
@@ -2184,7 +2186,7 @@ export function computeJankoRestLayer(
         // back onto the same line).
         let fallbackRow: number;
         if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-          const rules = drawnStaffRuleYs(geo, o, t);
+          const rules = drawnStaffRuleYs(geo, o, t, candidate.x);
           const neighbor =
             dir === -1
               ? [...rules].filter((r) => r < rowY - EPS).pop()
@@ -2195,7 +2197,7 @@ export function computeJankoRestLayer(
           fallbackRow = nearestLatticeRow(rowY + dir * step, geo, t, o);
         }
         if (Math.abs(fallbackRow - rowY) > EPS) {
-          x = solveAt(restSeatY(fallbackRow, o.restStyle, value, t, geo, o));
+          x = solveAt(restSeatY(fallbackRow, o.restStyle, value, t, geo, o, candidate.x));
         }
       }
       if (x === null) {
@@ -3592,6 +3594,22 @@ export function layoutJankoSystem(
   let geometry = geometryRaw;
   if (o.core === 'fixed-3' || o.core === 'fixed-4') {
     const scale = t.semitoneScale;
+    const {
+      segments: staffSegments,
+      staffLines,
+      coreLines,
+      extensionLines,
+    } = computeSystemStaffSegments(
+      sysNotes,
+      systemIndex,
+      geometry.measuresPerSystem,
+      geometry.staffLeft,
+      geometry.staffRight,
+      geometry.measureWidth,
+      o.core,
+      t
+    );
+
     const writtenLins: number[] = [];
     for (const n of sysNotes) {
       const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
@@ -3600,19 +3618,7 @@ export function layoutJankoSystem(
       writtenLins.push(lin + shift);
     }
 
-    let coreLines: readonly number[];
-    const extensionLines: number[] = [];
-    if (o.core === 'fixed-3') {
-      coreLines = [36, 48, 60];
-      if (writtenLins.some((lin) => lin < 30)) extensionLines.push(24);
-      if (writtenLins.some((lin) => lin > 66)) extensionLines.push(72);
-    } else {
-      coreLines = [29.5, 41.5, 53.5, 65.5];
-      if (writtenLins.some((lin) => lin < 23.5)) extensionLines.push(17.5);
-      if (writtenLins.some((lin) => lin > 71.5)) extensionLines.push(77.5);
-    }
-    const staffLines = [...coreLines, ...extensionLines].sort((a, b) => a - b);
-    const allLins = [...staffLines, ...writtenLins];
+    const allLins = [...coreLines, ...staffLines, ...writtenLins];
     const effMin = Math.min(...allLins);
     const effMax = Math.max(...allLins);
     const staffTopY = geometry.middleCY + continuousPitchY(effMax, scale) - 16.0;
@@ -3628,6 +3634,7 @@ export function layoutJankoSystem(
       coreLines,
       extensionLines,
       staffLines,
+      staffSegments,
     };
   }
   // The two dynamic layouts resolve each Set B flank against the *whole*
@@ -4564,3 +4571,11 @@ export function renderJankoCrop(
     '</svg>',
   ].join('\n');
 }
+
+export {
+  computeBarStaffRows,
+  computeSystemStaffSegments,
+  getBarStaffSegments,
+  getBarStaffRows,
+};
+

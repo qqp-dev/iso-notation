@@ -19,14 +19,23 @@
  * center row open too.
  */
 
+import { QuantizedNote } from '../../../model/types';
 import {
+  JankoCore,
   JankoLayoutOptions,
   JankoSystemGeometry,
   JankoTokens,
+  ResolvedJankoTokens,
+  StaffLineSegment,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
-import { DEFAULT_PITCH_WINDOW, continuousPitchY } from '../geometry';
+import {
+  DEFAULT_PITCH_WINDOW,
+  computeFoldShift,
+  continuousPitchY,
+  getMeasureIndexOfTick,
+} from '../geometry';
 import { f } from './style';
 
 type Hand = 'RH' | 'LH';
@@ -161,6 +170,187 @@ export interface PitchGridRule {
  * nothing to defer to). `'clef-marker'` keeps the divider grid's C-lines
  * with a short anchor tick at each system start instead of the full rule.
  */
+/**
+ * One center-out row definition for need-based staff lines.
+ *
+ * Vocabulary (operator's):
+ * Fixed-3:
+ *   Row 1 center (0/4, Middle C, lin 48, always drawn in every bar)
+ *   Row 2 above (0/5, lin 60, fires iff any bar-note strictly above 6/4, lin > 54)
+ *   Row 3 below (0/3, lin 36, fires iff any bar-note strictly below 6/3, lin < 42)
+ *   Row 4 outer-above (0/6, lin 72, fires iff any bar-note strictly above 6/5, lin > 66)
+ *   Row 5 outer-below (0/2, lin 24, fires iff any bar-note strictly below 6/2, lin < 30)
+ *
+ * Fixed-4 even analogue (gap-centered, no single anchor):
+ *   Central pair (straddling the middle-C gap, always drawn):
+ *     Inner middle below (o3 middle, lin 41.5)
+ *     Inner middle above (o4 middle, lin 53.5)
+ *   Outer middle above (o5 middle, lin 65.5, fires iff strictly > 59.5)
+ *   Outer middle below (o2 middle, lin 29.5, fires iff strictly < 35.5)
+ *   Outer extension above (o6 middle, lin 77.5, fires iff strictly > 71.5)
+ *   Outer extension below (o1 middle, lin 17.5, fires iff strictly < 23.5)
+ */
+export interface NeedBasedRowDef {
+  /** Linear pitch of this row line. */
+  lin: number;
+  /** Center-out row number (1=center, 2=above, 3=below, 4=outer-above, 5=outer-below). */
+  rowId: number;
+  /** Human-readable operator identifier. */
+  name: string;
+  /** Constitutional anchor: drawn always, unbroken, in every bar of every system. */
+  isAnchor: boolean;
+  /** Midpoint trigger evaluated per bar on written linear pitches. */
+  fires: (barLins: readonly number[]) => boolean;
+}
+
+export const FIXED_3_ROW_DEFS: readonly NeedBasedRowDef[] = [
+  { lin: 48, rowId: 1, name: 'center (0/4)', isAnchor: true, fires: () => true },
+  { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: (lins) => lins.some((l) => l > 54) },
+  { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: (lins) => lins.some((l) => l < 42) },
+  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l > 66) },
+  { lin: 24, rowId: 5, name: 'outer-below (0/2)', isAnchor: false, fires: (lins) => lins.some((l) => l < 30) },
+];
+
+export const FIXED_4_ROW_DEFS: readonly NeedBasedRowDef[] = [
+  { lin: 41.5, rowId: 1, name: 'inner-below (o3 middle)', isAnchor: true, fires: () => true },
+  { lin: 53.5, rowId: 2, name: 'inner-above (o4 middle)', isAnchor: true, fires: () => true },
+  { lin: 65.5, rowId: 3, name: 'outer-above (o5 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l > 59.5) },
+  { lin: 29.5, rowId: 4, name: 'outer-below (o2 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l < 35.5) },
+  { lin: 77.5, rowId: 5, name: 'extension-above (o6 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l > 71.5) },
+  { lin: 17.5, rowId: 6, name: 'extension-below (o1 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l < 23.5) },
+];
+
+/**
+ * Compute the active rows and linear pitches for a single bar under need-based rules.
+ */
+export function computeBarStaffRows(
+  barLins: readonly number[],
+  core?: JankoCore
+): { rowIds: number[]; lins: number[] } {
+  const defs = core === 'fixed-3' ? FIXED_3_ROW_DEFS : core === 'fixed-4' ? FIXED_4_ROW_DEFS : [];
+  const firing = defs.filter((d) => d.fires(barLins));
+  return {
+    rowIds: firing.map((d) => d.rowId).sort((a, b) => a - b),
+    lins: firing.map((d) => d.lin).sort((a, b) => a - b),
+  };
+}
+
+/**
+ * Compute maximal consecutive earning segments for all rows in a system.
+ */
+export function computeSystemStaffSegments(
+  sysNotes: readonly QuantizedNote[],
+  systemIndex: number,
+  measuresPerSystem: number,
+  staffLeft: number,
+  staffRight: number,
+  measureWidth: number,
+  core: JankoCore,
+  t: ResolvedJankoTokens
+): {
+  segments: StaffLineSegment[];
+  staffLines: number[];
+  coreLines: number[];
+  extensionLines: number[];
+} {
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
+  const numBars = isSys0Anacrusis ? measuresPerSystem + 1 : measuresPerSystem;
+
+  // Bucket notes into measure slots inside this system
+  const barLins: number[][] = Array.from({ length: numBars }, () => []);
+  const mockGeo = { measuresPerSystem };
+  for (const n of sysNotes) {
+    const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
+    const lin = n.pitch.octave * 12 + pc;
+    const shift = computeFoldShift(lin, core);
+    const writtenLin = lin + shift;
+    const m = getMeasureIndexOfTick(n, mockGeo, systemIndex, t);
+    if (m >= 0 && m < numBars) {
+      barLins[m].push(writtenLin);
+    }
+  }
+
+  const getBarSpanX = (m: number): { x1: number; x2: number } => {
+    if (isSys0Anacrusis) {
+      const upbeatWidth = (anacrusis / t.ticksPerMeasure) * measureWidth;
+      if (m === 0) {
+        return { x1: staffLeft, x2: staffLeft + upbeatWidth };
+      }
+      const left = staffLeft + upbeatWidth + (m - 1) * measureWidth;
+      return { x1: left, x2: left + measureWidth };
+    }
+    const left = staffLeft + m * measureWidth;
+    return { x1: left, x2: left + measureWidth };
+  };
+
+  const defs = core === 'fixed-3' ? FIXED_3_ROW_DEFS : core === 'fixed-4' ? FIXED_4_ROW_DEFS : [];
+  const segments: StaffLineSegment[] = [];
+
+  for (const def of defs) {
+    const earnsBar = barLins.map((lins) => def.fires(lins));
+    let runStart: number | null = null;
+    for (let m = 0; m <= numBars; m++) {
+      if (m < numBars && earnsBar[m]) {
+        if (runStart === null) runStart = m;
+      } else {
+        if (runStart !== null) {
+          const mStart = runStart;
+          const mEnd = m - 1;
+          const x1 = mStart === 0 ? staffLeft : getBarSpanX(mStart).x1;
+          const x2 = mEnd === numBars - 1 ? staffRight : getBarSpanX(mEnd).x2;
+          segments.push({
+            lin: def.lin,
+            rowId: def.rowId,
+            mStart,
+            mEnd,
+            x1,
+            x2,
+          });
+          runStart = null;
+        }
+      }
+    }
+  }
+
+  segments.sort((a, b) => a.lin - b.lin || a.x1 - b.x1);
+
+  const staffLines = Array.from(new Set(segments.map((s) => s.lin))).sort((a, b) => a - b);
+  const isFixed3 = core === 'fixed-3';
+  const coreLines = isFixed3 ? [36, 48, 60] : [29.5, 41.5, 53.5, 65.5];
+  const extensionLines = (isFixed3 ? [24, 72] : [17.5, 77.5]).filter((lin) =>
+    staffLines.includes(lin)
+  );
+
+  return { segments, staffLines, coreLines, extensionLines };
+}
+
+/**
+ * Query the staff line segments covering a specific measure (by system-local measure index).
+ */
+export function getBarStaffSegments(
+  geo: JankoSystemGeometry,
+  measureIndex: number
+): StaffLineSegment[] {
+  if (!geo.staffSegments) return [];
+  return geo.staffSegments.filter(
+    (seg) => seg.mStart <= measureIndex && measureIndex <= seg.mEnd
+  );
+}
+
+/**
+ * Query the row numbers drawn in a specific measure (by system-local measure index).
+ */
+export function getBarStaffRows(
+  geo: JankoSystemGeometry,
+  measureIndex: number
+): number[] {
+  return getBarStaffSegments(geo, measureIndex)
+    .map((s) => s.rowId ?? 0)
+    .filter((id) => id > 0)
+    .sort((a, b) => a - b);
+}
+
 export function pitchGridRules(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
@@ -175,6 +365,22 @@ export function pitchGridRules(
   const x2 = geo.staffRight;
   if (o.core === 'fixed-3' || o.core === 'fixed-4') {
     const isFixed3 = o.core === 'fixed-3';
+    if (geo.staffSegments && geo.staffSegments.length > 0) {
+      const out: PitchGridRule[] = [];
+      for (const seg of geo.staffSegments) {
+        out.push({
+          y: yOf(seg.lin),
+          x1: seg.x1,
+          x2: seg.x2,
+          ink: PITCH_GRID_OCTAVE_INK,
+          width: PITCH_GRID_OCTAVE_STROKE,
+          cls: isFixed3
+            ? 'janko-pitch-lane janko-pitch-clane'
+            : 'janko-pitch-octave',
+        });
+      }
+      return out;
+    }
     const lines =
       geo.staffLines ??
       (isFixed3 ? [36, 48, 60] : [29.5, 41.5, 53.5, 65.5]);

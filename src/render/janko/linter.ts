@@ -180,7 +180,10 @@ export type JankoLintCode =
   | 'ottava-clearance'
   | 'ottava-unbracketed'
   | 'ottava-unfolded'
-  | 'extension-beyond-core';
+  | 'extension-beyond-core'
+  | 'staff-segment-gap'
+  | 'staff-anchor-missing'
+  | 'staff-segment-degenerate';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -295,6 +298,7 @@ export const JANKO_LINT_CHECKS = [
   'ottava-clearance',
   'ottava-coverage',
   'ottava-extensions',
+  'staff-segments',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -2682,7 +2686,23 @@ export function checkRestSeat(
       // Every continuous mapping snaps slabs to drawn lines (see `restSeatY`),
       // so the touch audit keeps its teeth: exact contact with a painted
       // lane, C-line, octave line or divider.
-      const rules = pitchGridRules(layout.geometry, o, t).map((rule) => rule.y);
+      const rules = pitchGridRules(layout.geometry, o, t)
+        .filter((rule) => rule.x1 === undefined || (rule.x1 - 1.0 <= rest.x && rest.x <= rule.x2 + 1.0))
+        .map((rule) => rule.y);
+      if (rules.length === 0) {
+        out.push({
+          code: 'rest-slab-off-line',
+          severity: 'error',
+          message:
+            `Bar rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) touches no drawn grid line at x=${rest.x.toFixed(2)}.`,
+          system: layout.index,
+          measure: measureOfTick(rest.tick, t),
+          x: rest.x,
+          y: rest.y,
+          metrics: { contactY: rest.y, nearestRule: 0, offLine: 999 },
+        });
+        continue;
+      }
       const nearest = rules.reduce(
         (best, rule) => (Math.abs(rule - rest.y) < Math.abs(best - rest.y) ? rule : best),
         rules[0]
@@ -3634,6 +3654,214 @@ export function checkOttavaExtensions(
   }
 }
 
+/**
+ * Audit need-based staff segments:
+ * 1. staff-segment-degenerate:
+ *    - Segments with non-finite bounds or x2 <= x1 or mEnd < mStart.
+ *    - Overlapping segments for the same line.
+ * 2. staff-anchor-missing:
+ *    - Under fixed-3: row 1 (lin 48) must be present in every measure.
+ *    - Under fixed-4: central pair (lin 41.5, lin 53.5) must be present in every measure.
+ * 3. staff-segment-gap:
+ *    - In any measure, active rows must be center-connected:
+ *      under fixed-3: row 4 requires row 2; row 5 requires row 3; row 2/3 require row 1.
+ *      under fixed-4: row 5 requires row 3; row 6 requires row 4; row 3 requires row 2; row 4 requires row 1.
+ */
+export function checkStaffSegments(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') return;
+
+  const g = layout.geometry;
+  const segments = g.staffSegments ?? [];
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const isSys0Anacrusis = layout.index === 0 && anacrusis > 0;
+  const numBars = isSys0Anacrusis ? g.measuresPerSystem + 1 : g.measuresPerSystem;
+
+  const measureNum = (m: number): number => {
+    if (anacrusis > 0) {
+      if (layout.index === 0) {
+        return m === 0 ? 0 : m;
+      }
+      return layout.index * g.measuresPerSystem + m;
+    }
+    return layout.index * g.measuresPerSystem + m + 1;
+  };
+
+  // 1. Degenerate segment checks
+  for (const seg of segments) {
+    if (
+      seg.x2 <= seg.x1 ||
+      seg.mEnd < seg.mStart ||
+      seg.mStart < 0 ||
+      seg.mEnd >= numBars ||
+      !Number.isFinite(seg.x1) ||
+      !Number.isFinite(seg.x2)
+    ) {
+      out.push({
+        code: 'staff-segment-degenerate',
+        severity: 'error',
+        message: `Staff line segment lin=${seg.lin} has degenerate bounds [mStart=${seg.mStart}, mEnd=${seg.mEnd}, x1=${seg.x1}, x2=${seg.x2}].`,
+        system: layout.index,
+        x: seg.x1,
+        metrics: { lin: seg.lin, mStart: seg.mStart, mEnd: seg.mEnd, x1: seg.x1, x2: seg.x2 },
+      });
+    }
+  }
+
+  // Check for duplicate/overlapping segments for the same line
+  for (let i = 0; i < segments.length; i++) {
+    for (let j = i + 1; j < segments.length; j++) {
+      const a = segments[i];
+      const b = segments[j];
+      if (a.lin === b.lin) {
+        if (
+          Math.max(a.mStart, b.mStart) <= Math.min(a.mEnd, b.mEnd) ||
+          Math.max(a.x1, b.x1) < Math.min(a.x2, b.x2)
+        ) {
+          out.push({
+            code: 'staff-segment-degenerate',
+            severity: 'error',
+            message: `Staff line segments for lin=${a.lin} overlap in measure range [${a.mStart}..${a.mEnd}] and [${b.mStart}..${b.mEnd}].`,
+            system: layout.index,
+            x: a.x1,
+          });
+        }
+      }
+    }
+  }
+
+  // 2 & 3. Per-bar anchor and gap checks
+  for (let m = 0; m < numBars; m++) {
+    const activeSegs = segments.filter((s) => s.mStart <= m && m <= s.mEnd);
+    const activeLins = new Set(activeSegs.map((s) => s.lin));
+    const activeRows = new Set(
+      activeSegs.map((s) => s.rowId).filter((id): id is number => id !== undefined)
+    );
+    const mNum = measureNum(m);
+
+    if (o.core === 'fixed-3') {
+      // Row 1 (center, lin 48) is constitutional anchor
+      const hasAnchor = activeRows.has(1) || activeLins.has(48);
+      if (!hasAnchor) {
+        out.push({
+          code: 'staff-anchor-missing',
+          severity: 'error',
+          message: `Measure ${mNum} is missing constitutional staff anchor row 1 (Middle C, lin 48).`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+
+      // Check center-connectedness (no gaps):
+      // row 4 (72) requires row 2 (60)
+      if (
+        (activeRows.has(4) || activeLins.has(72)) &&
+        !(activeRows.has(2) || activeLins.has(60))
+      ) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has outer-above row 4 without inward neighbor row 2.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+      // row 5 (24) requires row 3 (36)
+      if (
+        (activeRows.has(5) || activeLins.has(24)) &&
+        !(activeRows.has(3) || activeLins.has(36))
+      ) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has outer-below row 5 without inward neighbor row 3.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+      // row 2 (60) or row 3 (36) requires row 1 (48)
+      if (
+        ((activeRows.has(2) || activeLins.has(60)) ||
+          (activeRows.has(3) || activeLins.has(36))) &&
+        !hasAnchor
+      ) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has staff rows disconnected from constitutional anchor row 1.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+    } else if (o.core === 'fixed-4') {
+      // Central pair: lin 41.5 (row 1) and lin 53.5 (row 2)
+      const hasLowerAnchor = activeRows.has(1) || activeLins.has(41.5);
+      const hasUpperAnchor = activeRows.has(2) || activeLins.has(53.5);
+      if (!hasLowerAnchor || !hasUpperAnchor) {
+        out.push({
+          code: 'staff-anchor-missing',
+          severity: 'error',
+          message: `Measure ${mNum} is missing constitutional central pair anchor(s).`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+
+      // Gap check:
+      // row 5 (ext above, 77.5) requires row 3 (outer above, 65.5)
+      if (
+        (activeRows.has(5) || activeLins.has(77.5)) &&
+        !(activeRows.has(3) || activeLins.has(65.5))
+      ) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has extension-above row 5 without outer-above row 3.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+      // row 6 (ext below, 17.5) requires row 4 (outer below, 29.5)
+      if (
+        (activeRows.has(6) || activeLins.has(17.5)) &&
+        !(activeRows.has(4) || activeLins.has(29.5))
+      ) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has extension-below row 6 without outer-below row 4.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+      // row 3 (65.5) requires row 2 (53.5)
+      if ((activeRows.has(3) || activeLins.has(65.5)) && !hasUpperAnchor) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has outer-above row 3 without central anchor row 2.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+      // row 4 (29.5) requires row 1 (41.5)
+      if ((activeRows.has(4) || activeLins.has(29.5)) && !hasLowerAnchor) {
+        out.push({
+          code: 'staff-segment-gap',
+          severity: 'error',
+          message: `Measure ${mNum} has outer-below row 4 without central anchor row 1.`,
+          system: layout.index,
+          measure: mNum,
+        });
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -3703,6 +3931,7 @@ export function lintJankoScore(
     checkOttavaClearance(layout, t, diagnostics);
     checkOttavaCoverage(layout, diagnostics);
     checkOttavaExtensions(layout, o, diagnostics);
+    checkStaffSegments(layout, o, t, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
