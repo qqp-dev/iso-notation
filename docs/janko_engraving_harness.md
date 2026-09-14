@@ -265,6 +265,9 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 | Beam/notehead clearance | no beam connector (primary or 16th secondary) comes closer than `noteheadRadius + minStemClearance` to any notehead centre |
 | Barline clearance | heads, stems and beams keep ≥ 1 pt from every barline |
 | Clasp clearance | no clasp spine comes within `claspMinBarlineAir` = 4 pt of a barline or within 1 pt of a foreign disc, halo or the margin furniture; no rail reaches a barline |
+| Clasp dot (Round 20) | every dotted clasp's 0.75 pt dot keeps the house hug (`augmentationDotGap` = 1.2 pt) from its own mark's ink (spine, ring, transverse cut) and from every member disc — a fused nib is `clasp-dot-fusion`, never a graze |
+| Rest seat (Round 20) | every rest's **painted ink centroid** stands on its phrase row (the bar forms half a slab above / below it, as their seat declares) — an off-row seat is `rest-centroid-off-row` |
+| Unison digit (Round 20) | one onset + one pitch sounds once and paints **one** digit; two painted heads on a merged unison are `unison-double-digit`, with no duration exception |
 | Margin furniture | measure numeral and accolade stay on the page, clear of the staff and each other |
 | Middle C corridor | no structural rule or beam crosses the corridor centre line; when a spine is opted in it never cuts a glyph |
 
@@ -276,10 +279,14 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
 - **Centred stems** — `getStemGeometry` engraves every stem on the notehead's
   vertical centreline, so duration indicators begin exactly on the note column
   instead of staggering around a round-notehead perimeter.
-- **Standard flags** — solitary / unbeamed notes of the `beamed` dialect carry
-  calligraphic flag hooks latched to the stem tip (two for 16ths, one for 8ths,
-  plus the augmentation dot for dotted values). Every hook sample stays strictly
-  right of the stem, so no cross/dagger is ever drawn over the notehead. The
+- **Standard flags (Round 20: one classical taper)** — solitary / unbeamed notes
+  of the `beamed` dialect carry the classical flag hook (U+1D160-class): a
+  filled crescent rooted on the stem at the style's root weight (1.1 pt kinetic
+  family, 1.4 pt tapered demonstrator, 0.9 pt urtext control), sweeping with the
+  stem's own direction and tapering to a point inside `flagWidth` × `flagHeight`
+  (two for 16ths, one for 8ths, plus the augmentation dot for dotted values).
+  The recorded Round 7–9 rake dialects survive as style keys (they tag their ink
+  and pick their root weight) but no longer paint a straight tab. The
   `angled-cuts` and `horizontal-ticks` dialects keep their crossbar identity.
 - **Elevated beams** — `computeBeamGroupGeometry` clamps the slope first, then
   raises (RH) or lowers (LH) the baseline until the extreme notehead in the stem
@@ -367,7 +374,8 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   pre-scale value (`REST_STROKE` = 0.90pt, exactly the note stem stroke; the
   bauhaus box 0.6pt, phantom strokes 0.8pt) while extents keep the 0.575
   scale. Size maxima recomputed per value × 4 dialects.
-- **Phrase rows (direct; replaces the rule-hang)** — the rest reference is
+- **Phrase rows (direct; replaces the rule-hang; Round 20 re-seats the glyph by
+  its ink centroid — see the Round 20 section)** — the rest reference is
   the phrase row (mean of the releasing/resuming rows, the single neighbour's
   row, or the hand default), snapped to the nearest whole-tone row of the
   phrase octave; the hang-toward-corridor mechanics stay (reference row in,
@@ -419,12 +427,15 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   half/whole marks at the bracket's own midpoint (m. 46's ring at cy = 136),
   the transverse subdivision marks at their own hand's vertical centre. The
   bracket still carries the shortest member value.
-- **`clusterAnchor` (the one judged axis)** — `'rh'` (golden) anchors the RH
-  tone on a mixed-hand row, the middle head otherwise; `'lower-first'` is the
-  naive demonstrator (the lowest-pitched head of every row keeps the column).
-  With the fixed joinery both cards are lint-clean; the axis decides the head
-  order at the interlocking onsets (m. 46: G♯4 left/D4 right vs D4 left/G♯4
-  right), never a defect.
+- **The RH anchor (the Round 19 verdict, now the only rule)** — `'rh'` anchors
+  the RH tone on a mixed-hand row, the middle head otherwise. The
+  `'lower-first'` demonstrator and the `clusterAnchor` option are **retired**
+  (Round 20, §F): the operator approved the RH anchor, so the option, its label
+  table and the demonstrator card are gone and the behavior is the only path.
+  The Round 19 **stack-yield mechanism is dead too — decided against by the R19
+  approval, not deferred**: with the unified bracket owning the onset's
+  duration, no head ever needs to yield its stem. m. 46 keeps G♯4 on the column
+  and fans D4 to 56.61.
 - **Beat grid follows the columns (direct; score-wide)** — the dashed pulse of
   a beat that carries an onset is painted through that onset's laid-out column
   (`nominalX + shift`), exposed as `JankoSystemLayout.columns`; an empty beat
@@ -440,6 +451,63 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   ['clusterAnchor']`; the mega-vs-split bracket evidence rides the served PNGs,
   never a candidate (grouping is not this round's axis).
 
+### Round 20 optical rest seats + urtext re-cut + unison merge + nib
+
+- **Optical rest seats (direct)** — a rest is no longer seated by the near edge
+  of a geometric ink box: the glyph is drawn about its **ink centroid**, and the
+  engine places that centroid on the seat point (the beat column and the phrase
+  row). The centroid is *data derived from the glyph's own primitives*
+  (`restInkCentroidOffset` weighs the very ink the renderer paints — strokes by
+  sampled length × width, fills by area), and `restGlyphOrigin` applies it. The
+  classical bar pair declares its own seat offset: the **half** slab sits atop
+  its row, the **whole** slab hangs below its own (`restSeatOffsetY`), so the
+  two silences can never read alike. The linter audits the seat as
+  `rest-centroid-off-row` (violation).
+- **The urtext re-cut (direct)** — every rest glyph and every flag hook is cut
+  against the classical standard at the house 0.90 pt weight (U+1D13B–U+1D140
+  proportions): the golden cut is a **slanted stem with oval-headed hooks** for
+  the 8th/16th (sweeping left, as the classical rest does), the **true
+  serpentine** quarter, and **wide solid slabs** for the half / whole bar; the
+  flags are the U+1D160-class **classical taper** (above). Every other dialect
+  keeps its shape language and gains the whole-bar form.
+- **The whole bar (new value)** — `restValueForTicks` states `'whole'` for a
+  192-tick silence, and the engine writes it only where the silence **covers
+  exactly one measure** (`isWholeBarSilence`: it opens on a downbeat and lasts
+  `ticksPerMeasure`). A wholly silent measure is the one case the "active
+  measure" rule cannot demand (the hand has no onset in it), so the whole-bar
+  silence is exempt from it; a 192-tick gap opening mid-measure stays unwritten,
+  exactly like any other non-standard silence. The Round 15 specimen is now six
+  4/4 measures (16th … whole bar + the resume measure), three per system, so the
+  whole bar of m. 5 is judged on clean material — the corpus never stated one.
+- **The unison merge (direct)** — one onset + one pitch = one sound event =
+  **one digit**, on the anchor-winner's column (the RH head). The merged
+  duplicates leave the painted head list before the column solve (so nothing
+  fans, measures or knocks them out twice) and keep their **rhythm voice**: a
+  mixed-duration unison keeps every voice's own stem/beam/flag — the existing
+  mixed-duration machinery never assumed a single hand, so no doctrine fork was
+  needed — while an exact duplicate (identical durations) carries one rhythm
+  statement. Eight unisons merge across the corpus: the Goldberg's final 550/551
+  (the two "7"s) and Brahms's seven (one 21/21 pair, six mixed: 84/24, 84/24,
+  21/156, 21/132, 21/156, 21/132), all lint-clean with their beams whole. The
+  linter's `unison-double-digit` makes the defect class unrepeatable.
+- **The clasp nib (direct)** — a dotted clasp's 0.75 pt dot is now a clean
+  **satellite** of its mark: `claspDotCenter` searches a deterministic fan
+  (up-and-right first, the free lower channel as the last resort) for the point
+  nearest the mark that keeps the house dot hug (`augmentationDotGap` = 1.2 pt)
+  from the spine, the ring(s) and every transverse cut **and** from every member
+  disc (which the bracket's fit rule exempts but the notehead knockout would
+  erase). The resolved centre is stored on the geometry (`durationDots`), so the
+  painter, `claspInkBox` and the linter measure one datum; the retired `yMid`
+  wedge (~1.05 pt of fusion into the ring's stroke on every Brahms dotted half)
+  is rejected as an infeasible channel. All 12 Brahms dotted clasps keep
+  ≥ 1.20 pt from the mark and ≥ 1.24 pt from their nearest member disc; note
+  dots never move (their own lane and coordinates are pinned).
+- **Round 20 registry** — a **verification round**: `openAxes: []`, four cards
+  on the fixed golden master (rest seats, urtext re-cut, unison merge, clasp
+  nib) over the round's own windows (the rest specimen incl. the whole bar,
+  Bach's 8th-flag and 16th-double measures, Brahms's seats, the final-bar and
+  Brahms unison measures, and Brahms m. 3's nib case).
+
 ### Two-view studio
 
 ```ts
@@ -453,7 +521,7 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 ## 3. Verification
 
 ```bash
-npm test                          # 287 tests, < 6 s
+npm test                          # 297 tests, < 8 s
 npm run lint:engraving            # visual lint of the golden master
 npm run build                     # tsc + vite (index.html + janko.html entries)
 ```
@@ -463,7 +531,8 @@ npm run build                     # tsc + vite (index.html + janko.html entries)
 | `test/janko-engraving.test.ts` | geometry invariants (rank mapping, lane offsets, 15 pt rows, 30 pt octave steps, unified absolute equator lattice, zero in-staff ledger cuts, halo placement, tick spacing), the bounded center channel (option/token schema, two boundary rules per equator, Set A in the channel, direction-resolved Set B flanks, zero contour contradictions on the canonical score), rhythm invariants (centred stems in every dialect, right-sided flag hooks with no crossbar, full stem length under every beam, no straddling beam group), engine composition (page/crop equivalence, pluggable dialects) |
 | `test/janko-linter.test.ts` | the report contract, the clean golden master, the clean bounded channel, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
 | `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the Round-4 registry (incumbent vs bounded channel), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
-| `test/janko-round19.test.ts` | the Round 19 cluster law: the `clusterAnchor` option, the symmetric tuck's exact m. 46 positions and its score-wide mirror property, the even-cluster coincidence, the beat-cell guard, the overlap unification (m. 46 / m. 26) and the m. 3 split guard, the unified bracket's per-hand duration groups, the anchor demonstrator's head order, the `stem-through-simultaneity` signature the joinery owns, and the beat grid's column-following pulses (m. 3, the anacrusis mapping, an empty beat, both scores score-wide) |
+| `test/janko-round19.test.ts` | the Round 19 cluster law (the RH anchor as the only rule, its option retired): the symmetric tuck's exact m. 46 positions and its score-wide mirror property, the even-cluster coincidence, the beat-cell guard, the overlap unification (m. 46 / m. 26) and the m. 3 split guard, the unified bracket's per-hand duration groups, the `stem-through-simultaneity` signature the joinery owns, and the beat grid's column-following pulses (m. 3, the anacrusis mapping, an empty beat, both scores score-wide) |
+| `test/janko-round20.test.ts` | the Round 20 verdict: the **painted** ink centroid (recomputed from the SVG primitives) on the seat point for every value × dialect and every corpus rest, the corpus seat-on-lattice sweep, the bar pair's sit / hang, the specimen's one whole bar, the Bach final-bar single seven, all seven Brahms unisons (one digit, every mixed-duration voice intact), the `unison-double-digit` violation fixture, the 12-clasp nib sweep, the `clasp-dot-fusion` violation fixture on the retired fused geometry, and the note-dot no-move guard |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test
 (Bach Variation 1 m. 8 does not contain that literal figure); the m. 8 crop

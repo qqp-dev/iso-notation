@@ -305,7 +305,15 @@ test('A spread chord never crosses its measure band', () => {
 
 test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => {
   const notes = allNotes();
-  assert.equal(notes.length, SCORE.notes.length, 'every note is engraved');
+  // Round 20: seven cross-hand unisons (one same-duration pair, six
+  // mixed-duration) draw one digit each, so the painted heads number the score's
+  // notes minus the merged duplicates.
+  const merged = LAYOUTS.reduce(
+    (sum, layout) => sum + layout.unisonMerges.reduce((n, m) => n + m.mergedIds.length, 0),
+    0
+  );
+  assert.equal(merged, 7, 'the seven Brahms unisons merge to one head each');
+  assert.equal(notes.length, SCORE.notes.length - merged, 'every note is engraved, merged unisons once');
   assert.equal(LAYOUTS.length, 24, 'the complete Intermezzo lays out as 24 systems, three measures each');
   // Every layout is engraved in its own system frame and later pages reuse the
   // three frames of page 1, so two notes are only comparable when their
@@ -346,7 +354,7 @@ test('Brahms Op. 118 No. 1 lints completely clean', () => {
   assert.equal(REPORT.ok, true);
   assert.equal(REPORT.stats.systems, 24);
   assert.equal(REPORT.stats.measures, 71);
-  assert.equal(REPORT.stats.notes, SCORE.notes.length);
+  assert.equal(REPORT.stats.notes, SCORE.notes.length - 7, 'the seven merged unison heads are painted once');
   assert.ok(REPORT.stats.beams > 0, 'the eighths are beamed');
 });
 

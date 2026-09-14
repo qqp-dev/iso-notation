@@ -2,11 +2,11 @@
  * Two-View Live Studio — architecture invariant suite.
  *
  * Covers:
- *  1. `renderCandidatesView()` renders every candidate declared in the
- *     registry, on **every engraving window it declares** (Round 19 judges the
- *     cluster anchor on Brahms mm. 46 / 26 / 3 plus the chord specimen's
- *     triples), with labels, per-axis option badges, lint chips and SVG
- *     previews.
+ *  1. `renderCandidatesView()` renders every card declared in the registry, on
+ *     **every engraving window it declares** (Round 20 is a verification round:
+ *     four golden cards over the rest specimen, the Bach flag measures, the
+ *     Brahms seats and unisons, and the nib case), with labels, the golden
+ *     baseline badge, lint chips and SVG previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
  *     (every page carries glyphs) plus the macro focus crops, based on
  *     `DEFAULT_JANKO_OPTIONS`.
@@ -88,18 +88,13 @@ function read(file: string): string {
 // 1. Decision Candidates Matrix
 // ---------------------------------------------------------------------------
 
-test('renderCandidatesView renders every registry candidate on every declared window', () => {
+test('renderCandidatesView renders every verification card on every declared window', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal(
-    (html.match(/data-candidate="/g) ?? []).length,
-    CURRENT_CANDIDATES.length,
-    'one card per registry entry'
+  const windows = CURRENT_CANDIDATES.reduce(
+    (sum, candidate) => sum + resolveCandidate(candidate).windows.length,
+    0
   );
-  assert.match(html, new RegExp(`data-candidate-count="${CURRENT_CANDIDATES.length}"`));
-  const windows = CURRENT_CANDIDATES.reduce((n, c) => n + resolveCandidate(c).windows.length, 0);
-  assert.equal(windows, 8, 'two anchor candidates × 4 case windows');
-  // Round 19 judges one axis; the header states its declared window count.
-  assert.match(html, /data-window-count="4"/, 'the header states the case window count');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, CURRENT_CANDIDATES.length);
   assert.equal((html.match(/<svg/g) ?? []).length, windows, 'one preview per declared window');
   assert.equal((html.match(/data-window="/g) ?? []).length, windows);
   for (const candidate of CURRENT_CANDIDATES) {
@@ -123,149 +118,50 @@ test('renderCandidatesView renders every registry candidate on every declared wi
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 19/);
-  assert.match(html, /Symmetric-Tuck Clusters/);
+  assert.match(html, /Round 20/);
+  assert.match(html, /Verification/);
 });
 
-test('Round 19 registry judges the cluster anchor on its single open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 19);
-  assert.match(CURRENT_ROUND_METADATA.title, /Symmetric-Tuck Clusters/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterAnchor'], 'one open axis');
+test('Round 20 is a verification round: no open axis, every card the golden master', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 20);
+  assert.match(CURRENT_ROUND_METADATA.title, /Verification/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'a verification round opens no axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['cluster-anchor-rh', 'cluster-anchor-lower-first'],
-    'the incumbent anchor and the demonstrator A–B, in display order'
+    ['verify-rest-seats', 'verify-urtext-recut', 'verify-unison-merge', 'verify-clasp-nib'],
+    'the four settled changes, in display order'
   );
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.axis),
-    ['clusterAnchor', 'clusterAnchor'],
-    'each candidate declares the round’s open axis'
-  );
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.clusterAnchor),
-    ['rh', 'lower-first'],
-    'the anchor axis: the incumbent and the naive variant'
-  );
-  assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => resolveCandidate(c).options.clusterSpacing),
-    ['tight', 'tight'],
-    'every anchor candidate keeps the decided tight golden'
-  );
-  // The two axes are independent: every resolved option set departs from the
-  // golden master ONLY on the candidate's own axis key (incumbent values are
-  // identical there, but the axis still belongs on the table).
-  const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  const goldenTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  // Every card is the fixed golden master: no option, no token, no axis.
   for (const candidate of CURRENT_CANDIDATES) {
-    const resolved = resolveCandidate(candidate);
+    assert.equal(candidate.options, undefined, `${candidate.id} states no macro option`);
+    assert.equal(candidate.tokens, undefined, `${candidate.id} states no micro token`);
+    assert.equal(candidate.axis, undefined, `${candidate.id} declares no axis`);
     assert.deepEqual(
-      Object.keys(candidate.options ?? {}),
-      [candidate.axis],
-      `${candidate.id} states only its own open axis`
+      candidateBadges(candidate),
+      [{ key: 'baseline', value: 'golden master', golden: 'golden master' }],
+      `${candidate.id} badges only the golden baseline`
     );
-    const diffs = Object.keys(golden).filter(
-      (key) =>
-        (resolved.options as unknown as Record<string, unknown>)[key] !==
-        (golden as unknown as Record<string, unknown>)[key]
-    );
-    assert.ok(
-      diffs.every((key) => key === candidate.axis),
-      `${candidate.id} departs from golden only on ${candidate.axis} (saw ${diffs.join(', ') || 'none'})`
-    );
-    for (const key of Object.keys(goldenTokens)) {
-      assert.equal(
-        (resolved.tokens as unknown as Record<string, unknown>)[key],
-        (goldenTokens as unknown as Record<string, unknown>)[key],
-        `${candidate.id} keeps token ${key} at the golden value`
-      );
+    const resolved = resolveCandidate(candidate);
+    assert.ok(resolved.windows.length > 0, `${candidate.id} shows real evidence`);
+    for (const window of resolved.windows) {
+      assert.ok(window.title.length > 20, `${candidate.id} titles every window`);
     }
   }
-  // The settled Round 14 context is fixed on both axes: the restored per-hand
-  // clasp, the canonical bracket, the settled grid policy C, the kinetic tab
-  // and rake — plus the Round 16 doctrine default, the gentle splay, which is
-  // shared context and never a candidate question.
-  for (const candidate of CURRENT_CANDIDATES) {
-    const resolved = resolveCandidate(candidate);
-    assert.ok(
-      !('stemAttachmentStyle' in (resolved.options as unknown as Record<string, unknown>)),
-      `${candidate.id} carries no stem-attachment key: the doctrine default splay is inherent`
-    );
-    assert.equal(
-      resolved.options.chordGrouping,
-      'per-hand-clasp',
-      `${candidate.id} carries the restored per-hand clasp`
-    );
-    assert.equal(
-      resolved.options.systemStartStyle,
-      'architectural-bracket',
-      `${candidate.id} carries the canonical flared 0.65pt bracket`
-    );
-    assert.equal(
-      resolved.options.gridWritingPolicy,
-      'overlaid-beat-grid',
-      `${candidate.id} keeps the settled Round 14 grid policy C`
-    );
-    assert.equal(
-      resolved.options.subdivisionStyle,
-      'kinetic-tab-beam',
-      `${candidate.id} keeps the settled kinetic tab`
-    );
-    assert.equal(
-      resolved.options.claspDurationStyle,
-      'kinetic-cross-slashes',
-      `${candidate.id} carries the standardized up-raked clasp`
-    );
-  }
-  // Every candidate keeps the canonical tokens: the delta is purely structural.
-  for (const candidate of CURRENT_CANDIDATES) {
-    const resolved = resolveCandidate(candidate);
-    assert.equal(resolved.tokens.claspWidth, DEFAULT_JANKO_TOKENS.claspWidth);
-    assert.equal(resolved.tokens.claspOffset, DEFAULT_JANKO_TOKENS.claspOffset);
-    assert.equal(resolved.tokens.claspMinBarlineAir, DEFAULT_JANKO_TOKENS.claspMinBarlineAir);
-    assert.equal(resolved.tokens.rowHeight, DEFAULT_JANKO_TOKENS.rowHeight);
-    assert.equal(resolved.tokens.flagSpacing, DEFAULT_JANKO_TOKENS.flagSpacing);
-    assert.equal(resolved.tokens.augmentationDotRadius, 0.75, 'the delicate dot');
-    assert.equal(resolved.options.pageMargin, 24.0, 'the widened page margin');
-    assert.equal(resolved.options.interStaffGap, 30.0, 'the symmetrical octave lattice');
-  }
-  // Every candidate badges exactly its own axis — never the other open axis and
-  // never a locked key.
-  for (const candidate of CURRENT_CANDIDATES) {
-    const badges = candidateBadges(candidate);
-    assert.deepEqual(
-      badges.map((b) => b.key),
-      [candidate.axis],
-      `${candidate.id} badges only its own axis`
-    );
-    assert.deepEqual(
-      badges[0],
-      {
-        key: candidate.axis,
-        value: String(
-          (resolveCandidate(candidate).options as unknown as Record<string, unknown>)[
-            candidate.axis ?? ''
-          ]
-        ),
-        golden: String((golden as unknown as Record<string, unknown>)[candidate.axis ?? '']),
-        axis: true,
-      },
-      `${candidate.id} states its value on the round’s axis`
-    );
-  }
-  // The incumbent states the golden value on its axis, without a delta.
-  assert.deepEqual(
-    candidateBadges(getCandidate('cluster-anchor-rh')!)[0],
-    {
-      key: 'clusterAnchor',
-      value: 'rh',
-      golden: 'rh',
-      axis: true,
-    },
-    'the incumbent anchor still states its value on the axis'
+  // The golden context every card inherits, unchanged.
+  const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  assert.equal(golden.clusterSpacing, 'tight', 'the decided spacing golden');
+  assert.equal(golden.restStyle, 'kinetic-monoline', 'the settled rest dialect');
+  assert.equal(golden.subdivisionStyle, 'kinetic-tab-beam', 'the settled flag cut');
+  assert.equal(golden.gridWritingPolicy, 'overlaid-beat-grid', 'grid candidate C is locked');
+  assert.equal(golden.systemStartStyle, 'architectural-bracket', 'the flared bracket is locked');
+  assert.equal(golden.chordGrouping, 'per-hand-clasp', 'the per-hand clasp is locked');
+  assert.equal(golden.systemsPerPage, 4, 'four systems per page is locked');
+  assert.ok(
+    !('clusterAnchor' in golden),
+    'the retired cluster anchor is gone from the golden master'
   );
 });
-
 
 test('Candidate previews honour their own option deltas', () => {
   const html = renderCandidatesView(CONFIG);
@@ -273,127 +169,64 @@ test('Candidate previews honour their own option deltas', () => {
     const card = html.slice(html.indexOf(`data-candidate="${id}"`));
     return card.slice(0, card.indexOf('</article>'));
   };
-  const axisValue = (candidate: (typeof CURRENT_CANDIDATES)[number], key: string): string =>
-    String((resolveCandidate(candidate).options as unknown as Record<string, unknown>)[key]);
 
-  // Every candidate states exactly one macro option: its own open axis.
+  // No card opens an axis and none badges a locked key: the round is pure
+  // verification, so `badge-axis` never appears and no delta is highlighted.
+  assert.equal((html.match(/badge-axis/g) ?? []).length, 0, 'no axis badge in a verification round');
+  assert.equal((html.match(/badge-delta/g) ?? []).length, 0, 'no delta styling either');
   for (const candidate of CURRENT_CANDIDATES) {
-    assert.deepEqual(
-      Object.keys(candidate.options ?? {}),
-      [candidate.axis],
-      `${candidate.id} states its own open axis and nothing else`
-    );
-  }
-  // The settled decisions ride along as shared context and are never badged.
-  assert.ok(
-    !html.includes('<b>chordGrouping</b>'),
-    'the restored per-hand clasp is shared context, never a Round 19 question'
-  );
-  assert.ok(
-    !html.includes('<b>systemStartStyle</b>'),
-    'the canonical flared bracket is shared context, never a Round 19 question'
-  );
-  assert.ok(
-    !html.includes('<b>gridWritingPolicy</b>'),
-    'the settled Round 14 grid policy is shared context, never a Round 19 question'
-  );
-  assert.ok(
-    !html.includes('<b>stemAttachmentStyle</b>'),
-    'the doctrine default splay is shared context, never a Round 19 question'
-  );
-  assert.ok(
-    !html.includes('<b>clusterSpacing</b>'),
-    'the decided tight gap is shared context, never a Round 19 question'
-  );
-  assert.doesNotMatch(
-    html,
-    /<b>subdivisionStyle<\/b>/,
-    'the settled kinetic tab is the golden master, no longer a candidate delta'
-  );
-  assert.doesNotMatch(
-    html,
-    /<b>claspDurationStyle<\/b>/,
-    'the settled kinetic clasp is the golden master, no longer a candidate delta'
-  );
-  assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
-
-  // Exactly one axis badge per candidate; only the genuine departures from the
-  // golden value carry the delta highlight.
-  assert.equal(
-    (html.match(/badge-axis/g) ?? []).length,
-    CURRENT_CANDIDATES.length,
-    'one axis badge per candidate'
-  );
-  const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  const departures = CURRENT_CANDIDATES.filter(
-    (candidate) =>
-      axisValue(candidate, candidate.axis ?? '') !==
-      String((golden as unknown as Record<string, unknown>)[candidate.axis ?? ''])
-  );
-  assert.equal(departures.length, 1, 'the lower-first demonstrator departs from golden');
-  assert.equal(
-    (html.match(/badge-delta/g) ?? []).length,
-    departures.length,
-    'only genuine deltas are highlighted'
-  );
-
-  // The lint chips report each candidate's real verdict. The behavior is
-  // fixed, so every card is clean — the verdict judges shapes, never defects.
-  assert.ok(
-    !cardOf('cluster-anchor-rh').includes('chip chip-warn'),
-    'the incumbent never merely warns'
-  );
-
-  for (const candidate of CURRENT_CANDIDATES) {
-    const resolved = resolveCandidate(candidate);
-    const axis = candidate.axis ?? '';
     const card = cardOf(candidate.id);
-    assert.match(
-      card,
-      new RegExp(`<b>${axis}</b> = ${axisValue(candidate, axis)}`),
-      `${candidate.id} states its own axis value`
-    );
-    const otherAxis = axis === 'clusterAnchor' ? 'clusterSpacing' : 'clusterAnchor';
-    assert.ok(!card.includes(`<b>${otherAxis}</b>`), `${candidate.id} never badges the other axis`);
-    assert.equal(
-      (card.match(/data-window="/g) ?? []).length,
-      resolved.windows.length,
-      `${candidate.id} engraves exactly its declared window set`
-    );
+    assert.match(card, /<b>baseline<\/b> = golden master/, `${candidate.id} states the baseline`);
     assert.match(card, /data-lint="clean"/, `${candidate.id} lint verdict: clean`);
     assert.match(card, /chip chip-ok/, `${candidate.id} reports its clean chip`);
-    // The declared windows legitimately include system starts (Bach m. 8), so
-    // the bracket may appear in the engraving itself; what must never appear
-    // is the settled bracket re-opened as a candidate.
-    assert.ok(
-      !card.includes('<b>systemStartStyle</b>'),
-      `${candidate.id} never re-showcases the settled bracket as a delta`
+    assert.equal(
+      (card.match(/data-window="/g) ?? []).length,
+      resolveCandidate(candidate).windows.length,
+      `${candidate.id} engraves exactly its declared window set`
     );
   }
 
-  // The anchor axis is judged on the Round 19 case windows only — never on the
-  // retired rest-dialect or spacing windows.
-  const incumbentCard = cardOf('cluster-anchor-rh');
-  for (const measure of [46, 26, 3]) {
-    assert.match(
-      incumbentCard,
-      new RegExp(`data-window="brahms-op118-no1:${measure}-${measure}"`),
-      `anchor Brahms m. ${measure}`
-    );
+  // The settled decisions ride along as shared context and are never badged.
+  for (const key of [
+    'chordGrouping',
+    'systemStartStyle',
+    'gridWritingPolicy',
+    'stemAttachmentStyle',
+    'clusterSpacing',
+    'subdivisionStyle',
+    'claspDurationStyle',
+    'restStyle',
+    'clusterAnchor',
+  ]) {
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 20 question`);
   }
-  assert.match(
-    incumbentCard,
-    /data-window="chord-duration-specimen:2-2"/,
-    'anchor chord specimen m. 2'
-  );
-  assert.ok(
-    !incumbentCard.includes('data-window="rest-duration-specimen:1-1"'),
-    'the anchor axis is never judged on the retired rest windows'
-  );
-  assert.ok(
-    !incumbentCard.includes('data-window="primary:8-8"'),
-    'the anchor axis is never judged on the retired cluster windows'
-  );
+  assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
+
+  // The case windows are the round's own evidence.
+  const seats = cardOf('verify-rest-seats');
+  for (const expected of [
+    'data-window="rest-duration-specimen:1-3"',
+    'data-window="rest-duration-specimen:4-6"',
+    'data-window="brahms-op118-no1:7-7"',
+    'data-window="brahms-op118-no1:17-17"',
+    'data-window="brahms-op118-no1:68-68"',
+  ]) {
+    assert.ok(seats.includes(expected), `seat card shows ${expected}`);
+  }
+  const flags = cardOf('verify-urtext-recut');
+  assert.ok(flags.includes('data-window="primary:1-1"'), 'flag card shows the 8th-flag window');
+  assert.ok(flags.includes('data-window="primary:22-22"'), 'flag card shows the 16th-double window');
+  const unisons = cardOf('verify-unison-merge');
+  for (const expected of [
+    'data-window="primary:32-32"',
+    'data-window="brahms-op118-no1:60-60"',
+    'data-window="brahms-op118-no1:65-65"',
+    'data-window="brahms-op118-no1:66-66"',
+  ]) {
+    assert.ok(unisons.includes(expected), `unison card shows ${expected}`);
+  }
+  const nib = cardOf('verify-clasp-nib');
+  assert.ok(nib.includes('data-window="brahms-op118-no1:3-3"'), 'nib card shows the m. 3 case');
 
   // The settled clasp grammar and grid policy are stated in the card facts.
   for (const candidate of CURRENT_CANDIDATES) {
@@ -574,13 +407,15 @@ test('The studio score library exposes the benchmarks and the curated specimens 
   assert.ok(ids.includes(REST_SPECIMEN_STUDIO_SCORE_ID), 'the rest-duration specimen is registered');
   const restSpecimen = CONFIG.scores[REST_SPECIMEN_STUDIO_SCORE_ID];
   assert.equal(restSpecimen.id, REST_SPECIMEN_STUDIO_SCORE_ID);
-  assert.equal(restSpecimen.options.measuresPerSystem, 4);
+  assert.equal(restSpecimen.options.measuresPerSystem, 3);
+  assert.equal(restSpecimen.options.ticksPerMeasure, 192, 'the 4/4 measure a whole bar needs');
+  assert.equal(restSpecimen.tokens.ticksPerMeasure, 192, 'and its grid');
   assert.deepEqual(
     REST_DURATION_SPECIMEN_VALUES.map((v) => v.value),
-    ['sixteenth', 'eighth', 'quarter', 'half'],
-    'one genuine silence per standard rest value'
+    ['sixteenth', 'eighth', 'quarter', 'half', 'whole'],
+    'one genuine silence per standard rest value, the whole bar included'
   );
-  assert.equal(restSpecimen.score.notes.length, 28, 'twenty RH notes + eight LH accompaniment notes');
+  assert.equal(restSpecimen.score.notes.length, 42, 'thirty RH notes + twelve LH accompaniment notes');
   const restReport = lintJankoScore(restSpecimen.score, restSpecimen.options, restSpecimen.tokens);
   assert.equal(restReport.ok, true, 'the dialect windows engrave clean under the golden default');
   // An unknown score id falls back to the primary score instead of blanking.
@@ -601,20 +436,20 @@ test('renderStudioMarkup contains both views and is DOM-free (SSR-safe)', () => 
 test('renderStatusLine reports live lint statistics', () => {
   const line = renderStatusLine(CONFIG, new Date('2024-01-01T12:34:56Z'));
   assert.match(line, /0 violations · 0 warnings/);
-  assert.match(line, /8 systems · 551 noteheads/);
+  assert.match(line, /8 systems · 550 noteheads/, 'the merged unison paints one head');
   assert.match(line, /rendered live at 12:34:56Z/);
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 19);
-  assert.match(CURRENT_ROUND_METADATA.title, /Symmetric-Tuck Clusters/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 20);
+  assert.match(CURRENT_ROUND_METADATA.title, /Verification/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['clusterAnchor'],
-    'the single judged axis is declared'
+    [],
+    'a verification round opens no axis'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'the incumbent anchor and the demonstrator');
+  assert.equal(CURRENT_CANDIDATES.length, 4, 'the four settled changes');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

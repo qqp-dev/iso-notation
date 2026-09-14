@@ -75,6 +75,7 @@ import {
   getMarginFurniture,
   knockoutHalfExtents,
   layoutJankoScore,
+  nearestLatticeRow,
   renderSystem,
   suppressedStemIds,
 } from './engine';
@@ -83,10 +84,13 @@ import { resolveBeatPulseXs } from './elements/barlines';
 import {
   JankoBeamConnector,
   JankoRhythmNote,
+  claspDotCenter,
   claspInkBox,
+  claspMarkDaylight,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
+  resolveClaspInk,
 } from './elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -95,7 +99,12 @@ import {
   digitHalfExtents,
   isPositionOfHonor,
 } from './elements/notehead';
-import { JankoRestGeometry, restInkBox } from './elements/rests';
+import {
+  JankoRestGeometry,
+  restInkCentroidOffset,
+  restInkBox,
+  restSeatOffsetY,
+} from './elements/rests';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -127,6 +136,9 @@ export type JankoLintCode =
   | 'accolade-collision'
   | 'rest-collision'
   | 'rest-unwritable'
+  | 'rest-centroid-off-row'
+  | 'unison-double-digit'
+  | 'clasp-dot-fusion'
   | 'stem-through-simultaneity'
   | 'split-stack-stems'
   | 'dot-collision'
@@ -230,6 +242,9 @@ export const JANKO_LINT_CHECKS = [
   'accolade-clearance',
   'rest-clearance',
   'rest-unwritable',
+  'rest-seat',
+  'unison-merge',
+  'clasp-dot-fusion',
   'stem-simultaneity',
   'split-stack-stems',
   'dot-clearance',
@@ -1889,8 +1904,85 @@ export function checkClaspClearance(
 }
 
 // ---------------------------------------------------------------------------
-// 4c. Rest clearance (Round 12)
+// 4c. Clasp dots (Round 20) and rest clearance (Round 12)
 // ---------------------------------------------------------------------------
+
+/**
+ * Round 20 — the **clasp dot is a satellite of its mark**, never a nib fused
+ * into it.
+ *
+ * Every dotted clasp paints its 0.75pt dot up-and-right of the duration mark
+ * (`rhythm.claspDotCenter`), and the audit measures the painted result in 2D:
+ *
+ * - daylight from the dot's disc to **its own mark's ink** — the spine, the
+ *   open ring(s) and every transverse cut — must be at least the house dot hug
+ *   (`tokens.augmentationDotGap`). The retired `yMid` wedge kept ~1.05pt
+ *   *overlap* into the ring's stroke on every Brahms dotted half;
+ * - daylight from the dot's disc to **every neighbour ink box** — the cluster's
+ *   own member discs (which the bracket's fit rule exempts, but the notehead
+ *   knockout would erase) and every foreign head of either hand — must keep the
+ *   linter's floor.
+ */
+export function checkClaspDotFusion(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  const hug = t.augmentationDotGap;
+  const r = t.augmentationDotRadius;
+  const haloEdge = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  for (const clasp of layout.clasps) {
+    const inks =
+      clasp.durationInk && clasp.durationInk.length > 0
+        ? clasp.durationInk
+        : [resolveClaspInk({ centerY: (clasp.topY + clasp.botY) / 2, durationTicks: clasp.durationTicks })];
+    for (const [index, ink] of inks.entries()) {
+      if (!ink.dotted) continue;
+      // The resolved geometry's own datum — never a fresh guess — so the audit
+      // measures what the renderer paints (and a fused regression is caught).
+      const dot = clasp.durationDots?.[index] ?? claspDotCenter(clasp, ink, t);
+      const markAir = claspMarkDaylight(clasp, ink, dot.x, dot.y, t);
+      if (markAir < hug - EPS) {
+        out.push({
+          code: 'clasp-dot-fusion',
+          severity: 'error',
+          message:
+            `Clasp at tick ${clasp.tick} paints its augmentation dot ${markAir.toFixed(2)}pt from the ` +
+            `mark it belongs to (${hug.toFixed(2)}pt of hug air required): the dot fuses with its own ink.`,
+          system: layout.index,
+          measure: measureOfTick(clasp.tick, t),
+          noteIds: clasp.notes.map((n) => n.id),
+          x: dot.x,
+          y: dot.y,
+          metrics: { markAir, required: hug, dotX: dot.x, dotY: dot.y, claspX: clasp.claspX },
+        });
+      }
+      const own = new Set(clasp.notes.map((n) => n.id));
+      for (const p of layout.notes) {
+        const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
+        const gap = Math.hypot(dot.x - p.x, dot.y - p.y) - radius - r;
+        // A member's disc is exempt from the bracket's own fit rule, so the
+        // dot's hug is measured against it here.
+        const required = own.has(p.note.id) ? hug : lint.minClearance;
+        if (gap >= required - EPS) continue;
+        out.push({
+          code: 'clasp-dot-fusion',
+          severity: 'error',
+          message:
+            `Clasp at tick ${clasp.tick} paints its augmentation dot ${gap.toFixed(2)}pt from notehead ` +
+            `${p.note.id} (${required.toFixed(2)}pt required): the dot runs into neighbouring ink.`,
+          system: layout.index,
+          measure: measureOfTick(clasp.tick, t),
+          noteIds: [p.note.id, ...clasp.notes.map((n) => n.id)],
+          x: dot.x,
+          y: dot.y,
+          metrics: { gap, required, dotX: dot.x, dotY: dot.y, noteX: p.x, noteY: p.y },
+        });
+      }
+    }
+  }
+}
 
 /**
  * A voice rest is **real musical ink**: its dialect's ink box must keep
@@ -2009,6 +2101,115 @@ export function checkUnwrittenRests(
         durationTicks: rest.durationTicks,
         targetY: rest.targetY,
       },
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4d. Rest seats (Round 20) and the united unison digit (Round 20)
+// ---------------------------------------------------------------------------
+/**
+ * Round 20 **optical seat audit**: a rest is seated by its ink centroid, so the
+ * glyph's gravity point must stand exactly on a real whole-tone row of the
+ * lattice (the phrase row the engine measured, or the row the vertical
+ * fallback snapped to).
+ *
+ * The linter re-derives the painted centroid from the shared ink model
+ * (`restInkCentroidOffset`) and subtracts the value's own classical seat
+ * offset — zero for the hanging glyphs, and for the bar forms the half-slab
+ * above / whole-slab below the row (the `sit` / `hang` pair). What remains must
+ * fall on the lattice to the float: a rest the boxes merely *approximated*, or
+ * one a regression seated between two rows, is a hard violation. The seat is
+ * never a warning — "rests don't sit where the notes are" is the defect this
+ * round exists to kill.
+ */
+export function checkRestSeat(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  for (const rest of layout.rests) {
+    // The painter seats the ink centroid exactly on the seat point, so the
+    // painted gravity point is `rest.y`; the seat's own classical offset gives
+    // back the phrase row the engine measured. (The bar pair's sit / hang cut —
+    // the half slab atop its row, the whole slab below it — is the value's own
+    // seat offset, pinned by the specimen tests; the audit here is the lattice.)
+    const gravity = restInkCentroidOffset(rest.value, rest.style, t);
+    const seatOffset = restSeatOffsetY(rest.value, rest.style, t);
+    const row = rest.y - seatOffset;
+    const snapped = nearestLatticeRow(row, layout.geometry, t, o);
+    if (Math.abs(snapped - row) <= EPS) continue;
+    out.push({
+      code: 'rest-centroid-off-row',
+      severity: 'error',
+      message:
+        `Rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) has its ink centroid on ` +
+        `y=${row.toFixed(2)}, which is ${Math.abs(snapped - row).toFixed(2)}pt off the nearest ` +
+        `whole-tone row (y=${snapped.toFixed(2)}): a rest is seated by its gravity point, and the ` +
+        `gravity point stands on its phrase row.`,
+      system: layout.index,
+      measure: measureOfTick(rest.tick, t),
+      x: rest.x,
+      y: rest.y,
+      metrics: {
+        seatY: rest.y,
+        seatOffset,
+        gravityY: gravity.y,
+        row,
+        nearestRow: snapped,
+        offRow: Math.abs(snapped - row),
+      },
+    });
+  }
+}
+
+/**
+ * Round 20: **one onset + one pitch = one sound event = one digit**, on both
+ * hands.
+ *
+ * The engine merges every cross-hand unison before the column solve (see
+ * `mergeUnisonHeads`), so the audit is a completeness proof on the same data
+ * the painter used: for every unison group of the score, exactly **one** head
+ * of the group may be painted. Two painted digits — the R19 defect, two "7"s
+ * side by side in the Goldberg's final bar, and the six Brahms doubling onsets
+ * — are a hard violation with no duration exception.
+ */
+export function checkUnisonDigits(
+  score: QuantizedGridScore,
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const painted = new Set(layout.notes.map((p) => p.note.id));
+  const systemTicks = new Set(layout.notes.map((p) => p.note.startTick));
+  for (const p of layout.unisonVoices) systemTicks.add(p.note.startTick);
+  const groups = new Map<string, typeof score.notes>();
+  for (const note of score.notes) {
+    if (!systemTicks.has(note.startTick)) continue;
+    const key = `${note.startTick}|${note.pitch.pitchClass}|${note.pitch.octave}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(note);
+    else groups.set(key, [note]);
+  }
+  for (const [key, group] of groups) {
+    if (group.length < 2) continue;
+    const hands = new Set(group.map((n) => n.hand));
+    if (hands.size < 2) continue;
+    const drawn = group.filter((n) => painted.has(n.id));
+    if (drawn.length <= 1) continue;
+    const [tick, pitchClass, octave] = key.split('|');
+    out.push({
+      code: 'unison-double-digit',
+      severity: 'error',
+      message:
+        `Onset tick ${tick} sounds pitch class ${pitchClass} (octave ${octave}) in both hands but ` +
+        `paints ${drawn.length} digits (${drawn.map((n) => n.id).join(', ')}): one onset and one ` +
+        `pitch is one sound event and can only ever draw one digit.`,
+      system: layout.index,
+      measure: measureOfTick(Number(tick), t),
+      noteIds: group.map((n) => n.id),
+      metrics: { tick: Number(tick), painted: drawn.length, voices: group.length },
     });
   }
 }
@@ -2701,6 +2902,9 @@ export function lintJankoScore(
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
     checkRestClearance(layout, o, t, thresholds, diagnostics);
     checkUnwrittenRests(layout, t, diagnostics);
+    checkRestSeat(layout, o, t, diagnostics);
+    checkUnisonDigits(score, layout, t, diagnostics);
+    checkClaspDotFusion(layout, t, thresholds, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     extents.push(systemInkExtents(layout, t, thresholds, o));

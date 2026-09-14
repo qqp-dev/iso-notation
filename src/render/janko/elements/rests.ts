@@ -1,47 +1,66 @@
 /**
  * Rest symbols — the Round 12 question (how a hand's **silent span inside an
- * active measure** is written), carried into Round 13 by the four high-fidelity
- * finalists and the voice-contour anchor, re-seated by Round 16 on the
- * rule-hang, and re-seated again by Round 17B on the **phrase row**: the rest
- * hangs from the nearest whole-tone row of its phrase octave and extends
- * toward the Middle C corridor (see the engine's `computeJankoRests`).
+ * active measure** is written), carried through Rounds 13–17B and re-cut by
+ * **Round 20**.
  *
- * Round 16 scales the ink to 57.5% linear of Round 15 — smaller ink on
- * standard-like proportions (not head-sized), with every dialect's shape
- * language preserved exactly (every extent below is its Round 15 value times
- * {@link REST_LINEAR_SCALE}). Round 17B restores every **stroke width** to its
- * Round 15 pre-scale value instead — `REST_STROKE` is exactly the 0.90pt note
- * stem stroke — so the small ink reads as thick as the regular notes. Bulb
- * radii and dash lengths are extents and stay scaled.
+ * Round 20 changes two things at once:
+ *
+ * 1. **Optical seats.** A rest is seated by its **ink centroid**, not by the
+ *    near edge of its geometric ink box: the engine places the glyph so that
+ *    `(centroid.x, centroid.y)` lands on the seat point — the beat column and
+ *    the phrase row (see the engine's `computeJankoRestLayer`). The centroid is
+ *    **data derived from the glyph's own ink** ({@link restInkCentroidOffset}),
+ *    computed from the very primitives the renderer paints, never from the
+ *    bounding box. The linter audits the seat
+ *    (`rest-centroid-off-row`).
+ * 2. **The classical re-cut.** Every glyph is cut against the classical
+ *    standard (U+1D13B–U+1D140-class proportions): a **slanted stem with oval
+ *    heads** for the 8th/16th, a **true serpentine** quarter, and **wide solid
+ *    slabs** for the half / whole bar rests. `REST_STROKE` stays the house
+ *    0.90pt monoline weight, and every extent keeps the Round 16 linear scale.
+ *
+ * The **whole-bar form is new** (`'whole'`, exactly 192 ticks = one whole
+ * measure): the half slab *sits atop* its phrase row, the whole slab *hangs
+ * below* it — the classical pair, and the only way to tell the two silences
+ * apart. A 96-tick silence is a half bar, a 192-tick silence a whole bar; the
+ * engine only states the whole form where the silence covers one complete
+ * measure (see `computeJankoRestLayer`).
  *
  * | style                | 16th                    | 8th                   | quarter                  | half / whole               |
  * | -------------------- | ----------------------- | --------------------- | ------------------------ | -------------------------- |
- * | `'kinetic-monoline'` | stem + two 12.4° tabs   | stem + one 12.4° tab  | central horizontal notch | hollow bar (W 4.0 × H 1.3pt) |
- * | `'classical-urtext'` | two calligraphic hooks  | one calligraphic hook | serpentine lightning     | solid block (W 3.5 × H 1.4pt)|
- * | `'geometric-node'`   | hollow diamond + 2 rays | hollow diamond + 1 ray| solid diamond (2.9 × 2.9pt)| open capsule / lozenge     |
+ * | `'kinetic-monoline'` | slanted stem + two oval-headed hooks | stem + one hook | true serpentine | wide solid slab (atop / below) |
+ * | `'classical-urtext'` | two calligraphic hooks  | one calligraphic hook | serpentine lightning     | solid block (atop / below) |
+ * | `'geometric-node'`   | hollow diamond + 2 rays | hollow diamond + 1 ray| solid diamond (2.9 × 2.9pt)| open capsule (atop / below)|
  * | `'bauhaus-slash'`    | 45° slash + two wings   | 45° slash + one wing  | minimalist reversed-Z    | thin hairline box          |
  * | `'phantom-notehead'` | dashed head + stem + two downward hooks | dashed head + stem + one hook | dashed head + bare stem | dashed head + hollow bar |
  *
- * The engine's `computeJankoRests` decides *where* a rest belongs (a clean
+ * The engine's `computeJankoRestLayer` decides *where* a rest belongs (a clean
  * standard-value silence of one hand in a measure that hand is active in),
- * hangs it from its phrase row and nudges it along the row inside its beat
+ * seats it on its phrase row and nudges it along the row inside its beat
  * cell; a rest with no clear slot is a named unwritten diagnostic, never a
- * silent overlap. This module only paints what it is handed.
+ * silent overlap. This module paints what it is handed, and is the single
+ * source of truth for both the ink and its gravity point.
  */
 
 import { Hand } from '../../../model/types';
-import { JankoRestStyle, JankoTokens, resolveJankoTokens } from '../types';
+import {
+  JankoRestStyle,
+  JankoTokens,
+  ResolvedJankoTokens,
+  resolveJankoTokens,
+} from '../types';
 import { f } from './style';
 
-/** The four duration classes every dialect states. */
-export type JankoRestValue = 'sixteenth' | 'eighth' | 'quarter' | 'half';
+/** The five duration classes every dialect states. */
+export type JankoRestValue = 'sixteenth' | 'eighth' | 'quarter' | 'half' | 'whole';
 
-/** Every rest value, longest last, in the canonical order. */
+/** Every rest value, shortest first, in the canonical order. */
 export const JANKO_REST_VALUES: readonly JankoRestValue[] = [
   'sixteenth',
   'eighth',
   'quarter',
   'half',
+  'whole',
 ];
 
 /**
@@ -51,21 +70,28 @@ export const JANKO_REST_VALUES: readonly JankoRestValue[] = [
  */
 export const REST_LINEAR_SCALE = 0.575;
 
-/** Vertical rest-stem height (pt) of the kinetic monoline dialect. */
+/** Vertical rest-stem height (pt) of the classical cut. */
 export const REST_STEM_HEIGHT = 12.0 * REST_LINEAR_SCALE;
 /**
- * Stroke (pt) of every monoline rest element. Round 17B restores the Round 15
- * pre-scale 0.90pt — exactly the note stem stroke — while extents stay scaled.
+ * Stroke (pt) of every monoline rest element — exactly the note stem stroke
+ * (Round 17B), the weight the Round 20 re-cut keeps.
  */
 export const REST_STROKE = 0.9;
-/** Horizontal reach (pt) of a kinetic tab right of its stem. */
-export const REST_TAB_WIDTH = 4.0 * REST_LINEAR_SCALE;
-/** Half-width (pt) of the quarter rest's central notch. */
-export const REST_NOTCH_HALF = 2.2 * REST_LINEAR_SCALE;
-/** Hollow half/whole bar of the kinetic dialect: `W × H` in pt. */
-export const REST_BAR_WIDTH = 7.0 * REST_LINEAR_SCALE;
-export const REST_BAR_HEIGHT = 2.2 * REST_LINEAR_SCALE;
-/** Solid half/whole block of the urtext dialect: `W × H` in pt. */
+/** Lean (pt) of the classical slanted stem: the top leans right of the foot. */
+export const REST_STEM_LEAN = 1.4 * REST_LINEAR_SCALE;
+/** Pullback (pt) of the stem's foot, so the cut never reads as a rule. */
+export const REST_STEM_FOOT = 0.6 * REST_LINEAR_SCALE;
+/** Reach (pt) of a hook, left of the stem it leaves. */
+export const REST_HOOK_REACH = 4.4 * REST_LINEAR_SCALE;
+/** Drop (pt) of a hook below the stem point it leaves. */
+export const REST_HOOK_DROP = 2.6 * REST_LINEAR_SCALE;
+/** Half-axes (pt) of the hook's terminal oval head — the classical blob. */
+export const REST_HEAD_RX = 1.8 * REST_LINEAR_SCALE;
+export const REST_HEAD_RY = 1.2 * REST_LINEAR_SCALE;
+/** Wide solid slab of the half / whole bar rests: `W × H` in pt. */
+export const REST_SLAB_WIDTH = 9.0 * REST_LINEAR_SCALE;
+export const REST_SLAB_HEIGHT = 2.4 * REST_LINEAR_SCALE;
+/** Hollow half/whole bar of the urtext dialect: `W × H` in pt. */
 export const REST_BLOCK_WIDTH = 6.0 * REST_LINEAR_SCALE;
 export const REST_BLOCK_HEIGHT = 2.5 * REST_LINEAR_SCALE;
 /** Half-diagonal (pt) of the geometric node diamonds. */
@@ -75,21 +101,23 @@ export const REST_NODE_SOLID_HALF = 2.5 * REST_LINEAR_SCALE;
 export const REST_RAY_REACH = 4.2 * REST_LINEAR_SCALE;
 /** Air (pt) between a hollow node and its lateral tick ray. */
 export const REST_RAY_GAP = 0.4 * REST_LINEAR_SCALE;
+/** Capsule height (pt) of the geometric half/whole bar, per side of its seat. */
+export const REST_CAPSULE_HEIGHT = 2.2 * REST_LINEAR_SCALE;
 /** Half-extent (pt) of the bauhaus slash and its parallel wings. */
 export const REST_SLASH_HALF = 3.5 * REST_LINEAR_SCALE;
 export const REST_WING_OFFSET = 2.2 * REST_LINEAR_SCALE;
 /** Half-height (pt) of the bauhaus quarter reversed-Z. */
 export const REST_Z_HALF = 3.4 * REST_LINEAR_SCALE;
-/** Half-height (pt) of the bauhaus half hairline box. */
+/** Half-height (pt) of the bauhaus half/whole hairline box, per side of its seat. */
 export const REST_BOX_HALF = 1.5 * REST_LINEAR_SCALE;
-/** Stroke (pt) of the bauhaus half hairline box (Round 17B: pre-scale 0.6pt). */
+/** Stroke (pt) of the bauhaus hairline box (Round 17B: pre-scale 0.6pt). */
 export const REST_BOX_STROKE = 0.6;
 /**
  * Round 13 phantom-notehead dialect: radius (pt) of the dashed open head that
  * stands where the unvoiced notehead would have been.
  */
 export const REST_PHANTOM_HEAD_RADIUS = 3.0 * REST_LINEAR_SCALE;
-/** Stroke (pt) of the phantom head's dashed outline and of its bare stem (Round 17B: pre-scale 0.8pt). */
+/** Stroke (pt) of the phantom head's dashed outline and of its bare stem. */
 export const REST_PHANTOM_HEAD_STROKE = 0.8;
 /** Dash pattern (pt) of the phantom head — an open, unwritten notehead. */
 export const REST_PHANTOM_DASH = `${(1.8 * REST_LINEAR_SCALE).toFixed(2)},${(1.5 * REST_LINEAR_SCALE).toFixed(2)}`;
@@ -97,14 +125,10 @@ export const REST_PHANTOM_DASH = `${(1.8 * REST_LINEAR_SCALE).toFixed(2)},${(1.5
 export const REST_PHANTOM_FLAG_REACH = 4.2 * REST_LINEAR_SCALE;
 /** Drop (pt) of a phantom flag hook below the stem point it leaves. */
 export const REST_PHANTOM_FLAG_DROP = 2.4 * REST_LINEAR_SCALE;
-/** Hollow half/whole bar of the phantom dialect: `W × H` in pt. */
+/** Hollow half/whole bar of the phantom dialect: `W × H` in pt, per side of its seat. */
 export const REST_PHANTOM_BAR_WIDTH = 7.0 * REST_LINEAR_SCALE;
-export const REST_PHANTOM_BAR_HEIGHT = 2.4 * REST_LINEAR_SCALE;
-/**
- * Round 13 classical urtext: the calligraphic hook geometry. The stem is a
- * slightly slanted rule; every hook leaves it at the top and sweeps left into a
- * solid teardrop bulb.
- */
+export const REST_PHANTOM_BAR_HEIGHT = 1.2 * REST_LINEAR_SCALE;
+/** Calligraphic hooks of the urtext dialect: reach, drop and bulb radius (pt). */
 export const REST_URTEXT_STEM_SLANT = 1.6 * REST_LINEAR_SCALE;
 export const REST_URTEXT_STEM_FOOT = 0.6 * REST_LINEAR_SCALE;
 export const REST_URTEXT_HOOK_REACH = 4.4 * REST_LINEAR_SCALE;
@@ -115,33 +139,17 @@ export const REST_URTEXT_LIGHTNING_HALF_WIDTH = 2.6 * REST_LINEAR_SCALE;
 export const REST_URTEXT_LIGHTNING_TOP = 5.4 * REST_LINEAR_SCALE;
 export const REST_URTEXT_LIGHTNING_BOTTOM = 5.8 * REST_LINEAR_SCALE;
 
-/** One resolved rest: where it stands, how long it is silent and in which dialect. */
-export interface JankoRestGeometry {
-  /** Absolute onset tick of the silence. */
-  tick: number;
-  /** Length of the silence (ticks). */
-  durationTicks: number;
-  /** Hand whose voice is silent. */
-  hand: Hand;
-  /** Beat column of the rest (page pt), possibly nudged along its row. */
-  x: number;
-  /** Glyph centre (page pt): hung from its phrase row toward Middle C. */
-  y: number;
-  /** Duration class painted. */
-  value: JankoRestValue;
-  /** Active dialect. */
-  style: JankoRestStyle;
-}
-
 /**
  * Duration class of a silence.
  *
  * The thresholds mirror the clasp duration grammar
  * (`rhythm.claspDurationClass`), so a rest and a clasped cluster of the same
- * value can never disagree: ≥ 96 ticks is the calm half/whole mark, a quarter
- * is anything over 38, an 8th over 14, and everything shorter is a 16th.
+ * value can never disagree: ≥ 192 ticks is the whole-bar mark, ≥ 96 the
+ * half-bar mark, a quarter is anything over 38, an 8th over 14, and everything
+ * shorter is a 16th.
  */
 export function restValueForTicks(durationTicks: number): JankoRestValue {
+  if (durationTicks >= 192) return 'whole';
   if (durationTicks >= 96) return 'half';
   if (durationTicks > 38) return 'quarter';
   if (durationTicks > 14) return 'eighth';
@@ -161,399 +169,845 @@ export function isStandardRestValue(durationTicks: number): boolean {
   return REST_STANDARD_VALUES.includes(durationTicks);
 }
 
-/** Grid-step rake of the kinetic tabs: the score's own beam-harmonized 12.4°. */
-function rake(tokens: ResolvedJankoTokens): number {
-  return tokens.maxBeamSlope;
+/** Is this rest value one of the two bar forms (the slab pair)? */
+export function isBarRestValue(value: JankoRestValue): boolean {
+  return value === 'half' || value === 'whole';
 }
 
-type ResolvedJankoTokens = ReturnType<typeof resolveJankoTokens>;
+// ---------------------------------------------------------------------------
+// The ink model: one glyph = a list of primitives, painted and weighed alike
+// ---------------------------------------------------------------------------
 
-/** The kinetic monoline ink: stem, 12.4° tabs / notch, hollow bar. */
-function renderKineticMonoline(rest: JankoRestGeometry, t: ResolvedJankoTokens): string[] {
-  const { x, y, value } = rest;
-  const out: string[] = [];
+/** One point in page pt coordinates. */
+export interface JankoInkPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * One primitive of a rest glyph, in page pt coordinates. The renderer paints
+ * exactly these primitives and {@link centroidOfInk} weighs exactly the same
+ * list, so the gravity point can never drift from the paint.
+ */
+export type JankoRestInk =
+  | {
+      kind: 'line';
+      cls: string;
+      a: JankoInkPoint;
+      b: JankoInkPoint;
+      width: number;
+      cap?: 'butt' | 'round';
+      attrs?: string;
+    }
+  | {
+      kind: 'curve';
+      cls: string;
+      start: JankoInkPoint;
+      segments: ReadonlyArray<readonly [JankoInkPoint, JankoInkPoint, JankoInkPoint]>;
+      width: number;
+      cap?: 'butt' | 'round';
+      attrs?: string;
+    }
+  | {
+      kind: 'poly';
+      cls: string;
+      pts: readonly JankoInkPoint[];
+      close: boolean;
+      stroke: number | null;
+      fill: string | null;
+      cap?: 'butt' | 'round';
+      attrs?: string;
+    }
+  | {
+      kind: 'rect';
+      cls: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      rx?: number;
+      stroke: number | null;
+      fill: string | null;
+      dash?: string;
+      attrs?: string;
+    }
+  | {
+      kind: 'ellipse';
+      cls: string;
+      c: JankoInkPoint;
+      rx: number;
+      ry: number;
+      stroke: number | null;
+      fill: string | null;
+      dash?: string;
+      attrs?: string;
+    };
+
+/** Number of samples used to weigh one cubic segment (deterministic). */
+const CURVE_SAMPLES = 32;
+
+/** Sample one cubic Bézier segment. */
+function sampleCubic(
+  p0: JankoInkPoint,
+  p1: JankoInkPoint,
+  p2: JankoInkPoint,
+  p3: JankoInkPoint,
+  steps: number
+): JankoInkPoint[] {
+  const out: JankoInkPoint[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const u = 1 - t;
+    out.push({
+      x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+      y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y,
+    });
+  }
+  return out;
+}
+
+/** Length-weighted centroid of one sampled polyline. */
+function polylineCentroid(pts: readonly JankoInkPoint[]): {
+  centroid: JankoInkPoint;
+  length: number;
+} {
+  let length = 0;
+  let sx = 0;
+  let sy = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const l = Math.hypot(b.x - a.x, b.y - a.y);
+    length += l;
+    sx += ((a.x + b.x) / 2) * l;
+    sy += ((a.y + b.y) / 2) * l;
+  }
+  return length > 0
+    ? { centroid: { x: sx / length, y: sy / length }, length }
+    : { centroid: pts[0] ?? { x: 0, y: 0 }, length: 0 };
+}
+
+/** Area centroid of one closed polygon (shoelace). */
+function polygonCentroid(pts: readonly JankoInkPoint[]): {
+  centroid: JankoInkPoint;
+  area: number;
+} {
+  let area = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const cross = a.x * b.y - b.x * a.y;
+    area += cross;
+    cx += (a.x + b.x) * cross;
+    cy += (a.y + b.y) * cross;
+  }
+  area /= 2;
+  if (Math.abs(area) < 1e-12) {
+    return { centroid: pts[0] ?? { x: 0, y: 0 }, area: 0 };
+  }
+  return { centroid: { x: cx / (6 * area), y: cy / (6 * area) }, area: Math.abs(area) };
+}
+
+/**
+ * The ink centroid of one primitive list — the glyph's **gravity point**, in
+ * the same coordinates as the primitives. Strokes weigh their length times
+ * their width, fills their area; a rectangle, an ellipse and a symmetric
+ * outline all centre on their own middle, which is exactly how the eye reads
+ * them.
+ */
+export function centroidOfInk(items: readonly JankoRestInk[]): JankoInkPoint {
+  let weight = 0;
+  let sx = 0;
+  let sy = 0;
+  const add = (c: JankoInkPoint, w: number): void => {
+    if (!(w > 1e-9)) return;
+    weight += w;
+    sx += c.x * w;
+    sy += c.y * w;
+  };
+  for (const item of items) {
+    switch (item.kind) {
+      case 'line': {
+        const l = Math.hypot(item.b.x - item.a.x, item.b.y - item.a.y);
+        add({ x: (item.a.x + item.b.x) / 2, y: (item.a.y + item.b.y) / 2 }, l * item.width);
+        break;
+      }
+      case 'curve': {
+        let cursor = item.start;
+        for (const [c1, c2, end] of item.segments) {
+          const sampled = sampleCubic(cursor, c1, c2, end, CURVE_SAMPLES);
+          const { centroid, length } = polylineCentroid(sampled);
+          add(centroid, length * item.width);
+          cursor = end;
+        }
+        break;
+      }
+      case 'poly': {
+        const closed = item.close
+          ? item.pts
+          : [...item.pts, item.pts[0] ?? { x: 0, y: 0 }];
+        // `'none'` is a hollow outline: only real paint weighs in.
+        if (item.fill !== null && item.fill !== 'none') {
+          const { centroid, area } = polygonCentroid(closed);
+          add(centroid, area);
+        }
+        if (item.stroke !== null) {
+          const { centroid, length } = polylineCentroid(
+            item.close ? [...item.pts, item.pts[0]] : item.pts
+          );
+          add(centroid, length * item.stroke);
+        }
+        break;
+      }
+      case 'rect': {
+        const center = { x: item.x + item.w / 2, y: item.y + item.h / 2 };
+        const filled = item.fill !== null && item.fill !== 'none';
+        const w =
+          (filled ? item.w * item.h : 0) +
+          (item.stroke !== null ? 2 * (item.w + item.h) * item.stroke : 0);
+        add(center, w);
+        break;
+      }
+      case 'ellipse': {
+        const filled = item.fill !== null && item.fill !== 'none';
+        const w =
+          (filled ? Math.PI * item.rx * item.ry : 0) +
+          (item.stroke !== null ? Math.PI * (item.rx + item.ry) * item.stroke : 0);
+        add(item.c, w);
+        break;
+      }
+    }
+  }
+  return weight > 0 ? { x: sx / weight, y: sy / weight } : { x: 0, y: 0 };
+}
+
+/**
+ * Axis-aligned ink extents of one primitive list — the conservative box every
+ * clearance rule measures foreign glyphs against. A stroked primitive grows by
+ * half its stroke on every side (butt and round caps alike), a fill by nothing.
+ */
+export function extentsOfInk(items: readonly JankoRestInk[]): {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+} {
+  let x0 = Number.POSITIVE_INFINITY;
+  let y0 = Number.POSITIVE_INFINITY;
+  let x1 = Number.NEGATIVE_INFINITY;
+  let y1 = Number.NEGATIVE_INFINITY;
+  const grow = (
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    pad: number
+  ): void => {
+    x0 = Math.min(x0, minX - pad);
+    y0 = Math.min(y0, minY - pad);
+    x1 = Math.max(x1, maxX + pad);
+    y1 = Math.max(y1, maxY + pad);
+  };
+  const bbox = (pts: readonly JankoInkPoint[]): [number, number, number, number] => {
+    let mnX = Number.POSITIVE_INFINITY;
+    let mnY = Number.POSITIVE_INFINITY;
+    let mxX = Number.NEGATIVE_INFINITY;
+    let mxY = Number.NEGATIVE_INFINITY;
+    for (const p of pts) {
+      mnX = Math.min(mnX, p.x);
+      mnY = Math.min(mnY, p.y);
+      mxX = Math.max(mxX, p.x);
+      mxY = Math.max(mxY, p.y);
+    }
+    return [mnX, mnY, mxX, mxY];
+  };
+  for (const item of items) {
+    switch (item.kind) {
+      case 'line':
+        grow(...bbox([item.a, item.b]), item.width / 2);
+        break;
+      case 'curve': {
+        const pts: JankoInkPoint[] = [item.start];
+        let cursor = item.start;
+        for (const [c1, c2, end] of item.segments) {
+          pts.push(...sampleCubic(cursor, c1, c2, end, CURVE_SAMPLES));
+          cursor = end;
+        }
+        grow(...bbox(pts), item.width / 2);
+        break;
+      }
+      case 'poly': {
+        const [mnX, mnY, mxX, mxY] = bbox(item.pts);
+        if (item.fill !== null) grow(mnX, mnY, mxX, mxY, 0);
+        if (item.stroke !== null) grow(mnX, mnY, mxX, mxY, item.stroke / 2);
+        break;
+      }
+      case 'rect':
+        grow(item.x, item.y, item.x + item.w, item.y + item.h, (item.stroke ?? 0) / 2);
+        break;
+      case 'ellipse':
+        grow(
+          item.c.x - item.rx,
+          item.c.y - item.ry,
+          item.c.x + item.rx,
+          item.c.y + item.ry,
+          (item.stroke ?? 0) / 2
+        );
+        break;
+    }
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/** Serialize one primitive as SVG. */
+function inkToSvg(item: JankoRestInk): string {
+  const attrs = item.attrs ?? '';
+  switch (item.kind) {
+    case 'line':
+      return (
+        `    <line class="${item.cls}" x1="${f(item.a.x)}" y1="${f(item.a.y)}" ` +
+        `x2="${f(item.b.x)}" y2="${f(item.b.y)}" stroke="#111111" ` +
+        `stroke-width="${item.width.toFixed(2)}" stroke-linecap="${item.cap ?? 'butt'}"${attrs}/>`
+      );
+    case 'curve': {
+      const d = [
+        `M ${f(item.start.x)} ${f(item.start.y)}`,
+        ...item.segments.map(
+          ([c1, c2, end]) => `C ${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(end.x)} ${f(end.y)}`
+        ),
+      ].join(' ');
+      return (
+        `    <path class="${item.cls}" d="${d}" fill="none" stroke="#111111" ` +
+        `stroke-width="${item.width.toFixed(2)}" stroke-linecap="${item.cap ?? 'round'}" ` +
+        `stroke-linejoin="round"${attrs}/>`
+      );
+    }
+    case 'poly': {
+      const d =
+        `M ${item.pts.map((p) => `${f(p.x)} ${f(p.y)}`).join(' L ')}` + (item.close ? ' Z' : '');
+      const fill = item.fill ?? 'none';
+      const stroke = item.stroke === null ? 'none' : '#111111';
+      const width = item.stroke === null ? '' : ` stroke-width="${item.stroke.toFixed(2)}"`;
+      return (
+        `    <path class="${item.cls}" d="${d}" fill="${fill}" stroke="${stroke}"${width} ` +
+        `stroke-linecap="${item.cap ?? 'butt'}" stroke-linejoin="miter"${attrs}/>`
+      );
+    }
+    case 'rect': {
+      const rx = item.rx === undefined ? '' : ` rx="${f(item.rx)}" ry="${f(item.rx)}"`;
+      const stroke = item.stroke === null ? 'none' : '#111111';
+      const width = item.stroke === null ? '' : ` stroke-width="${item.stroke.toFixed(2)}"`;
+      const dash = item.dash ? ` stroke-dasharray="${item.dash}"` : '';
+      return (
+        `    <rect class="${item.cls}" x="${f(item.x)}" y="${f(item.y)}" ` +
+        `width="${f(item.w)}" height="${f(item.h)}"${rx} fill="${item.fill ?? 'none'}" ` +
+        `stroke="${stroke}"${width}${dash}${attrs}/>`
+      );
+    }
+    case 'ellipse': {
+      const stroke = item.stroke === null ? 'none' : '#111111';
+      const width = item.stroke === null ? '' : ` stroke-width="${item.stroke.toFixed(2)}"`;
+      const dash = item.dash ? ` stroke-dasharray="${item.dash}"` : '';
+      return (
+        `    <ellipse class="${item.cls}" cx="${f(item.c.x)}" cy="${f(item.c.y)}" ` +
+        `rx="${f(item.rx)}" ry="${f(item.ry)}" fill="${item.fill ?? 'none'}" ` +
+        `stroke="${stroke}"${width}${dash}${attrs}/>`
+      );
+    }
+  }
+}
+
+/** Paint one primitive list. */
+export function renderInk(items: readonly JankoRestInk[]): string[] {
+  return items.map(inkToSvg);
+}
+
+// ---------------------------------------------------------------------------
+// Per-dialect cuts. Every builder draws about the glyph origin `o` (page pt).
+// The bar forms draw with their **near edge on the origin** — the half slab
+// sits atop it, the whole slab hangs below it — so the origin is exactly the
+// phrase row and the seat offset is the glyph's own gravity offset.
+// ---------------------------------------------------------------------------
+
+/** The classical slanted stem: top leaning right, foot stopping short. */
+function classicalStem(
+  o: JankoInkPoint,
+  width: number,
+  cls: string,
+  lean: number = REST_STEM_LEAN
+): JankoRestInk {
   const half = REST_STEM_HEIGHT / 2;
-  const stroke = REST_STROKE.toFixed(2);
+  return {
+    kind: 'line',
+    cls,
+    a: { x: o.x + lean / 2, y: o.y - half },
+    b: { x: o.x - lean / 2, y: o.y + half - REST_STEM_FOOT },
+    width,
+    cap: 'butt',
+  };
+}
 
-  if (value === 'half') {
-    out.push(
-      `    <rect class="janko-rest-bar" x="${f(x - REST_BAR_WIDTH / 2)}" y="${f(y - REST_BAR_HEIGHT / 2)}" width="${f(REST_BAR_WIDTH)}" height="${f(REST_BAR_HEIGHT)}" fill="none" stroke="#111111" stroke-width="${stroke}"/>`
-    );
-    return out;
+/** The stem's x at a height between its top and its foot (shared by the hooks). */
+function stemXAt(o: JankoInkPoint, y: number, lean: number = REST_STEM_LEAN): number {
+  const half = REST_STEM_HEIGHT / 2;
+  const topY = o.y - half;
+  const botY = o.y + half - REST_STEM_FOOT;
+  const t = (y - topY) / (botY - topY);
+  return o.x + lean / 2 + t * -lean;
+}
+
+/** Slanted stem + `marks` oval-headed classical hooks (the golden re-cut). */
+function classicalHookedInk(
+  o: JankoInkPoint,
+  marks: number,
+  t: ResolvedJankoTokens,
+  opts: {
+    stemCls: string;
+    hookCls: string;
+    headCls: string;
+    head: 'oval' | 'bulb';
+    hookReach: number;
+    hookDrop: number;
+    stroke: number;
+    lean?: number;
+    hookAttrs?: (index: number) => string;
   }
-
-  out.push(
-    `    <line class="janko-rest-stem" x1="${f(x)}" y1="${f(y - half)}" x2="${f(x)}" y2="${f(y + half)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-  );
-
-  if (value === 'quarter') {
-    out.push(
-      `    <line class="janko-rest-notch" x1="${f(x - REST_NOTCH_HALF)}" y1="${f(y)}" x2="${f(x + REST_NOTCH_HALF)}" y2="${f(y)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-    );
-    return out;
-  }
-
-  const marks = value === 'sixteenth' ? 2 : 1;
-  // Round 13: the tab hooks **downward** to the right of its stem (`sign = 1`),
-  // exactly like a note flag leaving the stem tip — the Round 12 up-rake read as
-  // an ascending accent instead of a duration mark.
-  const sign = 1;
+): JankoRestInk[] {
+  const lean = opts.lean ?? REST_STEM_LEAN;
+  const out: JankoRestInk[] = [classicalStem(o, opts.stroke, opts.stemCls, lean)];
+  const topY = o.y - REST_STEM_HEIGHT / 2;
   for (let i = 1; i <= marks; i++) {
-    const cy = y - half + (i - 1) * t.flagSpacing;
+    const cy = topY + (i - 1) * t.flagSpacing;
+    const sx = stemXAt(o, cy, lean);
+    const head = { x: sx - opts.hookReach, y: cy + opts.hookDrop };
+    out.push({
+      kind: 'curve',
+      cls: opts.hookCls,
+      start: { x: sx, y: cy },
+      segments: [
+        [
+          { x: sx - opts.hookReach * 0.45, y: cy + opts.hookDrop * 0.06 },
+          { x: sx - opts.hookReach * 0.92, y: cy + opts.hookDrop * 0.52 },
+          head,
+        ],
+      ],
+      width: opts.stroke,
+      cap: 'round',
+      ...(opts.hookAttrs ? { attrs: opts.hookAttrs(i) } : {}),
+    });
     out.push(
-      `    <line class="janko-rest-tab" data-rest-tab="${i}" x1="${f(x)}" y1="${f(cy)}" x2="${f(x + REST_TAB_WIDTH)}" y2="${f(cy + sign * REST_TAB_WIDTH * rake(t))}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+      opts.head === 'oval'
+        ? {
+            kind: 'ellipse',
+            cls: opts.headCls,
+            c: head,
+            rx: REST_HEAD_RX,
+            ry: REST_HEAD_RY,
+            stroke: null,
+            fill: '#111111',
+            attrs: opts.hookAttrs ? ` data-rest-hook-head="${i}"` : '',
+          }
+        : {
+            kind: 'ellipse',
+            cls: opts.headCls,
+            c: head,
+            rx: REST_URTEXT_BULB_RADIUS,
+            ry: REST_URTEXT_BULB_RADIUS,
+            stroke: null,
+            fill: '#111111',
+          }
     );
   }
   return out;
 }
 
 /**
- * Round 13 authentic Urtext stem: a slightly slanted calligraphic rule whose
- * foot leans left, the way every engraved 8th/16th rest is cut (SMuFL
- * `restEighth` / `restSixteenth`).
+ * The **true serpentine** quarter: the classical zigzag, monoline at the house
+ * 0.90pt weight, four calligraphic segments from the upper left to the long
+ * lower tail.
  */
-function urtextStem(x: number, y: number, stroke: string): string {
-  const top = y - REST_STEM_HEIGHT / 2;
-  const bot = y + REST_STEM_HEIGHT / 2 - REST_URTEXT_STEM_FOOT;
-  const d =
-    `M ${f(x + REST_URTEXT_STEM_SLANT * 0.5)} ${f(top)} ` +
-    `L ${f(x - REST_URTEXT_STEM_SLANT * 0.5)} ${f(bot)}`;
-  return `    <path class="janko-rest-stem-line" d="${d}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`;
+function serpentine(o: JankoInkPoint, s: number, width: number, cls: string): JankoRestInk {
+  const p = (dx: number, dy: number): JankoInkPoint => ({ x: o.x + dx * s, y: o.y + dy * s });
+  return {
+    kind: 'curve',
+    cls,
+    start: p(-2.3, -4.9),
+    segments: [
+      [p(-0.7, -4.4), p(1.3, -3.5), p(2.2, -2.5)],
+      [p(0.6, -1.8), p(-1.6, -1.1), p(-2.2, -0.3)],
+      [p(-0.5, 0.4), p(1.2, 1.2), p(2.0, 2.2)],
+      [p(0.4, 3.4), p(-1.5, 4.5), p(-2.6, 5.3)],
+    ],
+    width,
+    cap: 'round',
+  };
 }
 
-/**
- * One calligraphic Urtext hook: it leaves the stem's top, sweeps left and
- * curves down into a solid teardrop bulb — the authentic hooked-rest gesture
- * (`𝄿` carries two, `𝄾` one).
- */
-function urtextHook(x: number, y: number, stroke: string): string {
-  const reach = REST_URTEXT_HOOK_REACH;
-  const drop = REST_URTEXT_HOOK_DROP;
-  const d =
-    `M ${f(x + REST_URTEXT_STEM_SLANT * 0.5)} ${f(y)} ` +
-    `C ${f(x - reach * 0.35)} ${f(y - 0.7)} ${f(x - reach * 0.85)} ${f(y + drop * 0.35)} ${f(x - reach * 0.6)} ${f(y + drop)}`;
-  const bulb = `    <circle class="janko-rest-hook-bulb" cx="${f(x - reach * 0.6)}" cy="${f(y + drop)}" r="${f(REST_URTEXT_BULB_RADIUS)}" fill="#111111" stroke="none"/>`;
-  return [
-    `    <path class="janko-rest-hook" d="${d}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`,
-    bulb,
-  ].join('\n');
-}
-
-/** The classical urtext ink: calligraphic hooks, serpentine, solid block. */
-function renderClassicalUrtext(rest: JankoRestGeometry, t: ResolvedJankoTokens): string[] {
-  const { x, y, value } = rest;
-  const out: string[] = [];
-  const stroke = REST_STROKE.toFixed(2);
-
-  if (value === 'half') {
-    // The authentic half rest **sits on** its line (here: the voice contour),
-    // so the block rests on the register it silences instead of straddling it.
-    out.push(
-      `    <rect class="janko-rest-block" x="${f(x - REST_BLOCK_WIDTH / 2)}" y="${f(y - REST_BLOCK_HEIGHT)}" width="${f(REST_BLOCK_WIDTH)}" height="${f(REST_BLOCK_HEIGHT)}" fill="#111111" stroke="none"/>`
-    );
-    return out;
+/** The golden `'kinetic-monoline'` cut: classical monoline, Round 20. */
+function kineticInk(o: JankoInkPoint, value: JankoRestValue, t: ResolvedJankoTokens): JankoRestInk[] {
+  if (isBarRestValue(value)) {
+    // Wide solid slab: the half sits atop its seat row, the whole hangs below.
+    return [
+      {
+        kind: 'rect',
+        cls: value === 'half' ? 'janko-rest-slab' : 'janko-rest-slab janko-rest-slab-whole',
+        x: o.x - REST_SLAB_WIDTH / 2,
+        y: value === 'half' ? o.y - REST_SLAB_HEIGHT : o.y,
+        w: REST_SLAB_WIDTH,
+        h: REST_SLAB_HEIGHT,
+        stroke: null,
+        fill: '#111111',
+      },
+    ];
   }
-
   if (value === 'quarter') {
-    // The serpentine `𝄽`: an upper arm sweeping down-right, a return stroke, a
-    // second arm and the long calligraphic tail curling down-left — the Round 13
-    // gesture at the Round 16 linear scale.
-    const s = REST_LINEAR_SCALE;
-    const d =
-      `M ${f(x - 2.1 * s)} ${f(y - 4.8 * s)} ` +
-      `C ${f(x - 0.6 * s)} ${f(y - 4.4 * s)} ${f(x + 1.2 * s)} ${f(y - 3.6 * s)} ${f(x + 2.1 * s)} ${f(y - 2.6 * s)} ` +
-      `C ${f(x + 0.6 * s)} ${f(y - 1.9 * s)} ${f(x - 1.5 * s)} ${f(y - 1.2 * s)} ${f(x - 2.1 * s)} ${f(y - 0.4 * s)} ` +
-      `C ${f(x - 0.5 * s)} ${f(y + 0.3 * s)} ${f(x + 1.1 * s)} ${f(y + 1.1 * s)} ${f(x + 1.9 * s)} ${f(y + 2.1 * s)} ` +
-      `C ${f(x + 0.4 * s)} ${f(y + 3.3 * s)} ${f(x - 1.4 * s)} ${f(y + 4.4 * s)} ${f(x - 2.5 * s)} ${f(y + 5.2 * s)}`;
-    out.push(
-      `    <path class="janko-rest-lightning" d="${d}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`
-    );
-    return out;
+    return [serpentine(o, REST_LINEAR_SCALE, REST_STROKE, 'janko-rest-lightning')];
   }
-
-  out.push(urtextStem(x, y, stroke));
-  const hooks = value === 'sixteenth' ? 2 : 1;
-  for (let i = 1; i <= hooks; i++) {
-    out.push(urtextHook(x, y - REST_STEM_HEIGHT / 2 + (i - 1) * t.flagSpacing, stroke));
-  }
-  return out;
+  return classicalHookedInk(o, value === 'sixteenth' ? 2 : 1, t, {
+    stemCls: 'janko-rest-stem',
+    hookCls: 'janko-rest-hook',
+    headCls: 'janko-rest-hook-head',
+    head: 'oval',
+    hookReach: REST_HOOK_REACH,
+    hookDrop: REST_HOOK_DROP,
+    stroke: REST_STROKE,
+    hookAttrs: (i) => ` data-rest-hook="${i}"`,
+  });
 }
 
-/** The phantom notehead's dashed open head — the unvoiced notehead itself. */
-function phantomHead(x: number, y: number): string {
-  return `    <circle class="janko-rest-phantom-head" cx="${f(x)}" cy="${f(y)}" r="${f(REST_PHANTOM_HEAD_RADIUS)}" fill="none" stroke="#111111" stroke-width="${REST_PHANTOM_HEAD_STROKE.toFixed(2)}" stroke-dasharray="${REST_PHANTOM_DASH}"/>`;
+/** The `'classical-urtext'` cut: calligraphic hooks, serpentine, solid block. */
+function urtextInk(o: JankoInkPoint, value: JankoRestValue, t: ResolvedJankoTokens): JankoRestInk[] {
+  if (isBarRestValue(value)) {
+    // The authentic half rest **sits on** its line, the whole rest hangs below.
+    return [
+      {
+        kind: 'rect',
+        cls: 'janko-rest-block',
+        x: o.x - REST_BLOCK_WIDTH / 2,
+        y: value === 'half' ? o.y - REST_BLOCK_HEIGHT : o.y,
+        w: REST_BLOCK_WIDTH,
+        h: REST_BLOCK_HEIGHT,
+        stroke: null,
+        fill: '#111111',
+      },
+    ];
+  }
+  if (value === 'quarter') {
+    return [serpentine(o, REST_LINEAR_SCALE, REST_STROKE, 'janko-rest-lightning')];
+  }
+  return classicalHookedInk(o, value === 'sixteenth' ? 2 : 1, t, {
+    stemCls: 'janko-rest-stem-line',
+    hookCls: 'janko-rest-hook',
+    headCls: 'janko-rest-hook-bulb',
+    head: 'bulb',
+    hookReach: REST_URTEXT_HOOK_REACH,
+    hookDrop: REST_URTEXT_HOOK_DROP,
+    stroke: REST_STROKE,
+    lean: REST_URTEXT_STEM_SLANT,
+  });
 }
 
-/**
- * Round 13 phantom notehead: the duration grammar of a real note — an open
- * (dashed) head standing exactly where the unvoiced notehead would have been,
- * a monoline stem and one downward-hooked flag per subdivision. The quarter is
- * the bare stem, the 8th one hook and the 16th two hooks; the half/whole keeps
- * the calm hollow bar. It is the only dialect that shows *which* note is
- * missing rather than only that time passes.
- */
-function renderPhantomNotehead(rest: JankoRestGeometry, t: ResolvedJankoTokens): string[] {
-  const { x, y, value } = rest;
-  const out: string[] = [phantomHead(x, y)];
-  const stroke = REST_PHANTOM_HEAD_STROKE.toFixed(2);
+/** The `'phantom-notehead'` cut: an open dashed head where the note would be. */
+function phantomInk(
+  o: JankoInkPoint,
+  value: JankoRestValue,
+  t: ResolvedJankoTokens
+): JankoRestInk[] {
+  const stroke = REST_PHANTOM_HEAD_STROKE;
   const half = REST_STEM_HEIGHT / 2;
-
-  if (value === 'half') {
-    out.push(
-      `    <rect class="janko-rest-phantom-bar" x="${f(x - REST_PHANTOM_BAR_WIDTH / 2)}" y="${f(y - REST_PHANTOM_BAR_HEIGHT / 2)}" width="${f(REST_PHANTOM_BAR_WIDTH)}" height="${f(REST_PHANTOM_BAR_HEIGHT)}" fill="none" stroke="#111111" stroke-width="${REST_PHANTOM_HEAD_STROKE.toFixed(2)}" stroke-dasharray="${REST_PHANTOM_DASH}"/>`
-    );
+  const out: JankoRestInk[] = [
+    {
+      kind: 'ellipse',
+      cls: 'janko-rest-phantom-head',
+      c: o,
+      rx: REST_PHANTOM_HEAD_RADIUS,
+      ry: REST_PHANTOM_HEAD_RADIUS,
+      stroke,
+      fill: 'none',
+      dash: REST_PHANTOM_DASH,
+    },
+  ];
+  if (isBarRestValue(value)) {
+    out.push({
+      kind: 'rect',
+      cls: 'janko-rest-phantom-bar',
+      x: o.x - REST_PHANTOM_BAR_WIDTH / 2,
+      y: value === 'half' ? o.y - REST_PHANTOM_BAR_HEIGHT : o.y,
+      w: REST_PHANTOM_BAR_WIDTH,
+      h: REST_PHANTOM_BAR_HEIGHT,
+      stroke,
+      fill: 'none',
+      dash: REST_PHANTOM_DASH,
+    });
     return out;
   }
-
-  out.push(
-    `    <line class="janko-rest-phantom-stem" x1="${f(x)}" y1="${f(y - half)}" x2="${f(x)}" y2="${f(y + half)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-  );
+  out.push({
+    kind: 'line',
+    cls: 'janko-rest-phantom-stem',
+    a: { x: o.x, y: o.y - half },
+    b: { x: o.x, y: o.y + half },
+    width: stroke,
+    cap: 'butt',
+  });
   if (value === 'quarter') return out;
-
   const flags = value === 'sixteenth' ? 2 : 1;
   for (let i = 1; i <= flags; i++) {
-    const cy = y - half + (i - 1) * t.flagSpacing;
-    const d =
-      `M ${f(x)} ${f(cy)} ` +
-      `Q ${f(x + REST_PHANTOM_FLAG_REACH * 0.8)} ${f(cy + REST_PHANTOM_FLAG_DROP * 0.15)} ${f(x + REST_PHANTOM_FLAG_REACH)} ${f(cy + REST_PHANTOM_FLAG_DROP)}`;
-    out.push(
-      `    <path class="janko-rest-phantom-flag" data-rest-flag="${i}" d="${d}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="round"/>`
-    );
+    const cy = o.y - half + (i - 1) * t.flagSpacing;
+    out.push({
+      kind: 'curve',
+      cls: 'janko-rest-phantom-flag',
+      start: { x: o.x, y: cy },
+      segments: [
+        [
+          { x: o.x + REST_PHANTOM_FLAG_REACH * 0.6, y: cy + REST_PHANTOM_FLAG_DROP * 0.12 },
+          { x: o.x + REST_PHANTOM_FLAG_REACH * 0.95, y: cy + REST_PHANTOM_FLAG_DROP * 0.62 },
+          { x: o.x + REST_PHANTOM_FLAG_REACH, y: cy + REST_PHANTOM_FLAG_DROP },
+        ],
+      ],
+      width: stroke,
+      cap: 'round',
+      attrs: ` data-rest-flag="${i}"`,
+    });
   }
   return out;
 }
 
 /** One open diamond (hollow node). */
-function hollowDiamond(x: number, y: number, stroke: string): string {
-  const h = REST_NODE_HOLLOW_HALF;
-  return `    <path class="janko-rest-node" d="M ${f(x)} ${f(y - h)} L ${f(x + h)} ${f(y)} L ${f(x)} ${f(y + h)} L ${f(x - h)} ${f(y)} Z" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linejoin="miter"/>`;
+function diamond(o: JankoInkPoint, half: number, cls: string, stroke: number | null): JankoRestInk {
+  return {
+    kind: 'poly',
+    cls,
+    pts: [
+      { x: o.x, y: o.y - half },
+      { x: o.x + half, y: o.y },
+      { x: o.x, y: o.y + half },
+      { x: o.x - half, y: o.y },
+    ],
+    close: true,
+    stroke,
+    fill: stroke === null ? '#111111' : 'none',
+  };
 }
 
-/** One lateral tick ray of a pause node. */
-function nodeRay(x: number, y: number, side: -1 | 1, stroke: string): string {
-  return `    <line class="janko-rest-ray" x1="${f(x + side * (REST_NODE_HOLLOW_HALF + REST_RAY_GAP))}" y1="${f(y)}" x2="${f(x + side * REST_RAY_REACH)}" y2="${f(y)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`;
-}
-
-/** The geometric node ink: hollow/solid diamonds, rays, open capsule. */
-function renderGeometricNode(rest: JankoRestGeometry): string[] {
-  const { x, y, value } = rest;
-  const out: string[] = [];
-  const stroke = REST_STROKE.toFixed(2);
-
-  if (value === 'half') {
-    out.push(
-      `    <rect class="janko-rest-capsule" x="${f(x - REST_BAR_WIDTH / 2)}" y="${f(y - REST_BAR_HEIGHT)}" width="${f(REST_BAR_WIDTH)}" height="${f(REST_BAR_HEIGHT * 2)}" rx="${f(REST_BAR_HEIGHT)}" ry="${f(REST_BAR_HEIGHT)}" fill="none" stroke="#111111" stroke-width="${stroke}"/>`
-    );
-    return out;
+/** The `'geometric-node'` cut: hollow/solid diamonds, rays, open capsule. */
+function geometricInk(o: JankoInkPoint, value: JankoRestValue): JankoRestInk[] {
+  if (isBarRestValue(value)) {
+    return [
+      {
+        kind: 'rect',
+        cls: 'janko-rest-capsule',
+        x: o.x - REST_SLAB_WIDTH / 2,
+        y: value === 'half' ? o.y - REST_CAPSULE_HEIGHT * 2 : o.y,
+        w: REST_SLAB_WIDTH,
+        h: REST_CAPSULE_HEIGHT * 2,
+        rx: REST_CAPSULE_HEIGHT,
+        stroke: REST_STROKE,
+        fill: 'none',
+      },
+    ];
   }
-
   if (value === 'quarter') {
-    const h = REST_NODE_SOLID_HALF;
-    out.push(
-      `    <path class="janko-rest-node janko-rest-node-solid" d="M ${f(x)} ${f(y - h)} L ${f(x + h)} ${f(y)} L ${f(x)} ${f(y + h)} L ${f(x - h)} ${f(y)} Z" fill="#111111" stroke="none"/>`
-    );
-    return out;
+    return [diamond(o, REST_NODE_SOLID_HALF, 'janko-rest-node janko-rest-node-solid', null)];
   }
-
-  out.push(hollowDiamond(x, y, stroke));
-  const rays = value === 'sixteenth' ? 2 : 1;
-  out.push(nodeRay(x, y, -1, stroke));
-  if (rays === 2) out.push(nodeRay(x, y, 1, stroke));
+  const out: JankoRestInk[] = [diamond(o, REST_NODE_HOLLOW_HALF, 'janko-rest-node', REST_STROKE)];
+  const side = (s: -1 | 1): JankoRestInk => ({
+    kind: 'line',
+    cls: 'janko-rest-ray',
+    a: { x: o.x + s * (REST_NODE_HOLLOW_HALF + REST_RAY_GAP), y: o.y },
+    b: { x: o.x + s * REST_RAY_REACH, y: o.y },
+    width: REST_STROKE,
+    cap: 'butt',
+  });
+  out.push(side(-1));
+  if (value === 'sixteenth') out.push(side(1));
   return out;
 }
 
-/** One 45° beveled bauhaus slash (or wing) rising left to right. */
-function beveledSlash(
-  x: number,
-  y: number,
-  half: number,
-  cls: string,
-  stroke: string
-): string {
-  return `    <line class="${cls}" x1="${f(x - half)}" y1="${f(y + half)}" x2="${f(x + half)}" y2="${f(y - half)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`;
+/** One 45° beveled slash (or wing) rising left to right. */
+function beveledSlash(o: JankoInkPoint, half: number, cls: string): JankoRestInk {
+  return {
+    kind: 'line',
+    cls,
+    a: { x: o.x - half, y: o.y + half },
+    b: { x: o.x + half, y: o.y - half },
+    width: REST_STROKE,
+    cap: 'butt',
+  };
 }
 
-/** The bauhaus ink: beveled slashes + parallel wings, reversed-Z, hairline box. */
-function renderBauhausSlash(rest: JankoRestGeometry): string[] {
-  const { x, y, value } = rest;
-  const out: string[] = [];
-  const stroke = REST_STROKE.toFixed(2);
-
-  if (value === 'half') {
-    out.push(
-      `    <rect class="janko-rest-box" x="${f(x - REST_BAR_WIDTH / 2)}" y="${f(y - REST_BOX_HALF)}" width="${f(REST_BAR_WIDTH)}" height="${f(2 * REST_BOX_HALF)}" fill="none" stroke="#111111" stroke-width="${REST_BOX_STROKE.toFixed(2)}"/>`
-    );
-    return out;
+/** The `'bauhaus-slash'` cut: beveled slashes, reversed-Z, hairline box. */
+function bauhausInk(o: JankoInkPoint, value: JankoRestValue): JankoRestInk[] {
+  if (isBarRestValue(value)) {
+    return [
+      {
+        kind: 'rect',
+        cls: 'janko-rest-box',
+        x: o.x - REST_SLAB_WIDTH / 2,
+        y: value === 'half' ? o.y - REST_BOX_HALF * 2 : o.y,
+        w: REST_SLAB_WIDTH,
+        h: REST_BOX_HALF * 2,
+        stroke: REST_BOX_STROKE,
+        fill: 'none',
+      },
+    ];
   }
-
   if (value === 'quarter') {
     const h = REST_Z_HALF;
-    const d =
-      `M ${f(x + h * 0.82)} ${f(y + h)} L ${f(x - h * 0.82)} ${f(y + h)} ` +
-      `L ${f(x + h * 0.82)} ${f(y - h)} L ${f(x - h * 0.82)} ${f(y - h)}`;
-    out.push(
-      `    <path class="janko-rest-z" d="${d}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt" stroke-linejoin="miter"/>`
-    );
-    return out;
+    return [
+      {
+        kind: 'poly',
+        cls: 'janko-rest-z',
+        pts: [
+          { x: o.x + h * 0.82, y: o.y + h },
+          { x: o.x - h * 0.82, y: o.y + h },
+          { x: o.x + h * 0.82, y: o.y - h },
+          { x: o.x - h * 0.82, y: o.y - h },
+        ],
+        close: false,
+        stroke: REST_STROKE,
+        fill: null,
+      },
+    ];
   }
-
-  out.push(beveledSlash(x, y, REST_SLASH_HALF, 'janko-rest-slash', stroke));
-  const wings = value === 'sixteenth' ? 2 : 1;
+  const out: JankoRestInk[] = [beveledSlash(o, REST_SLASH_HALF, 'janko-rest-slash')];
   out.push(
-    beveledSlash(x - REST_WING_OFFSET, y, REST_SLASH_HALF * 0.6, 'janko-rest-wing', stroke)
+    beveledSlash(
+      { x: o.x - REST_WING_OFFSET, y: o.y },
+      REST_SLASH_HALF * 0.6,
+      'janko-rest-wing'
+    )
   );
-  if (wings === 2) {
+  if (value === 'sixteenth') {
     out.push(
-      beveledSlash(x + REST_WING_OFFSET, y, REST_SLASH_HALF * 0.6, 'janko-rest-wing', stroke)
+      beveledSlash(
+        { x: o.x + REST_WING_OFFSET, y: o.y },
+        REST_SLASH_HALF * 0.6,
+        'janko-rest-wing'
+      )
     );
   }
   return out;
 }
 
-/**
- * Paint one rest in the active dialect. The group carries the rest's musical
- * identity as data attributes (`data-rest-tick`, `-value`, `-hand`, `-style`),
- * so the studio, the tests and a future audition pass can address it without
- * parsing coordinates.
- */
-export function renderRest(
-  rest: JankoRestGeometry,
-  tokens?: Partial<JankoTokens> | null
-): string {
-  const t = resolveJankoTokens(tokens);
-  let ink: string[];
-  switch (rest.style) {
+/** The primitive list of one rest glyph, drawn about its origin `o`. */
+export function restInk(
+  o: JankoInkPoint,
+  value: JankoRestValue,
+  style: JankoRestStyle,
+  t: ResolvedJankoTokens
+): JankoRestInk[] {
+  switch (style) {
     case 'classical-urtext':
-      ink = renderClassicalUrtext(rest, t);
-      break;
+      return urtextInk(o, value, t);
     case 'geometric-node':
-      ink = renderGeometricNode(rest);
-      break;
+      return geometricInk(o, value);
     case 'bauhaus-slash':
-      ink = renderBauhausSlash(rest);
-      break;
+      return bauhausInk(o, value);
     case 'phantom-notehead':
-      ink = renderPhantomNotehead(rest, t);
-      break;
+      return phantomInk(o, value, t);
     case 'kinetic-monoline':
     default:
-      ink = renderKineticMonoline(rest, t);
-      break;
+      return kineticInk(o, value, t);
   }
-  return [
-    `    <g class="janko-rest-group" data-rest-tick="${rest.tick}" data-rest-value="${rest.value}" data-rest-hand="${rest.hand}" data-rest-style="${rest.style}">`,
-    ...ink,
-    '    </g>',
-  ].join('\n');
+}
+
+/** One resolved rest: where it stands, how long it is silent and in which dialect. */
+export interface JankoRestGeometry {
+  /** Absolute onset tick of the silence. */
+  tick: number;
+  /** Length of the silence (ticks). */
+  durationTicks: number;
+  /** Hand whose voice is silent. */
+  hand: Hand;
+  /**
+   * Optical seat point x (page pt): the glyph is placed so that its ink
+   * centroid stands exactly on this column.
+   */
+  x: number;
+  /** Optical seat point y (page pt): the ink centroid (and the bar forms' row). */
+  y: number;
+  /** Duration class painted. */
+  value: JankoRestValue;
+  /** Active dialect. */
+  style: JankoRestStyle;
 }
 
 /**
- * Axis-aligned ink box of one rest, in the active dialect. The engine's fit
- * rule measures foreign notehead discs against this same box, so a painted rest
- * can never be a surprise collision — the box and the ink are defined together.
+ * The glyph's **gravity offset**: the ink centroid of one rest glyph drawn
+ * about the origin, so the painted centroid of a rest whose seat point is
+ * `(x, y)` is exactly `(x, y)` — see {@link restGlyphOrigin}.
+ */
+export function restInkCentroidOffset(
+  value: JankoRestValue,
+  style: JankoRestStyle,
+  tokens?: Partial<JankoTokens> | null
+): JankoInkPoint {
+  const t = resolveJankoTokens(tokens);
+  return centroidOfInk(restInk({ x: 0, y: 0 }, value, style, t));
+}
+
+/**
+ * The glyph's draw origin for a rest whose optical seat point is
+ * `(rest.x, rest.y)`: the origin the dialect painters draw about, shifted so
+ * that the painted ink centroid lands exactly on the seat point.
+ */
+export function restGlyphOrigin(
+  rest: JankoRestGeometry,
+  tokens?: Partial<JankoTokens> | null
+): JankoInkPoint {
+  const c = restInkCentroidOffset(rest.value, rest.style, tokens);
+  return { x: rest.x - c.x, y: rest.y - c.y };
+}
+
+/**
+ * Extra offset (pt) of the phrase row above/below the seat point, for the two
+ * **bar forms**: a bar glyph is drawn with its near edge on the origin, so the
+ * half slab's gravity point sits half a slab above its row and the whole
+ * slab's half a slab below it. Every other value's centroid *is* the seat
+ * point, so its offset is 0.
+ */
+export function restSeatOffsetY(
+  value: JankoRestValue,
+  style: JankoRestStyle,
+  tokens?: Partial<JankoTokens> | null
+): number {
+  if (!isBarRestValue(value)) return 0;
+  return restInkCentroidOffset(value, style, tokens).y;
+}
+
+/**
+ * Axis-aligned ink box of one rest, in the active dialect, at the glyph's
+ * optical origin. The engine's fit rule measures foreign notehead discs
+ * against this same box, so a painted rest can never be a surprise collision —
+ * the box and the ink are defined together.
  */
 export function restInkBox(
   rest: JankoRestGeometry,
   tokens?: Partial<JankoTokens> | null
 ): { x0: number; y0: number; x1: number; y1: number } {
   const t = resolveJankoTokens(tokens);
-  const { x, y, value, style } = rest;
-  const box = (x0: number, y0: number, x1: number, y1: number) => ({ x0, y0, x1, y1 });
+  const o = restGlyphOrigin(rest, t);
+  return extentsOfInk(restInk(o, rest.value, rest.style, t));
+}
 
-  if (style === 'kinetic-monoline') {
-    if (value === 'half') {
-      return box(
-        x - REST_BAR_WIDTH / 2 - REST_STROKE / 2,
-        y - REST_BAR_HEIGHT / 2 - REST_STROKE / 2,
-        x + REST_BAR_WIDTH / 2 + REST_STROKE / 2,
-        y + REST_BAR_HEIGHT / 2 + REST_STROKE / 2
-      );
-    }
-    const half = REST_STEM_HEIGHT / 2;
-    if (value === 'quarter') {
-      return box(x - REST_NOTCH_HALF, y - half, x + REST_NOTCH_HALF, y + half);
-    }
-    // Round 13: the tabs hook downward, so the only ink above the stem top is
-    // the stem itself; the tab rakes stay inside the stem's own 12pt band.
-    const marks = value === 'sixteenth' ? 2 : 1;
-    const topTab = y - half;
-    const tabBottom =
-      topTab + (marks - 1) * t.flagSpacing + REST_TAB_WIDTH * rake(t) + REST_STROKE / 2;
-    return box(x - REST_STROKE / 2, y - half, x + REST_TAB_WIDTH, Math.max(y + half, tabBottom));
-  }
-
-  if (style === 'classical-urtext') {
-    if (value === 'half') {
-      // The authentic half rest sits **on** the contour.
-      return box(
-        x - REST_BLOCK_WIDTH / 2,
-        y - REST_BLOCK_HEIGHT,
-        x + REST_BLOCK_WIDTH / 2,
-        y
-      );
-    }
-    if (value === 'quarter') {
-      return box(
-        x - REST_URTEXT_LIGHTNING_HALF_WIDTH,
-        y - REST_URTEXT_LIGHTNING_TOP,
-        x + REST_URTEXT_LIGHTNING_HALF_WIDTH,
-        y + REST_URTEXT_LIGHTNING_BOTTOM
-      );
-    }
-    const hooks = value === 'sixteenth' ? 2 : 1;
-    const top = y - REST_STEM_HEIGHT / 2;
-    const bulbBottom =
-      top + (hooks - 1) * t.flagSpacing + REST_URTEXT_HOOK_DROP + REST_URTEXT_BULB_RADIUS;
-    return box(
-      x - REST_URTEXT_HOOK_REACH * 0.85,
-      top - REST_URTEXT_BULB_RADIUS,
-      x + REST_URTEXT_STEM_SLANT * 0.5 + REST_STROKE / 2,
-      Math.max(y + REST_STEM_HEIGHT / 2, bulbBottom)
-    );
-  }
-
-  if (style === 'phantom-notehead') {
-    if (value === 'half') {
-      return box(
-        x - REST_PHANTOM_BAR_WIDTH / 2 - REST_PHANTOM_HEAD_STROKE / 2,
-        y - REST_PHANTOM_BAR_HEIGHT / 2 - REST_PHANTOM_HEAD_STROKE / 2,
-        x + REST_PHANTOM_BAR_WIDTH / 2 + REST_PHANTOM_HEAD_STROKE / 2,
-        y + REST_PHANTOM_BAR_HEIGHT / 2 + REST_PHANTOM_HEAD_STROKE / 2
-      );
-    }
-    const half = REST_STEM_HEIGHT / 2;
-    const head = REST_PHANTOM_HEAD_RADIUS + REST_PHANTOM_HEAD_STROKE / 2;
-    if (value === 'quarter') return box(x - head, y - half, x + head, y + half);
-    const flags = value === 'sixteenth' ? 2 : 1;
-    const flagBottom =
-      y - half + (flags - 1) * t.flagSpacing + REST_PHANTOM_FLAG_DROP + REST_PHANTOM_HEAD_STROKE / 2;
-    return box(
-      x - head,
-      y - half,
-      x + REST_PHANTOM_FLAG_REACH + REST_PHANTOM_HEAD_STROKE / 2,
-      Math.max(y + half, flagBottom)
-    );
-  }
-
-  if (style === 'geometric-node') {
-    if (value === 'half') {
-      return box(x - REST_BAR_WIDTH / 2, y - REST_BAR_HEIGHT * 2, x + REST_BAR_WIDTH / 2, y + REST_BAR_HEIGHT * 2);
-    }
-    if (value === 'quarter') {
-      const h = REST_NODE_SOLID_HALF;
-      return box(x - h, y - h, x + h, y + h);
-    }
-    return box(x - REST_RAY_REACH, y - REST_NODE_HOLLOW_HALF, x + REST_RAY_REACH, y + REST_NODE_HOLLOW_HALF);
-  }
-
-  // bauhaus-slash
-  if (value === 'half') {
-    return box(x - REST_BAR_WIDTH / 2, y - REST_BOX_HALF, x + REST_BAR_WIDTH / 2, y + REST_BOX_HALF);
-  }
-  if (value === 'quarter') {
-    return box(x - REST_Z_HALF * 0.82, y - REST_Z_HALF, x + REST_Z_HALF * 0.82, y + REST_Z_HALF);
-  }
-  const wings = value === 'sixteenth' ? 2 : 1;
-  const reach = REST_SLASH_HALF + (wings === 2 ? REST_WING_OFFSET : 0);
-  return box(x - reach, y - REST_SLASH_HALF, x + reach, y + REST_SLASH_HALF);
+/**
+ * Paint one rest in the active dialect, at its optical seat. The group carries
+ * the rest's musical identity as data attributes (`data-rest-tick`, `-value`,
+ * `-hand`, `-style`), so the studio, the tests and a future audition pass can
+ * address it without parsing coordinates.
+ */
+export function renderRest(
+  rest: JankoRestGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const o = restGlyphOrigin(rest, t);
+  const ink = renderInk(restInk(o, rest.value, rest.style, t));
+  return [
+    `    <g class="janko-rest-group" data-rest-tick="${rest.tick}" data-rest-value="${rest.value}" data-rest-hand="${rest.hand}" data-rest-style="${rest.style}">`,
+    ...ink,
+    '    </g>',
+  ].join('\n');
 }

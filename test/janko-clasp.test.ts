@@ -66,7 +66,6 @@ import {
   CHORD_BRIDGE_DISC_AIR,
   CHORD_BRIDGE_MIN_GAP,
   CLASP_CROSS_SPACING,
-  CLASP_DOT_OFFSET,
   CLASP_MARK_REACH,
   CLASP_MARK_STACK_GAP,
   CLASP_MIN_HORIZONTAL_SPREAD,
@@ -415,20 +414,30 @@ test('Round 11 light paradigms paint four distinct line-based brackets cutting a
     );
 
     // Dotted quarter: the plain spine plus the 0.75pt augmentation dot, which
-    // keeps a real ≥ 2.0pt clearance from the spine's own ink.
+    // Round 20 seats up-and-right of the mark as a clean satellite: it keeps
+    // the house hug from the spine's own ink and from every member disc.
     const dotted = style(dottedQuarter(), s);
     const group = dottedQuarter();
     assert.equal((dotted.match(/janko-clasp-dot/g) ?? []).length, 1, `${s} dotted: one dot`);
+    const dot = /<circle class="janko-clasp-dot" cx="([\d.-]+)" cy="([\d.-]+)" r="([\d.-]+)"/.exec(dotted);
+    assert.ok(dot, `${s} paints its dot`);
+    const [dotX, dotY, dotR] = dot!.slice(1).map(Number);
     assert.ok(
-      dotted.includes(
-        `class="janko-clasp-dot" cx="${(group.claspX + CLASP_DOT_OFFSET).toFixed(2)}" cy="${yMid(group).toFixed(2)}" r="${T.augmentationDotRadius.toFixed(2)}"`
-      ),
-      `${s} dot is the canonical 0.75pt token at the midpoint`
+      Math.abs(dotR - T.augmentationDotRadius) < 1e-9,
+      `${s} dot is the canonical 0.75pt token`
     );
+    assert.ok(dotX > group.claspX, `${s} dot sits right of the spine`);
+    assert.ok(dotY < yMid(group), `${s} dot sits above the midpoint`);
     assert.ok(
-      CLASP_DOT_OFFSET - group.strokeWidth / 2 - T.augmentationDotRadius >= 2.0 - 1e-9,
-      `${s} dot keeps ≥ 2.0pt clear of the spine ink`
+      Math.abs(dotX - group.claspX) - group.strokeWidth / 2 - dotR >= T.augmentationDotGap - 1e-9,
+      `${s} dot keeps the house hug clear of the spine ink`
     );
+    for (const n of group.notes) {
+      assert.ok(
+        Math.hypot(dotX - n.x, dotY - n.y) - T.noteheadRadius - dotR >= T.augmentationDotGap - 1e-9,
+        `${s} dot keeps the house hug clear of every member disc`
+      );
+    }
     assert.ok(
       !new RegExp(`janko-clasp-${klass}`).test(dotted),
       `${s} keeps a dotted quarter plain apart from its dot`

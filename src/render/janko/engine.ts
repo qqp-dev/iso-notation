@@ -133,6 +133,7 @@ import {
   isStandardRestValue,
   renderRest,
   restInkBox,
+  restSeatOffsetY,
   restValueForTicks,
 } from './elements/rests';
 
@@ -334,6 +335,36 @@ export interface PositionedJankoNote {
    * (`[left, right]`, page pt) — a barline or a dashed beat pulse at each edge.
    */
   beatCell?: { left: number; right: number };
+  /**
+   * Round 20: for a rhythm voice merged into a cross-hand unison, the id of the
+   * head that keeps the digit — the voice follows that head's solved column so
+   * its stem leaves the merged notehead.
+   */
+  unisonSurvivorId?: string;
+}
+
+/**
+ * Round 20 — one merged cross-hand unison: **one onset + one pitch = one sound
+ * event = one digit**, always.
+ */
+export interface JankoUnisonMerge {
+  /** Onset tick of the merged sound. */
+  tick: number;
+  /** Pitch class of the merged sound. */
+  pitchClass: number;
+  /** Octave of the merged sound. */
+  octave: number;
+  /** The head that keeps the digit — the RH tone (the Round 19 anchor rule). */
+  survivorId: string;
+  /** Heads merged into it; their digits are never painted. */
+  mergedIds: string[];
+  /**
+   * True when every merged voice carried the same duration: the voices are
+   * identical, so the sound carries **one** rhythm statement. A mixed-duration
+   * unison keeps every voice's own stem/beam/flag (the existing mixed-duration
+   * machinery), so its merged voices ride in {@link JankoSystemLayout.unisonVoices}.
+   */
+  exact: boolean;
 }
 
 /** One clasp cluster of a system: the notes a single bracket groups. */
@@ -934,6 +965,18 @@ export interface JankoSystemLayout {
    * an onset (see `renderBeatGrid`), so the pulse and the music share one axis.
    */
   columns: ReadonlyMap<number, number>;
+  /**
+   * Round 20: every cross-hand unison of the system, merged to one digit (see
+   * {@link JankoUnisonMerge}). The linter audits the same list
+   * (`unison-double-digit`), so the defect class can never return silently.
+   */
+  unisonMerges: JankoUnisonMerge[];
+  /**
+   * Round 20: the rhythm voices of **mixed-duration** merged unisons. Each
+   * voice keeps its own stem/beam/flag — the existing mixed-duration machinery,
+   * which never assumed a single hand — and stands on the merged head's column.
+   */
+  unisonVoices: PositionedJankoNote[];
 }
 
 /**
@@ -1505,9 +1548,10 @@ function restPhraseRowReference(
 /**
  * Round 17B: snap an absolute y to the nearest whole-tone row of the lattice
  * (same tie-breaks as the phrase reference) — the vertical fallback seats the
- * adjacent row toward the corridor through this snap.
+ * adjacent row toward the corridor through this snap. Round 20 exports it: the
+ * linter's `rest-centroid-off-row` audit measures the same lattice.
  */
-function nearestLatticeRow(
+export function nearestLatticeRow(
   y: number,
   geo: JankoSystemGeometry,
   t: ResolvedJankoTokens,
@@ -1526,25 +1570,44 @@ function nearestLatticeRow(
 }
 
 /**
- * The glyph **centre** of a rest hung from its reference row — the near edge
- * of the dialect's ink box sits exactly on the row and the glyph extends
- * toward the Middle C corridor (`dir`), like a stem-analog mirror: same voice,
- * same place, every bar. Dialect-agnostic: the box is probed at the origin, so
- * symmetric and sitting glyphs (the classical half-block, the urtext quarter
- * serpentine) all hang correctly with no per-dialect code.
+ * Round 20 **optical seat**: the page-y of a rest's seat point hung from its
+ * phrase row.
+ *
+ * The glyph is placed so that its **ink centroid** stands exactly on the seat
+ * point (see `rests.restGlyphOrigin`), so the row the eye reads is the row the
+ * engine chose. The two bar forms are the one classical exception the seat
+ * carries as data: a **half** bar sits atop its row, a **whole** bar hangs
+ * below it, so their seat point stands half a slab above / below the row
+ * ({@link restSeatOffsetY}). Every other value's centroid *is* the row.
  */
-function restHangCenter(
-  referenceY: number,
-  dir: 1 | -1,
+function restSeatY(
+  rowY: number,
   style: JankoRestGeometry['style'],
   value: JankoRestGeometry['value'],
   t: ResolvedJankoTokens
 ): number {
-  const probe = restInkBox(
-    { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value, style },
-    t
-  );
-  return dir > 0 ? referenceY - probe.y0 : referenceY - probe.y1;
+  return rowY + restSeatOffsetY(value, style, t);
+}
+
+/**
+ * Round 20: does a silence state exactly one complete measure — the only shape
+ * the **whole-bar** form may ever carry?
+ *
+ * The whole rest is the classical sign for a wholly silent bar, so it is
+ * stated only where the silence opens on a measure downbeat and covers the
+ * measure exactly; a 192-tick silence opening mid-measure is not a
+ * standard-value silence *in context* and stays unwritten (a non-silence, never
+ * a refusal — the same rule that leaves a 2.5-beat gap unpainted).
+ */
+export function isWholeBarSilence(
+  releaseTick: number,
+  durationTicks: number,
+  t: ResolvedJankoTokens
+): boolean {
+  if (durationTicks !== t.ticksPerMeasure) return false;
+  const anacrusis = t.anacrusisTicks ?? 0;
+  if (releaseTick < anacrusis) return false;
+  return (releaseTick - anacrusis) % t.ticksPerMeasure === 0;
 }
 
 /**
@@ -1720,11 +1783,14 @@ export interface JankoRestLayer {
  * it stands beside: the Round 5 clasp-inset widening shifts a measure's note
  * field, never the absolute grid the rest belongs to.
  *
- * Vertically the rest hangs from the nearest whole-tone row of its phrase
- * octave ({@link restPhraseRowReference}) and extends toward the Middle C
- * corridor — same voice, same place, every bar. Horizontally
- * {@link resolveRestX} nudges it along the row inside its beat cell until its
- * ink stands clear of every notehead disc (either hand) with the guaranteed
+ * Vertically the rest is **optically seated** on the nearest whole-tone row of
+ * its phrase octave ({@link restPhraseRowReference}): the glyph's ink centroid
+ * stands exactly on the row (`rests.restGlyphOrigin`), so the row the eye reads
+ * is the row the engine chose — same voice, same place, every bar. The two bar
+ * forms carry their classical seat as data: the **half** slab sits atop the
+ * row, the **whole** slab hangs below it ({@link restSeatOffsetY}). Horizontally
+ * {@link resolveRestX} nudges the glyph along the row inside its beat cell until
+ * its ink stands clear of every notehead disc (either hand) with the guaranteed
  * {@link REST_SEAT_AIR}; when the reference row offers no clear slot, the
  * adjacent row toward the corridor gets its own in-cell solve before the
  * silence is named unwritable.
@@ -1732,9 +1798,12 @@ export interface JankoRestLayer {
  * - Bach Goldberg Var. 1 m. 4 is the canonical case: the RH plays 16ths up to
  *   tick 540 (digit `9`, `y = 158.5pt`), releases at 552 and resumes at 564
  *   (digit `0`, `y = 173.5pt`), while the LH enters at 552 — so a **16th rest**
- *   stands in the Right Hand at the tick-552 beat column, hung from the digit
- *   `9` phrase row (`158.5pt`) toward Middle C, clearing the LH D3 head that
- *   shares its column with room to spare.
+ *   stands in the Right Hand at the tick-552 beat column, its ink centroid on
+ *   the digit `9` phrase row (`158.5pt`), clearing the LH D3 head that shares
+ *   its column with room to spare.
+ * - The **whole-bar** form (`'whole'`, 192 ticks) is stated only where the
+ *   silence opens on a measure downbeat and covers that measure exactly
+ *   ({@link isWholeBarSilence}) — the classical sign for a wholly silent bar.
  * - A silence that is not a standard value (a 2.5-beat gap, a tie artefact) is
  *   left unwritten rather than approximated — that is a **non-silence**, not a
  *   refusal, so it is not reported.
@@ -1774,14 +1843,20 @@ export function computeJankoRestLayer(
       const releaseTick = release.get(ticks[i])!;
       const gap = ticks[i + 1] - releaseTick;
       if (gap <= 0 || !isStandardRestValue(gap)) continue;
+      const value = restValueForTicks(gap);
+      // Round 20: the whole-bar form states exactly one complete measure. A
+      // 192-tick silence opening mid-measure is not a standard-value silence in
+      // context — it is left unwritten exactly like any other non-standard gap.
+      if (value === 'whole' && !isWholeBarSilence(releaseTick, gap, t)) continue;
       const measureIdx = measureIndexOfTick(releaseTick, geo, systemIndex, t);
       // The rest belongs to an *active* measure of this hand: the hand must own
-      // at least one onset inside the measure the silence opens in.
+      // at least one onset inside the measure the silence opens in. A whole-bar
+      // silence is the one exception by definition — the measure it states is
+      // the measure the hand is silent in.
       if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
-      if (!activeMeasures.has(measureIdx)) continue;
-      const value = restValueForTicks(gap);
+      if (value !== 'whole' && !activeMeasures.has(measureIdx)) continue;
       const { rowY, dir } = restPhraseRowReference(hand, ticks[i], ticks[i + 1], notes, geo, t, o);
-      const targetY = restHangCenter(rowY, dir, o.restStyle, value, t);
+      const targetY = restSeatY(rowY, o.restStyle, value, t);
       const candidate: JankoRestGeometry = {
         tick: releaseTick,
         durationTicks: gap,
@@ -1802,7 +1877,7 @@ export function computeJankoRestLayer(
           reason,
         });
       };
-      // The phrase-row hang is the *musical* anchor; the slot solver nudges it
+      // The phrase-row seat is the *musical* anchor; the slot solver nudges it
       // along the row inside its beat cell, or names the silence unwritable
       // when the cell offers no clear slot. A silence that opens on a barline
       // the active grid policy protects — and whose nudge cannot escape it —
@@ -1819,7 +1894,7 @@ export function computeJankoRestLayer(
         // gets its own in-cell solve before the silence is named unwritable.
         const fallbackRow = nearestLatticeRow(rowY + dir * t.rowHeight, geo, t, o);
         if (Math.abs(fallbackRow - rowY) > EPS) {
-          x = solveAt(restHangCenter(fallbackRow, dir, o.restStyle, value, t));
+          x = solveAt(restSeatY(fallbackRow, o.restStyle, value, t));
         }
       }
       if (x === null) {
@@ -2321,19 +2396,15 @@ export function resolveChordColumns(
         offsetsById.set(cluster.notes[0].note.id, 0);
         continue;
       }
-      // The head that keeps its column (Round 19 `clusterAnchor`): `'rh'` is
-      // the incumbent rule — the RH tone when the row is mixed-hand, the middle
-      // head otherwise — while the `'lower-first'` demonstrator pins the
-      // lowest-pitched head of every row (the naive uniform variant).
-      let anchor: number;
-      if (o.clusterAnchor === 'lower-first') {
-        anchor = 0;
-      } else {
-        anchor = Math.floor((k - 1) / 2);
-        const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
-        const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
-        if (hands.size > 1 && rh >= 0) anchor = rh;
-      }
+      // The head that keeps its column — the Round 19 verdict, now the only
+      // rule: the RH tone when the row is mixed-hand, the middle head
+      // otherwise. The `'lower-first'` demonstrator was retired by the R19
+      // approval; a cross-hand unison never reaches this fan, because the two
+      // hands' one sound is merged to one head before the solve.
+      let anchor = Math.floor((k - 1) / 2);
+      const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
+      const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
+      if (hands.size > 1 && rh >= 0) anchor = rh;
       // The flank must clear whatever glyph the heads actually wear: a tick-0
       // sound carries the wider halo box, and two rings may never cut into
       // each other's box either. Box half-widths — the fan is a horizontal
@@ -3012,6 +3083,66 @@ export function resolveChordColumns(
 }
 
 /** Position every note of one system, in engraving order. */
+/**
+ * Round 20 — **one sound, one digit**.
+ *
+ * Two hands sounding the same pitch at the same onset produce one sound event
+ * (a piano can only strike it once; no notation draws it twice), so the two
+ * heads merge into **one** notehead at the anchor-winner's column — the RH tone
+ * on a mixed-hand row, exactly the Round 19 rule that is now the only rule.
+ *
+ * The merged duplicates leave the painted head list (so nothing measures or
+ * fans them twice) and keep their **rhythm voice**:
+ *
+ * - **mixed durations** — every voice keeps its own stem, beam and flag (each
+ *   voice's duration statement at its own end: the existing mixed-duration
+ *   machinery, which never assumed a single hand);
+ * - **exact duplicates** — the voices are identical, so the sound carries one
+ *   rhythm statement and the duplicate voice is dropped whole.
+ *
+ * The returned voices are positioned on the survivor's solved column by
+ * {@link layoutJankoSystem} once the column solve has settled.
+ */
+function mergeUnisonHeads(positioned: readonly PositionedJankoNote[]): {
+  notes: PositionedJankoNote[];
+  voices: PositionedJankoNote[];
+  merges: JankoUnisonMerge[];
+} {
+  const groups = new Map<string, PositionedJankoNote[]>();
+  for (const p of positioned) {
+    const key = `${p.note.startTick}|${p.note.pitch.pitchClass}|${p.note.pitch.octave}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(p);
+    else groups.set(key, [p]);
+  }
+  const notes: PositionedJankoNote[] = [];
+  const voices: PositionedJankoNote[] = [];
+  const merges: JankoUnisonMerge[] = [];
+  for (const group of groups.values()) {
+    const hands = new Set(group.map((p) => p.rhythm.hand));
+    if (group.length < 2 || hands.size < 2) {
+      notes.push(...group);
+      continue;
+    }
+    const survivor = group.find((p) => p.rhythm.hand === 'RH') ?? group[0];
+    const others = group.filter((p) => p !== survivor);
+    const exact = others.every((p) => p.note.durationTicks === survivor.note.durationTicks);
+    notes.push(survivor);
+    for (const p of others) {
+      if (!exact) voices.push({ ...p, unisonSurvivorId: survivor.note.id });
+    }
+    merges.push({
+      tick: survivor.note.startTick,
+      pitchClass: survivor.note.pitch.pitchClass,
+      octave: survivor.note.pitch.octave,
+      survivorId: survivor.note.id,
+      mergedIds: others.map((p) => p.note.id),
+      exact,
+    });
+  }
+  return { notes, voices, merges };
+}
+
 export function layoutJankoSystem(
   score: QuantizedGridScore,
   geo: JankoPageGeometry,
@@ -3041,15 +3172,23 @@ export function layoutJankoSystem(
   // withdrawn until the engraving is collision-free.
   const claspInsets = new Map(computeClaspInsetMap(score, geometry, systemIndex, o, t));
   let positioned: PositionedJankoNote[] = [];
+  let mergedVoices: PositionedJankoNote[] = [];
+  let unisonMerges: JankoUnisonMerge[] = [];
   let chordColumns: JankoChordColumnResolution = {
     notes: [],
     claspTicks: new Set<number>(),
     columns: new Map<number, number>(),
   };
   for (let attempt = 0; ; attempt++) {
-    positioned = sysNotes.map((n) =>
+    const raw = sysNotes.map((n) =>
       positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets)
     );
+    // Round 20: one sound, one digit — cross-hand unisons merge before the
+    // column solve, so the survivor keeps its column with no fan.
+    const merged = mergeUnisonHeads(raw);
+    positioned = merged.notes;
+    mergedVoices = merged.voices;
+    unisonMerges = merged.merges;
     // Approach 2: heads that share an onset, an octave and a whole-tone row are
     // spread horizontally around the beat column instead of being merged. A
     // clasped column additionally claims the air its bracket needs on the left.
@@ -3069,6 +3208,30 @@ export function layoutJankoSystem(
   // Round 17: the dot high-lane fallback resolves on the solved columns, where
   // same-row neighbours sit at their final x.
   const notes = resolveDotHighLane(chordColumns.notes, geometry, o, t);
+  // Round 20: a merged mixed-duration voice follows its survivor's solved
+  // column, so its stem/beam/flag leaves the one painted head.
+  const solvedById = new Map(chordColumns.notes.map((p) => [p.note.id, p]));
+  const unisonVoices = mergedVoices.map((voice) => {
+    const survivor = solvedById.get(voice.unisonSurvivorId ?? '');
+    if (!survivor) return voice;
+    return {
+      ...voice,
+      x: survivor.x,
+      nominalX: survivor.nominalX,
+      rhythm: {
+        ...voice.rhythm,
+        x: survivor.x,
+        ...(voice.rhythm.dotX === undefined
+          ? {}
+          : {
+              dotX:
+                survivor.x +
+                getClusterSpacingPreset(o.clusterSpacing).wx +
+                t.augmentationDotGap,
+            }),
+      },
+    };
+  });
 
   // Round 17B: rests resolve before beams — bridging re-joins runs across the
   // admitted printed rests, and every connector clears their ink.
@@ -3081,8 +3244,10 @@ export function layoutJankoSystem(
     // shared lattice lets one hand's beam cross the other hand's staff lines.
     // The Middle C spine is handed to the solver as well, so no connector can
     // ever slice across the corridor — and the printed rest ink boxes join
-    // the obstacles, so a bridged beam clears the rest it spans.
-    const rhythmNotes = notes.map((p) => p.rhythm);
+    // the obstacles, so a bridged beam clears the rest it spans. Round 20: a
+    // merged unison's mixed-duration voices join the partition, so a voice that
+    // belongs to a beam keeps its beam.
+    const rhythmNotes = [...notes, ...unisonVoices].map((p) => p.rhythm);
     const partition = bridgeBeamGroupsAcrossRests(
       partitionBeamGroups(rhythmNotes, t, geometry.middleCY),
       restLayer.rests,
@@ -3343,6 +3508,8 @@ export function layoutJankoSystem(
     chordBridges,
     sharedStems,
     columns: chordColumns.columns,
+    unisonMerges,
+    unisonVoices,
   };
 }
 

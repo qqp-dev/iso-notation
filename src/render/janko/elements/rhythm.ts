@@ -265,12 +265,9 @@ export interface JankoBeamConnector {
 
 /** Thickness (pt) of the kinetic monoline tabs (`'kinetic-tab-30'`/`-45'`/`-beam'`). */
 export const SUBDIVISION_TAB_THICKNESS = 1.1;
-/** Optical taper (pt) of `'kinetic-tab-tapered'`: root at the stem → tip. */
+/** Root weight (pt) of the `'kinetic-tab-tapered'` demonstrator's cut. */
 export const SUBDIVISION_TAPER_ROOT = 1.4;
-export const SUBDIVISION_TAPER_TIP = 0.8;
-/** Tangent of the 30° kinetic rake (the 45° tab rakes at exactly 1). */
-export const SUBDIVISION_TAB_30_TAN = Math.tan(Math.PI / 6);
-/** Stroke weight (pt) of the slender open `'classical-urtext'` hairline. */
+/** Stroke weight (pt) of the slender `'classical-urtext'` cut. */
 export const SUBDIVISION_URTEXT_STROKE = 0.9;
 
 /**
@@ -286,23 +283,62 @@ export function subdivisionMarkCount(durationTicks: number): number {
 }
 
 /**
+ * Round 20 — **the classical flag**.
+ *
+ * Every subdivision mark the renderer paints is one cut: the classical flag
+ * hook (U+1D160-class taper). It leaves the stem at the style's root
+ * thickness, sweeps right and down, and tapers to a point that curls back
+ * toward the stem — the shape a burin actually cuts, not a straight tab. The
+ * exploratory rake dialects (`'kinetic-tab-30'`/`-45'`/`-beam'`) and the
+ * tapered/hairline cuts survive as **style keys** (they still tag their ink and
+ * pick their root weight), so the recorded Round 7–9 axis is not erased from
+ * the option surface, but the hook itself is the one classical curve. The
+ * reach stays inside `flagWidth` and the drop inside `flagHeight`, so the
+ * shared clearance audit covers every style without a per-style box.
+ */
+const SUBDIVISION_ROOT: Record<JankoSubdivisionStyle, number> = {
+  'kinetic-tab-30': SUBDIVISION_TAB_THICKNESS,
+  'kinetic-tab-45': SUBDIVISION_TAB_THICKNESS,
+  'kinetic-tab-beam': SUBDIVISION_TAB_THICKNESS,
+  'kinetic-tab-tapered': SUBDIVISION_TAPER_ROOT,
+  'classical-urtext': SUBDIVISION_URTEXT_STROKE,
+};
+
+/**
+ * The classical tapered hook, in page pt: a filled crescent from `stemX`/`cy`
+ * toward `sign` (the stem's own sweep side), reaching at most `0.75 · w` right
+ * of the stem and `h` along the drop.
+ */
+export function classicalFlagPath(
+  stemX: number,
+  cy: number,
+  sign: number,
+  w: number,
+  h: number,
+  root: number
+): string {
+  const r = root / (2 * h);
+  const p = (dx: number, dy: number): string =>
+    `${f(stemX + dx * w)} ${f(cy + sign * dy * h)}`;
+  return (
+    `M ${p(0, -r)} ` +
+    `C ${p(0.5, 0.02 - r)} ${p(1.0, 0.46)} ${p(0.62, 0.88)} ` +
+    `C ${p(0.4, 0.8)} ${p(0.16, 0.34)} ${p(0, r)} Z`
+  );
+}
+
+/**
  * Paint one subdivision mark latched to a stem tip, in the active Round 7
  * dialect. `stemX`/`tipY` are the stem column and anchor, `direction` the stem
  * direction (−1 up, +1 down) and `index` the 1-based stack position: mark `k`
  * sits `(k − 1) · flagSpacing` further along the flag drop (`−direction`).
  *
- * **Kinetic direction.** The tab rakes diagonally *with* the stem's motion:
- * a lower stem (going down from its note) draws its tab angled **upward**, an
- * upper stem (going up) draws it angled **downward** — the shared
- * `sign = −direction` rake. Every dialect reaches at most `flagWidth` right of
- * the stem, and a single mark never drops further than `flagHeight`, so the
- * shared `claspInkBox` audit covers all of them without a per-style box:
- *
- * - `kinetic-tab-30`     30° diagonal tab, 1.1pt monoline
- * - `kinetic-tab-45`     45° diagonal tab, 1.1pt monoline (chevron rake)
- * - `kinetic-tab-beam`   beam-harmonized rake (`maxBeamSlope` ≈ 12.4°), 1.1pt
- * - `kinetic-tab-tapered` 30° diagonal tab, 1.4pt root tapering to 0.8pt tip
- * - `classical-urtext`   slender open 0.90pt urtext hairline
+ * **Kinetic direction.** The hook sweeps *with* the stem's motion: a lower stem
+ * (going down from its note) draws its hook sweeping **upward**, an upper stem
+ * (going up) sweeps it **downward** — the shared `sign = −direction` sweep.
+ * Every style reaches at most `flagWidth` right of the stem and drops at most
+ * `flagHeight`, so the shared `claspInkBox` audit covers all of them without a
+ * per-style box.
  */
 export function renderSubdivisionMark(
   stemX: number,
@@ -320,61 +356,8 @@ export function renderSubdivisionMark(
   const h = t.flagHeight;
   const head = `class="${cls}" data-stem-x="${f(stemX)}" data-flag-index="${index}"`;
   const tail = ` data-subdivision-style="${style}"`;
-  switch (style) {
-    case 'kinetic-tab-30':
-    case 'kinetic-tab-45':
-    case 'kinetic-tab-beam': {
-      const rake =
-        style === 'kinetic-tab-45'
-          ? 1
-          : style === 'kinetic-tab-beam'
-            ? t.maxBeamSlope
-            : SUBDIVISION_TAB_30_TAN;
-      return (
-        `    <line ${head} x1="${f(stemX)}" y1="${f(cy)}" ` +
-        `x2="${f(stemX + w)}" y2="${f(cy + sign * w * rake)}" stroke="#111111" ` +
-        `stroke-width="${SUBDIVISION_TAB_THICKNESS.toFixed(2)}" stroke-linecap="butt"${tail}/>`
-      );
-    }
-    case 'kinetic-tab-tapered': {
-      // The same 30° rake, drawn as a filled quad whose thickness tapers
-      // perpendicular to its own axis: a 1.4pt root at the stem narrowing to a
-      // 0.8pt tip. The tip is pulled in by its own normal half-extent so the
-      // dialect still reaches exactly `flagWidth` right of the stem.
-      const angle = Math.atan(SUBDIVISION_TAB_30_TAN);
-      const nx = -sign * Math.sin(angle);
-      const ny = Math.cos(angle);
-      const tip = SUBDIVISION_TAPER_TIP / 2;
-      const root = SUBDIVISION_TAPER_ROOT / 2;
-      const reach = w - tip * Math.abs(nx);
-      const tipX = stemX + reach;
-      const tabTipY = cy + sign * reach * SUBDIVISION_TAB_30_TAN;
-      const d =
-        `M ${f(stemX + root * nx)} ${f(cy + root * ny)} ` +
-        `L ${f(tipX + tip * nx)} ${f(tabTipY + tip * ny)} ` +
-        `L ${f(tipX - tip * nx)} ${f(tabTipY - tip * ny)} ` +
-        `L ${f(stemX - root * nx)} ${f(cy - root * ny)} Z`;
-      return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
-    }
-    case 'classical-urtext':
-    default: {
-      // Round 8: the urtext flag is a **slender open hairline** — the same
-      // calligraphic sweep as before, but stroked at the stem's own 0.90pt
-      // weight instead of being filled solid, so it never reads heavier than
-      // the stem it belongs to.
-      const d =
-        `M ${f(stemX)} ${f(cy)} ` +
-        `C ${f(stemX + 0.55 * w)} ${f(cy + sign * 0.10 * h)} ${f(stemX + w)} ` +
-        `${f(cy + sign * 0.62 * h)} ${f(stemX + 0.42 * w)} ${f(cy + sign * h)} ` +
-        `C ${f(stemX + 0.30 * w)} ${f(cy + sign * 0.66 * h)} ${f(stemX + 0.14 * w)} ` +
-        `${f(cy + sign * 0.70 * h)} ${f(stemX)} ${f(cy + sign * 0.52 * h)}`;
-      return (
-        `    <path ${head} d="${d}" fill="none" stroke="#111111" ` +
-        `stroke-width="${SUBDIVISION_URTEXT_STROKE.toFixed(2)}" ` +
-        `stroke-linecap="round" stroke-linejoin="round"${tail}/>`
-      );
-    }
-  }
+  const d = classicalFlagPath(stemX, cy, sign, w, h, SUBDIVISION_ROOT[style]);
+  return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
 }
 
 /**
@@ -438,7 +421,11 @@ export const CLASP_RING_RADIUS = 3.0;
 export const CLASP_RING_STROKE = 1.0;
 /** Air (pt) between the two stacked marks of a doubled (whole / 16th) value. */
 export const CLASP_MARK_STACK_GAP = 0.5;
-/** Horizontal offset (pt) of a dotted value's dot from the clasp spine. */
+/**
+ * Fallback up-and-right offset (pt) of a dotted value's dot from the clasp
+ * spine, used only by the degenerate empty-cluster case of
+ * {@link claspDotCenter}; the painted dot is the resolved `durationDots` datum.
+ */
 export const CLASP_DOT_OFFSET = 3.2;
 /**
  * Widest horizontal reach (pt) any Round 11 mark paints on either side of the
@@ -628,6 +615,13 @@ export interface JankoClaspGroupGeometry {
    * entry), which is all a classic bracket ever has.
    */
   durationInk: ResolvedJankoClaspInk[];
+  /**
+   * Round 20: the resolved centre of each group's augmentation dot, aligned
+   * with {@link durationInk} (`null` for a group that is not dotted). Painted,
+   * audited and boxed from this one datum, so the dot's satellite seat can
+   * never drift between the renderer, the fit rule and the linter.
+   */
+  durationDots: Array<{ x: number; y: number } | null>;
   /** The bracket itself: `M cap topY L claspX topY L claspX botY L cap botY`. */
   path: string;
 }
@@ -714,7 +708,7 @@ export function computeClaspGeometry(
   // bracket its open half/whole group.
   const primary = durationInk[0];
   const cap = t.claspWidth;
-  return {
+  const geometry: JankoClaspGroupGeometry = {
     tick: notes[0].startTick,
     notes: sorted,
     minX,
@@ -733,8 +727,15 @@ export function computeClaspGeometry(
     pips: primary.pips,
     dotted: primary.dotted,
     durationInk,
+    durationDots: [],
     path: claspBracketPath(claspX, topY, botY, cap),
   };
+  // Round 20: the augmentation dot of every dotted group is resolved here, once,
+  // against the group's own mark ink and member discs.
+  geometry.durationDots = durationInk.map((ink) =>
+    ink.dotted ? claspDotCenter(geometry, ink, t) : null
+  );
+  return geometry;
 }
 
 /**
@@ -823,6 +824,159 @@ function claspFlagMark(
 }
 
 /**
+ * One straight duration-mark segment of a clasp, in page pt.
+ */
+interface ClaspMarkSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** The spine y of every mark one duration-ink group paints (1 or 2, stacked). */
+function claspMarkCenters(
+  group: JankoClaspGroupGeometry,
+  ink: ResolvedJankoClaspInk,
+  rake: number
+): number[] {
+  const mark =
+    ink.pips > 0
+      ? claspOpenMark(ink.pips)
+      : claspFlagMark(group.durationStyle, ink.flags, rake);
+  return mark.stack === 0 ? [ink.centerY] : [ink.centerY - mark.stack, ink.centerY + mark.stack];
+}
+
+/** The straight segments one duration-ink group paints at `cy` ([] for a ring). */
+function claspMarkSegments(
+  group: JankoClaspGroupGeometry,
+  cy: number,
+  rake: number
+): ClaspMarkSegment[] {
+  const half = CLASP_TRANSVERSE_WIDTH / 2;
+  const dy = half * rake;
+  const x = group.claspX;
+  switch (group.durationStyle) {
+    case 'down-raked-slashes':
+      return [{ x1: x - half, y1: cy - dy, x2: x + half, y2: cy + dy }];
+    case 'cross-hatch-stitches':
+      return [
+        { x1: x - half, y1: cy + dy, x2: x + half, y2: cy - dy },
+        { x1: x - half, y1: cy - dy, x2: x + half, y2: cy + dy },
+      ];
+    case 'transverse-cross-bars':
+      return [{ x1: x - half, y1: cy, x2: x + half, y2: cy }];
+    case 'kinetic-cross-slashes':
+    default:
+      return [{ x1: x - half, y1: cy + dy, x2: x + half, y2: cy - dy }];
+  }
+}
+
+/** Distance (pt) from a point to one segment. */
+function pointToSegment(x: number, y: number, s: ClaspMarkSegment): number {
+  const dx = s.x2 - s.x1;
+  const dy = s.y2 - s.y1;
+  const length2 = dx * dx + dy * dy;
+  const u =
+    length2 <= 0 ? 0 : Math.max(0, Math.min(1, ((x - s.x1) * dx + (y - s.y1) * dy) / length2));
+  return Math.hypot(x - (s.x1 + u * dx), y - (s.y1 + u * dy));
+}
+
+/** Air (pt) the dot's ink at `(x, y)` keeps from all of its own mark's ink. */
+export function claspMarkDaylight(
+  group: JankoClaspGroupGeometry,
+  ink: ResolvedJankoClaspInk,
+  x: number,
+  y: number,
+  t: ResolvedJankoTokens
+): number {
+  const r = t.augmentationDotRadius;
+  const half = group.strokeWidth / 2;
+  let air = Math.abs(x - group.claspX) - half - r;
+  for (const cy of claspMarkCenters(group, ink, t.maxBeamSlope)) {
+    if (ink.pips > 0) {
+      air = Math.min(
+        air,
+        Math.hypot(x - group.claspX, y - cy) - (CLASP_RING_RADIUS + CLASP_RING_STROKE / 2) - r
+      );
+      continue;
+    }
+    // A plain spire (a quarter) paints the bracket alone: no transverse ink.
+    if (ink.flags === 0) continue;
+    for (const segment of claspMarkSegments(group, cy, t.maxBeamSlope)) {
+      air = Math.min(air, pointToSegment(x, y, segment) - CLASP_TRANSVERSE_STROKE / 2 - r);
+    }
+  }
+  return air;
+}
+
+/**
+ * The direction fan the dot is placed along, shallowest first (degrees above
+ * +x): the classical up-and-right satellite first, then the free lower channel
+ * as the last resort for a cluster whose upper channel is walled by its own
+ * heads.
+ */
+const CLASP_DOT_ANGLES: readonly number[] = [
+  45, 50, 55, 60, 65, 70, 75, 80, 85, -45, -55, -65, -75, -85,
+];
+
+/**
+ * Round 20 — **the clasp dot as a clean satellite of its mark**.
+ *
+ * The dot is placed up-and-right of its mark, tracking the mark's own edge, so
+ * it reads as an augmentation dot and never fuses with the ink it belongs to.
+ * Two constraints are absolute:
+ *
+ * - **hug air from the mark** — the dot's 0.75pt disc keeps the house dot hug
+ *   (`tokens.augmentationDotGap`) from the spine, from the open ring(s) and
+ *   from every transverse cut, in 2D. The retired `yMid` wedge sat inside the
+ *   ring's own stroke *and* inside a middle member's knockout — that channel is
+ *   infeasible, which is exactly why it is rejected;
+ * - **hug air from every neighbour ink box** — in practice the cluster's own
+ *   member discs, which the bracket's fit rule exempts but the notehead
+ *   knockout would erase.
+ *
+ * The search is deterministic: a fan of directions from 45° (the classical
+ * up-and-right satellite) to nearly vertical — and, for a cluster whose upper
+ * channel is walled by its own heads, the free lower channel as the last
+ * resort — and along each direction the nearest point that clears the mark. Of
+ * every candidate that also clears each member disc by the hug, the one
+ * **nearest its mark** wins (so the dot always hugs its own ink); if none does
+ * — never on the corpus, and the linter's `clasp-dot-fusion` would say so — the
+ * best-clearing candidate is returned rather than shrinking the air silently.
+ */
+export function claspDotCenter(
+  group: JankoClaspGroupGeometry,
+  ink: ResolvedJankoClaspInk,
+  tokens?: Partial<JankoTokens> | null
+): { x: number; y: number } {
+  const t = resolveJankoTokens(tokens);
+  const hug = t.augmentationDotGap;
+  const r = t.augmentationDotRadius;
+  const discAir = (x: number, y: number): number =>
+    group.notes.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...group.notes.map((n) => Math.hypot(x - n.x, y - n.y) - t.noteheadRadius - r));
+  let clean: { x: number; y: number; d: number } | null = null;
+  let best: { x: number; y: number; air: number } | null = null;
+  for (const degrees of CLASP_DOT_ANGLES) {
+    const angle = (degrees * Math.PI) / 180;
+    const ux = Math.cos(angle);
+    const uy = -Math.sin(angle);
+    for (let d = 0; d <= 24; d += 0.01) {
+      const x = group.claspX + d * ux;
+      const y = ink.centerY + d * uy;
+      if (claspMarkDaylight(group, ink, x, y, t) < hug - 1e-9) continue;
+      const air = discAir(x, y);
+      if (best === null || air > best.air) best = { x, y, air };
+      if (air >= hug - 1e-9 && (clean === null || d < clean.d - 1e-9)) clean = { x, y, d };
+      break;
+    }
+  }
+  if (clean) return { x: clean.x, y: clean.y };
+  return best ?? { x: group.claspX + CLASP_DOT_OFFSET, y: ink.centerY - CLASP_DOT_OFFSET };
+}
+
+/**
  * The duration ink of one clasp in the active Round 11 midpoint paradigm. Every
  * mark is anchored on `yMid = (topY + botY) / 2` and cuts symmetrically across
  * the spine, so the bracket stays a mirror-symmetrical `[` whatever value it
@@ -833,7 +987,7 @@ function claspFlagMark(
  * | ------------ | -------------------------------------------------------- |
  * | half / whole | 1 / 2 open white rings across the spine                   |
  * | quarter      | the plain bracket (a continuous solid spine)              |
- * | dotted       | + the 0.75pt augmentation dot right of the mark           |
+ * | dotted       | + the 0.75pt augmentation dot, a satellite of the mark     |
  * | 8th          | 1 light transverse cut (rung / slash / stitch)            |
  * | 16th         | 2 parallel cuts, mirrored about the midpoint              |
  */
@@ -850,7 +1004,7 @@ function renderClaspDurationInk(
       ? group.durationInk
       : [resolveClaspInk({ centerY: (group.topY + group.botY) / 2, durationTicks: group.durationTicks })];
 
-  for (const ink of groups) {
+  for (const [index, ink] of groups.entries()) {
     const yMid = ink.centerY;
     const open = ink.pips > 0;
     const hasMark = open || ink.flags > 0;
@@ -899,11 +1053,13 @@ function renderClaspDurationInk(
       }
     }
 
-    // A dotted value adds the canonical 0.75pt augmentation dot just right of
-    // the mark, painted last so a white knockout can never erase it.
+    // A dotted value adds the canonical 0.75pt augmentation dot as a clean
+    // satellite of the mark (Round 20), painted last so a white knockout can
+    // never erase it. The resolved dot centre is the geometry's own datum.
     if (ink.dotted) {
+      const dot = group.durationDots?.[index] ?? claspDotCenter(group, ink, t);
       out.push(
-        `    <circle class="janko-clasp-dot" cx="${f(claspX + CLASP_DOT_OFFSET)}" cy="${f(yMid)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
+        `    <circle class="janko-clasp-dot" cx="${f(dot.x)}" cy="${f(dot.y)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
       );
     }
   }
@@ -931,7 +1087,7 @@ export function claspInkBox(
     group.durationInk && group.durationInk.length > 0
       ? group.durationInk
       : [resolveClaspInk({ centerY: (group.topY + group.botY) / 2, durationTicks: group.durationTicks })];
-  for (const ink of inks) {
+  for (const [index, ink] of inks.entries()) {
     const yMid = ink.centerY;
     if (ink.pips > 0 || ink.flags > 0) {
       const mark =
@@ -944,7 +1100,13 @@ export function claspInkBox(
       y1 = Math.max(y1, yMid + mark.stack + mark.halfHeight);
     }
     if (ink.dotted) {
-      x1 = Math.max(x1, group.claspX + CLASP_DOT_OFFSET + t.augmentationDotRadius);
+      // Round 20: the dot is a satellite of its mark, so the audited box
+      // follows the painted dot exactly — on every side it can now reach.
+      const dot = group.durationDots?.[index] ?? claspDotCenter(group, ink, t);
+      x0 = Math.min(x0, dot.x - t.augmentationDotRadius);
+      x1 = Math.max(x1, dot.x + t.augmentationDotRadius);
+      y0 = Math.min(y0, dot.y - t.augmentationDotRadius);
+      y1 = Math.max(y1, dot.y + t.augmentationDotRadius);
     }
   }
   return { x0, y0, x1, y1 };

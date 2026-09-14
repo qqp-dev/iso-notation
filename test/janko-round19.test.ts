@@ -16,10 +16,9 @@
  *     its dashed pulse through the onset's laid-out column; an empty beat keeps
  *     the proportional line.
  *
- * The round's open axis is `clusterAnchor` (`'rh'` incumbent, `'lower-first'`
- * demonstrator). The tests pin the demonstrator's head order, and pin the
- * `stem-through-simultaneity` signature the tuck would produce without a
- * duration-owning bracket.
+ * Round 20 retires the round's axis: the RH anchor is the only rule, so the
+ * `'rh'` behavior below is the golden behavior. The tests pin the tuck, the
+ * unification and the grid; the anchor demonstrator is gone.
  */
 
 import { test } from 'node:test';
@@ -35,8 +34,6 @@ import {
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
-  JANKO_CLUSTER_ANCHORS,
-  JANKO_CLUSTER_ANCHOR_LABELS,
   getClusterSpacingPreset,
   getGridNoteInset,
   resolveJankoOptions,
@@ -103,19 +100,18 @@ function onsetsByTick(layouts: ReturnType<typeof layoutJankoScore>) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. The option
+// 1. The RH anchor (the only rule since the Round 19 verdict)
 // ---------------------------------------------------------------------------
 
-test('clusterAnchor: the golden default is rh, and both rules are declared', () => {
-  assert.equal(DEFAULT_JANKO_OPTIONS.clusterAnchor, 'rh', 'the incumbent anchors');
-  assert.deepEqual([...JANKO_CLUSTER_ANCHORS], ['rh', 'lower-first'], 'A–B order');
-  assert.equal(JANKO_CLUSTER_ANCHOR_LABELS.rh, 'RH Anchor (incumbent)');
+test('The RH anchor is the only anchor rule: the option is retired', () => {
   assert.ok(
-    JANKO_CLUSTER_ANCHOR_LABELS['lower-first'].includes('Lower-First'),
-    'the demonstrator is named'
+    !('clusterAnchor' in DEFAULT_JANKO_OPTIONS),
+    'the retired cluster-anchor option is gone from the golden master'
   );
-  assert.equal(resolveJankoOptions({}).clusterAnchor, 'rh');
-  assert.equal(resolveJankoOptions({ clusterAnchor: 'lower-first' }).clusterAnchor, 'lower-first');
+  assert.ok(
+    !('clusterAnchor' in resolveJankoOptions({})),
+    'and from every resolved option set'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -262,18 +258,10 @@ test('A gapped onset keeps Round 6 per-hand brackets: the m. 3 guard', () => {
     'only the three-note RH chord is bracketed'
   );
   assert.equal(clasps[0].notes.length, 3);
-  // The anchor axis is inert on this window: both cards are identical.
-  const lower = layoutJankoScore(
-    BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, clusterAnchor: 'lower-first' },
-    BRAHMS_OP118_NO1_JANKO_TOKENS
-  );
-  const xs = (l: typeof layouts): string[] =>
-    l
-      .flatMap((s) => s.notes)
-      .filter((p) => p.note.startTick >= M3 && p.note.startTick < M3 + 192)
-      .map((p) => p.x.toFixed(4));
-  assert.deepEqual(xs(lower), xs(layouts), 'm. 3 is anchor-inert (identical cards)');
+  // The 90pt hand gap keeps the brackets split: two per-hand brackets, never
+  // one unified span (the retired anchor axis was inert on this window).
+  const m3Svg = renderSystem(BRAHMS, layouts[0].geometry, 0, resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS), BRAHMS_T, layouts[0]);
+  assert.equal((m3Svg.match(/class="janko-clasp"/g) ?? []).length, 2, 'two split brackets');
 });
 
 test('A unified bracket paints one duration group per hand', () => {
@@ -308,72 +296,30 @@ test('A unified bracket paints one duration group per hand', () => {
 // 4. The anchor axis
 // ---------------------------------------------------------------------------
 
-test('lower-first pins the lowest head of the mixed row (the demonstrator’s order flip)', () => {
+test('The RH anchor holds the mixed row: G#4 keeps the column, D4 fans right', () => {
   const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
-  const lower = onset(
-    layoutJankoScore(
-      BRAHMS,
-      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, clusterAnchor: 'lower-first' },
-      BRAHMS_OP118_NO1_JANKO_TOKENS
-    ),
-    M46
-  );
-  // rh: G#4 (RH) holds the column, D4 (LH) is fanned right.
+  // The golden (and now only) rule: G#4 (RH) holds the column, D4 (LH) fans right.
   assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '51.15');
   assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '56.61');
-  // lower-first: the lowest pitch (D4) holds the column and G#4 fans right.
-  assert.equal(lower.get('brahms-op118-no1-633')!.x.toFixed(2), '51.15');
-  assert.equal(lower.get('brahms-op118-no1-635')!.x.toFixed(2), '56.61');
-  // The tuck is anchor-independent: F5/D3 stay on the pair midpoint.
-  for (const heads of [rh, lower]) {
-    assert.equal(heads.get('brahms-op118-no1-637')!.x.toFixed(2), '53.88');
-    assert.equal(heads.get('brahms-op118-no1-632')!.x.toFixed(2), '53.88');
-  }
+  // The tuck is anchor-free: F5/D3 stay on the pair columns' midpoint.
+  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '53.88');
+  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '53.88');
 });
 
-test('The anchor’s former stem collision is owned by the unified bracket', () => {
-  // With the fixed context (symmetric tuck + overlap unification) both anchor
-  // cards are stem-clean: the unified bracket replaces every member stem, so
-  // the anchor decides the *head order*, not a painted stem.
-  for (const anchor of ['rh', 'lower-first'] as const) {
-    const report = lintJankoScore(
-      BRAHMS,
-      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, clusterAnchor: anchor },
-      BRAHMS_OP118_NO1_JANKO_TOKENS
-    );
-    assert.equal(report.ok, true, `${anchor}: the tucked golden is clean`);
-    assert.equal(
-      report.diagnostics.filter((d) => d.code === 'stem-through-simultaneity').length,
-      0,
-      `${anchor}: no stem pierces a fellow chord tone`
-    );
-  }
-  // The tuck's signature without a duration-owning bracket is the Round 19
-  // defect the joinery owns: `chordGrouping: 'none'` paints every stem, and the
-  // tucked head's stem runs through a same-hand fellow at m. 46 (0.00pt) and at
-  // m. 17/t3120 (2.73pt) — the exact §Problem-3 signature.
-  const bare = lintJankoScore(
-    BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'none' },
-    BRAHMS_OP118_NO1_JANKO_TOKENS
-  );
-  const hits = bare.diagnostics.filter((d) => d.code === 'stem-through-simultaneity');
-  const byTick = new Map(
-    hits.map((h) => [
-      Number(h.metrics?.tick ?? -1),
-      Number((h.metrics?.distance ?? 0).toFixed(2)),
-    ])
-  );
-  assert.equal(byTick.get(M46), 0, 'm. 46: the dead-centre graze');
-  assert.equal(byTick.get(3120), 2.73, 'm. 17: the tucked-head graze');
-  assert.ok(
-    hits.length > 100,
-    'without a bracket every stacked chord paints its stems through its fellows'
+test('The former anchor collision is owned by the unified bracket', () => {
+  // With the fixed context (symmetric tuck + overlap unification) the golden
+  // is stem-clean: the unified bracket replaces every member stem.
+  const report = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  assert.equal(report.ok, true, 'the tucked golden is clean');
+  assert.equal(
+    report.diagnostics.filter((d) => d.code === 'stem-through-simultaneity').length,
+    0,
+    'no stem pierces a fellow chord tone'
   );
 });
 
 // ---------------------------------------------------------------------------
-// 5. The beat grid follows the columns
+// 4. The beat grid follows the columns
 // ---------------------------------------------------------------------------
 
 /** Rendered x of every dashed beat pulse of one system, in painting order. */
