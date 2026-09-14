@@ -101,6 +101,7 @@ import {
 } from './elements/notehead';
 import {
   JankoRestGeometry,
+  isBarRestValue,
   restInkCentroidOffset,
   restInkBox,
   restSeatOffsetY,
@@ -137,6 +138,7 @@ export type JankoLintCode =
   | 'rest-collision'
   | 'rest-unwritable'
   | 'rest-centroid-off-row'
+  | 'rest-slab-off-line'
   | 'unison-double-digit'
   | 'clasp-dot-fusion'
   | 'stem-through-simultaneity'
@@ -2130,11 +2132,49 @@ export function checkRestSeat(
   out: LintViolation[]
 ): void {
   for (const rest of layout.rests) {
-    // The painter seats the ink centroid exactly on the seat point, so the
-    // painted gravity point is `rest.y`; the seat's own classical offset gives
-    // back the phrase row the engine measured. (The bar pair's sit / hang cut —
-    // the half slab atop its row, the whole slab below it — is the value's own
-    // seat offset, pinned by the specimen tests; the audit here is the lattice.)
+    // Round 21 §C — the two seats are audited by their own rule.
+    //
+    // A **bar form** derives its meaning from touching a line, so its seat point
+    // is the drawn staff rule it must touch: the half slab's bottom edge, the
+    // whole slab's top edge (both exactly `rest.y`, because the painter draws
+    // the bar glyphs with their contact edge on the origin). A slab whose edge
+    // stands off the nearest drawn rule is the "floating brick" defect this
+    // round exists to kill — a hard violation.
+    if (isBarRestValue(rest.value)) {
+      const rules: number[] = [];
+      for (const [hand, octave] of [
+        ['RH', 5],
+        ['LH', 2],
+        ['RH', 4],
+        ['LH', 3],
+      ] as const) {
+        rules.push(...getEquatorRuleYs(layout.geometry.equatorY(hand, octave), o, t));
+      }
+      const nearest = rules.reduce(
+        (best, rule) => (Math.abs(rule - rest.y) < Math.abs(best - rest.y) ? rule : best),
+        rules[0]
+      );
+      if (Math.abs(nearest - rest.y) <= EPS) continue;
+      out.push({
+        code: 'rest-slab-off-line',
+        severity: 'error',
+        message:
+          `Bar rest at tick ${rest.tick} (${rest.value}, ${rest.hand}) touches no drawn staff line: ` +
+          `its contact edge stands on y=${rest.y.toFixed(2)}, ${Math.abs(nearest - rest.y).toFixed(2)}pt ` +
+          `from the nearest drawn rule (y=${nearest.toFixed(2)}). A half slab sits ON a line and a ` +
+          `whole slab hangs FROM one — a slab that touches nothing means nothing.`,
+        system: layout.index,
+        measure: measureOfTick(rest.tick, t),
+        x: rest.x,
+        y: rest.y,
+        metrics: { contactY: rest.y, nearestRule: nearest, offLine: Math.abs(nearest - rest.y) },
+      });
+      continue;
+    }
+    // A **hanging glyph** is seated by its ink centroid, so the painted gravity
+    // point is `rest.y` and it must stand on a real whole-tone row of the
+    // lattice. (Round 21 §C makes every value's seat offset zero, so the row is
+    // the seat point itself.)
     const gravity = restInkCentroidOffset(rest.value, rest.style, t);
     const seatOffset = restSeatOffsetY(rest.value, rest.style, t);
     const row = rest.y - seatOffset;

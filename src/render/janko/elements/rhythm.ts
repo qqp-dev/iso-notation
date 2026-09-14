@@ -276,11 +276,34 @@ export const SUBDIVISION_URTEXT_STROKE = 0.9;
  * Stacks are spaced by `tokens.flagSpacing`, so every dialect stacks alike.
  */
 export function subdivisionMarkCount(durationTicks: number): number {
-  if (durationTicks <= 7) return 3;
-  if (durationTicks <= 14) return 2;
-  if (durationTicks <= 38) return 1;
+  if (durationTicks <= 3) return 4; // 64th
+  if (durationTicks <= 6) return 3; // 32nd
+  if (durationTicks <= 14) return 2; // 16th
+  if (durationTicks <= 38) return 1; // 8th (plain or dotted)
   return 0;
 }
+
+/**
+ * Round 21 — the **beam level** of a duration: the number of beam strips the
+ * note needs, counted from the primary connector outward. `level = f(duration)`
+ * and nothing else, so the tertiary and quaternary levels are *data*, not a
+ * forked code path — a 128th would only add a row to this function.
+ *
+ * The thresholds mirror {@link subdivisionMarkCount}, so a beamed note and a
+ * flagged note of the same value can never disagree about how many marks they
+ * carry: 8th = 1 (primary), 16th = 2, 32nd = 3, 64th = 4.
+ */
+export function beamLevel(durationTicks: number): number {
+  return Math.max(1, subdivisionMarkCount(durationTicks));
+}
+
+/**
+ * Length (pt) of a **partial beam** (beamlet / stub): the LilyPond/Gould
+ * fractional-beam length of about one staff space, taken here from the measured
+ * flag reach (`flagWidth` = 1.056sp at the Round 21 scale), capped at the
+ * distance to the neighbouring stem it points toward.
+ */
+export const BEAM_STUB_FALLBACK = 4.0;
 
 /**
  * Round 20 — **the classical flag**.
@@ -1350,10 +1373,34 @@ export interface JankoBeamGroupGeometry {
   thickness: number;
   /** Primary connector across the stem tips. */
   primary: JankoBeamConnector;
-  /** Secondary 16th connector, or null when fewer than two 16ths. */
+  /**
+   * Round 21 — **every** beam strip, primary first: level 2 (16ths), level 3
+   * (32nds) and level 4 (64ths) are produced by one generic rule (maximal runs
+   * of notes at or above the level), so the higher levels are data. A run of a
+   * single note becomes a Gould **partial beam** (stub) instead of a connector.
+   */
+  levels: JankoBeamLevel[];
+  /**
+   * The level-2 connector when the group has exactly one, non-stub 16th run —
+   * the shape every Round 7–20 case carries. Kept as the named accessor for the
+   * existing audits; `null` when there is none, or when the 16ths are split
+   * into stubs.
+   */
   secondary: JankoBeamConnector | null;
   /** Beam centerline y at an absolute x. */
   beamY(x: number): number;
+}
+
+/** One beam strip: its level (1 = 8th/primary) and its painted connector. */
+export interface JankoBeamLevel {
+  /** 1 = primary, 2 = 16th, 3 = 32nd, 4 = 64th. */
+  level: number;
+  connector: JankoBeamConnector;
+  /**
+   * True for a **partial beam**: the connector starts at its own stem and ends
+   * in mid-air, because its level holds exactly one note in the group.
+   */
+  stub: boolean;
 }
 
 /** Gap (pt) between the primary beam and the 16th secondary beam. */
@@ -1502,22 +1549,51 @@ export function computeBeamGroupGeometry(
   const slope = Math.max(-limit, Math.min(limit, rawSlope));
   const beamX0 = lo.stemX;
 
-  const sixteenths = sorted.filter((n) => n.durationTicks <= 14);
-  const secondaryOffset = -direction * (t.beamThickness + SECONDARY_BEAM_GAP);
-  const hasSecondary = sixteenths.length >= 2;
-  // The secondary connector's columns do not depend on the anchor, so they are
-  // resolved once instead of inside every relaxation pass.
-  const secondarySpan = hasSecondary
-    ? span(sixteenths.map((n) => getStemGeometry(n, t)))
-    : null;
+  // --- Round 21: the beam levels are one generic rule -----------------------
+  const noteLevels = sorted.map((n) => beamLevel(n.durationTicks));
+  const maxLevel = Math.max(...noteLevels);
+  /** Offset (pt) of level `L`'s centerline from the primary connector. */
+  const levelOffset = (level: number): number =>
+    -direction * (level - 1) * (t.beamThickness + SECONDARY_BEAM_GAP);
+  /**
+   * One **run** per maximal stretch of consecutive notes at or above a level —
+   * the same rule for 16ths, 32nds and 64ths. A run of one note is a Gould
+   * partial beam. The run's columns do not depend on the anchor, so they are
+   * resolved once, outside every relaxation pass.
+   */
+  interface BeamRun {
+    level: number;
+    stems: JankoStemGeometry[];
+    /** Index in `sorted` of the run's only note (a partial beam). */
+    loneIndex: number | null;
+  }
+  const beamRuns: BeamRun[] = [];
+  for (let level = 2; level <= maxLevel; level++) {
+    let indices: number[] = [];
+    const flush = (): void => {
+      if (indices.length === 0) return;
+      beamRuns.push({
+        level,
+        stems: indices.map((i) => stems[i]),
+        loneIndex: indices.length === 1 ? indices[0] : null,
+      });
+      indices = [];
+    };
+    for (let i = 0; i <= noteLevels.length; i++) {
+      if (i < noteLevels.length && noteLevels[i] >= level) indices.push(i);
+      else flush();
+    }
+  }
+  const level2Runs = beamRuns.filter((r) => r.level === 2 && r.loneIndex === null);
+  const hasSecondary = level2Runs.length === 1;
 
   // Minimum stem length: the canonical stem, but never less than the notehead
-  // disc plus the required air — counting the 16th secondary beam, which sits
-  // `beamThickness + gap` closer to the heads than the primary connector.
+  // disc plus the required air — counting the *deepest* beam level, which sits
+  // `(L − 1) · (beamThickness + gap)` closer to the heads than the primary.
   // It is measured from the notehead centre (the beam anchor below), so the
   // *visible* stem between the disc perimeter and the beam is
   // `minStemLength - getStemAttachmentRadius(note)` and stays substantial.
-  const secondaryDepth = hasSecondary ? t.beamThickness + SECONDARY_BEAM_GAP : 0;
+  const secondaryDepth = maxLevel >= 2 ? (maxLevel - 1) * (t.beamThickness + SECONDARY_BEAM_GAP) : 0;
   const minStemLength = Math.max(
     t.stemLength,
     t.noteheadRadius + t.minStemClearance + secondaryDepth
@@ -1533,7 +1609,14 @@ export function computeBeamGroupGeometry(
     anchor = direction === -1 ? Math.min(anchor, limitY) : Math.max(anchor, limitY);
   }
 
-  /** The two connectors (primary + optional 16th secondary) for one anchor. */
+  /**
+   * Every beam strip (primary + one per level run) for one anchor. A run of a
+   * single note is a **partial beam**: it starts at that note's own stem and
+   * ends in mid-air, pointing *toward the group it is beamed with* — backward
+   * (toward the preceding note) whenever the group has one, forward only when
+   * the lone note opens the group. That is the Gould fractional-beam rule: the
+   * stub belongs to the group, never to the empty side of it.
+   */
   const connectorsAt = (a: number): JankoBeamConnector[] => {
     const list: JankoBeamConnector[] = [
       {
@@ -1543,12 +1626,31 @@ export function computeBeamGroupGeometry(
         y2: a + slope * (hi.stemX - lo.stemX),
       },
     ];
-    if (hasSecondary && secondarySpan) {
+    for (const run of beamRuns) {
+      const off = levelOffset(run.level);
+      if (run.loneIndex !== null) {
+        const here = stems[run.loneIndex];
+        const neighbour =
+          run.loneIndex > 0 ? stems[run.loneIndex - 1] : stems[run.loneIndex + 1];
+        const toward = run.loneIndex > 0 ? -1 : 1;
+        const reach = neighbour ? Math.abs(neighbour.stemX - here.stemX) : 0;
+        const len = Math.min(t.flagWidth > 0 ? t.flagWidth : BEAM_STUB_FALLBACK, reach);
+        if (!(len > 2 * t.beamThickness)) continue;
+        const y = a + slope * (here.stemX - beamX0) + off;
+        list.push({
+          x1: here.stemX,
+          y1: y,
+          x2: here.stemX + toward * len,
+          y2: y + slope * toward * len,
+        });
+        continue;
+      }
+      const { lo: rlo, hi: rhi } = span(run.stems);
       list.push({
-        x1: secondarySpan.lo.stemX,
-        y1: a + slope * (secondarySpan.lo.stemX - beamX0) + secondaryOffset,
-        x2: secondarySpan.hi.stemX,
-        y2: a + slope * (secondarySpan.hi.stemX - beamX0) + secondaryOffset,
+        x1: rlo.stemX,
+        y1: a + slope * (rlo.stemX - beamX0) + off,
+        x2: rhi.stemX,
+        y2: a + slope * (rhi.stemX - beamX0) + off,
       });
     }
     return list;
@@ -1617,7 +1719,18 @@ export function computeBeamGroupGeometry(
   }
 
   const beamY = (x: number): number => anchor + slope * (x - beamX0);
-  const [primary, secondary] = connectorsAt(anchor);
+  const list = connectorsAt(anchor);
+  const primary = list[0];
+  // The level-2 accessor: exactly one full 16th run, and no 16th stub beside it.
+  const secondary =
+    hasSecondary && beamRuns.filter((r) => r.level === 2).length === 1 && list[1]
+      ? list[1]
+      : null;
+  const levels: JankoBeamLevel[] = [{ level: 1, connector: primary, stub: false }];
+  beamRuns.forEach((run, i) => {
+    const connector = list[i + 1];
+    if (connector) levels.push({ level: run.level, connector, stub: run.loneIndex !== null });
+  });
 
   return {
     notes: sorted,
@@ -1628,7 +1741,8 @@ export function computeBeamGroupGeometry(
     minStemLength,
     thickness: t.beamThickness,
     primary,
-    secondary: hasSecondary ? (secondary ?? null) : null,
+    levels,
+    secondary,
     beamY,
   };
 }
@@ -1656,7 +1770,7 @@ export function renderBeamGroup(
 
   const beam = geometry ?? computeBeamGroupGeometry(group, t);
   if (!beam) return '';
-  const { notes: sorted, stems, primary, secondary, direction } = beam;
+  const { notes: sorted, stems, primary, direction } = beam;
 
   const parts: string[] = ['  <g class="janko-beam-group">'];
 
@@ -1670,10 +1784,23 @@ export function renderBeamGroup(
     `    <line class="janko-beam" x1="${f(primary.x1)}" y1="${f(primary.y1)}" x2="${f(primary.x2)}" y2="${f(primary.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
   );
 
-  // Secondary beam: spans the consecutive 16th notes, closer to the noteheads.
-  if (secondary) {
+  // Every higher beam level, closer to the noteheads: the 16th secondary, the
+  // 32nd tertiary and the 64th quaternary all come from the same generic run
+  // rule, and a single-note run paints a Gould partial beam. Level 2 keeps its
+  // historical `janko-beam-secondary` class; the deeper levels name themselves.
+  const LEVEL_CLASS: Readonly<Record<number, string>> = {
+    2: 'janko-beam-secondary',
+    3: 'janko-beam-tertiary',
+    4: 'janko-beam-quaternary',
+  };
+  for (const strip of beam.levels) {
+    if (strip.level < 2) continue;
+    const cls = strip.stub
+      ? `${LEVEL_CLASS[strip.level] ?? 'janko-beam-secondary'} janko-beam-stub`
+      : (LEVEL_CLASS[strip.level] ?? 'janko-beam-secondary');
+    const c = strip.connector;
     parts.push(
-      `    <line class="janko-beam-secondary" x1="${f(secondary.x1)}" y1="${f(secondary.y1)}" x2="${f(secondary.x2)}" y2="${f(secondary.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
+      `    <line class="${cls}" data-beam-level="${strip.level}"${strip.stub ? ' data-beam-stub="1"' : ''} x1="${f(c.x1)}" y1="${f(c.y1)}" x2="${f(c.x2)}" y2="${f(c.y2)}" stroke="#111111" stroke-width="${t.beamThickness.toFixed(2)}" stroke-linecap="butt"/>`
     );
   }
 
@@ -1938,8 +2065,11 @@ export function bridgeBeamGroupsAcrossRests(
     const spanned = rests.some(
       (r) =>
         r.hand === a.hand &&
-        r.durationTicks > 0 &&
-        r.durationTicks <= restMax &&
+        // Round 21: exactly a 16th bridges. The working set now also states
+        // 32nds and 64ths, and `<= restMax` would have silently re-beamed every
+        // beam that happens to span one of the new short rests — a move this
+        // round does not prescribe.
+        r.durationTicks === restMax &&
         r.tick === release &&
         r.tick + r.durationTicks === b.startTick &&
         r.tick > beatStart &&

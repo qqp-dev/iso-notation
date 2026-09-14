@@ -78,8 +78,10 @@ import {
 } from '../src/render/janko/elements/notehead';
 import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
 import {
+  QUARTER_CONTOUR_POINTS,
   REST_HEAD_RX,
   REST_HEAD_RY,
+  REST_SLAB_HEIGHT,
   REST_PHANTOM_DASH,
   REST_PHANTOM_HEAD_RADIUS,
   REST_PHANTOM_HEAD_STROKE,
@@ -680,7 +682,7 @@ test('Row-snapped clusters (doctrine): the anchored head keeps the column, the f
   close(c.x + e.x, 2 * g.x, 'the cluster mirrors about its own centre');
 });
 
-test('Row-snapped clusters: every note keeps its true row y and the RH head anchors the column', () => {
+test('Row-snapped clusters: every note keeps its true row y and the LOWER head anchors the column', () => {
   const score = makeScore(
     [
       makeNote('chord-c', 0, 4, 48, 48, 'LH'),
@@ -718,9 +720,10 @@ test('Row-snapped clusters: every note keeps its true row y and the RH head anch
   const c = layout.notes.find((p) => p.note.id === 'chord-c')!;
   const e = layout.notes.find((p) => p.note.id === 'chord-e')!;
   const g = layout.notes.find((p) => p.note.id === 'chord-g')!;
-  // The mixed-hand pair anchors its RH head on the beat and fans the LH head
-  // one judged pair gap aside (tick 48 wears no halo).
-  close(e.x, tickX(48), 'the RH head anchors the beat column');
+  // The mixed-hand pair anchors its **lower** head on the beat (Round 21 §D:
+  // lower-first) and fans the higher RH head one judged pair gap aside (tick 48
+  // wears no halo).
+  close(c.x, tickX(48), 'the lower head anchors the beat column');
   close(Math.abs(c.x - e.x), PAIR_GAP, 'the pair is fanned by exactly one pair gap');
   // Round 19 symmetric tuck: G4's single-head row centres on the pair's own
   // middle (not on the beat column).
@@ -1011,8 +1014,8 @@ test('Round 20 rest cuts: five distinct monoline grammars, all clean', () => {
   // hook and serpentine class names with the urtext control, so the exclusion
   // check keys on what only that dialect paints.
   const signatures: Record<JankoRestStyle, RegExp> = {
-    'kinetic-monoline': /janko-rest-(hook-head|slab)"/,
-    'classical-urtext': /janko-rest-(hook-bulb|block|stem-line)/,
+    'kinetic-monoline': /janko-rest-(hook|slab|lightning)"/,
+    'classical-urtext': /janko-rest-(hook-bulb|block|stem-line|serpentine)/,
     'geometric-node': /janko-rest-(node|ray|capsule)/,
     'bauhaus-slash': /janko-rest-(slash|wing|z|box)/,
     'phantom-notehead': /janko-rest-phantom-(head|stem|flag|bar)/,
@@ -1034,31 +1037,27 @@ test('Round 20 rest cuts: five distinct monoline grammars, all clean', () => {
   assert.equal(documents.size, 5, 'the five dialects are five different engravings');
 });
 
-test('Round 20 classical cut: a slanted stem, oval-headed hooks and a true serpentine', () => {
+test('Round 21 classical cut: one measured contour per part, never a monoline stick', () => {
   const score = buildBachGoldbergVar1Score();
   const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
-  // The m. 4 16th rest: a slanted stem carrying two hooks, each ending in a
-  // solid oval head.
-  const stem = /<line class="janko-rest-stem" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(
-    crop
-  );
-  assert.ok(stem, 'the slanted classical stem is painted');
-  close(Math.abs(Number(stem![1]) - Number(stem![3])), REST_STEM_LEAN, 'the stem leans', 0.01);
-  assert.ok(Number(stem![4]) > Number(stem![2]), 'and runs top to foot');
-  assert.equal((crop.match(/class="janko-rest-hook"/g) ?? []).length, 2, 'two hooks for a 16th');
-  assert.equal((crop.match(/class="janko-rest-hook-head"/g) ?? []).length, 2, 'two oval heads');
-  const heads = [
-    ...crop.matchAll(
-      /<ellipse class="janko-rest-hook-head" cx="([\d.-]+)" cy="([\d.-]+)" rx="([\d.-]+)" ry="([\d.-]+)"/g
-    ),
-  ].map((m) => m.slice(1).map(Number));
-  for (const [cx, , rx, ry] of heads) {
-    close(rx, REST_HEAD_RX, 'the head is an oval, wider than tall', 0.01);
-    close(ry, REST_HEAD_RY, 'with the classical blob proportions', 0.01);
-    assert.ok(cx < Number(stem![1]), 'and it sits left of the stem, where the hook sweeps');
+  // The m. 4 16th rest is the measured hooked cut: one tapered **stem**
+  // contour plus `REST_MARK_COUNT` **lobe** contours, every one of them a
+  // closed filled path — no stroked rule and no oval pushed onto a stick.
+  const paths = [...crop.matchAll(/<path class="(janko-rest-stem|janko-rest-hook)" d="([^"]+)" fill="([^"]+)" stroke="([^"]+)"/g)];
+  assert.equal(paths.length, 3, 'one stem + two lobes for the m. 4 16th');
+  for (const [, , d, fill, stroke] of paths) {
+    assert.equal(fill, '#111111', 'the classical cut is solid ink');
+    assert.equal(stroke, 'none', 'and it is filled, not stroked');
+    assert.match(d, /^M [\d.-]+ [\d.-]+ C /, 'each part is a contour with real curves');
+    assert.match(d, /Z$/, 'and it is closed');
   }
-  // The quarter rest is the true serpentine: one calligraphic curve, stroked at
-  // the house 0.90pt weight. The specimen's m. 3 is the clean quarter context.
+  assert.ok(
+    !/class="janko-rest-(hook-head|stem-line)"/.test(crop),
+    'the Round 20 monoline stick and its stuck-on oval are gone'
+  );
+
+  // The quarter on the specimen is the **traced measured serpentine**: one
+  // closed contour whose every sampled point is the reference outline.
   const specimenScore = buildRestDurationSpecimenScore();
   const specimenTokens = resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS);
   const quarterCrop = renderJankoCrop(
@@ -1068,56 +1067,84 @@ test('Round 20 classical cut: a slanted stem, oval-headed hooks and a true serpe
     resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS),
     specimenTokens
   );
-  const lightning = /<path class="janko-rest-lightning" d="([^"]+)"[^>]*stroke-width="([\d.]+)"/.exec(
+  const quarter = /<path class="janko-rest-lightning" d="([^"]+)" fill="#111111" stroke="none"/.exec(
     quarterCrop
   );
-  assert.ok(lightning, 'the serpentine quarter is painted');
-  assert.match(lightning![1], /C /, 'the serpentine is calligraphic, not a polyline');
-  close(Number(lightning![2]), REST_STROKE, 'at the house 0.90pt weight', 1e-9);
-  // The half / whole bar pair on the specimen: the half slab *sits atop* its
-  // seat row, the whole slab *hangs below* its own (Round 20's classical pair).
+  assert.ok(quarter, 'the serpentine quarter is one filled contour');
+  assert.equal(
+    (quarter![1].match(/C /g) ?? []).length,
+    QUARTER_CONTOUR_POINTS,
+    'the cut is the measured contour, one cubic per sampled point'
+  );
+
+  // The bar pair on the specimen: **touching** the drawn staff rules — the half
+  // slab's bottom edge on one, the whole slab's top edge on one — and the whole
+  // centred in its measure.
   const specimenOptions = resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS);
   const restLayouts = layoutJankoScore(specimenScore, specimenOptions, specimenTokens);
   const half = restLayouts.flatMap((s) => s.rests).find((r) => r.value === 'half')!;
   const whole = restLayouts.flatMap((s) => s.rests).find((r) => r.value === 'whole')!;
+  const systemOf = (r: { tick: number }): (typeof restLayouts)[number] =>
+    restLayouts.find((s) => s.rests.some((x) => x.tick === r.tick))!;
+  const rulesOf = (r: { tick: number }): number[] =>
+    (
+      [
+        ['RH', 5],
+        ['LH', 2],
+        ['RH', 4],
+        ['LH', 3],
+      ] as const
+    ).flatMap(([hand, octave]) =>
+      getEquatorRuleYs(systemOf(r).geometry.equatorY(hand, octave), specimenOptions, specimenTokens)
+    );
+  const onARule = (r: { tick: number; y: number }): boolean =>
+    rulesOf(r).some((rule) => Math.abs(rule - r.y) < 1e-9);
+  assert.ok(onARule(half), 'the half slab sits ON a drawn staff rule');
+  assert.ok(onARule(whole), 'the whole slab hangs FROM a drawn staff rule');
   const halfBox = restInkBox(half, specimenTokens);
   const wholeBox = restInkBox(whole, specimenTokens);
-  assert.ok(
-    halfBox.y1 <= half.y - restSeatOffsetY('half', 'kinetic-monoline', specimenTokens) + 1e-9,
-    'half sits atop'
-  );
-  assert.ok(
-    wholeBox.y0 >= whole.y - restSeatOffsetY('whole', 'kinetic-monoline', specimenTokens) - 1e-9,
-    'whole hangs below'
-  );
-  close(halfBox.x1 - halfBox.x0, REST_SLAB_WIDTH, 'the slabs are wide', 1e-9);
+  close(halfBox.y1, half.y, 'the half slab touches the line with its bottom edge', 1e-9);
+  close(wholeBox.y0, whole.y, 'the whole slab touches the line with its top edge', 1e-9);
+  close(halfBox.x1 - halfBox.x0, REST_SLAB_WIDTH, 'the slabs carry the measured width', 1e-9);
+  close(halfBox.y1 - halfBox.y0, REST_SLAB_HEIGHT, 'and the measured thickness', 1e-9);
+  // The ticket's no-move pin: the half keeps the **beat column** it has always
+  // had (R20 live: 62.61), while the whole moves to the barline midpoint.
+  close(half.x, 62.61, 'the half stays on its beat column (R20 value, unmoved)', 0.01);
+  // Whole-measure rest centring (Gould; LilyPond NR §§2.2.1, 2.2.3): the whole
+  // bar stands on the barline midpoint, not on its onset column.
+  // Whole-measure rest centring (Gould; LilyPond NR §§2.2.1, 2.2.3): the whole
+  // bar stands on the barline midpoint. The ticket's live R20 numbers for this
+  // very measure: barlines 214.29 / 392.79 → centre 303.54, and the onset column
+  // it left behind was 220.29 (83pt away).
+  close(whole.x, 303.54, 'the whole bar stands on the barline midpoint', 0.02);
+  assert.ok(Math.abs(whole.x - 220.29) > 80, 'and that is 83pt from its R20 onset column');
 });
 
-test('Round 20 urtext control: a slanted calligraphic stem with teardrop bulbs', () => {
+test('Round 21 urtext control: the same measured cut under its own class names', () => {
   const score = buildBachGoldbergVar1Score();
   const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'classical-urtext' });
   const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
-  const stem = /<line class="janko-rest-stem-line" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)"/.exec(
-    crop
+  // The urtext control is the same measured cut: a filled stem contour plus one
+  // filled lobe contour per mark, tagged with the urtext class names.
+  const stem = /<path class="janko-rest-stem-line" d="([^"]+)" fill="#111111" stroke="none"/.exec(crop);
+  assert.ok(stem, 'the urtext stem is a filled contour');
+  assert.match(stem![1], /Z$/, 'and it is closed');
+  assert.equal(
+    (crop.match(/class="janko-rest-hook-bulb"/g) ?? []).length,
+    2,
+    'two measured lobes for the m. 4 16th'
   );
-  assert.ok(stem, 'the calligraphic stem is painted');
-  close(
-    Math.abs(Number(stem![1]) - Number(stem![3])),
-    REST_URTEXT_STEM_SLANT,
-    'the stem is slanted, not a monoline rule',
-    0.01
+  // Its quarter is the same measured serpentine, under the urtext class.
+  const specimenScore = buildRestDurationSpecimenScore();
+  const specimenTokens = resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS);
+  const quarterCrop = renderJankoCrop(
+    specimenScore,
+    3,
+    1,
+    resolveJankoOptions({ ...REST_DURATION_SPECIMEN_JANKO_OPTIONS, restStyle: 'classical-urtext' }),
+    specimenTokens
   );
-  // A 16th rest carries two hooks, each ending in a solid teardrop bulb.
-  assert.equal((crop.match(/class="janko-rest-hook"/g) ?? []).length, 2, 'two hooks for a 16th');
-  assert.equal((crop.match(/class="janko-rest-hook-bulb"/g) ?? []).length, 2, 'two teardrop bulbs');
-  const bulbs = [...crop.matchAll(/<ellipse class="janko-rest-hook-bulb" cx="[\d.-]+" cy="[\d.-]+" rx="([\d.-]+)"/g)];
-  for (const bulb of bulbs) {
-    assert.ok(Number(bulb[1]) > 0, 'teardrop bulbs are solid ink, not hollow rings');
-  }
-  // The quarter rest is the serpentine lightning, and it is a curve (C commands).
-  const m4Quarter = renderJankoCrop(score, 2, 1, options, TOKENS);
-  const lightning = /<path class="janko-rest-lightning" d="([^"]+)"/.exec(m4Quarter);
-  if (lightning) assert.match(lightning[1], /C /, 'the serpentine is calligraphic, not a polyline');
+  assert.match(quarterCrop, /class="janko-rest-serpentine" d="[^"]*C [^"]*Z"/, 'the urtext quarter is the measured serpentine');
 });
 
 test('Round 20 phantom notehead rests stand exactly where the unvoiced note would have been', () => {

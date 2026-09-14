@@ -227,6 +227,26 @@ test('Optical seats: the painted centroid stands on the seat point — every val
         Math.abs(centroid.x - rest.x) < 0.02,
         `${style} · ${value}: centroid x ${centroid.x.toFixed(3)} on the seat column ${rest.x}`
       );
+      if (value === 'half' || value === 'whole') {
+        // Round 21 §C: a bar form is seated by its **contact edge** on a drawn
+        // staff rule, so its centroid deliberately stands half a slab off the
+        // seat point (above for the half, below for the whole). The contact
+        // edge itself is the pin.
+        // The pin belongs to the **classical cuts**: their slab is a plain
+        // filled bar drawn with its contact edge exactly on the line. A
+        // demonstrator bar (the geometric capsule, the bauhaus hairline box, the
+        // phantom's dashed bar) carries strokes and other ink of its own, so its
+        // box edge is not the contact edge and only the seat itself is pinned.
+        if (style === 'kinetic-monoline' || style === 'classical-urtext') {
+          const box = restInkBox(rest);
+          const edge = value === 'half' ? box.y1 : box.y0;
+          assert.ok(
+            Math.abs(edge - rest.y) < 0.02,
+            `${style} · ${value}: the contact edge ${edge.toFixed(3)} sits on the seat line ${rest.y}`
+          );
+        }
+        continue;
+      }
       assert.ok(
         Math.abs(centroid.y - rest.y) < 0.02,
         `${style} · ${value}: centroid y ${centroid.y.toFixed(3)} on the seat point ${rest.y}`
@@ -253,16 +273,32 @@ test('Corpus seats: every engraved rest paints its centroid on the seat point an
       for (const rest of layout.rests) {
         const centroid = paintedCentroid(restGroupSvg(rest, t));
         assert.ok(
-          Math.abs(centroid.x - rest.x) < 0.02 && Math.abs(centroid.y - rest.y) < 0.02,
-          `${label} t${rest.tick}: the painted centroid is the seat point`
+          Math.abs(centroid.x - rest.x) < 0.02,
+          `${label} t${rest.tick}: the painted centroid is on the seat column`
         );
-        // … and the seat's row is a real whole-tone row of the lattice.
-        const row = rest.y - restSeatOffsetY(rest.value, rest.style, t);
-        const snapped = Math.round((row - layout.geometry.middleCY) / (t.rowHeight / 2)) * (t.rowHeight / 2);
-        assert.ok(
-          Math.abs(row - layout.geometry.middleCY - snapped) < t.rowHeight / 4 + 1e-6,
-          `${label} t${rest.tick}: the seat line sits on the lattice`
-        );
+        if (rest.value === 'half' || rest.value === 'whole') {
+          // Round 21 §C: a bar form's seat point is the drawn staff rule its
+          // **contact edge** touches; its centroid stands half a slab off it.
+          const box = restInkBox(rest, t);
+          const edge = rest.value === 'half' ? box.y1 : box.y0;
+          assert.ok(
+            Math.abs(edge - rest.y) < 0.02,
+            `${label} t${rest.tick}: the ${rest.value} slab touches its drawn line`
+          );
+        } else {
+          assert.ok(
+            Math.abs(centroid.y - rest.y) < 0.02,
+            `${label} t${rest.tick}: the painted centroid is the seat point`
+          );
+          // … and the seat's row is a real whole-tone row of the lattice.
+          const row = rest.y - restSeatOffsetY(rest.value, rest.style, t);
+          const snapped =
+            Math.round((row - layout.geometry.middleCY) / (t.rowHeight / 2)) * (t.rowHeight / 2);
+          assert.ok(
+            Math.abs(row - layout.geometry.middleCY - snapped) < t.rowHeight / 4 + 1e-6,
+            `${label} t${rest.tick}: the seat line sits on the lattice`
+          );
+        }
         painted++;
       }
     }
@@ -334,8 +370,9 @@ test('Bach’s final bar paints one seven: 550/551 merge to a single digit', () 
   const final = layouts[layouts.length - 1];
   const merge = final.unisonMerges.find((m) => m.tick === 4560)!;
   assert.ok(merge, 'the final-bar unison is merged');
-  assert.deepEqual(merge.mergedIds, ['bach-var1-551']);
-  assert.equal(merge.survivorId, 'bach-var1-550');
+  // Round 21 §D: the **lower voice** (LH, id 551) keeps the digit.
+  assert.deepEqual(merge.mergedIds, ['bach-var1-550']);
+  assert.equal(merge.survivorId, 'bach-var1-551');
   assert.equal(merge.exact, true, 'the two voices are exact duplicates');
   assert.equal(
     final.notes.filter((p) => p.note.startTick === 4560).length,
@@ -415,7 +452,7 @@ test('Violation fixture: two digits on one sound report unison-double-digit', ()
   const survivor = final.notes.find((p) => p.note.startTick === 4560)!;
   const duplicate = {
     ...survivor,
-    note: BACH.notes.find((n) => n.id === 'bach-var1-551')!,
+    note: BACH.notes.find((n) => n.id === 'bach-var1-550')!,
     x: survivor.x + 5.46,
   };
   const broken: JankoSystemLayout = { ...final, notes: [...final.notes, duplicate] };
@@ -424,7 +461,7 @@ test('Violation fixture: two digits on one sound report unison-double-digit', ()
   assert.equal(out.length, 1, 'the doubling is named');
   assert.equal(out[0].code, 'unison-double-digit');
   assert.equal(out[0].severity, 'error');
-  assert.deepEqual(out[0].noteIds, ['bach-var1-550', 'bach-var1-551']);
+  assert.deepEqual([...out[0].noteIds!].sort(), ['bach-var1-550', 'bach-var1-551']);
   // The clean layout reports nothing.
   const clean: LintViolation[] = [];
   checkUnisonDigits(BACH, final, DEFAULT_JANKO_TOKENS, clean);

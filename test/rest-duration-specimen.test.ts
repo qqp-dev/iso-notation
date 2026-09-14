@@ -18,8 +18,14 @@ import {
   REST_DURATION_SPECIMEN_VALUES,
   buildRestDurationSpecimenScore,
 } from '../src/scores/rest-duration-specimen';
-import { JANKO_REST_STYLES, resolveJankoTokens } from '../src/render/janko/types';
-import { layoutJankoScore } from '../src/render/janko/engine';
+import {
+  JANKO_REST_STYLES,
+  resolveJankoOptions,
+  resolveJankoTokens,
+} from '../src/render/janko/types';
+import { getEquatorYForOctave } from '../src/render/janko/geometry';
+import { getEquatorRuleYs } from '../src/render/janko/elements/staff';
+import { layoutJankoScore, wholeToneRowOffsets } from '../src/render/janko/engine';
 import { formatLintReport, lintJankoScore } from '../src/render/janko/linter';
 import {
   JankoRestGeometry,
@@ -48,18 +54,22 @@ function laidOut(measuresPerSystem: number) {
   };
 }
 
-test('The specimen declares the five standard values in order, one per measure', () => {
-  assert.equal(REST_DURATION_SPECIMEN_MEASURES, 6, 'five values + the whole bar’s resume measure');
+test('The specimen declares the complete working set in order, one per measure', () => {
+  assert.equal(
+    REST_DURATION_SPECIMEN_MEASURES,
+    8,
+    'five values + the whole bar’s resume measure + the two Round 21 §E windows'
+  );
   assert.equal(REST_DURATION_SPECIMEN_TICKS_PER_MEASURE, 192, '4/4 — the meter that can state a whole bar');
-  assert.equal(REST_DURATION_SPECIMEN_TOTAL_TICKS, 1152);
+  assert.equal(REST_DURATION_SPECIMEN_TOTAL_TICKS, 1536, 'eight measures of 4/4');
   assert.deepEqual(
     REST_DURATION_SPECIMEN_VALUES.map((value) => value.durationTicks),
-    [12, 24, 48, 96, 192],
-    'exactly the five standard rest values, shortest first'
+    [12, 24, 48, 96, 192, 6, 3],
+    'the five original standard values, then the two §E constructions'
   );
   assert.deepEqual(
     REST_DURATION_SPECIMEN_VALUES.map((value) => value.measure),
-    [1, 2, 3, 4, 5],
+    [1, 2, 3, 4, 5, 7, 8],
     'each value owns its own measure'
   );
   for (const spec of REST_DURATION_SPECIMEN_VALUES) {
@@ -76,7 +86,7 @@ test('The specimen declares the five standard values in order, one per measure',
   assert.equal(SCORE.title, 'Rest Duration Specimen');
   assert.equal(SCORE.composer, 'Jánko Engraving Harness');
   assert.equal(SCORE.ticksPerBeat, 48);
-  assert.equal(SCORE.gridResolution, 24);
+  assert.equal(SCORE.gridResolution, 3, 'the specimen now states 64th silences (3 ticks)');
   assert.equal(SCORE.totalTicks, REST_DURATION_SPECIMEN_TOTAL_TICKS);
   assert.deepEqual(SCORE.timeSignatures, [{ tick: 0, numerator: 4, denominator: 4 }]);
   assert.deepEqual(
@@ -88,7 +98,9 @@ test('The specimen declares the five standard values in order, one per measure',
       [4, 576, 'regular'],
       [5, 768, 'regular'],
       [6, 960, 'regular'],
-      [7, 1152, 'final'],
+      [7, 1152, 'regular'],
+      [8, 1344, 'regular'],
+      [9, 1536, 'final'],
     ]
   );
 });
@@ -96,11 +108,11 @@ test('The specimen declares the five standard values in order, one per measure',
 for (const measuresPerSystem of [3]) {
   test(`Every declared value writes one RH rest in a free column at ${measuresPerSystem} per system`, () => {
     const { rests, notes, unwritten } = laidOut(measuresPerSystem);
-    assert.equal(rests.length, 5, 'exactly five silences are written');
-    assert.ok(rests.every((rest) => rest.hand === 'RH'), 'all five silences belong to the right hand');
+    assert.equal(rests.length, 7, 'exactly seven silences are written — the whole working set');
+    assert.ok(rests.every((rest) => rest.hand === 'RH'), 'all seven silences belong to the right hand');
     assert.deepEqual(
       rests.map((rest) => rest.durationTicks),
-      [12, 24, 48, 96, 192]
+      [12, 24, 48, 96, 192, 6, 3]
     );
     assert.equal(unwritten.length, 0, 'no silence is refused');
 
@@ -116,10 +128,48 @@ for (const measuresPerSystem of [3]) {
         `the ${spec.label} rest is written, never a named refusal`
       );
 
-      // The seat: the ink centroid stands on the phrase row — the half slab
-      // half a slab above it, the whole slab half a slab below it (Round 20).
-      const seatOffset = restSeatOffsetY(rest.value, rest.style, TOKENS);
-      assert.equal(rest.value === 'half' ? seatOffset < 0 : rest.value === 'whole' ? seatOffset > 0 : seatOffset === 0, true, `${spec.label} seat offset`);
+      // The seat (Round 21 §C): a hanging glyph's ink centroid stands on its
+      // phrase row; a bar form's **contact edge** stands on a drawn staff rule —
+      // the half slab's bottom edge on the line, the whole slab's top edge on
+      // it. Every value's seat offset is zero now, because a bar seat is a line
+      // and not a row.
+      assert.equal(restSeatOffsetY(rest.value, rest.style, TOKENS), 0, `${spec.label} seat offset`);
+      const sys = laidOut(measuresPerSystem).layouts.find((s) =>
+        s.rests.some((x) => x.tick === rest.tick)
+      )!;
+      const rules = (
+        [
+          ['RH', 5],
+          ['LH', 2],
+          ['RH', 4],
+          ['LH', 3],
+        ] as const
+      ).flatMap(([hand, octave]) =>
+        getEquatorRuleYs(sys.geometry.equatorY(hand, octave), resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS), TOKENS)
+      );
+      const box = restInkBox(rest, TOKENS);
+      if (rest.value === 'half' || rest.value === 'whole') {
+        assert.ok(
+          rules.some((rule) => Math.abs(rule - rest.y) < 1e-9),
+          `${spec.label}: the slab touches a drawn staff rule`
+        );
+        assert.ok(
+          Math.abs((rest.value === 'half' ? box.y1 : box.y0) - rest.y) < 0.02,
+          `${spec.label}: the contact edge is on the line`
+        );
+      } else {
+        const rows: number[] = [];
+        for (let octave = 0; octave <= 8; octave++) {
+          const base = sys.geometry.middleCY + getEquatorYForOctave(octave, 'RH', TOKENS, resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS));
+          for (const offset of wholeToneRowOffsets(resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS), TOKENS)) {
+            rows.push(base + offset);
+          }
+        }
+        assert.ok(
+          rows.some((row) => Math.abs(row - rest.y) < 1e-9),
+          `${spec.label}: the ink centroid stands on a phrase row`
+        );
+      }
 
       // The free-column guarantee: the nearest LH onset is a full 24 ticks
       // away, so no other-hand head may enter the rest's disc band — audited
@@ -136,6 +186,22 @@ for (const measuresPerSystem of [3]) {
           p.note.startTick < spec.measure * REST_DURATION_SPECIMEN_TICKS_PER_MEASURE
       );
       assert.ok(inMeasure.length > 0, `the LH is active in the ${spec.label} measure`);
+      if (rest.value === 'whole') {
+        // The whole bar is **centred in its measure** (Gould; LilyPond NR
+        // §§2.2.1/2.2.3), and that centre column is the LH C3 onset column
+        // (tick 864 → x = 303.54). The two inks clear each other **vertically**
+        // — by row separation — and the slab is never shifted to dodge: the
+        // linter confirms the clearance instead.
+        assert.ok(
+          inMeasure.some((p) => Math.abs(p.x - rest.x) < 1e-6),
+          'the centred whole shares the LH C3 onset column'
+        );
+        assert.ok(
+          inMeasure.every((p) => Math.abs(p.y - rest.y) > box.y1 - box.y0),
+          'and clears it vertically by row separation'
+        );
+        continue;
+      }
       const nearestDx = Math.min(...inMeasure.map((p) => Math.abs(p.x - rest.x)));
       assert.ok(nearestDx >= 2 * R, `nearest LH head is ${nearestDx.toFixed(2)}pt from the rest column`);
     }
@@ -168,7 +234,7 @@ test('The specimen engraves clean under the golden layout and the 3- and 5-per-s
   }
 });
 
-test('Every rest dialect states the same five silences on the clean specimen', () => {
+test('Every rest dialect states the same seven silences on the clean specimen', () => {
   for (const restStyle of JANKO_REST_STYLES) {
     const options = { ...REST_DURATION_SPECIMEN_JANKO_OPTIONS, measuresPerSystem: 3, restStyle };
     const report = lintJankoScore(SCORE, options, REST_DURATION_SPECIMEN_JANKO_TOKENS);
@@ -179,7 +245,7 @@ test('Every rest dialect states the same five silences on the clean specimen', (
     );
     assert.deepEqual(
       rests.map((rest) => rest.durationTicks),
-      [12, 24, 48, 96, 192],
+      [12, 24, 48, 96, 192, 6, 3],
       restStyle
     );
   }

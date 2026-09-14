@@ -130,6 +130,7 @@ import {
 } from './elements/barlines';
 import {
   JankoRestGeometry,
+  isBarRestValue,
   isStandardRestValue,
   renderRest,
   restInkBox,
@@ -354,7 +355,7 @@ export interface JankoUnisonMerge {
   pitchClass: number;
   /** Octave of the merged sound. */
   octave: number;
-  /** The head that keeps the digit — the RH tone (the Round 19 anchor rule). */
+  /** The head that keeps the digit — the lower voice (the Round 21 anchor rule). */
   survivorId: string;
   /** Heads merged into it; their digits are never painted. */
   mergedIds: string[];
@@ -1570,22 +1571,81 @@ export function nearestLatticeRow(
 }
 
 /**
- * Round 20 **optical seat**: the page-y of a rest's seat point hung from its
- * phrase row.
+ * Round 21 §C — the **drawn staff rules** a bar rest may sit on: exactly the
+ * four octave equators the staff paints (paired boundary rules under
+ * `'bounded-channel'`, one rule each otherwise), through the same
+ * `getEquatorRuleYs` the renderer uses, so "a drawn line" can never mean
+ * something the page does not show.
+ */
+export function drawnStaffRuleYs(
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number[] {
+  const out: number[] = [];
+  for (const [hand, octave] of [
+    ['RH', 5],
+    ['LH', 2],
+    ['RH', 4],
+    ['LH', 3],
+  ] as const) {
+    out.push(...getEquatorRuleYs(geo.equatorY(hand, octave), o, t));
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * The drawn staff rule nearest `y`; an exact tie goes to the rule **nearer
+ * Middle C** (and then to the upper rule), exactly as §C specifies.
+ */
+export function nearestDrawnStaffRule(
+  y: number,
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number {
+  const rules = drawnStaffRuleYs(geo, o, t);
+  let best = rules[0];
+  for (const rule of rules) {
+    const d = Math.abs(rule - y);
+    const bd = Math.abs(best - y);
+    if (d < bd - EPS) {
+      best = rule;
+      continue;
+    }
+    if (Math.abs(d - bd) > EPS) continue;
+    const corridor = Math.abs(rule - geo.middleCY);
+    const bestCorridor = Math.abs(best - geo.middleCY);
+    if (corridor < bestCorridor - EPS || (Math.abs(corridor - bestCorridor) <= EPS && rule < best)) {
+      best = rule;
+    }
+  }
+  return best;
+}
+
+/**
+ * Round 20 **optical seat**, Round 21 §C **bar seats on drawn lines**.
  *
- * The glyph is placed so that its **ink centroid** stands exactly on the seat
- * point (see `rests.restGlyphOrigin`), so the row the eye reads is the row the
- * engine chose. The two bar forms are the one classical exception the seat
- * carries as data: a **half** bar sits atop its row, a **whole** bar hangs
- * below it, so their seat point stands half a slab above / below the row
- * ({@link restSeatOffsetY}). Every other value's centroid *is* the row.
+ * A hanging glyph (64th … quarter) is placed so that its **ink centroid**
+ * stands exactly on the seat point (see `rests.restGlyphOrigin`), so the row
+ * the eye reads is the row the engine chose.
+ *
+ * The two bar forms are the classical exception, and Round 21 makes it literal:
+ * a bar rest derives its *meaning* from touching a line, so its seat point is
+ * not a phrase row at all but the nearest **drawn staff rule**
+ * ({@link nearestDrawnStaffRule}) — the **half slab sits on** that rule (its
+ * bottom edge on the line), the **whole slab hangs from** it (its top edge on
+ * the line). `restSeatOffsetY` is therefore zero for every value.
  */
 function restSeatY(
   rowY: number,
   style: JankoRestGeometry['style'],
   value: JankoRestGeometry['value'],
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions
 ): number {
+  if (isBarRestValue(value)) return nearestDrawnStaffRule(rowY, geo, o, t);
   return rowY + restSeatOffsetY(value, style, t);
 }
 
@@ -1727,8 +1787,12 @@ function restBeatCell(
       measureLeft = geo.staffLeft;
       mWidth = upbeatWidth;
     } else {
-      const m = measureIdx - 1;
-      measureLeft = geo.staffLeft + upbeatWidth + m * geo.measureWidth;
+      // Round 21 fix: `measureIdx` already counts the anacrusis measure as 0,
+      // so the measure that follows the upbeat starts exactly one upbeat-width
+      // into the staff — `measureIdx - 1` threw the cell a whole measure left
+      // and inverted it (`left > right`), which silently refused every rest of
+      // a system's first measure.
+      measureLeft = geo.staffLeft + upbeatWidth + measureIdx * geo.measureWidth;
     }
   }
   return tickBeatCell(tick, geo, systemIndex, o, t, measureLeft, mWidth, null);
@@ -1856,7 +1920,7 @@ export function computeJankoRestLayer(
       if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
       if (value !== 'whole' && !activeMeasures.has(measureIdx)) continue;
       const { rowY, dir } = restPhraseRowReference(hand, ticks[i], ticks[i + 1], notes, geo, t, o);
-      const targetY = restSeatY(rowY, o.restStyle, value, t);
+      const targetY = restSeatY(rowY, o.restStyle, value, t, geo, o);
       const candidate: JankoRestGeometry = {
         tick: releaseTick,
         durationTicks: gap,
@@ -1888,13 +1952,28 @@ export function computeJankoRestLayer(
         candidate.y = y;
         return resolveRestX(candidate, notes, geo, systemIndex, measureIdx, cell, t);
       };
+      // Round 21 §C — **the whole bar is centred in its measure** (Gould /
+      // LilyPond NR §§2.2.1, 2.2.3: "Whole measure rests, centered in the
+      // middle of the measure"). A centred whole deliberately stands outside
+      // its onset beat cell, so it is exempt from the along-the-row nudge: the
+      // slab holds the barline midpoint and the linter *confirms* the
+      // clearance there — it is never shifted to dodge a neighbour.
+      if (value === 'whole') {
+        const open = getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t);
+        const close = getMeasureClosingBarlineX(measureIdx, geo, systemIndex, t);
+        if (open !== null && close !== null) {
+          candidate.x = (open + close) / 2;
+          out.push(candidate);
+          continue;
+        }
+      }
       let x = solveAt(targetY);
       if (x === null) {
         // Round 17B vertical fallback: the adjacent row toward the corridor
         // gets its own in-cell solve before the silence is named unwritable.
         const fallbackRow = nearestLatticeRow(rowY + dir * t.rowHeight, geo, t, o);
         if (Math.abs(fallbackRow - rowY) > EPS) {
-          x = solveAt(restSeatY(fallbackRow, o.restStyle, value, t));
+          x = solveAt(restSeatY(fallbackRow, o.restStyle, value, t, geo, o));
         }
       }
       if (x === null) {
@@ -2396,15 +2475,18 @@ export function resolveChordColumns(
         offsetsById.set(cluster.notes[0].note.id, 0);
         continue;
       }
-      // The head that keeps its column — the Round 19 verdict, now the only
-      // rule: the RH tone when the row is mixed-hand, the middle head
-      // otherwise. The `'lower-first'` demonstrator was retired by the R19
-      // approval; a cross-hand unison never reaches this fan, because the two
-      // hands' one sound is merged to one head before the solve.
+      // The head that keeps its column — the **lower-first** rule (Round 21),
+      // now the only rule: on a mixed-hand row the **lowest-pitched** head holds
+      // the column, on a single-hand row the middle head does. `cluster.notes`
+      // is sorted pitch-ascending, so the lowest head is index 0 and the rule is
+      // one line. The Round 19 `'rh'` anchor is **retired** (mirror of R20's
+      // retirement of `'lower-first'`): a rule, not an option. A cross-hand
+      // unison never reaches this fan — the two hands' one sound is merged to
+      // one head before the solve — so the tie the rule cannot break by pitch
+      // is broken once, in `mergeUnisonHeads`, by taking the lower voice.
       let anchor = Math.floor((k - 1) / 2);
-      const rh = cluster.notes.findIndex((p) => p.rhythm.hand === 'RH');
       const hands = new Set(cluster.notes.map((p) => p.rhythm.hand));
-      if (hands.size > 1 && rh >= 0) anchor = rh;
+      if (hands.size > 1) anchor = 0;
       // The flank must clear whatever glyph the heads actually wear: a tick-0
       // sound carries the wider halo box, and two rings may never cut into
       // each other's box either. Box half-widths — the fan is a horizontal
@@ -3084,12 +3166,13 @@ export function resolveChordColumns(
 
 /** Position every note of one system, in engraving order. */
 /**
- * Round 20 — **one sound, one digit**.
+ * Round 20 — **one sound, one digit**; Round 21 — the **lower head** keeps it.
  *
  * Two hands sounding the same pitch at the same onset produce one sound event
  * (a piano can only strike it once; no notation draws it twice), so the two
- * heads merge into **one** notehead at the anchor-winner's column — the RH tone
- * on a mixed-hand row, exactly the Round 19 rule that is now the only rule.
+ * heads merge into **one** notehead at the anchor-winner's column — and since
+ * Round 21's anchor rule is **lower-first**, the winner is the **lower voice**,
+ * the Left Hand (Round 20 had given it to the RH tone).
  *
  * The merged duplicates leave the painted head list (so nothing measures or
  * fans them twice) and keep their **rhythm voice**:
@@ -3124,7 +3207,9 @@ function mergeUnisonHeads(positioned: readonly PositionedJankoNote[]): {
       notes.push(...group);
       continue;
     }
-    const survivor = group.find((p) => p.rhythm.hand === 'RH') ?? group[0];
+    // Lower-first: a cross-hand unison ties on pitch, so the *lower voice*
+    // (LH) keeps the column and the digit.
+    const survivor = group.find((p) => p.rhythm.hand === 'LH') ?? group[0];
     const others = group.filter((p) => p !== survivor);
     const exact = others.every((p) => p.note.durationTicks === survivor.note.durationTicks);
     notes.push(survivor);

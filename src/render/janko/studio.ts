@@ -24,6 +24,11 @@
 import { QuantizedGridScore } from '../../model/types';
 import { buildBachGoldbergVar1Score } from '../../scores/bach-goldberg-var1';
 import {
+  DURATION_SPECIMEN_JANKO_OPTIONS,
+  DURATION_SPECIMEN_JANKO_TOKENS,
+  buildDurationSpecimenScore,
+} from '../../scores/duration-specimen';
+import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
@@ -46,6 +51,7 @@ import { renderJankoCrop, renderJankoPage, countJankoSystems } from './engine';
 import { getChannelLayoutSpec } from './geometry';
 import {
   BRAHMS_STUDIO_SCORE_ID,
+  DURATION_SPECIMEN_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   CandidateOptionBadge,
@@ -174,6 +180,15 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildRestDurationSpecimenScore(),
       options: resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS),
       tokens: resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS),
+    },
+    // Round 21 §E: the constructed duration working-set specimen — 32nd and
+    // 64th runs, mixed levels, lone partial beams and solo flags. The corpus
+    // states none of that material, so this is where the complete set is judged.
+    [DURATION_SPECIMEN_STUDIO_SCORE_ID]: {
+      id: DURATION_SPECIMEN_STUDIO_SCORE_ID,
+      score: buildDurationSpecimenScore(),
+      options: resolveJankoOptions(DURATION_SPECIMEN_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(DURATION_SPECIMEN_JANKO_TOKENS),
     },
     ...(overrides.scores ?? {}),
   };

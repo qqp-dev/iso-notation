@@ -3,7 +3,7 @@
  *
  * Covers:
  *  1. `renderCandidatesView()` renders every card declared in the registry, on
- *     **every engraving window it declares** (Round 20 is a verification round:
+ *     **every engraving window it declares** (Round 21 is a verification round:
  *     four golden cards over the rest specimen, the Bach flag measures, the
  *     Brahms seats and unisons, and the nib case), with labels, the golden
  *     baseline badge, lint chips and SVG previews.
@@ -49,6 +49,7 @@ import {
 import {
   BRAHMS_STUDIO_SCORE_ID,
   DEFAULT_STUDIO_SCORE_ID,
+  DURATION_SPECIMEN_STUDIO_SCORE_ID,
   REST_SPECIMEN_STUDIO_SCORE_ID,
   SPECIMEN_STUDIO_SCORE_ID,
 } from '../src/render/janko/candidates';
@@ -118,18 +119,18 @@ test('renderCandidatesView renders every verification card on every declared win
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 20/);
-  assert.match(html, /Verification/);
+  assert.match(html, /Round 21/);
+  assert.match(html, /Measured/);
 });
 
-test('Round 20 is a verification round: no open axis, every card the golden master', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 20);
-  assert.match(CURRENT_ROUND_METADATA.title, /Verification/);
+test('Round 21 is a verification round: no open axis, every card the golden master', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 21);
+  assert.match(CURRENT_ROUND_METADATA.title, /Measured/);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'a verification round opens no axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['verify-rest-seats', 'verify-urtext-recut', 'verify-unison-merge', 'verify-clasp-nib'],
+    ['verify-measured-cuts', 'verify-slab-lines', 'verify-lower-first', 'verify-working-set'],
     'the four settled changes, in display order'
   );
   // Every card is the fixed golden master: no option, no token, no axis.
@@ -198,35 +199,46 @@ test('Candidate previews honour their own option deltas', () => {
     'restStyle',
     'clusterAnchor',
   ]) {
-    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 20 question`);
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 21 question`);
   }
   assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
 
   // The case windows are the round's own evidence.
-  const seats = cardOf('verify-rest-seats');
+  const cuts = cardOf('verify-measured-cuts');
   for (const expected of [
     'data-window="rest-duration-specimen:1-3"',
     'data-window="rest-duration-specimen:4-6"',
-    'data-window="brahms-op118-no1:7-7"',
-    'data-window="brahms-op118-no1:17-17"',
-    'data-window="brahms-op118-no1:68-68"',
+    'data-window="rest-duration-specimen:7-8"',
+    'data-window="primary:4-6"',
   ]) {
-    assert.ok(seats.includes(expected), `seat card shows ${expected}`);
+    assert.ok(cuts.includes(expected), `cut card shows ${expected}`);
   }
-  const flags = cardOf('verify-urtext-recut');
-  assert.ok(flags.includes('data-window="primary:1-1"'), 'flag card shows the 8th-flag window');
-  assert.ok(flags.includes('data-window="primary:22-22"'), 'flag card shows the 16th-double window');
-  const unisons = cardOf('verify-unison-merge');
+  const slabs = cardOf('verify-slab-lines');
+  assert.ok(
+    slabs.includes('data-window="rest-duration-specimen:4-6"'),
+    'slab card shows the half / whole-bar window'
+  );
+  assert.ok(
+    slabs.includes('data-window="brahms-op118-no1:3-3"'),
+    'slab card carries the nib guard'
+  );
+  const lower = cardOf('verify-lower-first');
   for (const expected of [
+    'data-window="primary:3-3"',
     'data-window="primary:32-32"',
-    'data-window="brahms-op118-no1:60-60"',
-    'data-window="brahms-op118-no1:65-65"',
-    'data-window="brahms-op118-no1:66-66"',
+    'data-window="brahms-op118-no1:7-7"',
+    'data-window="brahms-op118-no1:46-46"',
   ]) {
-    assert.ok(unisons.includes(expected), `unison card shows ${expected}`);
+    assert.ok(lower.includes(expected), `lower-first card shows ${expected}`);
   }
-  const nib = cardOf('verify-clasp-nib');
-  assert.ok(nib.includes('data-window="brahms-op118-no1:3-3"'), 'nib card shows the m. 3 case');
+  const working = cardOf('verify-working-set');
+  for (const expected of [
+    'data-window="duration-specimen:1-2"',
+    'data-window="duration-specimen:3-4"',
+    'data-window="duration-specimen:5-5"',
+  ]) {
+    assert.ok(working.includes(expected), `working-set card shows ${expected}`);
+  }
 
   // The settled clasp grammar and grid policy are stated in the card facts.
   for (const candidate of CURRENT_CANDIDATES) {
@@ -412,10 +424,31 @@ test('The studio score library exposes the benchmarks and the curated specimens 
   assert.equal(restSpecimen.tokens.ticksPerMeasure, 192, 'and its grid');
   assert.deepEqual(
     REST_DURATION_SPECIMEN_VALUES.map((v) => v.value),
-    ['sixteenth', 'eighth', 'quarter', 'half', 'whole'],
-    'one genuine silence per standard rest value, the whole bar included'
+    ['sixteenth', 'eighth', 'quarter', 'half', 'whole', 'thirty-second', 'sixty-fourth'],
+    'one genuine silence per standard rest value — Round 21 completes the set to the 64th'
   );
-  assert.equal(restSpecimen.score.notes.length, 42, 'thirty RH notes + twelve LH accompaniment notes');
+  // Round 21 §E: the constructed duration specimen is the working set's window —
+  // 32nd/64th runs, mixed beam levels, lone partial beams and solo flags.
+  assert.ok(ids.includes(DURATION_SPECIMEN_STUDIO_SCORE_ID), 'the duration specimen is registered');
+  const durationSpecimen = CONFIG.scores[DURATION_SPECIMEN_STUDIO_SCORE_ID];
+  assert.equal(durationSpecimen.id, DURATION_SPECIMEN_STUDIO_SCORE_ID);
+  assert.equal(durationSpecimen.options.ticksPerMeasure, 192);
+  assert.equal(
+    durationSpecimen.score.gridResolution,
+    3,
+    'the specimen states 64ths, so its grid resolution is three ticks'
+  );
+  const durationReport = lintJankoScore(
+    durationSpecimen.score,
+    durationSpecimen.options,
+    durationSpecimen.tokens
+  );
+  assert.equal(durationReport.ok, true, 'the constructed working set engraves clean');
+  assert.equal(durationReport.warnings.length, 0, 'and adds no warning');
+  assert.ok(
+    [...REST_DURATION_SPECIMEN_VALUES].length === 7,
+    'the rest specimen walks the complete working set'
+  );
   const restReport = lintJankoScore(restSpecimen.score, restSpecimen.options, restSpecimen.tokens);
   assert.equal(restReport.ok, true, 'the dialect windows engrave clean under the golden default');
   // An unknown score id falls back to the primary score instead of blanking.
@@ -441,8 +474,8 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 20);
-  assert.match(CURRENT_ROUND_METADATA.title, /Verification/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 21);
+  assert.match(CURRENT_ROUND_METADATA.title, /Measured/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,

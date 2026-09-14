@@ -4,6 +4,14 @@ import { buildBrahmsOp118No1Score } from './brahms-op118-no1';
 
 export { buildBachGoldbergVar1Score } from './bach-goldberg-var1';
 export {
+  buildDurationSpecimenScore,
+  DURATION_SPECIMEN_MEASURES,
+  DURATION_SPECIMEN_JANKO_OPTIONS,
+  DURATION_SPECIMEN_JANKO_TOKENS,
+  DURATION_SPECIMEN_TICKS_PER_MEASURE,
+  DURATION_SPECIMEN_TOTAL_TICKS,
+} from './duration-specimen';
+export {
   buildBrahmsOp118No1Score,
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,

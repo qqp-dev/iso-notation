@@ -432,10 +432,15 @@ resolved beam geometry; the renderers, the linter and the studio all consume it.
   `'lower-first'` demonstrator and the `clusterAnchor` option are **retired**
   (Round 20, §F): the operator approved the RH anchor, so the option, its label
   table and the demonstrator card are gone and the behavior is the only path.
-  The Round 19 **stack-yield mechanism is dead too — decided against by the R19
-  approval, not deferred**: with the unified bracket owning the onset's
-  duration, no head ever needs to yield its stem. m. 46 keeps G♯4 on the column
-  and fans D4 to 56.61.
+  The Round 19 **stack-yield mechanism** was recorded as dead by the R19
+  approval; Round 21 §D **un-records that as a standing fact**: yield is retired
+  only while the lower-first anchor holds without it, and it comes back **if and
+  only if** the §D STOP trips (the R19 `stem-through-simultaneity` signatures —
+  0.00pt at m. 46, 2.73pt at m. 17 — reappearing in the golden paradigms). The
+  STOP did **not** trip: the shipped lower-first layout lints clean with zero
+  `stem-through-simultaneity` diagnostics on both scores, so the unified bracket
+  still owns every onset's duration and no head yields its stem. The tripwire is
+  pinned in `test/janko-round21.test.ts`.
 - **Beat grid follows the columns (direct; score-wide)** — the dashed pulse of
   a beat that carries an onset is painted through that onset's laid-out column
   (`nominalX + shift`), exposed as `JankoSystemLayout.columns`; an empty beat
@@ -518,10 +523,102 @@ mountJankoStudio(config?, rootId?)      // DOM mount + tabs + zoom + HMR re-moun
 
 ---
 
+### Round 21 measured duration ink + slabs on lines + lower-first
+
+- **Measure first (§A)** — every rest constant now traces to a fontTools outline
+  extraction of **Bravura** (the SMuFL reference, OFL, v1.482, sha256
+  `cdf0f893…`) corroborated against **Noto Music** (Google Fonts, OFL, v2.003,
+  sha256 `e913be26…`). Measured envelopes (upm 1000, 1 space = 250u):
+  `restQuarter` 269 × 748u, `rest8th` 247 × 425u, `rest16th` 320 × 679u,
+  `rest32nd` 363 × 926u, `rest64th` 423 × 1183u, `restHalf`/`restWhole`
+  282 × 144u, `augmentationDot` r = 50u, `stem` 30 × 875u (**3.5 spaces = one
+  octave**), `flag8thUp` 264 × 819u, `flag64thUp` 261 × 1159u. Noto agrees on
+  the shapes but not on the slab width (683u, a 2.4× wider bar); the cut follows
+  Bravura, the SMuFL reference, and records the disagreement.
+- **The scale is derived, not chosen** — `REST_SPACE_PT = 18.4pt / 4.732sp =
+  3.8884pt`: the working set's tallest measured glyph (the 64th rest, 4.732
+  spaces) is set exactly equal to the lattice's measured inter-row headroom
+  `2 × (rowHeight − noteheadRadius − minClearance) = 2 × (15 − 4.8 − 1) = 18.4pt`.
+  Three house tokens corroborate it within 8% and are recorded rather than
+  averaged: the augmentation dot (measured 0.200sp → 0.778pt against the house
+  0.75pt), the flag reach (1.056sp → 4.11pt against 4.0pt) and the beam
+  thickness (0.5sp → 1.94pt against 1.80pt). The two house dimensions that do
+  **not** follow are stated as the round's boundary: the notehead knockout disc
+  is 9.6pt where a classical notehead is 3.89pt (the disc carries the digit),
+  and the note stem keeps its 0.90pt monoline weight (§B keeps stems
+  verify-only).
+- **The cut (§B)** — nothing is hand-drawn. The quarter is the **traced
+  reference contour** (`restQuarter`, one closed contour, 44 arc-length samples)
+  painted as one filled calligraphic path — three crossings, a hairline 28.8u
+  neck, a 165u belly, two tapered hooks — so the monoline lightning polyline is
+  deleted. The 8th … 64th are the measured **wedge stem + lobe** construction:
+  lobe radius 65u (130 × 100u, crown on the glyph's top edge), lobe pitch 249u,
+  lobe left edge on the glyph's left edge, stem 65u at the foot → 46u → a point,
+  tip 22u below the top. Each lobe's contour starts and ends **on the stem's own
+  spine**, so the hook is grown from the stem, never an oval pushed onto a
+  stick. The slab pair is the measured 282 × 144u. Flags and dots were
+  *verified*: the flag taper (root ÷ drop 0.136 vs the measured 0.159) is within
+  15%, so per "adjust IFF off" the R20 crescent stands; the dot's measured
+  0.778pt against the house 0.75pt is within 4%, so it stands too.
+- **Slabs on lines (§C)** — a bar rest derives its meaning from touching a line,
+  so its seat point is no longer a phrase row but the nearest **drawn staff
+  rule** (`drawnStaffRuleYs` = the four octave equators through the same
+  `getEquatorRuleYs` the renderer uses; tie → the rule nearer Middle C). The
+  **half slab's bottom edge** and the **whole slab's top edge** stand exactly on
+  it — measured zero gap on the specimen (the R20 slabs floated 6.12pt off).
+  The **whole bar is centred in its measure** on the barline midpoint (Gould,
+  *Behind Bars*; LilyPond Notation Reference §§2.2.1/2.2.3: "Whole measure
+  rests, centered in the middle of the measure"): on the specimen's m. 5 the
+  slab moves 220.29 → **303.54**, exempt from the beat-cell nudge, and the
+  centre column coincides with the LH C3 onset column (tick 864) — cleared
+  **vertically** by row separation, never by shifting the slab. The half keeps
+  its beat column (62.61, unmoved). New violation:
+  `rest-slab-off-line`.
+- **Lower-first (§D)** — the anchor rule is **lower-first**: on a mixed-hand row
+  the lowest-pitched head holds the column, on a single-hand row the middle head
+  does. The Round 19 `'rh'` anchor is retired — a rule, not an option. All
+  **sixteen** corpus rows flip (Bach bar3:t408, bar5:t672, bar8:t1032,
+  bar12:t1632, bar15:t2040, bar15:t2064, bar23:t3216, bar31:t4368; Brahms
+  bar7:t1296, bar17:t3216, bar26:t4848, bar28:t5400, bar29:t5592, bar46:t8688,
+  bar48:t9240, bar49:t9432); in every one the LH head is the lower one and was
+  the one on the right. The swap preserves the row's stem-x set exactly (the
+  head count per hand per onset is one corpus-wide), so no stem meets a new
+  disc. A cross-hand unison ties on pitch, so the **lower voice (LH)** keeps the
+  digit — Round 20 had given it to the RH tone.
+- **The working set is complete (§E)** — `whole → 64th`, because this is a
+  notation *system*, not two pieces. `restValueForTicks` gains the 32nd (6
+  ticks) and 64th (3) classes and `isStandardRestValue` their values; every
+  dialect states all seven. `subdivisionMarkCount` gains the 4-mark 64th, so a
+  solitary 64th carries a quad flag. `beamLevel = f(duration)` builds the beam
+  levels generically — level *L*'s strips are the maximal runs of notes at or
+  above *L*, so the tertiary (32nd) and quaternary (64th) levels are **data,
+  not architecture**, and a 128th would only add a row to the function. A run of
+  one note becomes a Gould **partial beam** (stub) that points *into* the group
+  it is beamed with — backward whenever the group precedes it, forward only when
+  it opens the group (Gould, *Behind Bars*, on fractional beams; compare the
+  LilyPond/MuseScore implementations of the same rule). The constructed
+  specimens carry every new part: the rest specimen's m. 7 (32nd) and m. 8
+  (64th) silences, and the new **duration working-set specimen** — a tertiary
+  32nd run, a quaternary 64th run, mixed levels inside one beat, the two lone-16th
+  partial beams and the solo triple/quad flags. Bridging is unchanged: only an
+  exact 16th rest bridges a beam, so the new short rests never re-beam the
+  corpus.
+- **One bug fixed on the way** — `restBeatCell` computed a system's first
+  measure one whole measure to the left when the score carries an anacrusis
+  (`measureIdx - 1`), producing an inverted cell (`left > right`) that silently
+  refused every rest in such a measure. It is now
+  `staffLeft + upbeatWidth + measureIdx · measureWidth`, which is what lets the
+  Brahms 32nd seat resolve.
+- **Round 21 registry** — four verification cards, no open axis:
+  `verify-measured-cuts`, `verify-slab-lines`, `verify-lower-first`,
+  `verify-working-set`, over twelve windows (the rest specimen mm. 1–3 / 4–6 /
+  7–8, Bach mm. 3 / 4–6 / 32, Brahms mm. 3 / 7 / 46, and the duration specimen
+  mm. 1–2 / 3–4 / 5).
+
 ## 3. Verification
 
 ```bash
-npm test                          # 297 tests, < 8 s
+npm test                          # 316 tests, < 10 s
 npm run lint:engraving            # visual lint of the golden master
 npm run build                     # tsc + vite (index.html + janko.html entries)
 ```
@@ -532,6 +629,7 @@ npm run build                     # tsc + vite (index.html + janko.html entries)
 | `test/janko-linter.test.ts` | the report contract, the clean golden master, the clean bounded channel, every defect class (overlap, undersized/missing knockout, pass-through, beam slope, floating/off-centre stem, beam-notehead collision, barline/accolade/numeral collision, corridor intrusion) and the CLI exit code |
 | `test/janko-studio.test.ts` | both views, registry-driven candidates (zero template edits), the Round-4 registry (incumbent vs bounded channel), the golden-master option badges, all-pages-engraved, page-shell navigation/zoom/HMR contract and the `public/` mirror identity |
 | `test/janko-round19.test.ts` | the Round 19 cluster law (the RH anchor as the only rule, its option retired): the symmetric tuck's exact m. 46 positions and its score-wide mirror property, the even-cluster coincidence, the beat-cell guard, the overlap unification (m. 46 / m. 26) and the m. 3 split guard, the unified bracket's per-hand duration groups, the `stem-through-simultaneity` signature the joinery owns, and the beat grid's column-following pulses (m. 3, the anacrusis mapping, an empty beat, both scores score-wide) |
+| `test/janko-round21.test.ts` | the Round 21 verdict: the derived scale (the 64th envelope *is* the measured headroom), the measured envelope per value within 3%, the seven-value duration grammar, every bar rest touching a drawn staff rule to the float, the whole bar centred on the specimen's 303.54 midpoint, the `rest-slab-off-line` violation fixture, all sixteen lower-first rows plus the pair-gap preservation, the `stem-through-simultaneity` tripwire, the lower-voice unison survivor, the constructed specimens' cleanliness, the generic beam levels (1-2-3 and 1-2-3-4 nesting), the two Gould partial beams with their direction rule, the solo triple/quad flags, the flag-taper tolerance the "adjust IFF off" decision rests on, the registry windows, and the no-move row census |
 | `test/janko-round20.test.ts` | the Round 20 verdict: the **painted** ink centroid (recomputed from the SVG primitives) on the seat point for every value × dialect and every corpus rest, the corpus seat-on-lattice sweep, the bar pair's sit / hang, the specimen's one whole bar, the Bach final-bar single seven, all seven Brahms unisons (one digit, every mixed-duration voice intact), the `unison-double-digit` violation fixture, the 12-clasp nib sweep, the `clasp-dot-fusion` violation fixture on the retired fused geometry, and the note-dot no-move guard |
 
 The same-row 16th cluster `0 2 4 6 2` is exercised as a synthetic engine test
