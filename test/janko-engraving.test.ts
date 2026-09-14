@@ -1745,6 +1745,12 @@ test('showHonorHalo: false removes the opening rings and drops tick-0 stems to t
   }
 });
 
+test('Golden default paints no middle-C spine (the Guide promises none)', () => {
+  const score = buildBachGoldbergVar1Score();
+  const page = renderJankoPage(score, 0, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.ok(!page.includes('janko-middle-c-spine'), 'middleCSpine stays none by default');
+});
+
 test('Foreign-stem crossings paint tall knockouts, columns unmoved (mm.13/14/16)', () => {
   const score = buildBachGoldbergVar1Score();
   const layouts = layoutJankoScore(score, OPTIONS, TOKENS);

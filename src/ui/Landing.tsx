@@ -427,7 +427,7 @@ export const Landing: React.FC = () => {
                 How to read the sheet
               </h2>
               <p className="mt-1 text-sm text-neutral-500">
-                Six facts; everything else reads like standard notation.
+                Five facts; everything else reads like standard notation.
               </p>
               <ol className="mt-4 list-decimal space-y-3 pl-5 text-[15px] leading-relaxed marker:font-semibold">
                 <li>
@@ -440,23 +440,19 @@ export const Landing: React.FC = () => {
                 </li>
                 <li>
                   <strong>Even and odd live on twin rows.</strong> Each octave
-                  spans two whole-tone rows; even digits print bolder, so rows
-                  read at a glance.
+                  spans two whole-tone rows — even digits on one, odd digits
+                  on the other.
                 </li>
                 <li>
-                  <strong>The middle is middle C.</strong> The corridor through
-                  the staff&apos;s center is C4 — everything above it sounds
-                  higher, everything below lower.
-                </li>
-                <li>
-                  <strong>Stems name the hands.</strong> Stems up, right hand;
-                  stems down, left hand.
+                  <strong>Both hands share the rows.</strong> There are no
+                  separate staves — a stem up means right hand, down means
+                  left.
                 </li>
                 <li>
                   <strong>Rhythm reads as usual.</strong> Beams group 8ths and
-                  16ths, single shorts carry flags, rests sit on their rows;
-                  solid barlines bound each measure, dashed lines mark the
-                  beats, and numerals open each system.
+                  16ths, single shorts carry flags, engraved rests mark the
+                  silences; solid barlines bound each measure, dashed lines
+                  mark the beats, and numerals open each system.
                 </li>
               </ol>
               <p className="mt-4 text-sm text-neutral-500">
