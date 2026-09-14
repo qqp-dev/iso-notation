@@ -135,6 +135,8 @@ export const PITCH_GRID_LANE_STROKE = 0.3;
 export const PITCH_GRID_OCTAVE_INK = '#1E293B';
 /** Weight of the equal-scheme octave lines: the golden equator spec, exactly. */
 export const PITCH_GRID_OCTAVE_STROKE = 0.5;
+/** Weight of the C4 octave line: just visibly heavier (0.65pt vs 0.50pt). */
+export const PITCH_GRID_C4_STROKE = 0.65;
 /** Length (pt) of the clef-marker anchor tick at each system start. */
 export const PITCH_GRID_MARKER_LENGTH = 20;
 
@@ -368,12 +370,13 @@ export function pitchGridRules(
     if (geo.staffSegments && geo.staffSegments.length > 0) {
       const out: PitchGridRule[] = [];
       for (const seg of geo.staffSegments) {
+        const isC4 = isFixed3 && seg.lin === 48;
         out.push({
           y: yOf(seg.lin),
           x1: seg.x1,
           x2: seg.x2,
           ink: PITCH_GRID_OCTAVE_INK,
-          width: PITCH_GRID_OCTAVE_STROKE,
+          width: isC4 ? PITCH_GRID_C4_STROKE : PITCH_GRID_OCTAVE_STROKE,
           cls: isFixed3
             ? 'janko-pitch-lane janko-pitch-clane'
             : 'janko-pitch-octave',
@@ -386,12 +389,13 @@ export function pitchGridRules(
       (isFixed3 ? [36, 48, 60] : [29.5, 41.5, 53.5, 65.5]);
     const out: PitchGridRule[] = [];
     for (const lin of lines) {
+      const isC4 = isFixed3 && lin === 48;
       out.push({
         y: yOf(lin),
         x1,
         x2,
         ink: PITCH_GRID_OCTAVE_INK,
-        width: PITCH_GRID_OCTAVE_STROKE,
+        width: isC4 ? PITCH_GRID_C4_STROKE : PITCH_GRID_OCTAVE_STROKE,
         cls: isFixed3
           ? 'janko-pitch-lane janko-pitch-clane'
           : 'janko-pitch-octave',
@@ -444,12 +448,13 @@ export function pitchGridRules(
   if (o.octaveLineScheme === 'equal-boundaries') {
     const out: PitchGridRule[] = [];
     for (let c = Math.ceil(window.min / 12) * 12; c <= window.max; c += 12) {
+      const isC4 = c === 48;
       out.push({
         y: yOf(c),
         x1,
         x2,
         ink: PITCH_GRID_OCTAVE_INK,
-        width: PITCH_GRID_OCTAVE_STROKE,
+        width: isC4 ? PITCH_GRID_C4_STROKE : PITCH_GRID_OCTAVE_STROKE,
         cls: 'janko-pitch-lane janko-pitch-clane',
       });
     }

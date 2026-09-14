@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import { QuantizedGridScore } from '../src/model/types';
+import { continuousPitchY } from '../src/render/janko/geometry';
 import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
@@ -711,11 +712,12 @@ test('Defect: a system-start mark pushed off the page and into the numeral is ca
   // A regression that drives the numeral's band down into the mark's column is
   // caught even though both sit left of the staff.
   const sunkLayout = systems(ruled)[0];
+  const c5Y = sunkLayout.geometry.middleCY + continuousPitchY(60, DEFAULT_JANKO_TOKENS.semitoneScale);
   const sunk = {
     ...sunkLayout,
     geometry: {
       ...sunkLayout.geometry,
-      staffTopY: sunkLayout.geometry.equatorY('RH', 5) + 4,
+      staffTopY: c5Y + 4,
     },
   };
   const out2: LintViolation[] = [];

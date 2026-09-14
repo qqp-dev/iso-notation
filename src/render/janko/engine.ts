@@ -127,6 +127,8 @@ import {
 import {
   ARCHITECTURAL_BRACKET_SPUR,
   ARCHITECTURAL_BRACKET_STROKE,
+  SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR,
+  SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE,
   CLEF_PILLAR_STROKE,
   CLEF_PILLAR_TICK,
   DELICATE_BRACKET_SPUR,
@@ -832,7 +834,8 @@ export function getMarginFurniture(
   t: ResolvedJankoTokens,
   measureNumber: number,
   digitAdvance: number = MARGIN_DIGIT_ADVANCE,
-  systemStartStyle: JankoSystemStartStyle = 'architectural-bracket'
+  systemStartStyle: JankoSystemStartStyle = 'architectural-bracket',
+  isSystem1: boolean = true
 ): { numeral: JankoBox; accolade: JankoBox | null } {
   // Round 11: the numeral moves into the true left margin
   // (`x = staffLeft − 10.0pt`) and is set flush right against the staff column,
@@ -852,14 +855,16 @@ export function getMarginFurniture(
   let accolade: JankoBox | null = null;
   if (paintsSystemStartInk(systemStartStyle)) {
     const x = geometry.staffLeft - t.accoladeGap - t.accoladeWidth;
-    const top = geometry.equatorY('RH', 5);
-    const bot = geometry.equatorY('LH', 2);
+    const top = geometry.middleCY + continuousPitchY(60, t.semitoneScale);
+    const bot = geometry.middleCY + continuousPitchY(36, t.semitoneScale);
     let x0 = x;
     let x1 = x;
     if (systemStartStyle === 'architectural-bracket') {
-      const half = ARCHITECTURAL_BRACKET_STROKE / 2;
+      const spur = isSystem1 ? SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR : ARCHITECTURAL_BRACKET_SPUR;
+      const stroke = isSystem1 ? SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE : ARCHITECTURAL_BRACKET_STROKE;
+      const half = stroke / 2;
       x0 = x - half;
-      x1 = x + ARCHITECTURAL_BRACKET_SPUR + half;
+      x1 = x + spur + half;
     } else if (systemStartStyle === 'delicate-bracket') {
       const half = DELICATE_BRACKET_STROKE / 2;
       x0 = x - half;
@@ -879,15 +884,8 @@ export function getMarginFurniture(
 
 /**
  * Every left-margin furniture box painted in one system (the system-start mark
- * only at the start of the piece, the measure numeral only where the engine
- * draws it), in the order the linter audits them.
- *
- * Round 7 draws the accolade **strictly at the start of the piece**
- * (`systemIndex === 0`); an intermediate system opens from the bare left
- * margin, so it neither paints nor reserves a system-start box. Round 10
- * retires the copperplate accolade; Round 14 settles the flared
- * `'architectural-bracket'` as the golden system start, so System 1 normally
- * reserves (and paints) the 0.65pt rule.
+ * on every system, the measure numeral only where the engine draws it), in the
+ * order the linter audits them.
  */
 export function systemFurniture(
   geometry: JankoSystemGeometry,
@@ -896,14 +894,16 @@ export function systemFurniture(
   systemIndex: number
 ): JankoBox[] {
   const anacrusis = t.anacrusisTicks ?? 0;
+  const isSystem1 = systemIndex === 0;
   const { numeral, accolade } = getMarginFurniture(
     geometry,
     t,
     systemIndex * o.measuresPerSystem + 1,
     MARGIN_DIGIT_ADVANCE,
-    o.systemStartStyle
+    o.systemStartStyle,
+    isSystem1
   );
-  const boxes: JankoBox[] = systemIndex === 0 && accolade ? [accolade] : [];
+  const boxes: JankoBox[] = accolade ? [accolade] : [];
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) boxes.push(numeral);
   return boxes;
 }
@@ -4207,13 +4207,12 @@ export function renderSystem(
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) {
     out.push(renderMeasureNumber(sysGeo, startMeasureOffset + 1, t));
   }
-  // Round 7: the system-start mark is drawn strictly at the start of the piece.
-  // Every intermediate system opens from the bare left margin with no bounding
-  // barline. Round 10 retires the copperplate accolade; Round 14 settles the
-  // flared 0.65pt architectural bracket as the golden System 1 start.
+  // The start bracket marks the core triple across every system. System 1
+  // (page 1 opening) renders the bracket at slightly grander metrics.
+  // Hand labels and time signature remain strictly at System 1.
+  const systemStart = renderAccolade(sysGeo, o, t, systemIndex);
+  if (systemStart.length > 0) out.push(systemStart);
   if (systemIndex === 0) {
-    const systemStart = renderAccolade(sysGeo, o, t);
-    if (systemStart.length > 0) out.push(systemStart);
     out.push(renderHandLabels(sysGeo, o, t));
     out.push(renderTimeSignature(sysGeo, o, t));
   }
