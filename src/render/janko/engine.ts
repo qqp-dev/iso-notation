@@ -43,6 +43,7 @@ import {
   JankoChannelFlank,
   JankoPitchCoordinate,
   JankoTickInsets,
+  computeFoldShift,
   continuousPitchY,
   getEquatorYForOctave,
   getNoteHand,
@@ -57,6 +58,7 @@ import {
   JANKO_RHYTHM_STYLE_LABELS,
   JankoChordGrouping,
   JankoLayoutOptions,
+  JankoOttavaBracket,
   JankoPageGeometry,
   JankoRhythmStyle,
   JankoSystemGeometry,
@@ -71,6 +73,10 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from './types';
+import {
+  buildSystemOttavaBrackets,
+  renderOttavaBrackets,
+} from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
 import {
   renderHandLabels,
@@ -199,8 +205,9 @@ export function computePageGeometry(
 
   // The continuous window: the score's own range (every system shares one
   // absolute grid), or the four-octave fallback when no score is given.
-  const continuous = o.pitchMapping !== 'twin-rows';
-  const pitchWindow = continuous
+  const isFixedCore = o.core === 'fixed-3' || o.core === 'fixed-4';
+  const continuous = o.pitchMapping !== 'twin-rows' || isFixedCore;
+  const pitchWindow = continuous && !isFixedCore
     ? score
       ? pitchWindowForScore(score)
       : { ...DEFAULT_PITCH_WINDOW }
@@ -209,6 +216,70 @@ export function computePageGeometry(
   const systems: JankoSystemGeometry[] = [];
   for (let s = 0; s < systemsPerPage; s++) {
     const slotTopY = marginTop + o.headerHeight + s * slotHeight;
+    if (isFixedCore) {
+      const scale = t.semitoneScale;
+      const slotCenterY = slotTopY + slotHeight / 2;
+      const middleCY = o.core === 'fixed-3' ? slotCenterY : slotCenterY - 0.5 * scale;
+
+      const anacrusis = t.anacrusisTicks ?? 0;
+      const startTick = s === 0 ? 0 : anacrusis + s * measuresPerSystem * t.ticksPerMeasure;
+      const endTick = anacrusis + (s + 1) * measuresPerSystem * t.ticksPerMeasure;
+      const sysNotes = score
+        ? score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick)
+        : [];
+
+      const writtenLins: number[] = [];
+      for (const n of sysNotes) {
+        const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
+        const lin = n.pitch.octave * 12 + pc;
+        const shift = computeFoldShift(lin, o.core);
+        writtenLins.push(lin + shift);
+      }
+
+      let coreLines: readonly number[];
+      const extensionLines: number[] = [];
+      if (o.core === 'fixed-3') {
+        coreLines = [36, 48, 60];
+        if (writtenLins.some((lin) => lin < 30)) extensionLines.push(24);
+        if (writtenLins.some((lin) => lin > 66)) extensionLines.push(72);
+      } else {
+        coreLines = [29.5, 41.5, 53.5, 65.5];
+        if (writtenLins.some((lin) => lin < 23.5)) extensionLines.push(17.5);
+        if (writtenLins.some((lin) => lin > 71.5)) extensionLines.push(77.5);
+      }
+      const staffLines = [...coreLines, ...extensionLines].sort((a, b) => a - b);
+      const allLins = [...staffLines, ...writtenLins];
+      const effMin = Math.min(...allLins);
+      const effMax = Math.max(...allLins);
+      const staffTopY = middleCY + continuousPitchY(effMax, scale) - 16.0;
+      const staffBotY = middleCY + continuousPitchY(effMin, scale) + 16.0;
+
+      const equatorY = (hand: Hand, octave: number): number =>
+        middleCY + getEquatorYForOctave(octave, hand, t, o);
+      const isSys0Anacrusis = s === 0 && (t.anacrusisTicks ?? 0) > 0;
+      const effectiveMeasures = isSys0Anacrusis
+        ? measuresPerSystem + t.anacrusisTicks! / t.ticksPerMeasure
+        : measuresPerSystem;
+
+      systems.push({
+        index: s,
+        measuresPerSystem,
+        slotTopY,
+        systemTopY: staffTopY + 7.0,
+        middleCY,
+        staffTopY,
+        staffBotY,
+        staffLeft,
+        staffRight,
+        measureWidth: staffWidth / effectiveMeasures,
+        equatorY,
+        pitchWindow: { min: effMin, max: effMax },
+        coreLines,
+        extensionLines,
+        staffLines,
+      });
+      continue;
+    }
     if (continuous && pitchWindow) {
       // The window box (lanes plus the golden 16pt of stem/beam air each
       // side) is centred in the slot; the Middle C line lands where the
@@ -411,6 +482,14 @@ export interface PositionedJankoNote {
    * room as an own-stem attachment. Paint-only: the head never moves.
    */
   tallKnockout?: boolean;
+  /**
+   * Round 27: Ottava octave fold shift in semitones (-12, +12, -24, +24) applied to written pitch.
+   */
+  ottavaShift?: number;
+  /**
+   * Round 27: Written linear pitch after fold shift is applied.
+   */
+  writtenLin?: number;
 }
 
 /**
@@ -1047,6 +1126,8 @@ export interface JankoSystemLayout {
    * which never assumed a single hand — and stands on the merged head's column.
    */
   unisonVoices: PositionedJankoNote[];
+  /** Round 27: Gould-compliant ottava spanner brackets rendered for this system. */
+  ottavaBrackets: JankoOttavaBracket[];
 }
 
 /**
@@ -1360,11 +1441,17 @@ export function positionJankoNote(
   const y = geo.middleCY + coord.y;
   const preset = getClusterSpacingPreset(o.clusterSpacing);
   const honor = isPositionOfHonor(note.startTick) && o.showHonorHalo;
+  const pc = ((note.pitch.pitchClass % 12) + 12) % 12;
+  const origLin = note.pitch.octave * 12 + pc;
+  const shift = computeFoldShift(origLin, o.core);
+  const writtenLin = origLin + shift;
   return {
     note,
     coord,
     x,
     y,
+    ottavaShift: shift !== 0 ? shift : undefined,
+    writtenLin,
     rhythm: {
       id: note.id,
       startTick: note.startTick,
@@ -1610,7 +1697,7 @@ function restPhraseRowReference(
     const dir: 1 | -1 = rowY > geo.middleCY + EPS ? -1 : 1;
     return { rowY, dir };
   }
-  if (o.pitchMapping === 'continuous') {
+  if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     const rowY = nearestLatticeRow(query, geo, t, o);
     const dir: 1 | -1 = rowY > geo.middleCY + EPS ? -1 : 1;
     return { rowY, dir };
@@ -1656,7 +1743,7 @@ export function nearestLatticeRow(
   // The grand grid snaps to its drawn lines (the only shared heights): the
   // divider grid to C-lines and divider, the equal schemes to their octave
   // lines. A window with no drawn line keeps the exact seat.
-  if (o.pitchMapping === 'continuous') {
+  if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     const rules = pitchGridRules(geo, o, t);
     if (rules.length === 0) return y;
     let best = rules[0].y;
@@ -1694,7 +1781,7 @@ export function drawnStaffRuleYs(
   // The truthful drawn-lines list under each mapping: the continuous grids
   // read the painter's own line set (every lane on the Klavar grid, the
   // scheme's lines on the grand grid), so the list cannot drift from the ink.
-  if (o.pitchMapping !== 'twin-rows') {
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     return pitchGridRules(geo, o, t)
       .map((rule) => rule.y)
       .sort((a, b) => a - b);
@@ -2096,7 +2183,7 @@ export function computeJankoRestLayer(
         // drawn line toward the corridor (a semitone step would snap straight
         // back onto the same line).
         let fallbackRow: number;
-        if (o.pitchMapping === 'continuous') {
+        if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
           const rules = drawnStaffRuleYs(geo, o, t);
           const neighbor =
             dir === -1
@@ -2528,7 +2615,7 @@ export function resolveChordColumns(
   // overlap chains under the continuous mappings (no rows — seconds fan
   // exactly like crowded rows do). Everything downstream (fan, tuck, clasps)
   // is geometric over `unit.rows` and runs unchanged.
-  const overlapGrouping = o.pitchMapping !== 'twin-rows';
+  const overlapGrouping = o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4';
   for (const unit of unitByTick.values()) {
     const stored = membersByTick.get(unit.tick) ?? [];
     // Twin rows keep score order (bit-identical rows); overlap chains need
@@ -3492,8 +3579,8 @@ export function layoutJankoSystem(
 ): JankoSystemLayout {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
-  const geometry = getSystemGeometry(geo, systemIndex);
-  const mps = geometry.measuresPerSystem;
+  const geometryRaw = getSystemGeometry(geo, systemIndex);
+  const mps = geometryRaw.measuresPerSystem;
   const anacrusis = t.anacrusisTicks ?? 0;
   const startTick =
     systemIndex === 0 ? 0 : anacrusis + systemIndex * mps * t.ticksPerMeasure;
@@ -3501,6 +3588,48 @@ export function layoutJankoSystem(
   const sysNotes = score.notes
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
     .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
+
+  let geometry = geometryRaw;
+  if (o.core === 'fixed-3' || o.core === 'fixed-4') {
+    const scale = t.semitoneScale;
+    const writtenLins: number[] = [];
+    for (const n of sysNotes) {
+      const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
+      const lin = n.pitch.octave * 12 + pc;
+      const shift = computeFoldShift(lin, o.core);
+      writtenLins.push(lin + shift);
+    }
+
+    let coreLines: readonly number[];
+    const extensionLines: number[] = [];
+    if (o.core === 'fixed-3') {
+      coreLines = [36, 48, 60];
+      if (writtenLins.some((lin) => lin < 30)) extensionLines.push(24);
+      if (writtenLins.some((lin) => lin > 66)) extensionLines.push(72);
+    } else {
+      coreLines = [29.5, 41.5, 53.5, 65.5];
+      if (writtenLins.some((lin) => lin < 23.5)) extensionLines.push(17.5);
+      if (writtenLins.some((lin) => lin > 71.5)) extensionLines.push(77.5);
+    }
+    const staffLines = [...coreLines, ...extensionLines].sort((a, b) => a - b);
+    const allLins = [...staffLines, ...writtenLins];
+    const effMin = Math.min(...allLins);
+    const effMax = Math.max(...allLins);
+    const staffTopY = geometry.middleCY + continuousPitchY(effMax, scale) - 16.0;
+    const staffBotY = geometry.middleCY + continuousPitchY(effMin, scale) + 16.0;
+
+    geometry = {
+      ...geometry,
+      index: systemIndex,
+      staffTopY,
+      staffBotY,
+      systemTopY: staffTopY + 7.0,
+      pitchWindow: { min: effMin, max: effMax },
+      coreLines,
+      extensionLines,
+      staffLines,
+    };
+  }
   // The two dynamic layouts resolve each Set B flank against the *whole*
   // voice, so the contour is continuous across system and page breaks.
   const flanks = usesContourFlanks(o.channelLayout)
@@ -3847,6 +3976,14 @@ export function layoutJankoSystem(
       ? notes
       : notes.map((p) => (crossed.has(p.note.id) ? { ...p, tallKnockout: true } : p));
 
+  const ottavaBrackets = buildSystemOttavaBrackets(
+    flaggedNotes,
+    geometry,
+    o,
+    t,
+    unisonMerges
+  );
+
   return {
     index: systemIndex,
     isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
@@ -3865,6 +4002,7 @@ export function layoutJankoSystem(
     columns: chordColumns.columns,
     unisonMerges,
     unisonVoices,
+    ottavaBrackets,
   };
 }
 
@@ -4053,33 +4191,34 @@ export function renderSystem(
   const t = resolveJankoTokens(tokens);
   const resolved =
     layout ?? layoutJankoSystem(score, computePageGeometry(o, t, score), systemIndex, o, t);
-  const startMeasureOffset = systemIndex * geo.measuresPerSystem;
+  const sysGeo = resolved.geometry;
+  const startMeasureOffset = systemIndex * sysGeo.measuresPerSystem;
 
   const out: string[] = [];
   out.push(`  <g id="system-${systemIndex + 1}">`);
   const anacrusis = t.anacrusisTicks ?? 0;
   if (o.showMeasureNumbers && (systemIndex > 0 || anacrusis === 0)) {
-    out.push(renderMeasureNumber(geo, startMeasureOffset + 1, t));
+    out.push(renderMeasureNumber(sysGeo, startMeasureOffset + 1, t));
   }
   // Round 7: the system-start mark is drawn strictly at the start of the piece.
   // Every intermediate system opens from the bare left margin with no bounding
   // barline. Round 10 retires the copperplate accolade; Round 14 settles the
   // flared 0.65pt architectural bracket as the golden System 1 start.
   if (systemIndex === 0) {
-    const systemStart = renderAccolade(geo, o, t);
+    const systemStart = renderAccolade(sysGeo, o, t);
     if (systemStart.length > 0) out.push(systemStart);
-    out.push(renderHandLabels(geo, o, t));
-    out.push(renderTimeSignature(geo, o, t));
+    out.push(renderHandLabels(sysGeo, o, t));
+    out.push(renderTimeSignature(sysGeo, o, t));
   }
-  out.push(renderOctaveLabels(geo, o, t));
-  out.push(renderStaffLines(geo, o, t));
+  out.push(renderOctaveLabels(sysGeo, o, t));
+  out.push(renderStaffLines(sysGeo, o, t));
   // Round 12: the continuous vertical grid (measure barlines + dashed beat
   // pulses). Under `'strict-protected-grid'` it is handed to the notes layer and
   // painted above the rhythm ink on its own white air channels; every other
   // policy paints it first, as the transparent structural background it is.
   const gridInk = [
-    renderBeatGrid(geo, systemIndex, o, t, resolved.columns),
-    renderBarlines(geo, o, t, resolved.isFinalSystem),
+    renderBeatGrid(sysGeo, systemIndex, o, t, resolved.columns),
+    renderBarlines(sysGeo, o, t, resolved.isFinalSystem),
   ].join('\n');
   // The contour round: all three paradigms are pure functions of
   // (score, layout) — every layer is '' when its option is off, so the
@@ -4091,6 +4230,8 @@ export function renderSystem(
     out.push(gridInk);
     out.push(renderNotesLayer(resolved, o, t, '', contour.thread, contour.ticks));
   }
+  const ottavaSvg = renderOttavaBrackets(resolved.ottavaBrackets, t);
+  if (ottavaSvg.length > 0) out.push(ottavaSvg);
   // The contour strip lives below the staff in the inter-system air.
   if (contour.strip.length > 0) out.push(contour.strip);
   out.push('  </g>');
@@ -4255,6 +4396,23 @@ export function computeCropExtents(
       const middleCY = layout.geometry.middleCY;
       top = Math.max(top, staffTop - CROP_PAD_TOP - (bounds.top - middleCY));
       bottom = Math.max(bottom, bounds.bottom - middleCY - (staffBottom + CROP_PAD_BOTTOM));
+    }
+  }
+  const mps = geo.measuresPerSystem;
+  const firstSystem = Math.floor(startIdx / mps);
+  const lastSystem = Math.floor((startIdx + count - 1) / mps);
+  const total = countJankoSystems(score, o, t);
+  for (let s = firstSystem; s <= Math.min(lastSystem, total - 1); s++) {
+    const layout = layoutJankoSystem(score, geo, s, o, t);
+    if (layout.ottavaBrackets && layout.ottavaBrackets.length > 0) {
+      const middleCY = layout.geometry.middleCY;
+      for (const b of layout.ottavaBrackets) {
+        const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
+        const bTop = Math.min(b.lineY, hookY) - middleCY;
+        const bBot = Math.max(b.lineY, hookY) - middleCY;
+        top = Math.max(top, staffTop - CROP_PAD_TOP - bTop);
+        bottom = Math.max(bottom, bBot - (staffBottom + CROP_PAD_BOTTOM));
+      }
     }
   }
   return { top: Math.max(0, top), bottom: Math.max(0, bottom) };

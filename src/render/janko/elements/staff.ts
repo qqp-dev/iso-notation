@@ -75,7 +75,9 @@ export function renderStaffLines(
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
-  if (o.pitchMapping !== 'twin-rows') return renderPitchGrid(geo, o, t);
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+    return renderPitchGrid(geo, o, t);
+  }
   const out: string[] = ['  <g class="janko-staff-lines">'];
 
   // Round 8 uniformizes the hierarchy: all four octave equators (RH 5, LH 2,
@@ -166,11 +168,31 @@ export function pitchGridRules(
 ): PitchGridRule[] {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
-  if (o.pitchMapping === 'twin-rows') return [];
+  if (o.pitchMapping === 'twin-rows' && o.core !== 'fixed-3' && o.core !== 'fixed-4') return [];
   const window = geo.pitchWindow ?? DEFAULT_PITCH_WINDOW;
   const yOf = (lin: number): number => geo.middleCY + continuousPitchY(lin, t.semitoneScale);
   const x1 = geo.staffLeft;
   const x2 = geo.staffRight;
+  if (o.core === 'fixed-3' || o.core === 'fixed-4') {
+    const isFixed3 = o.core === 'fixed-3';
+    const lines =
+      geo.staffLines ??
+      (isFixed3 ? [36, 48, 60] : [29.5, 41.5, 53.5, 65.5]);
+    const out: PitchGridRule[] = [];
+    for (const lin of lines) {
+      out.push({
+        y: yOf(lin),
+        x1,
+        x2,
+        ink: PITCH_GRID_OCTAVE_INK,
+        width: PITCH_GRID_OCTAVE_STROKE,
+        cls: isFixed3
+          ? 'janko-pitch-lane janko-pitch-clane'
+          : 'janko-pitch-octave',
+      });
+    }
+    return out;
+  }
   if (o.pitchMapping === 'chromatic-lanes') {
     const out: PitchGridRule[] = [
       {
@@ -305,7 +327,7 @@ export function renderRowGuidelines(
 ): string {
   const o = resolveJankoOptions(options);
   if (!o.showRowGuidelines) return '';
-  if (o.pitchMapping !== 'twin-rows') return '';
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') return '';
   const t = resolveJankoTokens(tokens);
   const halfRow = t.rowHeight / 2;
   const out: string[] = ['  <g class="janko-row-guidelines" opacity="0.45">'];
@@ -339,7 +361,7 @@ export function renderMiddleCSpine(
   const o = resolveJankoOptions(options);
   if (o.middleCSpine === 'none') return '';
   // Under the continuous mappings the grid's own divider owns the middle.
-  if (o.pitchMapping !== 'twin-rows') return '';
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') return '';
   const t = resolveJankoTokens(tokens);
   const y = geo.middleCY;
   const x1 = geo.staffLeft + t.measureInset;
@@ -402,7 +424,7 @@ export function renderOctaveLabels(
   const o = resolveJankoOptions(options);
   // The continuous grids read by shape and position; their margin landmarks
   // are opt-in, like the twin octave labels.
-  if (o.pitchMapping !== 'twin-rows') {
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     return o.showPitchLabels ? renderPitchLabels(geo, o, _tokens) : '';
   }
   if (!o.showOctaveLabels) return '';

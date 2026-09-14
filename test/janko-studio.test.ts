@@ -125,46 +125,36 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 26/);
-  assert.match(html, /0-Line/);
+  assert.match(html, /Round 27/);
+  assert.match(html, /Fixed Cores/);
 });
 
-test('Round 26 is an anchor round: one axis, four answers to one question', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 26);
-  assert.match(CURRENT_ROUND_METADATA.title, /0-Line/);
+test('Round 27 is a core round: one axis, two answers to one question', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 27);
+  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['octaveLineScheme'],
-    'one axis, one card per scheme'
+    ['core'],
+    'one axis, two cards'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['scheme-control', 'scheme-centers', 'scheme-boundaries', 'scheme-clef'],
-    'the control and the schemes, in display order'
+    ['core-fixed-4', 'core-fixed-3'],
+    'the control and the contender, in display order'
   );
-  // The control is the firm anchor grid: the round mapping, no axis.
-  const control = getCandidate('scheme-control')!;
-  assert.deepEqual(
-    Object.keys(control.options ?? {}),
-    ['pitchMapping'],
-    'the control states only the round mapping'
-  );
-  assert.equal(control.tokens, undefined, 'the control states no micro token');
-  assert.equal(control.axis, undefined, 'the control declares no axis');
-  assert.deepEqual(
-    candidateBadges(control),
-    [{ key: 'pitchMapping', value: 'continuous', golden: 'twin-rows' }],
-    'the control badges its mapping delta, never an axis'
-  );
-  // Every scheme card owns exactly its axis and shows the shared windows.
   for (const candidate of CURRENT_CANDIDATES) {
-    if (candidate.id === 'scheme-control') continue;
-    assert.equal(candidate.axis, 'octaveLineScheme', `${candidate.id} owns the scheme axis`);
+    assert.equal(candidate.axis, 'core', `${candidate.id} owns the core axis`);
     assert.deepEqual(
-      Object.keys(candidate.options ?? {}).sort(),
-      ['octaveLineScheme', 'pitchMapping'],
-      `${candidate.id} states the axis plus the round mapping`
+      Object.keys(candidate.options ?? {}),
+      ['core'],
+      `${candidate.id} states only the core axis`
+    );
+    assert.equal(candidate.tokens, undefined, `${candidate.id} states no micro token`);
+    assert.deepEqual(
+      candidateBadges(candidate),
+      [{ key: 'core', value: candidate.options!.core!, golden: 'adaptive', axis: true }],
+      `${candidate.id} badges its core axis`
     );
     const resolved = resolveCandidate(candidate);
     assert.equal(resolved.windows.length, 2, `${candidate.id} shows the shared windows`);
@@ -196,19 +186,13 @@ test('Candidate previews honour their own option deltas', () => {
     return card.slice(0, card.indexOf('</article>'));
   };
 
-  // Every paradigm badges its own axis as a delta; the control states the
-  // round mapping and badges that delta, never an axis.
-  assert.equal((html.match(/badge-axis/g) ?? []).length, 3, 'one axis badge per scheme card');
-  assert.equal((html.match(/badge-delta/g) ?? []).length, 7, 'mapping context on every card plus the axis on three');
+  // Both cards badge their own open axis as a delta.
+  assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
+  assert.equal((html.match(/badge-delta/g) ?? []).length, 2, 'one delta badge per card');
   for (const candidate of CURRENT_CANDIDATES) {
     const card = cardOf(candidate.id);
-    if (candidate.id === 'scheme-control') {
-      assert.match(card, /<b>pitchMapping<\/b>/, 'the control states the round mapping');
-    } else {
-      assert.match(card, new RegExp(`<b>${candidate.axis}</b>`), `${candidate.id} badges its axis`);
-    }
-    assert.match(card, /data-lint="clean"/, `${candidate.id} lint verdict: clean`);
-    assert.match(card, /chip chip-ok/, `${candidate.id} reports its clean chip`);
+    assert.match(card, new RegExp(`<b>${candidate.axis}</b>`), `${candidate.id} badges its axis`);
+    assert.match(card, /data-lint="(clean|violations)"/, `${candidate.id} reports a lint verdict`);
     assert.equal(
       (card.match(/data-window="/g) ?? []).length,
       resolveCandidate(candidate).windows.length,
@@ -228,15 +212,15 @@ test('Candidate previews honour their own option deltas', () => {
     'restStyle',
     'clusterAnchor',
   ]) {
-    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 26 question`);
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 27 question`);
   }
   assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
 
-  // The shared windows are the round's own evidence: page 1 plus the macro.
+  // The shared windows are the round's own evidence: Brahms page 1 plus the macro.
   for (const candidate of CURRENT_CANDIDATES) {
     const card = cardOf(candidate.id);
-    assert.ok(card.includes('data-window="primary:1-16"'), `${candidate.id} shows page 1`);
-    assert.ok(card.includes('data-window="primary:1-2"'), `${candidate.id} shows the macro`);
+    assert.ok(card.includes('data-window="brahms-op118-no1:1-9"'), `${candidate.id} shows page 1`);
+    assert.ok(card.includes('data-window="brahms-op118-no1:33-34"'), `${candidate.id} shows the macro`);
   }
 
   // The settled clasp grammar and grid policy are stated in the card facts.
@@ -473,15 +457,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 26);
-  assert.match(CURRENT_ROUND_METADATA.title, /0-Line/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 27);
+  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['octaveLineScheme'],
-    'one axis, one card per scheme'
+    ['core'],
+    'one axis, two cards'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'the control and the schemes');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'control and contender');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

@@ -58,6 +58,7 @@ import {
   JANKO_CHANNEL_LAYOUT_LABELS,
   JANKO_STAFF_OCTAVES,
   JankoChannelLayout,
+  JankoCore,
   JankoStaffOctaveRange,
   JankoTokens,
   JankoLayoutOptions,
@@ -268,6 +269,39 @@ export const DEFAULT_PITCH_WINDOW: { readonly min: number; readonly max: number 
  */
 export function continuousPitchY(lin: number, scale: number): number {
   return -(lin - CONTINUOUS_PITCH_ANCHOR_LIN) * scale;
+}
+
+/**
+ * Compute the octave fold shift in semitones (Round 27).
+ *
+ * - `fixed-3` (C3–C5, C-lines at 36, 48, 60):
+ *   Core coverage [30, 66]. Core±1 extensions at 24 and 72 cover [18, 78].
+ *   Notes with lin < 18 or lin > 78 fold by ∓12 (8va/8vb) or ∓24 (15ma/15mb).
+ * - `fixed-4` (o2–o5 middles at 29.5, 41.5, 53.5, 65.5):
+ *   Core coverage [23.5, 71.5]. Core±1 extensions at 17.5 and 77.5 cover [12, 83.5].
+ *   Notes with lin < 12 or lin > 83.5 fold by ∓12 (8va/8vb) or ∓24 (15ma/15mb).
+ * - `adaptive`: 0 (no folding).
+ */
+export function computeFoldShift(lin: number, core?: JankoCore): number {
+  if (core === 'fixed-3') {
+    if (lin < 18) {
+      return lin + 12 < 18 ? 24 : 12;
+    }
+    if (lin > 78) {
+      return lin - 12 > 78 ? -24 : -12;
+    }
+    return 0;
+  }
+  if (core === 'fixed-4') {
+    if (lin < 12) {
+      return lin + 12 < 12 ? 24 : 12;
+    }
+    if (lin > 83.5) {
+      return lin - 12 > 83.5 ? -24 : -12;
+    }
+    return 0;
+  }
+  return 0;
 }
 
 /** Exact linear-pitch range of a score: the continuous window. */
@@ -494,7 +528,7 @@ export function getEquatorYForOctave(
   void hand;
   const t = resolveJankoTokens(tokens);
   const o = resolveJankoOptions(options);
-  if (o.pitchMapping !== 'twin-rows') {
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     // Vestigial under the continuous mappings (the grid has no equators):
     // the octave-center height, so head-relative furniture that still asks
     // for an equator degrades gracefully instead of landing on stale rows.
@@ -567,16 +601,24 @@ export function getPitchCoordinate(
 ): JankoPitchCoordinate {
   const o = resolveJankoOptions(options);
   const pc = ((pitchClass % 12) + 12) % 12;
-  if (o.pitchMapping !== 'twin-rows') {
+  const isContinuous =
+    o.pitchMapping !== 'twin-rows' ||
+    o.core === 'fixed-3' ||
+    o.core === 'fixed-4';
+  if (isContinuous) {
     // Continuous height: the head stands at its exact pitch, its own
     // equator (offset 0), with no rows, no ledgers and nothing out of staff.
     // Rank/row/side stay parity facts so head-relative consumers keep working.
     const t = resolveJankoTokens(tokens);
-    const y = continuousPitchY(octave * 12 + pc, t.semitoneScale);
+    const origLin = octave * 12 + pc;
+    const shift = computeFoldShift(origLin, o.core);
+    const writtenLin = origLin + shift;
+    const writtenOctave = Math.floor(writtenLin / 12);
+    const y = continuousPitchY(writtenLin, t.semitoneScale);
     const rank = getWholeToneRank(pc);
     return {
       pitchClass: pc,
-      octave,
+      octave: writtenOctave,
       hand,
       rank,
       row: rank,

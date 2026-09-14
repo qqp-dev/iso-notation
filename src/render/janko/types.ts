@@ -715,6 +715,16 @@ export interface JankoTokens {
   contourStripAir?: number;
   /** Vertical scale (pt per semitone) of the continuous pitch mappings. */
   semitoneScale?: number;
+  /** Ottava bracket dashed-line segment length in pt. */
+  ottavaDashLength?: number;
+  /** Ottava bracket dashed-line gap in pt. */
+  ottavaDashGap?: number;
+  /** Ottava bracket end-hook length in pt (turns toward staff). */
+  ottavaHookLength?: number;
+  /** Minimum air (pt) between an ottava bracket and any notehead. */
+  ottavaClearance?: number;
+  /** Hairline stroke width for ottava dashed line and hook. */
+  ottavaLineWidth?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -768,6 +778,11 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   contourStripHeight: 24,
   contourStripAir: 3,
   semitoneScale: 2.5,
+  ottavaDashLength: 3.5,
+  ottavaDashGap: 2.0,
+  ottavaHookLength: 4.0,
+  ottavaClearance: 6.0,
+  ottavaLineWidth: 0.35,
 };
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */
@@ -926,6 +941,11 @@ export interface JankoLayoutOptions {
    * Defaults to `'grand-divider'` (see {@link JankoOctaveLineScheme}).
    */
   octaveLineScheme?: JankoOctaveLineScheme;
+  /**
+   * Fixed Middle-C-centered core octave line grammar (Round 27).
+   * Defaults to `'adaptive'`.
+   */
+  core?: JankoCore;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -933,6 +953,15 @@ export interface JankoLayoutOptions {
   /** Page composer attribution (full-page renders only). */
   composer?: string;
 }
+
+/**
+ * Fixed Middle-C-centered core octave line grammar (Round 27).
+ *
+ * - `'adaptive'`: current window-following adaptive behavior (default).
+ * - `'fixed-3'`: 3-core C-lines at lin 36 (C3), 48 (C4), 60 (C5).
+ * - `'fixed-4'`: 4-core octave middles at lin 29.5 (o2), 41.5 (o3), 53.5 (o4), 65.5 (o5).
+ */
+export type JankoCore = 'adaptive' | 'fixed-3' | 'fixed-4';
 
 /** Fully resolved layout options (every optional option filled in). */
 export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
@@ -980,6 +1009,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   contourStrip: false,
   pitchMapping: 'twin-rows',
   octaveLineScheme: 'grand-divider',
+  core: 'adaptive',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
@@ -1041,6 +1071,12 @@ export interface JankoSystemGeometry {
    * the score's own range, shared by every system. Absent under `'twin-rows'`.
    */
   pitchWindow?: { min: number; max: number };
+  /** Fixed core octave lines (linear pitch) for this system. */
+  coreLines?: readonly number[];
+  /** Per-system octave extension lines (linear pitch). */
+  extensionLines?: readonly number[];
+  /** Full drawn staff line set (core + extensions, sorted linear pitch). */
+  staffLines?: readonly number[];
 }
 
 /** Absolute page geometry for a Jánko Two-Row page. */
@@ -1095,3 +1131,29 @@ export const JANKO_HOME_OCTAVES: Record<Hand, JankoStaffOctaveRange> = {
   RH: JANKO_STAFF_OCTAVES,
   LH: JANKO_STAFF_OCTAVES,
 };
+
+/** The four SMuFL octave sign kinds (Round 27). */
+export type JankoOttavaKind = '8va' | '8vb' | '15ma' | '15mb';
+
+/** One rendered ottava bracket spanner (Round 27). */
+export interface JankoOttavaBracket {
+  /** Bracket sign kind. */
+  kind: JankoOttavaKind;
+  /** Pitch shift applied to notes (semitones: -12 for 8va, +12 for 8vb, -24 for 15ma, +24 for 15mb). */
+  shift: number;
+  /** Horizontal span of the entire bracket in page pt (including numeral and hook). */
+  x0: number;
+  x1: number;
+  /** Vertical page y of the straight horizontal dashed line. */
+  lineY: number;
+  /** Horizontal start of the dashed line (after the numeral and gap). */
+  dashX0: number;
+  /** Horizontal end of the dashed line (hook location). */
+  dashX1: number;
+  /** Hook direction toward the staff (-1 = upward for 8vb/15mb, 1 = downward for 8va/15ma). */
+  hookDirection: 1 | -1;
+  /** Hook length in pt. */
+  hookLength: number;
+  /** Note IDs covered by this bracket. */
+  noteIds: string[];
+}

@@ -171,95 +171,74 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * the whole→64th working set, round 22 the verbatim Bravura transcription,
  * round 23 the three pitch-contour paradigms, round 24 the continuous
  * pitch-mapping paradigms, round 25 the grand grid's octave-line schemes,
- * and round 26 the 0-line decision.
+ * round 26 the 0-line decision, and round 27 the fixed cores 3-vs-4 decision
+ * on Brahms with real Gould ottava brackets.
  *
- * **Round 26 is an ANCHOR round: one open axis, four answers to one question.**
- * Either the 0-line is the gravitational center everything reads against, or
- * it gets little if any emphasis: the firm 0.65 anchor on middle C as the
- * control, golden-weight hairlines at the octave middles (the minimal
- * modification to the golden master), golden-weight hairlines at the C
- * boundaries, or the anchor reduced to a clef-like tick at each system
- * start. Margin labels are gone on every card; rests seat on drawn lines.
+ * **Round 27 is a CORE round: one open axis, two answers to one question.**
+ * Window-following octave lines cannot look centered: each line count has
+ * exactly one middle-C-centered grammar (3 ⟺ C-lines C3–C5; 4 ⟺ middles o2–o5),
+ * plus a per-system extension rule (core±1 max) and ottava beyond extensions.
+ * Judged on Brahms Op. 118/1 (lin 9–78, 964 notes) with real Bravura ottava
+ * glyphs and Gould dashed spanners.
  *
- * Every card shows the same two windows: the whole of page 1 (mm. 1–16, all
- * four systems) for total visual weight, and mm. 1–2 for the octave reading
- * up close — plus the closer-comparison strip above the cards, the same
- * ascent under all four schemes side by side. The verdict is read off the
- * strip: anchor, tick, or nothing.
+ * Can we drop to 3, or does 4's floor earn its ink? Control is fixed-4
+ * (o2–o5 middles, 1 folded note in m. 69), contender is fixed-3 (C3–C5 C-lines,
+ * 9 folded notes across mm. 5, 15, 23, 33, 43, 53, 67, 69).
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 26,
-  title: 'The 0-Line — Anchor, Tick, or Nothing',
+  round: 27,
+  title: 'Fixed Cores 3-vs-4 on Brahms, with Ottava',
   description:
-    'The mapping is settled and the anchor moved onto middle C, so the question sharpens: either 0 is the gravitational center or it gets little if any emphasis. Four answers — the firm 0.65 anchor, the minimal equal centers, the calm equal boundaries, the clef tick — no margin labels anywhere. Judge total visual weight on page 1, flick the strip for mm. 1\u20132, and pick the middle.',
-  openAxes: ['octaveLineScheme'],
+    'Window-following octave lines cannot look centered, so the design reframes as fixed cores: each line count has one middle-C-centered grammar (3 ⟺ C3–C5 C-lines; 4 ⟺ o2–o5 middles), with per-system extensions and real Gould ottava brackets beyond. Can we drop to 3, or does 4\u2019s floor earn its ink? Judge total visual weight on page 1, flick the strip for mm. 33–34, and pick the core.',
+  openAxes: ['core'],
   compareStrip: {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 1,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 33,
     measureCount: 2,
-    title: 'mm. 1–2 · the same ascent four ways',
+    title: 'mm. 33–34 · densest macro with folded bass under fixed-4 vs fixed-3',
   },
 };
 
 /**
- * The Round 26 windows, shared by every card: the whole of page 1 for total
- * visual weight, and the opening ascent for the octave reading up close.
+ * The Round 27 windows, shared by every card: the whole of page 1 for total
+ * visual weight, and the densest 2-measure macro with folded bass up close.
  */
-const ROUND_26_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_27_WINDOWS: JankoCandidateWindow[] = [
   {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 1,
-    measureCount: 16,
-    title: 'Bach Var. 1 · Page 1 (mm. 1–16) — the full visual weight',
+    measureCount: 9,
+    title: 'Brahms Op. 118/1 · Page 1 (mm. 1–9) — full-page visual weight',
   },
   {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 1,
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 33,
     measureCount: 2,
-    title: 'Bach Var. 1 · mm. 1–2 — the opening ascent up close',
+    title: 'Brahms Op. 118/1 · mm. 33–34 — densest macro with folded bass',
   },
 ];
 
-/** The round’s cards: the firm anchor as control plus one answer each, in display order. */
+/** The round’s cards: control (fixed-4) and contender (fixed-3), in display order. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'scheme-control',
-    label: '0 · Control — the 0-line at 2x',
+    id: 'core-fixed-4',
+    label: '0 · Control — Fixed-4 (o2–o5 middles)',
     description:
-      'True chromatic height with the firm 0.65 anchor through middle C and faint C-lines — the corrected grid, no margin labels, rests seated on drawn lines. The gravitational center every other answer is weighed against.',
-    options: { pitchMapping: 'continuous' },
-    windows: ROUND_26_WINDOWS,
-    tags: ['control', 'anchor'],
+      'Four middle-centered hairlines at o2–o5 (lin 29.5/41.5/53.5/65.5) — the coverage-safe incumbent with equal weights. Covers 96.2% of Brahms; only 1 folded note (8vb) in m. 69 (A0, lin 9). Extensions fire at o1/o6.',
+    axis: 'core',
+    options: { core: 'fixed-4' },
+    windows: ROUND_27_WINDOWS,
+    tags: ['control', 'fixed-4'],
   },
   {
-    id: 'scheme-centers',
-    label: '1 · Equal Centers — the minimal modification',
+    id: 'core-fixed-3',
+    label: '1 · Contender — Fixed-3 (C3–C5 C-lines)',
     description:
-      'Golden-weight hairlines at the octave middles, no anchor at all: the closest the grand grid comes to the golden master — same four lines, same ink, only the heads and the line positions move. The middle falls in open space.',
-    axis: 'octaveLineScheme',
-    options: { pitchMapping: 'continuous', octaveLineScheme: 'equal-centers' },
-    windows: ROUND_26_WINDOWS,
-    tags: ['line-scheme', 'minimal', 'no-anchor'],
-  },
-  {
-    id: 'scheme-boundaries',
-    label: '2 · Equal Boundaries — C-lines, no anchor',
-    description:
-      'Golden-weight hairlines at the C boundaries, no anchor at all: lines sit between octaves where fewer heads touch them. The C4 line stands on middle C — the landmark without the wall.',
-    axis: 'octaveLineScheme',
-    options: { pitchMapping: 'continuous', octaveLineScheme: 'equal-boundaries' },
-    windows: ROUND_26_WINDOWS,
-    tags: ['line-scheme', 'equal-boundaries', 'no-anchor'],
-  },
-  {
-    id: 'scheme-clef',
-    label: '3 · Clef Marker — the anchor as a tick',
-    description:
-      'The control’s faint C-lines with the anchor reduced to a short tick at each system start: the minimal pair that asks whether the anchor must run full width. Little emphasis, same landmarks.',
-    axis: 'octaveLineScheme',
-    options: { pitchMapping: 'continuous', octaveLineScheme: 'clef-marker' },
-    windows: ROUND_26_WINDOWS,
-    tags: ['line-scheme', 'clef-marker', 'tick'],
+      'Three middle-C-centered hairlines at C3–C5 (lin 36/48/60) — the efficiency challenger with equal weights. Covers 83.7% of Brahms; 9 folded notes (8vb) across mm. 5, 15, 23, 33, 43, 53, 67, 69. Extensions fire at C2/C6.',
+    axis: 'core',
+    options: { core: 'fixed-3' },
+    windows: ROUND_27_WINDOWS,
+    tags: ['contender', 'fixed-3'],
   },
 ];
 

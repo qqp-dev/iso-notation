@@ -176,7 +176,11 @@ export type JankoLintCode =
   | 'contour-strip-placement'
   | 'contour-strip-scale'
   | 'contour-strip-geometry'
-  | 'contour-strip-clearance';
+  | 'contour-strip-clearance'
+  | 'ottava-clearance'
+  | 'ottava-unbracketed'
+  | 'ottava-unfolded'
+  | 'extension-beyond-core';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -288,6 +292,9 @@ export const JANKO_LINT_CHECKS = [
   'contour-thread',
   'contour-ticks',
   'contour-strip',
+  'ottava-clearance',
+  'ottava-coverage',
+  'ottava-extensions',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -1226,7 +1233,7 @@ export function checkDotCollision(
   const barlines = systemBarlines(layout, o, t);
   const pulses = beatPulseXs(layout, o, t);
   const rules: Array<{ y: number; stroke: number; x1?: number; x2?: number }> = [];
-  if (o.pitchMapping !== 'twin-rows') {
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     for (const rule of pitchGridRules(layout.geometry, o, t)) {
       // Texture lanes are background, not structure: a dot may touch a
       // 0.3pt hairline it cannot avoid, but never a landmark line.
@@ -1615,7 +1622,7 @@ export function checkContourTicks(
     });
   }
   const rules: number[] = [];
-  if (o.pitchMapping !== 'twin-rows') {
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
     for (const rule of pitchGridRules(layout.geometry, o, t)) rules.push(rule.y);
   } else {
     for (let octave = 0; octave <= 8; octave++) {
@@ -1926,6 +1933,13 @@ export function systemInkExtents(
     const box = restInkBox(rest, t);
     top = Math.min(top, box.y0);
     bottom = Math.max(bottom, box.y1);
+  }
+  if (layout.ottavaBrackets) {
+    for (const b of layout.ottavaBrackets) {
+      const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
+      top = Math.min(top, b.lineY, hookY);
+      bottom = Math.max(bottom, b.lineY, hookY);
+    }
   }
   return { top, bottom };
 }
@@ -2634,7 +2648,7 @@ export function checkRestSeat(
     // stands off the nearest drawn rule is the "floating brick" defect this
     // round exists to kill — a hard violation.
     if (isBarRestValue(rest.value)) {
-      if (o.pitchMapping === 'twin-rows') {
+      if (o.pitchMapping === 'twin-rows' && o.core !== 'fixed-3' && o.core !== 'fixed-4') {
         const rules: number[] = [];
         for (const [hand, octave] of [
           ['RH', 5],
@@ -2983,7 +2997,7 @@ export function checkMiddleCCorridor(
   //    audit the painter's own line set (the divider excepted — it IS the
   //    spine); the equal schemes draw no divider, so there is no corridor.
   const horizontalRules: Array<{ label: string; y: number }> = [];
-  if (o.pitchMapping === 'twin-rows') {
+  if (o.pitchMapping === 'twin-rows' && o.core !== 'fixed-3' && o.core !== 'fixed-4') {
     for (const hand of ['RH', 'LH'] as const) {
       for (const oct of hand === 'RH' ? [5, 4] : [3, 2]) {
         const eq = g.equatorY(hand, oct);
@@ -3450,6 +3464,177 @@ export function auditStemBeamConnections(
 }
 
 // ---------------------------------------------------------------------------
+// Ottava & extension checks (Round 27)
+// ---------------------------------------------------------------------------
+
+/**
+ * Enforce bracket↔notehead clearance for every ottava spanner bracket.
+ * Any notehead horizontally within [b.x0, b.x1] must clear the bracket line
+ * by at least `t.ottavaClearance`.
+ */
+export function checkOttavaClearance(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (!layout.ottavaBrackets || layout.ottavaBrackets.length === 0) return;
+  const clearance = t.ottavaClearance ?? 6.0;
+  const r = t.noteheadRadius;
+
+  for (const b of layout.ottavaBrackets) {
+    for (const p of layout.notes) {
+      if (p.x + r < b.x0 - EPS || p.x - r > b.x1 + EPS) continue;
+
+      if (b.shift > 0) {
+        // Below staff (8vb/15mb): bracket line should be >= note bottom + clearance
+        const noteBottom = p.y + r;
+        const actualClearance = b.lineY - noteBottom;
+        if (actualClearance < clearance - EPS) {
+          out.push({
+            code: 'ottava-clearance',
+            severity: 'error',
+            message:
+              `Ottava ${b.kind} bracket at lineY=${b.lineY.toFixed(2)} has clearance ` +
+              `${actualClearance.toFixed(2)}pt to note ${p.note.id} (bottom=${noteBottom.toFixed(2)}), ` +
+              `less than required ${clearance.toFixed(2)}pt.`,
+            system: layout.index,
+            noteIds: [p.note.id],
+            x: p.x,
+            y: b.lineY,
+            metrics: { actualClearance, requiredClearance: clearance },
+          });
+        }
+      } else {
+        // Above staff (8va/15ma): bracket line should be <= note top - clearance
+        const noteTop = p.y - r;
+        const actualClearance = noteTop - b.lineY;
+        if (actualClearance < clearance - EPS) {
+          out.push({
+            code: 'ottava-clearance',
+            severity: 'error',
+            message:
+              `Ottava ${b.kind} bracket at lineY=${b.lineY.toFixed(2)} has clearance ` +
+              `${actualClearance.toFixed(2)}pt to note ${p.note.id} (top=${noteTop.toFixed(2)}), ` +
+              `less than required ${clearance.toFixed(2)}pt.`,
+            system: layout.index,
+            noteIds: [p.note.id],
+            x: p.x,
+            y: b.lineY,
+            metrics: { actualClearance, requiredClearance: clearance },
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Enforce bracket coverage: every folded note must be covered by a bracket,
+ * and every bracketed note must actually be folded.
+ */
+export function checkOttavaCoverage(
+  layout: JankoSystemLayout,
+  out: LintViolation[]
+): void {
+  const brackets = layout.ottavaBrackets ?? [];
+  const coveredIds = new Set<string>();
+  for (const b of brackets) {
+    for (const id of b.noteIds) {
+      coveredIds.add(id);
+    }
+  }
+
+  for (const p of layout.notes) {
+    if (p.ottavaShift !== undefined && p.ottavaShift !== 0) {
+      if (!coveredIds.has(p.note.id)) {
+        out.push({
+          code: 'ottava-unbracketed',
+          severity: 'error',
+          message:
+            `Note ${p.note.id} has ottavaShift=${p.ottavaShift} but is not covered by any ottava bracket.`,
+          system: layout.index,
+          noteIds: [p.note.id],
+          x: p.x,
+          y: p.y,
+        });
+      }
+    }
+  }
+
+  const notesById = new Map<string, PositionedJankoNote>();
+  for (const p of layout.notes) {
+    notesById.set(p.note.id, p);
+  }
+  for (const b of brackets) {
+    for (const id of b.noteIds) {
+      const p = notesById.get(id);
+      if (p && (p.ottavaShift === undefined || p.ottavaShift === 0)) {
+        out.push({
+          code: 'ottava-unfolded',
+          severity: 'error',
+          message:
+            `Ottava bracket covers note ${id}, but note is not folded (ottavaShift=0).`,
+          system: layout.index,
+          noteIds: [id],
+          x: p.x,
+          y: p.y,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Enforce core±1 extensions: extensions must not exceed core±1 octave,
+ * and notes beyond core±1 must fold instead of extending further.
+ */
+export function checkOttavaExtensions(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  out: LintViolation[]
+): void {
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') return;
+
+  const g = layout.geometry;
+  const isFixed3 = o.core === 'fixed-3';
+  const minExt = isFixed3 ? 24 : 17.5;
+  const maxExt = isFixed3 ? 72 : 77.5;
+  const minWritten = isFixed3 ? 18 : 12;
+  const maxWritten = isFixed3 ? 78 : 83.5;
+
+  if (g.extensionLines) {
+    for (const ext of g.extensionLines) {
+      if (ext < minExt || ext > maxExt) {
+        out.push({
+          code: 'extension-beyond-core',
+          severity: 'error',
+          message:
+            `Extension line at lin=${ext} exceeds core±1 range [${minExt}, ${maxExt}].`,
+          system: layout.index,
+        });
+      }
+    }
+  }
+
+  for (const p of layout.notes) {
+    const wLin = p.writtenLin;
+    if (wLin !== undefined && (wLin < minWritten || wLin > maxWritten)) {
+      out.push({
+        code: 'extension-beyond-core',
+        severity: 'error',
+        message:
+          `Note ${p.note.id} has written linear pitch ${wLin}, exceeding core±1 coverage ` +
+          `[${minWritten}, ${maxWritten}]. It must fold instead.`,
+        system: layout.index,
+        noteIds: [p.note.id],
+        x: p.x,
+        y: p.y,
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -3515,6 +3700,9 @@ export function lintJankoScore(
     if (o.contourStrip) {
       checkContourStrip(score, layout, layouts, page, o, t, thresholds, diagnostics);
     }
+    checkOttavaClearance(layout, t, diagnostics);
+    checkOttavaCoverage(layout, diagnostics);
+    checkOttavaExtensions(layout, o, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
