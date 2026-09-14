@@ -40,7 +40,7 @@ import { getClusterSpacingPreset, resolveJankoOptions, resolveJankoTokens } from
 import { getPitchCoordinate } from '../src/render/janko/geometry';
 import { lintJankoScore } from '../src/render/janko/linter';
 
-const OPTIONS = BRAHMS_OP118_NO1_JANKO_OPTIONS;
+const OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
 const TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
 const R = BRAHMS_OP118_NO1_JANKO_TOKENS.noteheadRadius!;
 /** Decided golden fan step (Round 17B verdict `'tight'`): 2·2.53 + 0.4 = 5.46pt. */

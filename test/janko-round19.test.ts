@@ -44,6 +44,8 @@ import { lintJankoScore } from '../src/render/janko/linter';
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
+const BACH_OPTIONS = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const };
+const BRAHMS_OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
 const T = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 const BRAHMS_T = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const PAIR_GAP = getClusterSpacingPreset(DEFAULT_JANKO_OPTIONS.clusterSpacing).pairGap;
@@ -119,7 +121,7 @@ test('The RH anchor is the only anchor rule: the option is retired', () => {
 // ---------------------------------------------------------------------------
 
 test('m. 46 tucks to the ticket positions: single heads on the pair columns’ midpoint', () => {
-  const layout = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layout = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const n = onset(layout, M46);
   const x = (id: string): number => n.get(id)!.x;
   // F5 / D3 (the single-head rows) tuck onto the pair columns' midpoint …
@@ -145,8 +147,8 @@ test('m. 46 tucks to the ticket positions: single heads on the pair columns’ m
 
 test('The tuck is score-wide: every uneven cluster mirrors about its widest row’s middle', () => {
   for (const [name, score, options, tokens] of [
-    ['Bach', BACH, DEFAULT_JANKO_OPTIONS, T],
-    ['Brahms', BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T],
+    ['Bach', BACH, BACH_OPTIONS, T],
+    ['Brahms', BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
   ] as const) {
     const byTick = onsetsByTick(layoutJankoScore(score, options, tokens));
     let uneven = 0;
@@ -179,7 +181,7 @@ test('The tuck is score-wide: every uneven cluster mirrors about its widest row�
 });
 
 test('An even cluster coincides: equal-count rows share their middle exactly', () => {
-  const byTick = onsetsByTick(layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, T));
+  const byTick = onsetsByTick(layoutJankoScore(BACH, BACH_OPTIONS, T));
   let evenPairs = 0;
   for (const [tick, heads] of byTick) {
     const rows = new Map<number, number[]>();
@@ -200,8 +202,8 @@ test('An even cluster coincides: equal-count rows share their middle exactly', (
 
 test('The tuck respects the beat cell: no head of either score leaves its own beat', () => {
   for (const [score, options, tokens] of [
-    [BACH, DEFAULT_JANKO_OPTIONS, T],
-    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T],
+    [BACH, BACH_OPTIONS, T],
+    [BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
   ] as const) {
     const report = lintJankoScore(score, options, tokens);
     assert.equal(report.ok, true, 'the tucked golden lints clean');
@@ -218,7 +220,7 @@ test('The tuck respects the beat cell: no head of either score leaves its own be
 // ---------------------------------------------------------------------------
 
 test('Overlapping hands unify: m. 46 and m. 26 carry one bracket spanning both hands', () => {
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   for (const [tick, top, bot, mid] of [
     [M46, 99.7, 184.3, 142.0],
     // m. 26 sits in system 2: +6 top margin + 2·(14/3) slot spread.
@@ -251,7 +253,7 @@ test('Overlapping hands unify: m. 46 and m. 26 carry one bracket spanning both h
 });
 
 test('A gapped onset keeps Round 6 per-hand brackets: the m. 3 guard', () => {
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const system = layouts.find((l) => l.notes.some((p) => p.note.startTick === M3))!;
   const clasps = system.clasps.filter((c) => c.tick === M3);
   assert.equal(clasps.length, 1, 'the 90pt hand gap stays split');
@@ -263,7 +265,7 @@ test('A gapped onset keeps Round 6 per-hand brackets: the m. 3 guard', () => {
   assert.equal(clasps[0].notes.length, 3);
   // The 90pt hand gap keeps the brackets split: two per-hand brackets, never
   // one unified span (the retired anchor axis was inert on this window).
-  const m3Svg = renderSystem(BRAHMS, layouts[0].geometry, 0, resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS), BRAHMS_T, layouts[0]);
+  const m3Svg = renderSystem(BRAHMS, layouts[0].geometry, 0, resolveJankoOptions(BRAHMS_OPTIONS), BRAHMS_T, layouts[0]);
   assert.equal((m3Svg.match(/class="janko-clasp"/g) ?? []).length, 2, 'two split brackets');
 });
 
@@ -277,7 +279,7 @@ test('A unified bracket paints one duration group per hand', () => {
     makeNote('lh-2', 2, 4, 0, 24, 'LH'),
     makeNote('lh-6', 6, 4, 0, 24, 'LH'),
   ]);
-  const layout = layoutJankoScore(score, DEFAULT_JANKO_OPTIONS, T)[0];
+  const layout = layoutJankoScore(score, BACH_OPTIONS, T)[0];
   assert.equal(layout.clasps.length, 1, 'one unified bracket');
   const clasp = layout.clasps[0];
   assert.equal(clasp.notes.length, 4);
@@ -300,7 +302,7 @@ test('A unified bracket paints one duration group per hand', () => {
 // ---------------------------------------------------------------------------
 
 test('The lower-first anchor holds the mixed row: D4 keeps the column, G#4 fans right', () => {
-  const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
+  const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
   // Round 21 §D (the golden, and now only, rule): the lower head — D4 (LH) —
   // holds the column, and G#4 (RH) fans one pair gap right.
   assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '47.15');
@@ -313,7 +315,7 @@ test('The lower-first anchor holds the mixed row: D4 keeps the column, G#4 fans 
 test('The former anchor collision is owned by the unified bracket', () => {
   // With the fixed context (symmetric tuck + overlap unification) the golden
   // is stem-clean: the unified bracket replaces every member stem.
-  const report = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const report = lintJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   assert.equal(report.ok, true, 'the tucked golden is clean');
   assert.equal(
     report.diagnostics.filter((d) => d.code === 'stem-through-simultaneity').length,

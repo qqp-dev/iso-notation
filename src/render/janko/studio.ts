@@ -168,7 +168,7 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     [SPECIMEN_STUDIO_SCORE_ID]: {
       id: SPECIMEN_STUDIO_SCORE_ID,
       score: buildChordDurationSpecimenScore(),
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }),
+      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', measuresPerSystem: 2 }),
       tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
     },
     // Round 15/20: the curated rest-duration specimen. Six 4/4 measures — one

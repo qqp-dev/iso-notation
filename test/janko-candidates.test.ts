@@ -346,7 +346,7 @@ test('The decided tight golden passes every gate; snug stays implemented and cle
   );
   for (const [score, base, tokens, label] of [
     [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
-    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
+    [BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const }, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
   ] as const) {
     const report = lintJankoScore(score, base, tokens);
     assert.equal(report.violations.length, 0, `tight golden: zero violations on ${label}`);
@@ -357,7 +357,7 @@ test('The decided tight golden passes every gate; snug stays implemented and cle
   // retired golden stays clean too.
   for (const [score, base, tokens, label] of [
     [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
-    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
+    [BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const }, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
   ] as const) {
     const snug = lintJankoScore(score, { ...base, clusterSpacing: 'snug' }, tokens);
     assert.equal(snug.violations.length, 0, `snug: zero violations on ${label}`);
@@ -506,6 +506,7 @@ test('Pairs stand at the judged gap Â±0.1, inside their beat cell, in time order
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
       ...DEFAULT_JANKO_OPTIONS,
+      core: 'adaptive',
       clusterSpacing: spacing,
     });
     const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
@@ -614,6 +615,7 @@ test('Pin-preserving shrink: a pair starved of room narrows to the room with the
   // margins would push the 5.87pt room just over the snug pair gap.
   const options = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
+    core: 'adaptive',
     measuresPerSystem: 3,
     clusterSpacing: 'snug',
     pageMarginLeft: 24,
@@ -716,6 +718,7 @@ test('Brahms held triples span 2G with symmetrically tucked rows â€” every prese
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
       ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      core: 'adaptive',
       clusterSpacing: spacing,
     });
     const layouts = layoutJankoScore(BRAHMS, options, BRAHMS_OP118_NO1_JANKO_TOKENS);
@@ -745,6 +748,7 @@ test('t1392 tucks its rows symmetrically and shares one stem', () => {
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
       ...resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      core: 'adaptive',
       clusterSpacing: spacing,
     });
     const layouts = layoutJankoScore(BRAHMS, options, BRAHMS_OP118_NO1_JANKO_TOKENS);
@@ -976,6 +980,7 @@ test('Dots hug the mask corner on both scores â€” every preset', () => {
     const preset = getClusterSpacingPreset(spacing);
     const options = resolveJankoOptions({
       ...DEFAULT_JANKO_OPTIONS,
+      core: 'adaptive',
       clusterSpacing: spacing,
     });
     const layouts = layoutJankoScore(SCORE, options, tokens);
@@ -1128,7 +1133,7 @@ test('Dot high-lane fallback: a crowded same-row neighbour lifts the dot', () =>
     note('dot-head', 1, 4, 24, 36),
     note('dot-neighbour', 3, 4, 31, 12),
   ]);
-  const options = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' });
   const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const placed = layoutJankoScore(crowded, options, tokens).flatMap((l) => l.notes);
   const head = placed.find((p) => p.note.id === 'dot-head')!;
@@ -1346,28 +1351,28 @@ test('Phrase rows: the showcase rests seat their ink centroid on a phrase row â€
     {
       label: 'Bach m. 4',
       score: SCORE,
-      options: DEFAULT_JANKO_OPTIONS,
+      options: { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const },
       tokens: DEFAULT_JANKO_TOKENS,
       ticks: [552],
     },
     {
       label: 'Bach m. 6',
       score: SCORE,
-      options: DEFAULT_JANKO_OPTIONS,
+      options: { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const },
       tokens: DEFAULT_JANKO_TOKENS,
       ticks: [720],
     },
     {
       label: 'Bach m. 7',
       score: SCORE,
-      options: DEFAULT_JANKO_OPTIONS,
+      options: { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const },
       tokens: DEFAULT_JANKO_TOKENS,
       ticks: [864],
     },
     {
       label: 'chord specimen m. 2',
       score: SPECIMEN,
-      options: { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 },
+      options: { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const, measuresPerSystem: 2 },
       tokens: DEFAULT_JANKO_TOKENS,
       ticks: [180],
     },
@@ -1381,7 +1386,7 @@ test('Phrase rows: the showcase rests seat their ink centroid on a phrase row â€
     {
       label: 'Brahms m. 68',
       score: BRAHMS,
-      options: BRAHMS_OP118_NO1_JANKO_OPTIONS,
+      options: { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const },
       tokens: BRAHMS_OP118_NO1_JANKO_TOKENS,
       ticks: [13092],
     },
@@ -1474,7 +1479,7 @@ test('Vertical fallback: a walled reference row seats the adjacent row; a roomy 
 
   const narrow = layoutJankoScore(
     wall,
-    { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 },
+    { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', measuresPerSystem: 4 },
     DEFAULT_JANKO_TOKENS
   )[0];
   assert.deepEqual(narrow.unwrittenRests, [], 'the walled silence is written, not refused');
@@ -1502,7 +1507,7 @@ test('Vertical fallback: a walled reference row seats the adjacent row; a roomy 
   );
   const narrowReport = lintJankoScore(
     wall,
-    { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 4 },
+    { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', measuresPerSystem: 4 },
     DEFAULT_JANKO_TOKENS
   );
   assert.equal(narrowReport.violations.length, 0, 'the fallback engraving is violation-free');
@@ -1511,7 +1516,7 @@ test('Vertical fallback: a walled reference row seats the adjacent row; a roomy 
   // The same silence in a roomy cell never falls back.
   const wide = layoutJankoScore(
     wall,
-    { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 },
+    { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', measuresPerSystem: 2 },
     DEFAULT_JANKO_TOKENS
   )[0];
   const kept = wide.rests.find((r) => r.tick === 60)!;
@@ -1524,7 +1529,7 @@ test('Vertical fallback: a walled reference row seats the adjacent row; a roomy 
 });
 
 test('Bridging: m. 4 beams [528, 540, 564] as one gesture with its 16th rest printed beneath', () => {
-  const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[0];
+  const layout = layoutJankoScore(SCORE, { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' }, DEFAULT_JANKO_TOKENS)[0];
   const groups = layout.beams.map((b) => b.notes.map((n) => n.startTick).join(','));
   assert.ok(groups.includes('528,540,564'), `the beat-3 run beams as one gesture (got ${groups.join(' | ')})`);
   const beam = layout.beams.find((b) => b.notes.map((n) => n.startTick).join(',') === '528,540,564')!;
@@ -1544,7 +1549,7 @@ test('Bridging: m. 4 beams [528, 540, 564] as one gesture with its 16th rest pri
   assert.equal(rest.hand, 'RH');
   assert.equal(rest.value, 'sixteenth');
   assert.equal(rest.durationTicks, 12);
-  const crop = renderJankoCrop(SCORE, 4, 1, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const crop = renderJankoCrop(SCORE, 4, 1, { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' }, DEFAULT_JANKO_TOKENS);
   assert.match(
     crop,
     /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH"/,
@@ -1777,13 +1782,13 @@ test('Every dialect renders every clean window with zero diagnostics and every r
       ],
       [
         SPECIMEN,
-        { ...options, measuresPerSystem: 2 },
+        { ...options, core: 'adaptive', measuresPerSystem: 2 },
         DEFAULT_JANKO_TOKENS,
         'chord specimen',
       ],
       [
         BRAHMS,
-        { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, restStyle: style },
+        { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive', restStyle: style },
         BRAHMS_OP118_NO1_JANKO_TOKENS,
         'Brahms complete',
       ],
@@ -1856,7 +1861,11 @@ test('The live studio engraves every candidate card on the shared windows', () =
     cursor = at;
     const body = html.slice(at, html.indexOf('</article>', at));
     assert.ok(body.includes('badge-axis'), `${id} badges its axis`);
-    assert.ok(body.includes('badge-delta'), `${id} departs from the golden`);
+    if (id === 'core-fixed-3') {
+      assert.ok(!body.includes('badge-delta'), `${id} matches golden (0 deltas)`);
+    } else {
+      assert.ok(body.includes('badge-delta'), `${id} departs from the golden`);
+    }
     assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint verdict`);
     assert.equal(
       (body.match(/data-window="/g) ?? []).length,

@@ -150,6 +150,7 @@ export const REST_DURATION_SPECIMEN_VALUES: ReadonlyArray<{
  */
 export const REST_DURATION_SPECIMEN_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   ...DEFAULT_JANKO_OPTIONS,
+  core: 'adaptive',
   ticksPerMeasure: REST_DURATION_SPECIMEN_TICKS_PER_MEASURE,
   // Three per system, unchanged: every rest is read at the same macro scale as
   // the original five windows (the Round 21 windows simply extend the run).

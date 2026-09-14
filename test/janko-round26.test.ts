@@ -46,6 +46,7 @@ const SCORE = buildBachGoldbergVar1Score();
 function continuousOptions(scheme: JankoOctaveLineScheme, extra?: object) {
   return resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
+    core: 'adaptive',
     pitchMapping: 'continuous',
     octaveLineScheme: scheme,
     ...(extra ?? {}),

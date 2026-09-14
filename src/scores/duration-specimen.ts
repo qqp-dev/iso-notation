@@ -48,6 +48,7 @@ export const DURATION_SPECIMEN_TOTAL_TICKS =
  */
 export const DURATION_SPECIMEN_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   ...DEFAULT_JANKO_OPTIONS,
+  core: 'adaptive',
   ticksPerMeasure: DURATION_SPECIMEN_TICKS_PER_MEASURE,
   measuresPerSystem: 3,
   title: 'Duration Working-Set Specimen',

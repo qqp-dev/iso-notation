@@ -13,11 +13,12 @@ import {
   tickAtPoint,
 } from '../src/ui/playhead';
 
-const GEO = computePageGeometry(DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+const SCORE = buildBachGoldbergVar1Score();
+const GEO = computePageGeometry(DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, SCORE);
 const SYS0 = GEO.systems[0];
 
 test('locateTick: tick 0 opens the first system on the first beat column', () => {
-  const score = buildBachGoldbergVar1Score();
+  const score = SCORE;
   const pos = locateTick(score, 0);
   assert.equal(pos.page, 0);
   assert.equal(pos.system, 0);

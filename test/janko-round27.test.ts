@@ -70,7 +70,11 @@ test('Round 27 registry purity: exactly 2 cards, control = fixed-4, single open 
     const resolved = resolveCandidate(card);
     for (const [k, v] of Object.entries(resolved.options)) {
       if (k === 'core') {
-        assert.notEqual(v, golden.core, `${card.id} changes core`);
+        if (card.id === 'core-fixed-4') {
+          assert.notEqual(v, golden.core, `${card.id} departs from golden core`);
+        } else {
+          assert.equal(v, golden.core, `${card.id} matches new golden core`);
+        }
       } else {
         assert.deepEqual(v, (golden as any)[k], `${card.id} leaves ${k} locked to golden`);
       }
@@ -191,4 +195,27 @@ test('Candidate captions match rendered fold counts', () => {
 
   assert.match(control.description ?? '', /1 folded note/);
   assert.match(contender.description ?? '', /9 folded notes/);
+});
+
+// ---------------------------------------------------------------------------
+// 6. New-golden regression pins (R27 verdict enacted)
+// ---------------------------------------------------------------------------
+
+test('New-golden pins: fixed-3 default, zero folds/brackets on Bach, C2 and C6 extensions fire', () => {
+  assert.equal(DEFAULT_JANKO_OPTIONS.core, 'fixed-3', 'golden default core is fixed-3');
+
+  const layouts = layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const folded = layouts.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
+  assert.equal(folded.length, 0, 'Bach golden renders 0 folded notes');
+  const brackets = layouts.flatMap((s) => s.ottavaBrackets ?? []);
+  assert.equal(brackets.length, 0, 'Bach golden renders 0 ottava brackets');
+
+  // Extension rule visibly working on the golden:
+  // C2 extension (lin 24) fires on at least one low system (lin 26–29 notes)
+  const c2Systems = layouts.filter((s) => (s.geometry.extensionLines ?? []).includes(24));
+  assert.ok(c2Systems.length >= 1, 'Bach golden fires C2 extension on at least one low system');
+
+  // C6 extension (lin 72) fires on at least one high system (lin 72–74 notes)
+  const c6Systems = layouts.filter((s) => (s.geometry.extensionLines ?? []).includes(72));
+  assert.ok(c6Systems.length >= 1, 'Bach golden fires C6 extension on at least one high system');
 });

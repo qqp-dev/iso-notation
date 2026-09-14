@@ -224,10 +224,13 @@ const LOWER_FIRST_ROWS: ReadonlyArray<readonly [string, number]> = [
   ['brahms', 9432],
 ];
 
+const BACH_ADAPTIVE_OPTIONS = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const };
+const BRAHMS_ADAPTIVE_OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
+
 test('§D lower-first: all sixteen rows put the lower head on the column', () => {
   const layouts = {
-    bach: layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS),
-    brahms: layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS),
+    bach: layoutJankoScore(BACH, BACH_ADAPTIVE_OPTIONS, DEFAULT_JANKO_TOKENS),
+    brahms: layoutJankoScore(BRAHMS, BRAHMS_ADAPTIVE_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS),
   };
   let seen = 0;
   for (const [scoreKey, tick] of LOWER_FIRST_ROWS) {
@@ -266,7 +269,7 @@ test('§D stem tripwire: the retired R19 stem-through-simultaneity signatures ar
   // tripwire FAILS if either signature reappears.
   for (const [label, score, options, tokens] of [
     ['Bach', BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS],
-    ['Brahms', BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS],
+    ['Brahms', BRAHMS, BRAHMS_ADAPTIVE_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS],
   ] as const) {
     const report = lintJankoScore(score, options, tokens);
     assert.equal(
@@ -471,7 +474,7 @@ test('No-move guard: Bach’s note ink is byte-identical except the sixteen pres
   // The round prescribes: rest ink, slab seats, the 16 row swaps, and the
   // (unchanged) flags/dots. Every notehead and column outside those rows must be
   // exactly where it was — proven structurally by the row census.
-  const layouts = layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BACH, BACH_ADAPTIVE_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.equal(layouts.flatMap((l) => l.notes).length, 550, 'one merged head, as in Round 20');
   const swapped = new Set(LOWER_FIRST_ROWS.filter(([s]) => s === 'bach').map(([, t]) => t));
   // Every mixed-hand same-row onset is one of the sixteen, and every one of
