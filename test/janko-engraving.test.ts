@@ -45,6 +45,7 @@ import {
   computePageGeometry,
   countJankoPages,
   countJankoSystems,
+  detectStemDigitCrossings,
   getSystemGeometry,
   getMarginFurniture,
   layoutJankoScore,
@@ -66,8 +67,14 @@ import {
   renderSubdivisionMark,
   subdivisionMarkCount,
   computeClaspGeometry,
-  SUBDIVISION_TAB_THICKNESS,
+  beamRailPathD,
 } from '../src/render/janko/elements/rhythm';
+import {
+  URTEXT_FLAGS_DOWN,
+  URTEXT_FLAGS_UP,
+  URTEXT_REST_QUARTER,
+  URTEXT_REST_SIXTEENTH,
+} from '../src/render/janko/elements/urtext-paths';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
   JANKO_HALO_STROKE_WIDTH,
@@ -78,7 +85,6 @@ import {
 } from '../src/render/janko/elements/notehead';
 import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
 import {
-  QUARTER_CONTOUR_POINTS,
   REST_HEAD_RX,
   REST_HEAD_RY,
   REST_SLAB_HEIGHT,
@@ -416,7 +422,7 @@ test('Zero corridor ledger cuts across the canonical Bach score (mm. 3 & 4 inclu
   }
 });
 
-test('Position of Honor halo ring (R = 6.2pt) is emitted at tick 0 of Measure 1', () => {
+test('Position of Honor halo ring (R = 6.2pt) is emitted at tick 0 of Measure 1 (opt-in)', () => {
   close(TOKENS.haloRadius, 6.2, 'canonical halo radius');
   assert.match(renderHalo(10, 20, TOKENS), /r="6\.20"/);
   assert.match(renderHalo(10, 20), /r="6\.20"/, 'halo radius survives default tokens');
@@ -424,18 +430,19 @@ test('Position of Honor halo ring (R = 6.2pt) is emitted at tick 0 of Measure 1'
   const score = buildBachGoldbergVar1Score();
   const tickZero = score.notes.filter((n) => n.startTick === 0);
   assert.equal(tickZero.length, 2, 'Bach Variation 1 opens with two tick-0 sounds');
-  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const haloOpts = { ...OPTIONS, showHonorHalo: true };
+  const crop = renderJankoCrop(score, 1, 2, haloOpts, TOKENS);
   const halos = crop.match(/class="janko-halo"/g) ?? [];
   assert.equal(halos.length, tickZero.length, 'one halo per opening sound');
   assert.match(crop, /r="6\.20"/);
   // Every halo sits inside Measure 1 (before the first internal barline).
-  const geo = computePageGeometry(OPTIONS, TOKENS);
+  const geo = computePageGeometry(haloOpts, TOKENS);
   const m1Right = geo.staffLeft + geo.measureWidth;
   for (const m of crop.matchAll(/class="janko-halo" cx="([\d.]+)"/g)) {
     assert.ok(Number(m[1]) < m1Right, 'halo belongs to tick 0 of Measure 1');
   }
   // A crop of m. 2 must not place any halo inside the m. 2 x-span.
-  const m2 = renderJankoCrop(score, 2, 1, OPTIONS, TOKENS);
+  const m2 = renderJankoCrop(score, 2, 1, haloOpts, TOKENS);
   const m2Left = geo.staffLeft + geo.measureWidth;
   const m2Right = geo.staffLeft + 2 * geo.measureWidth;
   for (const m of m2.matchAll(/class="janko-halo" cx="([\d.]+)"/g)) {
@@ -476,7 +483,7 @@ test('computePageGeometry: A4 portrait, accolade-anchored staff column, 4 system
     Math.abs(geo.slotHeight - geo.bodyHeight / 4) < 1e-9,
     'four equal slots share the body height'
   );
-  close(geo.staffLeft, geo.margin + TOKENS.accoladeWidth + TOKENS.accoladeGap, 'staff left');
+  close(geo.staffLeft, geo.marginLeft + TOKENS.accoladeWidth + TOKENS.accoladeGap, 'staff left');
   close(geo.measureWidth, geo.staffWidth / 4, 'measure width');
   close(geo.pageWidth, 595.28, 'A4 width');
   close(geo.pageHeight, 841.89, 'A4 height');
@@ -485,6 +492,79 @@ test('computePageGeometry: A4 portrait, accolade-anchored staff column, 4 system
     close(sys.equatorY('LH', 3) - sys.middleCY, 15.0, 'LH o3 below spine');
     assert.ok(sys.staffTopY < sys.staffBotY);
   }
+});
+
+test('computePageGeometry: asymmetric page margins override per side, null follows pageMargin', () => {
+  const sym = computePageGeometry(OPTIONS, TOKENS);
+  close(sym.marginLeft, 20.0, 'golden left margin');
+  close(sym.marginRight, 20.0, 'golden right margin');
+
+  // Explicit nulls still follow the pageMargin fallback.
+  const fallback = computePageGeometry(
+    { ...OPTIONS, pageMarginLeft: null, pageMarginRight: null },
+    TOKENS
+  );
+  close(fallback.marginLeft, 24.0, 'null left follows pageMargin');
+  close(fallback.marginRight, 24.0, 'null right follows pageMargin');
+
+  const asym = computePageGeometry(
+    { ...OPTIONS, pageMarginLeft: 18, pageMarginRight: 6 },
+    TOKENS
+  );
+  close(asym.marginLeft, 18.0, 'left override');
+  close(asym.marginRight, 6.0, 'right override');
+  close(
+    asym.staffLeft,
+    18 + TOKENS.accoladeWidth + TOKENS.accoladeGap,
+    'staff left honors the left margin'
+  );
+  close(asym.staffRight, asym.pageWidth - 6, 'staff right honors the right margin');
+  close(asym.staffWidth, sym.staffWidth + 16, 'reclaimed width reaches the staff');
+  close(asym.slotHeight, sym.slotHeight, 'vertical geometry untouched by side margins');
+
+  const half = computePageGeometry(
+    { ...OPTIONS, pageMarginLeft: null, pageMarginRight: 10 },
+    TOKENS
+  );
+  close(half.marginLeft, 24.0, 'null side still follows pageMargin');
+  close(half.marginRight, 10.0, 'set side overrides');
+});
+
+test('computePageGeometry: top/bottom margin overrides shift and spread the systems', () => {
+  const base = computePageGeometry(OPTIONS, TOKENS);
+  close(base.marginTop, 30.0, 'golden top margin');
+  close(base.marginBottom, 14.0, 'golden bottom margin');
+
+  // Explicit nulls still follow the pageMargin fallback.
+  const fallback = computePageGeometry(
+    { ...OPTIONS, pageMarginTop: null, pageMarginBottom: null },
+    TOKENS
+  );
+  close(fallback.marginTop, 24.0, 'null top follows pageMargin');
+  close(fallback.marginBottom, 24.0, 'null bottom follows pageMargin');
+
+  // The golden 30/14/14 stack against the old symmetric 24/24/24 one.
+  const symBase = computePageGeometry(
+    { ...OPTIONS, pageMarginTop: 24, pageMarginBottom: 24, footerHeight: 24 },
+    TOKENS
+  );
+  const v = computePageGeometry(
+    { ...OPTIONS, pageMarginTop: 30, pageMarginBottom: 14, footerHeight: 14 },
+    TOKENS
+  );
+  close(v.marginTop, 30.0, 'top override');
+  close(v.marginBottom, 14.0, 'bottom override');
+  close(v.bodyHeight, symBase.bodyHeight + 14, 'reclaimed vertical reaches the body');
+  close(v.slotHeight, symBase.slotHeight + 3.5, 'each system gains spread');
+  close(
+    v.systems[0].slotTopY,
+    symBase.systems[0].slotTopY + 6,
+    'everything starts lower from the top'
+  );
+  close(v.staffWidth, symBase.staffWidth, 'horizontal geometry untouched by top/bottom');
+
+  const page = renderJankoPage(buildBachGoldbergVar1Score(), 0, { ...OPTIONS, pageMarginBottom: 14 }, TOKENS);
+  assert.match(page, /janko-page-num"[^>]*>Page 1 of 2<\//, 'page number still emitted');
 });
 
 test('renderJankoPage: well-formed 4-system page with all rhythm styles available', () => {
@@ -565,7 +645,7 @@ test('Round 10 multi-page headers: full title block on page 1, running header af
     assert.match(
       header,
       new RegExp(
-        `<text x="${geo.margin.toFixed(2)}" y="${(geo.margin + 10).toFixed(2)}" class="janko-running-head">` +
+        `<text x="${geo.marginLeft.toFixed(2)}" y="${(geo.marginTop + 10).toFixed(2)}" class="janko-running-head">` +
           'Johann Sebastian Bach · Goldberg-Variationen · Variatio 1\\. a 1 Clav\\.</text>'
       ),
       `page ${pageIndex + 1} carries the discreet running header at margin + 10`
@@ -835,7 +915,7 @@ test('Row-snapped parity offset: the canonical Bach score is unchanged on unaffe
 test('Token/option overrides flow through every renderer (pluggable design)', () => {
   const score = buildBachGoldbergVar1Score();
   const tokens = resolveJankoTokens({ rowHeight: 18, noteheadRadius: 5, haloRadius: 6.4 });
-  const options = resolveJankoOptions({ middleCSpine: 'double', interStaffGap: 60 });
+  const options = resolveJankoOptions({ middleCSpine: 'double', interStaffGap: 60, showHonorHalo: true });
   close(tokens.octaveStep, 30, 'octaveStep keeps its canonical default');
   const crop = renderJankoCrop(score, 1, 1, options, tokens);
   assert.match(crop, /r="6\.40"/, 'halo override');
@@ -879,6 +959,42 @@ test('Subdivision Invariant: beat grid replaces time signature, octave/hand labe
 
   // 5. Notes use beamed rhythm by default
   assert.match(crop, /class="janko-beam"/);
+});
+
+test('beamRailPathD extends stem-centre connectors to flush vertical faces', () => {
+  // Horizontal rail: one stem half-width (0.45pt) of extension each end.
+  assert.equal(
+    beamRailPathD(0, 70, 20, 70, 1.8),
+    'M -0.45 69.10 L 20.45 69.10 L 20.45 70.90 L -0.45 70.90 Z'
+  );
+  // Sloped rail: extension runs along the slope, so the angle is preserved.
+  const d = beamRailPathD(0, 0, 10, 1, 1.8);
+  const nums = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+  const [ax, ayT, bx, byT, , byB, , ayB] = nums;
+  assert.equal(ax.toFixed(2), nums[6].toFixed(2), 'left face vertical');
+  assert.equal(bx.toFixed(2), nums[4].toFixed(2), 'right face vertical');
+  assert.ok(ax < 0 && bx > 10, 'rail covers the outer stem edges');
+  const slope = (byT + byB) / 2 - (ayT + ayB) / 2;
+  assert.ok(Math.abs(slope / (bx - ax) - 0.1) < 0.002, 'slope unchanged by extension');
+});
+
+test('Beam rails are stem-flush filled paths with vertical end faces', () => {
+  const score = buildBachGoldbergVar1Score();
+  const page = renderJankoPage(score, 0, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+
+  // No beam survives as a stroked line: a butt cap cuts a slanted face on slopes.
+  const beamLines = [...page.matchAll(/<line[^>]*class="[^"]*janko-beam[^"]*"[^>]*>/g)];
+  assert.equal(beamLines.length, 0, 'every rail is a filled path, not a stroked line');
+
+  // Every rail is a filled parallelogram: M ax ayT L bx byT L bx byB L ax ayB Z.
+  const rails = [...page.matchAll(/<path[^>]*class="[^"]*janko-beam[^"]*"[^>]*d="([^"]+)"[^>]*>/g)];
+  assert.ok(rails.length > 0, 'the page carries beam rails');
+  for (const rail of rails) {
+    const nums = rail[1].match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    assert.equal(nums.length, 8, 'rail is a 4-corner parallelogram');
+    assert.equal(nums[0].toFixed(2), nums[6].toFixed(2), 'left end face is vertical');
+    assert.equal(nums[2].toFixed(2), nums[4].toFixed(2), 'right end face is vertical');
+  }
 });
 
 test('Round 10 staff hierarchy: uniform equators, canonical start mark and lightened numerals', () => {
@@ -935,7 +1051,7 @@ test('Round 10 staff hierarchy: uniform equators, canonical start mark and light
   const geo = computePageGeometry(OPTIONS, TOKENS);
   assert.equal(
     geo.staffLeft,
-    24.0 + DEFAULT_JANKO_TOKENS.accoladeWidth + DEFAULT_JANKO_TOKENS.accoladeGap,
+    geo.marginLeft + DEFAULT_JANKO_TOKENS.accoladeWidth + DEFAULT_JANKO_TOKENS.accoladeGap,
     'the staff column keeps its reserved margin inset'
   );
   const openFurniture = getMarginFurniture(geo.systems[0], TOKENS, 1, undefined, 'open-halo');
@@ -1010,12 +1126,12 @@ test('Round 10 staff hierarchy: uniform equators, canonical start mark and light
 
 test('Round 20 rest cuts: five distinct monoline grammars, all clean', () => {
   const score = buildBachGoldbergVar1Score();
-  // The unique ink marker of every dialect: the golden cut shares the classical
-  // hook and serpentine class names with the urtext control, so the exclusion
-  // check keys on what only that dialect paints.
+  // The unique ink marker of every dialect. Round 22: the classical cut is
+  // transcribed Bravura (`janko-rest-verbatim`); kinetic keeps the measured
+  // monoline builders. The exclusion check keys on what only that dialect paints.
   const signatures: Record<JankoRestStyle, RegExp> = {
     'kinetic-monoline': /janko-rest-(hook|slab|lightning)"/,
-    'classical-urtext': /janko-rest-(hook-bulb|block|stem-line|serpentine)/,
+    'classical-urtext': /janko-rest-(verbatim|block)/,
     'geometric-node': /janko-rest-(node|ray|capsule)/,
     'bauhaus-slash': /janko-rest-(slash|wing|z|box)/,
     'phantom-notehead': /janko-rest-phantom-(head|stem|flag|bar)/,
@@ -1037,27 +1153,27 @@ test('Round 20 rest cuts: five distinct monoline grammars, all clean', () => {
   assert.equal(documents.size, 5, 'the five dialects are five different engravings');
 });
 
-test('Round 21 classical cut: one measured contour per part, never a monoline stick', () => {
+test('Round 22 classical cut: transcribed Bravura contours, never assembled parts', () => {
   const score = buildBachGoldbergVar1Score();
   const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
-  // The m. 4 16th rest is the measured hooked cut: one tapered **stem**
-  // contour plus `REST_MARK_COUNT` **lobe** contours, every one of them a
-  // closed filled path — no stroked rule and no oval pushed onto a stick.
-  const paths = [...crop.matchAll(/<path class="(janko-rest-stem|janko-rest-hook)" d="([^"]+)" fill="([^"]+)" stroke="([^"]+)"/g)];
-  assert.equal(paths.length, 3, 'one stem + two lobes for the m. 4 16th');
-  for (const [, , d, fill, stroke] of paths) {
-    assert.equal(fill, '#111111', 'the classical cut is solid ink');
-    assert.equal(stroke, 'none', 'and it is filled, not stroked');
-    assert.match(d, /^M [\d.-]+ [\d.-]+ C /, 'each part is a contour with real curves');
-    assert.match(d, /Z$/, 'and it is closed');
-  }
+  // The m. 4 16th rest is ONE transcribed contour in one filled path — the
+  // segment count is the font's own, pinned against the baked table.
+  const paths = [...crop.matchAll(/<path class="janko-rest-verbatim" d="([^"]+)" fill="#111111" stroke="none"/g)];
+  assert.equal(paths.length, 1, 'the m. 4 16th is one verbatim contour, not assembled parts');
+  assert.match(crop, /data-verbatim-rest="sixteenth"/, 'tagged with its value');
+  assert.equal(
+    paths[0][1].split(' C ').length - 1,
+    URTEXT_REST_SIXTEENTH.contours[0].segments.length,
+    'every font bezier survives the transcription'
+  );
+  assert.ok(paths[0][1].trimEnd().endsWith('Z'), 'and the contour closes');
   assert.ok(
-    !/class="janko-rest-(hook-head|stem-line)"/.test(crop),
-    'the Round 20 monoline stick and its stuck-on oval are gone'
+    !/class="janko-rest-(hook-head|stem-line|stem|hook|lightning|serpentine)"/.test(crop),
+    'no R20 monoline and no R21 hand-cut parts remain'
   );
 
-  // The quarter on the specimen is the **traced measured serpentine**: one
-  // closed contour whose every sampled point is the reference outline.
+  // The specimen quarter is the transcribed `restQuarter`: one closed contour
+  // whose every bezier is the reference outline's.
   const specimenScore = buildRestDurationSpecimenScore();
   const specimenTokens = resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS);
   const quarterCrop = renderJankoCrop(
@@ -1067,14 +1183,14 @@ test('Round 21 classical cut: one measured contour per part, never a monoline st
     resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS),
     specimenTokens
   );
-  const quarter = /<path class="janko-rest-lightning" d="([^"]+)" fill="#111111" stroke="none"/.exec(
+  const quarter = /<path class="janko-rest-verbatim" d="([^"]+)" fill="#111111" stroke="none"[^>]*data-verbatim-rest="quarter"/.exec(
     quarterCrop
   );
-  assert.ok(quarter, 'the serpentine quarter is one filled contour');
+  assert.ok(quarter, 'the transcribed quarter is one filled contour');
   assert.equal(
     (quarter![1].match(/C /g) ?? []).length,
-    QUARTER_CONTOUR_POINTS,
-    'the cut is the measured contour, one cubic per sampled point'
+    URTEXT_REST_QUARTER.contours[0].segments.length,
+    'the cut is the reference contour, beziers intact'
   );
 
   // The bar pair on the specimen: **touching** the drawn staff rules — the half
@@ -1108,8 +1224,10 @@ test('Round 21 classical cut: one measured contour per part, never a monoline st
   close(halfBox.x1 - halfBox.x0, REST_SLAB_WIDTH, 'the slabs carry the measured width', 1e-9);
   close(halfBox.y1 - halfBox.y0, REST_SLAB_HEIGHT, 'and the measured thickness', 1e-9);
   // The ticket's no-move pin: the half keeps the **beat column** it has always
-  // had (R20 live: 62.61), while the whole moves to the barline midpoint.
-  close(half.x, 62.61, 'the half stays on its beat column (R20 value, unmoved)', 0.01);
+  // had — 62.61 under the 24pt margins, 58.945 under the golden 20pt margins
+  // (−4 staffLeft + ⅛·(8/3) measure growth at tick 600) — while the whole moves
+  // to the barline midpoint.
+  close(half.x, 58.945, 'the half stays on its beat column (golden value, unmoved)', 0.01);
   // Whole-measure rest centring (Gould; LilyPond NR §§2.2.1, 2.2.3): the whole
   // bar stands on the barline midpoint, not on its onset column.
   // Whole-measure rest centring (Gould; LilyPond NR §§2.2.1, 2.2.3): the whole
@@ -1120,21 +1238,18 @@ test('Round 21 classical cut: one measured contour per part, never a monoline st
   assert.ok(Math.abs(whole.x - 220.29) > 80, 'and that is 83pt from its R20 onset column');
 });
 
-test('Round 21 urtext control: the same measured cut under its own class names', () => {
+test('Round 22 urtext control: the transcribed cut under the golden default', () => {
   const score = buildBachGoldbergVar1Score();
   const options = resolveJankoOptions({ ...OPTIONS, restStyle: 'classical-urtext' });
   const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
-  // The urtext control is the same measured cut: a filled stem contour plus one
-  // filled lobe contour per mark, tagged with the urtext class names.
-  const stem = /<path class="janko-rest-stem-line" d="([^"]+)" fill="#111111" stroke="none"/.exec(crop);
-  assert.ok(stem, 'the urtext stem is a filled contour');
-  assert.match(stem![1], /Z$/, 'and it is closed');
-  assert.equal(
-    (crop.match(/class="janko-rest-hook-bulb"/g) ?? []).length,
-    2,
-    'two measured lobes for the m. 4 16th'
-  );
-  // Its quarter is the same measured serpentine, under the urtext class.
+  // The urtext control is the transcribed cut: one filled contour per rest,
+  // tagged verbatim, beziers pinned against the baked table.
+  const paths = [...crop.matchAll(/<path class="janko-rest-verbatim" d="([^"]+)" fill="#111111" stroke="none"/g)];
+  assert.equal(paths.length, 1, 'one transcribed contour for the m. 4 16th');
+  assert.match(crop, /data-verbatim-rest="sixteenth"/);
+  const baked = URTEXT_REST_SIXTEENTH.contours[0].segments.length;
+  assert.equal(paths[0][1].split(' C ').length - 1, baked, `all ${baked} font beziers survive`);
+  // Its quarter is the same transcription, under the verbatim tag.
   const specimenScore = buildRestDurationSpecimenScore();
   const specimenTokens = resolveJankoTokens(REST_DURATION_SPECIMEN_JANKO_TOKENS);
   const quarterCrop = renderJankoCrop(
@@ -1144,7 +1259,8 @@ test('Round 21 urtext control: the same measured cut under its own class names',
     resolveJankoOptions({ ...REST_DURATION_SPECIMEN_JANKO_OPTIONS, restStyle: 'classical-urtext' }),
     specimenTokens
   );
-  assert.match(quarterCrop, /class="janko-rest-serpentine" d="[^"]*C [^"]*Z"/, 'the urtext quarter is the measured serpentine');
+  assert.match(quarterCrop, /class="janko-rest-verbatim" d="[^"]*C [^"]*Z"/, 'the urtext quarter is one transcribed contour');
+  assert.match(quarterCrop, /data-verbatim-rest="quarter"/);
 });
 
 test('Round 20 phantom notehead rests stand exactly where the unvoiced note would have been', () => {
@@ -1193,10 +1309,10 @@ test('Round 13 multi-system crops span the staff column instead of collapsing to
   const multi = computeCropBox(geo, 27, 3, true);
   assert.equal(multi.firstSystem, 6);
   assert.equal(multi.lastSystem, 7);
-  close(multi.x, geo.margin - 8.0, 'a system-spanning crop opens at the page margin', 1e-9);
+  close(multi.x, geo.marginLeft - 8.0, 'a system-spanning crop opens at the page margin', 1e-9);
   close(
     multi.w,
-    geo.staffRight - geo.margin + 16.0,
+    geo.staffRight - geo.marginLeft + 16.0,
     'and spans the whole staff column',
     1e-9
   );
@@ -1553,13 +1669,14 @@ test('Optical notehead: 5.8pt digits sit dead-centre in the rectangular knockout
   );
 });
 
-test('Stem attachment: every stem starts flush outside its mask edge — and its halo at tick 0', () => {
+test('Stem attachment: every stem starts flush outside its mask edge — and its halo at tick 0 (halo opt-in)', () => {
   const score = buildBachGoldbergVar1Score();
+  const haloOpts = { ...OPTIONS, showHonorHalo: true };
   const radii = getStemAttachmentRadii(TOKENS, OPTIONS);
-  close(radii.regular, SPACING_PRESET.hy + 0.2, 'regular attachment radius');
+  close(radii.regular, SPACING_PRESET.hy + TOKENS.stemAttachmentAir, 'regular attachment radius');
   close(radii.honor, TOKENS.haloRadius + 0.4, 'Position of Honor attachment radius');
 
-  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  const layouts = layoutJankoScore(score, haloOpts, TOKENS);
   let honored = 0;
   for (const layout of layouts) {
     for (const p of layout.notes) {
@@ -1581,7 +1698,7 @@ test('Stem attachment: every stem starts flush outside its mask edge — and its
 
   // SVG level: every engraved stem starts exactly on the flush perimeter.
   const system0 = layouts[0];
-  const crop = renderJankoCrop(score, 1, 2, OPTIONS, TOKENS);
+  const crop = renderJankoCrop(score, 1, 2, haloOpts, TOKENS);
   const expectedStarts = new Set(
     system0.notes.map((p) => {
       const s = getStemGeometry(p.rhythm, TOKENS);
@@ -1597,6 +1714,76 @@ test('Stem attachment: every stem starts flush outside its mask edge — and its
   }
   for (const start of expectedStarts) {
     assert.ok(starts.includes(start), `notehead stem start ${start} must reach the document`);
+  }
+});
+
+test('stemAttachmentAir token: breathing room between mask edge and stem start', () => {
+  const radii = getStemAttachmentRadii({ ...TOKENS, stemAttachmentAir: 1.0 }, OPTIONS);
+  close(radii.regular, SPACING_PRESET.hy + 1.0, 'override moves the regular radius');
+
+  const score = buildBachGoldbergVar1Score();
+  const layouts = layoutJankoScore(score, OPTIONS, { ...TOKENS, stemAttachmentAir: 1.0 });
+  const plain = layouts.flatMap((l) => l.notes).find((p) => p.note.startTick !== 0);
+  assert.ok(plain, 'score has a non-opening note');
+  close(plain.rhythm.stemAttachR ?? -1, SPACING_PRESET.hy + 1.0, 'laid-out stemAttachR follows the token');
+});
+
+test('showHonorHalo: false removes the opening rings and drops tick-0 stems to the regular radius', () => {
+  const score = buildBachGoldbergVar1Score();
+  const noHalo = renderJankoCrop(score, 1, 1, { ...OPTIONS, showHonorHalo: false }, TOKENS);
+  assert.ok(!noHalo.includes('janko-halo'), 'no halo ring emitted');
+  const halo = renderJankoCrop(score, 1, 1, { ...OPTIONS, showHonorHalo: true }, TOKENS);
+  assert.ok(halo.includes('janko-halo'), 'opt-in halo still paints the rings');
+
+  const layouts = layoutJankoScore(score, { ...OPTIONS, showHonorHalo: false }, TOKENS);
+  for (const p of layouts.flatMap((l) => l.notes).filter((p) => p.note.startTick === 0)) {
+    close(
+      p.rhythm.stemAttachR ?? -1,
+      SPACING_PRESET.hy + TOKENS.stemAttachmentAir,
+      'tick-0 stem starts at the regular radius without its ring'
+    );
+  }
+});
+
+test('Foreign-stem crossings paint tall knockouts, columns unmoved (mm.13/14/16)', () => {
+  const score = buildBachGoldbergVar1Score();
+  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  // The five measured same-column crossings live in system 3 (mm.13–16).
+  const sys3 = layouts[3];
+  const crossings = detectStemDigitCrossings(sys3.notes, sys3.beams, sys3.ungrouped, OPTIONS, TOKENS);
+  const byId = new Map(sys3.notes.map((p) => [p.note.id, p]));
+  const ticks = new Set(
+    crossings.map((c) => byId.get(c.stemNoteId)?.note.startTick)
+  );
+  for (const tick of [1752, 1776, 1896, 1920, 2244]) {
+    assert.ok(ticks.has(tick), `tick ${tick} crossing detected`);
+  }
+  // Every crossed digit carries the tall-knockout flag; nothing fanned out.
+  for (const c of crossings) {
+    assert.equal(byId.get(c.digitNoteId)?.tallKnockout, true, `${c.digitNoteId} flagged tall`);
+  }
+  const flagged = sys3.notes.filter((p) => p.tallKnockout);
+  assert.ok(flagged.length > 0, 'crossed notes flagged');
+  for (const p of flagged) {
+    assert.ok(
+      p.nominalX === undefined || Math.abs(p.x - p.nominalX) < SPACING_PRESET.pairGap,
+      `${p.note.id} keeps its column (no fan-out)`
+    );
+  }
+  // Paint truth: flagged knockouts are exactly hy + air tall in the SVG.
+  const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
+  const rects = [
+    ...page.matchAll(
+      /class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g
+    ),
+  ].map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] }));
+  const tallH = 2 * (SPACING_PRESET.hy + TOKENS.stemAttachmentAir);
+  for (const p of flagged) {
+    const hit = rects.find(
+      (r) => Math.abs(r.x + r.w / 2 - p.x) < 0.05 && Math.abs(r.y + r.h / 2 - p.y) < 0.6
+    );
+    assert.ok(hit, `knockout painted for ${p.note.id}`);
+    close(hit.h, tallH, `${p.note.id} knockout reaches the stem-start line`);
   }
 });
 
@@ -1625,9 +1812,9 @@ test('Stems keep ≥0.7pt of clean air from their own digit glyph', () => {
   );
 });
 
-test('Measure 1 opening stems (pitch 7 RH & LH) never cut through the halo ring', () => {
+test('Measure 1 opening stems (pitch 7 RH & LH) never cut through the halo ring (halo opt-in)', () => {
   const score = buildBachGoldbergVar1Score();
-  const layout = layoutJankoScore(score, OPTIONS, TOKENS)[0];
+  const layout = layoutJankoScore(score, { ...OPTIONS, showHonorHalo: true }, TOKENS)[0];
   const opening = layout.notes.filter((p) => p.note.startTick === 0);
   assert.equal(opening.length, 2, 'two opening sounds');
   assert.deepEqual(
@@ -1746,58 +1933,50 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
   assert.ok(!crop.includes('class="janko-cut"'), 'no angled cut in the beamed dialect');
 
   const ungrouped = system0.ungrouped;
-  const expectedFlags = ungrouped.reduce(
-    (sum, n) => sum + (n.durationTicks <= 14 ? 2 : n.durationTicks <= 38 ? 1 : 0),
-    0
-  );
+  const flaggedNotes = ungrouped.filter((n) => subdivisionMarkCount(n.durationTicks) >= 1);
   const expectedDots = ungrouped.filter(
     (n) => n.durationTicks > 26 && n.durationTicks <= 38
   ).length;
   const flags = [
     ...crop.matchAll(
-      /<(?:line|path) class="janko-flag" data-stem-x="([\d.]+)" data-flag-index="(\d)"[^>]*>/g
+      /<path class="janko-flag" data-stem-x="([\d.]+)" data-flag-count="(\d)" d="([^"]+)" fill="#111111" stroke="none" fill-rule="evenodd"/g
     ),
   ];
-  assert.equal(flags.length, expectedFlags, 'one mark per 8th, two per 16th');
+  assert.equal(flags.length, flaggedNotes.length, 'one transcribed glyph per flagged note, never a stack');
   assert.equal(
     (crop.match(/class="janko-augmentation-dot"/g) ?? []).length,
     expectedDots,
     'one augmentation dot per dotted solitary value'
   );
 
-  // Standard flag geometry (Round 20): the classical tapered hook. It is rooted
-  // on the stem with a ~1.1pt root, sweeps to the stem's own side and never
-  // reaches beyond its tokenised width or drop.
-  for (const m of flags) {
-    const stemX = Number(m[1]);
-    const element = m[0];
-    assert.ok(element.startsWith('<path'), 'the classical flag is a filled taper');
-    assert.match(element, /fill="#111111" stroke="none"/, 'a solid tapered hook');
-    const d = / d="([^"]+)"/.exec(element)![1];
-    const points = [...d.matchAll(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)].map((pair) => [
-      Number(pair[1]),
-      Number(pair[2]),
+  // Round 22: each flag is one transcribed Bravura glyph at the stem tip.
+  // Join every flag to its note by stem column and pin the transcription
+  // against the baked table (count, contour beziers, origin anchor).
+  for (const [, stemXRaw, countRaw, d] of flags) {
+    const stemX = Number(stemXRaw);
+    const count = Number(countRaw);
+    const note = flaggedNotes.find((n) => Math.abs(n.x - stemX) < 0.02);
+    assert.ok(note, `flag at x=${stemX} belongs to a note`);
+    assert.equal(count, subdivisionMarkCount(note.durationTicks), 'glyph selected by subdivision count');
+    const s = getStemGeometry(note, TOKENS);
+    const table = s.direction === -1 ? URTEXT_FLAGS_UP : URTEXT_FLAGS_DOWN;
+    const glyph = table[count - 1];
+    const baked = glyph.contours.reduce((n, c) => n + c.segments.length, 0);
+    assert.equal(d.split(' C ').length - 1, baked, 'every font bezier survives');
+    assert.ok(d.trimEnd().endsWith('Z'), 'contours close');
+    // Origin anchor: the SMuFL stem-tip point sits exactly on (stemX, tipY),
+    // so the painted box is the baked box translated there (f() rounds 2dp).
+    const nums = [...d.matchAll(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)].map((m) => [
+      Number(m[1]),
+      Number(m[2]),
     ]);
-    const anchor = points[0];
-    const rootFoot = points[points.length - 1];
-    const tip = points[3];
-    assert.equal(anchor[0], stemX, 'the hook roots on the stem column');
-    assert.equal(rootFoot[0], stemX, 'and closes on the same column');
-    assert.ok(
-      Math.abs(Math.abs(rootFoot[1] - anchor[1]) - SUBDIVISION_TAB_THICKNESS) < 0.02,
-      'the root is the 1.1pt cut'
-    );
-    assert.ok(
-      Math.max(...points.map((p) => p[0])) - stemX <= TOKENS.flagWidth + 1e-9,
-      'the hook keeps its tokenised reach'
-    );
-    assert.ok(
-      Math.max(...points.map((p) => p[1])) - anchor[1] <= TOKENS.flagHeight + 1e-9,
-      'and its tokenised drop'
-    );
-    // The sweep follows the stem: an up-stem (RH) hooks downward to its tip.
-    assert.ok(tip[1] > anchor[1], 'the up-stem hook sweeps downward');
-    assert.ok(tip[0] > stemX, 'and reaches right of the stem');
+    const xs = nums.map(([x]) => x);
+    const ys = nums.map(([, y]) => y);
+    const [bx0, by0, bx1, by1] = glyph.bbox;
+    assert.ok(Math.abs(Math.min(...xs) - (stemX + bx0)) < 0.02, 'painted left edge is the baked edge on the stem');
+    assert.ok(Math.abs(Math.min(...ys) - (s.stemEndY + by0)) < 0.02, 'painted top is the baked top at the tip');
+    assert.ok(Math.abs(Math.max(...xs) - (stemX + bx1)) < 0.02, 'painted right edge matches');
+    assert.ok(Math.abs(Math.max(...ys) - (s.stemEndY + by1)) < 0.02, 'painted bottom matches');
   }
 
   // mm. 1–2: the solitary dotted 8ths of pitch 7 (m. 1) and pitch 2 (m. 2).
@@ -1847,11 +2026,11 @@ function subdivisionAnchorY(markup: string): number {
   return Number(/ y1="([\d.]+)"/.exec(markup)![1]);
 }
 
-test('Round 9/20: every subdivision dialect dispatches the classical taper at the stem tip', () => {
+test('Round 9/20/22: subdivision dialects dispatch at the stem tip (crescents stack, classical transcribes)', () => {
   assert.equal(
     DEFAULT_JANKO_OPTIONS.subdivisionStyle,
-    'kinetic-tab-beam',
-    'the golden master settles the beam-anchored cut'
+    'classical-urtext',
+    'the golden master settles the transcribed cut'
   );
   assert.deepEqual(
     [...JANKO_SUBDIVISION_STYLES],
@@ -1883,6 +2062,23 @@ test('Round 9/20: every subdivision dialect dispatches the classical taper at th
       `${style} is a flag, never a duration crossbar`
     );
     assert.ok(markup.includes(`data-subdivision-style="${style}"`), `${style} tags its ink`);
+    if (style === 'classical-urtext') {
+      // Round 22: one transcribed 16th glyph (outer sweep + open counter),
+      // never a two-crescent stack.
+      assert.match(markup, /data-flag-count="2"/, 'the glyph knows its count');
+      assert.match(markup, /fill-rule="evenodd"/, 'counters stay open');
+      assert.equal(
+        (markup.match(/class="janko-flag"/g) ?? []).length,
+        1,
+        'one verbatim glyph per note'
+      );
+      const table = stem.direction === -1 ? URTEXT_FLAGS_UP : URTEXT_FLAGS_DOWN;
+      const baked = table[1].contours.reduce((n, c) => n + c.segments.length, 0);
+      const d = /d="([^"]+)" fill="#111111" stroke="none" fill-rule="evenodd"/.exec(markup)![1];
+      assert.equal(d.split(' C ').length - 1, baked, 'every font bezier survives');
+      roots.add('verbatim-transplant');
+      continue;
+    }
     const marks = [
       ...markup.matchAll(/class="janko-flag" data-stem-x="([\d.]+)" data-flag-index="(\d)"/g),
     ];
@@ -1918,10 +2114,10 @@ test('Round 9/20: every subdivision dialect dispatches the classical taper at th
       `${style} stacks by flagSpacing`
     );
   }
-  // The only recorded difference between the dialects is the root weight: the
-  // kinetic family cuts 1.1pt, the tapered demonstrator 1.4pt, the urtext
-  // control 0.9pt — one shared classical hook, three root weights.
-  assert.equal(roots.size, 3, 'the taper is shared; only the root weight distinguishes the styles');
+  // The recorded difference between the dialects: the kinetic family cuts
+  // 1.1pt, the tapered demonstrator 1.4pt, and the classical control is the
+  // verbatim transplant — three distinct first marks.
+  assert.equal(roots.size, 3, 'three distinct first marks across the dialects');
 
   // The multi-tier grammar: 8th → 1 hook, 16th → 2 hooks, 32nd → 3 hooks.
   const marksFor = (durationTicks: number): number => {
@@ -1945,15 +2141,17 @@ test('Round 9/20: every subdivision dialect dispatches the classical taper at th
   const claspMarkup = renderChordClasp(clasped, TOKENS);
   assert.ok(!claspMarkup.includes('janko-flag'), 'no subdivision ink on the clasp');
 
-  // End to end: the golden default dispatches the settled cut, and the control
-  // dialect still dispatches on request.
+  // End to end: the golden default dispatches the transcribed cut, and a
+  // crescent dialect still dispatches stacked marks on request.
   const golden = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, OPTIONS, TOKENS);
-  assert.match(golden, /data-subdivision-style="kinetic-tab-beam"/);
+  assert.match(golden, /data-subdivision-style="classical-urtext"/);
+  assert.match(golden, /data-flag-count="/, 'the golden flag is one transcribed glyph');
   const control = renderJankoCrop(buildBachGoldbergVar1Score(), 1, 2, {
     ...OPTIONS,
-    subdivisionStyle: 'classical-urtext',
+    subdivisionStyle: 'kinetic-tab-beam',
   }, TOKENS);
-  assert.match(control, /data-subdivision-style="classical-urtext"/);
+  assert.match(control, /data-subdivision-style="kinetic-tab-beam"/);
+  assert.match(control, /data-flag-index="/, 'the crescent control still stacks');
 });
 
 test('Beam clearance: every notehead keeps a full stem length to its beam (mm. 2 & 4 ascents)', () => {

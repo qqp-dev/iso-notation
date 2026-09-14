@@ -54,6 +54,12 @@ export interface JankoNoteheadSpec {
   isPositionOfHonor?: boolean;
   /** Optional per-note digit override (defaults to the duodecimal digit). */
   digit?: string;
+  /**
+   * True when a foreign stem crosses this note: the knockout grows taller
+   * (`hy + stemAttachmentAir`, exactly the stem-start line) so the stem
+   * resumes with the same breathing room as an own-stem attachment.
+   */
+  tallKnockout?: boolean;
 }
 
 /** Stroke width of the Position of Honor halo ring (pt). */
@@ -183,7 +189,12 @@ export function renderNotehead(
   if (spec.isPositionOfHonor) {
     parts.push(renderHalo(spec.x, spec.y, tokens));
   }
-  parts.push(renderNoteheadKnockout(spec.x, spec.y, tokens, layoutOptions));
+  const t = resolveJankoTokens(tokens);
+  const preset = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
+  const maskOverride = spec.tallKnockout
+    ? { wx: preset.wx, hy: preset.hy + t.stemAttachmentAir }
+    : undefined;
+  parts.push(renderNoteheadKnockout(spec.x, spec.y, tokens, layoutOptions, maskOverride));
   parts.push(
     renderNoteheadDigit(spec.x, spec.y, spec.pitchClass, spec.hand ?? 'RH', tokens, spec.digit)
   );

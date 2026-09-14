@@ -90,7 +90,7 @@ import {
   CLASP_MIN_VERTICAL_CHORD,
   CLASP_TRANSVERSE_WIDTH,
   HONOR_STEM_ATTACHMENT_AIR,
-  STEM_ATTACHMENT_AIR,
+  JANKO_STEM_STROKE_WIDTH,
   bridgeBeamGroupsAcrossRests,
   claspDurationClass,
   claspInkBox,
@@ -99,6 +99,7 @@ import {
   computeClaspGeometry,
   computeVerticalChordGroup,
   getStemAttachmentRadius,
+  getStemGeometry,
   partitionBeamGroups,
   renderBeamGroup,
   renderChordBridges,
@@ -174,20 +175,24 @@ export function computePageGeometry(
   const t = resolveJankoTokens(tokens);
 
   const margin = o.pageMargin;
-  const printableHeight = o.pageHeight - 2 * margin;
+  const marginLeft = o.pageMarginLeft ?? margin;
+  const marginRight = o.pageMarginRight ?? margin;
+  const marginTop = o.pageMarginTop ?? margin;
+  const marginBottom = o.pageMarginBottom ?? margin;
+  const printableHeight = o.pageHeight - marginTop - marginBottom;
   const bodyHeight = printableHeight - o.headerHeight - o.footerHeight;
   const systemsPerPage = Math.max(1, Math.round(o.systemsPerPage));
   const measuresPerSystem = Math.max(1, Math.round(o.measuresPerSystem));
   const slotHeight = bodyHeight / systemsPerPage;
 
-  const staffLeft = margin + t.accoladeWidth + t.accoladeGap;
-  const staffRight = o.pageWidth - margin;
+  const staffLeft = marginLeft + t.accoladeWidth + t.accoladeGap;
+  const staffRight = o.pageWidth - marginRight;
   const staffWidth = staffRight - staffLeft;
   const measureWidth = staffWidth / measuresPerSystem;
 
   const systems: JankoSystemGeometry[] = [];
   for (let s = 0; s < systemsPerPage; s++) {
-    const slotTopY = margin + o.headerHeight + s * slotHeight;
+    const slotTopY = marginTop + o.headerHeight + s * slotHeight;
     const systemTopY = slotTopY + 12.0;
     const middleCY = systemTopY + 22.0 + t.octaveStep + o.interStaffGap / 2;
     const equatorY = (hand: Hand, octave: number): number =>
@@ -218,6 +223,10 @@ export function computePageGeometry(
     pageWidth: o.pageWidth,
     pageHeight: o.pageHeight,
     margin,
+    marginLeft,
+    marginRight,
+    marginTop,
+    marginBottom,
     headerHeight: o.headerHeight,
     footerHeight: o.footerHeight,
     bodyHeight,
@@ -249,21 +258,21 @@ function svgOpen(box: SvgBox): string {
 function renderPageHeader(geo: JankoPageGeometry, pageIndex: number, totalPages: number): string {
   const o = geo.options;
   void totalPages;
-  const y = geo.margin;
+  const y = geo.marginTop;
   if (pageIndex === 0) {
     const cx = geo.pageWidth / 2;
     return [
       '  <g id="page-header">',
       `    <text x="${f(cx)}" y="${f(y + 14)}" class="janko-title" text-anchor="middle">${o.title}</text>`,
       `    <text x="${f(cx)}" y="${f(y + 27)}" class="janko-subtitle" text-anchor="middle">${o.subtitle}</text>`,
-      `    <text x="${f(geo.pageWidth - geo.margin)}" y="${f(y + 27)}" class="janko-meta" text-anchor="end">${o.composer}</text>`,
+      `    <text x="${f(geo.pageWidth - geo.marginRight)}" y="${f(y + 27)}" class="janko-meta" text-anchor="end">${o.composer}</text>`,
       '  </g>',
     ].join('\n');
   }
   const running = [o.composer, o.title, o.subtitle].filter((part) => part.length > 0).join(' · ');
   return [
     '  <g id="page-header">',
-    `    <text x="${f(geo.margin)}" y="${f(y + 10)}" class="janko-running-head">${running}</text>`,
+    `    <text x="${f(geo.marginLeft)}" y="${f(y + 10)}" class="janko-running-head">${running}</text>`,
     '  </g>',
   ].join('\n');
 }
@@ -273,10 +282,12 @@ function renderPageHeader(geo: JankoPageGeometry, pageIndex: number, totalPages:
  * repetitive "Pure 12-TET Jánko Two-Row Grand Staff" slogan is gone.
  */
 function renderPageFooter(geo: JankoPageGeometry, pageIndex: number, totalPages: number): string {
-  const y = geo.pageHeight - geo.margin + 12;
+  // Pinned 12pt above the paper edge (identical to `pageHeight - margin + 12`
+  // at the golden 24pt margin), independent of the bottom margin override.
+  const y = geo.pageHeight - 12;
   return [
     '  <g id="page-footer">',
-    `    <text x="${f(geo.pageWidth - geo.margin)}" y="${f(y)}" class="janko-page-num" text-anchor="end">Page ${pageIndex + 1} of ${totalPages}</text>`,
+    `    <text x="${f(geo.pageWidth - geo.marginRight)}" y="${f(y)}" class="janko-page-num" text-anchor="end">Page ${pageIndex + 1} of ${totalPages}</text>`,
     '  </g>',
   ].join('\n');
 }
@@ -342,6 +353,12 @@ export interface PositionedJankoNote {
    * its stem leaves the merged notehead.
    */
   unisonSurvivorId?: string;
+  /**
+   * Round 23: a foreign stem crosses this note, so its knockout paints tall
+   * (`hy + stemAttachmentAir`) and the stem resumes with the same breathing
+   * room as an own-stem attachment. Paint-only: the head never moves.
+   */
+  tallKnockout?: boolean;
 }
 
 /**
@@ -1290,7 +1307,7 @@ export function positionJankoNote(
   );
   const y = geo.middleCY + coord.y;
   const preset = getClusterSpacingPreset(o.clusterSpacing);
-  const honor = isPositionOfHonor(note.startTick);
+  const honor = isPositionOfHonor(note.startTick) && o.showHonorHalo;
   return {
     note,
     coord,
@@ -1307,7 +1324,7 @@ export function positionJankoNote(
       dotY: resolveAugmentationDotY(y, geo, hand, o, t),
       stemAttachR: honor
         ? t.haloRadius + HONOR_STEM_ATTACHMENT_AIR
-        : preset.hy + STEM_ATTACHMENT_AIR,
+        : preset.hy + t.stemAttachmentAir,
     },
   };
 }
@@ -3228,6 +3245,91 @@ function mergeUnisonHeads(positioned: readonly PositionedJankoNote[]): {
   return { notes, voices, merges };
 }
 
+/** One stem-vs-foreign-digit breathing-room violation (Round 23). */
+export interface JankoStemDigitCrossing {
+  /** Id of the note (or merged voice) whose stem crosses. */
+  stemNoteId: string;
+  /** Id of the note whose digit is crossed. */
+  digitNoteId: string;
+  /** Penetration (pt) into the air-padded knockout. */
+  shortfall: number;
+}
+
+/**
+ * Every painted stem that reaches a foreign digit's air.
+ *
+ * Own stems start outside their own air by construction; a *foreign* stem —
+ * typically one hand's beam-extended stem driving past the other hand's digit
+ * in a shared column — has no such protection, and the standard knockout lets
+ * it resume with less breathing room than an own-stem attachment. This finds
+ * those crossings on final (beam-extended) extents so the crossed notes can
+ * paint tall knockouts; columns never move.
+ *
+ * Only painted stems are tested: ids in `suppressed` (clasp-replaced,
+ * vertical-chord interior, shared-stem members) are skipped. Knockout
+ * geometry is paint truth (the preset rect the renderer erases), never the
+ * halo-inflated audit box.
+ */
+export function detectStemDigitCrossings(
+  notes: readonly PositionedJankoNote[],
+  beams: readonly JankoBeamGroupGeometry[],
+  ungrouped: readonly JankoRhythmNote[],
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  suppressed?: ReadonlySet<string> | null
+): JankoStemDigitCrossing[] {
+  const air = t.stemAttachmentAir;
+  const halfStem = JANKO_STEM_STROKE_WIDTH / 2;
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+
+  interface StemSeg {
+    id: string;
+    x: number;
+    y0: number;
+    y1: number;
+  }
+  const segs = new Map<string, StemSeg>();
+  for (const beam of beams) {
+    beam.notes.forEach((n, i) => {
+      if (suppressed?.has(n.id)) return;
+      const s = beam.stems[i];
+      const yEnd = beam.beamY(s.stemX);
+      segs.set(n.id, {
+        id: n.id,
+        x: s.stemX,
+        y0: Math.min(s.stemStartY, yEnd),
+        y1: Math.max(s.stemStartY, yEnd),
+      });
+    });
+  }
+  for (const n of ungrouped) {
+    if (segs.has(n.id) || suppressed?.has(n.id)) continue;
+    const s = getStemGeometry(n, t);
+    segs.set(n.id, {
+      id: n.id,
+      x: s.stemX,
+      y0: Math.min(s.stemStartY, s.stemEndY),
+      y1: Math.max(s.stemStartY, s.stemEndY),
+    });
+  }
+
+  const out: JankoStemDigitCrossing[] = [];
+  for (const seg of segs.values()) {
+    for (const q of notes) {
+      if (q.note.id === seg.id) continue;
+      const x0 = q.x - preset.wx - air;
+      const x1 = q.x + preset.wx + air;
+      if (seg.x + halfStem <= x0 + EPS || seg.x - halfStem >= x1 - EPS) continue;
+      const y0 = q.y - preset.hy - air;
+      const y1 = q.y + preset.hy + air;
+      if (seg.y1 <= y0 + EPS || seg.y0 >= y1 - EPS) continue;
+      const shortfall = Math.min(seg.x + halfStem - x0, x1 - (seg.x - halfStem));
+      out.push({ stemNoteId: seg.id, digitNoteId: q.note.id, shortfall });
+    }
+  }
+  return out;
+}
+
 export function layoutJankoSystem(
   score: QuantizedGridScore,
   geo: JankoPageGeometry,
@@ -3577,11 +3679,26 @@ export function layoutJankoSystem(
     claspedStems = claspedStems.filter((id) => !carrierIds.has(id));
   }
 
+  // Round 23: flag crossed notes for tall knockouts. Paint-only — every head
+  // keeps its column; the erasure grows to the stem-start line instead.
+  const suppressed = new Set<string>([
+    ...claspedStems,
+    ...verticalChords.flatMap((chord) => chord.suppressedIds),
+    ...sharedStems.flatMap((group) => group.suppressedIds),
+  ]);
+  const crossed = new Set(
+    detectStemDigitCrossings(notes, beams, ungrouped, o, t, suppressed).map((c) => c.digitNoteId)
+  );
+  const flaggedNotes =
+    crossed.size === 0
+      ? notes
+      : notes.map((p) => (crossed.has(p.note.id) ? { ...p, tallKnockout: true } : p));
+
   return {
     index: systemIndex,
     isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
     geometry,
-    notes,
+    notes: flaggedNotes,
     beams,
     ungrouped,
     rests: restLayer.rests,
@@ -3740,7 +3857,8 @@ function renderNotesLayer(
           y: p.y,
           pitchClass: p.coord.pitchClass,
           hand: p.coord.hand,
-          isPositionOfHonor: p.note.startTick === 0,
+          isPositionOfHonor: p.note.startTick === 0 && o.showHonorHalo,
+          tallKnockout: p.tallKnockout === true,
         },
         t,
         o
@@ -3994,7 +4112,7 @@ export function computeCropBox(
 
   const x0 =
     spansSystems || startMIdx === 0
-      ? geo.margin - CROP_PAD_X
+      ? geo.marginLeft - CROP_PAD_X
       : geo.staffLeft + upbeatWidth + startMIdx * sysGeo.measureWidth - CROP_PAD_X;
   const x1 = spansSystems
     ? geo.staffRight + CROP_PAD_X

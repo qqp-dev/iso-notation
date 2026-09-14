@@ -20,6 +20,12 @@
  *    notation *system*, not two pieces): the 32nd and 64th rests join the five
  *    values, and every dialect states seven silences.
  *
+ * Round 22 keeps the table and the scale but stops redrawing: the
+ * `'classical-urtext'` hooked rests and quarter are the Bravura contours
+ * transcribed verbatim (`urtext-paths.ts`, OFL — R21's redraw had mirrored
+ * the quarter and flipped the hooks). The kinetic cut below still consumes
+ * the measured numbers; only the classical cut is a transplant.
+ *
  * ## Round 21 measurement table (Bravura v1.482, upm 1000, 1 space = 250u)
  *
  * | glyph            | code   | bbox (u)          | W (sp) | H (sp) | notes |
@@ -79,6 +85,7 @@ import {
   resolveJankoTokens,
 } from '../types';
 import { f } from './style';
+import { URTEXT_RESTS } from './urtext-paths';
 
 /**
  * The seven duration classes every dialect states — the Round 21 working set,
@@ -1163,7 +1170,33 @@ function kineticInk(o: JankoInkPoint, value: JankoRestValue, t: ResolvedJankoTok
   });
 }
 
-/** The `'classical-urtext'` cut: the same measured cut, urtext class names. */
+/**
+ * Round 22: one transcribed Bravura contour as a filled `path` primitive.
+ * The constants carry every contour point; this only translates by the draw
+ * origin — no measurement, no re-authorship. All five hooked/serpentine
+ * rests are single-contour solids, so one item each; the centroid/box
+ * machinery weighs exactly this paint.
+ */
+function verbatimRestGlyph(o: JankoInkPoint, value: JankoRestValue): JankoRestInk {
+  // Bars return early in `urtextInk`, so the key always names a hooked value.
+  const g = URTEXT_RESTS[value as keyof typeof URTEXT_RESTS];
+  const c = g.contours[0];
+  const pt = (p: readonly [number, number]): JankoInkPoint => ({ x: o.x + p[0], y: o.y + p[1] });
+  return {
+    kind: 'path',
+    cls: 'janko-rest-verbatim',
+    start: pt(c.start),
+    segments: c.segments.map(
+      ([a, b, e]) => [pt(a), pt(b), pt(e)] as [JankoInkPoint, JankoInkPoint, JankoInkPoint]
+    ),
+    close: true,
+    stroke: null,
+    fill: '#111111',
+    attrs: ` data-verbatim-rest="${value}"`,
+  };
+}
+
+/** The `'classical-urtext'` cut: Bravura outlines transcribed verbatim. */
 function urtextInk(o: JankoInkPoint, value: JankoRestValue, t: ResolvedJankoTokens): JankoRestInk[] {
   void t;
   if (isBarRestValue(value)) {
@@ -1181,8 +1214,7 @@ function urtextInk(o: JankoInkPoint, value: JankoRestValue, t: ResolvedJankoToke
       },
     ];
   }
-  if (value === 'quarter') return [serpentine(o, 'janko-rest-serpentine')];
-  return hookedRest(o, value, { stem: 'janko-rest-stem-line', lobe: 'janko-rest-hook-bulb' });
+  return [verbatimRestGlyph(o, value)];
 }
 
 /** The `'phantom-notehead'` cut: an open dashed head where the note would be. */

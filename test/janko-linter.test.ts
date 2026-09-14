@@ -62,6 +62,7 @@ import {
   checkSplitStackStems,
   checkStemAndBeamValidity,
   checkStemDigitClearance,
+  checkStemForeignDigitClearance,
   checkStemThroughSimultaneity,
   checkUnwrittenRests,
   formatLintReport,
@@ -426,7 +427,6 @@ test('Golden master: stems attach flush, keep digit air and never pierce a halo'
   for (const layout of systems()) {
     checkStemAndBeamValidity(layout, TOKENS, LINT, out);
     checkStemDigitClearance(layout, TOKENS, LINT, out);
-    checkHaloClearance(layout, TOKENS, LINT, out);
     for (const p of layout.notes) {
       const stem = getStemGeometry(p.rhythm, TOKENS);
       const attach = Math.hypot(stem.stemX - p.x, stem.stemStartY - p.y);
@@ -436,6 +436,10 @@ test('Golden master: stems attach flush, keep digit air and never pierce a halo'
       );
       if (isPositionOfHonor(p.note.startTick)) honored++;
     }
+  }
+  // The halo rule runs against the opt-in halo paint, where the rings exist.
+  for (const layout of systems({ ...DEFAULT_JANKO_OPTIONS, showHonorHalo: true })) {
+    checkHaloClearance(layout, TOKENS, LINT, out);
   }
   assert.deepEqual(out, [], 'flush stems, digit air and halo clearance all hold');
   assert.equal(honored, 2, 'both opening sounds are audited against the halo');
@@ -561,6 +565,34 @@ test('Defect: a beam driven through a notehead is caught', () => {
   assert.ok(out[0].metrics!.distance < out[0].metrics!.required);
 });
 
+test('Defect: a foreign-stem crossing without its tall knockout is caught', () => {
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('stem-foreign-digit-clearance'),
+    'check registered'
+  );
+  const layout = systems()[3];
+  const flagged = layout.notes.filter((p) => p.tallKnockout);
+  assert.ok(flagged.length > 0, 'system 3 carries crossed notes');
+  const broken: JankoSystemLayout = {
+    ...layout,
+    notes: layout.notes.map((p) => ({ ...p, tallKnockout: undefined })),
+  };
+  const out: LintViolation[] = [];
+  checkStemForeignDigitClearance(broken, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, out);
+  assert.ok(out.length > 0, 'unflagged crossings must be reported');
+  assert.ok(out.every((v) => v.code === 'stem-foreign-digit-collision'));
+  assert.ok(out.every((v) => v.severity === 'error'));
+  const victims = new Set(flagged.map((p) => p.note.id));
+  assert.ok(
+    out.every((v) => (v.noteIds ?? []).some((id) => victims.has(id))),
+    'every violation names a crossed digit'
+  );
+
+  const clean: LintViolation[] = [];
+  checkStemForeignDigitClearance(layout, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, clean);
+  assert.deepEqual(clean, [], 'flagged layout passes');
+});
+
 test('Defect: an unclamped beam slope is caught by the geometry check and the SVG audit', () => {
   const wild = { ...DEFAULT_JANKO_TOKENS, maxBeamSlope: 4.0 };
   const out: LintViolation[] = [];
@@ -579,6 +611,34 @@ test('Defect: an unclamped beam slope is caught by the geometry check and the SV
   assert.equal(audit.length, 1);
   assert.equal(audit[0].code, 'beam-slope');
   assert.ok(audit[0].metrics!.slope > 0.9);
+});
+
+test('Defect: the SVG audit reads beam centrelines from filled rail paths', () => {
+  const options = {
+    stemLength: DEFAULT_JANKO_TOKENS.stemLength,
+    maxBeamSlope: LINT.maxBeamSlope,
+    stemAttachmentRadius: REGULAR_ATTACH,
+    honorStemAttachmentRadius: HONOR_ATTACH,
+  };
+  // A rail path is a parallelogram M ax ayT L bx byT L bx byB L ax ayB Z; the
+  // audit recovers the (ax,ay)-(bx,by) centreline for the slope and landing checks.
+  const wild =
+    '<svg><path class="janko-beam" d="M 0.00 -1.00 L 10.00 9.00 L 10.00 10.80 L 0.00 0.80 Z" fill="#111"/></svg>';
+  const slopeAudit = auditStemBeamConnections(wild, {
+    stemLength: DEFAULT_JANKO_TOKENS.stemLength,
+    maxBeamSlope: LINT.maxBeamSlope,
+  });
+  assert.equal(slopeAudit.length, 1);
+  assert.equal(slopeAudit[0].code, 'beam-slope');
+  assert.ok(slopeAudit[0].metrics!.slope > 0.9);
+
+  // A non-canonical stem landing on a path-drawn rail centreline is legal.
+  const railY = 75;
+  const legal =
+    `<svg><path class="janko-beam" d="M 0.00 ${(railY - 0.9).toFixed(2)} L 20.00 ${(railY - 0.9).toFixed(2)} ` +
+    `L 20.00 ${(railY + 0.9).toFixed(2)} L 0.00 ${(railY + 0.9).toFixed(2)} Z" fill="#111"/>` +
+    `<line class="janko-stem" x1="10" y1="100" x2="10" y2="75" stroke="#111"/></svg>`;
+  assert.deepEqual(auditStemBeamConnections(legal, options), [], 'stem lands on the rail path');
 });
 
 test('Defect: a stem that does not land on any beam is caught in the rendered SVG', () => {
@@ -617,7 +677,7 @@ test('Defect: a system-start mark pushed off the page and into the numeral is ca
   // (`'architectural-bracket'`), so the audit is exercised on the canonical
   // reserved margin column itself.
   const ruled = { ...DEFAULT_JANKO_OPTIONS, systemStartStyle: 'architectural-bracket' as const };
-  const offPage = { ...ruled, pageMargin: -20.0 };
+  const offPage = { ...ruled, pageMarginLeft: -20.0 };
   const out: LintViolation[] = [];
   const layout = systems(offPage)[0];
   checkAccoladeClearance(layout, offPage, DEFAULT_JANKO_TOKENS, LINT, out);
@@ -844,8 +904,9 @@ test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', 
   assert.equal(refusal!.reason, 'no-slot');
   assert.equal(refusal!.hand, 'RH');
   assert.equal(refusal!.value, 'sixteenth');
+  // −4 staffLeft + 3·2 measure slots + ⅚·2 grid growth under golden margins.
   assert.ok(
-    Math.abs(refusal!.x - 544.97) < 0.01,
+    Math.abs(refusal!.x - 548.63) < 0.01,
     `the refusal keeps the canonical tick-552 beat column (x = ${refusal!.x.toFixed(2)}pt)`
   );
   assert.ok(Number.isFinite(refusal!.targetY), 'and records the phrase-row hang centre it could not honour');

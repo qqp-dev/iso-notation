@@ -72,6 +72,7 @@ import {
   JankoSystemLayout,
   PositionedJankoNote,
   computePageGeometry,
+  detectStemDigitCrossings,
   getMarginFurniture,
   knockoutHalfExtents,
   layoutJankoScore,
@@ -124,6 +125,7 @@ export type JankoLintCode =
   | 'knockout-pass-through'
   | 'stem-detached'
   | 'stem-digit-collision'
+  | 'stem-foreign-digit-collision'
   | 'halo-piercing'
   | 'beam-slope'
   | 'beam-stem-gap'
@@ -235,6 +237,7 @@ export const JANKO_LINT_CHECKS = [
   'knockout-coverage',
   'stem-beam-validity',
   'stem-digit-clearance',
+  'stem-foreign-digit-clearance',
   'halo-clearance',
   'beam-notehead-clearance',
   'beam-rest-clearance',
@@ -741,10 +744,9 @@ export function checkStemAndBeamValidity(
  * real margin is ≈1.0pt golden (≈0.8pt tight).
  *
  * Scope: each stem is audited against *its own* digit. A stem that crosses a
- * foreign glyph is invisible anyway (the rhythm layer is painted beneath the
- * noteheads, so that notehead's mask erases it), and the only way to reach a
- * foreign digit box in the first place is the cross-hand chordal collision,
- * which {@link checkNoteheadClearance} already surfaces as a warning.
+ * foreign glyph is covered by {@link checkStemForeignDigitClearance}: the
+ * crossed note paints a tall knockout, so the stem resumes with the same
+ * breathing room as an own-stem attachment.
  */
 export function checkStemDigitClearance(
   layout: JankoSystemLayout,
@@ -780,6 +782,47 @@ export function checkStemDigitClearance(
         stemStartY: stem.stemStartY,
         glyphTop: glyph.y0,
         glyphBottom: glyph.y1,
+      },
+    });
+  }
+}
+
+/**
+ * A stem that crosses a foreign digit must meet a tall knockout.
+ *
+ * When one hand's beam-extended stem drives past the other hand's digit in a
+ * shared column, the standard knockout would let it resume with less
+ * breathing room than an own-stem attachment. The engine therefore flags the
+ * crossed note (`tallKnockout`), extending its erasure to the stem-start line.
+ * This audits that every detected crossing carries the flag — a missing flag
+ * is an engine regression, never a layout judgement call.
+ */
+export function checkStemForeignDigitClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const hidden = suppressedStemIds(layout);
+  const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
+  for (const c of detectStemDigitCrossings(layout.notes, layout.beams, layout.ungrouped, o, t, hidden)) {
+    const victim = byId.get(c.digitNoteId);
+    if (victim?.tallKnockout) continue;
+    out.push({
+      code: 'stem-foreign-digit-collision',
+      severity: 'error',
+      message:
+        `Stem of ${c.stemNoteId} crosses the digit of ${c.digitNoteId} without a tall knockout ` +
+        `(shortfall ${c.shortfall.toFixed(2)}pt): the stem would resume with less breathing room ` +
+        `than an own-stem attachment.`,
+      system: layout.index,
+      measure: measureOfTick(byId.get(c.stemNoteId)?.note.startTick ?? 0, t),
+      noteIds: [c.stemNoteId, c.digitNoteId],
+      x: victim?.x ?? 0,
+      y: victim?.y ?? 0,
+      metrics: {
+        shortfall: c.shortfall,
+        requiredAir: t.stemAttachmentAir,
       },
     });
   }
@@ -2557,6 +2600,30 @@ function num(attrs: Record<string, string>, key: string): number {
   return Number.isFinite(value) ? value : Number.NaN;
 }
 
+/**
+ * Centreline endpoints of one beam rail node.
+ *
+ * Rails are filled parallelogram paths (`M ax ayT L bx byT L bx byB L ax ayB
+ * Z`); the slope and landing audits run on the recovered (ax,ay)-(bx,by)
+ * centreline. Plain `<line>` rails keep working so synthetic fixtures stay valid.
+ */
+function beamEndpoints(beam: SvgNode): [number, number, number, number] | null {
+  if (beam.tag === 'line') {
+    const x1 = num(beam.attrs, 'x1');
+    const y1 = num(beam.attrs, 'y1');
+    const x2 = num(beam.attrs, 'x2');
+    const y2 = num(beam.attrs, 'y2');
+    return [x1, y1, x2, y2].every(Number.isFinite) ? [x1, y1, x2, y2] : null;
+  }
+  if (beam.tag === 'path') {
+    const nums = (beam.attrs.d ?? '').match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+    if (nums.length !== 8 || !nums.every(Number.isFinite)) return null;
+    const [ax, ayT, bx, byT, , byB, , ayB] = nums;
+    return [ax, (ayT + ayB) / 2, bx, (byT + byB) / 2];
+  }
+  return null;
+}
+
 /** Options accepted by the paint-order audit. */
 export interface KnockoutAuditOptions {
   /** Knockout mask half-width `wx` in pt (the active spacing preset). */
@@ -2812,8 +2879,10 @@ export function auditStemBeamConnections(
   const nodes = parseSvgNodes(svg);
   const lines = nodes.filter((n) => n.tag === 'line');
   const stems = lines.filter((n) => n.cls.includes('janko-stem'));
-  const beams = lines.filter(
-    (n) => n.cls.includes('janko-beam') || n.cls.includes('janko-beam-secondary')
+  const beams = nodes.filter(
+    (n) =>
+      (n.tag === 'line' || n.tag === 'path') &&
+      (n.cls.includes('janko-beam') || n.cls.includes('janko-beam-secondary'))
   );
   const regularAttachment =
     options.stemAttachmentRadius ?? getClusterSpacingPreset().hy + 0.2;
@@ -2824,11 +2893,10 @@ export function auditStemBeamConnections(
   ];
 
   for (const beam of beams) {
-    const x1 = num(beam.attrs, 'x1');
-    const y1 = num(beam.attrs, 'y1');
-    const x2 = num(beam.attrs, 'x2');
-    const y2 = num(beam.attrs, 'y2');
-    if (![x1, y1, x2, y2].every(Number.isFinite) || Math.abs(x2 - x1) < EPS) continue;
+    const endpoints = beamEndpoints(beam);
+    if (!endpoints) continue;
+    const [x1, y1, x2, y2] = endpoints;
+    if (Math.abs(x2 - x1) < EPS) continue;
     const slope = (y2 - y1) / (x2 - x1);
     if (Math.abs(slope) > options.maxBeamSlope + EPS) {
       out.push({
@@ -2853,11 +2921,9 @@ export function auditStemBeamConnections(
     const canonical = standaloneLengths.some((l) => Math.abs(length - l) <= tol + 0.02);
     if (canonical) continue;
     const landsOnBeam = beams.some((beam) => {
-      const bx1 = num(beam.attrs, 'x1');
-      const by1 = num(beam.attrs, 'y1');
-      const bx2 = num(beam.attrs, 'x2');
-      const by2 = num(beam.attrs, 'y2');
-      if (![bx1, by1, bx2, by2].every(Number.isFinite)) return false;
+      const endpoints = beamEndpoints(beam);
+      if (!endpoints) return false;
+      const [bx1, by1, bx2, by2] = endpoints;
       const lo = Math.min(bx1, bx2);
       const hi = Math.max(bx1, bx2);
       if (x2 < lo - tol || x2 > hi + tol) return false;
@@ -2928,7 +2994,11 @@ export function lintJankoScore(
     checkKnockoutCoverage(layout, o, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);
     checkStemDigitClearance(layout, t, thresholds, diagnostics);
-    checkHaloClearance(layout, t, thresholds, diagnostics);
+    checkStemForeignDigitClearance(layout, o, t, diagnostics);
+    // The halo ring is optional paint: with showHonorHalo off there is no ring
+    // to pierce, so the clearance rule only runs when the rings are drawn.
+    // (The SVG audit side is self-gating — it iterates painted halo circles.)
+    if (o.showHonorHalo) checkHaloClearance(layout, t, thresholds, diagnostics);
     checkBeamNoteheadClearance(layout, t, thresholds, diagnostics);
     checkBeamRestClearance(layout, t, thresholds, diagnostics);
     checkStemThroughSimultaneity(layout, o, t, diagnostics);

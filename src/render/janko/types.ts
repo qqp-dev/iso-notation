@@ -532,6 +532,8 @@ export interface JankoTokens {
   // --- Optional rhythm / spacing refinements (resolved from defaults) ---
   /** Stem length from notehead centre. */
   stemLength?: number;
+  /** Air (pt) between a regular mask edge and its stem start. */
+  stemAttachmentAir?: number;
   /** Angled-cut horizontal half-width. */
   slashDx?: number;
   /** Angled-cut vertical half-height. */
@@ -640,6 +642,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   accoladeThick: 0.55,
   fontFamily: '"URW Gothic", "Century Gothic", "ITC Avant Garde Gothic", "Avant Garde", sans-serif',
   stemLength: 16.0,
+  stemAttachmentAir: 1.0,
   slashDx: 2.8,
   slashDy: 1.6,
   measureInset: 6.0,
@@ -755,12 +758,22 @@ export interface JankoLayoutOptions {
   pageHeight?: number;
   /** Page margin in pt. */
   pageMargin?: number;
+  /** Left page margin in pt; null follows `pageMargin`. */
+  pageMarginLeft?: number | null;
+  /** Right page margin in pt; null follows `pageMargin`. */
+  pageMarginRight?: number | null;
+  /** Top page margin in pt; null follows `pageMargin`. */
+  pageMarginTop?: number | null;
+  /** Bottom page margin in pt; null follows `pageMargin`. */
+  pageMarginBottom?: number | null;
   /** Header reservation in pt. */
   headerHeight?: number;
   /** Footer reservation in pt. */
   footerHeight?: number;
   /** Draw measure numbers above the first measure of every system. */
   showMeasureNumbers?: boolean;
+  /** Draw the Position of Honor halo ring around the opening sound(s). */
+  showHonorHalo?: boolean;
   /** Draw octave labels at the left margin. */
   showOctaveLabels?: boolean;
   /** Draw m.d./m.s. hand labels. */
@@ -794,9 +807,9 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   middleCSpine: 'none',
   channelLayout: 'single-equator',
   chordGrouping: 'per-hand-clasp',
-  subdivisionStyle: 'kinetic-tab-beam',
+  subdivisionStyle: 'classical-urtext',
   claspDurationStyle: 'kinetic-cross-slashes',
-  restStyle: 'kinetic-monoline',
+  restStyle: 'classical-urtext',
   clusterSpacing: 'tight',
   gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'architectural-bracket',
@@ -810,9 +823,14 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   pageWidth: 595.28,
   pageHeight: 841.89,
   pageMargin: 24.0,
+  pageMarginLeft: 20,
+  pageMarginRight: 20,
+  pageMarginTop: 30,
+  pageMarginBottom: 14,
   headerHeight: 48.0,
-  footerHeight: 24.0,
+  footerHeight: 14.0,
   showMeasureNumbers: true,
+  showHonorHalo: false,
   showOctaveLabels: false,
   showHandLabels: false,
   showTimeSignature: false,
@@ -883,6 +901,10 @@ export interface JankoPageGeometry {
   pageWidth: number;
   pageHeight: number;
   margin: number;
+  marginLeft: number;
+  marginRight: number;
+  marginTop: number;
+  marginBottom: number;
   headerHeight: number;
   footerHeight: number;
   bodyHeight: number;

@@ -144,7 +144,7 @@ const REST_STYLES: JankoRestStyle[] = [
 ];
 
 /**
- * The Round 21 **verification cards** — no open axis, one card per settled
+ * The Round 22 **verification cards** — no open axis, one card per settled
  * change, in display order.
  */
 const VERIFICATION_CARDS: string[] = [
@@ -238,15 +238,15 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 21 as a verification round with no open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 21);
-  assert.match(CURRENT_ROUND_METADATA.title, /Measured/);
-  assert.match(CURRENT_ROUND_METADATA.title, /Lower-First/);
+test('CURRENT_ROUND_METADATA opens round 22 as a verification round with no open axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 22);
+  assert.match(CURRENT_ROUND_METADATA.title, /Verbatim/);
+  assert.match(CURRENT_ROUND_METADATA.title, /Transcribed/);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'a verification round opens no axis');
   assert.match(CURRENT_ROUND_METADATA.description, /Bravura/);
   assert.match(CURRENT_ROUND_METADATA.description, /staff space/i, 'the explicit scale is stated');
-  assert.match(CURRENT_ROUND_METADATA.description, /lower-first/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /whole → 64th/i, 'the complete working set is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /transcrib/i, 'the round thesis is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /OFL/, 'the font license is stated');
 });
 
 test('CURRENT_CANDIDATES declares the round’s four verification cards', () => {
@@ -451,6 +451,14 @@ test('Rect paint pin: every mask a sharp rect with the preset wx/hy, every digit
       ...DEFAULT_JANKO_OPTIONS,
       clusterSpacing: spacing,
     });
+    // Round 23: notes crossed by a foreign stem paint tall knockouts reaching
+    // the stem-start line; every other mask keeps the exact preset box.
+    const tallByPage = new Map<number, Array<{ x: number; y: number }>>([[1, []], [2, []]]);
+    for (const [s, layout] of layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).entries()) {
+      for (const p of layout.notes.filter((q) => q.tallKnockout)) {
+        tallByPage.get(s < 4 ? 1 : 2)!.push({ x: p.x, y: p.y });
+      }
+    }
     for (const page of [1, 2]) {
       const svg =
         page === 1
@@ -467,15 +475,21 @@ test('Rect paint pin: every mask a sharp rect with the preset wx/hy, every digit
       ];
       assert.ok(masks.length > 200, `${spacing} p${page}: paints real masks`);
       for (const m of masks) {
+        const cx = Number(m[1]) + Number(m[3]) / 2;
+        const cy = Number(m[2]) + Number(m[4]) / 2;
         const wx = Number(m[3]) / 2;
         const hy = Number(m[4]) / 2;
+        const tall = (tallByPage.get(page) ?? []).some(
+          (q) => Math.abs(q.x - cx) < 0.05 && Math.abs(q.y - cy) < 0.6
+        );
+        const wantHy = tall ? preset.hy + DEFAULT_JANKO_TOKENS.stemAttachmentAir : preset.hy;
         assert.ok(
           Math.abs(wx - preset.wx) < 0.011,
           `${spacing}: mask half-width ${wx} is the preset ${preset.wx}`
         );
         assert.ok(
-          Math.abs(hy - preset.hy) < 0.011,
-          `${spacing}: mask half-height ${hy} is the preset ${preset.hy}`
+          Math.abs(hy - wantHy) < 0.011,
+          `${spacing}: mask half-height ${hy} is ${tall ? 'the tall knockout' : 'the preset'} ${wantHy}`
         );
       }
       const sizes = [
@@ -603,11 +617,15 @@ test('Pin-preserving shrink: a pair starved of room narrows to the room with the
     note('shrink-b', 1, 5, 48, 12),
   ]);
   // The synthetic room is tuned to the snug gap (snug remains implemented);
-  // the solver itself is untouched by the golden verdict.
+  // the solver itself is untouched by the golden verdict. The tick gap was
+  // tuned to the 24pt side margins, so they stay pinned here: the golden 20pt
+  // margins would push the 5.87pt room just over the snug pair gap.
   const options = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
     measuresPerSystem: 3,
     clusterSpacing: 'snug',
+    pageMarginLeft: 24,
+    pageMarginRight: 24,
   });
   const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const placed = layoutJankoScore(shrink, options, tokens).flatMap((l) => l.notes);
@@ -1260,14 +1278,15 @@ test('Rest weight: every rest stroke is the note-stem weight with scaled extents
 test('Rest size maxima: the measured working set, pinned per value', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   // Round 21 §A: every extent is the measured Bravura envelope through
-  // `REST_SPACE_PT`; the maximum over the five dialects is the classical cut's
-  // own box (the demonstrators are all smaller), so this table *is* the cut.
+  // `REST_SPACE_PT`. Round 22: the classical hooked heights are the transcribed
+  // envelopes themselves (taller than the hand cut by up to 0.1pt); the maximum
+  // over the four surveyed dialects is this table.
   const expected: Record<string, { w: number; h: number }> = {
     'sixty-fourth': { w: 6.602, h: 18.429 },
-    'thirty-second': { w: 5.73, h: 14.354 },
-    sixteenth: { w: 5.73, h: 10.458 },
+    'thirty-second': { w: 5.73, h: 14.403 },
+    sixteenth: { w: 5.73, h: 10.561 },
     eighth: { w: 4.94, h: 7.41 },
-    quarter: { w: 4.25, h: 11.559 },
+    quarter: { w: 4.25, h: 11.635 },
     half: { w: 5.286, h: 4.25 },
     whole: { w: 5.286, h: 4.25 },
   };
@@ -1553,8 +1572,8 @@ test('Bridging: m. 4 beams [528, 540, 564] as one gesture with its 16th rest pri
   // And the rest sits where a note would go: its ink centroid exactly on the
   // digit 9 phrase row it releases from.
   assert.ok(
-    Math.abs(rest.y - 158.5) < 1e-6,
-    `the m. 4 rest seats its ink centroid on the 158.5pt phrase row (got ${rest.y})`
+    Math.abs(rest.y - 164.5) < 1e-6,
+    `the m. 4 rest seats its ink centroid on the 164.5pt phrase row (got ${rest.y})`
   );
 });
 
@@ -1835,8 +1854,8 @@ test('The live studio engraves every verification card on its own windows, all g
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
   assert.match(html, /data-candidate-count="4"/);
   assert.match(html, /data-verification="true"/);
-  assert.match(html, /Round 21/);
-  assert.match(html, /Measured/, 'the round title headlines the view');
+  assert.match(html, /Round 22/);
+  assert.match(html, /Verbatim/, 'the round title headlines the view');
   assert.ok(!html.includes('Symmetric-Tuck Clusters'), 'the Round 19 title is retired');
   let cursor = -1;
   for (const id of VERIFICATION_CARDS) {

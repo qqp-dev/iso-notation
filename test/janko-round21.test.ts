@@ -168,8 +168,9 @@ test('§C: the whole bar is centred in its measure — 220.29 → 303.54 on the 
   assert.ok(Math.abs(whole.x - 303.54) < 0.02, `centred on the barline midpoint (got ${whole.x.toFixed(2)})`);
   assert.ok(Math.abs(whole.x - 220.29) > 80, 'and 83pt from the R20 onset column it used to hold');
   // The half slab keeps its beat column: §C moves no hanging seat.
+  // (−4 staffLeft + ⅛·(8/3) measure growth at tick 600 under golden margins.)
   const half = layouts.flatMap((l) => l.rests).find((r) => r.value === 'half')!;
-  assert.ok(Math.abs(half.x - 62.61) < 0.02, `the half stays on its beat column (got ${half.x.toFixed(2)})`);
+  assert.ok(Math.abs(half.x - 58.945) < 0.02, `the half stays on its beat column (got ${half.x.toFixed(2)})`);
 });
 
 test('§C violation fixture: a slab off its line is named rest-slab-off-line', () => {
@@ -440,8 +441,8 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 21 verification, four cards, every window resolvable', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 21);
+test('§F registry: round 22 verification, four cards, every window resolvable', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 22);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, ['verify-measured-cuts', 'verify-slab-lines', 'verify-lower-first', 'verify-working-set']);

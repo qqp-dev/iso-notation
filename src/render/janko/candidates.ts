@@ -170,20 +170,20 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * single digits with their beams whole, and no nib fuses with its ring.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 21,
-  title: 'Measured Duration Ink · Slabs on Lines · Lower-First',
+  round: 22,
+  title: 'Verbatim Duration Ink — Bravura Contours Transcribed 1:1',
   description:
-    'The round that stops drawing and starts measuring. Every rest constant now traces to a fontTools outline extraction of **Bravura** (SMuFL reference, v1.482) corroborated by **Noto Music** (v2.003), through one explicit scale: 1 staff space = 18.4pt / 4.732sp, because the working set’s tallest glyph (the 64th rest, 4.732 spaces) exactly fills the lattice’s measured inter-row headroom. The half slab now sits **on** a drawn staff rule and the whole slab hangs **from** one — touching, zero gap — with the whole bar centred in its measure; the anchor rule is **lower-first** on all sixteen corpus rows and the unison survivor is the lower voice; and the working set walks `whole → 64th` complete, on constructed specimen windows for every new part. No axis is open: every card is the golden master itself.',
+    'Round 21 measured the reference but redrew it — and the redraw mirrored the quarter, flipped the hooked rests and stacked crescent flags. This round transcribes instead: every hooked rest and flag contour is Bravura 1.482 **byte-for-byte** (fontTools outlines into generated constants, same round scale of 1 staff space = 3.8884pt, zero re-authorship; OFL, see `urtext-paths.ts`). Envelopes identical, ink exact. Seating, slabs, dots, beams and lower-first are untouched. No axis is open: every card is the golden master itself.',
   openAxes: [],
 };
 
 /**
- * The Round 21 verification windows: the five rest cuts + slab seats, the two
- * corpus rest windows, the sixteen lower-first rows, the mixed-level beam
- * groups, the constructed 32nd/64th windows, the nib guard and the final-bar
- * unison guard.
+ * The Round 22 verification windows (the Round 21 set, reused: the five rest
+ * cuts + slab seats, the two corpus rest windows, the sixteen lower-first
+ * rows, the mixed-level beam groups, the constructed 32nd/64th windows, the
+ * nib guard and the final-bar unison guard).
  */
-const ROUND_21_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_22_WINDOWS: JankoCandidateWindow[] = [
   {
     scoreId: REST_SPECIMEN_STUDIO_SCORE_ID,
     measureStart: 1,
@@ -262,22 +262,22 @@ const ROUND_21_WINDOWS: JankoCandidateWindow[] = [
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
     id: 'verify-measured-cuts',
-    label: '1 · Measured Cuts — every part traced to the outlines',
+    label: '1 · Verbatim Cuts — the reference contours, transcribed 1:1',
     description:
-      'Nothing is hand-drawn any more. The quarter is the **traced measured contour** of Bravura `restQuarter` (44 arc-length samples: three crossings, a hairline neck, a 165u belly, two tapered hooks) painted as one filled calligraphic path. The 8th … 64th are the measured **wedge stem + lobe** construction — lobe radius 65u, pitch 249u, stem 65u → 46u → a point — with each lobe’s contour starting and ending on the stem’s own spine, so the hook is *grown from* the stem. The slab pair is the measured 282 × 144u.',
-    windows: ROUND_21_WINDOWS.filter(
+      'The classical cut is no longer drawn — it is **transcribed**. Quarter, 8th … 64th and all eight flags are the Bravura 1.482 outlines verbatim: one closed solid per rest, one nested-contour glyph with `evenodd` counters per flag, anchored by the SMuFL stem-tip origin. What you see here is the reference itself at the round scale. Slabs, dots and the other four dialects are untouched.',
+    windows: ROUND_22_WINDOWS.filter(
       (w) =>
         w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID ||
         (w.scoreId === DEFAULT_STUDIO_SCORE_ID && w.measureStart === 4)
     ),
-    tags: ['measured', 'Bravura 1.482', 'serpentine', 'grown lobes'],
+    tags: ['verbatim', 'Bravura 1.482', 'transcribed 1:1', 'OFL'],
   },
   {
     id: 'verify-slab-lines',
     label: '2 · Slabs on Lines — half sits ON, whole hangs FROM, whole centred',
     description:
       'A bar rest derives its meaning from touching a line. The half slab’s bottom edge and the whole slab’s top edge now stand **exactly on a drawn staff rule** (zero gap, measured — the seat no longer snaps to an invisible phrase row), and the whole bar is **centred in its measure** on the barline midpoint (Gould; LilyPond NR §§2.2.1/2.2.3), exempt from the beat-cell nudge and cleared vertically by row separation. The linter names a slab that touches nothing: `rest-slab-off-line`.',
-    windows: ROUND_21_WINDOWS.filter(
+    windows: ROUND_22_WINDOWS.filter(
       (w) =>
         (w.scoreId === REST_SPECIMEN_STUDIO_SCORE_ID && w.measureStart >= 4) ||
         (w.scoreId === BRAHMS_STUDIO_SCORE_ID && w.measureStart === 3)
@@ -289,7 +289,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     label: '3 · Lower-First — the lowest head holds the column',
     description:
       'The anchor rule is **lower-first**, and it is a rule, not an option: on a mixed-hand row the lowest-pitched head keeps the column and the other fans; on a single-hand row the middle head does, exactly as before. All **sixteen** corpus rows flip — Bach’s eight (bar3:t408 … bar31:t4368) and Brahms’s eight (bar7:t1296 … bar49:t9432) — with the stem-x set inside each row preserved by the pure swap. A cross-hand unison ties on pitch, so the **lower voice** (LH) keeps the digit.',
-    windows: ROUND_21_WINDOWS.filter(
+    windows: ROUND_22_WINDOWS.filter(
       (w) =>
         (w.scoreId === DEFAULT_STUDIO_SCORE_ID && [3, 32].includes(w.measureStart)) ||
         w.scoreId === BRAHMS_STUDIO_SCORE_ID
@@ -301,7 +301,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     label: '4 · The Working Set — whole → 64th, complete, on constructed windows',
     description:
       'This is a notation **system**, not two pieces: the standard set `whole → 64th` is stated whether or not Bach or Brahms happens to use it. The corpus has no 32nds or 64ths at all, so §E **constructs** the specimens — the rest specimen’s new 32nd and 64th silences, and the duration specimen’s tertiary 32nd run, quaternary 64th run, mixed levels in one beat, lone-16th partial beams and solo triple/quad flags. `beamLevel = f(duration)` builds the levels generically: a 128th would be data, not architecture.',
-    windows: ROUND_21_WINDOWS.filter(
+    windows: ROUND_22_WINDOWS.filter(
       (w) => w.scoreId === DURATION_SPECIMEN_STUDIO_SCORE_ID
     ),
     tags: ['32nd', '64th', 'stubs', 'beam levels'],
