@@ -105,7 +105,7 @@ function rn(
 function layouts(
   mode: JankoChordGrouping,
   score = BACH,
-  base: Partial<typeof DEFAULT_JANKO_OPTIONS> = DEFAULT_JANKO_OPTIONS,
+  base: Partial<typeof DEFAULT_JANKO_OPTIONS> = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' },
   tokens = T
 ) {
   return layoutJankoScore(score, { ...base, chordGrouping: mode }, tokens);
@@ -744,6 +744,7 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
   // round targets (the 2-5-9 sonority among them).
   const o = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'adaptive',
     chordGrouping: 'per-hand-clasp',
   });
   const brahms = layoutJankoScore(BRAHMS, o, BRAHMS_T);
@@ -856,7 +857,7 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
 
   const report = lintJankoScore(
     BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'per-hand-clasp' },
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive', chordGrouping: 'per-hand-clasp' },
     BRAHMS_T
   );
   assert.equal(report.ok, true);
@@ -917,6 +918,7 @@ test('Round 7 Option 3 grammar: tight pairs stay silent, a wide leap gets its br
 test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket', () => {
   const o = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'adaptive',
     chordGrouping: 'per-hand-clasp',
   });
   const systems = layoutJankoScore(BRAHMS, o, BRAHMS_T);
@@ -1119,6 +1121,7 @@ test('A measure that cannot host the bracket loses it instead of colliding (edge
     // control was the only policy that ever demoted this measure.)
     const options = resolveJankoOptions({
       ...DEFAULT_JANKO_OPTIONS,
+      core: 'adaptive',
       chordGrouping: mode,
       measuresPerSystem: 2,
       systemsPerPage: 1,
@@ -1263,7 +1266,7 @@ test('Every clasping paradigm engraves both benchmarks with zero diagnostics', (
     );
     const brahms = lintJankoScore(
       BRAHMS,
-      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: mode },
+      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive', chordGrouping: mode },
       BRAHMS_T
     );
     if (mode === 'none') {
@@ -1299,7 +1302,7 @@ test('Every clasping paradigm engraves both benchmarks with zero diagnostics', (
     );
   }
   assert.deepEqual(
-    lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T).diagnostics.map(
+    lintJankoScore(BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' }, BRAHMS_T).diagnostics.map(
       (d) => `${d.code}: ${d.message}`
     ),
     [],

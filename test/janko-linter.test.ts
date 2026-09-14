@@ -169,8 +169,8 @@ test('Canonical Bach Goldberg Var. 1 with DEFAULT_JANKO_OPTIONS has zero violati
 });
 
 test('Row-snapped chord tones: every same-row pair is fanned by the preset pair gap', () => {
-  const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  const layouts = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const report = lintJankoScore(SCORE, { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' }, DEFAULT_JANKO_TOKENS);
+  const layouts = layoutJankoScore(SCORE, { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' }, DEFAULT_JANKO_TOKENS);
   // Round 17B: the golden `'tight'` fan is the asymmetric preset pair gap
   // 2wx + air (5.46pt) — tighter than the old circular diameter, and wider
   // than the box-overlap bound the clearance model audits.
@@ -729,7 +729,7 @@ test('Defect: collapsing the Middle C corridor is caught', () => {
   // Round 12: the vertical grid crosses the corridor on purpose, so the
   // remaining corridor invariant is the horizontal one — a squeezed lattice
   // drives the Octave 4 rule into the spine.
-  const cramped = { ...DEFAULT_JANKO_OPTIONS, interStaffGap: 2.0 };
+  const cramped = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const, interStaffGap: 2.0 };
   const out: LintViolation[] = [];
   const layout = systems(cramped)[0];
   checkMiddleCCorridor(layout, cramped, DEFAULT_JANKO_TOKENS, LINT, out);
@@ -840,11 +840,13 @@ test('Defect: an unclasped four-voice simultaneity paints its stems through its 
   // the historical unclasped paradigm versus the restored per-hand clasp.
   const unclasped = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
+    core: 'adaptive',
     chordGrouping: 'none',
     measuresPerSystem: 2,
   });
   const clasped = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
+    core: 'adaptive',
     chordGrouping: 'per-hand-clasp',
     measuresPerSystem: 2,
   });
@@ -996,7 +998,7 @@ test('Corridor audit reads the true rule positions of the bounded channel', () =
   // The channel displaces its boundary rules to `equator ± 6.5pt`, so a tight
   // corridor is cut by the inner rule even though the equator itself stays
   // clear. The audit must follow the painted rules, not the empty equator.
-  const tight = { ...DEFAULT_JANKO_OPTIONS, interStaffGap: 12.0 };
+  const tight = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const, interStaffGap: 12.0 };
   const channel = { ...tight, channelLayout: 'bounded-channel' as const };
   const ruleIntrusions = (options: typeof tight): LintViolation[] =>
     run((layout, out) => checkMiddleCCorridor(layout, options, DEFAULT_JANKO_TOKENS, LINT, out), systems(options)[0]).filter(

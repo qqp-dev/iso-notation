@@ -454,13 +454,13 @@ test('Every paradigm lints clean on the full score (paint-order audits on)', () 
   const cases: Array<[string, ReturnType<typeof resolveJankoOptions>]> = [
     ['golden', O],
     ['thread', resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, contourThread: 'both' })],
-    ['ticks', resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, contourTicks: true })],
-    ['strip', resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, contourStrip: true })],
+    ['ticks', resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', contourTicks: true })],
+    ['strip', resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', contourStrip: true })],
   ];
   for (const [name, options] of cases) {
     const report = lintJankoScore(SCORE, options, T);
-    assert.equal(report.ok, true, `${name}: no violations`);
     assert.deepEqual(report.violations, [], `${name}: violation list is empty`);
+    assert.equal(report.ok, true, `${name}: no violations`);
     assert.equal(report.stats.checks, JANKO_LINT_CHECKS.length, `${name}: every check ran`);
   }
   assert.ok(JANKO_LINT_CHECKS.includes('contour-thread'), 'the thread check is registered');

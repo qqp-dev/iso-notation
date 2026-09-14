@@ -153,7 +153,7 @@ test('Round 27 is a core round: one axis, two answers to one question', () => {
     assert.equal(candidate.tokens, undefined, `${candidate.id} states no micro token`);
     assert.deepEqual(
       candidateBadges(candidate),
-      [{ key: 'core', value: candidate.options!.core!, golden: 'adaptive', axis: true }],
+      [{ key: 'core', value: candidate.options!.core!, golden: 'fixed-3', axis: true }],
       `${candidate.id} badges its core axis`
     );
     const resolved = resolveCandidate(candidate);
@@ -186,9 +186,9 @@ test('Candidate previews honour their own option deltas', () => {
     return card.slice(0, card.indexOf('</article>'));
   };
 
-  // Both cards badge their own open axis as a delta.
+  // Both cards badge their own open axis; only fixed-4 departs from the new golden default.
   assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
-  assert.equal((html.match(/badge-delta/g) ?? []).length, 2, 'one delta badge per card');
+  assert.equal((html.match(/badge-delta/g) ?? []).length, 1, 'only fixed-4 departs from golden');
   for (const candidate of CURRENT_CANDIDATES) {
     const card = cardOf(candidate.id);
     assert.match(card, new RegExp(`<b>${candidate.axis}</b>`), `${candidate.id} badges its axis`);

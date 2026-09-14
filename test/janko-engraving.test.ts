@@ -107,7 +107,7 @@ import {
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const TOKENS = DEFAULT_JANKO_TOKENS;
-const OPTIONS = DEFAULT_JANKO_OPTIONS;
+const OPTIONS = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const };
 /**
  * Round 17 doctrine arithmetic. The golden master fans every row cluster at
  * the decided `'tight'` preset (Round 17B verdict): the pinned head keeps its
@@ -915,7 +915,7 @@ test('Row-snapped parity offset: the canonical Bach score is unchanged on unaffe
 test('Token/option overrides flow through every renderer (pluggable design)', () => {
   const score = buildBachGoldbergVar1Score();
   const tokens = resolveJankoTokens({ rowHeight: 18, noteheadRadius: 5, haloRadius: 6.4 });
-  const options = resolveJankoOptions({ middleCSpine: 'double', interStaffGap: 60, showHonorHalo: true });
+  const options = resolveJankoOptions({ core: 'adaptive', middleCSpine: 'double', interStaffGap: 60, showHonorHalo: true });
   close(tokens.octaveStep, 30, 'octaveStep keeps its canonical default');
   const crop = renderJankoCrop(score, 1, 1, options, tokens);
   assert.match(crop, /r="6\.40"/, 'halo override');
@@ -1753,10 +1753,11 @@ test('Golden default paints no middle-C spine (the Guide promises none)', () => 
 
 test('Foreign-stem crossings paint tall knockouts, columns unmoved (mm.13/14/16)', () => {
   const score = buildBachGoldbergVar1Score();
-  const layouts = layoutJankoScore(score, OPTIONS, TOKENS);
+  const testOptions = { ...OPTIONS, core: 'adaptive' as const };
+  const layouts = layoutJankoScore(score, testOptions, TOKENS);
   // The five measured same-column crossings live in system 3 (mm.13–16).
   const sys3 = layouts[3];
-  const crossings = detectStemDigitCrossings(sys3.notes, sys3.beams, sys3.ungrouped, OPTIONS, TOKENS);
+  const crossings = detectStemDigitCrossings(sys3.notes, sys3.beams, sys3.ungrouped, testOptions, TOKENS);
   const byId = new Map(sys3.notes.map((p) => [p.note.id, p]));
   const ticks = new Set(
     crossings.map((c) => byId.get(c.stemNoteId)?.note.startTick)
@@ -1777,7 +1778,7 @@ test('Foreign-stem crossings paint tall knockouts, columns unmoved (mm.13/14/16)
     );
   }
   // Paint truth: flagged knockouts are exactly hy + air tall in the SVG.
-  const page = renderJankoPage(score, 0, OPTIONS, TOKENS);
+  const page = renderJankoPage(score, 0, testOptions, TOKENS);
   const rects = [
     ...page.matchAll(
       /class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g
@@ -2375,13 +2376,13 @@ test('Round 11 m. 31 counterpoint: LH 2 stems down, RH B stems up, no stem colli
 // ---------------------------------------------------------------------------
 
 /** Options delta of Candidate A: the incumbent floating single equator. */
-const SINGLE_OPTIONS = { ...OPTIONS, channelLayout: 'single-equator' as const };
+const SINGLE_OPTIONS = { ...OPTIONS, core: 'adaptive' as const, channelLayout: 'single-equator' as const };
 /** Options delta of Candidate B: Set A anchored on the rule, Set B static above. */
-const ANCHORED_OPTIONS = { ...OPTIONS, channelLayout: 'on-the-line' as const };
+const ANCHORED_OPTIONS = { ...OPTIONS, core: 'adaptive' as const, channelLayout: 'on-the-line' as const };
 /** Options delta of Candidate C: one rule per octave, contour-resolved ±15pt flank. */
-const THREE_ROW_OPTIONS = { ...OPTIONS, channelLayout: 'single-line-3row' as const };
+const THREE_ROW_OPTIONS = { ...OPTIONS, core: 'adaptive' as const, channelLayout: 'single-line-3row' as const };
 /** Options delta of Candidate D: two boundary rules at ±6.5pt, ±13pt flank. */
-const CHANNEL_OPTIONS = { ...OPTIONS, channelLayout: 'bounded-channel' as const };
+const CHANNEL_OPTIONS = { ...OPTIONS, core: 'adaptive' as const, channelLayout: 'bounded-channel' as const };
 
 /** The exact per-mode table the round is defined by. */
 const LAYOUT_CASES = [

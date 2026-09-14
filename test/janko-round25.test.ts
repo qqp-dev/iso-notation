@@ -52,7 +52,7 @@ import {
 const SCORE = buildBachGoldbergVar1Score();
 
 function continuousOptions(scheme: JankoOctaveLineScheme) {
-  return resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, pitchMapping: 'continuous', octaveLineScheme: scheme });
+  return resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', pitchMapping: 'continuous', octaveLineScheme: scheme });
 }
 
 function systemZero(scheme: JankoOctaveLineScheme) {
@@ -92,7 +92,7 @@ test('The scheme enum carries the divider grid, the equal schemes, and the clef 
 });
 
 test('Twin rows have no pitch-grid rules: the equators are not grid lines', () => {
-  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' });
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const geo = getSystemGeometry(computePageGeometry(o, t, SCORE), 0);
   assert.deepEqual(pitchGridRules(geo, o, t), [], 'empty under twin-rows');

@@ -219,7 +219,7 @@ export function computePageGeometry(
     if (isFixedCore) {
       const scale = t.semitoneScale;
       const slotCenterY = slotTopY + slotHeight / 2;
-      const middleCY = o.core === 'fixed-3' ? slotCenterY : slotCenterY - 0.5 * scale;
+      const middleCY = o.core === 'fixed-3' ? slotCenterY + 2.0 : slotCenterY - 0.5 * scale;
 
       const anacrusis = t.anacrusisTicks ?? 0;
       const startTick = s === 0 ? 0 : anacrusis + s * measuresPerSystem * t.ticksPerMeasure;

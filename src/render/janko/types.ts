@@ -943,7 +943,7 @@ export interface JankoLayoutOptions {
   octaveLineScheme?: JankoOctaveLineScheme;
   /**
    * Fixed Middle-C-centered core octave line grammar (Round 27).
-   * Defaults to `'adaptive'`.
+   * Defaults to `'fixed-3'`.
    */
   core?: JankoCore;
   /** Page title (full-page renders only). */
@@ -957,8 +957,8 @@ export interface JankoLayoutOptions {
 /**
  * Fixed Middle-C-centered core octave line grammar (Round 27).
  *
- * - `'adaptive'`: current window-following adaptive behavior (default).
- * - `'fixed-3'`: 3-core C-lines at lin 36 (C3), 48 (C4), 60 (C5).
+ * - `'adaptive'`: historical window-following adaptive behavior.
+ * - `'fixed-3'`: 3-core C-lines at lin 36 (C3), 48 (C4), 60 (C5) (default).
  * - `'fixed-4'`: 4-core octave middles at lin 29.5 (o2), 41.5 (o3), 53.5 (o4), 65.5 (o5).
  */
 export type JankoCore = 'adaptive' | 'fixed-3' | 'fixed-4';
@@ -1009,7 +1009,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   contourStrip: false,
   pitchMapping: 'twin-rows',
   octaveLineScheme: 'grand-divider',
-  core: 'adaptive',
+  core: 'fixed-3',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
