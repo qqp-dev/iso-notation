@@ -144,9 +144,9 @@ const REST_STYLES: JankoRestStyle[] = [
 ];
 
 /**
- * The Round 28 cards — Card A (conjoin) and Card B (wide-gap).
+ * The Round 29 cards — Card D (new dots) and Card T (thin extensions).
  */
-const ROUND_28_CARDS: string[] = ['junction-conjoin', 'junction-wide-gap'];
+const ROUND_29_CARDS: string[] = ['dots-new', 'extensions-thin'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -232,56 +232,56 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 28 on the extensionJunction axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 28);
-  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
+test('CURRENT_ROUND_METADATA opens round 29 on dotRule and extensionWeight axes', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 29);
+  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['extensionJunction'],
-    'one axis, two cards'
+    ['dotRule', 'extensionWeight'],
+    'two axes, two cards'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /Conjoin/, 'conjoin is stated');
-  assert.match(CURRENT_ROUND_METADATA.description, /Wide Gap/, 'wide gap is stated');
-  assert.deepEqual(
+  assert.match(CURRENT_ROUND_METADATA.description, /Card D/, 'Card D is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /Card T/, 'Card T is stated');
+  assert.equal(
     CURRENT_ROUND_METADATA.compareStrip,
-    {
-      scoreId: DEFAULT_STUDIO_SCORE_ID,
-      measureStart: 29,
-      measureCount: 2,
-      title: 'mm. 29–30 · extension junction macro under conjoin vs wide gap',
-    },
-    'the strip declares the shared macro'
+    undefined,
+    'tight windows on cards — no shared compare strip'
   );
 });
 
-test('CURRENT_CANDIDATES declares Card A (conjoin) and Card B (wide-gap) with NO control card', () => {
-  // Ordered contract change: Round 28 has NO control card (Reference view is the standing control)
+test('CURRENT_CANDIDATES declares Card D (new dots) and Card T (thin extensions) with NO control card', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_28_CARDS, 'Card A and Card B, in display order');
+  assert.deepEqual(ids, ROUND_29_CARDS, 'Card D and Card T, in display order');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   assert.equal(CURRENT_CANDIDATES.length, 2, 'two contenders (no control card)');
-  for (const id of ROUND_28_CARDS) {
+  for (const id of ROUND_29_CARDS) {
     const candidate = getCandidate(id)!;
-    assert.match(candidate.label, /^[A-B] · /, `${id} is lettered`);
+    assert.match(candidate.label, /^[D|T] · /, `${id} is lettered`);
     assert.ok((candidate.description ?? '').length > 100, `${id} carries a rationale`);
     assert.ok((candidate.tags ?? []).length > 0, `${id} is tagged`);
-    assert.equal(candidate.axis, 'extensionJunction', `${id} owns the extensionJunction axis`);
   }
+  assert.equal(getCandidate('dots-new')!.axis, 'dotRule');
+  assert.equal(getCandidate('extensions-thin')!.axis, 'extensionWeight');
 });
 
-test('Candidates state only their extensionJunction option delta', () => {
+test('Candidates state only their own option delta (one delta per card)', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  for (const id of ROUND_28_CARDS) {
+
+  const cardD = getCandidate('dots-new')!;
+  assert.deepEqual(Object.keys(cardD.options ?? {}), ['dotRule']);
+  assert.equal(cardD.options!.dotRule, 'flag-clearance');
+  assert.equal(cardD.tokens, undefined);
+
+  const cardT = getCandidate('extensions-thin')!;
+  assert.deepEqual(Object.keys(cardT.options ?? {}), ['extensionWeight']);
+  assert.equal(cardT.options!.extensionWeight, 0.35);
+  assert.equal(cardT.tokens, undefined);
+
+  for (const id of ROUND_29_CARDS) {
     const candidate = getCandidate(id)!;
-    assert.deepEqual(
-      Object.keys(candidate.options ?? {}),
-      ['extensionJunction'],
-      `${id} states only the extensionJunction axis`
-    );
-    assert.equal(candidate.tokens, undefined, `${id} states no micro token`);
     const resolved = resolveCandidate(candidate);
     for (const key of Object.keys(golden)) {
-      if (key === 'extensionJunction') continue;
+      if (key === candidate.axis) continue;
       assert.equal(
         (resolved.options as unknown as Record<string, unknown>)[key],
         (golden as unknown as Record<string, unknown>)[key],
@@ -290,25 +290,26 @@ test('Candidates state only their extensionJunction option delta', () => {
     }
     const badges = candidateBadges(candidate);
     assert.equal(badges.length, 1, `${id} badges only its axis`);
-    assert.equal(badges[0].key, 'extensionJunction');
+    assert.equal(badges[0].key, candidate.axis);
     assert.equal(badges[0].axis, true);
   }
 });
 
-test('Every card shares the round’s two windows: Page 2 (mm. 17–32) plus the mm. 29–30 macro', () => {
-  for (const id of ROUND_28_CARDS) {
-    const resolved = resolveCandidate(getCandidate(id)!);
-    assert.equal(resolved.windows.length, 2, `${id} shows both windows`);
-    const [page, macro] = resolved.windows;
-    assert.equal(page.scoreId, DEFAULT_STUDIO_SCORE_ID, `${id} pages the primary Bach score`);
-    assert.equal(page.measureStart, 17, `${id} opens page 2 at m. 17`);
-    assert.equal(page.measureCount, 16, `${id} shows the full Page 2 (16 measures)`);
-    assert.ok(page.title.length > 20, `${id} titles the page window`);
-    assert.equal(macro.scoreId, DEFAULT_STUDIO_SCORE_ID, `${id} macros the primary Bach score`);
-    assert.equal(macro.measureStart, 29, `${id} opens the macro at m. 29`);
-    assert.equal(macro.measureCount, 2, `${id} shows mm. 29–30 up close`);
-    assert.ok(macro.title.length > 20, `${id} titles the macro window`);
-  }
+test('Every card demonstrates its declared windows: Card D has Bach m.1 + Brahms m.1; Card T has Bach mm. 29–30', () => {
+  const resolvedD = resolveCandidate(getCandidate('dots-new')!);
+  assert.equal(resolvedD.windows.length, 2, 'Card D shows two windows');
+  assert.equal(resolvedD.windows[0].scoreId, DEFAULT_STUDIO_SCORE_ID);
+  assert.equal(resolvedD.windows[0].measureStart, 1);
+  assert.equal(resolvedD.windows[0].measureCount, 1);
+  assert.equal(resolvedD.windows[1].scoreId, BRAHMS_STUDIO_SCORE_ID);
+  assert.equal(resolvedD.windows[1].measureStart, 1);
+  assert.equal(resolvedD.windows[1].measureCount, 1);
+
+  const resolvedT = resolveCandidate(getCandidate('extensions-thin')!);
+  assert.equal(resolvedT.windows.length, 1, 'Card T shows one window');
+  assert.equal(resolvedT.windows[0].scoreId, DEFAULT_STUDIO_SCORE_ID);
+  assert.equal(resolvedT.windows[0].measureStart, 29);
+  assert.equal(resolvedT.windows[0].measureCount, 2);
 });
 
 // ---------------------------------------------------------------------------
@@ -1847,16 +1848,16 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: four cards, every card clean, one strip
 // ---------------------------------------------------------------------------
 
-test('The live studio engraves every candidate card on the shared windows', () => {
+test('The live studio engraves every candidate card on its declared windows', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
   assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="4"/, 'two cards × two shared windows');
+  assert.match(html, /data-window-count="3"/, 'Card D (2 windows) + Card T (1 window)');
   assert.match(html, /data-verification="false"/, 'a candidate round is not verification');
-  assert.match(html, /Round 28/);
-  assert.match(html, /Extension Junctions/, 'the round title headlines the view');
+  assert.match(html, /Round 29/);
+  assert.match(html, /New Dot Standard/, 'the round title headlines the view');
   let cursor = -1;
-  for (const id of ROUND_28_CARDS) {
+  for (const id of ROUND_29_CARDS) {
     const at = html.indexOf(`data-candidate="${id}"`);
     assert.ok(at > cursor, `${id} appears in registry order`);
     cursor = at;
@@ -1866,34 +1867,13 @@ test('The live studio engraves every candidate card on the shared windows', () =
     assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint verdict`);
     assert.equal(
       (body.match(/data-window="/g) ?? []).length,
-      2,
-      `${id} engraves exactly the two shared windows`
+      resolveCandidate(getCandidate(id)!).windows.length,
+      `${id} engraves exactly its declared window set`
     );
   }
 });
 
-test('The closer-comparison strip engraves the shared macro under every card', () => {
+test('The closer-comparison strip is absent in Round 29 (tight windows on cards)', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.match(html, /data-strip="primary:29-30"/, 'the strip declares its window');
-  assert.match(html, /extension junction macro/, 'the strip carries its headline');
-  assert.equal((html.match(/data-strip-panel="/g) ?? []).length, 2, 'one panel per card');
-  let cursor = -1;
-  for (const id of ROUND_28_CARDS) {
-    const at = html.indexOf(`data-strip-panel="${id}"`);
-    assert.ok(at > cursor, `${id} appears in registry order`);
-    cursor = at;
-  }
-  for (const id of ROUND_28_CARDS) {
-    const panel = html.slice(
-      html.indexOf(`data-strip-panel="${id}"`),
-      html.indexOf('</figure>', html.indexOf(`data-strip-panel="${id}"`))
-    );
-    assert.match(panel, /<svg/, `${id} engraves the macro`);
-    assert.ok(panel.includes(getCandidate(id)!.label), `${id} is labelled`);
-  }
-  const view = renderCandidatesView(CONFIG);
-  assert.ok(
-    view.indexOf('data-strip="primary:29-30"') < view.indexOf('data-candidate-count="2"'),
-    'the strip stands above the cards'
-  );
+  assert.equal(html, '', 'Round 29 has no comparison strip');
 });

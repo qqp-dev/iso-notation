@@ -82,7 +82,7 @@ import {
 } from './engine';
 import { getBarStaffSegments, getEquatorRuleYs, pitchGridRules } from './elements/staff';
 import { continuousPitchY } from './geometry';
-import { resolveBeatPulseXs } from './elements/barlines';
+import { gridBotY, gridTopY, resolveBeatPulseXs } from './elements/barlines';
 import {
   JankoBeamConnector,
   JankoRhythmNote,
@@ -92,7 +92,10 @@ import {
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
+  getSubdivisionGlyphBBox,
+  partitionBeamGroups,
   resolveClaspInk,
+  subdivisionMarkCount,
 } from './elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -447,9 +450,15 @@ function handRuleSpans(
  * (`lhBot`), across the Middle C corridor. Every measure barline and dashed beat
  * pulse is painted as one such rule (see `elements/barlines`).
  */
-function gridRuleSpan(layout: JankoSystemLayout): { top: number; bottom: number } {
-  const g = layout.geometry;
-  return { top: g.equatorY('RH', 5) - 12, bottom: g.equatorY('LH', 2) + 12 };
+function gridRuleSpan(
+  layout: JankoSystemLayout,
+  o?: ResolvedJankoLayoutOptions,
+  t?: ResolvedJankoTokens
+): { top: number; bottom: number } {
+  return {
+    top: gridTopY(layout.geometry, o, t),
+    bottom: gridBotY(layout.geometry, o, t),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1252,6 +1261,16 @@ export function checkDotCollision(
       }
     }
   }
+  const beamedIds =
+    o.rhythmStyle === 'beamed'
+      ? new Set(
+          partitionBeamGroups(
+            layout.notes.map((n) => n.rhythm),
+            t,
+            layout.geometry.middleCY
+          ).groups.flatMap((g) => g.map((n) => n.id))
+        )
+      : null;
   for (const p of layout.notes) {
     const dur = p.note.durationTicks;
     if (dur <= 26 || dur > 38) continue;
@@ -1339,6 +1358,33 @@ export function checkDotCollision(
         metrics: { gap, required: dotR + 0.35, pulseX: x },
       });
       break;
+    }
+    if (o.dotRule !== 'legacy' && (!beamedIds || !beamedIds.has(p.note.id))) {
+      const marks = subdivisionMarkCount(dur);
+      if (marks >= 1) {
+        const s = getStemGeometry(p.rhythm, t);
+        const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
+        const fBox = {
+          x0: s.stemX + bbox.x0,
+          y0: s.stemEndY + bbox.y0,
+          x1: s.stemX + bbox.x1,
+          y1: s.stemEndY + bbox.y1,
+        };
+        const fdx = Math.max(fBox.x0 - cx, 0, cx - fBox.x1);
+        const fdy = Math.max(fBox.y0 - cy, 0, cy - fBox.y1);
+        const distance = Math.hypot(fdx, fdy) - dotR;
+        if (distance < t.augmentationDotGap - EPS) {
+          out.push({
+            code: 'dot-collision',
+            severity: 'error',
+            message:
+              `The augmentation dot of ${p.note.id} sits ${distance.toFixed(2)}pt from its flag ink box ` +
+              `(${t.augmentationDotGap.toFixed(2)}pt required).`,
+            ...base,
+            metrics: { distance, required: t.augmentationDotGap, cx, cy },
+          });
+        }
+      }
     }
   }
 }
@@ -2135,7 +2181,7 @@ export function systemBarlines(
 ): BarlineSpan[] {
   const g = layout.geometry;
   const spans = handRuleSpans(layout);
-  const grid = gridRuleSpan(layout);
+  const grid = gridRuleSpan(layout, o, t);
   const barlines: BarlineSpan[] = [];
   const anacrusis = t.anacrusisTicks ?? 0;
   const unifiedFinal = o.finalBarlineStyle === 'unified' && layout.isFinalSystem;

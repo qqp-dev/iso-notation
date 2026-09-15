@@ -136,8 +136,8 @@ export const PITCH_GRID_LANE_STROKE = 0.3;
 export const PITCH_GRID_OCTAVE_INK = '#1E293B';
 /** Weight of the equal-scheme octave lines: the golden equator spec, exactly. */
 export const PITCH_GRID_OCTAVE_STROKE = 0.5;
-/** Weight of the C4 octave line: just visibly heavier (0.70pt vs 0.50pt). */
-export const PITCH_GRID_C4_STROKE = 0.70;
+/** Weight of the C4 octave line: equalized to the octave stroke (0.50pt). */
+export const PITCH_GRID_C4_STROKE = 0.50;
 /** Length (pt) of the clef-marker anchor tick at each system start. */
 export const PITCH_GRID_MARKER_LENGTH = 20;
 
@@ -391,16 +391,24 @@ export function pitchGridRules(
   const x2 = geo.staffRight;
   if (o.core === 'fixed-3' || o.core === 'fixed-4') {
     const isFixed3 = o.core === 'fixed-3';
+    const extStroke = o.extensionWeight ?? PITCH_GRID_OCTAVE_STROKE;
     if (geo.staffSegments && geo.staffSegments.length > 0) {
       const out: PitchGridRule[] = [];
       for (const seg of geo.staffSegments) {
         const isC4 = isFixed3 && seg.lin === 48;
+        const isExt = isFixed3
+          ? seg.lin === 24 || seg.lin === 72
+          : seg.lin === 17.5 || seg.lin === 77.5;
         out.push({
           y: yOf(seg.lin),
           x1: seg.x1,
           x2: seg.x2,
           ink: PITCH_GRID_OCTAVE_INK,
-          width: isC4 ? PITCH_GRID_C4_STROKE : PITCH_GRID_OCTAVE_STROKE,
+          width: isExt
+            ? extStroke
+            : isC4
+              ? PITCH_GRID_C4_STROKE
+              : PITCH_GRID_OCTAVE_STROKE,
           cls: isFixed3
             ? 'janko-pitch-lane janko-pitch-clane'
             : 'janko-pitch-octave',
@@ -414,12 +422,19 @@ export function pitchGridRules(
     const out: PitchGridRule[] = [];
     for (const lin of lines) {
       const isC4 = isFixed3 && lin === 48;
+      const isExt = isFixed3
+        ? lin === 24 || lin === 72
+        : lin === 17.5 || lin === 77.5;
       out.push({
         y: yOf(lin),
         x1,
         x2,
         ink: PITCH_GRID_OCTAVE_INK,
-        width: isC4 ? PITCH_GRID_C4_STROKE : PITCH_GRID_OCTAVE_STROKE,
+        width: isExt
+          ? extStroke
+          : isC4
+            ? PITCH_GRID_C4_STROKE
+            : PITCH_GRID_OCTAVE_STROKE,
         cls: isFixed3
           ? 'janko-pitch-lane janko-pitch-clane'
           : 'janko-pitch-octave',

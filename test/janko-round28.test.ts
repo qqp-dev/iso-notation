@@ -29,9 +29,9 @@ import {
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
+  JankoCandidate,
+  JankoCandidateRound,
   getCandidate,
   resolveCandidate,
 } from '../src/render/janko/candidates';
@@ -54,22 +54,51 @@ import { lintJankoScore, systemBarlines } from '../src/render/janko/linter';
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 
+// Historical Round 28 registry (conjoin vs wide-gap) preserved for durable regression coverage.
+// Active candidate round in src/render/janko/candidates.ts is Round 29 (new dots + thin extensions).
+const ROUND_28_METADATA: JankoCandidateRound = {
+  round: 28,
+  title: 'Extension Junctions: Conjoin vs Wide Gap',
+  description:
+    'Where an extension-row terminal stands near a barline, does clean design favor contact or separation? Two answers: Conjoin (outer-row measure barlines meeting flush extension terminals in 90° T-junctions) vs Wide Gap (12.0pt standoff with short barlines). No control card — the Reference view carries the standing golden look (6.0pt standoff).',
+  openAxes: ['extensionJunction'],
+};
+
+const ROUND_28_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'junction-conjoin',
+    label: 'A · Conjoin — Flush Outer T-Junctions',
+    description:
+      'Measure barlines span the outer-row levels (fixed-3: lin 72–24; fixed-4: 77.5–17.5), and extension-row interior terminals run flush into abutting barlines (0pt guest gap). Page 2 contains 1 interior extension junction (m. 30 closing barline); macro contains 1 junction.',
+    axis: 'extensionJunction',
+    options: { extensionJunction: 'conjoin' },
+  },
+  {
+    id: 'junction-wide-gap',
+    label: 'B · Wide Gap — 12.0pt Clear Separation',
+    description:
+      'Extension-row interior terminals stand off 12.0pt (double the house inset) from abutting barlines, while measure barlines keep short heights. Page 2 contains 1 interior extension junction (m. 30 closing barline); macro contains 1 junction.',
+    axis: 'extensionJunction',
+    options: { extensionJunction: 'wide-gap' },
+  },
+];
+
 // ---------------------------------------------------------------------------
 // 1. Registry Purity (Round 28, NO control card, one open axis)
 // ---------------------------------------------------------------------------
 
 test('Round 28 registry purity: exactly 2 cards, NO control card, extensionJunction axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 28);
-  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
+  assert.equal(ROUND_28_METADATA.round, 28);
+  assert.match(ROUND_28_METADATA.title, /Extension Junctions/);
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
+    ROUND_28_METADATA.openAxes,
     ['extensionJunction'],
     'only extensionJunction is an open axis'
   );
 
   // Operator explicit order: NO control card (Reference view is the standing control)
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'exactly two contenders');
-  const [cardA, cardB] = CURRENT_CANDIDATES;
+  assert.equal(ROUND_28_CANDIDATES.length, 2, 'exactly two contenders');
+  const [cardA, cardB] = ROUND_28_CANDIDATES;
 
   assert.equal(cardA.id, 'junction-conjoin');
   assert.match(cardA.label, /Conjoin/);
@@ -85,7 +114,7 @@ test('Round 28 registry purity: exactly 2 cards, NO control card, extensionJunct
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   assert.equal(golden.extensionJunction, 'default', 'golden default is "default"');
 
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_28_CANDIDATES) {
     const resolved = resolveCandidate(card);
     for (const [k, v] of Object.entries(resolved.options)) {
       if (k === 'extensionJunction') {
@@ -246,7 +275,7 @@ test('Page 2 (mm. 17–32) contains m. 29 and >= 1 interior extension terminal; 
   assert.equal(sys7Ext.mEnd, 1, 'ends at m. 30 (interior terminal)');
 
   // Captions match: exactly 1 junction
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_28_CANDIDATES) {
     assert.match(card.description ?? '', /Page 2 contains 1 interior extension junction/);
     assert.match(card.description ?? '', /macro contains 1 junction/);
   }
@@ -258,7 +287,7 @@ test('Page 2 (mm. 17–32) contains m. 29 and >= 1 interior extension terminal; 
 
 test('Both candidate cards pass visual linter with 0 violations and 0 warnings', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_28_CANDIDATES) {
     const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, ...(card.options ?? {}) });
     const report = lintJankoScore(BACH, o, t);
     assert.equal(report.ok, true, `${card.id} lints clean on Bach`);

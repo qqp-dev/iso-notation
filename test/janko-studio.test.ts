@@ -97,11 +97,11 @@ test('renderCandidatesView renders every scheme card on every declared window', 
   );
   assert.equal((html.match(/data-candidate="/g) ?? []).length, CURRENT_CANDIDATES.length);
   const grid = html.slice(html.indexOf('candidate-grid'));
-  assert.equal((grid.match(/<svg/g) ?? []).length, windows, 'one card preview per declared window');
+  const stripPanels = CURRENT_ROUND_METADATA.compareStrip ? CURRENT_CANDIDATES.length : 0;
   assert.equal(
     (html.match(/<svg/g) ?? []).length - (grid.match(/<svg/g) ?? []).length,
-    CURRENT_CANDIDATES.length,
-    'one strip panel per card'
+    stripPanels,
+    'strip panels match compareStrip declaration'
   );
   assert.equal((html.match(/data-window="/g) ?? []).length, windows);
   for (const candidate of CURRENT_CANDIDATES) {
@@ -125,40 +125,39 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 28/);
-  assert.match(html, /Extension Junctions/);
+  assert.match(html, /Round 29/);
+  assert.match(html, /New Dot Standard/);
 });
 
-test('Round 28 is an extension junction round: one axis, two answers to one question', () => {
-  // Ordered contract change: Round 28 has NO control card (Reference view is the standing control)
-  assert.equal(CURRENT_ROUND_METADATA.round, 28);
-  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
+test('Round 29 is a preview round: two axes, two cards (no control card)', () => {
+  // Ordered contract change: Round 29 has NO control card (Reference view is the standing control)
+  assert.equal(CURRENT_ROUND_METADATA.round, 29);
+  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['extensionJunction'],
-    'one axis, two cards'
+    ['dotRule', 'extensionWeight'],
+    'two axes, two cards'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['junction-conjoin', 'junction-wide-gap'],
-    'Card A and Card B, in display order'
+    ['dots-new', 'extensions-thin'],
+    'Card D and Card T, in display order'
   );
   for (const candidate of CURRENT_CANDIDATES) {
-    assert.equal(candidate.axis, 'extensionJunction', `${candidate.id} owns the extensionJunction axis`);
+    assert.ok(candidate.axis === 'dotRule' || candidate.axis === 'extensionWeight');
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['extensionJunction'],
-      `${candidate.id} states only the extensionJunction axis`
+      [candidate.axis],
+      `${candidate.id} states only its own axis`
     );
     assert.equal(candidate.tokens, undefined, `${candidate.id} states no micro token`);
-    assert.deepEqual(
-      candidateBadges(candidate),
-      [{ key: 'extensionJunction', value: candidate.options!.extensionJunction!, golden: 'default', axis: true }],
-      `${candidate.id} badges its extensionJunction axis`
-    );
+    const badges = candidateBadges(candidate);
+    assert.equal(badges.length, 1);
+    assert.equal(badges[0].key, candidate.axis);
+    assert.equal(badges[0].axis, true);
     const resolved = resolveCandidate(candidate);
-    assert.equal(resolved.windows.length, 2, `${candidate.id} shows the shared windows`);
+    assert.ok(resolved.windows.length >= 1);
     for (const window of resolved.windows) {
       assert.ok(window.title.length > 20, `${candidate.id} titles every window`);
     }
@@ -214,16 +213,17 @@ test('Candidate previews honour their own option deltas', () => {
     'clusterAnchor',
     'core',
   ]) {
-    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 28 question`);
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 29 question`);
   }
   assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
 
-  // The shared windows are the round's own evidence: Bach Page 2 plus the macro.
-  for (const candidate of CURRENT_CANDIDATES) {
-    const card = cardOf(candidate.id);
-    assert.ok(card.includes('data-window="primary:17-32"'), `${candidate.id} shows Page 2`);
-    assert.ok(card.includes('data-window="primary:29-30"'), `${candidate.id} shows the macro`);
-  }
+  // Declared windows are rendered on each card.
+  const cardD = cardOf('dots-new');
+  assert.ok(cardD.includes('data-window="primary:1-1"'), 'Card D shows Bach m. 1');
+  assert.ok(cardD.includes('data-window="brahms-op118-no1:1-1"'), 'Card D shows Brahms m. 1');
+
+  const cardT = cardOf('extensions-thin');
+  assert.ok(cardT.includes('data-window="primary:29-30"'), 'Card T shows Bach mm. 29–30');
 
   // The settled clasp grammar and grid policy are stated in the card facts.
   for (const candidate of CURRENT_CANDIDATES) {
@@ -459,15 +459,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 28);
-  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 29);
+  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['extensionJunction'],
-    'one axis, two cards'
+    ['dotRule', 'extensionWeight'],
+    'two axes, two cards'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'Card A and Card B');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'Card D and Card T');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

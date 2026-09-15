@@ -7,8 +7,8 @@
  *     (identical vertical pitch extent across 2-line, 3-line, 4-line, and 5-line systems).
  *  2. System 1 bracket renders with grander metrics (stroke 0.90pt, +0.25pt delta,
  *     spur reach +0.50pt) while systems 2+ render the base 0.65pt mark.
- *  3. C4 octave line renders at 0.70pt against 0.50pt core hairlines wherever
- *     drawn (fixed-3, adaptive equal-boundaries), and no C4 line is drawn under fixed-4.
+ *  3. C4 octave line equalized to 0.50pt core hairlines (PITCH_GRID_OCTAVE_STROKE)
+ *     wherever drawn (fixed-3, adaptive equal-boundaries), and no C4 line is drawn under fixed-4.
  */
 
 import { test } from 'node:test';
@@ -199,7 +199,7 @@ test('System-1 grandeur pin: System 1 bracket metrics exceed systems 2+ by the e
 // 3. C4 weight pin
 // ---------------------------------------------------------------------------
 
-test('C4 weight pin: C4 line renders at 0.70pt; other core lines at 0.50pt', () => {
+test('C4 weight pin: C4 line renders at 0.50pt equalized with core lines', () => {
   // 1. Under default fixed-3 golden (segmented semantics)
   const pageGeo = computePageGeometry(DEFAULT_JANKO_OPTIONS, TOKENS, BACH);
   const geo = getSystemGeometry(pageGeo, 0);
@@ -218,7 +218,7 @@ test('C4 weight pin: C4 line renders at 0.70pt; other core lines at 0.50pt', () 
   assert.ok(c4Rules.length > 0, 'C4 segment rule(s) must be present in fixed-3 grid');
   for (const c4Rule of c4Rules) {
     assert.equal(c4Rule.width, PITCH_GRID_C4_STROKE, 'C4 segment rule width matches PITCH_GRID_C4_STROKE');
-    assert.equal(c4Rule.width, 0.70, 'C4 segment renders at locked 0.70pt weight');
+    assert.equal(c4Rule.width, 0.50, 'C4 segment renders at locked 0.50pt weight');
   }
 
   const otherRules = rules.filter((r) => Math.abs(r.y - c4) >= 1e-6);
@@ -246,7 +246,7 @@ test('C4 weight pin: C4 line renders at 0.70pt; other core lines at 0.50pt', () 
     assert.equal(r.width, 0.50, 'all fixed-4 lines render at 0.50pt');
   }
 
-  // 3. Under adaptive equal-boundaries: C4 line renders at 0.70pt, other boundaries at 0.50pt
+  // 3. Under adaptive equal-boundaries: C4 line renders at 0.50pt, equalized with other boundaries
   const boundOpts = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
     core: 'adaptive',
@@ -258,7 +258,7 @@ test('C4 weight pin: C4 line renders at 0.70pt; other core lines at 0.50pt', () 
   const boundRules = pitchGridRules(boundGeo, boundOpts, TOKENS);
   const boundC4 = boundRules.find((r) => Math.abs(r.y - (boundGeo.middleCY + continuousPitchY(48, TOKENS.semitoneScale))) < 1e-6);
   assert.ok(boundC4, 'equal-boundaries draws C4');
-  assert.equal(boundC4.width, 0.70, 'equal-boundaries weights C4 at 0.70pt');
+  assert.equal(boundC4.width, 0.50, 'equal-boundaries weights C4 at 0.50pt');
   for (const r of boundRules.filter((r) => Math.abs(r.y - (boundGeo.middleCY + continuousPitchY(48, TOKENS.semitoneScale))) >= 1e-6)) {
     assert.equal(r.width, 0.50, 'other equal-boundaries lines render at 0.50pt');
   }
@@ -268,11 +268,11 @@ test('C4 weight pin: C4 line renders at 0.70pt; other core lines at 0.50pt', () 
 // 4. Weights constants pin
 // ---------------------------------------------------------------------------
 
-test('Weights constants: barline balance (0.90), System-1 bracket (0.90), System 2+ bracket (0.65), C4 weight (0.70)', () => {
+test('Weights constants: barline balance (0.90), System-1 bracket (0.90), System 2+ bracket (0.65), C4 weight (0.50)', () => {
   assert.equal(SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE, 0.90, 'System 1 bracket is 0.90pt');
   assert.equal(ARCHITECTURAL_BRACKET_STROKE, 0.65, 'Systems 2+ bracket is 0.65pt');
   assert.equal(SYSTEM_1_BRACKET_STROKE_DELTA, 0.25, 'System 1 bracket delta is 0.25pt');
-  assert.equal(PITCH_GRID_C4_STROKE, 0.70, 'C4 stroke is 0.70pt');
+  assert.equal(PITCH_GRID_C4_STROKE, 0.50, 'C4 stroke is 0.50pt');
   assert.equal(PITCH_GRID_OCTAVE_STROKE, 0.50, 'Octave stroke is 0.50pt');
 });
 

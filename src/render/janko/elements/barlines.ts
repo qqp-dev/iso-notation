@@ -43,14 +43,46 @@ export function renderStaffBarline(
   return `    <line class="janko-barline" x1="${f(x)}" y1="${f(yTop)}" x2="${f(x)}" y2="${f(yBot)}" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(2)}"/>`;
 }
 
-/** Absolute y of the continuous grid's top (`rhTop`, Octave 5 + 12pt). */
-export function gridTopY(geo: JankoSystemGeometry): number {
-  return geo.equatorY('RH', 5) - 12;
+/**
+ * Absolute y of the continuous grid's top tip.
+ * Symmetric-6 golden span: stands off the outer-row level by exactly `t.measureInset` (6.0pt).
+ * Top tip = outerTopY + 6.0 (fixed-3: lin 69.6; fixed-4: 77.5 + 6.0).
+ */
+export function gridTopY(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): number {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') {
+    return geo.equatorY('RH', 5) - 12;
+  }
+  const isFixed3 = o.core === 'fixed-3';
+  const topExtLin = isFixed3 ? 72 : 77.5;
+  const outerTopY = geo.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+  return outerTopY + t.measureInset;
 }
 
-/** Absolute y of the continuous grid's bottom (`lhBot`, Octave 2 + 12pt). */
-export function gridBotY(geo: JankoSystemGeometry): number {
-  return geo.equatorY('LH', 2) + 12;
+/**
+ * Absolute y of the continuous grid's bottom tip.
+ * Symmetric-6 golden span: stands off the outer-row level by exactly `t.measureInset` (6.0pt).
+ * Bottom tip = outerBotY - 6.0 (fixed-3: lin 26.4; fixed-4: 17.5 - 6.0).
+ */
+export function gridBotY(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): number {
+  const o = resolveJankoOptions(options);
+  const t = resolveJankoTokens(tokens);
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') {
+    return geo.equatorY('LH', 2) + 12;
+  }
+  const isFixed3 = o.core === 'fixed-3';
+  const botExtLin = isFixed3 ? 24 : 17.5;
+  const outerBotY = geo.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+  return outerBotY - t.measureInset;
 }
 
 /**
@@ -100,10 +132,10 @@ export function renderBarlines(
   const out: string[] = ['  <g class="janko-barlines">'];
   const channelled = channelsGridInk(o.gridWritingPolicy);
 
-  const rhTop = gridTopY(geo);
+  const rhTop = gridTopY(geo, o, t);
   const rhBot = geo.equatorY('RH', 4) + 12;
   const lhTop = geo.equatorY('LH', 3) - 12;
-  const lhBot = gridBotY(geo);
+  const lhBot = gridBotY(geo, o, t);
 
   const isFixed3 = o.core === 'fixed-3';
   const topExtLin = isFixed3 ? 72 : 77.5;
@@ -333,8 +365,8 @@ export function renderBeatGrid(
   if (pulses.length === 0) return '';
 
   const out: string[] = ['  <g class="janko-beat-grid">'];
-  const rhTop = gridTopY(geo);
-  const lhBot = gridBotY(geo);
+  const rhTop = gridTopY(geo, o, t);
+  const lhBot = gridBotY(geo, o, t);
   const channelled = channelsGridInk(o.gridWritingPolicy);
 
   for (const x of pulses) {
