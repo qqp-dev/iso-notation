@@ -25,6 +25,7 @@
 
 import { Hand } from '../../../model/types';
 import {
+  JankoClaspDotNudge,
   JankoClaspDurationStyle,
   JankoDurationGrammar,
   JankoLayoutOptions,
@@ -898,6 +899,12 @@ export interface JankoClaspOptions {
    * keeps the legacy single dot. Defaults to `'golden'`.
    */
   durationGrammar?: JankoDurationGrammar;
+  /**
+   * Round 31: situational clasp-dot translation — a rigid `[dx, dy]` shift
+   * applied to every resolved bracket dot (first and second alike) after the
+   * seat solver runs. Defaults to `[0, 0]` (judged seats, byte-identical).
+   */
+  claspDotNudge?: JankoClaspDotNudge;
 }
 
 /** The bracket `[` path: cap → spine → cap. */
@@ -989,6 +996,16 @@ export function computeClaspGeometry(
     const first = geometry.durationDots[index];
     return ink.dots >= 2 && first ? claspSecondDotCenter(geometry, ink, first, t) : null;
   });
+  // Round 31: the situational nudge translates the RESOLVED seats rigidly, so
+  // the renderer, the fit rule, the ink box and the linter all read the moved
+  // dot from this one datum. Note dots are never touched.
+  const [nudgeDx, nudgeDy] = options?.claspDotNudge ?? [0, 0];
+  if (nudgeDx !== 0 || nudgeDy !== 0) {
+    const nudge = (dot: { x: number; y: number } | null): { x: number; y: number } | null =>
+      dot === null ? null : { x: dot.x + nudgeDx, y: dot.y + nudgeDy };
+    geometry.durationDots = geometry.durationDots.map(nudge);
+    geometry.durationSecondDots = geometry.durationSecondDots.map(nudge);
+  }
   return geometry;
 }
 

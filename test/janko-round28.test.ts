@@ -55,7 +55,7 @@ const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 
 // Historical Round 28 registry (conjoin vs wide-gap) preserved for durable regression coverage.
-// Active candidate round in src/render/janko/candidates.ts is Round 30 (duration-grammar preview).
+// Active candidate round in src/render/janko/candidates.ts is Round 31 (clasp-dot nudge preview).
 const ROUND_28_METADATA: JankoCandidateRound = {
   round: 28,
   title: 'Extension Junctions: Conjoin vs Wide Gap',

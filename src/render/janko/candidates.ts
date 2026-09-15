@@ -218,61 +218,47 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * (Brahms joins the Reference as a first-class surface): lone longs ring,
  * every dotted value dots, flags and beam levels derive from the notated
  * base. Two cards, one axis, no control — the Reference is the control.
+ * Round 30 is judged WITHHELD and parked (see the historical consts in
+ * `test/janko-round30.test.ts`); it returns for judgment post-cleanup.
+ *
+ * Round 31 previews the approved situational clasp-dot nudge — bracket dots
+ * step lower-right by one uniform vector — on the two pinned white-ring dots
+ * (Brahms m.1 tick 48 and its m.3 tick-432 twin). One card, one axis, no
+ * control — the fixed-3 BRONZE Reference is the control.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 30,
-  title: 'Duration-grammar preview: rings, dots, levels',
+  round: 31,
+  title: 'Clasp-dot nudge: a little lower and to the right',
   description:
-    'The complete duration grammar, previewed on Brahms before any flip: lone half/whole notes carry the bracket rings stem-mounted, every dotted value shows its dots (doubly dotted doubly) on singles, beams and brackets, and flags/beam levels derive from the notated base. Both cards run the full preview and differ only in windows: rings first, then the double-dot passages and the out-of-grammar boundary. Ties, tuplets and MIDI holds keep their current rendering.',
-  openAxes: ['durationGrammar'],
+    'The approved situational nudge, previewed before any flip: every bracket-attached augmentation dot steps lower-right by the uniform vector (+0.4pt, +0.2pt) while every note dot stays byte-identical. The card frames the two pinned white-ring dots — the Brahms m.1 tick-48 dot and its m.3 tick-432 twin — which move identically; the Reference BRONZE Brahms is the standing control.',
+  openAxes: ['claspDotNudge'],
 };
 
 /**
- * Round 30: two preview cards on the single `durationGrammar` axis (Brahms
- * ×3, Bach ×1 — all literal corpus windows, every count proofread against
- * the real engine and pinned in `test/janko-round30.test.ts`). No Card B:
- * the mm. 44–45 window frames a double-dotted-carrying bracket, so the
- * bracket-double-dot aspect is already demonstrated.
+ * Round 31: one preview card on the single `claspDotNudge` axis (Brahms ×2 —
+ * both literal corpus windows, every claim proofread against the real engine
+ * and pinned in `test/janko-round31.test.ts`). The tick-432 twin sits at the
+ * m.3 downbeat (48 + 2·192), so the second window is mm. 2–3, not m. 4.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'round-30-rings',
-    label: 'Rings on lone longs',
+    id: 'round-31-clasp-nudge',
+    label: 'Clasp dot lower-right',
     description:
-      'One open ring = half, two stacked = whole — the bracket rings (R 3.0pt, 1.0pt stroke) stem-mounted at the stem midpoint. Dotted longs ring AND dot; the 150/126 tie-merged holds stay bare.',
-    axis: 'durationGrammar',
-    options: { durationGrammar: 'complete' },
+      'Bracket dots step (+0.4pt, +0.2pt) — the approved situational nudge, uniform across clasp dots. The m.1 white-ring dot and its m.3 twin move identically; note dots are byte-identical. Adds no new findings: the card inherits the BRONZE surface\u2019s 4 known folding findings.',
+    axis: 'claspDotNudge',
+    options: { claspDotNudge: [0.4, 0.2] },
     windows: [
       brahmsWindow(
         1,
         2,
-        'Brahms mm. 1–2 · dd-8th #14 +flag+2 dots, dd-16th #22 +2nd flag+2 dots; the 150/126 LH holds stay bare'
+        'Brahms mm. 1–2 · the m.1 white-ring dot steps (+0.4pt, +0.2pt) lower-right'
       ),
       brahmsWindow(
-        24,
         2,
-        'Brahms mm. 24–25 · rings on the half #321 and the dotted half #332 (+dot); 2 more 42s, 7 21s and the 42-bracket dot twice'
-      ),
-    ],
-  },
-  {
-    id: 'round-30-double-dots',
-    label: 'Double dots everywhere',
-    description:
-      'Doubly dotted values dot twice — singles, beamed notes (level 2) and brackets alike — with the second dot further along the escape (right first, then up). The Bach window pins the boundary: a tied value keeps its bare stem.',
-    axis: 'durationGrammar',
-    options: { durationGrammar: 'complete' },
-    windows: [
-      brahmsWindow(
-        44,
         2,
-        'Brahms mm. 44–45 · 7 21s +level+2 dots, 2 42s +flag+2 dots, the 42-bracket +2 dots; rings on #607 and #618 (+dot)'
+        'Brahms mm. 2–3 · the m.3 downbeat twin steps the identical (+0.4pt, +0.2pt)'
       ),
-      {
-        measureStart: 20,
-        measureCount: 1,
-        title: 'Bach m. 20 · the tied 108 (#343) stays bare — zero new marks in this window',
-      },
     ],
   },
 ];

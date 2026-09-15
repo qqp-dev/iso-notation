@@ -444,13 +444,14 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 30 duration-grammar preview, two cards, one open axis', () => {
-  // Ordered contract change: Round 30 previews the complete duration grammar
-  // on two cards (rings, double dots) with the Reference as control.
-  assert.equal(CURRENT_ROUND_METADATA.round, 30);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationGrammar'], 'one open axis');
+test('§F registry: round 31 clasp-dot nudge preview, one card, one open axis', () => {
+  // Ordered contract change: Round 31 previews the situational clasp-dot
+  // nudge on one card (clasp nudge) with the Reference as control. Round 30
+  // is parked (historical consts in test/janko-round30.test.ts).
+  assert.equal(CURRENT_ROUND_METADATA.round, 31);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['round-30-rings', 'round-30-double-dots'], 'the two preview cards');
+  assert.deepEqual(ids, ['round-31-clasp-nudge'], 'the one preview card');
 });
 
 // ---------------------------------------------------------------------------
