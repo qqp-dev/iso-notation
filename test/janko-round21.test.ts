@@ -277,7 +277,21 @@ test('§D stem tripwire: the retired R19 stem-through-simultaneity signatures ar
       0,
       `${label}: no stem pierces a fellow chord tone`
     );
-    assert.equal(report.ok, true, `${label}: the lower-first golden is clean`);
+    if (label === 'Brahms') {
+      // 4-up by operator override (was clean at 3-up): exactly the 2
+      // accepted slot findings — the stem tripwire itself stays silent.
+      assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
+      assert.deepEqual(
+        report.violations.map((v) => [v.code, v.system + 1]),
+        [
+          ['system-slot-overlap', 23],
+          ['system-slot-overlap', 24],
+        ],
+        'exactly the accepted 2 (itemized in the §2-landed record)'
+      );
+    } else {
+      assert.equal(report.ok, true, `${label}: the lower-first golden is clean`);
+    }
   }
 });
 

@@ -204,10 +204,12 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildBrahmsOp118No1Score(),
       // Round 31: the studio's Brahms is the fixed-3 golden — the current
       // practice the defaults already carry, DISPLAY-ONLY (zero golden
-      // change). Fixed-3 carries four pre-existing
-      // stem-through-simultaneity violations from folding; they stay VISIBLE
-      // as tagged known findings (never gated, never hidden). The CLI keeps
-      // its own adaptive 0/0 entry, so deploy stays green.
+      // change). Fixed-3 carries 9 violations at 4-up (the 4 known folding
+      // stem-through-simultaneity findings plus 5 accepted slot-accounting
+      // findings); mixed codes carry no known tags, and every finding stays
+      // VISIBLE (never gated, never hidden). The CLI keeps its own adaptive
+      // entry (the accepted 2, red by operator order); deploy gates on
+      // tests + build only, so it stays green.
       options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
       tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
     },
@@ -629,8 +631,9 @@ function renderReferenceScore(
  * Render the Golden Reference Object: the full page spread of the canonical
  * score plus the macro focus crops, all from the golden-master options —
  * Bach GOLD AND, since Round 30, the Brahms BRONZE beside it (fixed-3 since
- * Round 31, with its four known folding findings tagged). Every round judges
- * against these objects; neither is ever a draft.
+ * Round 31, 4-up with its 9 findings itemized — the 4 known folding
+ * findings plus 5 accepted slot findings, untagged while mixed). Every
+ * round judges against these objects; neither is ever a draft.
  *
  * The BRONZE Brahms block leads (Brahms is the live iteration surface) and
  * the GOLD Bach block follows without focus crops (operator order — Bach's

@@ -20,7 +20,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -329,11 +329,25 @@ test('Dots golden: Brahms clasp dots UNMOVED — m.1 (tick 48) and m.4 (tick 432
   assert.equal(d1.length, 1, 'm.1 clasp carries one dot');
   assert.equal(d4.length, 1, 'm.4 clasp carries one dot');
 
-  // Judged PR #48 positions, pinned to the float.
+  // Judged PR #48 seats, re-pinned for 4-up: x is bit-identical (both dots
+  // sit in system 1, whose slot-0 frame keeps its measureWidth), y moved by
+  // exactly the slot-0 frame shift ΔmiddleCY (derived live from both
+  // geometries — proof the within-system geometry is untouched).
+  const g3 = computePageGeometry({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, systemsPerPage: 3 }, t, BRAHMS);
+  const g4 = computePageGeometry(BRAHMS_OP118_NO1_JANKO_OPTIONS, t, BRAHMS);
+  const delta = getSystemGeometry(g4, 0).middleCY - getSystemGeometry(g3, 0).middleCY;
   assert.equal(d1[0]!.x, 84.08115384615381, 'm.1 clasp dot x unmoved');
-  assert.equal(d1[0]!.y, 157.92849488270818, 'm.1 clasp dot y unmoved');
+  assert.equal(d1[0]!.y, 127.26641154937485, 'm.1 clasp dot y (was 157.92849488270818)');
+  assert.ok(
+    Math.abs(d1[0]!.y - 157.92849488270818 - delta) < 1e-9,
+    'm.1 y moved by exactly the frame shift'
+  );
   assert.equal(d4[0]!.x, 419.65911657285125, 'm.4 clasp dot x unmoved');
-  assert.equal(d4[0]!.y, 166.29460137586668, 'm.4 clasp dot y unmoved');
+  assert.equal(d4[0]!.y, 135.63251804253335, 'm.4 clasp dot y (was 166.29460137586668)');
+  assert.ok(
+    Math.abs(d4[0]!.y - 166.29460137586668 - delta) < 1e-9,
+    'm.4 y moved by exactly the frame shift'
+  );
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
@@ -591,13 +605,16 @@ test('Rests golden: dormant dialects keep #111111 ink and unscaled extents', () 
   assert.ok(Math.abs(box.y1 - box.y0 - 11.5594) < 1e-3, 'dormant kinetic quarter height unscaled');
 });
 
-test('npm run lint:engraving --strict reports the landed golden master clean and exits 0', () => {
-  const out = execFileSync(
+test('npm run lint:engraving --strict reports the accepted 4-up breakage and exits 1', () => {
+  // Red-on-Brahms is the expected, operator-accepted state (was clean/0 at
+  // 3-up): the strict gate exits 1 with exactly the 2 accepted slot findings.
+  const run = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--strict', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.match(out, /clean violations=0 warnings=0/);
+  assert.equal(run.status, 1, 'the strict gate exits 1 while Brahms carries the accepted 2');
+  assert.match(run.stdout, /violations violations=2 warnings=0/, 'exactly the accepted 2, zero warnings');
 });
 
 // ---------------------------------------------------------------------------
