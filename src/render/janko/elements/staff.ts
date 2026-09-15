@@ -135,8 +135,8 @@ export const PITCH_GRID_LANE_STROKE = 0.3;
 export const PITCH_GRID_OCTAVE_INK = '#1E293B';
 /** Weight of the equal-scheme octave lines: the golden equator spec, exactly. */
 export const PITCH_GRID_OCTAVE_STROKE = 0.5;
-/** Weight of the C4 octave line: just visibly heavier (0.65pt vs 0.50pt). */
-export const PITCH_GRID_C4_STROKE = 0.65;
+/** Weight of the C4 octave line: just visibly heavier (0.70pt vs 0.50pt). */
+export const PITCH_GRID_C4_STROKE = 0.70;
 /** Length (pt) of the clef-marker anchor tick at each system start. */
 export const PITCH_GRID_MARKER_LENGTH = 20;
 
@@ -175,22 +175,25 @@ export interface PitchGridRule {
 /**
  * One center-out row definition for need-based staff lines.
  *
- * Vocabulary (operator's):
+ * Strict rows rule: in any bar, a C-line 0/k is drawn iff some written note in
+ * the bar reaches 0/k (touches or passes it). The center 0/4 is always drawn.
+ * Inclusive at every threshold.
+ *
  * Fixed-3:
  *   Row 1 center (0/4, Middle C, lin 48, always drawn in every bar)
- *   Row 2 above (0/5, lin 60, fires iff any bar-note strictly above 6/4, lin > 54)
- *   Row 3 below (0/3, lin 36, fires iff any bar-note strictly below 6/3, lin < 42)
- *   Row 4 outer-above (0/6, lin 72, fires iff any bar-note strictly above 6/5, lin > 66)
- *   Row 5 outer-below (0/2, lin 24, fires iff any bar-note strictly below 6/2, lin < 30)
+ *   Row 2 above (0/5, lin 60, fires iff bar max >= 60)
+ *   Row 3 below (0/3, lin 36, fires iff bar min <= 36)
+ *   Row 4 outer-above (0/6, lin 72, fires iff bar max >= 72)
+ *   Row 5 outer-below (0/2, lin 24, fires iff bar min <= 24)
  *
- * Fixed-4 even analogue (gap-centered, no single anchor):
+ * Fixed-4 analogue at its middles (shared grammar):
  *   Central pair (straddling the middle-C gap, always drawn):
  *     Inner middle below (o3 middle, lin 41.5)
  *     Inner middle above (o4 middle, lin 53.5)
- *   Outer middle above (o5 middle, lin 65.5, fires iff strictly > 59.5)
- *   Outer middle below (o2 middle, lin 29.5, fires iff strictly < 35.5)
- *   Outer extension above (o6 middle, lin 77.5, fires iff strictly > 71.5)
- *   Outer extension below (o1 middle, lin 17.5, fires iff strictly < 23.5)
+ *   Outer middle above (o5 middle, lin 65.5, fires iff bar max >= 65.5)
+ *   Outer middle below (o2 middle, lin 29.5, fires iff bar min <= 29.5)
+ *   Outer extension above (o6 middle, lin 77.5, fires iff bar max >= 77.5)
+ *   Outer extension below (o1 middle, lin 17.5, fires iff bar min <= 17.5)
  */
 export interface NeedBasedRowDef {
   /** Linear pitch of this row line. */
@@ -207,19 +210,19 @@ export interface NeedBasedRowDef {
 
 export const FIXED_3_ROW_DEFS: readonly NeedBasedRowDef[] = [
   { lin: 48, rowId: 1, name: 'center (0/4)', isAnchor: true, fires: () => true },
-  { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: (lins) => lins.some((l) => l > 54) },
-  { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: (lins) => lins.some((l) => l < 42) },
-  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l > 66) },
-  { lin: 24, rowId: 5, name: 'outer-below (0/2)', isAnchor: false, fires: (lins) => lins.some((l) => l < 30) },
+  { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 60) },
+  { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 36) },
+  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 72) },
+  { lin: 24, rowId: 5, name: 'outer-below (0/2)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 24) },
 ];
 
 export const FIXED_4_ROW_DEFS: readonly NeedBasedRowDef[] = [
   { lin: 41.5, rowId: 1, name: 'inner-below (o3 middle)', isAnchor: true, fires: () => true },
   { lin: 53.5, rowId: 2, name: 'inner-above (o4 middle)', isAnchor: true, fires: () => true },
-  { lin: 65.5, rowId: 3, name: 'outer-above (o5 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l > 59.5) },
-  { lin: 29.5, rowId: 4, name: 'outer-below (o2 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l < 35.5) },
-  { lin: 77.5, rowId: 5, name: 'extension-above (o6 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l > 71.5) },
-  { lin: 17.5, rowId: 6, name: 'extension-below (o1 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l < 23.5) },
+  { lin: 65.5, rowId: 3, name: 'outer-above (o5 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 65.5) },
+  { lin: 29.5, rowId: 4, name: 'outer-below (o2 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 29.5) },
+  { lin: 77.5, rowId: 5, name: 'extension-above (o6 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 77.5) },
+  { lin: 17.5, rowId: 6, name: 'extension-below (o1 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 17.5) },
 ];
 
 /**
@@ -286,11 +289,15 @@ export function computeSystemStaffSegments(
     return { x1: left, x2: left + measureWidth };
   };
 
-  const defs = core === 'fixed-3' ? FIXED_3_ROW_DEFS : core === 'fixed-4' ? FIXED_4_ROW_DEFS : [];
+  const isFixed3 = core === 'fixed-3';
+  const defs = isFixed3 ? FIXED_3_ROW_DEFS : core === 'fixed-4' ? FIXED_4_ROW_DEFS : [];
   const segments: StaffLineSegment[] = [];
 
   for (const def of defs) {
     const earnsBar = barLins.map((lins) => def.fires(lins));
+    const isExtension = isFixed3
+      ? def.lin === 24 || def.lin === 72
+      : def.lin === 17.5 || def.lin === 77.5;
     let runStart: number | null = null;
     for (let m = 0; m <= numBars; m++) {
       if (m < numBars && earnsBar[m]) {
@@ -299,8 +306,18 @@ export function computeSystemStaffSegments(
         if (runStart !== null) {
           const mStart = runStart;
           const mEnd = m - 1;
-          const x1 = mStart === 0 ? staffLeft : getBarSpanX(mStart).x1;
-          const x2 = mEnd === numBars - 1 ? staffRight : getBarSpanX(mEnd).x2;
+          const x1 =
+            mStart === 0
+              ? staffLeft
+              : isExtension
+                ? getBarSpanX(mStart).x1 + t.measureInset
+                : getBarSpanX(mStart).x1;
+          const x2 =
+            mEnd === numBars - 1
+              ? staffRight
+              : isExtension
+                ? getBarSpanX(mEnd).x2 - t.measureInset
+                : getBarSpanX(mEnd).x2;
           segments.push({
             lin: def.lin,
             rowId: def.rowId,
@@ -318,7 +335,6 @@ export function computeSystemStaffSegments(
   segments.sort((a, b) => a.lin - b.lin || a.x1 - b.x1);
 
   const staffLines = Array.from(new Set(segments.map((s) => s.lin))).sort((a, b) => a - b);
-  const isFixed3 = core === 'fixed-3';
   const coreLines = isFixed3 ? [36, 48, 60] : [29.5, 41.5, 53.5, 65.5];
   const extensionLines = (isFixed3 ? [24, 72] : [17.5, 77.5]).filter((lin) =>
     staffLines.includes(lin)

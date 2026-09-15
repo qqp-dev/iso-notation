@@ -339,7 +339,7 @@ test('Slab honesty: grand bar rests touch drawn lines exactly', () => {
   }
 });
 
-test('Bar-4 regression: the tick-552 rest seats on the C3 line, not mid-air', () => {
+test('Bar-4 regression: the tick-552 rest seats on the Middle C line between the 9 and the 0, not mid-air', () => {
   const o = continuousOptions('grand-divider');
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const page = computePageGeometry(o, t, SCORE);
@@ -348,6 +348,7 @@ test('Bar-4 regression: the tick-552 rest seats on the C3 line, not mid-air', ()
   const geo = getSystemGeometry(page, 0);
   const rules = drawnStaffRuleYs(geo, o, t);
   assert.ok(rules.includes(rest.y), 'the seat is a drawn line');
-  const c3 = geo.middleCY + continuousPitchY(36, t.semitoneScale);
-  assert.ok(Math.abs(rest.y - c3) < 1e-9, `the seat is the C3 line (y=${rest.y.toFixed(2)})`);
+  const c4 = geo.middleCY + continuousPitchY(48, t.semitoneScale);
+  assert.ok(Math.abs(rest.y - c4) < 1e-9, `the seat is the Middle C line (y=${rest.y.toFixed(2)})`);
 });
+

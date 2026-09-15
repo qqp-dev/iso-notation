@@ -1440,7 +1440,7 @@ test('Round 13 start symbols: the flared 0.65pt bracket, the 0.50pt bracket and 
   const system0 = getSystemGeometry(geo, 0);
 
   const bracket = renderSystem(score, system0, 0, { ...OPTIONS, systemStartStyle: 'architectural-bracket' }, TOKENS);
-  const flared = /class="janko-system-bracket" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)" fill="none" stroke="#111827" stroke-width="0\.75" stroke-linecap="butt" stroke-linejoin="miter"\/>/.exec(bracket);
+  const flared = /class="janko-system-bracket" d="M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)" fill="none" stroke="#111827" stroke-width="0\.90" stroke-linecap="butt" stroke-linejoin="miter"\/>/.exec(bracket);
   assert.ok(flared, 'the flared architectural bracket is painted');
   const [, tipX, tipY, x1, y1, , , footX, footY] = flared!.map(Number);
   const c5 = system0.middleCY + continuousPitchY(60, TOKENS.semitoneScale);
@@ -1486,11 +1486,11 @@ test('Round 14 system openness: the canonical flared bracket opens System 1 gran
       [...svg.matchAll(/class="janko-barline" x1="([\d.]+)"/g)].map((m) => Number(m[1]))
     );
 
-  // The golden default opens the piece with the grander 0.75pt architectural bracket:
+  // The golden default opens the piece with the grander 0.90pt architectural bracket:
   const first = renderSystem(score, getSystemGeometry(geo, 0), 0, OPTIONS, TOKENS);
   assert.match(
     first,
-    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.75" stroke-linecap="butt" stroke-linejoin="miter"/,
+    /class="janko-system-bracket" d="M [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+ L [\d.-]+ [\d.-]+" fill="none" stroke="#111827" stroke-width="0\.90" stroke-linecap="butt" stroke-linejoin="miter"/,
     'System 1 opens with the grander flared bracket'
   );
   assert.ok(!first.includes('janko-accolade'), 'the copperplate accolade stays retired');
@@ -1526,7 +1526,7 @@ test('Round 14 system openness: the canonical flared bracket opens System 1 gran
     lastX.has(Number(getSystemGeometry(geo, total - 1).staffRight.toFixed(2))),
     'the final system draws the closing barline'
   );
-  assert.match(last, /class="janko-barline"[^>]*stroke-width="1\.05"/, 'the closing barline stays firm');
+  assert.match(last, /class="janko-barline"[^>]*stroke-width="0\.90"/, 'the closing barline stays firm');
   assert.match(first, /class="janko-barline"[^>]*stroke-width="0\.60"/, 'measure barlines are lighter');
 
   // Round 10: the default final barline is unified — one continuous rule from
@@ -1536,11 +1536,11 @@ test('Round 14 system openness: the canonical flared bracket opens System 1 gran
       `y1="${(getSystemGeometry(geo, total - 1).equatorY('RH', 5) - 12).toFixed(2)}" ` +
       `x2="${getSystemGeometry(geo, total - 1).staffRight.toFixed(2)}" ` +
       `y2="${(getSystemGeometry(geo, total - 1).equatorY('LH', 2) + 12).toFixed(2)}" ` +
-      'stroke="#111111" stroke-width="1.05"'
+      'stroke="#111111" stroke-width="0.90"'
   );
   assert.match(last, finalBar, 'the unified final barline spans both hands across the corridor');
   assert.equal(
-    (last.match(/class="janko-barline"[^>]*stroke-width="1\.05"/g) ?? []).length,
+    (last.match(/class="janko-barline"[^>]*stroke-width="0\.90"/g) ?? []).length,
     1,
     'the unified boundary is one single rule'
   );
@@ -1548,7 +1548,7 @@ test('Round 14 system openness: the canonical flared bracket opens System 1 gran
   const splitOptions = { ...OPTIONS, finalBarlineStyle: 'split-corridor' as const };
   const split = renderSystem(score, getSystemGeometry(geo, total - 1), total - 1, splitOptions, TOKENS);
   assert.equal(
-    (split.match(/class="janko-barline"[^>]*stroke-width="1\.05"/g) ?? []).length,
+    (split.match(/class="janko-barline"[^>]*stroke-width="0\.90"/g) ?? []).length,
     2,
     'the split final barline keeps two hand segments with an open corridor'
   );

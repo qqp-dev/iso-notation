@@ -1263,7 +1263,7 @@ function getNominalNoteX(
  * Round 12 voice rests share this one function, so a rest stands on exactly the
  * proportional grid the surrounding writing uses — never on an ad-hoc offset.
  */
-function getTickColumnX(
+export function getTickColumnX(
   tick: number,
   geo: JankoSystemGeometry,
   systemIndex: number,
@@ -2176,31 +2176,132 @@ export function computeJankoRestLayer(
           continue;
         }
       }
-      let x = solveAt(targetY);
-      if (x === null) {
-        // Round 17B vertical fallback: the adjacent row toward the corridor
-        // gets its own in-cell solve before the silence is named unwritable.
-        // Continuous step: one semitone (a rowHeight stride would leap six) —
-        // except on the grand grid, where the fallback is the neighboring
-        // drawn line toward the corridor (a semitone step would snap straight
-        // back onto the same line).
-        let fallbackRow: number;
-        if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-          const rules = drawnStaffRuleYs(geo, o, t, candidate.x);
-          const neighbor =
-            dir === -1
-              ? [...rules].filter((r) => r < rowY - EPS).pop()
-              : rules.find((r) => r > rowY + EPS);
-          fallbackRow = neighbor ?? rowY;
-        } else {
-          const step = o.pitchMapping === 'twin-rows' ? t.rowHeight : t.semitoneScale;
-          fallbackRow = nearestLatticeRow(rowY + dir * step, geo, t, o);
+
+      // Direction (a): inter-onset gap bounds. A rest must stay inside its inter-onset gap
+      // and never slide past a neighboring onset's column.
+      const colPrev = getTickColumnX(ticks[i], geo, systemIndex, o, t);
+      const colNext = getTickColumnX(ticks[i + 1], geo, systemIndex, o, t);
+      const probe = restInkBox(candidate, t);
+      const leftW = candidate.x - probe.x0;
+      const rightW = probe.x1 - candidate.x;
+      const gapLeft = Math.max(cell.left, colPrev + leftW);
+      const gapRight = Math.min(cell.right, colNext - rightW);
+      const gapCell = gapLeft < gapRight ? { left: gapLeft, right: gapRight } : cell;
+
+      // Direction (b): candidate rows include phrase row, neighbor rows (releasing and resuming),
+      // and corridor fallback row.
+      const drawnRules = drawnStaffRuleYs(geo, o, t, candidate.x);
+      const prevY = voiceYAt(notes, hand, ticks[i]);
+      const nextY = voiceYAt(notes, hand, ticks[i + 1]);
+      const voiceCandidateRows: number[] = [];
+      const addVoiceRow = (r: number | null): void => {
+        if (r === null) return;
+        // In fixed-3 and fixed-4, seats must stay on drawn lines
+        if (o.core === 'fixed-3' || o.core === 'fixed-4') {
+          if (!drawnRules.some((dr) => Math.abs(dr - r) < EPS)) return;
         }
-        if (Math.abs(fallbackRow - rowY) > EPS) {
-          x = solveAt(restSeatY(fallbackRow, o.restStyle, value, t, geo, o, candidate.x));
+        if (!voiceCandidateRows.some((cr) => Math.abs(cr - r) < EPS)) {
+          voiceCandidateRows.push(r);
+        }
+      };
+      addVoiceRow(rowY);
+      if (prevY !== null) {
+        addVoiceRow(nearestLatticeRow(prevY, geo, t, o));
+      }
+      if (nextY !== null) {
+        addVoiceRow(nearestLatticeRow(nextY, geo, t, o));
+      }
+
+      // Vertical fallback row toward the corridor
+      let fallbackRow: number | null = null;
+      if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+        const rules = drawnStaffRuleYs(geo, o, t, candidate.x);
+        const neighbor =
+          dir === -1
+            ? [...rules].filter((r) => r < rowY - EPS).pop()
+            : rules.find((r) => r > rowY + EPS);
+        fallbackRow = neighbor ?? null;
+      } else {
+        const step = o.pitchMapping === 'twin-rows' ? t.rowHeight : t.semitoneScale;
+        fallbackRow = nearestLatticeRow(rowY + dir * step, geo, t, o);
+      }
+      if (fallbackRow !== null && Math.abs(fallbackRow - rowY) <= EPS) {
+        fallbackRow = null;
+      }
+
+      // Pass 1: Try voice candidate rows at/near the canonical column before any horizontal slide
+      let chosenX: number | null = null;
+      let chosenY: number = targetY;
+      let bestNearDisp = Infinity;
+
+      const nearCell = {
+        left: Math.max(gapCell.left, colX - 1.5),
+        right: Math.min(gapCell.right, colX + 1.5),
+      };
+      if (nearCell.left <= nearCell.right) {
+        for (const r of voiceCandidateRows) {
+          const y = restSeatY(r, o.restStyle, value, t, geo, o, candidate.x);
+          candidate.y = y;
+          const x = resolveRestX(candidate, notes, geo, systemIndex, measureIdx, nearCell, t);
+          if (x !== null) {
+            const disp = Math.abs(x - colX);
+            if (disp < bestNearDisp - EPS) {
+              bestNearDisp = disp;
+              chosenX = x;
+              chosenY = y;
+            }
+          }
         }
       }
-      if (x === null) {
+
+      // Pass 2: If no slot near canonical column, slide voice candidate rows inside the inter-onset gap
+      if (chosenX === null) {
+        let bestGapDisp = Infinity;
+        for (const r of voiceCandidateRows) {
+          const y = restSeatY(r, o.restStyle, value, t, geo, o, candidate.x);
+          candidate.y = y;
+          const x = resolveRestX(candidate, notes, geo, systemIndex, measureIdx, gapCell, t);
+          if (x !== null) {
+            const disp = Math.abs(x - colX);
+            if (disp < bestGapDisp - EPS) {
+              bestGapDisp = disp;
+              chosenX = x;
+              chosenY = y;
+            }
+          }
+        }
+      }
+
+      // Pass 3: Fallback to beat cell for voice rows if inter-onset gap offered no slot
+      if (chosenX === null) {
+        let bestCellDisp = Infinity;
+        for (const r of voiceCandidateRows) {
+          const y = restSeatY(r, o.restStyle, value, t, geo, o, candidate.x);
+          candidate.y = y;
+          const x = resolveRestX(candidate, notes, geo, systemIndex, measureIdx, cell, t);
+          if (x !== null) {
+            const disp = Math.abs(x - colX);
+            if (disp < bestCellDisp - EPS) {
+              bestCellDisp = disp;
+              chosenX = x;
+              chosenY = y;
+            }
+          }
+        }
+      }
+
+      // Pass 4: Fallback row toward the corridor if voice candidate rows could not find a slot
+      if (chosenX === null && fallbackRow !== null) {
+        const y = restSeatY(fallbackRow, o.restStyle, value, t, geo, o, candidate.x);
+        candidate.y = y;
+        const x = resolveRestX(candidate, notes, geo, systemIndex, measureIdx, cell, t);
+        if (x !== null) {
+          chosenX = x;
+          chosenY = y;
+        }
+      }
+
+      if (chosenX === null) {
         // A silence that opens within a head's air of a protected barline
         // opened on the grid: it is named `'protected-barline'` rather than
         // `'no-slot'`, so the grid refusal stays distinguishable from a wall
@@ -2213,7 +2314,8 @@ export function computeJankoRestLayer(
         refused(onGrid ? 'protected-barline' : 'no-slot');
         continue;
       }
-      candidate.x = x;
+      candidate.x = chosenX;
+      candidate.y = chosenY;
       out.push(candidate);
     }
   }

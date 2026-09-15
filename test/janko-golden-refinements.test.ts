@@ -2,12 +2,12 @@
  * Golden Refinements: Durable Test Suite
  * =======================================
  *
- * Verifies the three locked golden master refinements:
+ * Verifies the locked golden master refinements:
  *  1. Start bracket marks the C3–C5 core triple across all systems
- *     (identical vertical pitch extent across 3-line, 4-line, and 5-line systems).
- *  2. System 1 bracket renders with slightly grander metrics (stroke +0.10pt,
+ *     (identical vertical pitch extent across 2-line, 3-line, 4-line, and 5-line systems).
+ *  2. System 1 bracket renders with grander metrics (stroke 0.90pt, +0.25pt delta,
  *     spur reach +0.50pt) while systems 2+ render the base 0.65pt mark.
- *  3. C4 octave line renders at 0.65pt against 0.50pt core hairlines wherever
+ *  3. C4 octave line renders at 0.70pt against 0.50pt core hairlines wherever
  *     drawn (fixed-3, adaptive equal-boundaries), and no C4 line is drawn under fixed-4.
  */
 
@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
   computePageGeometry,
   getSystemGeometry,
@@ -47,6 +48,7 @@ import {
 } from '../src/render/janko/types';
 
 const BACH = buildBachGoldbergVar1Score();
+const BRAHMS = buildBrahmsOp118No1Score();
 const TOKENS = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 
 function parseBracket(svg: string): {
@@ -82,42 +84,34 @@ function parseBracket(svg: string): {
 // 1. Bracket span pins
 // ---------------------------------------------------------------------------
 
-test('Bracket span pin: vertical extent equals C3–C5 pitch extent identically across 3-, 4-, and 5-line systems', () => {
-  // Under measuresPerSystem: 2, Bach Goldberg Var. 1 contains systems with 3-line, 4-line, and 5-line bars
-  const opts = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 });
-  const pageGeo = computePageGeometry(opts, TOKENS, BACH);
+test('Bracket span pin: vertical extent equals C3–C5 pitch extent identically across 2-, 3-, 4-, and 5-line systems', () => {
+  // Bach Var. 1 contains 2-line bars (e.g. sys 3 bar 0: rows {1, 2}) and 3-line bars (sys 0 bar 0: rows {1, 2, 3}).
+  // Brahms fixed-3 contains 4-line bars (sys 3 bar 0: rows {1, 2, 3, 5}) and 5-line bars (sys 0 bar 0: rows {1..5}).
+  const bachOpts = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 });
+  const bachPage = computePageGeometry(bachOpts, TOKENS, BACH);
 
-  let sys3: { index: number; rows: number[]; lins: number[] } | null = null;
-  let sys4: { index: number; rows: number[]; lins: number[] } | null = null;
-  let sys5: { index: number; rows: number[]; lins: number[] } | null = null;
+  const brahmsOpts = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3', measuresPerSystem: 1 });
+  const brahmsPage = computePageGeometry(brahmsOpts, TOKENS, BRAHMS);
 
-  for (let s = 0; s < 16; s++) {
-    const geo = getSystemGeometry(pageGeo, s);
-    const bar0Rows = getBarStaffRows(geo, 0);
-    const bar0Segs = getBarStaffSegments(geo, 0);
-    const bar0Lins = bar0Segs.map((seg) => seg.lin).sort((a, b) => a - b);
-    if (bar0Rows.length === 3 && !sys3) sys3 = { index: s, rows: bar0Rows, lins: bar0Lins };
-    if (bar0Rows.length === 4 && !sys4) sys4 = { index: s, rows: bar0Rows, lins: bar0Lins };
-    if (bar0Rows.length === 5 && !sys5) sys5 = { index: s, rows: bar0Rows, lins: bar0Lins };
-  }
-
-  assert.ok(sys3, 'found sample 3-line bar Bach system');
-  assert.ok(sys4, 'found sample 4-line bar Bach system');
-  assert.ok(sys5, 'found sample 5-line bar Bach system');
-
-  assert.deepEqual(sys3.rows, [1, 2, 3], '3-case bar: core rows {1, 2, 3}');
-  assert.deepEqual(sys4.rows, [1, 2, 3, 4], '4-case bar: core rows plus row 4 (C6)');
-  assert.deepEqual(sys5.rows, [1, 2, 3, 4, 5], '5-case bar: rows 1..5 (C2..C6)');
-
-  assert.deepEqual(sys3.lins, [36, 48, 60], '3-case: core lines C3, C4, C5');
-  assert.deepEqual(sys4.lins, [36, 48, 60, 72], '4-case: core lines plus C6 extension');
-  assert.deepEqual(sys5.lins, [24, 36, 48, 60, 72], '5-case: C2 and C6 extensions');
+  const cases = [
+    { score: BACH, page: bachPage, sysIndex: 3, opts: bachOpts, expectedRows: [1, 2], expectedLins: [48, 60], label: '2-line' },
+    { score: BACH, page: bachPage, sysIndex: 0, opts: bachOpts, expectedRows: [1, 2, 3], expectedLins: [36, 48, 60], label: '3-line' },
+    { score: BRAHMS, page: brahmsPage, sysIndex: 3, opts: brahmsOpts, expectedRows: [1, 2, 3, 5], expectedLins: [24, 36, 48, 60], label: '4-line' },
+    { score: BRAHMS, page: brahmsPage, sysIndex: 0, opts: brahmsOpts, expectedRows: [1, 2, 3, 4, 5], expectedLins: [24, 36, 48, 60, 72], label: '5-line' },
+  ];
 
   const expectedPitchExtent = 24 * TOKENS.semitoneScale; // 60.0pt (C3 lin 36 to C5 lin 60)
 
-  for (const sample of [sys3, sys4, sys5]) {
-    const geo = getSystemGeometry(pageGeo, sample.index);
-    const svg = renderSystem(BACH, geo, sample.index, opts, TOKENS);
+  for (const sample of cases) {
+    const geo = getSystemGeometry(sample.page, sample.sysIndex);
+    const bar0Rows = getBarStaffRows(geo, 0);
+    const bar0Segs = getBarStaffSegments(geo, 0);
+    const bar0Lins = bar0Segs.map((seg) => seg.lin).sort((a, b) => a - b);
+
+    assert.deepEqual(bar0Rows, sample.expectedRows, `${sample.label} bar rows match`);
+    assert.deepEqual(bar0Lins, sample.expectedLins, `${sample.label} bar lines match`);
+
+    const svg = renderSystem(sample.score, geo, sample.sysIndex, sample.opts, TOKENS);
     const b = parseBracket(svg);
 
     const c5LineY = geo.middleCY + continuousPitchY(60, TOKENS.semitoneScale);
@@ -126,29 +120,29 @@ test('Bracket span pin: vertical extent equals C3–C5 pitch extent identically 
     // Spine anchors exactly to C5 and C3 pitch coordinates (within SVG rounding)
     assert.ok(
       Math.abs(b.yTop - c5LineY) < 0.015,
-      `system ${sample.index + 1} (${sample.rows.length} rows in bar 0): top rule meets C5 line y`
+      `${sample.label} (system ${sample.sysIndex + 1}): top rule meets C5 line y`
     );
     assert.ok(
       Math.abs(b.yBot - c3LineY) < 0.015,
-      `system ${sample.index + 1} (${sample.rows.length} rows in bar 0): bottom rule meets C3 line y`
+      `${sample.label} (system ${sample.sysIndex + 1}): bottom rule meets C3 line y`
     );
 
     const pitchExtent = b.yBot - b.yTop;
     assert.ok(
       Math.abs(pitchExtent - expectedPitchExtent) < 0.015,
-      `system ${sample.index + 1} (${sample.rows.length} rows in bar 0): vertical extent equals exactly C3–C5 pitch extent (${expectedPitchExtent}pt)`
+      `${sample.label} (system ${sample.sysIndex + 1}): vertical extent equals exactly C3–C5 pitch extent (${expectedPitchExtent}pt)`
     );
 
     // Cap idiom: spurs flare diagonally outward by spur * tan(13°)
-    const spur = sample.index === 0 ? SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR : ARCHITECTURAL_BRACKET_SPUR;
+    const spur = sample.sysIndex === 0 ? SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR : ARCHITECTURAL_BRACKET_SPUR;
     const expectedFlare = spur * ARCHITECTURAL_BRACKET_FLARE_TAN;
     assert.ok(
       Math.abs((b.yTop - b.tipY) - expectedFlare) < 0.015,
-      `system ${sample.index + 1}: top spur flares upward beyond C5`
+      `${sample.label} (system ${sample.sysIndex + 1}): top spur flares upward beyond C5`
     );
     assert.ok(
       Math.abs((b.footY - b.yBot) - expectedFlare) < 0.015,
-      `system ${sample.index + 1}: bottom spur flares downward beyond C3`
+      `${sample.label} (system ${sample.sysIndex + 1}): bottom spur flares downward beyond C3`
     );
   }
 });
@@ -173,7 +167,7 @@ test('System-1 grandeur pin: System 1 bracket metrics exceed systems 2+ by the e
 
   // System 1 metrics
   assert.equal(b1.stroke, SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE, 'System 1 stroke matches constant');
-  assert.equal(b1.stroke, 0.75, 'System 1 renders at 0.75pt stroke');
+  assert.equal(b1.stroke, 0.90, 'System 1 renders at 0.90pt stroke');
   assert.ok(Math.abs(sys1Spur - SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR) < 0.015, 'System 1 reach matches constant');
   assert.ok(Math.abs(sys1Spur - 3.5) < 0.015, 'System 1 reach is 3.5pt');
 
@@ -186,7 +180,8 @@ test('System-1 grandeur pin: System 1 bracket metrics exceed systems 2+ by the e
   // Assert exact deltas
   const strokeDelta = Number((b1.stroke - b2.stroke).toFixed(4));
   const spurDelta = Number((sys1Spur - sys2Spur).toFixed(4));
-  assert.equal(strokeDelta, SYSTEM_1_BRACKET_STROKE_DELTA, 'stroke exceeds systems 2+ by delta (0.10pt)');
+  assert.equal(strokeDelta, SYSTEM_1_BRACKET_STROKE_DELTA, 'stroke exceeds systems 2+ by delta (0.25pt)');
+  assert.equal(SYSTEM_1_BRACKET_STROKE_DELTA, 0.25, 'delta constant is 0.25pt');
   assert.equal(spurDelta, SYSTEM_1_BRACKET_SPUR_DELTA, 'spur reach exceeds systems 2+ by delta (0.50pt)');
 
   // All intermediate systems 2..8 render the base metrics
@@ -204,7 +199,7 @@ test('System-1 grandeur pin: System 1 bracket metrics exceed systems 2+ by the e
 // 3. C4 weight pin
 // ---------------------------------------------------------------------------
 
-test('C4 weight pin: C4 line renders at 0.65pt; other core lines at 0.50pt', () => {
+test('C4 weight pin: C4 line renders at 0.70pt; other core lines at 0.50pt', () => {
   // 1. Under default fixed-3 golden (segmented semantics)
   const pageGeo = computePageGeometry(DEFAULT_JANKO_OPTIONS, TOKENS, BACH);
   const geo = getSystemGeometry(pageGeo, 0);
@@ -223,7 +218,7 @@ test('C4 weight pin: C4 line renders at 0.65pt; other core lines at 0.50pt', () 
   assert.ok(c4Rules.length > 0, 'C4 segment rule(s) must be present in fixed-3 grid');
   for (const c4Rule of c4Rules) {
     assert.equal(c4Rule.width, PITCH_GRID_C4_STROKE, 'C4 segment rule width matches PITCH_GRID_C4_STROKE');
-    assert.equal(c4Rule.width, 0.65, 'C4 segment renders at locked 0.65pt weight');
+    assert.equal(c4Rule.width, 0.70, 'C4 segment renders at locked 0.70pt weight');
   }
 
   const otherRules = rules.filter((r) => Math.abs(r.y - c4) >= 1e-6);
@@ -251,7 +246,7 @@ test('C4 weight pin: C4 line renders at 0.65pt; other core lines at 0.50pt', () 
     assert.equal(r.width, 0.50, 'all fixed-4 lines render at 0.50pt');
   }
 
-  // 3. Under adaptive equal-boundaries: C4 line renders at 0.65pt, other boundaries at 0.50pt
+  // 3. Under adaptive equal-boundaries: C4 line renders at 0.70pt, other boundaries at 0.50pt
   const boundOpts = resolveJankoOptions({
     ...DEFAULT_JANKO_OPTIONS,
     core: 'adaptive',
@@ -263,8 +258,21 @@ test('C4 weight pin: C4 line renders at 0.65pt; other core lines at 0.50pt', () 
   const boundRules = pitchGridRules(boundGeo, boundOpts, TOKENS);
   const boundC4 = boundRules.find((r) => Math.abs(r.y - (boundGeo.middleCY + continuousPitchY(48, TOKENS.semitoneScale))) < 1e-6);
   assert.ok(boundC4, 'equal-boundaries draws C4');
-  assert.equal(boundC4.width, 0.65, 'equal-boundaries weights C4 at 0.65pt');
+  assert.equal(boundC4.width, 0.70, 'equal-boundaries weights C4 at 0.70pt');
   for (const r of boundRules.filter((r) => Math.abs(r.y - (boundGeo.middleCY + continuousPitchY(48, TOKENS.semitoneScale))) >= 1e-6)) {
     assert.equal(r.width, 0.50, 'other equal-boundaries lines render at 0.50pt');
   }
 });
+
+// ---------------------------------------------------------------------------
+// 4. Weights constants pin
+// ---------------------------------------------------------------------------
+
+test('Weights constants: barline balance (0.90), System-1 bracket (0.90), System 2+ bracket (0.65), C4 weight (0.70)', () => {
+  assert.equal(SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE, 0.90, 'System 1 bracket is 0.90pt');
+  assert.equal(ARCHITECTURAL_BRACKET_STROKE, 0.65, 'Systems 2+ bracket is 0.65pt');
+  assert.equal(SYSTEM_1_BRACKET_STROKE_DELTA, 0.25, 'System 1 bracket delta is 0.25pt');
+  assert.equal(PITCH_GRID_C4_STROKE, 0.70, 'C4 stroke is 0.70pt');
+  assert.equal(PITCH_GRID_OCTAVE_STROKE, 0.50, 'Octave stroke is 0.50pt');
+});
+
