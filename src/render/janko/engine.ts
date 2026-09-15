@@ -3244,7 +3244,11 @@ export function resolveChordColumns(
           const geometry = computeClaspGeometry(
             group.map((p) => ({ ...p.rhythm, x: p.x + (offsets.get(p.note.id) ?? 0) })),
             t,
-            { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
+            {
+              claspDurationStyle: o.claspDurationStyle,
+              durationGrammar: o.durationGrammar,
+              claspDotNudge: o.claspDotNudge,
+            }
           );
           if (geometry) {
             unit.claspInkLeft = Math.min(
@@ -3266,7 +3270,11 @@ export function resolveChordColumns(
       const geometry = computeClaspGeometry(
         unit.rows.flatMap((cluster) => cluster.notes.map((p) => p.rhythm)),
         t,
-        { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
+        {
+          claspDurationStyle: o.claspDurationStyle,
+          durationGrammar: o.durationGrammar,
+          claspDotNudge: o.claspDotNudge,
+        }
       );
       if (geometry) unit.claspInkLeft = claspInkBox(geometry, t).x0 - unit.nominalX;
     }
@@ -3307,7 +3315,11 @@ export function resolveChordColumns(
       const geometry = computeClaspGeometry(
         members.map((p) => p.rhythm),
         t,
-        { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
+        {
+          claspDurationStyle: o.claspDurationStyle,
+          durationGrammar: o.durationGrammar,
+          claspDotNudge: o.claspDotNudge,
+        }
       );
       if (!geometry) return false;
       // Disc clearance is relative ink: every head of one onset moves with the
@@ -3318,7 +3330,11 @@ export function resolveChordColumns(
           : computeClaspGeometry(
               members.map((p) => ({ ...p.rhythm, x: displacedX(p) })),
               t,
-              { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
+              {
+                claspDurationStyle: o.claspDurationStyle,
+                durationGrammar: o.durationGrammar,
+                claspDotNudge: o.claspDotNudge,
+              }
             );
       const disk = claspInkBox(spreadGeometry ?? geometry, t);
       for (const other of units) {
@@ -4174,6 +4190,8 @@ export function layoutJankoSystem(
           // Round 30: the bracket's dots derive from the active grammar
           // (a double-dotted carried value dots twice under complete).
           durationGrammar: o.durationGrammar,
+          // Round 31: the situational dot translation (default [0, 0]).
+          claspDotNudge: o.claspDotNudge,
           ...(() => {
             const ink = unifiedClaspInk(cluster);
             return ink ? { durationInk: ink } : {};

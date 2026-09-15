@@ -8,8 +8,15 @@
  *     unchanged classes (out-of-grammar byte-pins, Bach byte-identity).
  *  4. Linter: the preview lints clean on both scores; the new audits are
  *     option-aware (golden silent).
- *  5. Registry + Reference: two cards, one axis, proofread captions, dual
- *     golden spread with Brahms beside Bach.
+ *  5. Registry + Reference (PARKED Round 31 — judgment withheld, historical
+ *     consts below): two cards, one axis, proofread captions, dual golden
+ *     spread with Brahms beside Bach.
+ *
+ * Round 31 parks this round by convention: §5 asserts on historical consts
+ * (exact R28/R29 precedent) while §§1–4 stay live on the adaptive engine
+ * pins. Flip-time debt: when the cards return for judgment post-cleanup, the
+ * §3 census must be re-verified on fixed-3 (the R30 counts were proven under
+ * adaptive; the studio's Brahms is fixed-3 since Round 31).
  *
  * The golden grammar is the incumbent throughout: option-off renders equal
  * the current golden byte-for-byte on both scores, and the preview changes
@@ -27,11 +34,10 @@ import {
 } from '../src/scores/brahms-op118-no1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  JankoCandidate,
+  JankoCandidateRound,
   brahmsWindow,
   candidateBadges,
-  getCandidate,
   resolveCandidate,
 } from '../src/render/janko/candidates';
 import {
@@ -74,7 +80,7 @@ import {
 } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
 import {
-  BRAHMS_STUDIO_CROPS,
+  StudioCrop,
   createStudioConfig,
   renderCandidatesView,
   renderReferenceView,
@@ -671,18 +677,104 @@ test('The new audits run under the preview and stay silent under golden', () => 
 });
 
 // ---------------------------------------------------------------------------
-// 5. Registry + Reference: two cards, proofread captions, dual golden spread
+// 5. Registry + Reference, PARKED (historical consts — Round 31 precedent)
 // ---------------------------------------------------------------------------
+//
+// Round 30 is judged WITHHELD and parked, not killed: the live registry now
+// serves Round 31, and these tests assert on verbatim historical consts
+// (exact R28/R29 precedent). The cards return for judgment post-cleanup.
 
-test('Registry purity: two cards, no control, one axis each', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 30);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationGrammar']);
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no strip: one shared preview');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'exactly two cards');
-  assert.equal(getCandidate('control'), undefined, 'no control card');
-  for (const card of CURRENT_CANDIDATES) {
+// Historical Round 30 registry (duration-grammar preview) preserved for
+// durable regression coverage. Active candidate round in
+// src/render/janko/candidates.ts is Round 31 (clasp-dot nudge preview).
+const ROUND_30_METADATA: JankoCandidateRound = {
+  round: 30,
+  title: 'Duration-grammar preview: rings, dots, levels',
+  description:
+    'The complete duration grammar, previewed on Brahms before any flip: lone half/whole notes carry the bracket rings stem-mounted, every dotted value shows its dots (doubly dotted doubly) on singles, beams and brackets, and flags/beam levels derive from the notated base. Both cards run the full preview and differ only in windows: rings first, then the double-dot passages and the out-of-grammar boundary. Ties, tuplets and MIDI holds keep their current rendering.',
+  openAxes: ['durationGrammar'],
+};
+
+const ROUND_30_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'round-30-rings',
+    label: 'Rings on lone longs',
+    description:
+      'One open ring = half, two stacked = whole — the bracket rings (R 3.0pt, 1.0pt stroke) stem-mounted at the stem midpoint. Dotted longs ring AND dot; the 150/126 tie-merged holds stay bare.',
+    axis: 'durationGrammar',
+    options: { durationGrammar: 'complete' },
+    windows: [
+      brahmsWindow(
+        1,
+        2,
+        'Brahms mm. 1–2 · dd-8th #14 +flag+2 dots, dd-16th #22 +2nd flag+2 dots; the 150/126 LH holds stay bare'
+      ),
+      brahmsWindow(
+        24,
+        2,
+        'Brahms mm. 24–25 · rings on the half #321 and the dotted half #332 (+dot); 2 more 42s, 7 21s and the 42-bracket dot twice'
+      ),
+    ],
+  },
+  {
+    id: 'round-30-double-dots',
+    label: 'Double dots everywhere',
+    description:
+      'Doubly dotted values dot twice — singles, beamed notes (level 2) and brackets alike — with the second dot further along the escape (right first, then up). The Bach window pins the boundary: a tied value keeps its bare stem.',
+    axis: 'durationGrammar',
+    options: { durationGrammar: 'complete' },
+    windows: [
+      brahmsWindow(
+        44,
+        2,
+        'Brahms mm. 44–45 · 7 21s +level+2 dots, 2 42s +flag+2 dots, the 42-bracket +2 dots; rings on #607 and #618 (+dot)'
+      ),
+      {
+        measureStart: 20,
+        measureCount: 1,
+        title: 'Bach m. 20 · the tied 108 (#343) stays bare — zero new marks in this window',
+      },
+    ],
+  },
+];
+
+/** The R30 studio's Brahms crops (the live const serves Round 31 now). */
+const ROUND_30_BRAHMS_CROPS: StudioCrop[] = [
+  {
+    start: 1,
+    count: 2,
+    title: 'mm. 1–2 · Upbeat and downbeat',
+    caption:
+      'The quarter-note upbeat, the m. 1 downbeat chord over the bass arpeggio, and the tie-merged LH holds the duration grammar leaves bare.',
+  },
+  {
+    start: 7,
+    count: 2,
+    title: 'mm. 7–8 · Five-voice chords',
+    caption: 'The massive chords with the sweeping octave-1 bass ledger stack kept whole.',
+  },
+  {
+    start: 65,
+    count: 2,
+    title: 'mm. 65–66 · Tie-merged holds',
+    caption:
+      'Tuplet and tied holds (63, 108, 117, 132, 138, 141, 156 ticks) that read no plain, dotted or double-dotted value and keep their current rendering.',
+  },
+];
+
+test('Registry purity: two cards, no control, one axis each (historical)', () => {
+  assert.equal(ROUND_30_METADATA.round, 30);
+  assert.deepEqual(ROUND_30_METADATA.openAxes, ['durationGrammar']);
+  assert.equal(ROUND_30_METADATA.compareStrip, undefined, 'no strip: one shared preview');
+  assert.equal(ROUND_30_CANDIDATES.length, 2, 'exactly two cards');
+  assert.equal(
+    ROUND_30_CANDIDATES.find((c) => c.id === 'control'),
+    undefined,
+    'no control card'
+  );
+  for (const card of ROUND_30_CANDIDATES) {
     assert.equal(card.axis, 'durationGrammar', `${card.id} declares the open axis`);
-    const badges = candidateBadges(card);
+    const badges = candidateBadges(card, ROUND_30_METADATA);
     assert.deepEqual(
       badges.map((b) => b.key),
       ['durationGrammar'],
@@ -702,6 +794,9 @@ test('Registry purity: two cards, no control, one axis each', () => {
 });
 
 test('brahmsWindow constructs honest literal Brahms windows', () => {
+  // The constructor stays live (Round 31 frames Brahms windows with it); the
+  // studio-config half of this test moved to test/janko-round31.test.ts,
+  // where the studio Brahms is pinned to the fixed-3 golden.
   assert.deepEqual(brahmsWindow(24, 2, 'x'), {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart: 24,
@@ -711,16 +806,11 @@ test('brahmsWindow constructs honest literal Brahms windows', () => {
   assert.equal(BRAHMS_STUDIO_SCORE_ID, 'brahms-op118-no1');
   const config = createStudioConfig({ score: BACH });
   assert.ok(config.scores[BRAHMS_STUDIO_SCORE_ID], 'the studio library carries Brahms');
-  assert.equal(
-    config.scores[BRAHMS_STUDIO_SCORE_ID].options.core,
-    'adaptive',
-    'the studio Brahms is the lint-gated golden'
-  );
 });
 
-test('Proofread captions: every window title counts what the engine paints', () => {
-  const rings = getCandidate('round-30-rings')!;
-  const dots = getCandidate('round-30-double-dots')!;
+test('Proofread captions: every window title counts what the engine paints (historical)', () => {
+  const rings = ROUND_30_CANDIDATES.find((c) => c.id === 'round-30-rings')!;
+  const dots = ROUND_30_CANDIDATES.find((c) => c.id === 'round-30-double-dots')!;
   // Card R: mm. 1–2 frames the dd-8th #14 (+flag+2 dots) and the dd-16th #22
   // (+2nd flag+2 dots); mm. 24–25 frames the half #321 (ring), the dotted
   // half #332 (ring+dot), 2 more 42s, 7 21s and the 42-bracket @4800.
@@ -778,12 +868,32 @@ test('Proofread captions: every window title counts what the engine paints', () 
   );
 });
 
-test('Reference carries the Brahms golden beside Bach (first-class surface)', () => {
-  const config = createStudioConfig({ score: BACH });
+test('Reference carries the Brahms golden beside Bach (first-class surface, historical)', () => {
+  // The R30 surface, reconstructed from historical consts: the adaptive
+  // Brahms the R30 studio carried (the live studio is fixed-3 since R31).
+  const config = createStudioConfig({
+    score: BACH,
+    candidates: ROUND_30_CANDIDATES,
+    round: ROUND_30_METADATA,
+    brahmsCrops: ROUND_30_BRAHMS_CROPS,
+    scores: {
+      [BRAHMS_STUDIO_SCORE_ID]: {
+        id: BRAHMS_STUDIO_SCORE_ID,
+        score: BRAHMS,
+        options: O_BRAHMS,
+        tokens: T_BRAHMS,
+      },
+    },
+  });
+  assert.equal(
+    config.scores[BRAHMS_STUDIO_SCORE_ID].options.core,
+    'adaptive',
+    'the R30 studio Brahms is the lint-gated adaptive golden'
+  );
   assert.equal(config.brahmsPages.length, 8, 'eight Brahms pages (24 systems, 3/page)');
-  assert.equal(config.brahmsCrops.length, BRAHMS_STUDIO_CROPS.length, 'three Brahms crops');
+  assert.equal(config.brahmsCrops.length, ROUND_30_BRAHMS_CROPS.length, 'three Brahms crops');
   assert.deepEqual(
-    BRAHMS_STUDIO_CROPS.map((c) => [c.start, c.count]),
+    ROUND_30_BRAHMS_CROPS.map((c) => [c.start, c.count]),
     [
       [1, 2],
       [7, 2],

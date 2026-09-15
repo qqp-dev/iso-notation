@@ -956,6 +956,13 @@ export interface JankoLayoutOptions {
    * written marks. Defaults to `'golden'` (see {@link JankoDurationGrammar}).
    */
   durationGrammar?: JankoDurationGrammar;
+  /**
+   * Situational clasp-dot translation (the Round 31 preview axis): a rigid
+   * `[dx, dy]` shift in pt applied to BRACKET-attached augmentation dots
+   * only — note dots are never touched. Defaults to `[0, 0]` (the judged
+   * seats, byte-identical).
+   */
+  claspDotNudge?: JankoClaspDotNudge;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -993,6 +1000,14 @@ export type ExtensionJunctionStyle = 'default' | 'conjoin' | 'wide-gap';
  *   keep their current rendering under both grammars.
  */
 export type JankoDurationGrammar = 'golden' | 'complete';
+
+/**
+ * Situational clasp-dot translation (the Round 31 preview axis): a rigid
+ * `[dx, dy]` shift in pt, uniform across every bracket-attached augmentation
+ * dot (first and second alike, so a double-dot pair stays rigid). `[0, 0]`
+ * is the judged golden seat.
+ */
+export type JankoClaspDotNudge = readonly [number, number];
 
 /**
  * Fixed Middle-C-centered core octave line grammar (Round 27).
@@ -1052,6 +1067,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   core: 'fixed-3',
   extensionJunction: 'default',
   durationGrammar: 'golden',
+  claspDotNudge: [0, 0],
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

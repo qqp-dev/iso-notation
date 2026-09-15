@@ -78,9 +78,10 @@ export interface StudioCrop {
 }
 
 /**
- * The reference-view Brahms macro crops (Round 30): the upbeat and downbeat,
- * the five-voice chords with their octave-1 ledger stack, and the tie-merged
- * holds — the out-of-grammar boundary, pinned durably bare.
+ * The reference-view Brahms macro crops (Round 31, re-aimed at the fixed-3
+ * golden): the upbeat and downbeat with the white-ring clasp, the first
+ * fixed-3 fold under its Gould bracket, and the five-voice chords at the
+ * first known folding finding — the three sights the operator walks first.
  */
 export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
   {
@@ -88,20 +89,21 @@ export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
     count: 2,
     title: 'mm. 1–2 · Upbeat and downbeat',
     caption:
-      'The quarter-note upbeat, the m. 1 downbeat chord over the bass arpeggio, and the tie-merged LH holds the duration grammar leaves bare.',
+      'The quarter-note upbeat, the m. 1 downbeat chord over the bass arpeggio, and the white-ring clasp dotting the dotted half.',
+  },
+  {
+    start: 5,
+    count: 2,
+    title: 'mm. 5–6 · First fold',
+    caption:
+      'Note #47 folds an octave below the fixed-3 core under its Gould 8vb bracket — the first of nine folded notes.',
   },
   {
     start: 7,
     count: 2,
-    title: 'mm. 7–8 · Five-voice chords',
-    caption: 'The massive chords with the sweeping octave-1 bass ledger stack kept whole.',
-  },
-  {
-    start: 65,
-    count: 2,
-    title: 'mm. 65–66 · Tie-merged holds',
+    title: 'mm. 7–8 · Chords and the first known finding',
     caption:
-      'Tuplet and tied holds (63, 108, 117, 132, 138, 141, 156 ticks) that read no plain, dotted or double-dotted value and keep their current rendering.',
+      'The massive five-voice chords — and the m. 7 stem-through-simultaneity (#78/#80) the BRONZE surface carries as a known folding finding.',
   },
 ];
 
@@ -195,13 +197,13 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: buildBrahmsOp118No1Score(),
-      // Round 30: the studio's Brahms is the lint-gated golden — adaptive
-      // core, exactly as `npm run lint:engraving` and the benchmark suite
-      // measure it (fixed-3 carries four pre-existing
-      // stem-through-simultaneity violations from folding, so the Reference
-      // could never be golden-clean on it, and cards must judge against the
-      // same config the Reference carries).
-      options: resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' }),
+      // Round 31: the studio's Brahms is the fixed-3 golden — the current
+      // practice the defaults already carry, DISPLAY-ONLY (zero golden
+      // change). Fixed-3 carries four pre-existing
+      // stem-through-simultaneity violations from folding; they stay VISIBLE
+      // as tagged known findings (never gated, never hidden). The CLI keeps
+      // its own adaptive 0/0 entry, so deploy stays green.
+      options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
       tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
     },
     // Round 9: the curated multi-duration specimen. Two measures across the
@@ -482,7 +484,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       verification
         ? `${candidates.length} verification card${candidates.length === 1 ? '' : 's'} · ` +
           `${windowCount} engraving window${windowCount === 1 ? '' : 's'} · fixed golden master, no open axis`
-        : `${candidates.length} candidates × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
+        : `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
     renderCompareStrip(config),
@@ -499,6 +501,18 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
 // View 2 · Golden Reference Object
 // ---------------------------------------------------------------------------
 
+/**
+ * The designation of one golden-reference block (Round 31): Bach is GOLD
+ * (the frozen perfection standard), Brahms is BRONZE (the active iteration
+ * surface). `knownCode` names the violation code this surface carries as
+ * documented known findings — scheduled for a future round, never gated,
+ * never hidden. Absent for a surface with no knowns.
+ */
+export interface ReferenceDesignation {
+  badge: 'GOLD' | 'BRONZE';
+  knownCode?: string;
+}
+
 /** Render one score's golden-reference block: page spread, macro crops, diagnostics. */
 function renderReferenceScore(
   scoreId: string,
@@ -506,12 +520,21 @@ function renderReferenceScore(
   options: StudioScore['options'],
   tokens: StudioScore['tokens'],
   pages: number[],
-  crops: StudioCrop[]
+  crops: StudioCrop[],
+  designation?: ReferenceDesignation
 ): string {
   const report = lintJankoScore(score, options, tokens);
   const systems = countJankoSystems(score, options, tokens);
   const beatsPerMeasure = Math.max(1, Math.round(options.ticksPerMeasure / options.ticksPerBeat));
   const channelSpec = getChannelLayoutSpec(options, tokens);
+  // A known-findings note is printed only when EVERY violation carries the
+  // documented code — a new defect class must never hide behind the tag.
+  const knowns =
+    designation?.knownCode !== undefined &&
+    report.violations.length > 0 &&
+    report.violations.every((v) => v.code === designation.knownCode)
+      ? report.violations.length
+      : 0;
 
   const pageCards = pages.map((page) => {
     const svg = renderJankoPage(score, page, options, tokens);
@@ -544,10 +567,16 @@ function renderReferenceScore(
     ].join('\n');
   });
 
+  const badge =
+    designation === undefined
+      ? ''
+      : designation.badge === 'GOLD'
+        ? ' <span class="tag tag-gold">GOLD · frozen standard</span>'
+        : ' <span class="tag tag-bronze">BRONZE · active surface</span>';
   return [
     `<div class="reference-score" data-score="${scoreId}">`,
     '  <div class="golden-card">',
-    '    <span class="round-badge">Golden Master</span>',
+    `    <span class="round-badge">Golden Master</span>${badge}`,
     `    <h2>${escapeHtml(score.title ?? 'J.S. Bach — Goldberg Variations, BWV 988')}</h2>`,
     `    <p>${escapeHtml(options.subtitle ?? 'Variatio 1. a 1 Clav.')} — the accumulated state of the engraving: ${report.stats.measures} measures, ${systems} systems, ${report.stats.notes} noteheads, ${report.stats.beams} beams.</p>`,
     '    <div class="badges">',
@@ -565,7 +594,7 @@ function renderReferenceScore(
     `      <span class="badge"><b>noteheadRadius</b> = ${tokens.noteheadRadius.toFixed(1)}pt</span>`,
     `      <span class="badge"><b>haloRadius</b> = ${tokens.haloRadius.toFixed(1)}pt</span>`,
     '    </div>',
-    `    <p class="round-meta" data-lint-ok="${report.ok}">Live linter: ${lintChip(report)} — ${report.stats.violations} violations, ${report.stats.warnings} warnings across ${report.stats.checks} checks in ${report.stats.durationMs} ms.</p>`,
+    `    <p class="round-meta" data-lint-ok="${report.ok}">Live linter: ${lintChip(report)} — ${report.stats.violations} violations, ${report.stats.warnings} warnings across ${report.stats.checks} checks in ${report.stats.durationMs} ms.${knowns > 0 ? ` <em class="known-note">${knowns} known folding-geometry finding${knowns === 1 ? '' : 's'}, scheduled for a future round.</em>` : ''}</p>`,
     '  </div>',
     '  <h3 class="section-title">Full page spread</h3>',
     `  <div class="page-grid">${pageCards.join('\n')}</div>`,
@@ -573,7 +602,7 @@ function renderReferenceScore(
     `  <div class="crop-grid">${cropCards.join('\n')}</div>`,
     '  <details class="diagnostics" open>',
     `    <summary>Diagnostics (${report.diagnostics.length})</summary>`,
-    `    <ul>${renderDiagnostics(report)}</ul>`,
+    `    <ul>${renderDiagnostics(report, knowns > 0 ? designation?.knownCode : undefined)}</ul>`,
     '  </details>',
     '</div>',
   ].join('\n');
@@ -582,7 +611,8 @@ function renderReferenceScore(
 /**
  * Render the Golden Reference Object: the full page spread of the canonical
  * score plus the macro focus crops, all from the golden-master options —
- * Bach AND, since Round 30, the Brahms golden beside it. Every round judges
+ * Bach GOLD AND, since Round 30, the Brahms BRONZE beside it (fixed-3 since
+ * Round 31, with its four known folding findings tagged). Every round judges
  * against these objects; neither is ever a draft.
  */
 export function renderReferenceView(config: JankoStudioConfig = createStudioConfig()): string {
@@ -590,27 +620,32 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
   const brahms = config.scores[BRAHMS_STUDIO_SCORE_ID];
   return [
     '<section class="view-panel" id="view-reference" data-view="reference">',
-    renderReferenceScore('primary', score, options, tokens, pages, crops),
+    renderReferenceScore('primary', score, options, tokens, pages, crops, { badge: 'GOLD' }),
     renderReferenceScore(
       BRAHMS_STUDIO_SCORE_ID,
       brahms.score,
       brahms.options,
       brahms.tokens,
       config.brahmsPages,
-      config.brahmsCrops
+      config.brahmsCrops,
+      { badge: 'BRONZE', knownCode: 'stem-through-simultaneity' }
     ),
     '</section>',
   ].join('\n');
 }
 
-function renderDiagnostics(report: LintReport): string {
+function renderDiagnostics(report: LintReport, knownCode?: string): string {
   if (report.diagnostics.length === 0) {
     return '<li class="diag-ok">✓ zero violations, zero warnings — the golden master is clean.</li>';
   }
   return report.diagnostics
     .map((d) => {
       const where = `system ${d.system + 1}${d.measure ? `, m. ${d.measure}` : ''}`;
-      return `<li class="diag-${d.severity}"><b>${escapeHtml(d.code)}</b> · ${escapeHtml(where)} — ${escapeHtml(d.message)}</li>`;
+      const known =
+        knownCode !== undefined && d.code === knownCode
+          ? ' <span class="known-finding">known folding-geometry finding · scheduled for a future round</span>'
+          : '';
+      return `<li class="diag-${d.severity}"><b>${escapeHtml(d.code)}</b> · ${escapeHtml(where)} — ${escapeHtml(d.message)}${known}</li>`;
     })
     .join('');
 }

@@ -103,3 +103,11 @@ Headless implementers must not render images to see a defect. Run the mathematic
 - The studio's "Download PDF" is `public/goldberg-variation-1.pdf`, exported from the judged golden by `npm run pdf` (`scripts/export-pdf.ts`: engine pages → `rsvg-convert -f pdf` at default DPI → `pdfunite` join).
 - **After ANY golden change, run `npm run pdf` and commit the result.** `test/janko-pdf.test.ts` regenerates the PDF and compares a semantic fingerprint (page count/size, text layer, vector geometry, subset fonts, zero raster images, ×4/3 title text scale) against the committed file; a stale PDF fails `npm test` and `deploy.yml` blocks the Pages publish.
 - Never pass `-d 72 -p 72` to rsvg-convert: its default 96 DPI renders text at ×4/3 by design (11pt title → Tm 14.667), pinned by the test.
+
+---
+
+## 7. Golden-Master Designations: GOLD (Frozen) vs BRONZE (Active) (Round 31)
+
+- **Bach Goldberg Var. 1 is GOLD = the frozen perfection standard.** Its engraving under `DEFAULT_JANKO_OPTIONS` is judged done: zero violations, and no open questions. Any future change to it requires a decision round plus operator judgment — never a drive-by.
+- **Brahms Op. 118/1 is BRONZE = the active iteration surface.** It renders under the fixed-3 golden config (the current practice), carries the whole spread so the operator can walk it producing suggestions, and lists its pre-existing findings honestly — each tagged in the Reference diagnostics as a known folding-geometry finding scheduled for a future round (never gated, never hidden).
+- The two Reference blocks carry visible `GOLD` / `BRONZE` badges (`ReferenceDesignation` in `src/render/janko/studio.ts`); the CLI keeps its own adaptive Brahms entry so deploy stays green.

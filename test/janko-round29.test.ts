@@ -606,7 +606,7 @@ test('npm run lint:engraving --strict reports the landed golden master clean and
 
 // Historical Round 29 registry (flips-landed, zero cards) preserved for
 // durable regression coverage. Active candidate round in
-// src/render/janko/candidates.ts is Round 30 (duration-grammar preview).
+// src/render/janko/candidates.ts is Round 31 (clasp-dot nudge preview).
 const ROUND_29_METADATA = {
   round: 29,
   title: 'Flips landed: new dots, thin extensions, lightened rests',

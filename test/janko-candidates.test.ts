@@ -140,10 +140,12 @@ const REST_STYLES: JankoRestStyle[] = [
 
 /**
  * Round 29 is judged and landed (kept as the named empty set for the
- * historical record). Round 30 previews the duration grammar on two cards.
+ * historical record). Round 30 is parked (kept as the named pair for the
+ * historical record). Round 31 previews the clasp-dot nudge on one card.
  */
 const ROUND_29_CARDS: string[] = [];
 const ROUND_30_CARDS: string[] = ['round-30-rings', 'round-30-double-dots'];
+const ROUND_31_CARDS: string[] = ['round-31-clasp-nudge'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -229,20 +231,21 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the Round 30 duration-grammar preview (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 30);
-  assert.match(CURRENT_ROUND_METADATA.title, /Duration-grammar preview/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationGrammar'], 'the grammar is the question');
+test('CURRENT_ROUND_METADATA is the Round 31 clasp-dot nudge preview (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 31);
+  assert.match(CURRENT_ROUND_METADATA.title, /Clasp-dot nudge/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge'], 'the nudge is the question');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
+  assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
 });
 
-test('CURRENT_CANDIDATES is the two-card Round 30 preview set, no control', () => {
+test('CURRENT_CANDIDATES is the one-card Round 31 preview set, no control', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_30_CARDS, 'rings first, then double dots');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two preview cards');
+  assert.deepEqual(ids, ROUND_31_CARDS, 'the nudge card');
+  assert.equal(CURRENT_CANDIDATES.length, 1, 'one preview card');
   for (const card of CURRENT_CANDIDATES) {
-    assert.equal(card.axis, 'durationGrammar', `${card.id} declares the open axis`);
-    assert.deepEqual(card.options, { durationGrammar: 'complete' }, `${card.id} is preview-only delta`);
+    assert.equal(card.axis, 'claspDotNudge', `${card.id} declares the open axis`);
+    assert.deepEqual(card.options, { claspDotNudge: [0.4, 0.2] }, `${card.id} is preview-only delta`);
   }
   assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
 });
@@ -1858,24 +1861,26 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: two preview cards, four windows, no strip
+// 17. Studio: one preview card, two windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the two Round 30 preview cards with green chips', () => {
+test('The live studio renders the one Round 31 preview card with an honest chip', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="4"/, 'Brahms ×3, Bach ×1');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
+  assert.match(html, /data-candidate-count="1"/);
+  assert.match(html, /data-window-count="2"/, 'Brahms ×2');
   assert.match(html, /data-verification="false"/, 'the preview round is decisive');
-  assert.match(html, /Round 30/);
-  assert.match(html, /Duration-grammar preview/, 'the preview title headlines the view');
-  for (const id of ROUND_30_CARDS) {
+  assert.match(html, /Round 31/);
+  assert.match(html, /Clasp-dot nudge/, 'the preview title headlines the view');
+  for (const id of ROUND_31_CARDS) {
     assert.ok(html.includes(`data-candidate="${id}"`), `${id} renders`);
   }
-  assert.equal((html.match(/data-lint="clean"/g) ?? []).length, 2, 'both chips green');
+  // Whole-score card lint inherits the BRONZE surface's 4 knowns (honestly
+  // red; the nudge adds 0 — proven in test/janko-round31.test.ts).
+  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 1, 'the surface chip');
 });
 
 test('The closer-comparison strip is absent in the preview round', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.equal(html, '', 'both cards share the preview — no strip to compare');
+  assert.equal(html, '', 'the one card carries the preview — no strip to compare');
 });
