@@ -77,6 +77,34 @@ export interface StudioCrop {
   caption: string;
 }
 
+/**
+ * The reference-view Brahms macro crops (Round 30): the upbeat and downbeat,
+ * the five-voice chords with their octave-1 ledger stack, and the tie-merged
+ * holds — the out-of-grammar boundary, pinned durably bare.
+ */
+export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
+  {
+    start: 1,
+    count: 2,
+    title: 'mm. 1–2 · Upbeat and downbeat',
+    caption:
+      'The quarter-note upbeat, the m. 1 downbeat chord over the bass arpeggio, and the tie-merged LH holds the duration grammar leaves bare.',
+  },
+  {
+    start: 7,
+    count: 2,
+    title: 'mm. 7–8 · Five-voice chords',
+    caption: 'The massive chords with the sweeping octave-1 bass ledger stack kept whole.',
+  },
+  {
+    start: 65,
+    count: 2,
+    title: 'mm. 65–66 · Tie-merged holds',
+    caption:
+      'Tuplet and tied holds (63, 108, 117, 132, 138, 141, 156 ticks) that read no plain, dotted or double-dotted value and keep their current rendering.',
+  },
+];
+
 /** The reference-view macro crops, chosen to cover every critical zone. */
 export const DEFAULT_STUDIO_CROPS: StudioCrop[] = [
   {
@@ -136,6 +164,14 @@ export interface JankoStudioConfig {
   /** Page indices rendered in the reference view (0-based). */
   pages: number[];
   /**
+   * Round 30: the Brahms golden's reference crops and page indices. Brahms
+   * is a first-class iteration surface: the Reference view carries its full
+   * page spread, macro crops and lint diagnostics beside Bach's.
+   */
+  brahmsCrops: StudioCrop[];
+  /** Page indices of the Brahms spread rendered in the reference view (0-based). */
+  brahmsPages: number[];
+  /**
    * Benchmark scores a candidate window may be engraved from, keyed by id. The
    * primary entry is always present under `DEFAULT_STUDIO_SCORE_ID`.
    */
@@ -159,7 +195,13 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: buildBrahmsOp118No1Score(),
-      options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+      // Round 30: the studio's Brahms is the lint-gated golden — adaptive
+      // core, exactly as `npm run lint:engraving` and the benchmark suite
+      // measure it (fixed-3 carries four pre-existing
+      // stem-through-simultaneity violations from folding, so the Reference
+      // could never be golden-clean on it, and cards must judge against the
+      // same config the Reference carries).
+      options: resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' }),
       tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
     },
     // Round 9: the curated multi-duration specimen. Two measures across the
@@ -192,6 +234,14 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     },
     ...(overrides.scores ?? {}),
   };
+  const brahmsEntry = scores[BRAHMS_STUDIO_SCORE_ID];
+  const brahmsPages = Math.max(
+    1,
+    Math.ceil(
+      countJankoSystems(brahmsEntry.score, brahmsEntry.options, brahmsEntry.tokens) /
+        Math.max(1, brahmsEntry.options.systemsPerPage)
+    )
+  );
   return {
     score,
     options,
@@ -200,6 +250,8 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     round: overrides.round ?? CURRENT_ROUND_METADATA,
     crops: overrides.crops ?? DEFAULT_STUDIO_CROPS,
     pages: overrides.pages ?? Array.from({ length: totalPages }, (_, i) => i),
+    brahmsCrops: overrides.brahmsCrops ?? BRAHMS_STUDIO_CROPS,
+    brahmsPages: overrides.brahmsPages ?? Array.from({ length: brahmsPages }, (_, i) => i),
     scores,
   };
 }
@@ -447,12 +499,15 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
 // View 2 · Golden Reference Object
 // ---------------------------------------------------------------------------
 
-/**
- * Render the Golden Reference Object: the full page spread of the canonical
- * score plus the macro focus crops, all from the golden-master options.
- */
-export function renderReferenceView(config: JankoStudioConfig = createStudioConfig()): string {
-  const { score, options, tokens, crops, pages } = config;
+/** Render one score's golden-reference block: page spread, macro crops, diagnostics. */
+function renderReferenceScore(
+  scoreId: string,
+  score: StudioScore['score'],
+  options: StudioScore['options'],
+  tokens: StudioScore['tokens'],
+  pages: number[],
+  crops: StudioCrop[]
+): string {
   const report = lintJankoScore(score, options, tokens);
   const systems = countJankoSystems(score, options, tokens);
   const beatsPerMeasure = Math.max(1, Math.round(options.ticksPerMeasure / options.ticksPerBeat));
@@ -490,7 +545,7 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
   });
 
   return [
-    '<section class="view-panel" id="view-reference" data-view="reference">',
+    `<div class="reference-score" data-score="${scoreId}">`,
     '  <div class="golden-card">',
     '    <span class="round-badge">Golden Master</span>',
     `    <h2>${escapeHtml(score.title ?? 'J.S. Bach — Goldberg Variations, BWV 988')}</h2>`,
@@ -520,6 +575,30 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
     `    <summary>Diagnostics (${report.diagnostics.length})</summary>`,
     `    <ul>${renderDiagnostics(report)}</ul>`,
     '  </details>',
+    '</div>',
+  ].join('\n');
+}
+
+/**
+ * Render the Golden Reference Object: the full page spread of the canonical
+ * score plus the macro focus crops, all from the golden-master options —
+ * Bach AND, since Round 30, the Brahms golden beside it. Every round judges
+ * against these objects; neither is ever a draft.
+ */
+export function renderReferenceView(config: JankoStudioConfig = createStudioConfig()): string {
+  const { score, options, tokens, crops, pages } = config;
+  const brahms = config.scores[BRAHMS_STUDIO_SCORE_ID];
+  return [
+    '<section class="view-panel" id="view-reference" data-view="reference">',
+    renderReferenceScore('primary', score, options, tokens, pages, crops),
+    renderReferenceScore(
+      BRAHMS_STUDIO_SCORE_ID,
+      brahms.score,
+      brahms.options,
+      brahms.tokens,
+      config.brahmsPages,
+      config.brahmsCrops
+    ),
     '</section>',
   ].join('\n');
 }

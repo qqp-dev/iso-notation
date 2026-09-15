@@ -951,6 +951,11 @@ export interface JankoLayoutOptions {
    * Defaults to `'default'` (short barlines + 6.0pt guest gaps).
    */
   extensionJunction?: ExtensionJunctionStyle;
+  /**
+   * Duration grammar (the Round 30 preview axis): which durations carry
+   * written marks. Defaults to `'golden'` (see {@link JankoDurationGrammar}).
+   */
+  durationGrammar?: JankoDurationGrammar;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -971,6 +976,23 @@ export interface JankoLayoutOptions {
  *   inset) from abutting barlines; barlines keep short heights.
  */
 export type ExtensionJunctionStyle = 'default' | 'conjoin' | 'wide-gap';
+
+/**
+ * Duration grammar (the Round 30 preview axis): which durations carry written
+ * marks, all deriving from the NOTATED duration on the 48-grid by exact
+ * arithmetic (see `elements/duration.analyzeNotatedDuration`).
+ *
+ * - `'golden'`: the incomplete incumbent — a dot iff `d ∈ (26, 38]`
+ *   (dotted 8ths only), flags/beam levels by raw threshold, lone longs read
+ *   exactly like quarters.
+ * - `'complete'`: the preview — lone half/whole notes carry the bracket open
+ *   rings stem-mounted (one = half, two stacked = whole), every dotted value
+ *   shows its dot(s) (doubly dotted doubly, singles/beamed/brackets alike),
+ *   and flags/beam levels derive from the notated base value. Durations with
+ *   no exact plain/dotted/double-dotted reading (ties, tuplets, MIDI holds)
+ *   keep their current rendering under both grammars.
+ */
+export type JankoDurationGrammar = 'golden' | 'complete';
 
 /**
  * Fixed Middle-C-centered core octave line grammar (Round 27).
@@ -1029,6 +1051,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   octaveLineScheme: 'grand-divider',
   core: 'fixed-3',
   extensionJunction: 'default',
+  durationGrammar: 'golden',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

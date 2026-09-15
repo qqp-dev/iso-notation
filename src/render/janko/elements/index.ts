@@ -5,6 +5,7 @@
 export * from './style';
 export * from './staff';
 export * from './notehead';
+export * from './duration';
 export * from './rhythm';
 export * from './accolade';
 export * from './barlines';

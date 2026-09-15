@@ -126,6 +126,7 @@ import {
   subdivisionMarkCount,
   withClaspRail,
 } from './elements/rhythm';
+import { durationDotCount } from './elements/duration';
 import {
   ARCHITECTURAL_BRACKET_SPUR,
   ARCHITECTURAL_BRACKET_STROKE,
@@ -1478,7 +1479,7 @@ export function resolveDotHighLane(
   const dotR = t.augmentationDotRadius;
   return notes.map((p) => {
     const dur = p.note.durationTicks;
-    if (dur <= 26 || dur > 38) return p;
+    if (durationDotCount(dur, o.durationGrammar) < 1) return p;
     const dotX = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx;
     const dotY = p.rhythm.dotY ?? p.y;
     for (const q of notes) {
@@ -1526,9 +1527,11 @@ export function resolveDotFlagClearance(
 
   return notes.map((p) => {
     const dur = p.note.durationTicks;
-    if (dur <= 26 || dur > 38) return p;
+    if (durationDotCount(dur, o.durationGrammar) < 1) return p;
     if (beamedIds && beamedIds.has(p.note.id)) return p;
-    const marks = subdivisionMarkCount(dur);
+    // Round 30: the escape clears the TRUE flag ink — under the complete
+    // grammar a double-dotted 16th's two-mark glyph, not the legacy one.
+    const marks = subdivisionMarkCount(dur, o.durationGrammar);
     if (marks < 1) return p;
 
     const s = getStemGeometry(p.rhythm, t);
@@ -1614,6 +1617,134 @@ export function resolveDotFlagClearance(
         dotX: rightX,
         dotY: curY,
       },
+    };
+  });
+}
+
+/**
+ * Round 30 — **the second augmentation dot** (complete grammar only).
+ *
+ * A double-dotted value dots twice: the second dot continues the first
+ * dot's escape further along the same right-then-up priority, keeping the
+ * house hug (`augmentationDotGap`, 1.2pt) from its sibling dot, from every
+ * notehead mask, and from its own true flag ink, plus the staff-rule air
+ * the first-dot lane keeps. The search is deterministic: angles from pure
+ * right (0°) up to vertical, distance-major — the canonical horizontal pair
+ * (`dotX + 2r + gap`, same height) wins whenever it clears, so the pair
+ * reads as one classical double dot and only rises when blocked. Barlines
+ * and beat pulses are backstopped by the linter (the corpus clears them by
+ * 11pt and 5pt respectively at the naive seat).
+ *
+ * Golden grammar: a no-op returning its input untouched (no `dot2X` is ever
+ * resolved, so golden layouts compare deep-equal).
+ */
+export function resolveSecondDots(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): PositionedJankoNote[] {
+  if (o.durationGrammar !== 'complete') return [...notes];
+  const dotR = t.augmentationDotRadius;
+  const gap = t.augmentationDotGap;
+  const siblingGap = 2 * dotR + gap;
+  const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+
+  const rhythmNotes = notes.map((p) => p.rhythm);
+  const partition =
+    o.rhythmStyle === 'beamed' ? partitionBeamGroups(rhythmNotes, t, geo.middleCY) : null;
+  const beamedIds = partition
+    ? new Set(partition.groups.flatMap((g) => g.map((n) => n.id)))
+    : null;
+
+  // Staff rules the dot must clear, exactly as the first-dot lane fits them.
+  const rules: Array<{ y: number; clearance: number }> = [];
+  for (let octave = 0; octave <= 8; octave++) {
+    for (const hand of ['RH', 'LH'] as const) {
+      const base = geo.middleCY + getEquatorYForOctave(octave, hand, t, o);
+      for (const ruleY of getEquatorRuleYs(base, o, t)) {
+        rules.push({ y: ruleY, clearance: dotR + 0.375 + 0.25 });
+      }
+    }
+  }
+
+  return notes.map((p) => {
+    const dur = p.note.durationTicks;
+    if (durationDotCount(dur, o.durationGrammar) < 2) return p;
+    const firstX = p.rhythm.dotX ?? p.x + preset.wx + gap;
+    const firstY = p.rhythm.dotY ?? p.y;
+
+    // The note's own true flag ink box (unbeamed flagged notes only), under
+    // the complete grammar's mark count.
+    let flagBox: { x0: number; y0: number; x1: number; y1: number } | null = null;
+    if (!beamedIds || !beamedIds.has(p.note.id)) {
+      const marks = subdivisionMarkCount(dur, o.durationGrammar);
+      if (marks >= 1) {
+        const s = getStemGeometry(p.rhythm, t);
+        const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
+        flagBox = {
+          x0: s.stemX + bbox.x0,
+          y0: s.stemEndY + bbox.y0,
+          x1: s.stemX + bbox.x1,
+          y1: s.stemEndY + bbox.y1,
+        };
+      }
+    }
+
+    /** Edge air the dot's ink at `(x, y)` keeps from the glyph obstacles. */
+    const edgeAir = (x: number, y: number): number => {
+      let air = Math.hypot(x - firstX, y - firstY) - 2 * dotR;
+      for (const q of notes) {
+        if (q === p) continue;
+        if (isPositionOfHonor(q.note.startTick)) {
+          air = Math.min(air, Math.hypot(x - q.x, y - q.y) - haloOuter - dotR);
+          continue;
+        }
+        const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+        const dx = Math.max(q.x - wx - x, 0, x - (q.x + wx));
+        const dy = Math.max(q.y - hy - y, 0, y - (q.y + hy));
+        air = Math.min(air, Math.hypot(dx, dy) - dotR);
+      }
+      if (flagBox) {
+        const dx = Math.max(flagBox.x0 - x, 0, x - flagBox.x1);
+        const dy = Math.max(flagBox.y0 - y, 0, y - flagBox.y1);
+        air = Math.min(air, Math.hypot(dx, dy) - dotR);
+      }
+      return air;
+    };
+    /** Excess beyond the first-dot lane's staff-rule air (≥ 0 clears). */
+    const ruleExcess = (y: number): number => {
+      let excess = Number.POSITIVE_INFINITY;
+      for (const rule of rules) {
+        excess = Math.min(excess, Math.abs(y - rule.y) - rule.clearance);
+      }
+      return excess;
+    };
+
+    // Distance-major over the right-then-up fan: the horizontal pair first.
+    const ANGLES = [0, 15, 30, 45, 60, 75, 90];
+    for (let d = siblingGap; d <= siblingGap + 24; d += 0.25) {
+      for (const degrees of ANGLES) {
+        const angle = (degrees * Math.PI) / 180;
+        const x = firstX + d * Math.cos(angle);
+        const y = firstY - d * Math.sin(angle);
+        if (edgeAir(x, y) >= gap - 1e-9 && ruleExcess(y) >= -1e-9) {
+          // Snap the canonical seat exactly: float dust must never move a
+          // dot that sits precisely on the horizontal pair.
+          const exact =
+            degrees === 0 && Math.abs(d - siblingGap) < 1e-9
+              ? { x: firstX + siblingGap, y: firstY }
+              : { x, y };
+          return { ...p, rhythm: { ...p.rhythm, dot2X: exact.x, dot2Y: exact.y } };
+        }
+      }
+    }
+    // Escape totality: the horizontal pair, exactly as the renderer falls
+    // back to it (the linter names the collision if one survives).
+    return {
+      ...p,
+      rhythm: { ...p.rhythm, dot2X: firstX + siblingGap, dot2Y: firstY },
     };
   });
 }
@@ -3113,7 +3244,7 @@ export function resolveChordColumns(
           const geometry = computeClaspGeometry(
             group.map((p) => ({ ...p.rhythm, x: p.x + (offsets.get(p.note.id) ?? 0) })),
             t,
-            { claspDurationStyle: o.claspDurationStyle }
+            { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
           );
           if (geometry) {
             unit.claspInkLeft = Math.min(
@@ -3135,7 +3266,7 @@ export function resolveChordColumns(
       const geometry = computeClaspGeometry(
         unit.rows.flatMap((cluster) => cluster.notes.map((p) => p.rhythm)),
         t,
-        { claspDurationStyle: o.claspDurationStyle }
+        { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
       );
       if (geometry) unit.claspInkLeft = claspInkBox(geometry, t).x0 - unit.nominalX;
     }
@@ -3176,7 +3307,7 @@ export function resolveChordColumns(
       const geometry = computeClaspGeometry(
         members.map((p) => p.rhythm),
         t,
-        { claspDurationStyle: o.claspDurationStyle }
+        { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
       );
       if (!geometry) return false;
       // Disc clearance is relative ink: every head of one onset moves with the
@@ -3187,7 +3318,7 @@ export function resolveChordColumns(
           : computeClaspGeometry(
               members.map((p) => ({ ...p.rhythm, x: displacedX(p) })),
               t,
-              { claspDurationStyle: o.claspDurationStyle }
+              { claspDurationStyle: o.claspDurationStyle, durationGrammar: o.durationGrammar }
             );
       const disk = claspInkBox(spreadGeometry ?? geometry, t);
       for (const other of units) {
@@ -3918,7 +4049,10 @@ export function layoutJankoSystem(
   // same-row neighbours sit at their final x.
   const notesAfterHighLane = resolveDotHighLane(chordColumns.notes, geometry, o, t);
   // Round 29: dot flag-clearance standard escapes flagged singles right then up
-  const notes = resolveDotFlagClearance(notesAfterHighLane, geometry, o, t);
+  const notesAfterFlagClearance = resolveDotFlagClearance(notesAfterHighLane, geometry, o, t);
+  // Round 30: the second dot of every double-dotted value (complete grammar
+  // only — golden returns its input untouched).
+  const notes = resolveSecondDots(notesAfterFlagClearance, geometry, o, t);
   // Round 20: a merged mixed-duration voice follows its survivor's solved
   // column, so its stem/beam/flag leaves the one painted head.
   const solvedById = new Map(notes.map((p) => [p.note.id, p]));
@@ -3968,7 +4102,9 @@ export function layoutJankoSystem(
     );
     const restInk = restLayer.rests.map((r) => restInkBox(r, t));
     beams = partition.groups
-      .map((group) => computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY, restInk))
+      .map((group) =>
+        computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY, restInk, o.durationGrammar)
+      )
       .filter((g): g is JankoBeamGroupGeometry => g !== null);
     ungrouped = partition.ungrouped;
   }
@@ -4035,6 +4171,9 @@ export function layoutJankoSystem(
           // vertical column keeps its stems.
           requireBracketScope: o.chordGrouping === 'per-hand-clasp',
           claspDurationStyle: o.claspDurationStyle,
+          // Round 30: the bracket's dots derive from the active grammar
+          // (a double-dotted carried value dots twice under complete).
+          durationGrammar: o.durationGrammar,
           ...(() => {
             const ink = unifiedClaspInk(cluster);
             return ink ? { durationInk: ink } : {};
@@ -4355,11 +4494,16 @@ function renderNotesLayer(
   };
   if (o.rhythmStyle === 'beamed') {
     for (const beam of layout.beams) {
-      out.push(renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle));
+      out.push(renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle, o.durationGrammar));
     }
+    // Round 30: a clasp member's kept stem renders with the golden grammar —
+    // the bracket owns the member's duration, so the stem carries no
+    // preview ink of its own (no double dots, no member rings).
+    const claspedIds = new Set(layout.clasps.flatMap((c) => c.notes.map((n) => n.id)));
     for (const n of layout.ungrouped) {
       if (suppressed.has(n.id)) continue;
-      out.push(renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle));
+      const grammar = claspedIds.has(n.id) ? 'golden' : o.durationGrammar;
+      out.push(renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle, grammar));
     }
   } else {
     for (const p of layout.notes) {

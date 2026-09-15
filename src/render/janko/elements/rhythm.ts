@@ -26,6 +26,7 @@
 import { Hand } from '../../../model/types';
 import {
   JankoClaspDurationStyle,
+  JankoDurationGrammar,
   JankoLayoutOptions,
   JankoRhythmStyle,
   JankoSubdivisionStyle,
@@ -35,6 +36,7 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
+import { durationDotCount, durationFlagCount, durationRingCount } from './duration';
 import { isPositionOfHonor } from './notehead';
 import { f } from './style';
 import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
@@ -66,6 +68,20 @@ export interface JankoRhythmNote {
    * paint it.
    */
   dotY?: number;
+  /**
+   * Round 30: page x/y of this note's **second augmentation dot** (a
+   * double-dotted value under the complete grammar). Resolved by the engine
+   * further along the escape — right of the first dot first, then up — and
+   * painted only when the active grammar reads two dots; absent otherwise.
+   * Callers that build a rhythm note by hand fall back to the canonical
+   * horizontal pair (`dotX + 2r + gap`, same height).
+   */
+  dot2X?: number;
+  /**
+   * Round 30: page y of this note's **second augmentation dot** (see
+   * {@link JankoRhythmNote.dot2X}).
+   */
+  dot2Y?: number;
   /**
    * Round 17: distance (pt) from the notehead centre at which this note's stem
    * begins — flush on the mask edge (`hy + 0.2`) or on the halo ring
@@ -203,6 +219,28 @@ function renderAugmentationDot(note: JankoRhythmNote, tokens: ResolvedJankoToken
 }
 
 /**
+ * Round 30: the SECOND augmentation dot of a double-dotted value (complete
+ * grammar only). Painted from the engine's resolved `dot2X`/`dot2Y` — further
+ * along the escape than the first dot — with the canonical horizontal pair
+ * (`dotX + 2r + gap`, same height) as the hand-built fallback. The
+ * `data-dot="2"` tag distinguishes it from its sibling; first dots keep their
+ * exact golden markup.
+ */
+function renderSecondAugmentationDot(
+  note: JankoRhythmNote,
+  tokens: ResolvedJankoTokens
+): string {
+  const r = tokens.augmentationDotRadius;
+  const cx =
+    note.dot2X ??
+    (note.dotX ?? note.x + getClusterSpacingPreset().wx + tokens.augmentationDotGap) +
+      2 * r +
+      tokens.augmentationDotGap;
+  const cy = note.dot2Y ?? note.dotY ?? note.y;
+  return `    <circle class="janko-augmentation-dot" data-dot="2" cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#111111"/>`;
+}
+
+/**
  * Jánko dialect: elegant angled 35° cuts.
  * 16th => two cuts, 8th => one cut, dotted 8th => one cut + dot.
  */
@@ -280,13 +318,16 @@ export const SUBDIVISION_URTEXT_STROKE = 0.9;
  * Number of subdivision marks stacked at a stem tip: three for a 32nd, two for
  * a 16th, one for an 8th (dotted or plain) and none for a quarter or longer.
  * Stacks are spaced by `tokens.flagSpacing`, so every dialect stacks alike.
+ *
+ * Round 30: under the complete grammar the count derives from the NOTATED
+ * base value (a double-dotted 16th carries two, a double-dotted 8th one);
+ * out-of-grammar durations keep these legacy thresholds.
  */
-export function subdivisionMarkCount(durationTicks: number): number {
-  if (durationTicks <= 3) return 4; // 64th
-  if (durationTicks <= 6) return 3; // 32nd
-  if (durationTicks <= 14) return 2; // 16th
-  if (durationTicks <= 38) return 1; // 8th (plain or dotted)
-  return 0;
+export function subdivisionMarkCount(
+  durationTicks: number,
+  grammar: JankoDurationGrammar = 'golden'
+): number {
+  return durationFlagCount(durationTicks, grammar);
 }
 
 /**
@@ -298,9 +339,15 @@ export function subdivisionMarkCount(durationTicks: number): number {
  * The thresholds mirror {@link subdivisionMarkCount}, so a beamed note and a
  * flagged note of the same value can never disagree about how many marks they
  * carry: 8th = 1 (primary), 16th = 2, 32nd = 3, 64th = 4.
+ *
+ * Round 30: under the complete grammar the level derives from the NOTATED
+ * base value (see {@link subdivisionMarkCount}).
  */
-export function beamLevel(durationTicks: number): number {
-  return Math.max(1, subdivisionMarkCount(durationTicks));
+export function beamLevel(
+  durationTicks: number,
+  grammar: JankoDurationGrammar = 'golden'
+): number {
+  return Math.max(1, subdivisionMarkCount(durationTicks, grammar));
 }
 
 /**
@@ -465,22 +512,75 @@ function verbatimFlagPath(stemX: number, tipY: number, direction: -1 | 1, marks:
 }
 
 /**
+ * Round 30: centres (page pt) of the open stem rings a lone long paints —
+ * the bracket's own rings (`CLASP_RING_*`: R = 3.0pt, stroke 1.0pt),
+ * stem-mounted at the stem midpoint, two stacked about it for a whole
+ * (`±(R + CLASP_MARK_STACK_GAP)`, the same stack as a whole-note bracket).
+ * Empty under the golden grammar and for out-of-grammar durations. Shared by
+ * the renderer and the linter's ring audit, so the audited centres can never
+ * drift from the painted ink.
+ */
+export function stemRingCenters(
+  note: JankoRhythmNote,
+  tokens?: Partial<JankoTokens> | null,
+  grammar: JankoDurationGrammar = 'golden'
+): Array<{ x: number; y: number }> {
+  const rings = durationRingCount(note.durationTicks, grammar);
+  if (rings === 0) return [];
+  const s = getStemGeometry(note, tokens);
+  const midY = (s.stemStartY + s.stemEndY) / 2;
+  if (rings === 1) return [{ x: s.stemX, y: midY }];
+  const stack = CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP;
+  return [
+    { x: s.stemX, y: midY - stack },
+    { x: s.stemX, y: midY + stack },
+  ];
+}
+
+/**
+ * Round 30: the open stem rings of a lone half/whole (complete grammar
+ * only). Each ring's 100% white interior knocks the stem out with zero
+ * crosshairs — the same knockout the bracket rings use — so the rings paint
+ * immediately after the stem and before every flag and dot.
+ */
+function renderStemRings(
+  note: JankoRhythmNote,
+  tokens: ResolvedJankoTokens,
+  grammar: JankoDurationGrammar
+): string[] {
+  return stemRingCenters(note, tokens, grammar).map(
+    (c) =>
+      `    <circle class="janko-stem-ring" cx="${f(c.x)}" cy="${f(c.y)}" r="${f(CLASP_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"/>`
+  );
+}
+
+/**
  * Solitary / unbeamed short note: bare stem plus duration ink plus the
  * augmentation dot for dotted values. Crescent dialects stack one mark per
  * subdivision at the stem tip within the tokenised reach; `'classical-urtext'`
  * paints one transcribed Bravura glyph per note (see `verbatimFlagPath`) at
  * the baked extents. Neither grammar crosses the stem.
+ *
+ * Round 30: under the complete grammar the flags derive from the NOTATED
+ * base value, every dotted value dots (doubly dotted doubly), and lone
+ * longs ring (see {@link durationDotCount}, {@link durationFlagCount},
+ * {@link durationRingCount}). The golden grammar renders byte-identically to
+ * before. A clasp member's kept stem is rendered with the golden grammar by
+ * the engine — the bracket owns the member's duration — so this function
+ * never suppresses member ink itself.
  */
 export function renderFlags(
   note: JankoRhythmNote,
   tokens?: Partial<JankoTokens> | null,
-  style: JankoSubdivisionStyle = 'classical-urtext'
+  style: JankoSubdivisionStyle = 'classical-urtext',
+  grammar: JankoDurationGrammar = 'golden'
 ): string {
   const t = resolveJankoTokens(tokens);
   const s = getStemGeometry(note, t);
   const parts: string[] = [renderStem(note, t)];
+  parts.push(...renderStemRings(note, t, grammar));
 
-  const marks = subdivisionMarkCount(note.durationTicks);
+  const marks = subdivisionMarkCount(note.durationTicks, grammar);
   if (style === 'classical-urtext') {
     if (marks >= 1) parts.push(verbatimFlagPath(s.stemX, s.stemEndY, s.direction, marks));
   } else {
@@ -488,8 +588,12 @@ export function renderFlags(
       parts.push(renderSubdivisionMark(s.stemX, s.stemEndY, s.direction, i, style, t));
     }
   }
-  if (note.durationTicks > 26 && note.durationTicks <= 38) {
+  const dots = durationDotCount(note.durationTicks, grammar);
+  if (dots >= 1) {
     parts.push(renderAugmentationDot(note, t));
+  }
+  if (dots >= 2) {
+    parts.push(renderSecondAugmentationDot(note, t));
   }
   return parts.join('\n');
 }
@@ -658,6 +762,12 @@ export interface ResolvedJankoClaspInk {
   pips: number;
   /** A dotted value adds the 0.75pt augmentation dot beside the mark. */
   dotted: boolean;
+  /**
+   * Round 30: augmentation dots the group paints (0–2). The complete grammar
+   * reads it from the notated value; the golden grammar reads 0/1 from
+   * {@link claspDurationDotted}.
+   */
+  dots: 0 | 1 | 2;
 }
 
 /** A duration-ink group the caller asks for (unresolved: value + spine y). */
@@ -668,16 +778,32 @@ export interface JankoClaspDurationInk {
   durationTicks: number;
 }
 
-/** Resolve one requested duration-ink group into its painted mark grammar. */
-export function resolveClaspInk(ink: JankoClaspDurationInk): ResolvedJankoClaspInk {
+/**
+ * Resolve one requested duration-ink group into its painted mark grammar.
+ *
+ * Round 30: under the complete grammar the dot count is the NOTATED count
+ * (a double-dotted carried value dots twice); `dotted` stays the
+ * "dots ≥ 1" shorthand, so golden callers read it unchanged.
+ */
+export function resolveClaspInk(
+  ink: JankoClaspDurationInk,
+  grammar: JankoDurationGrammar = 'golden'
+): ResolvedJankoClaspInk {
   const duration = claspDurationClass(ink.durationTicks);
+  const dots =
+    grammar === 'complete'
+      ? durationDotCount(ink.durationTicks, grammar)
+      : claspDurationDotted(ink.durationTicks)
+        ? 1
+        : 0;
   return {
     centerY: ink.centerY,
     durationTicks: ink.durationTicks,
     duration,
     flags: duration === 'spire-two-flags' ? 2 : duration === 'spire-one-flag' ? 1 : 0,
     pips: duration === 'double-pip' ? 2 : duration === 'pip' ? 1 : 0,
-    dotted: claspDurationDotted(ink.durationTicks),
+    dotted: dots >= 1,
+    dots,
   };
 }
 
@@ -729,6 +855,13 @@ export interface JankoClaspGroupGeometry {
    * never drift between the renderer, the fit rule and the linter.
    */
   durationDots: Array<{ x: number; y: number } | null>;
+  /**
+   * Round 30: the resolved centre of each group's SECOND augmentation dot,
+   * aligned with {@link durationInk} (`null` unless the group dots twice
+   * under the complete grammar). The same single-datum rule as
+   * {@link durationDots}.
+   */
+  durationSecondDots: Array<{ x: number; y: number } | null>;
   /** The bracket itself: `M cap topY L claspX topY L claspX botY L cap botY`. */
   path: string;
 }
@@ -759,6 +892,12 @@ export interface JankoClaspOptions {
    * carried value.
    */
   durationInk?: JankoClaspDurationInk[];
+  /**
+   * Round 30: duration grammar the bracket's dots derive from. The complete
+   * grammar dots a double-dotted carried value twice; the golden grammar
+   * keeps the legacy single dot. Defaults to `'golden'`.
+   */
+  durationGrammar?: JankoDurationGrammar;
 }
 
 /** The bracket `[` path: cap → spine → cap. */
@@ -803,11 +942,12 @@ export function computeClaspGeometry(
   const topY = minY - r;
   const botY = maxY + r;
   const durationTicks = options?.durationTicks ?? Math.min(...notes.map((n) => n.durationTicks));
+  const grammar = options?.durationGrammar ?? 'golden';
   const durationInk = (
     options?.durationInk && options.durationInk.length > 0
       ? options.durationInk
       : [{ centerY: (topY + botY) / 2, durationTicks }]
-  ).map(resolveClaspInk);
+  ).map((ink) => resolveClaspInk(ink, grammar));
   // `durationTicks` stays the **carried value** — the shortest member value,
   // which is what the cluster's first voice moves on, unified bracket or not.
   // The scalar mark fields mirror the bracket's primary ink group (the first
@@ -835,6 +975,7 @@ export function computeClaspGeometry(
     dotted: primary.dotted,
     durationInk,
     durationDots: [],
+    durationSecondDots: [],
     path: claspBracketPath(claspX, topY, botY, cap),
   };
   // Round 20: the augmentation dot of every dotted group is resolved here, once,
@@ -842,6 +983,12 @@ export function computeClaspGeometry(
   geometry.durationDots = durationInk.map((ink) =>
     ink.dotted ? claspDotCenter(geometry, ink, t) : null
   );
+  // Round 30: the second dot of every doubly dotted group, further along the
+  // same up-right fan — resolved from the first dot, never guessed twice.
+  geometry.durationSecondDots = durationInk.map((ink, index) => {
+    const first = geometry.durationDots[index];
+    return ink.dots >= 2 && first ? claspSecondDotCenter(geometry, ink, first, t) : null;
+  });
   return geometry;
 }
 
@@ -1084,6 +1231,59 @@ export function claspDotCenter(
 }
 
 /**
+ * Round 30 — **the bracket's second dot**.
+ *
+ * A doubly dotted carried value dots twice: the second dot continues the
+ * first dot's escape further along the same up-right fan, keeping the house
+ * hug from the mark, from every member disc AND from its own sibling dot
+ * (edge to edge). The search mirrors {@link claspDotCenter} — the same
+ * direction fan, nearest-to-the-mark wins — but measures distance from the
+ * FIRST dot, so the pair reads as one classical double-dot satellite. The
+ * linter's `clasp-dot-fusion` audits the same three airs.
+ */
+export function claspSecondDotCenter(
+  group: JankoClaspGroupGeometry,
+  ink: ResolvedJankoClaspInk,
+  first: { x: number; y: number },
+  tokens?: Partial<JankoTokens> | null
+): { x: number; y: number } {
+  const t = resolveJankoTokens(tokens);
+  const hug = t.augmentationDotGap;
+  const r = t.augmentationDotRadius;
+  const siblingGap = 2 * r + hug;
+  const discAir = (x: number, y: number): number =>
+    group.notes.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...group.notes.map((n) => Math.hypot(x - n.x, y - n.y) - t.noteheadRadius - r));
+  let clean: { x: number; y: number; d: number } | null = null;
+  let best: { x: number; y: number; air: number } | null = null;
+  for (const degrees of CLASP_DOT_ANGLES) {
+    const angle = (degrees * Math.PI) / 180;
+    const ux = Math.cos(angle);
+    const uy = -Math.sin(angle);
+    for (let d = 0; d <= 24; d += 0.01) {
+      const x = first.x + d * ux;
+      const y = first.y + d * uy;
+      // The sibling dot is the first obstacle: the pair starts one full
+      // sibling gap apart and only ever spreads from there.
+      if (Math.hypot(x - first.x, y - first.y) < siblingGap - 1e-9) continue;
+      if (claspMarkDaylight(group, ink, x, y, t) < hug - 1e-9) continue;
+      const air = discAir(x, y);
+      if (best === null || air > best.air) best = { x, y, air };
+      if (air >= hug - 1e-9 && (clean === null || d < clean.d - 1e-9)) clean = { x, y, d };
+      break;
+    }
+  }
+  if (clean) return { x: clean.x, y: clean.y };
+  return (
+    best ?? {
+      x: first.x + siblingGap,
+      y: first.y,
+    }
+  );
+}
+
+/**
  * The duration ink of one clasp in the active Round 11 midpoint paradigm. Every
  * mark is anchored on `yMid = (topY + botY) / 2` and cuts symmetrically across
  * the spine, so the bracket stays a mirror-symmetrical `[` whatever value it
@@ -1168,6 +1368,16 @@ function renderClaspDurationInk(
       out.push(
         `    <circle class="janko-clasp-dot" cx="${f(dot.x)}" cy="${f(dot.y)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
       );
+      // Round 30: a doubly dotted carried value dots twice — the second dot
+      // further along the same escape, tagged `data-dot="2"` so the pair
+      // counts honestly. First dots keep their exact golden markup.
+      if (ink.dots >= 2) {
+        const dot2 =
+          group.durationSecondDots?.[index] ?? claspSecondDotCenter(group, ink, dot, t);
+        out.push(
+          `    <circle class="janko-clasp-dot" data-dot="2" cx="${f(dot2.x)}" cy="${f(dot2.y)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
+        );
+      }
     }
   }
   return out;
@@ -1214,6 +1424,15 @@ export function claspInkBox(
       x1 = Math.max(x1, dot.x + t.augmentationDotRadius);
       y0 = Math.min(y0, dot.y - t.augmentationDotRadius);
       y1 = Math.max(y1, dot.y + t.augmentationDotRadius);
+      // Round 30: the second dot of a doubly dotted group rides the same box.
+      if (ink.dots >= 2) {
+        const dot2 =
+          group.durationSecondDots?.[index] ?? claspSecondDotCenter(group, ink, dot, t);
+        x0 = Math.min(x0, dot2.x - t.augmentationDotRadius);
+        x1 = Math.max(x1, dot2.x + t.augmentationDotRadius);
+        y0 = Math.min(y0, dot2.y - t.augmentationDotRadius);
+        y1 = Math.max(y1, dot2.y + t.augmentationDotRadius);
+      }
     }
   }
   return { x0, y0, x1, y1 };
@@ -1600,13 +1819,17 @@ export interface JankoBeamRestObstacle {
  * @param spineY    absolute y of the Middle C spine, when the corridor is a
  *                  declared no-fly line for beams
  * @param restInk   printed rest ink boxes of the system the connector clears
+ * @param grammar   Round 30 duration grammar: beam levels derive from the
+ *                  notated base value under `'complete'` (a double-dotted
+ *                  16th beams at level 2), from raw thresholds otherwise
  */
 export function computeBeamGroupGeometry(
   group: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
   obstacles?: readonly JankoRhythmNote[] | null,
   spineY?: number | null,
-  restInk?: readonly JankoBeamRestObstacle[] | null
+  restInk?: readonly JankoBeamRestObstacle[] | null,
+  grammar: JankoDurationGrammar = 'golden'
 ): JankoBeamGroupGeometry | null {
   const t = resolveJankoTokens(tokens);
   if (group.length < 2) return null;
@@ -1634,7 +1857,7 @@ export function computeBeamGroupGeometry(
   const beamX0 = lo.stemX;
 
   // --- Round 21: the beam levels are one generic rule -----------------------
-  const noteLevels = sorted.map((n) => beamLevel(n.durationTicks));
+  const noteLevels = sorted.map((n) => beamLevel(n.durationTicks, grammar));
   const maxLevel = Math.max(...noteLevels);
   /** Offset (pt) of level `L`'s centerline from the primary connector. */
   const levelOffset = (level: number): number =>
@@ -1873,21 +2096,27 @@ export function beamRailPathD(
  * layout). Supplying it guarantees the painted connector is byte-for-byte the
  * geometry the solver resolved against the foreign noteheads and the Middle C
  * corridor — and the one the visual linter audits.
+ *
+ * Round 30: under the complete grammar every dotted member dots (doubly
+ * dotted doubly, from the engine's resolved `dot2X`/`dot2Y`); beamed members
+ * are onset-alone by construction (Round 11), hence never clasped, so no
+ * member ink is ever suppressed here.
  */
 export function renderBeamGroup(
   group: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
   geometry?: JankoBeamGroupGeometry | null,
-  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext'
+  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext',
+  grammar: JankoDurationGrammar = 'golden'
 ): string {
   const t = resolveJankoTokens(tokens);
   if (group.length === 0) return '';
   if (group.length === 1) {
     // A solitary short note is flagged, never crossbarred.
-    return renderFlags(group[0], t, subdivisionStyle);
+    return renderFlags(group[0], t, subdivisionStyle, grammar);
   }
 
-  const beam = geometry ?? computeBeamGroupGeometry(group, t);
+  const beam = geometry ?? computeBeamGroupGeometry(group, t, null, null, null, grammar);
   if (!beam) return '';
   const { notes: sorted, stems, primary, direction } = beam;
 
@@ -1926,8 +2155,12 @@ export function renderBeamGroup(
 
   void direction;
   for (const n of sorted) {
-    if (n.durationTicks > 26 && n.durationTicks <= 38) {
+    const dots = durationDotCount(n.durationTicks, grammar);
+    if (dots >= 1) {
       parts.push(renderAugmentationDot(n, t));
+    }
+    if (dots >= 2) {
+      parts.push(renderSecondAugmentationDot(n, t));
     }
   }
 
@@ -1935,19 +2168,26 @@ export function renderBeamGroup(
   return parts.join('\n');
 }
 
-/** Dispatch one note to its selected rhythm dialect. */
+/**
+ * Dispatch one note to its selected rhythm dialect.
+ *
+ * Round 30: the complete grammar threads through the beamed dialect only;
+ * the retired display dialects (`angled-cuts`, `horizontal-ticks`) keep
+ * their legacy gates under every grammar.
+ */
 export function renderRhythm(
   note: JankoRhythmNote,
   style: JankoRhythmStyle,
   tokens?: Partial<JankoTokens> | null,
-  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext'
+  subdivisionStyle: JankoSubdivisionStyle = 'classical-urtext',
+  grammar: JankoDurationGrammar = 'golden'
 ): string {
   switch (style) {
     case 'horizontal-ticks':
       return renderHorizontalTicks(note, tokens);
     case 'beamed':
       // Standalone (unbeamable) notes carry standard flags, not crossbars.
-      return renderFlags(note, tokens, subdivisionStyle);
+      return renderFlags(note, tokens, subdivisionStyle, grammar);
     case 'angled-cuts':
     default:
       return renderAngledCuts(note, tokens);

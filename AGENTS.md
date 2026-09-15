@@ -74,7 +74,8 @@ Design review happens **exclusively on the live website** — never by sending t
   - **View 2 · Golden Reference Object**: the accumulated golden master — full page spread (all pages) plus 288-DPI-equivalent macro focus crops and the live lint diagnostics list (`janko.html#reference`).
   - **In-browser zoom**: `+` / `−` / `Reset` buttons, `+`/`−`/`0` keys, or `Ctrl/⌘ + wheel`, 50%–300%. Mobile-safe: 100% fits the card width.
 - **Declarative Candidate Registry**: `src/render/janko/candidates.ts` is the *only* file to touch when opening a round. `CURRENT_ROUND_METADATA` holds the round number/title/question, `CURRENT_CANDIDATES` holds the variants as 5-line option deltas against `DEFAULT_JANKO_OPTIONS`. The studio template never changes. Never invent separate HTML viewers or script files for candidate reviews.
-- **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`**; the Reference view is always the canonical Bach Goldberg Var. 1 engraving under those options.
+- **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`** for the primary Bach Goldberg Var. 1 engraving, plus the Brahms Op. 118 No. 1 golden (`BRAHMS_OP118_NO1_JANKO_OPTIONS` + adaptive core, as the lint CLI measures it). The Reference view always carries both spreads: Bach first, Brahms (`brahms-op118-no1`) beside it with its own pages, macro crops and lint diagnostics.
+- **Brahms is a first-class iteration surface**: rounds window it by measure via `brahmsWindow()` in the candidate registry, literal corpus measures first (synthetic only when no literal passage can demonstrate the question, caption says so).
 
 ---
 
