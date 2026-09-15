@@ -11,7 +11,7 @@ import { tickToMeasureBeat } from '../model/grid';
 import { parseMidiToScore } from '../model/midi';
 import { synth } from '../audio/synth';
 import { JankoPages, useJankoPages } from './JankoPages';
-import { SolfegeGuide } from './SolfegeGuide';
+import { PlayersGuide } from './PlayersGuide';
 import { checkMidiReadiness, locateTick, tickAtPoint } from './playhead';
 
 const BACH_ID = 'bach-goldberg-var1';
@@ -422,51 +422,8 @@ export const Landing: React.FC = () => {
         <>
           {/* Guide */}
           <div className="landing-scroll min-h-0 flex-1 overflow-y-auto">
-            <div className="landing-pages mx-auto max-w-3xl px-4 py-6">
-              <h2 className="font-serif text-2xl font-bold tracking-tight">
-                How to read the sheet
-              </h2>
-              <p className="mt-1 text-sm text-neutral-500">
-                Five facts; everything else reads like standard notation.
-              </p>
-              <ol className="mt-4 list-decimal space-y-3 pl-5 text-[15px] leading-relaxed marker:font-semibold">
-                <li>
-                  <strong>Digits are pitch names.</strong> 0–9, A, B count the
-                  twelve semitones up from C — 0 is C, 7 is G, A is B♭, B is B.
-                </li>
-                <li>
-                  <strong>Rows are octaves.</strong> Pitch climbs upward across
-                  octave rows, 2–5 on the staff, with ledger rows beyond.
-                </li>
-                <li>
-                  <strong>Even and odd live on twin rows.</strong> Each octave
-                  spans two whole-tone rows — even digits on one, odd digits
-                  on the other.
-                </li>
-                <li>
-                  <strong>Both hands share the rows.</strong> There are no
-                  separate staves — a stem up means right hand, down means
-                  left.
-                </li>
-                <li>
-                  <strong>Rhythm reads as usual.</strong> Beams group 8ths and
-                  16ths, single shorts carry flags, engraved rests mark the
-                  silences; solid barlines bound each measure, dashed lines
-                  mark the beats, and numerals open each system.
-                </li>
-              </ol>
-              <p className="mt-4 text-sm text-neutral-500">
-                In Play view, the red line follows the music — click any
-                measure to jump to it.
-              </p>
-
-              <p className="mb-3 mt-10 text-sm text-neutral-500">
-                Sing the digits — every pitch class has a one-syllable name.
-                Click to audition.
-              </p>
-              <div className="overflow-hidden rounded-2xl">
-                <SolfegeGuide onClose={() => setView('play')} />
-              </div>
+            <div className="landing-pages">
+              <PlayersGuide onClose={() => setView('play')} />
             </div>
           </div>
         </>
