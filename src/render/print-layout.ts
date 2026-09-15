@@ -12,7 +12,10 @@ import {
   DUODECIMAL_DIGITS,
 } from './types';
 
-export const URTEXT_SERIF = '"Century Schoolbook", "Baskerville", "Liberation Serif", "DejaVu Serif", "Times New Roman", Georgia, serif';
+// Order is load-bearing: fontconfig alias precedence (Century Schoolbook → C059
+// under urw-base35 conf) makes list position decide the embedded font;
+// Liberation-first keeps local and CI resolution identical.
+export const URTEXT_SERIF = '"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif';
 
 export const A4_WIDTH_PT = 595.28; // 210mm in PostScript points (72 pt/inch)
 export const A4_HEIGHT_PT = 841.89; // 297mm in PostScript points
