@@ -2139,20 +2139,28 @@ export function systemBarlines(
   const barlines: BarlineSpan[] = [];
   const anacrusis = t.anacrusisTicks ?? 0;
   const unifiedFinal = o.finalBarlineStyle === 'unified' && layout.isFinalSystem;
-  let finalTop = grid.top;
-  let finalBot = grid.bottom;
-  if (layout.isFinalSystem && (o.core === 'fixed-3' || o.core === 'fixed-4')) {
+
+  const isFixed3 = o.core === 'fixed-3';
+  const topExtLin = isFixed3 ? 72 : 77.5;
+  const botExtLin = isFixed3 ? 24 : 17.5;
+  const outerTopY = g.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+  const outerBotY = g.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+  const conjoin = o.extensionJunction === 'conjoin' && (o.core === 'fixed-3' || o.core === 'fixed-4');
+
+  const measureTop = conjoin ? outerTopY : grid.top;
+  const measureBot = conjoin ? outerBotY : grid.bottom;
+
+  let finalTop = measureTop;
+  let finalBot = measureBot;
+  if (!conjoin && layout.isFinalSystem && (o.core === 'fixed-3' || o.core === 'fixed-4')) {
     const finalMIdx =
       layout.index === 0 && anacrusis > 0 ? o.measuresPerSystem : o.measuresPerSystem - 1;
     const segs = getBarStaffSegments(g, finalMIdx);
-    const isFixed3 = o.core === 'fixed-3';
-    const topExtLin = isFixed3 ? 72 : 77.5;
-    const botExtLin = isFixed3 ? 24 : 17.5;
     if (segs.some((s) => s.lin === topExtLin)) {
-      finalTop = g.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+      finalTop = outerTopY;
     }
     if (segs.some((s) => s.lin === botExtLin)) {
-      finalBot = g.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+      finalBot = outerBotY;
     }
   }
   const push = (x: number, isSystemEnd: boolean = false): void => {
@@ -2168,7 +2176,7 @@ export function systemBarlines(
       barlines.push({ x, top: finalTop, bottom: finalBot });
       return;
     }
-    barlines.push({ x, top: grid.top, bottom: grid.bottom });
+    barlines.push({ x, top: measureTop, bottom: measureBot });
   };
   if (layout.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;

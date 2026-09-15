@@ -184,61 +184,66 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * Can we drop to 3, or does 4's floor earn its ink? Control is fixed-4
  * (o2–o5 middles, 1 folded note in m. 69), contender is fixed-3 (C3–C5 C-lines,
  * 9 folded notes across mm. 5, 15, 23, 33, 43, 53, 67, 69).
+ *
+ * Round 28 opens the extension-junction round on Bach Goldberg Var 1: where an
+ * extension-row terminal abuts a measure barline (m. 29/30), does clean design
+ * favor contact (Card A — conjoin) or separation (Card B — wide gap)? No
+ * control card in View 1: the Reference view carries the standing golden look.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 27,
-  title: 'Fixed Cores 3-vs-4 on Brahms, with Ottava',
+  round: 28,
+  title: 'Extension Junctions: Conjoin vs Wide Gap',
   description:
-    'Window-following octave lines cannot look centered, so the design reframes as fixed cores: each line count has one middle-C-centered grammar (3 ⟺ C3–C5 C-lines; 4 ⟺ o2–o5 middles), with per-bar need-based rows and real Gould ottava brackets beyond. Can we drop to 3, or does 4\u2019s floor earn its ink? Judge total visual weight on page 1, flick the strip for mm. 33–34, and pick the core.',
-  openAxes: ['core'],
+    'Where an extension-row terminal stands near a barline, does clean design favor contact or separation? Two answers: Conjoin (outer-row measure barlines meeting flush extension terminals in 90° T-junctions) vs Wide Gap (12.0pt standoff with short barlines). No control card — the Reference view carries the standing golden look (6.0pt standoff).',
+  openAxes: ['extensionJunction'],
   compareStrip: {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 33,
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 29,
     measureCount: 2,
-    title: 'mm. 33–34 · densest macro with folded bass under fixed-4 vs fixed-3',
+    title: 'mm. 29–30 · extension junction macro under conjoin vs wide gap',
   },
 };
 
 /**
- * The Round 27 windows, shared by every card: the whole of page 1 for total
- * visual weight, and the densest 2-measure macro with folded bass up close.
+ * The Round 28 windows, shared by every card: the full page containing m. 29
+ * (Page 2, mm. 17–32) and the m. 29–30 extension junction macro.
  */
-const ROUND_27_WINDOWS: JankoCandidateWindow[] = [
+const ROUND_28_WINDOWS: JankoCandidateWindow[] = [
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 9,
-    title: 'Brahms Op. 118/1 · Page 1 (mm. 1–9) — full-page visual weight',
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 17,
+    measureCount: 16,
+    title: 'Bach Goldberg Var 1 · Page 2 (mm. 17–32) — full-page visual weight with extension rows',
   },
   {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 33,
+    scoreId: DEFAULT_STUDIO_SCORE_ID,
+    measureStart: 29,
     measureCount: 2,
-    title: 'Brahms Op. 118/1 · mm. 33–34 — densest macro with folded bass',
+    title: 'Bach Goldberg Var 1 · mm. 29–30 — extension junction macro',
   },
 ];
 
-/** The round’s cards: control (fixed-4) and contender (fixed-3), in display order. */
+/** The round’s cards: Card A (conjoin) and Card B (wide-gap), in display order. No control card. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'core-fixed-4',
-    label: '0 · Control — Fixed-4 (o2–o5 middles)',
+    id: 'junction-conjoin',
+    label: 'A · Conjoin — Flush Outer T-Junctions',
     description:
-      'Four middle-centered hairlines at o2–o5 (lin 29.5/41.5/53.5/65.5) — the coverage-safe incumbent with equal weights. Covers 96.2% of Brahms; only 1 folded note (8vb) in m. 69 (A0, lin 9). Per-bar need-based rows fire at o1/o6.',
-    axis: 'core',
-    options: { core: 'fixed-4' },
-    windows: ROUND_27_WINDOWS,
-    tags: ['control', 'fixed-4'],
+      'Measure barlines span the outer-row levels (fixed-3: lin 72–24; fixed-4: 77.5–17.5), and extension-row interior terminals run flush into abutting barlines (0pt guest gap). Page 2 contains 1 interior extension junction (m. 30 closing barline); macro contains 1 junction.',
+    axis: 'extensionJunction',
+    options: { extensionJunction: 'conjoin' },
+    windows: ROUND_28_WINDOWS,
+    tags: ['conjoin'],
   },
   {
-    id: 'core-fixed-3',
-    label: '1 · Contender — Fixed-3 (C3–C5 C-lines)',
+    id: 'junction-wide-gap',
+    label: 'B · Wide Gap — 12.0pt Clear Separation',
     description:
-      'Three middle-C-centered hairlines at C3–C5 (lin 36/48/60) — the efficiency challenger with equal weights. Covers 83.7% of Brahms; 9 folded notes (8vb) across mm. 5, 15, 23, 33, 43, 53, 67, 69. Per-bar need-based rows fire at C2/C6.',
-    axis: 'core',
-    options: { core: 'fixed-3' },
-    windows: ROUND_27_WINDOWS,
-    tags: ['contender', 'fixed-3'],
+      'Extension-row interior terminals stand off 12.0pt (double the house inset) from abutting barlines, while measure barlines keep short heights. Page 2 contains 1 interior extension junction (m. 30 closing barline); macro contains 1 junction.',
+    axis: 'extensionJunction',
+    options: { extensionJunction: 'wide-gap' },
+    windows: ROUND_28_WINDOWS,
+    tags: ['wide-gap'],
   },
 ];
 

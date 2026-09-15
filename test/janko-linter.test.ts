@@ -63,6 +63,7 @@ import {
   checkOttavaCoverage,
   checkOttavaExtensions,
   checkRestClearance,
+  checkRestSeat,
   checkStaffSegments,
   checkSplitStackStems,
   checkStemAndBeamValidity,
@@ -1612,6 +1613,55 @@ test('checkStaffSegments flags missing anchors, gaps, and degenerate segments', 
   const vOverlap: LintViolation[] = [];
   checkStaffSegments(overlapLayout, o, t, vOverlap);
   assert.ok(vOverlap.some((v) => v.code === 'staff-segment-degenerate'));
+});
+
+test('junction-aware barline and segment audits: conjoin spans outer rows while wide-gap and default keep short heights', () => {
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const layout = layoutJankoScore(SCORE, resolveJankoOptions(DEFAULT_JANKO_OPTIONS), t)[7];
+
+  // Conjoin
+  const oConjoin = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, extensionJunction: 'conjoin' });
+  const conjoinBarlines = systemBarlines(layout, oConjoin, t);
+  const geo = layout.geometry;
+  const outerTopY = geo.middleCY + continuousPitchY(72, t.semitoneScale);
+  const outerBotY = geo.middleCY + continuousPitchY(24, t.semitoneScale);
+  assert.equal(conjoinBarlines[0].top.toFixed(2), outerTopY.toFixed(2));
+  assert.equal(conjoinBarlines[0].bottom.toFixed(2), outerBotY.toFixed(2));
+
+  // Wide gap
+  const oWide = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, extensionJunction: 'wide-gap' });
+  const wideBarlines = systemBarlines(layout, oWide, t);
+  assert.notEqual(wideBarlines[0].top.toFixed(2), outerTopY.toFixed(2));
+
+  // Segments check clean under both
+  const vConjoin: LintViolation[] = [];
+  checkStaffSegments(layout, oConjoin, t, vConjoin);
+  assert.equal(vConjoin.length, 0);
+
+  const vWide: LintViolation[] = [];
+  checkStaffSegments(layout, oWide, t, vWide);
+  assert.equal(vWide.length, 0);
+});
+
+test('semitone rest-centroid audit: hanging rest on integer semitone is clean; off-semitone drift is caught', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const layout = layoutJankoScore(SCORE, o, t)[0];
+
+  // Golden Bach m.4 rest is on semitone lin 46 (y = 179.48625)
+  const vClean: LintViolation[] = [];
+  checkRestSeat(layout, o, t, vClean);
+  assert.equal(vClean.length, 0, 'golden semitone seats lint 100% clean');
+
+  // Artificial drift of 1.4pt off semitone
+  const driftedLayout: JankoSystemLayout = {
+    ...layout,
+    rests: layout.rests.map((r, i) => (i === 0 ? { ...r, y: r.y + 1.4 } : r)),
+  };
+  const vDrift: LintViolation[] = [];
+  checkRestSeat(driftedLayout, o, t, vDrift);
+  assert.equal(vDrift.length, 1);
+  assert.equal(vDrift[0].code, 'rest-centroid-off-row');
 });
 
 // ---------------------------------------------------------------------------

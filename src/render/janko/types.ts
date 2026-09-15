@@ -946,6 +946,11 @@ export interface JankoLayoutOptions {
    * Defaults to `'fixed-3'`.
    */
   core?: JankoCore;
+  /**
+   * Extension row junction style at interior measure barlines (Round 28).
+   * Defaults to `'default'` (short barlines + 6.0pt guest gaps).
+   */
+  extensionJunction?: ExtensionJunctionStyle;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -953,6 +958,19 @@ export interface JankoLayoutOptions {
   /** Page composer attribution (full-page renders only). */
   composer?: string;
 }
+
+/**
+ * Extension row junction style at interior measure barlines (Round 28).
+ *
+ * - `'default'`: golden behavior — measure barlines keep short heights
+ *   (lin 60–36 staff rules), extension rows stand off 6.0pt (`t.measureInset`).
+ * - `'conjoin'`: Card A — measure barlines span the outer-row levels
+ *   (fixed-3: lin 72–24; fixed-4: 77.5–17.5), and extension-row interior
+ *   terminals run flush into abutting barlines (0pt gap, 90° T-junction).
+ * - `'wide-gap'`: Card B — extension rows stand off 12.0pt (double the house
+ *   inset) from abutting barlines; barlines keep short heights.
+ */
+export type ExtensionJunctionStyle = 'default' | 'conjoin' | 'wide-gap';
 
 /**
  * Fixed Middle-C-centered core octave line grammar (Round 27).
@@ -1010,6 +1028,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   pitchMapping: 'twin-rows',
   octaveLineScheme: 'grand-divider',
   core: 'fixed-3',
+  extensionJunction: 'default',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

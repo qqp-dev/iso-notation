@@ -125,36 +125,37 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 27/);
-  assert.match(html, /Fixed Cores/);
+  assert.match(html, /Round 28/);
+  assert.match(html, /Extension Junctions/);
 });
 
-test('Round 27 is a core round: one axis, two answers to one question', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 27);
-  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
+test('Round 28 is an extension junction round: one axis, two answers to one question', () => {
+  // Ordered contract change: Round 28 has NO control card (Reference view is the standing control)
+  assert.equal(CURRENT_ROUND_METADATA.round, 28);
+  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['core'],
+    ['extensionJunction'],
     'one axis, two cards'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['core-fixed-4', 'core-fixed-3'],
-    'the control and the contender, in display order'
+    ['junction-conjoin', 'junction-wide-gap'],
+    'Card A and Card B, in display order'
   );
   for (const candidate of CURRENT_CANDIDATES) {
-    assert.equal(candidate.axis, 'core', `${candidate.id} owns the core axis`);
+    assert.equal(candidate.axis, 'extensionJunction', `${candidate.id} owns the extensionJunction axis`);
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['core'],
-      `${candidate.id} states only the core axis`
+      ['extensionJunction'],
+      `${candidate.id} states only the extensionJunction axis`
     );
     assert.equal(candidate.tokens, undefined, `${candidate.id} states no micro token`);
     assert.deepEqual(
       candidateBadges(candidate),
-      [{ key: 'core', value: candidate.options!.core!, golden: 'fixed-3', axis: true }],
-      `${candidate.id} badges its core axis`
+      [{ key: 'extensionJunction', value: candidate.options!.extensionJunction!, golden: 'default', axis: true }],
+      `${candidate.id} badges its extensionJunction axis`
     );
     const resolved = resolveCandidate(candidate);
     assert.equal(resolved.windows.length, 2, `${candidate.id} shows the shared windows`);
@@ -186,9 +187,9 @@ test('Candidate previews honour their own option deltas', () => {
     return card.slice(0, card.indexOf('</article>'));
   };
 
-  // Both cards badge their own open axis; only fixed-4 departs from the new golden default.
+  // Both cards badge their own open axis; both depart from golden default.
   assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
-  assert.equal((html.match(/badge-delta/g) ?? []).length, 1, 'only fixed-4 departs from golden');
+  assert.equal((html.match(/badge-delta/g) ?? []).length, 2, 'both cards depart from golden on the open axis');
   for (const candidate of CURRENT_CANDIDATES) {
     const card = cardOf(candidate.id);
     assert.match(card, new RegExp(`<b>${candidate.axis}</b>`), `${candidate.id} badges its axis`);
@@ -211,16 +212,17 @@ test('Candidate previews honour their own option deltas', () => {
     'claspDurationStyle',
     'restStyle',
     'clusterAnchor',
+    'core',
   ]) {
-    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 27 question`);
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 28 question`);
   }
   assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
 
-  // The shared windows are the round's own evidence: Brahms page 1 plus the macro.
+  // The shared windows are the round's own evidence: Bach Page 2 plus the macro.
   for (const candidate of CURRENT_CANDIDATES) {
     const card = cardOf(candidate.id);
-    assert.ok(card.includes('data-window="brahms-op118-no1:1-9"'), `${candidate.id} shows page 1`);
-    assert.ok(card.includes('data-window="brahms-op118-no1:33-34"'), `${candidate.id} shows the macro`);
+    assert.ok(card.includes('data-window="primary:17-32"'), `${candidate.id} shows Page 2`);
+    assert.ok(card.includes('data-window="primary:29-30"'), `${candidate.id} shows the macro`);
   }
 
   // The settled clasp grammar and grid policy are stated in the card facts.
@@ -457,15 +459,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 27);
-  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 28);
+  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['core'],
+    ['extensionJunction'],
     'one axis, two cards'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'control and contender');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'Card A and Card B');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.
