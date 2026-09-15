@@ -84,19 +84,26 @@ import { getBarStaffSegments, getEquatorRuleYs, pitchGridRules } from './element
 import { continuousPitchY } from './geometry';
 import { gridBotY, gridTopY, resolveBeatPulseXs } from './elements/barlines';
 import {
+  CLASP_RING_RADIUS,
+  CLASP_RING_STROKE,
   JankoBeamConnector,
   JankoRhythmNote,
   claspDotCenter,
   claspInkBox,
   claspMarkDaylight,
+  claspSecondDotCenter,
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
   getSubdivisionGlyphBBox,
   partitionBeamGroups,
+  renderBeamGroup,
+  renderFlags,
   resolveClaspInk,
+  stemRingCenters,
   subdivisionMarkCount,
 } from './elements/rhythm';
+import { durationDotCount, durationRingCount } from './elements/duration';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
   JANKO_HALO_STROKE_WIDTH,
@@ -187,7 +194,9 @@ export type JankoLintCode =
   | 'extension-beyond-core'
   | 'staff-segment-gap'
   | 'staff-anchor-missing'
-  | 'staff-segment-degenerate';
+  | 'staff-segment-degenerate'
+  | 'dot-count-agreement'
+  | 'ring-geometry';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -303,6 +312,8 @@ export const JANKO_LINT_CHECKS = [
   'ottava-coverage',
   'ottava-extensions',
   'staff-segments',
+  'dot-count-agreement',
+  'ring-geometry',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -1236,6 +1247,11 @@ export function checkStemThroughSimultaneity(
  *    the dot to the wrong note — the Round 14 bar-5 defect),
  *  - any painted horizontal rule (a dot sitting on a staff rule drowns in it),
  *  - any painted vertical grid line (barline or dashed beat pulse).
+ *
+ * Round 30: under the complete grammar the gate is the notated dot count
+ * (every dotted value, doubly dotted doubly), unpainted positions
+ * (suppressed stems, clasp members' legacy-undotted stems) are skipped, and
+ * the second dot is audited against the same obstacles plus its sibling.
  */
 export function checkDotCollision(
   layout: JankoSystemLayout,
@@ -1271,119 +1287,359 @@ export function checkDotCollision(
           ).groups.flatMap((g) => g.map((n) => n.id))
         )
       : null;
+  const preview = o.durationGrammar === 'complete';
+  // Round 30: notes whose own dots never paint under the preview (a clasp
+  // member renders golden — the bracket owns its duration — unless the
+  // legacy gate itself dots it).
+  const hidden = preview ? suppressedStemIds(layout) : new Set<string>();
+  const clasped = preview
+    ? new Set(layout.clasps.flatMap((c) => c.notes.map((n) => n.id)))
+    : new Set<string>();
+  // Round 30: a gap-gated vertical carrier paints its GROUP's duration, so
+  // the preview gate reads the engraved value (the golden gate keeps the
+  // note's own, exactly as before).
+  const carrierDurations = preview
+    ? new Map(layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks]))
+    : new Map<string, number>();
   for (const p of layout.notes) {
-    const dur = p.note.durationTicks;
-    if (dur <= 26 || dur > 38) continue;
+    const dur = preview
+      ? (carrierDurations.get(p.note.id) ?? p.note.durationTicks)
+      : p.note.durationTicks;
+    if (durationDotCount(dur, o.durationGrammar) < 1) continue;
+    if (preview) {
+      if (hidden.has(p.note.id)) continue;
+      const legacyDotted = dur > 26 && dur <= 38;
+      if (clasped.has(p.note.id) && !legacyDotted) continue;
+    }
     // The dot the engine resolved: hugging the rectangular mask. Hand-built
     // rhythm notes fall back to the head row and the golden mask offset,
     // exactly as the renderer paints them.
     const cx = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + t.augmentationDotGap;
     const cy = p.rhythm.dotY ?? p.y;
-    const base = {
-      system: layout.index,
-      measure: measureOfTick(p.note.startTick, t),
-      noteIds: [p.note.id],
-      x: cx,
-      y: cy,
-    };
     const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
     const maskOf = (q: PositionedJankoNote): Box => {
       const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
       return box(q.x - wx, q.y - hy, q.x + wx, q.y + hy);
     };
-    for (const q of layout.notes) {
-      // Mask boxes for regular heads; the halo ring's outer edge for tick-0
-      // honour sounds, exactly as the engine seats them.
-      const distance = isPositionOfHonor(q.note.startTick)
-        ? Math.hypot(cx - q.x, cy - q.y) - haloOuter
-        : pointToBoxDistance(cx, cy, maskOf(q));
-      if (distance >= dotR - EPS) continue;
-      out.push({
-        code: 'dot-collision',
-        severity: 'error',
-        message:
-          `The augmentation dot of ${p.note.id} sits ${distance.toFixed(2)}pt from the mask of ` +
-          `${q.note.id} (dot r=${dotR.toFixed(2)}pt): the dot would attach to the wrong note.`,
-        ...base,
-        metrics: { distance, required: dotR, cx, cy },
-      });
-      break;
-    }
-    for (const rule of rules) {
-      // Full-width rules are audited by vertical gap; the short clef tick by
-      // true segment distance, so a far-away dot never trips on 20pt of ink.
-      const span = layout.geometry.staffRight - layout.geometry.staffLeft;
-      const short =
-        rule.x1 !== undefined && rule.x2 !== undefined && rule.x2 - rule.x1 < span - EPS;
-      const gap = short
-        ? pointToSegmentDistance(cx, cy, rule.x1!, rule.y, rule.x2!, rule.y)
-        : Math.abs(cy - rule.y);
-      if (gap >= dotR + rule.stroke / 2 - EPS) continue;
-      out.push({
-        code: 'dot-collision',
-        severity: 'error',
-        message:
-          `The augmentation dot of ${p.note.id} touches the staff rule at y=${rule.y.toFixed(2)} ` +
-          `(${gap.toFixed(2)}pt gap, ${(dotR + rule.stroke / 2).toFixed(2)}pt required).`,
-        ...base,
-        metrics: { gap, required: dotR + rule.stroke / 2, ruleY: rule.y },
-      });
-      break;
-    }
-    for (const b of barlines) {
-      if (cy < b.top - EPS || cy > b.bottom + EPS) continue;
-      const gap = Math.abs(cx - b.x);
-      if (gap >= dotR + 0.3 - EPS) continue;
-      out.push({
-        code: 'dot-collision',
-        severity: 'error',
-        message:
-          `The augmentation dot of ${p.note.id} touches the barline at x=${b.x.toFixed(2)} ` +
-          `(${gap.toFixed(2)}pt gap, ${(dotR + 0.3).toFixed(2)}pt required).`,
-        ...base,
-        metrics: { gap, required: dotR + 0.3, barlineX: b.x },
-      });
-      break;
-    }
-    for (const x of pulses) {
-      const gap = Math.abs(cx - x);
-      if (gap >= dotR + 0.35 - EPS) continue;
-      out.push({
-        code: 'dot-collision',
-        severity: 'error',
-        message:
-          `The augmentation dot of ${p.note.id} touches the dashed beat pulse at x=${x.toFixed(2)} ` +
-          `(${gap.toFixed(2)}pt gap, ${(dotR + 0.35).toFixed(2)}pt required).`,
-        ...base,
-        metrics: { gap, required: dotR + 0.35, pulseX: x },
-      });
-      break;
-    }
-    if (!beamedIds || !beamedIds.has(p.note.id)) {
-      const marks = subdivisionMarkCount(dur);
-      if (marks >= 1) {
-        const s = getStemGeometry(p.rhythm, t);
-        const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
-        const fBox = {
-          x0: s.stemX + bbox.x0,
-          y0: s.stemEndY + bbox.y0,
-          x1: s.stemX + bbox.x1,
-          y1: s.stemEndY + bbox.y1,
-        };
-        const fdx = Math.max(fBox.x0 - cx, 0, cx - fBox.x1);
-        const fdy = Math.max(fBox.y0 - cy, 0, cy - fBox.y1);
-        const distance = Math.hypot(fdx, fdy) - dotR;
-        if (distance < t.augmentationDotGap - EPS) {
-          out.push({
-            code: 'dot-collision',
-            severity: 'error',
-            message:
-              `The augmentation dot of ${p.note.id} sits ${distance.toFixed(2)}pt from its flag ink box ` +
-              `(${t.augmentationDotGap.toFixed(2)}pt required).`,
-            ...base,
-            metrics: { distance, required: t.augmentationDotGap, cx, cy },
-          });
+    /** One painted dot against every obstacle (first and second alike). */
+    const auditDot = (dx: number, dy: number, second: boolean): void => {
+      const which = second ? 'second augmentation dot' : 'augmentation dot';
+      const base = {
+        system: layout.index,
+        measure: measureOfTick(p.note.startTick, t),
+        noteIds: [p.note.id],
+        x: dx,
+        y: dy,
+      };
+      for (const q of layout.notes) {
+        // Mask boxes for regular heads; the halo ring's outer edge for tick-0
+        // honour sounds, exactly as the engine seats them.
+        const distance = isPositionOfHonor(q.note.startTick)
+          ? Math.hypot(dx - q.x, dy - q.y) - haloOuter
+          : pointToBoxDistance(dx, dy, maskOf(q));
+        if (distance >= dotR - EPS) continue;
+        out.push({
+          code: 'dot-collision',
+          severity: 'error',
+          message:
+            `The ${which} of ${p.note.id} sits ${distance.toFixed(2)}pt from the mask of ` +
+            `${q.note.id} (dot r=${dotR.toFixed(2)}pt): the dot would attach to the wrong note.`,
+          ...base,
+          metrics: { distance, required: dotR, cx: dx, cy: dy },
+        });
+        break;
+      }
+      for (const rule of rules) {
+        // Full-width rules are audited by vertical gap; the short clef tick by
+        // true segment distance, so a far-away dot never trips on 20pt of ink.
+        const span = layout.geometry.staffRight - layout.geometry.staffLeft;
+        const short =
+          rule.x1 !== undefined && rule.x2 !== undefined && rule.x2 - rule.x1 < span - EPS;
+        const gap = short
+          ? pointToSegmentDistance(dx, dy, rule.x1!, rule.y, rule.x2!, rule.y)
+          : Math.abs(dy - rule.y);
+        if (gap >= dotR + rule.stroke / 2 - EPS) continue;
+        out.push({
+          code: 'dot-collision',
+          severity: 'error',
+          message:
+            `The ${which} of ${p.note.id} touches the staff rule at y=${rule.y.toFixed(2)} ` +
+            `(${gap.toFixed(2)}pt gap, ${(dotR + rule.stroke / 2).toFixed(2)}pt required).`,
+          ...base,
+          metrics: { gap, required: dotR + rule.stroke / 2, ruleY: rule.y },
+        });
+        break;
+      }
+      for (const b of barlines) {
+        if (dy < b.top - EPS || dy > b.bottom + EPS) continue;
+        const gap = Math.abs(dx - b.x);
+        if (gap >= dotR + 0.3 - EPS) continue;
+        out.push({
+          code: 'dot-collision',
+          severity: 'error',
+          message:
+            `The ${which} of ${p.note.id} touches the barline at x=${b.x.toFixed(2)} ` +
+            `(${gap.toFixed(2)}pt gap, ${(dotR + 0.3).toFixed(2)}pt required).`,
+          ...base,
+          metrics: { gap, required: dotR + 0.3, barlineX: b.x },
+        });
+        break;
+      }
+      for (const x of pulses) {
+        const gap = Math.abs(dx - x);
+        if (gap >= dotR + 0.35 - EPS) continue;
+        out.push({
+          code: 'dot-collision',
+          severity: 'error',
+          message:
+            `The ${which} of ${p.note.id} touches the dashed beat pulse at x=${x.toFixed(2)} ` +
+            `(${gap.toFixed(2)}pt gap, ${(dotR + 0.35).toFixed(2)}pt required).`,
+          ...base,
+          metrics: { gap, required: dotR + 0.35, pulseX: x },
+        });
+        break;
+      }
+      if (!beamedIds || !beamedIds.has(p.note.id)) {
+        // Round 30: the escape clears the TRUE flag ink — the complete
+        // grammar's mark count, not the legacy one.
+        const marks = subdivisionMarkCount(dur, o.durationGrammar);
+        if (marks >= 1) {
+          const s = getStemGeometry(p.rhythm, t);
+          const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
+          const fBox = {
+            x0: s.stemX + bbox.x0,
+            y0: s.stemEndY + bbox.y0,
+            x1: s.stemX + bbox.x1,
+            y1: s.stemEndY + bbox.y1,
+          };
+          const fdx = Math.max(fBox.x0 - dx, 0, dx - fBox.x1);
+          const fdy = Math.max(fBox.y0 - dy, 0, dy - fBox.y1);
+          const distance = Math.hypot(fdx, fdy) - dotR;
+          if (distance < t.augmentationDotGap - EPS) {
+            out.push({
+              code: 'dot-collision',
+              severity: 'error',
+              message:
+                `The ${which} of ${p.note.id} sits ${distance.toFixed(2)}pt from its flag ink box ` +
+                `(${t.augmentationDotGap.toFixed(2)}pt required).`,
+              ...base,
+              metrics: { distance, required: t.augmentationDotGap, cx: dx, cy: dy },
+            });
+          }
         }
+      }
+    };
+    auditDot(cx, cy, false);
+    // Round 30: the second dot of a doubly dotted value — the same
+    // obstacles, plus the sibling it pairs with (the same ≥ 1.2 rule).
+    // Hand-built notes fall back to the canonical horizontal pair, exactly
+    // as the renderer paints them.
+    if (preview && durationDotCount(dur, o.durationGrammar) >= 2) {
+      const cx2 = p.rhythm.dot2X ?? cx + 2 * dotR + t.augmentationDotGap;
+      const cy2 = p.rhythm.dot2Y ?? cy;
+      auditDot(cx2, cy2, true);
+      const siblingAir = Math.hypot(cx2 - cx, cy2 - cy) - 2 * dotR;
+      if (siblingAir < t.augmentationDotGap - EPS) {
+        out.push({
+          code: 'dot-collision',
+          severity: 'error',
+          message:
+            `The two augmentation dots of ${p.note.id} sit ${siblingAir.toFixed(2)}pt apart ` +
+            `(${t.augmentationDotGap.toFixed(2)}pt of hug air required): the pair fuses.`,
+          system: layout.index,
+          measure: measureOfTick(p.note.startTick, t),
+          noteIds: [p.note.id],
+          x: cx2,
+          y: cy2,
+          metrics: { siblingAir, required: t.augmentationDotGap, cx: cx2, cy: cy2 },
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Round 30 — **painted dots agree with the notated value** (preview only).
+ *
+ * The audit the lost-dot defect class deserved: for every note whose stem
+ * paints, the dots the renderer PAINTS (counted from `renderFlags` /
+ * `renderBeamGroup`, called exactly as the engine calls them) must equal
+ * the dots its engraved duration READS under the active grammar. A clasp
+ * member's kept stem renders golden — the bracket owns its duration — so a
+ * member expects the legacy count. Any threading regression (a forgotten
+ * grammar argument, a gate that drifts from the grammar) is named per note.
+ * The golden grammar predates the notated counts, so this check is a no-op
+ * unless the preview is on — and it only runs on the beamed dialect, the
+ * only dialect the preview threads through.
+ */
+export function checkDotCountAgreement(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (o.durationGrammar !== 'complete') return;
+  if (o.rhythmStyle !== 'beamed') return;
+  const hidden = suppressedStemIds(layout);
+  const clasped = new Set(layout.clasps.flatMap((c) => c.notes.map((n) => n.id)));
+  const carrierDurations = new Map(
+    layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks])
+  );
+  /** The rhythm note as engraved: a carrier draws its group's duration. */
+  const asEngraved = (n: JankoRhythmNote): JankoRhythmNote => {
+    const durationTicks = carrierDurations.get(n.id);
+    return durationTicks === undefined || durationTicks === n.durationTicks
+      ? n
+      : { ...n, durationTicks };
+  };
+  const legacyDots = (durationTicks: number): number =>
+    durationTicks > 26 && durationTicks <= 38 ? 1 : 0;
+  const paintedDots = (svg: string): number =>
+    (svg.match(/janko-augmentation-dot/g) ?? []).length;
+
+  for (const beam of layout.beams) {
+    // Beamed members are onset-alone (Round 11), hence unclasped — but a
+    // future score that clasps one must not double-dot it: a member expects
+    // the legacy count there, and the painter is held to it.
+    const expected = beam.notes.reduce(
+      (sum, n) =>
+        sum +
+        (clasped.has(n.id)
+          ? legacyDots(n.durationTicks)
+          : durationDotCount(n.durationTicks, o.durationGrammar)),
+      0
+    );
+    const painted = paintedDots(
+      renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle, o.durationGrammar)
+    );
+    if (painted !== expected) {
+      out.push({
+        code: 'dot-count-agreement',
+        severity: 'error',
+        message:
+          `Beam group at tick ${beam.notes[0].startTick} paints ${painted} augmentation dots for ` +
+          `${expected} notated: the painted dots disagree with the notated values.`,
+        system: layout.index,
+        measure: measureOfTick(beam.notes[0].startTick, t),
+        noteIds: beam.notes.map((n) => n.id),
+        x: beam.primary.x1,
+        y: beam.primary.y1,
+        metrics: { painted, expected },
+      });
+    }
+  }
+
+  for (const n of layout.ungrouped) {
+    if (hidden.has(n.id)) continue;
+    const engraved = asEngraved(n);
+    const grammar = clasped.has(n.id) ? 'golden' : o.durationGrammar;
+    const expected = clasped.has(n.id)
+      ? legacyDots(engraved.durationTicks)
+      : durationDotCount(engraved.durationTicks, o.durationGrammar);
+    const painted = paintedDots(renderFlags(engraved, t, o.subdivisionStyle, grammar));
+    if (painted !== expected) {
+      out.push({
+        code: 'dot-count-agreement',
+        severity: 'error',
+        message:
+          `Note ${n.id} (${engraved.durationTicks} ticks, ${clasped.has(n.id) ? 'clasped' : 'lone'}) ` +
+          `paints ${painted} augmentation dots for ${expected} notated: the painted dots disagree ` +
+          `with the notated value.`,
+        system: layout.index,
+        measure: measureOfTick(n.startTick, t),
+        noteIds: [n.id],
+        x: n.x,
+        y: n.y,
+        metrics: { painted, expected, durationTicks: engraved.durationTicks },
+      });
+    }
+  }
+}
+
+/**
+ * Round 30 — **open stem-ring geometry** (preview only).
+ *
+ * A lone half/whole's stem-mounted rings share the bracket's ring constants
+ * and its knockout contract: each ring's white interior knocks the stem out,
+ * and nothing painted after the ring may cut it. The audit holds every
+ * painted single to both halves — the painted ring count (counted from
+ * `renderFlags`, called exactly as the engine calls it) equals the notated
+ * ring count, and every ring's stroke clears every notehead mask (its own
+ * head's and every foreign glyph's, halo rings included), so no later
+ * knockout or digit can chop the ring. Only the beamed dialect paints
+ * rings; every other style and the golden grammar are no-ops.
+ */
+export function checkStemRingGeometry(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (o.durationGrammar !== 'complete') return;
+  if (o.rhythmStyle !== 'beamed') return;
+  const hidden = suppressedStemIds(layout);
+  const clasped = new Set(layout.clasps.flatMap((c) => c.notes.map((n) => n.id)));
+  const carrierDurations = new Map(
+    layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks])
+  );
+  const asEngraved = (n: JankoRhythmNote): JankoRhythmNote => {
+    const durationTicks = carrierDurations.get(n.id);
+    return durationTicks === undefined || durationTicks === n.durationTicks
+      ? n
+      : { ...n, durationTicks };
+  };
+  const ringOuter = CLASP_RING_RADIUS + CLASP_RING_STROKE / 2;
+  /** Air a ring's stroke keeps from every mask (own head included). */
+  const RING_MASK_AIR = 0.5;
+  const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+
+  for (const n of layout.ungrouped) {
+    if (hidden.has(n.id)) continue;
+    const engraved = asEngraved(n);
+    const grammar = clasped.has(n.id) ? 'golden' : o.durationGrammar;
+    const expected = clasped.has(n.id) ? 0 : durationRingCount(engraved.durationTicks, grammar);
+    const painted = (renderFlags(engraved, t, o.subdivisionStyle, grammar).match(/janko-stem-ring/g) ?? []).length;
+    if (painted !== expected) {
+      out.push({
+        code: 'ring-geometry',
+        severity: 'error',
+        message:
+          `Note ${n.id} (${engraved.durationTicks} ticks) paints ${painted} stem rings for ${expected} ` +
+          `notated: the painted rings disagree with the notated value.`,
+        system: layout.index,
+        measure: measureOfTick(n.startTick, t),
+        noteIds: [n.id],
+        x: n.x,
+        y: n.y,
+        metrics: { painted, expected, durationTicks: engraved.durationTicks },
+      });
+      continue;
+    }
+    for (const center of stemRingCenters(engraved, t, grammar)) {
+      for (const q of layout.notes) {
+        const air = isPositionOfHonor(q.note.startTick)
+          ? Math.hypot(center.x - q.x, center.y - q.y) - haloOuter - ringOuter
+          : (() => {
+              const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+              const dx = Math.max(q.x - wx - center.x, 0, center.x - (q.x + wx));
+              const dy = Math.max(q.y - hy - center.y, 0, center.y - (q.y + hy));
+              return Math.hypot(dx, dy) - ringOuter;
+            })();
+        if (air >= RING_MASK_AIR - EPS) continue;
+        out.push({
+          code: 'ring-geometry',
+          severity: 'error',
+          message:
+            `The stem ring of ${n.id} sits ${air.toFixed(2)}pt from the mask of ${q.note.id} ` +
+            `(${RING_MASK_AIR.toFixed(2)}pt required): a later knockout would cut the ring.`,
+          system: layout.index,
+          measure: measureOfTick(n.startTick, t),
+          noteIds: [n.id, q.note.id],
+          x: center.x,
+          y: center.y,
+          metrics: { air, required: RING_MASK_AIR, ringX: center.x, ringY: center.y },
+        });
+        break;
       }
     }
   }
@@ -2518,17 +2774,48 @@ export function checkClaspDotFusion(
   layout: JankoSystemLayout,
   t: ResolvedJankoTokens,
   lint: JankoLintOptions,
-  out: LintViolation[]
+  out: LintViolation[],
+  o?: ResolvedJankoLayoutOptions | null
 ): void {
   const hug = t.augmentationDotGap;
   const r = t.augmentationDotRadius;
   const haloEdge = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  const grammar = o?.durationGrammar ?? 'golden';
   for (const clasp of layout.clasps) {
     const inks =
       clasp.durationInk && clasp.durationInk.length > 0
         ? clasp.durationInk
-        : [resolveClaspInk({ centerY: (clasp.topY + clasp.botY) / 2, durationTicks: clasp.durationTicks })];
+        : [
+            resolveClaspInk(
+              { centerY: (clasp.topY + clasp.botY) / 2, durationTicks: clasp.durationTicks },
+              grammar
+            ),
+          ];
     for (const [index, ink] of inks.entries()) {
+      // Round 30 (preview only — the golden bracket keeps its legacy single
+      // dot): the painted dot count is the grammar's notated count. A group
+      // resolved without the active grammar (a forgotten call site) dots
+      // wrong and is named here, before any clearance is measured.
+      if (grammar === 'complete') {
+        const expectedDots = durationDotCount(ink.durationTicks, grammar);
+        const paintedDots = ink.dots ?? (ink.dotted ? 1 : 0);
+        if (paintedDots !== expectedDots) {
+          out.push({
+            code: 'dot-count-agreement',
+            severity: 'error',
+            message:
+              `Clasp at tick ${clasp.tick} carries ${ink.durationTicks} ticks (${expectedDots} dots under ` +
+              `the ${grammar} grammar) but its ink group paints ${paintedDots}: the dot count disagrees ` +
+              `with the notated value.`,
+            system: layout.index,
+            measure: measureOfTick(clasp.tick, t),
+            noteIds: clasp.notes.map((n) => n.id),
+            x: clasp.claspX,
+            y: ink.centerY,
+            metrics: { paintedDots, expectedDots, durationTicks: ink.durationTicks },
+          });
+        }
+      }
       if (!ink.dotted) continue;
       // The resolved geometry's own datum — never a fresh guess — so the audit
       // measures what the renderer paints (and a fused regression is caught).
@@ -2570,6 +2857,63 @@ export function checkClaspDotFusion(
           y: dot.y,
           metrics: { gap, required, dotX: dot.x, dotY: dot.y, noteX: p.x, noteY: p.y },
         });
+      }
+
+      // Round 30 (preview only): the second dot of a doubly dotted group —
+      // the same three airs (mark hug, neighbour discs, sibling dot).
+      if (grammar === 'complete' && ink.dots >= 2) {
+        const dot2 =
+          clasp.durationSecondDots?.[index] ?? claspSecondDotCenter(clasp, ink, dot, t);
+        const base2 = {
+          system: layout.index,
+          measure: measureOfTick(clasp.tick, t),
+          noteIds: clasp.notes.map((n) => n.id),
+          x: dot2.x,
+          y: dot2.y,
+        };
+        const markAir2 = claspMarkDaylight(clasp, ink, dot2.x, dot2.y, t);
+        if (markAir2 < hug - EPS) {
+          out.push({
+            code: 'clasp-dot-fusion',
+            severity: 'error',
+            message:
+              `Clasp at tick ${clasp.tick} paints its second augmentation dot ${markAir2.toFixed(2)}pt from the ` +
+              `mark it belongs to (${hug.toFixed(2)}pt of hug air required): the dot fuses with its own ink.`,
+            ...base2,
+            metrics: { markAir: markAir2, required: hug, dotX: dot2.x, dotY: dot2.y },
+          });
+        }
+        const siblingAir = Math.hypot(dot2.x - dot.x, dot2.y - dot.y) - 2 * r;
+        if (siblingAir < hug - EPS) {
+          out.push({
+            code: 'clasp-dot-fusion',
+            severity: 'error',
+            message:
+              `Clasp at tick ${clasp.tick} paints its two augmentation dots ${siblingAir.toFixed(2)}pt apart ` +
+              `(${hug.toFixed(2)}pt of hug air required): the pair fuses.`,
+            ...base2,
+            metrics: { siblingAir, required: hug, dotX: dot2.x, dotY: dot2.y },
+          });
+        }
+        for (const p of layout.notes) {
+          const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
+          const gap = Math.hypot(dot2.x - p.x, dot2.y - p.y) - radius - r;
+          const required = own.has(p.note.id) ? hug : lint.minClearance;
+          if (gap >= required - EPS) continue;
+          out.push({
+            code: 'clasp-dot-fusion',
+            severity: 'error',
+            message:
+              `Clasp at tick ${clasp.tick} paints its second augmentation dot ${gap.toFixed(2)}pt from notehead ` +
+              `${p.note.id} (${required.toFixed(2)}pt required): the dot runs into neighbouring ink.`,
+            system: layout.index,
+            measure: measureOfTick(clasp.tick, t),
+            noteIds: [p.note.id, ...clasp.notes.map((n) => n.id)],
+            x: dot2.x,
+            y: dot2.y,
+            metrics: { gap, required, dotX: dot2.x, dotY: dot2.y, noteX: p.x, noteY: p.y },
+          });
+        }
       }
     }
   }
@@ -3997,7 +4341,9 @@ export function lintJankoScore(
     checkUnwrittenRests(layout, t, diagnostics);
     checkRestSeat(layout, o, t, diagnostics);
     checkUnisonDigits(score, layout, t, diagnostics);
-    checkClaspDotFusion(layout, t, thresholds, diagnostics);
+    checkClaspDotFusion(layout, t, thresholds, diagnostics, o);
+    checkDotCountAgreement(layout, o, t, diagnostics);
+    checkStemRingGeometry(layout, o, t, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     // The contour round: each paradigm audits itself, gated by its option —
     // with every contour option off these are no-ops and the golden master

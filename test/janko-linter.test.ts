@@ -36,7 +36,7 @@ import {
   resolveJankoTokens,
 } from '../src/render/janko/types';
 import { JankoSystemLayout, layoutJankoScore, renderSystem, computePageGeometry, getSystemGeometry } from '../src/render/janko/engine';
-import { getStemAttachmentRadius, getStemGeometry } from '../src/render/janko/elements/rhythm';
+import { getStemAttachmentRadius, getStemGeometry, stemRingCenters } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
   digitBaselineOffset,
@@ -55,7 +55,9 @@ import {
   checkBeamNoteheadClearance,
   checkBeamRestClearance,
   checkClaspClearance,
+  checkClaspDotFusion,
   checkDotCollision,
+  checkDotCountAgreement,
   checkHaloClearance,
   checkKnockoutCoverage,
   checkMeasureNumeralClearance,
@@ -70,6 +72,7 @@ import {
   checkSplitStackStems,
   checkStemAndBeamValidity,
   checkStemDigitClearance,
+  checkStemRingGeometry,
   checkStemForeignDigitClearance,
   checkStemThroughSimultaneity,
   checkUnwrittenRests,
@@ -1735,4 +1738,128 @@ test('npm run lint:engraving reports the golden master clean and exits 0', () =>
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
   assert.match(out, /clean violations=0 warnings=0/);
+});
+
+// ---------------------------------------------------------------------------
+// 6. Round 30: the duration-grammar audits catch their intentional defects
+// ---------------------------------------------------------------------------
+
+const BRAHMS_SCORE = buildBrahmsOp118No1Score();
+const BRAHMS_PREVIEW = resolveJankoOptions({
+  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  core: 'adaptive',
+  durationGrammar: 'complete',
+});
+const BRAHMS_PREVIEW_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+
+test('dot-collision names a fused single second dot (sibling air)', () => {
+  const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
+  const sys = layouts.find((s) => s.notes.some((p) => p.note.id === 'brahms-op118-no1-336'))!;
+  const victim = sys.notes.find((p) => p.note.id === 'brahms-op118-no1-336')!;
+  assert.ok(victim.rhythm.dot2X !== undefined, 'the 21 resolves a second dot');
+  // Fuse the pair: park the second dot exactly on the first.
+  victim.rhythm.dot2X = victim.rhythm.dotX;
+  victim.rhythm.dot2Y = victim.rhythm.dotY;
+  const out: LintViolation[] = [];
+  checkDotCollision(sys, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS, out);
+  assert.ok(
+    out.some((v) => v.code === 'dot-collision' && v.message.includes('two augmentation dots')),
+    'the fused pair is named'
+  );
+});
+
+test('clasp-dot-fusion names a fused bracket second dot (mark + sibling airs)', () => {
+  const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
+  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 4800))!;
+  const clasp = sys.clasps.find((c) => c.tick === 4800)!;
+  assert.ok(clasp.durationSecondDots[0], 'the 42-bracket resolves a second dot');
+  // Fuse the pair onto the mark centre: both the sibling air and the mark
+  // hug collapse.
+  clasp.durationSecondDots[0] = { ...clasp.durationDots[0]! };
+  const out: LintViolation[] = [];
+  checkClaspDotFusion(sys, BRAHMS_PREVIEW_TOKENS, DEFAULT_JANKO_LINT_OPTIONS, out, BRAHMS_PREVIEW);
+  const codes = out.filter((v) => v.code === 'clasp-dot-fusion').map((v) => v.message);
+  assert.ok(codes.some((m) => m.includes('two augmentation dots')), 'the sibling fusion is named');
+});
+
+test('dot-count-agreement names a bracket resolved without the active grammar', () => {
+  const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
+  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 4800))!;
+  const clasp = sys.clasps.find((c) => c.tick === 4800)!;
+  // Simulate a forgotten call site: golden ink (undotted) under preview.
+  clasp.durationInk[0].dots = 0;
+  clasp.durationInk[0].dotted = false;
+  clasp.durationDots[0] = null;
+  clasp.durationSecondDots[0] = null;
+  const out: LintViolation[] = [];
+  checkClaspDotFusion(sys, BRAHMS_PREVIEW_TOKENS, DEFAULT_JANKO_LINT_OPTIONS, out, BRAHMS_PREVIEW);
+  assert.ok(
+    out.some(
+      (v) =>
+        v.code === 'dot-count-agreement' &&
+        v.message.includes('carries 42 ticks') &&
+        v.message.includes('paints 0')
+    ),
+    'the undotted 42-bracket is named'
+  );
+});
+
+test('dot-count-agreement names a beamed member the bracket would double-dot', () => {
+  const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
+  const sys = layouts.find((s) => s.beams.some((b) => b.notes.some((n) => n.id === 'brahms-op118-no1-331')))!;
+  const beam = sys.beams.find((b) => b.notes.some((n) => n.id === 'brahms-op118-no1-331'))!;
+  const member = beam.notes.find((n) => n.id === 'brahms-op118-no1-331')!;
+  // Simulate the future hazard: a dotted beamed member joins a bracket, so
+  // the bracket owns its duration but the beam still paints grammar dots.
+  assert.ok(sys.clasps.length > 0, 'the system carries real brackets');
+  sys.clasps.push({ ...sys.clasps[0], tick: member.startTick, durationTicks: 21, notes: [member] });
+  const out: LintViolation[] = [];
+  checkDotCountAgreement(sys, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS, out);
+  assert.ok(
+    out.some((v) => v.code === 'dot-count-agreement'),
+    'the double-ink hazard is named'
+  );
+});
+
+test('ring-geometry names a stem ring a later knockout would cut', () => {
+  const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
+  const sys = layouts.find((s) => s.notes.some((p) => p.note.id === 'brahms-op118-no1-321'))!;
+  const half = sys.notes.find((p) => p.note.id === 'brahms-op118-no1-321')!;
+  const [center] = stemRingCenters(half.rhythm, BRAHMS_PREVIEW_TOKENS, 'complete');
+  assert.ok(center, 'the lone half resolves a ring centre');
+  // Park a foreign head exactly on the ring: the head's later knockout
+  // would chop the ring's stroke.
+  const foreign = sys.notes.find((p) => p.note.id !== half.note.id)!;
+  foreign.x = center.x;
+  foreign.y = center.y;
+  const out: LintViolation[] = [];
+  checkStemRingGeometry(sys, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS, out);
+  assert.ok(
+    out.some(
+      (v) =>
+        v.code === 'ring-geometry' &&
+        v.message.includes('brahms-op118-no1-321') &&
+        v.message.includes('would cut the ring')
+    ),
+    'the chopped ring is named'
+  );
+});
+
+test('the Round 30 audits are silent under golden and listed in the registry', () => {
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('dot-count-agreement'),
+    'dot-count-agreement is registered'
+  );
+  assert.ok(
+    (JANKO_LINT_CHECKS as readonly string[]).includes('ring-geometry'),
+    'ring-geometry is registered'
+  );
+  // Golden predates the grammar: the new checks no-op (proven by the gate
+  // staying green), and the option-aware paths never fire without preview.
+  const golden = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
+  const sys = layoutJankoScore(BRAHMS_SCORE, golden, BRAHMS_PREVIEW_TOKENS)[0];
+  const out: LintViolation[] = [];
+  checkDotCountAgreement(sys, golden, BRAHMS_PREVIEW_TOKENS, out);
+  checkStemRingGeometry(sys, golden, BRAHMS_PREVIEW_TOKENS, out);
+  assert.equal(out.length, 0, 'golden silence');
 });

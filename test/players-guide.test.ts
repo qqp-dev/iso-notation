@@ -178,7 +178,7 @@ test('Guide pin: fixed-3 core lines are C3/C4/C5 with the C4 anchor', () => {
 
 test('Guide pin: flag hooks and rest lobes count 1–4 from 8th to 64th', () => {
   assert.deepEqual(
-    [24, 12, 6, 3].map(subdivisionMarkCount),
+    [24, 12, 6, 3].map((d) => subdivisionMarkCount(d)),
     [1, 2, 3, 4]
   );
   assert.deepEqual(

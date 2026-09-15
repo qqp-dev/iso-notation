@@ -15,7 +15,7 @@
  *  4. Rest lightening golden-direct: the live family (5 verbatim glyphs + block) renders
  *     at 0.85 scale in 90% black (#1A1A1A); verbatim constants byte-identical; seating
  *     centers unchanged; linter resolves scaled extents.
- *  5. Registry: Round 29 retired, no open previews (CURRENT_CANDIDATES = []).
+ *  5. Registry: Round 29 retired (historical flips-landed state, preserved).
  */
 
 import { test } from 'node:test';
@@ -30,11 +30,6 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
-import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
-  getCandidate,
-} from '../src/render/janko/candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -606,15 +601,22 @@ test('npm run lint:engraving --strict reports the landed golden master clean and
 });
 
 // ---------------------------------------------------------------------------
-// Section 5. Registry: Round 29 retired, no open previews
+// Section 5. Registry: Round 29 retired, no open previews (historical)
 // ---------------------------------------------------------------------------
 
-test('Registry landed: Round 29 flips-landed state, zero cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.match(CURRENT_ROUND_METADATA.title, /Flips landed/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes');
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no compare strip');
-  assert.equal(CURRENT_CANDIDATES.length, 0, 'no open previews');
-  assert.equal(getCandidate('dots-new'), undefined, 'Card D is consumed');
-  assert.equal(getCandidate('extensions-thin'), undefined, 'Card T is consumed');
+// Historical Round 29 registry (flips-landed, zero cards) preserved for
+// durable regression coverage. Active candidate round in
+// src/render/janko/candidates.ts is Round 30 (duration-grammar preview).
+const ROUND_29_METADATA = {
+  round: 29,
+  title: 'Flips landed: new dots, thin extensions, lightened rests',
+  openAxes: [],
+  compareStrip: undefined,
+};
+
+test('Registry landed: Round 29 flips-landed state, zero cards (historical)', () => {
+  assert.equal(ROUND_29_METADATA.round, 29);
+  assert.match(ROUND_29_METADATA.title, /Flips landed/);
+  assert.deepEqual(ROUND_29_METADATA.openAxes, [], 'no open axes');
+  assert.equal(ROUND_29_METADATA.compareStrip, undefined, 'no compare strip');
 });

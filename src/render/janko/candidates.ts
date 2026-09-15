@@ -125,8 +125,31 @@ export interface JankoCandidate {
 /** Score id of the studio's primary benchmark (Bach Goldberg Var. 1). */
 export const DEFAULT_STUDIO_SCORE_ID = 'primary';
 
-/** Score id of the Brahms Intermezzo benchmark, used by the Round 5–7 windows. */
+/** Score id of the Brahms Intermezzo benchmark, a first-class surface since Round 30. */
 export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
+
+/**
+ * Round 30: standing Brahms window support. Brahms (cut time, 192
+ * ticks/measure, 48-tick upbeat) windows exactly like the primary score, by
+ * measure. The Round-29 literal-first rule generalizes: every window shows
+ * LITERAL corpus measures (a probe in the ticket's lineage records the
+ * exact ticks and note ids framed); a synthetic specimen is admissible only
+ * when no literal passage can demonstrate the question, and then the
+ * caption says so. This constructor keeps Brahms windows honest by
+ * construction.
+ */
+export function brahmsWindow(
+  measureStart: number,
+  measureCount: number,
+  title: string
+): JankoCandidateWindow {
+  return {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart,
+    measureCount,
+    title,
+  };
+}
 
 /**
  * Score id of the curated multi-duration chord specimen (Round 9): five
@@ -189,17 +212,70 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * extension-row terminal abuts a measure barline (m. 29/30), does clean design
  * favor contact (Card A — conjoin) or separation (Card B — wide gap)? No
  * control card in View 1: the Reference view carries the standing golden look.
+ *
+ * Round 29 lands the dot/extension/rest flips golden and renders
+ * Reference-only. Round 30 previews the complete duration grammar on Brahms
+ * (Brahms joins the Reference as a first-class surface): lone longs ring,
+ * every dotted value dots, flags and beam levels derive from the notated
+ * base. Two cards, one axis, no control — the Reference is the control.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 29,
-  title: 'Flips landed: new dots, thin extensions, lightened rests',
+  round: 30,
+  title: 'Duration-grammar preview: rings, dots, levels',
   description:
-    'Round 29 is judged and golden: augmentation dots clear true verbatim flag ink by >= 1.2pt (escaping right first, then up); extension rows render at 0.35pt with core rows untouched at 0.50pt; the live rest family renders at 0.85 scale in 90% black. No open previews — the Reference view carries the golden master.',
-  openAxes: [],
+    'The complete duration grammar, previewed on Brahms before any flip: lone half/whole notes carry the bracket rings stem-mounted, every dotted value shows its dots (doubly dotted doubly) on singles, beams and brackets, and flags/beam levels derive from the notated base. Both cards run the full preview and differ only in windows: rings first, then the double-dot passages and the out-of-grammar boundary. Ties, tuplets and MIDI holds keep their current rendering.',
+  openAxes: ['durationGrammar'],
 };
 
-/** No open previews: every judged flip is golden. The studio renders Reference-only. */
-export const CURRENT_CANDIDATES: JankoCandidate[] = [];
+/**
+ * Round 30: two preview cards on the single `durationGrammar` axis (Brahms
+ * ×3, Bach ×1 — all literal corpus windows, every count proofread against
+ * the real engine and pinned in `test/janko-round30.test.ts`). No Card B:
+ * the mm. 44–45 window frames a double-dotted-carrying bracket, so the
+ * bracket-double-dot aspect is already demonstrated.
+ */
+export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'round-30-rings',
+    label: 'Rings on lone longs',
+    description:
+      'One open ring = half, two stacked = whole — the bracket rings (R 3.0pt, 1.0pt stroke) stem-mounted at the stem midpoint. Dotted longs ring AND dot; the 150/126 tie-merged holds stay bare.',
+    axis: 'durationGrammar',
+    options: { durationGrammar: 'complete' },
+    windows: [
+      brahmsWindow(
+        1,
+        2,
+        'Brahms mm. 1–2 · dd-8th #14 +flag+2 dots, dd-16th #22 +2nd flag+2 dots; the 150/126 LH holds stay bare'
+      ),
+      brahmsWindow(
+        24,
+        2,
+        'Brahms mm. 24–25 · rings on the half #321 and the dotted half #332 (+dot); 2 more 42s, 7 21s and the 42-bracket dot twice'
+      ),
+    ],
+  },
+  {
+    id: 'round-30-double-dots',
+    label: 'Double dots everywhere',
+    description:
+      'Doubly dotted values dot twice — singles, beamed notes (level 2) and brackets alike — with the second dot further along the escape (right first, then up). The Bach window pins the boundary: a tied value keeps its bare stem.',
+    axis: 'durationGrammar',
+    options: { durationGrammar: 'complete' },
+    windows: [
+      brahmsWindow(
+        44,
+        2,
+        'Brahms mm. 44–45 · 7 21s +level+2 dots, 2 42s +flag+2 dots, the 42-bracket +2 dots; rings on #607 and #618 (+dot)'
+      ),
+      {
+        measureStart: 20,
+        measureCount: 1,
+        title: 'Bach m. 20 · the tied 108 (#343) stays bare — zero new marks in this window',
+      },
+    ],
+  },
+];
 
 
 /** A fully resolved candidate, ready to engrave. */

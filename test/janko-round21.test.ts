@@ -444,13 +444,13 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 29 flips-landed state, zero cards, no open axes', () => {
-  // Ordered contract change: Round 29 is JUDGED — both flips are golden and
-  // the registry holds no cards.
-  assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes');
+test('§F registry: round 30 duration-grammar preview, two cards, one open axis', () => {
+  // Ordered contract change: Round 30 previews the complete duration grammar
+  // on two cards (rings, double dots) with the Reference as control.
+  assert.equal(CURRENT_ROUND_METADATA.round, 30);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationGrammar'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, [], 'no open previews');
+  assert.deepEqual(ids, ['round-30-rings', 'round-30-double-dots'], 'the two preview cards');
 });
 
 // ---------------------------------------------------------------------------
