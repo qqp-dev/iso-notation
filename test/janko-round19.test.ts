@@ -201,12 +201,26 @@ test('An even cluster coincides: equal-count rows share their middle exactly', (
 });
 
 test('The tuck respects the beat cell: no head of either score leaves its own beat', () => {
-  for (const [score, options, tokens] of [
-    [BACH, BACH_OPTIONS, T],
-    [BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
+  for (const [label, score, options, tokens] of [
+    ['Bach', BACH, BACH_OPTIONS, T],
+    ['Brahms', BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
   ] as const) {
     const report = lintJankoScore(score, options, tokens);
-    assert.equal(report.ok, true, 'the tucked golden lints clean');
+    if (label === 'Brahms') {
+      // 4-up by operator override (was clean at 3-up): exactly the 2
+      // accepted slot findings — the tuck itself still crosses no grid.
+      assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
+      assert.deepEqual(
+        report.violations.map((v) => [v.code, v.system + 1]),
+        [
+          ['system-slot-overlap', 23],
+          ['system-slot-overlap', 24],
+        ],
+        'exactly the accepted 2 (itemized in the §2-landed record)'
+      );
+    } else {
+      assert.equal(report.ok, true, 'the tucked golden lints clean');
+    }
     assert.equal(
       report.diagnostics.filter((d) => d.code === 'grid-crossing-offset').length,
       0,
@@ -221,10 +235,19 @@ test('The tuck respects the beat cell: no head of either score leaves its own be
 
 test('Overlapping hands unify: m. 46 and m. 26 carry one bracket spanning both hands', () => {
   const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  // The retired 3-up frames, for the relative-invariance proof below.
+  const layouts3 = layoutJankoScore(
+    BRAHMS,
+    { ...BRAHMS_OPTIONS, systemsPerPage: 3 },
+    BRAHMS_OP118_NO1_JANKO_TOKENS
+  );
   for (const [tick, top, bot, mid] of [
-    [M46, 99.7, 184.3, 142.0],
-    // m. 26 sits in system 2: +6 top margin + 2·(14/3) slot spread.
-    [M26, 590.29, 674.89, 632.59],
+    // m. 46 (sys 16) moved slot 0 → slot 3 (was 99.70 / 184.30 / 142.00).
+    [M46, 651.62, 736.22, 693.92],
+    // m. 26 (sys 9) moved slot 2 → slot 0 (was 590.29 / 674.89 / 632.59).
+    // Its new seat equals m. 46's old seat: same slot-0 frame (middleCY 157)
+    // plus the identical bracket shape — frame identity, not coincidence.
+    [M26, 99.7, 184.3, 142.0],
   ] as const) {
     const system = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
     const clasps = system.clasps.filter((c) => c.tick === tick);
@@ -248,6 +271,22 @@ test('Overlapping hands unify: m. 46 and m. 26 carry one bracket spanning both h
       clasp.durationTicks,
       Math.min(...clasp.notes.map((n) => n.durationTicks)),
       `t${tick}: the carried value is the shortest member`
+    );
+    // Proof the flip moved only the frame: the bracket's seat relative to
+    // its own system middle is identical at 3-up and 4-up (float dust only).
+    const system3 = layouts3.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+    const clasp3 = system3.clasps.filter((c) => c.tick === tick)[0];
+    assert.ok(
+      Math.abs(
+        clasp.topY - system.geometry.middleCY - (clasp3.topY - system3.geometry.middleCY)
+      ) < 1e-9,
+      `t${tick}: unified top is frame-relative identical`
+    );
+    assert.ok(
+      Math.abs(
+        clasp.botY - system.geometry.middleCY - (clasp3.botY - system3.geometry.middleCY)
+      ) < 1e-9,
+      `t${tick}: unified bottom is frame-relative identical`
     );
   }
 });
@@ -316,7 +355,17 @@ test('The former anchor collision is owned by the unified bracket', () => {
   // With the fixed context (symmetric tuck + overlap unification) the golden
   // is stem-clean: the unified bracket replaces every member stem.
   const report = lintJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
-  assert.equal(report.ok, true, 'the tucked golden is clean');
+  // 4-up by operator override (was clean at 3-up): exactly the 2 accepted
+  // slot findings — stem-cleanliness itself is untouched.
+  assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
+  assert.deepEqual(
+    report.violations.map((v) => [v.code, v.system + 1]),
+    [
+      ['system-slot-overlap', 23],
+      ['system-slot-overlap', 24],
+    ],
+    'exactly the accepted 2 (itemized in the §2-landed record)'
+  );
   assert.equal(
     report.diagnostics.filter((d) => d.code === 'stem-through-simultaneity').length,
     0,

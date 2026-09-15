@@ -275,10 +275,11 @@ test('The golden page layout is four systems per page and two pages — every pr
   }
 });
 
-test('The decided tight golden passes every gate; snug stays implemented and clean', () => {
+test('The decided tight golden pins every gate; snug stays implemented and identical', () => {
   // The verdict is in: tight is the golden master, so the DEFAULT options —
   // exactly what the CLI gates — must report zero violations and zero
-  // warnings on both benchmark scores.
+  // warnings on Bach; Brahms carries the 2 accepted 4-up slot findings
+  // (was 0/0 at 3-up) under both gaps — spacing never touches slots.
   assert.equal(
     resolveJankoOptions(DEFAULT_JANKO_OPTIONS).clusterSpacing,
     'tight',
@@ -289,18 +290,41 @@ test('The decided tight golden passes every gate; snug stays implemented and cle
     [BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const }, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
   ] as const) {
     const report = lintJankoScore(score, base, tokens);
-    assert.equal(report.violations.length, 0, `tight golden: zero violations on ${label}`);
+    if (label === 'Brahms') {
+      assert.deepEqual(
+        report.violations.map((v) => [v.code, v.system + 1]),
+        [
+          ['system-slot-overlap', 23],
+          ['system-slot-overlap', 24],
+        ],
+        'tight golden: exactly the accepted 2 (itemized in the §2-landed record)'
+      );
+    } else {
+      assert.equal(report.violations.length, 0, `tight golden: zero violations on ${label}`);
+      assert.equal(report.ok, true, `tight golden: ${label} engraves clean`);
+    }
     assert.equal(report.warnings.length, 0, `tight golden: zero warnings on ${label}`);
-    assert.equal(report.ok, true, `tight golden: ${label} engraves clean`);
   }
   // Snug remains implemented: the rest behavior is gap-independent, so the
-  // retired golden stays clean too.
+  // retired golden matches tight exactly — clean on Bach, the accepted 2
+  // on Brahms.
   for (const [score, base, tokens, label] of [
     [SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
     [BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const }, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
   ] as const) {
     const snug = lintJankoScore(score, { ...base, clusterSpacing: 'snug' }, tokens);
-    assert.equal(snug.violations.length, 0, `snug: zero violations on ${label}`);
+    if (label === 'Brahms') {
+      assert.deepEqual(
+        snug.violations.map((v) => [v.code, v.system + 1]),
+        [
+          ['system-slot-overlap', 23],
+          ['system-slot-overlap', 24],
+        ],
+        'snug: the same accepted 2 — the gap never touches slots'
+      );
+    } else {
+      assert.equal(snug.violations.length, 0, `snug: zero violations on ${label}`);
+    }
     assert.equal(snug.warnings.length, 0, `snug: zero warnings on ${label}`);
   }
 });
@@ -1788,7 +1812,7 @@ test('Rest specimen material: the complete working set, each on a guaranteed-fre
   assert.equal(report.violations.length, 0, 'and none is refused');
 });
 
-test('Every dialect renders every clean window with zero diagnostics and every rest clear (locked)', () => {
+test('Every dialect renders every window with zero rest diagnostics and every rest clear (locked)', () => {
   for (const style of REST_STYLES) {
     const options = { ...DEFAULT_JANKO_OPTIONS, restStyle: style };
     for (const [score, base, tokens, label] of [
@@ -1812,6 +1836,21 @@ test('Every dialect renders every clean window with zero diagnostics and every r
       ],
     ] as const) {
       const report = lintJankoScore(score, base, tokens);
+      if (label === 'Brahms complete') {
+        // 4-up by operator override (was [] at 3-up): every dialect carries
+        // exactly the accepted 2 — the rest style never touches slots, so
+        // all five dialects agree to the finding.
+        assert.deepEqual(
+          report.violations.map((v) => [v.code, v.system + 1]),
+          [
+            ['system-slot-overlap', 23],
+            ['system-slot-overlap', 24],
+          ],
+          `${style} · ${label}: exactly the accepted 2`
+        );
+        assert.equal(report.warnings.length, 0, `${style} · ${label}: zero warnings`);
+        continue;
+      }
       assert.deepEqual(
         report.diagnostics.map((d) => `${d.code}: ${d.message}`),
         [],
@@ -1875,7 +1914,7 @@ test('The live studio renders the one Round 31 preview card with an honest chip'
   for (const id of ROUND_31_CARDS) {
     assert.ok(html.includes(`data-candidate="${id}"`), `${id} renders`);
   }
-  // Whole-score card lint inherits the BRONZE surface's 4 knowns (honestly
+  // Whole-score card lint inherits the BRONZE surface's 9 knowns (honestly
   // red; the nudge adds 0 — proven in test/janko-round31.test.ts).
   assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 1, 'the surface chip');
 });

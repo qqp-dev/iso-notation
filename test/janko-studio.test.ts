@@ -202,7 +202,7 @@ test('The Round 31 studio renders one preview card on one axis, no control', () 
   // No control card: the Reference view is the standing control.
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');
 
-  // The card inherits the BRONZE surface's 4 knowns (whole-score card lint):
+  // The card inherits the BRONZE surface's 9 knowns (whole-score card lint):
   // honestly red, with the attribution proven in test/janko-round31.test.ts.
   assert.equal(
     (html.match(/data-lint="violations"/g) ?? []).length,
@@ -218,7 +218,7 @@ test('The Round 31 studio renders one preview card on one axis, no control', () 
   assert.equal(
     (reference.match(/data-lint-ok="true"/g) ?? []).length,
     1,
-    'the GOLD score lints clean; BRONZE carries its 4 knowns'
+    'the GOLD score lints clean; BRONZE carries its 9 knowns'
   );
   assert.equal(
     (reference.match(/data-lint-ok="false"/g) ?? []).length,
@@ -245,7 +245,7 @@ test('renderReferenceView renders the golden page spread and macro crops', () =>
   const bachPages = bach.match(/data-page="/g) ?? [];
   const brahmsPages = brahms.match(/data-page="/g) ?? [];
   assert.equal(bachPages.length, 2, 'Round 17: Bach Var. 1 is a two-page spread (4 systems/page)');
-  assert.equal(brahmsPages.length, 8, 'Brahms stays an eight-page spread (3-up; the 4-up fit failed — see test/brahms-studio-ergonomics.test.ts)');
+  assert.equal(brahmsPages.length, 6, 'Brahms ships a six-page spread (4-up by operator override — see test/brahms-studio-ergonomics.test.ts)');
   const bachCrops = bach.match(/data-crop="/g) ?? [];
   const brahmsCrops = brahms.match(/data-crop="/g) ?? [];
   assert.equal(bachCrops.length, 0, 'Bach focus crops dropped by operator order (spread stays)');
@@ -282,7 +282,7 @@ test('Reference view is rendered from DEFAULT_JANKO_OPTIONS (the golden master)'
   const brahms = html.slice(brahmsAt, bachAt);
   const bach = html.slice(bachAt);
   assert.ok(bach.includes('data-lint-ok="true"'), 'the GOLD score lints clean');
-  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE score reports its 4 knowns');
+  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE score reports its 9 knowns');
 });
 
 test('Every page of the spread is engraved (no silently blank page)', () => {

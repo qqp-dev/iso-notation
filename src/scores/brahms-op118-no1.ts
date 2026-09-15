@@ -47,12 +47,16 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   ticksPerMeasure: BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   anacrusisTicks: BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   measuresPerSystem: 3,
-  // Round 15 keeps the golden's 4 systems/page for Bach; this benchmark's
-  // four-octave arpeggios reach octave 1-0 ledger equators ~44pt below the
-  // staff, and a 180pt slot cannot hold two such systems without their ink
-  // overlapping (the full-piece slot-fit audit reports it). Its bespoke
-  // notation therefore keeps three taller systems per page.
-  systemsPerPage: 3,
+  // Operator override (4-up forced): Brahms ships at 4 systems/page — 24
+  // systems over 6 pages — with the fit breakage RECORDED as known-accepted,
+  // never fixed here. Adaptive carries 2 slot findings (sys 23 furniture
+  // +1.41pt past its slot; sys 24 ink into sys 23, gap −16.83pt — the CLI
+  // gate is red-on-Brahms by operator order); fixed-3 carries its 4 folding
+  // findings plus 5 slot-accounting findings (BRONZE chip reads 9, no visual
+  // ink overlap). Full itemization: the §2-landed record in
+  // test/brahms-studio-ergonomics.test.ts. The fix pass is directed from
+  // the eyeball review afterwards.
+  systemsPerPage: 4,
   // Title block (operator order — composer right-only, title fits): no
   // composer prefix up top (it duplicated the right-aligned composer on
   // p0 and stuttered in every running head); the subtitle keeps the

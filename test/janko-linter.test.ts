@@ -14,7 +14,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -1731,13 +1731,42 @@ test('golden pitch grid weight audit: extension rows 0.35pt, core rows 0.50pt', 
 // 5. CLI contract
 // ---------------------------------------------------------------------------
 
-test('npm run lint:engraving reports the golden master clean and exits 0', () => {
-  const out = execFileSync(
+test('npm run lint:engraving reports the accepted 4-up breakage and exits 1', () => {
+  // Red-on-Brahms is the expected, operator-accepted state (was clean/0 at
+  // 3-up): the gate exits 1 with exactly the 2 accepted slot findings.
+  const run = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.match(out, /clean violations=0 warnings=0/);
+  assert.equal(run.status, 1, 'the gate exits 1 while Brahms carries the accepted 2');
+  assert.match(run.stdout, /violations violations=2 warnings=0/, 'exactly the accepted 2, zero warnings');
+  // Per-score: the 2 come from Brahms alone — Bach GOLD and every specimen
+  // stay 0/0.
+  const json = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', 'scripts/lint_engraving.ts', '--json'],
+    { cwd: REPO_ROOT, encoding: 'utf-8' }
+  );
+  const reports = JSON.parse(json.stdout) as Record<
+    string,
+    { violations: Array<{ code: string; system: number }>; warnings: unknown[] }
+  >;
+  assert.deepEqual(reports.bach.violations, [], 'Bach GOLD: zero violations');
+  assert.deepEqual(reports.bach.warnings, [], 'Bach GOLD: zero warnings');
+  assert.deepEqual(
+    reports.brahms.violations.map((v) => [v.code, v.system + 1]),
+    [
+      ['system-slot-overlap', 23],
+      ['system-slot-overlap', 24],
+    ],
+    'Brahms: exactly the accepted 2 (itemized in the §2-landed record)'
+  );
+  assert.deepEqual(reports.brahms.warnings, [], 'Brahms: zero warnings');
+  for (const key of ['chordSpecimen', 'restSpecimen', 'durationSpecimen']) {
+    assert.deepEqual(reports[key].violations, [], `${key}: zero violations`);
+    assert.deepEqual(reports[key].warnings, [], `${key}: zero warnings`);
+  }
 });
 
 // ---------------------------------------------------------------------------

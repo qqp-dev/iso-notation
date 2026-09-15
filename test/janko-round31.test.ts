@@ -3,8 +3,11 @@
  *
  *  1. Surface: the studio's Brahms is the fixed-3 golden (display-only — the
  *     defaults already carry fixed-3), whole-spread, GOLD/BRONZE badged, with
- *     the 4 pre-existing stem-through-simultaneity violations displayed
- *     honestly as tagged known findings (never gated, never hidden).
+ *     its 9 violations displayed honestly (never gated, never hidden): the 4
+ *     known folding findings (stem-through-simultaneity, sites unchanged)
+ *     plus the 5 accepted 4-up slot-accounting findings. Mixed codes carry
+ *     no known tags (the single-code rule degrades honestly); the itemized
+ *     record lives in test/brahms-studio-ergonomics.test.ts (§2-landed).
  *  2. Preview: ONE card on the single `claspDotNudge` axis — bracket dots step
  *     (+0.4pt, +0.2pt), uniform across clasp dots, note dots byte-identical —
  *     framed on the two pinned white-ring dots (m.1 tick 48 + m.3 tick-432
@@ -17,7 +20,12 @@
  *  - the Brahms-wide moved-dot census is 12, not 2 (twelve dotted brackets
  *    under the fixed-3 golden; each card window still frames exactly 1);
  *  - the card chip is honestly red: whole-score card lint inherits the BRONZE
- *    surface's 4 knowns, and the nudge adds 0 (proven by lint equality).
+ *    surface's 9 knowns, and the nudge adds 0 (proven by lint equality).
+ *
+ * 4-up update (operator override): every count below moved with proof —
+ * brahmsPages [0..7]→[0..5], spread 8→6 pages, chip ✗4→✗9, CLI 0/0→2
+ * violations (accepted red), page loops 8→6, three exact floats re-pinned
+ * to last-ulp dust. Old values quoted at each site.
  */
 
 import test from 'node:test';
@@ -130,18 +138,30 @@ test('Studio Brahms is the fixed-3 golden (display-only, no default change)', ()
   );
 });
 
-test('Whole-spread completeness: 8 Brahms pages tile mm. 1–71 exactly once', () => {
-  assert.deepEqual(CONFIG.brahmsPages, [0, 1, 2, 3, 4, 5, 6, 7], 'eight pages (24 systems, 3/page)');
+test('Whole-spread completeness: 6 Brahms pages tile mm. 1–71 exactly once', () => {
+  assert.deepEqual(CONFIG.brahmsPages, [0, 1, 2, 3, 4, 5], 'six pages (24 systems, 4/page; was [0..7])');
   assert.equal(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS), 24, '24 fixed-3 systems');
   const { brahms } = referenceBlocks();
   // Page-card captions only (crop titles and in-SVG crop captions also print
   // measure ranges, so the match is anchored on the page-card figcaption).
   const ranges = [
-    ...brahms.matchAll(/<b>Page \d+<\/b> · \d+ systems? · mm\. (\d+)–(\d+)/g),
-  ].map((m) => [Number(m[1]), Number(m[2])]);
-  assert.equal(ranges.length, 8, 'eight page captions');
+    ...brahms.matchAll(/<b>Page \d+<\/b> · (\d+) systems? · mm\. (\d+)–(\d+)/g),
+  ].map((m) => [Number(m[1]), Number(m[2]), Number(m[3])]);
+  assert.equal(ranges.length, 6, 'six page captions (was 8)');
+  assert.deepEqual(
+    ranges,
+    [
+      [4, 1, 12],
+      [4, 13, 24],
+      [4, 25, 36],
+      [4, 37, 48],
+      [4, 49, 60],
+      [4, 61, 71],
+    ],
+    '4 systems and 12 measures per page'
+  );
   const covered = new Map<number, number>();
-  for (const [a, b] of ranges) {
+  for (const [, a, b] of ranges) {
     for (let m = a; m <= b; m++) covered.set(m, (covered.get(m) ?? 0) + 1);
   }
   assert.equal(covered.size, 71, 'every measure of the 71-measure piece is covered');
@@ -164,51 +184,62 @@ test('GOLD/BRONZE badges on the two Reference blocks + AGENTS.md convention', ()
   assert.match(agents, /BRONZE = the active iteration surface/, 'the BRONZE convention is written');
 });
 
-test('The 4 knowns display honestly: tagged, ungated, unhidden', () => {
+test('The 9 knowns display honestly: itemized, ungated, unhidden', () => {
   const report = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(report.violations.length, 4, 'exactly the 4 pre-existing violations');
+  assert.equal(report.violations.length, 9, 'the itemized 9 (was exactly 4 at 3-up)');
   assert.equal(report.warnings.length, 0, 'zero warnings');
   assert.equal(report.ok, false, 'the BRONZE surface is honestly not-ok');
-  assert.ok(
-    report.violations.every((v) => v.code === 'stem-through-simultaneity'),
-    'all four are the folding-geometry code'
-  );
+  const folding = report.violations.filter((v) => v.code === 'stem-through-simultaneity');
+  const slots = report.violations.filter((v) => v.code === 'system-slot-overlap');
+  assert.equal(folding.length, 4, 'the 4 folding findings survive');
+  assert.equal(slots.length, 5, 'the 5 accepted slot findings join them');
   assert.deepEqual(
-    report.violations.map((v) => v.measure).sort((a, b) => a! - b!),
+    folding.map((v) => v.measure).sort((a, b) => a! - b!),
     [7, 17, 24, 44],
     'the four known sites'
   );
+  assert.deepEqual(
+    slots.map((v) => v.system + 1),
+    [2, 6, 11, 18, 21],
+    'the five accepted slot sites (itemized in the §2-landed record)'
+  );
   const { bach, brahms } = referenceBlocks();
   assert.match(brahms, /data-lint-ok="false"/, 'the BRONZE chip stays honestly red');
-  assert.match(brahms, /✗ 4 violations/, 'the count is shown, never folded away');
-  assert.match(
-    brahms,
-    /4 known folding-geometry findings, scheduled for a future round\./,
-    'the lint line names the knowns'
-  );
-  assert.equal(
-    (brahms.match(/known folding-geometry finding · scheduled for a future round/g) ?? []).length,
-    4,
-    'every diagnostic carries the known tag'
-  );
+  assert.match(brahms, /✗ 9 violations/, 'the count is shown, never folded away (was ✗ 4)');
+  assert.match(brahms, /<summary>Diagnostics \(9\)<\/summary>/, 'all 9 listed');
+  // Mixed codes carry no known tags (the single-code rule degrades honestly —
+  // the 4 tags and the known-note return when the fix pass clears the slots).
+  assert.ok(!brahms.includes('known-note'), 'no known-note on mixed codes (was shown for the 4)');
+  assert.ok(!brahms.includes('known-finding'), 'no known tags on mixed codes (was 4 tags)');
   assert.match(bach, /data-lint-ok="true"/, 'the GOLD block stays clean');
   assert.ok(!bach.includes('known-finding'), 'no known tags on GOLD');
   assert.ok(!bach.includes('known-note'), 'no known note on GOLD');
 });
 
-test('CLI untouched: its adaptive Brahms entry still reports 0/0 (deploy green)', () => {
+test('CLI red by operator order: its adaptive Brahms entry reports the accepted 2 (deploy green)', () => {
   const cli = lintJankoScore(
     BRAHMS,
     { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
     BRAHMS_OP118_NO1_JANKO_TOKENS
   );
-  assert.equal(cli.violations.length, 0, 'the CLI entry is violation-free');
+  assert.equal(cli.violations.length, 2, 'the two accepted slot findings (was 0/0 at 3-up)');
   assert.equal(cli.warnings.length, 0, 'and warning-free');
+  assert.deepEqual(
+    cli.violations.map((v) => [v.code, v.system + 1]),
+    [
+      ['system-slot-overlap', 23],
+      ['system-slot-overlap', 24],
+    ],
+    'sys 23 furniture + the sys 24/23 ink overlap (itemized in the §2-landed record)'
+  );
   assert.match(
     read('scripts/lint_engraving.ts'),
     /core: 'adaptive'/,
     'the script keeps its adaptive Brahms entry'
   );
+  // Deploy stays green: `.github/workflows/deploy.yml` gates on `npm test` +
+  // `npm run build` only — the CLI is an operator readout, not a gate.
+  assert.ok(!read('.github/workflows/deploy.yml').includes('lint:engraving'), 'deploy never gates on the CLI');
 });
 
 test('Bach engraved-identity by construction: 0 clasps, so the nudge is inert', () => {
@@ -306,7 +337,7 @@ test('No other ink moves: every note-dot seat is identical (1914 fields)', () =>
 test('Page census: note-dot multisets identical, exactly 12 clasp dots move', () => {
   let augTotal = 0;
   let movedTotal = 0;
-  for (let page = 0; page < 8; page++) {
+  for (let page = 0; page < 6; page++) {
     const golden = renderJankoPage(BRAHMS, page, O_BRAHMS, T_BRAHMS);
     const preview = renderJankoPage(BRAHMS, page, O_PREVIEW, T_BRAHMS);
     // Brahms states no plain dotted-8th, so its golden note-dot set is empty —
@@ -408,7 +439,7 @@ test('Linter covers the nudged positions: the preview adds no finding', () => {
   assert.deepEqual(
     preview.violations.map((v) => [v.code, v.system, v.measure, v.message]),
     golden.violations.map((v) => [v.code, v.system, v.measure, v.message]),
-    'preview violations are exactly the 4 knowns — the nudge adds nothing'
+    'preview violations are exactly the 9 knowns — the nudge adds nothing (was 4 at 3-up)'
   );
   const fusion = (codes: string[]): string[] =>
     codes.filter((c) => c === 'clasp-dot-fusion' || c === 'dot-collision' || c === 'dot-count-agreement');
@@ -417,29 +448,30 @@ test('Linter covers the nudged positions: the preview adds no finding', () => {
   // The binding seat, pinned absolutely: mark air keeps the hug (1.245, the
   // dy=0.2 ceiling — dy=0.3 breaks it at 1.163), the solver-hug to the member
   // disc is spent honestly (0.81), and the knockout keeps 1.47 of daylight.
+  // 4-up moved each value by last-ulp float dust only (the frame translated;
+  // the within-system geometry is identical) — old values quoted, dust
+  // bounded, so a real move still fails loudly.
   const layouts = layoutJankoScore(BRAHMS, O_PREVIEW, T_BRAHMS);
   const clasp = layouts.flatMap((s) => s.clasps).find((c) => c.tick === 48)!;
   const dot = clasp.durationDots[0]!;
-  assert.equal(
-    claspMarkDaylight(clasp, clasp.durationInk[0], dot.x, dot.y, T_BRAHMS),
-    1.244958109007686,
-    'nudged mark air keeps the hug'
+  const daylight = claspMarkDaylight(clasp, clasp.durationInk[0], dot.x, dot.y, T_BRAHMS);
+  assert.equal(daylight, 1.2449581090076745, 'nudged mark air keeps the hug (was …7686)');
+  assert.ok(
+    Math.abs(daylight - 1.244958109007686) < 1e-9,
+    'the move is float dust from the translated frame, not new geometry'
   );
   const member = layouts
     .flatMap((s) => s.notes)
     .find((p) => p.note.id === 'brahms-op118-no1-5')!;
-  assert.equal(
-    Math.hypot(dot.x - member.x, dot.y - member.y) - T_BRAHMS.noteheadRadius - T_BRAHMS.augmentationDotRadius,
-    0.8103902883195548,
-    'the spent solver-hug is stated, not hidden'
-  );
+  const hug =
+    Math.hypot(dot.x - member.x, dot.y - member.y) - T_BRAHMS.noteheadRadius - T_BRAHMS.augmentationDotRadius;
+  assert.equal(hug, 0.8103902883195451, 'the spent solver-hug is stated, not hidden (was …548)');
+  assert.ok(Math.abs(hug - 0.8103902883195548) < 1e-9, 'likewise dust, not geometry');
   const qx = Math.max(Math.abs(dot.x - member.x) - 2.53, 0);
   const qy = Math.max(Math.abs(dot.y - member.y) - 3.46, 0);
-  assert.equal(
-    Math.hypot(qx, qy) - T_BRAHMS.augmentationDotRadius,
-    1.4650129889965875,
-    'the knockout keeps daylight: the dot paints whole'
-  );
+  const ko = Math.hypot(qx, qy) - T_BRAHMS.augmentationDotRadius;
+  assert.equal(ko, 1.4650129889965804, 'the knockout keeps daylight: the dot paints whole (was …875)');
+  assert.ok(Math.abs(ko - 1.4650129889965875) < 1e-9, 'likewise dust, not geometry');
 });
 
 test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden + preview)', () => {
@@ -450,7 +482,7 @@ test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden
   ] as const) {
     let rects = 0;
     let dots = 0;
-    for (let page = 0; page < 8; page++) {
+    for (let page = 0; page < 6; page++) {
       const svg = renderJankoPage(BRAHMS, page, options, T_BRAHMS);
       const boxes = [
         ...svg.matchAll(/<rect class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
@@ -536,15 +568,18 @@ test('Card chip honestly inherits the surface: red by attribution, preview adds 
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
   assert.ok(html.includes('data-candidate="round-31-clasp-nudge"'), 'the nudge card renders');
-  // Whole-score card lint inherits the BRONZE surface's 4 knowns — the card
+  // Whole-score card lint inherits the BRONZE surface's 9 knowns — the card
   // is red BY ATTRIBUTION (the ticket's green-chip prediction assumed a clean
   // surface), and the nudge provably adds nothing (see the lint-equality test).
+  // (The frozen card caption still says "4 known folding findings" —
+  // candidates.ts is untouched while R31 is live; the caption re-pins when
+  // the round lands. The chip reads the live 9.)
   assert.match(html, /data-candidate-count="1"/);
   assert.match(html, /data-window-count="2"/);
   assert.match(html, /data-verification="false"/, 'the preview round is decisive');
   assert.match(html, /1 candidate × 2 engraving windows/, 'the header counts honestly');
   assert.match(html, /data-lint="violations"/, 'the chip inherits the surface honestly');
-  assert.match(html, /✗ 4 violations/, 'the count is shown, never folded away');
+  assert.match(html, /✗ 9 violations/, 'the count is shown, never folded away (was ✗ 4)');
   assert.equal((html.match(/badge-axis/g) ?? []).length, 1, 'one axis badge');
   assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 2, 'Brahms ×2');
   assert.ok(!html.includes('data-window="primary:'), 'Bach carries no window this round');

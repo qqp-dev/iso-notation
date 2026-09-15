@@ -6,8 +6,9 @@
  *  2. Geometry: stem rings, second dots (singles + brackets), flags/levels.
  *  3. Census: EVERY changed note by id/tick (the flip checklist) + the
  *     unchanged classes (out-of-grammar byte-pins, Bach byte-identity).
- *  4. Linter: the preview lints clean on both scores; the new audits are
- *     option-aware (golden silent).
+ *  4. Linter: the preview adds nothing to the golden's report on either
+ *     score (Bach clean; Brahms carries the 2 accepted 4-up slot findings
+ *     under both grammars); the new audits are option-aware (golden silent).
  *  5. Registry + Reference (PARKED Round 31 — judgment withheld, historical
  *     consts below): two cards, one axis, proofread captions, dual golden
  *     spread with Brahms beside Bach.
@@ -651,29 +652,41 @@ test('Unchanged: option-off renders equal the current golden on both scores', ()
 // 4. Linter: the preview lints clean, the new audits are option-aware
 // ---------------------------------------------------------------------------
 
-test('The complete grammar lints clean on both scores (card chips green)', () => {
+test('The complete grammar adds no finding on either score (Bach green, Brahms accepted-2)', () => {
   const bach = lintJankoScore(BACH, O_BACH_PREVIEW, T_BACH);
   assert.equal(bach.violations.length, 0, 'Bach preview: zero violations');
   assert.equal(bach.warnings.length, 0, 'Bach preview: zero warnings');
+  // 4-up: the Brahms preview carries the golden's 2 accepted slot findings
+  // (was 0/0 at 3-up) — and nothing else. Full itemization in the §2-landed
+  // record; the message-equality below proves the preview adds zero.
   const brahms = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
-  assert.equal(brahms.violations.length, 0, 'Brahms preview: zero violations');
+  assert.equal(brahms.violations.length, 2, 'Brahms preview: exactly the accepted 2');
   assert.equal(brahms.warnings.length, 0, 'Brahms preview: zero warnings');
-  assert.equal(brahms.ok, true);
+  assert.equal(brahms.ok, false, 'red by operator order, like its golden');
+  assert.deepEqual(
+    brahms.violations.map((v) => [v.code, v.system, v.message]),
+    lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS).violations.map((v) => [v.code, v.system, v.message]),
+    'preview report is exactly the golden report — the grammar adds nothing'
+  );
 });
 
 test('The new audits run under the preview and stay silent under golden', () => {
   // Golden: the two new checks are no-ops (the golden grammar predates the
-  // notated counts), so the gate reports exactly what it reported before.
+  // notated counts), so the gate reports exactly the accepted 2 (was 0/0).
   const golden = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(golden.violations.length, 0);
+  assert.equal(golden.violations.length, 2, 'golden: exactly the accepted 2 slot findings');
   assert.equal(golden.warnings.length, 0);
   // Preview: the checks run over real new ink — 4 rings, 234 single dots,
   // 75 beamed dots, 40 bracket dots — and stay silent because the ink is
   // clean. (Violation fixtures proving the checks are not vacuous live in
   // test/janko-linter.test.ts.)
   const preview = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
-  assert.equal(preview.violations.length, 0);
+  assert.equal(preview.violations.length, 2, 'preview: the accepted 2, nothing new');
   assert.equal(preview.warnings.length, 0);
+  const auditCodes = (codes: string[]): string[] =>
+    codes.filter((c) => c === 'ring-geometry' || c === 'dot-count-agreement');
+  assert.deepEqual(auditCodes(preview.violations.map((v) => v.code)), [], 'no new-audit code fires');
+  assert.deepEqual(auditCodes(golden.violations.map((v) => v.code)), [], 'the golden path is silent');
 });
 
 // ---------------------------------------------------------------------------
@@ -890,7 +903,7 @@ test('Reference carries the Brahms golden beside Bach (first-class surface, hist
     'adaptive',
     'the R30 studio Brahms is the lint-gated adaptive golden'
   );
-  assert.equal(config.brahmsPages.length, 8, 'eight Brahms pages (24 systems, 3/page)');
+  assert.equal(config.brahmsPages.length, 6, 'six Brahms pages (24 systems, 4-up; was 8)');
   assert.equal(config.brahmsCrops.length, ROUND_30_BRAHMS_CROPS.length, 'three Brahms crops');
   assert.deepEqual(
     ROUND_30_BRAHMS_CROPS.map((c) => [c.start, c.count]),
@@ -902,13 +915,19 @@ test('Reference carries the Brahms golden beside Bach (first-class surface, hist
   );
   const html = renderReferenceView(config);
   assert.ok(html.includes(`data-score="${BRAHMS_STUDIO_SCORE_ID}"`), 'the Brahms block renders');
-  const brahms = html.slice(html.indexOf(`data-score="${BRAHMS_STUDIO_SCORE_ID}"`));
+  // The Brahms block only (Brahms leads since the ergonomics order — an
+  // unbounded slice would also match the Bach verdict).
+  const brahmsAt = html.indexOf(`data-score="${BRAHMS_STUDIO_SCORE_ID}"`);
+  const bachAt = html.indexOf('data-score="primary"');
+  const brahms = bachAt > brahmsAt ? html.slice(brahmsAt, bachAt) : html.slice(brahmsAt);
   assert.match(brahms, /Intermezzo in A minor/, 'the Brahms heading');
-  assert.match(brahms, /data-lint-ok="true"/, 'the Brahms golden lints clean');
+  assert.match(brahms, /data-lint-ok="false"/, 'the Brahms block reports the accepted 2 (was clean at 3-up)');
+  assert.match(brahms, /✗ 2 violations/, 'the historical surface reads the accepted 2');
   assert.match(brahms, /Live linter/, 'Brahms diagnostics beside Bach’s');
-  // Both cards lint clean over every score they window (chips green).
+  // Both cards inherit the accepted 2 by whole-score attribution (chips red;
+  // were green at 3-up).
   const cards = renderCandidatesView(config);
-  assert.equal((cards.match(/data-lint="clean"/g) ?? []).length, 2);
+  assert.equal((cards.match(/data-lint="violations"/g) ?? []).length, 2);
   assert.ok(cards.includes('data-window="primary:20-20"'), 'the Bach window renders');
   assert.ok(cards.includes('data-window="brahms-op118-no1:44-45"'), 'the D2 Brahms window renders');
 });

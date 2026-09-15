@@ -8,8 +8,9 @@
  *  2. Row-Snapped Parity Offset (Approach 2) on real harmony: every same-row
  *     chord tone keeps its true whole-tone row and is spread horizontally by
  *     one full notehead diameter, including the three-note cluster of m. 8.
- *  3. The complete engraving: zero notehead collisions and a completely clean
- *     visual lint (no violations, no warnings).
+ *  3. The complete engraving: zero notehead collisions and the accepted
+ *     4-up lint record (2 slot findings, zero warnings — red by operator
+ *     order; itemized in test/brahms-studio-ergonomics.test.ts, §2-landed).
  */
 
 import { test } from 'node:test';
@@ -316,7 +317,7 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   assert.equal(notes.length, SCORE.notes.length - merged, 'every note is engraved, merged unisons once');
   assert.equal(LAYOUTS.length, 24, 'the complete Intermezzo lays out as 24 systems, three measures each');
   // Every layout is engraved in its own system frame and later pages reuse the
-  // three frames of page 1, so two notes are only comparable when their
+  // four frames of page 1, so two notes are only comparable when their
   // systems share a page.
   const systemsPerPage = OPTIONS.systemsPerPage ?? 1;
   const pageOf = new Map<string, number>();
@@ -340,18 +341,25 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   assert.equal(collisions, 0, 'no two rectangular notehead masks overlap anywhere in the score');
 });
 
-test('Brahms Op. 118 No. 1 lints completely clean', () => {
+test('Brahms Op. 118 No. 1 carries exactly the accepted 4-up slot findings', () => {
+  // 4-up by operator override (was completely clean at 3-up): the adaptive
+  // engraving reports the 2 accepted slot findings — sys 23 furniture past
+  // its slot, sys 24 ink into sys 23 (gap −16.83pt) — and nothing else.
+  // Sides and deficits are itemized in the §2-landed record.
   assert.deepEqual(
     REPORT.violations.map((v) => `${v.code}: ${v.message}`),
-    [],
-    'zero violations'
+    [
+      "system-slot-overlap: System 23's staff furniture spans y=[452.54, 630.32], outside its 183.97pt page slot [445.94, 629.92] (1.00pt clearance).",
+      "system-slot-overlap: System 24's ink reaches up to y=621.62, into system 23's ink (bottom y=638.44): the two systems overlap on the page.",
+    ],
+    'exactly the two accepted slot findings'
   );
   assert.deepEqual(
     REPORT.warnings.map((v) => `${v.code}: ${v.message}`),
     [],
     'zero warnings — the five-voice chords are fully resolved'
   );
-  assert.equal(REPORT.ok, true);
+  assert.equal(REPORT.ok, false, 'red-on-Brahms is the expected, operator-accepted state');
   assert.equal(REPORT.stats.systems, 24);
   assert.equal(REPORT.stats.measures, 71);
   assert.equal(REPORT.stats.notes, SCORE.notes.length - 7, 'the seven merged unison heads are painted once');

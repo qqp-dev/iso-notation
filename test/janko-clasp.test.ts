@@ -18,8 +18,9 @@
  *     measure-inset budget that pays for it without distorting the note grid;
  *  6. the beamed-clasp rail: contiguous clasps of one measure joined at the
  *     extended spine tops, strictly terminating inside the measure;
- *  7. engine integrity: a real 16th-note beam is never cut by a clasp, and both
- *     benchmark scores engrave every clasp mode with zero diagnostics;
+ *  7. engine integrity: a real 16th-note beam is never cut by a clasp; Bach
+ *     engraves every clasp mode with zero diagnostics while Brahms carries
+ *     exactly the 2 accepted 4-up slot findings under every mode;
  *  8. the Round 6 per-hand refinement, the Round 8 bracketing scope (a
  *     horizontally displaced cluster **or** a 3-or-more-note vertical chord; a
  *     clean 2-note column stays unbracketed) and the four **scaled** midpoint
@@ -860,7 +861,17 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
     { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive', chordGrouping: 'per-hand-clasp' },
     BRAHMS_T
   );
-  assert.equal(report.ok, true);
+  // 4-up by operator override (was clean at 3-up): exactly the 2 accepted
+  // slot findings — the per-hand refinement itself adds nothing.
+  assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
+  assert.deepEqual(
+    report.violations.map((v) => [v.code, v.system + 1]),
+    [
+      ['system-slot-overlap', 23],
+      ['system-slot-overlap', 24],
+    ],
+    'exactly the accepted 2 (itemized in the §2-landed record)'
+  );
   assert.equal(report.warnings.length, 0, 'the per-hand refinement adds no warning');
 });
 
@@ -1206,7 +1217,22 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the spines, in
     { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'beamed-clasp-rail' },
     BRAHMS_T
   );
-  assert.deepEqual(report.diagnostics, [], 'the railed engraving is completely clean');
+  // 4-up by operator override (was [] at 3-up): the fixed-3 rail carries
+  // exactly the 5 accepted slot findings (same systems/messages as the
+  // studio surface — the paradigm never touches slots), zero folding
+  // findings, zero warnings.
+  assert.deepEqual(
+    report.violations.map((v) => [v.code, v.system + 1]),
+    [
+      ['system-slot-overlap', 2],
+      ['system-slot-overlap', 6],
+      ['system-slot-overlap', 11],
+      ['system-slot-overlap', 18],
+      ['system-slot-overlap', 21],
+    ],
+    'the railed engraving carries exactly the accepted 5 (itemized in the §2-landed record)'
+  );
+  assert.equal(report.warnings.length, 0, 'the rail adds no warning');
 });
 
 // ---------------------------------------------------------------------------
@@ -1256,7 +1282,7 @@ test('Engine integrity: a real 16th-note beam is never cut, only standalone chor
   assert.deepEqual(unclasped.flatMap((l) => l.clasps), []);
 });
 
-test('Every clasping paradigm engraves both benchmarks with zero diagnostics', () => {
+test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the accepted 2', () => {
   for (const mode of JANKO_CHORD_GROUPINGS) {
     const bach = lintJankoScore(BACH, { ...DEFAULT_JANKO_OPTIONS, chordGrouping: mode }, T);
     assert.deepEqual(
@@ -1272,13 +1298,21 @@ test('Every clasping paradigm engraves both benchmarks with zero diagnostics', (
     if (mode === 'none') {
       // Round 14: the unclasped paradigm is exactly the regression the new
       // simultaneity audit exists to catch — it paints one full-length stem per
-      // chord tone, straight through the discs of its own simultaneity. It is
-      // the only diagnostic the unclasped rendering may produce.
+      // chord tone, straight through the discs of its own simultaneity. At
+      // 4-up the accepted 2 slot findings join that audit (were absent at
+      // 3-up); nothing else may appear.
       assert.ok(brahms.diagnostics.length > 0, 'Brahms · none trips the simultaneity audit');
       assert.deepEqual(
-        [...new Set(brahms.diagnostics.map((d) => d.code))],
-        ['stem-through-simultaneity'],
-        'the unclasped paradigm fails on nothing but the stems through its chord tones'
+        [...new Set(brahms.diagnostics.map((d) => d.code))].sort(),
+        ['stem-through-simultaneity', 'system-slot-overlap'],
+        'the unclasped paradigm fails on stems through chord tones plus the accepted 2'
+      );
+      assert.deepEqual(
+        brahms.diagnostics
+          .filter((d) => d.code === 'system-slot-overlap')
+          .map((d) => d.system + 1),
+        [23, 24],
+        'the slot pair is exactly the accepted 2'
       );
       assert.ok(
         brahms.diagnostics.every((d) => d.severity === 'error'),
@@ -1292,21 +1326,32 @@ test('Every clasping paradigm engraves both benchmarks with zero diagnostics', (
     // `'bounding-phrase'` path at m. 66 (a four-note RH column whose dropped
     // bracket leaves per-note stems, one of them through its own chord tone).
     // The paradigms' committed acceptance window stays diagnostic-free; the
-    // golden `'per-hand-clasp'` paradigm is clean over the whole piece.
+    // slot findings carry no measure (page geometry, not window findings —
+    // itemized in the §2-landed record), so the window filter excludes them.
     assert.deepEqual(
       brahms.diagnostics
-        .filter((d) => (d.measure ?? 0) <= 9)
+        .filter((d) => (d.measure ?? 0) <= 9 && d.code !== 'system-slot-overlap')
         .map((d) => `${d.code}: ${d.message}`),
       [],
       `Brahms mm. 1–9 · ${mode}`
+    );
+    assert.deepEqual(
+      brahms.diagnostics
+        .filter((d) => d.code === 'system-slot-overlap')
+        .map((d) => d.system + 1),
+      [23, 24],
+      `Brahms · ${mode}: the slot pair is exactly the accepted 2`
     );
   }
   assert.deepEqual(
     lintJankoScore(BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' }, BRAHMS_T).diagnostics.map(
       (d) => `${d.code}: ${d.message}`
     ),
-    [],
-    'the golden per-hand paradigm is clean over the complete Intermezzo'
+    [
+      "system-slot-overlap: System 23's staff furniture spans y=[452.54, 630.32], outside its 183.97pt page slot [445.94, 629.92] (1.00pt clearance).",
+      "system-slot-overlap: System 24's ink reaches up to y=621.62, into system 23's ink (bottom y=638.44): the two systems overlap on the page.",
+    ],
+    'the golden per-hand paradigm carries exactly the accepted 2 over the complete Intermezzo (was clean at 3-up)'
   );
   assert.ok(
     JANKO_LINT_CHECKS.includes('clasp-clearance'),
