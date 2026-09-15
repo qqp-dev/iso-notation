@@ -81,11 +81,17 @@ body, html {
 
   /* Public landing: the fixed app shell flows as a document; chrome and
      overlays never print; each engraved page takes exactly one sheet.
-     The SVG carries its own margins. */
+     The SVG carries its own margins.
+     Print widths are ABSOLUTE PAPER UNITS (mm), never viewport-relative:
+     phone browsers lay print out at phone width, so %/vw sizes print the
+     narrow phone column unscaled in the sheet's top-left corner. */
   .landing-root {
     position: static !important;
     height: auto !important;
     overflow: visible !important;
+    /* Neutralize the screen `w-screen` (100vw): the root must fill the
+       paper, not the phone viewport. */
+    width: auto !important;
   }
   .landing-chrome {
     display: none !important;
@@ -108,6 +114,9 @@ body, html {
     box-shadow: none !important;
     margin: 0 !important;
     max-width: none !important;
+    /* A4 sheet width in absolute paper units: identical geometry to the
+       old desktop `100%` (full paper width) on every print engine. */
+    width: 210mm !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     page-break-after: always !important;
@@ -120,7 +129,7 @@ body, html {
   }
 
   .janko-page svg {
-    width: 100% !important;
+    width: 210mm !important;
     height: auto !important;
     display: block !important;
   }
