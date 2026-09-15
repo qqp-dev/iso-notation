@@ -444,27 +444,13 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 29 preview round, two cards (no control card), every window resolvable', () => {
-  // Ordered contract change: Round 29 has NO control card (Reference view is the standing control)
+test('§F registry: round 29 flips-landed state, zero cards, no open axes', () => {
+  // Ordered contract change: Round 29 is JUDGED — both flips are golden and
+  // the registry holds no cards.
   assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
-    ['dotRule', 'extensionWeight'],
-    'two axes, two cards'
-  );
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['dots-new', 'extensions-thin']);
-  const windows = CURRENT_CANDIDATES.flatMap((c) => c.windows ?? []);
-  assert.equal(windows.length, 3, 'Card D (2 windows) + Card T (1 window)');
-  for (const candidate of CURRENT_CANDIDATES) {
-    assert.deepEqual(
-      Object.keys(candidate.options ?? {}),
-      [candidate.axis],
-      `${candidate.id}: states only its own axis`
-    );
-    assert.equal(candidate.tokens, undefined, `${candidate.id}: no token delta`);
-    assert.ok((candidate.windows ?? []).length >= 1, `${candidate.id}: has windows`);
-  }
+  assert.deepEqual(ids, [], 'no open previews');
 });
 
 // ---------------------------------------------------------------------------

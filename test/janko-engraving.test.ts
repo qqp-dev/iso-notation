@@ -62,6 +62,7 @@ import {
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
+  getSubdivisionGlyphBBox,
   partitionBeamGroups,
   renderChordClasp,
   renderFlags,
@@ -86,13 +87,14 @@ import {
 } from '../src/render/janko/elements/notehead';
 import { ARCHITECTURAL_BRACKET_FLARE_DEGREES } from '../src/render/janko/elements/accolade';
 import {
+  REST_BLOCK_HEIGHT,
+  REST_BLOCK_WIDTH,
   REST_HEAD_RX,
   REST_HEAD_RY,
-  REST_SLAB_HEIGHT,
   REST_PHANTOM_DASH,
   REST_PHANTOM_HEAD_RADIUS,
   REST_PHANTOM_HEAD_STROKE,
-  REST_SLAB_WIDTH,
+  REST_SCALE,
   REST_STEM_LEAN,
   REST_STROKE,
   REST_URTEXT_STEM_SLANT,
@@ -1158,7 +1160,7 @@ test('Round 22 classical cut: transcribed Bravura contours, never assembled part
   const crop = renderJankoCrop(score, 4, 1, OPTIONS, TOKENS);
   // The m. 4 16th rest is ONE transcribed contour in one filled path — the
   // segment count is the font's own, pinned against the baked table.
-  const paths = [...crop.matchAll(/<path class="janko-rest-verbatim" d="([^"]+)" fill="#111111" stroke="none"/g)];
+  const paths = [...crop.matchAll(/<path class="janko-rest-verbatim" d="([^"]+)" fill="#1A1A1A" stroke="none"/g)];
   assert.equal(paths.length, 1, 'the m. 4 16th is one verbatim contour, not assembled parts');
   assert.match(crop, /data-verbatim-rest="sixteenth"/, 'tagged with its value');
   assert.equal(
@@ -1183,7 +1185,7 @@ test('Round 22 classical cut: transcribed Bravura contours, never assembled part
     resolveJankoOptions(REST_DURATION_SPECIMEN_JANKO_OPTIONS),
     specimenTokens
   );
-  const quarter = /<path class="janko-rest-verbatim" d="([^"]+)" fill="#111111" stroke="none"[^>]*data-verbatim-rest="quarter"/.exec(
+  const quarter = /<path class="janko-rest-verbatim" d="([^"]+)" fill="#1A1A1A" stroke="none"[^>]*data-verbatim-rest="quarter"/.exec(
     quarterCrop
   );
   assert.ok(quarter, 'the transcribed quarter is one filled contour');
@@ -1221,8 +1223,8 @@ test('Round 22 classical cut: transcribed Bravura contours, never assembled part
   const wholeBox = restInkBox(whole, specimenTokens);
   close(halfBox.y1, half.y, 'the half slab touches the line with its bottom edge', 1e-9);
   close(wholeBox.y0, whole.y, 'the whole slab touches the line with its top edge', 1e-9);
-  close(halfBox.x1 - halfBox.x0, REST_SLAB_WIDTH, 'the slabs carry the measured width', 1e-9);
-  close(halfBox.y1 - halfBox.y0, REST_SLAB_HEIGHT, 'and the measured thickness', 1e-9);
+  close(halfBox.x1 - halfBox.x0, REST_BLOCK_WIDTH * REST_SCALE, 'the blocks carry 0.85 × the measured width', 1e-9);
+  close(halfBox.y1 - halfBox.y0, REST_BLOCK_HEIGHT * REST_SCALE, 'and 0.85 × the measured thickness', 1e-9);
   // The ticket's no-move pin: the half keeps the **beat column** it has always
   // had — 62.61 under the 24pt margins, 58.945 under the golden 20pt margins
   // (−4 staffLeft + ⅛·(8/3) measure growth at tick 600) — while the whole moves
@@ -1244,7 +1246,7 @@ test('Round 22 urtext control: the transcribed cut under the golden default', ()
   const crop = renderJankoCrop(score, 4, 1, options, TOKENS);
   // The urtext control is the transcribed cut: one filled contour per rest,
   // tagged verbatim, beziers pinned against the baked table.
-  const paths = [...crop.matchAll(/<path class="janko-rest-verbatim" d="([^"]+)" fill="#111111" stroke="none"/g)];
+  const paths = [...crop.matchAll(/<path class="janko-rest-verbatim" d="([^"]+)" fill="#1A1A1A" stroke="none"/g)];
   assert.equal(paths.length, 1, 'one transcribed contour for the m. 4 16th');
   assert.match(crop, /data-verbatim-rest="sixteenth"/);
   const baked = URTEXT_REST_SIXTEENTH.contours[0].segments.length;
@@ -1999,14 +2001,20 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
   for (const n of opening) {
     const noteFlags = flags.filter((m) => Math.abs(Number(m[1]) - n.x) < 0.02);
     assert.equal(noteFlags.length, 1, `${n.id} carries exactly one flag`);
-    // Round 17: the dot hugs the rectangular mask corner (`wx + gap`, low
-    // lane above its head) — the canonical hug lane, or the rule-nudged seat
-    // when the lane would graze a rule.
+    // The judged golden: the dot escapes RIGHT off its mask hug onto exactly
+    // 1.2pt of true verbatim flag air, keeping the hug lane height.
     const dotY = n.dotY ?? n.y;
+    const s = getStemGeometry(n, TOKENS);
+    const glyphBox = getSubdivisionGlyphBBox(
+      OPTIONS.subdivisionStyle,
+      s.direction,
+      subdivisionMarkCount(n.durationTicks),
+      TOKENS
+    );
     close(
       n.dotX ?? -1,
-      n.x + SPACING_PRESET.wx + TOKENS.augmentationDotGap,
-      `${n.id} dots tight to its mask`,
+      s.stemX + glyphBox.x1 + TOKENS.augmentationDotRadius + TOKENS.augmentationDotGap,
+      `${n.id} escapes right onto 1.2pt of flag air`,
       1e-9
     );
     assert.ok(dotY < n.y, `${n.id} dots above its head, never on its row`);
@@ -2022,7 +2030,7 @@ test('Unbeamed notes carry standard flags, never a crossbar through the stem', (
       crop.includes(
         `class="janko-augmentation-dot" cx="${(n.dotX ?? -1).toFixed(2)}" cy="${dotY.toFixed(2)}" r="${TOKENS.augmentationDotRadius.toFixed(2)}"`
       ),
-      `${n.id} paints its dot above its head, tight to the mask`
+      `${n.id} paints its dot above its head, clear of its flag`
     );
   }
 });

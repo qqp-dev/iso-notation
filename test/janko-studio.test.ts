@@ -43,7 +43,6 @@ import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   candidateBadges,
-  getCandidate,
   resolveCandidate,
 } from '../src/render/janko/candidates';
 import {
@@ -70,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.ok(resolveCandidate(CURRENT_CANDIDATES[0]).windows.length > 0);
+assert.equal(CURRENT_CANDIDATES.length, 0, 'the landed round declares zero cards');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -126,43 +125,22 @@ test('renderCandidatesView renders every scheme card on every declared window', 
     );
   }
   assert.match(html, /Round 29/);
-  assert.match(html, /New Dot Standard/);
+  assert.match(html, /Flips landed/);
 });
 
-test('Round 29 is a preview round: two axes, two cards (no control card)', () => {
-  // Ordered contract change: Round 29 has NO control card (Reference view is the standing control)
+test('Round 29 is landed: no open axes, zero cards, Reference-only studio', () => {
+  // Ordered contract change: Round 29 is JUDGED — both flips are golden, the
+  // registry holds no cards, and the Reference view is the whole studio.
   assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
+  assert.match(CURRENT_ROUND_METADATA.title, /Flips landed/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'zero cards');
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
-    ['dotRule', 'extensionWeight'],
-    'two axes, two cards'
+    CURRENT_CANDIDATES.map((c) => c.id),
+    [],
+    'no open previews'
   );
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(
-    ids,
-    ['dots-new', 'extensions-thin'],
-    'Card D and Card T, in display order'
-  );
-  for (const candidate of CURRENT_CANDIDATES) {
-    assert.ok(candidate.axis === 'dotRule' || candidate.axis === 'extensionWeight');
-    assert.deepEqual(
-      Object.keys(candidate.options ?? {}),
-      [candidate.axis],
-      `${candidate.id} states only its own axis`
-    );
-    assert.equal(candidate.tokens, undefined, `${candidate.id} states no micro token`);
-    const badges = candidateBadges(candidate);
-    assert.equal(badges.length, 1);
-    assert.equal(badges[0].key, candidate.axis);
-    assert.equal(badges[0].axis, true);
-    const resolved = resolveCandidate(candidate);
-    assert.ok(resolved.windows.length >= 1);
-    for (const window of resolved.windows) {
-      assert.ok(window.title.length > 20, `${candidate.id} titles every window`);
-    }
-  }
-  // The golden context every card inherits, unchanged.
+  // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   assert.equal(golden.clusterSpacing, 'tight', 'the decided spacing golden');
   assert.equal(golden.restStyle, 'classical-urtext', 'the settled rest dialect');
@@ -177,30 +155,27 @@ test('Round 29 is a preview round: two axes, two cards (no control card)', () =>
     !('clusterAnchor' in golden),
     'the retired cluster anchor is gone from the golden master'
   );
+  assert.ok(!('dotRule' in golden), 'the retired dot option is gone from the golden master');
+  assert.ok(
+    !('extensionWeight' in golden),
+    'the retired thin option is gone from the golden master'
+  );
 });
 
-test('Candidate previews honour their own option deltas', () => {
+test('The landed studio renders Reference-only with zero cards and no badges', () => {
   const html = renderCandidatesView(CONFIG);
-  const cardOf = (id: string): string => {
-    const card = html.slice(html.indexOf(`data-candidate="${id}"`));
-    return card.slice(0, card.indexOf('</article>'));
-  };
 
-  // Both cards badge their own open axis; both depart from golden default.
-  assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
-  assert.equal((html.match(/badge-delta/g) ?? []).length, 2, 'both cards depart from golden on the open axis');
-  for (const candidate of CURRENT_CANDIDATES) {
-    const card = cardOf(candidate.id);
-    assert.match(card, new RegExp(`<b>${candidate.axis}</b>`), `${candidate.id} badges its axis`);
-    assert.match(card, /data-lint="(clean|violations)"/, `${candidate.id} reports a lint verdict`);
-    assert.equal(
-      (card.match(/data-window="/g) ?? []).length,
-      resolveCandidate(candidate).windows.length,
-      `${candidate.id} engraves exactly its declared window set`
-    );
-  }
+  // Zero cards, zero badges, zero windows — and the grid still renders cleanly.
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
+  assert.equal((html.match(/badge-axis/g) ?? []).length, 0, 'no axis badges');
+  assert.equal((html.match(/badge-delta/g) ?? []).length, 0, 'no delta badges');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 0, 'no open windows');
+  assert.match(html, /data-candidate-count="0"/);
+  assert.match(html, /data-window-count="0"/);
+  assert.match(html, /data-verification="true"/, 'the landed round is verification');
+  assert.match(html, /0 verification cards · 0 engraving windows/, 'the empty state reads honestly');
 
-  // The settled decisions ride along as shared context and are never badged.
+  // No settled decision is badged as an open question.
   for (const key of [
     'chordGrouping',
     'systemStartStyle',
@@ -212,32 +187,21 @@ test('Candidate previews honour their own option deltas', () => {
     'restStyle',
     'clusterAnchor',
     'core',
+    'dotRule',
+    'extensionWeight',
   ]) {
-    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is shared context, never a Round 29 question`);
+    assert.ok(!html.includes(`<b>${key}</b>`), `${key} is settled context, never an open question`);
   }
   assert.doesNotMatch(html, /open-halo/, 'the retired open margin appears nowhere');
 
-  // Declared windows are rendered on each card.
-  const cardD = cardOf('dots-new');
-  assert.ok(cardD.includes('data-window="primary:1-1"'), 'Card D shows Bach m. 1');
-  assert.ok(cardD.includes('data-window="brahms-op118-no1:1-1"'), 'Card D shows Brahms m. 1');
+  // The consumed cards render nowhere.
+  assert.ok(!html.includes('data-candidate="dots-new"'), 'Card D is consumed');
+  assert.ok(!html.includes('data-candidate="extensions-thin"'), 'Card T is consumed');
 
-  const cardT = cardOf('extensions-thin');
-  assert.ok(cardT.includes('data-window="primary:29-30"'), 'Card T shows Bach mm. 29–30');
-
-  // The settled clasp grammar and grid policy are stated in the card facts.
-  for (const candidate of CURRENT_CANDIDATES) {
-    const card = cardOf(candidate.id);
-    assert.match(card, /clasp 2\.8pt offset \/ 4\.0pt barline air/, `${candidate.id} tokens`);
-    assert.match(card, /chord grouping per-hand-clasp/, `${candidate.id} grouping fact`);
-    assert.match(
-      card,
-      new RegExp(
-        `grid ${DEFAULT_JANKO_OPTIONS.gridWritingPolicy} · system start ${DEFAULT_JANKO_OPTIONS.systemStartStyle}`
-      ),
-      `${candidate.id} states the settled grid policy and the canonical start`
-    );
-  }
+  // The Reference view still carries the whole golden master.
+  const reference = renderReferenceView(CONFIG);
+  assert.match(reference, /Golden Master/);
+  assert.match(reference, /data-lint-ok="true"/, 'the landed golden lints clean');
 });
 
 // ---------------------------------------------------------------------------
@@ -312,8 +276,8 @@ test('Adding a candidate to the registry needs zero template edits', () => {
   assert.match(html, /data-candidate="probe-second"/);
   assert.match(html, /Probe Round/);
   assert.ok(
-    !html.includes(`data-candidate="${CURRENT_CANDIDATES[0].id}"`),
-    'registry entries are not hardcoded'
+    !html.includes('data-candidate="dots-new"'),
+    'consumed registry entries render nowhere — nothing is hardcoded'
   );
   assert.ok((html.match(/<svg/g) ?? []).length === 2);
 });
@@ -460,14 +424,10 @@ test('renderStatusLine reports live lint statistics', () => {
 
 test('Round metadata is exported and drives the view headline', () => {
   assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
+  assert.match(CURRENT_ROUND_METADATA.title, /Flips landed/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
-    ['dotRule', 'extensionWeight'],
-    'two axes, two cards'
-  );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'Card D and Card T');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes in the landed round');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'zero cards in the landed round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

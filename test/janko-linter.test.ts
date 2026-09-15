@@ -1666,73 +1666,62 @@ test('semitone rest-centroid audit: hanging rest on integer semitone is clean; o
   assert.equal(vDrift[0].code, 'rest-centroid-off-row');
 });
 
-test('checkDotCollision: dot-vs-flag clearance is option-aware', () => {
+test('checkDotCollision: the golden dot standard clears every flag (no option)', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const oLegacy = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, dotRule: 'legacy' });
-  const oNew = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, dotRule: 'flag-clearance' });
 
   // System 0 of Bach has m.1 tick 24 dotted 8th note
-  const sysLegacy = layoutJankoScore(SCORE, oLegacy, t)[0];
-  const sysNew = layoutJankoScore(SCORE, oNew, t)[0];
+  const sys = layoutJankoScore(SCORE, o, t)[0];
 
-  // Under legacy, no dot-collision even though dot is near flag
-  const vLegacy: LintViolation[] = [];
-  checkDotCollision(sysLegacy, oLegacy, t, vLegacy);
-  assert.equal(vLegacy.length, 0, 'legacy dot standard reports 0 dot-collisions');
+  // The engine-resolved golden layout is collision-free
+  const vClean: LintViolation[] = [];
+  checkDotCollision(sys, o, t, vClean);
+  assert.equal(vClean.length, 0, 'golden dot standard with engine resolution reports 0 dot-collisions');
 
-  // Under new rule, the engine-resolved layout is also collision-free
-  const vNew: LintViolation[] = [];
-  checkDotCollision(sysNew, oNew, t, vNew);
-  assert.equal(vNew.length, 0, 'new dot standard with engine resolution reports 0 dot-collisions');
-
-  // If a note under new rule has its dot forced back to legacy position inside the flag box:
-  const legNote = sysLegacy.notes.find((q) => q.note.id === 'bach-var1-5')!;
-  const collidingNotes = sysNew.notes.map((n) => {
+  // If a note has its dot forced into its own flag ink box, the audit catches it:
+  const victim = sys.notes.find((q) => q.note.id === 'bach-var1-5')!;
+  const stem = getStemGeometry(victim.rhythm, t);
+  const collidingNotes = sys.notes.map((n) => {
     if (n.note.id === 'bach-var1-5') {
-      // Force legacy dot position
       return {
         ...n,
         rhythm: {
           ...n.rhythm,
-          dotX: legNote.rhythm?.dotX,
-          dotY: legNote.rhythm?.dotY,
+          dotX: stem.stemX + 1.0,
+          dotY: stem.stemEndY - 2.0,
         },
       };
     }
     return n;
   });
   const collidingLayout: JankoSystemLayout = {
-    ...sysNew,
+    ...sys,
     notes: collidingNotes,
   };
   const vColliding: LintViolation[] = [];
-  checkDotCollision(collidingLayout, oNew, t, vColliding);
+  checkDotCollision(collidingLayout, o, t, vColliding);
   const flagViolations = vColliding.filter(
     (v) => v.code === 'dot-collision' && v.message.includes('flag ink box')
   );
-  assert.equal(flagViolations.length, 1, 'flag clearance audit catches colliding dot under new rule');
+  assert.equal(flagViolations.length, 1, 'flag clearance audit catches a colliding dot');
   assert.equal(flagViolations[0].noteIds?.[0], 'bach-var1-5');
 });
 
-test('option-aware pitch grid weight audits: extensionWeight options reflected in pitchGridRules', () => {
-  const oDefault = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  const oThin = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, extensionWeight: 0.35 });
+test('golden pitch grid weight audit: extension rows 0.35pt, core rows 0.50pt', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 
-  const sysDefault = layoutJankoScore(SCORE, oDefault, t)[7];
-  const sysThin = layoutJankoScore(SCORE, oThin, t)[7];
+  const sys = layoutJankoScore(SCORE, o, t)[7];
 
-  // Extension row lin 72 (C6) in m. 29
-  const defaultRules = pitchGridRules(sysDefault.geometry, oDefault, t);
-  const thinRules = pitchGridRules(sysThin.geometry, oThin, t);
+  // Extension row lin 72 (C6) in m. 29, core row lin 48 (C4)
+  const rules = pitchGridRules(sys.geometry, o, t);
+  const ext = rules.find((r) => r.y === sys.geometry.middleCY + continuousPitchY(72, t.semitoneScale));
+  const core = rules.find((r) => r.y === sys.geometry.middleCY + continuousPitchY(48, t.semitoneScale));
 
-  const defaultExt = defaultRules.find((r) => r.y === sysDefault.geometry.middleCY + continuousPitchY(72, t.semitoneScale));
-  const thinExt = thinRules.find((r) => r.y === sysThin.geometry.middleCY + continuousPitchY(72, t.semitoneScale));
-
-  assert.ok(defaultExt, 'default extension rule found');
-  assert.ok(thinExt, 'thin extension rule found');
-  assert.equal(defaultExt.width, 0.50, 'default extension weight is 0.50pt');
-  assert.equal(thinExt.width, 0.35, 'thin extension weight is 0.35pt');
+  assert.ok(ext, 'extension rule found');
+  assert.ok(core, 'core rule found');
+  assert.equal(ext.width, 0.35, 'golden extension weight is 0.35pt');
+  assert.equal(core.width, 0.50, 'golden core weight is 0.50pt');
 });
 
 // ---------------------------------------------------------------------------

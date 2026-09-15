@@ -1500,11 +1500,11 @@ export function resolveDotHighLane(
 }
 
 /**
- * Round 29 — **augmentation dot flag clearance**.
+ * **Augmentation dot flag clearance** (the Round 29 standard, now the golden rule).
  *
- * Under `dotRule !== 'legacy'`, a dotted note's augmentation dot must clear its
- * true verbatim flag ink box by at least `augmentationDotGap` (1.2pt),
- * escaping RIGHT first (preserving height-meaning), then UP, never left or down.
+ * A dotted note's augmentation dot must clear its true verbatim flag ink box
+ * by at least `augmentationDotGap` (1.2pt), escaping RIGHT first (preserving
+ * height-meaning), then UP, never left or down.
  */
 export function resolveDotFlagClearance(
   notes: readonly PositionedJankoNote[],
@@ -1512,7 +1512,6 @@ export function resolveDotFlagClearance(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): PositionedJankoNote[] {
-  if (o.dotRule === 'legacy') return [...notes];
   const dotR = t.augmentationDotRadius;
   const gap = t.augmentationDotGap;
   const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;

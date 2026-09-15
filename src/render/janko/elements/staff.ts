@@ -391,7 +391,7 @@ export function pitchGridRules(
   const x2 = geo.staffRight;
   if (o.core === 'fixed-3' || o.core === 'fixed-4') {
     const isFixed3 = o.core === 'fixed-3';
-    const extStroke = o.extensionWeight ?? PITCH_GRID_OCTAVE_STROKE;
+    const extStroke = PITCH_GRID_C_LINE_STROKE;
     if (geo.staffSegments && geo.staffSegments.length > 0) {
       const out: PitchGridRule[] = [];
       for (const seg of geo.staffSegments) {

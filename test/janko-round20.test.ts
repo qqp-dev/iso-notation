@@ -33,7 +33,6 @@ import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   JANKO_REST_STYLES,
-  getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
@@ -51,6 +50,11 @@ import {
   lintJankoScore,
 } from '../src/render/janko/linter';
 import { DEFAULT_JANKO_LINT_OPTIONS, JankoLintOptions, LintViolation } from '../src/render/janko/linter';
+import {
+  getStemGeometry,
+  getSubdivisionGlyphBBox,
+  subdivisionMarkCount,
+} from '../src/render/janko/elements/rhythm';
 import { JankoSystemLayout, layoutJankoScore, renderSystem } from '../src/render/janko/engine';
 
 const T = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
@@ -150,21 +154,21 @@ function paintedCentroid(groupSvg: string): { x: number; y: number } {
     if (tag.startsWith('<rect')) {
       const w = num(tag, 'width');
       const h = num(tag, 'height');
-      const weight = /fill="#111111"/.test(tag) ? w * h : 2 * (w + h) * num(tag, 'stroke-width');
+      const weight = /fill="#(111111|1A1A1A)"/.test(tag) ? w * h : 2 * (w + h) * num(tag, 'stroke-width');
       add(num(tag, 'x') + w / 2, num(tag, 'y') + h / 2, weight);
       continue;
     }
     if (tag.startsWith('<ellipse')) {
       const rx = num(tag, 'rx');
       const ry = num(tag, 'ry');
-      const weight = /fill="#111111"/.test(tag)
+      const weight = /fill="#(111111|1A1A1A)"/.test(tag)
         ? Math.PI * rx * ry
         : Math.PI * (rx + ry) * num(tag, 'stroke-width');
       add(num(tag, 'cx'), num(tag, 'cy'), weight);
       continue;
     }
     const d = / d="([^"]+)"/.exec(tag)![1];
-    const filled = /fill="#111111"/.test(tag);
+    const filled = /fill="#(111111|1A1A1A)"/.test(tag);
     const width = /stroke-width/.test(tag) ? num(tag, 'stroke-width') : 0;
     const tokens = d.match(/[MCLZ][^MCLZ]*/g) ?? [];
     const points: Array<[number, number]> = [];
@@ -565,9 +569,10 @@ test('Violation fixture: the retired fused geometry is caught by clasp-dot-fusio
 });
 
 test('Note-dot no-move guard: the augmentation dots are byte-identical', () => {
-  // The clasp-dot fix must never touch a note's own dot: the two m. 1–2
-  // solitary dotted 8ths keep their canonical mask-hugging lane, and the
-  // painted coordinates are pinned to the pre-Round-20 pixel.
+  // The clasp-dot fix must never touch a note's own dot: the system's three
+  // solitary dotted 8ths keep their judged flag-clearance escape (right off
+  // the mask hug onto exactly 1.2pt of true flag air, same lane height), and
+  // the painted coordinates are pinned to the pixel.
   const layout = layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)[0];
   const dotted = layout.ungrouped.filter((n) => n.durationTicks > 26 && n.durationTicks <= 38);
   assert.deepEqual(dotted.map((n) => n.startTick), [24, 168, 312], 'the system’s solitary dotted 8ths');
@@ -579,13 +584,26 @@ test('Note-dot no-move guard: the augmentation dots are byte-identical', () => {
       svg.includes(
         `class="janko-augmentation-dot" cx="${dotX}" cy="${dotY}" r="${T.augmentationDotRadius.toFixed(2)}"`
       ),
-      `t${note.startTick}: the note dot is painted at its canonical lane (${dotX}, ${dotY})`
+      `t${note.startTick}: the note dot is painted at its judged lane (${dotX}, ${dotY})`
     );
-    // The canonical relation, unchanged by Round 20: the dot hugs its mask.
+    // The judged relation: the dot escapes RIGHT off its mask hug onto exactly
+    // the house gap of true verbatim flag air, keeping the hug lane height.
+    const s = getStemGeometry(note, T);
+    const bbox = getSubdivisionGlyphBBox(
+      DEFAULT_JANKO_OPTIONS.subdivisionStyle,
+      s.direction,
+      subdivisionMarkCount(note.durationTicks),
+      T
+    );
     assert.equal(
       note.dotX,
-      note.x + getClusterSpacingPreset(DEFAULT_JANKO_OPTIONS.clusterSpacing).wx + T.augmentationDotGap,
-      `t${note.startTick}: the dot keeps its mask hug`
+      s.stemX + bbox.x1 + T.augmentationDotRadius + T.augmentationDotGap,
+      `t${note.startTick}: the dot escapes right onto 1.2pt of flag air`
+    );
+    assert.equal(
+      note.dotY,
+      note.y - T.augmentationDotRowOffset,
+      `t${note.startTick}: the dot keeps the hug lane height`
     );
   }
 });

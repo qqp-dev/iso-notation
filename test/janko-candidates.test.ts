@@ -56,16 +56,9 @@ import {
   buildRestDurationSpecimenScore,
 } from '../src/scores/rest-duration-specimen';
 import {
-  BRAHMS_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
-  DEFAULT_STUDIO_SCORE_ID,
-  DURATION_SPECIMEN_STUDIO_SCORE_ID,
-  REST_SPECIMEN_STUDIO_SCORE_ID,
-  SPECIMEN_STUDIO_SCORE_ID,
-  candidateBadges,
   getCandidate,
-  resolveCandidate,
 } from '../src/render/janko/candidates';
 import { createStudioConfig, renderCandidatesView, renderCompareStrip } from '../src/render/janko/studio';
 import {
@@ -97,7 +90,9 @@ import {
   JankoRhythmNote,
   bridgeBeamGroupsAcrossRests,
   getStemGeometry,
+  getSubdivisionGlyphBBox,
   partitionBeamGroups,
+  subdivisionMarkCount,
 } from '../src/render/janko/elements/rhythm';
 import {
   REST_SIXTY_FOURTH_HEIGHT,
@@ -144,9 +139,10 @@ const REST_STYLES: JankoRestStyle[] = [
 ];
 
 /**
- * The Round 29 cards — Card D (new dots) and Card T (thin extensions).
+ * Round 29 is judged and landed: no open previews (kept as the named empty
+ * set so studio-order assertions below read against the registry).
  */
-const ROUND_29_CARDS: string[] = ['dots-new', 'extensions-thin'];
+const ROUND_29_CARDS: string[] = [];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -232,84 +228,19 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 29 on dotRule and extensionWeight axes', () => {
+test('CURRENT_ROUND_METADATA is the Round 29 flips-landed state (no open axes)', () => {
   assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
-  assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
-    ['dotRule', 'extensionWeight'],
-    'two axes, two cards'
-  );
-  assert.match(CURRENT_ROUND_METADATA.description, /Card D/, 'Card D is stated');
-  assert.match(CURRENT_ROUND_METADATA.description, /Card T/, 'Card T is stated');
-  assert.equal(
-    CURRENT_ROUND_METADATA.compareStrip,
-    undefined,
-    'tight windows on cards — no shared compare strip'
-  );
+  assert.match(CURRENT_ROUND_METADATA.title, /Flips landed/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes — nothing left to decide');
+  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
 });
 
-test('CURRENT_CANDIDATES declares Card D (new dots) and Card T (thin extensions) with NO control card', () => {
+test('CURRENT_CANDIDATES is empty: every judged flip is golden, no open previews', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_29_CARDS, 'Card D and Card T, in display order');
-  assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two contenders (no control card)');
-  for (const id of ROUND_29_CARDS) {
-    const candidate = getCandidate(id)!;
-    assert.match(candidate.label, /^[D|T] · /, `${id} is lettered`);
-    assert.ok((candidate.description ?? '').length > 100, `${id} carries a rationale`);
-    assert.ok((candidate.tags ?? []).length > 0, `${id} is tagged`);
-  }
-  assert.equal(getCandidate('dots-new')!.axis, 'dotRule');
-  assert.equal(getCandidate('extensions-thin')!.axis, 'extensionWeight');
-});
-
-test('Candidates state only their own option delta (one delta per card)', () => {
-  const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-
-  const cardD = getCandidate('dots-new')!;
-  assert.deepEqual(Object.keys(cardD.options ?? {}), ['dotRule']);
-  assert.equal(cardD.options!.dotRule, 'flag-clearance');
-  assert.equal(cardD.tokens, undefined);
-
-  const cardT = getCandidate('extensions-thin')!;
-  assert.deepEqual(Object.keys(cardT.options ?? {}), ['extensionWeight']);
-  assert.equal(cardT.options!.extensionWeight, 0.35);
-  assert.equal(cardT.tokens, undefined);
-
-  for (const id of ROUND_29_CARDS) {
-    const candidate = getCandidate(id)!;
-    const resolved = resolveCandidate(candidate);
-    for (const key of Object.keys(golden)) {
-      if (key === candidate.axis) continue;
-      assert.equal(
-        (resolved.options as unknown as Record<string, unknown>)[key],
-        (golden as unknown as Record<string, unknown>)[key],
-        `${id} keeps ${key} at the golden value`
-      );
-    }
-    const badges = candidateBadges(candidate);
-    assert.equal(badges.length, 1, `${id} badges only its axis`);
-    assert.equal(badges[0].key, candidate.axis);
-    assert.equal(badges[0].axis, true);
-  }
-});
-
-test('Every card demonstrates its declared windows: Card D has Bach m.1 + Brahms m.1; Card T has Bach mm. 29–30', () => {
-  const resolvedD = resolveCandidate(getCandidate('dots-new')!);
-  assert.equal(resolvedD.windows.length, 2, 'Card D shows two windows');
-  assert.equal(resolvedD.windows[0].scoreId, DEFAULT_STUDIO_SCORE_ID);
-  assert.equal(resolvedD.windows[0].measureStart, 1);
-  assert.equal(resolvedD.windows[0].measureCount, 1);
-  assert.equal(resolvedD.windows[1].scoreId, BRAHMS_STUDIO_SCORE_ID);
-  assert.equal(resolvedD.windows[1].measureStart, 1);
-  assert.equal(resolvedD.windows[1].measureCount, 1);
-
-  const resolvedT = resolveCandidate(getCandidate('extensions-thin')!);
-  assert.equal(resolvedT.windows.length, 1, 'Card T shows one window');
-  assert.equal(resolvedT.windows[0].scoreId, DEFAULT_STUDIO_SCORE_ID);
-  assert.equal(resolvedT.windows[0].measureStart, 29);
-  assert.equal(resolvedT.windows[0].measureCount, 2);
+  assert.deepEqual(ids, ROUND_29_CARDS, 'the landed set is empty');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'no open previews');
+  assert.equal(getCandidate('dots-new'), undefined, 'Card D is consumed');
+  assert.equal(getCandidate('extensions-thin'), undefined, 'Card T is consumed');
 });
 
 // ---------------------------------------------------------------------------
@@ -978,6 +909,22 @@ test('Shared stems draw one beam span per beamed voice — none fused, none doub
 
 test('Dots hug the mask corner on both scores — every preset', () => {
   const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  // The judged escape set: flag clearance moves exactly these 12 Bach dots
+  // right onto 1.2pt of true flag air; every other dot hugs its mask.
+  const ESCAPED = [
+    'bach-var1-5',
+    'bach-var1-22',
+    'bach-var1-39',
+    'bach-var1-287',
+    'bach-var1-304',
+    'bach-var1-351',
+    'bach-var1-353',
+    'bach-var1-355',
+    'bach-var1-357',
+    'bach-var1-365',
+    'bach-var1-367',
+    'bach-var1-369',
+  ];
   for (const { spacing } of SPACING_CANDIDATES) {
     const preset = getClusterSpacingPreset(spacing);
     const options = resolveJankoOptions({
@@ -990,23 +937,72 @@ test('Dots hug the mask corner on both scores — every preset', () => {
       (p) => p.note.durationTicks > 26 && p.note.durationTicks <= 38
     );
     assert.equal(dotted.length, 19, `${spacing}: Bach carries 19 dotted values`);
+    const moved: string[] = [];
     for (const p of dotted) {
-      // Hug offsets: tight to the mask edge, low lane above the head.
-      assert.ok(
-        Math.abs((p.rhythm.dotX ?? -1) - (p.x + preset.wx + tokens.augmentationDotGap)) < 1e-9,
-        `${spacing}: ${p.note.id} hugs its mask edge`
+      const hugX = p.x + preset.wx + tokens.augmentationDotGap;
+      const hugY = p.y - tokens.augmentationDotRowOffset;
+      const dotX = p.rhythm.dotX ?? -1;
+      const dotY = p.rhythm.dotY ?? -1;
+      const atHug = Math.abs(dotX - hugX) < 1e-9 && Math.abs(dotY - hugY) < 1e-9;
+      const layout = layouts.find((l) => l.notes.includes(p))!;
+      const partition = partitionBeamGroups(
+        layout.notes.map((q) => q.rhythm),
+        tokens,
+        layout.geometry.middleCY
       );
-      assert.ok(
-        Math.abs(p.y - (p.rhythm.dotY ?? -1) - tokens.augmentationDotRowOffset) < 1e-9,
-        `${spacing}: ${p.note.id} sits the hug lane above its head`
-      );
+      const beamed = new Set(partition.groups.flatMap((g) => g.map((n) => n.id)));
+      const flagBoxOf = () => {
+        const s = getStemGeometry(p.rhythm, tokens);
+        const bbox = getSubdivisionGlyphBBox(
+          options.subdivisionStyle,
+          s.direction,
+          subdivisionMarkCount(p.note.durationTicks),
+          tokens
+        );
+        return {
+          x0: s.stemX + bbox.x0,
+          y0: s.stemEndY + bbox.y0,
+          x1: s.stemX + bbox.x1,
+          y1: s.stemEndY + bbox.y1,
+        };
+      };
+      const clearanceOf = (x: number, y: number): number => {
+        const f = flagBoxOf();
+        const dx = Math.max(f.x0 - x, 0, x - f.x1);
+        const dy = Math.max(f.y0 - y, 0, y - f.y1);
+        return Math.hypot(dx, dy) - tokens.augmentationDotRadius;
+      };
+      if (!atHug) {
+        moved.push(p.note.id);
+        // Right-escape: the judged direction — same lane height, right of the
+        // hug, clearing true flag ink by the house gap.
+        assert.ok(
+          Math.abs(dotY - hugY) < 1e-9,
+          `${spacing}: ${p.note.id} escapes right, keeping its lane`
+        );
+        assert.ok(dotX > hugX, `${spacing}: ${p.note.id} escapes right, never left`);
+        assert.ok(
+          clearanceOf(dotX, dotY) >= tokens.augmentationDotGap - 1e-9,
+          `${spacing}: ${p.note.id} clears its flag ink by >= 1.2pt`
+        );
+        // ... and the escape was required: the hug would have violated.
+        assert.ok(
+          clearanceOf(hugX, hugY) < tokens.augmentationDotGap - 1e-9,
+          `${spacing}: ${p.note.id} had to move (its hug sits inside flag air)`
+        );
+      } else if (!beamed.has(p.note.id) && subdivisionMarkCount(p.note.durationTicks) >= 1) {
+        // No missing escape: a hugging flagged single already clears its flag.
+        assert.ok(
+          clearanceOf(dotX, dotY) >= tokens.augmentationDotGap - 1e-9,
+          `${spacing}: ${p.note.id} hugs with flag clearance to spare`
+        );
+      }
       // Uniform sign, every bar.
       assert.ok(
         (p.rhythm.dotY ?? p.y) < p.y,
         `${spacing}: ${p.note.id} dots above its head`
       );
       // The high-lane fallback stays vacuous: no same-row neighbour crowds.
-      const layout = layouts.find((l) => l.notes.includes(p))!;
       for (const q of layout.notes) {
         if (q === p || Math.abs(q.y - p.y) >= 1e-9) continue;
         assert.ok(
@@ -1015,6 +1011,7 @@ test('Dots hug the mask corner on both scores — every preset', () => {
         );
       }
     }
+    assert.deepEqual(moved.sort(), [...ESCAPED].sort(), `${spacing}: exactly the judged 12 escape`);
     const brahmsLayouts = layoutJankoScore(
       BRAHMS,
       resolveJankoOptions({
@@ -1232,9 +1229,10 @@ test('Rest weight: every rest stroke is the note-stem weight with scaled extents
   };
   // Round 21 §B: the two classical cuts are **filled calligraphic contours**
   // (the measured serpentine and the measured hooked wedge) — a monoline stroke
-  // cannot carry their contrast — so they paint no `stroke-width` at all, and
-  // every contour is filled with the rest ink. The demonstrator dialects keep
-  // their strokes.
+  // cannot carry their contrast — so they paint no `stroke-width` at all. The
+  // live cut (classical-urtext) fills every contour with the 90% rest ink; the
+  // dormant kinetic demonstrator keeps #111111. The other demonstrator dialects
+  // keep their strokes.
   const groupsOf = (style: JankoRestStyle): string[] => [
     ...restInkOf(SCORE, { ...DEFAULT_JANKO_OPTIONS, restStyle: style }, DEFAULT_JANKO_TOKENS, 'tight'),
     ...restInkOf(
@@ -1244,13 +1242,22 @@ test('Rest weight: every rest stroke is the note-stem weight with scaled extents
       'tight'
     ),
   ];
-  for (const style of ['kinetic-monoline', 'classical-urtext'] as const) {
-    const groups = groupsOf(style);
-    const svg = groups.join('\n');
-    assert.ok(svg.includes('fill="#111111"'), `${style} paints filled contour ink`);
+  {
+    const kinetic = groupsOf('kinetic-monoline').join('\n');
+    assert.ok(kinetic.includes('fill="#111111"'), 'kinetic-monoline paints filled contour ink');
     assert.ok(
-      !svg.includes('stroke-width'),
-      `${style}: the classical cut is one filled contour per part, never a stroked rule`
+      !kinetic.includes('stroke-width'),
+      'kinetic-monoline: one filled contour per part, never a stroked rule'
+    );
+    const classical = groupsOf('classical-urtext').join('\n');
+    assert.ok(classical.includes('fill="#1A1A1A"'), 'classical-urtext paints 90% black contour ink');
+    assert.ok(
+      !classical.includes('fill="#111111"'),
+      'classical-urtext keeps no #111111 ink'
+    );
+    assert.ok(
+      !classical.includes('stroke-width'),
+      'classical-urtext: one filled contour per part, never a stroked rule'
     );
   }
   {
@@ -1278,14 +1285,16 @@ test('Rest size maxima: the measured working set, pinned per value', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   // Round 21 §A: every extent is the measured Bravura envelope through
   // `REST_SPACE_PT`. Round 22: the classical hooked heights are the transcribed
-  // envelopes themselves (taller than the hand cut by up to 0.1pt); the maximum
+  // envelopes themselves (taller than the hand cut by up to 0.1pt); the landed
+  // lightening renders those at 0.85 scale, so where classical used to lead the
+  // maximum now falls to the unscaled dormant kinetic demonstrator. The maximum
   // over the four surveyed dialects is this table.
   const expected: Record<string, { w: number; h: number }> = {
     'sixty-fourth': { w: 6.602, h: 18.429 },
-    'thirty-second': { w: 5.73, h: 14.403 },
-    sixteenth: { w: 5.73, h: 10.561 },
+    'thirty-second': { w: 5.73, h: 14.354 },
+    sixteenth: { w: 5.73, h: 10.459 },
     eighth: { w: 4.94, h: 7.41 },
-    quarter: { w: 4.25, h: 11.635 },
+    quarter: { w: 4.25, h: 11.559 },
     half: { w: 5.286, h: 4.25 },
     whole: { w: 5.286, h: 4.25 },
   };
@@ -1845,35 +1854,23 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: four cards, every card clean, one strip
+// 17. Studio: Reference-only, zero cards, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio engraves every candidate card on its declared windows', () => {
+test('The live studio renders Reference-only: zero cards, clean empty grid', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="3"/, 'Card D (2 windows) + Card T (1 window)');
-  assert.match(html, /data-verification="false"/, 'a candidate round is not verification');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
+  assert.match(html, /data-candidate-count="0"/);
+  assert.match(html, /data-window-count="0"/, 'no open windows');
+  assert.match(html, /data-verification="true"/, 'the landed round is verification');
   assert.match(html, /Round 29/);
-  assert.match(html, /New Dot Standard/, 'the round title headlines the view');
-  let cursor = -1;
+  assert.match(html, /Flips landed/, 'the landed title headlines the view');
   for (const id of ROUND_29_CARDS) {
-    const at = html.indexOf(`data-candidate="${id}"`);
-    assert.ok(at > cursor, `${id} appears in registry order`);
-    cursor = at;
-    const body = html.slice(at, html.indexOf('</article>', at));
-    assert.ok(body.includes('badge-axis'), `${id} badges its axis`);
-    assert.ok(body.includes('badge-delta'), `${id} departs from the golden`);
-    assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint verdict`);
-    assert.equal(
-      (body.match(/data-window="/g) ?? []).length,
-      resolveCandidate(getCandidate(id)!).windows.length,
-      `${id} engraves exactly its declared window set`
-    );
+    assert.ok(!html.includes(`data-candidate="${id}"`), `${id} is consumed`);
   }
 });
 
-test('The closer-comparison strip is absent in Round 29 (tight windows on cards)', () => {
+test('The closer-comparison strip is absent in the landed round', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.equal(html, '', 'Round 29 has no comparison strip');
+  assert.equal(html, '', 'the landed round has no comparison strip');
 });

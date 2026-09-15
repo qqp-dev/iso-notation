@@ -127,6 +127,26 @@ export const REST_MARK_COUNT: Readonly<Record<JankoRestValue, number>> = {
   whole: 0,
 };
 
+/**
+ * The live rest family's uniform geometric scale: the five verbatim Bravura
+ * glyphs (quarter, 8th, 16th, 32nd, 64th) and the whole/half block all render
+ * at 0.85 of their baked envelopes. Rests are the only solid ink on the page
+ * (noteheads are hollow rings); the scale quiets the ink area (~28%) while
+ * every contour stays the reference outline's. Applied at render about the
+ * glyph origin, so all placement math (seats, centroids, contact edges) is
+ * untouched — and so the linter's shared ink model resolves scaled extents.
+ * The verbatim constants in `urtext-paths.ts` stay byte-identical; dormant
+ * dialects never read this constant.
+ */
+export const REST_SCALE = 0.85;
+
+/**
+ * The live rest family's ink: 90% black. Dims the solid interior while edges
+ * stay crisp (~14:1 vs white). Only the live path (verbatim glyphs + block)
+ * reads this constant; dormant dialects keep `#111111`.
+ */
+export const REST_INK = '#1A1A1A';
+
 // ---------------------------------------------------------------------------
 // Round 21 §A — the one explicit space → point mapping
 // ---------------------------------------------------------------------------
@@ -1181,7 +1201,10 @@ function verbatimRestGlyph(o: JankoInkPoint, value: JankoRestValue): JankoRestIn
   // Bars return early in `urtextInk`, so the key always names a hooked value.
   const g = URTEXT_RESTS[value as keyof typeof URTEXT_RESTS];
   const c = g.contours[0];
-  const pt = (p: readonly [number, number]): JankoInkPoint => ({ x: o.x + p[0], y: o.y + p[1] });
+  const pt = (p: readonly [number, number]): JankoInkPoint => ({
+    x: o.x + p[0] * REST_SCALE,
+    y: o.y + p[1] * REST_SCALE,
+  });
   return {
     kind: 'path',
     cls: 'janko-rest-verbatim',
@@ -1191,7 +1214,7 @@ function verbatimRestGlyph(o: JankoInkPoint, value: JankoRestValue): JankoRestIn
     ),
     close: true,
     stroke: null,
-    fill: '#111111',
+    fill: REST_INK,
     attrs: ` data-verbatim-rest="${value}"`,
   };
 }
@@ -1201,16 +1224,19 @@ function urtextInk(o: JankoInkPoint, value: JankoRestValue, t: ResolvedJankoToke
   void t;
   if (isBarRestValue(value)) {
     // The authentic half rest **sits on** its line, the whole rest hangs below.
+    // Scaled about the origin: the contact edge stays exactly on it.
+    const w = REST_BLOCK_WIDTH * REST_SCALE;
+    const h = REST_BLOCK_HEIGHT * REST_SCALE;
     return [
       {
         kind: 'rect',
         cls: 'janko-rest-block',
-        x: o.x - REST_BLOCK_WIDTH / 2,
-        y: value === 'half' ? o.y - REST_BLOCK_HEIGHT : o.y,
-        w: REST_BLOCK_WIDTH,
-        h: REST_BLOCK_HEIGHT,
+        x: o.x - w / 2,
+        y: value === 'half' ? o.y - h : o.y,
+        w,
+        h,
         stroke: null,
-        fill: '#111111',
+        fill: REST_INK,
       },
     ];
   }

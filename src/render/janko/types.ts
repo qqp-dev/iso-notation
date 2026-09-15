@@ -951,18 +951,6 @@ export interface JankoLayoutOptions {
    * Defaults to `'default'` (short barlines + 6.0pt guest gaps).
    */
   extensionJunction?: ExtensionJunctionStyle;
-  /**
-   * Augmentation dot clearance standard (Round 29).
-   * - `'legacy'`: standing golden placement hugging the notehead mask.
-   * - `'flag-clearance'`: dot clears true verbatim flag ink by >= 1.2pt, escaping right first then up.
-   * Defaults to `'legacy'`.
-   */
-  dotRule?: JankoDotRule;
-  /**
-   * Extension row stroke width in pt (Round 29).
-   * Defaults to `0.50` (`PITCH_GRID_OCTAVE_STROKE`). Preview option is `0.35` (`PITCH_GRID_C_LINE_STROKE`).
-   */
-  extensionWeight?: number;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -992,14 +980,6 @@ export type ExtensionJunctionStyle = 'default' | 'conjoin' | 'wide-gap';
  * - `'fixed-4'`: 4-core octave middles at lin 29.5 (o2), 41.5 (o3), 53.5 (o4), 65.5 (o5).
  */
 export type JankoCore = 'adaptive' | 'fixed-3' | 'fixed-4';
-
-/**
- * Augmentation dot clearance standard (Round 29).
- * - `'legacy'`: standing golden placement hugging the notehead mask.
- * - `'flag-clearance'`: dot clears true verbatim flag ink by >= 1.2pt, escaping right first then up.
- * - `'new'`: alias for `'flag-clearance'`.
- */
-export type JankoDotRule = 'legacy' | 'flag-clearance' | 'new';
 
 /** Fully resolved layout options (every optional option filled in). */
 export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
@@ -1049,8 +1029,6 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   octaveLineScheme: 'grand-divider',
   core: 'fixed-3',
   extensionJunction: 'default',
-  dotRule: 'legacy',
-  extensionWeight: 0.50,
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
