@@ -1,0 +1,13 @@
+Attribution: Brahms Op. 118 No. 1 MIDI (vendored)
+
+File: public/midi/brahms-op118-no1.mid (md5 5c2b0188364e0cb2cdd894fb12bf7241)
+Source: Knute Snortum, ksnortum/brahms-opus-118, v0.1 (2026-04-17),
+commit b792764e004ece0498ff7fc736ab9ed7bcf44b68
+(https://github.com/ksnortum/brahms-opus-118) — transcribed from the
+Peters/Sauer edition scan (cf. docs/reference/brahms-op118-peters-sauer-edition.pdf).
+
+"Knute Snortum, 2026, CC BY-SA 4.0" — this MIDI is licensed under the
+Creative Commons Attribution-ShareAlike 4.0 International License.
+License: https://creativecommons.org/licenses/by-sa/4.0/
+Upstream asks users to attribute the work to Knute Snortum
+(https://github.com/ksnortum/).
