@@ -36,6 +36,7 @@ import {
   BRAHMS_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
+  DEFAULT_STUDIO_SCORE_ID,
   candidateBadges,
   getCandidate,
   resolveCandidate,
@@ -90,9 +91,11 @@ const read = (file: string): string => fs.readFileSync(path.join(REPO_ROOT, file
 /** Split the Reference view into its Bach block and its Brahms block. */
 function referenceBlocks(): { bach: string; brahms: string } {
   const html = renderReferenceView(CONFIG);
-  const at = html.indexOf(`data-score="${BRAHMS_STUDIO_SCORE_ID}"`);
-  assert.ok(at > 0, 'the Brahms block renders');
-  return { bach: html.slice(0, at), brahms: html.slice(at) };
+  const brahmsAt = html.indexOf(`data-score="${BRAHMS_STUDIO_SCORE_ID}"`);
+  const bachAt = html.indexOf(`data-score="${DEFAULT_STUDIO_SCORE_ID}"`);
+  assert.ok(brahmsAt > 0 && bachAt > 0, 'both reference blocks render');
+  assert.ok(brahmsAt < bachAt, 'Brahms leads (ergonomics order)');
+  return { bach: html.slice(bachAt), brahms: html.slice(brahmsAt, bachAt) };
 }
 
 /** `(cx, cy)` of every circle of one class in an SVG (2dp floats). */

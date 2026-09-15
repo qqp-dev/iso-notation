@@ -54,7 +54,6 @@ import {
 } from '../src/render/janko/candidates';
 import {
   BRAHMS_STUDIO_CROPS,
-  DEFAULT_STUDIO_CROPS,
   createStudioConfig,
   mountJankoStudio,
   renderCandidatesView,
@@ -237,26 +236,24 @@ test('renderReferenceView renders the golden page spread and macro crops', () =>
   // Two golden scores since Round 30, each in its own scored block.
   const blocks = html.match(/data-score="/g) ?? [];
   assert.equal(blocks.length, 2, 'Bach + Brahms reference blocks');
-  const bach = html.slice(html.indexOf('data-score="primary"'), html.indexOf('data-score="brahms-op118-no1"'));
-  const brahms = html.slice(html.indexOf('data-score="brahms-op118-no1"'));
+  // Brahms leads since the ergonomics ticket (Brahms is live); Bach follows.
+  const brahmsAt = html.indexOf('data-score="brahms-op118-no1"');
+  const bachAt = html.indexOf('data-score="primary"');
+  assert.ok(brahmsAt < bachAt, 'the BRONZE Brahms block precedes the GOLD Bach block');
+  const brahms = html.slice(brahmsAt, bachAt);
+  const bach = html.slice(bachAt);
   const bachPages = bach.match(/data-page="/g) ?? [];
   const brahmsPages = brahms.match(/data-page="/g) ?? [];
   assert.equal(bachPages.length, 2, 'Round 17: Bach Var. 1 is a two-page spread (4 systems/page)');
-  assert.equal(brahmsPages.length, 8, 'Round 31: fixed-3 Brahms is an eight-page spread (3 systems/page)');
+  assert.equal(brahmsPages.length, 8, 'Brahms stays an eight-page spread (3-up; the 4-up fit failed — see test/brahms-studio-ergonomics.test.ts)');
   const bachCrops = bach.match(/data-crop="/g) ?? [];
   const brahmsCrops = brahms.match(/data-crop="/g) ?? [];
-  assert.equal(bachCrops.length, DEFAULT_STUDIO_CROPS.length);
+  assert.equal(bachCrops.length, 0, 'Bach focus crops dropped by operator order (spread stays)');
   assert.equal(brahmsCrops.length, BRAHMS_STUDIO_CROPS.length);
   assert.equal(
     (html.match(/<svg/g) ?? []).length,
     bachPages.length + brahmsPages.length + bachCrops.length + brahmsCrops.length
   );
-  for (const crop of DEFAULT_STUDIO_CROPS) {
-    assert.ok(
-      bach.includes(`data-crop="${crop.start}-${crop.start + crop.count - 1}"`),
-      `crop ${crop.title}`
-    );
-  }
   for (const crop of BRAHMS_STUDIO_CROPS) {
     assert.ok(
       brahms.includes(`data-crop="${crop.start}-${crop.start + crop.count - 1}"`),
@@ -280,8 +277,10 @@ test('Reference view is rendered from DEFAULT_JANKO_OPTIONS (the golden master)'
   );
   const reports = html.match(/data-lint-ok="(\w+)"/g) ?? [];
   assert.equal(reports.length, 2, 'one lint verdict per golden score');
-  const bach = html.slice(html.indexOf('data-score="primary"'), html.indexOf('data-score="brahms-op118-no1"'));
-  const brahms = html.slice(html.indexOf('data-score="brahms-op118-no1"'));
+  const brahmsAt = html.indexOf('data-score="brahms-op118-no1"');
+  const bachAt = html.indexOf('data-score="primary"');
+  const brahms = html.slice(brahmsAt, bachAt);
+  const bach = html.slice(bachAt);
   assert.ok(bach.includes('data-lint-ok="true"'), 'the GOLD score lints clean');
   assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE score reports its 4 knowns');
 });
