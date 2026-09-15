@@ -254,7 +254,8 @@ export function computePageGeometry(
         staffRight,
         measureWidth,
         o.core,
-        t
+        t,
+        o.extensionJunction
       );
 
       const writtenLins: number[] = [];
@@ -1730,10 +1731,23 @@ export function nearestLatticeRow(
     }
     return best;
   }
+  // Under fixed cores (fixed-3 / fixed-4), candidate rows snap to SEMITONES, not drawn lines:
+  // Nearest semitone = nearest integer lin to the query.
+  if (o.core === 'fixed-3' || o.core === 'fixed-4') {
+    const rawLin = 48 + (geo.middleCY - y) / t.semitoneScale;
+    const floorLin = Math.floor(rawLin);
+    const ceilLin = Math.ceil(rawLin);
+    if (floorLin === ceilLin) {
+      return geo.middleCY + continuousPitchY(floorLin, t.semitoneScale);
+    }
+    const candFloor = geo.middleCY + continuousPitchY(floorLin, t.semitoneScale);
+    const candCeil = geo.middleCY + continuousPitchY(ceilLin, t.semitoneScale);
+    return prefersRowCandidate(candCeil, candFloor, y, geo.middleCY) ? candCeil : candFloor;
+  }
   // The grand grid snaps to its drawn lines (the only shared heights): the
   // divider grid to C-lines and divider, the equal schemes to their octave
   // lines. A window with no drawn line keeps the exact seat.
-  if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+  if (o.pitchMapping === 'continuous') {
     const rules = pitchGridRules(geo, o, t);
     if (rules.length === 0) return y;
     let best = rules[0].y;
@@ -2190,16 +2204,11 @@ export function computeJankoRestLayer(
 
       // Direction (b): candidate rows include phrase row, neighbor rows (releasing and resuming),
       // and corridor fallback row.
-      const drawnRules = drawnStaffRuleYs(geo, o, t, candidate.x);
       const prevY = voiceYAt(notes, hand, ticks[i]);
       const nextY = voiceYAt(notes, hand, ticks[i + 1]);
       const voiceCandidateRows: number[] = [];
       const addVoiceRow = (r: number | null): void => {
         if (r === null) return;
-        // In fixed-3 and fixed-4, seats must stay on drawn lines
-        if (o.core === 'fixed-3' || o.core === 'fixed-4') {
-          if (!drawnRules.some((dr) => Math.abs(dr - r) < EPS)) return;
-        }
         if (!voiceCandidateRows.some((cr) => Math.abs(cr - r) < EPS)) {
           voiceCandidateRows.push(r);
         }
@@ -2214,7 +2223,7 @@ export function computeJankoRestLayer(
 
       // Vertical fallback row toward the corridor
       let fallbackRow: number | null = null;
-      if (o.pitchMapping === 'continuous' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+      if (o.pitchMapping === 'continuous') {
         const rules = drawnStaffRuleYs(geo, o, t, candidate.x);
         const neighbor =
           dir === -1
@@ -3709,7 +3718,8 @@ export function layoutJankoSystem(
       geometry.staffRight,
       geometry.measureWidth,
       o.core,
-      t
+      t,
+      o.extensionJunction
     );
 
     const writtenLins: number[] = [];

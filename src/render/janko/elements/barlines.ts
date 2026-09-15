@@ -105,33 +105,41 @@ export function renderBarlines(
   const lhTop = geo.equatorY('LH', 3) - 12;
   const lhBot = gridBotY(geo);
 
+  const isFixed3 = o.core === 'fixed-3';
+  const topExtLin = isFixed3 ? 72 : 77.5;
+  const botExtLin = isFixed3 ? 24 : 17.5;
+  const outerTopY = geo.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+  const outerBotY = geo.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+  const conjoin = o.extensionJunction === 'conjoin' && (o.core === 'fixed-3' || o.core === 'fixed-4');
+
+  const measureTop = conjoin ? outerTopY : rhTop;
+  const measureBot = conjoin ? outerBotY : lhBot;
+
   // Finale exception (last measure of the score only): extension rows drawn there run
   // flush INTO the final barline (no gap), and the final vertical extends to exactly meet
   // the outermost drawn extension row(s) — no overshoot. If the last bar draws no
   // extension rows, the final barline height is unchanged.
-  let finalTop = rhTop;
-  let finalBot = lhBot;
-  if (isFinalScoreMeasure && (o.core === 'fixed-3' || o.core === 'fixed-4')) {
+  // Under conjoin (Card A), all barlines including the final barline span outerTopY..outerBotY.
+  let finalTop = measureTop;
+  let finalBot = measureBot;
+  if (!conjoin && isFinalScoreMeasure && (o.core === 'fixed-3' || o.core === 'fixed-4')) {
     const finalMIdx =
       geo.index === 0 && (t.anacrusisTicks ?? 0) > 0
         ? o.measuresPerSystem
         : o.measuresPerSystem - 1;
     const segs = getBarStaffSegments(geo, finalMIdx);
-    const isFixed3 = o.core === 'fixed-3';
-    const topExtLin = isFixed3 ? 72 : 77.5;
-    const botExtLin = isFixed3 ? 24 : 17.5;
     if (segs.some((s) => s.lin === topExtLin)) {
-      finalTop = geo.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+      finalTop = outerTopY;
     }
     if (segs.some((s) => s.lin === botExtLin)) {
-      finalBot = geo.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+      finalBot = outerBotY;
     }
   }
 
   /** Push one internal measure barline: continuous across the corridor. */
   const pushMeasure = (x: number, strokeWidth: number = 0.60): void => {
-    if (channelled) out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-    out.push(renderStaffBarline(x, rhTop, lhBot, strokeWidth));
+    if (channelled) out.push(gridChannel(x, measureTop, measureBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
+    out.push(renderStaffBarline(x, measureTop, measureBot, strokeWidth));
   };
 
   /** The authoritative final boundary of the score (stroke: 0.90pt). */

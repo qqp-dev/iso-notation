@@ -85,10 +85,10 @@ function makeScore(id: string, notes: QuantizedNote[], ticksPerMeasure = 144): Q
 }
 
 // ---------------------------------------------------------------------------
-// 1. Bar-4 Pin
+// 1. Bar-4, Bar-7, and Bar-9 Pins (Lock-Three Core)
 // ---------------------------------------------------------------------------
 
-test('Bar-4 Pin: Bach Var. 1 Bar 4 renders EXACTLY rows {3, 1} (lin 36, 48)', () => {
+test('Bar-4 Pin: Bach Var. 1 Bar 4 renders EXACTLY rows {1, 2, 3} (lin 36, 48, 60)', () => {
   const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const layouts = layoutJankoScore(BACH, o, t);
@@ -98,95 +98,93 @@ test('Bar-4 Pin: Bach Var. 1 Bar 4 renders EXACTLY rows {3, 1} (lin 36, 48)', ()
   const bar4Index = 3; // 0-based index of Bar 4 in System 0
 
   const rows = getBarStaffRows(sys0.geometry, bar4Index);
-  // Row IDs: 1 (lin 48), 3 (lin 36)
-  assert.deepEqual(rows, [1, 3], 'Bar 4 must render exactly rows {1, 3}');
+  // Under lock-three core, rows 1 (48), 2 (60), 3 (36) are drawn in every bar
+  assert.deepEqual(rows, [1, 2, 3], 'Bar 4 must render exactly rows {1, 2, 3}');
 
   const segments = getBarStaffSegments(sys0.geometry, bar4Index);
   const lins = segments.map((s) => s.lin).sort((a, b) => a - b);
-  assert.deepEqual(lins, [36, 48], 'Bar 4 must draw lines strictly at lin 36, 48');
+  assert.deepEqual(lins, [36, 48, 60], 'Bar 4 must draw lines strictly at lin 36, 48, 60');
 
-  // Verify that row 2 (lin 60), row 4 (lin 72), and row 5 (lin 24) are silent in Bar 4
-  assert.ok(!rows.includes(2), 'Row 2 (above, 0/5) must be silent in Bar 4');
+  // Verify that outer rows: row 4 (lin 72) and row 5 (lin 24) are silent in Bar 4
   assert.ok(!rows.includes(4), 'Row 4 (outer-above, 0/6) must be silent in Bar 4');
   assert.ok(!rows.includes(5), 'Row 5 (outer-below, 0/2) must be silent in Bar 4');
 });
 
-// ---------------------------------------------------------------------------
-// 2. Bar-3 Pin
-// ---------------------------------------------------------------------------
-
-test('Bar-3 Pin: Bach Var. 1 Bar 3 renders EXACTLY rows {1, 2, 3} (lin 36, 48, 60)', () => {
+test('Bar-7 Pin: Bach Var. 1 Bar 7 renders EXACTLY rows {1, 2, 3} with NO 0/6 (max 9/5 = 69 < 72)', () => {
   const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const layouts = layoutJankoScore(BACH, o, t);
 
-  // System 0 contains bars 1..4 (system-local measure indices 0..3)
-  const sys0 = layouts[0];
-  const bar3Index = 2; // 0-based index of Bar 3 in System 0
+  // System 1 contains bars 5..8 (system-local measure index 2 = Bar 7)
+  const sys1 = layouts[1];
+  const bar7Index = 2;
 
-  const rows = getBarStaffRows(sys0.geometry, bar3Index);
-  // Extremes 7/5=67 (>= 60, < 72), 4/2=28 (<= 36, > 24) -> {0/3, 0/4, 0/5}
-  assert.deepEqual(rows, [1, 2, 3], 'Bar 3 must render exactly rows {1, 2, 3}');
+  const rows = getBarStaffRows(sys1.geometry, bar7Index);
+  assert.deepEqual(rows, [1, 2, 3], 'Bar 7 must render exactly rows {1, 2, 3}');
 
-  const segments = getBarStaffSegments(sys0.geometry, bar3Index);
+  const segments = getBarStaffSegments(sys1.geometry, bar7Index);
   const lins = segments.map((s) => s.lin).sort((a, b) => a - b);
-  assert.deepEqual(lins, [36, 48, 60], 'Bar 3 must draw lines strictly at lin 36, 48, 60');
+  assert.deepEqual(lins, [36, 48, 60], 'Bar 7 must draw lines strictly at lin 36, 48, 60');
 
-  // Both outer rows are gone under strict thresholds
-  assert.ok(!rows.includes(4), 'Row 4 (outer-above, 0/6) must be silent in Bar 3');
-  assert.ok(!rows.includes(5), 'Row 5 (outer-below, 0/2) must be silent in Bar 3');
+  assert.ok(!rows.includes(4), 'Row 4 (0/6, lin 72) must be silent in Bar 7 (max note 69 < 72)');
+  assert.ok(!rows.includes(5), 'Row 5 (0/2, lin 24) must be silent in Bar 7');
+});
+
+test('Bar-9 System Spread Pin: System 2 (mm. 9–12) is byte-identical (already all-three core)', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BACH, o, t);
+  const sys2 = layouts[2];
+  for (let m = 0; m < sys2.geometry.measuresPerSystem; m++) {
+    const rows = getBarStaffRows(sys2.geometry, m);
+    assert.ok(rows.includes(1) && rows.includes(2) && rows.includes(3), `m. ${m + 9} includes {1, 2, 3}`);
+  }
 });
 
 // ---------------------------------------------------------------------------
-// 3. Strict Row Boundary Pins
+// 2. Strict Row Boundary Pins (Locked Core + Outer Conditional Rows)
 // ---------------------------------------------------------------------------
 
-test('Strict Row Boundary Pins: inclusive fire at 60, 36, 72, 24; single line inside (36, 60); fixed-4 analogue', () => {
+test('Strict Row Boundary Pins: inclusive fire at 72, 24 under fixed-3; 77.5, 17.5 under fixed-4; locked core always fires', () => {
   // Fixed-3:
-  // Row 2 (60, 0/5) fires iff max >= 60:
-  assert.deepEqual(computeBarStaffRows([59], 'fixed-3').rowIds, [1], 'lin 59 does NOT fire row 2');
-  assert.deepEqual(computeBarStaffRows([60], 'fixed-3').rowIds, [1, 2], 'lin 60 fires row 2');
-
-  // Row 3 (36, 0/3) fires iff min <= 36:
-  assert.deepEqual(computeBarStaffRows([37], 'fixed-3').rowIds, [1], 'lin 37 does NOT fire row 3');
-  assert.deepEqual(computeBarStaffRows([36], 'fixed-3').rowIds, [1, 3], 'lin 36 fires row 3');
+  // Core rows {1, 2, 3} (lin 48, 60, 36) always fire unconditionally:
+  assert.deepEqual(computeBarStaffRows([59], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
+  assert.deepEqual(computeBarStaffRows([60], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
+  assert.deepEqual(computeBarStaffRows([37], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
+  assert.deepEqual(computeBarStaffRows([36], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
 
   // Row 4 (72, 0/6) fires iff max >= 72:
-  assert.deepEqual(computeBarStaffRows([71], 'fixed-3').rowIds, [1, 2], 'lin 71 does NOT fire row 4');
-  assert.deepEqual(computeBarStaffRows([72], 'fixed-3').rowIds, [1, 2, 4], 'lin 72 fires row 4');
+  assert.deepEqual(computeBarStaffRows([71], 'fixed-3').rowIds, [1, 2, 3], 'lin 71 does NOT fire row 4');
+  assert.deepEqual(computeBarStaffRows([72], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 72 fires row 4');
 
   // Row 5 (24, 0/2) fires iff min <= 24:
-  assert.deepEqual(computeBarStaffRows([25], 'fixed-3').rowIds, [1, 3], 'lin 25 does NOT fire row 5');
-  assert.deepEqual(computeBarStaffRows([24], 'fixed-3').rowIds, [1, 3, 5], 'lin 24 fires row 5');
+  assert.deepEqual(computeBarStaffRows([25], 'fixed-3').rowIds, [1, 2, 3], 'lin 25 does NOT fire row 5');
+  assert.deepEqual(computeBarStaffRows([24], 'fixed-3').rowIds, [1, 2, 3, 5], 'lin 24 fires row 5');
 
-  // Single-line bar case: all notes strictly inside (0/3, 0/5) -> anchor only
-  assert.deepEqual(computeBarStaffRows([40, 50], 'fixed-3').rowIds, [1], 'notes strictly between 36 and 60 draw center 0/4 alone');
-  assert.deepEqual(computeBarStaffRows([48], 'fixed-3').rowIds, [1], 'single Middle C note draws center 0/4 alone');
-  assert.deepEqual(computeBarStaffRows([37, 59], 'fixed-3').rowIds, [1], 'notes at 37 and 59 draw center 0/4 alone');
+  // Single-note bars inside (36, 60) still get the complete locked core {1, 2, 3}:
+  assert.deepEqual(computeBarStaffRows([40, 50], 'fixed-3').rowIds, [1, 2, 3], 'notes strictly between 36 and 60 get locked core');
+  assert.deepEqual(computeBarStaffRows([48], 'fixed-3').rowIds, [1, 2, 3], 'single Middle C note gets locked core');
+  assert.deepEqual(computeBarStaffRows([37, 59], 'fixed-3').rowIds, [1, 2, 3], 'notes at 37 and 59 get locked core');
 
   // Fixed-4 analogue boundaries:
-  // Row 3 (outer-above, lin 65.5): max >= 65.5
-  assert.deepEqual(computeBarStaffRows([65], 'fixed-4').rowIds, [1, 2], 'lin 65 does NOT fire row 3');
-  assert.deepEqual(computeBarStaffRows([66], 'fixed-4').rowIds, [1, 2, 3], 'lin 66 fires row 3');
-
-  // Row 4 (outer-below, lin 29.5): min <= 29.5
-  assert.deepEqual(computeBarStaffRows([30], 'fixed-4').rowIds, [1, 2], 'lin 30 does NOT fire row 4');
-  assert.deepEqual(computeBarStaffRows([29], 'fixed-4').rowIds, [1, 2, 4], 'lin 29 fires row 4');
+  // Four middle rows {1, 2, 3, 4} (29.5, 41.5, 53.5, 65.5) always fire:
+  assert.deepEqual(computeBarStaffRows([65], 'fixed-4').rowIds, [1, 2, 3, 4], 'four middles {1, 2, 3, 4} always fire');
+  assert.deepEqual(computeBarStaffRows([30], 'fixed-4').rowIds, [1, 2, 3, 4], 'four middles {1, 2, 3, 4} always fire');
 
   // Row 5 (extension-above, lin 77.5): max >= 77.5
-  assert.deepEqual(computeBarStaffRows([77], 'fixed-4').rowIds, [1, 2, 3], 'lin 77 does NOT fire row 5');
-  assert.deepEqual(computeBarStaffRows([78], 'fixed-4').rowIds, [1, 2, 3, 5], 'lin 78 fires row 5');
+  assert.deepEqual(computeBarStaffRows([77], 'fixed-4').rowIds, [1, 2, 3, 4], 'lin 77 does NOT fire row 5');
+  assert.deepEqual(computeBarStaffRows([78], 'fixed-4').rowIds, [1, 2, 3, 4, 5], 'lin 78 fires row 5');
 
   // Row 6 (extension-below, lin 17.5): min <= 17.5
-  assert.deepEqual(computeBarStaffRows([18], 'fixed-4').rowIds, [1, 2, 4], 'lin 18 does NOT fire row 6');
-  assert.deepEqual(computeBarStaffRows([17], 'fixed-4').rowIds, [1, 2, 4, 6], 'lin 17 fires row 6');
+  assert.deepEqual(computeBarStaffRows([18], 'fixed-4').rowIds, [1, 2, 3, 4], 'lin 18 does NOT fire row 6');
+  assert.deepEqual(computeBarStaffRows([17], 'fixed-4').rowIds, [1, 2, 3, 4, 6], 'lin 17 fires row 6');
 });
 
 // ---------------------------------------------------------------------------
-// 3. Property Pins: All bars in Bach and Brahms are anchor-anchored & center-connected
+// 3. Property Pins: Core floor property on Bach and Brahms
 // ---------------------------------------------------------------------------
 
-test('Property Pin (fixed-3): Row 1 always present and sets are center-connected in all bars of Bach and Brahms', () => {
+test('Property Pin (fixed-3): Core floor {1, 2, 3} always present and center-connected in all bars of Bach and Brahms', () => {
   for (const [score, options, tokens, label] of [
     [BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, 'Bach'],
     [BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' as const }, BRAHMS_OP118_NO1_JANKO_TOKENS, 'Brahms'],
@@ -199,16 +197,16 @@ test('Property Pin (fixed-3): Row 1 always present and sets are center-connected
       const numBars = sys.geometry.measuresPerSystem;
       for (let m = 0; m < numBars; m++) {
         const rows = getBarStaffRows(sys.geometry, m);
+        // Lock-three core floor: no single-line or double-line bars anywhere
         assert.ok(
-          rows.includes(1),
-          `${label} sys ${sys.index} m ${m}: Row 1 (Middle C) must always be present (got ${rows.join(',')})`
+          rows.includes(1) && rows.includes(2) && rows.includes(3),
+          `${label} sys ${sys.index} m ${m}: Core rows {1, 2, 3} must always be present (got ${rows.join(',')})`
         );
+        assert.ok(rows.length >= 3, `${label} sys ${sys.index} m ${m}: At least 3 rows in every bar (no single- or double-line bars)`);
         // Center-connectedness:
-        // row 4 requires row 2
         if (rows.includes(4)) {
           assert.ok(rows.includes(2), `${label} sys ${sys.index} m ${m}: Row 4 requires Row 2`);
         }
-        // row 5 requires row 3
         if (rows.includes(5)) {
           assert.ok(rows.includes(3), `${label} sys ${sys.index} m ${m}: Row 5 requires Row 3`);
         }
@@ -217,7 +215,7 @@ test('Property Pin (fixed-3): Row 1 always present and sets are center-connected
   }
 });
 
-test('Property Pin (fixed-4): Central pair always present and sets are center-connected in all bars of Brahms', () => {
+test('Property Pin (fixed-4): Four middles {1, 2, 3, 4} always present and center-connected in all bars of Brahms', () => {
   const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-4' });
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const layouts = layoutJankoScore(BRAHMS, o, t);
@@ -227,9 +225,10 @@ test('Property Pin (fixed-4): Central pair always present and sets are center-co
     for (let m = 0; m < numBars; m++) {
       const rows = getBarStaffRows(sys.geometry, m);
       assert.ok(
-        rows.includes(1) && rows.includes(2),
-        `Brahms fixed-4 sys ${sys.index} m ${m}: Central pair (rows 1 & 2) must always be present (got ${rows.join(',')})`
+        rows.includes(1) && rows.includes(2) && rows.includes(3) && rows.includes(4),
+        `Brahms fixed-4 sys ${sys.index} m ${m}: Four middles (rows 1..4) must always be present (got ${rows.join(',')})`
       );
+      assert.ok(rows.length >= 4, `Brahms fixed-4 sys ${sys.index} m ${m}: At least 4 rows in every bar`);
       // Center-connectedness:
       if (rows.includes(5)) {
         assert.ok(rows.includes(3), `Brahms fixed-4 sys ${sys.index} m ${m}: Row 5 requires Row 3`);
@@ -242,11 +241,11 @@ test('Property Pin (fixed-4): Central pair always present and sets are center-co
 });
 
 // ---------------------------------------------------------------------------
-// 4. Rest-Bar Pin: Rest-only bar renders Row 1 alone with rest on Middle C
+// 4. Rest-Bar Pin: Rest-only bar renders locked core {1, 2, 3} with whole rest on Middle C
 // ---------------------------------------------------------------------------
 
-test('Rest-Bar Pin: Rest-only bar renders Row 1 alone with rest on Middle C', () => {
-  // Synthetic 4/4 score: Bar 0 has notes in octave 4 (within 6/3..6/4, so row 1 alone),
+test('Rest-Bar Pin: Rest-only bar renders locked core {1, 2, 3} with whole rest on Middle C', () => {
+  // Synthetic 4/4 score: Bar 0 has notes in octave 4,
   // Bar 1 is completely silent (whole-bar rest of 192 ticks),
   // Bar 2 resumes with a note in octave 4.
   const restScore: QuantizedGridScore = {
@@ -271,14 +270,14 @@ test('Rest-Bar Pin: Rest-only bar renders Row 1 alone with rest on Middle C', ()
   const layouts = layoutJankoScore(restScore, o, t);
   const sys = layouts[0];
 
-  // Bar 1 has no notes -> row 1 alone
+  // Bar 1 has no notes -> locked core {1, 2, 3}
   const bar1Rows = getBarStaffRows(sys.geometry, 1);
-  assert.deepEqual(bar1Rows, [1], 'Rest-only bar renders Row 1 alone');
+  assert.deepEqual(bar1Rows, [1, 2, 3], 'Rest-only bar renders locked core {1, 2, 3}');
 
-  // Verify the whole rest is placed and touches the Middle C line
+  // Verify the whole rest is placed and touches the Middle C line (lin 48)
   const bar1Rest = sys.rests.find((r) => r.tick === 192 && r.value === 'whole');
   assert.ok(bar1Rest, 'Whole rest generated for empty bar 1');
-  assert.ok(Math.abs(bar1Rest.y - sys.geometry.middleCY) < 0.05, 'Rest seats on Middle C rule');
+  assert.ok(Math.abs(bar1Rest.y - sys.geometry.middleCY) < 0.05, 'Bar rest still seats on drawn line (Middle C rule)');
 
   // Visual linter is green
   const report = lintJankoScore(restScore, o, t);
@@ -289,16 +288,20 @@ test('Rest-Bar Pin: Rest-only bar renders Row 1 alone with rest on Middle C', ()
 // 5. Segments Pin: Non-consecutive earning bars render disjoint unbroken segments
 // ---------------------------------------------------------------------------
 
-test('Segments Pin: Non-consecutive earning bars render disjoint unbroken segments', () => {
+// ---------------------------------------------------------------------------
+// 5. Segments Pin: Non-consecutive earning bars render disjoint unbroken segments
+// ---------------------------------------------------------------------------
+
+test('Segments Pin: Non-consecutive earning bars render disjoint unbroken segments on extension row', () => {
   // Synthetic 4-bar score:
-  // Bar 0: high note lin 70 (earns Row 2)
-  // Bar 1: middle note lin 48 (silent for Row 2)
-  // Bar 2: high note lin 70 (earns Row 2)
-  // Bar 3: middle note lin 48 (silent for Row 2)
+  // Bar 0: high note lin 72 (earns extension Row 4)
+  // Bar 1: middle note lin 48 (silent for Row 4)
+  // Bar 2: high note lin 72 (earns extension Row 4)
+  // Bar 3: middle note lin 48 (silent for Row 4)
   const score = makeScore('disjoint-segments', [
-    makeNote('n0', 10, 5, 0),    // lin 70 in bar 0
+    makeNote('n0', 0, 6, 0),     // lin 72 in bar 0
     makeNote('n1', 0, 4, 144),   // lin 48 in bar 1
-    makeNote('n2', 10, 5, 288),  // lin 70 in bar 2
+    makeNote('n2', 0, 6, 288),   // lin 72 in bar 2
     makeNote('n3', 0, 4, 432),   // lin 48 in bar 3
   ]);
 
@@ -308,22 +311,24 @@ test('Segments Pin: Non-consecutive earning bars render disjoint unbroken segmen
   const sys = layouts[0];
 
   const segments = sys.geometry.staffSegments ?? [];
-  const row2Segments = segments.filter((s) => s.rowId === 2);
+  const row4Segments = segments.filter((s) => s.rowId === 4);
 
-  // Must have exactly two disjoint segments for Row 2: [0..0] and [2..2]
-  assert.equal(row2Segments.length, 2, 'Row 2 renders exactly two disjoint unbroken segments');
-  assert.equal(row2Segments[0].mStart, 0);
-  assert.equal(row2Segments[0].mEnd, 0);
-  assert.equal(row2Segments[1].mStart, 2);
-  assert.equal(row2Segments[1].mEnd, 2);
+  // Must have exactly two disjoint segments for Row 4: [0..0] and [2..2]
+  assert.equal(row4Segments.length, 2, 'Row 4 renders exactly two disjoint unbroken segments');
+  assert.equal(row4Segments[0].mStart, 0);
+  assert.equal(row4Segments[0].mEnd, 0);
+  assert.equal(row4Segments[1].mStart, 2);
+  assert.equal(row4Segments[1].mEnd, 2);
 
-  // Row 1 is unbroken across the whole system [0..3]
-  const row1Segments = segments.filter((s) => s.rowId === 1);
-  assert.equal(row1Segments.length, 1, 'Row 1 is constitutional anchor spanning the whole system');
-  assert.equal(row1Segments[0].mStart, 0);
-  assert.equal(row1Segments[0].mEnd, 3);
-  assert.equal(row1Segments[0].x1, sys.geometry.staffLeft);
-  assert.equal(row1Segments[0].x2, sys.geometry.staffRight);
+  // Core rows 1, 2, 3 are unbroken across the whole system [0..3]
+  for (const rId of [1, 2, 3]) {
+    const rSegs = segments.filter((s) => s.rowId === rId);
+    assert.equal(rSegs.length, 1, `Row ${rId} spans the whole system`);
+    assert.equal(rSegs[0].mStart, 0);
+    assert.equal(rSegs[0].mEnd, 3);
+    assert.equal(rSegs[0].x1, sys.geometry.staffLeft);
+    assert.equal(rSegs[0].x2, sys.geometry.staffRight);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -383,29 +388,19 @@ test('Guest Gaps: extension rows (0/6, 0/2) stand off 6.0pt at interior barlines
   assert.equal(row5.x1, geo.staffLeft, 'Row 5 is flush at system left edge');
   assert.equal(Number(row5.x2.toFixed(2)), Number((barline1X - t.measureInset).toFixed(2)), 'Row 5 stands off 6.0pt before interior barline 1');
 
-  // Row 3 (0/3, lin 36, bar 0): inner conditional row terminates FLUSH at barline 1
-  const row3 = segs.find((s) => s.rowId === 3);
-  assert.ok(row3, 'Row 3 (0/3) segment found');
-  assert.equal(row3.x1, geo.staffLeft, 'Row 3 is flush at system left edge');
-  assert.equal(Number(row3.x2.toFixed(2)), barline1X, 'Row 3 terminates flush at barline 1 (normal-row treatment)');
-
   // Row 4 (0/6, lin 72, bar 1): starts after barline 1, ends before barline 2
   const row4 = segs.find((s) => s.rowId === 4);
   assert.ok(row4, 'Row 4 (0/6) segment found');
   assert.equal(Number(row4.x1.toFixed(2)), Number((barline1X + t.measureInset).toFixed(2)), 'Row 4 stands off 6.0pt after interior barline 1');
   assert.equal(Number(row4.x2.toFixed(2)), Number((barline2X - t.measureInset).toFixed(2)), 'Row 4 stands off 6.0pt before interior barline 2');
 
-  // Row 2 (0/5, lin 60, bar 1): inner conditional row terminates FLUSH at both barlines
-  const row2 = segs.find((s) => s.rowId === 2);
-  assert.ok(row2, 'Row 2 (0/5) segment found');
-  assert.equal(Number(row2.x1.toFixed(2)), barline1X, 'Row 2 is flush at barline 1 (normal-row treatment)');
-  assert.equal(Number(row2.x2.toFixed(2)), barline2X, 'Row 2 is flush at barline 2 (normal-row treatment)');
-
-  // System edges: always flush, no exceptions
-  const row1 = segs.find((s) => s.rowId === 1);
-  assert.ok(row1, 'Row 1 constitutional anchor spans system');
-  assert.equal(row1.x1, geo.staffLeft, 'System left edge is flush');
-  assert.equal(row1.x2, geo.staffRight, 'System right edge is flush');
+  // Inner rows (1, 2, 3) never terminate mid-system; they span system edges flush
+  for (const rowId of [1, 2, 3]) {
+    const seg = segs.find((s) => s.rowId === rowId);
+    assert.ok(seg, `Row ${rowId} found`);
+    assert.equal(seg.x1, geo.staffLeft, `Row ${rowId} left edge is flush`);
+    assert.equal(seg.x2, geo.staffRight, `Row ${rowId} right edge is flush`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -503,28 +498,90 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   // Canonical column alignment: aligns with tick 552 column (sharing beat with LH 2)
   const canonicalColX = getTickColumnX(552, sys0.geometry, 0, o, t);
   assert.equal(rest552.x, canonicalColX, 'Rest x aligns with canonical column x');
+  assert.equal(Number(rest552.x.toFixed(2)), 548.63, 'Rest x pinned at 548.63');
 
-  // Seats on Middle C drawn line
-  const middleCLineY = sys0.geometry.middleCY;
-  assert.ok(Math.abs(rest552.y - middleCLineY) < 1e-6, 'Rest seats on Middle C line (lin 48)');
+  // Voice-height rest seating: seats at the 9 note's own height (semitone lin 46)
+  assert.equal(Number(rest552.y.toFixed(1)), 179.5, 'Rest y pinned at 179.5');
+  assert.ok(Math.abs(rest552.y - 179.48625) < 0.01, 'Rest seats at exactly 179.48625');
+
+  // Hanging rest counts: Bach 9, Brahms 94
+  const bachHanging = bachLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
+  assert.equal(bachHanging.length, 9, 'Bach hanging-rest count holds at exactly 9');
+
+  const brahmsOpts = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const brahmsTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const brahmsLayouts = layoutJankoScore(BRAHMS, brahmsOpts, brahmsTokens);
+  const brahmsHanging = brahmsLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
+  assert.equal(brahmsHanging.length, 94, 'Brahms hanging-rest count holds at exactly 94');
 
   // Unwritten rest count across Bach and Brahms: 0
   const bachUnwritten = bachLayouts.flatMap((s) => s.unwrittenRests ?? []);
   assert.equal(bachUnwritten.length, 0, 'Bach has 0 unwritten rests');
-
-  const brahmsOpts = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const brahmsTokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const brahmsLayouts = layoutJankoScore(BRAHMS, brahmsOpts, brahmsTokens);
   const brahmsUnwritten = brahmsLayouts.flatMap((s) => s.unwrittenRests ?? []);
   assert.equal(brahmsUnwritten.length, 0, 'Brahms has 0 unwritten rests');
 
-  // Displacement stats: Bach max = 0.000, mean = 0.000
+  // Horizontal displacement stats: columns logic untouched (dx = 0)
   const bachDisplacements = bachLayouts.flatMap((s) =>
-    s.rests.filter((r) => r.value !== 'whole').map((r) => Math.abs(r.x - getTickColumnX(r.tick, s.geometry, s.index, o, t)))
+    s.rests.filter((r) => r.value !== 'whole' && r.value !== 'half').map((r) =>
+      Math.abs(r.x - getTickColumnX(r.tick, s.geometry, s.index, o, t))
+    )
   );
   const bachMaxDisp = Math.max(0, ...bachDisplacements);
   const bachMeanDisp = bachDisplacements.reduce((a, b) => a + b, 0) / bachDisplacements.length;
-  assert.equal(bachMaxDisp, 0, 'Bach rest displacement max is exactly 0.000');
-  assert.equal(bachMeanDisp, 0, 'Bach rest displacement mean is exactly 0.000');
+  assert.equal(bachMaxDisp, 0, 'Bach rest horizontal displacement max is exactly 0.000');
+  assert.equal(bachMeanDisp, 0, 'Bach rest horizontal displacement mean is exactly 0.000');
+
+  // Vertical displacement stats vs pre-change seats (pre-change snapped to drawn lines {36, 48, 60}):
+  let bachMovedCount = 0;
+  let bachDySum = 0;
+  let bachDyMax = 0;
+  for (const r of bachHanging) {
+    const sys = bachLayouts.find((s) => s.rests.includes(r))!;
+    const currentLin = 48 + (sys.geometry.middleCY - r.y) / t.semitoneScale;
+    let nearestLine = 48;
+    let bestDist = Math.abs(currentLin - 48);
+    for (const d of [36, 60]) {
+      const dist = Math.abs(currentLin - d);
+      if (dist < bestDist) {
+        bestDist = dist;
+        nearestLine = d;
+      }
+    }
+    const oldY = sys.geometry.middleCY - (nearestLine - 48) * t.semitoneScale;
+    const dy = Math.abs(r.y - oldY);
+    if (dy > 0.01) bachMovedCount++;
+    bachDySum += dy;
+    if (dy > bachDyMax) bachDyMax = dy;
+  }
+
+  let brahmsMovedCount = 0;
+  let brahmsDySum = 0;
+  let brahmsDyMax = 0;
+  for (const r of brahmsHanging) {
+    const sys = brahmsLayouts.find((s) => s.rests.includes(r))!;
+    const currentLin = 48 + (sys.geometry.middleCY - r.y) / brahmsTokens.semitoneScale;
+    let nearestLine = 48;
+    let bestDist = Math.abs(currentLin - 48);
+    for (const d of [36, 60]) {
+      const dist = Math.abs(currentLin - d);
+      if (dist < bestDist) {
+        bestDist = dist;
+        nearestLine = d;
+      }
+    }
+    const oldY = sys.geometry.middleCY - (nearestLine - 48) * brahmsTokens.semitoneScale;
+    const dy = Math.abs(r.y - oldY);
+    if (dy > 0.01) brahmsMovedCount++;
+    brahmsDySum += dy;
+    if (dy > brahmsDyMax) brahmsDyMax = dy;
+  }
+
+  console.log(
+    `[Voice-Height Rest Displacement Stats]\n` +
+    `  Bach: ${bachHanging.length} hanging rests, ${bachMovedCount} vertical moves (expected <= 8), max dy = ${bachDyMax.toFixed(2)}pt, mean dy = ${(bachDySum / bachHanging.length).toFixed(2)}pt, max dx = 0.000\n` +
+    `  Brahms: ${brahmsHanging.length} hanging rests, ${brahmsMovedCount} vertical moves (expected ~90), max dy = ${brahmsDyMax.toFixed(2)}pt, mean dy = ${(brahmsDySum / brahmsHanging.length).toFixed(2)}pt, max dx = 0.000`
+  );
+  assert.ok(bachMovedCount <= 8, `Bach vertical moves ${bachMovedCount} <= 8`);
+  assert.ok(brahmsMovedCount >= 80 && brahmsMovedCount <= 94, `Brahms vertical moves ${brahmsMovedCount} ~90`);
 });
 

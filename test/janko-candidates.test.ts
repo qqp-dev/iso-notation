@@ -144,9 +144,9 @@ const REST_STYLES: JankoRestStyle[] = [
 ];
 
 /**
- * The Round 27 cards — control (fixed-4) and contender (fixed-3).
+ * The Round 28 cards — Card A (conjoin) and Card B (wide-gap).
  */
-const ROUND_27_CARDS: string[] = ['core-fixed-4', 'core-fixed-3'];
+const ROUND_28_CARDS: string[] = ['junction-conjoin', 'junction-wide-gap'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -232,55 +232,56 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA opens round 27 on the core axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 27);
-  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
+test('CURRENT_ROUND_METADATA opens round 28 on the extensionJunction axis', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 28);
+  assert.match(CURRENT_ROUND_METADATA.title, /Extension Junctions/);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['core'],
+    ['extensionJunction'],
     'one axis, two cards'
   );
-  assert.match(CURRENT_ROUND_METADATA.description, /visual weight/, 'the page-1 verdict is stated');
-  assert.match(CURRENT_ROUND_METADATA.description, /fixed cores/, 'the fixed cores reframing is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /Conjoin/, 'conjoin is stated');
+  assert.match(CURRENT_ROUND_METADATA.description, /Wide Gap/, 'wide gap is stated');
   assert.deepEqual(
     CURRENT_ROUND_METADATA.compareStrip,
     {
-      scoreId: BRAHMS_STUDIO_SCORE_ID,
-      measureStart: 33,
+      scoreId: DEFAULT_STUDIO_SCORE_ID,
+      measureStart: 29,
       measureCount: 2,
-      title: 'mm. 33–34 · densest macro with folded bass under fixed-4 vs fixed-3',
+      title: 'mm. 29–30 · extension junction macro under conjoin vs wide gap',
     },
     'the strip declares the shared macro'
   );
 });
 
-test('CURRENT_CANDIDATES declares the round’s control (fixed-4) plus contender (fixed-3)', () => {
+test('CURRENT_CANDIDATES declares Card A (conjoin) and Card B (wide-gap) with NO control card', () => {
+  // Ordered contract change: Round 28 has NO control card (Reference view is the standing control)
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_27_CARDS, 'the control and the contender, in display order');
+  assert.deepEqual(ids, ROUND_28_CARDS, 'Card A and Card B, in display order');
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'one control plus one contender');
-  for (const id of ROUND_27_CARDS) {
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two contenders (no control card)');
+  for (const id of ROUND_28_CARDS) {
     const candidate = getCandidate(id)!;
-    assert.match(candidate.label, /^[0-1] · /, `${id} is numbered`);
+    assert.match(candidate.label, /^[A-B] · /, `${id} is lettered`);
     assert.ok((candidate.description ?? '').length > 100, `${id} carries a rationale`);
     assert.ok((candidate.tags ?? []).length > 0, `${id} is tagged`);
-    assert.equal(candidate.axis, 'core', `${id} owns the core axis`);
+    assert.equal(candidate.axis, 'extensionJunction', `${id} owns the extensionJunction axis`);
   }
 });
 
-test('Candidates state only their core option delta', () => {
+test('Candidates state only their extensionJunction option delta', () => {
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  for (const id of ROUND_27_CARDS) {
+  for (const id of ROUND_28_CARDS) {
     const candidate = getCandidate(id)!;
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['core'],
-      `${id} states only the core axis`
+      ['extensionJunction'],
+      `${id} states only the extensionJunction axis`
     );
     assert.equal(candidate.tokens, undefined, `${id} states no micro token`);
     const resolved = resolveCandidate(candidate);
     for (const key of Object.keys(golden)) {
-      if (key === 'core') continue;
+      if (key === 'extensionJunction') continue;
       assert.equal(
         (resolved.options as unknown as Record<string, unknown>)[key],
         (golden as unknown as Record<string, unknown>)[key],
@@ -289,23 +290,23 @@ test('Candidates state only their core option delta', () => {
     }
     const badges = candidateBadges(candidate);
     assert.equal(badges.length, 1, `${id} badges only its axis`);
-    assert.equal(badges[0].key, 'core');
+    assert.equal(badges[0].key, 'extensionJunction');
     assert.equal(badges[0].axis, true);
   }
 });
 
-test('Every card shares the round’s two windows: Brahms page 1 plus the mm. 33–34 macro', () => {
-  for (const id of ROUND_27_CARDS) {
+test('Every card shares the round’s two windows: Page 2 (mm. 17–32) plus the mm. 29–30 macro', () => {
+  for (const id of ROUND_28_CARDS) {
     const resolved = resolveCandidate(getCandidate(id)!);
     assert.equal(resolved.windows.length, 2, `${id} shows both windows`);
     const [page, macro] = resolved.windows;
-    assert.equal(page.scoreId, BRAHMS_STUDIO_SCORE_ID, `${id} pages the Brahms score`);
-    assert.equal(page.measureStart, 1, `${id} opens page 1 at m. 1`);
-    assert.equal(page.measureCount, 9, `${id} shows the whole first page (9 measures)`);
+    assert.equal(page.scoreId, DEFAULT_STUDIO_SCORE_ID, `${id} pages the primary Bach score`);
+    assert.equal(page.measureStart, 17, `${id} opens page 2 at m. 17`);
+    assert.equal(page.measureCount, 16, `${id} shows the full Page 2 (16 measures)`);
     assert.ok(page.title.length > 20, `${id} titles the page window`);
-    assert.equal(macro.scoreId, BRAHMS_STUDIO_SCORE_ID, `${id} macros the Brahms score`);
-    assert.equal(macro.measureStart, 33, `${id} opens the macro at m. 33`);
-    assert.equal(macro.measureCount, 2, `${id} shows mm. 33–34 up close`);
+    assert.equal(macro.scoreId, DEFAULT_STUDIO_SCORE_ID, `${id} macros the primary Bach score`);
+    assert.equal(macro.measureStart, 29, `${id} opens the macro at m. 29`);
+    assert.equal(macro.measureCount, 2, `${id} shows mm. 29–30 up close`);
     assert.ok(macro.title.length > 20, `${id} titles the macro window`);
   }
 });
@@ -1852,20 +1853,16 @@ test('The live studio engraves every candidate card on the shared windows', () =
   assert.match(html, /data-candidate-count="2"/);
   assert.match(html, /data-window-count="4"/, 'two cards × two shared windows');
   assert.match(html, /data-verification="false"/, 'a candidate round is not verification');
-  assert.match(html, /Round 27/);
-  assert.match(html, /Fixed Cores/, 'the round title headlines the view');
+  assert.match(html, /Round 28/);
+  assert.match(html, /Extension Junctions/, 'the round title headlines the view');
   let cursor = -1;
-  for (const id of ROUND_27_CARDS) {
+  for (const id of ROUND_28_CARDS) {
     const at = html.indexOf(`data-candidate="${id}"`);
     assert.ok(at > cursor, `${id} appears in registry order`);
     cursor = at;
     const body = html.slice(at, html.indexOf('</article>', at));
     assert.ok(body.includes('badge-axis'), `${id} badges its axis`);
-    if (id === 'core-fixed-3') {
-      assert.ok(!body.includes('badge-delta'), `${id} matches golden (0 deltas)`);
-    } else {
-      assert.ok(body.includes('badge-delta'), `${id} departs from the golden`);
-    }
+    assert.ok(body.includes('badge-delta'), `${id} departs from the golden`);
     assert.match(body, /data-lint="(clean|violations)"/, `${id} carries a lint verdict`);
     assert.equal(
       (body.match(/data-window="/g) ?? []).length,
@@ -1877,16 +1874,16 @@ test('The live studio engraves every candidate card on the shared windows', () =
 
 test('The closer-comparison strip engraves the shared macro under every card', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.match(html, /data-strip="brahms-op118-no1:33-34"/, 'the strip declares its window');
-  assert.match(html, /densest macro with folded bass/, 'the strip carries its headline');
+  assert.match(html, /data-strip="primary:29-30"/, 'the strip declares its window');
+  assert.match(html, /extension junction macro/, 'the strip carries its headline');
   assert.equal((html.match(/data-strip-panel="/g) ?? []).length, 2, 'one panel per card');
   let cursor = -1;
-  for (const id of ROUND_27_CARDS) {
+  for (const id of ROUND_28_CARDS) {
     const at = html.indexOf(`data-strip-panel="${id}"`);
     assert.ok(at > cursor, `${id} appears in registry order`);
     cursor = at;
   }
-  for (const id of ROUND_27_CARDS) {
+  for (const id of ROUND_28_CARDS) {
     const panel = html.slice(
       html.indexOf(`data-strip-panel="${id}"`),
       html.indexOf('</figure>', html.indexOf(`data-strip-panel="${id}"`))
@@ -1896,7 +1893,7 @@ test('The closer-comparison strip engraves the shared macro under every card', (
   }
   const view = renderCandidatesView(CONFIG);
   assert.ok(
-    view.indexOf('data-strip="brahms-op118-no1:33-34"') < view.indexOf('data-candidate-count="2"'),
+    view.indexOf('data-strip="primary:29-30"') < view.indexOf('data-candidate-count="2"'),
     'the strip stands above the cards'
   );
 });

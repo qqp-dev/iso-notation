@@ -25,6 +25,8 @@ import {
 import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
+  JankoCandidate,
+  JankoCandidateRound,
   getCandidate,
   resolveCandidate,
   candidateBadges,
@@ -42,17 +44,51 @@ import { checkOttavaCoverage } from '../src/render/janko/linter';
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
 
+// Historical Round 27 registry (fixed cores 3 vs 4) preserved for durable regression coverage.
+// Active candidate round in src/render/janko/candidates.ts is Round 28 (extension junctions).
+const ROUND_27_METADATA: JankoCandidateRound = {
+  round: 27,
+  title: 'Fixed Cores: 3 vs 4 on Brahms with Real Gould Ottava Brackets',
+  description: 'Visual weight on Brahms Op. 118/1 under fixed cores.',
+  openAxes: ['core'],
+  compareStrip: {
+    scoreId: BRAHMS_STUDIO_SCORE_ID,
+    measureStart: 33,
+    measureCount: 2,
+    title: 'mm. 33–34 · densest macro with folded bass under fixed-4 vs fixed-3',
+  },
+};
+
+const ROUND_27_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'core-fixed-4',
+    label: '0 · Control — Fixed-4 with Octave Middles',
+    description: 'Fixed-4 middles o2–o5; 1 folded note in m. 69.',
+    axis: 'core',
+    options: { core: 'fixed-4' },
+    tags: ['control'],
+  },
+  {
+    id: 'core-fixed-3',
+    label: '1 · Contender — Fixed-3 with C-Lines C3–C5',
+    description: 'Fixed-3 C-lines C3–C5; 9 folded notes across mm. 5, 15, 23, 33, 43, 53, 67, 69.',
+    axis: 'core',
+    options: { core: 'fixed-3' },
+    tags: ['contender'],
+  },
+];
+
 // ---------------------------------------------------------------------------
 // 1. Registry purity
 // ---------------------------------------------------------------------------
 
 test('Round 27 registry purity: exactly 2 cards, control = fixed-4, single open axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 27);
-  assert.match(CURRENT_ROUND_METADATA.title, /Fixed Cores/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['core'], 'only core is an open axis');
+  assert.equal(ROUND_27_METADATA.round, 27);
+  assert.match(ROUND_27_METADATA.title, /Fixed Cores/);
+  assert.deepEqual(ROUND_27_METADATA.openAxes, ['core'], 'only core is an open axis');
 
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'exactly two cards');
-  const [control, contender] = CURRENT_CANDIDATES;
+  assert.equal(ROUND_27_CANDIDATES.length, 2, 'exactly two cards');
+  const [control, contender] = ROUND_27_CANDIDATES;
 
   assert.equal(control.id, 'core-fixed-4');
   assert.match(control.label, /Control/);
@@ -66,7 +102,7 @@ test('Round 27 registry purity: exactly 2 cards, control = fixed-4, single open 
 
   // Candidate discipline: each card differs only on 'core'
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_27_CANDIDATES) {
     const resolved = resolveCandidate(card);
     for (const [k, v] of Object.entries(resolved.options)) {
       if (k === 'core') {
@@ -165,7 +201,7 @@ test('Every folded note is covered by exactly one bracket', () => {
 // ---------------------------------------------------------------------------
 
 test('Densest macro window (mm. 33–34) contains folded bass under fixed-3', () => {
-  const strip = CURRENT_ROUND_METADATA.compareStrip;
+  const strip = ROUND_27_METADATA.compareStrip;
   assert.ok(strip, 'compare strip is declared');
   assert.equal(strip.scoreId, BRAHMS_STUDIO_SCORE_ID);
   assert.equal(strip.measureStart, 33);
@@ -190,8 +226,8 @@ test('Densest macro window (mm. 33–34) contains folded bass under fixed-3', ()
 // ---------------------------------------------------------------------------
 
 test('Candidate captions match rendered fold counts', () => {
-  const control = getCandidate('core-fixed-4')!;
-  const contender = getCandidate('core-fixed-3')!;
+  const control = ROUND_27_CANDIDATES.find((c) => c.id === 'core-fixed-4')!;
+  const contender = ROUND_27_CANDIDATES.find((c) => c.id === 'core-fixed-3')!;
 
   assert.match(control.description ?? '', /1 folded note/);
   assert.match(contender.description ?? '', /9 folded notes/);

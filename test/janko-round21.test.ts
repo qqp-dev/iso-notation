@@ -444,22 +444,23 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 27 fixed cores, control plus contender, every window resolvable', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 27);
+test('§F registry: round 28 extension junctions, two contenders (no control card), every window resolvable', () => {
+  // Ordered contract change: Round 28 has NO control card (Reference view is the standing control)
+  assert.equal(CURRENT_ROUND_METADATA.round, 28);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['core'],
+    ['extensionJunction'],
     'one axis, two cards'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['core-fixed-4', 'core-fixed-3']);
+  assert.deepEqual(ids, ['junction-conjoin', 'junction-wide-gap']);
   const windows = CURRENT_CANDIDATES.flatMap((c) => c.windows ?? []);
   assert.equal(windows.length, 4, 'two cards × two shared windows');
   for (const candidate of CURRENT_CANDIDATES) {
     assert.deepEqual(
       Object.keys(candidate.options ?? {}),
-      ['core'],
-      `${candidate.id}: states only core axis`
+      ['extensionJunction'],
+      `${candidate.id}: states only extensionJunction axis`
     );
     assert.equal(candidate.tokens, undefined, `${candidate.id}: no token delta`);
     assert.equal((candidate.windows ?? []).length, 2, `${candidate.id}: both windows`);

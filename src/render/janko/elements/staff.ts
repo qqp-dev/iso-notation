@@ -21,6 +21,7 @@
 
 import { QuantizedNote } from '../../../model/types';
 import {
+  ExtensionJunctionStyle,
   JankoCore,
   JankoLayoutOptions,
   JankoSystemGeometry,
@@ -175,25 +176,24 @@ export interface PitchGridRule {
 /**
  * One center-out row definition for need-based staff lines.
  *
- * Strict rows rule: in any bar, a C-line 0/k is drawn iff some written note in
- * the bar reaches 0/k (touches or passes it). The center 0/4 is always drawn.
- * Inclusive at every threshold.
+ * Lock-three core: in any bar, the core rows are drawn unconditionally.
  *
  * Fixed-3:
- *   Row 1 center (0/4, Middle C, lin 48, always drawn in every bar)
- *   Row 2 above (0/5, lin 60, fires iff bar max >= 60)
- *   Row 3 below (0/3, lin 36, fires iff bar min <= 36)
+ *   Row 1 center (0/4, Middle C, lin 48, always drawn — constitutional anchor)
+ *   Row 2 above (0/5, lin 60, always drawn — locked core)
+ *   Row 3 below (0/3, lin 36, always drawn — locked core)
  *   Row 4 outer-above (0/6, lin 72, fires iff bar max >= 72)
  *   Row 5 outer-below (0/2, lin 24, fires iff bar min <= 24)
  *
  * Fixed-4 analogue at its middles (shared grammar):
- *   Central pair (straddling the middle-C gap, always drawn):
+ *   Four middle lines always drawn (locked core):
  *     Inner middle below (o3 middle, lin 41.5)
  *     Inner middle above (o4 middle, lin 53.5)
- *   Outer middle above (o5 middle, lin 65.5, fires iff bar max >= 65.5)
- *   Outer middle below (o2 middle, lin 29.5, fires iff bar min <= 29.5)
- *   Outer extension above (o6 middle, lin 77.5, fires iff bar max >= 77.5)
- *   Outer extension below (o1 middle, lin 17.5, fires iff bar min <= 17.5)
+ *     Outer middle above (o5 middle, lin 65.5)
+ *     Outer middle below (o2 middle, lin 29.5)
+ *   Extensions remain conditional:
+ *     Outer extension above (o6 middle, lin 77.5, fires iff bar max >= 77.5)
+ *     Outer extension below (o1 middle, lin 17.5, fires iff bar min <= 17.5)
  */
 export interface NeedBasedRowDef {
   /** Linear pitch of this row line. */
@@ -210,8 +210,8 @@ export interface NeedBasedRowDef {
 
 export const FIXED_3_ROW_DEFS: readonly NeedBasedRowDef[] = [
   { lin: 48, rowId: 1, name: 'center (0/4)', isAnchor: true, fires: () => true },
-  { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 60) },
-  { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 36) },
+  { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: () => true },
+  { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: () => true },
   { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 72) },
   { lin: 24, rowId: 5, name: 'outer-below (0/2)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 24) },
 ];
@@ -219,8 +219,8 @@ export const FIXED_3_ROW_DEFS: readonly NeedBasedRowDef[] = [
 export const FIXED_4_ROW_DEFS: readonly NeedBasedRowDef[] = [
   { lin: 41.5, rowId: 1, name: 'inner-below (o3 middle)', isAnchor: true, fires: () => true },
   { lin: 53.5, rowId: 2, name: 'inner-above (o4 middle)', isAnchor: true, fires: () => true },
-  { lin: 65.5, rowId: 3, name: 'outer-above (o5 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 65.5) },
-  { lin: 29.5, rowId: 4, name: 'outer-below (o2 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 29.5) },
+  { lin: 65.5, rowId: 3, name: 'outer-above (o5 middle)', isAnchor: false, fires: () => true },
+  { lin: 29.5, rowId: 4, name: 'outer-below (o2 middle)', isAnchor: false, fires: () => true },
   { lin: 77.5, rowId: 5, name: 'extension-above (o6 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 77.5) },
   { lin: 17.5, rowId: 6, name: 'extension-below (o1 middle)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 17.5) },
 ];
@@ -251,7 +251,8 @@ export function computeSystemStaffSegments(
   staffRight: number,
   measureWidth: number,
   core: JankoCore,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  extensionJunction: ExtensionJunctionStyle = 'default'
 ): {
   segments: StaffLineSegment[];
   staffLines: number[];
@@ -293,6 +294,13 @@ export function computeSystemStaffSegments(
   const defs = isFixed3 ? FIXED_3_ROW_DEFS : core === 'fixed-4' ? FIXED_4_ROW_DEFS : [];
   const segments: StaffLineSegment[] = [];
 
+  const guestGap =
+    extensionJunction === 'conjoin'
+      ? 0
+      : extensionJunction === 'wide-gap'
+        ? 12.0
+        : t.measureInset;
+
   for (const def of defs) {
     const earnsBar = barLins.map((lins) => def.fires(lins));
     const isExtension = isFixed3
@@ -310,13 +318,13 @@ export function computeSystemStaffSegments(
             mStart === 0
               ? staffLeft
               : isExtension
-                ? getBarSpanX(mStart).x1 + t.measureInset
+                ? getBarSpanX(mStart).x1 + guestGap
                 : getBarSpanX(mStart).x1;
           const x2 =
             mEnd === numBars - 1
               ? staffRight
               : isExtension
-                ? getBarSpanX(mEnd).x2 - t.measureInset
+                ? getBarSpanX(mEnd).x2 - guestGap
                 : getBarSpanX(mEnd).x2;
           segments.push({
             lin: def.lin,
