@@ -28,7 +28,8 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
-import { getTickX } from '../geometry';
+import { continuousPitchY, getTickX } from '../geometry';
+import { getBarStaffSegments } from './staff';
 import { f } from './style';
 
 /** One hand's barline segment at x, from its top rule to its bottom rule. */
@@ -104,23 +105,46 @@ export function renderBarlines(
   const lhTop = geo.equatorY('LH', 3) - 12;
   const lhBot = gridBotY(geo);
 
+  // Finale exception (last measure of the score only): extension rows drawn there run
+  // flush INTO the final barline (no gap), and the final vertical extends to exactly meet
+  // the outermost drawn extension row(s) — no overshoot. If the last bar draws no
+  // extension rows, the final barline height is unchanged.
+  let finalTop = rhTop;
+  let finalBot = lhBot;
+  if (isFinalScoreMeasure && (o.core === 'fixed-3' || o.core === 'fixed-4')) {
+    const finalMIdx =
+      geo.index === 0 && (t.anacrusisTicks ?? 0) > 0
+        ? o.measuresPerSystem
+        : o.measuresPerSystem - 1;
+    const segs = getBarStaffSegments(geo, finalMIdx);
+    const isFixed3 = o.core === 'fixed-3';
+    const topExtLin = isFixed3 ? 72 : 77.5;
+    const botExtLin = isFixed3 ? 24 : 17.5;
+    if (segs.some((s) => s.lin === topExtLin)) {
+      finalTop = geo.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+    }
+    if (segs.some((s) => s.lin === botExtLin)) {
+      finalBot = geo.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+    }
+  }
+
   /** Push one internal measure barline: continuous across the corridor. */
   const pushMeasure = (x: number, strokeWidth: number = 0.60): void => {
     if (channelled) out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
     out.push(renderStaffBarline(x, rhTop, lhBot, strokeWidth));
   };
 
-  /** The authoritative final boundary of the score. */
+  /** The authoritative final boundary of the score (stroke: 0.90pt). */
   const pushFinal = (x: number): void => {
     if (o.finalBarlineStyle === 'split-corridor') {
-      if (channelled) out.push(gridChannel(x, rhTop, rhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-      out.push(renderStaffBarline(x, rhTop, rhBot, 1.05));
-      if (channelled) out.push(gridChannel(x, lhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-      out.push(renderStaffBarline(x, lhTop, lhBot, 1.05));
+      if (channelled) out.push(gridChannel(x, finalTop, rhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
+      out.push(renderStaffBarline(x, finalTop, rhBot, 0.90));
+      if (channelled) out.push(gridChannel(x, lhTop, finalBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
+      out.push(renderStaffBarline(x, lhTop, finalBot, 0.90));
       return;
     }
-    if (channelled) out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-    out.push(renderStaffBarline(x, rhTop, lhBot, 1.05));
+    if (channelled) out.push(gridChannel(x, finalTop, finalBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
+    out.push(renderStaffBarline(x, finalTop, finalBot, 0.90));
   };
 
   const anacrusis = t.anacrusisTicks ?? 0;

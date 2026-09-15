@@ -44,9 +44,9 @@ export const ARCHITECTURAL_BRACKET_STROKE = 0.65;
 /** Horizontal reach (pt) of System 1 architectural bracket's spurs (slightly grander). */
 export const SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR = 3.5;
 /** Stroke (pt) of System 1 architectural bracket (slightly grander). */
-export const SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE = 0.75;
-/** Delta between System 1 bracket stroke and Systems 2+ stroke. */
-export const SYSTEM_1_BRACKET_STROKE_DELTA = 0.10;
+export const SYSTEM_1_ARCHITECTURAL_BRACKET_STROKE = 0.90;
+/** Delta between System 1 bracket stroke and Systems 2+ stroke (operator ruling: 0.90 vs 0.65, no delta preservation). */
+export const SYSTEM_1_BRACKET_STROKE_DELTA = 0.25;
 /** Delta between System 1 bracket spur reach and Systems 2+ spur reach. */
 export const SYSTEM_1_BRACKET_SPUR_DELTA = 0.50;
 /**

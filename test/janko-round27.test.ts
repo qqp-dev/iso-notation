@@ -201,7 +201,7 @@ test('Candidate captions match rendered fold counts', () => {
 // 6. New-golden regression pins (R27 verdict enacted)
 // ---------------------------------------------------------------------------
 
-test('New-golden pins: fixed-3 default, zero folds/brackets on Bach, C2 and C6 extensions fire', () => {
+test('New-golden pins: fixed-3 default, zero folds/brackets on Bach, C6 on Bach and C2 on Brahms fire', () => {
   assert.equal(DEFAULT_JANKO_OPTIONS.core, 'fixed-3', 'golden default core is fixed-3');
 
   const layouts = layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
@@ -210,12 +210,21 @@ test('New-golden pins: fixed-3 default, zero folds/brackets on Bach, C2 and C6 e
   const brackets = layouts.flatMap((s) => s.ottavaBrackets ?? []);
   assert.equal(brackets.length, 0, 'Bach golden renders 0 ottava brackets');
 
-  // Extension rule visibly working on the golden:
-  // C2 extension (lin 24) fires on at least one low system (lin 26–29 notes)
-  const c2Systems = layouts.filter((s) => (s.geometry.extensionLines ?? []).includes(24));
-  assert.ok(c2Systems.length >= 1, 'Bach golden fires C2 extension on at least one low system');
+  // Extension rule visibly working under strict rows:
+  // Bach's minimum note is lin 26 (D2 > 24), so Bach golden does NOT fire C2 extension (lin 24)
+  const bachC2Systems = layouts.filter((s) => (s.geometry.extensionLines ?? []).includes(24));
+  assert.equal(bachC2Systems.length, 0, 'Bach golden min note (26 > 24) correctly does not fire C2 extension');
 
-  // C6 extension (lin 72) fires on at least one high system (lin 72–74 notes)
+  // C6 extension (lin 72) fires on at least one high system (lin 72–74 notes in mm. 29–30)
   const c6Systems = layouts.filter((s) => (s.geometry.extensionLines ?? []).includes(72));
   assert.ok(c6Systems.length >= 1, 'Bach golden fires C6 extension on at least one high system');
+
+  // Brahms fixed-3 reaches lin 9 (<= 24), firing C2 extension on low systems
+  const brahmsLayouts = layoutJankoScore(
+    BRAHMS,
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' }),
+    resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
+  );
+  const brahmsC2Systems = brahmsLayouts.filter((s) => (s.geometry.extensionLines ?? []).includes(24));
+  assert.ok(brahmsC2Systems.length >= 1, 'Brahms fixed-3 fires C2 extension on low systems');
 });

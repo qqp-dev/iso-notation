@@ -80,7 +80,7 @@ import {
   renderSystem,
   suppressedStemIds,
 } from './engine';
-import { getEquatorRuleYs, pitchGridRules } from './elements/staff';
+import { getBarStaffSegments, getEquatorRuleYs, pitchGridRules } from './elements/staff';
 import { continuousPitchY } from './geometry';
 import { resolveBeatPulseXs } from './elements/barlines';
 import {
@@ -2139,9 +2139,33 @@ export function systemBarlines(
   const barlines: BarlineSpan[] = [];
   const anacrusis = t.anacrusisTicks ?? 0;
   const unifiedFinal = o.finalBarlineStyle === 'unified' && layout.isFinalSystem;
+  let finalTop = grid.top;
+  let finalBot = grid.bottom;
+  if (layout.isFinalSystem && (o.core === 'fixed-3' || o.core === 'fixed-4')) {
+    const finalMIdx =
+      layout.index === 0 && anacrusis > 0 ? o.measuresPerSystem : o.measuresPerSystem - 1;
+    const segs = getBarStaffSegments(g, finalMIdx);
+    const isFixed3 = o.core === 'fixed-3';
+    const topExtLin = isFixed3 ? 72 : 77.5;
+    const botExtLin = isFixed3 ? 24 : 17.5;
+    if (segs.some((s) => s.lin === topExtLin)) {
+      finalTop = g.middleCY + continuousPitchY(topExtLin, t.semitoneScale);
+    }
+    if (segs.some((s) => s.lin === botExtLin)) {
+      finalBot = g.middleCY + continuousPitchY(botExtLin, t.semitoneScale);
+    }
+  }
   const push = (x: number, isSystemEnd: boolean = false): void => {
     if (isSystemEnd && !unifiedFinal) {
-      for (const span of spans) barlines.push({ x, top: span.top, bottom: span.bottom });
+      for (const span of spans) {
+        const top = span === spans[0] ? finalTop : span.top;
+        const bottom = span === spans[spans.length - 1] ? finalBot : span.bottom;
+        barlines.push({ x, top, bottom });
+      }
+      return;
+    }
+    if (isSystemEnd && layout.isFinalSystem) {
+      barlines.push({ x, top: finalTop, bottom: finalBot });
       return;
     }
     barlines.push({ x, top: grid.top, bottom: grid.bottom });
