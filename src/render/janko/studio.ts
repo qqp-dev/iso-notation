@@ -107,7 +107,12 @@ export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
   },
 ];
 
-/** The reference-view macro crops, chosen to cover every critical zone. */
+/**
+ * The retired Bach reference-view macro crops. Dropped from the default
+ * Reference by operator order (visual weight, not necessary — the full
+ * spread stays); kept exported so an explicit `crops` override can still
+ * resurrect them. The Brahms crops ({@link BRAHMS_STUDIO_CROPS}) are live.
+ */
 export const DEFAULT_STUDIO_CROPS: StudioCrop[] = [
   {
     start: 1,
@@ -250,7 +255,9 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     tokens,
     candidates: overrides.candidates ?? CURRENT_CANDIDATES,
     round: overrides.round ?? CURRENT_ROUND_METADATA,
-    crops: overrides.crops ?? DEFAULT_STUDIO_CROPS,
+    // Bach carries no focus crops by default (operator order); pass
+    // `crops` explicitly to resurrect DEFAULT_STUDIO_CROPS on demand.
+    crops: overrides.crops ?? [],
     pages: overrides.pages ?? Array.from({ length: totalPages }, (_, i) => i),
     brahmsCrops: overrides.brahmsCrops ?? BRAHMS_STUDIO_CROPS,
     brahmsPages: overrides.brahmsPages ?? Array.from({ length: brahmsPages }, (_, i) => i),
@@ -573,6 +580,15 @@ function renderReferenceScore(
       : designation.badge === 'GOLD'
         ? ' <span class="tag tag-gold">GOLD · frozen standard</span>'
         : ' <span class="tag tag-bronze">BRONZE · active surface</span>';
+  // A cropless block (Bach, by operator order) omits the whole section —
+  // no empty heading weighs on the page.
+  const cropsSection =
+    cropCards.length === 0
+      ? ''
+      : [
+          '  <h3 class="section-title">Macro focus crops (288 DPI equivalent)</h3>',
+          `  <div class="crop-grid">${cropCards.join('\n')}</div>`,
+        ].join('\n');
   return [
     `<div class="reference-score" data-score="${scoreId}">`,
     '  <div class="golden-card">',
@@ -598,14 +614,15 @@ function renderReferenceScore(
     '  </div>',
     '  <h3 class="section-title">Full page spread</h3>',
     `  <div class="page-grid">${pageCards.join('\n')}</div>`,
-    '  <h3 class="section-title">Macro focus crops (288 DPI equivalent)</h3>',
-    `  <div class="crop-grid">${cropCards.join('\n')}</div>`,
+    cropsSection,
     '  <details class="diagnostics" open>',
     `    <summary>Diagnostics (${report.diagnostics.length})</summary>`,
     `    <ul>${renderDiagnostics(report, knowns > 0 ? designation?.knownCode : undefined)}</ul>`,
     '  </details>',
     '</div>',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
@@ -614,13 +631,16 @@ function renderReferenceScore(
  * Bach GOLD AND, since Round 30, the Brahms BRONZE beside it (fixed-3 since
  * Round 31, with its four known folding findings tagged). Every round judges
  * against these objects; neither is ever a draft.
+ *
+ * The BRONZE Brahms block leads (Brahms is the live iteration surface) and
+ * the GOLD Bach block follows without focus crops (operator order — Bach's
+ * crop weight is dropped, its full spread stays).
  */
 export function renderReferenceView(config: JankoStudioConfig = createStudioConfig()): string {
   const { score, options, tokens, crops, pages } = config;
   const brahms = config.scores[BRAHMS_STUDIO_SCORE_ID];
   return [
     '<section class="view-panel" id="view-reference" data-view="reference">',
-    renderReferenceScore('primary', score, options, tokens, pages, crops, { badge: 'GOLD' }),
     renderReferenceScore(
       BRAHMS_STUDIO_SCORE_ID,
       brahms.score,
@@ -630,6 +650,7 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
       config.brahmsCrops,
       { badge: 'BRONZE', knownCode: 'stem-through-simultaneity' }
     ),
+    renderReferenceScore('primary', score, options, tokens, pages, crops, { badge: 'GOLD' }),
     '</section>',
   ].join('\n');
 }

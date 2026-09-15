@@ -53,8 +53,14 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   // overlapping (the full-piece slot-fit audit reports it). Its bespoke
   // notation therefore keeps three taller systems per page.
   systemsPerPage: 3,
-  title: "J. Brahms: 6 Klavierstücke, Op. 118",
-  subtitle: "No. 1. Intermezzo in A minor — Allegro non assai, ma molto appassionato",
+  // Title block (operator order — composer right-only, title fits): no
+  // composer prefix up top (it duplicated the right-aligned composer on
+  // p0 and stuttered in every running head); the subtitle keeps the
+  // tempo head with 135.4pt of air to the composer (measured Liberation
+  // Serif Italic v2.1.5 advances; the full marking survives verbatim in
+  // score.tempos below). Renderer untouched — Bach stays byte-identical.
+  title: "6 Klavierstücke, Op. 118",
+  subtitle: "No. 1. Intermezzo in A minor — Allegro non assai",
   composer: "Johannes Brahms",
 };
 
