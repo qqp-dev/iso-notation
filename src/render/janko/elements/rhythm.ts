@@ -389,6 +389,56 @@ export function renderSubdivisionMark(
   return `    <path ${head} d="${d}" fill="#111111" stroke="none"${tail}/>`;
 }
 
+export interface SubdivisionBBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Baked bounding box of a subdivision flag mark / glyph relative to the stem tip (stemX, tipY).
+ * For `'classical-urtext'`, uses the baked SMuFL/Bravura verbatim glyph bbox.
+ * For the crescent styles, uses the classicalFlagPath extents.
+ */
+export function getSubdivisionGlyphBBox(
+  style: JankoSubdivisionStyle = 'classical-urtext',
+  direction: -1 | 1 = -1,
+  marks: number = 1,
+  tokens?: Partial<JankoTokens> | null
+): SubdivisionBBox {
+  const t = resolveJankoTokens(tokens);
+  if (style === 'classical-urtext') {
+    const table = direction === -1 ? URTEXT_FLAGS_UP : URTEXT_FLAGS_DOWN;
+    const g = table[Math.min(Math.max(marks, 1), 4) - 1];
+    return {
+      x0: g.bbox[0],
+      y0: g.bbox[1],
+      x1: g.bbox[2],
+      y1: g.bbox[3],
+    };
+  }
+  const w = t.flagWidth;
+  const h = t.flagHeight;
+  const root = SUBDIVISION_ROOT[style];
+  const r = root / 2;
+  const sign = -direction;
+  if (sign === 1) {
+    return {
+      x0: 0,
+      y0: -r,
+      x1: w,
+      y1: (marks - 1) * t.flagSpacing + 0.88 * h,
+    };
+  }
+  return {
+    x0: 0,
+    y0: -(marks - 1) * t.flagSpacing - 0.88 * h,
+    x1: w,
+    y1: r,
+  };
+}
+
 /**
  * Round 22: one transcribed Bravura flag glyph at the stem tip. Bravura nests
  * inner flags inside a single sweep with open counters, so one glyph per note

@@ -114,6 +114,7 @@ import {
   computeBeamGroupGeometry,
   computeClaspGeometry,
   computeVerticalChordGroup,
+  getSubdivisionGlyphBBox,
   getStemAttachmentRadius,
   getStemGeometry,
   partitionBeamGroups,
@@ -122,6 +123,7 @@ import {
   renderClaspGroup,
   renderRhythm,
   stemDirection,
+  subdivisionMarkCount,
   withClaspRail,
 } from './elements/rhythm';
 import {
@@ -1494,6 +1496,126 @@ export function resolveDotHighLane(
       };
     }
     return p;
+  });
+}
+
+/**
+ * Round 29 — **augmentation dot flag clearance**.
+ *
+ * Under `dotRule !== 'legacy'`, a dotted note's augmentation dot must clear its
+ * true verbatim flag ink box by at least `augmentationDotGap` (1.2pt),
+ * escaping RIGHT first (preserving height-meaning), then UP, never left or down.
+ */
+export function resolveDotFlagClearance(
+  notes: readonly PositionedJankoNote[],
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): PositionedJankoNote[] {
+  if (o.dotRule === 'legacy') return [...notes];
+  const dotR = t.augmentationDotRadius;
+  const gap = t.augmentationDotGap;
+  const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+
+  // Standalone/unbeamable notes with marks carry flags.
+  const rhythmNotes = notes.map((p) => p.rhythm);
+  const partition =
+    o.rhythmStyle === 'beamed' ? partitionBeamGroups(rhythmNotes, t, geo.middleCY) : null;
+  const beamedIds = partition
+    ? new Set(partition.groups.flatMap((g) => g.map((n) => n.id)))
+    : null;
+
+  return notes.map((p) => {
+    const dur = p.note.durationTicks;
+    if (dur <= 26 || dur > 38) return p;
+    if (beamedIds && beamedIds.has(p.note.id)) return p;
+    const marks = subdivisionMarkCount(dur);
+    if (marks < 1) return p;
+
+    const s = getStemGeometry(p.rhythm, t);
+    const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
+    const fBox = {
+      x0: s.stemX + bbox.x0,
+      y0: s.stemEndY + bbox.y0,
+      x1: s.stemX + bbox.x1,
+      y1: s.stemEndY + bbox.y1,
+    };
+
+    const curX =
+      p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + gap;
+    const curY = p.rhythm.dotY ?? p.y;
+
+    const dx = Math.max(fBox.x0 - curX, 0, curX - fBox.x1);
+    const dy = Math.max(fBox.y0 - curY, 0, curY - fBox.y1);
+    const distToFlag = Math.hypot(dx, dy) - dotR;
+    if (distToFlag >= gap - 1e-9) return p;
+
+    // Must escape!
+    // Try escaping RIGHT first (preserves height-meaning)
+    const rightX = fBox.x1 + dotR + gap;
+    let rightBlocked = false;
+    for (const q of notes) {
+      if (q === p) continue;
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const qdx = Math.max(q.x - wx - rightX, 0, rightX - (q.x + wx));
+      const qdy = Math.max(q.y - hy - curY, 0, curY - (q.y + hy));
+      const d = isPositionOfHonor(q.note.startTick)
+        ? Math.hypot(rightX - q.x, curY - q.y) - haloOuter
+        : Math.hypot(qdx, qdy);
+      if (d < dotR - EPS) {
+        rightBlocked = true;
+        break;
+      }
+    }
+
+    if (!rightBlocked) {
+      return {
+        ...p,
+        rhythm: {
+          ...p.rhythm,
+          dotX: rightX,
+          dotY: curY,
+        },
+      };
+    }
+
+    // Try escaping UP
+    const upY = fBox.y0 - dotR - gap;
+    let upBlocked = false;
+    for (const q of notes) {
+      if (q === p) continue;
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const qdx = Math.max(q.x - wx - curX, 0, curX - (q.x + wx));
+      const qdy = Math.max(q.y - hy - upY, 0, upY - (q.y + hy));
+      const d = isPositionOfHonor(q.note.startTick)
+        ? Math.hypot(curX - q.x, upY - q.y) - haloOuter
+        : Math.hypot(qdx, qdy);
+      if (d < dotR - EPS) {
+        upBlocked = true;
+        break;
+      }
+    }
+
+    if (!upBlocked) {
+      return {
+        ...p,
+        rhythm: {
+          ...p.rhythm,
+          dotX: curX,
+          dotY: upY,
+        },
+      };
+    }
+
+    // Escape totality: dots are mandatory ink (no refusal path)
+    return {
+      ...p,
+      rhythm: {
+        ...p.rhythm,
+        dotX: rightX,
+        dotY: curY,
+      },
+    };
   });
 }
 
@@ -3795,10 +3917,12 @@ export function layoutJankoSystem(
   }
   // Round 17: the dot high-lane fallback resolves on the solved columns, where
   // same-row neighbours sit at their final x.
-  const notes = resolveDotHighLane(chordColumns.notes, geometry, o, t);
+  const notesAfterHighLane = resolveDotHighLane(chordColumns.notes, geometry, o, t);
+  // Round 29: dot flag-clearance standard escapes flagged singles right then up
+  const notes = resolveDotFlagClearance(notesAfterHighLane, geometry, o, t);
   // Round 20: a merged mixed-duration voice follows its survivor's solved
   // column, so its stem/beam/flag leaves the one painted head.
-  const solvedById = new Map(chordColumns.notes.map((p) => [p.note.id, p]));
+  const solvedById = new Map(notes.map((p) => [p.note.id, p]));
   const unisonVoices = mergedVoices.map((voice) => {
     const survivor = solvedById.get(voice.unisonSurvivorId ?? '');
     if (!survivor) return voice;
@@ -3813,9 +3937,11 @@ export function layoutJankoSystem(
           ? {}
           : {
               dotX:
+                survivor.rhythm.dotX ??
                 survivor.x +
                 getClusterSpacingPreset(o.clusterSpacing).wx +
                 t.augmentationDotGap,
+              dotY: survivor.rhythm.dotY,
             }),
       },
     };

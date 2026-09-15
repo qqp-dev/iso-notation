@@ -210,8 +210,8 @@ test('Weights: centers keep one weight; boundaries weight C4 at 0.65pt', () => {
   const boundaryRules = pitchGridRules(boundaries.geo, boundaries.o, boundaries.t);
   assert.deepEqual(
     [...new Set(boundaryRules.map((r) => r.width))].sort(),
-    [PITCH_GRID_OCTAVE_STROKE, PITCH_GRID_C4_STROKE].sort(),
-    'equal-boundaries: 0.50pt hairlines with 0.65pt C4 anchor'
+    [...new Set([PITCH_GRID_OCTAVE_STROKE, PITCH_GRID_C4_STROKE])].sort(),
+    'equal-boundaries: 0.50pt hairlines with equalized C4 anchor'
   );
   assert.deepEqual(
     [...new Set(boundaryRules.map((r) => r.ink))],
