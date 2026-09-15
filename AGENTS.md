@@ -94,3 +94,11 @@ Headless implementers must not render images to see a defect. Run the mathematic
     - `npm run build`
   - **NEVER** run ad-hoc or unconfigured compiler flags (e.g. `tsc --noEmit --noUnusedLocals --noUnusedParameters`) that are not enabled in `tsconfig.json` or `package.json`.
   - **NEVER** embark on rabbit holes attempting to fix pre-existing unused parameters, dead code, or refactor functions outside the ticket's explicit scope. Keep diffs strictly minimal and bounded to the ticket requirements.
+
+---
+
+## 6. Download-PDF Release Rule (`npm run pdf`)
+
+- The studio's "Download PDF" is `public/goldberg-variation-1.pdf`, exported from the judged golden by `npm run pdf` (`scripts/export-pdf.ts`: engine pages → `rsvg-convert -f pdf` at default DPI → `pdfunite` join).
+- **After ANY golden change, run `npm run pdf` and commit the result.** `test/janko-pdf.test.ts` regenerates the PDF and compares a semantic fingerprint (page count/size, text layer, vector geometry, subset fonts, zero raster images, ×4/3 title text scale) against the committed file; a stale PDF fails `npm test` and `deploy.yml` blocks the Pages publish.
+- Never pass `-d 72 -p 72` to rsvg-convert: its default 96 DPI renders text at ×4/3 by design (11pt title → Tm 14.667), pinned by the test.
