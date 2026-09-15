@@ -1359,7 +1359,7 @@ export function checkDotCollision(
       });
       break;
     }
-    if (o.dotRule !== 'legacy' && (!beamedIds || !beamedIds.has(p.note.id))) {
+    if (!beamedIds || !beamedIds.has(p.note.id)) {
       const marks = subdivisionMarkCount(dur);
       if (marks >= 1) {
         const s = getStemGeometry(p.rhythm, t);

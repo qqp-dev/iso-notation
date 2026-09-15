@@ -1,32 +1,28 @@
 /**
- * Round 29: Preview Round — New Dot Standard + Thin Extensions; Symmetric-6 Barlines Golden-Immediate
- * ===================================================================================================
+ * Round 29 FLIPS LANDED — New Dot Standard + Thin Extensions + Lightened Rests (golden).
+ * ===================================================================================
  *
- * Durable maintained test suite verifying:
- *  0. Core equalization GOLDEN-IMMEDIATE: PITCH_GRID_C4_STROKE 0.70 -> 0.50 (equalized
- *     to PITCH_GRID_OCTAVE_STROKE); all three core rows identical at 0.50pt.
- *  1. Symmetric-6 spans GOLDEN-IMMEDIATE: measure barlines and beat pulses stand off outer-row
- *     levels by exactly measureInset (6.0pt) on both sides (|top gap - 6| and |bottom gap - 6| < EPS);
- *     shared span functions move both; finale path extends iff outer rows drawn.
- *  2. Dots preview card (option dotRule: 'legacy' default vs 'flag-clearance'/'new'):
- *     - Note dot clears true verbatim flag ink by >= augmentationDotGap (1.2pt), escaping right then up.
- *     - Bach m.1 tick 24 dot clears true flag ink and clears tick 60 follower.
- *     - Legacy-12 -> new-0 demonstration test across Bach.
- *     - Brahms clasp displacement exactly 0 (both tick 48 and tick 432 instances).
- *     - Audit-box == baked-extents agreement per subdivision style.
- *     - Corpus scan finds zero unresolvable cases.
- *  3. Thin preview card (option extensionWeight: default 0.50 vs 0.35):
- *     - Extension rows render at 0.35pt reusing PITCH_GRID_C_LINE_STROKE, same ink (#1E293B).
- *     - Core rows untouched at 0.50pt.
- *  4. Round 29 registry:
- *     - Exactly two cards, NO control card, one delta per card.
- *     - Windows resolve (Card D: Bach m.1, Brahms m.1; Card T: Bach mm. 29–30).
- *     - Captions match rendered counts.
- *     - Both cards lint-clean (chips green).
+ * Round 29 is JUDGED. The two preview cards are consumed and their options retired:
+ *  0. Core equalization (golden since PR #48): PITCH_GRID_C4_STROKE 0.50, all core rows 0.50pt.
+ *  1. Symmetric-6 spans (golden since PR #48): barlines/beat pulses stand off outer-row
+ *     levels by exactly 6.0pt on both sides.
+ *  2. Dots golden: every augmentation dot clears TRUE verbatim flag ink by >= 1.2pt,
+ *     escaping right first then up — Bach m.1 tick-24 clearance, Bach golden 0 collisions,
+ *     Brahms clasps (tick 48, tick 432) unmoved, audit-box == baked-extents agreement,
+ *     corpus escape-totality. No dot option or legacy code remains.
+ *  3. Thin golden: extension rows render 0.35pt (fixed-3: lin 24/72; fixed-4: 17.5/77.5),
+ *     reusing PITCH_GRID_C_LINE_STROKE; core rows untouched at 0.50pt; ink unchanged.
+ *  4. Rest lightening golden-direct: the live family (5 verbatim glyphs + block) renders
+ *     at 0.85 scale in 90% black (#1A1A1A); verbatim constants byte-identical; seating
+ *     centers unchanged; linter resolves scaled extents.
+ *  5. Registry: Round 29 retired, no open previews (CURRENT_CANDIDATES = []).
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
@@ -35,13 +31,9 @@ import {
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
-  DEFAULT_STUDIO_SCORE_ID,
-  candidateBadges,
   getCandidate,
-  resolveCandidate,
 } from '../src/render/janko/candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -55,6 +47,7 @@ import {
   computePageGeometry,
   getSystemGeometry,
   layoutJankoScore,
+  renderJankoCrop,
 } from '../src/render/janko/engine';
 import {
   PITCH_GRID_C4_STROKE,
@@ -69,28 +62,39 @@ import {
   gridTopY,
   renderBarlines,
   renderBeatGrid,
-  resolveBeatPulseXs,
 } from '../src/render/janko/elements/barlines';
 import {
   getStemGeometry,
   getSubdivisionGlyphBBox,
+  partitionBeamGroups,
   subdivisionMarkCount,
 } from '../src/render/janko/elements/rhythm';
-import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from '../src/render/janko/elements/urtext-paths';
-import { continuousPitchY } from '../src/render/janko/geometry';
 import {
-  LintViolation,
-  checkDotCollision,
-  lintJankoScore,
-  systemBarlines,
-} from '../src/render/janko/linter';
+  REST_BLOCK_HEIGHT,
+  REST_BLOCK_WIDTH,
+  REST_INK,
+  REST_SCALE,
+  restInk,
+  restInkBox,
+} from '../src/render/janko/elements/rests';
+import {
+  URTEXT_FLAGS_DOWN,
+  URTEXT_FLAGS_UP,
+  URTEXT_REST_QUARTER,
+  URTEXT_RESTS,
+} from '../src/render/janko/elements/urtext-paths';
+import { continuousPitchY } from '../src/render/janko/geometry';
+import { lintJankoScore, systemBarlines } from '../src/render/janko/linter';
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const EPS = 1e-9;
 
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, '..');
+
 // ---------------------------------------------------------------------------
-// Section 0. Core Equalization GOLDEN-IMMEDIATE
+// Section 0. Core Equalization (golden since PR #48)
 // ---------------------------------------------------------------------------
 
 test('Core equalization: PITCH_GRID_C4_STROKE is 0.50pt equal to PITCH_GRID_OCTAVE_STROKE', () => {
@@ -126,7 +130,7 @@ test('Core equalization: all three core rows in fixed-3 render at identical 0.50
 });
 
 // ---------------------------------------------------------------------------
-// Section 1. Symmetric-6 Spans GOLDEN-IMMEDIATE
+// Section 1. Symmetric-6 Spans (golden since PR #48)
 // ---------------------------------------------------------------------------
 
 test('Symmetric-6 spans: barline tips stand off outer-row levels by exactly 6.0pt on both sides (Bach)', () => {
@@ -215,13 +219,13 @@ test('Symmetric-6 spans: finale barline path conjoin preserved (extends iff oute
 });
 
 // ---------------------------------------------------------------------------
-// Section 2. Dots Preview Card
+// Section 2. Dots GOLDEN (Card D consumed; no dot option remains)
 // ---------------------------------------------------------------------------
 
-test('Dots: m.1 tick-24 dot clears true flag ink by >= 1.2pt AND clears tick-60 follower', () => {
-  const oNew = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, dotRule: 'flag-clearance' });
+test('Dots golden: m.1 tick-24 dot clears true flag ink by >= 1.2pt AND clears tick-60 follower', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const [sys] = layoutJankoScore(BACH, oNew, t);
+  const [sys] = layoutJankoScore(BACH, o, t);
 
   const n5 = sys.notes.find((n) => n.note.id === 'bach-var1-5')!;
   const n7 = sys.notes.find((n) => n.note.id === 'bach-var1-7')!;
@@ -253,7 +257,7 @@ test('Dots: m.1 tick-24 dot clears true flag ink by >= 1.2pt AND clears tick-60 
   );
 
   // Clearance from follower note n7 (starts at tick 60)
-  const n7Preset = getClusterSpacingPreset(oNew.clusterSpacing);
+  const n7Preset = getClusterSpacingPreset(o.clusterSpacing);
   const n7dx = Math.max(n7.x - n7Preset.wx - dotX, 0, dotX - (n7.x + n7Preset.wx));
   const n7dy = Math.max(n7.y - n7Preset.hy - dotY, 0, dotY - (n7.y + n7Preset.hy));
   const followerClearance = Math.hypot(n7dx, n7dy) - dotR;
@@ -263,78 +267,78 @@ test('Dots: m.1 tick-24 dot clears true flag ink by >= 1.2pt AND clears tick-60 
   );
 });
 
-test('Dots demonstration test: legacy-12 -> new-0 flag collisions on Bach', () => {
+test('Dots golden pin: Bach ships 0 dot-flag collisions (19 dotted flagged singles audited)', () => {
+  // Replaces the retired legacy-12 -> new-0 demonstration test: the legacy path
+  // is gone, so golden pins 0 collisions directly over every dotted flagged
+  // single, linter-consistent (beamed notes carry no flags and are skipped).
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const oLegacy = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, dotRule: 'legacy' });
-  const oNew = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, dotRule: 'flag-clearance' });
 
-  const countFlagCollisions = (layouts: ReturnType<typeof layoutJankoScore>): number => {
-    let count = 0;
-    for (const sys of layouts) {
-      for (const p of sys.notes) {
-        if (p.note.durationTicks <= 26 || p.note.durationTicks > 38) continue;
-        const s = getStemGeometry(p.rhythm, t);
-        const marks = subdivisionMarkCount(p.note.durationTicks);
-        if (marks < 1) continue;
-        const bbox = getSubdivisionGlyphBBox('classical-urtext', s.direction, marks, t);
-        const fBox = {
-          x0: s.stemX + bbox.x0,
-          y0: s.stemEndY + bbox.y0,
-          x1: s.stemX + bbox.x1,
-          y1: s.stemEndY + bbox.y1,
-        };
-        const dotX = p.rhythm.dotX ?? p.x + getClusterSpacingPreset('tight').wx + t.augmentationDotGap;
-        const dotY = p.rhythm.dotY ?? p.y;
-        const dx = Math.max(fBox.x0 - dotX, 0, dotX - fBox.x1);
-        const dy = Math.max(fBox.y0 - dotY, 0, dotY - fBox.y1);
-        const dist = Math.hypot(dx, dy) - t.augmentationDotRadius;
-        if (dist < t.augmentationDotGap - EPS) {
-          count++;
-        }
-      }
-    }
-    return count;
-  };
-
-  const legacyCollisions = countFlagCollisions(layoutJankoScore(BACH, oLegacy, t));
-  const newCollisions = countFlagCollisions(layoutJankoScore(BACH, oNew, t));
-
-  assert.equal(legacyCollisions, 12, 'exactly 12 dotted notes violate flag clearance under legacy');
-  assert.equal(newCollisions, 0, 'exactly 0 flag collisions under new dot standard');
-});
-
-test('Dots: Brahms clasp dot displacement exactly 0 (both m.1 tick 48 and m.4 tick 432 instances)', () => {
-  // Brahms m.1 probe outcome: Following onset tick 72 is at x=107.94, >23pt to the right,
-  // and down in the bass staff; it does not constrain the clasp dot. Brahms m.1 literal window
-  // resolves cleanly, showing the clasp dot unmoved (displacement 0).
-  const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const oLegacy = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, dotRule: 'legacy' });
-  const oNew = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, dotRule: 'flag-clearance' });
-
-  const sysLegacy = layoutJankoScore(BRAHMS, oLegacy, t);
-  const sysNew = layoutJankoScore(BRAHMS, oNew, t);
-
-  const getDottedClasps = (systems: typeof sysLegacy) =>
-    systems.flatMap((s) => s.clasps ?? []).filter((c) => c.durationInk.some((ink) => ink.dotted));
-
-  const claspsLegacy = getDottedClasps(sysLegacy);
-  const claspsNew = getDottedClasps(sysNew);
-
-  assert.equal(claspsLegacy.length, claspsNew.length);
-  assert.ok(claspsLegacy.length >= 2, 'Brahms contains >= 2 dotted clasps');
-
-  for (let i = 0; i < claspsLegacy.length; i++) {
-    const cl = claspsLegacy[i];
-    const cn = claspsNew[i];
-    for (let j = 0; j < cl.durationDots.length; j++) {
-      const dl = cl.durationDots[j];
-      const dn = cn.durationDots[j];
-      if (!dl && !dn) continue;
-      assert.ok(dl && dn, 'both dots defined');
-      const displacement = Math.hypot(dn.x - dl.x, dn.y - dl.y);
-      assert.equal(displacement, 0, `clasp dot at index ${i}.${j} has displacement exactly 0`);
+  let scanned = 0;
+  let collisions = 0;
+  for (const sys of layoutJankoScore(BACH, o, t)) {
+    const partition =
+      o.rhythmStyle === 'beamed'
+        ? partitionBeamGroups(
+            sys.notes.map((p) => p.rhythm),
+            t,
+            sys.geometry.middleCY
+          )
+        : null;
+    const beamedIds = partition
+      ? new Set(partition.groups.flatMap((g) => g.map((n) => n.id)))
+      : null;
+    for (const p of sys.notes) {
+      if (p.note.durationTicks <= 26 || p.note.durationTicks > 38) continue;
+      if (beamedIds && beamedIds.has(p.note.id)) continue;
+      const marks = subdivisionMarkCount(p.note.durationTicks);
+      if (marks < 1) continue;
+      scanned++;
+      const s = getStemGeometry(p.rhythm, t);
+      const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
+      const fBox = {
+        x0: s.stemX + bbox.x0,
+        y0: s.stemEndY + bbox.y0,
+        x1: s.stemX + bbox.x1,
+        y1: s.stemEndY + bbox.y1,
+      };
+      const dotX = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + t.augmentationDotGap;
+      const dotY = p.rhythm.dotY ?? p.y;
+      const dx = Math.max(fBox.x0 - dotX, 0, dotX - fBox.x1);
+      const dy = Math.max(fBox.y0 - dotY, 0, dotY - fBox.y1);
+      const dist = Math.hypot(dx, dy) - t.augmentationDotRadius;
+      if (dist < t.augmentationDotGap - EPS) collisions++;
     }
   }
+
+  assert.equal(scanned, 19, 'the audit covers all 19 dotted flagged singles (non-vacuous)');
+  assert.equal(collisions, 0, 'golden ships 0 dot-flag collisions');
+});
+
+test('Dots golden: Brahms clasp dots UNMOVED — m.1 (tick 48) and m.4 (tick 432) pinned exactly', () => {
+  // The legacy-vs-new displacement comparison retires with the legacy path; the
+  // judged clasp-dot positions are pinned absolutely instead, so any future
+  // move fails. (Clasp dots are computed independently of the note-dot rule.)
+  const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+  const systems = layoutJankoScore(BRAHMS, o, t);
+  const clasps = systems.flatMap((s) => s.clasps ?? []);
+
+  const m1 = clasps.find((c) => c.tick === 48)!;
+  const m4 = clasps.find((c) => c.tick === 432)!;
+  assert.ok(m1, 'Brahms m.1 (tick 48) dotted clasp present');
+  assert.ok(m4, 'Brahms m.4 (tick 432) dotted clasp present');
+
+  const d1 = m1.durationDots.filter((d) => d !== null);
+  const d4 = m4.durationDots.filter((d) => d !== null);
+  assert.equal(d1.length, 1, 'm.1 clasp carries one dot');
+  assert.equal(d4.length, 1, 'm.4 clasp carries one dot');
+
+  // Judged PR #48 positions, pinned to the float.
+  assert.equal(d1[0]!.x, 84.08115384615381, 'm.1 clasp dot x unmoved');
+  assert.equal(d1[0]!.y, 157.92849488270818, 'm.1 clasp dot y unmoved');
+  assert.equal(d4[0]!.x, 419.65911657285125, 'm.4 clasp dot x unmoved');
+  assert.equal(d4[0]!.y, 166.29460137586668, 'm.4 clasp dot y unmoved');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
@@ -371,17 +375,14 @@ test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
   }
 });
 
-test('Dots: unresolvable-case scan finds zero across Bach and Brahms corpora', () => {
-  const oNew = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, dotRule: 'flag-clearance' });
+test('Dots golden: escape-totality scan finds zero across Bach and Brahms corpora', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const bachSystems = layoutJankoScore(BACH, oNew, t);
-
   const tBrahms = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const oBrahmsNew = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, dotRule: 'flag-clearance' });
-  const brahmsSystems = layoutJankoScore(BRAHMS, oBrahmsNew, tBrahms);
+  const oBrahms = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
 
-  const reportBach = lintJankoScore(BACH, oNew, t);
-  const reportBrahms = lintJankoScore(BRAHMS, oBrahmsNew, tBrahms);
+  const reportBach = lintJankoScore(BACH, o, t);
+  const reportBrahms = lintJankoScore(BRAHMS, oBrahms, tBrahms);
 
   const dotViolationsBach = reportBach.violations.filter((v) => v.code === 'dot-collision');
   const dotViolationsBrahms = reportBrahms.violations.filter((v) => v.code === 'dot-collision');
@@ -390,108 +391,230 @@ test('Dots: unresolvable-case scan finds zero across Bach and Brahms corpora', (
   assert.equal(dotViolationsBrahms.length, 0, 'Brahms has 0 unresolvable dot collisions');
 });
 
-// ---------------------------------------------------------------------------
-// Section 3. Thin Preview Card
-// ---------------------------------------------------------------------------
-
-test('Thin preview: m.29 outer row renders at 0.35pt under card T, 0.50pt under golden; core rows 0.50pt', () => {
-  const oDefault = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  const oThin = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, extensionWeight: 0.35 });
-  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-
-  const sysDefault = layoutJankoScore(BACH, oDefault, t)[7];
-  const sysThin = layoutJankoScore(BACH, oThin, t)[7];
-
-  const rulesDefault = pitchGridRules(sysDefault.geometry, oDefault, t);
-  const rulesThin = pitchGridRules(sysThin.geometry, oThin, t);
-
-  const c6Y = sysDefault.geometry.middleCY + continuousPitchY(72, t.semitoneScale);
-  const c4Y = sysDefault.geometry.middleCY + continuousPitchY(48, t.semitoneScale);
-
-  const extDefault = rulesDefault.find((r) => Math.abs(r.y - c6Y) < 1e-6);
-  const extThin = rulesThin.find((r) => Math.abs(r.y - c6Y) < 1e-6);
-  const coreDefault = rulesDefault.find((r) => Math.abs(r.y - c4Y) < 1e-6);
-  const coreThin = rulesThin.find((r) => Math.abs(r.y - c4Y) < 1e-6);
-
-  assert.ok(extDefault, 'default extension rule found');
-  assert.ok(extThin, 'thin extension rule found');
-  assert.ok(coreDefault, 'default core rule found');
-  assert.ok(coreThin, 'thin core rule found');
-
-  assert.equal(extDefault.width, 0.50, 'golden extension weight is 0.50pt');
-  assert.equal(extThin.width, 0.35, 'Card T extension weight is 0.35pt (PITCH_GRID_C_LINE_STROKE)');
-  assert.equal(extThin.width, PITCH_GRID_C_LINE_STROKE, 'reusing PITCH_GRID_C_LINE_STROKE');
-  assert.equal(coreDefault.width, 0.50, 'core row under golden is 0.50pt');
-  assert.equal(coreThin.width, 0.50, 'core row under Card T is untouched at 0.50pt');
-  assert.equal(extThin.ink, PITCH_GRID_OCTAVE_INK, 'ink is unchanged (#1E293B)');
-});
-
-// ---------------------------------------------------------------------------
-// Section 4. Round 29 Registry Purity & Gates
-// ---------------------------------------------------------------------------
-
-test('Round 29 registry purity: exactly 2 cards, NO control card, one delta per card', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 29);
-  assert.match(CURRENT_ROUND_METADATA.title, /New Dot Standard/);
-  assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
-    ['dotRule', 'extensionWeight'],
-    'two axes, two cards'
+test('Dots golden: no dot option or legacy code remains in the golden master', () => {
+  assert.ok(!('dotRule' in DEFAULT_JANKO_OPTIONS), 'dotRule is retired from the layout options');
+  assert.ok(
+    !('dotRule' in resolveJankoOptions(DEFAULT_JANKO_OPTIONS)),
+    'dotRule is retired from the resolved options'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two contenders (no control card)');
-
-  const [cardD, cardT] = CURRENT_CANDIDATES;
-  assert.equal(cardD.id, 'dots-new');
-  assert.equal(cardD.axis, 'dotRule');
-  assert.deepEqual(cardD.options, { dotRule: 'flag-clearance' });
-
-  assert.equal(cardT.id, 'extensions-thin');
-  assert.equal(cardT.axis, 'extensionWeight');
-  assert.deepEqual(cardT.options, { extensionWeight: 0.35 });
-
-  const badgesD = candidateBadges(cardD);
-  assert.equal(badgesD.length, 1);
-  assert.equal(badgesD[0].key, 'dotRule');
-
-  const badgesT = candidateBadges(cardT);
-  assert.equal(badgesT.length, 1);
-  assert.equal(badgesT[0].key, 'extensionWeight');
 });
 
-test('Round 29 windows resolve and captions match rendered counts', () => {
-  const cardD = getCandidate('dots-new')!;
-  const cardT = getCandidate('extensions-thin')!;
+// ---------------------------------------------------------------------------
+// Section 3. Thin GOLDEN (Card T consumed; no thin option remains)
+// ---------------------------------------------------------------------------
 
-  const resD = resolveCandidate(cardD);
-  const resT = resolveCandidate(cardT);
-
-  // Card D windows: Bach m.1 and Brahms m.1
-  assert.equal(resD.windows.length, 2);
-  assert.equal(resD.windows[0].scoreId, DEFAULT_STUDIO_SCORE_ID);
-  assert.equal(resD.windows[0].measureStart, 1);
-  assert.equal(resD.windows[0].measureCount, 1);
-  assert.equal(resD.windows[1].scoreId, BRAHMS_STUDIO_SCORE_ID);
-  assert.equal(resD.windows[1].measureStart, 1);
-  assert.equal(resD.windows[1].measureCount, 1);
-
-  // Card T windows: Bach mm. 29–30
-  assert.equal(resT.windows.length, 1);
-  assert.equal(resT.windows[0].scoreId, DEFAULT_STUDIO_SCORE_ID);
-  assert.equal(resT.windows[0].measureStart, 29);
-  assert.equal(resT.windows[0].measureCount, 2);
-
-  // Captions match: 12 flag-colliding dots move, 0 blocked; 0.35pt extension stroke
-  assert.match(cardD.description ?? '', /12 flag-colliding dots move; 0 blocked/);
-  assert.match(cardT.description ?? '', /0\.35pt/);
-});
-
-test('Round 29 linter cleanliness: both cards lint clean (chips green)', () => {
+test('Thin golden: m.29 extension row renders at 0.35pt, core rows untouched at 0.50pt', () => {
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  for (const card of CURRENT_CANDIDATES) {
-    const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, ...(card.options ?? {}) });
-    const report = lintJankoScore(BACH, o, t);
-    assert.equal(report.ok, true, `${card.id} lints clean on Bach`);
-    assert.equal(report.violations.length, 0, `${card.id} has 0 violations`);
-    assert.equal(report.warnings.length, 0, `${card.id} has 0 warnings`);
+
+  const sys = layoutJankoScore(BACH, o, t)[7];
+  const rules = pitchGridRules(sys.geometry, o, t);
+
+  const c6Y = sys.geometry.middleCY + continuousPitchY(72, t.semitoneScale);
+  const c4Y = sys.geometry.middleCY + continuousPitchY(48, t.semitoneScale);
+
+  const ext = rules.find((r) => Math.abs(r.y - c6Y) < 1e-6);
+  const core = rules.find((r) => Math.abs(r.y - c4Y) < 1e-6);
+
+  assert.ok(ext, 'extension rule found');
+  assert.ok(core, 'core rule found');
+
+  assert.equal(ext.width, 0.35, 'golden extension weight is 0.35pt');
+  assert.equal(ext.width, PITCH_GRID_C_LINE_STROKE, 'reusing PITCH_GRID_C_LINE_STROKE (no new constant)');
+  assert.equal(core.width, 0.50, 'core row is untouched at 0.50pt');
+  assert.equal(ext.ink, PITCH_GRID_OCTAVE_INK, 'ink is unchanged (#1E293B)');
+});
+
+test('Thin golden: fixed-4 extension rows (17.5, 77.5) render at 0.35pt on Brahms', () => {
+  const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-4' });
+  const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const systems = layoutJankoScore(BRAHMS, o, t);
+
+  // System 1 draws the low extension (lin 17.5), system 20 the high one (77.5).
+  const low = systems[1];
+  const high = systems[20];
+  assert.ok((low.geometry.extensionLines ?? []).includes(17.5), 'system 1 draws lin 17.5');
+  assert.ok((high.geometry.extensionLines ?? []).includes(77.5), 'system 20 draws lin 77.5');
+
+  const lowRule = pitchGridRules(low.geometry, o, t).find(
+    (r) => Math.abs(r.y - (low.geometry.middleCY + continuousPitchY(17.5, t.semitoneScale))) < 1e-6
+  );
+  const highRule = pitchGridRules(high.geometry, o, t).find(
+    (r) => Math.abs(r.y - (high.geometry.middleCY + continuousPitchY(77.5, t.semitoneScale))) < 1e-6
+  );
+  assert.ok(lowRule, 'low extension rule found');
+  assert.ok(highRule, 'high extension rule found');
+  assert.equal(lowRule.width, 0.35, 'lin 17.5 renders at 0.35pt');
+  assert.equal(highRule.width, 0.35, 'lin 77.5 renders at 0.35pt');
+  assert.equal(lowRule.ink, PITCH_GRID_OCTAVE_INK, 'extension ink unchanged');
+  assert.equal(highRule.ink, PITCH_GRID_OCTAVE_INK, 'extension ink unchanged');
+});
+
+test('Thin golden: no thin option remains in the golden master', () => {
+  assert.ok(!('extensionWeight' in DEFAULT_JANKO_OPTIONS), 'extensionWeight is retired');
+  assert.ok(
+    !('extensionWeight' in resolveJankoOptions(DEFAULT_JANKO_OPTIONS)),
+    'extensionWeight is retired from the resolved options'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Section 4. Rest lightening GOLDEN-DIRECT (0.85 scale + 90% black)
+// ---------------------------------------------------------------------------
+
+test('Rests golden: rendered bbox == 0.85 x baked bbox (quarter, 8th, block)', () => {
+  // The scaled-extents agreement: engine and linter share restInkBox, so this
+  // one pin covers both the paint and every audit drawn from it.
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  assert.equal(REST_SCALE, 0.85, 'the one rest scale constant is 0.85');
+
+  for (const value of ['quarter', 'eighth'] as const) {
+    const box = restInkBox(
+      { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value, style: 'classical-urtext' },
+      t
+    );
+    const [bx0, by0, bx1, by1] = URTEXT_RESTS[value].bbox;
+    const bakedW = bx1 - bx0;
+    const bakedH = by1 - by0;
+    assert.ok(
+      Math.abs(box.x1 - box.x0 - bakedW * REST_SCALE) < 1e-9,
+      `${value}: rendered width is 0.85 x baked (${(bakedW * REST_SCALE).toFixed(4)}pt)`
+    );
+    assert.ok(
+      Math.abs(box.y1 - box.y0 - bakedH * REST_SCALE) < 1e-9,
+      `${value}: rendered height is 0.85 x baked (${(bakedH * REST_SCALE).toFixed(4)}pt)`
+    );
   }
+
+  for (const value of ['half', 'whole'] as const) {
+    const box = restInkBox(
+      { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value, style: 'classical-urtext' },
+      t
+    );
+    assert.ok(
+      Math.abs(box.x1 - box.x0 - REST_BLOCK_WIDTH * REST_SCALE) < 1e-9,
+      `${value}: block width is 0.85 x baked`
+    );
+    assert.ok(
+      Math.abs(box.y1 - box.y0 - REST_BLOCK_HEIGHT * REST_SCALE) < 1e-9,
+      `${value}: block height is 0.85 x baked`
+    );
+    // Anchoring preserved: the contact edge stands exactly on the seat line.
+    const contact = value === 'half' ? box.y1 : box.y0;
+    assert.ok(Math.abs(contact - 0) < 1e-9, `${value}: contact edge on the seat line`);
+  }
+});
+
+test('Rests golden: live rest ink is 90% black (#1A1A1A) via the one ink constant', () => {
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  assert.equal(REST_INK, '#1A1A1A', 'the one rest ink constant is 90% black');
+
+  // Unit level: every live value's ink carries the constant.
+  for (const value of [
+    'sixty-fourth',
+    'thirty-second',
+    'sixteenth',
+    'eighth',
+    'quarter',
+    'half',
+    'whole',
+  ] as const) {
+    const ink = restInk({ x: 0, y: 0 }, value, 'classical-urtext', t);
+    for (const item of ink) {
+      if (item.kind === 'path' || item.kind === 'rect') {
+        assert.equal(item.fill, REST_INK, `${value}: fill is the rest ink constant`);
+      }
+    }
+  }
+
+  // Painted level: the Bach m.4 16th rest prints the 90% fill.
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const crop = renderJankoCrop(BACH, 4, 1, o, t);
+  assert.match(
+    crop,
+    /<path class="janko-rest-verbatim" d="[^"]+" fill="#1A1A1A" stroke="none"/,
+    'the painted verbatim contour carries 90% black'
+  );
+  assert.ok(
+    !/janko-rest-(verbatim|block)"[^>]*fill="#111111"/.test(crop),
+    'no live rest ink keeps the old #111111'
+  );
+});
+
+test('Rests golden: verbatim constants stay byte-identical (license provenance)', () => {
+  assert.deepEqual(
+    [...URTEXT_REST_QUARTER.bbox],
+    [0.016, -5.802, 4.199, 5.833],
+    'the transcribed quarter bbox is untouched — scale applies at render only'
+  );
+});
+
+test('Rests golden: seating centers unchanged — all nine Bach seats pinned', () => {
+  // The scale applies about the glyph origin, so every seat point stands where
+  // it always has. Absolute pins: any seating drift fails here.
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const seats = layoutJankoScore(BACH, o, t).flatMap((s) => s.rests);
+
+  const expected: ReadonlyArray<readonly [number, string, number, number]> = [
+    [552, 'sixteenth', 548.635, 179.48625],
+    [720, 'eighth', 173.67, 318.45875],
+    [864, 'eighth', 309.54, 313.45875],
+    [1056, 'sixteenth', 486.7, 333.45875],
+    [2988, 'quarter', 130.7025, 325.95875],
+    [3060, 'quarter', 204.6375, 370.95875],
+    [3132, 'quarter', 266.5725, 345.95875],
+    [3432, 'sixteenth', 548.635, 358.45875],
+    [3600, 'eighth', 173.67, 512.43125],
+  ];
+  assert.equal(seats.length, expected.length, 'Bach writes nine rests');
+
+  for (const [tick, value, x, y] of expected) {
+    const rest = seats.find((r) => r.tick === tick)!;
+    assert.ok(rest, `tick-${tick} rest is written`);
+    assert.equal(rest.value, value, `tick-${tick} value`);
+    assert.ok(Math.abs(rest.x - x) < 1e-6, `tick-${tick} seat x unmoved (${rest.x})`);
+    assert.ok(Math.abs(rest.y - y) < 1e-6, `tick-${tick} seat y unmoved (${rest.y})`);
+  }
+});
+
+test('Rests golden: dormant dialects keep #111111 ink and unscaled extents', () => {
+  // The lightening touches ONLY the live path. Kinetic (the measured
+  // demonstrator) pins both its ink and one envelope absolutely.
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const ink = restInk({ x: 0, y: 0 }, 'quarter', 'kinetic-monoline', t);
+  for (const item of ink) {
+    if (item.kind === 'path' || item.kind === 'rect') {
+      assert.equal(item.fill, '#111111', 'dormant kinetic ink keeps #111111');
+    }
+  }
+  const box = restInkBox(
+    { tick: 0, durationTicks: 0, hand: 'RH', x: 0, y: 0, value: 'quarter', style: 'kinetic-monoline' },
+    t
+  );
+  assert.ok(Math.abs(box.x1 - box.x0 - 4.1131) < 1e-3, 'dormant kinetic quarter width unscaled');
+  assert.ok(Math.abs(box.y1 - box.y0 - 11.5594) < 1e-3, 'dormant kinetic quarter height unscaled');
+});
+
+test('npm run lint:engraving --strict reports the landed golden master clean and exits 0', () => {
+  const out = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', 'scripts/lint_engraving.ts', '--strict', '--quiet'],
+    { cwd: REPO_ROOT, encoding: 'utf-8' }
+  );
+  assert.match(out, /clean violations=0 warnings=0/);
+});
+
+// ---------------------------------------------------------------------------
+// Section 5. Registry: Round 29 retired, no open previews
+// ---------------------------------------------------------------------------
+
+test('Registry landed: Round 29 flips-landed state, zero cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 29);
+  assert.match(CURRENT_ROUND_METADATA.title, /Flips landed/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axes');
+  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no compare strip');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'no open previews');
+  assert.equal(getCandidate('dots-new'), undefined, 'Card D is consumed');
+  assert.equal(getCandidate('extensions-thin'), undefined, 'Card T is consumed');
 });

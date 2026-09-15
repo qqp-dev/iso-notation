@@ -192,66 +192,14 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 29,
-  title: 'Preview: New Dot Standard + Thin Extensions',
+  title: 'Flips landed: new dots, thin extensions, lightened rests',
   description:
-    'Two preview cards evaluated against Reference: Card D (new dot standard: dots clear verbatim flags by >= 1.2pt, escaping right first then up; 12 moves on Bach, Brahms m. 1 white-ring clasp unmoved) and Card T (thin extension rows: 0.35pt stroke on 0/6 and 0/2; core rows untouched at 0.50pt). Symmetric-6 barlines golden-immediate.',
-  openAxes: ['dotRule', 'extensionWeight'],
+    'Round 29 is judged and golden: augmentation dots clear true verbatim flag ink by >= 1.2pt (escaping right first, then up); extension rows render at 0.35pt with core rows untouched at 0.50pt; the live rest family renders at 0.85 scale in 90% black. No open previews — the Reference view carries the golden master.',
+  openAxes: [],
 };
 
-/**
- * Windows for Card D: Bach m. 1 (tick-24 collision + tick-60 follower) and
- * Brahms m. 1 (white-ring clasp dot, displacement 0).
- */
-const CARD_D_WINDOWS: JankoCandidateWindow[] = [
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 1,
-    title: 'Bach Goldberg Var 1 · m. 1 — single-note dot flag clearance (tick-24 collision + tick-60 follower)',
-  },
-  {
-    scoreId: BRAHMS_STUDIO_SCORE_ID,
-    measureStart: 1,
-    measureCount: 1,
-    title: 'Brahms Op. 118 No. 1 · m. 1 — white-ring clasp dot (displacement 0)',
-  },
-];
-
-/**
- * Windows for Card T: Bach mm. 29–30 (extension rows, terminal and junction).
- */
-const CARD_T_WINDOWS: JankoCandidateWindow[] = [
-  {
-    scoreId: DEFAULT_STUDIO_SCORE_ID,
-    measureStart: 29,
-    measureCount: 2,
-    title: 'Bach Goldberg Var 1 · mm. 29–30 — thin extension rows (0.35pt) at terminal and junction',
-  },
-];
-
-/** The round’s cards: Card D (new dots) and Card T (thin extensions). No control card. */
-export const CURRENT_CANDIDATES: JankoCandidate[] = [
-  {
-    id: 'dots-new',
-    label: 'D · New Dots — Flag Clearance (1.2pt)',
-    description:
-      'Augmentation dots clear true verbatim flag ink by >= 1.2pt, escaping right first then up. Bach m. 1 tick 24 dot shifts right by +2.33pt (from 62.18 to 64.50), clearing the 8th flag while leaving > 11pt air to the tick-60 follower; Brahms m. 1 white-ring clasp dot sits unmoved (displacement 0). Across Bach, 12 flag-colliding dots move; 0 blocked.',
-    axis: 'dotRule',
-    options: { dotRule: 'flag-clearance' },
-    windows: CARD_D_WINDOWS,
-    tags: ['dots-new', 'flag-clearance'],
-  },
-  {
-    id: 'extensions-thin',
-    label: 'T · Thin Extensions — 0.35pt Stroke',
-    description:
-      'Extension rows (0/6, 0/2) render at 0.35pt (reusing PITCH_GRID_C_LINE_STROKE) rather than the standard 0.50pt octave stroke, reducing visual noise where extension rows appear. Core rows remain untouched at 0.50pt. Demonstrated on Bach mm. 29–30.',
-    axis: 'extensionWeight',
-    options: { extensionWeight: 0.35 },
-    windows: CARD_T_WINDOWS,
-    tags: ['thin-extensions'],
-  },
-];
+/** No open previews: every judged flip is golden. The studio renders Reference-only. */
+export const CURRENT_CANDIDATES: JankoCandidate[] = [];
 
 
 /** A fully resolved candidate, ready to engrave. */
