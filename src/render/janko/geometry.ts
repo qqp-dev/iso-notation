@@ -761,4 +761,26 @@ export function getMeasureIndexOfTick(
   return measureOffset - systemIndex * geo.measuresPerSystem;
 }
 
+/**
+ * Distance from a point to a line segment. Shared by the visual linter's
+ * stem-through audit and the engine's Pass C stem-clearance, which predicts
+ * piercing with the exact predicate the audit applies — prediction and audit
+ * can never disagree.
+ */
+export function pointToSegmentDistance(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const len2 = vx * vx + vy * vy;
+  if (len2 <= 1e-6) return Math.hypot(px - x1, py - y1);
+  const tt = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / len2));
+  return Math.hypot(px - (x1 + tt * vx), py - (y1 + tt * vy));
+}
+
 export type { JankoStaffOctaveRange };

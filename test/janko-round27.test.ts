@@ -23,8 +23,6 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
 } from '../src/scores/brahms-op118-no1';
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   JankoCandidate,
   JankoCandidateRound,
   getCandidate,
@@ -187,8 +185,9 @@ test('Every folded note is covered by exactly one bracket', () => {
     assert.equal(coveredNoteIds.size, totalFolded, `every folded note covered under ${core}`);
 
     if (core === 'fixed-3') {
-      // 7 singletons in mm. 5, 15, 23, 33, 43, 53, 67 + 1 run of 2 notes in m. 69 = 8 brackets
-      assert.equal(totalBrackets, 8, 'fixed-3 renders exactly 8 brackets covering 9 folded notes');
+      // 7 singletons in mm. 5, 15, 23, 33, 43, 53, 67 + the 937/938 pair
+      // split across the sys16/17 break at 4-per packing = 9 brackets
+      assert.equal(totalBrackets, 9, 'fixed-3 renders exactly 9 brackets covering 9 folded notes');
     } else {
       // 1 singleton in m. 69 = 1 bracket
       assert.equal(totalBrackets, 1, 'fixed-4 renders exactly 1 bracket covering 1 folded note');

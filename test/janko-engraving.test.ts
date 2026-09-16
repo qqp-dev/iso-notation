@@ -766,7 +766,7 @@ test('Row-snapped clusters (doctrine): lowest sits one gap inward, the rest on t
   assert.ok(Math.abs(c.x + e.x - 2 * g.x) > HALO_GAP / 2, 'no mirror symmetry');
 });
 
-test('Row-snapped clusters: every note keeps its true row y and the LOWER head sits inward', () => {
+test('Row-snapped clusters: every note keeps its true row y and the foreign-led pair seats {0, +G}', () => {
   const score = makeScore(
     [
       makeNote('chord-c', 0, 4, 48, 48, 'LH'),
@@ -804,32 +804,32 @@ test('Row-snapped clusters: every note keeps its true row y and the LOWER head s
   const c = layout.notes.find((p) => p.note.id === 'chord-c')!;
   const e = layout.notes.find((p) => p.note.id === 'chord-e')!;
   const g = layout.notes.find((p) => p.note.id === 'chord-g')!;
-  // The mixed-hand pair seats its **lower** head one judged gap inward of
-  // the solved column and holds the higher RH head on it (tick 48 wears no
-  // halo). Round 21 §D's lower-holds anchor is retired. Tick 48 is a
-  // downbeat whose nominal sits on the cell edge, so the whole onset steps
-  // right to stay inside (legitimate translation); the demand stays reported.
+  // The mixed-hand pair is led by its UNQUALIFIED lowest (the lone LH head),
+  // so it seats ON the solved column and staggers the higher RH head right
+  // (tick 48 wears no halo): the inward seat belongs to bracket members
+  // (§2 line 18). Lowest-pitch-first order holds. Tick 48 is a downbeat
+  // whose nominal sits on the cell edge; nothing leaves the cell now, so no
+  // demand is reported and the whole onset holds its translation.
   const column = layout.columns.get(48)!;
-  close(c.x, column - PAIR_GAP, 'the lower head sits one gap inward');
-  close(e.x, column, 'the upper head holds the solved column');
+  close(c.x, column, 'the lower head holds the solved column');
+  close(e.x, column + PAIR_GAP, 'the upper head staggers one gap right');
   close(Math.abs(c.x - e.x), PAIR_GAP, 'the pair spans exactly one pair gap');
-  // No tuck: G4's single-head row stands on the solved column with the upper
+  // No tuck: G4's single-head row stands on the solved column with the lower
   // pair head.
   close(g.x, column, 'the lone head stands on the solved column');
-  // The desired inward head leaves its beat cell: the demand is reported,
-  // the slots stay honest, the shift fits the ink.
+  // No head leaves its beat cell: no demand, the slots stay honest.
   const diag = (layout.clusterDiagnostics ?? []).find((d) => d.tick === 48);
-  assert.ok(diag, 'the cell excess is reported');
-  assert.deepEqual(diag!.memberIds, ['chord-c'], 'the diagnostic names the leaving member');
+  assert.equal(diag, undefined, 'no cell excess is reported');
 });
 
-test('Row-snapped clusters: a crowd at the barline seats inward, never shears', () => {
+test('Row-snapped clusters: a crowd at the barline seats on-column, never shears', () => {
   // On a downbeat the beat cell has no room to the left — and the permanent
-  // rule seats the lower head inward anyway: the pair keeps its full halo
-  // spread (tick 0 wears the ring), the lone different-row head stands on
-  // the solved column (no tuck), every voice of the onset travels together
-  // (one rigid unit, never sheared), the cell demand is reported, and the
-  // whole onset steps right to stay inside (legitimate translation).
+  // rule seats the foreign-led pair's lower head ON the column (the inward
+  // seat belongs to bracket members): the pair keeps its full halo spread
+  // (tick 0 wears the ring), the lone different-row head stands on the
+  // solved column with it (no tuck), every voice of the onset travels
+  // together (one rigid unit, never sheared), no cell demand arises, and the
+  // whole onset holds inside (legitimate translation).
   const layout = layoutJankoScore(
     makeScore(
       [
@@ -847,15 +847,14 @@ test('Row-snapped clusters: a crowd at the barline seats inward, never shears', 
   const g = layout.notes.find((p) => p.note.id === 'open-g')!;
   assert.equal(layout.notes.length, 3);
   close(Math.abs(e.x - c.x), HALO_GAP, 'the pair keeps its full halo spread');
-  close(g.x, e.x, 'the lone RH head stands on the column with the upper head');
+  close(g.x, c.x, 'the lone RH head stands on the column with the lower head');
   const column = layout.columns.get(0)!;
-  close(c.x, column - HALO_GAP, 'the lower head sits one halo gap inward of the solved column');
-  close(e.x, column, 'the upper head holds the solved column');
-  // The desired inward head leaves its beat cell: the demand is reported,
-  // the slots stay honest, the shift fits the ink — clean, never sheared.
+  close(c.x, column, 'the lower head holds the solved column');
+  close(e.x, column + HALO_GAP, 'the upper head staggers one halo gap right');
+  // No head leaves its beat cell: no demand, the slots stay honest — clean,
+  // never sheared.
   const diag = (layout.clusterDiagnostics ?? []).find((d) => d.tick === 0);
-  assert.ok(diag, 'the cell excess is reported');
-  assert.deepEqual(diag!.memberIds, ['open-c'], 'the diagnostic names the leaving member');
+  assert.equal(diag, undefined, 'no cell excess is reported');
   const audit = lintJankoScore(
     makeScore(
       [

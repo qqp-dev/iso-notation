@@ -52,6 +52,7 @@ import { QuantizedGridScore } from '../src/model/types';
 import { splitTick } from '../src/render/janko/geometry';
 import {
   CLASP_NOTEHEAD_AIR,
+  claspMemberCarriedTicks,
   collectClaspClusters,
   computeClaspInsetMap,
   computePageGeometry,
@@ -65,7 +66,8 @@ import {
 } from '../src/render/janko/engine';
 import {
   CHORD_BRIDGE_DISC_AIR,
-  CHORD_BRIDGE_MIN_GAP,
+  chordBridgeThreshold,
+  bracketModeDuration,
   CLASP_CROSS_SPACING,
   CLASP_MARK_REACH,
   CLASP_MARK_STACK_GAP,
@@ -777,6 +779,14 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
         spans[0].bot >= spans[1].top - 1e-6 && spans[1].bot >= spans[0].top - 1e-6,
         `unified clasp at tick ${clasp.tick} spans two overlapping hands`
       );
+      // Eligibility preserved: unification needs BOTH hands qualifying, so
+      // each hand-subgroup carries 2+ heads (one note/hand never brackets).
+      for (const group of byHand.values()) {
+        assert.ok(
+          group.length >= 2,
+          `unified clasp at tick ${clasp.tick}: each hand-subgroup carries 2+ heads`
+        );
+      }
     }
     assert.ok(
       claspQualifies(clasp.notes),
@@ -790,10 +800,11 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
     );
     assert.equal(clasp.topY, Math.min(...clasp.notes.map((n) => n.y)) - r);
     assert.equal(clasp.botY, Math.max(...clasp.notes.map((n) => n.y)) + r);
-    // Duration ownership: the bracket carries the shortest member value.
+    // Duration ownership (§3): the bracket carries the MOST COMMON member
+    // value (longest among tied modes) — never the shortest.
     assert.equal(
       clasp.durationTicks,
-      Math.min(...clasp.notes.map((n) => n.durationTicks)),
+      bracketModeDuration(clasp.notes.map((n) => n.durationTicks)),
       'the clasp carries the cluster duration on its spine'
     );
     // A downbeat bracket keeps its barline air (≥ 3.5pt; the token holds 4.0).
@@ -810,11 +821,15 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
       assert.ok(BRAHMS_T.claspMinBarlineAir >= 3.5, 'the ticket floor is 3.5pt');
     }
   }
-  // Round 19 corpus pin: exactly the two interlocking-hands downbeats (mm. 46
-  // and 26) unify; every other Brahms bracket stays a per-hand bracket.
-  assert.equal(unified, 2, 'only the two overlapping-hands onsets unify');
-  // Duration ownership: a member whose stem is not part of a real beam loses its
-  // standalone stem, because the bracket now carries the value.
+  // Unification under the repaired eligibility rule (§2 line 19): a bracket
+  // unifies only two INDEPENDENTLY qualifying hands. The mm. 46/26 LH pairs
+  // are clean 2-note columns (no spread, under 3 heads) — they never
+  // qualified on their own; their old spread was a joint-bucket artifact of
+  // the retired any-qualified inward rule. Every Brahms bracket is per-hand.
+  assert.equal(unified, 0, 'no onset unifies without two qualifying hands');
+  // Duration ownership (§3): an unbeamed member loses its standalone stem
+  // iff the bracket carries its exact value; a member with any other
+  // duration keeps its complete statement (exception stem).
   const beamed = new Set(
     brahms.flatMap((l) => l.beams.flatMap((b) => b.notes.map((n) => n.id)))
   );
@@ -827,16 +842,26 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
       );
     }
     // Round 16 shared stems: the carrier keeps its stem — the one stem the
-    // bracket does not replace — while every other unbeamed member loses its
-    // standalone stem to the bracket.
+    // bracket does not replace. On the corpus every carrier is a
+    // carried-match (shared groups are duration-uniform and every bracket is
+    // single-hand, so the hand mode always equals the carrier's value) —
+    // carrier-exceptions are structurally impossible here.
     const carriers = new Set(layout.sharedStems.map((g) => g.carrierId));
     for (const clasp of layout.clasps) {
       if (clasp.notes.some((n) => beamed.has(n.id))) continue;
       for (const n of clasp.notes) {
-        assert.ok(
-          layout.claspedStems.includes(n.id) || carriers.has(n.id),
-          `${n.id} loses its standalone stem or carries the shared stem`
-        );
+        const exception = n.durationTicks !== claspMemberCarriedTicks(clasp, n.id);
+        if (exception) {
+          assert.ok(
+            !layout.claspedStems.includes(n.id),
+            `${n.id} keeps its exact exception statement`
+          );
+        } else {
+          assert.ok(
+            layout.claspedStems.includes(n.id) || carriers.has(n.id),
+            `${n.id} loses its standalone stem or carries the shared stem`
+          );
+        }
       }
     }
   }
@@ -887,24 +912,33 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
 // ---------------------------------------------------------------------------
 
 test('Round 7 Option 3 grammar: tight pairs stay silent, a wide leap gets its bridge', () => {
-  // A 2-note vertical column of one hand: Δy = 30pt is a wide leap.
+  // A 2-note vertical column of one hand: Δy = 30pt is a wide leap. Mixed
+  // durations (48/84): the carrier still draws the hand's shortest value
+  // (48), but the 84 no longer adopts it — the exception keeps its stem.
   const group = computeVerticalChordGroup(
     [rn('top', 100, 605.76, 48), rn('low', 100, 661.76, 84)],
     T
   )!;
   assert.equal(group.carrier.id, 'top', 'an up-stem hand hands its duration to the topmost head');
   assert.equal(group.durationTicks, 48, 'the carrier draws the hand’s shortest member value');
-  assert.deepEqual(group.suppressedIds, ['low'], 'the interior head draws no stem');
+  assert.deepEqual(group.suppressedIds, [], 'the 84 exception keeps its own stem (no adopt-min)');
   assert.equal(group.bridges.length, 1, 'the wide leap earns a bridge');
   const bridge = group.bridges[0];
   assert.equal(bridge.x, 100, 'the bridge runs on the shared column');
   assert.equal(bridge.y1, 605.76 + T.noteheadRadius + CHORD_BRIDGE_DISC_AIR);
   assert.equal(bridge.y2, 661.76 - T.noteheadRadius - CHORD_BRIDGE_DISC_AIR);
   assert.ok(
-    bridge.y2 - bridge.y1 > CHORD_BRIDGE_MIN_GAP - 2 * T.noteheadRadius,
+    bridge.y2 - bridge.y1 > chordBridgeThreshold('tight') - 2 * T.noteheadRadius,
     'the bridge spans the leap, not just the discs'
   );
   assert.deepEqual(bridge.noteIds, ['top', 'low']);
+  // Uniform durations still suppress fully: the carrier draws, the interior
+  // heads join it.
+  const uniform = computeVerticalChordGroup(
+    [rn('a', 100, 605.76, 48), rn('b', 100, 661.76, 48)],
+    T
+  )!;
+  assert.deepEqual(uniform.suppressedIds, ['b'], 'a matching interior head draws no stem');
 
   // A tight pair (Δy = 15pt) draws no connecting ink at all.
   const tight = computeVerticalChordGroup(
@@ -933,6 +967,56 @@ test('Round 7 Option 3 grammar: tight pairs stay silent, a wide leap gets its br
   );
 });
 
+test('Bridge threshold is three protected-head heights, strictly greater-than', () => {
+  // Per-preset thresholds from the active style: 3 × 2 × hy. Binary floats
+  // cannot hold 20.76 exactly (3 × 6.92 lands one ulp low), so the decimal
+  // pins use a tight tolerance while every boundary probe reads the actual
+  // computed threshold — exact-threshold equality must stay silent.
+  const tight = chordBridgeThreshold('tight');
+  const snug = chordBridgeThreshold('snug');
+  assert.ok(Math.abs(tight - 20.76) < 1e-9, `tight pins 20.76, got ${tight}`);
+  assert.ok(Math.abs(snug - 21.96) < 1e-9, `snug pins 21.96, got ${snug}`);
+  assert.equal(chordBridgeThreshold(), tight, 'the default style is tight');
+  // Branch coverage around the tight threshold: below/at stay silent, a hair
+  // over bridges. Strictly greater-than — never <= or >=.
+  // Base y = 0 keeps the probed gap bit-exact: (0 + gap) − 0 === gap, so
+  // the exact-threshold probes test the comparison operator, not float dust.
+  const bridged = (gap: number, spacing: 'tight' | 'snug' = 'tight'): boolean =>
+    computeVerticalChordGroup([rn('a', 100, 0, 48), rn('b', 100, gap, 48)], T, spacing)!
+      .bridges.length === 1;
+  assert.equal(bridged(tight - 0.01), false, 'below the threshold stays silent');
+  assert.equal(bridged(tight), false, 'exactly three head heights stays unbridged');
+  assert.equal(bridged(tight + 1e-9), true, 'a hair over three head heights bridges');
+  assert.equal(bridged(30), true, 'well over bridges');
+  // The snug threshold moves with the style (21.96, not 20.76): the tight
+  // threshold stays silent under snug, a hair over the snug threshold bridges.
+  assert.equal(bridged(tight, 'snug'), false, 'the tight threshold stays silent under snug');
+  assert.equal(bridged(snug, 'snug'), false, 'exactly three snug head heights stays unbridged');
+  assert.equal(bridged(snug + 1e-9, 'snug'), true, 'a hair over the snug threshold bridges');
+});
+
+test('bracketModeDuration carries the mode, ties longest, order-free', () => {
+  // Ticket §3 literal cases: most common wins, longest among tied modes,
+  // all-unique falls back to the longest — never the min, never the max.
+  assert.equal(bracketModeDuration([24, 48, 48]), 48, '24/48/48 → 48');
+  assert.equal(bracketModeDuration([24, 24, 48]), 24, '24/24/48 → 24');
+  assert.equal(bracketModeDuration([24, 24, 48, 48]), 48, '24/24/48/48 → 48 (tied modes, longest)');
+  assert.equal(bracketModeDuration([24, 24, 48, 48, 96]), 48, '24/24/48/48/96 → 48, not 96');
+  assert.equal(bracketModeDuration([24, 48, 96]), 96, 'all-unique → longest');
+  assert.equal(bracketModeDuration([96, 48, 96, 96]), 96, 'the majority wins over the min');
+  assert.equal(bracketModeDuration([144, 144, 96]), 144, 'the majority wins over the min');
+  assert.equal(bracketModeDuration([96, 96, 48]), 96, 'the majority wins');
+  assert.equal(bracketModeDuration([48, 96]), 96, 'a 1–1 tie breaks toward the longest');
+  assert.equal(bracketModeDuration([192, 192, 144]), 192, 'the majority wins over the min');
+  assert.equal(bracketModeDuration([48, 48]), 48, 'uniform passthrough');
+  assert.equal(
+    bracketModeDuration([48, 96, 96, 48, 144]),
+    bracketModeDuration([144, 48, 96, 48, 96]),
+    'permutation-invariant (multiset only)'
+  );
+  assert.equal(bracketModeDuration([48, 96, 96, 48, 144]), 96, '2–2–1 tie breaks longest of the tied pair');
+});
+
 test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket', () => {
   const o = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
@@ -958,16 +1042,21 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
 
   // B - 4 - 7 (m. 8, tick 1488): one vertical RH column of three heads. Round 8
   // widens the bracket scope to 3-note chords, so it is bracketed — and, being
-  // bracketed, it is never also gap-gated by Option 3.
-  const system2 = systems[2];
+  // bracketed, it is never also gap-gated by Option 3. (m.8 sits on system 1
+  // at canonical 4-per packing — sys1 mm. 5–8 — located by content, not index.)
+  // §3: the 48-exception keeps its stem, so Pass C steps the pierced mate
+  // (107) one slot right while the y-missing mate (108) holds — the bracket
+  // spans two columns, minX untouched.
+  const system2 = systems.find((l) => l.notes.some((p) => p.note.startTick === 1488))!;
   const chord = system2.clasps.find((c) => c.tick === 1488);
   assert.ok(chord, 'the B - 4 - 7 vertical hand chord carries a bracket');
   assert.equal(chord!.notes.length, CLASP_MIN_VERTICAL_CHORD, 'three heads in one hand');
   assert.equal(new Set(chord!.notes.map((n) => n.hand)).size, 1, 'strictly one hand');
-  assert.equal(
-    new Set(chord!.notes.map((n) => n.x)).size,
-    1,
-    'the bracket exists although the column is clean and vertical'
+  const chordXs = chord!.notes.map((n) => n.x);
+  assert.deepEqual(
+    [...new Set(chordXs)].sort((a, b) => a - b).map((x) => Number((x - Math.min(...chordXs)).toFixed(2))),
+    [0, 5.46],
+    'the exception stem clears: pierced mate +1 slot, the rest hold the column'
   );
   assert.ok(
     !system2.verticalChords.some((c) => c.carrier.startTick === 1488),
@@ -976,6 +1065,16 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
   // The 2-note columns of the earlier systems stay with Option 3.
   const optionThree = systems.flatMap((l) => l.verticalChords);
   assert.ok(optionThree.length > 0, 'clean 2-note columns keep the gap-gated grammar');
+  // The tick-12432 and tick-12624 3+-note chords carry brackets (the
+  // true-ink pre-step makes the room the packing-only audit could not see),
+  // so Option 3 handles 2-note columns only — no refused-bracket fallback.
+  for (const tick of [12432, 12624]) {
+    const sys = systems.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+    assert.ok(
+      sys.clasps.some((c) => c.tick === tick),
+      `tick-${tick} carries its bracket`
+    );
+  }
   for (const group of optionThree) {
     assert.equal(group.suppressedIds.length, 1, 'Option 3 now handles 2-note columns only');
   }
@@ -983,7 +1082,16 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
   const svg = renderJankoCrop(BRAHMS, 8, 1, o, BRAHMS_T);
   assert.match(svg, /class="janko-clasp-group"[^>]*data-clasp-tick="1488"/, 'the bracket is painted');
   for (const n of chord!.notes) {
-    assert.ok(system2.claspedStems.includes(n.id), `${n.id} hands its duration to the bracket`);
+    // §3: carried matches hand their duration to the bracket; the 48
+    // exception keeps its complete exact statement (stem painted).
+    if (n.durationTicks === chord!.durationTicks) {
+      assert.ok(system2.claspedStems.includes(n.id), `${n.id} hands its duration to the bracket`);
+    } else {
+      assert.ok(
+        !system2.claspedStems.includes(n.id),
+        `${n.id} keeps its exception stem`
+      );
+    }
   }
   assert.equal(
     (svg.match(/class="janko-chord-bridge"/g) ?? []).length,
@@ -1221,23 +1329,23 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the spines, in
   }
   const report = lintJankoScore(
     BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'beamed-clasp-rail' },
+    {
+      ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+      chordGrouping: 'beamed-clasp-rail',
+      measuresPerSystem: 3,
+      correctPageTopAnacrusisMeasureWidth: false,
+    },
     BRAHMS_T
   );
-  // 4-up by operator override (was [] at 3-up): the fixed-3 rail carries
-  // exactly the 5 accepted slot findings (same systems/messages as the
-  // studio surface — the paradigm never touches slots), zero folding
-  // findings, zero warnings.
+  // The retired rail paradigm's lint record at its verified mps3 packing
+  // (an explicit override, not canonical): the §5 rigid slot correction is
+  // paradigm-independent, so the formerly accepted 5 slot findings
+  // (systems 2/6/11/18/21) are seated here too — zero violations, zero
+  // folding findings, zero warnings. The paradigm never touches slots.
   assert.deepEqual(
     report.violations.map((v) => [v.code, v.system + 1]),
-    [
-      ['system-slot-overlap', 2],
-      ['system-slot-overlap', 6],
-      ['system-slot-overlap', 11],
-      ['system-slot-overlap', 18],
-      ['system-slot-overlap', 21],
-    ],
-    'the railed engraving carries exactly the accepted 5 (itemized in the §2-landed record)'
+    [],
+    'the railed engraving is clean at its verified packing'
   );
   assert.equal(report.warnings.length, 0, 'the rail adds no warning');
 });
@@ -1290,6 +1398,18 @@ test('Engine integrity: a real 16th-note beam is never cut, only standalone chor
 });
 
 test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the accepted 2', () => {
+  // The retired union paradigms (left-clasp-spire, beamed-clasp-rail,
+  // bounding-phrase) were only ever verified at mps3: their committed
+  // mm. 1–9 window stays pinned at that packing (an explicit override, not
+  // canonical — the narrower canonical columns drop union brackets the
+  // retired fit rule cannot stand). The live per-hand paradigm and the
+  // unclasped baseline run canonical. All modes share the column-solve
+  // engine, so engine regressions still move these pins.
+  const RETIRED_MPS3: ReadonlySet<string> = new Set([
+    'left-clasp-spire',
+    'beamed-clasp-rail',
+    'bounding-phrase',
+  ]);
   for (const mode of JANKO_CHORD_GROUPINGS) {
     const bach = lintJankoScore(BACH, { ...DEFAULT_JANKO_OPTIONS, chordGrouping: mode }, T);
     assert.deepEqual(
@@ -1299,7 +1419,14 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
     );
     const brahms = lintJankoScore(
       BRAHMS,
-      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive', chordGrouping: mode },
+      {
+        ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+        core: 'adaptive',
+        chordGrouping: mode,
+        ...(RETIRED_MPS3.has(mode)
+          ? { measuresPerSystem: 3, correctPageTopAnacrusisMeasureWidth: false }
+          : {}),
+      },
       BRAHMS_T
     );
     if (mode === 'none') {
@@ -1318,7 +1445,7 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
         brahms.diagnostics
           .filter((d) => d.code === 'system-slot-overlap')
           .map((d) => d.system + 1),
-        [23, 24],
+        [18, 18],
         'the slot pair is exactly the accepted 2'
       );
       assert.ok(
@@ -1346,7 +1473,7 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
       brahms.diagnostics
         .filter((d) => d.code === 'system-slot-overlap')
         .map((d) => d.system + 1),
-      [23, 24],
+      RETIRED_MPS3.has(mode) ? [23, 24] : [18, 18],
       `Brahms · ${mode}: the slot pair is exactly the accepted 2`
     );
   }
@@ -1355,10 +1482,10 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
       (d) => `${d.code}: ${d.message}`
     ),
     [
-      "system-slot-overlap: System 23's staff furniture spans y=[452.54, 630.32], outside its 183.97pt page slot [445.94, 629.92] (1.00pt clearance).",
-      "system-slot-overlap: System 24's ink reaches up to y=610.42, into system 23's ink (bottom y=638.44): the two systems overlap on the page.",
+      "system-slot-overlap: System 18's staff furniture spans y=[265.59, 446.35], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
+      "system-slot-overlap: System 18's ink reaches up to y=242.47, into system 17's ink (bottom y=255.50): the two systems overlap on the page.",
     ],
-    'the golden per-hand paradigm carries exactly the accepted 2 over the complete Intermezzo (sys-24 top 610.42 after the rule-A carrier move to 964)'
+    'the golden per-hand paradigm carries exactly the pre-existing adaptive 2 over the complete Intermezzo'
   );
   assert.ok(
     JANKO_LINT_CHECKS.includes('clasp-clearance'),

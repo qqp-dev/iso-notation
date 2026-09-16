@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 2, 'Round 33 declares two grid cards');
+assert.equal(CURRENT_CANDIDATES.length, 0, 'Round 33 decided: no active comparison');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -125,21 +125,22 @@ test('renderCandidatesView renders every scheme card on every declared window', 
     );
   }
   assert.match(html, /Round 33/);
-  assert.match(html, /no interior grid/i);
+  assert.match(html, /no active comparison/i);
 });
 
-test('Round 33 is the full-vs-none grid round: one axis, two cards, no control', () => {
-  // Ordered contract change: Round 33 compares the interior beat grid on
-  // Brahms — two cards on the single gridPulseFilter axis, Reference as the
-  // standing control. Rounds 30–32 are parked (historical consts).
+test('Round 33 decided: full grid selected, no open axis, zero cards', () => {
+  // Ordered contract change: Round 33 is judged — the full interior grid is
+  // canonical, the settled packing/correction/refinements are promoted to the
+  // Reference, and no comparison remains. Rounds 30–33 are parked
+  // (historical consts).
   assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no interior grid/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
+  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'zero cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['grid-full-vs-none-full', 'grid-full-vs-none-none'],
-    'the grid cards'
+    [],
+    'no active comparison'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -171,24 +172,20 @@ test('Round 33 is the full-vs-none grid round: one axis, two cards, no control',
   );
 });
 
-test('The Round 33 studio renders two grid cards on one axis, no control', () => {
+test('The decided studio renders zero cards and no active comparison', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Two cards, one axis badge each, six windows each — Brahms ×12, Bach ×0.
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'twelve windows');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="12"/);
-  assert.match(html, /data-verification="false"/, 'the grid round is decisive');
-  assert.match(html, /2 candidates × 12 engraving windows/, 'the header counts honestly');
-  assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 12, 'Brahms ×12');
-  assert.ok(!html.includes('data-window="primary:'), 'Bach carries no window this round');
+  // Zero cards: the round is decided, the Reference is the studio.
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 0, 'zero windows');
+  assert.match(html, /data-candidate-count="0"/);
+  assert.match(html, /data-window-count="0"/);
+  assert.match(html, /data-decided="true"/, 'the decided round is marked');
+  assert.match(html, /no active comparison/, 'the view says no comparison is active');
+  assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
+  assert.ok(!html.includes('data-window="brahms-op118-no1:"'), 'Brahms carries no window either');
 
-  // No settled decision is badged as an open question (the shared packing
-  // correction rides as a delta badge, not an axis — asserted in the
-  // round-32 suite; the settled packing itself equals the Bach golden and
-  // never badges).
+  // No settled decision is badged as an open question.
   for (const key of [
     'chordGrouping',
     'systemStartStyle',
@@ -212,15 +209,6 @@ test('The Round 33 studio renders two grid cards on one axis, no control', () =>
   // No control card: the Reference view is the standing control.
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');
 
-  // Each card inherits the settled candidate-only 8 findings (whole-score
-  // card lint): honestly red, with the attribution proven in
-  // test/janko-round33.test.ts.
-  assert.equal(
-    (html.match(/data-lint="violations"/g) ?? []).length,
-    2,
-    'both cards carry the candidate chip honestly'
-  );
-
   // The Reference view still carries the whole golden master, both scores.
   const reference = renderReferenceView(CONFIG);
   assert.match(reference, /Golden Master/);
@@ -229,7 +217,7 @@ test('The Round 33 studio renders two grid cards on one axis, no control', () =>
   const brahmsAt = reference.indexOf('data-score="brahms-op118-no1"');
   const bachAt = reference.indexOf('data-score="primary"');
   const brahms = reference.slice(brahmsAt, bachAt);
-  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE block reports honestly');
+  assert.ok(brahms.includes('data-lint-ok="true"'), 'the BRONZE block reports honestly clean');
   // The GOLD chip is a STOP tripwire while the Goldberg delta is
   // unadjudicated — see 'STOP tripwire: GOLD Bach block lints clean' below.
 });
@@ -263,7 +251,7 @@ test('renderReferenceView renders the golden page spread and macro crops', () =>
   const bachPages = bach.match(/data-page="/g) ?? [];
   const brahmsPages = brahms.match(/data-page="/g) ?? [];
   assert.equal(bachPages.length, 2, 'Round 17: Bach Var. 1 is a two-page spread (4 systems/page)');
-  assert.equal(brahmsPages.length, 6, 'Brahms ships a six-page spread (4-up by operator override — see test/brahms-studio-ergonomics.test.ts)');
+  assert.equal(brahmsPages.length, 5, 'Brahms ships the judged five-page spread (4/system, 4-up, 18 systems)');
   const bachCrops = bach.match(/data-crop="/g) ?? [];
   const brahmsCrops = brahms.match(/data-crop="/g) ?? [];
   assert.equal(bachCrops.length, 0, 'Bach focus crops dropped by operator order (spread stays)');
@@ -299,8 +287,8 @@ test('Reference view is rendered from DEFAULT_JANKO_OPTIONS (the golden master)'
   const bachAt = html.indexOf('data-score="primary"');
   const brahms = html.slice(brahmsAt, bachAt);
   // The GOLD chip is a STOP tripwire while the Goldberg delta is
-  // unadjudicated (see above); BRONZE keeps reporting honestly.
-  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE score reports its knowns');
+  // unadjudicated (see above); BRONZE reports its clean surface honestly.
+  assert.ok(brahms.includes('data-lint-ok="true"'), 'the BRONZE score reports clean');
 });
 
 test('Every page of the spread is engraved (no silently blank page)', () => {
@@ -492,10 +480,10 @@ test('renderStatusLine reports live lint statistics', () => {
 
 test('Round metadata is exported and drives the view headline', () => {
   assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no interior grid/i);
+  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis in the grid round');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the grid round');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis in the decided round');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'zero cards in the decided round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

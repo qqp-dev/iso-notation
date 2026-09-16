@@ -525,8 +525,11 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
   }
   // Source correction restored six dotted brackets (18 total, was 12): shortened
   // 126←144 dotted halves at 3888/4656/7728/8496 plus the final 144 chord ×2
-  // hands at 13488. Engine rules unchanged (Bach byte-identical).
-  assert.equal(dots, 18, 'the complete Brahms dotted-clasp census');
+  // hands at 13488. The §3 mode rule (§3 line 24) adds five (1776/3696/7536:
+  // [96,144,144] carry 144, not the 96 min; 6192/10032: [120,144,144] carry
+  // 144, not the undotted 120 min) and removes one (7344: [144,192,192]
+  // carries the undotted 192 whole, not the dotted 144 min): 22 total.
+  assert.equal(dots, 22, 'the complete Brahms dotted-clasp census');
   assert.ok(worstMark >= hug - 1e-9, `worst mark daylight ${worstMark.toFixed(3)}pt`);
   // The true-masks margin, pinned: the tightest seat (tick 13488) clears by
   // 0.466pt. Any future erosion fails here before ink ever touches.

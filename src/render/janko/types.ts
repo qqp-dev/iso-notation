@@ -964,23 +964,23 @@ export interface JankoLayoutOptions {
    */
   claspDotNudge?: JankoClaspDotNudge;
   /**
-   * Beat-grid pulse filter (the Round 32/33 preview axis): which interior beat
-   * pulses are painted. `'all'` keeps every existing interior quarter
-   * position; `'midpoint-only'` retains an existing pulse iff its tick offset
-   * is exactly half `ticksPerMeasure`; `'none'` paints no interior pulse at
-   * all (a filter over existing candidates — no new subdivisions, no
-   * retiming, no barline change). Defaults to `'all'` (byte-identical).
+   * Beat-grid pulse filter (the Round 32/33 axis — judged: `'all'` is
+   * canonical): which interior beat pulses are painted. `'all'` keeps every
+   * existing interior quarter position; `'midpoint-only'` retains an existing
+   * pulse iff its tick offset is exactly half `ticksPerMeasure`; `'none'`
+   * paints no interior pulse at all (a filter over existing candidates — no
+   * new subdivisions, no retiming, no barline change). Defaults to `'all'`.
    * Odd subdivisions with no existing midpoint retain no interior pulses
    * under the opt-ins; never reinterpreted as `'all'`.
    */
   gridPulseFilter?: JankoGridPulseFilter;
   /**
    * Compatibility-isolated page-top anacrusis width correction (Round 32
-   * candidate-only, pending canonical judgment — not a score-specific switch):
-   * later page-top systems use the normal full-measure width instead of
-   * inheriting system 0's pickup-reduced denominator. System 0 keeps its
-   * pickup geometry; no-pickup scores are unchanged. Defaults to `false`
-   * (byte-identical).
+   * preview, canonical for Brahms since Round 33 was judged — not a
+   * score-specific switch): later page-top systems use the normal
+   * full-measure width instead of inheriting system 0's pickup-reduced
+   * denominator. System 0 keeps its pickup geometry; no-pickup scores are
+   * unchanged. Defaults to `false` (byte-identical for Goldberg).
    */
   correctPageTopAnacrusisMeasureWidth?: boolean;
   /** Page title (full-page renders only). */

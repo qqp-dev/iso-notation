@@ -386,13 +386,24 @@ type Num = number;
  */
 // Lone halves (96) gain one stem ring (bare → ring). Old 84s (shortened 96s)
 // corrected to 96 join the two historical lone halves (321, 607) plus 553.
+// The tick-12624 bracket is admitted (§2 true-ink pre-step), so 916 leaves
+// the census (bracketed and suppressed); the de-unified m.26/m.46 LH pairs
+// (§2 line 19: clean pairs never independently qualify) join it as gap-gated
+// Option-3 carriers (346, 632), each gaining its preview ring.
 const RING_96: Num[] = [
-  290, 321, 368, 375, 383, 390, 407, 414, 545, 553, 576, 607, 654, 661, 669, 676, 693, 700,
-  840, 849, 934,
+  290, 321, 346, 368, 375, 383, 390, 407, 414, 545, 553, 576, 607, 632, 654, 661, 669, 676,
+  693, 700, 840, 849, 934,
 ];
 // Lone dotted halves (144) gain one stem ring plus their dot. Historical pair
-// (332, 618) plus ten more lone 144s now that shortenings are corrected.
+// (332, 618) plus ten more lone 144s now that shortenings are corrected. The
+// m.1 downbeat pair (4, 6) leaves the census: the tick-48 bracket is admitted
+// (§2 true-ink pre-step), so both are bracketed and suppressed.
 const RING_DOT_144: Num[] = [16, 38, 151, 173, 332, 435, 543, 618, 721, 903, 904, 911];
+// Lone whole (192): empty. Note 5 (m.1 downbeat, 192) was the first whole in
+// the census while tick-48 stood bare; the admitted bracket carries it as
+// the 192 exception (preview stays golden for clasp members), so no whole
+// changes ink anymore.
+const RING2_192: Num[] = [];
 // Lone double-dotted halves (168, legitimate hidden-8th + dotted-half ties)
 // gain two dots plus one ring. The 8 source-anchored 168s (e.g. tick 216:
 // lines 268+269; tick 12360: line 320 tieWait gap).
@@ -412,7 +423,7 @@ const DOUBLE_DOT_CLASPS: Array<[tick: Num, carried: Num]> = [];
 
 const id = (n: Num): string => `brahms-op118-no1-${n}`;
 
-test('Census: the changed singles are exactly the pinned id sets (43 notes)', () => {
+test('Census: the changed singles are exactly the pinned id sets (45 notes)', () => {
   const golden = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const preview = layoutJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   const changed = new Map<string, string>();
@@ -453,7 +464,8 @@ test('Census: the changed singles are exactly the pinned id sets (43 notes)', ()
   for (const n of RING_DOT_144) expect.set(id(n), '1d/1r');
   for (const n of DOTS2_168) expect.set(id(n), '2d/1r');
   for (const n of DOT_72) expect.set(id(n), '1d/0r');
-  assert.equal(changed.size, 43, '43 changed singles, no more, no fewer');
+  for (const n of RING2_192) expect.set(id(n), '0d/2r');
+  assert.equal(changed.size, 45, '45 changed singles, no more, no fewer');
   assert.deepEqual(
     [...changed.keys()].sort(),
     [...expect.keys()].sort(),
@@ -624,40 +636,47 @@ test('Unchanged: option-off renders equal the current golden on both scores', ()
 // 4. Linter: the preview lints clean, the new audits are option-aware
 // ---------------------------------------------------------------------------
 
-test('The complete grammar adds no finding on either score (Bach green, Brahms accepted-2)', () => {
+test('The complete grammar adds no finding (Bach green, Brahms 2+0)', () => {
   const bach = lintJankoScore(BACH, O_BACH_PREVIEW, T_BACH);
   assert.equal(bach.violations.length, 0, 'Bach preview: zero violations');
   assert.equal(bach.warnings.length, 0, 'Bach preview: zero warnings');
-  // 4-up: the Brahms preview carries the golden's 2 accepted slot findings
-  // (was 0/0 at 3-up) — and nothing else. Full itemization in the §2-landed
-  // record; the message-equality below proves the preview adds zero.
+  // Canonical packing: the Brahms preview carries exactly the golden's 2
+  // slot findings. Note 5 (m.1 downbeat whole) used to stand bare, mounting
+  // two preview rings on its short chord stem with the upper ring colliding
+  // with its own mask; the admitted tick-48 bracket (§2 true-ink pre-step)
+  // carries it as the 192 exception (preview stays golden for clasp
+  // members), so the ring defect is gone with the bare stem.
   const brahms = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
-  assert.equal(brahms.violations.length, 2, 'Brahms preview: exactly the accepted 2');
+  assert.equal(brahms.violations.length, 2, 'Brahms preview: the golden 2 slot findings, nothing new');
   assert.equal(brahms.warnings.length, 0, 'Brahms preview: zero warnings');
   assert.equal(brahms.ok, false, 'red by operator order, like its golden');
+  const slots = brahms.violations.filter((v) => v.code === 'system-slot-overlap');
   assert.deepEqual(
-    brahms.violations.map((v) => [v.code, v.system, v.message]),
+    slots.map((v) => [v.code, v.system, v.message]),
     lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS).violations.map((v) => [v.code, v.system, v.message]),
-    'preview report is exactly the golden report — the grammar adds nothing'
+    'the 2 slot findings are byte-identical to the golden report'
   );
+  const rings = brahms.violations.filter((v) => v.code === 'ring-geometry');
+  assert.equal(rings.length, 0, 'no new-audit finding: the whole is bracketed');
 });
 
 test('The new audits run under the preview and stay silent under golden', () => {
   // Golden: the two new checks are no-ops (the golden grammar predates the
-  // notated counts), so the gate reports exactly the accepted 2 (was 0/0).
+  // notated counts), so the gate reports exactly the accepted 2.
   const golden = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(golden.violations.length, 2, 'golden: exactly the accepted 2 slot findings');
   assert.equal(golden.warnings.length, 0);
-  // Preview: the checks run over real new ink — 4 rings, 234 single dots,
-  // 75 beamed dots, 40 bracket dots — and stay silent because the ink is
-  // clean. (Violation fixtures proving the checks are not vacuous live in
-  // test/janko-linter.test.ts.)
+  // Preview: the checks run over real new ink and stay silent — the one
+  // genuine corpus firing (note 5's self-colliding whole ring) is gone with
+  // the bare stem (5 is the admitted tick-48 bracket's 192 exception now).
+  // Non-vacuousness rests on the synthetic fixtures in
+  // test/janko-linter.test.ts.
   const preview = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   assert.equal(preview.violations.length, 2, 'preview: the accepted 2, nothing new');
   assert.equal(preview.warnings.length, 0);
   const auditCodes = (codes: string[]): string[] =>
     codes.filter((c) => c === 'ring-geometry' || c === 'dot-count-agreement');
-  assert.deepEqual(auditCodes(preview.violations.map((v) => v.code)), [], 'no new-audit code fires');
+  assert.deepEqual(auditCodes(preview.violations.map((v) => v.code)), [], 'the preview path is silent too');
   assert.deepEqual(auditCodes(golden.violations.map((v) => v.code)), [], 'the golden path is silent');
 });
 
@@ -878,7 +897,7 @@ test('Reference carries the Brahms golden beside Bach (first-class surface, hist
     'adaptive',
     'the R30 studio Brahms is the lint-gated adaptive golden'
   );
-  assert.equal(config.brahmsPages.length, 6, 'six Brahms pages (24 systems, 4-up; was 8)');
+  assert.equal(config.brahmsPages.length, 5, 'five Brahms pages (18 systems, 4-up; was 8)');
   assert.equal(config.brahmsCrops.length, ROUND_30_BRAHMS_CROPS.length, 'three Brahms crops');
   assert.deepEqual(
     ROUND_30_BRAHMS_CROPS.map((c) => [c.start, c.count]),

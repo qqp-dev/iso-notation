@@ -80,8 +80,8 @@ export interface StudioCrop {
 /**
  * The reference-view Brahms macro crops (Round 31, re-aimed at the fixed-3
  * golden): the upbeat and downbeat with the white-ring clasp, the first
- * fixed-3 fold under its Gould bracket, and the five-voice chords at the
- * first known folding finding — the three sights the operator walks first.
+ * fixed-3 fold under its Gould bracket, and the five-voice chords — the
+ * three sights the operator walks first.
  */
 export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
   {
@@ -101,9 +101,9 @@ export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
   {
     start: 7,
     count: 2,
-    title: 'mm. 7–8 · Chords and the first known finding',
+    title: 'mm. 7–8 · Five-voice chords',
     caption:
-      'The massive five-voice chords — and the m. 7 stem-through-simultaneity (#78/#80) the BRONZE surface carries as a known folding finding.',
+      'The massive five-voice chords with the octave-1 ledger stack whole — the seated surface carries no finding here.',
   },
 ];
 
@@ -202,14 +202,12 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: buildBrahmsOp118No1Score(),
-      // Round 31: the studio's Brahms is the fixed-3 golden — the current
-      // practice the defaults already carry, DISPLAY-ONLY (zero golden
-      // change). Fixed-3 carries 9 violations at 4-up (the 4 known folding
-      // stem-through-simultaneity findings plus 5 accepted slot-accounting
-      // findings); mixed codes carry no known tags, and every finding stays
-      // VISIBLE (never gated, never hidden). The CLI keeps its own adaptive
-      // entry (the accepted 2, red by operator order); deploy gates on
-      // tests + build only, so it stays green.
+      // Canonical Brahms (judged when Round 33 closed): the fixed-3 golden
+      // at four measures/system with the page-top correction and the full
+      // grid — 18 systems over 5 pages. Canonical fixed-3 is clean; every
+      // finding stays VISIBLE (never gated, never hidden). The CLI keeps
+      // its own adaptive entry (the pre-existing secondary residual);
+      // deploy gates on tests + build only, so it stays green.
       options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
       tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
     },
@@ -483,6 +481,11 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     (sum, candidate) => sum + resolveCandidate(candidate).windows.length,
     0
   );
+  // Decided round: zero cards means no active comparison — the view says so
+  // explicitly and the mount selects the Reference (see mountJankoStudio).
+  // Normal future two-view behavior is untouched: any new round's cards
+  // render exactly as before.
+  const decided = candidates.length === 0;
   return [
     '<section class="view-panel" id="view-candidates" data-view="candidates">',
     '  <div class="round-card">',
@@ -490,14 +493,16 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     `    <h2>${escapeHtml(round.title)}</h2>`,
     `    <p>${escapeHtml(round.description)}</p>`,
     `    <p class="round-meta">${
-      verification
-        ? `${candidates.length} verification card${candidates.length === 1 ? '' : 's'} · ` +
-          `${windowCount} engraving window${windowCount === 1 ? '' : 's'} · fixed golden master, no open axis`
-        : `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
+      decided
+        ? 'no active comparison — the round is decided, see the Golden Reference'
+        : verification
+          ? `${candidates.length} verification card${candidates.length === 1 ? '' : 's'} · ` +
+            `${windowCount} engraving window${windowCount === 1 ? '' : 's'} · fixed golden master, no open axis`
+          : `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
     renderCompareStrip(config),
-    `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}">`,
+    `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}" data-decided="${decided}">`,
     cards.join('\n'),
     '  </div>',
     '</section>',
@@ -631,9 +636,9 @@ function renderReferenceScore(
  * Render the Golden Reference Object: the full page spread of the canonical
  * score plus the macro focus crops, all from the golden-master options —
  * Bach GOLD AND, since Round 30, the Brahms BRONZE beside it (fixed-3 since
- * Round 31, 4-up with its 9 findings itemized — the 4 known folding
- * findings plus 5 accepted slot findings, untagged while mixed). Every
- * round judges against these objects; neither is ever a draft.
+ * Round 31, 4-up, its diagnostics itemized — clean since the §5 geometry
+ * pass seated every system and verified the stem tucks). Every round judges
+ * against these objects; neither is ever a draft.
  *
  * The BRONZE Brahms block leads (Brahms is the live iteration surface) and
  * the GOLD Bach block follows without focus crops (operator order — Bach's
@@ -651,7 +656,7 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
       brahms.tokens,
       config.brahmsPages,
       config.brahmsCrops,
-      { badge: 'BRONZE', knownCode: 'stem-through-simultaneity' }
+      { badge: 'BRONZE' }
     ),
     renderReferenceScore('primary', score, options, tokens, pages, crops, { badge: 'GOLD' }),
     '</section>',
@@ -780,8 +785,12 @@ export function mountJankoStudio(
   root.innerHTML = renderStudioMarkup(config);
   const dom = collectDom(root);
 
-  const showFromHash = (): void =>
-    showView(dom, viewFromHash(root.dataset.initialView ?? 'candidates'));
+  // Decided round (zero cards): the studio opens on the Reference — there is
+  // no comparison to show. An explicit `#candidates` hash still wins, and any
+  // future round's cards restore the normal candidates-first behavior.
+  const initialView =
+    root.dataset.initialView ?? (config.candidates.length === 0 ? 'reference' : 'candidates');
+  const showFromHash = (): void => showView(dom, viewFromHash(initialView));
 
   for (const tab of dom.tabs) {
     tab.addEventListener('click', () => {

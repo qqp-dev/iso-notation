@@ -19,11 +19,11 @@
  *     subset (offset 96 only), solved-column subset equality, showBeatGrid
  *     false, no pickup pulses, final-partial subset, odd-subdivision empty
  *     set.
- *  4. Linter (live, re-pinned to the settled-refinement engine): packing-only
- *     baseline itemized; correction/filter add no new or worsened findings;
- *     window findings pinned.
+ *  4. Linter (live, re-pinned to the §5-seated engine): packing-only
+ *     baseline clean; correction/filter add no new or worsened findings;
+ *     window findings cleared, seating pinned.
  *  5. Canonical (STOP tripwire, preserved not rebased): Bach GOLD frozen,
- *     Brahms studio 9 / adaptive 2.
+ *     Brahms studio clean / adaptive 2.
  *
  * Candidate-only: no canonical promotion, no Reference change, no PDF release.
  */
@@ -44,7 +44,6 @@ import {
   BRAHMS_STUDIO_SCORE_ID,
   brahmsWindow,
   candidateBadges,
-  getCandidate,
   type JankoCandidate,
   type JankoCandidateRound,
 } from '../src/render/janko/candidates';
@@ -64,7 +63,11 @@ import {
   renderJankoPage,
 } from '../src/render/janko/engine';
 import { resolveBeatPulseXs } from '../src/render/janko/elements/barlines';
-import { lintJankoScore } from '../src/render/janko/linter';
+import {
+  DEFAULT_JANKO_LINT_OPTIONS,
+  lintJankoScore,
+  systemInkExtents,
+} from '../src/render/janko/linter';
 import { createStudioConfig, renderCandidatesView } from '../src/render/janko/studio';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -75,11 +78,15 @@ const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const O_BACH = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const T_BACH = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-/** Studio Brahms golden: fixed-3, 3/system, 4/page — the frozen reference. */
+/** Studio Brahms golden: fixed-3, 4/system, 4/page — the canonical reference. */
 const O_BRAHMS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
 const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 /** Packing-only diagnostic: mps4, no correction, full grid. */
-const O_PACK = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, measuresPerSystem: 4 });
+const O_PACK = resolveJankoOptions({
+  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  measuresPerSystem: 4,
+  correctPageTopAnacrusisMeasureWidth: false,
+});
 const O_CORR_ALL = resolveJankoOptions({
   ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
   measuresPerSystem: 4,
@@ -261,9 +268,10 @@ test('Registry: historical cards differ only in gridPulseFilter; core/page inher
       `${card.id} shows the shared correction delta`
     );
   }
-  // Reference stays frozen: the studio Brahms entry is untouched mps3.
-  assert.equal(entry.options.measuresPerSystem, 3, 'reference packing untouched');
-  assert.equal(entry.options.correctPageTopAnacrusisMeasureWidth, false);
+  // Canonical promotion: the studio Brahms entry now carries the judged
+  // packing (4/system + correction + full grid).
+  assert.equal(entry.options.measuresPerSystem, 4, 'canonical packing promoted');
+  assert.equal(entry.options.correctPageTopAnacrusisMeasureWidth, true);
   assert.equal(entry.options.gridPulseFilter, 'all');
 });
 
@@ -279,8 +287,10 @@ test('Candidates view: parked Round 32 renders two cards × four windows, Brahms
   assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 8, 'Brahms ×8');
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');
   // Whole-score card lint reads the LIVE engine under the historical cards —
-  // both cards stay honestly red (see §4 for the re-pinned counts).
-  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 2, 'both cards honestly red');
+  // the §5 geometry pass seated every system, so both cards are honestly
+  // green (see §4 for the re-pinned counts).
+  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 0, 'no card honestly red');
+  assert.equal((html.match(/data-lint="clean"/g) ?? []).length, 2, 'both cards honestly green');
 });
 
 // ---------------------------------------------------------------------------
@@ -395,9 +405,14 @@ test('Correction preserves slot verticals; no pickup repeats; generic opt-in', (
     );
   }
   // Non-four-measure packing corrects generically (mps3: 543.48/3.25 → /3).
-  const o3n = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS });
+  const o3n = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    measuresPerSystem: 3,
+    correctPageTopAnacrusisMeasureWidth: false,
+  });
   const o3c = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    measuresPerSystem: 3,
     correctPageTopAnacrusisMeasureWidth: true,
   });
   const g3n = computePageGeometry(o3n, T_BRAHMS, BRAHMS);
@@ -463,15 +478,22 @@ test('Paired crop mm. 57–64 retains the page-relative inter-system gap', () =>
   // The systems are page-mates (page 4): the crop stacks them at page Y.
   assert.equal(Math.floor(14 / 4), Math.floor(15 / 4), 'same page');
   assert.ok(upper.geometry.staffBotY > lower.geometry.staffTopY - 200, 'stacked, not rearranged');
-  // The known overlap survives the crop: upper ink bottom past lower ink top.
+  // The §5 correction seated the lower system: the crop carries the same
+  // positive page gap the linter verifies (upper ink bottom 623.43125,
+  // lower ink top 630.9175 — the pre-fix −1.9275 overlap, resolved).
   const report = lintJankoScore(BRAHMS, O_CORR_ALL, T_BRAHMS);
-  const overlap = report.violations.find(
-    (v) => v.code === 'system-slot-overlap' && v.system === 15 && v.metrics?.lowerTop !== undefined
+  assert.equal(
+    report.violations.filter((v) => v.code === 'system-slot-overlap').length,
+    0,
+    'no slot finding survives the seating'
   );
-  assert.ok(overlap, 'the sys14/15 overlap is reported');
-  const gap = (overlap!.metrics!.lowerTop as number) - (overlap!.metrics!.upperBottom as number);
-  assert.ok(Math.abs(gap - -1.9275) < 1e-6, `signed gap ${gap}pt exposes the collision`);
-  assert.equal(gap.toFixed(2), '-1.93');
+  const upperInk = systemInkExtents(upper, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_CORR_ALL);
+  const lowerInk = systemInkExtents(lower, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_CORR_ALL);
+  assert.ok(Math.abs(upperInk.bottom - 623.43125) < 1e-6, 'upper ink bottom unmoved');
+  assert.ok(Math.abs(lowerInk.top - 630.9175) < 1e-6, 'lower ink top seated');
+  const gap = lowerInk.top - upperInk.bottom;
+  assert.ok(Math.abs(gap - 7.48625) < 1e-6, `signed gap ${gap}pt clears`);
+  assert.equal(gap.toFixed(2), '7.49');
 });
 
 // ---------------------------------------------------------------------------
@@ -601,24 +623,16 @@ test('Retained pulses equal solved-column twins; grid edge cases preserved', () 
 //    findings from the correction/filter
 // ---------------------------------------------------------------------------
 
-test('Packing-only baseline: 8 violations/0 warnings, two folding sites pinned', () => {
+test('Packing-only baseline: clean under the §5 geometry pass (was 8/0)', () => {
+  // Pre-§5 the packing-only surface carried 8: five slot findings, the
+  // sys14/15 ink overlap, and the two fold-coincident stem tucks (sys 5/m. 24
+  // notes 326/325, sys 10/m. 44 notes 612/611). The rigid slot correction
+  // seats the five systems and the true-ink tuck audit clears the two stems
+  // (ends tucked at the breathing line, digit air kept) — every item
+  // genuinely resolved, none demoted or hidden.
   const report = lintJankoScore(BRAHMS, O_PACK, T_BRAHMS);
-  assert.equal(report.violations.length, 8, 'the packing-only 8 under the settled engine');
+  assert.equal(report.violations.length, 0, 'the packing-only surface is clean');
   assert.equal(report.warnings.length, 0);
-  const folding = report.violations.filter((v) => v.code === 'stem-through-simultaneity');
-  assert.deepEqual(
-    folding.map((v) => [v.system, v.measure, ...(v.noteIds ?? [])]),
-    [
-      [5, 24, 'brahms-op118-no1-326', 'brahms-op118-no1-325'],
-      [10, 44, 'brahms-op118-no1-612', 'brahms-op118-no1-611'],
-    ],
-    'the two retained fold-coincident folding sites (m. 33, m. 53)'
-  );
-  // The retired m. 7 (note 78) and m. 17 (note 213) stem-throughs were
-  // tuck-caused piercings (the Round 19 midpoint tuck handed the shared stem
-  // to a tucked interior head); the settled lowest-inward slots untuck the
-  // singletons onto the column and the main-column upper head carries the
-  // stem, so both findings are genuinely gone — not demoted, not hidden.
   assert.ok(
     !report.violations.some((v) => (v.noteIds ?? []).includes('brahms-op118-no1-78')),
     'm. 7 tuck piercing eliminated'
@@ -629,48 +643,48 @@ test('Packing-only baseline: 8 violations/0 warnings, two folding sites pinned',
   );
 });
 
-test('Slot findings and the new sys14/15 ink overlap, unrounded values pinned', () => {
+test('Slot seating: the five corrected systems sit at 1.00pt air, sys14/15 clears', () => {
+  // Pre-§5 overflows (1.00pt clearance included) were 2.01375 /
+  // 4.41375 / 9.41375 at systems [1, 3, 7, 12, 15], plus the sys14/15 ink
+  // overlap (signed gap −1.9275: lowerTop 621.50375 into upperBottom
+  // 623.43125). The rigid correction seats each system's complete ink at
+  // exactly 1.00pt air on its binding side; the linter verifies the seat.
   const report = lintJankoScore(BRAHMS, O_PACK, T_BRAHMS);
-  const slots = report.violations.filter(
-    (v) => v.code === 'system-slot-overlap' && v.metrics?.lowerTop === undefined
+  assert.equal(
+    report.violations.filter((v) => v.code === 'system-slot-overlap').length,
+    0,
+    'no slot finding survives the seating'
   );
-  assert.deepEqual(
-    slots.map((v) => v.system),
-    [1, 3, 7, 12, 15],
-    'the five slot-accounting sites'
-  );
-  // Unrounded overflows (1.00pt clearance included): 2.01375 / 4.41375 / 9.41375.
-  const overflowOf = (v: (typeof slots)[number]): number => {
-    const m = v.metrics as { inkTop: number; inkBottom: number; slotTop: number; slotBottom: number };
-    const topOverflow = m.slotTop + 1 - m.inkTop;
-    const botOverflow = m.inkBottom - (m.slotBottom - 1);
-    return Math.max(topOverflow, botOverflow);
+  const layouts = layoutJankoScore(BRAHMS, O_PACK, T_BRAHMS);
+  const page = computePageGeometry(O_PACK, T_BRAHMS, BRAHMS);
+  const airOf = (idx: number): [number, number] => {
+    const l = layouts[idx];
+    const e = systemInkExtents(l, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_PACK);
+    const slotTop = l.geometry.slotTopY;
+    return [e.top - slotTop, slotTop + page.slotHeight - e.bottom];
   };
-  const overflows = slots.map((v) => overflowOf(v));
-  assert.ok(Math.abs(overflows[0] - 2.01375) < 1e-6, `sys1 +${overflows[0]}pt`);
-  assert.ok(Math.abs(overflows[1] - 2.01375) < 1e-6, `sys3 +${overflows[1]}pt`);
-  assert.ok(Math.abs(overflows[2] - 4.41375) < 1e-6, `sys7 +${overflows[2]}pt`);
-  assert.ok(Math.abs(overflows[3] - 4.41375) < 1e-6, `sys12 +${overflows[3]}pt`);
-  assert.ok(Math.abs(overflows[4] - 9.41375) < 1e-6, `sys15 +${overflows[4]}pt`);
-  assert.deepEqual(
-    overflows.map((o) => o.toFixed(2)),
-    ['2.01', '2.01', '4.41', '4.41', '9.41'],
-    'the rounded diagnostic values'
-  );
-  // The new real ink overlap — not mere slot accounting.
-  const overlaps = report.violations.filter((v) => v.metrics?.lowerTop !== undefined);
-  assert.equal(overlaps.length, 1, 'exactly one adjacent-system ink collision');
-  assert.equal(overlaps[0].system, 15);
-  const gap =
-    (overlaps[0].metrics!.lowerTop as number) - (overlaps[0].metrics!.upperBottom as number);
-  assert.ok(Math.abs(gap - -1.9275) < 1e-6, `signed gap ${gap}pt`);
-  assert.equal(gap.toFixed(2), '-1.93');
-  assert.ok(Math.abs((overlaps[0].metrics!.upperBottom as number) - 623.43125) < 1e-6);
-  assert.ok(Math.abs((overlaps[0].metrics!.lowerTop as number) - 621.50375) < 1e-6);
+  // Bottom-bound systems seat at 1.00pt below; top-bound at 1.00pt above.
+  for (const idx of [1, 3]) {
+    const [, airB] = airOf(idx);
+    assert.ok(Math.abs(airB - 1.0) < 1e-6, `sys${idx} bottom air ${airB}pt`);
+  }
+  for (const idx of [7, 12, 15]) {
+    const [airT] = airOf(idx);
+    assert.ok(Math.abs(airT - 1.0) < 1e-6, `sys${idx} top air ${airT}pt`);
+  }
+  // The sys14/15 pair clears by +7.48625 (upper unmoved, lower seated).
+  const upper = systemInkExtents(layouts[14], T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_PACK);
+  const lower = systemInkExtents(layouts[15], T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_PACK);
+  assert.ok(Math.abs(upper.bottom - 623.43125) < 1e-6, 'upper ink bottom unmoved');
+  assert.ok(Math.abs(lower.top - 630.9175) < 1e-6, 'lower ink top seated');
+  const gap = lower.top - upper.bottom;
+  assert.ok(Math.abs(gap - 7.48625) < 1e-6, `signed gap ${gap}pt`);
+  assert.equal(gap.toFixed(2), '7.49');
 });
 
-test('Correction/filter add no new or worsened findings (identities, not counts)', () => {
+test('Correction/filter add no new or worsened findings (all clean)', () => {
   const base = lintJankoScore(BRAHMS, O_PACK, T_BRAHMS);
+  assert.equal(base.violations.length, 0, 'packing-only baseline clean');
   const keyOf = (v: (typeof base.violations)[number]): string =>
     [v.code, v.system, v.measure ?? '', ...(v.noteIds ?? [])].join('|');
   const baseKeys = base.violations.map(keyOf);
@@ -685,15 +699,12 @@ test('Correction/filter add no new or worsened findings (identities, not counts)
       baseKeys,
       `${label}: same finding identities and sites as the approved baseline`
     );
-    // Severity and geometry unchanged (spot-check the overlap metrics).
-    const overlap = r.violations.find((v) => v.metrics?.lowerTop !== undefined)!;
-    const gap = (overlap.metrics!.lowerTop as number) - (overlap.metrics!.upperBottom as number);
-    assert.ok(Math.abs(gap - -1.9275) < 1e-6, `${label}: overlap unmoved`);
   }
 });
 
-test('Baseline window findings: sys0/4/8/17 clean; sys1/14–15 pinned', () => {
+test('Baseline window findings: every window clean under the seating', () => {
   const report = lintJankoScore(BRAHMS, O_PACK, T_BRAHMS);
+  assert.equal(report.violations.length, 0, 'no window carries a finding');
   const bySys = new Map<number, typeof report.violations>();
   for (const v of report.violations) {
     const bucket = bySys.get(v.system) ?? [];
@@ -701,47 +712,41 @@ test('Baseline window findings: sys0/4/8/17 clean; sys1/14–15 pinned', () => {
     bySys.set(v.system, bucket);
   }
   assert.equal(bySys.get(0), undefined, 'sys0 (pickup + mm. 1–4) clean');
-  assert.deepEqual(
-    bySys.get(1)!.map((v) => v.code),
-    ['system-slot-overlap'],
-    'sys1 carries the slot finding only (m. 7 tuck piercing eliminated)'
-  );
+  assert.equal(bySys.get(1), undefined, 'sys1 clean (m. 7 tuck piercing eliminated)');
   assert.equal(bySys.get(4), undefined, 'sys4 (mm. 17–20) clean (m. 17 tuck piercing eliminated)');
   assert.equal(bySys.get(8), undefined, 'sys8 clean');
+  assert.equal(bySys.get(15), undefined, 'sys15 clean (slot seated, sys14/15 clears)');
   assert.equal(bySys.get(17), undefined, 'sys17 (partial close) clean');
-  const s15 = bySys.get(15)!;
-  assert.equal(s15.length, 2, 'sys15 carries slot + the new collision');
-  assert.ok(s15.some((v) => v.metrics?.lowerTop === undefined), 'the slot-accounting finding');
-  assert.ok(s15.some((v) => v.metrics?.lowerTop !== undefined), 'the sys14/15 ink overlap');
 });
 
 // ---------------------------------------------------------------------------
 // 5. Canonical gates: frozen GOLD, studio 9, CLI 2, byte-identical defaults
 // ---------------------------------------------------------------------------
 
-test('Canonical frozen: Bach 0/0, Brahms studio 7, adaptive CLI 2, defaults inert', () => {
+test('Canonical frozen: Bach 0/0, Brahms studio clean, adaptive CLI 2, defaults inert', () => {
   assert.deepEqual(resolveJankoOptions(DEFAULT_JANKO_OPTIONS).gridPulseFilter, 'all');
   assert.equal(resolveJankoOptions(DEFAULT_JANKO_OPTIONS).correctPageTopAnacrusisMeasureWidth, false);
   const bach = lintJankoScore(BACH, O_BACH, T_BACH);
   assert.equal(bach.violations.length, 0);
   assert.equal(bach.warnings.length, 0);
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(studio.violations.length, 7, 'live fixed-3 canonical 7 (was 9: m7/m17 resolved by full slots)');
+  assert.equal(studio.violations.length, 0, 'live fixed-3 canonical clean (§5 seated, itemized in the round-33 suite)');
   assert.equal(studio.warnings.length, 0);
   const cli = lintJankoScore(
     BRAHMS,
     { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
     BRAHMS_OP118_NO1_JANKO_TOKENS
   );
-  assert.equal(cli.violations.length, 2, 'CLI adaptive 2 unchanged');
+  assert.equal(cli.violations.length, 2, 'CLI adaptive 2 at canonical packing');
   assert.equal(cli.warnings.length, 0);
   assert.deepEqual(
     cli.violations.map((v) => v.system),
-    [22, 23],
-    'sys 23 furniture + sys 24/23 overlap'
+    [17, 17],
+    'sys 18 furniture + sys 18/17 overlap'
   );
-  assert.ok(!('core' in getCandidate('grid-full-vs-none-full')!.options!), 'no core delta');
-  assert.ok(!('systemsPerPage' in getCandidate('grid-full-vs-none-full')!.options!), 'no page delta');
+  const parkedFull = ROUND_32_CANDIDATES.find((c) => c.id === '4-per-system-full-grid')!;
+  assert.ok(!('core' in parkedFull.options!), 'no core delta');
+  assert.ok(!('systemsPerPage' in parkedFull.options!), 'no page delta');
 });
 
 test('R31 parked: historical consts in the round-31 suite, registry carries the record', () => {

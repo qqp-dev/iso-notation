@@ -369,24 +369,26 @@ test('janko.html <-> public/janko.html byte-identical', () => {
 
 test('Guest Gaps: extension rows (0/6, 0/2) stand off 6.0pt at interior barlines; system edges and inner rows flush', () => {
   // Use Brahms fixed-3, which has extension rows in middle measures.
-  // In the final system of Brahms:
-  // Bar 0 has row 5 (lin 24) ending at barline 1;
-  // Bar 1 has row 4 (lin 72) starting at barline 1 and ending at barline 2.
+  // In system 2 (mm. 9–12) at canonical 4-per packing:
+  // Row 5 (lin 24) runs bars 0–2, flush at the system left edge, ending at
+  // barline 3; row 4 (lin 72) spans bar 1, starting at barline 1 and ending
+  // at barline 2.
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
   const layouts = layoutJankoScore(BRAHMS, o, t);
-  const lastSys = layouts[layouts.length - 1];
-  const geo = lastSys.geometry;
+  const sys = layouts[2];
+  const geo = sys.geometry;
   const segs = geo.staffSegments ?? [];
 
   const barline1X = Number((geo.staffLeft + geo.measureWidth).toFixed(2));
   const barline2X = Number((geo.staffLeft + 2 * geo.measureWidth).toFixed(2));
+  const barline3X = Number((geo.staffLeft + 3 * geo.measureWidth).toFixed(2));
 
-  // Row 5 (0/2, lin 24, bar 0): starts at system left edge, ends at barline 1
+  // Row 5 (0/2, lin 24): starts at system left edge, ends at barline 3
   const row5 = segs.find((s) => s.rowId === 5);
   assert.ok(row5, 'Row 5 (0/2) segment found');
   assert.equal(row5.x1, geo.staffLeft, 'Row 5 is flush at system left edge');
-  assert.equal(Number(row5.x2.toFixed(2)), Number((barline1X - t.measureInset).toFixed(2)), 'Row 5 stands off 6.0pt before interior barline 1');
+  assert.equal(Number(row5.x2.toFixed(2)), Number((barline3X - t.measureInset).toFixed(2)), 'Row 5 stands off 6.0pt before interior barline 3');
 
   // Row 4 (0/6, lin 72, bar 1): starts after barline 1, ends before barline 2
   const row4 = segs.find((s) => s.rowId === 4);

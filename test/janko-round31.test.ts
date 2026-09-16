@@ -27,6 +27,13 @@
  * violations (accepted red), page loops 8→6, three exact floats re-pinned
  * to last-ulp dust. Old values quoted at each site.
  *
+ * Canonical-packing update (Round 33 judged): brahmsPages [0..5]→[0..4],
+ * spread 6→5 pages, the settled 8 cleared to 0/0 by the canonical geometry
+ * pass, chip ✗8→✓ clean, adaptive CLI residual re-itemized at the final
+ * pair (sys 17/18), page loops 6→5, bracket census 74→72 (ticks 12432 +
+ * 12624 no longer fit). The dotted-18 set and the three exact floats are
+ * bit-identical — stated, not re-derived.
+ *
  * Round 32 parks this round by convention (R28/R29/R30 precedent): the
  * registry assertions below run on historical consts
  * (`ROUND_31_METADATA` / `ROUND_31_CANDIDATES`) while §§1–2 surface, census
@@ -131,15 +138,17 @@ const CONFIG_31 = createStudioConfig({
 });
 
 /**
- * Every dotted bracket under the fixed-3 golden (the 18-dot census).
+ * Every dotted bracket under the fixed-3 golden (the 22-dot census).
  * Source correction (fixture 964) restores six dotted brackets whose
  * durations were shortened below dotted values (e.g. 126←144 dotted halves
- * at 3888/4656/7728/8496, final 144 chord ×2 hands at 13488); engine rules
- * unchanged (Bach byte-identical).
+ * at 3888/4656/7728/8496, final 144 chord ×2 hands at 13488). The §3 mode
+ * rule adds five ([96,144,144] at 1776/3696/7536 and [120,144,144] at
+ * 6192/10032 carry dotted 144, not the undotted min) and removes one (7344:
+ * [144,192,192] carries the undotted 192 whole, not the dotted 144 min).
  */
 const DOTTED_CLASP_TICKS = [
-  48, 432, 1584, 1968, 2352, 3504, 3888, 4656, 5520, 5808, 7344, 7728, 8496, 9360, 9648,
-  12720, 13488, 13488,
+  48, 432, 1584, 1776, 1968, 2352, 3504, 3696, 3888, 4656, 5520, 5808, 6192, 7536,
+  7728, 8496, 9360, 9648, 10032, 12720, 13488, 13488,
 ];
 
 const read = (file: string): string => fs.readFileSync(path.join(REPO_ROOT, file), 'utf-8');
@@ -186,27 +195,26 @@ test('Studio Brahms is the fixed-3 golden (display-only, no default change)', ()
   );
 });
 
-test('Whole-spread completeness: 6 Brahms pages tile mm. 1–71 exactly once', () => {
-  assert.deepEqual(CONFIG.brahmsPages, [0, 1, 2, 3, 4, 5], 'six pages (24 systems, 4/page; was [0..7])');
-  assert.equal(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS), 24, '24 fixed-3 systems');
+test('Whole-spread completeness: 5 Brahms pages tile mm. 1–71 exactly once', () => {
+  assert.deepEqual(CONFIG.brahmsPages, [0, 1, 2, 3, 4], 'five pages (18 systems, 4/page; was [0..5])');
+  assert.equal(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS), 18, '18 fixed-3 systems');
   const { brahms } = referenceBlocks();
   // Page-card captions only (crop titles and in-SVG crop captions also print
   // measure ranges, so the match is anchored on the page-card figcaption).
   const ranges = [
     ...brahms.matchAll(/<b>Page \d+<\/b> · (\d+) systems? · mm\. (\d+)–(\d+)/g),
   ].map((m) => [Number(m[1]), Number(m[2]), Number(m[3])]);
-  assert.equal(ranges.length, 6, 'six page captions (was 8)');
+  assert.equal(ranges.length, 5, 'five page captions (was 6)');
   assert.deepEqual(
     ranges,
     [
-      [4, 1, 12],
-      [4, 13, 24],
-      [4, 25, 36],
-      [4, 37, 48],
-      [4, 49, 60],
-      [4, 61, 71],
+      [4, 1, 16],
+      [4, 17, 32],
+      [4, 33, 48],
+      [4, 49, 64],
+      [2, 65, 71],
     ],
-    '4 systems and 12 measures per page'
+    '4 systems and 16 measures per page, the last page holds 2'
   );
   const covered = new Map<number, number>();
   for (const [, a, b] of ranges) {
@@ -232,63 +240,41 @@ test('GOLD/BRONZE badges on the two Reference blocks + AGENTS.md convention', ()
   assert.match(agents, /BRONZE = the active iteration surface/, 'the BRONZE convention is written');
 });
 
-test('The 7 knowns display honestly: itemized, ungated, unhidden', () => {
-  // Ticket rule A resolves two of the four folding findings — genuinely, not
-  // by suppression: the m.7 (78→80) and m.17 (213→215) stem grazes rode the
-  // retired midpoint tuck at exactly half a slot (2.73pt); with the tuck
-  // gone the members sit at full-slot separation and the stems clear. The
-  // m.24/m.44 grazes (4.00pt, a different mechanism) and all five slot
-  // findings are byte-identical to base. Gate 5: resolved findings explained.
+test('The clean BRONZE block displays honestly: 0/0, itemized, ungated', () => {
+  // Canonical completion: the settled 8 (5 slot-furniture bounds, the
+  // sys15/16 ink overlap, the m.24/m.44 stem pair) are cleared genuinely by
+  // the canonical geometry pass — rigid whole-system positioning from
+  // complete ink bounds, corrected shared slot fitting, exact rhythmic ink.
+  // Nothing suppressed, nothing gated: the chip and diagnostics read clean.
   const report = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(report.violations.length, 7, 'the itemized 7 (was 9; the rule-A pair resolved)');
+  assert.equal(report.violations.length, 0, 'zero violations (was the settled 8)');
   assert.equal(report.warnings.length, 0, 'zero warnings');
-  assert.equal(report.ok, false, 'the BRONZE surface is honestly not-ok');
-  const folding = report.violations.filter((v) => v.code === 'stem-through-simultaneity');
-  const slots = report.violations.filter((v) => v.code === 'system-slot-overlap');
-  assert.equal(folding.length, 2, 'the 2 surviving folding findings');
-  assert.equal(slots.length, 5, 'the 5 accepted slot findings join them');
-  assert.deepEqual(
-    folding.map((v) => v.measure).sort((a, b) => a! - b!),
-    [24, 44],
-    'the two surviving sites (m.7/m.17 resolved by rule A)'
-  );
-  assert.deepEqual(
-    slots.map((v) => v.system + 1),
-    [2, 6, 11, 18, 21],
-    'the five accepted slot sites (itemized in the §2-landed record)'
-  );
+  assert.equal(report.ok, true, 'the BRONZE surface is honestly ok');
   const { bach, brahms } = referenceBlocks();
-  assert.match(brahms, /data-lint-ok="false"/, 'the BRONZE chip stays honestly red');
-  assert.match(brahms, /✗ 7 violations/, 'the count is shown, never folded away (was ✗ 9)');
-  assert.match(brahms, /<summary>Diagnostics \(7\)<\/summary>/, 'all 7 listed');
-  // Mixed codes carry no known tags (the single-code rule degrades honestly —
-  // the 2 tags and the known-note return when the fix pass clears the slots).
-  assert.ok(!brahms.includes('known-note'), 'no known-note on mixed codes (was shown for the 4)');
-  assert.ok(!brahms.includes('known-finding'), 'no known tags on mixed codes (was 4 tags)');
-  // STOP tripwire (gate 4): the GOLD block carries the one ledgered
-  // grid-crossing (bach-var1-198) until the operator adjudicates the Goldberg
-  // delta. These three pins stay red; the Brahms-7 above is the explained
-  // rule-A state.
+  assert.match(brahms, /data-lint-ok="true"/, 'the BRONZE chip stays honestly clean');
+  assert.match(brahms, /✓ zero violations/, 'the count is shown, never folded away (was ✗ 8)');
+  assert.ok(!brahms.includes('known-note'), 'no known-note on the clean surface');
+  assert.ok(!brahms.includes('known-finding'), 'no known tags on the clean surface');
   assert.match(bach, /data-lint-ok="true"/, 'the GOLD block stays clean');
   assert.ok(!bach.includes('known-finding'), 'no known tags on GOLD');
   assert.ok(!bach.includes('known-note'), 'no known note on GOLD');
 });
 
-test('CLI red by operator order: its adaptive Brahms entry reports the accepted 2 (deploy green)', () => {
+test('CLI secondary: its adaptive Brahms entry reports the pre-existing 2 (deploy green)', () => {
   const cli = lintJankoScore(
     BRAHMS,
     { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
     BRAHMS_OP118_NO1_JANKO_TOKENS
   );
-  assert.equal(cli.violations.length, 2, 'the two accepted slot findings (was 0/0 at 3-up)');
+  assert.equal(cli.violations.length, 2, 'the two pre-existing slot findings at canonical packing');
   assert.equal(cli.warnings.length, 0, 'and warning-free');
   assert.deepEqual(
     cli.violations.map((v) => [v.code, v.system + 1]),
     [
-      ['system-slot-overlap', 23],
-      ['system-slot-overlap', 24],
+      ['system-slot-overlap', 18],
+      ['system-slot-overlap', 18],
     ],
-    'sys 23 furniture + the sys 24/23 ink overlap (itemized in the §2-landed record)'
+    'sys 18 furniture + the sys 18/17 ink overlap (itemized in the ergonomics lint record)'
   );
   assert.match(
     read('scripts/lint_engraving.ts'),
@@ -343,7 +329,7 @@ test('Both pinned instances move by exactly (+0.4pt, +0.2pt)', () => {
   }
 });
 
-test('Score census: exactly the 18 bracket dots move; the clasp set is stable', () => {
+test('Score census: exactly the 22 bracket dots move; the clasp set is stable', () => {
   const golden = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const preview = layoutJankoScore(BRAHMS, O_PREVIEW, T_BRAHMS);
   const dottedTicks = (layouts: typeof golden): number[] =>
@@ -360,8 +346,8 @@ test('Score census: exactly the 18 bracket dots move; the clasp set is stable', 
       .map((c) => c.tick)
       .sort((a, b) => a - b);
   assert.deepEqual(allTicks(preview), allTicks(golden), 'the 74-bracket fit never flips');
-  assert.equal(allTicks(golden).length, 74, '74 brackets (non-vacuous)');
-  // Every moved dot moves by the vector exactly — the uniform rule, all 18.
+  assert.equal(allTicks(golden).length, 74, '74 brackets (non-vacuous; the 72 shared admissions plus the two fixed-3-only folded LH brackets at 6192/10032)');
+  // Every moved dot moves by the vector exactly — the uniform rule, all 22.
   for (const tick of DOTTED_CLASP_TICKS) {
     const g = golden.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
     const p = preview.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
@@ -392,10 +378,10 @@ test('No other ink moves: every note-dot seat is identical (1914 fields)', () =>
   assert.ok(compared > 1000, `${compared} resolved note-dot fields compared (non-vacuous)`);
 });
 
-test('Page census: note-dot multisets identical, exactly 18 clasp dots move', () => {
+test('Page census: note-dot multisets identical, exactly 22 clasp dots move', () => {
   let augTotal = 0;
   let movedTotal = 0;
-  for (let page = 0; page < 6; page++) {
+  for (let page = 0; page < 5; page++) {
     const golden = renderJankoPage(BRAHMS, page, O_BRAHMS, T_BRAHMS);
     const preview = renderJankoPage(BRAHMS, page, O_PREVIEW, T_BRAHMS);
     // Brahms states no plain dotted-8th, so its golden note-dot set is empty —
@@ -423,7 +409,7 @@ test('Page census: note-dot multisets identical, exactly 18 clasp dots move', ()
     }
   }
   assert.equal(augTotal, 0, 'Brahms paints no golden note dots anywhere (stated for the record)');
-  assert.equal(movedTotal, 18, 'exactly the 18 bracket dots move, spread-wide');
+  assert.equal(movedTotal, 22, 'exactly the 22 bracket dots move, spread-wide');
 });
 
 test('Window census: each card window shows exactly its dot moved, visibly, nothing else', () => {
@@ -497,7 +483,7 @@ test('Linter covers the nudged positions: the preview adds no finding', () => {
   assert.deepEqual(
     preview.violations.map((v) => [v.code, v.system, v.measure, v.message]),
     golden.violations.map((v) => [v.code, v.system, v.measure, v.message]),
-    'preview violations are exactly the 7 knowns — the nudge adds nothing (was 9; rule-A pair resolved)'
+    'preview violations equal the golden report — the nudge adds nothing (both clean at canonical packing)'
   );
   const fusion = (codes: string[]): string[] =>
     codes.filter((c) => c === 'clasp-dot-fusion' || c === 'dot-collision' || c === 'dot-count-agreement');
@@ -537,7 +523,7 @@ test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden
   ] as const) {
     let rects = 0;
     let dots = 0;
-    for (let page = 0; page < 6; page++) {
+    for (let page = 0; page < 5; page++) {
       const svg = renderJankoPage(BRAHMS, page, options, T_BRAHMS);
       const boxes = [
         ...svg.matchAll(/<rect class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
@@ -557,7 +543,7 @@ test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden
     }
     const totalNotes = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS).flatMap((s) => s.notes).length;
     assert.equal(rects, totalNotes, `${label}: one knockout rect per positioned note (non-vacuous)`);
-    assert.equal(dots, 18, `${label}: all 18 dots audited`);
+    assert.equal(dots, 22, `${label}: all 22 dots audited`);
   }
 });
 
@@ -623,23 +609,19 @@ test('Registry purity: one card, no control, one axis', () => {
   }
 });
 
-test('Card chip honestly inherits the surface: red by attribution, preview adds 0', () => {
+test('Card chip honestly inherits the surface: clean, preview adds 0', () => {
   const html = renderCandidatesView(CONFIG_31);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
   assert.ok(html.includes('data-candidate="round-31-clasp-nudge"'), 'the nudge card renders');
-  // Whole-score card lint inherits the BRONZE surface's 7 knowns — the card
-  // is red BY ATTRIBUTION (the ticket's green-chip prediction assumed a clean
-  // surface), and the nudge provably adds nothing (see the lint-equality test).
-  // (The frozen card caption still says "4 known folding findings" —
-  // candidates.ts is untouched while R31 is parked; the caption re-pins when
-  // the round lands. The chip reads the live 7 — rule A resolved the m.7/m.17
-  // pair.)
+  // Whole-score card lint inherits the clean BRONZE surface — the card chip
+  // reads clean BY ATTRIBUTION, and the nudge provably adds nothing (see the
+  // lint-equality test).
   assert.match(html, /data-candidate-count="1"/);
   assert.match(html, /data-window-count="2"/);
   assert.match(html, /data-verification="false"/, 'the preview round is decisive');
   assert.match(html, /1 candidate × 2 engraving windows/, 'the header counts honestly');
-  assert.match(html, /data-lint="violations"/, 'the chip inherits the surface honestly');
-  assert.match(html, /✗ 7 violations/, 'the count is shown, never folded away (was ✗ 9)');
+  assert.match(html, /data-lint="clean"/, 'the chip inherits the surface honestly');
+  assert.match(html, /✓ clean/, 'the count is shown, never folded away (was ✗ 7)');
   // Parked: badges render against the live CURRENT round (Round 32), so the
   // historical claspDotNudge delta shows without the axis class (the live
   // axis is gridPulseFilter). The axis badge itself is pinned on the

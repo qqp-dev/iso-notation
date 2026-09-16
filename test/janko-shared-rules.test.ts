@@ -84,13 +84,17 @@ function slotMap(fit: { slots: Map<string, number> }): Record<string, number> {
 }
 
 // ---------------------------------------------------------------------------
-// §A. Lowest-inward slot fit — pure unit theory
+// §A. Context-anchored slot fit — pure unit theory
 // ---------------------------------------------------------------------------
+// Order (pitch ascending) is fixed; anchoring follows the bracket context:
+// 'inward' seats the lowest colour toward its actual bracket (-1, 0, …),
+// 'column' seats it ON the true rhythmic column (0, +1, …). Single-colour
+// groups sit on the column under either anchor.
 
 test('§A units: a clear vertical stays one component on the main column', () => {
   const members = [mem('a', 0, 6.92, 60), mem('b', 7.5, 14.42, 62), mem('c', 15, 21.92, 64)];
   assert.equal(clusterOverlapComponents(members).length, 3, 'three clear components');
-  const fit = fitClusterSlots(members, AIR);
+  const fit = fitClusterSlots(members, AIR, 'inward');
   assert.deepEqual(slotMap(fit), { a: 0, b: 0, c: 0 }, 'every clear member holds the column');
 });
 
@@ -100,23 +104,31 @@ test('§A units: touching masks split components but share the column', () => {
   // column, exactly as the notehead-overlap audit permits.
   const members = [mem('a', 0, 6.92, 60), mem('b', 6.92, 13.84, 62)];
   assert.equal(clusterOverlapComponents(members).length, 2, 'exact touch splits');
-  assert.deepEqual(slotMap(fitClusterSlots(members, AIR)), { a: 0, b: 0 }, 'both on the column');
+  assert.deepEqual(slotMap(fitClusterSlots(members, AIR, 'column')), { a: 0, b: 0 }, 'both on the column');
 });
 
-test('§A units: an ordinary conflicting pair takes exactly {-gap, 0}', () => {
+test('§A units: a conflicting pair takes {-gap, 0} inward, {0, +gap} on the column', () => {
   const members = [mem('low', 0, 6.92, 48), mem('high', 2.5, 9.42, 50)];
   assert.equal(clusterOverlapComponents(members).length, 1, 'one component');
-  const fit = fitClusterSlots(members, AIR);
-  assert.deepEqual(slotMap(fit), { high: 0, low: -1 }, 'lowest pitch inward, other on the column');
+  const fit = fitClusterSlots(members, AIR, 'inward');
+  assert.deepEqual(slotMap(fit), { high: 0, low: -1 }, 'bracketed: lowest pitch inward, other on the column');
   assert.equal(fit.gap, 2 * WX + AIR, 'the sufficient 5.46pt pair gap');
   assert.equal(fit.gap, 5.46, 'ordinary tight heads: 2·2.53 + 0.4');
+  const col = fitClusterSlots(members, AIR, 'column');
+  assert.deepEqual(slotMap(col), { high: 1, low: 0 }, 'unbracketed: lowest ON the column, higher right');
+  assert.equal(col.gap, fit.gap, 'anchoring never changes the sufficient gap');
 });
 
 test('§A units: a chromatic three-clique takes {-gap, 0, +gap} by pitch', () => {
   const members = [mem('c', 0, 6.92, 48), mem('cs', 2.5, 9.42, 49), mem('d', 5, 11.92, 50)];
   assert.equal(clusterOverlapComponents(members).length, 1, 'one component');
-  const fit = fitClusterSlots(members, AIR);
-  assert.deepEqual(slotMap(fit), { c: -1, cs: 0, d: 1 }, 'lowest inward, rest outward by pitch');
+  const fit = fitClusterSlots(members, AIR, 'inward');
+  assert.deepEqual(slotMap(fit), { c: -1, cs: 0, d: 1 }, 'inward: lowest inward, rest outward by pitch');
+  assert.deepEqual(
+    slotMap(fitClusterSlots(members, AIR, 'column')),
+    { c: 0, cs: 1, d: 2 },
+    'column: lowest ON the column, rest outward by pitch'
+  );
 });
 
 test('§A units: a longer overlap chain reuses columns (no pairwise rule)', () => {
@@ -129,28 +141,33 @@ test('§A units: a longer overlap chain reuses columns (no pairwise rule)', () =
     mem('d', 15, 21.92, 49),
   ];
   assert.equal(clusterOverlapComponents(members).length, 1, 'one chained component');
-  const fit = fitClusterSlots(members, AIR);
+  const fit = fitClusterSlots(members, AIR, 'inward');
   assert.deepEqual(
     slotMap(fit),
     { a: -1, b: 0, c: -1, d: 0 },
-    'colours reused: {a, c} inward, {b, d} on the column'
+    'inward colours reused: {a, c} inward, {b, d} on the column'
+  );
+  assert.deepEqual(
+    slotMap(fitClusterSlots(members, AIR, 'column')),
+    { a: 0, b: 1, c: 0, d: 1 },
+    'column colours reused: {a, c} on the column, {b, d} outward'
   );
 });
 
 test('§A units: input permutation never changes the fit', () => {
   const members = [mem('c', 0, 6.92, 48), mem('cs', 2.5, 9.42, 49), mem('d', 5, 11.92, 50)];
-  const expected = slotMap(fitClusterSlots(members, AIR));
+  const expected = slotMap(fitClusterSlots(members, AIR, 'inward'));
   const reversals = [
     [members[2], members[1], members[0]],
     [members[1], members[2], members[0]],
     [members[2], members[0], members[1]],
   ];
   for (const order of reversals) {
-    assert.deepEqual(slotMap(fitClusterSlots(order, AIR)), expected, 'stable under permutation');
+    assert.deepEqual(slotMap(fitClusterSlots(order, AIR, 'inward')), expected, 'stable under permutation');
   }
   // Id tie-break inside equal pitch: deterministic, still lowest-inward.
   const twins = [mem('b', 0, 6.92, 48), mem('a', 2.5, 9.42, 48)];
-  assert.deepEqual(slotMap(fitClusterSlots(twins, AIR)), { a: -1, b: 0 }, 'stable id tie-break');
+  assert.deepEqual(slotMap(fitClusterSlots(twins, AIR, 'inward')), { a: -1, b: 0 }, 'stable id tie-break');
 });
 
 test('§A units: lowest means SOURCE pitch, not folded drawing y', () => {
@@ -158,10 +175,10 @@ test('§A units: lowest means SOURCE pitch, not folded drawing y', () => {
   // fold-coincident pair shares its interval exactly. Both seat lowest-lin
   // inward — drawing order never decides.
   const reversed = [mem('low', 0, 6.92, 40), mem('high', 2.5, 9.42, 52)];
-  assert.deepEqual(slotMap(fitClusterSlots(reversed, AIR)), { high: 0, low: -1 }, 'drawn-higher low pitch inward');
+  assert.deepEqual(slotMap(fitClusterSlots(reversed, AIR, 'inward')), { high: 0, low: -1 }, 'drawn-higher low pitch inward');
   const coincident = [mem('e1', 10, 16.92, 16), mem('e2', 10, 16.92, 28)];
   assert.deepEqual(
-    slotMap(fitClusterSlots(coincident, AIR)),
+    slotMap(fitClusterSlots(coincident, AIR, 'inward')),
     { e1: -1, e2: 0 },
     'same interval: lowest lin inward (the m.33/m.53 octave case)'
   );
@@ -171,7 +188,7 @@ test('§A units: halo-grown and tall masks widen the gap, never shrink it', () =
   // A halo-grown member (wx 6.2) against an ordinary head: the gap covers
   // the grown extents plus air.
   const grown = [mem('halo', 0, 6.92, 48, 6.2), mem('plain', 2.5, 9.42, 50)];
-  const fit = fitClusterSlots(grown, AIR);
+  const fit = fitClusterSlots(grown, AIR, 'inward');
   assert.deepEqual(slotMap(fit), { halo: -1, plain: 0 });
   assert.equal(fit.gap, 6.2 + WX + AIR, 'grown extents plus air (9.13pt)');
   // A tall member unifies two disjoint small ones into one component; the
@@ -181,17 +198,17 @@ test('§A units: halo-grown and tall masks widen the gap, never shrink it', () =
   const s2 = mem('s2', 15, 18, 40);
   assert.equal(clusterOverlapComponents([tall, s1, s2]).length, 1, 'the tall member unifies');
   assert.deepEqual(
-    slotMap(fitClusterSlots([tall, s1, s2], AIR)),
+    slotMap(fitClusterSlots([tall, s1, s2], AIR, 'inward')),
     { s1: -1, s2: -1, tall: 0 },
     'smalls share inward, tall holds the column'
   );
 });
 
 test('§A units: singletons and empties stay trivially on the column', () => {
-  const single = fitClusterSlots([mem('solo', 0, 6.92, 48)], AIR);
+  const single = fitClusterSlots([mem('solo', 0, 6.92, 48)], AIR, 'column');
   assert.deepEqual(slotMap(single), { solo: 0 });
   assert.equal(single.gap, 2 * WX + AIR);
-  const empty = fitClusterSlots([], AIR);
+  const empty = fitClusterSlots([], AIR, 'column');
   assert.equal(empty.slots.size, 0);
   assert.equal(empty.gap, AIR);
 });
@@ -374,7 +391,7 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   const ink: ResolvedJankoClaspInk = m1.durationInk[inkIdx];
   const hostile: JankoRhythmNote = {
     id: 'hostile',
-    x: 85.21,
+    x: 75.37,
     y: 128.13,
     durationTicks: 96,
     startTick: 48,
@@ -383,7 +400,7 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   const group: JankoClaspGroupGeometry = { ...m1, notes: [...m1.notes, hostile] };
   const honorHalo = (O_BRAHMS as unknown as { honorHalo?: boolean }).honorHalo;
   const seatOpts = { clusterSpacing: O_BRAHMS.clusterSpacing, honorHalo };
-  const walled = claspDotMemberAir(85.20988580362048, 128.13251804253335, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
+  const walled = claspDotMemberAir(75.37314372217251, 128.13251804253335, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
   assert.ok(walled < 0, `the 45° seat is a real collision (air ${walled.toFixed(2)}pt)`);
   const alt = claspDotCenter(group, ink, BRAHMS_OP118_NO1_JANKO_TOKENS, seatOpts);
   const angle = (Math.atan2(-(alt.y - ink.centerY), alt.x - group.claspX) * 180) / Math.PI;
@@ -449,28 +466,49 @@ test('§C render: the painted glyph is the scaled outline in rest ink', () => {
 });
 
 test('§C window: a real spanner connects one gap past the numeral edge', () => {
-  // Canonical Brahms system 2 carries an 8vb run over one folded note. The
-  // dashed line must start exactly one dash-gap past the RENDERED numeral's
-  // right edge — the connection reads the painted (scaled) advance.
+  // The dashed line must start exactly one dash-gap past the RENDERED
+  // numeral's right edge — the connection reads the painted (scaled)
+  // advance. Pinned on both placement branches: the roomy branch (note 182,
+  // numeral fully left of the head, dash at the head's left edge) and the
+  // left-margin branch (note 47, numeral tucked, dash past the head — the
+  // numeral sits below the staff, so the horizontal overlap is clean).
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const brackets = layouts.flatMap((l) => l.ottavaBrackets);
-  assert.equal(brackets.length, 8, 'eight folded runs on the canonical surface');
-  const sys1 = layouts[1];
-  const b = sys1.ottavaBrackets[0];
-  const first = sys1.notes.find((p) => p.note.id === b.noteIds[0])!;
-  assert.ok(
-    Math.abs(b.dashX0 - (first.x - T_BRAHMS.noteheadRadius)) < 1e-9,
-    'dash starts at the first head’s left edge'
-  );
-  const svg = renderOttavaBracket(b, T_BRAHMS);
-  const glyph = svg.match(/<path class="janko-ottava-glyph"[^>]*d="([^"]*)"/)!;
-  const nums = glyph[1].match(/-?\d+\.\d+|-?\d+/g)!.map(Number);
-  let maxX = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i < nums.length; i += 2) maxX = Math.max(maxX, nums[i]);
+  assert.equal(brackets.length, 9, 'nine folded runs on the canonical surface (the 937/938 pair splits at 4-per)');
   const gap = T_BRAHMS.ottavaDashGap ?? 2.0;
+  const glyphRightEdge = (b: (typeof brackets)[number]): number => {
+    const svg = renderOttavaBracket(b, T_BRAHMS);
+    const glyph = svg.match(/<path class="janko-ottava-glyph"[^>]*d="([^"]*)"/)!;
+    const nums = glyph[1].match(/-?\d+\.\d+|-?\d+/g)!.map(Number);
+    let maxX = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < nums.length; i += 2) maxX = Math.max(maxX, nums[i]);
+    return maxX;
+  };
+  // Roomy branch: note 182 (sys3).
+  const sys3 = layouts[3];
+  const roomy = sys3.ottavaBrackets.find((x) => x.noteIds.includes('brahms-op118-no1-182'))!;
+  const firstRoomy = sys3.notes.find((p) => p.note.id === 'brahms-op118-no1-182')!;
   assert.ok(
-    Math.abs(maxX + gap - b.dashX0) < 0.011,
-    `glyph right edge + one gap meets the dash (edge ${maxX.toFixed(2)}, dash ${b.dashX0})`
+    Math.abs(roomy.dashX0 - (firstRoomy.x - T_BRAHMS.noteheadRadius)) < 1e-9,
+    'roomy: dash starts at the first head’s left edge'
+  );
+  const roomyEdge = glyphRightEdge(roomy);
+  assert.ok(
+    Math.abs(roomyEdge + gap - roomy.dashX0) < 0.011,
+    `roomy: glyph right edge + one gap meets the dash (edge ${roomyEdge.toFixed(2)}, dash ${roomy.dashX0})`
+  );
+  // Margin branch: note 47 (sys1).
+  const sys1 = layouts[1];
+  const margin = sys1.ottavaBrackets.find((x) => x.noteIds.includes('brahms-op118-no1-47'))!;
+  const firstMargin = sys1.notes.find((p) => p.note.id === 'brahms-op118-no1-47')!;
+  assert.ok(
+    margin.dashX0 > firstMargin.x - T_BRAHMS.noteheadRadius,
+    'margin: dash starts past the head’s left edge (numeral tucked)'
+  );
+  const marginEdge = glyphRightEdge(margin);
+  assert.ok(
+    Math.abs(marginEdge + gap - margin.dashX0) < 0.011,
+    `margin: glyph right edge + one gap meets the dash (edge ${marginEdge.toFixed(2)}, dash ${margin.dashX0})`
   );
 });
 
@@ -538,9 +576,17 @@ test('§D rule: an exact tick tie prefers the preceding onset', () => {
   assert.ok(Math.abs(seatY - after) > 1, 'not the resume side');
 });
 
-test('§D rule: with both sides in-measure, the nearer onset wins', () => {
-  // Rest 4200 LH: release 24 ticks back, resume 48 ahead — both in m.22 —
-  // so the release level seats it.
+test('§D rule: a blocked release row falls through to the in-measure resume level', () => {
+  // Rest 4200 LH: release 24 ticks back, resume 48 ahead — both in m.22.
+  // The release side is nearer, so the phrase row IS the release level —
+  // but at 4-per packing the release head itself (id 299, 7.8pt left of the
+  // rest column) blocks that row, and the voice-row solver falls through to
+  // the resume level. Still in-measure, still same-hand: the documented
+  // fallback, not an interpolation. (Every release-nearer corpus rest falls
+  // through the same way at this packing — 4200/4968/8040/8808 LH — and no
+  // resume-nearer both-sides specimen exists; the nearer-side preference
+  // itself is proven by the tie-break pin above and the free-release m.2
+  // seat.)
   assert.equal(absMeasure(4200), 22, 'the rest opens in m.22');
   assert.equal(absMeasure(4176), 22, 'release in-measure');
   assert.equal(absMeasure(4248), 22, 'resume in-measure');
@@ -548,10 +594,16 @@ test('§D rule: with both sides in-measure, the nearer onset wins', () => {
   const { seatY, geoIndex } = restSeat(4200, 'LH');
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const geo = layouts[geoIndex].geometry;
-  assert.equal(
-    seatY,
-    nearestLatticeRow(onsetLevel(4176, 'LH'), geo, T_BRAHMS, O_BRAHMS),
-    'the seat follows the nearer release side'
+  const releaseRow = nearestLatticeRow(onsetLevel(4176, 'LH'), geo, T_BRAHMS, O_BRAHMS);
+  const resumeRow = nearestLatticeRow(onsetLevel(4248, 'LH'), geo, T_BRAHMS, O_BRAHMS);
+  assert.ok(Math.abs(releaseRow - resumeRow) > 1, 'the two sides offer different rows');
+  assert.equal(seatY, resumeRow, 'the seat falls through to the resume row');
+  // The block is real: the release head crowds the rest column on its row.
+  const head = layouts.flatMap((l) => l.notes).find((p) => p.note.id === 'brahms-op118-no1-299')!;
+  const rest = layouts.flatMap((l) => l.rests).find((r) => r.tick === 4200 && r.hand === 'LH')!;
+  assert.ok(
+    Math.abs(head.x - rest.x) < 8.5,
+    `the release head crowds the rest column (${Math.abs(head.x - rest.x).toFixed(2)}pt)`
   );
 });
 

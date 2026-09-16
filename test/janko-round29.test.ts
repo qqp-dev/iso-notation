@@ -340,23 +340,16 @@ test('Dots golden: Brahms m.1 dot reseated to the m.19 45° (rule B), m.4 UNMOVE
   assert.equal(d4.length, 1, 'm.4 clasp carries one dot');
   assert.equal(d19.length, 1, 'm.19 clasp carries one dot');
 
-  // Judged PR #48 seats, re-pinned for 4-up: x is bit-identical (both dots
-  // sit in system 1, whose slot-0 frame keeps its measureWidth), y moved by
-  // exactly the slot-0 frame shift ΔmiddleCY (derived live from both
-  // geometries — proof the within-system geometry is untouched). Rule B then
-  // reseats m.1 only: (84.081…, 127.266…) → (85.209…, 128.132…).
-  const g3 = computePageGeometry({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, systemsPerPage: 3 }, t, BRAHMS);
-  const g4 = computePageGeometry(BRAHMS_OP118_NO1_JANKO_OPTIONS, t, BRAHMS);
-  const delta = getSystemGeometry(g4, 0).middleCY - getSystemGeometry(g3, 0).middleCY;
-  assert.equal(d1[0]!.x, 85.20988580362048, 'm.1 clasp dot x (rule-B 45° seat; was 84.08115384615381)');
-  assert.equal(d1[0]!.y, 128.13251804253335, 'm.1 clasp dot y (rule-B 45° seat; was 127.26641154937485)');
-  assert.equal(m1.claspX, 81.35615384615384, 'm.1 clasp spine unmoved — the seat moved, not the bracket');
-  assert.equal(d4[0]!.x, 419.65911657285125, 'm.4 clasp dot x unmoved');
-  assert.equal(d4[0]!.y, 135.63251804253335, 'm.4 clasp dot y (was 166.29460137586668)');
-  assert.ok(
-    Math.abs(d4[0]!.y - 166.29460137586668 - delta) < 1e-9,
-    'm.4 y moved by exactly the frame shift'
-  );
+  // Judged PR #48 seats, re-pinned for canonical 4-per packing: y is
+  // bit-identical (both dots sit in system 1, whose slot frame keeps its
+  // verticals), x scales with the narrower measure width (543.48/4.25 vs
+  // /3.25 — proof the within-system geometry is untouched). Rule B then
+  // reseats m.1 only: (85.209…, 128.132…) at 45°.
+  assert.equal(d1[0]!.x, 75.37314372217251, 'm.1 clasp dot x (rule-B 45° seat; was 85.20988580362048 at mps3)');
+  assert.equal(d1[0]!.y, 128.13251804253335, 'm.1 clasp dot y bit-identical (packing moves x only)');
+  assert.equal(m1.claspX, 71.51941176470588, 'm.1 clasp spine x scales with the measure width');
+  assert.equal(d4[0]!.x, 331.1284378398195, 'm.4 clasp dot x scales with the measure width');
+  assert.equal(d4[0]!.y, 135.63251804253335, 'm.4 clasp dot y bit-identical (packing moves x only)');
   // The consistency the ticket orders: opening and m.19 sit at the same
   // 45.00° off their ring centres at the same 5.45 radius; m.19's absolute
   // seat is bit-identical to base (base: 60.00° opening vs 45.00° m.19).
@@ -366,8 +359,11 @@ test('Dots golden: Brahms m.1 dot reseated to the m.19 45° (rule B), m.4 UNMOVE
   };
   assert.ok(Math.abs(angleOf(m1, d1[0]!) - 45) < 1e-9, 'm.1 sits at 45°');
   assert.ok(Math.abs(angleOf(m19, d19[0]!) - 45) < 1e-9, 'm.19 sits at 45°');
-  assert.equal(d19[0]!.x, 43.40373195746664, 'm.19 dot x bit-identical to base');
-  assert.equal(d19[0]!.y, 536.0775180425334, 'm.19 dot y bit-identical to base');
+  // m.19 moved systems at 4-per packing (sys6 slot-2 → sys4 slot-0), so its
+  // absolute seat re-pins; the 45° seat relative to its own spine is the
+  // invariant, and it holds.
+  assert.equal(d19[0]!.x, 315.1437319574666, 'm.19 dot x (was 43.40373195746664 at mps3)');
+  assert.equal(d19[0]!.y, 168.13251804253335, 'm.19 dot y (was 536.0775180425334 at mps3)');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
@@ -459,11 +455,12 @@ test('Thin golden: fixed-4 extension rows (17.5, 77.5) render at 0.35pt on Brahm
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const systems = layoutJankoScore(BRAHMS, o, t);
 
-  // System 1 draws the low extension (lin 17.5), system 20 the high one (77.5).
+  // System 1 draws the low extension (lin 17.5), system 15 the high one
+  // (77.5; was system 20 at mps3 — the high passage re-systems at 4-per).
   const low = systems[1];
-  const high = systems[20];
+  const high = systems[15];
   assert.ok((low.geometry.extensionLines ?? []).includes(17.5), 'system 1 draws lin 17.5');
-  assert.ok((high.geometry.extensionLines ?? []).includes(77.5), 'system 20 draws lin 77.5');
+  assert.ok((high.geometry.extensionLines ?? []).includes(77.5), 'system 15 draws lin 77.5');
 
   const lowRule = pitchGridRules(low.geometry, o, t).find(
     (r) => Math.abs(r.y - (low.geometry.middleCY + continuousPitchY(17.5, t.semitoneScale))) < 1e-6
@@ -578,23 +575,29 @@ test('Rests golden: verbatim constants stay byte-identical (license provenance)'
   );
 });
 
-test('Rests golden: seating centers unchanged — all nine Bach seats pinned', () => {
-  // The scale applies about the glyph origin, so every seat point stands where
-  // it always has. Absolute pins: any seating drift fails here.
+test('Rests golden: all nine Bach seats pinned (§4 nearby-level rule)', () => {
+  // Provenance: pre-§4 seats were 720/318.45875, 864/313.45875,
+  // 1056/333.45875, 2988/325.95875, 3060/370.95875, 3132/345.95875,
+  // 3600/512.43125 (552/179.48625 and 3432/358.45875 never moved). The §4
+  // nearby-level rule reseats the other seven onto the nearest row of an
+  // actual in-measure same-hand level (downbeat rests take the resume side,
+  // the only side present; mid-measure rests take the nearer side) — every
+  // delta traced to played-note data, x/values/hands byte-identical.
+  // Absolute pins: any further seating drift fails here.
   const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const seats = layoutJankoScore(BACH, o, t).flatMap((s) => s.rests);
 
   const expected: ReadonlyArray<readonly [number, string, number, number]> = [
     [552, 'sixteenth', 548.635, 179.48625],
-    [720, 'eighth', 173.67, 318.45875],
-    [864, 'eighth', 309.54, 313.45875],
-    [1056, 'sixteenth', 486.7, 333.45875],
-    [2988, 'quarter', 130.7025, 325.95875],
-    [3060, 'quarter', 204.6375, 370.95875],
-    [3132, 'quarter', 266.5725, 345.95875],
+    [720, 'eighth', 173.67, 315.95875],
+    [864, 'eighth', 309.54, 310.95875],
+    [1056, 'sixteenth', 486.7, 338.45875],
+    [2988, 'quarter', 130.7025, 345.95875],
+    [3060, 'quarter', 204.6375, 385.95875],
+    [3132, 'quarter', 266.5725, 333.45875],
     [3432, 'sixteenth', 548.635, 358.45875],
-    [3600, 'eighth', 173.67, 512.43125],
+    [3600, 'eighth', 173.67, 504.93125],
   ];
   assert.equal(seats.length, expected.length, 'Bach writes nine rests');
 
@@ -602,8 +605,8 @@ test('Rests golden: seating centers unchanged — all nine Bach seats pinned', (
     const rest = seats.find((r) => r.tick === tick)!;
     assert.ok(rest, `tick-${tick} rest is written`);
     assert.equal(rest.value, value, `tick-${tick} value`);
-    assert.ok(Math.abs(rest.x - x) < 1e-6, `tick-${tick} seat x unmoved (${rest.x})`);
-    assert.ok(Math.abs(rest.y - y) < 1e-6, `tick-${tick} seat y unmoved (${rest.y})`);
+    assert.ok(Math.abs(rest.x - x) < 1e-6, `tick-${tick} seat x pinned (${rest.x})`);
+    assert.ok(Math.abs(rest.y - y) < 1e-6, `tick-${tick} seat y pinned (${rest.y})`);
   }
 });
 

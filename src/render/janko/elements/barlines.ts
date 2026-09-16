@@ -297,6 +297,23 @@ export function resolveBeatPulseXs(
   t: ResolvedJankoTokens,
   columns?: ReadonlyMap<number, number> | null
 ): number[] {
+  return resolveBeatPulses(geo, systemIndex, o, t, columns).map((p) => p.x);
+}
+
+/**
+ * Every painted dashed beat pulse of one system with its absolute beat tick:
+ * the same candidates {@link resolveBeatPulseXs} paints (occupied beats at
+ * their laid-out columns, unoccupied beats proportional, `gridPulseFilter`
+ * applied), as `{ tick, x }` pairs for audits that must know which beat line
+ * brackets an onset.
+ */
+export function resolveBeatPulses(
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  columns?: ReadonlyMap<number, number> | null
+): Array<{ tick: number; x: number }> {
   if (!o.showBeatGrid) return [];
   const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / t.ticksPerBeat));
   if (beatsPerMeasure <= 1) return [];
@@ -305,7 +322,7 @@ export function resolveBeatPulseXs(
   const anacrusis = t.anacrusisTicks ?? 0;
   const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
   const upbeatWidth = isSys0Anacrusis ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth : 0;
-  const xs: number[] = [];
+  const out: Array<{ tick: number; x: number }> = [];
 
   for (let m = 0; m < o.measuresPerSystem; m++) {
     const isOpeningMeasure = systemIndex === 0 && m === 0;
@@ -338,10 +355,10 @@ export function resolveBeatPulseXs(
         continue;
       }
       const tick = measureStartTick + b * t.ticksPerBeat;
-      xs.push(columns?.get(tick) ?? measureLeft + left + (b / beatsPerMeasure) * available);
+      out.push({ tick, x: columns?.get(tick) ?? measureLeft + left + (b / beatsPerMeasure) * available });
     }
   }
-  return xs;
+  return out;
 }
 
 /**

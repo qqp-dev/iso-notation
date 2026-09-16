@@ -143,8 +143,8 @@ const REST_STYLES: JankoRestStyle[] = [
  * historical record). Round 30 is parked (kept as the named pair for the
  * historical record). Round 31 previewed the clasp-dot nudge on one card
  * (parked as the named singleton). Round 32 asked full vs midpoint-only grid
- * (parked as the named pair; midpoint rejected). Round 33 is the full-vs-none
- * grid round: two cards differing only in `gridPulseFilter`.
+ * (parked as the named pair; midpoint rejected). Round 33 asked full vs none
+ * (parked as the named pair; DECIDED — full grid selected, zero live cards).
  */
 const ROUND_29_CARDS: string[] = [];
 const ROUND_30_CARDS: string[] = ['round-30-rings', 'round-30-double-dots'];
@@ -236,10 +236,10 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the Round 33 full-vs-none grid round (one open axis)', () => {
+test('CURRENT_ROUND_METADATA is the decided Round 33 (no open axis)', () => {
   assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no interior grid/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'the grid is the question');
+  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -248,32 +248,23 @@ test('CURRENT_ROUND_METADATA is the Round 33 full-vs-none grid round (one open a
     ['4-per-system-full-grid', '4-per-system-midpoint-grid'],
     'R32 parked pair on record'
   );
+  assert.deepEqual(
+    ROUND_33_CARDS,
+    ['grid-full-vs-none-full', 'grid-full-vs-none-none'],
+    'R33 parked pair on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the two-card Round 33 grid set, no control', () => {
+test('CURRENT_CANDIDATES is empty: Round 33 decided, no control', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_33_CARDS, 'the grid cards');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two grid cards');
-  for (const card of CURRENT_CANDIDATES) {
-    assert.equal(card.axis, 'gridPulseFilter', `${card.id} declares the open axis`);
-    assert.equal(card.options?.measuresPerSystem, 4, `${card.id} settles packing`);
-    assert.equal(
-      card.options?.correctPageTopAnacrusisMeasureWidth,
-      true,
-      `${card.id} carries the correction`
-    );
-  }
-  assert.equal(
-    getCandidate('grid-full-vs-none-full')!.options?.gridPulseFilter,
-    'all',
-    'full-grid card keeps every pulse'
-  );
-  assert.equal(
-    getCandidate('grid-full-vs-none-none')!.options?.gridPulseFilter,
-    'none',
-    'no-grid card paints no interior pulse'
-  );
+  assert.deepEqual(ids, [], 'zero live cards');
+  assert.equal(CURRENT_CANDIDATES.length, 0, 'no active comparison');
   assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
+  assert.equal(
+    getCandidate('grid-full-vs-none-full'),
+    undefined,
+    'the parked full-grid card lives in the round-33 suite, not the registry'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -320,8 +311,8 @@ test('The decided tight golden pins every gate; snug stays implemented and ident
       assert.deepEqual(
         report.violations.map((v) => [v.code, v.system + 1]),
         [
-          ['system-slot-overlap', 23],
-          ['system-slot-overlap', 24],
+          ['system-slot-overlap', 18],
+          ['system-slot-overlap', 18],
         ],
         'tight golden: exactly the accepted 2 (itemized in the §2-landed record)'
       );
@@ -343,8 +334,8 @@ test('The decided tight golden pins every gate; snug stays implemented and ident
       assert.deepEqual(
         snug.violations.map((v) => [v.code, v.system + 1]),
         [
-          ['system-slot-overlap', 23],
-          ['system-slot-overlap', 24],
+          ['system-slot-overlap', 18],
+          ['system-slot-overlap', 18],
         ],
         'snug: the same accepted 2 — the gap never touches slots'
       );
@@ -514,20 +505,23 @@ test('Pairs stand at the judged gap ±0.1, in time order, cells reported — eve
         Math.abs(span - G) < 0.1,
         `${spacing} t${tick}: pair spans ${span.toFixed(2)} (G = ${G})`
       );
-      // Lowest-inward relative to the solved column (nominal + legitimate
-      // shift): the lower source pitch one slot inward, the upper on it.
+      // Lowest-on-column relative to the solved column (nominal + legitimate
+      // shift): these cross-hand pairs carry one note per hand, so no bracket
+      // qualifies — the lower source pitch sits ON the column, the upper one
+      // slot right. (Upper-on-grid is retired: the inward slot is reserved
+      // for actual brackets.)
       const linOf = (p: (typeof pair)[number]): number =>
         p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
       const [lo, hi] = [...pair].sort((a, b) => linOf(a) - linOf(b));
       const layout = layouts.find((l) => l.columns.has(tick))!;
       const column = layout.columns.get(tick)!;
       assert.ok(
-        Math.abs(lo.x - (column - G)) < 0.1,
-        `${spacing} t${tick}: lower head one slot inward of the solved column`
+        Math.abs(lo.x - column) < 0.1,
+        `${spacing} t${tick}: lower head ON the solved column`
       );
       assert.ok(
-        Math.abs(hi.x - column) < 0.1,
-        `${spacing} t${tick}: upper head on the solved column`
+        Math.abs(hi.x - (column + G)) < 0.1,
+        `${spacing} t${tick}: upper head one slot right of the solved column`
       );
       // Beat cells: legitimate shifts fit every corpus pair — actual ink
       // stays inside — while the demand report names the desired excess.
@@ -538,8 +532,8 @@ test('Pairs stand at the judged gap ±0.1, in time order, cells reported — eve
       const diag = diags.find((d) => d.tick === tick);
       if (diag) {
         assert.ok(
-          diag.memberIds.includes(lo.note.id),
-          `${spacing} t${tick}: the diagnostic names the inward demand`
+          diag.memberIds.includes(hi.note.id),
+          `${spacing} t${tick}: the diagnostic names the outward demand`
         );
       }
     }
@@ -585,10 +579,10 @@ test('Unit centering: the t1032 pair sits symmetric in its free space — every 
 });
 
 // ---------------------------------------------------------------------------
-// 7. Lowest-inward slots: m12's 7 inward, the gap always G, demand reported
+// 7. Context-anchored slots: m12's 7 on its column, the gap always G, demand reported
 // ---------------------------------------------------------------------------
 
-test('Pin: m12 seats the 7 one slot inward with the 9 on its column — every preset', () => {
+test('Pin: m12 seats the 7 ON its column with the 9 one slot right — every preset', () => {
   for (const { spacing } of SPACING_CANDIDATES) {
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
@@ -600,21 +594,22 @@ test('Pin: m12 seats the 7 one slot inward with the 9 on its column — every pr
     const pair = notes
       .filter((p) => p.note.startTick === 1632)
       .sort((a, b) => a.x - b.x);
-    // Permanent lowest-inward rule relative to the solved column (nominal +
-    // legitimate shift): the **lower** head (pc7, the LH tone) sits one slot
-    // inward; the pc9 RH tone holds the column. (Round 21 §D's lower-holds
-    // anchor is retired.) The downbeat steps right to stay inside its cell.
+    // Permanent context-anchored rule relative to the solved column (nominal
+    // + legitimate shift): the m12 pair carries one note per hand, so no
+    // bracket qualifies — the **lower** head (pc7, the LH tone) sits ON the
+    // column and the pc9 RH tone stands one slot right. (Upper-on-grid is
+    // retired: the inward slot is reserved for actual brackets.)
     const nine = pair.find((p) => p.coord.pitchClass === 9)!;
     const seven = pair.find((p) => p.coord.pitchClass === 7)!;
     assert.ok(nine && seven, `${spacing}: the ticketed pair exists`);
     const column = layouts.find((l) => l.columns.has(1632))!.columns.get(1632)!;
     assert.ok(
-      Math.abs(seven.x - (column - G)) <= 0.3,
-      `${spacing}: the lower head sits one slot inward (Δ${Math.abs(seven.x - (column - G)).toFixed(2)})`
+      Math.abs(seven.x - column) <= 0.3,
+      `${spacing}: the lower head holds its column (Δ${Math.abs(seven.x - column).toFixed(2)})`
     );
     assert.ok(
-      Math.abs(nine.x - column) <= 0.3,
-      `${spacing}: the upper head holds its column (Δ${Math.abs(nine.x - column).toFixed(2)})`
+      Math.abs(nine.x - (column + G)) <= 0.3,
+      `${spacing}: the upper head sits one slot right (Δ${Math.abs(nine.x - (column + G)).toFixed(2)})`
     );
     const span = Math.abs(pair[1].x - pair[0].x);
     assert.ok(
@@ -1912,8 +1907,8 @@ test('STOP tripwire (unlanded): Brahms complete carries exactly the accepted 2',
   assert.deepEqual(
     report.violations.map((v) => [v.code, v.system + 1]),
     [
-      ['system-slot-overlap', 23],
-      ['system-slot-overlap', 24],
+      ['system-slot-overlap', 18],
+      ['system-slot-overlap', 18],
     ],
     'exactly the accepted 2'
   );
@@ -2015,23 +2010,21 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two grid cards, twelve windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the two Round 33 grid cards with honest chips', () => {
+test('The live studio renders the decided round with zero cards', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="12"/, '2 cards × 6 Brahms windows');
-  assert.match(html, /data-verification="false"/, 'the grid round is decisive');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
+  assert.match(html, /data-candidate-count="0"/);
+  assert.match(html, /data-window-count="0"/, 'zero windows');
+  assert.match(html, /data-decided="true"/, 'the decided round is marked');
   assert.match(html, /Round 33/);
-  assert.match(html, /no interior grid/i, 'the grid title headlines the view');
+  assert.match(html, /no active comparison/i, 'the decided title headlines the view');
   for (const id of ROUND_33_CARDS) {
-    assert.ok(html.includes(`data-candidate="${id}"`), `${id} renders`);
+    assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  // Whole-score card lint inherits the settled candidate-only 8 findings
-  // (honestly red on both cards — proven in test/janko-round33.test.ts).
-  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 2, 'both cards honestly red');
+  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 0, 'no card chips at all');
 });
 
-test('The closer-comparison strip is absent in the grid round', () => {
+test('The closer-comparison strip is absent in the decided round', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.equal(html, '', 'the matched windows carry the comparison — no strip to compare');
+  assert.equal(html, '', 'no active comparison — no strip to compare');
 });
