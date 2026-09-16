@@ -325,6 +325,8 @@ export function resolveBeatPulseXs(
     const measureStartTick = isSys0Anacrusis
       ? anacrusis + m * t.ticksPerMeasure
       : anacrusis + (systemIndex * o.measuresPerSystem + m) * t.ticksPerMeasure;
+    // Round 33 `none`: no interior pulse paints at all (barlines always do).
+    if (o.gridPulseFilter === 'none') continue;
     for (let b = 1; b < beatsPerMeasure; b++) {
       // Round 32 `midpoint-only`: a filter over the existing candidates —
       // retain the pulse iff its tick offset is exactly half a measure.

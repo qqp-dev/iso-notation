@@ -729,43 +729,44 @@ function majorTriad(): QuantizedGridScore {
   );
 }
 
-test('Row-snapped clusters (doctrine): the anchored head keeps the column, the follower fans one gap', () => {
+test('Row-snapped clusters (doctrine): lowest sits one gap inward, the rest on the column', () => {
   const layout = layoutJankoScore(majorTriad(), OPTIONS, TOKENS)[0];
   const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
   const c = byId.get('triad-c')!;
   const e = byId.get('triad-e')!;
   const g = byId.get('triad-g')!;
 
-  // C4 and E4 are both rank 0 of octave 4: one lattice point before the fan.
+  // C4 and E4 are both rank 0 of octave 4: one lattice point before the fit.
   // At tick 0 both wear the Position of Honor ring, so the step is the widened
   // halo gap, not the judged pair gap.
   assert.equal(c.coord.rank, 0);
   assert.equal(e.coord.rank, 0);
   assert.equal(c.y, e.y, 'the two heads keep one row y');
-  close(Math.abs(e.x - c.x), HALO_GAP, 'the pair is fanned by exactly one halo gap');
+  close(Math.abs(e.x - c.x), HALO_GAP, 'the pair spans exactly one halo gap');
   assert.ok(
     HALO_GAP >= 2 * HALO_WX,
     'the halo step covers two full ring extents plus air'
   );
 
-  // …asymmetrically: the lower head (index 0 of a single-hand pair) anchors the
-  // column the whole unit was translated to, while the follower steps into the
-  // open measure.
-  const column = (c.x + e.x) / 2;
-  close(c.x, column - HALO_GAP / 2, 'the anchored head keeps the unit column');
-  close(e.x, column + HALO_GAP / 2, 'the follower steps one halo gap right');
+  // Lowest-inward: the lower head (C4) sits one halo gap inward of the
+  // solved onset column while the upper head (E4) holds it. The clasped unit
+  // legitimately translated right for bracket air, so the column here is the
+  // laid-out one, not the proportional beat.
+  const column = layout.columns.get(0)!;
+  close(c.x, column - HALO_GAP, 'the lower head sits one halo gap inward');
+  close(e.x, column, 'the upper head holds the solved column');
 
-  // Round 19 symmetric tuck: G4 is rank 1 — a single-head row — so it is
-  // centred on the fan's own middle instead of keeping the column, and the
-  // whole triad mirrors about `column` (the isomorphic ∇/Δ rationale of the
-  // deleted interleave is gone).
+  // No tuck: G4 is rank 1 — a single-head row — so it stands on the column
+  // with the upper pair head, and the cluster is asymmetric (the Round 19
+  // symmetric tuck and its mirror are retired).
   assert.equal(g.coord.rank, 1);
   assert.notEqual(g.y, c.y);
-  close(g.x, column, 'the lone different-row head tucks to the fan middle');
-  close(c.x + e.x, 2 * g.x, 'the cluster mirrors about its own centre');
+  close(g.x, column, 'the lone different-row head stands on the column');
+  assert.equal(g.x, e.x, 'the lone head shares the column with the upper head');
+  assert.ok(Math.abs(c.x + e.x - 2 * g.x) > HALO_GAP / 2, 'no mirror symmetry');
 });
 
-test('Row-snapped clusters: every note keeps its true row y and the LOWER head anchors the column', () => {
+test('Row-snapped clusters: every note keeps its true row y and the LOWER head sits inward', () => {
   const score = makeScore(
     [
       makeNote('chord-c', 0, 4, 48, 48, 'LH'),
@@ -803,21 +804,32 @@ test('Row-snapped clusters: every note keeps its true row y and the LOWER head a
   const c = layout.notes.find((p) => p.note.id === 'chord-c')!;
   const e = layout.notes.find((p) => p.note.id === 'chord-e')!;
   const g = layout.notes.find((p) => p.note.id === 'chord-g')!;
-  // The mixed-hand pair anchors its **lower** head on the beat (Round 21 §D:
-  // lower-first) and fans the higher RH head one judged pair gap aside (tick 48
-  // wears no halo).
-  close(c.x, tickX(48), 'the lower head anchors the beat column');
-  close(Math.abs(c.x - e.x), PAIR_GAP, 'the pair is fanned by exactly one pair gap');
-  // Round 19 symmetric tuck: G4's single-head row centres on the pair's own
-  // middle (not on the beat column).
-  close(g.x, (e.x + c.x) / 2, 'the lone head tucks to the pair middle');
+  // The mixed-hand pair seats its **lower** head one judged gap inward of
+  // the solved column and holds the higher RH head on it (tick 48 wears no
+  // halo). Round 21 §D's lower-holds anchor is retired. Tick 48 is a
+  // downbeat whose nominal sits on the cell edge, so the whole onset steps
+  // right to stay inside (legitimate translation); the demand stays reported.
+  const column = layout.columns.get(48)!;
+  close(c.x, column - PAIR_GAP, 'the lower head sits one gap inward');
+  close(e.x, column, 'the upper head holds the solved column');
+  close(Math.abs(c.x - e.x), PAIR_GAP, 'the pair spans exactly one pair gap');
+  // No tuck: G4's single-head row stands on the solved column with the upper
+  // pair head.
+  close(g.x, column, 'the lone head stands on the solved column');
+  // The desired inward head leaves its beat cell: the demand is reported,
+  // the slots stay honest, the shift fits the ink.
+  const diag = (layout.clusterDiagnostics ?? []).find((d) => d.tick === 48);
+  assert.ok(diag, 'the cell excess is reported');
+  assert.deepEqual(diag!.memberIds, ['chord-c'], 'the diagnostic names the leaving member');
 });
 
-test('Row-snapped clusters: a crowd at the barline fans right, never shears', () => {
-  // On a downbeat the beat cell has no room to the left, so the anchored RH
-  // head keeps the column and the follower steps into the open measure; every
-  // voice of the onset travels together. At tick 0 the step is the widened halo
-  // gap, and the lone different-row head tucks to the pair's own middle.
+test('Row-snapped clusters: a crowd at the barline seats inward, never shears', () => {
+  // On a downbeat the beat cell has no room to the left — and the permanent
+  // rule seats the lower head inward anyway: the pair keeps its full halo
+  // spread (tick 0 wears the ring), the lone different-row head stands on
+  // the solved column (no tuck), every voice of the onset travels together
+  // (one rigid unit, never sheared), the cell demand is reported, and the
+  // whole onset steps right to stay inside (legitimate translation).
   const layout = layoutJankoScore(
     makeScore(
       [
@@ -835,10 +847,31 @@ test('Row-snapped clusters: a crowd at the barline fans right, never shears', ()
   const g = layout.notes.find((p) => p.note.id === 'open-g')!;
   assert.equal(layout.notes.length, 3);
   close(Math.abs(e.x - c.x), HALO_GAP, 'the pair keeps its full halo spread');
-  close(g.x, (e.x + c.x) / 2, 'the lone RH head tucks to the pair middle');
-  assert.ok(
-    Math.min(c.x, e.x, g.x) - TOKENS.noteheadRadius >= layout.geometry.staffLeft + 1.0,
-    'the slid column still clears the opening barline by >= 1pt'
+  close(g.x, e.x, 'the lone RH head stands on the column with the upper head');
+  const column = layout.columns.get(0)!;
+  close(c.x, column - HALO_GAP, 'the lower head sits one halo gap inward of the solved column');
+  close(e.x, column, 'the upper head holds the solved column');
+  // The desired inward head leaves its beat cell: the demand is reported,
+  // the slots stay honest, the shift fits the ink — clean, never sheared.
+  const diag = (layout.clusterDiagnostics ?? []).find((d) => d.tick === 0);
+  assert.ok(diag, 'the cell excess is reported');
+  assert.deepEqual(diag!.memberIds, ['open-c'], 'the diagnostic names the leaving member');
+  const audit = lintJankoScore(
+    makeScore(
+      [
+        makeNote('open-c', 0, 4, 0, 96, 'LH'),
+        makeNote('open-e', 4, 4, 0, 96, 'RH'),
+        makeNote('open-g', 7, 4, 0, 96, 'RH'),
+      ],
+      144
+    ),
+    OPTIONS,
+    TOKENS
+  );
+  assert.deepEqual(
+    audit.violations.map((v) => v.code).sort(),
+    [],
+    'legitimate shifts fit the margin crowd: clean'
   );
 });
 
@@ -1148,7 +1181,14 @@ test('Round 20 rest cuts: five distinct monoline grammars, all clean', () => {
       assert.ok(!pattern.test(crop), `${style} never paints ${other} ink`);
     }
     const report = lintJankoScore(score, options, TOKENS);
-    assert.equal(report.ok, true, `${style} engraves clean`);
+    // Clean: legitimate shifts fit every downbeat joint pair — zero
+    // violations. The five inward demands stay reported in
+    // clusterDiagnostics; the dialect adds no finding.
+    assert.deepEqual(
+      report.violations.map((v) => [v.code, ...(v.noteIds ?? [])].join('|')).sort(),
+      [],
+      `${style} adds no finding: Bach adaptive clean`
+    );
     assert.equal(report.warnings.length, 0, `${style} adds no warning`);
     documents.add(crop.replace(new RegExp(`data-rest-style="${style}"`, 'g'), ''));
   }
@@ -1431,7 +1471,13 @@ test('Round 12 grid writing policies: protected air, air channels and full-width
   );
   for (const policy of ['overlaid-beat-grid', 'strict-protected-grid', 'unified-transparent-grid'] as const) {
     const report = lintJankoScore(score, { ...OPTIONS, gridWritingPolicy: policy }, TOKENS);
-    assert.equal(report.ok, true, `${policy} is clean`);
+    // Clean: legitimate shifts fit every downbeat joint pair — zero
+    // violations. Demands stay reported in clusterDiagnostics.
+    assert.deepEqual(
+      report.violations.map((v) => [v.code, ...(v.noteIds ?? [])].join('|')).sort(),
+      [],
+      `${policy} adds no finding: Bach adaptive clean`
+    );
     assert.equal(report.warnings.length, 0, `${policy} adds no warning`);
   }
 });
@@ -1474,7 +1520,13 @@ test('Round 13 start symbols: the flared 0.65pt bracket, the 0.50pt bracket and 
   );
   for (const style of ['architectural-bracket', 'delicate-bracket', 'clef-pillar'] as const) {
     const report = lintJankoScore(score, { ...OPTIONS, systemStartStyle: style }, TOKENS);
-    assert.equal(report.ok, true, `${style} engraves clean`);
+    // Clean: legitimate shifts fit every downbeat joint pair — zero
+    // violations. Demands stay reported in clusterDiagnostics.
+    assert.deepEqual(
+      report.violations.map((v) => [v.code, ...(v.noteIds ?? [])].join('|')).sort(),
+      [],
+      `${style} adds no finding: Bach adaptive clean`
+    );
     assert.equal(report.warnings.length, 0, `${style} adds no warning`);
   }
 });
@@ -2783,15 +2835,25 @@ test('Anchored and 3-row layouts surface their real cost: high notes crowd the n
     'single-line-3row': 11.69,
     'bounded-channel': 12.29,
   };
+  // Clean across paradigms: legitimate shifts fit every inward slot and
+  // barline crowd — zero violations. Demands stay reported in
+  // clusterDiagnostics; each paradigm adds nothing.
+  const KNOWN: Record<string, string[]> = {
+    'single-equator': [],
+    'on-the-line': [],
+    'single-line-3row': [],
+    'bounded-channel': [],
+  };
   for (const c of LAYOUT_CASES) {
     const report = lintJankoScore(score, c.options, TOKENS);
     assert.deepEqual(
-      report.violations.map((v) => `${v.code}: ${v.message}`),
-      [],
-      `${c.id} lint verdict`
+      report.violations.map((v) => [v.code, ...(v.noteIds ?? [])].join('|')).sort(),
+      [...KNOWN[c.id]].sort(),
+      `${c.id} adds no finding: Bach clean`
     );
-    assert.ok(
-      report.diagnostics.every((d) => d.code === 'chordal-overlap'),
+    assert.deepEqual(
+      report.diagnostics.map((d) => d.code).sort(),
+      KNOWN[c.id].map((k) => k.split('|')[0]).sort(),
       `${c.id} produces no unexpected diagnostic class`
     );
     const layouts = layoutJankoScore(score, c.options, TOKENS);

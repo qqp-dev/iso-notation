@@ -235,31 +235,41 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * quarter-position pulses vs midpoint-only keeping the third quarter
  * position). The mm. 57–64 paired window exposes the known new
  * adjacent-system overlap under investigation. Candidate-only: no canonical
- * promotion, no Reference change.
+ * promotion, no Reference change. Round 32 is parked (see the historical
+ * consts in `test/janko-round32.test.ts`); midpoint-only is REJECTED — the
+ * full grid stays canonical until Round 33 is judged.
+ *
+ * Round 33 re-asks the grid question with every settled refinement SHARED by
+ * both cards (lowest-inward cluster slots, m19-style 45° bracket dots, the E3
+ * rest level, lighter ottava glyphs): full interior quarter-position grid vs
+ * NO interior grid, on the six literal Brahms windows pickup+mm1–4, mm5–8,
+ * mm17–20, mm33–36, mm53–56, mm57–64. Two cards, one axis — the grid filter.
+ * The Reference is the control.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 32,
-  title: 'Four per system + midpoint-only grid',
+  round: 33,
+  title: 'Full interior grid vs no interior grid',
   description:
-    'Settled packing — first system pickup + four full measures (five displayed slots), later systems four full measures — under the opt-in page-top width correction on the fixed-3 core at four systems/page. The question is the interior grid only: the existing quarter-position pulses versus midpoint-only keeping the third quarter position and removing the second and fourth, measure boundaries untouched. The mm. 57–64 paired window exposes the known new adjacent-system overlap under investigation; no canonical promotion. The broader density-aware grid rule stays open.',
+    'Settled packing — first system pickup + four full measures (five displayed slots), later systems four full measures — under the opt-in page-top width correction on the fixed-3 core at four systems/page, with every settled refinement shared. The question is the interior grid only: the existing quarter-position pulses versus no interior grid at all, measure boundaries untouched. Midpoint-only is rejected. Two cards, one axis (gridPulseFilter); no canonical promotion.',
   openAxes: ['gridPulseFilter'],
 };
 
 /**
- * Round 32: two cards on the single `gridPulseFilter` axis (Brahms ×4 —
+ * Round 33: two cards on the single `gridPulseFilter` axis (Brahms ×6 —
  * literal corpus windows, every claim proofread against the real engine and
- * pinned in `test/janko-round32.test.ts`). Both cards share the settled
- * four-per-system packing plus the opt-in page-top correction and differ
- * only in the interior grid. Window 1 (mm. 1–4) shows five displayed slots
- * (pickup + four full measures); window 4 (mm. 57–64) spans the two adjacent
- * systems carrying the known new overlap.
+ * pinned in `test/janko-round33.test.ts`). Both cards share the settled
+ * four-per-system packing plus the opt-in page-top correction and every
+ * settled refinement, and differ only in the interior grid. Window 1
+ * (pickup + mm. 1–4) shows five displayed slots (upbeat + four full
+ * measures); the mm. 57–64 window spans the two adjacent systems carrying
+ * the known overlap.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: '4-per-system-full-grid',
-    label: 'Four per system · full grid',
+    id: 'grid-full-vs-none-full',
+    label: 'Full grid · settled packing',
     description:
-      'Settled 4-per-system packing with the page-top correction and the existing interior quarter-position grid (second, third and fourth positions). Carries the approved candidate-only findings including the known mm. 57–64 adjacent-system overlap under investigation; no canonical promotion.',
+      'Settled 4-per-system packing with the page-top correction and the existing interior quarter-position grid (second, third and fourth positions). Every settled refinement shared; no canonical promotion.',
     axis: 'gridPulseFilter',
     options: {
       measuresPerSystem: 4,
@@ -274,23 +284,25 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
       ),
       brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
       brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
+      brahmsWindow(33, 4, 'Brahms mm. 33–36 · four full measures'),
+      brahmsWindow(53, 4, 'Brahms mm. 53–56 · four full measures'),
       brahmsWindow(
         57,
         8,
-        'Brahms mm. 57–64 · paired systems exposing the known new adjacent-system overlap under investigation'
+        'Brahms mm. 57–64 · paired systems spanning the known adjacent-system overlap'
       ),
     ],
   },
   {
-    id: '4-per-system-midpoint-grid',
-    label: 'Four per system · midpoint-only grid',
+    id: 'grid-full-vs-none-none',
+    label: 'No interior grid · settled packing',
     description:
-      'Same settled packing and page-top correction; interior grid keeps only the third quarter position (half-measure offset), removing the second and fourth. Measure boundaries untouched. Carries the same approved candidate-only findings including the known mm. 57–64 overlap; no canonical promotion.',
+      'Same settled packing, page-top correction and shared refinements; no interior grid pulse paints at all. Measure boundaries untouched; no canonical promotion.',
     axis: 'gridPulseFilter',
     options: {
       measuresPerSystem: 4,
       correctPageTopAnacrusisMeasureWidth: true,
-      gridPulseFilter: 'midpoint-only',
+      gridPulseFilter: 'none',
     },
     windows: [
       brahmsWindow(
@@ -300,10 +312,12 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
       ),
       brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
       brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
+      brahmsWindow(33, 4, 'Brahms mm. 33–36 · four full measures'),
+      brahmsWindow(53, 4, 'Brahms mm. 53–56 · four full measures'),
       brahmsWindow(
         57,
         8,
-        'Brahms mm. 57–64 · paired systems exposing the known new adjacent-system overlap under investigation'
+        'Brahms mm. 57–64 · paired systems spanning the known adjacent-system overlap'
       ),
     ],
   },

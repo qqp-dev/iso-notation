@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 2, 'Round 32 declares two grid cards');
+assert.equal(CURRENT_CANDIDATES.length, 2, 'Round 33 declares two grid cards');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -124,21 +124,21 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 32/);
-  assert.match(html, /Four per system/);
+  assert.match(html, /Round 33/);
+  assert.match(html, /no interior grid/i);
 });
 
-test('Round 32 is the settled-packing grid round: one axis, two cards, no control', () => {
-  // Ordered contract change: Round 32 compares the interior beat grid on
+test('Round 33 is the full-vs-none grid round: one axis, two cards, no control', () => {
+  // Ordered contract change: Round 33 compares the interior beat grid on
   // Brahms — two cards on the single gridPulseFilter axis, Reference as the
-  // standing control. Rounds 30–31 are parked (historical consts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 32);
-  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
+  // standing control. Rounds 30–32 are parked (historical consts).
+  assert.equal(CURRENT_ROUND_METADATA.round, 33);
+  assert.match(CURRENT_ROUND_METADATA.title, /no interior grid/i);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['4-per-system-full-grid', '4-per-system-midpoint-grid'],
+    ['grid-full-vs-none-full', 'grid-full-vs-none-none'],
     'the grid cards'
   );
   // The golden context the Reference view engraves, unchanged.
@@ -171,18 +171,18 @@ test('Round 32 is the settled-packing grid round: one axis, two cards, no contro
   );
 });
 
-test('The Round 32 studio renders two grid cards on one axis, no control', () => {
+test('The Round 33 studio renders two grid cards on one axis, no control', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Two cards, one axis badge each, four windows each — Brahms ×8, Bach ×0.
+  // Two cards, one axis badge each, six windows each — Brahms ×12, Bach ×0.
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
   assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 8, 'eight windows');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'twelve windows');
   assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="8"/);
+  assert.match(html, /data-window-count="12"/);
   assert.match(html, /data-verification="false"/, 'the grid round is decisive');
-  assert.match(html, /2 candidates × 8 engraving windows/, 'the header counts honestly');
-  assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 8, 'Brahms ×8');
+  assert.match(html, /2 candidates × 12 engraving windows/, 'the header counts honestly');
+  assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 12, 'Brahms ×12');
   assert.ok(!html.includes('data-window="primary:'), 'Bach carries no window this round');
 
   // No settled decision is badged as an open question (the shared packing
@@ -212,9 +212,9 @@ test('The Round 32 studio renders two grid cards on one axis, no control', () =>
   // No control card: the Reference view is the standing control.
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');
 
-  // Each card inherits the approved candidate-only 10 findings (whole-score
+  // Each card inherits the settled candidate-only 8 findings (whole-score
   // card lint): honestly red, with the attribution proven in
-  // test/janko-round32.test.ts.
+  // test/janko-round33.test.ts.
   assert.equal(
     (html.match(/data-lint="violations"/g) ?? []).length,
     2,
@@ -226,16 +226,23 @@ test('The Round 32 studio renders two grid cards on one axis, no control', () =>
   assert.match(reference, /Golden Master/);
   assert.match(reference, /GOLD · frozen standard/, 'the GOLD badge');
   assert.match(reference, /BRONZE · active surface/, 'the BRONZE badge');
-  assert.equal(
-    (reference.match(/data-lint-ok="true"/g) ?? []).length,
-    1,
-    'the GOLD score lints clean; BRONZE carries its 9 knowns'
-  );
-  assert.equal(
-    (reference.match(/data-lint-ok="false"/g) ?? []).length,
-    1,
-    'the BRONZE block reports honestly'
-  );
+  const brahmsAt = reference.indexOf('data-score="brahms-op118-no1"');
+  const bachAt = reference.indexOf('data-score="primary"');
+  const brahms = reference.slice(brahmsAt, bachAt);
+  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE block reports honestly');
+  // The GOLD chip is a STOP tripwire while the Goldberg delta is
+  // unadjudicated — see 'STOP tripwire: GOLD Bach block lints clean' below.
+});
+
+test('STOP tripwire (unlanded): GOLD Bach block lints clean in the Reference view', () => {
+  // The settled refinements moved Goldberg (tick-1632 joint slot plus rest
+  // reseats): Bach carries 1 violation until the architect/operator
+  // adjudicates. Preserved, not rebased — see
+  // test/janko-goldberg-frozen.test.ts.
+  const reference = renderReferenceView(CONFIG);
+  const bachAt = reference.indexOf('data-score="primary"');
+  const bach = reference.slice(bachAt);
+  assert.ok(bach.includes('data-lint-ok="true"'), 'the GOLD score lints clean');
 });
 
 // ---------------------------------------------------------------------------
@@ -291,9 +298,9 @@ test('Reference view is rendered from DEFAULT_JANKO_OPTIONS (the golden master)'
   const brahmsAt = html.indexOf('data-score="brahms-op118-no1"');
   const bachAt = html.indexOf('data-score="primary"');
   const brahms = html.slice(brahmsAt, bachAt);
-  const bach = html.slice(bachAt);
-  assert.ok(bach.includes('data-lint-ok="true"'), 'the GOLD score lints clean');
-  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE score reports its 9 knowns');
+  // The GOLD chip is a STOP tripwire while the Goldberg delta is
+  // unadjudicated (see above); BRONZE keeps reporting honestly.
+  assert.ok(brahms.includes('data-lint-ok="false"'), 'the BRONZE score reports its knowns');
 });
 
 test('Every page of the spread is engraved (no silently blank page)', () => {
@@ -474,14 +481,18 @@ test('renderStudioMarkup contains both views and is DOM-free (SSR-safe)', () => 
 
 test('renderStatusLine reports live lint statistics', () => {
   const line = renderStatusLine(CONFIG, new Date('2024-01-01T12:34:56Z'));
-  assert.match(line, /0 violations · 0 warnings/);
+  // Goldberg is lint-clean (0/0): the tick-1632 inward slot steps its column
+  // right to stay inside the beat cell (legitimate translation, demand still
+  // reported in clusterDiagnostics). Rest-seat deltas remain unadjudicated
+  // (see the GOLD hash tripwire); the line format itself stays pinned.
+  assert.match(line, /✓ 0 violations · 0 warnings/, 'the line honestly reports the clean count');
   assert.match(line, /8 systems · 550 noteheads/, 'the merged unison paints one head');
   assert.match(line, /rendered live at 12:34:56Z/);
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 32);
-  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 33);
+  assert.match(CURRENT_ROUND_METADATA.title, /no interior grid/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis in the grid round');
   assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the grid round');

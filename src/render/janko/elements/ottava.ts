@@ -24,7 +24,31 @@ import {
 } from '../types';
 import { PositionedJankoNote, JankoUnisonMerge } from '../engine';
 import { URTEXT_OTTAVA_GLYPHS, OttavaGlyph } from './ottava-paths';
+import { REST_INK, REST_SCALE } from './rests';
 import { f } from './style';
+
+/**
+ * Shared solid-ink treatment (permanent rule): the ottava numeral/letterform
+ * renders at the live rest family's uniform scale and ink (`0.85`, `#1A1A1A`).
+ * The baked Bravura outlines in `ottava-paths.ts` stay byte-identical; the
+ * scale applies at render about the glyph origin, and every measured extent
+ * (advance, bbox, spanner connection) reads the scaled helpers below so
+ * placement, attachment and audit can never drift from the paint.
+ */
+export const OTTAVA_GLYPH_SCALE = REST_SCALE;
+export const OTTAVA_GLYPH_INK = REST_INK;
+
+/** Scaled advance width (page pt) of one ottava numeral — the painted extent. */
+export function ottavaGlyphAdvance(kind: JankoOttavaKind): number {
+  return URTEXT_OTTAVA_GLYPHS[kind].advance * OTTAVA_GLYPH_SCALE;
+}
+
+/** Scaled bounding box `[x0, y0, x1, y1]` of one ottava numeral — the painted extent. */
+export function ottavaGlyphBbox(kind: JankoOttavaKind): readonly [number, number, number, number] {
+  const [x0, y0, x1, y1] = URTEXT_OTTAVA_GLYPHS[kind].bbox;
+  const s = OTTAVA_GLYPH_SCALE;
+  return [x0 * s, y0 * s, x1 * s, y1 * s];
+}
 
 /** Render a verbatim Bravura ottava sign outline into an SVG path string. */
 export function renderOttavaGlyph(
@@ -33,12 +57,13 @@ export function renderOttavaGlyph(
   lineY: number
 ): string {
   const glyph: OttavaGlyph = URTEXT_OTTAVA_GLYPHS[kind];
+  const s = OTTAVA_GLYPH_SCALE;
   // For 8vb/15mb (below the staff), the numeral sits ON the line (origin at baseline lineY).
   // For 8va/15ma (above the staff), the numeral sits UNDER the line (towards the staff).
   const baselineY =
-    kind === '8va' || kind === '15ma' ? lineY - glyph.bbox[1] : lineY;
+    kind === '8va' || kind === '15ma' ? lineY - glyph.bbox[1] * s : lineY;
   const p = (q: readonly [number, number]): string =>
-    `${f(x + q[0])} ${f(baselineY + q[1])}`;
+    `${f(x + q[0] * s)} ${f(baselineY + q[1] * s)}`;
   const d = glyph.contours
     .map(
       (c) =>
@@ -47,7 +72,7 @@ export function renderOttavaGlyph(
         ' Z'
     )
     .join(' ');
-  return `<path class="janko-ottava-glyph" data-ottava-kind="${kind}" d="${d}" fill="#111111" stroke="none" fill-rule="evenodd"/>`;
+  return `<path class="janko-ottava-glyph" data-ottava-kind="${kind}" d="${d}" fill="${OTTAVA_GLYPH_INK}" stroke="none" fill-rule="evenodd"/>`;
 }
 
 /** Render one complete ottava spanner bracket (numeral + dashed line + hook). */
@@ -144,8 +169,9 @@ export function buildSystemOttavaBrackets(
       const firstNote = currentRun[0];
       const lastNote = currentRun[currentRun.length - 1];
       const kind = kindForShift(currentShift);
-      const glyph = URTEXT_OTTAVA_GLYPHS[kind];
-      const advance = glyph.advance;
+      // Spanner connection reads the painted (scaled) advance, so the dashed
+      // line starts exactly one gap past the rendered numeral's right edge.
+      const advance = ottavaGlyphAdvance(kind);
 
       let lineY: number;
       let hookDirection: 1 | -1;

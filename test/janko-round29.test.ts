@@ -310,10 +310,17 @@ test('Dots golden pin: Bach ships 0 dot-flag collisions (19 dotted flagged singl
   assert.equal(collisions, 0, 'golden ships 0 dot-flag collisions');
 });
 
-test('Dots golden: Brahms clasp dots UNMOVED — m.1 (tick 48) and m.4 (tick 432) pinned exactly', () => {
+test('Dots golden: Brahms m.1 dot reseated to the m.19 45° (rule B), m.4 UNMOVED', () => {
   // The legacy-vs-new displacement comparison retires with the legacy path; the
   // judged clasp-dot positions are pinned absolutely instead, so any future
   // move fails. (Clasp dots are computed independently of the note-dot rule.)
+  //
+  // Ticket rule B (direct consistency correction): the opening A-major dotted
+  // pip leaves its 60° seat for the existing m.19-style 45° seat — actual-mask
+  // seating replaces the virtual-disc veto that held it at 60°. The m.1
+  // claspX (81.356…) and all three member heads (88.96) are bit-identical to
+  // base: the move is purely the dot's seat, zero column drift. m.4 and m.19
+  // are bit-identical to base (the style anchor, untouched).
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   const systems = layoutJankoScore(BRAHMS, o, t);
@@ -321,33 +328,46 @@ test('Dots golden: Brahms clasp dots UNMOVED — m.1 (tick 48) and m.4 (tick 432
 
   const m1 = clasps.find((c) => c.tick === 48)!;
   const m4 = clasps.find((c) => c.tick === 432)!;
+  const m19 = clasps.find((c) => c.tick === 3504)!;
   assert.ok(m1, 'Brahms m.1 (tick 48) dotted clasp present');
   assert.ok(m4, 'Brahms m.4 (tick 432) dotted clasp present');
+  assert.ok(m19, 'Brahms m.19 (tick 3504) dotted clasp present');
 
   const d1 = m1.durationDots.filter((d) => d !== null);
   const d4 = m4.durationDots.filter((d) => d !== null);
+  const d19 = m19.durationDots.filter((d) => d !== null);
   assert.equal(d1.length, 1, 'm.1 clasp carries one dot');
   assert.equal(d4.length, 1, 'm.4 clasp carries one dot');
+  assert.equal(d19.length, 1, 'm.19 clasp carries one dot');
 
   // Judged PR #48 seats, re-pinned for 4-up: x is bit-identical (both dots
   // sit in system 1, whose slot-0 frame keeps its measureWidth), y moved by
   // exactly the slot-0 frame shift ΔmiddleCY (derived live from both
-  // geometries — proof the within-system geometry is untouched).
+  // geometries — proof the within-system geometry is untouched). Rule B then
+  // reseats m.1 only: (84.081…, 127.266…) → (85.209…, 128.132…).
   const g3 = computePageGeometry({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, systemsPerPage: 3 }, t, BRAHMS);
   const g4 = computePageGeometry(BRAHMS_OP118_NO1_JANKO_OPTIONS, t, BRAHMS);
   const delta = getSystemGeometry(g4, 0).middleCY - getSystemGeometry(g3, 0).middleCY;
-  assert.equal(d1[0]!.x, 84.08115384615381, 'm.1 clasp dot x unmoved');
-  assert.equal(d1[0]!.y, 127.26641154937485, 'm.1 clasp dot y (was 157.92849488270818)');
-  assert.ok(
-    Math.abs(d1[0]!.y - 157.92849488270818 - delta) < 1e-9,
-    'm.1 y moved by exactly the frame shift'
-  );
+  assert.equal(d1[0]!.x, 85.20988580362048, 'm.1 clasp dot x (rule-B 45° seat; was 84.08115384615381)');
+  assert.equal(d1[0]!.y, 128.13251804253335, 'm.1 clasp dot y (rule-B 45° seat; was 127.26641154937485)');
+  assert.equal(m1.claspX, 81.35615384615384, 'm.1 clasp spine unmoved — the seat moved, not the bracket');
   assert.equal(d4[0]!.x, 419.65911657285125, 'm.4 clasp dot x unmoved');
   assert.equal(d4[0]!.y, 135.63251804253335, 'm.4 clasp dot y (was 166.29460137586668)');
   assert.ok(
     Math.abs(d4[0]!.y - 166.29460137586668 - delta) < 1e-9,
     'm.4 y moved by exactly the frame shift'
   );
+  // The consistency the ticket orders: opening and m.19 sit at the same
+  // 45.00° off their ring centres at the same 5.45 radius; m.19's absolute
+  // seat is bit-identical to base (base: 60.00° opening vs 45.00° m.19).
+  const angleOf = (clasp: typeof m1, dot: NonNullable<(typeof d1)[number]>): number => {
+    const ink = clasp.durationInk[clasp.durationDots.indexOf(dot)];
+    return (Math.atan2(-(dot.y - ink.centerY), dot.x - clasp.claspX) * 180) / Math.PI;
+  };
+  assert.ok(Math.abs(angleOf(m1, d1[0]!) - 45) < 1e-9, 'm.1 sits at 45°');
+  assert.ok(Math.abs(angleOf(m19, d19[0]!) - 45) < 1e-9, 'm.19 sits at 45°');
+  assert.equal(d19[0]!.x, 43.40373195746664, 'm.19 dot x bit-identical to base');
+  assert.equal(d19[0]!.y, 536.0775180425334, 'm.19 dot y bit-identical to base');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
