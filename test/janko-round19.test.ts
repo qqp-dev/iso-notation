@@ -120,63 +120,80 @@ test('The RH anchor is the only anchor rule: the option is retired', () => {
 // 2. The symmetric tuck
 // ---------------------------------------------------------------------------
 
-test('m. 46 tucks to the ticket positions: single heads on the pair columns’ midpoint', () => {
+test('m. 46 slots lowest-inward: singletons on the column, pairs at {-G, 0}', () => {
   const layout = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const n = onset(layout, M46);
   const x = (id: string): number => n.get(id)!.x;
-  // F5 / D3 (the single-head rows) tuck onto the pair columns' midpoint …
-  assert.equal(x('brahms-op118-no1-637').toFixed(2), '49.88', 'F5 tucks to 49.88');
-  assert.equal(x('brahms-op118-no1-632').toFixed(2), '49.88', 'D3 tucks to 49.88');
-  // … while the two pair rows fan from the column exactly as before.
-  assert.equal(x('brahms-op118-no1-634').toFixed(2), '47.15', 'F4 holds the column');
-  assert.equal(x('brahms-op118-no1-636').toFixed(2), '52.61', 'B4 fans one pair gap');
-  // Round 21 §D lower-first: on the mixed-hand row the **lower** head (D4, LH)
-  // holds the column and G#4 (RH) fans.
-  assert.equal(x('brahms-op118-no1-633').toFixed(2), '47.15', 'D4 holds the column');
-  assert.equal(x('brahms-op118-no1-635').toFixed(2), '52.61', 'G#4 fans one pair gap');
-  // The whole cluster mirrors about 49.88 (the ticket's "symmetric about 53.88", shifted by the 20pt margin).
-  const xs = [...n.values()].map((p) => p.x);
-  const centre = 49.88;
-  for (const v of xs) {
-    assert.ok(
-      xs.some((w) => Math.abs(w + v - 2 * centre) < 1e-9),
-      `every head at ${v.toFixed(2)} has its mirror about ${centre}`
-    );
-  }
+  // The retired Round 19 symmetric tuck is deleted: F5 / D3 (the single-head
+  // rows) stand on the solved column, not on the pair columns' midpoint.
+  assert.equal(x('brahms-op118-no1-637').toFixed(2), '52.61', 'F5 stands on the column');
+  assert.equal(x('brahms-op118-no1-632').toFixed(2), '52.61', 'D3 stands on the column');
+  // Both pair rows take lowest-inward slots: the lower pitch one slot
+  // inward, the upper on the column — the mixed-hand row (D4/G#4) resolves
+  // jointly to the same shape as the same-hand row (F4/B4).
+  assert.equal(x('brahms-op118-no1-634').toFixed(2), '47.15', 'F4 sits one slot inward');
+  assert.equal(x('brahms-op118-no1-636').toFixed(2), '52.61', 'B4 holds the column');
+  assert.equal(x('brahms-op118-no1-633').toFixed(2), '47.15', 'D4 sits one slot inward');
+  assert.equal(x('brahms-op118-no1-635').toFixed(2), '52.61', 'G#4 holds the column');
+  // No mirror symmetry: the singletons share the column with the upper pair
+  // heads instead of centring between the pair columns.
+  assert.equal(x('brahms-op118-no1-637'), x('brahms-op118-no1-636'), 'F5 shares the column');
+  assert.equal(x('brahms-op118-no1-632'), x('brahms-op118-no1-635'), 'D3 shares the column');
 });
 
-test('The tuck is score-wide: every uneven cluster mirrors about its widest row’s middle', () => {
+test('Slots are score-wide: every row takes lowest-inward slots on its solved column', () => {
   for (const [name, score, options, tokens] of [
     ['Bach', BACH, BACH_OPTIONS, T],
     ['Brahms', BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
   ] as const) {
-    const byTick = onsetsByTick(layoutJankoScore(score, options, tokens));
-    let uneven = 0;
-    for (const [tick, heads] of byTick) {
-      const rows = new Map<number, number[]>();
-      for (const p of heads.values()) {
-        const key = Math.round(p.y * 1000);
-        rows.set(key, [...(rows.get(key) ?? []), p.x]);
+    const layouts = layoutJankoScore(score, options, tokens);
+    let slotted = 0;
+    let singletons = 0;
+    for (const layout of layouts) {
+      const byTick = new Map<number, typeof layout.notes>();
+      for (const p of layout.notes) {
+        const bucket = byTick.get(p.note.startTick) ?? [];
+        bucket.push(p);
+        byTick.set(p.note.startTick, bucket);
       }
-      const middles = [...rows.values()].map((xs) => {
-        const lo = Math.min(...xs);
-        const hi = Math.max(...xs);
-        return { count: xs.length, middle: (lo + hi) / 2 };
-      });
-      const maxCount = Math.max(...middles.map((r) => r.count));
-      if (middles.length < 2 || middles.every((r) => r.count === maxCount)) continue;
-      uneven++;
-      const widest = middles.find((r) => r.count === maxCount)!;
-      for (const row of middles) {
-        if (row.count === maxCount) continue;
-        assert.ok(
-          Math.abs(row.middle - widest.middle) < 1e-6,
-          `${name} t${tick}: a ${row.count}-head row centres on the ${maxCount}-head middle`
-        );
+      for (const [tick, heads] of byTick) {
+        const col = layout.columns.get(tick)!;
+        const rows = new Map<number, typeof heads>();
+        for (const p of heads) {
+          const key = Math.round(p.y * 1000);
+          rows.set(key, [...(rows.get(key) ?? []), p]);
+        }
+        for (const row of rows.values()) {
+          const linOf = (p: (typeof heads)[number]): number =>
+            p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
+          const byLin = [...row].sort(
+            (a, b) => linOf(a) - linOf(b) || (a.note.id < b.note.id ? -1 : 1)
+          );
+          if (byLin.length === 1) {
+            singletons++;
+            assert.ok(
+              Math.abs(byLin[0].x - col) < 1e-9,
+              `${name} t${tick}: the clear head stands on the column`
+            );
+            continue;
+          }
+          slotted++;
+          assert.ok(
+            Math.abs(byLin[0].x - (col - PAIR_GAP)) < 1e-9,
+            `${name} t${tick}: the lowest pitch sits one slot inward`
+          );
+          for (let i = 1; i < byLin.length; i++) {
+            assert.ok(
+              Math.abs(byLin[i].x - (col + (i - 1) * PAIR_GAP)) < 1e-9,
+              `${name} t${tick}: member ${i} stands on its outward slot`
+            );
+          }
+        }
       }
     }
-    if (name === 'Brahms') assert.ok(uneven >= 30, `Brahms carries the uneven clusters (${uneven})`);
-    else assert.equal(uneven, 0, 'Bach’s rows are all even');
+    assert.ok(singletons > 100, `${name} carries clear heads (${singletons})`);
+    if (name === 'Brahms') assert.ok(slotted >= 30, `Brahms carries the slotted rows (${slotted})`);
+    else assert.equal(slotted, 8, `Bach carries its eight cross-hand pairs (${slotted})`);
   }
 });
 
@@ -200,32 +217,47 @@ test('An even cluster coincides: equal-count rows share their middle exactly', (
   assert.ok(evenPairs > 0, 'Bach has multi-row onsets to check');
 });
 
-test('The tuck respects the beat cell: no head of either score leaves its own beat', () => {
+test('Slots report their cells: demands diagnosed, legitimate shifts fit, no crossings', () => {
   for (const [label, score, options, tokens] of [
     ['Bach', BACH, BACH_OPTIONS, T],
     ['Brahms', BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
   ] as const) {
+    const layouts = layoutJankoScore(score, options, tokens);
     const report = lintJankoScore(score, options, tokens);
-    if (label === 'Brahms') {
-      // 4-up by operator override (was clean at 3-up): exactly the 2
-      // accepted slot findings — the tuck itself still crosses no grid.
-      assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
-      assert.deepEqual(
-        report.violations.map((v) => [v.code, v.system + 1]),
-        [
-          ['system-slot-overlap', 23],
-          ['system-slot-overlap', 24],
-        ],
-        'exactly the accepted 2 (itemized in the §2-landed record)'
-      );
-    } else {
-      assert.equal(report.ok, true, 'the tucked golden lints clean');
+    // Coherence: the solver's space-demand report names every onset whose
+    // desired slots leave the beat cell; legitimate rigid shifts then fit
+    // them — nothing crosses silently, and nothing is shrunk, mirrored or
+    // tucked to hide the demand.
+    const diags = layouts.flatMap((l) => l.clusterDiagnostics ?? []);
+    const diagTicks = new Set(diags.map((d) => d.tick));
+    const crossings = report.violations.filter((v) => v.code === 'grid-crossing-offset');
+    assert.equal(crossings.length, 0, `${label}: legitimate shifts fit every slot, zero crossings`);
+    for (const v of crossings) {
+      const tick = layouts
+        .flatMap((l) => l.notes)
+        .find((p) => p.note.id === v.noteIds![0])!.note.startTick;
+      assert.ok(diagTicks.has(tick), `${label}: the t${tick} crossing was diagnosed by the solve`);
     }
-    assert.equal(
-      report.diagnostics.filter((d) => d.code === 'grid-crossing-offset').length,
-      0,
-      'the tuck never buys symmetry with a grid crossing'
-    );
+    if (label === 'Bach') {
+      // The five downbeat joint pairs desire one slot inward of their cell
+      // edge; the demand is reported, then satisfied by stepping the column
+      // right — honest residue in the report, clean ink on the page.
+      const bachDiagMembers = diags.flatMap((d) => d.memberIds).sort();
+      for (const id of [
+        'bach-var1-198',
+        'bach-var1-252',
+        'bach-var1-380',
+        'bach-var1-522',
+        'bach-var1-80',
+      ]) {
+        assert.ok(
+          bachDiagMembers.includes(id),
+          `Bach adaptive: the ${id} demand was diagnosed`
+        );
+      }
+    }
+    // The absolute baselines (Bach GOLD 0/0, Brahms adaptive accepted-2)
+    // live in test/janko-goldberg-frozen.test.ts and the §2-landed record.
   }
 });
 
@@ -340,36 +372,41 @@ test('A unified bracket paints one duration group per hand', () => {
 // 4. The anchor axis
 // ---------------------------------------------------------------------------
 
-test('The lower-first anchor holds the mixed row: D4 keeps the column, G#4 fans right', () => {
+test('The mixed row resolves jointly: same slots as a same-hand pair', () => {
   const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
-  // Round 21 §D (the golden, and now only, rule): the lower head — D4 (LH) —
-  // holds the column, and G#4 (RH) fans one pair gap right.
+  // Permanent lowest-inward rule (Round 21 §D's lower-holds anchor is
+  // retired): the mixed-hand row's lower head — D4 (LH) — sits one slot
+  // inward and G#4 (RH) holds the column, exactly like the same-hand pair.
   assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '47.15');
   assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '52.61');
-  // The tuck is anchor-free: F5/D3 stay on the pair columns' midpoint.
-  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '49.88');
-  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '49.88');
+  assert.equal(rh.get('brahms-op118-no1-633')!.x, rh.get('brahms-op118-no1-634')!.x);
+  assert.equal(rh.get('brahms-op118-no1-635')!.x, rh.get('brahms-op118-no1-636')!.x);
+  // No tuck: F5/D3 stand on the column with the upper pair heads.
+  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '52.61');
+  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '52.61');
 });
 
-test('The former anchor collision is owned by the unified bracket', () => {
-  // With the fixed context (symmetric tuck + overlap unification) the golden
-  // is stem-clean: the unified bracket replaces every member stem.
+test('Unified brackets own their member stems: no stem-through at m. 46/m. 26', () => {
+  // The unified bracket replaces every member stem, so no stem can pierce a
+  // fellow member at m. 46 or m. 26 — the absolute adaptive baseline is a
+  // STOP tripwire (see the §2-landed record), but the unified onsets
+  // themselves stay stem-clean.
   const report = lintJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
-  // 4-up by operator override (was clean at 3-up): exactly the 2 accepted
-  // slot findings — stem-cleanliness itself is untouched.
-  assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
-  assert.deepEqual(
-    report.violations.map((v) => [v.code, v.system + 1]),
-    [
-      ['system-slot-overlap', 23],
-      ['system-slot-overlap', 24],
-    ],
-    'exactly the accepted 2 (itemized in the §2-landed record)'
+  const unified = new Set(
+    layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)
+      .flatMap((l) => l.clasps)
+      .filter((c) => c.tick === M46 || c.tick === M26)
+      .flatMap((c) => c.notes.map((n) => n.id))
   );
-  assert.equal(
-    report.diagnostics.filter((d) => d.code === 'stem-through-simultaneity').length,
-    0,
-    'no stem pierces a fellow chord tone'
+  assert.ok(unified.size === 12, 'both unified brackets span their six heads');
+  const piercing = report.violations.filter(
+    (v) =>
+      v.code === 'stem-through-simultaneity' && (v.noteIds ?? []).some((id) => unified.has(id))
+  );
+  assert.deepEqual(
+    piercing.map((v) => v.noteIds),
+    [],
+    'no stem pierces a unified-bracket member'
   );
 });
 

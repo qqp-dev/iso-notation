@@ -90,6 +90,7 @@ import {
   JankoRhythmNote,
   claspDotCenter,
   claspInkBox,
+  claspOwnMemberAir,
   claspMarkDaylight,
   claspSecondDotCenter,
   getStemAttachmentRadii,
@@ -2683,6 +2684,31 @@ export function checkClaspClearance(
       });
     }
 
+    // 2b. Own members (permanent rule): the fit rule skips them, so the audit
+    // verifies the assumption — bracket spine, caps and duration marks against
+    // each member's actual mask rectangle (painted extents: halo-grown only
+    // when honor halos paint). Any real cut is named; augmentation dots are
+    // excluded (owned by `clasp-dot-fusion`).
+    for (const p of layout.notes) {
+      if (!own.has(p.note.id)) continue;
+      const { wx, hy } = knockoutHalfExtents(o, t, o.showHonorHalo ? p.note.startTick : undefined);
+      const gap = claspOwnMemberAir(clasp, p.x, p.y, wx, hy, t);
+      if (gap >= -EPS) continue;
+      out.push({
+        code: 'clasp-collision',
+        severity: 'error',
+        message:
+          `Clasp at tick ${clasp.tick} cuts its own member ${p.note.id}: the bracket ink overlaps ` +
+          `the member's mask by ${(-gap).toFixed(2)}pt.`,
+        system: layout.index,
+        measure: measureOfTick(clasp.tick, t),
+        noteIds: [p.note.id, ...clasp.notes.map((n) => n.id)],
+        x: p.x,
+        y: p.y,
+        metrics: { gap, memberX: p.x, memberY: p.y, claspX: clasp.claspX },
+      });
+    }
+
     // 3. Left-margin furniture (accolade, measure numeral). Round 7 paints the
     // accolade only at the start of the piece, so intermediate systems only owe
     // the measure numeral its air.
@@ -2819,7 +2845,12 @@ export function checkClaspDotFusion(
       if (!ink.dotted) continue;
       // The resolved geometry's own datum — never a fresh guess — so the audit
       // measures what the renderer paints (and a fused regression is caught).
-      const dot = clasp.durationDots?.[index] ?? claspDotCenter(clasp, ink, t);
+      const dot =
+        clasp.durationDots?.[index] ??
+        claspDotCenter(clasp, ink, t, {
+          clusterSpacing: o?.clusterSpacing,
+          honorHalo: o?.showHonorHalo ?? false,
+        });
       const markAir = claspMarkDaylight(clasp, ink, dot.x, dot.y, t);
       if (markAir < hug - EPS) {
         out.push({
@@ -2863,7 +2894,11 @@ export function checkClaspDotFusion(
       // the same three airs (mark hug, neighbour discs, sibling dot).
       if (grammar === 'complete' && ink.dots >= 2) {
         const dot2 =
-          clasp.durationSecondDots?.[index] ?? claspSecondDotCenter(clasp, ink, dot, t);
+          clasp.durationSecondDots?.[index] ??
+          claspSecondDotCenter(clasp, ink, dot, t, {
+            clusterSpacing: o?.clusterSpacing,
+            honorHalo: o?.showHonorHalo ?? false,
+          });
         const base2 = {
           system: layout.index,
           measure: measureOfTick(clasp.tick, t),

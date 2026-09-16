@@ -27,6 +27,7 @@ import { Hand } from '../../../model/types';
 import {
   JankoClaspDotNudge,
   JankoClaspDurationStyle,
+  JankoClusterSpacing,
   JankoDurationGrammar,
   JankoLayoutOptions,
   JankoRhythmStyle,
@@ -38,7 +39,7 @@ import {
   resolveJankoTokens,
 } from '../types';
 import { durationDotCount, durationFlagCount, durationRingCount } from './duration';
-import { isPositionOfHonor } from './notehead';
+import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor } from './notehead';
 import { f } from './style';
 import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
 
@@ -905,6 +906,18 @@ export interface JankoClaspOptions {
    * seat solver runs. Defaults to `[0, 0]` (judged seats, byte-identical).
    */
   claspDotNudge?: JankoClaspDotNudge;
+  /**
+   * Permanent dot-consistency rule: the active cluster-spacing preset, whose
+   * rectangular knockout half-extents are the actual member geometry the dot
+   * seat clears. Defaults to the golden `'tight'`.
+   */
+  clusterSpacing?: JankoClusterSpacing;
+  /**
+   * Permanent dot-consistency rule: whether Position-of-Honor halos paint, in
+   * which case a tick-0 member's mask grows to its halo ring's outer edge
+   * exactly as the knockout does. Defaults to `false`.
+   */
+  honorHalo?: boolean;
 }
 
 /** The bracket `[` path: cap → spine → cap. */
@@ -986,15 +999,19 @@ export function computeClaspGeometry(
     path: claspBracketPath(claspX, topY, botY, cap),
   };
   // Round 20: the augmentation dot of every dotted group is resolved here, once,
-  // against the group's own mark ink and member discs.
+  // against the group's own mark ink and member masks.
+  const dotOptions: JankoClaspDotSeatOptions = {
+    clusterSpacing: options?.clusterSpacing,
+    honorHalo: options?.honorHalo,
+  };
   geometry.durationDots = durationInk.map((ink) =>
-    ink.dotted ? claspDotCenter(geometry, ink, t) : null
+    ink.dotted ? claspDotCenter(geometry, ink, t, dotOptions) : null
   );
   // Round 30: the second dot of every doubly dotted group, further along the
   // same up-right fan — resolved from the first dot, never guessed twice.
   geometry.durationSecondDots = durationInk.map((ink, index) => {
     const first = geometry.durationDots[index];
-    return ink.dots >= 2 && first ? claspSecondDotCenter(geometry, ink, first, t) : null;
+    return ink.dots >= 2 && first ? claspSecondDotCenter(geometry, ink, first, t, dotOptions) : null;
   });
   // Round 31: the situational nudge translates the RESOLVED seats rigidly, so
   // the renderer, the fit rule, the ink box and the linter all read the moved
@@ -1190,6 +1207,185 @@ const CLASP_DOT_ANGLES: readonly number[] = [
   45, 50, 55, 60, 65, 70, 75, 80, 85, -45, -55, -65, -75, -85,
 ];
 
+/** 2D distance from a point to an axis-aligned rectangle (0 inside). */
+function pointToRect(
+  px: number,
+  py: number,
+  rx0: number,
+  ry0: number,
+  rx1: number,
+  ry1: number
+): number {
+  const dx = Math.max(rx0 - px, 0, px - rx1);
+  const dy = Math.max(ry0 - py, 0, py - ry1);
+  return Math.hypot(dx, dy);
+}
+
+/** True when the segment touches or crosses the rectangle. */
+function segmentHitsRect(
+  s: ClaspMarkSegment,
+  rx0: number,
+  ry0: number,
+  rx1: number,
+  ry1: number
+): boolean {
+  if (
+    (s.x1 >= rx0 && s.x1 <= rx1 && s.y1 >= ry0 && s.y1 <= ry1) ||
+    (s.x2 >= rx0 && s.x2 <= rx1 && s.y2 >= ry0 && s.y2 <= ry1)
+  ) {
+    return true;
+  }
+  const edges: ClaspMarkSegment[] = [
+    { x1: rx0, y1: ry0, x2: rx1, y2: ry0 },
+    { x1: rx1, y1: ry0, x2: rx1, y2: ry1 },
+    { x1: rx1, y1: ry1, x2: rx0, y2: ry1 },
+    { x1: rx0, y1: ry1, x2: rx0, y2: ry0 },
+  ];
+  const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number =>
+    (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  for (const e of edges) {
+    const d1 = orient(e.x1, e.y1, e.x2, e.y2, s.x1, s.y1);
+    const d2 = orient(e.x1, e.y1, e.x2, e.y2, s.x2, s.y2);
+    const d3 = orient(s.x1, s.y1, s.x2, s.y2, e.x1, e.y1);
+    const d4 = orient(s.x1, s.y1, s.x2, s.y2, e.x2, e.y2);
+    if ((d1 > 0) !== (d2 > 0) && (d3 > 0) !== (d4 > 0)) return true;
+    if (d1 === 0 || d2 === 0 || d3 === 0 || d4 === 0) {
+      // Collinear touch: fall back to endpoint proximity (exact collinear
+      // overlap is measure-zero for engraved geometry; proximity decides).
+      if (
+        pointToSegment(s.x1, s.y1, e) < 1e-9 ||
+        pointToSegment(s.x2, s.y2, e) < 1e-9 ||
+        pointToSegment(e.x1, e.y1, s) < 1e-9 ||
+        pointToSegment(e.x2, e.y2, s) < 1e-9
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** 2D distance from a segment to an axis-aligned rectangle (0 on contact). */
+function segmentToRect(
+  s: ClaspMarkSegment,
+  rx0: number,
+  ry0: number,
+  rx1: number,
+  ry1: number
+): number {
+  if (segmentHitsRect(s, rx0, ry0, rx1, ry1)) return 0;
+  return Math.min(
+    pointToRect(s.x1, s.y1, rx0, ry0, rx1, ry1),
+    pointToRect(s.x2, s.y2, rx0, ry0, rx1, ry1),
+    pointToSegment(rx0, ry0, s),
+    pointToSegment(rx1, ry0, s),
+    pointToSegment(rx1, ry1, s),
+    pointToSegment(rx0, ry1, s)
+  );
+}
+
+/**
+ * Permanent rule — **own-member bracket daylight** (pt): the minimum 2D
+ * daylight from one member's actual mask rectangle to the bracket's own ink —
+ * the spine, both caps and every duration mark (open rings, transverse cuts).
+ * Positive means the bracket clears its own heads; zero or negative is real
+ * ink cutting a member (the fit rule's own-member skip assumes this never
+ * happens — the linter's `clasp-collision` audit now verifies it instead of
+ * trusting it). Augmentation dots are excluded: the `clasp-dot-fusion` audit
+ * owns their hug metric.
+ */
+export function claspOwnMemberAir(
+  group: JankoClaspGroupGeometry,
+  memberX: number,
+  memberY: number,
+  maskWx: number,
+  maskHy: number,
+  t: ResolvedJankoTokens
+): number {
+  const rx0 = memberX - maskWx;
+  const ry0 = memberY - maskHy;
+  const rx1 = memberX + maskWx;
+  const ry1 = memberY + maskHy;
+  const half = group.strokeWidth / 2;
+  let air = segmentToRect(
+    { x1: group.claspX, y1: group.topY, x2: group.claspX, y2: group.botY },
+    rx0,
+    ry0,
+    rx1,
+    ry1
+  ) - half;
+  for (const capY of [group.topY, group.botY]) {
+    air = Math.min(
+      air,
+      segmentToRect(
+        { x1: group.claspX, y1: capY, x2: group.claspX + group.capWidth, y2: capY },
+        rx0,
+        ry0,
+        rx1,
+        ry1
+      ) - half
+    );
+  }
+  const rake = t.maxBeamSlope;
+  for (const ink of group.durationInk ?? []) {
+    for (const cy of claspMarkCenters(group, ink, rake)) {
+      if (ink.pips > 0) {
+        const ringOuter = CLASP_RING_RADIUS + CLASP_RING_STROKE / 2;
+        const dx = Math.max(rx0 - group.claspX, 0, group.claspX - rx1);
+        const dy = Math.max(ry0 - cy, 0, cy - ry1);
+        air = Math.min(air, Math.hypot(dx, dy) - ringOuter);
+        continue;
+      }
+      if (ink.flags === 0) continue;
+      for (const segment of claspMarkSegments(group, cy, rake)) {
+        air = Math.min(air, segmentToRect(segment, rx0, ry0, rx1, ry1) - CLASP_TRANSVERSE_STROKE / 2);
+      }
+    }
+  }
+  return air;
+}
+
+/**
+ * Permanent dot-consistency rule — **actual member-mask daylight** (pt) of a
+ * dot's disc at `(x, y)`: the minimum over the bracket's own members of the 2D
+ * distance from the dot centre to the member's painted knockout rectangle
+ * minus the dot radius. The rectangle is the active cluster-spacing preset's
+ * `wx × hy`, grown to the halo ring's outer edge for a tick-0 member exactly
+ * when honor halos paint (mirroring the knockout). Positive means the dot
+ * clears actual ink; zero or negative is a real erasure collision. The retired
+ * virtual 4.8pt-disc hug vetoed seats (the Brahms m.1 opening dot sat at 60°)
+ * whose actual ink clears (m.19's 45° seat) — that false veto is deleted.
+ */
+export function claspDotMemberAir(
+  x: number,
+  y: number,
+  group: JankoClaspGroupGeometry,
+  t: ResolvedJankoTokens,
+  spacing?: JankoClusterSpacing | null,
+  honorHalo?: boolean
+): number {
+  if (group.notes.length === 0) return Number.POSITIVE_INFINITY;
+  const preset = getClusterSpacingPreset(spacing);
+  const r = t.augmentationDotRadius;
+  const haloEdge = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  return Math.min(
+    ...group.notes.map((n) => {
+      const grown = honorHalo === true && isPositionOfHonor(n.startTick);
+      const wx = grown ? Math.max(preset.wx, haloEdge) : preset.wx;
+      const hy = grown ? Math.max(preset.hy, haloEdge) : preset.hy;
+      const dx = Math.max(Math.abs(x - n.x) - wx, 0);
+      const dy = Math.max(Math.abs(y - n.y) - hy, 0);
+      return Math.hypot(dx, dy) - r;
+    })
+  );
+}
+
+/** Member-geometry options accepted by the dot seat solvers. */
+export interface JankoClaspDotSeatOptions {
+  clusterSpacing?: JankoClusterSpacing | null;
+  honorHalo?: boolean;
+}
+
 /**
  * Round 20 — **the clasp dot as a clean satellite of its mark**.
  *
@@ -1202,31 +1398,33 @@ const CLASP_DOT_ANGLES: readonly number[] = [
  *   from every transverse cut, in 2D. The retired `yMid` wedge sat inside the
  *   ring's own stroke *and* inside a middle member's knockout — that channel is
  *   infeasible, which is exactly why it is rejected;
- * - **hug air from every neighbour ink box** — in practice the cluster's own
- *   member discs, which the bracket's fit rule exempts but the notehead
- *   knockout would erase.
+ * - **actual clearance from every member mask** — the dot must not overlap the
+ *   cluster's own painted knockout rectangles (which the bracket's fit rule
+ *   exempts, but the notehead knockout would erase). Measured by
+ *   {@link claspDotMemberAir}: positive actual daylight passes, an actual
+ *   collision vetoes. The retired virtual-disc hug is deleted — it vetoed the
+ *   Brahms m.1 opening seat at 45° (virtual −0.18pt) although its actual ink
+ *   clears (+0.53pt), while the same dotted-pip type sits at 45° in m.19.
  *
  * The search is deterministic: a fan of directions from 45° (the classical
  * up-and-right satellite) to nearly vertical — and, for a cluster whose upper
  * channel is walled by its own heads, the free lower channel as the last
  * resort — and along each direction the nearest point that clears the mark. Of
- * every candidate that also clears each member disc by the hug, the one
- * **nearest its mark** wins (so the dot always hugs its own ink); if none does
- * — never on the corpus, and the linter's `clasp-dot-fusion` would say so — the
+ * every candidate that also clears each member mask, the one **nearest its
+ * mark** wins (so the dot always hugs its own ink); if none does — never on
+ * the corpus, and the linter's `clasp-dot-fusion` would say so — the
  * best-clearing candidate is returned rather than shrinking the air silently.
  */
 export function claspDotCenter(
   group: JankoClaspGroupGeometry,
   ink: ResolvedJankoClaspInk,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  dotOptions?: JankoClaspDotSeatOptions | null
 ): { x: number; y: number } {
   const t = resolveJankoTokens(tokens);
   const hug = t.augmentationDotGap;
-  const r = t.augmentationDotRadius;
-  const discAir = (x: number, y: number): number =>
-    group.notes.length === 0
-      ? Number.POSITIVE_INFINITY
-      : Math.min(...group.notes.map((n) => Math.hypot(x - n.x, y - n.y) - t.noteheadRadius - r));
+  const memberAir = (x: number, y: number): number =>
+    claspDotMemberAir(x, y, group, t, dotOptions?.clusterSpacing, dotOptions?.honorHalo);
   let clean: { x: number; y: number; d: number } | null = null;
   let best: { x: number; y: number; air: number } | null = null;
   for (const degrees of CLASP_DOT_ANGLES) {
@@ -1237,9 +1435,9 @@ export function claspDotCenter(
       const x = group.claspX + d * ux;
       const y = ink.centerY + d * uy;
       if (claspMarkDaylight(group, ink, x, y, t) < hug - 1e-9) continue;
-      const air = discAir(x, y);
+      const air = memberAir(x, y);
       if (best === null || air > best.air) best = { x, y, air };
-      if (air >= hug - 1e-9 && (clean === null || d < clean.d - 1e-9)) clean = { x, y, d };
+      if (air >= -1e-9 && (clean === null || d < clean.d - 1e-9)) clean = { x, y, d };
       break;
     }
   }
@@ -1252,26 +1450,25 @@ export function claspDotCenter(
  *
  * A doubly dotted carried value dots twice: the second dot continues the
  * first dot's escape further along the same up-right fan, keeping the house
- * hug from the mark, from every member disc AND from its own sibling dot
- * (edge to edge). The search mirrors {@link claspDotCenter} — the same
- * direction fan, nearest-to-the-mark wins — but measures distance from the
- * FIRST dot, so the pair reads as one classical double-dot satellite. The
- * linter's `clasp-dot-fusion` audits the same three airs.
+ * hug from the mark and from its own sibling dot (edge to edge) and actual
+ * clearance from every member mask. The search mirrors {@link claspDotCenter}
+ * — the same direction fan, nearest-to-the-mark wins — but measures distance
+ * from the FIRST dot, so the pair reads as one classical double-dot satellite.
+ * The linter's `clasp-dot-fusion` audits the same three airs.
  */
 export function claspSecondDotCenter(
   group: JankoClaspGroupGeometry,
   ink: ResolvedJankoClaspInk,
   first: { x: number; y: number },
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  dotOptions?: JankoClaspDotSeatOptions | null
 ): { x: number; y: number } {
   const t = resolveJankoTokens(tokens);
   const hug = t.augmentationDotGap;
   const r = t.augmentationDotRadius;
   const siblingGap = 2 * r + hug;
-  const discAir = (x: number, y: number): number =>
-    group.notes.length === 0
-      ? Number.POSITIVE_INFINITY
-      : Math.min(...group.notes.map((n) => Math.hypot(x - n.x, y - n.y) - t.noteheadRadius - r));
+  const memberAir = (x: number, y: number): number =>
+    claspDotMemberAir(x, y, group, t, dotOptions?.clusterSpacing, dotOptions?.honorHalo);
   let clean: { x: number; y: number; d: number } | null = null;
   let best: { x: number; y: number; air: number } | null = null;
   for (const degrees of CLASP_DOT_ANGLES) {
@@ -1285,9 +1482,9 @@ export function claspSecondDotCenter(
       // sibling gap apart and only ever spreads from there.
       if (Math.hypot(x - first.x, y - first.y) < siblingGap - 1e-9) continue;
       if (claspMarkDaylight(group, ink, x, y, t) < hug - 1e-9) continue;
-      const air = discAir(x, y);
+      const air = memberAir(x, y);
       if (best === null || air > best.air) best = { x, y, air };
-      if (air >= hug - 1e-9 && (clean === null || d < clean.d - 1e-9)) clean = { x, y, d };
+      if (air >= -1e-9 && (clean === null || d < clean.d - 1e-9)) clean = { x, y, d };
       break;
     }
   }

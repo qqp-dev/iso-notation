@@ -155,9 +155,15 @@ test('Brahms pagination arithmetic: 71 measures → 24 systems → 6 pages at 4-
   assert.equal(brahms.match(/data-page="/g)?.length ?? 0, 6, 'the Reference spread shows all 6 Brahms pages');
 });
 
-test('Brahms §2-landed record: adaptive 2 + fixed-3 9, itemized, zero fixes', () => {
+test('Brahms §2-landed record: adaptive 2 + fixed-3 7, itemized, m7/m17 resolved', () => {
   // The operator-accepted breakage, every item with proof. If ANY assertion
   // flips, the fit picture changed — re-measure §2, do not re-pin blindly.
+  // Rule A (lowest-inward full slots, no tuck) genuinely resolves the m.7/m.17
+  // stem grazes (both rode the retired midpoint tuck at half a slot); the
+  // m.24/m.44 pair and all 5 slot findings survive byte-identical. The
+  // adaptive sys-24 top re-measures 621.62 → 610.42: the tick-13488 shared
+  // carrier moves to the main-column upper head (964), whose stem stands 30pt
+  // higher — same overlap, honest new extent.
   // --- Adaptive = the CLI gate configuration, spread exactly as the script does.
   const adaptive = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
   const cli = lintJankoScore(BRAHMS, adaptive, T_BRAHMS);
@@ -183,31 +189,31 @@ test('Brahms §2-landed record: adaptive 2 + fixed-3 9, itemized, zero fixes', (
   assert.equal(overlap24.system, 23, 'system 24 (0-based 23)');
   assert.equal(
     overlap24.message,
-    "System 24's ink reaches up to y=621.62, into system 23's ink (bottom y=638.44): " +
+    "System 24's ink reaches up to y=610.42, into system 23's ink (bottom y=638.44): " +
       'the two systems overlap on the page.'
   );
   assert.equal(
     (overlap24.metrics!.lowerTop - overlap24.metrics!.upperBottom).toFixed(2),
-    '-16.83',
-    'sys 24 head ink into sys 23 beam ink: gap −16.83pt (re-measured live)'
+    '-28.03',
+    'sys 24 stem ink into sys 23 beam ink: gap −28.03pt (re-measured live; carrier to 964)'
   );
-  // --- Fixed-3 = the studio surface: the itemized 9, zero visual ink overlap.
+  // --- Fixed-3 = the studio surface: the itemized 7, zero visual ink overlap.
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.ok, false, 'the BRONZE surface is honestly not-ok');
   assert.equal(studio.warnings.length, 0, 'zero warnings');
-  assert.equal(studio.violations.length, 9, 'the BRONZE chip reads 9 (was 4 at 3-up)');
+  assert.equal(studio.violations.length, 7, 'the BRONZE chip reads 7 (was 9: m7/m17 resolved by full slots)');
   const folding = studio.violations.filter((v) => v.code === 'stem-through-simultaneity');
   const slots = studio.violations.filter((v) => v.code === 'system-slot-overlap');
-  assert.equal(folding.length, 4, 'the 4 known folding findings survive the flip');
+  assert.equal(folding.length, 2, 'm24/m44 survive; m7/m17 resolved by full-slot separation');
   assert.deepEqual(
     folding.map((v) => v.system + 1),
-    [3, 6, 8, 15],
-    'folding sites unchanged from 3-up'
+    [8, 15],
+    'surviving folding sites (m24 sys8, m44 sys15)'
   );
   assert.deepEqual(
     folding.map((v) => v.measure),
-    [7, 17, 24, 44],
-    'folding measures unchanged from 3-up'
+    [24, 44],
+    'surviving folding measures'
   );
   assert.equal(slots.length, 5, 'the 5 accepted slot-accounting findings');
   for (const v of slots) {
@@ -249,11 +255,11 @@ test('Brahms §2-landed record: adaptive 2 + fixed-3 9, itemized, zero fixes', (
     ],
     'the exact fixed-3 slot list the operator sees in Diagnostics'
   );
-  // --- The chip reads the itemized 9.
+  // --- The chip reads the itemized 7 (was 9: m7/m17 resolved).
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
-  assert.match(brahms, /✗ 9 violations/, 'the BRONZE chip reads the itemized 9');
-  assert.match(brahms, /<summary>Diagnostics \(9\)<\/summary>/, 'all 9 listed, none hidden');
+  assert.match(brahms, /✗ 7 violations/, 'the BRONZE chip reads the itemized 7');
+  assert.match(brahms, /<summary>Diagnostics \(7\)<\/summary>/, 'all 7 listed, none hidden');
   assert.ok(
     !brahms.includes('known-note') && !brahms.includes('known-finding'),
     'mixed codes degrade honestly: no known tags (they return when the fix pass clears the slot findings)'

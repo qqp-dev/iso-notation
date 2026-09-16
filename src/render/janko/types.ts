@@ -964,13 +964,14 @@ export interface JankoLayoutOptions {
    */
   claspDotNudge?: JankoClaspDotNudge;
   /**
-   * Beat-grid pulse filter (the Round 32 preview axis): which interior beat
+   * Beat-grid pulse filter (the Round 32/33 preview axis): which interior beat
    * pulses are painted. `'all'` keeps every existing interior quarter
    * position; `'midpoint-only'` retains an existing pulse iff its tick offset
-   * is exactly half `ticksPerMeasure` (a filter over existing candidates —
-   * no new subdivisions, no retiming, no barline change). Defaults to `'all'`
-   * (byte-identical). Odd subdivisions with no existing midpoint retain no
-   * interior pulses under the opt-in; never reinterpreted as `'all'`.
+   * is exactly half `ticksPerMeasure`; `'none'` paints no interior pulse at
+   * all (a filter over existing candidates — no new subdivisions, no
+   * retiming, no barline change). Defaults to `'all'` (byte-identical).
+   * Odd subdivisions with no existing midpoint retain no interior pulses
+   * under the opt-ins; never reinterpreted as `'all'`.
    */
   gridPulseFilter?: JankoGridPulseFilter;
   /**
@@ -1029,13 +1030,18 @@ export type JankoDurationGrammar = 'golden' | 'complete';
 export type JankoClaspDotNudge = readonly [number, number];
 
 /**
- * Beat-grid pulse filter (the Round 32 preview axis).
+ * Beat-grid pulse filter (the Round 32/33 preview axis). Filters hide only
+ * ink: temporal units, onset placement and space solving never consult this
+ * filter (beat cell barriers stay identical), and measure barlines always
+ * paint — so the grid rounds compare grid ink, never geometry.
  *
  * - `'all'`: every existing interior pulse (the incumbent).
  * - `'midpoint-only'`: only the existing pulse at exactly half
  *   `ticksPerMeasure` — a filter, never a generator.
+ * - `'none'`: no interior pulse at all (Round 33: the sole open grid
+ *   alternative to the full grid).
  */
-export type JankoGridPulseFilter = 'all' | 'midpoint-only';
+export type JankoGridPulseFilter = 'all' | 'midpoint-only' | 'none';
 
 /**
  * Fixed Middle-C-centered core octave line grammar (Round 27).

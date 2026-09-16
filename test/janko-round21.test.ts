@@ -458,14 +458,14 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 32 settled-packing grid round, two cards, one open axis', () => {
-  // Ordered contract change: Round 32 compares the interior beat grid on
+test('§F registry: round 33 full-vs-none grid round, two cards, one open axis', () => {
+  // Ordered contract change: Round 33 compares the interior beat grid on
   // Brahms — two cards on the single gridPulseFilter axis with the Reference
-  // as control. Rounds 30–31 are parked (historical consts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 32);
+  // as control. Rounds 30–32 are parked (historical consts).
+  assert.equal(CURRENT_ROUND_METADATA.round, 33);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['4-per-system-full-grid', '4-per-system-midpoint-grid'], 'the grid cards');
+  assert.deepEqual(ids, ['grid-full-vs-none-full', 'grid-full-vs-none-none'], 'the grid cards');
 });
 
 // ---------------------------------------------------------------------------

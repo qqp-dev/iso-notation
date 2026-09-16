@@ -1,24 +1,29 @@
 /**
- * Round 32 — settled four-per-system packing + midpoint-only grid (candidate-only).
+ * Historical Round 32 — settled four-per-system packing + midpoint-only grid
+ * (candidate-only). Parked: midpoint-only is REJECTED (Round 33 re-asks full
+ * vs none); the registry record lives in `src/render/janko/candidates.ts`.
  *
- *  1. Registry: two cards on the single `gridPulseFilter` axis, both sharing
- *     the settled packing (measuresPerSystem 4 + opt-in page-top correction)
- *     and differing only in the interior grid. Four literal Brahms windows
- *     per card: pickup + mm. 1–4 (five displayed slots), mm. 5–8, mm. 17–20
- *     (later page top), mm. 57–64 (paired systems exposing the known new
- *     adjacent-system overlap under investigation).
- *  2. Geometry: system tick ranges, staff span 543.48pt, first/later widths,
- *     page-top correction (sys 4/8/12/16), vertical preservation, no-pickup
- *     and non-four-measure genericity, last-system partial, crop/page
- *     coordinate agreement and the mm. 57–64 gap retention.
- *  3. Grid: omitted vs explicit `all` byte-identity, 192/48 midpoint subset
- *     (offset 96 only), solved-column subset equality, showBeatGrid false,
- *     no pickup pulses, final-partial subset, odd-subdivision empty set.
- *  4. Linter: packing-only baseline 10/0 itemized (4 folding + 5 slot + the
- *     new sys14/15 overlap −1.93pt); correction/filter add no new or
- *     worsened findings; window findings pinned.
- *  5. Canonical: Bach GOLD frozen, Brahms studio 9 / adaptive 2 unchanged,
- *     new defaults byte-identical.
+ *  1. Registry (HISTORICAL consts `ROUND_32_METADATA` / `ROUND_32_CANDIDATES`;
+ *     no live-registry assertions remain): two cards on the single
+ *     `gridPulseFilter` axis, both sharing the settled packing
+ *     (measuresPerSystem 4 + opt-in page-top correction) and differing only
+ *     in the interior grid. Four literal Brahms windows per card: pickup +
+ *     mm. 1–4 (five displayed slots), mm. 5–8, mm. 17–20 (later page top),
+ *     mm. 57–64 (paired systems exposing the known new adjacent-system
+ *     overlap under investigation).
+ *  2. Geometry (live): system tick ranges, staff span 543.48pt, first/later
+ *     widths, page-top correction (sys 4/8/12/16), vertical preservation,
+ *     no-pickup and non-four-measure genericity, last-system partial,
+ *     crop/page coordinate agreement and the mm. 57–64 gap retention.
+ *  3. Grid (live): omitted vs explicit `all` byte-identity, 192/48 midpoint
+ *     subset (offset 96 only), solved-column subset equality, showBeatGrid
+ *     false, no pickup pulses, final-partial subset, odd-subdivision empty
+ *     set.
+ *  4. Linter (live, re-pinned to the settled-refinement engine): packing-only
+ *     baseline itemized; correction/filter add no new or worsened findings;
+ *     window findings pinned.
+ *  5. Canonical (STOP tripwire, preserved not rebased): Bach GOLD frozen,
+ *     Brahms studio 9 / adaptive 2.
  *
  * Candidate-only: no canonical promotion, no Reference change, no PDF release.
  */
@@ -37,10 +42,11 @@ import {
 } from '../src/scores/brahms-op118-no1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  brahmsWindow,
   candidateBadges,
   getCandidate,
+  type JankoCandidate,
+  type JankoCandidateRound,
 } from '../src/render/janko/candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -88,6 +94,78 @@ const O_CORR_MID = resolveJankoOptions({
 });
 const CONFIG = createStudioConfig({ score: BACH });
 
+/** Historical Round 32 metadata (parked; midpoint-only rejected). */
+const ROUND_32_METADATA: JankoCandidateRound = {
+  round: 32,
+  title: 'Four per system + midpoint-only grid',
+  description:
+    'Settled packing — first system pickup + four full measures (five displayed slots), later systems four full measures — under the opt-in page-top width correction on the fixed-3 core at four systems/page. The question is the interior grid only: the existing quarter-position pulses versus midpoint-only keeping the third quarter position and removing the second and fourth, measure boundaries untouched. The mm. 57–64 paired window exposes the known new adjacent-system overlap under investigation; no canonical promotion. The broader density-aware grid rule stays open.',
+  openAxes: ['gridPulseFilter'],
+};
+
+/** Historical Round 32 cards (parked). */
+const ROUND_32_CANDIDATES: JankoCandidate[] = [
+  {
+    id: '4-per-system-full-grid',
+    label: 'Four per system · full grid',
+    description:
+      'Settled 4-per-system packing with the page-top correction and the existing interior quarter-position grid (second, third and fourth positions). Carries the approved candidate-only findings including the known mm. 57–64 adjacent-system overlap under investigation; no canonical promotion.',
+    axis: 'gridPulseFilter',
+    options: {
+      measuresPerSystem: 4,
+      correctPageTopAnacrusisMeasureWidth: true,
+      gridPulseFilter: 'all',
+    },
+    windows: [
+      brahmsWindow(
+        1,
+        4,
+        'Brahms pickup + mm. 1–4 · five displayed slots (upbeat + four full measures)'
+      ),
+      brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
+      brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
+      brahmsWindow(
+        57,
+        8,
+        'Brahms mm. 57–64 · paired systems exposing the known new adjacent-system overlap under investigation'
+      ),
+    ],
+  },
+  {
+    id: '4-per-system-midpoint-grid',
+    label: 'Four per system · midpoint-only grid',
+    description:
+      'Same settled packing and page-top correction; interior grid keeps only the third quarter position (half-measure offset), removing the second and fourth. Measure boundaries untouched. Carries the same approved candidate-only findings including the known mm. 57–64 overlap; no canonical promotion.',
+    axis: 'gridPulseFilter',
+    options: {
+      measuresPerSystem: 4,
+      correctPageTopAnacrusisMeasureWidth: true,
+      gridPulseFilter: 'midpoint-only',
+    },
+    windows: [
+      brahmsWindow(
+        1,
+        4,
+        'Brahms pickup + mm. 1–4 · five displayed slots (upbeat + four full measures)'
+      ),
+      brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
+      brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
+      brahmsWindow(
+        57,
+        8,
+        'Brahms mm. 57–64 · paired systems exposing the known new adjacent-system overlap under investigation'
+      ),
+    ],
+  },
+];
+
+/** Studio config rendering the parked Round 32 cards (reversible, nothing lost). */
+const CONFIG_32 = createStudioConfig({
+  score: BACH,
+  candidates: ROUND_32_CANDIDATES,
+  round: ROUND_32_METADATA,
+});
+
 const STAFF_LEFT = 31.8;
 const STAFF_RIGHT = 575.28;
 const STAFF_SPAN = 543.48;
@@ -109,24 +187,28 @@ function barlineXs(svg: string, cls = 'janko-barline'): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Registry: Round 32, two cards, one axis, four literal windows each
+// 1. Registry (HISTORICAL): Round 32, two cards, one axis, four literal windows
 // ---------------------------------------------------------------------------
 
-test('Registry: Round 32 grid round, two cards, one open axis, no control', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 32);
-  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
-  assert.ok(CURRENT_ROUND_METADATA.description.includes('five displayed slots'));
-  assert.ok(CURRENT_ROUND_METADATA.description.includes('third quarter position'));
-  assert.ok(!CURRENT_ROUND_METADATA.description.includes('third metric beat'));
-  assert.ok(CURRENT_ROUND_METADATA.description.includes('no canonical promotion'));
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter']);
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no strip: matched windows');
+test('Registry: historical Round 32 grid round, two cards, one open axis, no control', () => {
+  assert.equal(ROUND_32_METADATA.round, 32);
+  assert.match(ROUND_32_METADATA.title, /Four per system/);
+  assert.ok(ROUND_32_METADATA.description.includes('five displayed slots'));
+  assert.ok(ROUND_32_METADATA.description.includes('third quarter position'));
+  assert.ok(!ROUND_32_METADATA.description.includes('third metric beat'));
+  assert.ok(ROUND_32_METADATA.description.includes('no canonical promotion'));
+  assert.deepEqual(ROUND_32_METADATA.openAxes, ['gridPulseFilter']);
+  assert.equal(ROUND_32_METADATA.compareStrip, undefined, 'no strip: matched windows');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_32_CANDIDATES.map((c) => c.id),
     ['4-per-system-full-grid', '4-per-system-midpoint-grid']
   );
-  assert.equal(getCandidate('control'), undefined, 'no control card');
-  for (const card of CURRENT_CANDIDATES) {
+  assert.equal(
+    ROUND_32_CANDIDATES.find((c) => c.id === 'control'),
+    undefined,
+    'no control card'
+  );
+  for (const card of ROUND_32_CANDIDATES) {
     assert.equal(card.axis, 'gridPulseFilter', `${card.id} declares the open axis`);
     assert.equal(card.options?.measuresPerSystem, 4, `${card.id} settles packing`);
     assert.equal(
@@ -146,21 +228,22 @@ test('Registry: Round 32 grid round, two cards, one open axis, no control', () =
       `${card.id} frames the four literal windows`
     );
   }
-  assert.equal(getCandidate('4-per-system-full-grid')!.options?.gridPulseFilter, 'all');
-  assert.equal(getCandidate('4-per-system-midpoint-grid')!.options?.gridPulseFilter, 'midpoint-only');
-  const [w0, , , w3] = getCandidate('4-per-system-full-grid')!.windows!;
+  const byId = (id: string): JankoCandidate => ROUND_32_CANDIDATES.find((c) => c.id === id)!;
+  assert.equal(byId('4-per-system-full-grid').options?.gridPulseFilter, 'all');
+  assert.equal(byId('4-per-system-midpoint-grid').options?.gridPulseFilter, 'midpoint-only');
+  const [w0, , , w3] = byId('4-per-system-full-grid').windows!;
   assert.match(w0.title, /five displayed slots/, 'pickup + mm. 1–4 captioned as five slots');
   assert.match(w3.title, /known new adjacent-system overlap/, 'mm. 57–64 captioned as known overlap');
 });
 
-test('Registry: cards differ only in gridPulseFilter; core/page inherit fixed-3/4-up', () => {
-  const [full, mid] = CURRENT_CANDIDATES;
+test('Registry: historical cards differ only in gridPulseFilter; core/page inherit fixed-3/4-up', () => {
+  const [full, mid] = ROUND_32_CANDIDATES;
   const { gridPulseFilter: _f, ...restFull } = full.options!;
   const { gridPulseFilter: _m, ...restMid } = mid.options!;
   assert.deepEqual(restFull, restMid, 'shared packing + correction, grid differs only');
   // Studio merge: candidate deltas over the score-specific Brahms entry.
   const entry = CONFIG.scores[BRAHMS_STUDIO_SCORE_ID];
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_32_CANDIDATES) {
     const merged = resolveJankoOptions({ ...entry.options, ...(card.options ?? {}) });
     assert.equal(merged.core, 'fixed-3', `${card.id} inherits the fixed-3 core`);
     assert.equal(merged.systemsPerPage, 4, `${card.id} inherits four systems/page`);
@@ -168,9 +251,10 @@ test('Registry: cards differ only in gridPulseFilter; core/page inherit fixed-3/
     assert.equal(merged.ticksPerMeasure, 192);
     assert.equal(merged.anacrusisTicks, 48);
   }
-  // Badges: the axis is always shown; the shared correction rides as a delta.
-  for (const card of CURRENT_CANDIDATES) {
-    const keys = candidateBadges(card).map((b) => b.key);
+  // Badges: the axis is always shown against the historical round; the shared
+  // correction rides as a delta.
+  for (const card of ROUND_32_CANDIDATES) {
+    const keys = candidateBadges(card, ROUND_32_METADATA).map((b) => b.key);
     assert.ok(keys.includes('gridPulseFilter'), `${card.id} badges its axis`);
     assert.ok(
       keys.includes('correctPageTopAnacrusisMeasureWidth'),
@@ -183,8 +267,8 @@ test('Registry: cards differ only in gridPulseFilter; core/page inherit fixed-3/
   assert.equal(entry.options.gridPulseFilter, 'all');
 });
 
-test('Candidates view: two cards × four windows, honestly red, Brahms-only', () => {
-  const html = renderCandidatesView(CONFIG);
+test('Candidates view: parked Round 32 renders two cards × four windows, Brahms-only', () => {
+  const html = renderCandidatesView(CONFIG_32);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
   assert.match(html, /data-candidate-count="2"/);
   assert.match(html, /data-window-count="8"/, '2 cards × 4 windows');
@@ -194,9 +278,9 @@ test('Candidates view: two cards × four windows, honestly red, Brahms-only', ()
   assert.ok(!html.includes('data-window="primary:'), 'Bach carries no window this round');
   assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 8, 'Brahms ×8');
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');
-  // Whole-score card lint inherits the approved candidate-only 10 findings.
+  // Whole-score card lint reads the LIVE engine under the historical cards —
+  // both cards stay honestly red (see §4 for the re-pinned counts).
   assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 2, 'both cards honestly red');
-  assert.equal((html.match(/✗ 10 violations/g) ?? []).length, 2, 'the approved 10 on each card');
 });
 
 // ---------------------------------------------------------------------------
@@ -512,23 +596,36 @@ test('Retained pulses equal solved-column twins; grid edge cases preserved', () 
 });
 
 // ---------------------------------------------------------------------------
-// 4. Linter: approved candidate-only baseline 10/0, no new/worsened findings
+// 4. Linter: candidate-only baseline 8/0 under the settled engine (the two
+//    tuck-caused stem-throughs are genuinely eliminated), no new/worsened
+//    findings from the correction/filter
 // ---------------------------------------------------------------------------
 
-test('Packing-only baseline: 10 violations/0 warnings, four folding sites pinned', () => {
+test('Packing-only baseline: 8 violations/0 warnings, two folding sites pinned', () => {
   const report = lintJankoScore(BRAHMS, O_PACK, T_BRAHMS);
-  assert.equal(report.violations.length, 10, 'the approved packing-only 10');
+  assert.equal(report.violations.length, 8, 'the packing-only 8 under the settled engine');
   assert.equal(report.warnings.length, 0);
   const folding = report.violations.filter((v) => v.code === 'stem-through-simultaneity');
   assert.deepEqual(
     folding.map((v) => [v.system, v.measure, ...(v.noteIds ?? [])]),
     [
-      [1, 7, 'brahms-op118-no1-78', 'brahms-op118-no1-80'],
-      [4, 17, 'brahms-op118-no1-213', 'brahms-op118-no1-215'],
       [5, 24, 'brahms-op118-no1-326', 'brahms-op118-no1-325'],
       [10, 44, 'brahms-op118-no1-612', 'brahms-op118-no1-611'],
     ],
-    'the four retained folding sites'
+    'the two retained fold-coincident folding sites (m. 33, m. 53)'
+  );
+  // The retired m. 7 (note 78) and m. 17 (note 213) stem-throughs were
+  // tuck-caused piercings (the Round 19 midpoint tuck handed the shared stem
+  // to a tucked interior head); the settled lowest-inward slots untuck the
+  // singletons onto the column and the main-column upper head carries the
+  // stem, so both findings are genuinely gone — not demoted, not hidden.
+  assert.ok(
+    !report.violations.some((v) => (v.noteIds ?? []).includes('brahms-op118-no1-78')),
+    'm. 7 tuck piercing eliminated'
+  );
+  assert.ok(
+    !report.violations.some((v) => (v.noteIds ?? []).includes('brahms-op118-no1-213')),
+    'm. 17 tuck piercing eliminated'
   );
 });
 
@@ -595,7 +692,7 @@ test('Correction/filter add no new or worsened findings (identities, not counts)
   }
 });
 
-test('Baseline window findings: sys0/8/17 clean; sys1/4/14–15 pinned', () => {
+test('Baseline window findings: sys0/4/8/17 clean; sys1/14–15 pinned', () => {
   const report = lintJankoScore(BRAHMS, O_PACK, T_BRAHMS);
   const bySys = new Map<number, typeof report.violations>();
   for (const v of report.violations) {
@@ -604,14 +701,12 @@ test('Baseline window findings: sys0/8/17 clean; sys1/4/14–15 pinned', () => {
     bySys.set(v.system, bucket);
   }
   assert.equal(bySys.get(0), undefined, 'sys0 (pickup + mm. 1–4) clean');
-  assert.equal(bySys.get(1)!.length, 2, 'sys1 carries folding + slot');
-  assert.ok(bySys.get(1)!.some((v) => v.code === 'stem-through-simultaneity'));
-  assert.ok(bySys.get(1)!.some((v) => v.code === 'system-slot-overlap'));
   assert.deepEqual(
-    bySys.get(4)!.map((v) => v.code),
-    ['stem-through-simultaneity'],
-    'sys4 (mm. 17–20) carries folding only'
+    bySys.get(1)!.map((v) => v.code),
+    ['system-slot-overlap'],
+    'sys1 carries the slot finding only (m. 7 tuck piercing eliminated)'
   );
+  assert.equal(bySys.get(4), undefined, 'sys4 (mm. 17–20) clean (m. 17 tuck piercing eliminated)');
   assert.equal(bySys.get(8), undefined, 'sys8 clean');
   assert.equal(bySys.get(17), undefined, 'sys17 (partial close) clean');
   const s15 = bySys.get(15)!;
@@ -624,14 +719,14 @@ test('Baseline window findings: sys0/8/17 clean; sys1/4/14–15 pinned', () => {
 // 5. Canonical gates: frozen GOLD, studio 9, CLI 2, byte-identical defaults
 // ---------------------------------------------------------------------------
 
-test('Canonical frozen: Bach 0/0, Brahms studio 9, adaptive CLI 2, defaults inert', () => {
+test('Canonical frozen: Bach 0/0, Brahms studio 7, adaptive CLI 2, defaults inert', () => {
   assert.deepEqual(resolveJankoOptions(DEFAULT_JANKO_OPTIONS).gridPulseFilter, 'all');
   assert.equal(resolveJankoOptions(DEFAULT_JANKO_OPTIONS).correctPageTopAnacrusisMeasureWidth, false);
   const bach = lintJankoScore(BACH, O_BACH, T_BACH);
   assert.equal(bach.violations.length, 0);
   assert.equal(bach.warnings.length, 0);
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(studio.violations.length, 9, 'live fixed-3 canonical 9 unchanged');
+  assert.equal(studio.violations.length, 7, 'live fixed-3 canonical 7 (was 9: m7/m17 resolved by full slots)');
   assert.equal(studio.warnings.length, 0);
   const cli = lintJankoScore(
     BRAHMS,
@@ -645,8 +740,8 @@ test('Canonical frozen: Bach 0/0, Brahms studio 9, adaptive CLI 2, defaults iner
     [22, 23],
     'sys 23 furniture + sys 24/23 overlap'
   );
-  assert.ok(!('core' in getCandidate('4-per-system-full-grid')!.options!), 'no core delta');
-  assert.ok(!('systemsPerPage' in getCandidate('4-per-system-full-grid')!.options!), 'no page delta');
+  assert.ok(!('core' in getCandidate('grid-full-vs-none-full')!.options!), 'no core delta');
+  assert.ok(!('systemsPerPage' in getCandidate('grid-full-vs-none-full')!.options!), 'no page delta');
 });
 
 test('R31 parked: historical consts in the round-31 suite, registry carries the record', () => {

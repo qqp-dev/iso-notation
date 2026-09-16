@@ -142,13 +142,15 @@ const REST_STYLES: JankoRestStyle[] = [
  * Round 29 is judged and landed (kept as the named empty set for the
  * historical record). Round 30 is parked (kept as the named pair for the
  * historical record). Round 31 previewed the clasp-dot nudge on one card
- * (parked as the named singleton). Round 32 is the settled-packing grid
- * round: two cards differing only in `gridPulseFilter`.
+ * (parked as the named singleton). Round 32 asked full vs midpoint-only grid
+ * (parked as the named pair; midpoint rejected). Round 33 is the full-vs-none
+ * grid round: two cards differing only in `gridPulseFilter`.
  */
 const ROUND_29_CARDS: string[] = [];
 const ROUND_30_CARDS: string[] = ['round-30-rings', 'round-30-double-dots'];
 const ROUND_31_CARDS: string[] = ['round-31-clasp-nudge'];
 const ROUND_32_CARDS: string[] = ['4-per-system-full-grid', '4-per-system-midpoint-grid'];
+const ROUND_33_CARDS: string[] = ['grid-full-vs-none-full', 'grid-full-vs-none-none'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -234,18 +236,23 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the Round 32 settled-packing grid round (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 32);
-  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
+test('CURRENT_ROUND_METADATA is the Round 33 full-vs-none grid round (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 33);
+  assert.match(CURRENT_ROUND_METADATA.title, /no interior grid/i);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'the grid is the question');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
+  assert.deepEqual(
+    ROUND_32_CARDS,
+    ['4-per-system-full-grid', '4-per-system-midpoint-grid'],
+    'R32 parked pair on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the two-card Round 32 grid set, no control', () => {
+test('CURRENT_CANDIDATES is the two-card Round 33 grid set, no control', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_32_CARDS, 'the grid cards');
+  assert.deepEqual(ids, ROUND_33_CARDS, 'the grid cards');
   assert.equal(CURRENT_CANDIDATES.length, 2, 'two grid cards');
   for (const card of CURRENT_CANDIDATES) {
     assert.equal(card.axis, 'gridPulseFilter', `${card.id} declares the open axis`);
@@ -257,14 +264,14 @@ test('CURRENT_CANDIDATES is the two-card Round 32 grid set, no control', () => {
     );
   }
   assert.equal(
-    getCandidate('4-per-system-full-grid')!.options?.gridPulseFilter,
+    getCandidate('grid-full-vs-none-full')!.options?.gridPulseFilter,
     'all',
     'full-grid card keeps every pulse'
   );
   assert.equal(
-    getCandidate('4-per-system-midpoint-grid')!.options?.gridPulseFilter,
-    'midpoint-only',
-    'midpoint card filters to the half-measure pulse'
+    getCandidate('grid-full-vs-none-none')!.options?.gridPulseFilter,
+    'none',
+    'no-grid card paints no interior pulse'
   );
   assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
 });
@@ -482,8 +489,12 @@ test('Rect paint pin: every mask a sharp rect with the preset wx/hy, every digit
 // 5. Spans: pairs G ±0.1, triples 2G ±0.2, cells firm, time ordered
 // ---------------------------------------------------------------------------
 
-test('Pairs stand at the judged gap ±0.1, inside their beat cell, in time order — every preset', () => {
-  // Bach's same-row pairs: t1032 (m8), t1632 (m12), t2040/t2064 (m15).
+test('Pairs stand at the judged gap ±0.1, in time order, cells reported — every preset', () => {
+  // Bach's cross-hand pairs: t1032 (m8), t1632 (m12), t2040/t2064 (m15). Each
+  // resolves jointly (per-hand singletons whose masks overlap): the lower
+  // pitch one slot inward, the upper on the solved column. A downbeat pair
+  // whose desired slots leave the cell steps its column right (legitimate
+  // translation); the demand stays reported in clusterDiagnostics.
   const pairTicks = [1032, 1632, 2040, 2064];
   for (const { spacing } of SPACING_CANDIDATES) {
     const G = getClusterSpacingPreset(spacing).pairGap;
@@ -492,7 +503,9 @@ test('Pairs stand at the judged gap ±0.1, inside their beat cell, in time order
       core: 'adaptive',
       clusterSpacing: spacing,
     });
-    const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
+    const layouts = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS);
+    const notes = layouts.flatMap((l) => l.notes);
+    const diags = layouts.flatMap((l) => l.clusterDiagnostics ?? []);
     for (const tick of pairTicks) {
       const pair = notes.filter((p) => p.note.startTick === tick);
       assert.equal(pair.length, 2, `${spacing} t${tick}: the ticketed pair`);
@@ -501,10 +514,32 @@ test('Pairs stand at the judged gap ±0.1, inside their beat cell, in time order
         Math.abs(span - G) < 0.1,
         `${spacing} t${tick}: pair spans ${span.toFixed(2)} (G = ${G})`
       );
-      for (const p of pair) {
+      // Lowest-inward relative to the solved column (nominal + legitimate
+      // shift): the lower source pitch one slot inward, the upper on it.
+      const linOf = (p: (typeof pair)[number]): number =>
+        p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
+      const [lo, hi] = [...pair].sort((a, b) => linOf(a) - linOf(b));
+      const layout = layouts.find((l) => l.columns.has(tick))!;
+      const column = layout.columns.get(tick)!;
+      assert.ok(
+        Math.abs(lo.x - (column - G)) < 0.1,
+        `${spacing} t${tick}: lower head one slot inward of the solved column`
+      );
+      assert.ok(
+        Math.abs(hi.x - column) < 0.1,
+        `${spacing} t${tick}: upper head on the solved column`
+      );
+      // Beat cells: legitimate shifts fit every corpus pair — actual ink
+      // stays inside — while the demand report names the desired excess.
+      const inCell = (p: (typeof pair)[number]): boolean =>
+        p.x >= (p.beatCell?.left ?? 0) - 1e-9 && p.x <= (p.beatCell?.right ?? 0) + 1e-9;
+      const offenders = pair.filter((p) => !inCell(p));
+      assert.equal(offenders.length, 0, `${spacing} t${tick}: legitimate shifts fit the pair`);
+      const diag = diags.find((d) => d.tick === tick);
+      if (diag) {
         assert.ok(
-          p.x >= (p.beatCell?.left ?? 0) - 1e-9 && p.x <= (p.beatCell?.right ?? 0) + 1e-9,
-          `${spacing} t${tick}: ${p.note.id} stays in its beat cell`
+          diag.memberIds.includes(lo.note.id),
+          `${spacing} t${tick}: the diagnostic names the inward demand`
         );
       }
     }
@@ -550,42 +585,51 @@ test('Unit centering: the t1032 pair sits symmetric in its free space — every 
 });
 
 // ---------------------------------------------------------------------------
-// 7. The pin: m12's 9 holds, the gap is min(G, room)
+// 7. Lowest-inward slots: m12's 7 inward, the gap always G, demand reported
 // ---------------------------------------------------------------------------
 
-test('Pin: m12 pins the 9 on its column while the 7 walks in — every preset', () => {
+test('Pin: m12 seats the 7 one slot inward with the 9 on its column — every preset', () => {
   for (const { spacing } of SPACING_CANDIDATES) {
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
       ...DEFAULT_JANKO_OPTIONS,
       clusterSpacing: spacing,
     });
-    const notes = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS).flatMap((l) => l.notes);
+    const layouts = layoutJankoScore(SCORE, options, DEFAULT_JANKO_TOKENS);
+    const notes = layouts.flatMap((l) => l.notes);
     const pair = notes
       .filter((p) => p.note.startTick === 1632)
       .sort((a, b) => a.x - b.x);
-    // Round 21 §D: the **lower** head holds the column (pc7, the LH tone); the
-    // pc9 RH tone walks in beside it.
+    // Permanent lowest-inward rule relative to the solved column (nominal +
+    // legitimate shift): the **lower** head (pc7, the LH tone) sits one slot
+    // inward; the pc9 RH tone holds the column. (Round 21 §D's lower-holds
+    // anchor is retired.) The downbeat steps right to stay inside its cell.
     const nine = pair.find((p) => p.coord.pitchClass === 9)!;
     const seven = pair.find((p) => p.coord.pitchClass === 7)!;
     assert.ok(nine && seven, `${spacing}: the ticketed pair exists`);
+    const column = layouts.find((l) => l.columns.has(1632))!.columns.get(1632)!;
     assert.ok(
-      Math.abs(seven.x - (seven.nominalX ?? seven.x)) <= 0.3,
-      `${spacing}: the lower head holds its column (Δ${Math.abs(seven.x - (seven.nominalX ?? 0)).toFixed(2)})`
+      Math.abs(seven.x - (column - G)) <= 0.3,
+      `${spacing}: the lower head sits one slot inward (Δ${Math.abs(seven.x - (column - G)).toFixed(2)})`
+    );
+    assert.ok(
+      Math.abs(nine.x - column) <= 0.3,
+      `${spacing}: the upper head holds its column (Δ${Math.abs(nine.x - column).toFixed(2)})`
     );
     const span = Math.abs(pair[1].x - pair[0].x);
-    // Free room here exceeds G on the roomy side, so the walked-in gap is G.
     assert.ok(
       Math.abs(span - G) < 0.1,
-      `${spacing}: the 7 walks in to the judged gap (${span.toFixed(2)} = min(G, room))`
+      `${spacing}: the pair keeps the judged gap (${span.toFixed(2)})`
     );
   }
 });
 
-test('Pin-preserving shrink: a pair starved of room narrows to the room with the pin held', () => {
+test('No silent shrink: a pair starved of room keeps the judged gap, shifts to clear', () => {
   // 5-tick onsets: the pair at tick 43 faces a 5-tick room to its beat pulse
-  // — inside [touching, G) — so the gap shrinks to the room instead of
-  // hiding the overflow by sliding the anchor.
+  // — inside [touching, G). The retired pin-preserving shrink narrowed the
+  // gap to the room; the permanent rule keeps the judged gap and steps the
+  // whole onset right to clear its same-pitch neighbour (legitimate
+  // translation for time order and mask clearance, never a shrink).
   const shrink = score('synthetic-pin-shrink', [
     note('shrink-a', 0, 5, 38, 12),
     note('shrink-lo', 0, 5, 43, 12),
@@ -605,7 +649,8 @@ test('Pin-preserving shrink: a pair starved of room narrows to the room with the
     pageMarginRight: 24,
   });
   const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const placed = layoutJankoScore(shrink, options, tokens).flatMap((l) => l.notes);
+  const layouts = layoutJankoScore(shrink, options, tokens);
+  const placed = layouts.flatMap((l) => l.notes);
   const lo = placed.find((p) => p.note.id === 'shrink-lo')!;
   const hi = placed.find((p) => p.note.id === 'shrink-hi')!;
   const room = (lo.beatCell?.right ?? 0) - (lo.nominalX ?? 0);
@@ -613,19 +658,29 @@ test('Pin-preserving shrink: a pair starved of room narrows to the room with the
     room >= 2 * getClusterSpacingPreset('snug').wx && room < getClusterSpacingPreset('snug').pairGap,
     `the room (${room.toFixed(2)}pt) sits inside [touching, G)`
   );
+  // Lowest-inward with no shrink relative to the solved column: the lower
+  // head one slot inward, the upper on it, the judged gap intact. The column
+  // steps right to clear the tick-38 same-pitch head (time order + 5.46pt
+  // mask air); the gap is never min(G, room).
+  const G = getClusterSpacingPreset('snug').pairGap;
+  const column = layouts.find((l) => l.columns.has(43))!.columns.get(43)!;
   assert.ok(
-    Math.abs(lo.x - (lo.nominalX ?? 0)) < 1e-9,
-    'the pinned head holds its column exactly'
+    Math.abs(lo.x - (column - G)) < 0.05,
+    `the lower head sits one slot inward (${lo.x.toFixed(2)})`
+  );
+  assert.ok(
+    Math.abs(hi.x - column) < 0.05,
+    `the upper head holds its column (${hi.x.toFixed(2)})`
   );
   const span = Math.abs(hi.x - lo.x);
-  assert.ok(
-    Math.abs(span - room) < 0.05,
-    `the gap shrinks to the room (${span.toFixed(2)} = min(G, room))`
-  );
-  assert.ok(span < getClusterSpacingPreset('snug').pairGap, 'and stays under the judged gap');
-  const report = lintJankoScore(shrink, options, tokens);
-  assert.equal(report.violations.length, 0, 'the shrunk pair still lints clean');
-  assert.equal(report.warnings.length, 0, '... with no warnings either');
+  assert.ok(Math.abs(span - G) < 0.05, `the gap stays judged (${span.toFixed(2)} = G, never min(G, room))`);
+  // The cell itself is feasible (both desired slots inside), so no cell
+  // demand is reported; the shift answers the neighbour, not the cell. The
+  // cell-demand twin (a downbeat inward head desiring past its cell edge,
+  // Bach m. 12 tick 1632) is pinned with its diagnostic in the round-19
+  // slots suite.
+  const diags = layouts.flatMap((l) => l.clusterDiagnostics ?? []);
+  assert.equal(diags.find((d) => d.tick === 43), undefined, 'a cell-feasible fit reports no cell demand');
 });
 
 // ---------------------------------------------------------------------------
@@ -693,7 +748,7 @@ test('Seconds keep two stems at head-x: the m12 rule on the t1632 pair — every
 });
 
 // ---------------------------------------------------------------------------
-// 10. Held triples: 2G spans, tucked rows, one shared stem (t1392)
+// 10. Held triples: 2G spans, lowest-inward slots, one shared stem (t1392)
 // ---------------------------------------------------------------------------
 
 test('Brahms held triples span 2G with symmetrically tucked rows — every preset', () => {
@@ -726,7 +781,7 @@ test('Brahms held triples span 2G with symmetrically tucked rows — every prese
   }
 });
 
-test('t1392 tucks its rows symmetrically and shares one stem', () => {
+test('t1392 slots lowest-inward with no tuck and shares one stem', () => {
   for (const { spacing } of SPACING_CANDIDATES) {
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
@@ -745,46 +800,43 @@ test('t1392 tucks its rows symmetrically and shares one stem', () => {
     }
     const byY = [...rows.values()].sort((a, b) => a[0].y - b[0].y);
     const fanned = byY.filter((hs) => hs.length >= 2);
-    assert.ok(fanned.length >= 2, `${spacing}: t1392 carries 2+ fanned rows`);
+    assert.ok(fanned.length >= 2, `${spacing}: t1392 carries 2+ slotted rows`);
     const widest = fanned.reduce((a, b) => (b.length > a.length ? b : a));
     assert.equal(widest.length, 3, `${spacing}: the widest row is the triple`);
-    // The widest row anchors: its middle head on the (clasp-shifted) column —
-    // the same column the lone LH head stands on.
-    const middle = widest.map((p) => p.x).sort((a, b) => a - b)[1];
-    const lone = byY.find((hs) => hs.length === 1)![0];
-    assert.ok(
-      Math.abs(middle - lone.x) < 0.05,
-      `${spacing}: the triple middle anchors the shifted column`
-    );
-    // Round 19 symmetric tuck: the narrower pair is centred on the triple's own
-    // middle (mirror symmetry), instead of nesting at the old half-step.
-    const other = fanned.find((hs) => hs !== widest)!;
-    const otherXs = other.map((p) => p.x).sort((a, b) => a - b);
-    assert.ok(
-      Math.abs((otherXs[0] + otherXs[1]) / 2 - middle) < 0.05,
-      `${spacing}: the pair tucks onto the triple's middle`
-    );
-    assert.ok(
-      Math.abs(otherXs[1] - otherXs[0] - G) < 0.2,
-      `${spacing}: the tucked pair keeps its judged gap`
-    );
-    for (const p of other) {
-      assert.ok(
-        Math.abs(Math.abs(p.x - middle) - G / 2) < 0.05,
-        `${spacing}: every tucked head mirrors about the middle`
-      );
-    }
-    // One shared stem for the whole one-duration onset, on the onset's own
-    // column: the triple's middle head (the axis head), not the stale
-    // proportional column the pre-Round-19 solve ranked against.
+    // The onset column: the lone LH head stands on it (clear members stay).
     const layout = layouts.find((l) => l.notes.some((p) => p.note.startTick === 1392))!;
+    const col = layout.columns.get(1392)!;
+    const lone = byY.find((hs) => hs.length === 1)![0];
+    assert.ok(Math.abs(lone.x - col) < 0.05, `${spacing}: the lone head stands on the column`);
+    // Permanent lowest-inward slots: the triple takes {-G, 0, +G} with its
+    // lowest pitch (96) inward, and the pair takes {-G, 0} with its lowest
+    // (99) inward. No tuck: both inward heads share the inward slot, both
+    // upper heads the column.
+    const linOf = (p: (typeof heads)[number]): number =>
+      p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
+    const tripleXs = [...widest].sort((a, b) => linOf(a) - linOf(b));
+    assert.ok(Math.abs(tripleXs[0].x - (col - G)) < 0.05, `${spacing}: triple lowest inward`);
+    assert.ok(Math.abs(tripleXs[1].x - col) < 0.05, `${spacing}: triple middle on column`);
+    assert.ok(Math.abs(tripleXs[2].x - (col + G)) < 0.05, `${spacing}: triple highest outward`);
+    const other = fanned.find((hs) => hs !== widest)!;
+    const pairXs = [...other].sort((a, b) => linOf(a) - linOf(b));
+    assert.ok(Math.abs(pairXs[0].x - (col - G)) < 0.05, `${spacing}: pair lowest inward`);
+    assert.ok(Math.abs(pairXs[1].x - col) < 0.05, `${spacing}: pair upper on column`);
+    assert.ok(
+      Math.abs(pairXs[0].x - tripleXs[0].x) < 1e-9,
+      `${spacing}: inward heads share one slot (no tuck)`
+    );
+    // One shared stem for the whole one-duration onset: the carrier is the
+    // on-column outward extremity (topmost RH head on the column), never a
+    // tucked interior head.
     const groups = layout.sharedStems.filter((g) => g.tick === 1392);
     assert.equal(groups.length, 1, `${spacing}: t1392 shares one stem`);
     const carrier = notes.find((p) => p.note.id === groups[0].carrierId)!;
     assert.ok(
-      Math.abs(carrier.x - lone.x) < 0.05,
+      Math.abs(carrier.x - col) < 0.05,
       `${spacing}: the carrier stands on the onset's own column`
     );
+    assert.equal(carrier.note.id, 'brahms-op118-no1-100', `${spacing}: the upper on-column head carries`);
   }
 });
 
@@ -874,7 +926,11 @@ test('Synthetic same-duration stacks: one painted stem — stacked and flanked',
   const groups = layout.sharedStems.filter((g) => g.tick === 48 && g.hand === 'RH');
   assert.equal(groups.length, 1, 'the flanked pair forms one shared-stem group');
   const carrier = layout.notes.find((p) => p.note.id === groups[0].carrierId)!;
-  assert.ok(Math.abs(carrier.x - carrier.nominalX!) < 0.05, 'the carrier stands on the column');
+  // The carrier stands on the SOLVED onset column (laid-out x after the
+  // column solve's rigid translation), not the un-shifted proportional beat:
+  // the clasped inward pair legitimately translated right for bracket air.
+  const solvedCol = layout.columns.get(48)!;
+  assert.ok(Math.abs(carrier.x - solvedCol) < 0.05, 'the carrier stands on the solved column');
   const flankPainted = ['flank-lo', 'flank-hi'].filter((id) => !hidden.has(id));
   assert.deepEqual(flankPainted, [carrier.note.id], 'the flanked pair paints one shared stem');
 
@@ -1776,7 +1832,15 @@ test('Bar 5 beat 2: the beam covers exactly t636/648/660 and the dotted B spans 
     'the LH beam covers exactly the three played slots of beat 2'
   );
   const report = lintJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
-  assert.equal(report.ok, true, 'the locked beaming stays honest');
+  // Clean: the locked beaming adds no finding and the tick-1632 inward slot
+  // steps its column right to stay inside the beat cell (legitimate
+  // translation, demand in clusterDiagnostics) — zero violations.
+  assert.deepEqual(
+    report.violations.map((v) => [v.code, v.system, v.measure, ...(v.noteIds ?? [])]),
+    [],
+    'the locked beaming stays honest: Goldberg lint-clean'
+  );
+  assert.equal(report.warnings.length, 0);
 });
 
 test('The m. 4 rest and the specimen m. 2 rest survive every spacing preset', () => {
@@ -1835,7 +1899,32 @@ test('Rest specimen material: the complete working set, each on a guaranteed-fre
   assert.equal(report.violations.length, 0, 'and none is refused');
 });
 
+test('STOP tripwire (unlanded): Brahms complete carries exactly the accepted 2', () => {
+  // 4-up by operator override (was [] at 3-up). The settled refinements moved
+  // the adaptive path (downbeat inward slots + the m. 57 clasp demotion):
+  // 14 violations until the architect/operator adjudicates. Preserved, not
+  // rebased — see test/brahms-engraving.test.ts §2-landed record.
+  const report = lintJankoScore(
+    BRAHMS,
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
+    BRAHMS_OP118_NO1_JANKO_TOKENS
+  );
+  assert.deepEqual(
+    report.violations.map((v) => [v.code, v.system + 1]),
+    [
+      ['system-slot-overlap', 23],
+      ['system-slot-overlap', 24],
+    ],
+    'exactly the accepted 2'
+  );
+  assert.equal(report.warnings.length, 0);
+});
+
 test('Every dialect renders every window with zero rest diagnostics and every rest clear (locked)', () => {
+  // Dialect-independence anchor: the first style's finding identities, which
+  // every other style must reproduce exactly (the absolute pin is the STOP
+  // tripwire above).
+  let brahmsKeys: string[] | null = null;
   for (const style of REST_STYLES) {
     const options = { ...DEFAULT_JANKO_OPTIONS, restStyle: style };
     for (const [score, base, tokens, label] of [
@@ -1860,17 +1949,16 @@ test('Every dialect renders every window with zero rest diagnostics and every re
     ] as const) {
       const report = lintJankoScore(score, base, tokens);
       if (label === 'Brahms complete') {
-        // 4-up by operator override (was [] at 3-up): every dialect carries
-        // exactly the accepted 2 — the rest style never touches slots, so
-        // all five dialects agree to the finding.
-        assert.deepEqual(
-          report.violations.map((v) => [v.code, v.system + 1]),
-          [
-            ['system-slot-overlap', 23],
-            ['system-slot-overlap', 24],
-          ],
-          `${style} · ${label}: exactly the accepted 2`
-        );
+        // STOP-state: the absolute accepted-2 pin is a tripwire while the
+        // adaptive delta is unadjudicated (see 'STOP tripwire: Brahms
+        // complete carries exactly the accepted 2' below). The live property
+        // — the rest style never touches findings, so all five dialects
+        // agree to the finding — stays pinned here.
+        const keyOf = (v: (typeof report.violations)[number]): string =>
+          [v.code, v.system, v.measure ?? '', ...(v.noteIds ?? [])].join('|');
+        const keys = report.violations.map(keyOf);
+        if (brahmsKeys === null) brahmsKeys = keys;
+        assert.deepEqual(keys, brahmsKeys, `${style} · ${label}: all dialects agree to the finding`);
         assert.equal(report.warnings.length, 0, `${style} · ${label}: zero warnings`);
         continue;
       }
@@ -1924,22 +2012,22 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: two grid cards, eight windows, no strip
+// 17. Studio: two grid cards, twelve windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the two Round 32 grid cards with honest chips', () => {
+test('The live studio renders the two Round 33 grid cards with honest chips', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
   assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="8"/, '2 cards × 4 Brahms windows');
+  assert.match(html, /data-window-count="12"/, '2 cards × 6 Brahms windows');
   assert.match(html, /data-verification="false"/, 'the grid round is decisive');
-  assert.match(html, /Round 32/);
-  assert.match(html, /Four per system/, 'the grid title headlines the view');
-  for (const id of ROUND_32_CARDS) {
+  assert.match(html, /Round 33/);
+  assert.match(html, /no interior grid/i, 'the grid title headlines the view');
+  for (const id of ROUND_33_CARDS) {
     assert.ok(html.includes(`data-candidate="${id}"`), `${id} renders`);
   }
-  // Whole-score card lint inherits the approved candidate-only 10 findings
-  // (honestly red on both cards — proven in test/janko-round32.test.ts).
+  // Whole-score card lint inherits the settled candidate-only 8 findings
+  // (honestly red on both cards — proven in test/janko-round33.test.ts).
   assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 2, 'both cards honestly red');
 });
 

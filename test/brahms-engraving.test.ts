@@ -344,13 +344,14 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
 test('Brahms Op. 118 No. 1 carries exactly the accepted 4-up slot findings', () => {
   // 4-up by operator override (was completely clean at 3-up): the adaptive
   // engraving reports the 2 accepted slot findings — sys 23 furniture past
-  // its slot, sys 24 ink into sys 23 (gap −16.83pt) — and nothing else.
-  // Sides and deficits are itemized in the §2-landed record.
+  // its slot, sys 24 ink into sys 23 (gap −28.03pt after the rule-A carrier
+  // move to 964) — and nothing else. Sides and deficits are itemized in the
+  // §2-landed record.
   assert.deepEqual(
     REPORT.violations.map((v) => `${v.code}: ${v.message}`),
     [
       "system-slot-overlap: System 23's staff furniture spans y=[452.54, 630.32], outside its 183.97pt page slot [445.94, 629.92] (1.00pt clearance).",
-      "system-slot-overlap: System 24's ink reaches up to y=621.62, into system 23's ink (bottom y=638.44): the two systems overlap on the page.",
+      "system-slot-overlap: System 24's ink reaches up to y=610.42, into system 23's ink (bottom y=638.44): the two systems overlap on the page.",
     ],
     'exactly the two accepted slot findings'
   );

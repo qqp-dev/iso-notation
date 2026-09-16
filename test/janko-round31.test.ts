@@ -232,19 +232,25 @@ test('GOLD/BRONZE badges on the two Reference blocks + AGENTS.md convention', ()
   assert.match(agents, /BRONZE = the active iteration surface/, 'the BRONZE convention is written');
 });
 
-test('The 9 knowns display honestly: itemized, ungated, unhidden', () => {
+test('The 7 knowns display honestly: itemized, ungated, unhidden', () => {
+  // Ticket rule A resolves two of the four folding findings — genuinely, not
+  // by suppression: the m.7 (78→80) and m.17 (213→215) stem grazes rode the
+  // retired midpoint tuck at exactly half a slot (2.73pt); with the tuck
+  // gone the members sit at full-slot separation and the stems clear. The
+  // m.24/m.44 grazes (4.00pt, a different mechanism) and all five slot
+  // findings are byte-identical to base. Gate 5: resolved findings explained.
   const report = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(report.violations.length, 9, 'the itemized 9 (was exactly 4 at 3-up)');
+  assert.equal(report.violations.length, 7, 'the itemized 7 (was 9; the rule-A pair resolved)');
   assert.equal(report.warnings.length, 0, 'zero warnings');
   assert.equal(report.ok, false, 'the BRONZE surface is honestly not-ok');
   const folding = report.violations.filter((v) => v.code === 'stem-through-simultaneity');
   const slots = report.violations.filter((v) => v.code === 'system-slot-overlap');
-  assert.equal(folding.length, 4, 'the 4 folding findings survive');
+  assert.equal(folding.length, 2, 'the 2 surviving folding findings');
   assert.equal(slots.length, 5, 'the 5 accepted slot findings join them');
   assert.deepEqual(
     folding.map((v) => v.measure).sort((a, b) => a! - b!),
-    [7, 17, 24, 44],
-    'the four known sites'
+    [24, 44],
+    'the two surviving sites (m.7/m.17 resolved by rule A)'
   );
   assert.deepEqual(
     slots.map((v) => v.system + 1),
@@ -253,12 +259,16 @@ test('The 9 knowns display honestly: itemized, ungated, unhidden', () => {
   );
   const { bach, brahms } = referenceBlocks();
   assert.match(brahms, /data-lint-ok="false"/, 'the BRONZE chip stays honestly red');
-  assert.match(brahms, /✗ 9 violations/, 'the count is shown, never folded away (was ✗ 4)');
-  assert.match(brahms, /<summary>Diagnostics \(9\)<\/summary>/, 'all 9 listed');
+  assert.match(brahms, /✗ 7 violations/, 'the count is shown, never folded away (was ✗ 9)');
+  assert.match(brahms, /<summary>Diagnostics \(7\)<\/summary>/, 'all 7 listed');
   // Mixed codes carry no known tags (the single-code rule degrades honestly —
-  // the 4 tags and the known-note return when the fix pass clears the slots).
+  // the 2 tags and the known-note return when the fix pass clears the slots).
   assert.ok(!brahms.includes('known-note'), 'no known-note on mixed codes (was shown for the 4)');
   assert.ok(!brahms.includes('known-finding'), 'no known tags on mixed codes (was 4 tags)');
+  // STOP tripwire (gate 4): the GOLD block carries the one ledgered
+  // grid-crossing (bach-var1-198) until the operator adjudicates the Goldberg
+  // delta. These three pins stay red; the Brahms-7 above is the explained
+  // rule-A state.
   assert.match(bach, /data-lint-ok="true"/, 'the GOLD block stays clean');
   assert.ok(!bach.includes('known-finding'), 'no known tags on GOLD');
   assert.ok(!bach.includes('known-note'), 'no known note on GOLD');
@@ -487,39 +497,36 @@ test('Linter covers the nudged positions: the preview adds no finding', () => {
   assert.deepEqual(
     preview.violations.map((v) => [v.code, v.system, v.measure, v.message]),
     golden.violations.map((v) => [v.code, v.system, v.measure, v.message]),
-    'preview violations are exactly the 9 knowns — the nudge adds nothing (was 4 at 3-up)'
+    'preview violations are exactly the 7 knowns — the nudge adds nothing (was 9; rule-A pair resolved)'
   );
   const fusion = (codes: string[]): string[] =>
     codes.filter((c) => c === 'clasp-dot-fusion' || c === 'dot-collision' || c === 'dot-count-agreement');
   assert.deepEqual(fusion(preview.violations.map((v) => v.code)), [], 'no fusion audit fires');
   assert.deepEqual(fusion(golden.violations.map((v) => v.code)), [], 'the golden path is silent');
-  // The binding seat, pinned absolutely: mark air keeps the hug (1.245, the
-  // dy=0.2 ceiling — dy=0.3 breaks it at 1.163), the solver-hug to the member
-  // disc is spent honestly (0.81), and the knockout keeps 1.47 of daylight.
-  // 4-up moved each value by last-ulp float dust only (the frame translated;
-  // the within-system geometry is identical) — old values quoted, dust
-  // bounded, so a real move still fails loudly.
+  // The binding seat, pinned absolutely — re-pinned for the ticket's rule-B
+  // 45° seat (the nudge applies to the new seat exactly: dot = golden seat +
+  // [0.4, 0.2], proven by the moved-circles test above). Mark air improves to
+  // 1.357 (keeps the hug with room); the binding margin moves to the head
+  // knockout, which keeps 0.089 of daylight — thin but positive, so the dot
+  // still paints whole and no audit fires. The virtual-disc hug reads −0.595:
+  // stated, not hidden (rule B retires that veto — the 45° seat's true ink
+  // clears; virtual overlap is not a collision).
   const layouts = layoutJankoScore(BRAHMS, O_PREVIEW, T_BRAHMS);
   const clasp = layouts.flatMap((s) => s.clasps).find((c) => c.tick === 48)!;
   const dot = clasp.durationDots[0]!;
   const daylight = claspMarkDaylight(clasp, clasp.durationInk[0], dot.x, dot.y, T_BRAHMS);
-  assert.equal(daylight, 1.2449581090076745, 'nudged mark air keeps the hug (was …7686)');
-  assert.ok(
-    Math.abs(daylight - 1.244958109007686) < 1e-9,
-    'the move is float dust from the translated frame, not new geometry'
-  );
+  assert.equal(daylight, 1.3574943408786462, 'nudged mark air keeps the hug (was 1.2449… on the 60° seat)');
   const member = layouts
     .flatMap((s) => s.notes)
     .find((p) => p.note.id === 'brahms-op118-no1-5')!;
   const hug =
     Math.hypot(dot.x - member.x, dot.y - member.y) - T_BRAHMS.noteheadRadius - T_BRAHMS.augmentationDotRadius;
-  assert.equal(hug, 0.8103902883195451, 'the spent solver-hug is stated, not hidden (was …548)');
-  assert.ok(Math.abs(hug - 0.8103902883195548) < 1e-9, 'likewise dust, not geometry');
+  assert.equal(hug, -0.5954801413766582, 'the virtual-disc hug is stated, not hidden (was +0.8103…)');
   const qx = Math.max(Math.abs(dot.x - member.x) - 2.53, 0);
   const qy = Math.max(Math.abs(dot.y - member.y) - 3.46, 0);
   const ko = Math.hypot(qx, qy) - T_BRAHMS.augmentationDotRadius;
-  assert.equal(ko, 1.4650129889965804, 'the knockout keeps daylight: the dot paints whole (was …875)');
-  assert.ok(Math.abs(ko - 1.4650129889965875) < 1e-9, 'likewise dust, not geometry');
+  assert.equal(ko, 0.08894313788545338, 'the knockout keeps daylight: the dot paints whole (was 1.4650…)');
+  assert.ok(ko > 0, 'positive knockout daylight — zero clipping on the nudged seat');
 });
 
 test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden + preview)', () => {
@@ -620,18 +627,19 @@ test('Card chip honestly inherits the surface: red by attribution, preview adds 
   const html = renderCandidatesView(CONFIG_31);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
   assert.ok(html.includes('data-candidate="round-31-clasp-nudge"'), 'the nudge card renders');
-  // Whole-score card lint inherits the BRONZE surface's 9 knowns — the card
+  // Whole-score card lint inherits the BRONZE surface's 7 knowns — the card
   // is red BY ATTRIBUTION (the ticket's green-chip prediction assumed a clean
   // surface), and the nudge provably adds nothing (see the lint-equality test).
   // (The frozen card caption still says "4 known folding findings" —
-  // candidates.ts is untouched while R31 is live; the caption re-pins when
-  // the round lands. The chip reads the live 9.)
+  // candidates.ts is untouched while R31 is parked; the caption re-pins when
+  // the round lands. The chip reads the live 7 — rule A resolved the m.7/m.17
+  // pair.)
   assert.match(html, /data-candidate-count="1"/);
   assert.match(html, /data-window-count="2"/);
   assert.match(html, /data-verification="false"/, 'the preview round is decisive');
   assert.match(html, /1 candidate × 2 engraving windows/, 'the header counts honestly');
   assert.match(html, /data-lint="violations"/, 'the chip inherits the surface honestly');
-  assert.match(html, /✗ 9 violations/, 'the count is shown, never folded away (was ✗ 4)');
+  assert.match(html, /✗ 7 violations/, 'the count is shown, never folded away (was ✗ 9)');
   // Parked: badges render against the live CURRENT round (Round 32), so the
   // historical claspDotNudge delta shows without the axis class (the live
   // axis is gridPulseFilter). The axis badge itself is pinned on the

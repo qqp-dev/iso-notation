@@ -51,6 +51,7 @@ import {
 } from '../src/render/janko/linter';
 import { DEFAULT_JANKO_LINT_OPTIONS, JankoLintOptions, LintViolation } from '../src/render/janko/linter';
 import {
+  claspDotMemberAir,
   getStemGeometry,
   getSubdivisionGlyphBBox,
   subdivisionMarkCount,
@@ -503,12 +504,22 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
           Math.min(ringAir, spineAir) >= hug - 1e-9,
           `t${clasp.tick}: the dot keeps ${hug}pt from its own mark`
         );
-        // … and from every member disc the knockout would erase it with.
-        for (const n of clasp.notes) {
-          const air = Math.hypot(dot!.x - n.x, dot!.y - n.y) - tokens.noteheadRadius - r;
-          worstNeighbour = Math.min(worstNeighbour, air);
-          assert.ok(air >= hug - 1e-9, `t${clasp.tick}: the dot keeps ${hug}pt from member ${n.id}`);
-        }
+        // … and from every member's ACTUAL painted mask (ticket rule B
+        // retires the conservative virtual-4.8 disc veto: the m.1 45° seat
+        // reads −0.18pt on virtual discs while its true ink clears by
+        // +0.53pt, and a virtual overlap is not an ink collision). The bar
+        // is positive true daylight — zero visible clipping — measured by
+        // the same helper the seat search uses.
+        const memberAir = claspDotMemberAir(
+          dot!.x,
+          dot!.y,
+          clasp,
+          tokens,
+          options.clusterSpacing,
+          (options as { honorHalo?: boolean }).honorHalo
+        );
+        worstNeighbour = Math.min(worstNeighbour, memberAir);
+        assert.ok(memberAir > 0, `t${clasp.tick}: the dot's ink clears every member mask`);
       });
     }
   }
@@ -517,7 +528,12 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
   // hands at 13488. Engine rules unchanged (Bach byte-identical).
   assert.equal(dots, 18, 'the complete Brahms dotted-clasp census');
   assert.ok(worstMark >= hug - 1e-9, `worst mark daylight ${worstMark.toFixed(3)}pt`);
-  assert.ok(worstNeighbour >= hug - 1e-9, `worst neighbour daylight ${worstNeighbour.toFixed(3)}pt`);
+  // The true-masks margin, pinned: the tightest seat (tick 13488) clears by
+  // 0.466pt. Any future erosion fails here before ink ever touches.
+  assert.ok(
+    worstNeighbour >= 0.466 - 1e-3,
+    `worst true-mask daylight ${worstNeighbour.toFixed(3)}pt keeps the 0.466 margin`
+  );
 
   const report = lintJankoScore(BRAHMS, options, tokens);
   assert.equal(report.diagnostics.filter((d) => d.code === 'clasp-dot-fusion').length, 0);
