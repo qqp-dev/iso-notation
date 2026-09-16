@@ -141,11 +141,14 @@ const REST_STYLES: JankoRestStyle[] = [
 /**
  * Round 29 is judged and landed (kept as the named empty set for the
  * historical record). Round 30 is parked (kept as the named pair for the
- * historical record). Round 31 previews the clasp-dot nudge on one card.
+ * historical record). Round 31 previewed the clasp-dot nudge on one card
+ * (parked as the named singleton). Round 32 is the settled-packing grid
+ * round: two cards differing only in `gridPulseFilter`.
  */
 const ROUND_29_CARDS: string[] = [];
 const ROUND_30_CARDS: string[] = ['round-30-rings', 'round-30-double-dots'];
 const ROUND_31_CARDS: string[] = ['round-31-clasp-nudge'];
+const ROUND_32_CARDS: string[] = ['4-per-system-full-grid', '4-per-system-midpoint-grid'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -231,22 +234,38 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the Round 31 clasp-dot nudge preview (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 31);
-  assert.match(CURRENT_ROUND_METADATA.title, /Clasp-dot nudge/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge'], 'the nudge is the question');
+test('CURRENT_ROUND_METADATA is the Round 32 settled-packing grid round (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 32);
+  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'the grid is the question');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
+  assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
 });
 
-test('CURRENT_CANDIDATES is the one-card Round 31 preview set, no control', () => {
+test('CURRENT_CANDIDATES is the two-card Round 32 grid set, no control', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ROUND_31_CARDS, 'the nudge card');
-  assert.equal(CURRENT_CANDIDATES.length, 1, 'one preview card');
+  assert.deepEqual(ids, ROUND_32_CARDS, 'the grid cards');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two grid cards');
   for (const card of CURRENT_CANDIDATES) {
-    assert.equal(card.axis, 'claspDotNudge', `${card.id} declares the open axis`);
-    assert.deepEqual(card.options, { claspDotNudge: [0.4, 0.2] }, `${card.id} is preview-only delta`);
+    assert.equal(card.axis, 'gridPulseFilter', `${card.id} declares the open axis`);
+    assert.equal(card.options?.measuresPerSystem, 4, `${card.id} settles packing`);
+    assert.equal(
+      card.options?.correctPageTopAnacrusisMeasureWidth,
+      true,
+      `${card.id} carries the correction`
+    );
   }
+  assert.equal(
+    getCandidate('4-per-system-full-grid')!.options?.gridPulseFilter,
+    'all',
+    'full-grid card keeps every pulse'
+  );
+  assert.equal(
+    getCandidate('4-per-system-midpoint-grid')!.options?.gridPulseFilter,
+    'midpoint-only',
+    'midpoint card filters to the half-measure pulse'
+  );
   assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
 });
 
@@ -1905,26 +1924,26 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: one preview card, two windows, no strip
+// 17. Studio: two grid cards, eight windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the one Round 31 preview card with an honest chip', () => {
+test('The live studio renders the two Round 32 grid cards with honest chips', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
-  assert.match(html, /data-candidate-count="1"/);
-  assert.match(html, /data-window-count="2"/, 'Brahms ×2');
-  assert.match(html, /data-verification="false"/, 'the preview round is decisive');
-  assert.match(html, /Round 31/);
-  assert.match(html, /Clasp-dot nudge/, 'the preview title headlines the view');
-  for (const id of ROUND_31_CARDS) {
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /data-window-count="8"/, '2 cards × 4 Brahms windows');
+  assert.match(html, /data-verification="false"/, 'the grid round is decisive');
+  assert.match(html, /Round 32/);
+  assert.match(html, /Four per system/, 'the grid title headlines the view');
+  for (const id of ROUND_32_CARDS) {
     assert.ok(html.includes(`data-candidate="${id}"`), `${id} renders`);
   }
-  // Whole-score card lint inherits the BRONZE surface's 9 knowns (honestly
-  // red; the nudge adds 0 — proven in test/janko-round31.test.ts).
-  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 1, 'the surface chip');
+  // Whole-score card lint inherits the approved candidate-only 10 findings
+  // (honestly red on both cards — proven in test/janko-round32.test.ts).
+  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 2, 'both cards honestly red');
 });
 
-test('The closer-comparison strip is absent in the preview round', () => {
+test('The closer-comparison strip is absent in the grid round', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.equal(html, '', 'the one card carries the preview — no strip to compare');
+  assert.equal(html, '', 'the matched windows carry the comparison — no strip to compare');
 });

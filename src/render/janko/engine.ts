@@ -445,14 +445,34 @@ function renderPageFooter(geo: JankoPageGeometry, pageIndex: number, totalPages:
  * `n % systemsPerPage` on its page. This is what lets pages 2, 3, … and macro
  * crops of late measures render correctly instead of silently collapsing to an
  * empty page.
+ *
+ * Round 32 (opt-in `correctPageTopAnacrusisMeasureWidth`): slot 0 carries
+ * system 0's pickup-reduced denominator, so later page-top systems
+ * (`systemIndex > 0`, `slot === 0`) inherit a narrowed measure width with a
+ * blank tail. When the correction is enabled, those systems use the normal
+ * full-measure width (`geo.measureWidth`) instead — every vertical/slot
+ * property, staff margin and normal-system behavior is preserved; system 0
+ * keeps its pickup geometry and no-pickup scores are unchanged. The flag is
+ * read from the explicit `options` override when given, else `geo.options`.
  */
 export function getSystemGeometry(
   geo: JankoPageGeometry,
-  systemIndex: number
+  systemIndex: number,
+  options?: Partial<JankoLayoutOptions> | null
 ): JankoSystemGeometry {
   const perPage = Math.max(1, geo.systemsPerPage);
   const slot = ((systemIndex % perPage) + perPage) % perPage;
-  return geo.systems[slot];
+  const base = geo.systems[slot];
+  const correction =
+    options?.correctPageTopAnacrusisMeasureWidth ??
+    geo.options.correctPageTopAnacrusisMeasureWidth ??
+    false;
+  const anacrusis = geo.tokens.anacrusisTicks ?? 0;
+  if (!correction || anacrusis <= 0 || systemIndex <= 0 || slot !== 0) {
+    return base;
+  }
+  if (base.measureWidth === geo.measureWidth) return base;
+  return { ...base, measureWidth: geo.measureWidth };
 }
 
 /** Total horizontal systems engraved for a score. */
@@ -3960,7 +3980,7 @@ export function layoutJankoSystem(
 ): JankoSystemLayout {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
-  const geometryRaw = getSystemGeometry(geo, systemIndex);
+  const geometryRaw = getSystemGeometry(geo, systemIndex, o);
   const mps = geometryRaw.measuresPerSystem;
   const anacrusis = t.anacrusisTicks ?? 0;
   const startTick =

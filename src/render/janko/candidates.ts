@@ -224,40 +224,86 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * Round 31 previews the approved situational clasp-dot nudge — bracket dots
  * step lower-right by one uniform vector — on the two pinned white-ring dots
  * (Brahms m.1 tick 48 and its m.3 tick-432 twin). One card, one axis, no
- * control — the fixed-3 BRONZE Reference is the control.
+ * control — the fixed-3 BRONZE Reference is the control. Round 31 is parked
+ * (see the historical consts in `test/janko-round31.test.ts`).
+ *
+ * Round 32 is the settled-packing grid round on Brahms: first system pickup
+ * + four full measures (five displayed slots), later systems four full
+ * measures — the packing itself is settled, not a vote. Both cards carry the
+ * opt-in page-top anacrusis width correction on the fixed-3 core at four
+ * systems/page; the open axis is the interior grid only (existing
+ * quarter-position pulses vs midpoint-only keeping the third quarter
+ * position). The mm. 57–64 paired window exposes the known new
+ * adjacent-system overlap under investigation. Candidate-only: no canonical
+ * promotion, no Reference change.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 31,
-  title: 'Clasp-dot nudge: a little lower and to the right',
+  round: 32,
+  title: 'Four per system + midpoint-only grid',
   description:
-    'The approved situational nudge, previewed before any flip: every bracket-attached augmentation dot steps lower-right by the uniform vector (+0.4pt, +0.2pt) while every note dot stays byte-identical. The card frames the two pinned white-ring dots — the Brahms m.1 tick-48 dot and its m.3 tick-432 twin — which move identically; the Reference BRONZE Brahms is the standing control.',
-  openAxes: ['claspDotNudge'],
+    'Settled packing — first system pickup + four full measures (five displayed slots), later systems four full measures — under the opt-in page-top width correction on the fixed-3 core at four systems/page. The question is the interior grid only: the existing quarter-position pulses versus midpoint-only keeping the third quarter position and removing the second and fourth, measure boundaries untouched. The mm. 57–64 paired window exposes the known new adjacent-system overlap under investigation; no canonical promotion. The broader density-aware grid rule stays open.',
+  openAxes: ['gridPulseFilter'],
 };
 
 /**
- * Round 31: one preview card on the single `claspDotNudge` axis (Brahms ×2 —
- * both literal corpus windows, every claim proofread against the real engine
- * and pinned in `test/janko-round31.test.ts`). The tick-432 twin sits at the
- * m.3 downbeat (48 + 2·192), so the second window is mm. 2–3, not m. 4.
+ * Round 32: two cards on the single `gridPulseFilter` axis (Brahms ×4 —
+ * literal corpus windows, every claim proofread against the real engine and
+ * pinned in `test/janko-round32.test.ts`). Both cards share the settled
+ * four-per-system packing plus the opt-in page-top correction and differ
+ * only in the interior grid. Window 1 (mm. 1–4) shows five displayed slots
+ * (pickup + four full measures); window 4 (mm. 57–64) spans the two adjacent
+ * systems carrying the known new overlap.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'round-31-clasp-nudge',
-    label: 'Clasp dot lower-right',
+    id: '4-per-system-full-grid',
+    label: 'Four per system · full grid',
     description:
-      'Bracket dots step (+0.4pt, +0.2pt) — the approved situational nudge, uniform across clasp dots. The m.1 white-ring dot and its m.3 twin move identically; note dots are byte-identical. Adds no new findings: the card inherits the BRONZE surface\u2019s 4 known folding findings.',
-    axis: 'claspDotNudge',
-    options: { claspDotNudge: [0.4, 0.2] },
+      'Settled 4-per-system packing with the page-top correction and the existing interior quarter-position grid (second, third and fourth positions). Carries the approved candidate-only findings including the known mm. 57–64 adjacent-system overlap under investigation; no canonical promotion.',
+    axis: 'gridPulseFilter',
+    options: {
+      measuresPerSystem: 4,
+      correctPageTopAnacrusisMeasureWidth: true,
+      gridPulseFilter: 'all',
+    },
     windows: [
       brahmsWindow(
         1,
-        2,
-        'Brahms mm. 1–2 · the m.1 white-ring dot steps (+0.4pt, +0.2pt) lower-right'
+        4,
+        'Brahms pickup + mm. 1–4 · five displayed slots (upbeat + four full measures)'
       ),
+      brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
+      brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
       brahmsWindow(
-        2,
-        2,
-        'Brahms mm. 2–3 · the m.3 downbeat twin steps the identical (+0.4pt, +0.2pt)'
+        57,
+        8,
+        'Brahms mm. 57–64 · paired systems exposing the known new adjacent-system overlap under investigation'
+      ),
+    ],
+  },
+  {
+    id: '4-per-system-midpoint-grid',
+    label: 'Four per system · midpoint-only grid',
+    description:
+      'Same settled packing and page-top correction; interior grid keeps only the third quarter position (half-measure offset), removing the second and fourth. Measure boundaries untouched. Carries the same approved candidate-only findings including the known mm. 57–64 overlap; no canonical promotion.',
+    axis: 'gridPulseFilter',
+    options: {
+      measuresPerSystem: 4,
+      correctPageTopAnacrusisMeasureWidth: true,
+      gridPulseFilter: 'midpoint-only',
+    },
+    windows: [
+      brahmsWindow(
+        1,
+        4,
+        'Brahms pickup + mm. 1–4 · five displayed slots (upbeat + four full measures)'
+      ),
+      brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
+      brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
+      brahmsWindow(
+        57,
+        8,
+        'Brahms mm. 57–64 · paired systems exposing the known new adjacent-system overlap under investigation'
       ),
     ],
   },

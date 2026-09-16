@@ -326,6 +326,15 @@ export function resolveBeatPulseXs(
       ? anacrusis + m * t.ticksPerMeasure
       : anacrusis + (systemIndex * o.measuresPerSystem + m) * t.ticksPerMeasure;
     for (let b = 1; b < beatsPerMeasure; b++) {
+      // Round 32 `midpoint-only`: a filter over the existing candidates —
+      // retain the pulse iff its tick offset is exactly half a measure.
+      // Odd subdivisions with no existing midpoint retain nothing here.
+      if (
+        o.gridPulseFilter === 'midpoint-only' &&
+        b * t.ticksPerBeat * 2 !== t.ticksPerMeasure
+      ) {
+        continue;
+      }
       const tick = measureStartTick + b * t.ticksPerBeat;
       xs.push(columns?.get(tick) ?? measureLeft + left + (b / beatsPerMeasure) * available);
     }

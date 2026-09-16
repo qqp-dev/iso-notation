@@ -458,14 +458,14 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 31 clasp-dot nudge preview, one card, one open axis', () => {
-  // Ordered contract change: Round 31 previews the situational clasp-dot
-  // nudge on one card (clasp nudge) with the Reference as control. Round 30
-  // is parked (historical consts in test/janko-round30.test.ts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 31);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge'], 'one open axis');
+test('§F registry: round 32 settled-packing grid round, two cards, one open axis', () => {
+  // Ordered contract change: Round 32 compares the interior beat grid on
+  // Brahms — two cards on the single gridPulseFilter axis with the Reference
+  // as control. Rounds 30–31 are parked (historical consts).
+  assert.equal(CURRENT_ROUND_METADATA.round, 32);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['round-31-clasp-nudge'], 'the one preview card');
+  assert.deepEqual(ids, ['4-per-system-full-grid', '4-per-system-midpoint-grid'], 'the grid cards');
 });
 
 // ---------------------------------------------------------------------------
