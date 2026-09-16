@@ -3,6 +3,8 @@ import path from "node:path";
 import { QuantizedGridScore } from "../model/types";
 import { parseMidiToScore } from "../model/midi";
 import { detectHandCrossings } from "../model/grid";
+import { applyWrittenDurations } from "./brahms-source-fidelity";
+import writtenDurationsFixture from "./data/brahms-op118-no1-written-durations.json";
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -117,12 +119,25 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
 
   const totalTicks = BRAHMS_OP118_NO1_TOTAL_TICKS;
 
-  const notes = parsed.notes
+  const midiNotes = parsed.notes
     .filter((n) => n.startTick < totalTicks)
     .map((n, idx) => ({
       ...n,
       id: `brahms-op118-no1-${idx + 1}`,
     }));
+
+  // Written-duration overlay (source-fidelity milestone): validated bijection
+  // on (pitchClass, octave, startTick, hand); durationTicks only. No fallback
+  // to performance durations — any mismatch throws. Hand follows the
+  // MIDI-track baseline (staff destination); voice identity lives in
+  // provenance for future intent work. See data/sources/brahms-op118-no1/.
+  if ((writtenDurationsFixture as { version?: number }).version !== 1) {
+    throw new Error('Brahms written durations: fixture version mismatch (want 1) — refusing overlay');
+  }
+  const notes = applyWrittenDurations(
+    midiNotes,
+    (writtenDurationsFixture as { durations: { pitchClass: number; octave: number; startTick: number; hand: 'RH' | 'LH'; durationTicks: number }[] }).durations
+  );
 
   // One barline per measure opening plus the score's closing boundary. The
   // final measure is 144 ticks long (the piece's own closing bar), so the last

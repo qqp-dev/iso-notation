@@ -1,0 +1,171 @@
+{
+  "description": "Independent normalizer fixture: tie chain vs reattack, cross-voice unison (max), tieWaitForNote gap. Hand-computed expectations below (not exporter self-match).",
+  "evidence": [
+    {
+      "voice": "rightHandUpper",
+      "segments": [
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 0,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 2,
+          "semi": 0,
+          "hasTie": true,
+          "file": "includes/test.ily",
+          "line": 10,
+          "col": 1,
+          "bar": 1,
+          "tieWait": false
+        },
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 1,
+          "onsetDen": 2,
+          "durNum": 1,
+          "durDen": 2,
+          "semi": 0,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 11,
+          "col": 1,
+          "bar": 1,
+          "tieWait": false
+        },
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 1,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 4,
+          "semi": 0,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 12,
+          "col": 1,
+          "bar": 2,
+          "tieWait": false
+        }
+      ],
+      "ties": [{ "onsetNum": 0, "onsetDen": 1 }]
+    },
+    {
+      "voice": "rightHandLower",
+      "segments": [
+        {
+          "voice": "rightHandLower",
+          "staff": "upper",
+          "onsetNum": 0,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 4,
+          "semi": 0,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 20,
+          "col": 1,
+          "bar": 1,
+          "tieWait": false
+        }
+      ],
+      "ties": []
+    },
+    {
+      "voice": "leftHandLower",
+      "segments": [
+        {
+          "voice": "leftHandLower",
+          "staff": "lower",
+          "onsetNum": 0,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 8,
+          "semi": -15,
+          "hasTie": true,
+          "file": "includes/test.ily",
+          "line": 30,
+          "col": 1,
+          "bar": 1,
+          "tieWait": true
+        },
+        {
+          "voice": "leftHandLower",
+          "staff": "lower",
+          "onsetNum": 1,
+          "onsetDen": 8,
+          "durNum": 1,
+          "durDen": 4,
+          "semi": -10,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 30,
+          "col": 10,
+          "bar": 1,
+          "tieWait": true
+        },
+        {
+          "voice": "leftHandLower",
+          "staff": "lower",
+          "onsetNum": 3,
+          "onsetDen": 8,
+          "durNum": 1,
+          "durDen": 2,
+          "semi": -15,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 30,
+          "col": 20,
+          "bar": 1,
+          "tieWait": true
+        }
+      ],
+      "ties": [{ "onsetNum": 0, "onsetDen": 1 }]
+    },
+    {
+      "voice": "leftHandUpper",
+      "segments": [],
+      "ties": []
+    }
+  ],
+  "expected": [
+    {
+      "pitchClass": 9,
+      "octave": 2,
+      "startTick": 0,
+      "hand": "LH",
+      "durationTicks": 168,
+      "segmentLines": [30, 30],
+      "unison": false
+    },
+    {
+      "pitchClass": 0,
+      "octave": 4,
+      "startTick": 0,
+      "hand": "RH",
+      "durationTicks": 192,
+      "segmentLines": [20, 10, 11],
+      "unison": true
+    },
+    {
+      "pitchClass": 2,
+      "octave": 3,
+      "startTick": 24,
+      "hand": "LH",
+      "durationTicks": 48,
+      "segmentLines": [30],
+      "unison": false
+    },
+    {
+      "pitchClass": 0,
+      "octave": 4,
+      "startTick": 192,
+      "hand": "RH",
+      "durationTicks": 48,
+      "segmentLines": [12],
+      "unison": false
+    }
+  ]
+}

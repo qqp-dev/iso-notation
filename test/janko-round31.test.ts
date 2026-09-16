@@ -89,9 +89,16 @@ const O_PREVIEW = resolveJankoOptions({
 });
 const CONFIG = createStudioConfig({ score: BACH });
 
-/** Every dotted bracket under the fixed-3 golden (the 12-dot census). */
+/**
+ * Every dotted bracket under the fixed-3 golden (the 18-dot census).
+ * Source correction (fixture 964) restores six dotted brackets whose
+ * durations were shortened below dotted values (e.g. 126←144 dotted halves
+ * at 3888/4656/7728/8496, final 144 chord ×2 hands at 13488); engine rules
+ * unchanged (Bach byte-identical).
+ */
 const DOTTED_CLASP_TICKS = [
-  48, 432, 1584, 1968, 2352, 3504, 5520, 5808, 7344, 9360, 9648, 12720,
+  48, 432, 1584, 1968, 2352, 3504, 3888, 4656, 5520, 5808, 7344, 7728, 8496, 9360, 9648,
+  12720, 13488, 13488,
 ];
 
 const read = (file: string): string => fs.readFileSync(path.join(REPO_ROOT, file), 'utf-8');
@@ -285,7 +292,7 @@ test('Both pinned instances move by exactly (+0.4pt, +0.2pt)', () => {
   }
 });
 
-test('Score census: exactly the 12 bracket dots move; the clasp set is stable', () => {
+test('Score census: exactly the 18 bracket dots move; the clasp set is stable', () => {
   const golden = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const preview = layoutJankoScore(BRAHMS, O_PREVIEW, T_BRAHMS);
   const dottedTicks = (layouts: typeof golden): number[] =>
@@ -303,7 +310,7 @@ test('Score census: exactly the 12 bracket dots move; the clasp set is stable', 
       .sort((a, b) => a - b);
   assert.deepEqual(allTicks(preview), allTicks(golden), 'the 74-bracket fit never flips');
   assert.equal(allTicks(golden).length, 74, '74 brackets (non-vacuous)');
-  // Every moved dot moves by the vector exactly — the uniform rule, all 12.
+  // Every moved dot moves by the vector exactly — the uniform rule, all 18.
   for (const tick of DOTTED_CLASP_TICKS) {
     const g = golden.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
     const p = preview.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
@@ -334,7 +341,7 @@ test('No other ink moves: every note-dot seat is identical (1914 fields)', () =>
   assert.ok(compared > 1000, `${compared} resolved note-dot fields compared (non-vacuous)`);
 });
 
-test('Page census: note-dot multisets identical, exactly 12 clasp dots move', () => {
+test('Page census: note-dot multisets identical, exactly 18 clasp dots move', () => {
   let augTotal = 0;
   let movedTotal = 0;
   for (let page = 0; page < 6; page++) {
@@ -365,7 +372,7 @@ test('Page census: note-dot multisets identical, exactly 12 clasp dots move', ()
     }
   }
   assert.equal(augTotal, 0, 'Brahms paints no golden note dots anywhere (stated for the record)');
-  assert.equal(movedTotal, 12, 'exactly the 12 bracket dots move, spread-wide');
+  assert.equal(movedTotal, 18, 'exactly the 18 bracket dots move, spread-wide');
 });
 
 test('Window census: each card window shows exactly its dot moved, visibly, nothing else', () => {
@@ -502,7 +509,7 @@ test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden
     }
     const totalNotes = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS).flatMap((s) => s.notes).length;
     assert.equal(rects, totalNotes, `${label}: one knockout rect per positioned note (non-vacuous)`);
-    assert.equal(dots, 12, `${label}: all 12 dots audited`);
+    assert.equal(dots, 18, `${label}: all 18 dots audited`);
   }
 });
 

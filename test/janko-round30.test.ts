@@ -349,42 +349,26 @@ test('resolveClaspInk reads bracket dots from the notated value (complete)', () 
   assert.deepEqual(resolveClaspInk({ centerY: 0, durationTicks: 144 }).dots, 1, 'golden: dotted halves dot');
 });
 
-test('claspSecondDotCenter continues the escape with the house hug on all three airs', () => {
+test('claspSecondDotCenter: no double-dotted brackets remain in source-correct Brahms', () => {
+  // Source correction eliminated all 42/84/336 brackets (shortened quarters/
+  // halves); the m.25 bracket at tick 4800 now carries a standard 48-tick
+  // quarter (fixture: all tick-4800 notes 48, provenance lines 65/132/215/287)
+  // with no second dot under either grammar. Second-dot positioning logic
+  // stays covered by the synthetic
+  // resolveClaspInk unit test above (42/84/336 → 2 dots) and the historical
+  // record; engine rules unchanged (Bach byte-identical).
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   const clasp = layouts.flatMap((s) => s.clasps).find((c) => c.tick === 4800)!;
-  assert.equal(clasp.durationTicks, 42, 'the m. 25 double-dotted-8th bracket');
-  const ink = clasp.durationInk[0];
-  assert.equal(ink.dots, 2);
-  const [first] = clasp.durationDots;
-  const [second] = clasp.durationSecondDots;
-  assert.ok(first && second, 'both dots resolved');
-  const r = T_BRAHMS.augmentationDotRadius;
-  const hug = T_BRAHMS.augmentationDotGap;
-  // All three airs the solver promises (and the linter audits).
+  assert.equal(clasp.durationTicks, 48, 'm.25 bracket corrected 42→48 (standard quarter)');
   assert.ok(
-    Math.hypot(second.x - first.x, second.y - first.y) - 2 * r >= hug - 1e-9,
-    'sibling hug'
+    clasp.durationSecondDots.every((d) => d === null),
+    'no second dot under the preview'
   );
-  assert.ok(claspMarkDaylight(clasp, ink, second.x, second.y, T_BRAHMS) >= hug - 1e-9, 'mark hug');
-  for (const n of clasp.notes) {
-    assert.ok(
-      Math.hypot(second.x - n.x, second.y - n.y) - T_BRAHMS.noteheadRadius - r >= hug - 1e-9,
-      `member-disc hug (${n.id})`
-    );
-  }
-  // Further along the escape: right of the first dot first.
-  assert.ok(second.x > first.x, 'the pair reads left-to-right');
-  // The painted pair counts honestly and the ink box rides both dots.
-  const painted = renderClaspGroup([clasp], [], T_BRAHMS);
-  assert.equal((painted.match(/janko-clasp-dot/g) ?? []).length, 2, 'two painted dots');
-  assert.match(painted, /data-dot="2"/, 'the second dot is tagged');
-  const box = claspInkBox(clasp, T_BRAHMS);
-  assert.ok(box.x1 >= second.x + r - 1e-9 && box.y0 <= second.y - r + 1e-9, 'box rides dot 2');
-  // Golden: the same bracket carries no dots at all.
+  const withSecond = layouts.flatMap((s) => s.clasps).filter((c) => c.durationSecondDots.some(Boolean));
+  assert.equal(withSecond.length, 0, 'zero double-dotted brackets in corrected Brahms');
   const goldenLayouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const goldenClasp = goldenLayouts.flatMap((s) => s.clasps).find((c) => c.tick === 4800)!;
   assert.equal(goldenClasp.durationInk[0].dots, 0, 'golden: undotted');
-  assert.equal((renderClaspGroup([goldenClasp], [], T_BRAHMS).match(/janko-clasp-dot/g) ?? []).length, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -392,53 +376,43 @@ test('claspSecondDotCenter continues the escape with the house hug on all three 
 // ---------------------------------------------------------------------------
 
 type Num = number;
-/** Lone halves gain one stem ring (bare → ring). */
-const RING_96: Num[] = [321, 607];
-/** Lone dotted halves gain one stem ring plus their dot. */
-const RING_DOT_144: Num[] = [332, 618];
-/** Lone double-dotted quarters gain two dots (bare → 2 dots). */
-const DOTS2_84: Num[] = [
-  290, 368, 375, 383, 390, 407, 414, 545, 576, 654, 661, 669, 676, 693, 700, 840, 849, 934,
-];
-/** Lone double-dotted 8ths gain a flag plus two dots (bare → 1 flag + 2 dots). */
-const FLAG_DOTS2_42: Num[] = [
-  14, 36, 54, 59, 69, 74, 86, 92, 93, 111, 135, 134, 149, 171, 189, 194, 204, 209, 221, 227,
-  228, 246, 270, 269, 283, 285, 326, 341, 433, 456, 461, 466, 488, 520, 536, 556, 555, 569,
-  571, 612, 627, 719, 742, 747, 752, 774, 806, 822, 838, 847, 856, 955,
-];
-/** Dotted 16ths gain their dot plus the second flag level. */
-const DOT_LVL_18: Num[] = [953, 954];
 /**
- * Notes drawing a double-dotted 16th gain two dots plus the second flag
- * level — 43 own-21s (incl. the merged unison voices 900/902/908/910, whose
- * heads are merged away but whose stems paint) plus the vertical carriers
- * 319 and 605, which own 24 ticks but draw their group's 21.
+ * Source-correct durations (fixture 964, LilyPond written values) re-baseline
+ * the Round-30 census: playback shortenings (42←48 quarters, 84←96 halves,
+ * 18/21←24 eighths, 336←? ) are eliminated; the preview now differs from
+ * golden only on standard dotted/half values that gain preview rings/dots.
+ * Engine rules unchanged (Bach byte-identical, zero engine diff); new pins
+ * follow from corrected input (e.g. ID 5: 168→192 whole; IDs 953/954: 18→24).
  */
-const DOTS2_LVL_21: Num[] = [
-  22, 44, 61, 76, 94, 157, 179, 196, 211, 229, 289, 299, 319, 336, 337, 338, 339, 340, 345,
-  355, 406, 441, 470, 472, 575, 585, 605, 622, 623, 624, 625, 626, 631, 641, 692, 727, 756,
-  758, 881, 889, 898, 900, 902, 908, 910,
+// Lone halves (96) gain one stem ring (bare → ring). Old 84s (shortened 96s)
+// corrected to 96 join the two historical lone halves (321, 607) plus 553.
+const RING_96: Num[] = [
+  290, 321, 368, 375, 383, 390, 407, 414, 545, 553, 576, 607, 654, 661, 669, 676, 693, 700,
+  840, 849, 934,
 ];
-/** Beamed [24 + 21] pairs: the 21 gains a level-2 stub plus two dots (×37). */
-const BEAMED_21_PAIRS: Array<[Num, Num]> = [
-  [84, 85], [110, 112], [219, 220], [245, 247], [308, 310], [328, 331], [365, 367], [364, 366],
-  [380, 382], [379, 381], [394, 396], [395, 397], [403, 404], [418, 420], [419, 421], [487, 489],
-  [502, 504], [519, 521], [535, 537], [594, 596], [614, 617], [651, 653], [650, 652], [666, 668],
-  [665, 667], [680, 682], [681, 683], [689, 690], [704, 706], [705, 707], [773, 775], [788, 790],
-  [805, 807], [821, 823], [837, 839], [855, 857], [936, 937],
-];
-/** The beamed [24 + 18] pair: the 18 gains a level-2 stub plus its dot. */
-const BEAMED_18_PAIR: [Num, Num] = [956, 957];
-/** Brackets carrying a double-dotted value gain two dots (42 ×14, 84 ×5, 336 ×1). */
-const DOUBLE_DOT_CLASPS: Array<[tick: Num, carried: Num]> = [
-  [912, 42], [1104, 42], [1200, 84], [1392, 84], [2832, 42], [3024, 42], [3120, 84], [3312, 84],
-  [3840, 42], [4032, 42], [4800, 42], [6672, 42], [6864, 42], [7680, 42], [7872, 42], [8640, 42],
-  [10512, 42], [10704, 42], [12624, 84], [13104, 336],
-];
+// Lone dotted halves (144) gain one stem ring plus their dot. Historical pair
+// (332, 618) plus ten more lone 144s now that shortenings are corrected.
+const RING_DOT_144: Num[] = [16, 38, 151, 173, 332, 435, 543, 618, 721, 903, 904, 911];
+// Lone double-dotted halves (168, legitimate hidden-8th + dotted-half ties)
+// gain two dots plus one ring. The 8 source-anchored 168s (e.g. tick 216:
+// lines 268+269; tick 12360: line 320 tieWait gap).
+const DOTS2_168: Num[] = [15, 37, 150, 172, 434, 720, 901, 909];
+// Lone dotted quarters (72) gain their dot. Two newly in-grammar 72s
+// (previously out-of-grammar 63s, byte-identical under both grammars).
+const DOT_72: Num[] = [554, 899];
+// Eliminated playback-artifact categories (no 42/84/18/21 in corrected source):
+// DOTS2_84 (18×84←96), FLAG_DOTS2_42 (52×42←48), DOT_LVL_18 (953/954: 18→24),
+// DOTS2_LVL_21 (45×21←24) — all now standard values with no preview delta.
+/** Beamed pairs: none (no 21/18 members remain; all beamed 24s identical). */
+const BEAMED_21_PAIRS: Array<[Num, Num]> = [];
+/** The beamed [24 + 18] pair: eliminated (956/957 now 24+24, no delta). */
+const BEAMED_18_PAIR: [Num, Num] | null = null;
+/** Brackets carrying double-dotted values: none (no 42/84/336 brackets remain). */
+const DOUBLE_DOT_CLASPS: Array<[tick: Num, carried: Num]> = [];
 
 const id = (n: Num): string => `brahms-op118-no1-${n}`;
 
-test('Census: the changed singles are exactly the pinned id sets (121 notes)', () => {
+test('Census: the changed singles are exactly the pinned id sets (43 notes)', () => {
   const golden = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const preview = layoutJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   const changed = new Map<string, string>();
@@ -477,11 +451,9 @@ test('Census: the changed singles are exactly the pinned id sets (121 notes)', (
   const expect = new Map<string, string>();
   for (const n of RING_96) expect.set(id(n), '0d/1r');
   for (const n of RING_DOT_144) expect.set(id(n), '1d/1r');
-  for (const n of DOTS2_84) expect.set(id(n), '2d/0r');
-  for (const n of FLAG_DOTS2_42) expect.set(id(n), '2d/0r');
-  for (const n of DOT_LVL_18) expect.set(id(n), '1d/0r');
-  for (const n of DOTS2_LVL_21) expect.set(id(n), '2d/0r');
-  assert.equal(changed.size, 121, '121 changed singles, no more, no fewer');
+  for (const n of DOTS2_168) expect.set(id(n), '2d/1r');
+  for (const n of DOT_72) expect.set(id(n), '1d/0r');
+  assert.equal(changed.size, 43, '43 changed singles, no more, no fewer');
   assert.deepEqual(
     [...changed.keys()].sort(),
     [...expect.keys()].sort(),
@@ -492,7 +464,7 @@ test('Census: the changed singles are exactly the pinned id sets (121 notes)', (
   }
 });
 
-test('Census: 38 beam groups gain level-2 stubs and member dots, nothing else', () => {
+test('Census: no beam groups change (all beamed 24s identical)', () => {
   const golden = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const preview = layoutJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   const key = (b: { notes: JankoRhythmNote[] }): string =>
@@ -509,11 +481,14 @@ test('Census: 38 beam groups gain level-2 stubs and member dots, nothing else', 
       if (gSvg !== pSvg) changed.push(k);
     }
   }
-  const expect = [
+  // Source-correct 24-tick beamed eighths (no 21/18 shortenings remain).
+  const expect: string[] = [
     ...BEAMED_21_PAIRS.map(([a, b]) => [id(a), id(b)].sort().join(',')),
-    [id(BEAMED_18_PAIR[0]), id(BEAMED_18_PAIR[1])].sort().join(','),
+    ...(BEAMED_18_PAIR
+      ? [[id(BEAMED_18_PAIR[0]), id(BEAMED_18_PAIR[1])].sort().join(',')]
+      : []),
   ].sort();
-  assert.deepEqual(changed.sort(), expect, 'exactly the 38 dotted-member groups change');
+  assert.deepEqual(changed.sort(), expect, 'no beamed groups change under corrected durations');
   // Every changed group gains its level-2 stub (single-note run → one stub).
   for (const k of changed) {
     const sys = preview.flatMap((s) => s.beams).find((b) => key(b) === k)!;
@@ -522,7 +497,7 @@ test('Census: 38 beam groups gain level-2 stubs and member dots, nothing else', 
   }
 });
 
-test('Census: 20 brackets gain two dots each (42 ×14, 84 ×5, 336 ×1)', () => {
+test('Census: no brackets gain two dots (no double-dotted brackets in source)', () => {
   const golden = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const preview = layoutJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   const gSet = golden.flatMap((s) => s.clasps.map((c) => `${c.tick}:${c.durationTicks}`)).sort();
@@ -533,11 +508,9 @@ test('Census: 20 brackets gain two dots each (42 ×14, 84 ×5, 336 ×1)', () => 
     .filter((c) => c.durationSecondDots.some(Boolean))
     .map((c) => [c.tick, c.durationTicks] as [number, number])
     .sort((a, b) => a[0] - b[0]);
-  assert.deepEqual(
-    dotted,
-    DOUBLE_DOT_CLASPS,
-    'exactly the double-dotted-carrying brackets dot twice'
-  );
+  // Source-correct durations carry no 42/84/336 brackets (all corrected to
+  // standard 48/96/144); double-dots survive only on singles (168s).
+  assert.deepEqual(dotted, DOUBLE_DOT_CLASPS, 'no bracket carries a double-dotted value');
   for (const [tick] of DOUBLE_DOT_CLASPS) {
     const clasp = preview.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
     const painted = renderClaspGroup([clasp], [], T_BRAHMS);
@@ -547,12 +520,11 @@ test('Census: 20 brackets gain two dots each (42 ×14, 84 ×5, 336 ×1)', () => 
       `bracket @${tick} paints its pair`
     );
   }
-  // The unified 84-carrying brackets (@4848, @8688) show their per-hand 96
-  // open ring and NO dots under both grammars — the carried value is not an
-  // ink group there, so there is nothing to dot twice.
+  // The unified brackets (@4848, @8688) now carry standard 96 (corrected from
+  // shortened 84) and show their per-hand ring with no second dot.
   for (const tick of [4848, 8688]) {
     const clasp = preview.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
-    assert.equal(clasp.durationTicks, 84, `@${tick} carries 84`);
+    assert.equal(clasp.durationTicks, 96, `@${tick} carries corrected 96 (was shortened 84)`);
     assert.ok(
       clasp.durationSecondDots.every((d) => d === null),
       `@${tick} paints no second dot under the preview`
@@ -866,9 +838,12 @@ test('Proofread captions: every window title counts what the engine paints (hist
       if (inBrahms(c.tick, 44, 45) && c.durationSecondDots.some(Boolean)) framedBrackets.push(c.tick);
     }
   }
-  assert.deepEqual([...framed21].sort((a, b) => a - b), [617, 622, 623, 624, 625, 626, 631], '7 21s');
-  assert.deepEqual([...framed42].sort((a, b) => a - b), [612, 627], '2 42s');
-  assert.deepEqual(framedBrackets, [8640], 'the 42-bracket — no Card B needed');
+  // Source correction eliminated all 21/42 playback shortenings (24←21 eighths,
+  // 48←42 quarters); historical titles above preserve the pre-correction
+  // record verbatim, while the engine now paints zero of each in mm. 44–45.
+  assert.deepEqual([...framed21].sort((a, b) => a - b), [], '0 21s (corrected to 24)');
+  assert.deepEqual([...framed42].sort((a, b) => a - b), [], '0 42s (corrected to 48)');
+  assert.deepEqual(framedBrackets, [], 'no double-dotted bracket (all 42-brackets corrected)');
   // Bach m. 20: the tied 108 is the only long, and it keeps its bare stem.
   const bach = layoutJankoScore(BACH, O_BACH_PREVIEW, T_BACH);
   const longs = bach

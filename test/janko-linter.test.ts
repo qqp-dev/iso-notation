@@ -1783,9 +1783,12 @@ const BRAHMS_PREVIEW_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 
 test('dot-collision names a fused single second dot (sibling air)', () => {
   const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
-  const sys = layouts.find((s) => s.notes.some((p) => p.note.id === 'brahms-op118-no1-336'))!;
-  const victim = sys.notes.find((p) => p.note.id === 'brahms-op118-no1-336')!;
-  assert.ok(victim.rhythm.dot2X !== undefined, 'the 21 resolves a second dot');
+  // Source correction eliminated all 21s (ID 336 now a standard 24 eighth);
+  // the double-dotted audit now uses a legitimate 168 (ID 15, hidden-8th +
+  // dotted-half tie, lines 268+269) which resolves two dots under preview.
+  const sys = layouts.find((s) => s.notes.some((p) => p.note.id === 'brahms-op118-no1-15'))!;
+  const victim = sys.notes.find((p) => p.note.id === 'brahms-op118-no1-15')!;
+  assert.ok(victim.rhythm.dot2X !== undefined, 'the 168 resolves a second dot');
   // Fuse the pair: park the second dot exactly on the first.
   victim.rhythm.dot2X = victim.rhythm.dotX;
   victim.rhythm.dot2Y = victim.rhythm.dotY;
@@ -1799,11 +1802,17 @@ test('dot-collision names a fused single second dot (sibling air)', () => {
 
 test('clasp-dot-fusion names a fused bracket second dot (mark + sibling airs)', () => {
   const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
-  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 4800))!;
-  const clasp = sys.clasps.find((c) => c.tick === 4800)!;
-  assert.ok(clasp.durationSecondDots[0], 'the 42-bracket resolves a second dot');
-  // Fuse the pair onto the mark centre: both the sibling air and the mark
-  // hug collapse.
+  // No double-dotted brackets remain in source-correct Brahms (all 42/84/336
+  // corrected to standard values); synthesize the second dot on the real
+  // single-dot tick-48 bracket (144 dotted half) to prove the fusion audit
+  // still catches a collapsed pair. Engine rules unchanged.
+  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 48))!;
+  const clasp = sys.clasps.find((c) => c.tick === 48)!;
+  assert.ok(clasp.durationDots[0], 'the 144-bracket resolves its first dot');
+  assert.ok(!clasp.durationSecondDots[0], 'and no second dot (single-dot source value)');
+  // Synthesize a double-dotted bracket: claim two dots, resolve the second,
+  // then fuse the pair onto the first (sibling air collapses to zero).
+  clasp.durationInk[0].dots = 2;
   clasp.durationSecondDots[0] = { ...clasp.durationDots[0]! };
   const out: LintViolation[] = [];
   checkClaspDotFusion(sys, BRAHMS_PREVIEW_TOKENS, DEFAULT_JANKO_LINT_OPTIONS, out, BRAHMS_PREVIEW);
@@ -1813,9 +1822,10 @@ test('clasp-dot-fusion names a fused bracket second dot (mark + sibling airs)', 
 
 test('dot-count-agreement names a bracket resolved without the active grammar', () => {
   const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
-  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 4800))!;
-  const clasp = sys.clasps.find((c) => c.tick === 4800)!;
+  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 48))!;
+  const clasp = sys.clasps.find((c) => c.tick === 48)!;
   // Simulate a forgotten call site: golden ink (undotted) under preview.
+  // Tick 48 carries a source-correct 144 dotted half (was 42-bracket pre-fix).
   clasp.durationInk[0].dots = 0;
   clasp.durationInk[0].dotted = false;
   clasp.durationDots[0] = null;
@@ -1826,10 +1836,10 @@ test('dot-count-agreement names a bracket resolved without the active grammar', 
     out.some(
       (v) =>
         v.code === 'dot-count-agreement' &&
-        v.message.includes('carries 42 ticks') &&
+        v.message.includes('carries 144 ticks') &&
         v.message.includes('paints 0')
     ),
-    'the undotted 42-bracket is named'
+    'the undotted 144-bracket is named'
   );
 });
 
@@ -1840,7 +1850,10 @@ test('dot-count-agreement names a beamed member the bracket would double-dot', (
   const member = beam.notes.find((n) => n.id === 'brahms-op118-no1-331')!;
   // Simulate the future hazard: a dotted beamed member joins a bracket, so
   // the bracket owns its duration but the beam still paints grammar dots.
+  // Source correction left no dotted beamed members (all beamed 24s); the
+  // hazard is synthesized with a 21 double-dotted member to prove the check.
   assert.ok(sys.clasps.length > 0, 'the system carries real brackets');
+  (member as { durationTicks: number }).durationTicks = 21;
   sys.clasps.push({ ...sys.clasps[0], tick: member.startTick, durationTicks: 21, notes: [member] });
   const out: LintViolation[] = [];
   checkDotCountAgreement(sys, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS, out);

@@ -1426,11 +1426,15 @@ test('Phrase rows: the showcase rests seat their ink centroid on a phrase row �
       ticks: [24, 216, 408, 600, 768],
     },
     {
-      label: 'Brahms m. 68',
+      // Source correction filled the false m.68 rest (t13092 was a 12-tick gap
+      // from shortened 96→84 halves at tick 13008, now full 96 to 13104);
+      // the showcase now uses the genuine m.66 rest (t12528 LH 24, between
+      // tieWait chains ending/starting at 12528/12552, lines 320–321).
+      label: 'Brahms m. 2',
       score: BRAHMS,
       options: { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const },
       tokens: BRAHMS_OP118_NO1_JANKO_TOKENS,
-      ticks: [13092],
+      ticks: [384],
     },
   ] as const;
   for (const style of REST_STYLES) {
@@ -1858,15 +1862,16 @@ test('Every dialect renders every window with zero rest diagnostics and every re
       );
     }
   }
-  // The real-world anchor carries a genuine rest.
+  // The real-world anchor carries a genuine rest (m.66 t12528; the m.68
+  // t13092 rest was a false 12-tick gap from shortened halves, now filled).
   const brahmsRests = allRests(
     BRAHMS,
     BRAHMS_OP118_NO1_JANKO_OPTIONS,
     BRAHMS_OP118_NO1_JANKO_TOKENS
   );
   assert.ok(
-    brahmsRests.some((r) => r.tick >= 13056 && r.tick < 13248),
-    'Brahms m. 68 writes a genuine rest'
+    brahmsRests.some((r) => r.tick >= 12528 && r.tick < 12720),
+    'Brahms m. 66 writes a genuine rest'
   );
 });
 
