@@ -512,7 +512,10 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
       });
     }
   }
-  assert.equal(dots, 12, 'the complete Brahms dotted-clasp census');
+  // Source correction restored six dotted brackets (18 total, was 12): shortened
+  // 126←144 dotted halves at 3888/4656/7728/8496 plus the final 144 chord ×2
+  // hands at 13488. Engine rules unchanged (Bach byte-identical).
+  assert.equal(dots, 18, 'the complete Brahms dotted-clasp census');
   assert.ok(worstMark >= hug - 1e-9, `worst mark daylight ${worstMark.toFixed(3)}pt`);
   assert.ok(worstNeighbour >= hug - 1e-9, `worst neighbour daylight ${worstNeighbour.toFixed(3)}pt`);
 

@@ -1,4 +1,4 @@
-Attribution: Brahms Op. 118 No. 1 MIDI (vendored)
+Attribution: Brahms Op. 118 No. 1 MIDI (vendored) + LilyPond source + derived fixture
 
 File: public/midi/brahms-op118-no1.mid (md5 5c2b0188364e0cb2cdd894fb12bf7241)
 Source: Knute Snortum, ksnortum/brahms-opus-118, v0.1 (2026-04-17),
@@ -6,8 +6,18 @@ commit b792764e004ece0498ff7fc736ab9ed7bcf44b68
 (https://github.com/ksnortum/brahms-opus-118) — transcribed from the
 Peters/Sauer edition scan (cf. docs/reference/brahms-op118-peters-sauer-edition.pdf).
 
-"Knute Snortum, 2026, CC BY-SA 4.0" — this MIDI is licensed under the
-Creative Commons Attribution-ShareAlike 4.0 International License.
+Vendored source (original bytes preserved): data/sources/brahms-op118-no1/
+includes/intermezzo-op118-no1-parts.ily (14032 bytes,
+md5 9d794386719fc1198890aa233c2b6c6a,
+git blob 4ddaa2bde06f050c556e603706b5422eecd3783f) plus
+includes/global-variables.ily and includes/spline-sandwitch.ily (pins in
+data/sources/brahms-op118-no1/manifest.json).
+Derived fixture: src/scores/data/brahms-op118-no1-written-durations.json
+(+ .provenance.json), exported via LilyPond's parser from the pinned source.
+
+"Knute Snortum, 2026, CC BY-SA 4.0" — the MIDI, vendored source and derived
+fixture are licensed under the Creative Commons Attribution-ShareAlike 4.0
+International License.
 License: https://creativecommons.org/licenses/by-sa/4.0/
 Upstream asks users to attribute the work to Knute Snortum
 (https://github.com/ksnortum/).

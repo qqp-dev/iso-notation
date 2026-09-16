@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "exporterVersion": 1,
+  "upstream": {
+    "repo": "https://github.com/ksnortum/brahms-opus-118",
+    "commit": "b792764e004ece0498ff7fc736ab9ed7bcf44b68",
+    "attribution": "Knute Snortum, 2026, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)",
+    "licenseFile": "licenses/CC-BY-SA-4.0-Snortum-Brahms-Op118.txt"
+  },
+  "compiler": {
+    "name": "GNU LilyPond",
+    "testedVersion": "2.26.0",
+    "testedGuile": "3.0",
+    "witnessDeclaredVersion": "2.24",
+    "binaryEnvVar": "LILYPOND_BIN",
+    "defaultBinary": "lilypond",
+    "notes": "Witness declares 2.24; export verified on 2.26.0 (forward-compatible parser for durations/onsets/origins/ties). 2.24.3 hangs in this container (see README). Procedure accepts any 2.24+ compiler path; actual version is recorded in fixture provenance."
+  },
+  "sources": [
+    {
+      "path": "includes/intermezzo-op118-no1-parts.ily",
+      "bytes": 14032,
+      "md5": "9d794386719fc1198890aa233c2b6c6a",
+      "sha256": "d8783f90c417aa94e653fd73d03f9502cbc3c0fdde4b9365583443eb95dc5553",
+      "gitBlob": "4ddaa2bde06f050c556e603706b5422eecd3783f"
+    },
+    {
+      "path": "includes/global-variables.ily",
+      "bytes": 7244,
+      "md5": "1df224156711ade8c00dbb0674f78470",
+      "sha256": "f73f87d011ed9d8c454bbfdd97a9726ed1a34e1d6bf6a14830085e365905b086",
+      "gitBlob": "0b12c121ea6d2af5458aa77b5e61151a62dafbb8"
+    },
+    {
+      "path": "includes/spline-sandwitch.ily",
+      "bytes": 12643,
+      "md5": "ca804415449e49d01dd22fe6629df522",
+      "sha256": "8353bd8be61b1672be5549c6c42802ba852ab594165662ebb693620dab31e138",
+      "gitBlob": "554b0d5dbd3a4a3689250d58babbabe14ae66e40"
+    }
+  ]
+}

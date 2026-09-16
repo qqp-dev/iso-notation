@@ -1,0 +1,112 @@
+{
+  "description": "Partial chord-wide tie: 2-note chord with stream tie, only top continues adjacently; bottom separates (matching LilyPond MIDI).",
+  "evidence": [
+    {
+      "voice": "rightHandUpper",
+      "segments": [
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 0,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 2,
+          "semi": 0,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 5,
+          "col": 1,
+          "bar": 1,
+          "tieWait": false
+        },
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 0,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 2,
+          "semi": 4,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 5,
+          "col": 5,
+          "bar": 1,
+          "tieWait": false
+        },
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 1,
+          "onsetDen": 2,
+          "durNum": 1,
+          "durDen": 8,
+          "semi": 4,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 5,
+          "col": 15,
+          "bar": 1,
+          "tieWait": false
+        },
+        {
+          "voice": "rightHandUpper",
+          "staff": "upper",
+          "onsetNum": 1,
+          "onsetDen": 1,
+          "durNum": 1,
+          "durDen": 8,
+          "semi": 0,
+          "hasTie": false,
+          "file": "includes/test.ily",
+          "line": 6,
+          "col": 1,
+          "bar": 2,
+          "tieWait": false
+        }
+      ],
+      "ties": [{ "onsetNum": 0, "onsetDen": 1 }]
+    },
+    {
+      "voice": "rightHandLower",
+      "segments": [],
+      "ties": []
+    },
+    {
+      "voice": "leftHandUpper",
+      "segments": [],
+      "ties": []
+    },
+    {
+      "voice": "leftHandLower",
+      "segments": [],
+      "ties": []
+    }
+  ],
+  "expected": [
+    {
+      "pitchClass": 0,
+      "octave": 4,
+      "startTick": 0,
+      "hand": "RH",
+      "durationTicks": 96,
+      "segmentCount": 1
+    },
+    {
+      "pitchClass": 4,
+      "octave": 4,
+      "startTick": 0,
+      "hand": "RH",
+      "durationTicks": 120,
+      "segmentCount": 2
+    },
+    {
+      "pitchClass": 0,
+      "octave": 4,
+      "startTick": 192,
+      "hand": "RH",
+      "durationTicks": 24,
+      "segmentCount": 1
+    }
+  ]
+}

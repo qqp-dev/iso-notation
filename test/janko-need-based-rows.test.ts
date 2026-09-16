@@ -504,7 +504,10 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   assert.equal(Number(rest552.y.toFixed(1)), 179.5, 'Rest y pinned at 179.5');
   assert.ok(Math.abs(rest552.y - 179.48625) < 0.01, 'Rest seats at exactly 179.48625');
 
-  // Hanging rest counts: Bach 9, Brahms 94
+  // Hanging rest counts: Bach 9 (frozen), Brahms 20 (was 94 pre-correction).
+  // Source correction filled 74 false hanging rests opened by playback
+  // shortenings (e.g. the m.68 t13092 12-tick gap from 96→84 halves, now full
+  // 96; staccato 24→18 gaps, now abutting). Engine rules unchanged.
   const bachHanging = bachLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
   assert.equal(bachHanging.length, 9, 'Bach hanging-rest count holds at exactly 9');
 
@@ -512,7 +515,7 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   const brahmsTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const brahmsLayouts = layoutJankoScore(BRAHMS, brahmsOpts, brahmsTokens);
   const brahmsHanging = brahmsLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
-  assert.equal(brahmsHanging.length, 94, 'Brahms hanging-rest count holds at exactly 94');
+  assert.equal(brahmsHanging.length, 20, 'Brahms hanging-rest count holds at exactly 20');
 
   // Unwritten rest count across Bach and Brahms: 0
   const bachUnwritten = bachLayouts.flatMap((s) => s.unwrittenRests ?? []);
@@ -579,9 +582,9 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   console.log(
     `[Voice-Height Rest Displacement Stats]\n` +
     `  Bach: ${bachHanging.length} hanging rests, ${bachMovedCount} vertical moves (expected <= 8), max dy = ${bachDyMax.toFixed(2)}pt, mean dy = ${(bachDySum / bachHanging.length).toFixed(2)}pt, max dx = 0.000\n` +
-    `  Brahms: ${brahmsHanging.length} hanging rests, ${brahmsMovedCount} vertical moves (expected ~90), max dy = ${brahmsDyMax.toFixed(2)}pt, mean dy = ${(brahmsDySum / brahmsHanging.length).toFixed(2)}pt, max dx = 0.000`
+    `  Brahms: ${brahmsHanging.length} hanging rests, ${brahmsMovedCount} vertical moves (expected ~18; was ~90 pre-correction with 94 hanging), max dy = ${brahmsDyMax.toFixed(2)}pt, mean dy = ${(brahmsDySum / brahmsHanging.length).toFixed(2)}pt, max dx = 0.000`
   );
   assert.ok(bachMovedCount <= 8, `Bach vertical moves ${bachMovedCount} <= 8`);
-  assert.ok(brahmsMovedCount >= 80 && brahmsMovedCount <= 94, `Brahms vertical moves ${brahmsMovedCount} ~90`);
+  assert.ok(brahmsMovedCount >= 15 && brahmsMovedCount <= 20, `Brahms vertical moves ${brahmsMovedCount} ~18`);
 });
 
