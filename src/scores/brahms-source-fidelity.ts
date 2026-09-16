@@ -138,10 +138,14 @@ interface WorkingSeg extends BrahmsRawSegment {
  * Normalize raw LilyPond evidence to written durations.
  *
  * Pure and deterministic. Throws with actionable diagnostics on dangling /
- * ambiguous / noncontiguous ties (except documented partial-tie and
- * tieWaitForNote behaviour), duplicate keys, unknown voices/staves,
- * fractional ticks or missing correspondence. Cross-voice unisons collapse
- * to max (sounding) duration.
+ * ambiguous / noncontiguous explicit note-specific ties, duplicate keys,
+ * unknown voices/staves, fractional ticks or missing correspondence.
+ * Chord-wide partial ties leave unmatched tones untied per LilyPond source
+ * semantics (https://lilypond.org/doc/v2.26/Documentation/notation/writing-rhythms#ties):
+ * only matching pitches of the immediately following adjacent event connect;
+ * unmatched tones are legitimate reattacks, independent of later recurrence.
+ * Explicit tieWaitForNote gaps merge to the next same-pitch segment.
+ * Cross-voice unisons collapse to max (sounding) duration.
  */
 export function normalizeWrittenDurations(
   evidence: BrahmsRawVoiceEvidence[]
@@ -218,7 +222,14 @@ export function normalizeWrittenDurations(
     // Explicit tie-forward per segment: per-note flags plus stream ties.
     // Single-note `e~`: flag + one stream tie. Chord-wide `<..>~`: zero
     // flags + exactly one stream tie. Per-note chord `<a~ ..>`: flags only.
+    // `tieForward` is the raw outgoing declaration (provenance truth);
+    // `tieKind` preserves the declaration kind for fail-closed resolution:
+    // chord-wide ties connect only matching pitches of the immediately
+    // following adjacent event (LilyPond source semantics), while explicit
+    // note-specific ties require an eligible continuation.
+    type BrahmsTieKind = 'none' | 'note' | 'chord';
     const tieForward = new Map<WorkingSeg, boolean>();
+    const tieKind = new Map<WorkingSeg, BrahmsTieKind>();
     for (const [tick, grp] of byOnset) {
       const rk = `${grp[0].onsetNum}/${grp[0].onsetDen}`;
       for (const s of grp) {
@@ -240,6 +251,7 @@ export function normalizeWrittenDurations(
       if (hasCount > 0 && tieCount > 0) {
         if (grp.length === 1 && hasCount === 1 && tieCount === 1) {
           tieForward.set(grp[0], true);
+          tieKind.set(grp[0], 'note');
         } else {
           throw new Error(
             `Brahms source fidelity: ${where} has ambiguous tie evidence ` +
@@ -248,7 +260,10 @@ export function normalizeWrittenDurations(
           );
         }
       } else if (hasCount > 0) {
-        for (const s of grp) tieForward.set(s, s.hasTie);
+        for (const s of grp) {
+          tieForward.set(s, s.hasTie);
+          tieKind.set(s, s.hasTie ? 'note' : 'none');
+        }
       } else if (tieCount > 0) {
         if (tieCount !== 1) {
           throw new Error(
@@ -256,9 +271,18 @@ export function normalizeWrittenDurations(
               `${grp.length} notes — chord-wide tie must carry exactly one; refusing to guess`
           );
         }
-        for (const s of grp) tieForward.set(s, true);
+        for (const s of grp) {
+          tieForward.set(s, true);
+          // A lone single-note stream tie is still an explicit tie on that
+          // pitch (no partial-continuation concept); only multi-note
+          // chord-wide declarations leave unmatched tones legitimately untied.
+          tieKind.set(s, grp.length === 1 ? 'note' : 'chord');
+        }
       } else {
-        for (const s of grp) tieForward.set(s, false);
+        for (const s of grp) {
+          tieForward.set(s, false);
+          tieKind.set(s, 'none');
+        }
       }
     }
 
@@ -312,6 +336,7 @@ export function normalizeWrittenDurations(
             cur = [s];
             curEnd = s.endTick;
           } else {
+            const kind = tieKind.get(prev)!;
             const prevIdx = onsetIndex.get(prev.onsetTick)!;
             const curIdx = onsetIndex.get(s.onsetTick)!;
             const isImmediate = curIdx === prevIdx + 1;
@@ -324,10 +349,21 @@ export function normalizeWrittenDurations(
               // duration spans the gap to the next same-pitch segment.
               cur.push(s);
               curEnd = s.endTick;
+            } else if (kind === 'note') {
+              // Explicit note-specific tie with no eligible continuation:
+              // fail closed rather than silently flushing into a reattack.
+              throw new Error(
+                `Brahms source fidelity: voice ${ev.voice} MIDI ${midi} explicit note-specific tie ` +
+                  `at ${prev.file}:${prev.line}:${prev.col} tick ${prev.onsetTick} has no eligible same-pitch ` +
+                  `continuation (next same-pitch tick ${s.onsetTick} at ${s.file}:${s.line}:${s.col}; ` +
+                  `immediate=${isImmediate} adjacent=${adjacent} tieWait=false) — refusing to silently reattack`
+              );
             } else {
               // Chord-wide partial tie with no adjacent same-pitch
               // successor (e.g. `<chord>2~` into arpeggiated eighths):
-              // keep separate, matching LilyPond MIDI behaviour.
+              // unmatched tones stay untied per LilyPond source semantics
+              // (only matching pitches of the next event connect), not an
+              // error — independent of any later recurrence.
               flush();
               cur = [s];
               curEnd = s.endTick;
@@ -336,10 +372,16 @@ export function normalizeWrittenDurations(
         }
         if (i === lst.length - 1) {
           if (tieForward.get(s)!) {
-            throw new Error(
-              `Brahms source fidelity: voice ${ev.voice} MIDI ${midi} line ${s.line} ` +
-                `tick ${s.onsetTick} carries a tie with no following same-pitch segment — dangling tie`
-            );
+            const kind = tieKind.get(s)!;
+            if (kind === 'note') {
+              throw new Error(
+                `Brahms source fidelity: voice ${ev.voice} MIDI ${midi} ${s.file}:${s.line}:${s.col} ` +
+                  `tick ${s.onsetTick} carries an explicit note-specific tie with no following same-pitch segment — dangling tie`
+              );
+            }
+            // Chord-wide unmatched final tone: legitimately untied per
+            // LilyPond source semantics (no matching successor); the later
+            // recurrence of an unrelated pitch must not decide validity.
           }
           flush();
         }

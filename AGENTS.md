@@ -76,6 +76,12 @@ Design review happens **exclusively on the live website** — never by sending t
 - **Declarative Candidate Registry**: `src/render/janko/candidates.ts` is the *only* file to touch when opening a round. `CURRENT_ROUND_METADATA` holds the round number/title/question, `CURRENT_CANDIDATES` holds the variants as 5-line option deltas against `DEFAULT_JANKO_OPTIONS`. The studio template never changes. Never invent separate HTML viewers or script files for candidate reviews.
 - **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`** for the primary Bach Goldberg Var. 1 engraving, plus the Brahms Op. 118 No. 1 golden (`BRAHMS_OP118_NO1_JANKO_OPTIONS` + adaptive core, as the lint CLI measures it). The Reference view always carries both spreads: Bach first, Brahms (`brahms-op118-no1`) beside it with its own pages, macro crops and lint diagnostics.
 - **Brahms is a first-class iteration surface**: rounds window it by measure via `brahmsWindow()` in the candidate registry, literal corpus measures first (synthetic only when no literal passage can demonstrate the question, caption says so).
+- **Visual hand-off field (mandatory)**: every implementer/reviewer hand-off supplies `Visual impact: affected / not affected / uncertain` with a brief evidence-based explanation.
+  - When affected, give the existing real-studio URL, affected score/view, and verified representative measures/windows or other inspection cues (e.g. `http://100.102.70.49:5175/janko.html#reference`, BRONZE Brahms reference). Use Tailscale or GitHub Pages; never invent a viewer/URL.
+  - The architect relays the link and cues to the operator without waiting to be asked.
+  - Distinguish landed/currently served output from unlanded or unverified deployment; never imply operator visual acceptance.
+  - If impact/locations are not cheaply known, surface the uncertainty and obtain bounded real-engine/linter evidence rather than guessing or making mockups/images.
+  - For nonvisual changes say so explicitly; no artificial need for generated visuals.
 
 ---
 
