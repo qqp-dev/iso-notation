@@ -48,16 +48,14 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   ...DEFAULT_JANKO_OPTIONS,
   ticksPerMeasure: BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   anacrusisTicks: BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
-  measuresPerSystem: 3,
-  // Operator override (4-up forced): Brahms ships at 4 systems/page — 24
-  // systems over 6 pages — with the fit breakage RECORDED as known-accepted,
-  // never fixed here. Adaptive carries 2 slot findings (sys 23 furniture
-  // +1.41pt past its slot; sys 24 ink into sys 23, gap −16.83pt — the CLI
-  // gate is red-on-Brahms by operator order); fixed-3 carries its 4 folding
-  // findings plus 5 slot-accounting findings (BRONZE chip reads 9, no visual
-  // ink overlap). Full itemization: the §2-landed record in
-  // test/brahms-studio-ergonomics.test.ts. The fix pass is directed from
-  // the eyeball review afterwards.
+  // Canonical packing (judged): settled four-per-system — first system the
+  // 48-tick pickup plus four full 192-tick measures, later systems four full
+  // measures, including subsequent-page tops — on the fixed-3 core at four
+  // systems/page (18 systems over 5 pages). Full interior quarter-position
+  // grid (Round 33 judged: full grid selected, no comparison).
+  measuresPerSystem: 4,
+  correctPageTopAnacrusisMeasureWidth: true,
+  gridPulseFilter: 'all',
   systemsPerPage: 4,
   // Title block (operator order — composer right-only, title fits): no
   // composer prefix up top (it duplicated the right-aligned composer on

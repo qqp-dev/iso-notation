@@ -8,26 +8,17 @@
  *  2. Brahms four systems per page — LANDED BY OPERATOR OVERRIDE (see below).
  *  3. Title block: composer right-only, title fits, Bach frozen (hash).
  *
- * Section 2 record (LANDED 4-up — the operator overrode the fit gate:
- * "We'll fix the problems after I see them"). Brahms lays out as 24
- * systems (71 measures: (13632 − 48) / 192 = 70.75 → 71; ceil(71 / 3)
- * = 24) over 6 pages (ceil(24 / 4)). The page slot is 183.97pt (body
- * 735.89 / 4) and the breakage below ships RECORDED as known-accepted,
- * fixed NEVER here — the fix pass is directed from the eyeball review:
- *  - adaptive (the CLI gate — RED by operator order): 2 `system-slot-
- *    overlap` findings. System 23's furniture runs +1.41pt past its
- *    slot bottom, and REAL full-ink overlap — system 24's ink reaches
- *    y=621.62 into system 23's beam ink (bottom y=638.44), gap
- *    −16.83pt. `lint:engraving --strict` red-on-Brahms is expected.
- *  - fixed-3 (the studio surface): 9 findings, ZERO visual ink overlap
- *    (no same-page pair collides — proven by the absence of the
- *    ink-overlap flavor): the 4 known folding findings (sys 3, 6, 8,
- *    15 — sites unchanged from 3-up) plus 5 slot-accounting findings
- *    (sys 2 bottom +2.01, sys 6 bottom +2.01, sys 11 top +4.41, sys 18
- *    top +4.41, sys 21 top +9.41). The BRONZE chip reads 9.
- * The pins below record the arithmetic (with proof), the itemized
- * breakage, the single-source surfaces agreement, and the slot-0
- * anacrusis mechanism (10 systems re-resolve X — measured, not fixed).
+ * Section 2 record (CANONICAL 4-per-system — judged when Round 33 closed:
+ * the full grid is selected, the packing/correction/refinements promoted).
+ * Brahms lays out as 18 systems (first system the 48-tick pickup plus four
+ * full 192-tick measures, later systems four full measures — 71 measures:
+ * (13632 − 48) / 192 = 70.75 → 71; 1 + ceil(67 / 4) = 18) over 5 pages
+ * (ceil(18 / 4)). The page slot is 183.97pt (body 735.89 / 4). The
+ * canonical fixed-3 surface is CLEAN (zero violations, zero warnings);
+ * the CLI adaptive entry is the secondary surface (see the lint record
+ * below). The pins record the arithmetic (with proof), the lint record,
+ * the single-source surfaces agreement, and the page-top correction
+ * (only system 0 engraves narrow).
  */
 
 import { test } from 'node:test';
@@ -108,7 +99,7 @@ test('Bach carries no focus crops; Brahms crops unchanged in content', () => {
   assert.equal(brahmsCrops.length, 3, 'Brahms keeps its three macro crops');
   assert.deepEqual(
     BRAHMS_STUDIO_CROPS.map((c) => c.title),
-    ['mm. 1–2 · Upbeat and downbeat', 'mm. 5–6 · First fold', 'mm. 7–8 · Chords and the first known finding'],
+    ['mm. 1–2 · Upbeat and downbeat', 'mm. 5–6 · First fold', 'mm. 7–8 · Five-voice chords'],
     'Brahms crop content unchanged (crops frame measures, not pages — 4-up needs no re-aim)'
   );
   for (const crop of BRAHMS_STUDIO_CROPS) {
@@ -124,7 +115,7 @@ test('Bach carries no focus crops; Brahms crops unchanged in content', () => {
 // 2. Pagination: 4-up LANDED (operator override) — arithmetic with proof
 // ---------------------------------------------------------------------------
 
-test('Brahms pagination arithmetic: 71 measures → 24 systems → 6 pages at 4-up', () => {
+test('Brahms pagination arithmetic: 71 measures → 18 systems → 5 pages canonical', () => {
   // The measure count from the MIDI's own ticks (upbeat + 70 full cut-time
   // measures + the closing 144-tick measure = 71 × 192 = 13632).
   assert.equal(BRAHMS_OP118_NO1_TOTAL_TICKS, 13632);
@@ -135,8 +126,13 @@ test('Brahms pagination arithmetic: 71 measures → 24 systems → 6 pages at 4-
     71,
     '(13632 − 48) / 192 = 70.75 → 71 measures'
   );
-  assert.equal(O_BRAHMS.measuresPerSystem, 3);
-  assert.equal(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS), 24, 'ceil(71 / 3) = 24 systems');
+  // Canonical packing (judged): first system pickup + mm. 1–4, later systems
+  // four full measures, the page-top correction on, full grid.
+  assert.equal(O_BRAHMS.measuresPerSystem, 4);
+  assert.equal(O_BRAHMS.correctPageTopAnacrusisMeasureWidth, true);
+  assert.equal(O_BRAHMS.gridPulseFilter, 'all');
+  assert.equal(O_BRAHMS.core, 'fixed-3', 'the fixed-3 core stays canonical');
+  assert.equal(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS), 18, '1 + ceil(67 / 4) = 18 systems');
   // The page-slot proof: every body-height component, then the quotient.
   assert.equal(O_BRAHMS.pageHeight, 841.89, 'A4 height');
   assert.equal(O_BRAHMS.pageMarginTop, 30);
@@ -145,125 +141,48 @@ test('Brahms pagination arithmetic: 71 measures → 24 systems → 6 pages at 4-
   assert.equal(O_BRAHMS.footerHeight, 14);
   const geo = computePageGeometry(O_BRAHMS, T_BRAHMS, BRAHMS);
   assert.equal(geo.bodyHeight.toFixed(2), '735.89', '841.89 − 30 − 14 − 48 − 14 = 735.89');
-  assert.equal(O_BRAHMS.systemsPerPage, 4, '4-up landed by operator override (was 3)');
+  assert.equal(O_BRAHMS.systemsPerPage, 4, 'four systems per page');
   assert.equal(geo.slotHeight.toFixed(2), '183.97', '735.89 / 4 = 183.97');
-  assert.equal(Math.ceil(24 / O_BRAHMS.systemsPerPage), 6, '24 systems at 4-up = 6 pages');
-  assert.equal(countJankoPages(BRAHMS, O_BRAHMS, T_BRAHMS), 6, 'the engine pages 6 (ceil(71 / 12))');
-  assert.deepEqual(createStudioConfig().brahmsPages, [0, 1, 2, 3, 4, 5], 'the studio spreads 6');
+  assert.equal(Math.ceil(18 / O_BRAHMS.systemsPerPage), 5, '18 systems at 4-up = 5 pages');
+  assert.equal(countJankoPages(BRAHMS, O_BRAHMS, T_BRAHMS), 5, 'the engine pages 5');
+  assert.deepEqual(createStudioConfig().brahmsPages, [0, 1, 2, 3, 4], 'the studio spreads 5');
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
-  assert.equal(brahms.match(/data-page="/g)?.length ?? 0, 6, 'the Reference spread shows all 6 Brahms pages');
+  assert.equal(brahms.match(/data-page="/g)?.length ?? 0, 5, 'the Reference spread shows all 5 Brahms pages');
+  // First system: the 48-tick pickup plus four full 192-tick measures.
+  const s0 = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS)[0];
+  const s0ticks = s0.notes.map((p) => p.note.startTick);
+  assert.equal(Math.min(...s0ticks), 0, 'system 1 opens on the pickup (tick 0)');
+  assert.ok(Math.max(...s0ticks) < 48 + 4 * 192, 'system 1 closes inside mm. 1–4');
+  assert.ok(Math.max(...s0ticks) >= 48 + 3 * 192, 'system 1 reaches m. 4');
 });
 
-test('Brahms §2-landed record: adaptive 2 + fixed-3 7, itemized, m7/m17 resolved', () => {
-  // The operator-accepted breakage, every item with proof. If ANY assertion
-  // flips, the fit picture changed — re-measure §2, do not re-pin blindly.
-  // Rule A (lowest-inward full slots, no tuck) genuinely resolves the m.7/m.17
-  // stem grazes (both rode the retired midpoint tuck at half a slot); the
-  // m.24/m.44 pair and all 5 slot findings survive byte-identical. The
-  // adaptive sys-24 top re-measures 621.62 → 610.42: the tick-13488 shared
-  // carrier moves to the main-column upper head (964), whose stem stands 30pt
-  // higher — same overlap, honest new extent.
-  // --- Adaptive = the CLI gate configuration, spread exactly as the script does.
-  const adaptive = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
-  const cli = lintJankoScore(BRAHMS, adaptive, T_BRAHMS);
-  assert.equal(cli.ok, false, 'red-on-Brahms is the expected, operator-accepted state');
-  assert.equal(cli.warnings.length, 0, 'zero warnings');
-  assert.equal(cli.violations.length, 2, 'exactly the two accepted slot findings (was 0/0 at 3-up)');
-  const [fit23, overlap24] = cli.violations;
-  assert.equal(fit23.code, 'system-slot-overlap');
-  assert.equal(fit23.system, 22, 'system 23 (0-based 22)');
-  assert.equal(
-    fit23.message,
-    "System 23's staff furniture spans y=[452.54, 630.32], outside its 183.97pt page slot " +
-      '[445.94, 629.92] (1.00pt clearance).'
-  );
-  const m23 = fit23.metrics!;
-  assert.ok(m23.inkTop >= m23.slotTop + m23.required, 'sys 23: top edge clears its slot');
-  assert.equal(
-    (m23.inkBottom - (m23.slotBottom - m23.required)).toFixed(2),
-    '1.41',
-    'sys 23: bottom-side deficit +1.41pt (metrics-exact; the 2dp message rounds to 1.40)'
-  );
-  assert.equal(overlap24.code, 'system-slot-overlap');
-  assert.equal(overlap24.system, 23, 'system 24 (0-based 23)');
-  assert.equal(
-    overlap24.message,
-    "System 24's ink reaches up to y=610.42, into system 23's ink (bottom y=638.44): " +
-      'the two systems overlap on the page.'
-  );
-  assert.equal(
-    (overlap24.metrics!.lowerTop - overlap24.metrics!.upperBottom).toFixed(2),
-    '-28.03',
-    'sys 24 stem ink into sys 23 beam ink: gap −28.03pt (re-measured live; carrier to 964)'
-  );
-  // --- Fixed-3 = the studio surface: the itemized 7, zero visual ink overlap.
+test('Brahms canonical lint record: fixed-3 clean; adaptive secondary disclosed', () => {
+  // Canonical fixed-3 (the live Reference surface): zero violations, zero
+  // warnings. The §5 geometry pass clears the settled findings genuinely
+  // (rigid whole-system positioning from complete ink bounds, corrected
+  // shared slot fitting, exact rhythmic ink) — nothing suppressed.
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(studio.ok, false, 'the BRONZE surface is honestly not-ok');
-  assert.equal(studio.warnings.length, 0, 'zero warnings');
-  assert.equal(studio.violations.length, 7, 'the BRONZE chip reads 7 (was 9: m7/m17 resolved by full slots)');
-  const folding = studio.violations.filter((v) => v.code === 'stem-through-simultaneity');
-  const slots = studio.violations.filter((v) => v.code === 'system-slot-overlap');
-  assert.equal(folding.length, 2, 'm24/m44 survive; m7/m17 resolved by full-slot separation');
-  assert.deepEqual(
-    folding.map((v) => v.system + 1),
-    [8, 15],
-    'surviving folding sites (m24 sys8, m44 sys15)'
-  );
-  assert.deepEqual(
-    folding.map((v) => v.measure),
-    [24, 44],
-    'surviving folding measures'
-  );
-  assert.equal(slots.length, 5, 'the 5 accepted slot-accounting findings');
-  for (const v of slots) {
-    assert.match(v.message, /staff furniture spans/, `sys ${v.system + 1}: accounting flavor`);
-    assert.ok(
-      !/overlap on the page/.test(v.message),
-      `sys ${v.system + 1}: no ink-overlap flavor — nothing visibly collides`
-    );
-  }
-  const expected: Array<[number, 'top' | 'bottom', string]> = [
-    [2, 'bottom', '2.01'],
-    [6, 'bottom', '2.01'],
-    [11, 'top', '4.41'],
-    [18, 'top', '4.41'],
-    [21, 'top', '9.41'],
-  ];
-  for (const [sys, side, deficit] of expected) {
-    const v = slots.find((s) => s.system + 1 === sys)!;
-    assert.ok(v, `system ${sys} slot finding recorded`);
-    const m = v.metrics!;
-    const topDeficit = m.slotTop + m.required - m.inkTop;
-    const botDeficit = m.inkBottom - (m.slotBottom - m.required);
-    if (side === 'top') {
-      assert.ok(botDeficit <= 0, `sys ${sys}: bottom edge clears its slot`);
-      assert.equal(topDeficit.toFixed(2), deficit, `sys ${sys}: top-side deficit +${deficit}pt`);
-    } else {
-      assert.ok(topDeficit <= 0, `sys ${sys}: top edge clears its slot`);
-      assert.equal(botDeficit.toFixed(2), deficit, `sys ${sys}: bottom-side deficit +${deficit}pt`);
-    }
-  }
-  assert.deepEqual(
-    slots.map((v) => v.message),
-    [
-      "System 2's staff furniture spans y=[276.06, 446.96], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
-      "System 6's staff furniture spans y=[293.56, 446.96], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
-      "System 11's staff furniture spans y=[442.53, 615.93], outside its 183.97pt page slot [445.94, 629.92] (1.00pt clearance).",
-      "System 18's staff furniture spans y=[258.56, 421.96], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
-      "System 21's staff furniture spans y=[69.59, 237.99], outside its 183.97pt page slot [78.00, 261.97] (1.00pt clearance).",
-    ],
-    'the exact fixed-3 slot list the operator sees in Diagnostics'
-  );
-  // --- The chip reads the itemized 7 (was 9: m7/m17 resolved).
+  assert.equal(studio.violations.length, 0, 'canonical fixed-3: zero violations');
+  assert.equal(studio.warnings.length, 0, 'canonical fixed-3: zero warnings');
+  assert.equal(studio.ok, true, 'the BRONZE surface is honestly ok');
+  // The chip reads the clean count; diagnostics carry the ok line.
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
-  assert.match(brahms, /✗ 7 violations/, 'the BRONZE chip reads the itemized 7');
-  assert.match(brahms, /<summary>Diagnostics \(7\)<\/summary>/, 'all 7 listed, none hidden');
+  assert.match(brahms, /✓ zero violations/, 'the BRONZE chip reads clean');
+  // --- Adaptive = the CLI secondary surface. Its residual (if any) must be
+  // same-class pre-existing with demonstrated no-worsening — pinned live in
+  // the round-33 suite's adaptive record, never assumed here.
+  const adaptive = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
+  const cli = lintJankoScore(BRAHMS, adaptive, T_BRAHMS);
+  assert.equal(cli.warnings.length, 0, 'adaptive: zero warnings');
   assert.ok(
-    !brahms.includes('known-note') && !brahms.includes('known-finding'),
-    'mixed codes degrade honestly: no known tags (they return when the fix pass clears the slot findings)'
+    cli.violations.length <= 2,
+    `adaptive: at most the pre-existing residual (now ${cli.violations.length})`
   );
+  for (const v of cli.violations) {
+    assert.equal(v.code, 'system-slot-overlap', 'adaptive residual stays same-class');
+  }
 });
 
 test('Brahms pagination has one source of truth; every surface agrees', () => {
@@ -284,7 +203,7 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
   assert.equal(
     countJankoPages(BRAHMS, O_BRAHMS, T_BRAHMS),
     config.brahmsPages.length,
-    'engine and studio page counts agree (6)'
+    'engine and studio page counts agree (5)'
   );
   assert.equal(O_BRAHMS.systemsPerPage, 4);
   // Sheet + print never consume Brahms pagination, so there is nothing to
@@ -304,7 +223,7 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
   );
 });
 
-test('Brahms option diff is pagination/meter/title-data only — rows/ink/grammar identical', () => {
+test('Brahms option diff is pagination/meter/grid/title-data only — rows/ink/grammar identical', () => {
   const brahms = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const allowed = new Set([
@@ -312,6 +231,7 @@ test('Brahms option diff is pagination/meter/title-data only — rows/ink/gramma
     'anacrusisTicks',
     'measuresPerSystem',
     'systemsPerPage',
+    'correctPageTopAnacrusisMeasureWidth',
     'title',
     'subtitle',
     'composer',
@@ -333,101 +253,53 @@ test('Brahms option diff is pagination/meter/title-data only — rows/ink/gramma
   }
 });
 
-test('Reference completeness: Brahms systems 1–24 each render exactly once across the 6-page spread', () => {
+test('Reference completeness: Brahms systems 1–18 each render exactly once across the 5-page spread', () => {
   const seen = new Map<number, number>();
   const perPage: number[] = [];
-  for (let page = 0; page < 6; page++) {
+  for (let page = 0; page < 5; page++) {
     const svg = renderJankoPage(BRAHMS, page, O_BRAHMS, T_BRAHMS);
     const ids = [...svg.matchAll(/id="system-(\d+)"/g)].map((m) => Number(m[1]));
     perPage.push(ids.length);
-    assert.match(svg, new RegExp(`Page ${page + 1} of 6`), `page ${page + 1} footer counts 6`);
+    assert.match(svg, new RegExp(`Page ${page + 1} of 5`), `page ${page + 1} footer counts 5`);
     for (const n of ids) {
       seen.set(n, (seen.get(n) ?? 0) + 1);
     }
   }
-  assert.deepEqual(perPage, [4, 4, 4, 4, 4, 4], '4 systems on every page (was 3 × 8)');
-  assert.equal(seen.size, 24, 'all 24 systems render somewhere');
-  for (let n = 1; n <= 24; n++) {
+  assert.deepEqual(perPage, [4, 4, 4, 4, 2], '4 systems per page, the last page holds 2');
+  assert.equal(seen.size, 18, 'all 18 systems render somewhere');
+  for (let n = 1; n <= 18; n++) {
     assert.equal(seen.get(n), 1, `system ${n} renders exactly once`);
   }
 });
 
-test('Slot-0 anacrusis mechanism: 10 systems re-resolve X at 4-up (measured, not fixed)', () => {
-  // Pre-existing engine behavior in every computePageGeometry branch: the
-  // anacrusis-narrowed measureWidth (staffWidth / 3.25) applies to SLOT 0,
-  // not SYSTEM 0 — whichever systems land in slot 0 engrave narrow. The
-  // flip moves the narrow set; the 10 systems whose slot-0 membership
-  // changed re-resolve X as a pure measure-width scaling. Recorded for the
-  // eyeball pass; re-scoping to system 0 is the fix pass's call, not this
-  // ticket's (ZERO fixes).
-  const o3 = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, systemsPerPage: 3 });
-  const g3 = computePageGeometry(o3, T_BRAHMS, BRAHMS);
-  const g4 = computePageGeometry(O_BRAHMS, T_BRAHMS, BRAHMS);
-  const narrowOf = (g: ReturnType<typeof computePageGeometry>): number[] => {
-    const out: number[] = [];
-    for (let s = 0; s < 24; s++) {
-      if (getSystemGeometry(g, s).measureWidth < 181) out.push(s + 1);
-    }
-    return out;
-  };
-  assert.deepEqual(narrowOf(g3), [1, 4, 7, 10, 13, 16, 19, 22], '3-up narrow set (retired)');
-  assert.deepEqual(narrowOf(g4), [1, 5, 9, 13, 17, 21], '4-up narrow set (live)');
-  assert.equal(getSystemGeometry(g4, 0).measureWidth.toFixed(2), '167.22', 'narrow = 543.48 / 3.25');
-  assert.equal(getSystemGeometry(g4, 1).measureWidth.toFixed(2), '181.16', 'full = 543.48 / 3');
-  const changed = [4, 5, 7, 9, 10, 16, 17, 19, 21, 22];
-  for (const core of ['fixed-3', 'adaptive'] as const) {
-    const a = layoutJankoScore(
-      BRAHMS,
-      { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core, systemsPerPage: 3 },
-      T_BRAHMS
-    );
-    const b = layoutJankoScore(BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core }, T_BRAHMS);
-    const ax = new Map(a.flatMap((s) => s.notes.map((p) => [p.note.id, { x: p.x, sys: s.index }] as const)));
-    const bx = new Map(b.flatMap((s) => s.notes.map((p) => [p.note.id, p.x] as const)));
-    const movedSystems = new Set<number>();
-    let moved = 0;
-    for (const [id, { x, sys }] of ax) {
-      if (bx.get(id) !== x) {
-        moved++;
-        movedSystems.add(sys + 1);
-      }
-    }
-    assert.deepEqual(
-      [...movedSystems].sort((x, y) => x - y),
-      changed,
-      `${core}: exactly the 10 re-slotted systems move in X`
-    );
-    assert.equal(moved, 357, `${core}: 357 heads re-resolve X (600 bit-identical)`);
+test('Page-top correction: only system 0 engraves narrow; later page tops full width', () => {
+  // Canonical: the pickup-narrowed denominator (staffWidth / 4.25) applies to
+  // SYSTEM 0 only. Later page-top systems (slots 0 of pages 2–5) use the
+  // normal full-measure width — the judged correction, promoted from the
+  // Round 32/33 candidate cards.
+  const g = computePageGeometry(O_BRAHMS, T_BRAHMS, BRAHMS);
+  const narrow: number[] = [];
+  for (let s = 0; s < 18; s++) {
+    if (getSystemGeometry(g, s).measureWidth < 130) narrow.push(s + 1);
   }
-  // The move is a pure measure-width scaling: dx is linear in the
-  // within-measure offset (system 4, m. 10 starts at tick 1776).
-  const a4 = layoutJankoScore(
-    BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3', systemsPerPage: 3 },
-    T_BRAHMS
+  assert.deepEqual(narrow, [1], 'only system 1 engraves narrow');
+  assert.equal(getSystemGeometry(g, 0).measureWidth.toFixed(2), '127.88', 'narrow = 543.48 / 4.25');
+  assert.equal(getSystemGeometry(g, 1).measureWidth.toFixed(2), '135.87', 'full = 543.48 / 4');
+  // Later page tops (systems 5, 9, 13, 17) engrave full width, not narrow.
+  for (const s of [4, 8, 12, 16]) {
+    assert.equal(
+      getSystemGeometry(g, s).measureWidth.toFixed(2),
+      '135.87',
+      `page-top system ${s + 1} engraves full width`
+    );
+  }
+  // Without the correction the legacy slot-0 narrowing returns (opt-out
+  // characterization, not canonical): page tops inherit system 0's width.
+  assert.equal(
+    getSystemGeometry(g, 4, { correctPageTopAnacrusisMeasureWidth: false }).measureWidth.toFixed(2),
+    '127.88',
+    'opt-out: system 5 inherits the narrow width'
   );
-  const b4 = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  const xOf = (id: string): [number, number] => [
-    a4.flatMap((s) => s.notes).find((p) => p.note.id === id)!.x,
-    b4.flatMap((s) => s.notes).find((p) => p.note.id === id)!.x,
-  ];
-  const deltaW =
-    getSystemGeometry(g4, 3).measureWidth - getSystemGeometry(g3, 3).measureWidth;
-  const k = deltaW / 192;
-  for (const [id, tick] of [
-    ['brahms-op118-no1-131', 1800],
-    ['brahms-op118-no1-132', 1824],
-    ['brahms-op118-no1-136', 1920],
-  ] as const) {
-    const [x3, x4] = xOf(id);
-    const dx = x4 - x3;
-    assert.ok(
-      Math.abs(dx / (tick - 1776) - k) < 1e-9,
-      `${id}: dx follows the width-scaling law (dx=${dx.toFixed(2)})`
-    );
-  }
-  assert.equal((xOf('brahms-op118-no1-131')[1] - xOf('brahms-op118-no1-131')[0]).toFixed(2), '1.74');
-  assert.equal((xOf('brahms-op118-no1-138')[1] - xOf('brahms-op118-no1-138')[0]).toFixed(2), '13.94');
 });
 
 // ---------------------------------------------------------------------------

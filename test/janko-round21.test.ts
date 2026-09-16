@@ -278,16 +278,17 @@ test('§D stem tripwire: the retired R19 stem-through-simultaneity signatures ar
       `${label}: no stem pierces a fellow chord tone`
     );
     if (label === 'Brahms') {
-      // 4-up by operator override (was clean at 3-up): exactly the 2
-      // accepted slot findings — the stem tripwire itself stays silent.
-      assert.equal(report.ok, false, 'red by operator order, like the CLI entry');
+      // Canonical packing: exactly the 2 pre-existing adaptive slot findings
+      // (itemized in the ergonomics lint record) — the stem tripwire itself
+      // stays silent.
+      assert.equal(report.ok, false, 'the secondary surface stays honestly non-ok');
       assert.deepEqual(
         report.violations.map((v) => [v.code, v.system + 1]),
         [
-          ['system-slot-overlap', 23],
-          ['system-slot-overlap', 24],
+          ['system-slot-overlap', 18],
+          ['system-slot-overlap', 18],
         ],
-        'exactly the accepted 2 (itemized in the §2-landed record)'
+        'exactly the pre-existing adaptive 2'
       );
     } else {
       assert.equal(report.ok, true, `${label}: the lower-first golden is clean`);
@@ -458,14 +459,14 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 33 full-vs-none grid round, two cards, one open axis', () => {
-  // Ordered contract change: Round 33 compares the interior beat grid on
-  // Brahms — two cards on the single gridPulseFilter axis with the Reference
-  // as control. Rounds 30–32 are parked (historical consts).
+test('§F registry: round 33 decided, no open axis, zero cards', () => {
+  // Ordered contract change: Round 33 is judged — the full interior grid is
+  // canonical and no comparison remains. Rounds 30–33 are parked
+  // (historical consts).
   assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['grid-full-vs-none-full', 'grid-full-vs-none-none'], 'the grid cards');
+  assert.deepEqual(ids, [], 'zero live cards');
 });
 
 // ---------------------------------------------------------------------------

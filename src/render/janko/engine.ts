@@ -51,6 +51,7 @@ import {
   getPitchCoordinate,
   getTickX,
   pitchWindowForScore,
+  pointToSegmentDistance,
   resolveChannelFlanks,
   splitTick,
   usesContourFlanks,
@@ -107,6 +108,7 @@ import {
   CLASP_TRANSVERSE_WIDTH,
   HONOR_STEM_ATTACHMENT_AIR,
   JANKO_STEM_STROKE_WIDTH,
+  bracketModeDuration,
   bridgeBeamGroupsAcrossRests,
   claspDurationClass,
   claspInkBox,
@@ -581,7 +583,7 @@ export interface JankoClaspCluster {
  *
  * Round 6/8 rule (unchanged): the grouping unit is the **hand**. A hand's
  * onset is grouped when it carries two or more heads that are horizontally
- * displaced (row-snapped parity offset), or when it is a vertical chord of
+ * displaced (actual fitted slot spread), or when it is a vertical chord of
  * three or more heads; a clean 2-note column and a lone melodic note are never
  * grouped.
  *
@@ -640,8 +642,8 @@ export function resolveOnsetClaspGroups(
  *   duration.
  * - `'per-hand-clasp'` (Round 6, widened by Round 8): the grouping unit is the
  *   **hand** — never the grand staff. A hand's onset is grouped when it carries
- *   two or more heads that are horizontally displaced by the row-snapped parity
- *   offset, **or** when it is a vertical chord of three or more heads; a clean
+ *   two or more heads that are horizontally displaced by the actual fitted slot
+ *   spread, **or** when it is a vertical chord of three or more heads; a clean
  *   2-note column and a lone melodic note keep their stems. A hand cluster that
  *   crosses Middle C is grouped across the corridor, because the bracket spans
  *   that hand's own full reach.
@@ -739,6 +741,130 @@ export function getMeasureOpeningBarlineX(
     : geo.staffLeft;
   const offset = upbeatSystem0 ? measureIdx - 1 : measureIdx;
   return firstMeasureLeft + offset * geo.measureWidth;
+}
+
+/** Minimal member shape for carried-duration prediction (geometry-free). */
+export interface JankoClaspMemberTicks {
+  id: string;
+  hand: Hand;
+  durationTicks: number;
+}
+
+/**
+ * The duration value carrying one member of a per-hand bracket group: its
+ * hand's mode, except that a hand whose mode reads open (pip / double-pip) is
+ * carried by the bracket's open ink group (the mode of the open hands' modes
+ * — the same value the unified ink paints). Members whose own duration differs
+ * keep their exact statement (exception stems) instead of being suppressed.
+ *
+ * Pure over member durations, so the column solve (Pass C stem-clearance)
+ * predicts the exact suppression the final layout applies — the two can never
+ * disagree about which members keep stems.
+ */
+export function claspCarriedDuration(
+  members: readonly JankoClaspMemberTicks[],
+  memberId: string
+): number {
+  const byHand = new Map<Hand, number[]>();
+  for (const n of members) {
+    const bucket = byHand.get(n.hand);
+    if (bucket) bucket.push(n.durationTicks);
+    else byHand.set(n.hand, [n.durationTicks]);
+  }
+  const member = members.find((n) => n.id === memberId)!;
+  const handMode = bracketModeDuration(byHand.get(member.hand)!);
+  const cls = claspDurationClass(handMode);
+  if (cls !== 'pip' && cls !== 'double-pip') return handMode;
+  const openModes = [...byHand.values()]
+    .map((durs) => bracketModeDuration(durs))
+    .filter((value) => {
+      const c = claspDurationClass(value);
+      return c === 'pip' || c === 'double-pip';
+    });
+  return bracketModeDuration(openModes);
+}
+
+/**
+ * The duration value carrying one member of an admitted per-hand bracket (see
+ * {@link claspCarriedDuration}).
+ */
+export function claspMemberCarriedTicks(
+  clasp: JankoClaspGroupGeometry,
+  memberId: string
+): number {
+  return claspCarriedDuration(clasp.notes, memberId);
+}
+
+/**
+ * Duration-ink groups of a unified cross-hand bracket: the open half/whole
+ * marks read as the bracket's own value and sit at its midpoint; each hand's
+ * transverse subdivision marks stay at that hand's vertical centre. Pure over
+ * the member notes, shared by the final layout and the column solve's
+ * true-ink admission audits (pre-step, fit rule, ink-left) — admission judges
+ * the exact ink the bracket paints.
+ */
+export function unifiedBracketInk(
+  notes: readonly PositionedJankoNote[],
+  unified: boolean | undefined
+): JankoClaspDurationInk[] | undefined {
+  if (!unified) return undefined;
+  const handY = (members: readonly PositionedJankoNote[]): number =>
+    (Math.min(...members.map((p) => p.y)) + Math.max(...members.map((p) => p.y))) / 2;
+  const byHand = new Map<Hand, PositionedJankoNote[]>();
+  for (const p of notes) {
+    const bucket = byHand.get(p.rhythm.hand);
+    if (bucket) bucket.push(p);
+    else byHand.set(p.rhythm.hand, [p]);
+  }
+  const open: number[] = [];
+  const transverse: JankoClaspDurationInk[] = [];
+  for (const members of byHand.values()) {
+    const value = bracketModeDuration(members.map((p) => p.note.durationTicks));
+    const cls = claspDurationClass(value);
+    if (cls === 'pip' || cls === 'double-pip') open.push(value);
+    else if (cls === 'spire-one-flag' || cls === 'spire-two-flags') {
+      transverse.push({ centerY: handY(members), durationTicks: value });
+    }
+  }
+  const midY =
+    (Math.min(...notes.map((p) => p.y)) + Math.max(...notes.map((p) => p.y))) / 2; // the bracket's midpoint (the disc radius cancels out)
+  const ink: JankoClaspDurationInk[] = [];
+  if (open.length > 0) ink.push({ centerY: midY, durationTicks: bracketModeDuration(open) });
+  ink.push(...transverse);
+  return ink.length > 0 ? ink : undefined;
+}
+
+/**
+ * Whether a centred stem segment pierces a notehead disc — the exact
+ * predicate the visual linter's stem-through audit applies, shared with
+ * Pass C stem-clearance so prediction and audit agree bit-for-bit.
+ */
+export function stemPiercesDisc(
+  stemX: number,
+  stemStartY: number,
+  stemEndY: number,
+  cx: number,
+  cy: number,
+  radius: number
+): boolean {
+  return (
+    pointToSegmentDistance(cx, cy, stemX, stemStartY, stemX, stemEndY) + EPS < radius
+  );
+}
+
+/**
+ * True duration options of one per-hand bracket group for admission audits:
+ * the carried mode plus the unified ink groups when the bracket spans both
+ * hands — exactly what the final layout paints (see `layoutJankoSystem`), so
+ * the pre-step, the fit rule and the final audit judge identical ink.
+ */
+export function claspAuditDurationOptions(
+  members: readonly PositionedJankoNote[],
+  unified: boolean
+): { durationTicks: number; durationInk?: JankoClaspDurationInk[] } {
+  const durationTicks = bracketModeDuration(members.map((p) => p.note.durationTicks));
+  const durationInk = unifiedBracketInk(members, unified);
+  return durationInk ? { durationTicks, durationInk } : { durationTicks };
 }
 
 /** Absolute x of the barline that closes a measure (always painted). */
@@ -969,9 +1095,27 @@ export function claspClearsLayout(
   furniture: readonly JankoBox[] = []
 ): boolean {
   const disk = claspInkBox(geometry, t);
-  if (barlineX !== null && disk.x0 - barlineX < t.claspMinBarlineAir - CLASP_EPS) return false;
+  const debugClear =
+    typeof process !== 'undefined' &&
+    (process.env?.JANKO_DEBUG_CLASP_CLEAR === String(geometry.tick) ||
+      process.env?.JANKO_DEBUG_CLASP_CLEAR === 'all');
+  if (debugClear) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `CLASPCLEAR tick=${geometry.tick} dur=${geometry.durationTicks} ` +
+        `disk=${disk.x0.toFixed(2)},${disk.y0.toFixed(2)}..${disk.x1.toFixed(2)},${disk.y1.toFixed(2)} ` +
+        `barlineX=${barlineX === null ? 'null' : barlineX.toFixed(2)}`
+    );
+  }
+  if (barlineX !== null && disk.x0 - barlineX < t.claspMinBarlineAir - CLASP_EPS) {
+    if (debugClear) console.error('  VETO barline air');
+    return false;
+  }
   for (const box of furniture) {
-    if (boxesWithin(disk, box, CLASP_NOTEHEAD_AIR)) return false;
+    if (boxesWithin(disk, box, CLASP_NOTEHEAD_AIR)) {
+      if (debugClear) console.error(`  VETO furniture ${JSON.stringify(box)}`);
+      return false;
+    }
   }
   const own = new Set(geometry.notes.map((n) => n.id));
   for (const p of notes) {
@@ -979,7 +1123,14 @@ export function claspClearsLayout(
     const dx = Math.max(disk.x0 - p.x, 0, p.x - disk.x1);
     const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
     const air = claspForeignAir(geometry, p.note.startTick);
-    if (Math.hypot(dx, dy) < t.noteheadRadius + air - CLASP_EPS) return false;
+    if (Math.hypot(dx, dy) < t.noteheadRadius + air - CLASP_EPS) {
+      if (debugClear) {
+        console.error(
+          `  VETO head id=${p.note.id.split('-').pop()} tick=${p.note.startTick} x=${p.x.toFixed(2)} y=${p.y.toFixed(2)} hypot=${Math.hypot(dx, dy).toFixed(2)}`
+        );
+      }
+      return false;
+    }
   }
   return true;
 }
@@ -1171,6 +1322,14 @@ export interface JankoSystemLayout {
    * the engine always sets it.
    */
   clusterDiagnostics?: JankoClusterFitDiagnostic[];
+  /**
+   * Note ids whose onset hand-group qualified for a bracket on the Pass-A
+   * relative spread. This set drives inward slot anchoring — a superset of
+   * the admitted clasp members, since a qualifying group refused by the fit
+   * rule keeps its inward slots. Optional so lightweight fixtures stay
+   * valid; the engine always sets it.
+   */
+  claspQualifiedIds?: ReadonlySet<string>;
 }
 
 /**
@@ -2813,13 +2972,25 @@ export interface JankoClusterFitMember {
   lin: number;
 }
 
-/** Result of the permanent lowest-inward slot fit over one component. */
+/** Result of the permanent slot fit over one component. */
 export interface JankoClusterSlotFit {
   /** Slot index per member id: `-1` inward, `0` main column, `+1…` outward. */
   slots: Map<string, number>;
   /** Sufficient slot gap (pt): conflicting horizontal extents plus style air. */
   gap: number;
 }
+
+/**
+ * Slot-fit anchoring context: **order** (pitch ascending — the lowest source
+ * pitch first) is fixed, **anchoring** depends on the bracket context.
+ * `'column'` seats the lowest colour ON the true rhythmic column and spreads
+ * higher colours right (`0, +1, …`) — the unbracketed fit, which never
+ * manufactures leftward demand. `'inward'` seats the lowest colour one slot
+ * inward toward its actual bracket and keeps the main anchor (`-1, 0, …`) —
+ * the bracketed fit, which reserves the room the bracket ink stands in.
+ * Single-colour groups sit on the column under either anchor.
+ */
+export type JankoClusterAnchor = 'column' | 'inward';
 
 /**
  * Connected vertical-overlap components of one member group (pure): the sweep
@@ -2868,7 +3039,8 @@ export function clusterOverlapComponents(
  */
 export function fitClusterSlots(
   members: readonly JankoClusterFitMember[],
-  air: number
+  air: number,
+  anchor: JankoClusterAnchor
 ): JankoClusterSlotFit {
   const slots = new Map<string, number>();
   if (members.length === 0) return { slots, gap: air };
@@ -2902,7 +3074,9 @@ export function fitClusterSlots(
     for (const m of group) slots.set(m.id, 0);
     return { slots, gap: Math.max(...group.map((m) => 2 * m.wx + air)) };
   }
-  // Lowest-pitch colour inward; the rest by their lowest pitch outward.
+  // Order is fixed (pitch ascending); anchoring follows the bracket context:
+  // the lowest-pitch colour sits on the column unbracketed, one slot inward
+  // toward its actual bracket when bracketed.
   const lowestOf = (c: number): JankoClusterFitMember =>
     group
       .filter((m) => colourOf.get(m.id) === c)
@@ -2912,9 +3086,13 @@ export function fitClusterSlots(
     const y = lowestOf(b);
     return x.lin - y.lin || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
   });
-  const inward = byPitch[0];
-  const slotOf = new Map<number, number>([[inward, -1]]);
-  byPitch.slice(1).forEach((c, i) => slotOf.set(c, i));
+  const slotOf = new Map<number, number>();
+  if (anchor === 'inward') {
+    slotOf.set(byPitch[0], -1);
+    byPitch.slice(1).forEach((c, i) => slotOf.set(c, i));
+  } else {
+    byPitch.forEach((c, i) => slotOf.set(c, i));
+  }
   for (const m of group) slots.set(m.id, slotOf.get(colourOf.get(m.id)!)!);
   // Sufficient gap: every vertically overlapping pair clears horizontally.
   let gap = air;
@@ -3037,7 +3215,7 @@ export function computeClaspInsetMap(
     const firstTick = Math.min(...ticks.keys());
     const onset = ticks.get(firstTick) ?? [];
     const qualifies = perHand
-      ? perHandDownbeatQualifies(onset)
+      ? perHandDownbeatQualifies(onset, geo, systemIndex, o, t)
       : onset.length >= 2;
     if (!qualifies) continue;
     // Only a true downbeat can drive the clasp onto the opening barline.
@@ -3049,49 +3227,82 @@ export function computeClaspInsetMap(
 
 /**
  * Does one hand of this downbeat onset qualify for a
- * `'per-hand-clasp'` bracket — the same predicate `handClaspGroups` applies
- * after the row-snapped solve, evaluated on the raw score: a hand's group needs
- * {@link CLASP_MIN_VERTICAL_CHORD} heads, or two heads sharing one whole-tone
- * row (which the parity offset will spread, making the bracket reach for the
- * displaced pair). A clean two-note vertical stack and a lone melodic note
- * never qualify.
+ * `'per-hand-clasp'` bracket — the same relative-spread predicate
+ * `handClaspGroups` applies after the column solve, evaluated pre-solve on a
+ * preliminary slot fit: a hand's group of {@link CLASP_MIN_VERTICAL_CHORD} or
+ * more heads always qualifies, and a two-head group qualifies iff the actual
+ * fit spreads it (strictly more than 1pt — the admission threshold). Spread
+ * is inset-invariant (a clasp inset shifts the whole measure rigidly), so the
+ * preliminary fit runs with no insets. A clean two-note vertical stack and a
+ * lone melodic note never qualify. No pitch-parity heuristic: reservation,
+ * anchoring and admission all read the same actual spread.
+ *
+ * Scope: the preliminary fit is per-hand, so joint-spread-only qualification
+ * (a clean pair spread by a cross-hand joint bucket, e.g. Brahms m.2 tick 240
+ * under adaptive) reserves nothing. On the corpus those brackets are refused
+ * for inset-invariant same-onset overlap — no admitted downbeat bracket lacks
+ * its reservation on either core — and an admittable bracket without an inset
+ * still stands via the Round 7 column step.
  */
-function perHandDownbeatQualifies(notes: readonly QuantizedNote[]): boolean {
-  const byHand = new Map<Hand, QuantizedNote[]>();
+function perHandDownbeatQualifies(
+  notes: readonly QuantizedNote[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): boolean {
+  const byHand = new Map<Hand, PositionedJankoNote[]>();
   for (const note of notes) {
-    const hand = handForNote(note);
-    const bucket = byHand.get(hand);
-    if (bucket) bucket.push(note);
-    else byHand.set(hand, [note]);
+    const p = positionJankoNote(note, geo, systemIndex, o, t, null, null);
+    const bucket = byHand.get(p.rhythm.hand);
+    if (bucket) bucket.push(p);
+    else byHand.set(p.rhythm.hand, [p]);
   }
+  const air = getClusterSpacingPreset(o.clusterSpacing).air;
   for (const group of byHand.values()) {
     if (group.length >= CLASP_MIN_VERTICAL_CHORD) return true;
-    // Two heads share a whole-tone row iff they share the octave and the
-    // pitch-class parity (the row's `(octave, rank)` identity).
-    const rows = new Set(group.map((n) => `${n.pitch.octave}|${n.pitch.pitchClass % 2}`));
-    if (rows.size < group.length) return true;
+    if (group.length < 2) continue;
+    // Exactly two heads: qualify iff the actual slot fit spreads them past
+    // the admission threshold — the same relative-spread predicate the
+    // anchor pass and the fit rule apply.
+    const members = group.map((p): JankoClusterFitMember => {
+      const e = knockoutHalfExtents(o, t, p.note.startTick);
+      const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
+      return {
+        id: p.note.id,
+        lower: p.y - e.hy,
+        upper: p.y + e.hy,
+        wx: e.wx,
+        lin: p.note.pitch.octave * 12 + pc,
+      };
+    });
+    const fit = fitClusterSlots(members, air, 'column');
+    const slots = [...fit.slots.values()];
+    if ((Math.max(...slots) - Math.min(...slots)) * fit.gap > 1) return true;
   }
   return false;
 }
 
 /**
- * Lowest-inward slot fit of one system (permanent rule).
+ * Context-anchored slot fit of one system (permanent rule).
  *
  * **The rule.** Heads at the same `startTick` whose knockout intervals
  * overlap vertically share one horizontal slot group: the later white
  * knockout would erase the earlier digit. Each per-hand overlap component is
  * coloured by the deterministic minimum head-column assignment (see
- * {@link fitClusterSlots}) and mapped to slots — the colour holding the
- * lowest SOURCE musical pitch sits one slot inward, the rest on the main
- * onset column and outward:
+ * {@link fitClusterSlots}) and mapped to slots — order is pitch ascending,
+ * anchoring follows the bracket context: a qualifying group's lowest SOURCE
+ * musical pitch sits one slot inward toward its actual bracket, an
+ * unbracketed group's sits ON the true rhythmic column:
  *
  * ```
  * x_i = x_onset + slot_i · gap,   gap = max(wxᵢ + wxⱼ) + air over conflicts
  * ```
  *
- * So an ordinary conflicting pair becomes exactly `x − gap, x` (5.46pt apart
+ * So a bracketed conflicting pair becomes exactly `x − gap, x` (5.46pt apart
  * on the golden `'tight'`) and a chromatic three-clique
- * `x − gap, x, x + gap`; longer chains reuse columns. Clear members stay on
+ * `x − gap, x, x + gap`; an unbracketed conflicting pair becomes `x, x + gap`
+ * — lowest ON the column. Longer chains reuse columns. Clear members stay on
  * the column. There is no midpoint tuck and no envelope recentering: the
  * onset column is the rhythmic anchor (the retired fan's roomier-side mirror
  * and the Round 19 symmetric tuck are deleted — a member pinned to the beat
@@ -3156,6 +3367,13 @@ export interface JankoChordColumnResolution {
    * hide the demand.
    */
   diagnostics: JankoClusterFitDiagnostic[];
+  /**
+   * Note ids whose onset hand-group qualified for a bracket on the Pass-A
+   * relative spread (see `handClaspGroups`). This set drives inward slot
+   * anchoring — a superset of the admitted clasp members, since a qualifying
+   * group refused by the fit rule keeps its inward slots.
+   */
+  claspQualifiedIds: ReadonlySet<string>;
 }
 
 /** Full result of the chord-column solve (see {@link resolveRowSnappedChordOffsets}). */
@@ -3319,93 +3537,172 @@ export function resolveChordColumns(
   };
 
   // -------------------------------------------------------------------------
-  // 1a. Lowest-inward slot fit (permanent rule).
+  // 1a. Context-anchored slot fit (permanent rule).
   //
   //     Each per-hand component is coloured by the deterministic minimum
-  //     head-column assignment (see {@link fitClusterSlots}): the colour
-  //     holding the lowest SOURCE musical pitch sits one slot inward, the
-  //     rest on the main onset column and outward — an ordinary conflicting
-  //     pair takes exactly `{-gap, 0}`, a chromatic three-clique
-  //     `{-gap, 0, +gap}`, longer chains reuse columns. Clear members stay on
-  //     the column. The slot gap derives from the actual conflicting
-  //     horizontal extents plus the style air (5.46pt for ordinary `'tight'`
-  //     heads) and is never shrunk, mirrored or tucked: no midpoint tuck, no
-  //     envelope recentering — the onset column is the rhythmic anchor, and
-  //     whatever still overflows is honest residue for the linter.
+  //     head-column assignment (see {@link fitClusterSlots}). Order is fixed
+  //     (pitch ascending); anchoring follows the bracket context: a
+  //     qualifying hand-group's lowest colour sits one slot inward toward its
+  //     actual bracket and keeps the main anchor (`{-gap, 0}` for an ordinary
+  //     conflicting pair, `{-gap, 0, +gap}` for a chromatic three-clique),
+  //     while an unbracketed group's lowest colour sits ON the true rhythmic
+  //     column and higher colours spread right (`{0, +gap}`) — the
+  //     unbracketed fit never manufactures the leftward demand that used to
+  //     shove the column off the beat. Longer chains reuse columns; clear
+  //     members stay on the column. The slot gap derives from the actual
+  //     conflicting horizontal extents plus the style air (5.46pt for
+  //     ordinary `'tight'` heads) and is never shrunk, mirrored or tucked:
+  //     no midpoint tuck, no envelope recentering — the onset column is the
+  //     rhythmic anchor, and whatever still overflows is honest residue for
+  //     the linter.
+  //
+  //     Two passes. Pass A fits every group on the column (the minimal
+  //     assumption) and resolves cross-hand residuals; brackets qualify on
+  //     the Pass-A relative spread, which a rigid anchor shift cannot change.
+  //     Pass B refits every group containing a qualifying member inward and
+  //     re-resolves residuals under the final anchors.
   //
   //     Cross-hand residuals: per-hand partitioning never exempts the other
   //     hand — members of different hands whose resolved masks still overlap
   //     in 2D merge (with their full per-hand components, so same-hand
   //     vertical neighbours travel together) and refit jointly under the
-  //     IDENTICAL rule — lowest source pitch inward, no hand-based priority.
-  //     Groups grow monotonically, so the pass terminates.
+  //     IDENTICAL rule — lowest source pitch first, no hand-based priority;
+  //     a merged bucket anchors inward iff its lowest-pitch member qualified
+  //     for a bracket (the inward seat faces the bracket ink). Groups grow
+  //     monotonically, so each pass terminates.
   // -------------------------------------------------------------------------
   const offsetsById = new Map<string, number>();
   const byX = [...units].sort((a, b) => a.nominalX - b.nominalX || a.tick - b.tick);
-  for (const unit of units) {
-    for (const cluster of unit.rows) {
-      const fit = fitClusterSlots(
-        cluster.notes.map((p) => fitById.get(p.note.id)!),
-        presetAir
-      );
-      for (const [id, slot] of fit.slots) offsetsById.set(id, slot * fit.gap);
-    }
-  }
   const xOf = (unit: OnsetUnit, id: string): number => unit.nominalX + (offsetsById.get(id) ?? 0);
-  for (const unit of units) {
-    const memberCount = unit.rows.reduce((n, c) => n + c.notes.length, 0);
-    for (let pass = 0; pass < memberCount; pass++) {
-      const parent = unit.rows.map((_, i) => i);
-      const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
-      const union = (i: number, j: number): void => {
-        parent[find(i)] = find(j);
-      };
-      const idxOf = new Map<string, number>();
-      unit.rows.forEach((c, i) => {
-        for (const p of c.notes) idxOf.set(p.note.id, i);
-      });
-      let residual = false;
-      const all = unit.rows.flatMap((c) => c.notes);
-      for (let i = 0; i < all.length; i++) {
-        for (let j = i + 1; j < all.length; j++) {
-          const a = all[i];
-          const b = all[j];
-          if (a.rhythm.hand === b.rhythm.hand) continue;
-          const fa = fitById.get(a.note.id)!;
-          const fb = fitById.get(b.note.id)!;
-          const overlapY = Math.min(fa.upper, fb.upper) - Math.max(fa.lower, fb.lower);
-          if (overlapY <= EPS) continue;
-          const dx = Math.abs(xOf(unit, a.note.id) - xOf(unit, b.note.id));
-          if (dx >= fa.wx + fb.wx - EPS) continue;
-          union(idxOf.get(a.note.id)!, idxOf.get(b.note.id)!);
-          residual = true;
-        }
-      }
-      if (!residual) break;
-      if (typeof process !== 'undefined' && process.env?.JANKO_DEBUG_JOINT === '1') {
-        // eslint-disable-next-line no-console
-        console.error(
-          `JOINT tick=${unit.tick} rows=${unit.rows.map((c) => c.notes.map((p) => `${p.note.id.split('-').pop()}:${p.rhythm.hand}`).join('+')).join(' | ')}`
+  /**
+   * One full fit pass: per-hand component fits under `anchorOf`, then the
+   * joint cross-hand residual loop (merged buckets refit under `anchorOf`).
+   * `anchorOf` sees the member ids of the group being fit; note ids are
+   * score-unique, so a global bracketed set resolves every bucket.
+   */
+  const fitPass = (anchorOf: (memberIds: readonly string[]) => JankoClusterAnchor): void => {
+    for (const unit of units) {
+      for (const cluster of unit.rows) {
+        const ids = cluster.notes.map((p) => p.note.id);
+        const fit = fitClusterSlots(
+          ids.map((id) => fitById.get(id)!),
+          presetAir,
+          anchorOf(ids)
         );
-      }
-      const buckets = new Map<number, RowCluster[]>();
-      unit.rows.forEach((c, i) => {
-        const root = find(i);
-        const bucket = buckets.get(root);
-        if (bucket) bucket.push(c);
-        else buckets.set(root, [c]);
-      });
-      let refit = false;
-      for (const bucket of buckets.values()) {
-        if (bucket.length < 2) continue;
-        const members = bucket.flatMap((c) => c.notes.map((p) => fitById.get(p.note.id)!));
-        const fit = fitClusterSlots(members, presetAir);
         for (const [id, slot] of fit.slots) offsetsById.set(id, slot * fit.gap);
-        refit = true;
       }
-      if (!refit) break;
     }
+    for (const unit of units) {
+      const memberCount = unit.rows.reduce((n, c) => n + c.notes.length, 0);
+      for (let pass = 0; pass < memberCount; pass++) {
+        const parent = unit.rows.map((_, i) => i);
+        const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+        const union = (i: number, j: number): void => {
+          parent[find(i)] = find(j);
+        };
+        const idxOf = new Map<string, number>();
+        unit.rows.forEach((c, i) => {
+          for (const p of c.notes) idxOf.set(p.note.id, i);
+        });
+        let residual = false;
+        const all = unit.rows.flatMap((c) => c.notes);
+        for (let i = 0; i < all.length; i++) {
+          for (let j = i + 1; j < all.length; j++) {
+            const a = all[i];
+            const b = all[j];
+            if (a.rhythm.hand === b.rhythm.hand) continue;
+            const fa = fitById.get(a.note.id)!;
+            const fb = fitById.get(b.note.id)!;
+            const overlapY = Math.min(fa.upper, fb.upper) - Math.max(fa.lower, fb.lower);
+            if (overlapY <= EPS) continue;
+            const dx = Math.abs(xOf(unit, a.note.id) - xOf(unit, b.note.id));
+            if (dx >= fa.wx + fb.wx - EPS) continue;
+            union(idxOf.get(a.note.id)!, idxOf.get(b.note.id)!);
+            residual = true;
+          }
+        }
+        if (!residual) break;
+        if (typeof process !== 'undefined' && process.env?.JANKO_DEBUG_JOINT === '1') {
+          // eslint-disable-next-line no-console
+          console.error(
+            `JOINT tick=${unit.tick} rows=${unit.rows.map((c) => c.notes.map((p) => `${p.note.id.split('-').pop()}:${p.rhythm.hand}`).join('+')).join(' | ')}`
+          );
+        }
+        const buckets = new Map<number, RowCluster[]>();
+        unit.rows.forEach((c, i) => {
+          const root = find(i);
+          const bucket = buckets.get(root);
+          if (bucket) bucket.push(c);
+          else buckets.set(root, [c]);
+        });
+        let refit = false;
+        for (const bucket of buckets.values()) {
+          if (bucket.length < 2) continue;
+          const ids = bucket.flatMap((c) => c.notes.map((p) => p.note.id));
+          const fit = fitClusterSlots(
+            ids.map((id) => fitById.get(id)!),
+            presetAir,
+            anchorOf(ids)
+          );
+          for (const [id, slot] of fit.slots) offsetsById.set(id, slot * fit.gap);
+          refit = true;
+        }
+        if (!refit) break;
+      }
+    }
+  };
+  /** Row-snapped horizontal offset (page pt) of every head of one onset unit. */
+  const rowOffsetOf = (unit: OnsetUnit): Map<string, number> => {
+    const offsets = new Map<string, number>();
+    for (const cluster of unit.rows) {
+      for (const p of cluster.notes) offsets.set(p.note.id, offsetsById.get(p.note.id) ?? 0);
+    }
+    return offsets;
+  };
+  /**
+   * Round 6/8/19 — the clasp groups of one onset that qualify under the
+   * per-hand paradigm, unified into one cross-hand bracket where the hands'
+   * spans overlap (see {@link resolveOnsetClaspGroups}). Qualification is
+   * measured in row-offset space here: the heads still share their nominal
+   * column, before the solve.
+   */
+  const handClaspGroups = (unit: OnsetUnit): PositionedJankoNote[][] => {
+    const offsets = rowOffsetOf(unit);
+    const onset = unit.rows
+      .flatMap((cluster) => cluster.notes)
+      .sort((a, b) => a.y - b.y || a.x - b.x);
+    return resolveOnsetClaspGroups(onset, t, (p) => offsets.get(p.note.id) ?? 0);
+  };
+  // Pass A: the minimal assumption — every group on the column.
+  fitPass(() => 'column');
+  // Bracket qualification on the Pass-A relative spread. Note ids are
+  // score-unique, so one global set resolves every Pass-B bucket. Union
+  // paradigms qualify a whole onset of two or more heads (as admission
+  // does); per-hand qualification is the shared relative-spread predicate.
+  const bracketedIds = new Set<string>();
+  for (const unit of units) {
+    const groups = perHandClasps
+      ? handClaspGroups(unit)
+      : unit.rows.reduce((n, c) => n + c.notes.length, 0) >= 2
+        ? [unit.rows.flatMap((c) => c.notes)]
+        : [];
+    for (const p of groups.flat()) bracketedIds.add(p.note.id);
   }
+  // Pass B: a group anchors inward iff its lowest-source-pitch member
+  // qualified for a bracket — the inward seat faces the bracket ink, so it
+  // belongs to a bracket member (exempt from the veto); a bucket led by a
+  // foreign head (e.g. a joint cross-hand pair whose lowest is the other
+  // hand's lone note) seats that head ON the column and staggers right, so
+  // no foreign head is ever manufactured into the bracket-ink lane. Order
+  // stays lowest-pitch-first under either anchor. Residuals re-resolve
+  // under the final anchors.
+  const lowestIdOf = (ids: readonly string[]): string =>
+    [...ids].sort((a, b) => {
+      const fa = fitById.get(a)!;
+      const fb = fitById.get(b)!;
+      return fa.lin - fb.lin || (a < b ? -1 : a > b ? 1 : 0);
+    })[0];
+  fitPass((ids) => (bracketedIds.has(lowestIdOf(ids)) ? 'inward' : 'column'));
   for (const unit of units) {
     for (const cluster of unit.rows) {
       const offs = cluster.notes.map((p) => offsetsById.get(p.note.id) ?? 0);
@@ -3461,29 +3758,95 @@ export function resolveChordColumns(
     else if (0 > hiCell) unit.shift = hiCell;
   }
 
-  /** Row-snapped horizontal offset (page pt) of every head of one onset unit. */
-  const rowOffsetOf = (unit: OnsetUnit): Map<string, number> => {
-    const offsets = new Map<string, number>();
-    for (const cluster of unit.rows) {
-      for (const p of cluster.notes) offsets.set(p.note.id, offsetsById.get(p.note.id) ?? 0);
+  // True-ink bracket-air pre-step (permanent rule): a qualifying bracket's
+  // carried mode ink (pips, slashes, dots) reaches left of the legacy spine
+  // the old audits measured, so the column steps right — rigidly, minimally,
+  // once, left-to-right — until the TRUE ink box (the exact box the final
+  // audit judges) clears every left-neighbour head and the opening barline.
+  // Demands flow rightward only, so one pass suffices; the step clamps into
+  // the band and beat cell, and whatever still cannot fit is honestly refused
+  // by the true-ink fit rule below instead of being silently dropped later.
+  if (perHandClasps && claspsActive) {
+    const debugPreStep = typeof process !== 'undefined' && process.env?.JANKO_DEBUG_PRESTEP === '1';
+    const r = t.noteheadRadius;
+    for (const unit of byX) {
+      const groups = handClaspGroups(unit);
+      if (groups.length === 0) continue;
+      const onsetSize = unit.rows.reduce((n, c) => n + c.notes.length, 0);
+      const offsets = rowOffsetOf(unit);
+      let demand = 0;
+      for (const group of groups) {
+        const unified = groups.length === 1 && group.length === onsetSize;
+        const geometry = computeClaspGeometry(
+          group.map((p) => ({
+            ...p.rhythm,
+            x: p.x + unit.shift + (offsets.get(p.note.id) ?? 0),
+          })),
+          t,
+          {
+            ...claspAuditDurationOptions(group, unified),
+            claspDurationStyle: o.claspDurationStyle,
+            durationGrammar: o.durationGrammar,
+            claspDotNudge: o.claspDotNudge,
+            clusterSpacing: o.clusterSpacing,
+            honorHalo: o.showHonorHalo,
+          }
+        );
+        if (!geometry) continue;
+        const box = claspInkBox(geometry, t);
+        // Opening-barline air (a column constraint, never a silent veto).
+        if (unit.measureIdx > 0) {
+          demand = Math.max(demand, unit.measureLeft + t.claspMinBarlineAir - box.x0);
+        }
+        // Left-neighbour heads at their settled (§1a + pre-step) positions.
+        // Same-onset heads travel with the column (their dx is invariant) and
+        // right-side heads can never meet the left-hanging ink, so only left
+        // onsets constrain the step. Exact 2D shortfall: the box clears once
+        // dx reaches √((r+air)² − dy²); y-clear heads never constrain.
+        for (const other of byX) {
+          if (other.nominalX >= unit.nominalX || other === unit) continue;
+          const limit = r + CLASP_NOTEHEAD_AIR;
+          for (const cluster of other.rows) {
+            for (const p of cluster.notes) {
+              const hx = other.nominalX + other.shift + (offsetsById.get(p.note.id) ?? 0);
+              const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
+              if (dy >= limit) continue;
+              const need = Math.sqrt(limit * limit - dy * dy);
+              const dx = box.x0 - hx;
+              if (dx >= need) continue;
+              demand = Math.max(demand, need - dx);
+            }
+          }
+        }
+      }
+      if (demand <= 0) continue;
+      // Clamp into the band and beat cell (mirrors the §1a window): a demand
+      // the cell cannot host stays honest residue for the fit rule.
+      let loCell = Number.NEGATIVE_INFINITY;
+      let hiCell = Number.POSITIVE_INFINITY;
+      for (const cluster of unit.rows) {
+        loCell = Math.max(
+          loCell,
+          unit.bandLeft - cluster.minOffset - unit.nominalX,
+          unit.cellLeft - cluster.minOffset - unit.nominalX
+        );
+        hiCell = Math.min(
+          hiCell,
+          unit.bandRight - cluster.maxOffset - unit.nominalX,
+          unit.cellRight - cluster.maxOffset - unit.nominalX
+        );
+      }
+      const stepped = Math.max(loCell, Math.min(hiCell, unit.shift + demand));
+      if (debugPreStep) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `PRESTEP tick=${unit.tick} demand=${demand.toFixed(2)} shift=${unit.shift.toFixed(2)}→${stepped.toFixed(2)}` +
+            (stepped < unit.shift + demand - 1e-9 ? ' CLAMPED' : '')
+        );
+      }
+      unit.shift = stepped;
     }
-    return offsets;
-  };
-
-  /**
-   * Round 6/8/19 — the clasp groups of one onset that qualify under the
-   * per-hand paradigm, unified into one cross-hand bracket where the hands'
-   * spans overlap (see {@link resolveOnsetClaspGroups}). Qualification is
-   * measured in row-offset space here: the heads still share their nominal
-   * column, before the solve.
-   */
-  const handClaspGroups = (unit: OnsetUnit): PositionedJankoNote[][] => {
-    const offsets = rowOffsetOf(unit);
-    const onset = unit.rows
-      .flatMap((cluster) => cluster.notes)
-      .sort((a, b) => a.y - b.y || a.x - b.x);
-    return resolveOnsetClaspGroups(onset, t, (p) => offsets.get(p.note.id) ?? 0);
-  };
+  }
 
   for (const unit of units) {
     // A unit is spread when any head left the onset column — including a
@@ -3500,7 +3863,12 @@ export function resolveChordColumns(
         unit.claspTop = Math.min(...members.map((p) => p.y)) - t.noteheadRadius;
         unit.claspBot = Math.max(...members.map((p) => p.y)) + t.noteheadRadius;
         const offsets = rowOffsetOf(unit);
+        const onsetSize = unit.rows.reduce((n, c) => n + c.notes.length, 0);
         for (const group of groups) {
+          // True-ink audit: the bracket's left reach is resolved from the
+          // carried mode and the unified ink groups — the exact ink the final
+          // layout paints — never from the legacy shortest-member shorthand.
+          const unified = groups.length === 1 && group.length === onsetSize;
           const geometry = computeClaspGeometry(
             group.map((p) => ({
               ...p.rhythm,
@@ -3508,6 +3876,7 @@ export function resolveChordColumns(
             })),
             t,
             {
+              ...claspAuditDurationOptions(group, unified),
               claspDurationStyle: o.claspDurationStyle,
               durationGrammar: o.durationGrammar,
               claspDotNudge: o.claspDotNudge,
@@ -3577,15 +3946,27 @@ export function resolveChordColumns(
     /** A head of this onset as the solved column places it (shift + slots). */
     const displacedX = (p: PositionedJankoNote): number =>
       p.x + unit.shift + (offsets?.get(p.note.id) ?? 0);
+    // True-ink audit under the per-hand paradigm (retired paradigms keep the
+    // legacy shortest-member ink they paint): one onset-wide group is the
+    // unified bracket, per-hand groups carry their own mode.
+    const onsetSize = perHandClasps ? unit.rows.reduce((n, c) => n + c.notes.length, 0) : 0;
     for (const members of groups) {
       // `handClaspGroups` qualifies in row-offset space (relative displacement);
       // the bracket itself is audited at the shifted column the legitimate
       // translation settled, so a low-inward slot that stepped right to clear
       // its cell is judged where it paints, not where it desired.
+      const auditDuration =
+        perHandClasps && offsets !== null
+          ? claspAuditDurationOptions(
+              members,
+              groups.length === 1 && members.length === onsetSize
+            )
+          : {};
       const geometry = computeClaspGeometry(
         members.map((p) => ({ ...p.rhythm, x: p.x + unit.shift })),
         t,
         {
+          ...auditDuration,
           claspDurationStyle: o.claspDurationStyle,
           durationGrammar: o.durationGrammar,
           claspDotNudge: o.claspDotNudge,
@@ -3603,6 +3984,7 @@ export function resolveChordColumns(
               members.map((p) => ({ ...p.rhythm, x: displacedX(p) })),
               t,
               {
+                ...auditDuration,
                 claspDurationStyle: o.claspDurationStyle,
                 durationGrammar: o.durationGrammar,
                 claspDotNudge: o.claspDotNudge,
@@ -3611,6 +3993,16 @@ export function resolveChordColumns(
               }
             );
       const disk = claspInkBox(spreadGeometry ?? geometry, t);
+      const debugClasp = typeof process !== 'undefined' && process.env?.JANKO_DEBUG_CLASP_FITS === String(unit.tick);
+      if (debugClasp) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `CLASPFITS tick=${unit.tick} members=${members.map((p) => p.note.id.split('-').pop()).join(',')} ` +
+            `shift=${unit.shift.toFixed(3)} nominalX=${unit.nominalX.toFixed(2)} ` +
+            `disk=${disk.x0.toFixed(2)},${disk.y0.toFixed(2)}..${disk.x1.toFixed(2)},${disk.y1.toFixed(2)} ` +
+            `ink=${JSON.stringify((spreadGeometry ?? geometry).durationInk)}`
+        );
+      }
       for (const other of units) {
         for (const cluster of other.rows) {
           for (const p of cluster.notes) {
@@ -3622,6 +4014,13 @@ export function resolveChordColumns(
             const dx = Math.max(disk.x0 - px, 0, px - disk.x1);
             const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
             const air = other === unit ? 0 : CLASP_NOTEHEAD_AIR;
+            if (debugClasp && Math.hypot(dx, dy) < t.noteheadRadius + air + 2) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `  near id=${p.note.id.split('-').pop()} tick=${other.tick} px=${px.toFixed(2)} y=${p.y.toFixed(2)} ` +
+                  `dx=${dx.toFixed(2)} dy=${dy.toFixed(2)} hypot=${Math.hypot(dx, dy).toFixed(2)} limit=${(t.noteheadRadius + air - CLASP_EPS).toFixed(2)}`
+              );
+            }
             if (Math.hypot(dx, dy) < t.noteheadRadius + air - CLASP_EPS) return false;
           }
         }
@@ -3632,6 +4031,138 @@ export function resolveChordColumns(
   if (units.some((unit) => unit.clasp)) {
     for (const unit of units) {
       if (unit.clasp && !claspFits(unit)) unit.clasp = false;
+    }
+  }
+  // -------------------------------------------------------------------------
+  // 1a-Pass-C. Exception stem-clearance (permanent rule).
+  //
+  //     A bracketed member whose duration differs from its carried value keeps
+  //     its own exact stem (the §3 exception), and that centred stem would
+  //     dagger the suppressed column-mates it shares a slot with. Each pierced
+  //     mate steps one preset slot (`pairGap`) away from the stem — right for
+  //     a mate on or right of the stem (the corpus case: higher mates step
+  //     right, pitch order kept, the exception holds its slot and the
+  //     bracket's minX never moves, so no admission verdict can change), left
+  //     for a mate strictly left of it. A move that lands on another
+  //     same-onset head pushes further the same way (bounded; same-onset
+  //     heads are finite, so the cascade always terminates).
+  //
+  //     Piercing is predicted with the linter's own predicate
+  //     (`getStemGeometry` + `pointToSegmentDistance`), so prediction and
+  //     audit agree exactly; the predicted suppression reuses
+  //     {@link claspCarriedDuration}, so it agrees with the final layout too.
+  //     Only admitted brackets (`unit.clasp`) move mates — a refused group
+  //     falls back to the gap-gated grammar on its unspread column.
+  // -------------------------------------------------------------------------
+  if (perHandClasps && claspsActive) {
+    /** Do two same-onset heads mask-overlap at their current slots (relative)? */
+    const sameOnsetMaskCollision = (unit: OnsetUnit, id: string): boolean => {
+      const fa = fitById.get(id)!;
+      const xa = unit.nominalX + (offsetsById.get(id) ?? 0);
+      for (const cluster of unit.rows) {
+        for (const p of cluster.notes) {
+          if (p.note.id === id) continue;
+          const fb = fitById.get(p.note.id)!;
+          const overlapY = Math.min(fa.upper, fb.upper) - Math.max(fa.lower, fb.lower);
+          if (overlapY <= EPS) continue;
+          const dx = Math.abs(xa - (unit.nominalX + (offsetsById.get(p.note.id) ?? 0)));
+          if (dx >= fa.wx + fb.wx - EPS) continue;
+          return true;
+        }
+      }
+      return false;
+    };
+    const debugPassC = typeof process !== 'undefined' && process.env?.JANKO_DEBUG_PASSC === '1';
+    for (const unit of units) {
+      if (!unit.clasp) continue;
+      const groups = handClaspGroups(unit);
+      if (groups.length === 0) continue;
+      let moved = false;
+      for (const members of groups) {
+        const memberTicks = members.map((p) => ({
+          id: p.note.id,
+          hand: p.rhythm.hand,
+          durationTicks: p.note.durationTicks,
+        }));
+        const carried = new Map(
+          memberTicks.map((m) => [m.id, claspCarriedDuration(memberTicks, m.id)] as const)
+        );
+        const exceptions = members.filter((p) => p.note.durationTicks !== carried.get(p.note.id));
+        if (exceptions.length === 0) continue;
+        const suppressed = members.filter((p) => p.note.durationTicks === carried.get(p.note.id));
+        // Exception stems at Pass-B slots (shift-free: piercing is shift-invariant
+        // within the rigid onset, so this equals the final relative geometry).
+        const stems = exceptions.map((p) => ({
+          id: p.note.id,
+          ...getStemGeometry(
+            { ...p.rhythm, x: unit.nominalX + (offsetsById.get(p.note.id) ?? 0) },
+            t
+          ),
+        }));
+        for (const mate of suppressed) {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const mateX = unit.nominalX + (offsetsById.get(mate.note.id) ?? 0);
+            const piercer = stems.find((s) =>
+              stemPiercesDisc(s.stemX, s.stemStartY, s.stemEndY, mateX, mate.y, t.noteheadRadius)
+            );
+            if (!piercer) break;
+            const dir = mateX < piercer.stemX ? -1 : 1;
+            offsetsById.set(mate.note.id, (offsetsById.get(mate.note.id) ?? 0) + dir * pairGap);
+            moved = true;
+            if (debugPassC) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `PASSC tick=${unit.tick} mate=${mate.note.id.split('-').pop()} dir=${dir > 0 ? '+1' : '-1'} ` +
+                  `piercer=${piercer.id.split('-').pop()}`
+              );
+            }
+            for (let bump = 0; bump < 3; bump++) {
+              if (!sameOnsetMaskCollision(unit, mate.note.id)) break;
+              offsetsById.set(mate.note.id, offsetsById.get(mate.note.id)! + dir * pairGap);
+              if (debugPassC) {
+                // eslint-disable-next-line no-console
+                console.error(`PASSC tick=${unit.tick} mate=${mate.note.id.split('-').pop()} cascade+1`);
+              }
+            }
+          }
+        }
+      }
+      if (moved) {
+        unit.spread = true;
+        // Honest demand: a mate the clearance pushed out of its beat cell is
+        // reported (the rigid solve cannot reseat a relative move), never
+        // hidden — the linter then names the truly infeasible residue.
+        const centres = new Map<string, number>();
+        for (const cluster of unit.rows) {
+          for (const p of cluster.notes) {
+            centres.set(
+              p.note.id,
+              unit.nominalX + unit.shift + (offsetsById.get(p.note.id) ?? 0)
+            );
+          }
+        }
+        const { loAir, hiAir } = cellAirs(unit);
+        const demand = checkClusterCellFit(
+          unit.tick,
+          centres,
+          unit.cellLeft + loAir,
+          unit.cellRight - hiAir
+        );
+        if (demand) {
+          const at = clusterDiagnostics.findIndex((d) => d.tick === unit.tick);
+          if (at >= 0) clusterDiagnostics[at] = demand;
+          else clusterDiagnostics.push(demand);
+        }
+      }
+    }
+    // Pass-C moves change resolved slots: refresh the row extremes the solve
+    // and the diagnostics read (unmoved rows recompute identically).
+    for (const unit of units) {
+      for (const cluster of unit.rows) {
+        const offs = cluster.notes.map((p) => offsetsById.get(p.note.id) ?? 0);
+        cluster.minOffset = Math.min(...offs);
+        cluster.maxOffset = Math.max(...offs);
+      }
     }
   }
   const hasClasp = units.some((unit) => unit.clasp);
@@ -3655,6 +4186,7 @@ export function resolveChordColumns(
       claspTicks: new Set<number>(),
       columns: new Map(units.map((unit) => [unit.tick, unit.nominalX + unit.shift])),
       diagnostics: clusterDiagnostics,
+      claspQualifiedIds: bracketedIds,
     };
   }
 
@@ -4051,6 +4583,7 @@ export function resolveChordColumns(
     // translation, which is what the beat grid and the shared stem follow.
     columns: new Map(ordered.map((unit) => [unit.tick, unit.nominalX + unit.shift])),
     diagnostics: clusterDiagnostics,
+    claspQualifiedIds: bracketedIds,
   };
 }
 
@@ -4203,6 +4736,163 @@ export function detectStemDigitCrossings(
   return out;
 }
 
+/**
+ * Air (pt) the rigid slot correction keeps between a system's complete ink
+ * and its page-slot edges (top and bottom). Mirrors the linter's default
+ * `minClearance`, which gates the corrected layout — the two values must move
+ * together, pinned by the slot-correction suite.
+ */
+export const SYSTEM_SLOT_CORRECTION_AIR = 1.0;
+
+/**
+ * Staff furniture bounds of a laid-out system (page pt): the staff extents,
+ * the measure numeral and every ledger equator — the exact span the linter's
+ * slot-fit gate measures. The furniture triggers the correction; the complete
+ * ink sizes it.
+ */
+export function systemFurnitureBounds(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): { top: number; bottom: number } {
+  const g = layout.geometry;
+  let top = g.staffTopY;
+  let bottom = g.staffBotY;
+  if (o.showMeasureNumbers) {
+    const { numeral } = getMarginFurniture(
+      g,
+      t,
+      1,
+      undefined,
+      o.systemStartStyle,
+      layout.index === 0
+    );
+    top = Math.min(top, numeral.y0);
+  }
+  for (const p of layout.notes) {
+    for (const ledgerY of p.coord.ledgerYs) {
+      top = Math.min(top, g.middleCY + ledgerY - 0.38);
+      bottom = Math.max(bottom, g.middleCY + ledgerY + 0.38);
+    }
+  }
+  return { top, bottom };
+}
+
+/**
+ * Complete painted bounds of a laid-out system (page pt): every glyph, rule,
+ * beam and bracket — the exact span the linter's adjacent-system scan
+ * measures. Mirrors `linter.systemInkExtents` term for term (same boxes from
+ * the same builders); the slot-correction suite asserts equality on the
+ * corpus, so the two can never drift apart silently.
+ */
+export function systemCompleteInkBounds(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): { top: number; bottom: number } {
+  const g = layout.geometry;
+  let top = g.staffTopY;
+  let bottom = g.staffBotY;
+  if (o.showMeasureNumbers) {
+    const { numeral } = getMarginFurniture(
+      g,
+      t,
+      1,
+      undefined,
+      o.systemStartStyle,
+      layout.index === 0
+    );
+    top = Math.min(top, numeral.y0);
+  }
+  const r = t.noteheadRadius;
+  for (const p of layout.notes) {
+    const glyph = isPositionOfHonor(p.note.startTick)
+      ? Math.max(r, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
+      : r;
+    top = Math.min(top, p.y - glyph);
+    bottom = Math.max(bottom, p.y + glyph);
+    for (const ledgerY of p.coord.ledgerYs) {
+      top = Math.min(top, g.middleCY + ledgerY - 0.38);
+      bottom = Math.max(bottom, g.middleCY + ledgerY + 0.38);
+    }
+  }
+  for (const beam of layout.beams) {
+    for (const c of [beam.primary, beam.secondary]) {
+      if (!c) continue;
+      top = Math.min(top, c.y1, c.y2);
+      bottom = Math.max(bottom, c.y1, c.y2);
+    }
+  }
+  const hidden = suppressedStemIds(layout);
+  const stemTopBot = (stemStartY: number, stemEndY: number): void => {
+    top = Math.min(top, stemStartY, stemEndY);
+    bottom = Math.max(bottom, stemStartY, stemEndY);
+  };
+  if (o.rhythmStyle === 'beamed') {
+    for (const beam of layout.beams) {
+      for (const s of beam.stems) stemTopBot(s.stemStartY, s.stemEndY);
+    }
+    for (const n of layout.ungrouped) {
+      if (hidden.has(n.id)) continue;
+      const s = getStemGeometry(n, t);
+      stemTopBot(s.stemStartY, s.stemEndY);
+    }
+  } else {
+    for (const p of layout.notes) {
+      if (hidden.has(p.rhythm.id)) continue;
+      const s = getStemGeometry(p.rhythm, t);
+      stemTopBot(s.stemStartY, s.stemEndY);
+    }
+  }
+  for (const clasp of layout.clasps) {
+    top = Math.min(top, clasp.topY);
+    bottom = Math.max(bottom, clasp.botY);
+  }
+  for (const rest of layout.rests) {
+    const box = restInkBox(rest, t);
+    top = Math.min(top, box.y0);
+    bottom = Math.max(bottom, box.y1);
+  }
+  if (layout.ottavaBrackets) {
+    for (const b of layout.ottavaBrackets) {
+      const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
+      top = Math.min(top, b.lineY, hookY);
+      bottom = Math.max(bottom, b.lineY, hookY);
+    }
+  }
+  return { top, bottom };
+}
+
+/**
+ * Rigid whole-system slot correction (page pt, +down): the minimal translation
+ * that seats the system's complete ink inside its page slot with
+ * {@link SYSTEM_SLOT_CORRECTION_AIR} top and bottom. Zero for an
+ * already-fitting system (furniture inside the slot — the layout is returned
+ * untouched, so fitting scores are byte-identical). Complete ink taller than
+ * the slot cannot be seated by any rigid shift — shifting it would only trade
+ * one overflow for another (proven on the Brahms adaptive final system, where
+ * seating the furniture deepens the neighbour overlap by exactly the shift),
+ * so the correction reports zero and leaves the genuinely infeasible geometry
+ * as honest residue the linter names, instead of redistributing it.
+ */
+export function computeSystemSlotShift(
+  layout: JankoSystemLayout,
+  page: JankoPageGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number {
+  const air = SYSTEM_SLOT_CORRECTION_AIR;
+  const slotTop = layout.geometry.slotTopY;
+  const slotBottom = slotTop + page.slotHeight;
+  const furn = systemFurnitureBounds(layout, o, t);
+  if (furn.top >= slotTop + air && furn.bottom <= slotBottom - air) return 0;
+  const ink = systemCompleteInkBounds(layout, o, t);
+  if (ink.bottom - ink.top > page.slotHeight - 2 * air) return 0;
+  if (ink.top < slotTop + air) return slotTop + air - ink.top;
+  if (ink.bottom > slotBottom - air) return slotBottom - air - ink.bottom;
+  return 0;
+}
+
 export function layoutJankoSystem(
   score: QuantizedGridScore,
   geo: JankoPageGeometry,
@@ -4212,7 +4902,50 @@ export function layoutJankoSystem(
 ): JankoSystemLayout {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
+  const first = layoutJankoSystemShifted(score, geo, systemIndex, o, t, 0);
+  const shift = computeSystemSlotShift(first, geo, o, t);
+  if (shift === 0) return first;
+  // Rigid whole-system correction: re-lay-out on the shifted staff centre so
+  // every derived y (heads, stems, beams, clasps, rests, ottava, numeral,
+  // ledgers) moves as one piece. One iteration suffices — the layout is a
+  // pure function of the centre, so the shifted ink fits by construction and
+  // a second measure would read shift zero. Render, crops, PDF and the linter
+  // all consume this layout, so all share the resolved geometry.
+  return layoutJankoSystemShifted(score, geo, systemIndex, o, t, shift);
+}
+
+/**
+ * Lay out one system on a staff centre translated by `shiftY` (page pt,
+ * +down). `shiftY = 0` is the uncorrected layout; the slot-correction suite
+ * pins the rigid invariant between the uncorrected and corrected layouts
+ * (every y translated by exactly the shift — the layout is a pure function
+ * of the centre, so re-layout never re-decides relative geometry).
+ */
+export function layoutJankoSystemShifted(
+  score: QuantizedGridScore,
+  geo: JankoPageGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  shiftY: number
+): JankoSystemLayout {
   const geometryRaw = getSystemGeometry(geo, systemIndex, o);
+  // The slot is fixed page furniture; the shift moves the music within it.
+  // The fixed cores re-derive their staff extents from middleCY below, so
+  // shifting the centre carries them; the equator closure is rebuilt on the
+  // shifted centre (it closes over the template value otherwise).
+  const geometryBase =
+    shiftY === 0
+      ? geometryRaw
+      : {
+          ...geometryRaw,
+          middleCY: geometryRaw.middleCY + shiftY,
+          staffTopY: geometryRaw.staffTopY + shiftY,
+          staffBotY: geometryRaw.staffBotY + shiftY,
+          systemTopY: geometryRaw.systemTopY + shiftY,
+          equatorY: (hand: Hand, octave: number): number =>
+            geometryRaw.middleCY + shiftY + getEquatorYForOctave(octave, hand, t, o),
+        };
   const mps = geometryRaw.measuresPerSystem;
   const anacrusis = t.anacrusisTicks ?? 0;
   const startTick =
@@ -4222,7 +4955,7 @@ export function layoutJankoSystem(
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
     .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
 
-  let geometry = geometryRaw;
+  let geometry = geometryBase;
   if (o.core === 'fixed-3' || o.core === 'fixed-4') {
     const scale = t.semitoneScale;
     const {
@@ -4287,6 +5020,7 @@ export function layoutJankoSystem(
     claspTicks: new Set<number>(),
     columns: new Map<number, number>(),
     diagnostics: [],
+    claspQualifiedIds: new Set<string>(),
   };
   for (let attempt = 0; ; attempt++) {
     const raw = sysNotes.map((n) =>
@@ -4385,40 +5119,19 @@ export function layoutJankoSystem(
   // cleanly is dropped and its cluster falls back to traditional stems.
   //
   // Round 19: a **unified** cross-hand bracket (both hands' spans overlap) keeps
-  // both hands' duration information — one ink group per hand. The open
-  // half/whole marks read as the bracket's own value and sit at its midpoint;
-  // each hand's transverse subdivision marks stay at that hand's vertical
-  // centre.
-  const unifiedClaspInk = (
-    cluster: JankoClaspCluster
-  ): JankoClaspDurationInk[] | undefined => {
-    if (!cluster.unified) return undefined;
-    const handY = (members: readonly PositionedJankoNote[]): number =>
-      (Math.min(...members.map((p) => p.y)) + Math.max(...members.map((p) => p.y))) / 2;
-    const byHand = new Map<Hand, PositionedJankoNote[]>();
-    for (const p of cluster.notes) {
-      const bucket = byHand.get(p.rhythm.hand);
-      if (bucket) bucket.push(p);
-      else byHand.set(p.rhythm.hand, [p]);
-    }
-    const open: number[] = [];
-    const transverse: JankoClaspDurationInk[] = [];
-    for (const members of byHand.values()) {
-      const value = Math.min(...members.map((p) => p.note.durationTicks));
-      const cls = claspDurationClass(value);
-      if (cls === 'pip' || cls === 'double-pip') open.push(value);
-      else if (cls === 'spire-one-flag' || cls === 'spire-two-flags') {
-        transverse.push({ centerY: handY(members), durationTicks: value });
-      }
-    }
-    const midY =
-      (Math.min(...cluster.notes.map((p) => p.y)) +
-        Math.max(...cluster.notes.map((p) => p.y))) /
-      2; // the bracket's midpoint (the disc radius cancels out)
-    const ink: JankoClaspDurationInk[] = [];
-    if (open.length > 0) ink.push({ centerY: midY, durationTicks: Math.min(...open) });
-    ink.push(...transverse);
-    return ink.length > 0 ? ink : undefined;
+  // both hands' duration information — one ink group per hand (see
+  // {@link unifiedBracketInk}). The open half/whole marks read as the
+  // bracket's own value and sit at its midpoint; each hand's transverse
+  // subdivision marks stay at that hand's vertical centre.
+  /**
+   * Is one member of an admitted bracket an exception — a duration the
+   * bracket does not carry, so the member keeps its own exact statement?
+   * Per-hand paradigm only; retired paradigms keep the legacy rule.
+   */
+  const claspIsException = (clasp: JankoClaspGroupGeometry, id: string): boolean => {
+    if (o.chordGrouping !== 'per-hand-clasp') return false;
+    const member = clasp.notes.find((n) => n.id === id)!;
+    return member.durationTicks !== claspMemberCarriedTicks(clasp, id);
   };
   const clusters = collectClaspClusters(
     notes,
@@ -4434,7 +5147,15 @@ export function layoutJankoSystem(
         cluster.notes.map((p) => p.rhythm),
         t,
         {
-          ...(cluster.durationTicks === undefined ? {} : { durationTicks: cluster.durationTicks }),
+          ...(cluster.durationTicks === undefined
+            ? o.chordGrouping === 'per-hand-clasp'
+              ? {
+                  durationTicks: bracketModeDuration(
+                    cluster.notes.map((p) => p.note.durationTicks)
+                  ),
+                }
+              : {}
+            : { durationTicks: cluster.durationTicks }),
           // Round 6/8: a per-hand clasp exists only for a horizontally displaced
           // cluster or a vertical chord of three or more heads; a clean 2-note
           // vertical column keeps its stems.
@@ -4448,7 +5169,7 @@ export function layoutJankoSystem(
           clusterSpacing: o.clusterSpacing,
           honorHalo: o.showHonorHalo,
           ...(() => {
-            const ink = unifiedClaspInk(cluster);
+            const ink = unifiedBracketInk(cluster.notes, cluster.unified);
             return ink ? { durationInk: ink } : {};
           })(),
         }
@@ -4497,9 +5218,16 @@ export function layoutJankoSystem(
     claspRails = railed.rails;
   }
   const beamedIds = new Set(beams.flatMap((beam) => beam.notes.map((n) => n.id)));
-  let claspedStems = clasps
-    .flatMap((clasp) => clasp.notes.map((n) => n.id))
-    .filter((id) => !beamedIds.has(id));
+  // A clasp member that is part of a beam keeps its stem, so no real beam is
+  // ever broken by the grouping — and under the per-hand paradigm a member
+  // whose duration differs from its carried value keeps its own exact
+  // statement (exception stem) instead of being suppressed into the bracket.
+  // Retired paradigms keep the legacy all-suppressed rule.
+  let claspedStems = clasps.flatMap((clasp) =>
+    clasp.notes
+      .map((n) => n.id)
+      .filter((id) => !beamedIds.has(id) && !claspIsException(clasp, id))
+  );
 
   // Round 7 (Option 3): gap-gated vertical chording. Under the per-hand clasp
   // paradigm a horizontally spread hand cluster takes the external bracket,
@@ -4533,7 +5261,8 @@ export function layoutJankoSystem(
       if (standalone.length < 2) continue;
       const resolved = computeVerticalChordGroup(
         standalone.map((p) => p.rhythm),
-        t
+        t,
+        o.clusterSpacing
       );
       if (!resolved) continue;
       verticalChords.push(resolved);
@@ -4659,6 +5388,7 @@ export function layoutJankoSystem(
     unisonVoices,
     ottavaBrackets,
     clusterDiagnostics: chordColumns.diagnostics,
+    claspQualifiedIds: chordColumns.claspQualifiedIds,
   };
 }
 
@@ -4749,11 +5479,14 @@ function renderNotesLayer(
   // 2. Rhythm layer (the beamed dialect renders its stems group-wise). It is
   //    painted *beneath* the noteheads so the white knockouts erase whatever
   //    stem or beam passes behind a glyph — the invariant the linter audits.
-  //    A clasp owns the duration of every member whose stem is not part of a
-  //    beam, so those standalone stems are replaced by the bracket. Option 3
-  //    suppresses the interior stems of a vertical hand chord the same way: the
-  //    group's outer extremity carries the whole hand's duration. Round 16
-  //    shared stems suppress every member but the carrier the same way again.
+  //    A clasp owns the duration of every member that matches its carried
+  //    value and whose stem is not part of a beam, so those standalone stems
+  //    are replaced by the bracket; members with any other duration keep
+  //    their own exact statement (exception stems). Option 3 suppresses the
+  //    interior stems of a vertical hand chord the same way: the group's
+  //    outer extremity carries the hand's shortest value, matching members
+  //    join it, exceptions keep their stems. Round 16 shared stems suppress
+  //    every member but the carrier the same way again.
   const suppressed = suppressedStemIds(layout);
   const carrierDurations = new Map(
     layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks])
@@ -4771,11 +5504,21 @@ function renderNotesLayer(
     }
     // Round 30: a clasp member's kept stem renders with the golden grammar —
     // the bracket owns the member's duration, so the stem carries no
-    // preview ink of its own (no double dots, no member rings).
+    // preview ink of its own (no double dots, no member rings). Exception
+    // members are the converse: the bracket does NOT own their duration, so
+    // they render the active grammar — their complete exact statement.
     const claspedIds = new Set(layout.clasps.flatMap((c) => c.notes.map((n) => n.id)));
+    const claspOf = new Map(
+      layout.clasps.flatMap((c) => c.notes.map((n) => [n.id, c] as const))
+    );
     for (const n of layout.ungrouped) {
       if (suppressed.has(n.id)) continue;
-      const grammar = claspedIds.has(n.id) ? 'golden' : o.durationGrammar;
+      const clasp = claspOf.get(n.id);
+      const exception =
+        o.chordGrouping === 'per-hand-clasp' &&
+        clasp !== undefined &&
+        n.durationTicks !== claspMemberCarriedTicks(clasp, n.id);
+      const grammar = claspedIds.has(n.id) && !exception ? 'golden' : o.durationGrammar;
       out.push(renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle, grammar));
     }
   } else {

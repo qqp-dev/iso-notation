@@ -239,89 +239,31 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * consts in `test/janko-round32.test.ts`); midpoint-only is REJECTED — the
  * full grid stays canonical until Round 33 is judged.
  *
- * Round 33 re-asks the grid question with every settled refinement SHARED by
+ * Round 33 re-asked the grid question with every settled refinement SHARED by
  * both cards (lowest-inward cluster slots, m19-style 45° bracket dots, the E3
  * rest level, lighter ottava glyphs): full interior quarter-position grid vs
  * NO interior grid, on the six literal Brahms windows pickup+mm1–4, mm5–8,
- * mm17–20, mm33–36, mm53–56, mm57–64. Two cards, one axis — the grid filter.
- * The Reference is the control.
+ * mm17–20, mm33–36, mm53–56, mm57–64. DECIDED: the full grid is selected —
+ * the settled packing, the page-top correction and every shared refinement
+ * are canonical (see the Brahms score options), and no comparison remains.
+ * The historical cards are parked as `ROUND_33_METADATA` / `ROUND_33_CANDIDATES`
+ * in `test/janko-round33.test.ts`; nothing is lost.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 33,
-  title: 'Full interior grid vs no interior grid',
+  title: 'Full interior grid selected — no active comparison',
   description:
-    'Settled packing — first system pickup + four full measures (five displayed slots), later systems four full measures — under the opt-in page-top width correction on the fixed-3 core at four systems/page, with every settled refinement shared. The question is the interior grid only: the existing quarter-position pulses versus no interior grid at all, measure boundaries untouched. Midpoint-only is rejected. Two cards, one axis (gridPulseFilter); no canonical promotion.',
-  openAxes: ['gridPulseFilter'],
+    'Round 33 judged: the full interior quarter-position grid is canonical, with the settled four-per-system packing, the page-top width correction and every shared refinement promoted to the Reference. No open axis, no candidate cards — the studio shows the Golden Reference only.',
+  openAxes: [],
 };
 
 /**
- * Round 33: two cards on the single `gridPulseFilter` axis (Brahms ×6 —
- * literal corpus windows, every claim proofread against the real engine and
- * pinned in `test/janko-round33.test.ts`). Both cards share the settled
- * four-per-system packing plus the opt-in page-top correction and every
- * settled refinement, and differ only in the interior grid. Window 1
- * (pickup + mm. 1–4) shows five displayed slots (upbeat + four full
- * measures); the mm. 57–64 window spans the two adjacent systems carrying
- * the known overlap.
+ * No active comparison: Round 33 is decided (full grid selected) and no new
+ * round is open. The studio's candidates view renders the decided round with
+ * zero cards and selects the Reference; the parked Round 33 cards live in
+ * `test/janko-round33.test.ts` as `ROUND_33_METADATA` / `ROUND_33_CANDIDATES`.
  */
-export const CURRENT_CANDIDATES: JankoCandidate[] = [
-  {
-    id: 'grid-full-vs-none-full',
-    label: 'Full grid · settled packing',
-    description:
-      'Settled 4-per-system packing with the page-top correction and the existing interior quarter-position grid (second, third and fourth positions). Every settled refinement shared; no canonical promotion.',
-    axis: 'gridPulseFilter',
-    options: {
-      measuresPerSystem: 4,
-      correctPageTopAnacrusisMeasureWidth: true,
-      gridPulseFilter: 'all',
-    },
-    windows: [
-      brahmsWindow(
-        1,
-        4,
-        'Brahms pickup + mm. 1–4 · five displayed slots (upbeat + four full measures)'
-      ),
-      brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
-      brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
-      brahmsWindow(33, 4, 'Brahms mm. 33–36 · four full measures'),
-      brahmsWindow(53, 4, 'Brahms mm. 53–56 · four full measures'),
-      brahmsWindow(
-        57,
-        8,
-        'Brahms mm. 57–64 · paired systems spanning the known adjacent-system overlap'
-      ),
-    ],
-  },
-  {
-    id: 'grid-full-vs-none-none',
-    label: 'No interior grid · settled packing',
-    description:
-      'Same settled packing, page-top correction and shared refinements; no interior grid pulse paints at all. Measure boundaries untouched; no canonical promotion.',
-    axis: 'gridPulseFilter',
-    options: {
-      measuresPerSystem: 4,
-      correctPageTopAnacrusisMeasureWidth: true,
-      gridPulseFilter: 'none',
-    },
-    windows: [
-      brahmsWindow(
-        1,
-        4,
-        'Brahms pickup + mm. 1–4 · five displayed slots (upbeat + four full measures)'
-      ),
-      brahmsWindow(5, 4, 'Brahms mm. 5–8 · second system, four full measures'),
-      brahmsWindow(17, 4, 'Brahms mm. 17–20 · later page-top system, four full measures'),
-      brahmsWindow(33, 4, 'Brahms mm. 33–36 · four full measures'),
-      brahmsWindow(53, 4, 'Brahms mm. 53–56 · four full measures'),
-      brahmsWindow(
-        57,
-        8,
-        'Brahms mm. 57–64 · paired systems spanning the known adjacent-system overlap'
-      ),
-    ],
-  },
-];
+export const CURRENT_CANDIDATES: JankoCandidate[] = [];
 
 
 /** A fully resolved candidate, ready to engrave. */

@@ -729,6 +729,26 @@ export function claspDurationClass(durationTicks: number): JankoClaspDuration {
 }
 
 /**
+ * The duration a bracket carries: the **mode** of its members' values, ties
+ * broken toward the **longest**. The shortest member no longer dictates the
+ * bracket's reading — members that differ from the carried value keep their
+ * own exact duration statement (see the engine's exception suppression).
+ * Deterministic: first-maximum wins under the (count, duration) order, so
+ * the result depends only on the multiset of values, never their order.
+ */
+export function bracketModeDuration(durations: readonly number[]): number {
+  const counts = new Map<number, number>();
+  for (const d of durations) counts.set(d, (counts.get(d) ?? 0) + 1);
+  let best = durations[0];
+  for (const d of durations) {
+    const c = counts.get(d)!;
+    const b = counts.get(best)!;
+    if (c > b || (c === b && d > best)) best = d;
+  }
+  return best;
+}
+
+/**
  * Is a clasp's carried value **dotted** — exactly 1.5× a plain note value?
  * (72 = dotted quarter, 36 = dotted 8th, 144 = dotted half …). A dotted value
  * keeps its plain paradigm's midpoint ink and adds the canonical
@@ -1727,8 +1747,17 @@ export function renderClaspGroup(
  * Vertical distance (pt) at or below which two adjacent heads of one hand form
  * a **tight cluster**: no connecting ink is drawn between them, because a stem
  * there would only dagger the neighbouring notehead.
+ *
+ * The threshold is three ordinary protected-head vertical heights — the digit
+ * ink box plus its protective margin on both sides (`2 * hy` per head, from
+ * the active cluster-spacing preset, whose `hy` is the digit half-height plus
+ * the style margin) — so it follows the active style and scale instead of a
+ * fixed constant. Tight: `3 * 6.92 = 20.76pt`. The comparison is strictly
+ * greater-than: a gap of exactly three head heights stays unbridged.
  */
-export const CHORD_BRIDGE_MIN_GAP = 20.0;
+export function chordBridgeThreshold(spacing?: JankoClusterSpacing | null): number {
+  return 3 * (2 * getClusterSpacingPreset(spacing).hy);
+}
 /** Air (pt) a bridge line keeps from the two discs it connects. */
 export const CHORD_BRIDGE_DISC_AIR = 0.2;
 
@@ -1751,23 +1780,25 @@ export interface JankoChordBridge {
  * (`claspNotesHorizontallySpread` is false). Option 3 instead gives the column
  * a gap-gated stem grammar:
  *
- * - every adjacent pair closer than {@link CHORD_BRIDGE_MIN_GAP} is a tight
- *   cluster — its internal connecting stem is **suppressed**, so nothing
- *   daggers the neighbouring notehead;
- * - every adjacent pair further apart is a wide leap — an intentional
- *   {@link JankoChordBridge} line connects the two heads and unifies the hand's
- *   reach;
+ * - every adjacent pair at or below {@link chordBridgeThreshold} (three
+ *   ordinary protected-head heights) is a tight cluster — its internal
+ *   connecting stem is **suppressed**, so nothing daggers the neighbouring
+ *   notehead; strictly above it is a wide leap — an intentional
+ *   {@link JankoChordBridge} line connects the two heads and unifies the
+ *   hand's reach;
  * - the **outer extremity** of the group (topmost head for an up-stem hand,
  *   bottommost for a down-stem hand) carries the group's rhythmic duration —
  *   its stem, plus one mark per 8th/16th/32nd level of the hand's shortest
- *   member value.
+ *   member value. Members that match the carried value are suppressed into
+ *   the carrier's stem; members with any other duration keep their own exact
+ *   statement (exception stems).
  */
 export interface JankoVerticalChordGroup {
   /** The head that carries the whole hand's duration, at the group's extremity. */
   carrier: JankoRhythmNote;
   /** Duration (ticks) the carrier draws — the hand's shortest member value. */
   durationTicks: number;
-  /** Ids of the interior heads whose own stems are suppressed. */
+  /** Ids of the interior heads whose own stems are suppressed (carried-value matches only). */
   suppressedIds: string[];
   /** Intentional bridge lines across the group's wide leaps, top to bottom. */
   bridges: JankoChordBridge[];
@@ -1781,7 +1812,8 @@ export interface JankoVerticalChordGroup {
  */
 export function computeVerticalChordGroup(
   notes: readonly JankoRhythmNote[],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  spacing?: JankoClusterSpacing | null
 ): JankoVerticalChordGroup | null {
   const t = resolveJankoTokens(tokens);
   if (notes.length < 2) return null;
@@ -1793,12 +1825,20 @@ export function computeVerticalChordGroup(
   // The extremity in the stem direction carries the duration: an up-stem hand
   // (RH) hands it to its topmost head, a down-stem hand (LH) to its bottommost.
   const carrier = direction === -1 ? sorted[0] : sorted[sorted.length - 1];
-  const suppressedIds = sorted.filter((n) => n.id !== carrier.id).map((n) => n.id);
+  const durationTicks = Math.min(...notes.map((n) => n.durationTicks));
+  // Exception members (a duration other than the carried min) keep their own
+  // exact duration statement — only members that match the carried value are
+  // suppressed into the carrier's stem. The carried value itself stays the
+  // actual min (shortest) for the extant patterns.
+  const suppressedIds = sorted
+    .filter((n) => n.id !== carrier.id && n.durationTicks === durationTicks)
+    .map((n) => n.id);
   const bridges: JankoChordBridge[] = [];
+  const bridgeThreshold = chordBridgeThreshold(spacing);
   for (let i = 0; i + 1 < sorted.length; i++) {
     const upper = sorted[i];
     const lower = sorted[i + 1];
-    if (lower.y - upper.y <= CHORD_BRIDGE_MIN_GAP) continue;
+    if (lower.y - upper.y <= bridgeThreshold) continue;
     bridges.push({
       x: upper.x,
       y1: upper.y + t.noteheadRadius + CHORD_BRIDGE_DISC_AIR,
@@ -1808,7 +1848,7 @@ export function computeVerticalChordGroup(
   }
   return {
     carrier,
-    durationTicks: Math.min(...notes.map((n) => n.durationTicks)),
+    durationTicks,
     suppressedIds,
     bridges,
   };

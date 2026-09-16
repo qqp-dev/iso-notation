@@ -81,8 +81,13 @@ import {
   suppressedStemIds,
 } from './engine';
 import { getBarStaffSegments, getEquatorRuleYs, pitchGridRules } from './elements/staff';
-import { continuousPitchY } from './geometry';
-import { gridBotY, gridTopY, resolveBeatPulseXs } from './elements/barlines';
+import {
+  continuousPitchY,
+  getMeasureIndexOfTick,
+  pointToSegmentDistance,
+  splitTick,
+} from './geometry';
+import { gridBotY, gridTopY, resolveBeatPulseXs, resolveBeatPulses } from './elements/barlines';
 import {
   CLASP_RING_RADIUS,
   CLASP_RING_STROKE,
@@ -396,23 +401,6 @@ function segmentToBoxDistance(
     d = Math.min(d, pointToSegmentDistance(cx, cy, x1, y1, x2, y2));
   }
   return d;
-}
-
-/** Distance from a point to a line segment. */
-function pointToSegmentDistance(
-  px: number,
-  py: number,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): number {
-  const vx = x2 - x1;
-  const vy = y2 - y1;
-  const len2 = vx * vx + vy * vy;
-  if (len2 <= EPS) return Math.hypot(px - x1, py - y1);
-  const tt = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / len2));
-  return Math.hypot(px - (x1 + tt * vx), py - (y1 + tt * vy));
 }
 
 /** Distance from a vertical segment (`x`, `ya..yb`) to an axis-aligned box. */
@@ -1083,6 +1071,42 @@ interface PaintedSegment {
 }
 
 /**
+ * Is this stem segment's disc approach a Round 23 handled tuck — a stem END
+ * stopping at the head's grown erasure with true clearance?
+ *
+ * Three independent gates, all measured against true painted ink (never the
+ * virtual disc): the closest approach is an ENDPOINT (a mid-span approach is
+ * the Round 14 chop, always a violation); the end stands outside the digit's
+ * ink box grown by the stem-attachment air (the same breathing room an
+ * own-stem start keeps); and the head paints the tall knockout whose grown
+ * white covers the end (the layout's own Round 23 handling — a tuck the
+ * layout forgot to grow still violates).
+ */
+function isHandledStemTuck(
+  seg: PaintedSegment,
+  other: PositionedJankoNote,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): boolean {
+  const dx = seg.x2 - seg.x1;
+  const dy = seg.y2 - seg.y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 <= EPS * EPS) return false;
+  const proj = ((other.x - seg.x1) * dx + (other.y - seg.y1) * dy) / len2;
+  if (proj > 0 && proj < 1) return false;
+  const ex = proj <= 0 ? seg.x1 : seg.x2;
+  const ey = proj <= 0 ? seg.y1 : seg.y2;
+  const air = t.stemAttachmentAir ?? 1.0;
+  const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize);
+  if (Math.abs(ex - other.x) <= halfWidth + air && Math.abs(ey - other.y) <= halfHeight + air) {
+    return false;
+  }
+  if (other.tallKnockout !== true) return false;
+  const { wx, hy } = knockoutHalfExtents(o, t, other.note.startTick);
+  return Math.abs(ex - other.x) <= wx && Math.abs(ey - other.y) <= hy + air;
+}
+
+/**
  * Round 14: **no painted stem or beam segment may pass through the notehead
  * disc of a same-onset chord tone of its own hand**
  * (`stem-through-simultaneity`).
@@ -1108,6 +1132,12 @@ interface PaintedSegment {
  *
  * A tone's own stem starts on the outside of its own glyph circle, so it can
  * never trip this check; only a *foreign* same-onset head of the same hand can.
+ *
+ * A stem END tucked at the head's grown erasure is exempt (see
+ * {@link isHandledStemTuck}): the Round 23 tall knockout covers the end
+ * exactly to the own-stem breathing line, so the visible stem stops with the
+ * designed air and the digit ink clears — true protected ink, not a
+ * virtual-disc waiver.
  */
 export function checkStemThroughSimultaneity(
   layout: JankoSystemLayout,
@@ -1204,6 +1234,13 @@ export function checkStemThroughSimultaneity(
           seg.y2
         );
         if (distance + EPS >= r) continue;
+        // Round 23 handled tuck: a stem END that stops at the head's grown
+        // erasure — tucked under the tall white exactly at the own-stem
+        // breathing line, digit ink clear — is the designed paint, not the
+        // Round 14 mid-span chop. Only a through-crossing (interior closest
+        // point) or an end that reaches the digit's air still violates; beam
+        // connectors stay strict (they never tuck).
+        if (seg.stemOf !== null && isHandledStemTuck(seg, other, o, t)) continue;
         const source = seg.stemOf === null ? `${seg.label} of [${seg.ids.join(', ')}]` : `stem of notehead ${seg.stemOf}`;
         out.push({
           code: 'stem-through-simultaneity',
@@ -1647,45 +1684,147 @@ export function checkStemRingGeometry(
 }
 
 /**
- * Round 15 hard barrier — **no head may leave the beat cell of its nominal
- * column**. Each onset carries the `[left, right]` span between the two painted
- * grid lines that bracket its beat (`layout.notes[].beatCell`, recorded by the
- * chord-column solve), and a displaced head outside it has crossed a beat pulse
- * or a barline into another beat's territory (the Round 14 bar-12 defect).
+ * Round 15 hard barrier — **no head may leave the beat cell of its final
+ * column**. Each onset's cell is the span between the two painted grid lines
+ * that bracket its beat — barlines (fixed) and beat pulses at their final
+ * actual x (occupied beats at their laid-out columns, unoccupied beats
+ * proportional, the pulse filter applied) — and a displaced head outside it
+ * has crossed a beat pulse or a barline into another beat's territory (the
+ * Round 14 bar-12 defect).
+ *
+ * The cell is resolved from the final declared context (`layout.columns` plus
+ * the painted pulse map), never from the cached pre-shift beat cell the solve
+ * records: a column the solve translated (clasp air, spacing relief) carries
+ * its beat lines with it, so judging shifted heads against unshifted lines is
+ * a false green. Layouts without declared columns (lightweight fixtures)
+ * keep the legacy cached-cell path.
  */
 export function checkGridCrossingOffset(
   layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
   out: LintViolation[]
 ): void {
-  for (const p of layout.notes) {
-    if (p.nominalX === undefined || !p.beatCell) continue;
-    const { left, right } = p.beatCell;
-    if (p.x >= left - EPS && p.x <= right + EPS) continue;
-    const crossed = p.x < left ? left : right;
-    const side = p.x < left ? 'left' : 'right';
-    out.push({
-      code: 'grid-crossing-offset',
-      severity: 'error',
-      message:
-        `Head ${p.note.id} was displaced to x=${p.x.toFixed(2)}, outside the beat cell ` +
-        `[${left.toFixed(2)}, ${right.toFixed(2)}] of its nominal column ` +
-        `(x=${p.nominalX.toFixed(2)}): it crosses the grid line at x=${crossed.toFixed(2)} into the ` +
-        `${side === 'left' ? 'preceding' : 'following'} beat's territory.`,
-      system: layout.index,
-      measure: measureOfTick(p.note.startTick, t),
-      noteIds: [p.note.id],
-      x: p.x,
-      y: p.y,
-      metrics: {
-        nominalX: p.nominalX,
-        x: p.x,
-        cellLeft: left,
-        cellRight: right,
-        crossedX: crossed,
-      },
-    });
+  if (!layout.columns) {
+    for (const p of layout.notes) {
+      if (p.nominalX === undefined || !p.beatCell) continue;
+      checkHeadInCell(layout, p, p.beatCell.left, p.beatCell.right, p.nominalX, t, out);
+    }
+    return;
   }
+  const geo = layout.geometry;
+  const columns = layout.columns;
+  const pulseByTick = new Map(
+    resolveBeatPulses(geo, layout.index, o, t, columns).map((p) => [p.tick, p.x] as const)
+  );
+  const anacrusis = t.anacrusisTicks ?? 0;
+  const upbeatWidth =
+    layout.index === 0 && anacrusis > 0
+      ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth
+      : 0;
+  const beatTicks = Math.max(1, Math.round(t.ticksPerBeat));
+  const byTick = new Map<number, PositionedJankoNote[]>();
+  for (const p of layout.notes) {
+    const bucket = byTick.get(p.note.startTick);
+    if (bucket) bucket.push(p);
+    else byTick.set(p.note.startTick, [p]);
+  }
+  for (const [tick, heads] of byTick) {
+    const measureIdx = getMeasureIndexOfTick(heads[0].note, geo, layout.index, t);
+    const mWidth =
+      layout.index === 0 && anacrusis > 0 && tick < anacrusis
+        ? upbeatWidth
+        : geo.measureWidth;
+    const measureLeft =
+      layout.index === 0 && anacrusis > 0
+        ? tick < anacrusis
+          ? geo.staffLeft
+          : geo.staffLeft + upbeatWidth + (measureIdx - 1) * geo.measureWidth
+        : geo.staffLeft + measureIdx * geo.measureWidth;
+    if (layout.index === 0 && anacrusis > 0 && tick < anacrusis) {
+      for (const p of heads) {
+        checkHeadInCell(layout, p, measureLeft, measureLeft + mWidth, p.nominalX, t, out);
+      }
+      continue;
+    }
+    const { tickInMeasure } = splitTick(tick, t);
+    const beatIndex = Math.floor(tickInMeasure / beatTicks);
+    const base = tick - tickInMeasure;
+    const cellEnd = Math.min((beatIndex + 1) * beatTicks, t.ticksPerMeasure);
+    const measureStartTick = base;
+    const measureEndTick = base + t.ticksPerMeasure;
+    // Nearest painted line at-or-beyond a beat edge, walking over beats the
+    // pulse filter withheld (a hidden grid widens cells to the barlines —
+    // paint-only, never a new failure).
+    const paintedEdge = (edgeTick: number, dir: -1 | 1, barlineX: number): number => {
+      let b = edgeTick;
+      for (;;) {
+        const x = pulseByTick.get(b);
+        if (x !== undefined) return x;
+        if (b <= measureStartTick || b >= measureEndTick) return barlineX;
+        b += dir * beatTicks;
+      }
+    };
+    const left =
+      beatIndex === 0
+        ? measureLeft
+        : paintedEdge(base + beatIndex * beatTicks, -1, measureLeft);
+    const right =
+      cellEnd >= t.ticksPerMeasure
+        ? measureLeft + mWidth
+        : paintedEdge(base + cellEnd, 1, measureLeft + mWidth);
+    const column = columns.get(tick) ?? heads[0].nominalX;
+    // The §2 inward anchor, declared: an onset with a bracket-qualified
+    // member seats one slot toward the bracket ink, so its left edge extends
+    // one style gap left of the column — the bracketed head stands left of
+    // its beat pulse legitimately. Unqualified onsets keep the strict line
+    // (lowest ON the column): a pulse moved to the upper head leaves the
+    // lower head outside, and fails.
+    const inward = heads.some((p) => layout.claspQualifiedIds?.has(p.note.id) === true);
+    const leftEdge =
+      inward && column !== undefined
+        ? Math.min(left, column - getClusterSpacingPreset(o.clusterSpacing).pairGap)
+        : left;
+    for (const p of heads) {
+      checkHeadInCell(layout, p, leftEdge, right, column, t, out);
+    }
+  }
+}
+
+/** One head against its final beat cell (shared by both grid-audit paths). */
+function checkHeadInCell(
+  layout: JankoSystemLayout,
+  p: PositionedJankoNote,
+  left: number,
+  right: number,
+  column: number | undefined,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (p.x >= left - EPS && p.x <= right + EPS) return;
+  const crossed = p.x < left ? left : right;
+  const side = p.x < left ? 'left' : 'right';
+  out.push({
+    code: 'grid-crossing-offset',
+    severity: 'error',
+    message:
+      `Head ${p.note.id} was displaced to x=${p.x.toFixed(2)}, outside the beat cell ` +
+      `[${left.toFixed(2)}, ${right.toFixed(2)}] of its nominal column ` +
+      `(x=${(column ?? p.nominalX ?? p.x).toFixed(2)}): it crosses the grid line at x=${crossed.toFixed(2)} into the ` +
+      `${side === 'left' ? 'preceding' : 'following'} beat's territory.`,
+    system: layout.index,
+    measure: measureOfTick(p.note.startTick, t),
+    noteIds: [p.note.id],
+    x: p.x,
+    y: p.y,
+    metrics: {
+      nominalX: column ?? p.nominalX ?? p.x,
+      x: p.x,
+      cellLeft: left,
+      cellRight: right,
+      crossedX: crossed,
+    },
+  });
 }
 
 /**
@@ -4366,7 +4505,7 @@ export function lintJankoScore(
     checkStemThroughSimultaneity(layout, o, t, diagnostics);
     checkSplitStackStems(layout, t, diagnostics);
     checkDotCollision(layout, o, t, diagnostics);
-    checkGridCrossingOffset(layout, t, diagnostics);
+    checkGridCrossingOffset(layout, o, t, diagnostics);
     checkTimeOrder(layout, t, diagnostics);
     checkBarlineClearance(layout, o, t, thresholds, diagnostics);
     checkClaspClearance(layout, o, t, thresholds, diagnostics);

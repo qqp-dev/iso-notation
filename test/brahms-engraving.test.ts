@@ -8,9 +8,9 @@
  *  2. Row-Snapped Parity Offset (Approach 2) on real harmony: every same-row
  *     chord tone keeps its true whole-tone row and is spread horizontally by
  *     one full notehead diameter, including the three-note cluster of m. 8.
- *  3. The complete engraving: zero notehead collisions and the accepted
- *     4-up lint record (2 slot findings, zero warnings — red by operator
- *     order; itemized in test/brahms-studio-ergonomics.test.ts, §2-landed).
+ *  3. The complete engraving: zero notehead collisions and the canonical
+ *     lint record (the adaptive secondary surface carries its pre-existing
+ *     residual; itemized in test/brahms-studio-ergonomics.test.ts).
  */
 
 import { test } from 'node:test';
@@ -315,7 +315,7 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   );
   assert.equal(merged, 7, 'the seven Brahms unisons merge to one head each');
   assert.equal(notes.length, SCORE.notes.length - merged, 'every note is engraved, merged unisons once');
-  assert.equal(LAYOUTS.length, 24, 'the complete Intermezzo lays out as 24 systems, three measures each');
+  assert.equal(LAYOUTS.length, 18, 'the complete Intermezzo lays out as 18 systems, four measures each');
   // Every layout is engraved in its own system frame and later pages reuse the
   // four frames of page 1, so two notes are only comparable when their
   // systems share a page.
@@ -341,27 +341,27 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   assert.equal(collisions, 0, 'no two rectangular notehead masks overlap anywhere in the score');
 });
 
-test('Brahms Op. 118 No. 1 carries exactly the accepted 4-up slot findings', () => {
-  // 4-up by operator override (was completely clean at 3-up): the adaptive
-  // engraving reports the 2 accepted slot findings — sys 23 furniture past
-  // its slot, sys 24 ink into sys 23 (gap −28.03pt after the rule-A carrier
-  // move to 964) — and nothing else. Sides and deficits are itemized in the
-  // §2-landed record.
+test('Brahms Op. 118 No. 1 adaptive carries exactly its pre-existing residual', () => {
+  // The adaptive secondary surface (the CLI spread) at canonical 4-per
+  // packing: 2 same-class pre-existing findings at the final system pair —
+  // sys 18 furniture past its slot (+1.41pt) and sys 18 ink into sys 17
+  // (gap −13.03pt, already less than the pre-PR66 16.82pt). The canonical
+  // fixed-3 surface is clean (see the ergonomics lint record).
   assert.deepEqual(
     REPORT.violations.map((v) => `${v.code}: ${v.message}`),
     [
-      "system-slot-overlap: System 23's staff furniture spans y=[452.54, 630.32], outside its 183.97pt page slot [445.94, 629.92] (1.00pt clearance).",
-      "system-slot-overlap: System 24's ink reaches up to y=610.42, into system 23's ink (bottom y=638.44): the two systems overlap on the page.",
+      "system-slot-overlap: System 18's staff furniture spans y=[265.59, 446.35], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
+      "system-slot-overlap: System 18's ink reaches up to y=242.47, into system 17's ink (bottom y=255.50): the two systems overlap on the page.",
     ],
-    'exactly the two accepted slot findings'
+    'exactly the pre-existing residual pair'
   );
   assert.deepEqual(
     REPORT.warnings.map((v) => `${v.code}: ${v.message}`),
     [],
     'zero warnings — the five-voice chords are fully resolved'
   );
-  assert.equal(REPORT.ok, false, 'red-on-Brahms is the expected, operator-accepted state');
-  assert.equal(REPORT.stats.systems, 24);
+  assert.equal(REPORT.ok, false, 'the secondary surface stays honestly non-ok');
+  assert.equal(REPORT.stats.systems, 18);
   assert.equal(REPORT.stats.measures, 71);
   assert.equal(REPORT.stats.notes, SCORE.notes.length - 7, 'the seven merged unison heads are painted once');
   assert.ok(REPORT.stats.beams > 0, 'the eighths are beamed');
@@ -386,9 +386,11 @@ test('The mm. 7–8 macro crop keeps the octave-1 ledger stack whole', () => {
   const [vx, vy, vw, vh] = viewBox.slice(1).map(Number);
 
   // The glyph work is the whole system (a crop is a viewBox narrowing), so the
-  // assertion is on the notes the crop actually frames: mm. 7–8 of system 3.
-  const system = LAYOUTS[2];
-  const framed = system.notes.filter((p) => p.note.startTick < at(9, 0));
+  // assertion is on the notes the crop actually frames: mm. 7–8 of system 2
+  // (canonical 4-per packing: sys1 pickup+1–4, sys2 mm. 5–8 — the filter
+  // excludes the system's mm. 5–6, which the crop does not frame).
+  const system = LAYOUTS[1];
+  const framed = system.notes.filter((p) => p.note.startTick >= at(7, 0) && p.note.startTick < at(9, 0));
   assert.ok(framed.length >= 30, 'the crop frames the two five-voice chords and their arpeggios');
   const pad = Math.max(R, TOKENS.ledgerHalfWidth!);
   for (const p of framed) {
@@ -421,9 +423,9 @@ test('The Brahms page renders every system with glyphs and no phantom staff', ()
     assert.ok(layout.notes.length > 0, `system ${layout.index + 1} carries notes`);
   }
   const systems = LAYOUTS.map((l: JankoSystemLayout) => l.index);
-  assert.equal(systems.length, 24, 'the complete Intermezzo renders as 24 systems');
+  assert.equal(systems.length, 18, 'the complete Intermezzo renders as 18 systems');
   assert.deepEqual(
     systems,
-    Array.from({ length: 24 }, (_, i) => i)
+    Array.from({ length: 18 }, (_, i) => i)
   );
 });

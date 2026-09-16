@@ -907,6 +907,60 @@ test('Defect: an unclasped four-voice simultaneity paints its stems through its 
   );
 });
 
+test('Handled tuck: a stem end at the grown erasure is true-ink clean, not a chop', () => {
+  // Brahms t4560 (m. 24) and t8400 (m. 44): the upper quarter's down-stem
+  // ends 4.00pt above the lower head's centre — inside the virtual 4.8 disc
+  // but tucked under the Round 23 tall white exactly at the own-stem
+  // breathing line, digit ink clear. Designed paint, zero violation.
+  const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
+  const layouts = layoutJankoScore(buildBrahmsOp118No1Score(), o, BRAHMS_TOKENS);
+  for (const [tick, stemId, headId] of [
+    [4560, 'brahms-op118-no1-326', 'brahms-op118-no1-325'],
+    [8400, 'brahms-op118-no1-612', 'brahms-op118-no1-611'],
+  ] as const) {
+    const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+    assert.deepEqual(
+      run((l, out) => checkStemThroughSimultaneity(l, o, BRAHMS_TOKENS, out), sys),
+      [],
+      `t${tick}: the handled tuck is silent`
+    );
+    const stemNote = sys.ungrouped.find((n) => n.id === stemId)!;
+    const head = sys.notes.find((p) => p.note.id === headId)!;
+    const s = getStemGeometry(stemNote, BRAHMS_TOKENS);
+    assert.ok(Math.abs(s.stemX - head.x) < 1e-9, `t${tick}: stem on the head column`);
+    assert.ok(Math.abs(head.y - s.stemEndY - 4.0) < 1e-9, `t${tick}: end 4.00 above centre`);
+    assert.equal(head.tallKnockout, true, `t${tick}: the tall erasure is painted`);
+  }
+});
+
+test('Handled tuck: an unpainted or too-deep tuck still violates', () => {
+  const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
+  const layouts = layoutJankoScore(buildBrahmsOp118No1Score(), o, BRAHMS_TOKENS);
+  const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === 4560))!;
+  // The layout forgot the tall erasure: the end inside the disc violates.
+  const untallied = {
+    ...sys,
+    notes: sys.notes.map((p) =>
+      p.note.id === 'brahms-op118-no1-325' ? { ...p, tallKnockout: false } : p
+    ),
+  };
+  const forgotten = run((l, out) => checkStemThroughSimultaneity(l, o, BRAHMS_TOKENS, out), untallied);
+  assert.equal(forgotten.length, 1, 'an ungrown tuck is named');
+  assert.equal(forgotten[0].code, 'stem-through-simultaneity');
+  assert.ok(forgotten[0].noteIds!.includes('brahms-op118-no1-326'));
+  assert.ok(forgotten[0].noteIds!.includes('brahms-op118-no1-325'));
+  // The end pushed 1.0pt deeper reaches the digit's air: violates.
+  const deep = {
+    ...sys,
+    ungrouped: sys.ungrouped.map((n) =>
+      n.id === 'brahms-op118-no1-326' ? { ...n, y: n.y + 1.0 } : n
+    ),
+  };
+  const reached = run((l, out) => checkStemThroughSimultaneity(l, o, BRAHMS_TOKENS, out), deep);
+  assert.equal(reached.length, 1, 'an end inside the digit air is named');
+  assert.equal(reached[0].code, 'stem-through-simultaneity');
+});
+
 test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', () => {
   // A disc wide enough to wall the m. 4 beat cell shut: no slot along the row
   // keeps the guaranteed seating air from the LH D3 head that shares the column.
@@ -1757,8 +1811,8 @@ test('npm run lint:engraving reports the accepted 4-up breakage and exits 1', ()
   assert.deepEqual(
     reports.brahms.violations.map((v) => [v.code, v.system + 1]),
     [
-      ['system-slot-overlap', 23],
-      ['system-slot-overlap', 24],
+      ['system-slot-overlap', 18],
+      ['system-slot-overlap', 18],
     ],
     'Brahms: exactly the accepted 2 (itemized in the §2-landed record)'
   );
@@ -1804,10 +1858,11 @@ test('clasp-dot-fusion names a fused bracket second dot (mark + sibling airs)', 
   const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
   // No double-dotted brackets remain in source-correct Brahms (all 42/84/336
   // corrected to standard values); synthesize the second dot on the real
-  // single-dot tick-48 bracket (144 dotted half) to prove the fusion audit
+  // single-dot tick-432 bracket (144 dotted half; the tick-48 twin stands
+  // bare at canonical packing under adaptive) to prove the fusion audit
   // still catches a collapsed pair. Engine rules unchanged.
-  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 48))!;
-  const clasp = sys.clasps.find((c) => c.tick === 48)!;
+  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 432))!;
+  const clasp = sys.clasps.find((c) => c.tick === 432)!;
   assert.ok(clasp.durationDots[0], 'the 144-bracket resolves its first dot');
   assert.ok(!clasp.durationSecondDots[0], 'and no second dot (single-dot source value)');
   // Synthesize a double-dotted bracket: claim two dots, resolve the second,
@@ -1822,10 +1877,11 @@ test('clasp-dot-fusion names a fused bracket second dot (mark + sibling airs)', 
 
 test('dot-count-agreement names a bracket resolved without the active grammar', () => {
   const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
-  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 48))!;
-  const clasp = sys.clasps.find((c) => c.tick === 48)!;
+  const sys = layouts.find((s) => s.clasps.some((c) => c.tick === 432))!;
+  const clasp = sys.clasps.find((c) => c.tick === 432)!;
   // Simulate a forgotten call site: golden ink (undotted) under preview.
-  // Tick 48 carries a source-correct 144 dotted half (was 42-bracket pre-fix).
+  // Tick 432 carries a source-correct 144 dotted half (the tick-48 twin
+  // stands bare at canonical packing under adaptive).
   clasp.durationInk[0].dots = 0;
   clasp.durationInk[0].dotted = false;
   clasp.durationDots[0] = null;
