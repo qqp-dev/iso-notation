@@ -26,6 +26,11 @@
  * brahmsPages [0..7]→[0..5], spread 8→6 pages, chip ✗4→✗9, CLI 0/0→2
  * violations (accepted red), page loops 8→6, three exact floats re-pinned
  * to last-ulp dust. Old values quoted at each site.
+ *
+ * Round 32 parks this round by convention (R28/R29/R30 precedent): the
+ * registry assertions below run on historical consts
+ * (`ROUND_31_METADATA` / `ROUND_31_CANDIDATES`) while §§1–2 surface, census
+ * and linter pins stay live on the explicit fixed-3 options.
  */
 
 import test from 'node:test';
@@ -42,11 +47,11 @@ import {
 } from '../src/scores/brahms-op118-no1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   DEFAULT_STUDIO_SCORE_ID,
+  JankoCandidate,
+  JankoCandidateRound,
+  brahmsWindow,
   candidateBadges,
-  getCandidate,
   resolveCandidate,
 } from '../src/render/janko/candidates';
 import { claspMarkDaylight } from '../src/render/janko/elements/rhythm';
@@ -88,6 +93,42 @@ const O_PREVIEW = resolveJankoOptions({
   claspDotNudge: [NUDGE_DX, NUDGE_DY],
 });
 const CONFIG = createStudioConfig({ score: BACH });
+
+/** Historical Round 31 registry (parked by Round 32; R28/R29/R30 precedent). */
+const ROUND_31_METADATA: JankoCandidateRound = {
+  round: 31,
+  title: 'Clasp-dot nudge: a little lower and to the right',
+  description:
+    'The approved situational nudge, previewed before any flip: every bracket-attached augmentation dot steps lower-right by the uniform vector (+0.4pt, +0.2pt) while every note dot stays byte-identical. The card frames the two pinned white-ring dots — the Brahms m.1 tick-48 dot and its m.3 tick-432 twin — which move identically; the Reference BRONZE Brahms is the standing control.',
+  openAxes: ['claspDotNudge'],
+};
+const ROUND_31_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'round-31-clasp-nudge',
+    label: 'Clasp dot lower-right',
+    description:
+      'Bracket dots step (+0.4pt, +0.2pt) — the approved situational nudge, uniform across clasp dots. The m.1 white-ring dot and its m.3 twin move identically; note dots are byte-identical. Adds no new findings: the card inherits the BRONZE surface\u2019s 4 known folding findings.',
+    axis: 'claspDotNudge',
+    options: { claspDotNudge: [0.4, 0.2] },
+    windows: [
+      brahmsWindow(
+        1,
+        2,
+        'Brahms mm. 1–2 · the m.1 white-ring dot steps (+0.4pt, +0.2pt) lower-right'
+      ),
+      brahmsWindow(
+        2,
+        2,
+        'Brahms mm. 2–3 · the m.3 downbeat twin steps the identical (+0.4pt, +0.2pt)'
+      ),
+    ],
+  },
+];
+const CONFIG_31 = createStudioConfig({
+  score: BACH,
+  candidates: ROUND_31_CANDIDATES,
+  round: ROUND_31_METADATA,
+});
 
 /**
  * Every dotted bracket under the fixed-3 golden (the 18-dot census).
@@ -275,7 +316,7 @@ test('Option default is the judged seat; the card carries the preview vector', (
     [0, 0],
     'default [0, 0] renders the judged seats byte-identically'
   );
-  const card = getCandidate('round-31-clasp-nudge')!;
+  const card = ROUND_31_CANDIDATES.find((c) => c.id === 'round-31-clasp-nudge')!;
   assert.ok(card, 'the card is registered');
   assert.deepEqual(card.options, { claspDotNudge: [0.4, 0.2] }, 'a one-axis preview delta');
 });
@@ -380,7 +421,7 @@ test('Window census: each card window shows exactly its dot moved, visibly, noth
   // sys 0) carries the tick-432 mate clipped in its DOM, and vice versa.
   // The VISIBLE diff is exactly one dot per window; the DOM diff is exactly
   // the two system-mate dots — both pinned, nothing else.
-  const card = getCandidate('round-31-clasp-nudge')!;
+  const card = ROUND_31_CANDIDATES.find((c) => c.id === 'round-31-clasp-nudge')!;
   const windows = [
     { start: 1, count: 2, visible: 48, clipped: 432 },
     { start: 2, count: 2, visible: 432, clipped: 48 },
@@ -514,7 +555,7 @@ test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden
 });
 
 test('Caption proofread against the actual render', () => {
-  const card = getCandidate('round-31-clasp-nudge')!;
+  const card = ROUND_31_CANDIDATES.find((c) => c.id === 'round-31-clasp-nudge')!;
   const [w0, w1] = card.windows!;
   // The displacement vector, printed to 0.1pt in both windows — and true.
   for (const w of [w0, w1]) {
@@ -544,16 +585,20 @@ test('Caption proofread against the actual render', () => {
 // ---------------------------------------------------------------------------
 
 test('Registry purity: one card, no control, one axis', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 31);
-  assert.match(CURRENT_ROUND_METADATA.title, /Clasp-dot nudge/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge']);
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no strip: one shared preview');
-  assert.equal(CURRENT_CANDIDATES.length, 1, 'exactly one card');
-  assert.equal(getCandidate('control'), undefined, 'no control card');
-  const [card] = CURRENT_CANDIDATES;
+  assert.equal(ROUND_31_METADATA.round, 31);
+  assert.match(ROUND_31_METADATA.title, /Clasp-dot nudge/);
+  assert.deepEqual(ROUND_31_METADATA.openAxes, ['claspDotNudge']);
+  assert.equal(ROUND_31_METADATA.compareStrip, undefined, 'no strip: one shared preview');
+  assert.equal(ROUND_31_CANDIDATES.length, 1, 'exactly one card');
+  assert.equal(
+    ROUND_31_CANDIDATES.find((c) => c.id === 'control'),
+    undefined,
+    'no control card'
+  );
+  const [card] = ROUND_31_CANDIDATES;
   assert.equal(card.id, 'round-31-clasp-nudge');
   assert.equal(card.axis, 'claspDotNudge', 'the card declares the open axis');
-  const badges = candidateBadges(card);
+  const badges = candidateBadges(card, ROUND_31_METADATA);
   assert.deepEqual(
     badges.map((b) => b.key),
     ['claspDotNudge'],
@@ -572,7 +617,7 @@ test('Registry purity: one card, no control, one axis', () => {
 });
 
 test('Card chip honestly inherits the surface: red by attribution, preview adds 0', () => {
-  const html = renderCandidatesView(CONFIG);
+  const html = renderCandidatesView(CONFIG_31);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
   assert.ok(html.includes('data-candidate="round-31-clasp-nudge"'), 'the nudge card renders');
   // Whole-score card lint inherits the BRONZE surface's 9 knowns — the card
@@ -587,7 +632,12 @@ test('Card chip honestly inherits the surface: red by attribution, preview adds 
   assert.match(html, /1 candidate × 2 engraving windows/, 'the header counts honestly');
   assert.match(html, /data-lint="violations"/, 'the chip inherits the surface honestly');
   assert.match(html, /✗ 9 violations/, 'the count is shown, never folded away (was ✗ 4)');
-  assert.equal((html.match(/badge-axis/g) ?? []).length, 1, 'one axis badge');
+  // Parked: badges render against the live CURRENT round (Round 32), so the
+  // historical claspDotNudge delta shows without the axis class (the live
+  // axis is gridPulseFilter). The axis badge itself is pinned on the
+  // historical round explicitly in the Registry purity test above.
+  assert.equal((html.match(/badge-axis/g) ?? []).length, 0, 'no live-axis badge on parked card');
+  assert.ok(html.includes('<b>claspDotNudge</b>'), 'the historical delta still badges');
   assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 2, 'Brahms ×2');
   assert.ok(!html.includes('data-window="primary:'), 'Bach carries no window this round');
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');

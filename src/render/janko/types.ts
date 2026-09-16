@@ -963,6 +963,25 @@ export interface JankoLayoutOptions {
    * seats, byte-identical).
    */
   claspDotNudge?: JankoClaspDotNudge;
+  /**
+   * Beat-grid pulse filter (the Round 32 preview axis): which interior beat
+   * pulses are painted. `'all'` keeps every existing interior quarter
+   * position; `'midpoint-only'` retains an existing pulse iff its tick offset
+   * is exactly half `ticksPerMeasure` (a filter over existing candidates —
+   * no new subdivisions, no retiming, no barline change). Defaults to `'all'`
+   * (byte-identical). Odd subdivisions with no existing midpoint retain no
+   * interior pulses under the opt-in; never reinterpreted as `'all'`.
+   */
+  gridPulseFilter?: JankoGridPulseFilter;
+  /**
+   * Compatibility-isolated page-top anacrusis width correction (Round 32
+   * candidate-only, pending canonical judgment — not a score-specific switch):
+   * later page-top systems use the normal full-measure width instead of
+   * inheriting system 0's pickup-reduced denominator. System 0 keeps its
+   * pickup geometry; no-pickup scores are unchanged. Defaults to `false`
+   * (byte-identical).
+   */
+  correctPageTopAnacrusisMeasureWidth?: boolean;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1008,6 +1027,15 @@ export type JankoDurationGrammar = 'golden' | 'complete';
  * is the judged golden seat.
  */
 export type JankoClaspDotNudge = readonly [number, number];
+
+/**
+ * Beat-grid pulse filter (the Round 32 preview axis).
+ *
+ * - `'all'`: every existing interior pulse (the incumbent).
+ * - `'midpoint-only'`: only the existing pulse at exactly half
+ *   `ticksPerMeasure` — a filter, never a generator.
+ */
+export type JankoGridPulseFilter = 'all' | 'midpoint-only';
 
 /**
  * Fixed Middle-C-centered core octave line grammar (Round 27).
@@ -1068,6 +1096,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   extensionJunction: 'default',
   durationGrammar: 'golden',
   claspDotNudge: [0, 0],
+  gridPulseFilter: 'all',
+  correctPageTopAnacrusisMeasureWidth: false,
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

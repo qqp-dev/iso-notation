@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 1, 'Round 31 declares one preview card');
+assert.equal(CURRENT_CANDIDATES.length, 2, 'Round 32 declares two grid cards');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -124,22 +124,22 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 31/);
-  assert.match(html, /Clasp-dot nudge/);
+  assert.match(html, /Round 32/);
+  assert.match(html, /Four per system/);
 });
 
-test('Round 31 previews the clasp-dot nudge: one axis, one card, no control', () => {
-  // Ordered contract change: Round 31 previews the situational clasp-dot
-  // nudge on Brahms — one card on the single claspDotNudge axis, Reference
-  // as the standing control. Round 30 is parked (historical consts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 31);
-  assert.match(CURRENT_ROUND_METADATA.title, /Clasp-dot nudge/);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 1, 'one card');
+test('Round 32 is the settled-packing grid round: one axis, two cards, no control', () => {
+  // Ordered contract change: Round 32 compares the interior beat grid on
+  // Brahms — two cards on the single gridPulseFilter axis, Reference as the
+  // standing control. Rounds 30–31 are parked (historical consts).
+  assert.equal(CURRENT_ROUND_METADATA.round, 32);
+  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['round-31-clasp-nudge'],
-    'the nudge card'
+    ['4-per-system-full-grid', '4-per-system-midpoint-grid'],
+    'the grid cards'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -163,23 +163,32 @@ test('Round 31 previews the clasp-dot nudge: one axis, one card, no control', ()
   );
   assert.equal(golden.durationGrammar, 'golden', 'the incomplete grammar is the incumbent');
   assert.deepEqual(golden.claspDotNudge, [0, 0], 'the judged clasp-dot seats are the default');
+  assert.equal(golden.gridPulseFilter, 'all', 'the full interior grid is the default');
+  assert.equal(
+    golden.correctPageTopAnacrusisMeasureWidth,
+    false,
+    'the page-top correction is opt-in'
+  );
 });
 
-test('The Round 31 studio renders one preview card on one axis, no control', () => {
+test('The Round 32 studio renders two grid cards on one axis, no control', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // One card, one axis badge, two windows — Brahms ×2, Bach ×0.
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
-  assert.equal((html.match(/badge-axis/g) ?? []).length, 1, 'one axis badge on the card');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 2, 'two windows');
-  assert.match(html, /data-candidate-count="1"/);
-  assert.match(html, /data-window-count="2"/);
-  assert.match(html, /data-verification="false"/, 'the preview round is decisive');
-  assert.match(html, /1 candidate × 2 engraving windows/, 'the header counts honestly');
-  assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 2, 'Brahms ×2');
+  // Two cards, one axis badge each, four windows each — Brahms ×8, Bach ×0.
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.equal((html.match(/badge-axis/g) ?? []).length, 2, 'one axis badge per card');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 8, 'eight windows');
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /data-window-count="8"/);
+  assert.match(html, /data-verification="false"/, 'the grid round is decisive');
+  assert.match(html, /2 candidates × 8 engraving windows/, 'the header counts honestly');
+  assert.equal((html.match(/data-window="brahms-op118-no1:/g) ?? []).length, 8, 'Brahms ×8');
   assert.ok(!html.includes('data-window="primary:'), 'Bach carries no window this round');
 
-  // No settled decision is badged as an open question.
+  // No settled decision is badged as an open question (the shared packing
+  // correction rides as a delta badge, not an axis — asserted in the
+  // round-32 suite; the settled packing itself equals the Bach golden and
+  // never badges).
   for (const key of [
     'chordGrouping',
     'systemStartStyle',
@@ -194,6 +203,7 @@ test('The Round 31 studio renders one preview card on one axis, no control', () 
     'dotRule',
     'extensionWeight',
     'durationGrammar',
+    'claspDotNudge',
   ]) {
     assert.ok(!html.includes(`<b>${key}</b>`), `${key} is settled context, never an open question`);
   }
@@ -202,12 +212,13 @@ test('The Round 31 studio renders one preview card on one axis, no control', () 
   // No control card: the Reference view is the standing control.
   assert.ok(!html.includes('data-candidate="control"'), 'no control card');
 
-  // The card inherits the BRONZE surface's 9 knowns (whole-score card lint):
-  // honestly red, with the attribution proven in test/janko-round31.test.ts.
+  // Each card inherits the approved candidate-only 10 findings (whole-score
+  // card lint): honestly red, with the attribution proven in
+  // test/janko-round32.test.ts.
   assert.equal(
     (html.match(/data-lint="violations"/g) ?? []).length,
-    1,
-    'the card carries the surface chip honestly'
+    2,
+    'both cards carry the candidate chip honestly'
   );
 
   // The Reference view still carries the whole golden master, both scores.
@@ -469,11 +480,11 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 31);
-  assert.match(CURRENT_ROUND_METADATA.title, /Clasp-dot nudge/);
+  assert.equal(CURRENT_ROUND_METADATA.round, 32);
+  assert.match(CURRENT_ROUND_METADATA.title, /Four per system/);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['claspDotNudge'], 'one open axis in the preview round');
-  assert.equal(CURRENT_CANDIDATES.length, 1, 'one card in the preview round');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['gridPulseFilter'], 'one open axis in the grid round');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the grid round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.
