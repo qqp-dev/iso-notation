@@ -32,13 +32,18 @@ real-engine operator review for genuinely new cases.
   (explicit subsequent working-sheet tasks). The sheet is NOT labelled
   wholly faithful.
 - Articulation never changes written duration. MIDI remains a performance
-  witness and identity baseline, never notation-duration truth.
-- Matching hand follows the MIDI-track baseline (staff destination:
-  upper→RH, lower→LH) to preserve the approved 964-key track assignment.
-  Source voice identity (`rightHandUpper/Lower`, `leftHandUpper/Lower`) is
-  retained separately in provenance; cross-staff intended-hand assignments
-  remain uncertified (see below). Voice-based hand alone yields 958 keys
-  with 61 missing / 55 extra and is rejected by the bijection gate.
+  witness and identity baseline, never notation-duration truth. Tie
+  interpretation follows the pinned source and LilyPond documented semantics
+  (https://lilypond.org/doc/v2.26/Documentation/notation/writing-rhythms#ties),
+  not MIDI playback behaviour.
+- Matching hand is ONLY the existing MIDI-track matching label (staff
+  destination: upper→RH, lower→LH) to preserve the approved 964-key track
+  assignment. Logical source voices (`rightHandUpper/Lower`,
+  `leftHandUpper/Lower`) remain separately preserved in provenance;
+  intended hands are NOT certified, especially at cross-staff passages.
+  Voice-based hand alone yields 958 keys with 61 missing / 55 extra and is
+  rejected by the bijection gate. This track-label projection must not be
+  reinterpreted as permission to coerce event counts or duration data.
 - Unfamiliar constructs or ambiguous mappings produce explicit diagnostics
   and stop certification; no optimistic fallback, no duration guessing.
 
@@ -74,18 +79,29 @@ real-engine operator review for genuinely new cases.
   rejected. No adjacency-inferred ties.
 - Merges only explicitly tied same-pitch segments in the same source voice
   at exact temporal adjacency to the immediate successor onset; reattacks
-  stay separate. Chord-wide partial ties (some pitches lack an adjacent
-  same-pitch successor, e.g. mm. with `<chord>2~` into arpeggiated eighths)
-  keep non-continuing pitches separate — matching LilyPond MIDI behaviour —
-  not an error. `tieWaitForNote` gaps (leftHand mm. 39–40 `a,4.*1/3~` /
-  `d4~` into `<a d>2`) merge across the gap to the next same-pitch segment
-  with sounding duration (end − start, gap included).
-- Cross-voice unisons (same hand/pitch/onset in two voices, e.g. RHU half
-  + RHL quarter on F4) dedup to one event with max (sounding) duration and
-  combined provenance — required for the 964 bijection; MIDI merges these.
-- Rejects dangling ties, duplicate/ambiguous keys, unexplained timing,
-  unsupported constructs and missing correspondence with actionable
-  diagnostics. Mixed-staff tie chains are rejected.
+  stay separate. Declaration kind is preserved through resolution: explicit
+  note-specific ties (per-note flags, single-note ties) require an eligible
+  continuation and fail closed with voice/pitch/source/onset diagnostics
+  when nonadjacent without `tieWaitForNote` or dangling; ordinary
+  chord-wide ties apply only to matching pitches of the immediately
+  following adjacent event per LilyPond source semantics, and unmatched
+  chord tones remain legitimately untied — independent of any later
+  recurrence — not an error (e.g. line 61 `<c ds fs c'>2~` into arpeggiated
+  eighths: only the top C merges to 120 ticks). `tieWaitForNote` gaps
+  (leftHand mm. 39–40 `a,4.*1/3~` / `d4~` into `<a d>2`, plus line 320–321
+  A2 spanning a 48-tick gap to 168 ticks) merge across the gap to the next
+  same-pitch segment with sounding duration (end − start, gap included).
+  Unresolved explicit delayed ties need diagnostics, not fallback.
+- Co-onset same-pitch/same-track voice unions (e.g. RHU half + RHL quarter
+  on F4 at tick 1392) project to one runtime event with max (sounding)
+  duration — an exact projection of source sounding coverage for this
+  flattened runtime model, with all original voices/durations retained in
+  provenance. This preserves the 964 bijection; it does not certify
+  independently notated voices and must not coerce event counts.
+- Rejects dangling/nonadjacent explicit note-specific ties,
+  duplicate/ambiguous keys, unexplained timing, unsupported constructs and
+  missing correspondence with actionable diagnostics. Mixed-staff tie chains
+  are rejected.
 
 ## Regeneration
 
@@ -113,6 +129,11 @@ LILYPOND_BIN=/path/to/lilypond npm run brahms:export-durations
   (versioned, stable ordering, relative paths, no timestamps).
 - Companion: `src/scores/data/brahms-op118-no1-written-durations.provenance.json`
   (per-event tied segments, origins, voice/staff/bar/occurrence; linked by
-  fixture sha256).
+  fixture sha256). `tieForward` there is the raw outgoing declaration
+  (per-note TieEvent flag and/or chord-wide stream tie), not proof of a
+  resolved tie: resolved connections are multi-segment events (e.g. line-61
+  chord marks all four tones `tieForward: true`, but only the continuing
+  top C has two segments for 120 ticks; the others have one segment each
+  for 96 ticks).
 - Microfixtures + negative tests: `test/fixtures/brahms-*`,
   `test/brahms-written-durations.test.ts`.

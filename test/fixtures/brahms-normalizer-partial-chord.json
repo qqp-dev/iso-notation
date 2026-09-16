@@ -1,5 +1,5 @@
 {
-  "description": "Partial chord-wide tie: 2-note chord with stream tie, only top continues adjacently; bottom separates (matching LilyPond MIDI).",
+  "description": "Partial chord-wide tie: 2-note chord with stream tie, only top continues adjacently; bottom separates per LilyPond source semantics (only matching pitches of the next event connect).",
   "evidence": [
     {
       "voice": "rightHandUpper",

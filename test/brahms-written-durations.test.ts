@@ -246,6 +246,7 @@ test('partial-chord tie: line-61 chord marks all, only the top continues (tick 4
   const at4080 = provenance.events.filter((e) => e.startTick === 4080 && e.hand === 'RH');
   assert.equal(at4080.length, 4);
   for (const e of at4080) {
+    // Raw outgoing chord-wide declaration (not proof of a resolved tie).
     assert.equal(e.segments[0].tieForward, true, 'chord-wide tie marks every member');
     assert.equal(e.segments[0].line, 61);
   }
@@ -254,7 +255,11 @@ test('partial-chord tie: line-61 chord marks all, only the top continues (tick 4
   assert.equal(top.segments.length, 2);
   for (const e of at4080.filter((x) => x !== top)) {
     assert.equal(e.durationTicks, 96);
-    assert.equal(e.segments.length, 1, 'non-continuing chord tones stay separate (LilyPond MIDI behaviour)');
+    assert.equal(
+      e.segments.length,
+      1,
+      'non-continuing chord tones stay separate per LilyPond source semantics (only matching pitches of the next event connect)'
+    );
   }
 });
 
@@ -470,6 +475,381 @@ test('independent normalizer fixtures: tie/unison/tieWait and partial-chord (no 
   assert.equal(gap.segments.length, 2);
 });
 
+test('tie-kind fail-closed: explicit note tie with nonadjacent recurrence fails (no silent reattack)', () => {
+  const seg = (over: Record<string, unknown>) => ({
+    voice: 'rightHandUpper',
+    staff: 'upper',
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 4,
+    semi: 0,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 10,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  const empties = (voice: string) => ({ voice, segments: [], ties: [] });
+  // Case A: intervening different pitch (onset indices 0 vs 2, gap 48 ticks).
+  assert.throws(
+    () =>
+      normalizeWrittenDurations([
+        {
+          voice: 'rightHandUpper',
+          segments: [
+            seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 4, semi: 0, hasTie: true, line: 10, col: 1 }),
+            seg({ onsetNum: 1, onsetDen: 4, durNum: 1, durDen: 4, semi: 4, hasTie: false, line: 11, col: 1 }),
+            seg({ onsetNum: 1, onsetDen: 2, durNum: 1, durDen: 4, semi: 0, hasTie: false, line: 12, col: 1 }),
+          ],
+          ties: [{ onsetNum: 0, onsetDen: 1 }],
+        },
+        empties('rightHandLower'),
+        empties('leftHandUpper'),
+        empties('leftHandLower'),
+      ]),
+    /explicit note-specific tie.*refusing to silently reattack/
+  );
+  // Case B: temporal gap with no intervening pitch (immediate but nonadjacent).
+  let messageB = '';
+  assert.throws(
+    () =>
+      normalizeWrittenDurations([
+        {
+          voice: 'rightHandUpper',
+          segments: [
+            seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 4, semi: 0, hasTie: true, line: 20, col: 3 }),
+            seg({ onsetNum: 1, onsetDen: 2, durNum: 1, durDen: 4, semi: 0, hasTie: false, line: 21, col: 3 }),
+          ],
+          ties: [{ onsetNum: 0, onsetDen: 1 }],
+        },
+        empties('rightHandLower'),
+        empties('leftHandUpper'),
+        empties('leftHandLower'),
+      ]),
+    (e: unknown) => {
+      messageB = (e as Error).message;
+      return /explicit note-specific tie/.test(messageB);
+    }
+  );
+  // Diagnostic carries voice/pitch/source/onset.
+  assert.ok(messageB.includes('rightHandUpper'), 'voice in diagnostic');
+  assert.ok(messageB.includes('MIDI 60'), 'pitch in diagnostic');
+  assert.ok(messageB.includes('includes/test.ily:20:3'), 'source in diagnostic');
+  assert.ok(messageB.includes('tick 0'), 'onset in diagnostic');
+});
+
+test('tie-kind consistency: same explicit note tie with no later occurrence also fails', () => {
+  const seg = (over: Record<string, unknown>) => ({
+    voice: 'rightHandUpper',
+    staff: 'upper',
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 4,
+    semi: 0,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 1,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  const empties = (voice: string) => ({ voice, segments: [], ties: [] });
+  let message = '';
+  assert.throws(
+    () =>
+      normalizeWrittenDurations([
+        {
+          voice: 'rightHandUpper',
+          segments: [seg({ hasTie: true })],
+          ties: [{ onsetNum: 0, onsetDen: 1 }],
+        },
+        empties('rightHandLower'),
+        empties('leftHandUpper'),
+        empties('leftHandLower'),
+      ]),
+    (e: unknown) => {
+      message = (e as Error).message;
+      return /dangling tie/.test(message);
+    }
+  );
+  assert.match(message, /explicit note-specific tie/, 'dangling is an explicit note tie');
+  assert.ok(message.includes('rightHandUpper') && message.includes('MIDI 60'));
+  assert.ok(message.includes('includes/test.ily:1:1') && message.includes('tick 0'));
+});
+
+test('tie-kind fail-closed: explicit per-note chord tie without continuation fails (not chord-wide)', () => {
+  const seg = (over: Record<string, unknown>) => ({
+    voice: 'rightHandUpper',
+    staff: 'upper',
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 4,
+    semi: 0,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 10,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  const empties = (voice: string) => ({ voice, segments: [], ties: [] });
+  // Per-note chord: flags only, zero stream ties. Tied C has only a
+  // nonadjacent later recurrence (intervening D); must fail, not silently
+  // separate like an unmatched chord-wide tone.
+  assert.throws(
+    () =>
+      normalizeWrittenDurations([
+        {
+          voice: 'rightHandUpper',
+          segments: [
+            seg({ onsetNum: 0, onsetDen: 1, semi: 0, hasTie: true, col: 1 }),
+            seg({ onsetNum: 0, onsetDen: 1, semi: 4, hasTie: false, col: 5 }),
+            seg({ onsetNum: 1, onsetDen: 4, semi: 2, hasTie: false, line: 11, col: 1 }),
+            seg({ onsetNum: 1, onsetDen: 2, semi: 0, hasTie: false, line: 12, col: 1 }),
+          ],
+          ties: [],
+        },
+        empties('rightHandLower'),
+        empties('leftHandUpper'),
+        empties('leftHandLower'),
+      ]),
+    /explicit note-specific tie.*refusing to silently reattack/
+  );
+});
+
+test('tie-kind chord-wide: partial tie with never-recurring tone succeeds (only eligible merges)', () => {
+  const seg = (over: Record<string, unknown>) => ({
+    voice: 'rightHandUpper',
+    staff: 'upper',
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 2,
+    semi: 0,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 5,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  const empties = (voice: string) => ({ voice, segments: [], ties: [] });
+  // Hand-computed: C@0 (96) never recurs; E@0 (96) + E@96 (24) merge to 120.
+  const { events, provenance: prov } = normalizeWrittenDurations([
+    {
+      voice: 'rightHandUpper',
+      segments: [
+        seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 2, semi: 0, col: 1 }),
+        seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 2, semi: 4, col: 5 }),
+        seg({ onsetNum: 1, onsetDen: 2, durNum: 1, durDen: 8, semi: 4, col: 15 }),
+      ],
+      ties: [{ onsetNum: 0, onsetDen: 1 }],
+    },
+    empties('rightHandLower'),
+    empties('leftHandUpper'),
+    empties('leftHandLower'),
+  ]);
+  assert.equal(events.length, 2);
+  assert.deepEqual(events[0], { pitchClass: 0, octave: 4, startTick: 0, hand: 'RH', durationTicks: 96 });
+  assert.deepEqual(events[1], { pitchClass: 4, octave: 4, startTick: 0, hand: 'RH', durationTicks: 120 });
+  const c = prov.find((e) => e.pitchClass === 0)!;
+  const e = prov.find((e) => e.pitchClass === 4)!;
+  assert.equal(c.segments.length, 1);
+  assert.equal(c.segments[0].tieForward, true, 'raw chord-wide declaration, not a resolved tie');
+  assert.equal(e.segments.length, 2);
+});
+
+test('tie-kind chord-wide: recurring unmatched tone gives same initial outcome plus reattack', () => {
+  const seg = (over: Record<string, unknown>) => ({
+    voice: 'rightHandUpper',
+    staff: 'upper',
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 2,
+    semi: 0,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 5,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  const empties = (voice: string) => ({ voice, segments: [], ties: [] });
+  // Same head as the never-recurs case, plus a later C reattack at tick 192.
+  const { events, provenance: prov } = normalizeWrittenDurations([
+    {
+      voice: 'rightHandUpper',
+      segments: [
+        seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 2, semi: 0, col: 1 }),
+        seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 2, semi: 4, col: 5 }),
+        seg({ onsetNum: 1, onsetDen: 2, durNum: 1, durDen: 8, semi: 4, col: 15 }),
+        seg({ onsetNum: 1, onsetDen: 1, durNum: 1, durDen: 8, semi: 0, line: 6, col: 1 }),
+      ],
+      ties: [{ onsetNum: 0, onsetDen: 1 }],
+    },
+    empties('rightHandLower'),
+    empties('leftHandUpper'),
+    empties('leftHandLower'),
+  ]);
+  assert.equal(events.length, 3);
+  // Initial outcome identical to the never-recurs case: no dependence on
+  // irrelevant future recurrence.
+  assert.deepEqual(events[0], { pitchClass: 0, octave: 4, startTick: 0, hand: 'RH', durationTicks: 96 });
+  assert.deepEqual(events[1], { pitchClass: 4, octave: 4, startTick: 0, hand: 'RH', durationTicks: 120 });
+  assert.deepEqual(events[2], { pitchClass: 0, octave: 4, startTick: 192, hand: 'RH', durationTicks: 24 });
+  const reattack = prov.find((ev) => ev.startTick === 192)!;
+  assert.equal(reattack.segments.length, 1);
+  assert.equal(reattack.segments[0].tieForward, false);
+});
+
+test('tie-kind positive: complete chord ties and chains merge; untied repeats stay separate', () => {
+  const mk = (voice: string, staff: string, over: Record<string, unknown>) => ({
+    voice,
+    staff,
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 4,
+    semi: 0,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 1,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  // RHU: complete 2-note chord tie (both continue immediate+adjacent).
+  // LHL: single-pitch 3-segment chain (two outgoing ties).
+  // RHL: untied adjacent repeats (no tie flags) stay two attacks.
+  const { events, provenance: prov } = normalizeWrittenDurations([
+    {
+      voice: 'rightHandUpper',
+      segments: [
+        mk('rightHandUpper', 'upper', { onsetNum: 0, onsetDen: 1, semi: 0, line: 1, col: 1 }),
+        mk('rightHandUpper', 'upper', { onsetNum: 0, onsetDen: 1, semi: 4, line: 1, col: 5 }),
+        mk('rightHandUpper', 'upper', { onsetNum: 1, onsetDen: 4, semi: 0, line: 2, col: 1 }),
+        mk('rightHandUpper', 'upper', { onsetNum: 1, onsetDen: 4, semi: 4, line: 2, col: 5 }),
+      ],
+      ties: [{ onsetNum: 0, onsetDen: 1 }],
+    },
+    {
+      voice: 'rightHandLower',
+      segments: [
+        mk('rightHandLower', 'upper', { onsetNum: 0, onsetDen: 1, semi: 2, line: 3, col: 1 }),
+        mk('rightHandLower', 'upper', { onsetNum: 1, onsetDen: 4, semi: 2, line: 4, col: 1 }),
+      ],
+      ties: [],
+    },
+    { voice: 'leftHandUpper', segments: [], ties: [] },
+    {
+      voice: 'leftHandLower',
+      segments: [
+        mk('leftHandLower', 'lower', { onsetNum: 0, onsetDen: 1, semi: 7, hasTie: true, line: 5, col: 1 }),
+        mk('leftHandLower', 'lower', { onsetNum: 1, onsetDen: 4, semi: 7, hasTie: true, line: 6, col: 1 }),
+        mk('leftHandLower', 'lower', { onsetNum: 1, onsetDen: 2, semi: 7, line: 7, col: 1 }),
+      ],
+      ties: [
+        { onsetNum: 0, onsetDen: 1 },
+        { onsetNum: 1, onsetDen: 4 },
+      ],
+    },
+  ]);
+  assert.equal(events.length, 5);
+  const byKey = new Map(events.map((ev) => [brahmsEventKey(ev.pitchClass, ev.octave, ev.startTick, ev.hand), ev]));
+  // Complete chord: C@0 and E@0 each 48+48=96.
+  assert.equal(byKey.get(brahmsEventKey(0, 4, 0, 'RH'))!.durationTicks, 96);
+  assert.equal(byKey.get(brahmsEventKey(4, 4, 0, 'RH'))!.durationTicks, 96);
+  // Chain: G4@0 48*3=144 (MIDI 67 -> pc7 oct4).
+  assert.equal(byKey.get(brahmsEventKey(7, 4, 0, 'LH'))!.durationTicks, 144);
+  // Untied repeats: D@0 and D@48 each 48.
+  assert.equal(byKey.get(brahmsEventKey(2, 4, 0, 'RH'))!.durationTicks, 48);
+  assert.equal(byKey.get(brahmsEventKey(2, 4, 48, 'RH'))!.durationTicks, 48);
+  const chain = prov.find((ev) => ev.pitchClass === 7 && ev.startTick === 0)!;
+  assert.equal(chain.segments.length, 3);
+  const untiedFirst = prov.find((ev) => ev.pitchClass === 2 && ev.startTick === 0)!;
+  assert.equal(untiedFirst.segments.length, 1);
+  assert.equal(untiedFirst.segments[0].tieForward, false);
+});
+
+test('tie-kind tieWait: literal corpus A2 gap stays valid; absent directive fails the same shape', () => {
+  // Literal corpus: leftHandLower A2 tick 12360 spans a 48-tick gap into the
+  // later chord (lines 319–321 set tieWaitForNote): 24 + gap 48 + 96 = 168.
+  const corpus = provByKey.get(brahmsEventKey(9, 2, 12360, 'LH'))!;
+  assert.equal(corpus.durationTicks, 168);
+  assert.equal(corpus.segments.length, 2);
+  assert.ok(corpus.segments.every((s) => s.tieWait === true));
+  assert.ok(corpus.segments.every((s) => s.line === 320));
+  const [first, second] = corpus.segments;
+  assert.equal(first.startTick, 12360);
+  assert.equal(first.durationTicks, 24);
+  assert.equal(second.startTick, 12432);
+  assert.equal(second.startTick - (first.startTick + first.durationTicks), 48);
+  // Independent small fixture: same nonadjacent shape merges only with tieWait.
+  const seg = (over: Record<string, unknown>) => ({
+    voice: 'leftHandLower',
+    staff: 'lower',
+    onsetNum: 0,
+    onsetDen: 1,
+    durNum: 1,
+    durDen: 8,
+    semi: -15,
+    hasTie: false,
+    file: 'includes/test.ily',
+    line: 30,
+    col: 1,
+    bar: 1,
+    tieWait: false,
+    ...over,
+  });
+  const empties = (voice: string) => ({ voice, segments: [], ties: [] });
+  const valid = normalizeWrittenDurations([
+    {
+      voice: 'leftHandLower',
+      segments: [
+        seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 8, semi: -15, hasTie: true, col: 1, tieWait: true }),
+        seg({ onsetNum: 1, onsetDen: 8, durNum: 1, durDen: 4, semi: -10, col: 10, tieWait: true }),
+        seg({ onsetNum: 3, onsetDen: 8, durNum: 1, durDen: 2, semi: -15, col: 20, tieWait: true }),
+      ],
+      ties: [{ onsetNum: 0, onsetDen: 1 }],
+    },
+    empties('rightHandUpper'),
+    empties('rightHandLower'),
+    empties('leftHandUpper'),
+  ]);
+  const merged = valid.events.find((ev) => ev.startTick === 0 && ev.hand === 'LH' && ev.pitchClass === 9)!;
+  assert.equal(merged.durationTicks, 168);
+  // Absent directive: identical shape without tieWait must fail closed.
+  assert.throws(
+    () =>
+      normalizeWrittenDurations([
+        {
+          voice: 'leftHandLower',
+          segments: [
+            seg({ onsetNum: 0, onsetDen: 1, durNum: 1, durDen: 8, semi: -15, hasTie: true, col: 1, tieWait: false }),
+            seg({ onsetNum: 1, onsetDen: 8, durNum: 1, durDen: 4, semi: -10, col: 10, tieWait: false }),
+            seg({ onsetNum: 3, onsetDen: 8, durNum: 1, durDen: 2, semi: -15, col: 20, tieWait: false }),
+          ],
+          ties: [{ onsetNum: 0, onsetDen: 1 }],
+        },
+        empties('rightHandUpper'),
+        empties('rightHandLower'),
+        empties('leftHandUpper'),
+      ]),
+    /explicit note-specific tie.*tieWait=false/
+  );
+});
+
 test('performance shortening cannot masquerade as a notated rest (real rest computation)', async () => {
   const { layoutJankoScore } = await import('../src/render/janko/engine');
   const { resolveJankoOptions, resolveJankoTokens } = await import('../src/render/janko/types');
@@ -626,6 +1006,85 @@ outDir = "${tmp.replace(/"/g, '\\"')}"
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test('tie-kind via the real LilyPond parser: chord-wide partial succeeds, per-note gap fails', { skip: NEEDS_COMPILER }, () => {
+  const bin = COMPILER_BIN as string;
+  const microMusic = path.join(HERE, 'fixtures', 'brahms-micro-tie-kind.ily');
+  const listener = path.join(REPO_ROOT, 'scripts', 'brahms-written-durations-listener.ly');
+  const runCase = (upperSym: string, lowerSym: string) => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'brahms-tiekind-'));
+    try {
+      const wrapper = `\\version "2.24.0"
+\\language "english"
+\\include "${microMusic.replace(/"/g, '\\"')}"
+outDir = "${tmp.replace(/"/g, '\\"')}"
+\\include "${listener.replace(/"/g, '\\"')}"
+\\score {
+  \\new PianoStaff <<
+    \\new Staff = "upper" << \\new Voice = "rightHandUpper" \\${upperSym} >>
+    \\new Staff = "lower" << \\new Voice = "leftHandLower" \\${lowerSym} >>
+  >>
+  \\layout { \\context { \\Voice \\consists #brahms-durations-listener } }
+}
+`;
+      const wrapperPath = path.join(tmp, 'wrapper.ly');
+      fs.writeFileSync(wrapperPath, wrapper, 'utf8');
+      execFileSync(bin, ['-dno-print-pages', '-o', path.join(tmp, 'out'), wrapperPath], {
+        encoding: 'utf8',
+        timeout: 120000,
+        stdio: 'pipe',
+      });
+      const readVoice = (v: string) => {
+        const file = path.join(tmp, `voice-${v}.jsonl`);
+        assert.ok(fs.existsSync(file), `missing voice file ${v}`);
+        const segments: never[] = [];
+        const ties: never[] = [];
+        for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+          if (!line.trim()) continue;
+          const o = JSON.parse(line) as Record<string, unknown>;
+          if (o.type === 'tie') {
+            (ties as unknown as { onsetNum: number; onsetDen: number }[]).push({
+              onsetNum: o.onsetNum as number,
+              onsetDen: o.onsetDen as number,
+            });
+          } else {
+            (segments as unknown as Record<string, unknown>[]).push({
+              voice: v,
+              staff: o.staff,
+              onsetNum: o.onsetNum,
+              onsetDen: o.onsetDen,
+              durNum: o.durNum,
+              durDen: o.durDen,
+              semi: o.semi,
+              hasTie: o.hasTie,
+              file: `includes/${path.basename(String(o.file))}`,
+              line: o.line,
+              col: o.col,
+              bar: o.bar,
+              tieWait: o.tieWait,
+            });
+          }
+        }
+        return { voice: v, segments: segments as never, ties: ties as never };
+      };
+      return [readVoice('rightHandUpper'), readVoice('leftHandLower')] as Parameters<typeof normalizeWrittenDurations>[0];
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  };
+  // Valid chord-wide partial: <c e>2~ e8 — hand-computed C 96, E 120.
+  const valid = normalizeWrittenDurations(runCase('microTieValidUpper', 'microTieValidLower'));
+  assert.equal(valid.events.length, 2);
+  assert.deepEqual(
+    valid.events.map((e) => e.durationTicks).sort((a, b) => a - b),
+    [96, 120]
+  );
+  const validTop = valid.provenance.find((e) => e.durationTicks === 120)!;
+  assert.equal(validTop.segments.length, 2);
+  // Invalid per-note gap: <c~ e>2 d4 c4 — must fail closed, not silently reattack.
+  const invalidEvidence = runCase('microTieInvalidUpper', 'microTieInvalidLower');
+  assert.throws(() => normalizeWrittenDurations(invalidEvidence), /explicit note-specific tie/);
 });
 
 test('clean regeneration reproduces the committed fixture (explicit, compiler)', { skip: NEEDS_COMPILER }, () => {
