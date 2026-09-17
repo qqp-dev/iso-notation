@@ -47,6 +47,29 @@ real-engine operator review for genuinely new cases.
 - Unfamiliar constructs or ambiguous mappings produce explicit diagnostics
   and stop certification; no optimistic fallback, no duration guessing.
 
+## Bounded hand corrections (score layer, v2)
+
+Ten authorized LH → RH retargetings for the descending RH line in performed
+mm. 23/43 plus its phrase continuation in mm. 24/44
+(`src/scores/brahms-hand-corrections.ts`, versioned table +
+`applyBrahmsHandCorrections`). Applied AFTER the validated duration overlay
+(original track keys, fixture bytes unchanged) and BEFORE hand-crossing
+computation. Each record carries source file/line, logical part, performed
+occurrence, expected original hand/pitch/onset/duration/id guards; any
+mismatch throws, never silently falls back.
+
+- Witness: `includes/intermezzo-op118-no1-parts.ily:62–63` (`rightHandUpper`
+  `\staffDown c ( a fs |`) against `leftHandLower:285` (`e, ( a c ds )`),
+  continued at `:64` (`rightHandUpper` `ds2) e4) \staffUp`).
+- Targets: `brahms-op118-no1-{315,317,319}` (ticks 4392/4416/4440) and
+  `{601,603,605}` (ticks 8232/8256/8280), each 24 ticks; plus the phrase
+  continuation `{321 (tick 4464, 96), 326 (tick 4560, 48)}` and
+  `{607 (tick 8304, 96), 612 (tick 8400, 48)}` per the operator amendment.
+  Bass `{314,316,318,600,602,604}` stay LH.
+- Limitation: source cross-staff does not by itself force a hand change, and
+  whole-piece hand fidelity remains uncertified (notably mm. 61–62 cross-voice
+  unison projection). No general voice importer or fingering inference.
+
 ## Extraction (LilyPond's own parser, pre-playback)
 
 - `scripts/brahms-written-durations-listener.ly` — Scheme event listener

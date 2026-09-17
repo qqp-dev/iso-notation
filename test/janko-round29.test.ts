@@ -310,17 +310,17 @@ test('Dots golden pin: Bach ships 0 dot-flag collisions (19 dotted flagged singl
   assert.equal(collisions, 0, 'golden ships 0 dot-flag collisions');
 });
 
-test('Dots golden: Brahms m.1 dot reseated to the m.19 45° (rule B), m.4 UNMOVED', () => {
+test('Dots golden: Brahms m.1/m.4/m.19 dots share the 45° rule-B seat at the §3 radius', () => {
   // The legacy-vs-new displacement comparison retires with the legacy path; the
   // judged clasp-dot positions are pinned absolutely instead, so any future
   // move fails. (Clasp dots are computed independently of the note-dot rule.)
   //
   // Ticket rule B (direct consistency correction): the opening A-major dotted
   // pip leaves its 60° seat for the existing m.19-style 45° seat — actual-mask
-  // seating replaces the virtual-disc veto that held it at 60°. The m.1
-  // claspX (81.356…) and all three member heads (88.96) are bit-identical to
-  // base: the move is purely the dot's seat, zero column drift. m.4 and m.19
-  // are bit-identical to base (the style anchor, untouched).
+  // seating replaces the virtual-disc veto that held it at 60°. Under §2/§3
+  // the absolute seats re-pin (§2 columns, §3 radius 4.75), but the judged
+  // invariant — all three dots at exactly 45° off their own ring centres —
+  // holds absolutely.
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   const systems = layoutJankoScore(BRAHMS, o, t);
@@ -340,30 +340,29 @@ test('Dots golden: Brahms m.1 dot reseated to the m.19 45° (rule B), m.4 UNMOVE
   assert.equal(d4.length, 1, 'm.4 clasp carries one dot');
   assert.equal(d19.length, 1, 'm.19 clasp carries one dot');
 
-  // Judged PR #48 seats, re-pinned for canonical 4-per packing: y is
-  // bit-identical (both dots sit in system 1, whose slot frame keeps its
-  // verticals), x scales with the narrower measure width (543.48/4.25 vs
-  // /3.25 — proof the within-system geometry is untouched). Rule B then
-  // reseats m.1 only: (85.209…, 128.132…) at 45°.
-  assert.equal(d1[0]!.x, 75.37314372217251, 'm.1 clasp dot x (rule-B 45° seat; was 85.20988580362048 at mps3)');
-  assert.equal(d1[0]!.y, 128.13251804253335, 'm.1 clasp dot y bit-identical (packing moves x only)');
-  assert.equal(m1.claspX, 71.51941176470588, 'm.1 clasp spine x scales with the measure width');
-  assert.equal(d4[0]!.x, 331.1284378398195, 'm.4 clasp dot x scales with the measure width');
-  assert.equal(d4[0]!.y, 135.63251804253335, 'm.4 clasp dot y bit-identical (packing moves x only)');
+  // Judged seats re-pinned for the §2/§3 geometry: §2 moves the columns
+  // (per-measure downbeat insets replace the blanket 15.35pt) and §3 shrinks
+  // every ring seat from radius 5.45 to 4.75 (outer 2.8 + hug 1.2 + dot
+  // r 0.75). Rule B still holds absolutely: m.1, m.4 and m.19 all sit at
+  // exactly 45.00° off their own ring centres at exactly 4.75.
+  assert.equal(d1[0]!.x, 73.92816897534193, 'm.1 clasp dot x (§2 column + §3 4.75 seat; was 75.37314372217251)');
+  assert.equal(d1[0]!.y, 128.6274927893639, 'm.1 clasp dot y (centreY 131.986 − 4.75·sin45°)');
+  assert.equal(m1.claspX, 70.56941176470588, 'm.1 clasp spine x (column 78.17 − r − offset)');
+  assert.equal(d4[0]!.x, 329.683463092989, 'm.4 clasp dot x (§2 column + §3 4.75 seat; was 331.1284378398195)');
+  assert.equal(d4[0]!.y, 136.1274927893639, 'm.4 clasp dot y (centreY 139.486 − 4.75·sin45°)');
   // The consistency the ticket orders: opening and m.19 sit at the same
-  // 45.00° off their ring centres at the same 5.45 radius; m.19's absolute
-  // seat is bit-identical to base (base: 60.00° opening vs 45.00° m.19).
+  // 45.00° off their ring centres at the same 4.75 radius.
   const angleOf = (clasp: typeof m1, dot: NonNullable<(typeof d1)[number]>): number => {
     const ink = clasp.durationInk[clasp.durationDots.indexOf(dot)];
     return (Math.atan2(-(dot.y - ink.centerY), dot.x - clasp.claspX) * 180) / Math.PI;
   };
   assert.ok(Math.abs(angleOf(m1, d1[0]!) - 45) < 1e-9, 'm.1 sits at 45°');
   assert.ok(Math.abs(angleOf(m19, d19[0]!) - 45) < 1e-9, 'm.19 sits at 45°');
-  // m.19 moved systems at 4-per packing (sys6 slot-2 → sys4 slot-0), so its
-  // absolute seat re-pins; the 45° seat relative to its own spine is the
-  // invariant, and it holds.
-  assert.equal(d19[0]!.x, 315.1437319574666, 'm.19 dot x (was 43.40373195746664 at mps3)');
-  assert.equal(d19[0]!.y, 168.13251804253335, 'm.19 dot y (was 536.0775180425334 at mps3)');
+  // m.19's column rides the §2 within-system redistribution (its system
+  // reclaims the shrunk downbeat insets), so its absolute seat re-pins; the
+  // 45° seat relative to its own spine is the invariant, and it holds.
+  assert.equal(d19[0]!.x, 319.15875721063605, 'm.19 dot x (was 315.1437319574666 pre-§2)');
+  assert.equal(d19[0]!.y, 168.6274927893639, 'm.19 dot y (was 168.13251804253335 at radius 5.45)');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {

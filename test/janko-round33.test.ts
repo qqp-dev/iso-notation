@@ -402,10 +402,12 @@ test('Round 33 full card clean under the §5 geometry pass; none adds no finding
   // Gate 5 recapture (not assumed): the historical 4-per candidate 10 was 4
   // stem-through + 5 slot-accounting + 1 sys15/16 ink overlap. Ticket rule A
   // genuinely resolved the m.7 (78→80) and m.17 (213→215) tuck grazes, and
-  // the §5 geometry pass seats the five slot systems, clears the mm57–64
-  // sys15/16 overlap (+7.49pt gap), and verifies the two stem tucks
-  // (sys 5/m. 24 notes 326/325, sys 10/m. 44 notes 612/611) as true-ink
-  // clean — leaving zero findings, every item genuinely resolved.
+  // the §5 geometry pass seats the five slot systems and clears the mm57–64
+  // sys15/16 overlap (+7.49pt gap) — leaving zero findings, every item
+  // genuinely resolved. (The historical m.24/m.44 stem tucks 326/325 and
+  // 612/611 retired with the §4 hand correction: 326/612 are RH now, stems
+  // up, and the tuck rule itself is pinned synthetically in the linter
+  // suite.)
   const keyOf = (v: { code: string; system?: number; measure?: number; noteIds?: string[] }): string =>
     [v.code, v.system ?? '', v.measure ?? '', ...(v.noteIds ?? [])].join('|');
   const full = lintJankoScore(BRAHMS, O_FULL, T_BRAHMS);
@@ -431,17 +433,19 @@ test('Round 33 settled refinements ride on both cards (m7 slots, dots, rest, ott
     ['none', O_NONE],
   ] as const) {
     const layout = layoutJankoScore(BRAHMS, o, T_BRAHMS);
-    // m. 7 (tick 1200): the lower RH head sits one slot inward, the rest on
-    // the column, and the main-column upper head carries the shared stem.
+    // m. 7 (tick 1200): the ordinary ninth pair alternates lower LEFT /
+    // higher RIGHT (§1), the three clear heads hold CENTER, and the
+    // main-column upper head carries the shared stem.
     const s1 = layout[1];
     const m7 = s1.notes.filter((p) => p.note.startTick === 1200 && p.rhythm.hand === 'RH');
     assert.equal(m7.length, 5, `${label}: m. 7 RH five`);
     const col = s1.columns.get(1200)!;
     const byX = [...m7].sort((a, b) => a.x - b.x);
-    assert.ok(Math.abs(byX[0].x - (col - 5.46)) < 1e-6, `${label}: lowest head one slot inward`);
+    assert.ok(Math.abs(byX[0].x - (col - 5.46)) < 1e-6, `${label}: lower head LEFT`);
+    assert.ok(Math.abs(byX[4].x - (col + 5.46)) < 1e-6, `${label}: higher head RIGHT`);
     assert.ok(
-      byX.slice(1).every((p) => Math.abs(p.x - col) < 1e-6),
-      `${label}: the rest on the column`
+      byX.slice(1, 4).every((p) => Math.abs(p.x - col) < 1e-6),
+      `${label}: the clear three on the column`
     );
     const carrier = s1.sharedStems.find((g) => g.tick === 1200);
     assert.equal(carrier?.carrierId, 'brahms-op118-no1-82', `${label}: upper RH head carries`);

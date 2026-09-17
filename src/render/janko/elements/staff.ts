@@ -116,6 +116,65 @@ export function renderStaffLines(
   return out.join('\n');
 }
 
+/**
+ * Continuous outlier-rule spans for one system (Round 11): when successive
+ * measures share an out-of-staff ledger equator (Octave 6+), the choppy
+ * notehead-centred dashes are suppressed in favour of one unbroken rule per
+ * equator from the first measure's opening edge to the last measure's closing
+ * edge. Shared by the renderer and the ottava ink model (§5), so the
+ * audited ledger ink can never drift from the paint.
+ */
+export interface OutlierRuleSpan {
+  /** Ledger key (`Math.round(ledgerY * 100)`, relative to middle C). */
+  key: number;
+  /** Absolute page x where the rule starts/ends. */
+  x1: number;
+  x2: number;
+  /** Absolute page y of the rule. */
+  y: number;
+}
+
+export function outlierLedgerSpans(
+  notes: readonly {
+    note: QuantizedNote;
+    coord: { octave: number; ledgerYs: readonly number[] };
+  }[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  tokens: ResolvedJankoTokens
+): OutlierRuleSpan[] {
+  const spans = new Map<number, { first: number; last: number }>();
+  for (const p of notes) {
+    if (p.coord.octave <= 5) continue;
+    const m = getMeasureIndexOfTick(p.note, geo, systemIndex, tokens);
+    for (const ledgerY of p.coord.ledgerYs) {
+      const key = Math.round(ledgerY * 100);
+      const span = spans.get(key);
+      if (!span) spans.set(key, { first: m, last: m });
+      else {
+        span.first = Math.min(span.first, m);
+        span.last = Math.max(span.last, m);
+      }
+    }
+  }
+  const anacrusisTicks = tokens.anacrusisTicks ?? 0;
+  const upbeatWidth =
+    systemIndex === 0 && anacrusisTicks > 0
+      ? (anacrusisTicks / tokens.ticksPerMeasure) * geo.measureWidth
+      : 0;
+  const out: OutlierRuleSpan[] = [];
+  for (const [key, span] of spans) {
+    if (span.last <= span.first) continue;
+    out.push({
+      key,
+      x1: geo.staffLeft + upbeatWidth + span.first * geo.measureWidth,
+      x2: geo.staffLeft + upbeatWidth + (span.last + 1) * geo.measureWidth,
+      y: geo.middleCY + key / 100,
+    });
+  }
+  return out;
+}
+
 /** Ink of the Middle C divider (the landscape benchmark's dark spine). */
 export const PITCH_GRID_DIVIDER_INK = '#0F172A';
 /** Weight of the Middle C divider: firm, not bold (2x the faint C-lines). */

@@ -76,7 +76,9 @@ import {
   resolveJankoTokens,
 } from './types';
 import {
+  OttavaInkContext,
   buildSystemOttavaBrackets,
+  ottavaLabelBox,
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
@@ -88,6 +90,7 @@ import {
   renderStaffLines,
   renderTimeSignature,
   getEquatorRuleYs,
+  outlierLedgerSpans,
   pitchGridRules,
   computeBarStaffRows,
   computeSystemStaffSegments,
@@ -103,6 +106,7 @@ import {
   JankoClaspRailGeometry,
   JankoRhythmNote,
   JankoVerticalChordGroup,
+  BRACKET_RING_OUTER,
   CLASP_MARK_REACH,
   CLASP_MIN_VERTICAL_CHORD,
   CLASP_TRANSVERSE_WIDTH,
@@ -129,6 +133,13 @@ import {
   withClaspRail,
 } from './elements/rhythm';
 import { durationDotCount } from './elements/duration';
+import {
+  ThreeRailDiagnostic,
+  ThreeRailFixed,
+  ThreeRailInkBox,
+  ThreeRailMember,
+  assignThreeRails,
+} from './three-rail';
 import {
   ARCHITECTURAL_BRACKET_SPUR,
   ARCHITECTURAL_BRACKET_STROKE,
@@ -867,6 +878,83 @@ export function claspAuditDurationOptions(
   return durationInk ? { durationTicks, durationInk } : { durationTicks };
 }
 
+/**
+ * One bracket member as the fixed three-rail solver (§1) sees it, with its
+ * complete independent duration ink resolved at `xCenter` (the CENTER rail).
+ *
+ * Ink is the GOLDEN grammar's paint for clasped exceptions (commons are
+ * suppressed into the bracket and carry null ink): stem box, subdivision
+ * flag glyph box in the active style, and the golden augmentation dot from
+ * the resolved hug seat. Rails are shared grid geometry across grammars —
+ * the complete preview changes ink, never positions (round-30 census) — so
+ * complete-only ink (stem rings, second dots) stays out of the obstruction
+ * model: a ring's 7pt span cannot clear any three-rail seating next to a
+ * same-row head, and modelling it would revert every ringed exception to
+ * stem-through simultaneities. Ring-vs-head under the preview is a known
+ * unaudited limitation (pre-existing, disclosed). Beams are shared ink laid
+ * out downstream and verified by the beam audits — the obstruction model
+ * covers the note's own golden ink.
+ */
+export function buildThreeRailMember(
+  p: PositionedJankoNote,
+  xCenter: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  carriedTicks: number
+): ThreeRailMember {
+  const e = knockoutHalfExtents(o, t, p.note.startTick);
+  const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
+  const sourceLin = p.note.pitch.octave * 12 + pc;
+  const dir = stemDirection(p.rhythm.hand);
+  // Golden grammar always: rails are shared grid geometry (see above).
+  const grammar = 'golden' as const;
+  let ink: ThreeRailMember['ink'] = null;
+  if (p.note.durationTicks !== carriedTicks) {
+    const rhythmAtCenter: JankoRhythmNote = { ...p.rhythm, x: xCenter };
+    const s = getStemGeometry(rhythmAtCenter, t);
+    const halfStroke = JANKO_STEM_STROKE_WIDTH / 2;
+    const flags: ThreeRailInkBox[] = [];
+    const marks = subdivisionMarkCount(p.note.durationTicks, grammar);
+    if (marks >= 1) {
+      const bb = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
+      flags.push({
+        x0: s.stemX + bb.x0,
+        y0: s.stemEndY + bb.y0,
+        x1: s.stemX + bb.x1,
+        y1: s.stemEndY + bb.y1,
+      });
+    }
+    const dots: ThreeRailInkBox[] = [];
+    if (durationDotCount(p.note.durationTicks, grammar) >= 1) {
+      const r = t.augmentationDotRadius;
+      const cx = xCenter + e.wx + t.augmentationDotGap;
+      const cy = p.rhythm.dotY ?? p.y;
+      dots.push({ x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r });
+    }
+    ink = {
+      stem: {
+        x0: s.stemX - halfStroke,
+        y0: Math.min(s.stemStartY, s.stemEndY),
+        x1: s.stemX + halfStroke,
+        y1: Math.max(s.stemStartY, s.stemEndY),
+      },
+      flags,
+      dots,
+    };
+  }
+  return {
+    id: p.note.id,
+    sourceLin,
+    y: p.y,
+    wx: e.wx,
+    hy: e.hy,
+    durationTicks: p.note.durationTicks,
+    carriedTicks,
+    stemDir: dir,
+    ink,
+  };
+}
+
 /** Absolute x of the barline that closes a measure (always painted). */
 export function getMeasureClosingBarlineX(
   measureIdx: number,
@@ -1330,6 +1418,11 @@ export interface JankoSystemLayout {
    * valid; the engine always sets it.
    */
   claspQualifiedIds?: ReadonlySet<string>;
+  /**
+   * Fixed three-rail diagnostics (§1) from the column solve. Optional so
+   * lightweight fixtures stay valid; the engine always sets it.
+   */
+  railDiagnostics?: ThreeRailDiagnostic[];
 }
 
 /**
@@ -1373,14 +1466,11 @@ function handForNote(note: QuantizedNote): Hand {
 }
 
 /**
- * Left inset (pt) a measure must reserve when its **downbeat** carries a left
- * clasp: `claspX = noteLeft − r − claspOffset` has to keep
- * `claspMinBarlineAir` clear of the measure's opening barline, and Round 10's
- * scaled marks reach {@link CLASP_MARK_REACH} further left of the spine, so
- * `noteLeft ≥ r + claspOffset + CLASP_MARK_REACH + claspMinBarlineAir` (15.6pt
- * with the canonical tokens). The budget is deliberately conservative — the
- * widest mark is the 8pt diamond band — so no paradigm's mark can be driven
- * into the barline it follows.
+ * Blanket upper-bound left inset (pt) for a downbeat clasp (15.35pt with the
+ * canonical tokens): `r + claspOffset + CLASP_MARK_REACH + claspMinBarlineAir`.
+ * Retained as the conservative fallback; §2's {@link predictDownbeatInset}
+ * reserves the space the resolved rails and bracket ink actually need per
+ * measure instead of this blanket.
  */
 export function getClaspDownbeatInset(tokens?: Partial<JankoTokens> | null): number {
   const t = resolveJankoTokens(tokens);
@@ -3214,15 +3304,78 @@ export function computeClaspInsetMap(
   for (const [measureIdx, ticks] of byMeasure) {
     const firstTick = Math.min(...ticks.keys());
     const onset = ticks.get(firstTick) ?? [];
-    const qualifies = perHand
-      ? perHandDownbeatQualifies(onset, geo, systemIndex, o, t)
-      : onset.length >= 2;
-    if (!qualifies) continue;
     // Only a true downbeat can drive the clasp onto the opening barline.
     if (splitTick(firstTick, t).tickInMeasure !== 0) continue;
-    map.set(measureIdx, getClaspDownbeatInset(t));
+    if (perHand) {
+      const groups = perHandDownbeatGroups(onset, geo, systemIndex, o, t);
+      if (groups.length === 0) continue;
+      map.set(measureIdx, predictDownbeatInset(groups, onset.length, o, t));
+    } else {
+      if (onset.length < 2) continue;
+      const positioned = onset.map((n) => positionJankoNote(n, geo, systemIndex, o, t, null, null));
+      map.set(measureIdx, predictDownbeatInset([positioned], onset.length, o, t));
+    }
   }
   return map;
+}
+
+/**
+ * Space a downbeat's brackets actually need (§2): the resolved three-rail
+ * seating (shared `assignThreeRails`, so prediction and Pass-C′ placement
+ * agree) plus the resolved bracket ink box (ring scale, stacks, dots,
+ * strokes via `computeClaspGeometry`/`claspInkBox`) plus justified barline
+ * air — replacing the gratuitous blanket reservation. Falls back to the
+ * blanket {@link getClaspDownbeatInset} when a group cannot be seated (the
+ * same diagnostic surfaces from Pass C′; any literal-corpus fallback is a
+ * STOP condition).
+ *
+ * Returns `claspMinBarlineAir − box.x0` (box relative to the true column):
+ * the nominal column must stand that far right of the opening barline for
+ * the leftmost ink to keep barline air. Never reserves an unoccupied LEFT
+ * rail (the bracket hugs the leftmost OCCUPIED rail); never forces 6pt
+ * where genuine bracket ink cannot fit.
+ */
+export function predictDownbeatInset(
+  groups: readonly PositionedJankoNote[][],
+  onsetSize: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): number {
+  const gap = getClusterSpacingPreset(o.clusterSpacing).pairGap;
+  let need = 0;
+  for (const group of groups) {
+    const memberTicks = group.map((p) => ({
+      id: p.note.id,
+      hand: p.rhythm.hand,
+      durationTicks: p.note.durationTicks,
+    }));
+    const carriedOf = new Map(
+      memberTicks.map((m) => [m.id, claspCarriedDuration(memberTicks, m.id)] as const)
+    );
+    // Relative geometry (nominalX = 0): rails and ink are translation- and
+    // inset-invariant, so the no-inset preliminary positions predict exactly.
+    const threeMembers = group.map((p) =>
+      buildThreeRailMember(p, 0, o, t, carriedOf.get(p.note.id)!)
+    );
+    const assignment = assignThreeRails(threeMembers, 0, gap);
+    if (assignment.diagnostics.length > 0) return getClaspDownbeatInset(t);
+    const unified = groups.length === 1 && group.length === onsetSize;
+    const geometry = computeClaspGeometry(
+      group.map((p) => ({ ...p.rhythm, x: assignment.rails.get(p.note.id)! * gap })),
+      t,
+      {
+        ...claspAuditDurationOptions(group, unified),
+        claspDurationStyle: o.claspDurationStyle,
+        durationGrammar: o.durationGrammar,
+        claspDotNudge: o.claspDotNudge,
+        clusterSpacing: o.clusterSpacing,
+        honorHalo: o.showHonorHalo,
+      }
+    );
+    if (!geometry) return getClaspDownbeatInset(t);
+    need = Math.max(need, t.claspMinBarlineAir - claspInkBox(geometry, t).x0);
+  }
+  return need;
 }
 
 /**
@@ -3251,20 +3404,35 @@ function perHandDownbeatQualifies(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): boolean {
+  return perHandDownbeatGroups(notes, geo, systemIndex, o, t).length > 0;
+}
+
+/**
+ * The qualifying `'per-hand-clasp'` groups of a downbeat onset (§2): the
+ * same relative-spread predicate `handClaspGroups` applies after the column
+ * solve, evaluated pre-solve on a preliminary slot fit and unified across
+ * hands exactly like the solve groups them (see
+ * {@link resolveOnsetClaspGroups}), so the inset predictor reserves for the
+ * brackets Pass C′ actually seats.
+ */
+export function perHandDownbeatGroups(
+  notes: readonly QuantizedNote[],
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): PositionedJankoNote[][] {
+  const positioned = notes.map((n) => positionJankoNote(n, geo, systemIndex, o, t, null, null));
   const byHand = new Map<Hand, PositionedJankoNote[]>();
-  for (const note of notes) {
-    const p = positionJankoNote(note, geo, systemIndex, o, t, null, null);
+  for (const p of positioned) {
     const bucket = byHand.get(p.rhythm.hand);
     if (bucket) bucket.push(p);
     else byHand.set(p.rhythm.hand, [p]);
   }
   const air = getClusterSpacingPreset(o.clusterSpacing).air;
+  const offsets = new Map<string, number>();
   for (const group of byHand.values()) {
-    if (group.length >= CLASP_MIN_VERTICAL_CHORD) return true;
     if (group.length < 2) continue;
-    // Exactly two heads: qualify iff the actual slot fit spreads them past
-    // the admission threshold — the same relative-spread predicate the
-    // anchor pass and the fit rule apply.
     const members = group.map((p): JankoClusterFitMember => {
       const e = knockoutHalfExtents(o, t, p.note.startTick);
       const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
@@ -3277,10 +3445,9 @@ function perHandDownbeatQualifies(
       };
     });
     const fit = fitClusterSlots(members, air, 'column');
-    const slots = [...fit.slots.values()];
-    if ((Math.max(...slots) - Math.min(...slots)) * fit.gap > 1) return true;
+    for (const [id, slot] of fit.slots) offsets.set(id, slot * fit.gap);
   }
-  return false;
+  return resolveOnsetClaspGroups(positioned, t, (p) => offsets.get(p.note.id) ?? 0);
 }
 
 /**
@@ -3374,6 +3541,12 @@ export interface JankoChordColumnResolution {
    * group refused by the fit rule keeps its inward slots.
    */
   claspQualifiedIds: ReadonlySet<string>;
+  /**
+   * Fixed three-rail diagnostics (§1): bracket groups Pass C′ could not seat
+   * on three rails with required ink. Those groups keep their honest prior
+   * offsets; any entry on the literal corpus is a STOP condition.
+   */
+  railDiagnostics: ThreeRailDiagnostic[];
 }
 
 /** Full result of the chord-column solve (see {@link resolveRowSnappedChordOffsets}). */
@@ -4008,20 +4181,27 @@ export function resolveChordColumns(
           for (const p of cluster.notes) {
             // A per-hand bracket treats the other hand's heads of its own onset
             // as positioned ink that travels with the column, never as a
-            // foreign collision (unless the discs actually overlap).
+            // foreign collision (unless the discs actually overlap). Tick-0
+            // heads wear the halo-grown protection the seating reserves and
+            // the linter audits (`Math.max(r, haloEdge)`), so the fit refuses
+            // exactly what the audit would name — never a bracket the audit
+            // then collides with a halo.
             if (other === unit && members.includes(p)) continue;
             const px = other === unit ? displacedX(p) : p.x + other.shift;
             const dx = Math.max(disk.x0 - px, 0, px - disk.x1);
             const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
             const air = other === unit ? 0 : CLASP_NOTEHEAD_AIR;
-            if (debugClasp && Math.hypot(dx, dy) < t.noteheadRadius + air + 2) {
+            const radius = isPositionOfHonor(p.note.startTick)
+              ? Math.max(t.noteheadRadius, t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2)
+              : t.noteheadRadius;
+            if (debugClasp && Math.hypot(dx, dy) < radius + air + 2) {
               // eslint-disable-next-line no-console
               console.error(
                 `  near id=${p.note.id.split('-').pop()} tick=${other.tick} px=${px.toFixed(2)} y=${p.y.toFixed(2)} ` +
-                  `dx=${dx.toFixed(2)} dy=${dy.toFixed(2)} hypot=${Math.hypot(dx, dy).toFixed(2)} limit=${(t.noteheadRadius + air - CLASP_EPS).toFixed(2)}`
+                  `dx=${dx.toFixed(2)} dy=${dy.toFixed(2)} hypot=${Math.hypot(dx, dy).toFixed(2)} limit=${(radius + air - CLASP_EPS).toFixed(2)}`
               );
             }
-            if (Math.hypot(dx, dy) < t.noteheadRadius + air - CLASP_EPS) return false;
+            if (Math.hypot(dx, dy) < radius + air - CLASP_EPS) return false;
           }
         }
       }
@@ -4034,44 +4214,32 @@ export function resolveChordColumns(
     }
   }
   // -------------------------------------------------------------------------
-  // 1a-Pass-C. Exception stem-clearance (permanent rule).
+  // 1a-Pass-C′. Fixed three-rail seating with duration-ink precedence (§1).
   //
-  //     A bracketed member whose duration differs from its carried value keeps
-  //     its own exact stem (the §3 exception), and that centred stem would
-  //     dagger the suppressed column-mates it shares a slot with. Each pierced
-  //     mate steps one preset slot (`pairGap`) away from the stem — right for
-  //     a mate on or right of the stem (the corpus case: higher mates step
-  //     right, pitch order kept, the exception holds its slot and the
-  //     bracket's minX never moves, so no admission verdict can change), left
-  //     for a mate strictly left of it. A move that lands on another
-  //     same-onset head pushes further the same way (bounded; same-onset
-  //     heads are finite, so the cascade always terminates).
+  //     Every admitted bracket group's members are seated on three invisible
+  //     rails about the true rhythmic column (−d, 0, +d; `d` = the style's
+  //     `pairGap`) per the settled precedence: commons CENTER with ordinary
+  //     LEFT/RIGHT alternation for conflicts, one obstructed internal
+  //     exception RIGHT (m1/m3), outward carriers undisplaced (m9/m19),
+  //     two obstructed internal exceptions LONGER-LEFT/SHORTER-RIGHT (see
+  //     `three-rail.ts`, shared with the §2 inset predictor so prediction
+  //     and placement agree). The carried rule reuses
+  //     {@link claspCarriedDuration}, so suppression agrees with the layout.
   //
-  //     Piercing is predicted with the linter's own predicate
-  //     (`getStemGeometry` + `pointToSegmentDistance`), so prediction and
-  //     audit agree exactly; the predicted suppression reuses
-  //     {@link claspCarriedDuration}, so it agrees with the final layout too.
-  //     Only admitted brackets (`unit.clasp`) move mates — a refused group
-  //     falls back to the gap-gated grammar on its unspread column.
+  //     Same-onset non-members keep their Pass-B/joint offsets and enter the
+  //     solver as fixed obstacles: members seat around them, staggering off
+  //     CENTER only where CENTER is genuinely taken. Same-onset relative
+  //     collisions are shift-invariant (rigid downstream shifts cannot fix
+  //     them), so a group the solver cannot seat keeps its honest prior
+  //     offsets and reports a rail diagnostic. Cross-onset and barline air
+  //     are shift-variant: the downstream solve (Phase 2 bracket air, fed by
+  //     the refreshed `claspInkLeft`) steps rigidly for them, and the linter
+  //     backstops the residue. Only admitted brackets (`unit.clasp`) are
+  //     reseated — a refused group falls back to the gap-gated grammar on
+  //     its unspread column.
   // -------------------------------------------------------------------------
+  const railDiagnostics: ThreeRailDiagnostic[] = [];
   if (perHandClasps && claspsActive) {
-    /** Do two same-onset heads mask-overlap at their current slots (relative)? */
-    const sameOnsetMaskCollision = (unit: OnsetUnit, id: string): boolean => {
-      const fa = fitById.get(id)!;
-      const xa = unit.nominalX + (offsetsById.get(id) ?? 0);
-      for (const cluster of unit.rows) {
-        for (const p of cluster.notes) {
-          if (p.note.id === id) continue;
-          const fb = fitById.get(p.note.id)!;
-          const overlapY = Math.min(fa.upper, fb.upper) - Math.max(fa.lower, fb.lower);
-          if (overlapY <= EPS) continue;
-          const dx = Math.abs(xa - (unit.nominalX + (offsetsById.get(p.note.id) ?? 0)));
-          if (dx >= fa.wx + fb.wx - EPS) continue;
-          return true;
-        }
-      }
-      return false;
-    };
     const debugPassC = typeof process !== 'undefined' && process.env?.JANKO_DEBUG_PASSC === '1';
     for (const unit of units) {
       if (!unit.clasp) continue;
@@ -4084,54 +4252,52 @@ export function resolveChordColumns(
           hand: p.rhythm.hand,
           durationTicks: p.note.durationTicks,
         }));
-        const carried = new Map(
+        const carriedOf = new Map(
           memberTicks.map((m) => [m.id, claspCarriedDuration(memberTicks, m.id)] as const)
         );
-        const exceptions = members.filter((p) => p.note.durationTicks !== carried.get(p.note.id));
-        if (exceptions.length === 0) continue;
-        const suppressed = members.filter((p) => p.note.durationTicks === carried.get(p.note.id));
-        // Exception stems at Pass-B slots (shift-free: piercing is shift-invariant
-        // within the rigid onset, so this equals the final relative geometry).
-        const stems = exceptions.map((p) => ({
-          id: p.note.id,
-          ...getStemGeometry(
-            { ...p.rhythm, x: unit.nominalX + (offsetsById.get(p.note.id) ?? 0) },
-            t
-          ),
-        }));
-        for (const mate of suppressed) {
-          for (let attempt = 0; attempt < 3; attempt++) {
-            const mateX = unit.nominalX + (offsetsById.get(mate.note.id) ?? 0);
-            const piercer = stems.find((s) =>
-              stemPiercesDisc(s.stemX, s.stemStartY, s.stemEndY, mateX, mate.y, t.noteheadRadius)
-            );
-            if (!piercer) break;
-            const dir = mateX < piercer.stemX ? -1 : 1;
-            offsetsById.set(mate.note.id, (offsetsById.get(mate.note.id) ?? 0) + dir * pairGap);
+        const threeMembers: ThreeRailMember[] = members.map((p) =>
+          buildThreeRailMember(p, unit.nominalX, o, t, carriedOf.get(p.note.id)!)
+        );
+        const memberIds = new Set(members.map((p) => p.note.id));
+        const fixed: ThreeRailFixed[] = unit.rows
+          .flatMap((c) => c.notes)
+          .filter((p) => !memberIds.has(p.note.id))
+          .map((p) => {
+            const e = knockoutHalfExtents(o, t, p.note.startTick);
+            return {
+              id: p.note.id,
+              x: unit.nominalX + (offsetsById.get(p.note.id) ?? 0),
+              y: p.y,
+              wx: e.wx,
+              hy: e.hy,
+            };
+          });
+        const assignment = assignThreeRails(threeMembers, unit.nominalX, pairGap, fixed);
+        if (assignment.diagnostics.length > 0) {
+          railDiagnostics.push(...assignment.diagnostics);
+          continue;
+        }
+        for (const m of threeMembers) {
+          const rail = assignment.rails.get(m.id)!;
+          const prev = offsetsById.get(m.id) ?? 0;
+          const next = rail * pairGap;
+          if (Math.abs(next - prev) > EPS) {
+            offsetsById.set(m.id, next);
             moved = true;
             if (debugPassC) {
               // eslint-disable-next-line no-console
               console.error(
-                `PASSC tick=${unit.tick} mate=${mate.note.id.split('-').pop()} dir=${dir > 0 ? '+1' : '-1'} ` +
-                  `piercer=${piercer.id.split('-').pop()}`
+                `PASSC tick=${unit.tick} member=${m.id.split('-').pop()} rail=${rail > 0 ? '+1' : rail < 0 ? '-1' : '0'}`
               );
-            }
-            for (let bump = 0; bump < 3; bump++) {
-              if (!sameOnsetMaskCollision(unit, mate.note.id)) break;
-              offsetsById.set(mate.note.id, offsetsById.get(mate.note.id)! + dir * pairGap);
-              if (debugPassC) {
-                // eslint-disable-next-line no-console
-                console.error(`PASSC tick=${unit.tick} mate=${mate.note.id.split('-').pop()} cascade+1`);
-              }
             }
           }
         }
       }
       if (moved) {
         unit.spread = true;
-        // Honest demand: a mate the clearance pushed out of its beat cell is
-        // reported (the rigid solve cannot reseat a relative move), never
-        // hidden — the linter then names the truly infeasible residue.
+        // Honest demand: a member the rail seating pushed out of its beat
+        // cell is reported (the rigid solve cannot reseat a relative move),
+        // never hidden — the linter then names the truly infeasible residue.
         const centres = new Map<string, number>();
         for (const cluster of unit.rows) {
           for (const p of cluster.notes) {
@@ -4155,13 +4321,47 @@ export function resolveChordColumns(
         }
       }
     }
-    // Pass-C moves change resolved slots: refresh the row extremes the solve
-    // and the diagnostics read (unmoved rows recompute identically).
+    // Pass-C′ moves change resolved slots: refresh the row extremes the
+    // solve and the diagnostics read (unmoved rows recompute identically),
+    // and refresh the true-ink bracket reach Phase 2 steps for — the
+    // pre-pass reach was measured at Pass-B offsets.
     for (const unit of units) {
       for (const cluster of unit.rows) {
         const offs = cluster.notes.map((p) => offsetsById.get(p.note.id) ?? 0);
         cluster.minOffset = Math.min(...offs);
         cluster.maxOffset = Math.max(...offs);
+      }
+    }
+    for (const unit of units) {
+      if (!unit.clasp) continue;
+      const groups = handClaspGroups(unit);
+      if (groups.length === 0) continue;
+      const onsetSize = unit.rows.reduce((n, c) => n + c.notes.length, 0);
+      const offsets = rowOffsetOf(unit);
+      unit.claspInkLeft = -claspReach;
+      for (const group of groups) {
+        const unified = groups.length === 1 && group.length === onsetSize;
+        const geometry = computeClaspGeometry(
+          group.map((p) => ({
+            ...p.rhythm,
+            x: p.x + unit.shift + (offsets.get(p.note.id) ?? 0),
+          })),
+          t,
+          {
+            ...claspAuditDurationOptions(group, unified),
+            claspDurationStyle: o.claspDurationStyle,
+            durationGrammar: o.durationGrammar,
+            claspDotNudge: o.claspDotNudge,
+            clusterSpacing: o.clusterSpacing,
+            honorHalo: o.showHonorHalo,
+          }
+        );
+        if (geometry) {
+          unit.claspInkLeft = Math.min(
+            unit.claspInkLeft,
+            claspInkBox(geometry, t).x0 - unit.nominalX
+          );
+        }
       }
     }
   }
@@ -4187,6 +4387,7 @@ export function resolveChordColumns(
       columns: new Map(units.map((unit) => [unit.tick, unit.nominalX + unit.shift])),
       diagnostics: clusterDiagnostics,
       claspQualifiedIds: bracketedIds,
+      railDiagnostics,
     };
   }
 
@@ -4584,6 +4785,7 @@ export function resolveChordColumns(
     columns: new Map(ordered.map((unit) => [unit.tick, unit.nominalX + unit.shift])),
     diagnostics: clusterDiagnostics,
     claspQualifiedIds: bracketedIds,
+    railDiagnostics,
   };
 }
 
@@ -4858,6 +5060,11 @@ export function systemCompleteInkBounds(
       const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
       top = Math.min(top, b.lineY, hookY);
       bottom = Math.max(bottom, b.lineY, hookY);
+      // Ticket §5: the numeral/letterform is painted ink too (its top drove
+      // the m69 collision) — the shared label box keeps bounds exact.
+      const label = ottavaLabelBox(b, t);
+      top = Math.min(top, label.y0);
+      bottom = Math.max(bottom, label.y1);
     }
   }
   return { top, bottom };
@@ -5021,6 +5228,7 @@ export function layoutJankoSystemShifted(
     columns: new Map<number, number>(),
     diagnostics: [],
     claspQualifiedIds: new Set<string>(),
+    railDiagnostics: [],
   };
   for (let attempt = 0; ; attempt++) {
     const raw = sysNotes.map((n) =>
@@ -5303,9 +5511,10 @@ export function layoutJankoSystemShifted(
       // The unit's **laid-out** column (Round 19): the column solve translates
       // the whole onset rigidly, so the axis every member of this hand is
       // slotted around is `nominalX + shift`, not the un-shifted proportional
-      // beat column. Under the permanent lowest-inward fit the on-column
-      // members tie at distance zero and the outward extremity wins (Brahms
-      // m. 7/m. 17: the main-column upper RH head carries the shared stem).
+      // beat column. Under the fixed three-rail fit (§1) on-column members
+      // tie at distance zero and the outward extremity wins (Brahms m. 7:
+      // the main-column upper RH head carries; m. 8: the middle CENTER
+      // head carries once both pairs flank onto the side rails).
       const nominal =
         chordColumns.columns.get(group[0].note.startTick) ??
         group[0].nominalX ??
@@ -5360,12 +5569,25 @@ export function layoutJankoSystemShifted(
       ? notes
       : notes.map((p) => (crossed.has(p.note.id) ? { ...p, tallKnockout: true } : p));
 
+  // Ticket §5: the ottava resolver reads the complete laid-out rhythm ink
+  // (beams, painted stems, flags, dots, rings, brackets, rests), so each
+  // spanner clears the actual ink over its span — not just notehead discs.
+  const ottavaContext: OttavaInkContext = {
+    beams,
+    ungrouped: o.rhythmStyle === 'beamed' ? ungrouped : flaggedNotes.map((p) => p.rhythm),
+    suppressedStemIds: suppressed,
+    clasps,
+    rests: restLayer.rests,
+    outlierRules: outlierLedgerSpans(flaggedNotes, geometry, systemIndex, t),
+    options: o,
+  };
   const ottavaBrackets = buildSystemOttavaBrackets(
     flaggedNotes,
     geometry,
     o,
     t,
-    unisonMerges
+    unisonMerges,
+    ottavaContext
   );
 
   return {
@@ -5389,6 +5611,7 @@ export function layoutJankoSystemShifted(
     ottavaBrackets,
     clusterDiagnostics: chordColumns.diagnostics,
     claspQualifiedIds: chordColumns.claspQualifiedIds,
+    railDiagnostics: chordColumns.railDiagnostics,
   };
 }
 
@@ -5436,32 +5659,12 @@ function renderNotesLayer(
   //    notehead-centred dashes are suppressed in favour of one continuous
   //    outlier rule spanning those measures edge to edge.
   const ledgers: string[] = [];
-  const spans = new Map<number, { first: number; last: number }>();
-  for (const p of layout.notes) {
-    if (p.coord.octave <= 5) continue;
-    const m = getMeasureIndexOfTick(p.note, layout.geometry, layout.index, t);
-    for (const ledgerY of p.coord.ledgerYs) {
-      const key = Math.round(ledgerY * 100);
-      const span = spans.get(key);
-      if (!span) spans.set(key, { first: m, last: m });
-      else {
-        span.first = Math.min(span.first, m);
-        span.last = Math.max(span.last, m);
-      }
-    }
-  }
-  const anacrusisTicks = t.anacrusisTicks ?? 0;
-  const upbeatWidth =
-    layout.index === 0 && anacrusisTicks > 0
-      ? (anacrusisTicks / t.ticksPerMeasure) * layout.geometry.measureWidth
-      : 0;
+  // Round 11 outlier spans via the shared helper (also read by the §5
+  // ottava ink model, so audited ledger ink matches the paint exactly).
   const continuous = new Map<number, { x1: number; x2: number }>();
-  for (const [key, span] of spans) {
-    if (span.last <= span.first) continue;
-    const x1 = layout.geometry.staffLeft + upbeatWidth + span.first * layout.geometry.measureWidth;
-    const x2 = layout.geometry.staffLeft + upbeatWidth + (span.last + 1) * layout.geometry.measureWidth;
-    continuous.set(key, { x1, x2 });
-    ledgers.push(renderOutlierRule(x1, x2, layout.geometry.middleCY + key / 100));
+  for (const span of outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t)) {
+    continuous.set(span.key, { x1: span.x1, x2: span.x2 });
+    ledgers.push(renderOutlierRule(span.x1, span.x2, span.y));
   }
   for (const p of layout.notes) {
     for (const ledgerY of p.coord.ledgerYs) {
@@ -5811,8 +6014,11 @@ export function computeCropExtents(
       const middleCY = layout.geometry.middleCY;
       for (const b of layout.ottavaBrackets) {
         const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
-        const bTop = Math.min(b.lineY, hookY) - middleCY;
-        const bBot = Math.max(b.lineY, hookY) - middleCY;
+        // Ticket §5: crops frame the complete spanner — line, hook and the
+        // numeral/letterform (labels descend below the line for 8vb/15mb).
+        const label = ottavaLabelBox(b, t);
+        const bTop = Math.min(b.lineY, hookY, label.y0) - middleCY;
+        const bBot = Math.max(b.lineY, hookY, label.y1) - middleCY;
         top = Math.max(top, staffTop - CROP_PAD_TOP - bTop);
         bottom = Math.max(bottom, bBot - (staffBottom + CROP_PAD_BOTTOM));
       }

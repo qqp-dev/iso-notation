@@ -51,6 +51,7 @@ import {
 } from '../src/render/janko/linter';
 import { DEFAULT_JANKO_LINT_OPTIONS, JankoLintOptions, LintViolation } from '../src/render/janko/linter';
 import {
+  BRACKET_RING_OUTER,
   claspDotMemberAir,
   getStemGeometry,
   getSubdivisionGlyphBBox,
@@ -496,7 +497,7 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
         // Daylight from the dot's ink to the mark's own ink, measured on the
         // painted primitives of the bracket's duration ink.
         const ringAir = ink.pips > 0
-          ? Math.hypot(dot!.x - clasp.claspX, dot!.y - ink.centerY) - 3.5 - r
+          ? Math.hypot(dot!.x - clasp.claspX, dot!.y - ink.centerY) - BRACKET_RING_OUTER - r
           : Number.POSITIVE_INFINITY;
         const spineAir = Math.abs(dot!.x - clasp.claspX) - clasp.strokeWidth / 2 - r;
         worstMark = Math.min(worstMark, ringAir, spineAir);
@@ -552,12 +553,13 @@ test('The nib: m. 3’s tick-432 dot is the case window, clean by every measure'
   assert.equal(clasp.pips, 1, '… as an open ring');
   const dot = clasp.durationDots[0]!;
   const yMid = (clasp.topY + clasp.botY) / 2;
-  // The retired placement sat at (+3.2, yMid) — inside the ring's 3.5pt stroke
-  // (~1.05pt of fusion). The new dot is up-and-right of the ring, outside it.
-  const legacy = Math.hypot(clasp.claspX + 3.2 - clasp.claspX, 0) - 3.5 - tokens.augmentationDotRadius;
+  // The retired placement sat at (+3.2, yMid) — inside the ring's stroke
+  // (~1.05pt of fusion at the old 3.5pt outer; still fused at the §3 2.8pt
+  // outer). The new dot is up-and-right of the ring, outside it.
+  const legacy = Math.hypot(clasp.claspX + 3.2 - clasp.claspX, 0) - BRACKET_RING_OUTER - tokens.augmentationDotRadius;
   assert.ok(legacy < 0, `the retired placement overlapped the ring (${legacy.toFixed(2)}pt)`);
   assert.ok(
-    Math.hypot(dot.x - clasp.claspX, dot.y - yMid) - 3.5 - tokens.augmentationDotRadius >=
+    Math.hypot(dot.x - clasp.claspX, dot.y - yMid) - BRACKET_RING_OUTER - tokens.augmentationDotRadius >=
       tokens.augmentationDotGap - 1e-9,
     'the painted dot keeps the full hug from the ring'
   );

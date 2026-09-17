@@ -107,7 +107,7 @@ export function durationFlagCount(
 
 /**
  * Open stem rings a LONE note paints (0–2): one for a half, two stacked for
- * a whole — the bracket's own rings (`CLASP_RING_*`), stem-mounted. Dotted
+ * a whole — the standalone rings (`CLASP_RING_*`), stem-mounted. Dotted
  * and double-dotted longs ring by base (a dotted half rings once and dots
  * once). Golden: none, always. Out-of-grammar durations: none under both.
  */

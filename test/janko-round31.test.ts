@@ -489,29 +489,28 @@ test('Linter covers the nudged positions: the preview adds no finding', () => {
     codes.filter((c) => c === 'clasp-dot-fusion' || c === 'dot-collision' || c === 'dot-count-agreement');
   assert.deepEqual(fusion(preview.violations.map((v) => v.code)), [], 'no fusion audit fires');
   assert.deepEqual(fusion(golden.violations.map((v) => v.code)), [], 'the golden path is silent');
-  // The binding seat, pinned absolutely — re-pinned for the ticket's rule-B
-  // 45° seat (the nudge applies to the new seat exactly: dot = golden seat +
-  // [0.4, 0.2], proven by the moved-circles test above). Mark air improves to
-  // 1.357 (keeps the hug with room); the binding margin moves to the head
-  // knockout, which keeps 0.089 of daylight — thin but positive, so the dot
-  // still paints whole and no audit fires. The virtual-disc hug reads −0.595:
-  // stated, not hidden (rule B retires that veto — the 45° seat's true ink
-  // clears; virtual overlap is not a collision).
+  // The binding seat, pinned absolutely — re-pinned for the §1/§2/§3 geometry
+  // (the nudge applies to the new seat exactly: dot = golden seat +
+  // [0.4, 0.2], proven by the moved-circles test above). Mark air is 1.360
+  // (keeps the hug with room). The old binding case is gone BY DESIGN: §1
+  // seats the 192-tick exception (member 5) on the RIGHT rail, 5.46pt off
+  // the column, so the nudged dot now clears its head widely — virtual hug
+  // +4.27, knockout daylight +6.02 — and no audit fires.
   const layouts = layoutJankoScore(BRAHMS, O_PREVIEW, T_BRAHMS);
   const clasp = layouts.flatMap((s) => s.clasps).find((c) => c.tick === 48)!;
   const dot = clasp.durationDots[0]!;
   const daylight = claspMarkDaylight(clasp, clasp.durationInk[0], dot.x, dot.y, T_BRAHMS);
-  assert.equal(daylight, 1.3574943408786462, 'nudged mark air keeps the hug (was 1.2449… on the 60° seat)');
+  assert.equal(daylight, 1.3597864397806587, 'nudged mark air keeps the hug (was 1.3574… pre-§1/§3)');
   const member = layouts
     .flatMap((s) => s.notes)
     .find((p) => p.note.id === 'brahms-op118-no1-5')!;
   const hug =
     Math.hypot(dot.x - member.x, dot.y - member.y) - T_BRAHMS.noteheadRadius - T_BRAHMS.augmentationDotRadius;
-  assert.equal(hug, -0.5954801413766582, 'the virtual-disc hug is stated, not hidden (was +0.8103…)');
+  assert.equal(hug, 4.272976358642013, 'the exception head stands well clear (was −0.5954… on the column)');
   const qx = Math.max(Math.abs(dot.x - member.x) - 2.53, 0);
   const qy = Math.max(Math.abs(dot.y - member.y) - 3.46, 0);
   const ko = Math.hypot(qx, qy) - T_BRAHMS.augmentationDotRadius;
-  assert.equal(ko, 0.08894313788545338, 'the knockout keeps daylight: the dot paints whole (was 1.4650…)');
+  assert.equal(ko, 6.021242789363926, 'the knockout keeps daylight: the dot paints whole (was 0.0889…)');
   assert.ok(ko > 0, 'positive knockout daylight — zero clipping on the nudged seat');
 });
 

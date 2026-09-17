@@ -53,10 +53,17 @@ const O_BRAHMS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
 const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const O_ADAPTIVE = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
 
-/** Canonical fixed-3 shifts (page pt, +down), systems 0-based. */
+/**
+ * Canonical fixed-3 shifts (page pt, +down), systems 0-based.
+ *
+ * Systems 2/4 (index 1/3) carry the §5 label-box term: their 8vb numerals
+ * descend 0.1326pt below the spanner line, so complete ink runs 0.1326
+ * deeper and the shift grows by exactly that (−8.01375 → −8.14635). The
+ * other three systems carry no ottava ink and keep their settled values.
+ */
 const CANON_SHIFTS: Array<[number, number]> = [
-  [1, -8.01375],
-  [3, -8.01375],
+  [1, -8.14635],
+  [3, -8.14635],
   [7, 4.41375],
   [12, 4.41375],
   [15, 9.41375],

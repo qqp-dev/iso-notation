@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
-import { QuantizedGridScore } from '../src/model/types';
+import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { continuousPitchY } from '../src/render/janko/geometry';
 import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
@@ -907,56 +907,69 @@ test('Defect: an unclasped four-voice simultaneity paints its stems through its 
   );
 });
 
+/** Synthetic handled tuck: the retired Brahms m.24/m.44 shape (E3 quarter over G♯2 eighth, LH), whose literal instances the §4 hand correction removes by design (326/612 are RH now, stems up). The fixed-3 fold reproduces the tuck geometry exactly. */
+function tuckScore(): QuantizedGridScore {
+  const note = (
+    id: string,
+    pitchClass: number,
+    octave: number,
+    startTick: number,
+    durationTicks: number
+  ): QuantizedNote => ({ id, pitch: { pitchClass, octave }, startTick, durationTicks, hand: 'LH' });
+  return {
+    id: 'synthetic-handled-tuck',
+    title: 'Synthetic handled tuck',
+    composer: 'test',
+    ticksPerBeat: 48,
+    totalTicks: 192,
+    timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes: [note('tuck-upper', 4, 3, 48, 48), note('tuck-lower', 8, 2, 48, 24)],
+  };
+}
+
 test('Handled tuck: a stem end at the grown erasure is true-ink clean, not a chop', () => {
-  // Brahms t4560 (m. 24) and t8400 (m. 44): the upper quarter's down-stem
-  // ends 4.00pt above the lower head's centre — inside the virtual 4.8 disc
-  // but tucked under the Round 23 tall white exactly at the own-stem
-  // breathing line, digit ink clear. Designed paint, zero violation.
-  const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
-  const layouts = layoutJankoScore(buildBrahmsOp118No1Score(), o, BRAHMS_TOKENS);
-  for (const [tick, stemId, headId] of [
-    [4560, 'brahms-op118-no1-326', 'brahms-op118-no1-325'],
-    [8400, 'brahms-op118-no1-612', 'brahms-op118-no1-611'],
-  ] as const) {
-    const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
-    assert.deepEqual(
-      run((l, out) => checkStemThroughSimultaneity(l, o, BRAHMS_TOKENS, out), sys),
-      [],
-      `t${tick}: the handled tuck is silent`
-    );
-    const stemNote = sys.ungrouped.find((n) => n.id === stemId)!;
-    const head = sys.notes.find((p) => p.note.id === headId)!;
-    const s = getStemGeometry(stemNote, BRAHMS_TOKENS);
-    assert.ok(Math.abs(s.stemX - head.x) < 1e-9, `t${tick}: stem on the head column`);
-    assert.ok(Math.abs(head.y - s.stemEndY - 4.0) < 1e-9, `t${tick}: end 4.00 above centre`);
-    assert.equal(head.tallKnockout, true, `t${tick}: the tall erasure is painted`);
-  }
+  // The upper quarter's down-stem ends 4.00pt above the lower head's centre —
+  // inside the virtual 4.8 disc but tucked under the Round 23 tall white
+  // exactly at the own-stem breathing line, digit ink clear. Designed paint,
+  // zero violation.
+  const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3' });
+  const sys = layoutJankoScore(tuckScore(), o, TOKENS)[0];
+  assert.deepEqual(
+    run((l, out) => checkStemThroughSimultaneity(l, o, TOKENS, out), sys),
+    [],
+    'the handled tuck is silent'
+  );
+  const stemNote = sys.ungrouped.find((n) => n.id === 'tuck-upper')!;
+  const head = sys.notes.find((p) => p.note.id === 'tuck-lower')!;
+  const s = getStemGeometry(stemNote, TOKENS);
+  assert.ok(Math.abs(s.stemX - head.x) < 1e-9, 'stem on the head column');
+  assert.ok(Math.abs(head.y - s.stemEndY - 4.0) < 1e-9, 'end 4.00 above centre');
+  assert.equal(head.tallKnockout, true, 'the tall erasure is painted');
 });
 
 test('Handled tuck: an unpainted or too-deep tuck still violates', () => {
-  const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
-  const layouts = layoutJankoScore(buildBrahmsOp118No1Score(), o, BRAHMS_TOKENS);
-  const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === 4560))!;
+  const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3' });
+  const sys = layoutJankoScore(tuckScore(), o, TOKENS)[0];
   // The layout forgot the tall erasure: the end inside the disc violates.
   const untallied = {
     ...sys,
-    notes: sys.notes.map((p) =>
-      p.note.id === 'brahms-op118-no1-325' ? { ...p, tallKnockout: false } : p
-    ),
+    notes: sys.notes.map((p) => (p.note.id === 'tuck-lower' ? { ...p, tallKnockout: false } : p)),
   };
-  const forgotten = run((l, out) => checkStemThroughSimultaneity(l, o, BRAHMS_TOKENS, out), untallied);
+  const forgotten = run((l, out) => checkStemThroughSimultaneity(l, o, TOKENS, out), untallied);
   assert.equal(forgotten.length, 1, 'an ungrown tuck is named');
   assert.equal(forgotten[0].code, 'stem-through-simultaneity');
-  assert.ok(forgotten[0].noteIds!.includes('brahms-op118-no1-326'));
-  assert.ok(forgotten[0].noteIds!.includes('brahms-op118-no1-325'));
+  assert.ok(forgotten[0].noteIds!.includes('tuck-upper'));
+  assert.ok(forgotten[0].noteIds!.includes('tuck-lower'));
   // The end pushed 1.0pt deeper reaches the digit's air: violates.
   const deep = {
     ...sys,
-    ungrouped: sys.ungrouped.map((n) =>
-      n.id === 'brahms-op118-no1-326' ? { ...n, y: n.y + 1.0 } : n
-    ),
+    ungrouped: sys.ungrouped.map((n) => (n.id === 'tuck-upper' ? { ...n, y: n.y + 1.0 } : n)),
   };
-  const reached = run((l, out) => checkStemThroughSimultaneity(l, o, BRAHMS_TOKENS, out), deep);
+  const reached = run((l, out) => checkStemThroughSimultaneity(l, o, TOKENS, out), deep);
   assert.equal(reached.length, 1, 'an end inside the digit air is named');
   assert.equal(reached[0].code, 'stem-through-simultaneity');
 });
@@ -1418,6 +1431,7 @@ test('Paint audit honours the digit baseline of a custom token set', () => {
 
 test('checkOttavaClearance catches brackets too close to noteheads', () => {
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const fakeNote: any = {
     note: { id: 'n1', startTick: 0, durationTicks: 48, pitch: { pitchClass: 0, octave: 4 } },
     x: 100,
@@ -1448,7 +1462,7 @@ test('checkOttavaClearance catches brackets too close to noteheads', () => {
   };
 
   const violations: LintViolation[] = [];
-  checkOttavaClearance(tightLayout, t, violations);
+  checkOttavaClearance(tightLayout, o, t, violations);
   assert.equal(violations.length, 1);
   assert.equal(violations[0].code, 'ottava-clearance');
 
@@ -1463,7 +1477,7 @@ test('checkOttavaClearance catches brackets too close to noteheads', () => {
     ],
   };
   const okViolations: LintViolation[] = [];
-  checkOttavaClearance(okLayout, t, okViolations);
+  checkOttavaClearance(okLayout, o, t, okViolations);
   assert.equal(okViolations.length, 0);
 });
 
