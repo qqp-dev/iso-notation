@@ -58,6 +58,10 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'all',
   systemsPerPage: 4,
+  // Content-aware vertical placement: facing ink clearances (including
+  // ottava extent) enforced, residual page space distributed evenly —
+  // reclaiming the excess air fixed slots leave between uneven systems.
+  verticalPlacement: 'content-aware',
   // Title block (operator order — composer right-only, title fits): no
   // composer prefix up top (it duplicated the right-aligned composer on
   // p0 and stuttered in every running head); the subtitle keeps the

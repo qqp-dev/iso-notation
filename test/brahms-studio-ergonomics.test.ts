@@ -157,11 +157,10 @@ test('Brahms pagination arithmetic: 71 measures → 18 systems → 5 pages canon
   assert.ok(Math.max(...s0ticks) >= 48 + 3 * 192, 'system 1 reaches m. 4');
 });
 
-test('Brahms canonical lint record: fixed-3 clean; adaptive secondary disclosed', () => {
+test('Brahms canonical lint record: fixed-3 clean on studio and CLI', () => {
   // Canonical fixed-3 (the live Reference surface): zero violations, zero
-  // warnings. The §5 geometry pass clears the settled findings genuinely
-  // (rigid whole-system positioning from complete ink bounds, corrected
-  // shared slot fitting, exact rhythmic ink) — nothing suppressed.
+  // warnings. The CLI lints this same entry — studio, production commands
+  // and acceptance tests agree.
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.violations.length, 0, 'canonical fixed-3: zero violations');
   assert.equal(studio.warnings.length, 0, 'canonical fixed-3: zero warnings');
@@ -170,19 +169,14 @@ test('Brahms canonical lint record: fixed-3 clean; adaptive secondary disclosed'
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
   assert.match(brahms, /✓ zero violations/, 'the BRONZE chip reads clean');
-  // --- Adaptive = the CLI secondary surface. Its residual (if any) must be
-  // same-class pre-existing with demonstrated no-worsening — pinned live in
-  // the round-33 suite's adaptive record, never assumed here.
-  const adaptive = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
-  const cli = lintJankoScore(BRAHMS, adaptive, T_BRAHMS);
-  assert.equal(cli.warnings.length, 0, 'adaptive: zero warnings');
-  assert.ok(
-    cli.violations.length <= 2,
-    `adaptive: at most the pre-existing residual (now ${cli.violations.length})`
+  // The CLI spread is this same const (see the single-source test below).
+  const cli = lintJankoScore(
+    BRAHMS,
+    resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+    resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
   );
-  for (const v of cli.violations) {
-    assert.equal(v.code, 'system-slot-overlap', 'adaptive residual stays same-class');
-  }
+  assert.equal(cli.violations.length, 0, 'CLI canonical: zero violations');
+  assert.equal(cli.warnings.length, 0, 'CLI canonical: zero warnings');
 });
 
 test('Brahms pagination has one source of truth; every surface agrees', () => {
@@ -192,12 +186,16 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
   assert.equal(studioBrahms.measuresPerSystem, O_BRAHMS.measuresPerSystem);
   assert.equal(studioBrahms.ticksPerMeasure, O_BRAHMS.ticksPerMeasure);
   // The lint CLI spreads the same const; reconstruct its spread exactly.
-  const cliBrahms = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
+  const cliBrahms = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   assert.equal(cliBrahms.systemsPerPage, 4, 'the CLI spread carries the 4-up flip');
   assert.match(
     read('scripts/lint_engraving.ts'),
-    /\.\.\.BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive'/,
-    'the CLI spreads the const — no private pagination'
+    /BRAHMS_OP118_NO1_JANKO_OPTIONS,\n\s*BRAHMS_OP118_NO1_JANKO_TOKENS/,
+    'the CLI spreads the const — no private pagination, no adaptive override'
+  );
+  assert.ok(
+    !read('scripts/lint_engraving.ts').includes("core: 'adaptive'"),
+    'the CLI carries no adaptive production override'
   );
   // The engine agrees with the studio on the page count, from the const alone.
   assert.equal(
@@ -206,16 +204,23 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
     'engine and studio page counts agree (5)'
   );
   assert.equal(O_BRAHMS.systemsPerPage, 4);
-  // Sheet + print never consume Brahms pagination, so there is nothing to
-  // disagree: the Sheet/Play views hardcode the golden defaults over
-  // Bach-only scores, print runs the duodecimal engine, the PDF is Bach-only.
+  // Sheet views hardcode the golden defaults over Bach-only scores, so there
+  // is nothing to disagree; print engraves the canonical Jánko pages
+  // (Bach + Brahms entries) with Letter fit, the PDF stays Bach-only.
   assert.ok(!read('src/ui/JankoPages.tsx').includes('BRAHMS'), 'sheet hardcodes the golden defaults');
   assert.ok(!read('src/ui/Landing.tsx').includes('brahms'), 'the app never loads Brahms (Bach + uploads)');
   assert.ok(
-    read('scripts/print-score.ts').includes('computeColumnarLayout'),
-    'print runs the duodecimal engine'
+    read('scripts/print-score.ts').includes('renderJankoPage'),
+    'print runs the canonical Jánko engine'
   );
-  assert.ok(!read('scripts/print-score.ts').includes('systemsPerPage'), 'print knows no Jankó pagination');
+  assert.ok(
+    read('scripts/print-score.ts').includes('BRAHMS_OP118_NO1_JANKO_OPTIONS'),
+    'print engraves the Brahms golden entry'
+  );
+  assert.ok(
+    !read('scripts/print-score.ts').includes('computeColumnarLayout'),
+    'print retired the duodecimal engine'
+  );
   assert.match(
     read('scripts/export-pdf.ts'),
     /const SCORE_ID = 'bach-goldberg-var1'/,
@@ -232,6 +237,7 @@ test('Brahms option diff is pagination/meter/grid/title-data only — rows/ink/g
     'measuresPerSystem',
     'systemsPerPage',
     'correctPageTopAnacrusisMeasureWidth',
+    'verticalPlacement',
     'title',
     'subtitle',
     'composer',

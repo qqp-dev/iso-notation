@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 0, 'Round 33 decided: no active comparison');
+assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 34 open: the m33 A/B/C trio');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -124,23 +124,23 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 33/);
-  assert.match(html, /no active comparison/i);
+  assert.match(html, /Round 34/);
+  assert.match(html, /m\.33/i);
 });
 
-test('Round 33 decided: full grid selected, no open axis, zero cards', () => {
-  // Ordered contract change: Round 33 is judged — the full interior grid is
-  // canonical, the settled packing/correction/refinements are promoted to the
-  // Reference, and no comparison remains. Rounds 30–33 are parked
-  // (historical consts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
-  assert.equal(CURRENT_CANDIDATES.length, 0, 'zero cards');
+test('Round 34 open: m33 fold-pair trio, one axis, three cards', () => {
+  // Ordered contract change: Round 33 is judged (full grid canonical, parked
+  // historical consts) and Round 34 opens the m.33 fold-coincident
+  // octave-pair comparison: literal fold vs shared transposition vs true
+  // octave. No selection — the Reference stays the literal fold.
+  assert.equal(CURRENT_ROUND_METADATA.round, 34);
+  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    [],
-    'no active comparison'
+    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
+    'the A/B/C trio'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -172,18 +172,19 @@ test('Round 33 decided: full grid selected, no open axis, zero cards', () => {
   );
 });
 
-test('The decided studio renders zero cards and no active comparison', () => {
+test('The open studio renders the three m33 cards on six Brahms windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Zero cards: the round is decided, the Reference is the studio.
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 0, 'zero windows');
-  assert.match(html, /data-candidate-count="0"/);
-  assert.match(html, /data-window-count="0"/);
-  assert.match(html, /data-decided="true"/, 'the decided round is marked');
-  assert.match(html, /no active comparison/, 'the view says no comparison is active');
+  // Three cards × two windows: the m33 A/B/C trio on mm.33–36 + mm.53–56.
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 6, 'six windows');
+  assert.match(html, /data-candidate-count="3"/);
+  assert.match(html, /data-window-count="6"/);
+  assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
+  assert.match(html, /Round 34/);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
-  assert.ok(!html.includes('data-window="brahms-op118-no1:"'), 'Brahms carries no window either');
+  assert.ok(html.includes('data-window="brahms-op118-no1:33-36"'), 'the m33 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:53-56"'), 'the m53 twin');
 
   // No settled decision is badged as an open question.
   for (const key of [
@@ -479,11 +480,11 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 34);
+  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis in the decided round');
-  assert.equal(CURRENT_CANDIDATES.length, 0, 'zero cards in the decided round');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

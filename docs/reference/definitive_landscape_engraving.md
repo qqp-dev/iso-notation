@@ -1,7 +1,7 @@
 # Definitive Landscape 3-System Engraving Reference
 
 > **Status**: Master Engraving Benchmark (Canonical Reference)  
-> **Source Code**: `src/render/print-layout.ts` (functions `computeColumnarLayout`, `renderPageToSvg`, `getVerticalAccoladePath`)  
+> **Source Code**: `src/render/janko/elements/accolade.ts` (function `getVerticalAccoladePath`); historical landscape engine in commit `f33d9e0` (PR #14)  
 > **Target Score**: J.S. Bach, *Goldberg Variations* BWV 988, Variatio 1. a 1 Clav.  
 > **Direct Checkout Images**:  
 > - `reference_landscape_page1.png` (Full Page 1 Spread)  

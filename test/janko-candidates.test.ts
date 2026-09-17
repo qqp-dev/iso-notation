@@ -236,10 +236,10 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the decided Round 33 (no open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
+test('CURRENT_ROUND_METADATA is the open Round 34 (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 34);
+  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -255,16 +255,23 @@ test('CURRENT_ROUND_METADATA is the decided Round 33 (no open axis)', () => {
   );
 });
 
-test('CURRENT_CANDIDATES is empty: Round 33 decided, no control', () => {
+test('CURRENT_CANDIDATES is the Round 34 trio: A/B/C, one axis, no control', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, [], 'zero live cards');
-  assert.equal(CURRENT_CANDIDATES.length, 0, 'no active comparison');
+  assert.deepEqual(
+    ids,
+    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
+    'three live cards'
+  );
   assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
   assert.equal(
     getCandidate('grid-full-vs-none-full'),
     undefined,
     'the parked full-grid card lives in the round-33 suite, not the registry'
   );
+  for (const c of CURRENT_CANDIDATES) {
+    assert.equal(c.axis, 'foldPairPresentation', `${c.id}: per-candidate purity`);
+    assert.deepEqual(Object.keys(c.options ?? {}), ['foldPairPresentation'], `${c.id}: one-line delta`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -803,10 +810,11 @@ test('t1392 slots on three rails with no tuck and shares one stem', () => {
     const col = layout.columns.get(1392)!;
     const lone = byY.find((hs) => hs.length === 1)![0];
     assert.ok(Math.abs(lone.x - col) < 0.05, `${spacing}: the lone head stands on the column`);
-    // Ticket §1 three-rail slots: the triple (a true clique) takes
-    // {-G, 0, +G} by source pitch, and the ordinary pair alternates lower
-    // LEFT / higher RIGHT. No tuck: both LEFT heads share the LEFT rail,
-    // both RIGHT heads the RIGHT rail.
+    // Compact three-rail slots: the triple (a true clique) takes
+    // {-G, 0, +G} by source pitch, and the ordinary pair seats ADJACENT
+    // (lower CENTER / higher RIGHT — one rail step clears the masks). No
+    // tuck: the pair's heads share the CENTER and RIGHT rails with the
+    // triple's middle and highest.
     const linOf = (p: (typeof heads)[number]): number =>
       p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
     const tripleXs = [...widest].sort((a, b) => linOf(a) - linOf(b));
@@ -815,19 +823,19 @@ test('t1392 slots on three rails with no tuck and shares one stem', () => {
     assert.ok(Math.abs(tripleXs[2].x - (col + G)) < 0.05, `${spacing}: triple highest outward`);
     const other = fanned.find((hs) => hs !== widest)!;
     const pairXs = [...other].sort((a, b) => linOf(a) - linOf(b));
-    assert.ok(Math.abs(pairXs[0].x - (col - G)) < 0.05, `${spacing}: pair lower LEFT`);
+    assert.ok(Math.abs(pairXs[0].x - col) < 0.05, `${spacing}: pair lower CENTER`);
     assert.ok(Math.abs(pairXs[1].x - (col + G)) < 0.05, `${spacing}: pair higher RIGHT`);
     assert.ok(
-      Math.abs(pairXs[0].x - tripleXs[0].x) < 1e-9,
-      `${spacing}: LEFT heads share one rail (no tuck)`
+      Math.abs(pairXs[0].x - tripleXs[1].x) < 1e-9,
+      `${spacing}: CENTER heads share one rail (no tuck)`
     );
     assert.ok(
       Math.abs(pairXs[1].x - tripleXs[2].x) < 1e-9,
       `${spacing}: RIGHT heads share one rail (no tuck)`
     );
     // One shared stem for the whole one-duration onset: the carrier is the
-    // nearest-to-column head (then the outward extremity) — the triple's
-    // middle head 97, the only on-column RH head once the pair flanks.
+    // nearest-to-column head (then the outward extremity) — head 99, the
+    // topmost on-column head now that the compact pair seats lower CENTER.
     const groups = layout.sharedStems.filter((g) => g.tick === 1392);
     assert.equal(groups.length, 1, `${spacing}: t1392 shares one stem`);
     const carrier = notes.find((p) => p.note.id === groups[0].carrierId)!;
@@ -835,7 +843,7 @@ test('t1392 slots on three rails with no tuck and shares one stem', () => {
       Math.abs(carrier.x - col) < 0.05,
       `${spacing}: the carrier stands on the onset's own column`
     );
-    assert.equal(carrier.note.id, 'brahms-op118-no1-97', `${spacing}: the triple middle carries`);
+    assert.equal(carrier.note.id, 'brahms-op118-no1-99', `${spacing}: the topmost on-column head carries`);
   }
 });
 
@@ -914,27 +922,26 @@ test('Synthetic same-duration stacks: one painted stem — stacked and flanked',
   const stackPainted = ['stack-lo', 'stack-hi'].filter((id) => !hidden.has(id));
   assert.equal(stackPainted.length, 1, 'the stack paints one shared stem');
 
-  // Ticket §1: the flanked pair is an ordinary conflicting pair (dy 5.0 <
-  // 2·hy), so it alternates lower LEFT / higher RIGHT about the SOLVED
-  // onset column (laid-out x after the column solve's rigid translation),
-  // spanning two rail gaps; the bracket hugs the LEFT rail.
+  // Compact seating: the flanked pair is an ordinary conflicting pair
+  // (dy 5.0 < 2·hy), so it seats ADJACENT about the SOLVED onset column
+  // (laid-out x after the column solve's rigid translation) — lower CENTER
+  // / higher RIGHT, spanning one rail gap; the bracket hugs the column.
   const flank = layout.notes.filter((p) => p.note.startTick === 48).sort((a, b) => a.x - b.x);
   assert.equal(flank.length, 2);
   const G = getClusterSpacingPreset('tight').pairGap;
   const solvedCol = layout.columns.get(48)!;
   assert.ok(
-    Math.abs(flank[1].x - flank[0].x - 2 * G) < 0.05,
-    `the flanked pair spans two rail gaps (${(2 * G).toFixed(2)}pt, got ${(flank[1].x - flank[0].x).toFixed(2)})`
+    Math.abs(flank[1].x - flank[0].x - G) < 0.05,
+    `the flanked pair spans one rail gap (${G.toFixed(2)}pt, got ${(flank[1].x - flank[0].x).toFixed(2)})`
   );
-  assert.ok(Math.abs(flank[0].x - (solvedCol - G)) < 0.05, 'the lower head sits LEFT');
+  assert.ok(Math.abs(flank[0].x - solvedCol) < 0.05, 'the lower head sits CENTER');
   assert.ok(Math.abs(flank[1].x - (solvedCol + G)) < 0.05, 'the higher head sits RIGHT');
   const groups = layout.sharedStems.filter((g) => g.tick === 48 && g.hand === 'RH');
   assert.equal(groups.length, 1, 'the flanked pair forms one shared-stem group');
   const carrier = layout.notes.find((p) => p.note.id === groups[0].carrierId)!;
-  // Both heads tie at distance G from the column, so the carrier rule falls
-  // through to the outward extremity: the topmost head carries from RIGHT.
-  assert.equal(carrier.note.id, 'flank-hi', 'the topmost head carries the tie');
-  assert.ok(Math.abs(carrier.x - (solvedCol + G)) < 0.05, 'the carrier stands on RIGHT');
+  // The lower head stands on the column, so it carries (nearest-to-column).
+  assert.equal(carrier.note.id, 'flank-lo', 'the on-column head carries');
+  assert.ok(Math.abs(carrier.x - solvedCol) < 0.05, 'the carrier stands on CENTER');
   const flankPainted = ['flank-lo', 'flank-hi'].filter((id) => !hidden.has(id));
   assert.deepEqual(flankPainted, [carrier.note.id], 'the flanked pair paints one shared stem');
 
@@ -2019,21 +2026,21 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two grid cards, twelve windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the decided round with zero cards', () => {
+test('The live studio renders the open round with three cards', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
-  assert.match(html, /data-candidate-count="0"/);
-  assert.match(html, /data-window-count="0"/, 'zero windows');
-  assert.match(html, /data-decided="true"/, 'the decided round is marked');
-  assert.match(html, /Round 33/);
-  assert.match(html, /no active comparison/i, 'the decided title headlines the view');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.match(html, /data-candidate-count="3"/);
+  assert.match(html, /data-window-count="6"/, 'six windows');
+  assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
+  assert.match(html, /Round 34/);
+  assert.match(html, /m\.33/i, 'the m33 title headlines the view');
   for (const id of ROUND_33_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 0, 'no card chips at all');
+  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 1, 'only card C chips red');
 });
 
-test('The closer-comparison strip is absent in the decided round', () => {
+test('The closer-comparison strip is absent without a declared strip', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.equal(html, '', 'no active comparison — no strip to compare');
+  assert.equal(html, '', 'no declared strip — no strip to compare');
 });

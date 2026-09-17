@@ -983,6 +983,26 @@ export interface JankoLayoutOptions {
    * unchanged. Defaults to `false` (byte-identical for Goldberg).
    */
   correctPageTopAnacrusisMeasureWidth?: boolean;
+  /**
+   * Fold-coincident octave-pair presentation (the Round 34 m.33 axis):
+   * how a same-onset same-hand octave pair that coincides only through
+   * folding is drawn. `'literal-fold'` (default) folds the low note onto
+   * the high note's row with its own ↓10; `'shared-ottava'` shifts both
+   * notes up one octave under one shared ↓10; `'split-octave'` draws the
+   * low note at its literal pitch (no fold, no bracket) as a true octave
+   * stack. Sounding pitches are preserved in every mode; the bracket
+   * alone transposes and never adds a note. Defaults to `'literal-fold'`
+   * (byte-identical for Goldberg, which folds nothing).
+   */
+  foldPairPresentation?: JankoFoldPairPresentation;
+  /**
+   * Vertical page placement: `'slot'` centers staffs in fixed slots with
+   * overflow-only correction; `'content-aware'` enforces facing ink
+   * clearances (including ottava extent) then distributes residual page
+   * space evenly within the page's slot block. Defaults to `'slot'`
+   * (byte-identical for Goldberg).
+   */
+  verticalPlacement?: JankoVerticalPlacement;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1052,6 +1072,24 @@ export type JankoGridPulseFilter = 'all' | 'midpoint-only' | 'none';
  */
 export type JankoCore = 'adaptive' | 'fixed-3' | 'fixed-4';
 
+/**
+ * Fold-coincident octave-pair presentation (Round 34 m.33 axis).
+ *
+ * - `'literal-fold'`: the low note folds onto the high note's row (own ↓10).
+ * - `'shared-ottava'`: both notes shift up one octave under one shared ↓10.
+ * - `'split-octave'`: the low note draws at literal pitch (true octave stack).
+ */
+export type JankoFoldPairPresentation = 'literal-fold' | 'shared-ottava' | 'split-octave';
+
+/**
+ * Vertical page placement.
+ *
+ * - `'slot'`: staffs center in fixed slots; overflow-only correction.
+ * - `'content-aware'`: facing ink clearances enforced, residual page space
+ *   distributed evenly within the page's slot block.
+ */
+export type JankoVerticalPlacement = 'slot' | 'content-aware';
+
 /** Fully resolved layout options (every optional option filled in). */
 export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
 
@@ -1104,6 +1142,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   claspDotNudge: [0, 0],
   gridPulseFilter: 'all',
   correctPageTopAnacrusisMeasureWidth: false,
+  foldPairPresentation: 'literal-fold',
+  verticalPlacement: 'slot',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
@@ -1244,14 +1284,19 @@ export const JANKO_HOME_OCTAVES: Record<Hand, JankoStaffOctaveRange> = {
   LH: JANKO_STAFF_OCTAVES,
 };
 
-/** The four SMuFL octave sign kinds (Round 27). */
-export type JankoOttavaKind = '8va' | '8vb' | '15ma' | '15mb';
+/**
+ * The four duodecimal octave sign kinds: arrow + dozenal span.
+ * `up10` (↑10) sounds an octave above the written pitch; `down10` (↓10) an
+ * octave below; `up20`/`down20` two octaves. Zero-based dozenal spans:
+ * b = 11 semitones, 10 = 12, 14 = 16, 20 = 24.
+ */
+export type JankoOttavaKind = 'up10' | 'down10' | 'up20' | 'down20';
 
-/** One rendered ottava bracket spanner (Round 27). */
+/** One rendered ottava bracket spanner (Round 27, dozenal labels). */
 export interface JankoOttavaBracket {
   /** Bracket sign kind. */
   kind: JankoOttavaKind;
-  /** Pitch shift applied to notes (semitones: -12 for 8va, +12 for 8vb, -24 for 15ma, +24 for 15mb). */
+  /** Pitch shift applied to notes (semitones: -12 for up10, +12 for down10, -24 for up20, +24 for down20). */
   shift: number;
   /** Horizontal span of the entire bracket in page pt (including numeral and hook). */
   x0: number;
@@ -1262,7 +1307,7 @@ export interface JankoOttavaBracket {
   dashX0: number;
   /** Horizontal end of the dashed line (hook location). */
   dashX1: number;
-  /** Hook direction toward the staff (-1 = upward for 8vb/15mb, 1 = downward for 8va/15ma). */
+  /** Hook direction toward the staff (-1 = upward for down10/down20, 1 = downward for up10/up20). */
   hookDirection: 1 | -1;
   /** Hook length in pt. */
   hookLength: number;

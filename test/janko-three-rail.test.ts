@@ -77,12 +77,36 @@ const railsOf = (members: readonly ThreeRailMember[], rails: Map<string, ThreeRa
 // 1. Ordinary seating: pairs, chains, cliques, singletons
 // ---------------------------------------------------------------------------
 
-test('Ordinary conflicting pair: lower LEFT / higher RIGHT', () => {
+test('Ordinary conflicting pair: compact adjacent, lower CENTER / higher RIGHT', () => {
   const lo = member(40, 100, 48, 48, -1);
   const hi = member(52, 100, 48, 48, -1);
   const { rails, diagnostics } = assignThreeRails([lo, hi], COL, G);
   assert.deepEqual(diagnostics, []);
-  assert.deepEqual(railsOf([lo, hi], rails), [-1, 1]);
+  assert.deepEqual(railsOf([lo, hi], rails), [0, 1]);
+});
+
+test('Ordinary pair falls back when compact seats are taken or too narrow', () => {
+  // RIGHT blocked by a fixed obstacle: lower LEFT / higher CENTER.
+  const lo = member(40, 100, 48, 48, -1);
+  const hi = member(52, 100, 48, 48, -1);
+  const blocked = assignThreeRails([lo, hi], COL, G, [{ id: 'fx', x: COL + G, y: 100, wx: WX, hy: HY }]);
+  assert.deepEqual(blocked.diagnostics, []);
+  assert.deepEqual(railsOf([lo, hi], blocked.rails), [-1, 0]);
+  // Both compact seats blocked: outer rails.
+  const lo2 = member(40, 100, 48, 48, -1);
+  const hi2 = member(52, 100, 48, 48, -1);
+  const outer = assignThreeRails(
+    [lo2, hi2],
+    COL,
+    G,
+    [
+      { id: 'fx0', x: COL, y: 100, wx: WX, hy: HY },
+      { id: 'fx1', x: COL + G, y: 100, wx: WX, hy: HY },
+      { id: 'fx2', x: COL - G, y: 100, wx: WX, hy: HY },
+    ]
+  );
+  // Every rail collides with a fixed mask: honest diagnostic, unseated.
+  assert.equal(outer.diagnostics.length, 1);
 });
 
 test('Ordinary three-chain alternates LEFT/RIGHT/LEFT by source pitch', () => {

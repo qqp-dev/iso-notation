@@ -129,7 +129,7 @@ test('Brahms fold counts: exactly 9 under fixed-3, 1 under fixed-4, 0 on Bach go
   const f3Folded = f3Layouts.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
   assert.equal(f3Folded.length, 9, 'fixed-3 on Brahms has exactly 9 folded notes');
   for (const n of f3Folded) {
-    assert.equal(n.ottavaShift, 12, 'all folded notes in Brahms are 8vb (shift = +12)');
+    assert.equal(n.ottavaShift, 12, 'all folded notes in Brahms are down10 (shift = +12)');
   }
 
   // Fixed-4 on Brahms: exactly 1 folded note (m. 69, A0, lin 9)
@@ -137,7 +137,7 @@ test('Brahms fold counts: exactly 9 under fixed-3, 1 under fixed-4, 0 on Bach go
   const f4Layouts = layoutJankoScore(BRAHMS, f4Opts, t);
   const f4Folded = f4Layouts.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
   assert.equal(f4Folded.length, 1, 'fixed-4 on Brahms has exactly 1 folded note');
-  assert.equal(f4Folded[0].ottavaShift, 12, 'm. 69 A0 folded note is 8vb (shift = +12)');
+  assert.equal(f4Folded[0].ottavaShift, 12, 'm. 69 A0 folded note is down10 (shift = +12)');
   assert.equal(f4Folded[0].note.pitch.octave * 12 + f4Folded[0].note.pitch.pitchClass, 9, 'm. 69 note is A0 (lin 9)');
 
   // Bach golden: 0 folded notes

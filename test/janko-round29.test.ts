@@ -346,10 +346,10 @@ test('Dots golden: Brahms m.1/m.4/m.19 dots share the 45° rule-B seat at the §
   // r 0.75). Rule B still holds absolutely: m.1, m.4 and m.19 all sit at
   // exactly 45.00° off their own ring centres at exactly 4.75.
   assert.equal(d1[0]!.x, 73.92816897534193, 'm.1 clasp dot x (§2 column + §3 4.75 seat; was 75.37314372217251)');
-  assert.equal(d1[0]!.y, 128.6274927893639, 'm.1 clasp dot y (centreY 131.986 − 4.75·sin45°)');
+  assert.equal(d1[0]!.y, 127.89924278936398, 'm.1 clasp dot y (content-aware page 1; 45° seat kept)');
   assert.equal(m1.claspX, 70.56941176470588, 'm.1 clasp spine x (column 78.17 − r − offset)');
   assert.equal(d4[0]!.x, 329.683463092989, 'm.4 clasp dot x (§2 column + §3 4.75 seat; was 331.1284378398195)');
-  assert.equal(d4[0]!.y, 136.1274927893639, 'm.4 clasp dot y (centreY 139.486 − 4.75·sin45°)');
+  assert.equal(d4[0]!.y, 135.39924278936397, 'm.4 clasp dot y (content-aware page 1; 45° seat kept)');
   // The consistency the ticket orders: opening and m.19 sit at the same
   // 45.00° off their ring centres at the same 4.75 radius.
   const angleOf = (clasp: typeof m1, dot: NonNullable<(typeof d1)[number]>): number => {
@@ -362,7 +362,7 @@ test('Dots golden: Brahms m.1/m.4/m.19 dots share the 45° rule-B seat at the §
   // reclaims the shrunk downbeat insets), so its absolute seat re-pins; the
   // 45° seat relative to its own spine is the invariant, and it holds.
   assert.equal(d19[0]!.x, 319.15875721063605, 'm.19 dot x (was 315.1437319574666 pre-§2)');
-  assert.equal(d19[0]!.y, 168.6274927893639, 'm.19 dot y (was 168.13251804253335 at radius 5.45)');
+  assert.equal(d19[0]!.y, 158.51564278936397, 'm.19 dot y (content-aware page 2; 45° seat kept)');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
@@ -627,16 +627,16 @@ test('Rests golden: dormant dialects keep #111111 ink and unscaled extents', () 
   assert.ok(Math.abs(box.y1 - box.y0 - 11.5594) < 1e-3, 'dormant kinetic quarter height unscaled');
 });
 
-test('npm run lint:engraving --strict reports the accepted 4-up breakage and exits 1', () => {
-  // Red-on-Brahms is the expected, operator-accepted state (was clean/0 at
-  // 3-up): the strict gate exits 1 with exactly the 2 accepted slot findings.
+test('npm run lint:engraving --strict reports canonical clean and exits 0', () => {
+  // Canonical fixed-3 everywhere: the strict gate exits 0 with zero
+  // violations and zero warnings on every score.
   const run = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--strict', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.equal(run.status, 1, 'the strict gate exits 1 while Brahms carries the accepted 2');
-  assert.match(run.stdout, /violations violations=2 warnings=0/, 'exactly the accepted 2, zero warnings');
+  assert.equal(run.status, 0, 'the strict gate exits 0 on the canonical clean record');
+  assert.match(run.stdout, /clean violations=0 warnings=0/, 'zero violations, zero warnings');
 });
 
 // ---------------------------------------------------------------------------

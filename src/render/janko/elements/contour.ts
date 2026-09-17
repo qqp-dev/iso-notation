@@ -57,9 +57,8 @@ import {
   ResolvedJankoTokens,
   getClusterSpacingPreset,
 } from '../types';
-import { URTEXT_SERIF } from '../../print-layout';
 import { resolveBeatPulseXs } from './barlines';
-import { f } from './style';
+import { URTEXT_SERIF, f } from './style';
 
 /**
  * Linear pitch of the staff's Middle C line: middle C the note. Single

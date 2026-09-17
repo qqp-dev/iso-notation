@@ -277,10 +277,10 @@ export function continuousPitchY(lin: number, scale: number): number {
  *
  * - `fixed-3` (C3–C5, C-lines at 36, 48, 60):
  *   Core coverage [30, 66]. Core±1 extensions at 24 and 72 cover [18, 78].
- *   Notes with lin < 18 or lin > 78 fold by ∓12 (8va/8vb) or ∓24 (15ma/15mb).
+ *   Notes with lin < 18 or lin > 78 fold by ∓12 (↑10/↓10) or ∓24 (↑20/↓20).
  * - `fixed-4` (o2–o5 middles at 29.5, 41.5, 53.5, 65.5):
  *   Core coverage [23.5, 71.5]. Core±1 extensions at 17.5 and 77.5 cover [12, 83.5].
- *   Notes with lin < 12 or lin > 83.5 fold by ∓12 (8va/8vb) or ∓24 (15ma/15mb).
+ *   Notes with lin < 12 or lin > 83.5 fold by ∓12 (↑10/↓10) or ∓24 (↑20/↓20).
  * - `adaptive`: 0 (no folding).
  */
 export function computeFoldShift(lin: number, core?: JankoCore): number {

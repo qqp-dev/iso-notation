@@ -330,24 +330,33 @@ export function assignThreeRails(
       seatOrdinaryRelative(component[0], 'Common member');
       continue;
     }
-    // Alternating pair/chain: bottom LEFT, then RIGHT, LEFT, … by source
-    // pitch (pair: lower LEFT / higher RIGHT; triple: LEFT/RIGHT/LEFT).
-    // A three-member TRUE CLIQUE (every pair overlaps) cannot alternate —
-    // it seats the only feasible three-rail pattern, LEFT/CENTER/RIGHT by
-    // source pitch — while larger infeasible components diagnose honestly.
+    // Compact ordinary seating from protected mask bounds: a conflicting
+    // pair needs exactly one rail step (dx = gap ≥ 2wx + air), so it seats
+    // ADJACENT — lower CENTER / higher RIGHT first, then lower LEFT /
+    // higher CENTER — and only falls back to the outer rails when a fixed
+    // obstacle genuinely takes the compact seats. Longer chains alternate
+    // from LEFT by source pitch; a three-member TRUE CLIQUE (every pair
+    // overlaps) cannot alternate — it seats the only feasible three-rail
+    // pattern, LEFT/CENTER/RIGHT by source pitch — while larger infeasible
+    // components diagnose honestly.
     const patterns: ThreeRail[][] =
       component.length === 3
         ? [
             [-1, 1, -1],
             [-1, 0, 1],
           ]
-        : [component.map((_, i) => ((i % 2 === 0 ? -1 : 1) as ThreeRail))];
+        : component.length === 2
+          ? [
+              [0, 1],
+              [-1, 0],
+              [-1, 1],
+            ]
+          : [component.map((_, i) => ((i % 2 === 0 ? -1 : 1) as ThreeRail))];
     let seated: ThreeRail[] | null = null;
     for (const seats of patterns) {
       let fits = true;
       for (let i = 0; i < component.length && fits; i++) {
         for (let j = i + 1; j < component.length; j++) {
-          if (seats[i] !== seats[j]) continue;
           if (masksOverlap(component[i], seats[i], component[j], seats[j], nominalX, gap)) {
             fits = false;
             break;

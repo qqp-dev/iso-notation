@@ -86,18 +86,21 @@ const O_PACK = resolveJankoOptions({
   ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: false,
+  verticalPlacement: 'slot',
 });
 const O_CORR_ALL = resolveJankoOptions({
   ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'all',
+  verticalPlacement: 'slot',
 });
 const O_CORR_MID = resolveJankoOptions({
   ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'midpoint-only',
+  verticalPlacement: 'slot',
 });
 const CONFIG = createStudioConfig({ score: BACH });
 
@@ -723,7 +726,7 @@ test('Baseline window findings: every window clean under the seating', () => {
 // 5. Canonical gates: frozen GOLD, studio 9, CLI 2, byte-identical defaults
 // ---------------------------------------------------------------------------
 
-test('Canonical frozen: Bach 0/0, Brahms studio clean, adaptive CLI 2, defaults inert', () => {
+test('Canonical frozen: Bach 0/0, Brahms studio clean, adaptive solver 2, defaults inert', () => {
   assert.deepEqual(resolveJankoOptions(DEFAULT_JANKO_OPTIONS).gridPulseFilter, 'all');
   assert.equal(resolveJankoOptions(DEFAULT_JANKO_OPTIONS).correctPageTopAnacrusisMeasureWidth, false);
   const bach = lintJankoScore(BACH, O_BACH, T_BACH);
@@ -732,15 +735,15 @@ test('Canonical frozen: Bach 0/0, Brahms studio clean, adaptive CLI 2, defaults 
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.violations.length, 0, 'live fixed-3 canonical clean (§5 seated, itemized in the round-33 suite)');
   assert.equal(studio.warnings.length, 0);
-  const cli = lintJankoScore(
+  const solver = lintJankoScore(
     BRAHMS,
     { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
     BRAHMS_OP118_NO1_JANKO_TOKENS
   );
-  assert.equal(cli.violations.length, 2, 'CLI adaptive 2 at canonical packing');
-  assert.equal(cli.warnings.length, 0);
+  assert.equal(solver.violations.length, 2, 'adaptive solver 2 at canonical packing (historical surface, not the CLI)');
+  assert.equal(solver.warnings.length, 0);
   assert.deepEqual(
-    cli.violations.map((v) => v.system),
+    solver.violations.map((v) => v.system),
     [17, 17],
     'sys 18 furniture + sys 18/17 overlap'
   );

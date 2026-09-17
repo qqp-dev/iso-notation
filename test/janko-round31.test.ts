@@ -260,26 +260,17 @@ test('The clean BRONZE block displays honestly: 0/0, itemized, ungated', () => {
   assert.ok(!bach.includes('known-note'), 'no known note on GOLD');
 });
 
-test('CLI secondary: its adaptive Brahms entry reports the pre-existing 2 (deploy green)', () => {
+test('CLI canonical: fixed-3 Brahms entry is clean (deploy green)', () => {
   const cli = lintJankoScore(
     BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS },
     BRAHMS_OP118_NO1_JANKO_TOKENS
   );
-  assert.equal(cli.violations.length, 2, 'the two pre-existing slot findings at canonical packing');
+  assert.equal(cli.violations.length, 0, 'canonical Brahms: zero violations');
   assert.equal(cli.warnings.length, 0, 'and warning-free');
-  assert.deepEqual(
-    cli.violations.map((v) => [v.code, v.system + 1]),
-    [
-      ['system-slot-overlap', 18],
-      ['system-slot-overlap', 18],
-    ],
-    'sys 18 furniture + the sys 18/17 ink overlap (itemized in the ergonomics lint record)'
-  );
-  assert.match(
-    read('scripts/lint_engraving.ts'),
-    /core: 'adaptive'/,
-    'the script keeps its adaptive Brahms entry'
+  assert.ok(
+    !read('scripts/lint_engraving.ts').includes("core: 'adaptive'"),
+    'the script carries no adaptive production override'
   );
   // Deploy stays green: `.github/workflows/deploy.yml` gates on `npm test` +
   // `npm run build` only — the CLI is an operator readout, not a gate.
@@ -345,8 +336,8 @@ test('Score census: exactly the 22 bracket dots move; the clasp set is stable', 
       .flatMap((s) => s.clasps)
       .map((c) => c.tick)
       .sort((a, b) => a - b);
-  assert.deepEqual(allTicks(preview), allTicks(golden), 'the 74-bracket fit never flips');
-  assert.equal(allTicks(golden).length, 74, '74 brackets (non-vacuous; the 72 shared admissions plus the two fixed-3-only folded LH brackets at 6192/10032)');
+  assert.deepEqual(allTicks(preview), allTicks(golden), 'the 72-bracket fit never flips');
+  assert.equal(allTicks(golden).length, 72, '72 brackets (the fold-coincident LH octaves at 6192/10032 stagger unbracketed)');
   // Every moved dot moves by the vector exactly — the uniform rule, all 22.
   for (const tick of DOTTED_CLASP_TICKS) {
     const g = golden.flatMap((s) => s.clasps).find((c) => c.tick === tick)!;
@@ -500,17 +491,17 @@ test('Linter covers the nudged positions: the preview adds no finding', () => {
   const clasp = layouts.flatMap((s) => s.clasps).find((c) => c.tick === 48)!;
   const dot = clasp.durationDots[0]!;
   const daylight = claspMarkDaylight(clasp, clasp.durationInk[0], dot.x, dot.y, T_BRAHMS);
-  assert.equal(daylight, 1.3597864397806587, 'nudged mark air keeps the hug (was 1.3574… pre-§1/§3)');
+  assert.ok(Math.abs(daylight - 1.3597864397806587) < 1e-10, 'nudged mark air keeps the hug (was 1.3574… pre-§1/§3)');
   const member = layouts
     .flatMap((s) => s.notes)
     .find((p) => p.note.id === 'brahms-op118-no1-5')!;
   const hug =
     Math.hypot(dot.x - member.x, dot.y - member.y) - T_BRAHMS.noteheadRadius - T_BRAHMS.augmentationDotRadius;
-  assert.equal(hug, 4.272976358642013, 'the exception head stands well clear (was −0.5954… on the column)');
+  assert.ok(Math.abs(hug - 4.272976358642013) < 1e-10, 'the exception head stands well clear (was −0.5954… on the column)');
   const qx = Math.max(Math.abs(dot.x - member.x) - 2.53, 0);
   const qy = Math.max(Math.abs(dot.y - member.y) - 3.46, 0);
   const ko = Math.hypot(qx, qy) - T_BRAHMS.augmentationDotRadius;
-  assert.equal(ko, 6.021242789363926, 'the knockout keeps daylight: the dot paints whole (was 0.0889…)');
+  assert.ok(Math.abs(ko - 6.021242789363926) < 1e-10, 'the knockout keeps daylight: the dot paints whole (was 0.0889…)');
   assert.ok(ko > 0, 'positive knockout daylight — zero clipping on the nudged seat');
 });
 

@@ -20,9 +20,9 @@
  *  4. Linter (live): the full-grid card carries the settled baseline; the
  *     filter adds no finding.
  *  5. Candidates view (HISTORICAL config): the parked cards render 2 × 6,
- *     Brahms-only; the live decided view carries zero cards.
- *  6. Decided registry (live): Round 33 judged, openAxes [], CURRENT_CANDIDATES
- *     empty, the studio selects the Reference and shows no active comparison.
+ *     Brahms-only.
+ *  6. R33 decided by convention: historical consts parked, live registry
+ *     moved to Round 34 (see test/janko-round34.test.ts).
  */
 
 import test from 'node:test';
@@ -39,8 +39,6 @@ import {
 } from '../src/scores/brahms-op118-no1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   brahmsWindow,
   candidateBadges,
   type JankoCandidate,
@@ -433,19 +431,19 @@ test('Round 33 settled refinements ride on both cards (m7 slots, dots, rest, ott
     ['none', O_NONE],
   ] as const) {
     const layout = layoutJankoScore(BRAHMS, o, T_BRAHMS);
-    // m. 7 (tick 1200): the ordinary ninth pair alternates lower LEFT /
-    // higher RIGHT (§1), the three clear heads hold CENTER, and the
-    // main-column upper head carries the shared stem.
+    // m. 7 (tick 1200): the ordinary ninth pair seats adjacent — lower
+    // CENTER / higher RIGHT (compact) — the three clear heads hold CENTER,
+    // and the main-column upper head carries the shared stem.
     const s1 = layout[1];
     const m7 = s1.notes.filter((p) => p.note.startTick === 1200 && p.rhythm.hand === 'RH');
     assert.equal(m7.length, 5, `${label}: m. 7 RH five`);
     const col = s1.columns.get(1200)!;
     const byX = [...m7].sort((a, b) => a.x - b.x);
-    assert.ok(Math.abs(byX[0].x - (col - 5.46)) < 1e-6, `${label}: lower head LEFT`);
+    assert.ok(Math.abs(byX[0].x - col) < 1e-6, `${label}: lower head CENTER`);
     assert.ok(Math.abs(byX[4].x - (col + 5.46)) < 1e-6, `${label}: higher head RIGHT`);
     assert.ok(
       byX.slice(1, 4).every((p) => Math.abs(p.x - col) < 1e-6),
-      `${label}: the clear three on the column`
+      `${label}: the lower plus the clear three on the column`
     );
     const carrier = s1.sharedStems.find((g) => g.tick === 1200);
     assert.equal(carrier?.carrierId, 'brahms-op118-no1-82', `${label}: upper RH head carries`);
@@ -470,7 +468,7 @@ test('Round 33 settled refinements ride on both cards (m7 slots, dots, rest, ott
     const brackets = layout.flatMap((s) => s.ottavaBrackets);
     assert.equal(brackets.length, 9, `${label}: nine ottava runs (rule C)`);
     assert.deepEqual(brackets[0].noteIds, ['brahms-op118-no1-47'], `${label}: first run over note 47`);
-    assert.equal(brackets[0].kind, '8vb', `${label}: first run is 8vb`);
+    assert.equal(brackets[0].kind, 'down10', `${label}: first run is down10`);
   }
   // Deeper rule pins (slot unit theory, dot daylight, ottava scale/ink,
   // rest fallbacks) live in the shared-rules suite; both cards resolve
@@ -496,25 +494,12 @@ test('The parked Round 33 cards render two grid cards, Brahms-only', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Decided registry (live): judged, empty, Reference-first
+// 6. R33 decided by convention (live registry moved to Round 34)
 // ---------------------------------------------------------------------------
-
-test('Round 33 decided: full grid selected, no open axis, zero cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.match(CURRENT_ROUND_METADATA.title, /no active comparison/i);
-  assert.ok(CURRENT_ROUND_METADATA.description.includes('full interior quarter-position grid'));
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
-  assert.deepEqual(CURRENT_CANDIDATES, [], 'no candidate cards remain');
-});
-
-test('Decided view: zero cards, no active comparison, Reference-first data', () => {
-  const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 0, 'zero cards');
-  assert.match(html, /data-candidate-count="0"/);
-  assert.match(html, /data-decided="true"/);
-  assert.match(html, /no active comparison/, 'the view says no comparison is active');
-  assert.match(html, /Round 33/);
-});
+// Round 33 is judged (full grid canonical) and its live registry pins moved
+// to the Round 34 suite with the newly opened m.33 comparison. This suite
+// keeps the historical consts and every canonical assertion; it carries no
+// live-registry pins (see the R33 parking record in test/janko-round34.test.ts).
 
 test('R33 parked: historical consts in this suite, registry carries the record', () => {
   const suite = read('test/janko-round33.test.ts');
