@@ -96,7 +96,7 @@ export const BRAHMS_STUDIO_CROPS: StudioCrop[] = [
     count: 2,
     title: 'mm. 5–6 · First fold',
     caption:
-      'Note #47 folds an octave below the fixed-3 core under its Gould 8vb bracket — the first of nine folded notes.',
+      'Note #47 folds an octave below the fixed-3 core under its ↓10 bracket — the first of nine folded notes.',
   },
   {
     start: 7,
@@ -202,22 +202,20 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: buildBrahmsOp118No1Score(),
-      // Canonical Brahms (judged when Round 33 closed): the fixed-3 golden
-      // at four measures/system with the page-top correction and the full
-      // grid — 18 systems over 5 pages. Canonical fixed-3 is clean; every
-      // finding stays VISIBLE (never gated, never hidden). The CLI keeps
-      // its own adaptive entry (the pre-existing secondary residual);
-      // deploy gates on tests + build only, so it stays green.
+      // Canonical Brahms: the fixed-3 golden at four measures/system with
+      // the page-top correction and the full grid — 18 systems over 5 pages.
+      // Fixed-3 is project-wide canonical: studio, production commands and
+      // acceptance tests agree; the CLI lints this same entry.
       options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
       tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
     },
     // Round 9: the curated multi-duration specimen. Two measures across the
     // staff width, so the five chords and their midpoint marks stay large
-    // enough to judge at a glance.
+    // enough to judge at a glance. Canonical fixed-3 like every surface.
     [SPECIMEN_STUDIO_SCORE_ID]: {
       id: SPECIMEN_STUDIO_SCORE_ID,
       score: buildChordDurationSpecimenScore(),
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', measuresPerSystem: 2 }),
+      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 }),
       tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
     },
     // Round 15/20: the curated rest-duration specimen. Six 4/4 measures — one

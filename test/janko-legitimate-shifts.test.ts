@@ -52,6 +52,7 @@ const BRAHMS = buildBrahmsOp118No1Score();
 const O_BACH = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const T_BACH = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 const O_ADAPTIVE = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
+const O_CANONICAL = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS });
 const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const G = getClusterSpacingPreset('tight').pairGap;
 
@@ -83,38 +84,40 @@ test('legitimate shifts: Bach t1632 lower ON column, both fit, zero crossings', 
   );
 });
 
-test('legitimate shifts: downbeat barline triples clear their barlines, zero collisions', () => {
-  const layouts = layoutJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
+test('legitimate shifts: downbeat barline triples clear their barlines, zero collisions (canonical + solver)', () => {
   // Repaired anchoring (§2 line 18): each triple's joint bucket is led by its
   // unbracketed lone head (17/152/436), so the lowest sits ON the column and
-  // nothing leaves the beat cell — the retired any-qualified inward rule used
-  // to manufacture a barline-side demand here; zero demand is the honest
-  // report now. The triples' brackets stay honestly bare on both rules: the
-  // pip ring meets a same-onset head at dx 4.10 (rigid-invariant, HEAD-bare
-  // too), and every fallback is finding-clean.
-  for (const [tick, lowestId] of [
-    [240, 'brahms-op118-no1-17'],
-    [2160, 'brahms-op118-no1-152'],
-    [6000, 'brahms-op118-no1-436'],
+  // nothing leaves the beat cell — on both the canonical fixed-3 surface and
+  // the adaptive solver surface.
+  for (const [label, O] of [
+    ['canonical', O_CANONICAL],
+    ['adaptive', O_ADAPTIVE],
   ] as const) {
-    const diag = layouts.flatMap((l) => l.clusterDiagnostics ?? []).find((d) => d.tick === tick);
-    assert.equal(diag, undefined, `t${tick}: no demand — the unbracketed lowest holds the column`);
-    const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
-    const column = sys.columns.get(tick)!;
-    const lowest = sys.notes.find((p) => p.note.id === lowestId)!;
-    assert.ok(Math.abs(lowest.x - column) < 0.1, `t${tick}: ${lowestId} ON the solved column`);
+    const layouts = layoutJankoScore(BRAHMS, O, T_BRAHMS);
+    for (const [tick, lowestId] of [
+      [240, 'brahms-op118-no1-17'],
+      [2160, 'brahms-op118-no1-152'],
+      [6000, 'brahms-op118-no1-436'],
+    ] as const) {
+      const diag = layouts.flatMap((l) => l.clusterDiagnostics ?? []).find((d) => d.tick === tick);
+      assert.equal(diag, undefined, `t${tick} [${label}]: no demand — the unbracketed lowest holds the column`);
+      const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+      const column = sys.columns.get(tick)!;
+      const lowest = sys.notes.find((p) => p.note.id === lowestId)!;
+      assert.ok(Math.abs(lowest.x - column) < 0.1, `t${tick} [${label}]: ${lowestId} ON the solved column`);
+    }
+    const report = lintJankoScore(BRAHMS, O, T_BRAHMS);
+    assert.equal(
+      report.violations.filter((v) => v.code === 'barline-collision').length,
+      0,
+      `zero barline collisions on Brahms ${label}`
+    );
+    assert.equal(
+      report.violations.filter((v) => v.code === 'grid-crossing-offset').length,
+      0,
+      `zero grid crossings on Brahms ${label}`
+    );
   }
-  const report = lintJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
-  assert.equal(
-    report.violations.filter((v) => v.code === 'barline-collision').length,
-    0,
-    'zero barline collisions on Brahms adaptive'
-  );
-  assert.equal(
-    report.violations.filter((v) => v.code === 'grid-crossing-offset').length,
-    0,
-    'zero grid crossings on Brahms adaptive'
-  );
 });
 
 test('grid audit: unchanged heads but pulse moved to the upper head MUST fail', () => {
@@ -160,18 +163,24 @@ test('grid audit: zero crossings on the canonical fixed-3 Brahms', () => {
   );
 });
 
-test('legitimate shifts: m.37 keeps its clasp, zero stem-through', () => {
-  const layouts = layoutJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
+test('legitimate shifts: m.37 keeps its clasp, zero stem-through (canonical)', () => {
+  const layouts = layoutJankoScore(BRAHMS, O_CANONICAL, T_BRAHMS);
   const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === 7056))!;
   assert.ok(sys.clasps.some((c) => c.tick === 7056), 'the m.37 onset keeps its bracket (no demotion)');
-  const diag = (sys.clusterDiagnostics ?? []).find((d) => d.tick === 7056);
-  assert.ok(diag, 'the inward demand is reported');
-  assert.deepEqual(diag!.memberIds, ['brahms-op118-no1-515'], 'the diagnostic names the leaving member');
-  const report = lintJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
+  const report = lintJankoScore(BRAHMS, O_CANONICAL, T_BRAHMS);
   const m37 = report.violations.filter((v) => v.measure === 37);
   assert.deepEqual(
     m37.map((v) => v.code).sort(),
     [],
     'm.37 carries no finding (clasp stands, slots fit)'
   );
+});
+
+test('legitimate shifts: m.37 inward demand names its leaving member (adaptive solver)', () => {
+  const layouts = layoutJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
+  const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === 7056))!;
+  assert.ok(sys.clasps.some((c) => c.tick === 7056), 'the m.37 onset keeps its bracket (no demotion)');
+  const diag = (sys.clusterDiagnostics ?? []).find((d) => d.tick === 7056);
+  assert.ok(diag, 'the inward demand is reported');
+  assert.deepEqual(diag!.memberIds, ['brahms-op118-no1-515'], 'the diagnostic names the leaving member');
 });

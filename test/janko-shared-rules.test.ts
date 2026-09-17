@@ -53,14 +53,20 @@ import {
   claspDotMemberAir,
 } from '../src/render/janko/elements/rhythm';
 import {
+  DUODECIMAL_SPAN_SEMITONES,
   OTTAVA_GLYPH_INK,
-  OTTAVA_GLYPH_SCALE,
+  OTTAVA_LABELS,
+  OTTAVA_LABEL_ADVANCE,
+  OTTAVA_LABEL_ASCENT,
+  OTTAVA_LABEL_DESCENT,
+  OTTAVA_LABEL_FONT_SIZE,
+  duodecimalSpanSemitones,
+  kindForShift,
   ottavaGlyphAdvance,
   ottavaGlyphBbox,
   renderOttavaBracket,
 } from '../src/render/janko/elements/ottava';
-import { URTEXT_OTTAVA_GLYPHS } from '../src/render/janko/elements/ottava-paths';
-import { REST_INK, REST_SCALE } from '../src/render/janko/elements/rests';
+import { REST_INK } from '../src/render/janko/elements/rests';
 import { getEquatorYForOctave } from '../src/render/janko/geometry';
 import { lintJankoScore } from '../src/render/janko/linter';
 import type { QuantizedGridScore, QuantizedNote } from '../src/model/types';
@@ -287,19 +293,20 @@ test('§A literal: m.4 (tick 624) stays a clear vertical, every hand on the colu
   }
 });
 
-test('§A literal: m.7/m.17 seat the ordinary ninth pair LEFT/RIGHT; the upper head carries', () => {
-  // Ticket §1: the five-voice downbeat is one ordinary component {low, high}
-  // (dy 5.0 < 2·hy 6.92) plus three clear singletons. The pair alternates by
-  // source pitch — lower LEFT, higher RIGHT — and every clear member holds
-  // CENTER. The LH singleton shares the onset but no component.
+test('§A literal: m.7/m.17 seat the ordinary ninth pair CENTER/RIGHT; the upper head carries', () => {
+  // Compact seating: the five-voice downbeat is one ordinary component
+  // {low, high} (dy 5.0 < 2·hy 6.92) plus three clear singletons. The pair
+  // seats adjacent by source pitch — lower CENTER, higher RIGHT — and every
+  // clear member holds CENTER. The LH singleton shares the onset but no
+  // component.
   for (const [tick, lowId, highId, carrierId] of [
     [1200, 'brahms-op118-no1-78', 'brahms-op118-no1-79', 'brahms-op118-no1-82'],
     [3120, 'brahms-op118-no1-213', 'brahms-op118-no1-214', 'brahms-op118-no1-217'],
   ] as const) {
     const { column, xs } = onsetColumns(tick);
     assert.ok(
-      Math.abs(xs.get(lowId)! - (column - 5.46)) < 1e-6,
-      `tick ${tick}: lower head LEFT`
+      Math.abs(xs.get(lowId)! - column) < 1e-6,
+      `tick ${tick}: lower head CENTER`
     );
     assert.ok(
       Math.abs(xs.get(highId)! - (column + 5.46)) < 1e-6,
@@ -322,30 +329,31 @@ test('§A literal: m.7/m.17 seat the ordinary ninth pair LEFT/RIGHT; the upper h
   }
 });
 
-test('§A literal: m.8/m.18 alternate both pairs LEFT/RIGHT, middle head CENTER', () => {
-  // Ticket §1: two ordinary pair components {96,97} and {99,100} (each dy 5.0
-  // < 2·hy 6.92) plus the clear singleton 98. Each pair seats lower LEFT /
-  // higher RIGHT; the carrier rule (nearest the column, then topmost) elects
-  // 98 — the only on-column head — instead of the old off-column topmost.
-  for (const [tick, left, right, carrierId] of [
+test('§A literal: m.8/m.18 seat both pairs CENTER/RIGHT, middle head CENTER', () => {
+  // Compact seating: two ordinary pair components {96,97} and {99,100}
+  // (each dy 5.0 < 2·hy 6.92) plus the clear singleton 98. Each pair seats
+  // adjacent — lower CENTER / higher RIGHT — so the doubled 5s share the
+  // column with b and the doubled 7s share RIGHT. The carrier rule
+  // (nearest the column, then topmost) elects the topmost on-column head.
+  for (const [tick, center, right, carrierId] of [
     [
       1392,
       ['brahms-op118-no1-96', 'brahms-op118-no1-99'],
       ['brahms-op118-no1-97', 'brahms-op118-no1-100'],
-      'brahms-op118-no1-98',
+      'brahms-op118-no1-99',
     ],
     [
       3312,
       ['brahms-op118-no1-231', 'brahms-op118-no1-234'],
       ['brahms-op118-no1-232', 'brahms-op118-no1-235'],
-      'brahms-op118-no1-233',
+      'brahms-op118-no1-234',
     ],
   ] as const) {
     const { column, xs } = onsetColumns(tick);
-    for (const id of left) {
+    for (const id of center) {
       assert.ok(
-        Math.abs(xs.get(id)! - (column - 5.46)) < 1e-6,
-        `tick ${tick}: ${id} LEFT (its pair's lower)`
+        Math.abs(xs.get(id)! - column) < 1e-6,
+        `tick ${tick}: ${id} CENTER (its pair's lower)`
       );
     }
     for (const id of right) {
@@ -355,7 +363,7 @@ test('§A literal: m.8/m.18 alternate both pairs LEFT/RIGHT, middle head CENTER'
       );
     }
     for (const [id, x] of xs) {
-      if (([...left, ...right] as readonly string[]).includes(id)) continue;
+      if (([...center, ...right] as readonly string[]).includes(id)) continue;
       assert.ok(Math.abs(x - column) < 1e-9, `tick ${tick}: ${id} on the column`);
     }
     const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
@@ -367,30 +375,17 @@ test('§A literal: m.8/m.18 alternate both pairs LEFT/RIGHT, middle head CENTER'
 });
 
 test('§A literal: m.9/m.19 clear top pair seats lower CENTER / higher RIGHT, never fusing carriers', () => {
-  // Ticket §1: the commons {114,115,116} seat as an ordinary pair {114,115}
-  // (dy 5.0 < 2·hy 6.92 → 114 LEFT / 115 RIGHT) plus clear singleton 116.
-  // The two 192-tick exceptions are a clear-path TOP pair, NOT obstructed
-  // internal exceptions: 117 (lower) takes CENTER, 118 (higher) staggers
-  // RIGHT off it — both duration paths run upward unobstructed.
-  for (const [tick, left, right] of [
-    [
-      1584,
-      ['brahms-op118-no1-114'],
-      ['brahms-op118-no1-115', 'brahms-op118-no1-118'],
-    ],
-    [
-      3504,
-      ['brahms-op118-no1-249'],
-      ['brahms-op118-no1-250', 'brahms-op118-no1-253'],
-    ],
+  // Compact seating: the commons {114,115,116} seat as an ordinary pair
+  // {114,115} (dy 5.0 < 2·hy 6.92 → 114 CENTER / 115 RIGHT) plus clear
+  // singleton 116. The two 192-tick exceptions are a clear-path TOP pair,
+  // NOT obstructed internal exceptions: 117 (lower) takes CENTER, 118
+  // (higher) staggers RIGHT off it — both duration paths run upward
+  // unobstructed.
+  for (const [tick, right] of [
+    [1584, ['brahms-op118-no1-115', 'brahms-op118-no1-118']],
+    [3504, ['brahms-op118-no1-250', 'brahms-op118-no1-253']],
   ] as const) {
     const { column, xs } = onsetColumns(tick);
-    for (const id of left) {
-      assert.ok(
-        Math.abs(xs.get(id)! - (column - 5.46)) < 1e-6,
-        `tick ${tick}: ${id} LEFT`
-      );
-    }
     for (const id of right) {
       assert.ok(
         Math.abs(xs.get(id)! - (column + 5.46)) < 1e-6,
@@ -398,7 +393,7 @@ test('§A literal: m.9/m.19 clear top pair seats lower CENTER / higher RIGHT, ne
       );
     }
     for (const [id, x] of xs) {
-      if (([...left, ...right] as readonly string[]).includes(id)) continue;
+      if (([...right] as readonly string[]).includes(id)) continue;
       assert.ok(Math.abs(x - column) < 1e-9, `tick ${tick}: ${id} on the column`);
     }
     const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
@@ -415,7 +410,11 @@ test('§A literal: m.9/m.19 clear top pair seats lower CENTER / higher RIGHT, ne
   }
 });
 
-test('§A literal: m.33/m.53 fold-coincident octaves alternate lower LEFT / higher RIGHT', () => {
+test('§A literal: m.33/m.53 fold-coincident octaves stagger on the column, unbracketed', () => {
+  // Fold-coincident octaves share their drawn row only because folding
+  // transposed one member: they stagger horizontally (masks must clear) but
+  // earn no bracket solely for the coincidence. Column-anchored: lowest
+  // source pitch ON the column, upper one gap right.
   for (const [tick, lowId, highId] of [
     [6192, 'brahms-op118-no1-444', 'brahms-op118-no1-445'],
     [10032, 'brahms-op118-no1-730', 'brahms-op118-no1-731'],
@@ -426,16 +425,21 @@ test('§A literal: m.33/m.53 fold-coincident octaves alternate lower LEFT / high
     const high = atTick.find((p) => p.note.id === highId)!;
     assert.equal(low.y, high.y, `tick ${tick}: the octave pair coincides after folding`);
     const lin = (p: (typeof atTick)[number]): number => p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
-    assert.ok(lin(low) < lin(high), `tick ${tick}: inward member is lower source pitch`);
+    assert.ok(lin(low) < lin(high), `tick ${tick}: column member is lower source pitch`);
     const { column } = onsetColumns(tick);
     assert.ok(
-      Math.abs(low.x - (column - 5.46)) < 1e-6,
-      `tick ${tick}: lowest-lin LEFT`
+      Math.abs(low.x - column) < 1e-6,
+      `tick ${tick}: lowest-lin ON the column`
     );
     assert.ok(
       Math.abs(high.x - (column + 5.46)) < 1e-6,
-      `tick ${tick}: upper RIGHT (ordinary conflicting pair)`
+      `tick ${tick}: upper one gap right`
     );
+    const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+    const lhPair = sys.clasps.filter(
+      (c) => c.tick === tick && c.notes.every((n) => n.hand === 'LH')
+    );
+    assert.equal(lhPair.length, 0, `tick ${tick}: the fold-coincident LH pair carries no bracket`);
   }
 });
 
@@ -492,27 +496,43 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
 // §C. Ottava glyph treatment — scale/ink/advance + spanner attachment
 // ---------------------------------------------------------------------------
 
-test('§C wiring: the numeral vests the live rest scale and ink (0.85, #1A1A1A)', () => {
-  assert.equal(OTTAVA_GLYPH_SCALE, 0.85, 'glyph scale');
-  assert.equal(OTTAVA_GLYPH_INK, '#1A1A1A', 'glyph ink');
-  assert.equal(OTTAVA_GLYPH_SCALE, REST_SCALE, 'one shared scale constant');
+test('§C wiring: the label vests italic serif at 7.5pt in rest ink (#1A1A1A)', () => {
+  assert.equal(OTTAVA_LABEL_FONT_SIZE, 7.5, 'label size');
+  assert.equal(OTTAVA_GLYPH_INK, '#1A1A1A', 'label ink');
   assert.equal(OTTAVA_GLYPH_INK, REST_INK, 'one shared ink constant');
-  for (const kind of ['8va', '8vb', '15ma', '15mb'] as const) {
-    const baked = URTEXT_OTTAVA_GLYPHS[kind];
-    assert.equal(ottavaGlyphAdvance(kind), baked.advance * 0.85, `${kind}: painted advance is 0.85 × baked`);
+  assert.deepEqual(
+    OTTAVA_LABELS,
+    { up10: '↑10', down10: '↓10', up20: '↑20', down20: '↓20' },
+    'arrow plus dozenal span per kind'
+  );
+  assert.equal(kindForShift(12), 'down10', 'shift +12 sounds down an octave');
+  assert.equal(kindForShift(-12), 'up10', 'shift −12 sounds up an octave');
+  assert.equal(kindForShift(24), 'down20', 'shift +24 sounds down two octaves');
+  assert.equal(kindForShift(-24), 'up20', 'shift −24 sounds up two octaves');
+  assert.deepEqual(
+    DUODECIMAL_SPAN_SEMITONES,
+    { b: 11, '10': 12, '14': 16, '20': 24 },
+    'zero-based dozenal spans'
+  );
+  assert.equal(duodecimalSpanSemitones('b'), 11);
+  assert.equal(duodecimalSpanSemitones('10'), 12);
+  assert.equal(duodecimalSpanSemitones('14'), 16);
+  assert.equal(duodecimalSpanSemitones('20'), 24);
+  for (const kind of ['up10', 'down10', 'up20', 'down20'] as const) {
+    assert.equal(ottavaGlyphAdvance(kind), OTTAVA_LABEL_ADVANCE, `${kind}: nominal advance`);
     assert.deepEqual(
       [...ottavaGlyphBbox(kind)],
-      [baked.bbox[0] * 0.85, baked.bbox[1] * 0.85, baked.bbox[2] * 0.85, baked.bbox[3] * 0.85],
-      `${kind}: painted bbox is 0.85 × baked`
+      [0, -OTTAVA_LABEL_ASCENT, OTTAVA_LABEL_ADVANCE, OTTAVA_LABEL_DESCENT],
+      `${kind}: nominal bbox`
     );
   }
-  assert.equal(ottavaGlyphAdvance('8vb'), 10.52385, '8vb advance pinned (12.381 × 0.85)');
+  assert.equal(ottavaGlyphAdvance('down10'), 10.5, 'down10 advance pinned');
 });
 
-test('§C render: the painted glyph is the scaled outline in rest ink', () => {
+test('§C render: the painted label is italic serif text in rest ink', () => {
   const svg = renderOttavaBracket(
     {
-      kind: '8vb',
+      kind: 'down10',
       shift: 12,
       x0: 200,
       x1: 260,
@@ -525,37 +545,33 @@ test('§C render: the painted glyph is the scaled outline in rest ink', () => {
     },
     T_BRAHMS
   );
-  const glyph = svg.match(/<path class="janko-ottava-glyph"[^>]*d="([^"]*)" fill="([^"]*)"/)!;
-  assert.equal(glyph[2], '#1A1A1A', 'the numeral paints in rest ink');
-  // The first contour point is the baked start scaled about the glyph origin:
-  // render and measure read the same 0.85, so paint can never drift from audit.
-  const baked = URTEXT_OTTAVA_GLYPHS['8vb'].contours[0].start;
-  const head = glyph[1].match(/M (-?[\d.]+) (-?[\d.]+)/)!;
-  assert.equal(Number(head[1]), Number((200 + baked[0] * 0.85).toFixed(2)), 'glyph x is 0.85 × baked');
+  const glyph = svg.match(/<text class="janko-ottava-glyph"[^>]*>([^<]*)<\/text>/)!;
+  assert.equal(glyph[1], '↓10', 'the label reads arrow plus dozenal span');
+  assert.ok(svg.includes('font-style="italic"'), 'the label sets italic');
+  assert.ok(svg.includes('font-size="7.5"'), 'the label sets 7.5pt');
+  assert.ok(svg.includes('fill="#1A1A1A"'), 'the label paints in rest ink');
+  assert.ok(svg.includes('data-ottava-kind="down10"'), 'the kind rides the node');
   // Line and hook keep the existing thin dark treatment (no redesign).
   assert.ok(svg.includes('class="janko-ottava-line"'), 'the dashed line renders');
   assert.ok(svg.includes('stroke="#111111"'), 'line/hook keep #111111');
   assert.ok(svg.includes('stroke-width="0.35"'), 'line/hook keep 0.35pt');
 });
 
-test('§C window: a real spanner connects one gap past the numeral edge', () => {
+test('§C window: a real spanner connects one gap past the label edge', () => {
   // The dashed line must start exactly one dash-gap past the RENDERED
-  // numeral's right edge — the connection reads the painted (scaled)
-  // advance. Pinned on both placement branches: the roomy branch (note 182,
-  // numeral fully left of the head, dash at the head's left edge) and the
-  // left-margin branch (note 47, numeral tucked, dash past the head — the
-  // numeral sits below the staff, so the horizontal overlap is clean).
+  // label's right edge — the connection reads the nominal advance. Pinned
+  // on both placement branches: the roomy branch (note 182, label fully
+  // left of the head, dash at the head's left edge) and the left-margin
+  // branch (note 47, label tucked, dash past the head — the label sits
+  // below the staff, so the horizontal overlap is clean).
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const brackets = layouts.flatMap((l) => l.ottavaBrackets);
   assert.equal(brackets.length, 9, 'nine folded runs on the canonical surface (the 937/938 pair splits at 4-per)');
   const gap = T_BRAHMS.ottavaDashGap ?? 2.0;
   const glyphRightEdge = (b: (typeof brackets)[number]): number => {
     const svg = renderOttavaBracket(b, T_BRAHMS);
-    const glyph = svg.match(/<path class="janko-ottava-glyph"[^>]*d="([^"]*)"/)!;
-    const nums = glyph[1].match(/-?\d+\.\d+|-?\d+/g)!.map(Number);
-    let maxX = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < nums.length; i += 2) maxX = Math.max(maxX, nums[i]);
-    return maxX;
+    const glyph = svg.match(/<text class="janko-ottava-glyph"[^>]*x="([\d.]+)"[^>]*>/)!;
+    return Number(glyph[1]) + ottavaGlyphAdvance(b.kind);
   };
   // Roomy branch: note 182 (sys3).
   const sys3 = layouts[3];
@@ -568,7 +584,7 @@ test('§C window: a real spanner connects one gap past the numeral edge', () => 
   const roomyEdge = glyphRightEdge(roomy);
   assert.ok(
     Math.abs(roomyEdge + gap - roomy.dashX0) < 0.011,
-    `roomy: glyph right edge + one gap meets the dash (edge ${roomyEdge.toFixed(2)}, dash ${roomy.dashX0})`
+    `roomy: label right edge + one gap meets the dash (edge ${roomyEdge.toFixed(2)}, dash ${roomy.dashX0})`
   );
   // Margin branch: note 47 (sys1).
   const sys1 = layouts[1];
@@ -576,12 +592,12 @@ test('§C window: a real spanner connects one gap past the numeral edge', () => 
   const firstMargin = sys1.notes.find((p) => p.note.id === 'brahms-op118-no1-47')!;
   assert.ok(
     margin.dashX0 > firstMargin.x - T_BRAHMS.noteheadRadius,
-    'margin: dash starts past the head’s left edge (numeral tucked)'
+    'margin: dash starts past the head’s left edge (label tucked)'
   );
   const marginEdge = glyphRightEdge(margin);
   assert.ok(
     Math.abs(marginEdge + gap - margin.dashX0) < 0.011,
-    `margin: glyph right edge + one gap meets the dash (edge ${marginEdge.toFixed(2)}, dash ${margin.dashX0})`
+    `margin: label right edge + one gap meets the dash (edge ${marginEdge.toFixed(2)}, dash ${margin.dashX0})`
   );
 });
 

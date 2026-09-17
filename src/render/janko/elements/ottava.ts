@@ -1,18 +1,24 @@
 /**
- * Ottava Spanner Engine (Round 27)
- * =================================
+ * Ottava Spanner Engine (Round 27, dozenal labels)
+ * =================================================
  *
- * Gould-compliant octave spanners (8va / 8vb / 15ma / 15mb):
+ * Gould-shaped octave spanners with duodecimal labels (↑10 / ↓10 / ↑20 / ↓20):
  *
- * 1. Shape per Gould/SMuFL: verbatim Bravura numeral at the start, straight
+ * 1. Shape per Gould: italic arrow-plus-dozenal label at the start, straight
  *    horizontal DASHED line over exactly the affected passage, short hook
  *    turning toward the staff at the far end; above the notes to raise
- *    (8va/15ma), below to lower (8vb/15mb). The line is straight even as
- *    notes move (never follows contour).
+ *    (up10/up20), below to lower (down10/down20). The line is straight even
+ *    as notes move (never follows contour). Anchors and dashed scope are
+ *    retained from the Round 27 spanner; only the label letterform changes.
  * 2. Grouping: maximal contiguous folded runs PER SYSTEM; fresh full label
  *    after every system break (no paren-continuations); singleton folded notes
- *    get the full numeral+line+hook.
+ *    get the full label+line+hook.
  * 3. Self-delimiting: `loco` is skipped.
+ *
+ * Intervals are zero-based duodecimal: b-span = 11 semitones, 10-span = 12,
+ * 14-span = 16, 20-span = 24 (see {@link DUODECIMAL_SPAN_SEMITONES}). Solf
+ * remains absolute: folding transposes by whole octaves, so every folded
+ * note keeps its pitch-class solfège syllable.
  */
 
 import {
@@ -23,9 +29,8 @@ import {
   ResolvedJankoTokens,
 } from '../types';
 import type { PositionedJankoNote, JankoUnisonMerge } from '../engine';
-import { URTEXT_OTTAVA_GLYPHS, OttavaGlyph } from './ottava-paths';
-import { REST_INK, REST_SCALE } from './rests';
-import { f } from './style';
+import { REST_INK } from './rests';
+import { URTEXT_SERIF, f } from './style';
 import {
   JANKO_STEM_STROKE_WIDTH,
   JankoBeamGroupGeometry,
@@ -45,54 +50,80 @@ import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor } from './notehead';
 import { OutlierRuleSpan, getEquatorRuleYs, pitchGridRules } from './staff';
 
 /**
- * Shared solid-ink treatment (permanent rule): the ottava numeral/letterform
- * renders at the live rest family's uniform scale and ink (`0.85`, `#1A1A1A`).
- * The baked Bravura outlines in `ottava-paths.ts` stay byte-identical; the
- * scale applies at render about the glyph origin, and every measured extent
- * (advance, bbox, spanner connection) reads the scaled helpers below so
+ * Zero-based duodecimal interval spans in semitones: b = 11, 10 (one dozen)
+ * = 12, 14 = 16, 20 (two dozen) = 24. Ottava brackets transpose by whole
+ * dozens (10/20); the b/14 spans name the neighbouring interval vocabulary.
+ */
+export const DUODECIMAL_SPAN_SEMITONES: Readonly<Record<'b' | '10' | '14' | '20', number>> = {
+  b: 11,
+  '10': 12,
+  '14': 16,
+  '20': 24,
+};
+
+/** Semitones of one zero-based duodecimal span label. */
+export function duodecimalSpanSemitones(span: 'b' | '10' | '14' | '20'): number {
+  return DUODECIMAL_SPAN_SEMITONES[span];
+}
+
+/**
+ * Painted label per ottava kind: italic arrow plus dozenal span. The arrow
+ * names the sounding direction (↑ = sounds above the written pitch).
+ */
+export const OTTAVA_LABELS: Readonly<Record<JankoOttavaKind, string>> = {
+  up10: '↑10',
+  down10: '↓10',
+  up20: '↑20',
+  down20: '↓20',
+};
+
+/**
+ * Shared label treatment: the arrow-plus-dozenal label sets in italic
+ * Urtext serif at 7.5pt in the rest family's ink (`#1A1A1A`) — the house
+ * small-label size (octave labels set 7.5pt). Every measured extent
+ * (advance, bbox, spanner connection) reads the nominal helpers below so
  * placement, attachment and audit can never drift from the paint.
  */
-export const OTTAVA_GLYPH_SCALE = REST_SCALE;
+export const OTTAVA_LABEL_FONT_SIZE = 7.5;
 export const OTTAVA_GLYPH_INK = REST_INK;
+/** Nominal ascent (pt) of the italic label above its baseline. */
+export const OTTAVA_LABEL_ASCENT = 5.5;
+/** Nominal descent (pt) of the italic label below its baseline. */
+export const OTTAVA_LABEL_DESCENT = 0.5;
+/** Nominal advance (pt) of one label: arrow plus two dozenal digits. */
+export const OTTAVA_LABEL_ADVANCE = 10.5;
 
-/** Scaled advance width (page pt) of one ottava numeral — the painted extent. */
+/** Nominal advance width (page pt) of one ottava label — the painted extent. */
 export function ottavaGlyphAdvance(kind: JankoOttavaKind): number {
-  return URTEXT_OTTAVA_GLYPHS[kind].advance * OTTAVA_GLYPH_SCALE;
+  void kind;
+  return OTTAVA_LABEL_ADVANCE;
 }
 
-/** Scaled bounding box `[x0, y0, x1, y1]` of one ottava numeral — the painted extent. */
+/** Nominal bounding box `[x0, y0, x1, y1]` of one ottava label — the painted extent. */
 export function ottavaGlyphBbox(kind: JankoOttavaKind): readonly [number, number, number, number] {
-  const [x0, y0, x1, y1] = URTEXT_OTTAVA_GLYPHS[kind].bbox;
-  const s = OTTAVA_GLYPH_SCALE;
-  return [x0 * s, y0 * s, x1 * s, y1 * s];
+  void kind;
+  return [0, -OTTAVA_LABEL_ASCENT, OTTAVA_LABEL_ADVANCE, OTTAVA_LABEL_DESCENT];
 }
 
-/** Render a verbatim Bravura ottava sign outline into an SVG path string. */
+/** Render one italic arrow-plus-dozenal ottava label into an SVG text string. */
 export function renderOttavaGlyph(
   kind: JankoOttavaKind,
   x: number,
   lineY: number
 ): string {
-  const glyph: OttavaGlyph = URTEXT_OTTAVA_GLYPHS[kind];
-  const s = OTTAVA_GLYPH_SCALE;
-  // For 8vb/15mb (below the staff), the numeral sits ON the line (origin at baseline lineY).
-  // For 8va/15ma (above the staff), the numeral sits UNDER the line (towards the staff).
+  const label = OTTAVA_LABELS[kind];
+  // For down10/down20 (below the staff), the label sits ON the line (baseline at lineY).
+  // For up10/up20 (above the staff), the label sits UNDER the line (towards the staff).
   const baselineY =
-    kind === '8va' || kind === '15ma' ? lineY - glyph.bbox[1] * s : lineY;
-  const p = (q: readonly [number, number]): string =>
-    `${f(x + q[0] * s)} ${f(baselineY + q[1] * s)}`;
-  const d = glyph.contours
-    .map(
-      (c) =>
-        `M ${p(c.start)} ` +
-        c.segments.map(([a, b, e]) => `C ${p(a)} ${p(b)} ${p(e)}`).join(' ') +
-        ' Z'
-    )
-    .join(' ');
-  return `<path class="janko-ottava-glyph" data-ottava-kind="${kind}" d="${d}" fill="${OTTAVA_GLYPH_INK}" stroke="none" fill-rule="evenodd"/>`;
+    kind === 'up10' || kind === 'up20' ? lineY + OTTAVA_LABEL_ASCENT : lineY;
+  return (
+    `<text class="janko-ottava-glyph" data-ottava-kind="${kind}" ` +
+    `x="${f(x)}" y="${f(baselineY)}" font-family="${URTEXT_SERIF}" ` +
+    `font-style="italic" font-size="${OTTAVA_LABEL_FONT_SIZE}" fill="${OTTAVA_GLYPH_INK}">${label}</text>`
+  );
 }
 
-/** Render one complete ottava spanner bracket (numeral + dashed line + hook). */
+/** Render one complete ottava spanner bracket (label + dashed line + hook). */
 export function renderOttavaBracket(
   bracket: JankoOttavaBracket,
   tokens: ResolvedJankoTokens
@@ -127,13 +158,13 @@ export function renderOttavaBrackets(
   return out.join('\n');
 }
 
-/** Determine the SMuFL octave sign kind from the pitch shift. */
+/** Determine the duodecimal octave sign kind from the pitch shift. */
 export function kindForShift(shift: number): JankoOttavaKind {
-  if (shift === 12) return '8vb';
-  if (shift === -12) return '8va';
-  if (shift === 24) return '15mb';
-  if (shift === -24) return '15ma';
-  return shift > 0 ? '8vb' : '8va';
+  if (shift === 12) return 'down10';
+  if (shift === -12) return 'up10';
+  if (shift === 24) return 'down20';
+  if (shift === -24) return 'up20';
+  return shift > 0 ? 'down10' : 'up10';
 }
 
 // ---------------------------------------------------------------------------
@@ -156,8 +187,8 @@ export interface OttavaInkBox {
   y1: number;
 }
 
-/** Absolute x of a bracket's numeral (inverse of the builder's placement). */
-export function ottavaNumeralX(
+/** Absolute x of a bracket's label (inverse of the builder's placement). */
+export function ottavaLabelX(
   bracket: JankoOttavaBracket,
   tokens: ResolvedJankoTokens
 ): number {
@@ -168,33 +199,30 @@ export function ottavaNumeralX(
 }
 
 /**
- * Painted extent of a bracket's numeral/letterform (page pt) — the scaled
- * Bravura bbox at the rendered origin, mirroring {@link renderOttavaGlyph}
- * exactly (below-staff signs sit ON the line, above-staff signs UNDER it).
- * The glyph paints with `stroke="none"`, so no stroke growth applies.
+ * Painted extent of a bracket's label (page pt) — the nominal italic bbox at
+ * the rendered origin, mirroring {@link renderOttavaGlyph} exactly
+ * (below-staff labels sit ON the line, above-staff labels UNDER it).
  */
 export function ottavaLabelBox(
   bracket: JankoOttavaBracket,
   tokens: ResolvedJankoTokens
 ): OttavaInkBox {
-  const glyph: OttavaGlyph = URTEXT_OTTAVA_GLYPHS[bracket.kind];
-  const s = OTTAVA_GLYPH_SCALE;
-  const nx = ottavaNumeralX(bracket, tokens);
-  const [gx0, gy0, gx1, gy1] = glyph.bbox;
+  const nx = ottavaLabelX(bracket, tokens);
+  const [gx0, gy0, gx1, gy1] = ottavaGlyphBbox(bracket.kind);
   if (bracket.shift > 0) {
     return {
-      x0: nx + gx0 * s,
-      y0: bracket.lineY + gy0 * s,
-      x1: nx + gx1 * s,
-      y1: bracket.lineY + gy1 * s,
+      x0: nx + gx0,
+      y0: bracket.lineY + gy0,
+      x1: nx + gx1,
+      y1: bracket.lineY + gy1,
     };
   }
-  const baselineY = bracket.lineY - gy0 * s;
+  const baselineY = bracket.lineY - gy0;
   return {
-    x0: nx + gx0 * s,
-    y0: baselineY + gy0 * s,
-    x1: nx + gx1 * s,
-    y1: baselineY + gy1 * s,
+    x0: nx + gx0,
+    y0: baselineY + gy0,
+    x1: nx + gx1,
+    y1: baselineY + gy1,
   };
 }
 
@@ -396,17 +424,16 @@ export function resolveOttavaLineY(args: {
 }): number {
   const { kind, shift, inkTop, inkBottom, noteTop, noteBottom, staffTopY, staffBotY, hookLength, tokens } = args;
   const clearance = tokens.ottavaClearance ?? 6.0;
-  const [, gy0, , gy1] = URTEXT_OTTAVA_GLYPHS[kind].bbox;
-  const s = OTTAVA_GLYPH_SCALE;
+  const [, gy0, , gy1] = ottavaGlyphBbox(kind);
   if (shift > 0) {
-    const labelUp = -gy0 * s;
+    const labelUp = -gy0;
     return Math.max(
       staffBotY + clearance,
       noteBottom + clearance,
       inkBottom + Math.max(labelUp, hookLength) + OTTAVA_ACTUAL_INK_GAP
     );
   }
-  const labelDown = (gy1 - gy0) * s;
+  const labelDown = gy1 - gy0;
   return Math.min(
     staffTopY - clearance,
     noteTop - clearance,
@@ -416,7 +443,7 @@ export function resolveOttavaLineY(args: {
 
 /**
  * Build maximal contiguous folded runs of notes per system and construct
- * their Gould-compliant ottava spanner brackets.
+ * their Gould-shaped ottava spanner brackets.
  */
 export function buildSystemOttavaBrackets(
   notes: readonly PositionedJankoNote[],
@@ -472,25 +499,25 @@ export function buildSystemOttavaBrackets(
       const lastNote = currentRun[currentRun.length - 1];
       const kind = kindForShift(currentShift);
       // Spanner connection reads the painted (scaled) advance, so the dashed
-      // line starts exactly one gap past the rendered numeral's right edge.
+      // line starts exactly one gap past the rendered label's right edge.
       const advance = ottavaGlyphAdvance(kind);
 
       // Horizontal position (X only; the line y resolves after, from the
       // complete ink over this span):
-      let numeralX: number;
+      let labelX: number;
       if (firstNote.x - r - dashGap - advance >= geo.staffLeft) {
-        numeralX = firstNote.x - r - dashGap - advance;
+        labelX = firstNote.x - r - dashGap - advance;
       } else {
-        numeralX = Math.max(geo.staffLeft, firstNote.x - advance / 2);
+        labelX = Math.max(geo.staffLeft, firstNote.x - advance / 2);
       }
-      const dashX0 = numeralX + advance + dashGap;
+      const dashX0 = labelX + advance + dashGap;
       const lastNoteRight = lastNote.x + r + 2.0;
       const dashX1 = Math.min(
         geo.staffRight,
         Math.max(lastNoteRight, dashX0 + minDashSpan)
       );
 
-      const x0 = Math.min(numeralX, firstNote.x - r);
+      const x0 = Math.min(labelX, firstNote.x - r);
       const x1 = Math.max(dashX1, lastNote.x + r);
 
       // Complete ink over the span: halo-aware notehead discs, staff grid

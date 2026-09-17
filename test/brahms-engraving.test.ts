@@ -5,12 +5,13 @@
  *  1. The score itself: authentic cut-time metadata, the sweeping four-octave
  *     left-hand arpeggio, and the two five-voice chords of mm. 7–8 exactly as
  *     the ticket specifies them.
- *  2. Row-Snapped Parity Offset (Approach 2) on real harmony: every same-row
- *     chord tone keeps its true whole-tone row and is spread horizontally by
- *     one full notehead diameter, including the three-note cluster of m. 8.
- *  3. The complete engraving: zero notehead collisions and the canonical
- *     lint record (the adaptive secondary surface carries its pre-existing
- *     residual; itemized in test/brahms-studio-ergonomics.test.ts).
+ *  2. Row-Snapped Parity Offset (Approach 2) on real harmony, preserved as
+ *     intentional solver coverage on the adaptive surface: every same-row
+ *     chord tone keeps its true whole-tone row and is spread horizontally,
+ *     including the three-note cluster of m. 8. Canonical fixed-3 asserts
+ *     compact clusters separately (no same-row fan on continuous height).
+ *  3. The complete canonical fixed-3 engraving: zero notehead collisions,
+ *     zero violations, zero warnings.
  */
 
 import { test } from 'node:test';
@@ -41,8 +42,10 @@ import { getClusterSpacingPreset, resolveJankoOptions, resolveJankoTokens } from
 import { getPitchCoordinate } from '../src/render/janko/geometry';
 import { lintJankoScore } from '../src/render/janko/linter';
 
-const OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
+const OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS };
 const TOKENS = BRAHMS_OP118_NO1_JANKO_TOKENS;
+/** Intentional solver coverage: the adaptive surface for row-fan assertions. */
+const OPTIONS_ADAPTIVE = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
 const R = BRAHMS_OP118_NO1_JANKO_TOKENS.noteheadRadius!;
 /** Decided golden fan step (Round 17B verdict `'tight'`): 2·2.53 + 0.4 = 5.46pt. */
 const PAIR_GAP = getClusterSpacingPreset(OPTIONS.clusterSpacing).pairGap;
@@ -54,6 +57,7 @@ const MIN_BARLINE_AIR = 1.0;
 const SCORE = buildBrahmsOp118No1Score();
 const LAYOUTS = layoutJankoScore(SCORE, OPTIONS, TOKENS);
 const REPORT = lintJankoScore(SCORE, OPTIONS, TOKENS);
+const LAYOUTS_ADAPTIVE = layoutJankoScore(SCORE, OPTIONS_ADAPTIVE, TOKENS);
 const resolvedOptions = resolveJankoOptions(OPTIONS);
 const resolvedTokens = resolveJankoTokens(TOKENS);
 
@@ -73,15 +77,20 @@ function sonority(tick: number): QuantizedNote[] {
     );
 }
 
-/** Every positioned note of the engraving, systems flattened. */
+/** Every positioned note of the canonical engraving, systems flattened. */
 function allNotes(): PositionedJankoNote[] {
   return LAYOUTS.flatMap((layout) => layout.notes);
+}
+
+/** Every positioned note of the adaptive solver surface, systems flattened. */
+function allNotesAdaptive(): PositionedJankoNote[] {
+  return LAYOUTS_ADAPTIVE.flatMap((layout) => layout.notes);
 }
 
 /** Onsets whose notes share one whole-tone row, keyed by tick and row y. */
 function sameRowGroups(): Map<string, PositionedJankoNote[]> {
   const groups = new Map<string, PositionedJankoNote[]>();
-  for (const p of allNotes()) {
+  for (const p of allNotesAdaptive()) {
     const key = `${p.note.startTick}|${(p.y + 0).toFixed(3)}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(p);
@@ -188,14 +197,14 @@ test('Authentic lossless score contains 964 notes across 71 measures and upbeat'
 // 2. Row-Snapped Parity Offset on real harmony
 // ---------------------------------------------------------------------------
 
-test('Every same-row chord tone keeps its true whole-tone row', () => {
-  for (const p of allNotes()) {
+test('Every same-row chord tone keeps its true whole-tone row (adaptive solver)', () => {
+  for (const p of allNotesAdaptive()) {
     const expected = getPitchCoordinate(
       p.note.pitch.pitchClass,
       p.note.pitch.octave,
       p.coord.hand,
       TOKENS,
-      OPTIONS,
+      OPTIONS_ADAPTIVE,
       p.coord.flank
     );
     assert.equal(p.coord.y, expected.y, `${p.note.id} keeps its row y`);
@@ -205,7 +214,23 @@ test('Every same-row chord tone keeps its true whole-tone row', () => {
   }
 });
 
-test('Row collisions are fanned at the judged pair gap (Round 17 golden)', () => {
+test('Canonical fixed-3 keeps every head on its resolved pitch height', () => {
+  for (const p of allNotes()) {
+    const expected = getPitchCoordinate(
+      p.note.pitch.pitchClass,
+      p.note.pitch.octave,
+      p.coord.hand,
+      TOKENS,
+      OPTIONS,
+      p.coord.flank
+    );
+    assert.equal(p.coord.y, expected.y, `${p.note.id} keeps its pitch y`);
+    assert.equal(p.rhythm.y, p.y, `${p.note.id} rhythm layer follows the head`);
+    assert.equal(p.rhythm.x, p.x, `${p.note.id} stem column follows the head`);
+  }
+});
+
+test('Row collisions are fanned at the judged pair gap (adaptive solver, Round 17 golden)', () => {
   const groups = sameRowGroups();
   assert.ok(groups.size >= 10, `the Brahms chords collide on many rows (${groups.size})`);
   for (const [key, group] of groups) {
@@ -233,7 +258,7 @@ test('Row collisions are fanned at the judged pair gap (Round 17 golden)', () =>
   }
 });
 
-test('mm. 8–9 stack three heads on one row and fan the triplet at the judged pair gap', () => {
+test('mm. 8–9 stack three heads on one row and fan the triplet at the judged pair gap (adaptive solver)', () => {
   const groups = sameRowGroups();
   const inMm89 = (tick: number): boolean => tick >= at(8, 0) && tick < at(10, 0);
   const triplets = [...groups.entries()].filter(
@@ -251,7 +276,7 @@ test('mm. 8–9 stack three heads on one row and fan the triplet at the judged p
     const middle = group.find((p) => p.coord.pitchClass === 7)!;
     assert.equal(xs[1], middle.x, 'the middle head anchors the fan');
     const tick = middle.note.startTick;
-    const fellowTraveller = allNotes().some(
+    const fellowTraveller = allNotesAdaptive().some(
       (p) => p.note.startTick === tick && p.y !== middle.y && Math.abs(p.x - middle.x) < 1e-9
     );
     assert.ok(fellowTraveller, 'the anchored head shares its column with the onset');
@@ -346,26 +371,18 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   assert.equal(collisions, 0, 'no two rectangular notehead masks overlap anywhere in the score');
 });
 
-test('Brahms Op. 118 No. 1 adaptive carries exactly its pre-existing residual', () => {
-  // The adaptive secondary surface (the CLI spread) at canonical 4-per
-  // packing: 2 same-class pre-existing findings at the final system pair —
-  // sys 18 furniture past its slot (+1.41pt) and sys 18 ink into sys 17
-  // (gap −13.03pt, already less than the pre-PR66 16.82pt). The canonical
-  // fixed-3 surface is clean (see the ergonomics lint record).
+test('Brahms Op. 118 No. 1 canonical fixed-3 is clean', () => {
   assert.deepEqual(
     REPORT.violations.map((v) => `${v.code}: ${v.message}`),
-    [
-      "system-slot-overlap: System 18's staff furniture spans y=[265.59, 446.35], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
-      "system-slot-overlap: System 18's ink reaches up to y=242.47, into system 17's ink (bottom y=255.50): the two systems overlap on the page.",
-    ],
-    'exactly the pre-existing residual pair'
+    [],
+    'zero violations on the canonical fixed-3 surface'
   );
   assert.deepEqual(
     REPORT.warnings.map((v) => `${v.code}: ${v.message}`),
     [],
     'zero warnings — the five-voice chords are fully resolved'
   );
-  assert.equal(REPORT.ok, false, 'the secondary surface stays honestly non-ok');
+  assert.equal(REPORT.ok, true, 'the canonical surface is honestly ok');
   assert.equal(REPORT.stats.systems, 18);
   assert.equal(REPORT.stats.measures, 71);
   assert.equal(REPORT.stats.notes, SCORE.notes.length - 7, 'the seven merged unison heads are painted once');
@@ -382,10 +399,10 @@ test('Brahms linting stays a millisecond-scale operation', () => {
   assert.ok(elapsed < 2000, `Brahms lint must stay fast (took ${elapsed}ms)`);
 });
 
-test('The mm. 7–8 macro crop keeps the octave-1 ledger stack whole', () => {
+test('The mm. 7–8 macro crop keeps the bass extension whole (canonical fixed-3)', () => {
   const geo = computePageGeometry(OPTIONS, TOKENS);
   const extents = computeCropExtents(SCORE, geo, 7, 2, OPTIONS, TOKENS);
-  assert.ok(extents.bottom > 0, 'the sweeping bass ledger claims extra room below the staff');
+  assert.ok(extents.bottom > 0, 'the sweeping bass claims extra room below the staff');
   assert.equal(extents.top, 0, 'nothing in mm. 7–8 leaves the staff upwards');
   const crop = renderJankoCrop(SCORE, 7, 2, OPTIONS, TOKENS, 'five-voice chords');
   const viewBox = /viewBox="([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+)"/.exec(crop)!;
@@ -408,19 +425,39 @@ test('The mm. 7–8 macro crop keeps the octave-1 ledger stack whole', () => {
       p.y - R >= vy && p.y + R <= vy + vh,
       `${p.note.id} keeps its whole disc inside the crop`
     );
+  }
+  // The bass really does reach octave 1: the crop would clip it without the
+  // extension-aware extent. Fixed-3 draws need-based extension rows (not
+  // twin-row ledger dashes), so ledgerYs stays empty here.
+  assert.ok(
+    framed.some((p) => p.coord.octave === 1),
+    'the framed measures contain an octave-1 bass note'
+  );
+  assert.ok(
+    framed.every((p) => p.coord.ledgerYs.length === 0),
+    'fixed-3 carries no twin-row ledger dashes in mm. 7–8'
+  );
+});
+
+test('The mm. 7–8 adaptive crop keeps the octave-1 ledger stack whole (solver)', () => {
+  const crop = renderJankoCrop(SCORE, 7, 2, OPTIONS_ADAPTIVE, TOKENS, 'five-voice chords');
+  const viewBox = /viewBox="([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+)"/.exec(crop)!;
+  const [vx, vy, vw, vh] = viewBox.slice(1).map(Number);
+  const system = LAYOUTS_ADAPTIVE[1];
+  const framed = system.notes.filter((p) => p.note.startTick >= at(7, 0) && p.note.startTick < at(9, 0));
+  assert.ok(framed.length >= 30, 'the adaptive crop frames the two five-voice chords');
+  for (const p of framed) {
     for (const ledgerY of p.coord.ledgerYs) {
       const y = system.geometry.middleCY + ledgerY;
       assert.ok(
         y >= vy && y <= vy + vh,
-        `${p.note.id} keeps ledger y=${y.toFixed(2)} inside the crop (viewBox ${vy}–${vy + vh})`
+        `${p.note.id} keeps ledger y=${y.toFixed(2)} inside the crop`
       );
     }
   }
-  // The bass really does reach octave 1: the crop would clip it without the
-  // ledger-aware extent.
   assert.ok(
     framed.some((p) => p.coord.octave === 1 && p.coord.ledgerYs.length > 0),
-    'the framed measures contain an octave-1 ledger note'
+    'the adaptive framed measures contain an octave-1 ledger note'
   );
 });
 

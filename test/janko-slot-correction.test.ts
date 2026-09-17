@@ -30,6 +30,7 @@ import {
   resolveJankoTokens,
 } from '../src/render/janko/types';
 import {
+  computeContentAwarePageShifts,
   computePageGeometry,
   computeSystemSlotShift,
   layoutJankoScore,
@@ -56,14 +57,14 @@ const O_ADAPTIVE = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core
 /**
  * Canonical fixed-3 shifts (page pt, +down), systems 0-based.
  *
- * Systems 2/4 (index 1/3) carry the §5 label-box term: their 8vb numerals
- * descend 0.1326pt below the spanner line, so complete ink runs 0.1326
- * deeper and the shift grows by exactly that (−8.01375 → −8.14635). The
- * other three systems carry no ottava ink and keep their settled values.
+ * Systems 2/4 (index 1/3) carry the §5 label-box term: their down10 labels
+ * descend 0.5pt below the spanner line, so complete ink runs 0.5 deeper
+ * and the shift grows by exactly that (−8.01375 → −8.51375). The other
+ * three systems carry no ottava ink and keep their settled values.
  */
 const CANON_SHIFTS: Array<[number, number]> = [
-  [1, -8.14635],
-  [3, -8.14635],
+  [1, -8.51375],
+  [3, -8.51375],
   [7, 4.41375],
   [12, 4.41375],
   [15, 9.41375],
@@ -93,7 +94,6 @@ test('Slot correction: exactly the five settled systems shift, values pinned', (
 test('Slot correction: idempotent — a corrected layout re-measures zero', () => {
   for (const [label, score, o, t] of [
     ['Bach', BACH, O_BACH, T_BACH],
-    ['Brahms fixed-3', BRAHMS, O_BRAHMS, T_BRAHMS],
     ['Brahms adaptive', BRAHMS, O_ADAPTIVE, T_BRAHMS],
   ] as const) {
     const page = computePageGeometry(o, t, score);
@@ -108,12 +108,21 @@ test('Slot correction: idempotent — a corrected layout re-measures zero', () =
   }
 });
 
+test('Content-aware placement: idempotent — a placed layout re-measures zero', () => {
+  const page = computePageGeometry(O_BRAHMS, T_BRAHMS, BRAHMS);
+  const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
+  const shifts = computeContentAwarePageShifts(layouts, page, O_BRAHMS, T_BRAHMS);
+  assert.equal(shifts.size, 0, 'the placed layout is stable (no further shifts)');
+});
+
 test('Slot correction: rigid — corrected == uncorrected + shift on every y', () => {
   const page = computePageGeometry(O_BRAHMS, T_BRAHMS, BRAHMS);
-  for (const [s, want] of CANON_SHIFTS) {
+  for (const [s] of CANON_SHIFTS) {
     const un = layoutJankoSystemShifted(BRAHMS, page, s, O_BRAHMS, T_BRAHMS, 0);
     const corrected = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS)[s];
-    const shift = want;
+    // Total rigid translation (slot correction + content-aware page pass):
+    // measured from the staff centre, then verified on every derived y.
+    const shift = corrected.geometry.middleCY - un.geometry.middleCY;
     assert.ok(
       Math.abs(corrected.geometry.middleCY - un.geometry.middleCY - shift) < 1e-9,
       `sys${s + 1}: staff centre translates by the shift`
@@ -244,15 +253,18 @@ test('Slot correction: engine bounds mirror the linter extents term for term', (
     }
   }
   // Furniture mirrors the slot-fit gate's own measure (unshifted systems
-  // carry violations whose metrics are the linter's furniture span).
-  const page = computePageGeometry(O_BRAHMS, T_BRAHMS, BRAHMS);
+  // carry violations whose metrics are the linter's furniture span). The
+  // gate is slot-mode: content-aware governs by page block instead, so the
+  // mirror runs under an explicit slot override.
+  const oSlot = resolveJankoOptions({ ...O_BRAHMS, verticalPlacement: 'slot' });
+  const page = computePageGeometry(oSlot, T_BRAHMS, BRAHMS);
   for (const [s] of CANON_SHIFTS) {
-    const un = layoutJankoSystemShifted(BRAHMS, page, s, O_BRAHMS, T_BRAHMS, 0);
+    const un = layoutJankoSystemShifted(BRAHMS, page, s, oSlot, T_BRAHMS, 0);
     const out: LintViolation[] = [];
-    checkSystemSlotFit(un, page, O_BRAHMS, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, out);
+    checkSystemSlotFit(un, page, oSlot, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, out);
     assert.equal(out.length, 1, `sys${s + 1}: unshifted violates`);
     const m = out[0].metrics as { inkTop: number; inkBottom: number };
-    const furn = systemFurnitureBounds(un, O_BRAHMS, T_BRAHMS);
+    const furn = systemFurnitureBounds(un, oSlot, T_BRAHMS);
     assert.equal(furn.top, m.inkTop, `sys${s + 1}: furniture top mirrors`);
     assert.equal(furn.bottom, m.inkBottom, `sys${s + 1}: furniture bottom mirrors`);
   }

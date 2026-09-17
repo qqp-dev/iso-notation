@@ -49,7 +49,7 @@ This design is the standard of beauty for this repository. When taking inspirati
 
 ### Reference Documentation & Implementation
 - **Full Dossier**: `docs/reference/definitive_landscape_engraving.md`
-- **Code Implementation**: `src/render/print-layout.ts` (functions `computeColumnarLayout`, `renderPageToSvg`, `getVerticalAccoladePath`)
+- **Code Implementation**: `src/render/janko/elements/accolade.ts` (function `getVerticalAccoladePath`), historical landscape engraving in commit `f33d9e0` (PR #14)
 - **Key Historic Docs**: `docs/definitive_duodecimal_lightened_staff.md`, `docs/duodecimal_font_typography.md`, `docs/chevron_tuning.md`
 
 ### Core Aesthetics of the Reference Design:
@@ -74,7 +74,7 @@ Design review happens **exclusively on the live website** — never by sending t
   - **View 2 · Golden Reference Object**: the accumulated golden master — full page spread (all pages) plus 288-DPI-equivalent macro focus crops and the live lint diagnostics list (`janko.html#reference`).
   - **In-browser zoom**: `+` / `−` / `Reset` buttons, `+`/`−`/`0` keys, or `Ctrl/⌘ + wheel`, 50%–300%. Mobile-safe: 100% fits the card width.
 - **Declarative Candidate Registry**: `src/render/janko/candidates.ts` is the *only* file to touch when opening a round. `CURRENT_ROUND_METADATA` holds the round number/title/question, `CURRENT_CANDIDATES` holds the variants as 5-line option deltas against `DEFAULT_JANKO_OPTIONS`. The studio template never changes. Never invent separate HTML viewers or script files for candidate reviews.
-- **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`** for the primary Bach Goldberg Var. 1 engraving, plus the Brahms Op. 118 No. 1 golden (`BRAHMS_OP118_NO1_JANKO_OPTIONS` + adaptive core, as the lint CLI measures it). The Reference view always carries both spreads: Bach first, Brahms (`brahms-op118-no1`) beside it with its own pages, macro crops and lint diagnostics.
+- **Golden Master = `DEFAULT_JANKO_OPTIONS` + `DEFAULT_JANKO_TOKENS`** for the primary Bach Goldberg Var. 1 engraving, plus the Brahms Op. 118 No. 1 golden (`BRAHMS_OP118_NO1_JANKO_OPTIONS` + `BRAHMS_OP118_NO1_JANKO_TOKENS`). Fixed-3 is project-wide canonical notation: studio, production commands and acceptance tests agree; exploration uses the real-engine candidate surface. The Reference view always carries both spreads: Bach first, Brahms (`brahms-op118-no1`) beside it with its own pages, macro crops and lint diagnostics.
 - **Brahms is a first-class iteration surface**: rounds window it by measure via `brahmsWindow()` in the candidate registry, literal corpus measures first (synthetic only when no literal passage can demonstrate the question, caption says so).
 - **Visual hand-off field (mandatory)**: every implementer/reviewer hand-off supplies `Visual impact: affected / not affected / uncertain` with a brief evidence-based explanation.
   - When affected, give the existing real-studio URL, affected score/view, and verified representative measures/windows or other inspection cues (e.g. `http://100.102.70.49:5175/janko.html#reference`, BRONZE Brahms reference). Use Tailscale or GitHub Pages; never invent a viewer/URL.

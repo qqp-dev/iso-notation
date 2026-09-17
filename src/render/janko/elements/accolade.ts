@@ -22,11 +22,10 @@
  *   outer, 0.35pt inner, 2.5pt spacing) flush at the start of System 1;
  * - `'none'` — nothing at all.
  *
- * The copperplate path itself is still exported (and shared with the legacy
- * print pipeline in `print-layout.ts`) for the historical golden masters.
+ * The copperplate path itself is still exported (and preserved from the historical
+ * landscape print pipeline) for the historical golden masters.
  */
 
-import { getVerticalAccoladePath } from '../../print-layout';
 import { continuousPitchY } from '../geometry';
 import {
   JankoLayoutOptions,
@@ -36,6 +35,199 @@ import {
   resolveJankoTokens,
 } from '../types';
 import { f } from './style';
+
+/** Classical architectural reach of the vertical accolade cusp from the staff edge. */
+const ACCOLADE_WIDTH_PT = 7.5;
+/** Delicate calligraphic swell of the accolade in its lobe bellies. */
+const ACCOLADE_THICKNESS_PT = 1.9;
+
+/**
+ * Classical LilyPond/Emmentaler brace outline command table.
+ * 15 cubic Bézier segments derived from authentic master music engraving (brace396).
+ */
+const LILY_BRACE_CMDS: Array<{ type: 'M' | 'c' | 's'; args: number[] }> = [
+  { type: 'M', args: [-133, -1078] },
+  { type: 'c', args: [0, 721, -287, 1064, -287, 1078] },
+  { type: 'c', args: [0, 35, 287, 329, 287, 1078] },
+  { type: 'c', args: [0, 756, -266, 1463, -266, 2324] },
+  { type: 'c', args: [0, 504, 98, 994, 378, 1414] },
+  { type: 'c', args: [21, 28, 63, -7, 42, -35] },
+  { type: 'c', args: [-217, -322, -287, -686, -287, -1071] },
+  { type: 'c', args: [0, -749, 259, -1449, 259, -2296] },
+  { type: 'c', args: [0, -504, -91, -994, -371, -1414] },
+  { type: 'c', args: [280, -420, 371, -910, 371, -1414] },
+  { type: 'c', args: [0, -847, -259, -1547, -259, -2296] },
+  { type: 'c', args: [0, -385, 70, -749, 287, -1071] },
+  { type: 'c', args: [21, -28, -21, -63, -42, -35] },
+  { type: 'c', args: [-280, 420, -378, 910, -378, 1414] },
+  { type: 'c', args: [0, 861, 266, 1568, 266, 2324] },
+];
+
+/** One point of the master outline, in font units. */
+type BracePoint = [number, number];
+
+/**
+ * The master outline as cubic curves (font units). Both the path builder and
+ * the Round 9 ink-weight pass read this one table, so the shape that is painted
+ * and the shape that is measured can never drift apart.
+ */
+const LILY_BRACE_CURVES: ReadonlyArray<readonly [BracePoint, BracePoint, BracePoint, BracePoint]> =
+  (() => {
+    const curves: Array<[BracePoint, BracePoint, BracePoint, BracePoint]> = [];
+    let curr: BracePoint = [LILY_BRACE_CMDS[0].args[0], LILY_BRACE_CMDS[0].args[1]];
+    let prevCp: BracePoint = [curr[0], curr[1]];
+    for (let i = 1; i < LILY_BRACE_CMDS.length; i++) {
+      const cmd = LILY_BRACE_CMDS[i];
+      let p1: BracePoint;
+      let p2: BracePoint;
+      let p3: BracePoint;
+      if (cmd.type === 'c') {
+        p1 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
+        p2 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
+        p3 = [curr[0] + cmd.args[4], curr[1] + cmd.args[5]];
+      } else {
+        p1 = [2 * curr[0] - prevCp[0], 2 * curr[1] - prevCp[1]];
+        p2 = [curr[0] + cmd.args[0], curr[1] + cmd.args[1]];
+        p3 = [curr[0] + cmd.args[2], curr[1] + cmd.args[3]];
+      }
+      curves.push([curr, p1, p2, p3]);
+      prevCp = p2;
+      curr = p3;
+    }
+    return curves;
+  })();
+
+/** The outline's `M` anchor (the first point of the first curve). */
+const LILY_BRACE_START: BracePoint = [LILY_BRACE_CMDS[0].args[0], LILY_BRACE_CMDS[0].args[1]];
+
+/** Samples per curve when the outline is measured for its ink weight. */
+const LILY_BRACE_SAMPLES = 32;
+
+/** Sample one cubic Bézier at `t`. */
+function bracePointAt(
+  [p0, p1, p2, p3]: readonly [BracePoint, BracePoint, BracePoint, BracePoint],
+  t: number
+): BracePoint {
+  const u = 1 - t;
+  const a = u * u * u;
+  const b = 3 * u * u * t;
+  const c = 3 * u * t * t;
+  const d = t * t * t;
+  return [
+    a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0],
+    a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1],
+  ];
+}
+
+/** Flattened master outline (font units) — the reference of the thinning pass. */
+const LILY_BRACE_OUTLINE: readonly BracePoint[] = (() => {
+  const points: BracePoint[] = [];
+  for (const curve of LILY_BRACE_CURVES) points.push([curve[0][0], curve[0][1]]);
+  for (const curve of LILY_BRACE_CURVES) {
+    for (let s = 1; s <= LILY_BRACE_SAMPLES; s++) points.push(bracePointAt(curve, s / LILY_BRACE_SAMPLES));
+  }
+  return points;
+})();
+
+/** The `[left, right]` ink intervals of the master outline at font height `y`. */
+function braceInkIntervalsAt(y: number): Array<[number, number]> {
+  const outline = LILY_BRACE_OUTLINE;
+  const crossings: number[] = [];
+  for (let i = 0; i < outline.length; i++) {
+    const a = outline[i];
+    const b = outline[(i + 1) % outline.length];
+    if ((a[1] - y) * (b[1] - y) >= 0) continue;
+    const t = (y - a[1]) / (b[1] - a[1]);
+    crossings.push(a[0] + t * (b[0] - a[0]));
+  }
+  crossings.sort((a, b) => a - b);
+  const intervals: Array<[number, number]> = [];
+  for (let i = 0; i + 1 < crossings.length; i += 2) {
+    intervals.push([crossings[i], crossings[i + 1]]);
+  }
+  return intervals;
+}
+
+/**
+ * Round 9 — thin one outline point toward its section's outer edge until the
+ * local ink is at most `thick` font units wide. A point on the outer contour is
+ * fixed (the requested reach is never touched) and a section already thinner
+ * than `thick` — the feather-tapered tips and the cusp needle — stays exactly as
+ * drawn, so the master curve keeps its silhouette and taper while shedding the
+ * weight the `accoladeThick` token does not want.
+ */
+function thinBracePoint(p: BracePoint, thick: number): BracePoint {
+  const intervals = braceInkIntervalsAt(p[1]);
+  if (intervals.length === 0) return [p[0], p[1]];
+  let best = intervals[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const interval of intervals) {
+    const distance = Math.max(interval[0] - p[0], 0, p[0] - interval[1]);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = interval;
+    }
+  }
+  const width = best[1] - best[0];
+  if (width <= 0 || width <= thick) return [p[0], p[1]];
+  const k = thick / width;
+  return [best[0] + (p[0] - best[0]) * k, p[1]];
+}
+
+/**
+ * Authentic classical vertical accolade (curly brace) for the left margin of a
+ * horizontal system. It clasps the full 4-octave staff from yTop (o5) to yBot (o1)
+ * with its central cusp pointing directly horizontally into the Middle C spine at y(48).
+ *
+ * Implements the definitive Emmentaler/LilyPond master-engraved brace geometry:
+ * - Razor-sharp horizontal beak cusp at yMid pointing leftward into the margin
+ * - Delicate, graceful waist inflections
+ * - Sculptural, organic swelling bellies
+ * - Feather-tapered tips clasping the staff edges at staffLeft
+ *
+ * Round 9 makes the slimming *genuine*: `reach` drives `scaleX`, and `thick` is
+ * the ink weight the master outline is thinned to (see {@link thinBracePoint}),
+ * so the Jánko token pair (`4.8pt` / `0.55pt`) paints a truly hairline brace
+ * instead of a fixed-weight glyph.
+ */
+export function getVerticalAccoladePath(
+  staffLeft: number,
+  yTop: number,
+  yBot: number,
+  reachOrBelly: number = ACCOLADE_WIDTH_PT,
+  cuspOrThick: number = ACCOLADE_THICKNESS_PT,
+  maybeThick?: number
+): string {
+  const requestedReach = maybeThick !== undefined ? cuspOrThick : reachOrBelly;
+  const reach = requestedReach > 0 ? requestedReach : ACCOLADE_WIDTH_PT;
+  const thick = maybeThick !== undefined ? maybeThick : cuspOrThick;
+
+  const ym = (yTop + yBot) / 2;
+  const h = yBot - yTop;
+  const FONT_MAX_Y = 4844.0;
+  const FONT_MIN_X = -420.0;
+  const FONT_MAX_X = 42.0;
+
+  const scaleY = (h / 2) / FONT_MAX_Y;
+  const scaleX = reach / (FONT_MAX_X - FONT_MIN_X);
+  const thin = scaleX > 0 && thick > 0 ? thick / scaleX : 0;
+  const fix = (p: BracePoint): BracePoint => (thin > 0 ? thinBracePoint(p, thin) : p);
+
+  const toS = (x: number, y: number): string =>
+    `${(staffLeft + (x - FONT_MAX_X) * scaleX).toFixed(2)} ${(ym - y * scaleY).toFixed(2)}`;
+
+  const start = fix(LILY_BRACE_START);
+  const parts = [`M ${toS(start[0], start[1])}`];
+
+  for (const curve of LILY_BRACE_CURVES) {
+    const p1 = fix([curve[1][0], curve[1][1]]);
+    const p2 = fix([curve[2][0], curve[2][1]]);
+    const p3 = fix([curve[3][0], curve[3][1]]);
+    parts.push(`C ${toS(p1[0], p1[1])}, ${toS(p2[0], p2[1])}, ${toS(p3[0], p3[1])}`);
+  }
+  parts.push('Z');
+  return parts.join(' ');
+}
 
 /** Horizontal reach (pt) of an architectural bracket's spurs. */
 export const ARCHITECTURAL_BRACKET_SPUR = 3.0;
@@ -78,7 +270,7 @@ export const DOUBLE_HAIRLINE_SPACING = 2.5;
 /**
  * Accolade path at explicit coordinates — the historical copperplate master
  * outline (w = 4.8pt, thick = 0.55pt), retained for the archived golden masters
- * and shared with the legacy print pipeline in `print-layout.ts`. Round 10
+ * and historical reference. Round 10
  * retires it from the Jánko system start (`JankoSystemStartStyle`).
  */
 export function renderAccoladePath(

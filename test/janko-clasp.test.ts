@@ -33,8 +33,10 @@ import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
+  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
+  BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import {
@@ -894,16 +896,14 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
 
   const report = lintJankoScore(
     BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive', chordGrouping: 'per-hand-clasp' },
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'per-hand-clasp' },
     BRAHMS_T
   );
-  // STOP-state: the absolute accepted-2 pin is a tripwire while the adaptive
-  // delta is unadjudicated (see the §2-landed record). The live property —
-  // the per-hand refinement itself adds nothing over the default grouping —
-  // stays pinned here.
+  // Canonical fixed-3: the per-hand refinement adds nothing over the default
+  // grouping (both clean on the canonical surface).
   const baseline = lintJankoScore(
     BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS },
     BRAHMS_T
   );
   const keyOf = (v: (typeof report.violations)[number]): string =>
@@ -1228,6 +1228,10 @@ test('§2 downbeat insets are predicted per measure: 14.40 plain, 19.86 LEFT-occ
   // air 4.0) when CENTER/RIGHT carry the ink, plus one rail (5.46) when a
   // member occupies LEFT. Measures without a downbeat clasp stay absent
   // (the 6pt default); nothing pins the blanket for this paradigm.
+  // Compact seating reclaims the LEFT-rail air on the fixed-3 corpus (all
+  // plain 14.40 — 5.46 returned to later beats wherever a pair went outer
+  // before); the adaptive solver surface keeps genuine 19.86 floors where
+  // triple cliques occupy LEFT.
   const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   const geo = computePageGeometry(o, BRAHMS_T);
   const expected: Record<number, Array<[number, number]>> = {
@@ -1238,11 +1242,11 @@ test('§2 downbeat insets are predicted per measure: 14.40 plain, 19.86 LEFT-occ
     1: [
       [0, 14.4],
       [1, 14.4],
-      [2, 19.86],
-      [3, 19.86],
+      [2, 14.4],
+      [3, 14.4],
     ],
     2: [
-      [0, 19.86],
+      [0, 14.4],
       [1, 14.4],
       [2, 14.4],
     ],
@@ -1254,6 +1258,34 @@ test('§2 downbeat insets are predicted per measure: 14.40 plain, 19.86 LEFT-occ
       [...insets.entries()].map(([m, v]) => [m, Number(v.toFixed(2))]),
       rows,
       `system ${sys}: predicted insets`
+    );
+  }
+  const oAdaptive = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
+  const geoAdaptive = computePageGeometry(oAdaptive, BRAHMS_T);
+  const expectedAdaptive: Record<number, Array<[number, number]>> = {
+    0: [
+      [1, 19.86],
+      [3, 14.4],
+    ],
+    1: [
+      [0, 14.4],
+      [1, 14.4],
+      [2, 14.4],
+      [3, 19.86],
+    ],
+    2: [
+      [0, 19.86],
+      [1, 14.4],
+      [2, 19.86],
+    ],
+  };
+  for (const [sys, rows] of Object.entries(expectedAdaptive)) {
+    const system = getSystemGeometry(geoAdaptive, Number(sys));
+    const insets = computeClaspInsetMap(BRAHMS, system, Number(sys), oAdaptive, BRAHMS_T);
+    assert.deepEqual(
+      [...insets.entries()].map(([m, v]) => [m, Number(v.toFixed(2))]),
+      rows,
+      `adaptive system ${sys}: predicted insets`
     );
   }
   assert.equal(
@@ -1297,22 +1329,78 @@ test('§2 measured geometry: m.1/m.3 onsets move 0.95 left, barlines byte-identi
   }
 });
 
-test('§2 LEFT-occupied downbeats keep the 19.86 floor under content pressure', () => {
-  // m.7/m.8 carry LEFT-rail members, so their floors are 19.86. Mid-system
-  // content (the previous measure's tail) legitimately pushes the columns
-  // further right — the floor is a minimum, never a shear: both columns
-  // stand past bar + 19.86, pinned absolutely so any drift fails.
+test('§2 compact downbeats keep the 14.40 floor under content pressure', () => {
+  // m.7/m.8 seat compactly (no LEFT occupancy), so their floors are the
+  // plain 14.40. Mid-system content (the previous measure's tail)
+  // legitimately pushes the columns further right — the floor is a minimum,
+  // never a shear: both columns stand past bar + 14.40, pinned absolutely
+  // so any drift fails.
   const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const l1 = layouts[1];
   for (const [measureIdx, tick, col] of [
-    [2, 1200, 328.86],
-    [3, 1392, 464.73],
+    [2, 1200, 323.4],
+    [3, 1392, 459.27],
   ] as const) {
     const bar = getMeasureOpeningBarlineX(measureIdx, l1.geometry, 1, BRAHMS_T)!;
     const column = l1.columns.get(tick)!;
-    assert.ok(column - bar >= 19.86 - 1e-9, `tick ${tick}: past the 19.86 floor`);
+    assert.ok(column - bar >= 14.4 - 1e-9, `tick ${tick}: past the 14.40 floor`);
     assert.equal(Number(column.toFixed(2)), col, `tick ${tick}: absolute column`);
   }
+});
+
+test('§2 LEFT-occupied downbeats keep the 19.86 floor (adaptive solver)', () => {
+  // The 19.86 mechanism stays live: adaptive triple cliques occupy LEFT, so
+  // their columns stand past bar + 19.86 — pinned on sys1 m.8 (tick 1392,
+  // the {96,97,98} clique).
+  const oAdaptive = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
+  const layouts = layoutJankoScore(BRAHMS, oAdaptive, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const l1 = layouts[1];
+  const bar = getMeasureOpeningBarlineX(3, l1.geometry, 1, BRAHMS_T)!;
+  const column = l1.columns.get(1392)!;
+  assert.ok(column - bar >= 19.86 - 1e-9, 'tick 1392: past the 19.86 floor');
+});
+
+test('§2 first-beat reclaim: mm.1/3/5/6/7–9 keep multi-row clasps on plain insets', () => {
+  // Compact seating reclaims the unnecessary LEFT-rail allocation: every
+  // downbeat below keeps its legitimate multi-row bracket on the plain
+  // 14.40 inset (5.46 returned to later beats), barline air holds, later
+  // beats progress without compression, and measure widths never change.
+  const at = (m: number): number =>
+    BRAHMS_OP118_NO1_ANACRUSIS_TICKS + (m - 1) * BRAHMS_OP118_NO1_TICKS_PER_MEASURE;
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  for (const [m, members] of [
+    [1, 3],
+    [3, 3],
+    [5, 3],
+    [6, 3],
+    [7, 5],
+    [8, 5],
+    [9, 5],
+  ] as const) {
+    const tick = at(m);
+    const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+    const clasps = sys.clasps.filter((c) => c.tick === tick);
+    assert.equal(clasps.length, 1, `m.${m}: one downbeat bracket`);
+    assert.equal(clasps[0].notes.length, members, `m.${m}: all ${members} rows bracketed`);
+    const col = sys.columns.get(tick)!;
+    const later = [...new Set(
+      sys.notes
+        .filter((p) => p.note.startTick > tick && p.note.startTick < tick + 192)
+        .map((p) => p.note.startTick)
+    )].sort((a, b) => a - b);
+    assert.ok(later.length > 0, `m.${m}: later beats exist`);
+    let prev = col;
+    for (const t of later) {
+      const c = sys.columns.get(t)!;
+      assert.ok(c - prev >= 8, `m.${m} tick ${t}: later beat clears the previous column`);
+      prev = c;
+    }
+  }
+  // Measure widths fixed: the reclaim comes from the reservation, never
+  // from widening a measure.
+  const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+  const geo = computePageGeometry(o, BRAHMS_T);
+  assert.equal(Number(geo.measureWidth.toFixed(2)), 135.87, 'canonical measure width fixed');
 });
 
 test('A measure that cannot host the bracket loses it instead of colliding (edge case)', () => {
@@ -1500,14 +1588,16 @@ test('Engine integrity: a real 16th-note beam is never cut, only standalone chor
   assert.deepEqual(unclasped.flatMap((l) => l.clasps), []);
 });
 
-test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the accepted 2', () => {
+test('Every clasping paradigm engraves Bach clean; canonical Brahms fixed-3 carries no slot findings', () => {
   // The retired union paradigms (left-clasp-spire, beamed-clasp-rail,
   // bounding-phrase) were only ever verified at mps3: their committed
   // mm. 1–9 window stays pinned at that packing (an explicit override, not
   // canonical — the narrower canonical columns drop union brackets the
   // retired fit rule cannot stand). The live per-hand paradigm and the
-  // unclasped baseline run canonical. All modes share the column-solve
-  // engine, so engine regressions still move these pins.
+  // unclasped baseline run canonical fixed-3. All modes share the
+  // column-solve engine, so engine regressions still move these pins.
+  // Retired paradigms keep their adaptive experimental surface; canonical
+  // per-hand/none run fixed-3 with zero slot findings.
   const RETIRED_MPS3: ReadonlySet<string> = new Set([
     'left-clasp-spire',
     'beamed-clasp-rail',
@@ -1520,11 +1610,12 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
       [],
       `Bach · ${mode}`
     );
+    const canonical = mode === 'none' || mode === 'per-hand-clasp';
     const brahms = lintJankoScore(
       BRAHMS,
       {
         ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
-        core: 'adaptive',
+        ...(canonical ? {} : { core: 'adaptive' as const }),
         chordGrouping: mode,
         ...(RETIRED_MPS3.has(mode)
           ? { measuresPerSystem: 3, correctPageTopAnacrusisMeasureWidth: false }
@@ -1535,21 +1626,13 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
     if (mode === 'none') {
       // Round 14: the unclasped paradigm is exactly the regression the new
       // simultaneity audit exists to catch — it paints one full-length stem per
-      // chord tone, straight through the discs of its own simultaneity. At
-      // 4-up the accepted 2 slot findings join that audit (were absent at
-      // 3-up); nothing else may appear.
+      // chord tone, straight through the discs of its own simultaneity.
+      // Canonical fixed-3 carries no slot findings; nothing else may appear.
       assert.ok(brahms.diagnostics.length > 0, 'Brahms · none trips the simultaneity audit');
       assert.deepEqual(
         [...new Set(brahms.diagnostics.map((d) => d.code))].sort(),
-        ['stem-through-simultaneity', 'system-slot-overlap'],
-        'the unclasped paradigm fails on stems through chord tones plus the accepted 2'
-      );
-      assert.deepEqual(
-        brahms.diagnostics
-          .filter((d) => d.code === 'system-slot-overlap')
-          .map((d) => d.system + 1),
-        [18, 18],
-        'the slot pair is exactly the accepted 2'
+        ['stem-through-simultaneity'],
+        'the unclasped paradigm fails on stems through chord tones only'
       );
       assert.ok(
         brahms.diagnostics.every((d) => d.severity === 'error'),
@@ -1557,14 +1640,17 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
       );
       continue;
     }
-    // Round 15 extended the Brahms ingest to the complete Intermezzo. The
-    // legacy union paradigms were only ever verified on the original mm. 1–9
-    // window, and the new material exposes one interior-stem defect in the
-    // `'bounding-phrase'` path at m. 66 (a four-note RH column whose dropped
-    // bracket leaves per-note stems, one of them through its own chord tone).
-    // The paradigms' committed acceptance window stays diagnostic-free; the
-    // slot findings carry no measure (page geometry, not window findings —
-    // itemized in the §2-landed record), so the window filter excludes them.
+    if (mode === 'per-hand-clasp') {
+      assert.deepEqual(
+        brahms.diagnostics.map((d) => `${d.code}: ${d.message}`),
+        [],
+        'canonical per-hand Brahms fixed-3 is clean'
+      );
+      continue;
+    }
+    // Retired experimental surface (adaptive, mps3): the committed mm. 1–9
+    // acceptance window stays diagnostic-free; the slot pair pins the
+    // experimental surface geometry.
     assert.deepEqual(
       brahms.diagnostics
         .filter((d) => (d.measure ?? 0) <= 9 && d.code !== 'system-slot-overlap')
@@ -1576,19 +1662,16 @@ test('Every clasping paradigm engraves Bach clean; Brahms carries exactly the ac
       brahms.diagnostics
         .filter((d) => d.code === 'system-slot-overlap')
         .map((d) => d.system + 1),
-      RETIRED_MPS3.has(mode) ? [23, 24] : [18, 18],
-      `Brahms · ${mode}: the slot pair is exactly the accepted 2`
+      [23, 24],
+      `Brahms · ${mode}: the experimental slot pair is exactly [23, 24]`
     );
   }
   assert.deepEqual(
-    lintJankoScore(BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' }, BRAHMS_T).diagnostics.map(
+    lintJankoScore(BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS }, BRAHMS_T).diagnostics.map(
       (d) => `${d.code}: ${d.message}`
     ),
-    [
-      "system-slot-overlap: System 18's staff furniture spans y=[265.59, 446.35], outside its 183.97pt page slot [261.97, 445.94] (1.00pt clearance).",
-      "system-slot-overlap: System 18's ink reaches up to y=242.47, into system 17's ink (bottom y=255.50): the two systems overlap on the page.",
-    ],
-    'the golden per-hand paradigm carries exactly the pre-existing adaptive 2 over the complete Intermezzo'
+    [],
+    'the golden per-hand paradigm is clean on canonical fixed-3 over the complete Intermezzo'
   );
   assert.ok(
     JANKO_LINT_CHECKS.includes('clasp-clearance'),

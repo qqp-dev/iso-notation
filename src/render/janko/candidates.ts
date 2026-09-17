@@ -248,22 +248,68 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * are canonical (see the Brahms score options), and no comparison remains.
  * The historical cards are parked as `ROUND_33_METADATA` / `ROUND_33_CANDIDATES`
  * in `test/janko-round33.test.ts`; nothing is lost.
+ *
+ * Round 34 opens the m.33 fold-coincident octave-pair comparison on Brahms:
+ * the low LH note folds onto its octave twin's row — should the pair read
+ * as a folded coincidence (A, the incumbent), a shared transposition (B),
+ * or a true octave stack (C)? One axis, three answers, no selection yet —
+ * the Reference stays the literal fold while the operator judges.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 33,
-  title: 'Full interior grid selected — no active comparison',
+  round: 34,
+  title: 'm.33 fold-coincident octave pair: literal fold vs shared transposition vs true octave',
   description:
-    'Round 33 judged: the full interior quarter-position grid is canonical, with the settled four-per-system packing, the page-top width correction and every shared refinement promoted to the Reference. No open axis, no candidate cards — the studio shows the Golden Reference only.',
-  openAxes: [],
+    'Round 34: the m.33 (and m.53 twin) LH octave coincides only through folding. Card A keeps the literal fold (low note folded with its own ↓10, staggered, unbracketed — the incumbent). Card B shifts both notes up under one shared ↓10. Card C draws the low note at literal pitch as a true octave stack (carries extension findings). Sounding pitches preserved on every card; no arpeggio engraving; no selection — the Reference stays the literal fold.',
+  openAxes: ['foldPairPresentation'],
 };
 
 /**
- * No active comparison: Round 33 is decided (full grid selected) and no new
- * round is open. The studio's candidates view renders the decided round with
- * zero cards and selects the Reference; the parked Round 33 cards live in
- * `test/janko-round33.test.ts` as `ROUND_33_METADATA` / `ROUND_33_CANDIDATES`.
+ * Round 34: three answers to the fold-pair question, each a one-line option
+ * delta against the golden master on the literal m.33 window (mm.33–36, the
+ * full system) plus the m.53 twin. No card is marked canonical — the
+ * operator judges on the live studio; the Reference stays the literal fold.
  */
-export const CURRENT_CANDIDATES: JankoCandidate[] = [];
+export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'm33-literal-fold',
+    label: 'A · Literal fold',
+    description:
+      'The incumbent: the low note folds onto its octave twin’s row with its own ↓10, staggered one gap, unbracketed. Sounding pitches literal; the bracket alone transposes.',
+    axis: 'foldPairPresentation',
+    options: { foldPairPresentation: 'literal-fold' },
+    windows: [
+      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
+      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
+    ],
+    tags: ['brahms', 'm33', 'incumbent'],
+  },
+  {
+    id: 'm33-shared-ottava',
+    label: 'B · Shared ↓10',
+    description:
+      'Both notes written up one octave under one shared ↓10: the pair reads as a single transposition. Sounding pitches preserved; the bracket alone transposes and never adds a note.',
+    axis: 'foldPairPresentation',
+    options: { foldPairPresentation: 'shared-ottava' },
+    windows: [
+      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
+      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
+    ],
+    tags: ['brahms', 'm33'],
+  },
+  {
+    id: 'm33-split-octave',
+    label: 'C · Split octave',
+    description:
+      'The low note draws at literal pitch with no fold and no bracket: the pair reads as a true octave stack. Sounding pitches preserved; the low note exceeds core±1 coverage and carries its extension findings visibly.',
+    axis: 'foldPairPresentation',
+    options: { foldPairPresentation: 'split-octave' },
+    windows: [
+      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
+      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
+    ],
+    tags: ['brahms', 'm33'],
+  },
+];
 
 
 /** A fully resolved candidate, ready to engrave. */

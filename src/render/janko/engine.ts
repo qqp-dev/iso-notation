@@ -59,6 +59,7 @@ import {
 import {
   JANKO_RHYTHM_STYLE_LABELS,
   JankoChordGrouping,
+  JankoFoldPairPresentation,
   JankoLayoutOptions,
   JankoOttavaBracket,
   JankoPageGeometry,
@@ -610,6 +611,88 @@ export interface JankoClaspCluster {
  * row-snapped **offset** inside the column solve, the final page x once the
  * columns are solved).
  */
+/**
+ * True when a two-head group shares its drawn row only because octave
+ * folding transposed one member onto the other: the source pitches differ
+ * by a whole octave (or two) while the folded heads coincide. Such a pair
+ * is horizontally staggered by the slot fit but must never earn a bracket
+ * solely for occupying one row after folding (m.33/m.53 LH octaves).
+ */
+export function isFoldCoincidentOctavePair(group: readonly PositionedJankoNote[]): boolean {
+  if (group.length !== 2) return false;
+  const [a, b] = group;
+  if (Math.abs(a.y - b.y) > EPS) return false;
+  const diff = Math.abs(sourceLin(a) - sourceLin(b));
+  return diff === 12 || diff === 24;
+}
+
+/** Sounding linear pitch (semitones from C0) of one positioned note. */
+export function sourceLin(p: PositionedJankoNote): number {
+  const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
+  return p.note.pitch.octave * 12 + pc;
+}
+
+/**
+ * Round 34 m.33 axis: rewrite fold-coincident octave pairs per
+ * `foldPairPresentation`. `'literal-fold'` returns its input untouched;
+ * `'shared-ottava'` matches the high member's shift to the low member's
+ * (both written up, one shared ↓10/↓20); `'split-octave'` draws the low
+ * member at literal pitch (no fold, true octave stack). Start ticks,
+ * durations and sounding pitches are preserved in every mode — the
+ * bracket alone transposes and never adds a note.
+ */
+export function applyFoldPairPresentation(
+  positioned: readonly PositionedJankoNote[],
+  mode: JankoFoldPairPresentation,
+  middleCY: number,
+  t: ResolvedJankoTokens
+): PositionedJankoNote[] {
+  if (mode === 'literal-fold') return [...positioned];
+  const byOnsetHand = new Map<string, PositionedJankoNote[]>();
+  for (const p of positioned) {
+    const key = `${p.note.startTick}|${p.rhythm.hand}`;
+    const bucket = byOnsetHand.get(key);
+    if (bucket) bucket.push(p);
+    else byOnsetHand.set(key, [p]);
+  }
+  const rewrite = new Map<string, PositionedJankoNote>();
+  for (const group of byOnsetHand.values()) {
+    if (!isFoldCoincidentOctavePair(group)) continue;
+    const [a, b] = group;
+    const low = sourceLin(a) <= sourceLin(b) ? a : b;
+    const high = low === a ? b : a;
+    if (mode === 'shared-ottava') {
+      const shift = low.ottavaShift ?? 0;
+      if (shift === 0 || (high.ottavaShift ?? 0) === shift) continue;
+      rewrite.set(high.note.id, rewriteFoldShift(high, shift, middleCY, t));
+    } else {
+      if ((low.ottavaShift ?? 0) === 0) continue;
+      rewrite.set(low.note.id, rewriteFoldShift(low, 0, middleCY, t));
+    }
+  }
+  if (rewrite.size === 0) return [...positioned];
+  return positioned.map((p) => rewrite.get(p.note.id) ?? p);
+}
+
+/** One note rewritten to a new fold shift (sounding pitch preserved). */
+function rewriteFoldShift(
+  p: PositionedJankoNote,
+  shift: number,
+  middleCY: number,
+  t: ResolvedJankoTokens
+): PositionedJankoNote {
+  const writtenLin = sourceLin(p) + shift;
+  const y = continuousPitchY(writtenLin, t.semitoneScale);
+  return {
+    ...p,
+    y: middleCY + y,
+    coord: { ...p.coord, y, equatorY: y, octave: Math.floor(writtenLin / 12) },
+    ottavaShift: shift,
+    writtenLin,
+    rhythm: { ...p.rhythm, y: middleCY + y },
+  };
+}
+
 export function resolveOnsetClaspGroups(
   onset: readonly PositionedJankoNote[],
   t: ResolvedJankoTokens,
@@ -625,6 +708,7 @@ export function resolveOnsetClaspGroups(
   for (const hand of ['RH', 'LH'] as const) {
     const group = byHand.get(hand);
     if (!group || group.length < 2) continue;
+    if (isFoldCoincidentOctavePair(group)) continue;
     const displaced = group.map((p) => ({ ...p.rhythm, x: spreadX(p) }));
     if (claspQualifies(displaced)) groups.push(group);
   }
@@ -1401,7 +1485,7 @@ export interface JankoSystemLayout {
    * which never assumed a single hand — and stands on the merged head's column.
    */
   unisonVoices: PositionedJankoNote[];
-  /** Round 27: Gould-compliant ottava spanner brackets rendered for this system. */
+  /** Round 27: Gould-shaped ottava spanner brackets rendered for this system. */
   ottavaBrackets: JankoOttavaBracket[];
   /**
    * Permanent rule: the column solve's explicit space-demand report — onsets
@@ -5071,6 +5155,74 @@ export function systemCompleteInkBounds(
 }
 
 /**
+ * Minimum facing ink clearance (pt) between consecutive systems under
+ * content-aware vertical placement. Inter-system gaps carry this plus an
+ * even share of residual page space; top/bottom page margins share the
+ * residual without the facing term (they face page furniture, not ink).
+ */
+export const CONTENT_AWARE_MIN_FACING_GAP = 10.0;
+
+/**
+ * True when content-aware vertical placement governs: the option opts in
+ * AND the core is fixed. The adaptive solver surface always keeps its
+ * window-following slot geometry, whatever the option says.
+ */
+export function isContentAwarePlacement(o: ResolvedJankoLayoutOptions): boolean {
+  return (
+    o.verticalPlacement === 'content-aware' && (o.core === 'fixed-3' || o.core === 'fixed-4')
+  );
+}
+
+/**
+ * Content-aware page shifts (page pt, +down), by system index: facing
+ * complete-ink clearances (staff, notes, beams, clasps, rests, ottava
+ * labels) enforced at {@link CONTENT_AWARE_MIN_FACING_GAP}, then residual
+ * page space distributed evenly within the page's occupied slot block
+ * (top margin, inter-system gaps and bottom margin share one unit). Empty
+ * for `'slot'` placement and for genuinely infeasible pages (ink taller
+ * than the block even at minimum gaps — slot positions kept, the linter
+ * names the residue honestly). No blanket reserves, no page growth.
+ */
+export function computeContentAwarePageShifts(
+  layouts: readonly JankoSystemLayout[],
+  page: JankoPageGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): Map<number, number> {
+  const out = new Map<number, number>();
+  if (!isContentAwarePlacement(o)) return out;
+  const byPage = new Map<number, JankoSystemLayout[]>();
+  for (const l of layouts) {
+    const p = Math.floor(l.index / page.systemsPerPage);
+    const bucket = byPage.get(p);
+    if (bucket) bucket.push(l);
+    else byPage.set(p, [l]);
+  }
+  for (const systems of byPage.values()) {
+    const ordered = [...systems].sort((a, b) => a.index - b.index);
+    const inks = ordered.map((l) => systemCompleteInkBounds(l, o, t));
+    const contentTop = Math.min(...ordered.map((l) => l.geometry.slotTopY));
+    const contentBottom = Math.max(
+      ...ordered.map((l) => l.geometry.slotTopY + page.slotHeight)
+    );
+    const heights = inks.map((b) => b.bottom - b.top);
+    const totalInk = heights.reduce((sum, h) => sum + h, 0);
+    const n = ordered.length;
+    const residual =
+      contentBottom - contentTop - totalInk - CONTENT_AWARE_MIN_FACING_GAP * (n - 1);
+    if (residual < 0) continue;
+    const unit = residual / (n + 1);
+    let cursor = contentTop + unit;
+    for (let i = 0; i < n; i++) {
+      const dy = cursor - inks[i].top;
+      if (Math.abs(dy) > 1e-9) out.set(ordered[i].index, dy);
+      cursor += heights[i] + CONTENT_AWARE_MIN_FACING_GAP + unit;
+    }
+  }
+  return out;
+}
+
+/**
  * Rigid whole-system slot correction (page pt, +down): the minimal translation
  * that seats the system's complete ink inside its page slot with
  * {@link SYSTEM_SLOT_CORRECTION_AIR} top and bottom. Zero for an
@@ -5231,8 +5383,13 @@ export function layoutJankoSystemShifted(
     railDiagnostics: [],
   };
   for (let attempt = 0; ; attempt++) {
-    const raw = sysNotes.map((n) =>
-      positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets)
+    const raw = applyFoldPairPresentation(
+      sysNotes.map((n) =>
+        positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets)
+      ),
+      o.foldPairPresentation,
+      geometry.middleCY,
+      t
     );
     // Round 20: one sound, one digit — cross-hand unisons merge before the
     // column solve, so the survivor keeps its column with no fan.
@@ -5627,6 +5784,17 @@ export function layoutJankoScore(
   const total = countJankoSystems(score, o, t);
   const out: JankoSystemLayout[] = [];
   for (let s = 0; s < total; s++) out.push(layoutJankoSystem(score, geo, s, o, t));
+  if (isContentAwarePlacement(o)) {
+    // Content-aware page pass: re-lay-out moved systems on their resolved
+    // centres (layout is a pure function of the centre, so every derived y
+    // rides rigidly — render, crops, PDF and the linter share the geometry).
+    const shifts = computeContentAwarePageShifts(out, geo, o, t);
+    for (const [index, dy] of shifts) {
+      const template = getSystemGeometry(geo, index, o);
+      const applied = out[index].geometry.middleCY - template.middleCY;
+      out[index] = layoutJankoSystemShifted(score, geo, index, o, t, applied + dy);
+    }
+  }
   return out;
 }
 
@@ -5858,8 +6026,12 @@ export function renderSystemsBody(
   const out: string[] = [];
   const total = countJankoSystems(score, o, t);
   const last = Math.min(lastSystem, total - 1);
+  // Full-score layout: systems render at their placed (slot- or
+  // content-aware) centres, so pages, crops, print, PDF and the linter
+  // share one geometry.
+  const layouts = layoutJankoScore(score, o, t);
   for (let s = Math.max(0, firstSystem); s <= last; s++) {
-    out.push(renderSystem(score, getSystemGeometry(geo, s), s, o, t));
+    out.push(renderSystem(score, layouts[s].geometry, s, o, t, layouts[s]));
   }
   return out.join('\n');
 }
@@ -5897,9 +6069,11 @@ export function renderJankoPage(
 
   const body: string[] = [];
   const totalSystems = countJankoSystems(score, o, t);
+  // Full-score layout: systems render at their placed centres (see above).
+  const layouts = layoutJankoScore(score, o, t);
   for (let s = firstSystem; s < firstSystem + geo.systemsPerPage; s++) {
     if (s >= totalSystems) break;
-    body.push(renderSystem(score, getSystemGeometry(geo, s), s, o, t));
+    body.push(renderSystem(score, layouts[s].geometry, s, o, t, layouts[s]));
   }
 
   return [
@@ -6015,7 +6189,7 @@ export function computeCropExtents(
       for (const b of layout.ottavaBrackets) {
         const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
         // Ticket §5: crops frame the complete spanner — line, hook and the
-        // numeral/letterform (labels descend below the line for 8vb/15mb).
+        // label (labels descend below the line for down10/down20).
         const label = ottavaLabelBox(b, t);
         const bTop = Math.min(b.lineY, hookY, label.y0) - middleCY;
         const bBot = Math.max(b.lineY, hookY, label.y1) - middleCY;
@@ -6128,6 +6302,23 @@ export function renderJankoCrop(
     true,
     computeCropExtents(score, geo, measureStart, measureCount, o, t)
   );
+  // Placed-system framing: the box derives from slot-template staff lines,
+  // but systems render at their placed centres — shift the frame to cover
+  // the placed ink (rigid per system; multi-system crops expand to cover).
+  if (isContentAwarePlacement(o)) {
+    const layouts = layoutJankoScore(score, o, t);
+    let lo = Number.POSITIVE_INFINITY;
+    let hi = Number.NEGATIVE_INFINITY;
+    for (let s = box.firstSystem; s <= box.lastSystem; s++) {
+      const dy = layouts[s].geometry.middleCY - getSystemGeometry(geo, s, o).middleCY;
+      lo = Math.min(lo, dy);
+      hi = Math.max(hi, dy);
+    }
+    if (Number.isFinite(lo)) {
+      box.y += lo;
+      box.h += hi - lo;
+    }
+  }
 
   // Wrap the caption so even a single-measure crop keeps a fully visible label.
   const CAPTION_FONT_SIZE = 7;

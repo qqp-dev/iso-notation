@@ -69,11 +69,13 @@ import {
   resolveJankoTokens,
 } from './types';
 import {
+  CONTENT_AWARE_MIN_FACING_GAP,
   JankoSystemLayout,
   PositionedJankoNote,
   computePageGeometry,
   detectStemDigitCrossings,
   getMarginFurniture,
+  isContentAwarePlacement,
   knockoutHalfExtents,
   layoutJankoScore,
   nearestLatticeRow,
@@ -1901,6 +1903,9 @@ export function checkSystemSlotFit(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
+  // Content-aware fixed-core placement resolves positions from ink, not
+  // slots — the page-block and facing-gap audits govern it instead.
+  if (isContentAwarePlacement(o)) return;
   const g = layout.geometry;
   const slotTop = g.slotTopY;
   const slotBottom = g.slotTopY + page.slotHeight;
@@ -2007,6 +2012,80 @@ export function resolveAllocatedPageSlots(
  * header zone on first-on-page systems (pre-existing, disclosed, accepted
  * alongside its two grandfathered findings — not newly gated here).
  */
+/**
+ * Content-aware page fit: every system's ink stays inside the page's
+ * occupied slot block, and consecutive facing inks clear by at least
+ * {@link CONTENT_AWARE_MIN_FACING_GAP}. Slot bounds do not apply — the
+ * placement distributes from ink, so the audit measures ink.
+ */
+export function checkContentAwarePageFit(
+  layouts: readonly JankoSystemLayout[],
+  page: JankoPageGeometry,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  o: ResolvedJankoLayoutOptions,
+  out: LintViolation[]
+): void {
+  if (layouts.length === 0) return;
+  if (!isContentAwarePlacement(o)) return;
+  const byPage = new Map<number, JankoSystemLayout[]>();
+  for (const layout of layouts) {
+    const pageIndex = Math.floor(layout.index / page.systemsPerPage);
+    const bucket = byPage.get(pageIndex);
+    if (bucket) bucket.push(layout);
+    else byPage.set(pageIndex, [layout]);
+  }
+  for (const [pageIndex, systems] of byPage) {
+    const ordered = [...systems].sort((a, b) => a.index - b.index);
+    const contentTop = Math.min(...ordered.map((l) => l.geometry.slotTopY));
+    const contentBottom = Math.max(
+      ...ordered.map((l) => l.geometry.slotTopY + page.slotHeight)
+    );
+    const extents = ordered.map((l) => systemInkExtents(l, t, lint, o));
+    const first = extents[0];
+    const last = extents[extents.length - 1];
+    if (first.top < contentTop - EPS) {
+      out.push({
+        code: 'system-slot-overlap',
+        severity: 'error',
+        message:
+          `System ${ordered[0].index + 1}'s ink reaches up to y=${first.top.toFixed(2)}, ` +
+          `past page ${pageIndex + 1}'s block top ${contentTop.toFixed(2)}.`,
+        system: ordered[0].index,
+        y: first.top,
+        metrics: { inkTop: first.top, blockTop: contentTop },
+      });
+    }
+    if (last.bottom > contentBottom + EPS) {
+      out.push({
+        code: 'system-slot-overlap',
+        severity: 'error',
+        message:
+          `System ${ordered[ordered.length - 1].index + 1}'s ink reaches down to y=${last.bottom.toFixed(2)}, ` +
+          `past page ${pageIndex + 1}'s block bottom ${contentBottom.toFixed(2)}.`,
+        system: ordered[ordered.length - 1].index,
+        y: last.bottom,
+        metrics: { inkBottom: last.bottom, blockBottom: contentBottom },
+      });
+    }
+    for (let i = 1; i < ordered.length; i++) {
+      const gap = extents[i].top - extents[i - 1].bottom;
+      if (gap >= CONTENT_AWARE_MIN_FACING_GAP - EPS) continue;
+      out.push({
+        code: 'system-slot-overlap',
+        severity: 'error',
+        message:
+          `Systems ${ordered[i - 1].index + 1}/${ordered[i].index + 1} face across ` +
+          `y=${extents[i].top.toFixed(2)} with ${gap.toFixed(2)}pt, below the ` +
+          `${CONTENT_AWARE_MIN_FACING_GAP.toFixed(2)}pt facing minimum.`,
+        system: ordered[i].index,
+        y: extents[i].top,
+        metrics: { gap, minimum: CONTENT_AWARE_MIN_FACING_GAP },
+      });
+    }
+  }
+}
+
 export function checkSystemAllocatedSlotFit(
   layouts: readonly JankoSystemLayout[],
   page: JankoPageGeometry,
@@ -2016,6 +2095,7 @@ export function checkSystemAllocatedSlotFit(
   out: LintViolation[]
 ): void {
   if (layouts.length === 0) return;
+  if (isContentAwarePlacement(o)) return;
   const clearance = lint.minClearance;
   const slots = new Map(resolveAllocatedPageSlots(layouts, page, t, lint, o).map((s) => [s.index, s] as const));
   const byPage = new Map<number, JankoSystemLayout[]>();
@@ -4236,7 +4316,7 @@ export function checkOttavaClearance(
       if (p.x + r < b.x0 - EPS || p.x - r > b.x1 + EPS) continue;
 
       if (b.shift > 0) {
-        // Below staff (8vb/15mb): bracket line should be >= note bottom + clearance
+        // Below staff (down10/down20): bracket line should be >= note bottom + clearance
         const noteBottom = p.y + r;
         const actualClearance = b.lineY - noteBottom;
         if (actualClearance < clearance - EPS) {
@@ -4255,7 +4335,7 @@ export function checkOttavaClearance(
           });
         }
       } else {
-        // Above staff (8va/15ma): bracket line should be <= note top - clearance
+        // Above staff (up10/up20): bracket line should be <= note top - clearance
         const noteTop = p.y - r;
         const actualClearance = noteTop - b.lineY;
         if (actualClearance < clearance - EPS) {
@@ -4829,6 +4909,8 @@ export function lintJankoScore(
   // Ticket §5: page-boundary fit against allocated slots (nominal slots
   // extended minimally from trailing page space; origins preserved).
   checkSystemAllocatedSlotFit(layouts, page, t, thresholds, o, diagnostics);
+  // Content-aware placement: page-block fit and facing-gap minimums.
+  checkContentAwarePageFit(layouts, page, t, thresholds, o, diagnostics);
 
   const violations = diagnostics.filter((d) => d.severity === 'error');
   const warnings = diagnostics.filter((d) => d.severity === 'warning');

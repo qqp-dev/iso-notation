@@ -459,14 +459,18 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 33 decided, no open axis, zero cards', () => {
-  // Ordered contract change: Round 33 is judged — the full interior grid is
-  // canonical and no comparison remains. Rounds 30–33 are parked
+test('§F registry: round 34 open, one m33 axis, three cards', () => {
+  // Ordered contract change: Round 33 is judged (full grid canonical) and
+  // Round 34 opens the m.33 fold-pair comparison. Rounds 30–33 are parked
   // (historical consts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 33);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, [], 'no open axis remains');
+  assert.equal(CURRENT_ROUND_METADATA.round, 34);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, [], 'zero live cards');
+  assert.deepEqual(
+    ids,
+    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
+    'the A/B/C trio'
+  );
 });
 
 // ---------------------------------------------------------------------------

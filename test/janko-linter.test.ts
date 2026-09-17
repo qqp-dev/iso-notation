@@ -1439,16 +1439,16 @@ test('checkOttavaClearance catches brackets too close to noteheads', () => {
     rhythm: { id: 'n1', startTick: 0, durationTicks: 48, hand: 'LH', x: 100, y: 100 },
   };
 
-  // 8vb bracket (shift > 0, below note) with 2pt clearance (requires 6pt)
+  // down10 bracket (shift > 0, below note) with 2pt clearance (requires 6pt)
   const tightLayout: any = {
     index: 0,
     notes: [fakeNote],
     ottavaBrackets: [
       {
-        kind: '8vb',
+        kind: 'down10',
         shift: 12,
-        numeral: '8vb',
-        glyph: '8vb',
+        numeral: 'down10',
+        glyph: 'down10',
         x0: 80,
         x1: 120,
         dashStartX: 100,
@@ -1512,10 +1512,10 @@ test('checkOttavaCoverage catches unbracketed folded notes and unfolded brackete
     notes: [fakePlainNote],
     ottavaBrackets: [
       {
-        kind: '8vb',
+        kind: 'down10',
         shift: 12,
-        numeral: '8vb',
-        glyph: '8vb',
+        numeral: 'down10',
+        glyph: 'down10',
         x0: 130,
         x1: 170,
         dashStartX: 150,
@@ -1538,10 +1538,10 @@ test('checkOttavaCoverage catches unbracketed folded notes and unfolded brackete
     notes: [fakeFoldedNote],
     ottavaBrackets: [
       {
-        kind: '8vb',
+        kind: 'down10',
         shift: 12,
-        numeral: '8vb',
-        glyph: '8vb',
+        numeral: 'down10',
+        glyph: 'down10',
         x0: 80,
         x1: 120,
         dashStartX: 100,
@@ -1799,18 +1799,16 @@ test('golden pitch grid weight audit: extension rows 0.35pt, core rows 0.50pt', 
 // 5. CLI contract
 // ---------------------------------------------------------------------------
 
-test('npm run lint:engraving reports the accepted 4-up breakage and exits 1', () => {
-  // Red-on-Brahms is the expected, operator-accepted state (was clean/0 at
-  // 3-up): the gate exits 1 with exactly the 2 accepted slot findings.
+test('npm run lint:engraving reports canonical clean and exits 0', () => {
+  // Canonical fixed-3 everywhere: the gate exits 0 with zero violations and
+  // zero warnings on every score.
   const run = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.equal(run.status, 1, 'the gate exits 1 while Brahms carries the accepted 2');
-  assert.match(run.stdout, /violations violations=2 warnings=0/, 'exactly the accepted 2, zero warnings');
-  // Per-score: the 2 come from Brahms alone — Bach GOLD and every specimen
-  // stay 0/0.
+  assert.equal(run.status, 0, 'the gate exits 0 on the canonical clean record');
+  assert.match(run.stdout, /clean violations=0 warnings=0/, 'zero violations, zero warnings');
   const json = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--json'],
@@ -1822,15 +1820,8 @@ test('npm run lint:engraving reports the accepted 4-up breakage and exits 1', ()
   >;
   assert.deepEqual(reports.bach.violations, [], 'Bach GOLD: zero violations');
   assert.deepEqual(reports.bach.warnings, [], 'Bach GOLD: zero warnings');
-  assert.deepEqual(
-    reports.brahms.violations.map((v) => [v.code, v.system + 1]),
-    [
-      ['system-slot-overlap', 18],
-      ['system-slot-overlap', 18],
-    ],
-    'Brahms: exactly the accepted 2 (itemized in the §2-landed record)'
-  );
-  assert.deepEqual(reports.brahms.warnings, [], 'Brahms: zero warnings');
+  assert.deepEqual(reports.brahms.violations, [], 'Brahms canonical: zero violations');
+  assert.deepEqual(reports.brahms.warnings, [], 'Brahms canonical: zero warnings');
   for (const key of ['chordSpecimen', 'restSpecimen', 'durationSpecimen']) {
     assert.deepEqual(reports[key].violations, [], `${key}: zero violations`);
     assert.deepEqual(reports[key].warnings, [], `${key}: zero warnings`);

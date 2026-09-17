@@ -6,7 +6,11 @@
  */
 
 import { JankoTokens, resolveJankoTokens } from '../types';
-import { URTEXT_SERIF } from '../../print-layout';
+
+// Order is load-bearing: fontconfig alias precedence (Century Schoolbook → C059
+// under urw-base35 conf) makes list position decide the embedded font;
+// Liberation-first keeps local and CI resolution identical.
+export const URTEXT_SERIF = '"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif';
 
 export function renderJankoStyleDefs(tokens?: Partial<JankoTokens> | null): string {
   const t = resolveJankoTokens(tokens);

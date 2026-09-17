@@ -125,26 +125,26 @@ test('The RH anchor is the only anchor rule: the option is retired', () => {
 // 2. The symmetric tuck
 // ---------------------------------------------------------------------------
 
-test('m. 46 slots on three rails: bracketed pairs go {-G, +G}, mixed rows {0, +G}', () => {
+test('m. 46 slots compactly: bracketed pairs go {0, +G}, mixed rows {0, +G}', () => {
   const layout = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const n = onset(layout, M46);
   const x = (id: string): number => n.get(id)!.x;
   // The retired Round 19 symmetric tuck is deleted: F5 / D3 (the single-head
   // rows) stand on the solved column, not on the pair columns' midpoint.
-  // The column is 192.99: m.46's downbeat inset is 19.86 (predicted need
-  // 14.40 — spine 7.6 + ring 2.8 + barline air 4.0 — plus the occupied LEFT
-  // rail 5.46), not the old blanket 15.35.
-  assert.equal(x('brahms-op118-no1-637').toFixed(2), '192.99', 'F5 stands on the column');
-  assert.equal(x('brahms-op118-no1-632').toFixed(2), '192.99', 'D3 stands on the column');
-  // Ticket §1: the same-hand bracketed row (F4/B4) is an ordinary conflicting
-  // pair — lower LEFT, higher RIGHT — since the bracket hugs the leftmost
-  // OCCUPIED rail and no qualification gate remains.
-  assert.equal(x('brahms-op118-no1-634').toFixed(2), '187.53', 'F4 sits LEFT');
-  assert.equal(x('brahms-op118-no1-636').toFixed(2), '198.45', 'B4 sits RIGHT');
+  // The column is 187.53: m.46's downbeat inset is the plain 14.40 (spine
+  // 7.6 + ring 2.8 + barline air 4.0) — compact seating leaves the LEFT
+  // rail unoccupied, so no LEFT-rail air is reserved.
+  assert.equal(x('brahms-op118-no1-637').toFixed(2), '187.53', 'F5 stands on the column');
+  assert.equal(x('brahms-op118-no1-632').toFixed(2), '187.53', 'D3 stands on the column');
+  // Compact seating: the same-hand bracketed row (F4/B4) is an ordinary
+  // conflicting pair — lower CENTER, higher RIGHT — since the bracket hugs
+  // the leftmost OCCUPIED rail and no qualification gate remains.
+  assert.equal(x('brahms-op118-no1-634').toFixed(2), '187.53', 'F4 sits CENTER');
+  assert.equal(x('brahms-op118-no1-636').toFixed(2), '192.99', 'B4 sits RIGHT');
   // The mixed-hand row (D4/G#4): the unbracketed D4 holds the column and the
   // bracketed G#4 staggers right off it. Lowest-pitch-first order holds.
-  assert.equal(x('brahms-op118-no1-633').toFixed(2), '192.99', 'D4 holds the column');
-  assert.equal(x('brahms-op118-no1-635').toFixed(2), '198.45', 'G#4 staggers one slot right');
+  assert.equal(x('brahms-op118-no1-633').toFixed(2), '187.53', 'D4 holds the column');
+  assert.equal(x('brahms-op118-no1-635').toFixed(2), '192.99', 'G#4 staggers one slot right');
   // The singletons share the column with the mixed row's lower head; the two
   // RIGHT-rail heads (B4, G#4) coincide exactly.
   assert.equal(x('brahms-op118-no1-637'), x('brahms-op118-no1-633'), 'F5 shares the column');
@@ -153,12 +153,13 @@ test('m. 46 slots on three rails: bracketed pairs go {-G, +G}, mixed rows {0, +G
 });
 
 test('Slots are score-wide: three-rail seats on every solved column', () => {
-  // Ticket §1 seating model (adaptive core runs the same solver): every head
+  // Compact seating model (adaptive core runs the same solver): every head
   // stands on exactly one of the three rails (col−G, col, col+G); no two
   // heads of one folded row share a rail. Ordinary same-clasp common pairs
-  // alternate lower LEFT / higher RIGHT; same-clasp common triples (true
-  // cliques) seat LEFT/CENTER/RIGHT; unbracketed pairs keep the legacy joint
-  // rule {0, +G}; mixed rows hold the unbracketed head on the column.
+  // seat ADJACENT (lower CENTER / higher RIGHT, or lower LEFT / higher
+  // CENTER when RIGHT is taken); same-clasp common triples (true cliques)
+  // seat LEFT/CENTER/RIGHT; unbracketed pairs keep the legacy joint rule
+  // {0, +G}; mixed rows hold the unbracketed head on the column.
   // Exception rows assert rails + separation (duration-ink precedence is
   // covered by the solver unit tests and the fixed-3 literals); the linter
   // backstops every exception stem globally.
@@ -252,13 +253,15 @@ test('Slots are score-wide: three-rail seats on every solved column', () => {
             assert.equal(clasps.size, 1, `${name} t${tick}: common rows share one clasp`);
             if (byLin.length === 2) {
               kinds.ordinaryPair++;
+              const dx0 = byLin[0].x - col;
+              const dx1 = byLin[1].x - col;
               assert.ok(
-                Math.abs(byLin[0].x - (col - PAIR_GAP)) < 1e-9,
-                `${name} t${tick}: ordinary lower LEFT`
+                Math.abs(dx1 - dx0 - PAIR_GAP) < 1e-9,
+                `${name} t${tick}: ordinary pair spans one gap (compact adjacent)`
               );
               assert.ok(
-                Math.abs(byLin[1].x - (col + PAIR_GAP)) < 1e-9,
-                `${name} t${tick}: ordinary higher RIGHT`
+                Math.abs(dx0) < 1e-9 || Math.abs(dx0 + PAIR_GAP) < 1e-9,
+                `${name} t${tick}: ordinary lower CENTER or LEFT`
               );
             } else {
               // True clique: the only feasible three-rail pattern.
@@ -508,22 +511,22 @@ test('A unified bracket paints one duration group per hand', () => {
 // 4. The anchor axis
 // ---------------------------------------------------------------------------
 
-test('The mixed row resolves {0, +G} against the same-hand {-G, +G}', () => {
+test('The mixed row resolves {0, +G} against the same-hand {0, +G}', () => {
   const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
-  // Ticket §1: the mixed-hand row's unbracketed lower head — D4 (LH) — holds
-  // the column and the bracketed G#4 (RH) staggers right off it, while the
-  // same-hand bracketed pair (F4/B4) alternates lower LEFT / higher RIGHT.
-  // Same lowest-first order; the heads meet on the shared rails.
-  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '192.99');
-  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '198.45');
+  // Compact seating: the mixed-hand row's unbracketed lower head — D4 (LH)
+  // — holds the column and the bracketed G#4 (RH) staggers right off it,
+  // while the same-hand bracketed pair (F4/B4) seats lower CENTER / higher
+  // RIGHT. Same lowest-first order; the heads meet on the shared rails.
+  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '187.53');
+  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '192.99');
   assert.equal(rh.get('brahms-op118-no1-635')!.x, rh.get('brahms-op118-no1-636')!.x);
   assert.equal(
     (rh.get('brahms-op118-no1-636')!.x - rh.get('brahms-op118-no1-633')!.x).toFixed(2),
     '5.46'
   );
   // No tuck: F5/D3 stand on the column with the mixed row's lower head.
-  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '192.99');
-  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '192.99');
+  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '187.53');
+  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '187.53');
 });
 
 test('Per-hand brackets own their member stems: no stem-through at m. 46/m. 26', () => {

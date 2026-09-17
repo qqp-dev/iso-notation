@@ -47,7 +47,7 @@ const bachReport = lintJankoScore(bachScore, DEFAULT_JANKO_OPTIONS, DEFAULT_JANK
 const brahmsScore = buildBrahmsOp118No1Score();
 const brahmsReport = lintJankoScore(
   brahmsScore,
-  { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
+  BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS
 );
 
@@ -57,7 +57,7 @@ const brahmsReport = lintJankoScore(
 // on material that isolates it.
 const chordSpecimenReport = lintJankoScore(
   buildChordDurationSpecimenScore(),
-  { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive', measuresPerSystem: 2 },
+  { ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2 },
   DEFAULT_JANKO_TOKENS
 );
 const restSpecimenReport = lintJankoScore(
