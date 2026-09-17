@@ -80,7 +80,7 @@ import {
   renderSystem,
   suppressedStemIds,
 } from './engine';
-import { getBarStaffSegments, getEquatorRuleYs, pitchGridRules } from './elements/staff';
+import { getBarStaffSegments, getEquatorRuleYs, outlierLedgerSpans, pitchGridRules } from './elements/staff';
 import {
   continuousPitchY,
   getMeasureIndexOfTick,
@@ -88,6 +88,13 @@ import {
   splitTick,
 } from './geometry';
 import { gridBotY, gridTopY, resolveBeatPulseXs, resolveBeatPulses } from './elements/barlines';
+import {
+  OTTAVA_ACTUAL_INK_GAP,
+  collectOttavaContextInk,
+  ottavaHookBox,
+  ottavaLabelBox,
+  ottavaLineBox,
+} from './elements/ottava';
 import {
   CLASP_RING_RADIUS,
   CLASP_RING_STROKE,
@@ -1931,6 +1938,114 @@ export function checkSystemSlotFit(
   });
 }
 
+/** One system's allocated page slot: nominal top, possibly extended bottom. */
+export interface AllocatedSystemSlot {
+  /** System index (0-based). */
+  index: number;
+  /** Allocated top: always the nominal slot top (origins preserved). */
+  top: number;
+  /** Allocated bottom: nominal, or extended from trailing page space. */
+  bottom: number;
+  /** Nominal slot bottom (before extension). */
+  nominalBottom: number;
+}
+
+/**
+ * Resolve allocated page slots for laid-out systems (ticket §5): every
+ * system keeps its nominal slot top (origins preserved — no redistribution),
+ * and the LAST system on each page extends its bottom minimally to contain
+ * its complete ink plus clearance, bounded by the page body bottom. Sparse
+ * final pages absorb genuine extensions (ottava labels, deep beams) from
+ * the abundant trailing space; crowded full pages grant nothing, so ink
+ * past the body is a genuine STOP finding, never silently clipped.
+ *
+ * Non-last systems keep nominal bottoms: inter-system fit stays governed
+ * by the adjacent-ink scan (nominal slots are not hard containers between
+ * neighbours), and staff furniture by {@link checkSystemSlotFit}.
+ */
+export function resolveAllocatedPageSlots(
+  layouts: readonly JankoSystemLayout[],
+  page: JankoPageGeometry,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  o: ResolvedJankoLayoutOptions
+): AllocatedSystemSlot[] {
+  const clearance = lint.minClearance;
+  const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
+  const out: AllocatedSystemSlot[] = [];
+  const byPage = new Map<number, JankoSystemLayout[]>();
+  for (const layout of layouts) {
+    const pageIndex = Math.floor(layout.index / page.systemsPerPage);
+    const bucket = byPage.get(pageIndex);
+    if (bucket) bucket.push(layout);
+    else byPage.set(pageIndex, [layout]);
+  }
+  for (const systems of byPage.values()) {
+    const ordered = [...systems].sort((a, b) => a.index - b.index);
+    const last = ordered[ordered.length - 1];
+    for (const layout of ordered) {
+      const nominalBottom = layout.geometry.slotTopY + page.slotHeight;
+      let bottom = nominalBottom;
+      if (layout.index === last.index) {
+        const ink = systemInkExtents(layout, t, lint, o);
+        bottom = Math.max(nominalBottom, Math.min(bodyBottom, ink.bottom + clearance));
+      }
+      out.push({ index: layout.index, top: layout.geometry.slotTopY, bottom, nominalBottom });
+    }
+  }
+  return out.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Page-boundary fit against allocated slots (ticket §5, `system-slot`
+ * family): the LAST system on each page must fit its allocated bottom —
+ * nominal on crowded full pages (genuine page overflow errors instead of
+ * clipping), minimally extended from trailing space on sparse pages.
+ * First/middle systems are exempt (origins preserved; adjacent-ink and
+ * furniture audits govern them). Top-boundary fit is a known unaudited
+ * residual: the secondary adaptive core already reaches 4.5pt into the
+ * header zone on first-on-page systems (pre-existing, disclosed, accepted
+ * alongside its two grandfathered findings — not newly gated here).
+ */
+export function checkSystemAllocatedSlotFit(
+  layouts: readonly JankoSystemLayout[],
+  page: JankoPageGeometry,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  o: ResolvedJankoLayoutOptions,
+  out: LintViolation[]
+): void {
+  if (layouts.length === 0) return;
+  const clearance = lint.minClearance;
+  const slots = new Map(resolveAllocatedPageSlots(layouts, page, t, lint, o).map((s) => [s.index, s] as const));
+  const byPage = new Map<number, JankoSystemLayout[]>();
+  for (const layout of layouts) {
+    const pageIndex = Math.floor(layout.index / page.systemsPerPage);
+    const bucket = byPage.get(pageIndex);
+    if (bucket) bucket.push(layout);
+    else byPage.set(pageIndex, [layout]);
+  }
+  for (const [pageIndex, systems] of byPage) {
+    const ordered = [...systems].sort((a, b) => a.index - b.index);
+    const last = ordered[ordered.length - 1];
+    const lastInk = systemInkExtents(last, t, lint, o);
+    const slot = slots.get(last.index)!;
+    if (lastInk.bottom + clearance > slot.bottom + EPS) {
+      out.push({
+        code: 'system-slot-overlap',
+        severity: 'error',
+        message:
+          `System ${last.index + 1}'s ink reaches down to y=${lastInk.bottom.toFixed(2)}, ` +
+          `past its allocated slot bottom ${slot.bottom.toFixed(2)} on page ${pageIndex + 1} ` +
+          `(nominal ${slot.nominalBottom.toFixed(2)}, ${clearance.toFixed(2)}pt clearance).`,
+        system: last.index,
+        y: lastInk.bottom,
+        metrics: { inkBottom: lastInk.bottom, slotBottom: slot.bottom, nominalBottom: slot.nominalBottom, required: clearance },
+      });
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Contour round: thread, ticks, strip
 // ---------------------------------------------------------------------------
@@ -2386,6 +2501,12 @@ export function systemInkExtents(
       const hookY = b.lineY + (b.hookDirection === -1 ? -b.hookLength : b.hookLength);
       top = Math.min(top, b.lineY, hookY);
       bottom = Math.max(bottom, b.lineY, hookY);
+      // Ticket §5: the numeral/letterform is painted ink too — the shared
+      // label box keeps the linter's extents exact (mirrors the engine's
+      // complete bounds term for term).
+      const label = ottavaLabelBox(b, t);
+      top = Math.min(top, label.y0);
+      bottom = Math.max(bottom, label.y1);
     }
   }
   return { top, bottom };
@@ -4088,15 +4209,27 @@ export function auditStemBeamConnections(
  * Enforce bracket↔notehead clearance for every ottava spanner bracket.
  * Any notehead horizontally within [b.x0, b.x1] must clear the bracket line
  * by at least `t.ottavaClearance`.
+ *
+ * Ticket §5 extends the audit to the complete spanner: the numeral label
+ * and hook must clear every music-ink box over the bracket's span (beams,
+ * stems, flags, dots, rings, brackets, rests, staff rules, ledgers — the
+ * same shared collector the builder resolves from) by the 1.2pt
+ * actual-ink gap, and the dashed line must not touch music ink. Scope is
+ * the span itself in both placement and audit, so the two agree exactly;
+ * box conservatism can only over-report, never miss. (Near-span ink is a
+ * non-issue in practice: the numeral's advance opens a ~15pt left moat,
+ * and the span extends 2pt past the last disc on the right.)
  */
 export function checkOttavaClearance(
   layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
   out: LintViolation[]
 ): void {
   if (!layout.ottavaBrackets || layout.ottavaBrackets.length === 0) return;
   const clearance = t.ottavaClearance ?? 6.0;
   const r = t.noteheadRadius;
+  const gap = OTTAVA_ACTUAL_INK_GAP;
 
   for (const b of layout.ottavaBrackets) {
     for (const p of layout.notes) {
@@ -4140,6 +4273,121 @@ export function checkOttavaClearance(
             metrics: { actualClearance, requiredClearance: clearance },
           });
         }
+      }
+    }
+  }
+
+  // Ticket §5: the complete spanner (label, hook, line) against the
+  // complete music ink over the span — the same boxes the builder resolves
+  // from, so the audit judges what the placement cleared. Real layouts
+  // always carry geometry; the guard keeps lightweight historical fixtures
+  // (noteheads only) on the legacy 6pt path.
+  if (!layout.geometry) return;
+  const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+  const ledgerHalf = t.ledgerHalfWidth;
+  const contextInk = collectOttavaContextInk(
+    {
+      beams: layout.beams ?? [],
+      ungrouped:
+        o.rhythmStyle === 'beamed' ? (layout.ungrouped ?? []) : layout.notes.map((p) => p.rhythm),
+      suppressedStemIds: new Set([
+        ...(layout.claspedStems ?? []),
+        ...(layout.verticalChords ?? []).flatMap((chord) => chord.suppressedIds),
+        ...(layout.sharedStems ?? []).flatMap((group) => group.suppressedIds),
+      ]),
+      clasps: layout.clasps ?? [],
+      rests: layout.rests ?? [],
+      outlierRules: outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t),
+      options: o,
+    },
+    t
+  );
+  interface InkBox {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+    what: string;
+  }
+  const boxGap = (a: InkBox, b: InkBox): number =>
+    Math.hypot(
+      Math.max(a.x0 - b.x1, b.x0 - a.x1, 0),
+      Math.max(a.y0 - b.y1, b.y0 - a.y1, 0)
+    );
+  for (const b of layout.ottavaBrackets) {
+    if (!Number.isFinite(b.x0) || !Number.isFinite(b.x1) || !Number.isFinite(b.lineY)) continue;
+    const ink: InkBox[] = [];
+    const inSpan = (ix0: number, ix1: number): boolean => !(ix1 < b.x0 - EPS || ix0 > b.x1 + EPS);
+    for (const p of layout.notes) {
+      const glyph = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloOuter) : r;
+      if (inSpan(p.x - glyph, p.x + glyph)) {
+        ink.push({ x0: p.x - glyph, y0: p.y - glyph, x1: p.x + glyph, y1: p.y + glyph, what: `notehead ${p.note.id}` });
+      }
+      if (inSpan(p.x - ledgerHalf, p.x + ledgerHalf)) {
+        for (const ledgerY of p.coord.ledgerYs) {
+          for (const ruleY of getEquatorRuleYs(layout.geometry.middleCY + ledgerY, o, t)) {
+            ink.push({ x0: p.x - ledgerHalf, y0: ruleY - 0.375, x1: p.x + ledgerHalf, y1: ruleY + 0.375, what: `ledger of ${p.note.id}` });
+          }
+        }
+      }
+    }
+    for (const rule of pitchGridRules(layout.geometry, o, t)) {
+      if (!inSpan(rule.x1, rule.x2)) continue;
+      ink.push({ x0: rule.x1, y0: rule.y - rule.width / 2, x1: rule.x2, y1: rule.y + rule.width / 2, what: 'staff rule' });
+    }
+    for (const span of outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t)) {
+      if (!inSpan(span.x1, span.x2)) continue;
+      ink.push({ x0: span.x1, y0: span.y - 0.375, x1: span.x2, y1: span.y + 0.375, what: 'outlier rule' });
+    }
+    for (const box of contextInk) {
+      if (!inSpan(box.x0, box.x1)) continue;
+      ink.push({ ...box, what: 'rhythm ink' });
+    }
+    const parts: { box: InkBox; part: string; required: number }[] = [];
+    const label = ottavaLabelBox(b, t);
+    if ([label.x0, label.y0, label.x1, label.y1].every(Number.isFinite)) {
+      parts.push({ box: { ...label, what: 'label' }, part: 'label', required: gap });
+    }
+    if (Number.isFinite(b.dashX1)) {
+      const hook = ottavaHookBox(b, t);
+      parts.push({ box: { ...hook, what: 'hook' }, part: 'hook', required: gap });
+      const line = ottavaLineBox(b, t);
+      if (Number.isFinite(b.dashX0)) {
+        parts.push({ box: { ...line, what: 'line' }, part: 'line', required: 0 });
+      }
+    }
+    for (const { box, part, required } of parts) {
+      let worst = Number.POSITIVE_INFINITY;
+      let worstWhat = '';
+      for (const m of ink) {
+        const g = boxGap(box, m);
+        if (g < worst) {
+          worst = g;
+          worstWhat = m.what;
+        }
+      }
+      // The dashed line carries no padding requirement, but it must not
+      // touch music ink; labels and hooks keep the 1.2pt actual-ink gap.
+      const touches =
+        part === 'line' &&
+        ink.some(
+          (m) =>
+            !(box.x1 < m.x0 - EPS || m.x1 < box.x0 - EPS || box.y1 < m.y0 - EPS || m.y1 < box.y0 - EPS)
+        );
+      if ((part === 'line' && touches) || (part !== 'line' && worst < required - EPS)) {
+        out.push({
+          code: 'ottava-clearance',
+          severity: 'error',
+          message:
+            `Ottava ${b.kind} bracket ${part} has actual-ink gap ${worst.toFixed(2)}pt ` +
+            `to ${worstWhat} over span [${b.x0.toFixed(1)}, ${b.x1.toFixed(1)}], ` +
+            (part === 'line' ? 'touching music ink.' : `less than required ${required.toFixed(2)}pt.`),
+          system: layout.index,
+          noteIds: [...b.noteIds],
+          x: (box.x0 + box.x1) / 2,
+          y: (box.y0 + box.y1) / 2,
+          metrics: { actualClearance: worst, requiredClearance: part === 'line' ? 0 : required },
+        });
       }
     }
   }
@@ -4527,7 +4775,7 @@ export function lintJankoScore(
     if (o.contourStrip) {
       checkContourStrip(score, layout, layouts, page, o, t, thresholds, diagnostics);
     }
-    checkOttavaClearance(layout, t, diagnostics);
+    checkOttavaClearance(layout, o, t, diagnostics);
     checkOttavaCoverage(layout, diagnostics);
     checkOttavaExtensions(layout, o, diagnostics);
     checkStaffSegments(layout, o, t, diagnostics);
@@ -4577,6 +4825,10 @@ export function lintJankoScore(
       metrics: { lowerTop: below.top, upperBottom: above.bottom },
     });
   }
+
+  // Ticket §5: page-boundary fit against allocated slots (nominal slots
+  // extended minimally from trailing page space; origins preserved).
+  checkSystemAllocatedSlotFit(layouts, page, t, thresholds, o, diagnostics);
 
   const violations = diagnostics.filter((d) => d.severity === 'error');
   const warnings = diagnostics.filter((d) => d.severity === 'warning');

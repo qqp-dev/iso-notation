@@ -29,10 +29,21 @@ import {
   renderSystem,
   computePageGeometry,
   getSystemGeometry,
+  renderJankoCrop,
   renderJankoPage,
 } from '../src/render/janko/engine';
 import { toMidi, linearIndex } from '../src/model/pitch';
 import { continuousPitchY } from '../src/render/janko/geometry';
+import {
+  collectOttavaContextInk,
+  ottavaLabelBox,
+} from '../src/render/janko/elements/ottava';
+import {
+  checkOttavaClearance,
+  DEFAULT_JANKO_LINT_OPTIONS,
+  resolveAllocatedPageSlots,
+  systemInkExtents,
+} from '../src/render/janko/linter';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
@@ -131,4 +142,131 @@ test('Default golden master renders zero brackets (byte-stable)', () => {
   const svg2 = renderJankoPage(BACH, 0, o, t);
   assert.equal(svg1, svg2, 'golden page 0 render is deterministic');
   assert.ok(!svg1.includes('janko-ottava'), 'golden master SVG contains zero ottava elements');
+});
+
+// ---------------------------------------------------------------------------
+// 3. §5 complete-ink ottava: the m.69 collision, resolved
+// ---------------------------------------------------------------------------
+
+const BRAHMS_O = resolveJankoOptions({
+  ...DEFAULT_JANKO_OPTIONS,
+  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+});
+const BRAHMS_T = resolveJankoTokens({
+  ...DEFAULT_JANKO_TOKENS,
+  ...BRAHMS_OP118_NO1_JANKO_TOKENS,
+});
+const BRAHMS_LAYOUTS = layoutJankoScore(BRAHMS, BRAHMS_O, BRAHMS_T);
+
+test('§5 m.69: the spanner drops exactly 2.22 and the label clears beam ink by 1.20', () => {
+  // The judged defect: the 8vb numeral box top (439.34) overlapped the
+  // downward beam ink bottom (440.36) by 1.02pt. The resolver seats the
+  // label top exactly one air (1.2) below the beam ink, dropping the whole
+  // spanner by 1.02 + 1.20 = 2.22 — line, label, and hook ride rigidly.
+  const l = BRAHMS_LAYOUTS[17];
+  assert.equal(l.ottavaBrackets.length, 1, 'sys17 carries the m.69 spanner');
+  const b = l.ottavaBrackets[0];
+  assert.equal(Number(b.lineY.toFixed(2)), 447.68, 'line dropped 445.46 → 447.68');
+  assert.equal(Number((b.lineY - 445.46).toFixed(2)), 2.22, 'exactly overlap + air');
+  assert.equal(Number(b.x0.toFixed(2)), 40.94, 'span start');
+  assert.equal(Number(b.x1.toFixed(2)), 62.46, 'span end');
+  const label = ottavaLabelBox(b, BRAHMS_T);
+  assert.deepEqual(
+    [label.x0, label.y0, label.x1, label.y1].map((v) => Number(v.toFixed(2))),
+    [40.94, 441.56, 51.46, 447.81],
+    'label box rides the line'
+  );
+  // Complete music ink over the span, from the shared collector (the same
+  // boxes the resolver seats from): the binding ink below the label is the
+  // downward beam strip.
+  const ink = collectOttavaContextInk(
+    {
+      beams: l.beams ?? [],
+      ungrouped: l.ungrouped ?? [],
+      suppressedStemIds: new Set([
+        ...(l.claspedStems ?? []),
+        ...(l.verticalChords ?? []).flatMap((chord) => chord.suppressedIds),
+        ...(l.sharedStems ?? []).flatMap((group) => group.suppressedIds),
+      ]),
+      clasps: l.clasps ?? [],
+      rests: l.rests ?? [],
+      outlierRules: [],
+      options: BRAHMS_O,
+    },
+    BRAHMS_T
+  );
+  const overSpan = ink.filter((box) => box.x1 >= b.x0 && box.x0 <= b.x1 && box.y1 <= label.y0);
+  const beamBottom = Math.max(...overSpan.map((box) => box.y1));
+  assert.equal(Number(beamBottom.toFixed(2)), 440.36, 'downward beam ink bottom');
+  assert.ok(
+    Math.abs(label.y0 - beamBottom - 1.2) < 1e-6,
+    `label clears beam ink by exactly the air (${(label.y0 - beamBottom).toFixed(4)})`
+  );
+  // The hook paints: upward 4pt return at the span end.
+  assert.equal(b.hookDirection, -1, 'hook returns upward');
+  assert.equal(b.hookLength, 4, 'hook length');
+  // The extreme folded pitch (A0, lin 9) is the covered note.
+  assert.deepEqual(b.noteIds, ['brahms-op118-no1-938'], 'the m.69 A0');
+  const a0 = BRAHMS.notes.find((n) => n.id === 'brahms-op118-no1-938')!;
+  assert.equal(a0.pitch.octave * 12 + a0.pitch.pitchClass, 9, 'lin 9 extreme');
+});
+
+test('§5 the old notehead-only criterion was blind to m.69; complete ink was not', () => {
+  // At the judged line (445.46) the lowest notehead bottom over the span
+  // clears by 17.20pt — the retired 6pt check passes with room, blind to
+  // the beam the label actually hits. Complete ink names the 1.02 overlap.
+  const l = BRAHMS_LAYOUTS[17];
+  const b = l.ottavaBrackets[0];
+  const r = BRAHMS_T.noteheadRadius;
+  const lowestBottom = Math.max(
+    ...l.notes.filter((p) => p.x + r >= b.x0 && p.x - r <= b.x1).map((p) => p.y + r)
+  );
+  assert.equal(Number(lowestBottom.toFixed(2)), 428.26, 'lowest notehead bottom over span');
+  assert.ok(445.46 - lowestBottom >= 6.0, 'the retired check passes (blind)');
+  // The old label top (rigidly 2.22 above today's) sat inside the beam ink.
+  const label = ottavaLabelBox(b, BRAHMS_T);
+  const oldLabelTop = label.y0 - 2.22;
+  assert.equal(Number(oldLabelTop.toFixed(2)), 439.34, 'judged label top');
+  assert.ok(oldLabelTop < 440.36, 'old label top inside the 440.36 beam ink (1.02 overlap)');
+});
+
+test('§5 all nine spanners clear complete ink: the audit is silent score-wide', () => {
+  let brackets = 0;
+  for (const l of BRAHMS_LAYOUTS) {
+    brackets += l.ottavaBrackets.length;
+    const out: Parameters<typeof checkOttavaClearance>[3] = [];
+    checkOttavaClearance(l, BRAHMS_O, BRAHMS_T, out);
+    assert.deepEqual(out, [], `system ${l.index}: line, label, and hook clear`);
+  }
+  assert.equal(brackets, 9, 'nine literal runs, all resolved');
+});
+
+test('§5 slot, page, and crop agree on the resolved sys17 ink', () => {
+  // The resolved label bottom (447.81) is the system's bottom ink: it
+  // overflows the nominal slot (445.94), so the allocator extends sys17
+  // from trailing page space to exactly ink + 1.00 — the audit that gates
+  // the page measures the ALLOCATION, never the nominal frame.
+  const page = computePageGeometry(BRAHMS_O, BRAHMS_T, BRAHMS);
+  const slots = resolveAllocatedPageSlots(
+    BRAHMS_LAYOUTS,
+    page,
+    BRAHMS_T,
+    DEFAULT_JANKO_LINT_OPTIONS,
+    BRAHMS_O
+  );
+  const sys17 = slots.find((s) => s.index === 17)!;
+  const ink = systemInkExtents(BRAHMS_LAYOUTS[17], BRAHMS_T, DEFAULT_JANKO_LINT_OPTIONS, BRAHMS_O);
+  assert.equal(Number(ink.bottom.toFixed(2)), 447.81, 'label bottom is bottom ink');
+  assert.equal(Number(sys17.nominalBottom.toFixed(2)), 445.94, 'nominal slot would clip');
+  assert.ok(ink.bottom > sys17.nominalBottom, 'allocation is necessary, not cosmetic');
+  assert.equal(Number(sys17.bottom.toFixed(2)), 448.81, 'allocated to ink + 1.00');
+  assert.ok(
+    Math.abs(sys17.bottom - ink.bottom - 1.0) < 1e-9,
+    'minimal allocation from trailing space'
+  );
+  // Page and crop render the resolved spanner alike.
+  const sheet = renderJankoPage(BRAHMS, 4, BRAHMS_O, BRAHMS_T);
+  assert.ok(sheet.includes('janko-ottava'), 'final page carries the spanner');
+  const crop = renderJankoCrop(BRAHMS, 69, 1, BRAHMS_O, BRAHMS_T);
+  assert.ok(/ottava/i.test(crop), 'the m.69 crop frames the resolved spanner');
 });

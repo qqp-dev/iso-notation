@@ -126,9 +126,13 @@ test('fixture is versioned, complete and provenance-linked', () => {
 });
 
 test('964 pitch/onset/hand keys reconcile exactly with multiplicity 1', () => {
+  // The duration overlay matches ORIGINAL track keys (pre-hand-correction);
+  // SCORE additionally carries the bounded §4 hand correction (10 LH→RH).
+  const overlaid = applyWrittenDurations(buildPreOverlayNotes(), fixture.durations);
   assert.equal(SCORE.notes.length, 964);
+  assert.equal(overlaid.length, 964);
   const seen = new Set<string>();
-  for (const n of SCORE.notes) {
+  for (const n of overlaid) {
     const k = brahmsEventKey(n.pitch.pitchClass, n.pitch.octave, n.startTick, n.hand);
     assert.ok(!seen.has(k), `duplicate score key ${k}`);
     seen.add(k);
@@ -141,11 +145,14 @@ test('964 pitch/onset/hand keys reconcile exactly with multiplicity 1', () => {
 
 test('overlay changes durationTicks only; IDs/order/pitch/onset/hand/velocity preserved', () => {
   const pre = buildPreOverlayNotes();
-  assert.equal(pre.length, SCORE.notes.length);
+  // Compare against the duration overlay boundary (pre-hand-correction):
+  // the overlay itself must preserve hands; §4 retargets ten afterwards.
+  const overlaid = applyWrittenDurations(pre, fixture.durations);
+  assert.equal(pre.length, overlaid.length);
   let changed = 0;
   for (let i = 0; i < pre.length; i++) {
     const a = pre[i];
-    const b = SCORE.notes[i];
+    const b = overlaid[i];
     assert.equal(b.id, a.id);
     assert.deepEqual(b.pitch, a.pitch);
     assert.equal(b.startTick, a.startTick);

@@ -4,6 +4,7 @@ import { QuantizedGridScore } from "../model/types";
 import { parseMidiToScore } from "../model/midi";
 import { detectHandCrossings } from "../model/grid";
 import { applyWrittenDurations } from "./brahms-source-fidelity";
+import { applyBrahmsHandCorrections } from "./brahms-hand-corrections";
 import writtenDurationsFixture from "./data/brahms-op118-no1-written-durations.json";
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -132,10 +133,17 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
   if ((writtenDurationsFixture as { version?: number }).version !== 1) {
     throw new Error('Brahms written durations: fixture version mismatch (want 1) — refusing overlay');
   }
-  const notes = applyWrittenDurations(
+  const durationOverlaid = applyWrittenDurations(
     midiNotes,
     (writtenDurationsFixture as { durations: { pitchClass: number; octave: number; startTick: number; hand: 'RH' | 'LH'; durationTicks: number }[] }).durations
   );
+
+  // Bounded source-informed hand correction (ticket §4 + amendment): ten
+  // authorized LH → RH retargetings for the descending RH line in mm. 23/43
+  // and its phrase continuation in mm. 24/44, applied AFTER the validated
+  // duration overlay (original track keys) and BEFORE hand-crossing
+  // computation. Preserves order and every other field.
+  const notes = applyBrahmsHandCorrections(durationOverlaid);
 
   // One barline per measure opening plus the score's closing boundary. The
   // final measure is 144 ticks long (the piece's own closing bar), so the last

@@ -43,10 +43,8 @@ import {
   claspMemberCarriedTicks,
   layoutJankoScore,
   renderSystem,
-  stemPiercesDisc,
 } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
-import { getStemGeometry } from '../src/render/janko/elements/rhythm';
 import { pointToSegmentDistance } from '../src/render/janko/geometry';
 
 const BACH = buildBachGoldbergVar1Score();
@@ -127,32 +125,43 @@ test('The RH anchor is the only anchor rule: the option is retired', () => {
 // 2. The symmetric tuck
 // ---------------------------------------------------------------------------
 
-test('m. 46 slots by lowest context: qualified-led pairs go {-G, 0}, foreign-led go {0, +G}', () => {
+test('m. 46 slots on three rails: bracketed pairs go {-G, +G}, mixed rows {0, +G}', () => {
   const layout = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const n = onset(layout, M46);
   const x = (id: string): number => n.get(id)!.x;
   // The retired Round 19 symmetric tuck is deleted: F5 / D3 (the single-head
   // rows) stand on the solved column, not on the pair columns' midpoint.
-  assert.equal(x('brahms-op118-no1-637').toFixed(2), '188.48', 'F5 stands on the column');
-  assert.equal(x('brahms-op118-no1-632').toFixed(2), '188.48', 'D3 stands on the column');
-  // The same-hand row (F4/B4) is led by its qualified lowest, so it takes
-  // inward slots: the lower pitch one slot inward, the upper on the column.
-  assert.equal(x('brahms-op118-no1-634').toFixed(2), '183.02', 'F4 sits one slot inward');
-  assert.equal(x('brahms-op118-no1-636').toFixed(2), '188.48', 'B4 holds the column');
-  // The mixed-hand row (D4/G#4) is led by its UNQUALIFIED lowest (D4 belongs
-  // to the clean LH pair that never qualifies), so it seats D4 ON the column
-  // and staggers G#4 right — no foreign head is manufactured into the
-  // bracket-ink lane (§2 line 18: the inward seat belongs to a bracket
-  // member). Lowest-pitch-first order holds under both anchors.
-  assert.equal(x('brahms-op118-no1-633').toFixed(2), '188.48', 'D4 holds the column');
-  assert.equal(x('brahms-op118-no1-635').toFixed(2), '193.94', 'G#4 staggers one slot right');
-  // No mirror symmetry: the singletons share the column with the upper pair
-  // heads instead of centring between the pair columns.
-  assert.equal(x('brahms-op118-no1-637'), x('brahms-op118-no1-636'), 'F5 shares the column');
+  // The column is 192.99: m.46's downbeat inset is 19.86 (predicted need
+  // 14.40 — spine 7.6 + ring 2.8 + barline air 4.0 — plus the occupied LEFT
+  // rail 5.46), not the old blanket 15.35.
+  assert.equal(x('brahms-op118-no1-637').toFixed(2), '192.99', 'F5 stands on the column');
+  assert.equal(x('brahms-op118-no1-632').toFixed(2), '192.99', 'D3 stands on the column');
+  // Ticket §1: the same-hand bracketed row (F4/B4) is an ordinary conflicting
+  // pair — lower LEFT, higher RIGHT — since the bracket hugs the leftmost
+  // OCCUPIED rail and no qualification gate remains.
+  assert.equal(x('brahms-op118-no1-634').toFixed(2), '187.53', 'F4 sits LEFT');
+  assert.equal(x('brahms-op118-no1-636').toFixed(2), '198.45', 'B4 sits RIGHT');
+  // The mixed-hand row (D4/G#4): the unbracketed D4 holds the column and the
+  // bracketed G#4 staggers right off it. Lowest-pitch-first order holds.
+  assert.equal(x('brahms-op118-no1-633').toFixed(2), '192.99', 'D4 holds the column');
+  assert.equal(x('brahms-op118-no1-635').toFixed(2), '198.45', 'G#4 staggers one slot right');
+  // The singletons share the column with the mixed row's lower head; the two
+  // RIGHT-rail heads (B4, G#4) coincide exactly.
+  assert.equal(x('brahms-op118-no1-637'), x('brahms-op118-no1-633'), 'F5 shares the column');
   assert.equal(x('brahms-op118-no1-632'), x('brahms-op118-no1-633'), 'D3 shares the column');
+  assert.equal(x('brahms-op118-no1-636'), x('brahms-op118-no1-635'), 'B4 and G#4 share RIGHT');
 });
 
-test('Slots are score-wide: rows take context-anchored slots on their solved column', () => {
+test('Slots are score-wide: three-rail seats on every solved column', () => {
+  // Ticket §1 seating model (adaptive core runs the same solver): every head
+  // stands on exactly one of the three rails (col−G, col, col+G); no two
+  // heads of one folded row share a rail. Ordinary same-clasp common pairs
+  // alternate lower LEFT / higher RIGHT; same-clasp common triples (true
+  // cliques) seat LEFT/CENTER/RIGHT; unbracketed pairs keep the legacy joint
+  // rule {0, +G}; mixed rows hold the unbracketed head on the column.
+  // Exception rows assert rails + separation (duration-ink precedence is
+  // covered by the solver unit tests and the fixed-3 literals); the linter
+  // backstops every exception stem globally.
   for (const [name, score, options, tokens] of [
     ['Bach', BACH, BACH_OPTIONS, T],
     ['Brahms', BRAHMS, BRAHMS_OPTIONS, BRAHMS_T],
@@ -160,6 +169,8 @@ test('Slots are score-wide: rows take context-anchored slots on their solved col
     const layouts = layoutJankoScore(score, options, tokens);
     let slotted = 0;
     let singletons = 0;
+    let offColumnSingletons = 0;
+    const kinds = { ordinaryPair: 0, cliqueTriple: 0, jointPair: 0, mixed: 0, exception: 0 };
     for (const layout of layouts) {
       const byTick = new Map<number, typeof layout.notes>();
       for (const p of layout.notes) {
@@ -169,6 +180,8 @@ test('Slots are score-wide: rows take context-anchored slots on their solved col
       }
       for (const [tick, heads] of byTick) {
         const col = layout.columns.get(tick)!;
+        const claspOf = (id: string): (typeof layout.clasps)[number] | undefined =>
+          layout.clasps.find((c) => c.tick === tick && c.notes.some((n) => n.id === id));
         const rows = new Map<number, typeof heads>();
         for (const p of heads) {
           const key = Math.round(p.y * 1000);
@@ -180,67 +193,132 @@ test('Slots are score-wide: rows take context-anchored slots on their solved col
           const byLin = [...row].sort(
             (a, b) => linOf(a) - linOf(b) || (a.note.id < b.note.id ? -1 : 1)
           );
-          // Every head stands on its lattice seat — or exactly one slot
-          // right of it when Pass C clearance requires the move. The
-          // requirement is recomputed with the shared predicates (carried
-          // value, stem geometry, piercing), never trusted from the seat.
-          const checkSeat = (p: (typeof heads)[number], latticeX: number, what: string): void => {
-            if (Math.abs(p.x - latticeX) < 1e-9) return;
-            const clasp = layout.clasps.find(
-              (c) => c.tick === tick && c.notes.some((n) => n.id === p.note.id)
-            );
-            assert.ok(clasp, `${name} t${tick}: ${what} belongs to an admitted bracket`);
-            assert.equal(
-              p.note.durationTicks,
-              claspMemberCarriedTicks(clasp!, p.note.id),
-              `${name} t${tick}: ${what} is a suppressed carried-match`
-            );
-            const exceptions = clasp!.notes.filter(
-              (n) => n.durationTicks !== claspMemberCarriedTicks(clasp!, n.id)
-            );
-            const piercedAtLattice = exceptions.some((e) => {
-              const s = getStemGeometry(e, tokens);
-              return stemPiercesDisc(s.stemX, s.stemStartY, s.stemEndY, latticeX, p.y, tokens.noteheadRadius);
-            });
+          // Universal: every head on a rail.
+          for (const p of byLin) {
+            const dx = p.x - col;
             assert.ok(
-              piercedAtLattice,
-              `${name} t${tick}: an exception stem pierces ${what}'s lattice seat`
+              Math.abs(dx) < 1e-9 || Math.abs(Math.abs(dx) - PAIR_GAP) < 1e-9,
+              `${name} t${tick}: ${p.note.id} stands on a rail (dx=${dx.toFixed(3)})`
             );
-            assert.ok(
-              Math.abs(p.x - (latticeX + PAIR_GAP)) < 1e-9,
-              `${name} t${tick}: ${what} steps exactly one slot right`
-            );
-          };
+          }
           if (byLin.length === 1) {
             singletons++;
-            checkSeat(byLin[0], col, 'the clear head');
+            // A clear head holds the column; the only off-column singletons
+            // are bracketed exceptions displaced onto a side rail.
+            if (Math.abs(byLin[0].x - col) < 1e-9) continue;
+            offColumnSingletons++;
+            const clasp = claspOf(byLin[0].note.id);
+            assert.ok(clasp, `${name} t${tick}: off-column singleton is bracketed`);
+            assert.notEqual(
+              byLin[0].note.durationTicks,
+              claspMemberCarriedTicks(clasp!, byLin[0].note.id),
+              `${name} t${tick}: off-column singleton is an exception`
+            );
             continue;
           }
           slotted++;
-          // Anchoring follows the LOWEST member's qualification context (not
-          // admission, not any-member: a bucket anchors inward iff its
-          // lowest-pitch member qualified, so the inward seat — which faces
-          // the bracket ink — always belongs to a bracket member). E.g.
-          // Brahms m.2 tick 240: the joint row is led by the unbracketed
-          // lone RH head, so it seats ON the column and staggers right. The
-          // layout reports the true Pass-A set; no post-hoc proxy.
-          const qualified = layout.claspQualifiedIds ?? new Set<string>();
-          const inward = qualified.has(byLin[0].note.id);
-          const base = inward ? col - PAIR_GAP : col;
-          checkSeat(
-            byLin[0],
-            base,
-            `the lowest pitch (${inward ? 'one slot inward' : 'ON the column'})`
+          // Universal: no two heads of one row share a rail.
+          const rails = byLin.map((p) => Math.round((p.x - col) / PAIR_GAP));
+          assert.equal(
+            new Set(rails).size,
+            rails.length,
+            `${name} t${tick}: one rail per head (no shared seat)`
           );
-          for (let i = 1; i < byLin.length; i++) {
-            checkSeat(byLin[i], base + i * PAIR_GAP, `member ${i}`);
+          const member = byLin.map((p) => {
+            const clasp = claspOf(p.note.id);
+            return {
+              p,
+              clasp,
+              common: clasp
+                ? p.note.durationTicks === claspMemberCarriedTicks(clasp, p.note.id)
+                : false,
+            };
+          });
+          const allBracketed = member.every((m) => m.clasp !== undefined);
+          const noneBracketed = member.every((m) => m.clasp === undefined);
+          const anyException = member.some((m) => m.clasp && !m.common);
+          if (noneBracketed) {
+            // Legacy joint rule, untouched by §1: lowest ON, stagger right.
+            kinds.jointPair++;
+            assert.equal(byLin.length, 2, `${name} t${tick}: joint rows are pairs`);
+            assert.ok(Math.abs(byLin[0].x - col) < 1e-9, `${name} t${tick}: joint lower ON`);
+            assert.ok(
+              Math.abs(byLin[1].x - (col + PAIR_GAP)) < 1e-9,
+              `${name} t${tick}: joint higher +G`
+            );
+          } else if (allBracketed && !anyException) {
+            // One clasp only: a cross-clasp common row would need its own rule.
+            const clasps = new Set(member.map((m) => m.clasp));
+            assert.equal(clasps.size, 1, `${name} t${tick}: common rows share one clasp`);
+            if (byLin.length === 2) {
+              kinds.ordinaryPair++;
+              assert.ok(
+                Math.abs(byLin[0].x - (col - PAIR_GAP)) < 1e-9,
+                `${name} t${tick}: ordinary lower LEFT`
+              );
+              assert.ok(
+                Math.abs(byLin[1].x - (col + PAIR_GAP)) < 1e-9,
+                `${name} t${tick}: ordinary higher RIGHT`
+              );
+            } else {
+              // True clique: the only feasible three-rail pattern.
+              kinds.cliqueTriple++;
+              assert.equal(byLin.length, 3, `${name} t${tick}: common rows are pairs or triples`);
+              for (const [i, dx] of [-PAIR_GAP, 0, PAIR_GAP].entries()) {
+                assert.ok(
+                  Math.abs(byLin[i].x - (col + dx)) < 1e-9,
+                  `${name} t${tick}: clique member ${i} on its rail`
+                );
+              }
+            }
+          } else if (!allBracketed && !noneBracketed && !anyException) {
+            // Mixed row: the unbracketed head holds the column (it seats
+            // first); the bracketed member staggers off it — same-row masks
+            // can never share the column.
+            kinds.mixed++;
+            for (const m of member) {
+              if (!m.clasp) {
+                assert.ok(
+                  Math.abs(m.p.x - col) < 1e-9,
+                  `${name} t${tick}: mixed-row unbracketed head ON`
+                );
+              } else {
+                assert.ok(
+                  Math.abs(m.p.x - col) > 1e-9,
+                  `${name} t${tick}: mixed-row member staggers off the column`
+                );
+              }
+            }
+          } else {
+            // Exception row: rails + separation (asserted above); precedence
+            // correctness lives in the solver unit tests and literals.
+            kinds.exception++;
           }
         }
       }
     }
     assert.ok(singletons > 100, `${name} carries clear heads (${singletons})`);
-    if (name === 'Brahms') assert.ok(slotted >= 30, `Brahms carries the slotted rows (${slotted})`);
-    else assert.equal(slotted, 8, `Bach carries its eight cross-hand pairs (${slotted})`);
+    if (name === 'Brahms') {
+      assert.equal(slotted, 50, `Brahms carries its fifty slotted rows (${slotted})`);
+      assert.deepEqual(
+        kinds,
+        { ordinaryPair: 22, cliqueTriple: 4, jointPair: 8, mixed: 4, exception: 12 },
+        'the fifty rows split 22/4/8/4/12 by seating kind'
+      );
+      assert.equal(
+        offColumnSingletons,
+        12,
+        `twelve exception singletons take a side rail (${offColumnSingletons})`
+      );
+    } else {
+      assert.equal(slotted, 8, `Bach carries its eight cross-hand pairs (${slotted})`);
+      assert.deepEqual(
+        kinds,
+        { ordinaryPair: 0, cliqueTriple: 0, jointPair: 8, mixed: 0, exception: 0 },
+        'all eight Bach rows are unbracketed joint pairs'
+      );
+      assert.equal(offColumnSingletons, 0, 'no Bach singleton leaves the column');
+    }
   }
 });
 
@@ -430,23 +508,22 @@ test('A unified bracket paints one duration group per hand', () => {
 // 4. The anchor axis
 // ---------------------------------------------------------------------------
 
-test('The mixed row resolves by lowest context: {0, +G} against the same-hand {-G, 0}', () => {
+test('The mixed row resolves {0, +G} against the same-hand {-G, +G}', () => {
   const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
-  // Permanent lowest-context rule (§2 line 18): the mixed-hand row's lower
-  // head — D4 (LH), unqualified — holds the column and G#4 (RH) staggers
-  // right, diverging from the qualified-led same-hand pair (F4 inward, B4 on
-  // the column). Same lowest-first order, opposite anchors — the inward seat
-  // is reserved for bracket members.
-  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '188.48');
-  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '193.94');
-  assert.equal(rh.get('brahms-op118-no1-633')!.x, rh.get('brahms-op118-no1-636')!.x);
+  // Ticket §1: the mixed-hand row's unbracketed lower head — D4 (LH) — holds
+  // the column and the bracketed G#4 (RH) staggers right off it, while the
+  // same-hand bracketed pair (F4/B4) alternates lower LEFT / higher RIGHT.
+  // Same lowest-first order; the heads meet on the shared rails.
+  assert.equal(rh.get('brahms-op118-no1-633')!.x.toFixed(2), '192.99');
+  assert.equal(rh.get('brahms-op118-no1-635')!.x.toFixed(2), '198.45');
+  assert.equal(rh.get('brahms-op118-no1-635')!.x, rh.get('brahms-op118-no1-636')!.x);
   assert.equal(
-    (rh.get('brahms-op118-no1-635')!.x - rh.get('brahms-op118-no1-636')!.x).toFixed(2),
+    (rh.get('brahms-op118-no1-636')!.x - rh.get('brahms-op118-no1-633')!.x).toFixed(2),
     '5.46'
   );
-  // No tuck: F5/D3 stand on the column with the upper pair heads.
-  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '188.48');
-  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '188.48');
+  // No tuck: F5/D3 stand on the column with the mixed row's lower head.
+  assert.equal(rh.get('brahms-op118-no1-637')!.x.toFixed(2), '192.99');
+  assert.equal(rh.get('brahms-op118-no1-632')!.x.toFixed(2), '192.99');
 });
 
 test('Per-hand brackets own their member stems: no stem-through at m. 46/m. 26', () => {
@@ -500,11 +577,11 @@ test('m. 3’s pulses move onto their own note columns', () => {
   // Brahms is cut time: 4 pulses per measure, 3 dashed lines each. System 0 is
   // the anacrusis + mm. 1–4, so m. 3's pulses are indices 6–8.
   const m3 = pulses.slice(6, 9).map((x) => Number(x.toFixed(2)));
-  assert.deepEqual(m3, [363.01, 391.14, 419.27], 'the dotted quarter lines follow the columns');
+  assert.deepEqual(m3, [362.29, 390.66, 419.03], 'the dotted quarter lines follow the columns');
   // The pre-Round-19 grid drew m. 3's pulses proportionally inside the
-  // anacrusis system's third cell (after the 48-tick upbeat), 8.52 / 7.68 /
-  // 6.84pt left of their own note columns (was 8.51 / 7.67 / 6.84 — 0.01
-  // dust from the narrower cell).
+  // anacrusis system's third cell (after the 48-tick upbeat), 7.80 / 7.20 /
+  // 6.60pt left of their own note columns (was 8.52 / 7.68 / 6.84 — §2's
+  // shrunk downbeat insets redistribute the system width leftwards).
   const g = layouts[0].geometry;
   const inset = getGridNoteInset(options, BRAHMS_T);
   const upbeat = (BRAHMS_T.anacrusisTicks! / BRAHMS_T.ticksPerMeasure) * g.measureWidth;
@@ -513,7 +590,7 @@ test('m. 3’s pulses move onto their own note columns', () => {
   );
   assert.deepEqual(
     m3.map((x, i) => Number((x - proportional[i]).toFixed(2))),
-    [8.52, 7.68, 6.84],
+    [7.8, 7.2, 6.6],
     'the ticket’s measured left-drift is gone'
   );
   // The m. 3 pair's bracket spine (claspX = leftmost head − r − claspOffset)
@@ -550,6 +627,31 @@ test('An empty beat keeps the proportional line', () => {
   const proportional =
     system.geometry.staffLeft + inset + (1 / 4) * (system.geometry.measureWidth - 2 * inset);
   assert.equal(Number(pulses[0].toFixed(2)), Number(proportional.toFixed(2)), 'proportional line');
+});
+
+test('Pulses never borrow a neighbour: each stands 10pt+ from every wrong column', () => {
+  // The strong negative behind the pulse pins: a pulse shifted onto the
+  // wrong head's column would have to jump a full beat cell (~28pt on
+  // Brahms system 0). Every rendered pulse's nearest occupied column is its
+  // own beat's (exact), and the next-nearest is over 10pt away — a mix-up
+  // cannot hide in float dust.
+  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T);
+  const system = layouts[0];
+  const pulses = pulsesOf(BRAHMS, layouts, 0, options, BRAHMS_T);
+  const columns = [...system.columns.values()];
+  assert.ok(pulses.length > 0 && columns.length > 0);
+  // Occupied pulses only (empty beats stand proportionally by design).
+  const occupied = pulses.filter((pulse) => columns.some((c) => Math.abs(c - pulse) < 0.01));
+  assert.ok(occupied.length > 0, 'system 0 carries occupied pulses');
+  for (const pulse of occupied) {
+    const gaps = columns.map((c) => Math.abs(c - pulse)).sort((a, b) => a - b);
+    assert.ok(gaps[0] < 0.01, `pulse ${pulse.toFixed(2)} stands on its own column`);
+    assert.ok(
+      gaps[1] > 10,
+      `pulse ${pulse.toFixed(2)} is ${gaps[1].toFixed(2)}pt from any wrong column`
+    );
+  }
 });
 
 test('Score-wide: every occupied pulse stands on its column, every empty one proportionally', () => {

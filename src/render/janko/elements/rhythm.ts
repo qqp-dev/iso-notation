@@ -515,9 +515,9 @@ function verbatimFlagPath(stemX: number, tipY: number, direction: -1 | 1, marks:
 
 /**
  * Round 30: centres (page pt) of the open stem rings a lone long paints —
- * the bracket's own rings (`CLASP_RING_*`: R = 3.0pt, stroke 1.0pt),
- * stem-mounted at the stem midpoint, two stacked about it for a whole
- * (`±(R + CLASP_MARK_STACK_GAP)`, the same stack as a whole-note bracket).
+ * the standalone rings (`CLASP_RING_*`: R = 3.0pt, stroke 1.0pt, unchanged
+ * by the bracket-circle scale), stem-mounted at the stem midpoint, two
+ * stacked about it for a whole (`±(R + CLASP_MARK_STACK_GAP)`).
  * Empty under the golden grammar and for out-of-grammar durations. Shared by
  * the renderer and the linter's ring audit, so the audited centres can never
  * drift from the painted ink.
@@ -611,9 +611,9 @@ export function renderFlags(
  * a mirror-symmetrical `[` whatever value it carries. Heavy solid beads and
  * solid diamond blocks are eliminated:
  *
- * - the shared **half / whole** mark is a clean open white circular ring
- *   (`R = 3.0pt`, stroke `1.0pt`) whose interior knocks the spine out — zero
- *   crosshairs, under every paradigm;
+ * - the bracket's **half / whole** mark is a clean open white circular ring
+ *   (`R = 2.4pt`, stroke `0.8pt` at bracket-circle scale 0.80) whose interior
+ *   knocks the spine out — zero crosshairs, under every paradigm;
  * - the **quarter** note is the continuous solid bracket `[` alone;
  * - a **dotted** value keeps that plain bracket and adds the 0.75pt dot;
  * - **subdivisions** explore light transverse line cuts across the spine:
@@ -629,9 +629,24 @@ export const CLASP_TRANSVERSE_WIDTH = 7.5;
 export const CLASP_TRANSVERSE_STROKE = 1.0;
 /** Vertical spacing (pt) between the two parallel bars/slashes of a 16th. */
 export const CLASP_CROSS_SPACING = 2.5;
-/** Shared open white ring of a half / whole value (R = 3.0pt, stroke 1.0pt). */
+/** Standalone open stem ring of a lone half / whole (R = 3.0pt, stroke 1.0pt). Unchanged by the bracket-circle scale. */
 export const CLASP_RING_RADIUS = 3.0;
 export const CLASP_RING_STROKE = 1.0;
+/**
+ * Bracket-circle family scale (first operator-review value 0.80): the
+ * bracket's own half/whole rings render at R = 2.4pt, stroke 0.8pt
+ * (outer diameter 5.6pt), isolated from standalone stem rings, transverse
+ * marks, pitch glyphs and the bracket spine. Single scale control; the
+ * baked radius/stroke derive from it so render and geometry cannot drift.
+ */
+export const BRACKET_CIRCLE_SCALE = 0.8;
+/** Rounded to 0.01pt so scaled geometry stays exact (no FP dust in SVG bytes). */
+const bracketScale = (v: number): number => Math.round(v * BRACKET_CIRCLE_SCALE * 100) / 100;
+export const BRACKET_RING_RADIUS = bracketScale(CLASP_RING_RADIUS);
+export const BRACKET_RING_STROKE = bracketScale(CLASP_RING_STROKE);
+/** Outer edge of a bracket ring (R + stroke/2 = 2.8pt at scale 0.80). */
+export const BRACKET_RING_OUTER =
+  Math.round((BRACKET_RING_RADIUS + BRACKET_RING_STROKE / 2) * 100) / 100;
 /** Air (pt) between the two stacked marks of a doubled (whole / 16th) value. */
 export const CLASP_MARK_STACK_GAP = 0.5;
 /**
@@ -1080,15 +1095,16 @@ interface JankoClaspMarkExtents {
 }
 
 /**
- * Half-extents of the shared open (half / whole) mark: one clean white ring,
- * or two stacked rings for a whole note.
+ * Half-extents of the bracket's open (half / whole) mark: one clean white
+ * ring, or two stacked rings for a whole note. Uses the isolated
+ * bracket-circle family (scale 0.80), not the standalone stem-ring constants.
  */
 function claspOpenMark(count: number): JankoClaspMarkExtents {
-  const r = CLASP_RING_RADIUS + CLASP_RING_STROKE / 2;
+  const r = BRACKET_RING_OUTER;
   return {
     halfWidth: r,
     halfHeight: r,
-    stack: count <= 1 ? 0 : CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP,
+    stack: count <= 1 ? 0 : BRACKET_RING_RADIUS + CLASP_MARK_STACK_GAP,
   };
 }
 
@@ -1204,7 +1220,7 @@ export function claspMarkDaylight(
     if (ink.pips > 0) {
       air = Math.min(
         air,
-        Math.hypot(x - group.claspX, y - cy) - (CLASP_RING_RADIUS + CLASP_RING_STROKE / 2) - r
+        Math.hypot(x - group.claspX, y - cy) - BRACKET_RING_OUTER - r
       );
       continue;
     }
@@ -1350,7 +1366,7 @@ export function claspOwnMemberAir(
   for (const ink of group.durationInk ?? []) {
     for (const cy of claspMarkCenters(group, ink, rake)) {
       if (ink.pips > 0) {
-        const ringOuter = CLASP_RING_RADIUS + CLASP_RING_STROKE / 2;
+        const ringOuter = BRACKET_RING_OUTER;
         const dx = Math.max(rx0 - group.claspX, 0, group.claspX - rx1);
         const dy = Math.max(ry0 - cy, 0, cy - ry1);
         air = Math.min(air, Math.hypot(dx, dy) - ringOuter);
@@ -1557,9 +1573,10 @@ function renderClaspDurationInk(
     for (const cy of hasMark ? centers : []) {
       if (open) {
         // Every paradigm shares the clean open white ring: its 100% white
-        // interior knocks the spine out with zero crosshairs.
+        // interior knocks the spine out with zero crosshairs. Bracket-circle
+        // family (scale 0.80), isolated from standalone stem rings.
         out.push(
-          `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(CLASP_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"/>`
+          `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(BRACKET_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${BRACKET_RING_STROKE.toFixed(2)}"/>`
         );
         continue;
       }

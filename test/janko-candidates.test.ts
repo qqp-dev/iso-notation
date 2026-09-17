@@ -776,7 +776,7 @@ test('Brahms held triples span 2G with symmetrically tucked rows — every prese
   }
 });
 
-test('t1392 slots lowest-inward with no tuck and shares one stem', () => {
+test('t1392 slots on three rails with no tuck and shares one stem', () => {
   for (const { spacing } of SPACING_CANDIDATES) {
     const G = getClusterSpacingPreset(spacing).pairGap;
     const options = resolveJankoOptions({
@@ -803,10 +803,10 @@ test('t1392 slots lowest-inward with no tuck and shares one stem', () => {
     const col = layout.columns.get(1392)!;
     const lone = byY.find((hs) => hs.length === 1)![0];
     assert.ok(Math.abs(lone.x - col) < 0.05, `${spacing}: the lone head stands on the column`);
-    // Permanent lowest-inward slots: the triple takes {-G, 0, +G} with its
-    // lowest pitch (96) inward, and the pair takes {-G, 0} with its lowest
-    // (99) inward. No tuck: both inward heads share the inward slot, both
-    // upper heads the column.
+    // Ticket §1 three-rail slots: the triple (a true clique) takes
+    // {-G, 0, +G} by source pitch, and the ordinary pair alternates lower
+    // LEFT / higher RIGHT. No tuck: both LEFT heads share the LEFT rail,
+    // both RIGHT heads the RIGHT rail.
     const linOf = (p: (typeof heads)[number]): number =>
       p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
     const tripleXs = [...widest].sort((a, b) => linOf(a) - linOf(b));
@@ -815,15 +815,19 @@ test('t1392 slots lowest-inward with no tuck and shares one stem', () => {
     assert.ok(Math.abs(tripleXs[2].x - (col + G)) < 0.05, `${spacing}: triple highest outward`);
     const other = fanned.find((hs) => hs !== widest)!;
     const pairXs = [...other].sort((a, b) => linOf(a) - linOf(b));
-    assert.ok(Math.abs(pairXs[0].x - (col - G)) < 0.05, `${spacing}: pair lowest inward`);
-    assert.ok(Math.abs(pairXs[1].x - col) < 0.05, `${spacing}: pair upper on column`);
+    assert.ok(Math.abs(pairXs[0].x - (col - G)) < 0.05, `${spacing}: pair lower LEFT`);
+    assert.ok(Math.abs(pairXs[1].x - (col + G)) < 0.05, `${spacing}: pair higher RIGHT`);
     assert.ok(
       Math.abs(pairXs[0].x - tripleXs[0].x) < 1e-9,
-      `${spacing}: inward heads share one slot (no tuck)`
+      `${spacing}: LEFT heads share one rail (no tuck)`
+    );
+    assert.ok(
+      Math.abs(pairXs[1].x - tripleXs[2].x) < 1e-9,
+      `${spacing}: RIGHT heads share one rail (no tuck)`
     );
     // One shared stem for the whole one-duration onset: the carrier is the
-    // on-column outward extremity (topmost RH head on the column), never a
-    // tucked interior head.
+    // nearest-to-column head (then the outward extremity) — the triple's
+    // middle head 97, the only on-column RH head once the pair flanks.
     const groups = layout.sharedStems.filter((g) => g.tick === 1392);
     assert.equal(groups.length, 1, `${spacing}: t1392 shares one stem`);
     const carrier = notes.find((p) => p.note.id === groups[0].carrierId)!;
@@ -831,7 +835,7 @@ test('t1392 slots lowest-inward with no tuck and shares one stem', () => {
       Math.abs(carrier.x - col) < 0.05,
       `${spacing}: the carrier stands on the onset's own column`
     );
-    assert.equal(carrier.note.id, 'brahms-op118-no1-100', `${spacing}: the upper on-column head carries`);
+    assert.equal(carrier.note.id, 'brahms-op118-no1-97', `${spacing}: the triple middle carries`);
   }
 });
 
@@ -910,22 +914,27 @@ test('Synthetic same-duration stacks: one painted stem — stacked and flanked',
   const stackPainted = ['stack-lo', 'stack-hi'].filter((id) => !hidden.has(id));
   assert.equal(stackPainted.length, 1, 'the stack paints one shared stem');
 
-  // The flanked pair spans the golden gap and shares one stem on the column.
+  // Ticket §1: the flanked pair is an ordinary conflicting pair (dy 5.0 <
+  // 2·hy), so it alternates lower LEFT / higher RIGHT about the SOLVED
+  // onset column (laid-out x after the column solve's rigid translation),
+  // spanning two rail gaps; the bracket hugs the LEFT rail.
   const flank = layout.notes.filter((p) => p.note.startTick === 48).sort((a, b) => a.x - b.x);
   assert.equal(flank.length, 2);
   const G = getClusterSpacingPreset('tight').pairGap;
+  const solvedCol = layout.columns.get(48)!;
   assert.ok(
-    Math.abs(flank[1].x - flank[0].x - G) < 0.05,
-    `the flanked pair spans the golden ${G}pt (got ${(flank[1].x - flank[0].x).toFixed(2)})`
+    Math.abs(flank[1].x - flank[0].x - 2 * G) < 0.05,
+    `the flanked pair spans two rail gaps (${(2 * G).toFixed(2)}pt, got ${(flank[1].x - flank[0].x).toFixed(2)})`
   );
+  assert.ok(Math.abs(flank[0].x - (solvedCol - G)) < 0.05, 'the lower head sits LEFT');
+  assert.ok(Math.abs(flank[1].x - (solvedCol + G)) < 0.05, 'the higher head sits RIGHT');
   const groups = layout.sharedStems.filter((g) => g.tick === 48 && g.hand === 'RH');
   assert.equal(groups.length, 1, 'the flanked pair forms one shared-stem group');
   const carrier = layout.notes.find((p) => p.note.id === groups[0].carrierId)!;
-  // The carrier stands on the SOLVED onset column (laid-out x after the
-  // column solve's rigid translation), not the un-shifted proportional beat:
-  // the clasped inward pair legitimately translated right for bracket air.
-  const solvedCol = layout.columns.get(48)!;
-  assert.ok(Math.abs(carrier.x - solvedCol) < 0.05, 'the carrier stands on the solved column');
+  // Both heads tie at distance G from the column, so the carrier rule falls
+  // through to the outward extremity: the topmost head carries from RIGHT.
+  assert.equal(carrier.note.id, 'flank-hi', 'the topmost head carries the tie');
+  assert.ok(Math.abs(carrier.x - (solvedCol + G)) < 0.05, 'the carrier stands on RIGHT');
   const flankPainted = ['flank-lo', 'flank-hi'].filter((id) => !hidden.has(id));
   assert.deepEqual(flankPainted, [carrier.note.id], 'the flanked pair paints one shared stem');
 

@@ -257,6 +257,28 @@ function onsetColumns(tick: number): { column: number; xs: Map<string, number> }
   throw new Error(`tick ${tick} not laid out`);
 }
 
+test('§A literal: m.1/m.3 seat commons CENTER, the obstructed exception RIGHT', () => {
+  // Ticket §1 duration priority (fixed-3): the two ordinary 144-tick members
+  // align CENTER; the middle 192-tick exception's up-stem would pierce the
+  // upper common's mask at CENTER, so it takes RIGHT — explicitly outranking
+  // ordinary pitch alternation. The LH downbeat singleton holds the column.
+  for (const [tick, loId, excId, hiId, lhId] of [
+    [48, 'brahms-op118-no1-4', 'brahms-op118-no1-5', 'brahms-op118-no1-6', 'brahms-op118-no1-3'],
+    [432, 'brahms-op118-no1-26', 'brahms-op118-no1-27', 'brahms-op118-no1-28', 'brahms-op118-no1-25'],
+  ] as const) {
+    const { column, xs } = onsetColumns(tick);
+    assert.ok(Math.abs(xs.get(loId)! - column) < 1e-9, `tick ${tick}: lower common CENTER`);
+    assert.ok(Math.abs(xs.get(hiId)! - column) < 1e-9, `tick ${tick}: upper common CENTER`);
+    assert.ok(
+      Math.abs(xs.get(excId)! - (column + 5.46)) < 1e-6,
+      `tick ${tick}: obstructed exception RIGHT`
+    );
+    assert.ok(Math.abs(xs.get(lhId)! - column) < 1e-9, `tick ${tick}: LH singleton CENTER`);
+    // The aligned commons share the column bit-for-bit: no shear.
+    assert.equal(xs.get(loId), xs.get(hiId), `tick ${tick}: commons coincide`);
+  }
+});
+
 test('§A literal: m.4 (tick 624) stays a clear vertical, every hand on the column', () => {
   const { column, xs } = onsetColumns(624);
   assert.equal(xs.size, 3, 'three heads sound the downbeat');
@@ -265,18 +287,26 @@ test('§A literal: m.4 (tick 624) stays a clear vertical, every hand on the colu
   }
 });
 
-test('§A literal: m.7/m.17 lower the ninth inward; the upper head carries', () => {
-  for (const [tick, lowId, carrierId] of [
-    [1200, 'brahms-op118-no1-78', 'brahms-op118-no1-82'],
-    [3120, 'brahms-op118-no1-213', 'brahms-op118-no1-217'],
+test('§A literal: m.7/m.17 seat the ordinary ninth pair LEFT/RIGHT; the upper head carries', () => {
+  // Ticket §1: the five-voice downbeat is one ordinary component {low, high}
+  // (dy 5.0 < 2·hy 6.92) plus three clear singletons. The pair alternates by
+  // source pitch — lower LEFT, higher RIGHT — and every clear member holds
+  // CENTER. The LH singleton shares the onset but no component.
+  for (const [tick, lowId, highId, carrierId] of [
+    [1200, 'brahms-op118-no1-78', 'brahms-op118-no1-79', 'brahms-op118-no1-82'],
+    [3120, 'brahms-op118-no1-213', 'brahms-op118-no1-214', 'brahms-op118-no1-217'],
   ] as const) {
     const { column, xs } = onsetColumns(tick);
     assert.ok(
       Math.abs(xs.get(lowId)! - (column - 5.46)) < 1e-6,
-      `tick ${tick}: lowest head one slot inward`
+      `tick ${tick}: lower head LEFT`
+    );
+    assert.ok(
+      Math.abs(xs.get(highId)! - (column + 5.46)) < 1e-6,
+      `tick ${tick}: higher head RIGHT`
     );
     for (const [id, x] of xs) {
-      if (id === lowId) continue;
+      if (id === lowId || id === highId) continue;
       assert.ok(Math.abs(x - column) < 1e-9, `tick ${tick}: ${id} on the column`);
     }
     const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
@@ -292,20 +322,40 @@ test('§A literal: m.7/m.17 lower the ninth inward; the upper head carries', () 
   }
 });
 
-test('§A literal: m.8/m.18 seat two inward heads, one per overlap component', () => {
-  for (const [tick, inward, carrierId] of [
-    [1392, ['brahms-op118-no1-96', 'brahms-op118-no1-99'], 'brahms-op118-no1-100'],
-    [3312, ['brahms-op118-no1-231', 'brahms-op118-no1-234'], 'brahms-op118-no1-235'],
+test('§A literal: m.8/m.18 alternate both pairs LEFT/RIGHT, middle head CENTER', () => {
+  // Ticket §1: two ordinary pair components {96,97} and {99,100} (each dy 5.0
+  // < 2·hy 6.92) plus the clear singleton 98. Each pair seats lower LEFT /
+  // higher RIGHT; the carrier rule (nearest the column, then topmost) elects
+  // 98 — the only on-column head — instead of the old off-column topmost.
+  for (const [tick, left, right, carrierId] of [
+    [
+      1392,
+      ['brahms-op118-no1-96', 'brahms-op118-no1-99'],
+      ['brahms-op118-no1-97', 'brahms-op118-no1-100'],
+      'brahms-op118-no1-98',
+    ],
+    [
+      3312,
+      ['brahms-op118-no1-231', 'brahms-op118-no1-234'],
+      ['brahms-op118-no1-232', 'brahms-op118-no1-235'],
+      'brahms-op118-no1-233',
+    ],
   ] as const) {
     const { column, xs } = onsetColumns(tick);
-    for (const id of inward) {
+    for (const id of left) {
       assert.ok(
         Math.abs(xs.get(id)! - (column - 5.46)) < 1e-6,
-        `tick ${tick}: ${id} inward (its component's lowest)`
+        `tick ${tick}: ${id} LEFT (its pair's lower)`
+      );
+    }
+    for (const id of right) {
+      assert.ok(
+        Math.abs(xs.get(id)! - (column + 5.46)) < 1e-6,
+        `tick ${tick}: ${id} RIGHT (its pair's higher)`
       );
     }
     for (const [id, x] of xs) {
-      if ((inward as readonly string[]).includes(id)) continue;
+      if (([...left, ...right] as readonly string[]).includes(id)) continue;
       assert.ok(Math.abs(x - column) < 1e-9, `tick ${tick}: ${id} on the column`);
     }
     const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
@@ -316,20 +366,39 @@ test('§A literal: m.8/m.18 seat two inward heads, one per overlap component', (
   }
 });
 
-test('§A literal: m.9/m.19 slot mixed durations together, never fusing carriers', () => {
-  for (const [tick, inward] of [
-    [1584, ['brahms-op118-no1-114', 'brahms-op118-no1-117']],
-    [3504, ['brahms-op118-no1-249', 'brahms-op118-no1-252']],
+test('§A literal: m.9/m.19 clear top pair seats lower CENTER / higher RIGHT, never fusing carriers', () => {
+  // Ticket §1: the commons {114,115,116} seat as an ordinary pair {114,115}
+  // (dy 5.0 < 2·hy 6.92 → 114 LEFT / 115 RIGHT) plus clear singleton 116.
+  // The two 192-tick exceptions are a clear-path TOP pair, NOT obstructed
+  // internal exceptions: 117 (lower) takes CENTER, 118 (higher) staggers
+  // RIGHT off it — both duration paths run upward unobstructed.
+  for (const [tick, left, right] of [
+    [
+      1584,
+      ['brahms-op118-no1-114'],
+      ['brahms-op118-no1-115', 'brahms-op118-no1-118'],
+    ],
+    [
+      3504,
+      ['brahms-op118-no1-249'],
+      ['brahms-op118-no1-250', 'brahms-op118-no1-253'],
+    ],
   ] as const) {
     const { column, xs } = onsetColumns(tick);
-    for (const id of inward) {
+    for (const id of left) {
       assert.ok(
         Math.abs(xs.get(id)! - (column - 5.46)) < 1e-6,
-        `tick ${tick}: ${id} inward`
+        `tick ${tick}: ${id} LEFT`
+      );
+    }
+    for (const id of right) {
+      assert.ok(
+        Math.abs(xs.get(id)! - (column + 5.46)) < 1e-6,
+        `tick ${tick}: ${id} RIGHT`
       );
     }
     for (const [id, x] of xs) {
-      if ((inward as readonly string[]).includes(id)) continue;
+      if (([...left, ...right] as readonly string[]).includes(id)) continue;
       assert.ok(Math.abs(x - column) < 1e-9, `tick ${tick}: ${id} on the column`);
     }
     const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
@@ -346,7 +415,7 @@ test('§A literal: m.9/m.19 slot mixed durations together, never fusing carriers
   }
 });
 
-test('§A literal: m.33/m.53 fold-coincident octaves seat lowest-lin inward', () => {
+test('§A literal: m.33/m.53 fold-coincident octaves alternate lower LEFT / higher RIGHT', () => {
   for (const [tick, lowId, highId] of [
     [6192, 'brahms-op118-no1-444', 'brahms-op118-no1-445'],
     [10032, 'brahms-op118-no1-730', 'brahms-op118-no1-731'],
@@ -361,9 +430,12 @@ test('§A literal: m.33/m.53 fold-coincident octaves seat lowest-lin inward', ()
     const { column } = onsetColumns(tick);
     assert.ok(
       Math.abs(low.x - (column - 5.46)) < 1e-6,
-      `tick ${tick}: lowest-lin inward`
+      `tick ${tick}: lowest-lin LEFT`
     );
-    assert.ok(Math.abs(high.x - column) < 1e-9, `tick ${tick}: upper on the column`);
+    assert.ok(
+      Math.abs(high.x - (column + 5.46)) < 1e-6,
+      `tick ${tick}: upper RIGHT (ordinary conflicting pair)`
+    );
   }
 });
 
@@ -384,7 +456,8 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   // the real m.1 group plus one hostile head whose mask swallows the 45°
   // seat. The solver must refuse the preferred seat (a REAL erasure
   // collision, air −0.75) and seat deterministically on −45° — the free
-  // lower channel — at the same 5.45 radius, with positive true daylight.
+  // lower channel — at the same 4.75 radius (ring outer 2.8 + hug 1.2 +
+  // dot r 0.75; was 5.45 at the old 3.5 outer), with positive true daylight.
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const m1 = layouts.flatMap((l) => l.clasps).find((c) => c.tick === 48)!;
   const inkIdx = m1.durationDots.findIndex((d) => d !== null);
@@ -406,8 +479,8 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   const angle = (Math.atan2(-(alt.y - ink.centerY), alt.x - group.claspX) * 180) / Math.PI;
   assert.ok(Math.abs(angle - -45) < 1e-9, 'the fallback seats on −45° (lower channel)');
   assert.ok(
-    Math.abs(Math.hypot(alt.x - group.claspX, alt.y - ink.centerY) - 5.45) < 1e-9,
-    'at the same 5.45 radius as the preferred seat'
+    Math.abs(Math.hypot(alt.x - group.claspX, alt.y - ink.centerY) - 4.75) < 1e-9,
+    'at the same 4.75 radius as the preferred seat'
   );
   const air = claspDotMemberAir(alt.x, alt.y, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
   assert.ok(air > 0, `positive true daylight on the fallback (air ${air.toFixed(3)}pt)`);

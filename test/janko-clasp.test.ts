@@ -68,6 +68,9 @@ import {
   CHORD_BRIDGE_DISC_AIR,
   chordBridgeThreshold,
   bracketModeDuration,
+  BRACKET_CIRCLE_SCALE,
+  BRACKET_RING_RADIUS,
+  BRACKET_RING_STROKE,
   CLASP_CROSS_SPACING,
   CLASP_MARK_REACH,
   CLASP_MARK_STACK_GAP,
@@ -160,7 +163,12 @@ test('Clasp tokens: geometry lands on the ticket defaults, and Round 14 restores
   assert.equal(getClaspDownbeatInset(T), 4.8 + 2.8 + CLASP_MARK_REACH + 4.0);
   assert.equal(CLASP_MARK_REACH, CLASP_TRANSVERSE_WIDTH / 2, 'the widest cut is the 7.5pt rung');
   assert.equal(CLASP_TRANSVERSE_STROKE, 1.0, 'every transverse cut is a 1.0pt line');
-  assert.equal(CLASP_RING_STROKE, 1.0, 'the shared open half ring is a 1.0pt stroke');
+  assert.equal(CLASP_RING_STROKE, 1.0, 'the standalone open stem ring is a 1.0pt stroke');
+  // §3 bracket-circle family: the bracket's own rings render at scale 0.80
+  // (R = 2.4pt, 0.8pt), isolated from standalone stem rings (3.0/1.0).
+  assert.equal(BRACKET_CIRCLE_SCALE, 0.8);
+  assert.equal(BRACKET_RING_RADIUS, 2.4);
+  assert.equal(BRACKET_RING_STROKE, 0.8);
   assert.equal(resolveJankoOptions({ chordGrouping: 'left-clasp-spire' }).chordGrouping, 'left-clasp-spire');
   assert.equal(resolveJankoOptions({ chordGrouping: 'per-hand-clasp' }).chordGrouping, 'per-hand-clasp');
 });
@@ -351,8 +359,9 @@ test('Round 11 light paradigms paint four distinct line-based brackets cutting a
       `${s} leaves a quarter as a continuous solid spine`
     );
 
-    // The shared half / whole mark is the clean open white ring (zero
-    // crosshairs) under every paradigm.
+    // The bracket's half / whole mark is the clean open white ring (zero
+    // crosshairs) under every paradigm — the §3 bracket-circle family at
+    // scale 0.80 (R = 2.4pt, 0.8pt), not the standalone 3.0/1.0 rings.
     const opened = style(half(), s);
     assert.equal(
       (opened.match(/janko-clasp-ring/g) ?? []).length,
@@ -363,10 +372,10 @@ test('Round 11 light paradigms paint four distinct line-based brackets cutting a
       opened,
       new RegExp(
         `class="janko-clasp-ring" cx="[\\d.-]+" cy="${yMid(half()).toFixed(2)}" ` +
-          `r="${CLASP_RING_RADIUS.toFixed(2)}" fill="#FFFFFF" stroke="#111111" ` +
-          `stroke-width="${CLASP_RING_STROKE.toFixed(2)}"`
+          `r="${BRACKET_RING_RADIUS.toFixed(2)}" fill="#FFFFFF" stroke="#111111" ` +
+          `stroke-width="${BRACKET_RING_STROKE.toFixed(2)}"`
       ),
-      `${s} half ring is R = 3.0pt at 1.0pt with a 100% white interior`
+      `${s} half ring is R = 2.4pt at 0.8pt with a 100% white interior`
     );
     const wholeMarkup = style(whole(), s);
     assert.equal(
@@ -377,7 +386,7 @@ test('Round 11 light paradigms paint four distinct line-based brackets cutting a
     const wholeYs = markYs(wholeMarkup).sort((a, b) => a - b);
     assert.deepEqual(
       wholeYs,
-      [yMid(whole()) - (CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP), yMid(whole()) + (CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP)],
+      [yMid(whole()) - (BRACKET_RING_RADIUS + CLASP_MARK_STACK_GAP), yMid(whole()) + (BRACKET_RING_RADIUS + CLASP_MARK_STACK_GAP)],
       `${s} whole rings mirror about the bracket midpoint`
     );
 
@@ -592,10 +601,10 @@ test('renderChordClasp paints the symmetrical bracket and its light duration par
   assert.ok(
     half.includes(
       `class="janko-clasp-ring" cx="${halfGroup.claspX.toFixed(2)}" cy="${halfMid.toFixed(2)}" ` +
-        `r="${CLASP_RING_RADIUS.toFixed(2)}" fill="#FFFFFF" stroke="#111111" ` +
-        `stroke-width="${CLASP_RING_STROKE.toFixed(2)}"`
+        `r="${BRACKET_RING_RADIUS.toFixed(2)}" fill="#FFFFFF" stroke="#111111" ` +
+        `stroke-width="${BRACKET_RING_STROKE.toFixed(2)}"`
     ),
-    'the ring is R = 3.0pt at 1.0pt with a 100% white knockout interior'
+    'the ring is R = 2.4pt at 0.8pt with a 100% white knockout interior'
   );
   assert.ok(!half.includes('janko-clasp-slash'), 'a half note carries no transverse slash');
 
@@ -609,7 +618,7 @@ test('renderChordClasp paints the symmetrical bracket and its light duration par
   );
   assert.deepEqual(
     wholeYs,
-    [halfMid - (CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP), halfMid + (CLASP_RING_RADIUS + CLASP_MARK_STACK_GAP)],
+    [halfMid - (BRACKET_RING_RADIUS + CLASP_MARK_STACK_GAP), halfMid + (BRACKET_RING_RADIUS + CLASP_MARK_STACK_GAP)],
     'the whole-note rings mirror about the midpoint'
   );
 
@@ -1209,6 +1218,100 @@ test('The admission loop demotes a measure whose own content cannot absorb the s
         `${p.note.id} keeps barline air`
       );
     }
+  }
+});
+
+test('§2 downbeat insets are predicted per measure: 14.40 plain, 19.86 LEFT-occupied', () => {
+  // The blanket 15.35pt retires to a conservative fallback. The predictor
+  // seats the downbeat group on three rails and reserves exactly the
+  // complete bracket ink plus barline air: 14.40 (spine 7.6 + ring 2.8 +
+  // air 4.0) when CENTER/RIGHT carry the ink, plus one rail (5.46) when a
+  // member occupies LEFT. Measures without a downbeat clasp stay absent
+  // (the 6pt default); nothing pins the blanket for this paradigm.
+  const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+  const geo = computePageGeometry(o, BRAHMS_T);
+  const expected: Record<number, Array<[number, number]>> = {
+    0: [
+      [1, 14.4],
+      [3, 14.4],
+    ],
+    1: [
+      [0, 14.4],
+      [1, 14.4],
+      [2, 19.86],
+      [3, 19.86],
+    ],
+    2: [
+      [0, 19.86],
+      [1, 14.4],
+      [2, 14.4],
+    ],
+  };
+  for (const [sys, rows] of Object.entries(expected)) {
+    const system = getSystemGeometry(geo, Number(sys));
+    const insets = computeClaspInsetMap(BRAHMS, system, Number(sys), o, BRAHMS_T);
+    assert.deepEqual(
+      [...insets.entries()].map(([m, v]) => [m, Number(v.toFixed(2))]),
+      rows,
+      `system ${sys}: predicted insets`
+    );
+  }
+  assert.equal(
+    getClaspDownbeatInset(BRAHMS_T),
+    4.8 + 2.8 + CLASP_MARK_REACH + 4.0,
+    'the retired blanket stays 15.35 — and no prediction equals it'
+  );
+});
+
+test('§2 measured geometry: m.1/m.3 onsets move 0.95 left, barlines byte-identical, m.2/m.4 controls at 6.00', () => {
+  // Independent of the inset map: on the real laid-out page the m.1/m.3
+  // downbeat columns stand exactly 14.40pt past their (unmoved) opening
+  // barlines — the 0.95 saving is realized ink, not a reserved number —
+  // while the unclasped m.2/m.4 downbeats hold the 6pt control.
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const l0 = layouts[0];
+  const leading = (measureIdx: number, tick: number): [number, number, number] => {
+    const bar = getMeasureOpeningBarlineX(measureIdx, l0.geometry, 0, BRAHMS_T)!;
+    const col = l0.columns.get(tick)!;
+    return [bar, col, col - bar];
+  };
+  const [bar1, col1, lead1] = leading(1, 48);
+  assert.equal(bar1.toFixed(4), '63.7694', 'm.1 barline unmoved (base: 63.7694)');
+  assert.equal(col1.toFixed(4), '78.1694', 'm.1 onset left 0.95 (base: 79.1194)');
+  assert.ok(Math.abs(lead1 - 14.4) < 1e-9, 'm.1 leading exactly 14.40');
+  const [bar3, col3, lead3] = leading(3, 432);
+  assert.equal(bar3.toFixed(4), '319.5247', 'm.3 barline unmoved (base: 319.5247)');
+  assert.equal(col3.toFixed(4), '333.9247', 'm.3 onset left 0.95 (base: 334.8747)');
+  assert.ok(Math.abs(lead3 - 14.4) < 1e-9, 'm.3 leading exactly 14.40');
+  assert.ok(Math.abs(leading(2, 240)[2] - 6.0) < 1e-9, 'm.2 control at 6.00');
+  assert.ok(Math.abs(leading(4, 624)[2] - 6.0) < 1e-9, 'm.4 control at 6.00');
+  // The saved 0.95pt per clasped downbeat is genuine: the bracket ink still
+  // clears its barline by the full air, measured on paint, not reserved.
+  for (const tick of [48, 432]) {
+    const clasp = l0.clasps.find((c) => c.tick === tick)!;
+    const opening = getMeasureOpeningBarlineX(tick === 48 ? 1 : 3, l0.geometry, 0, BRAHMS_T)!;
+    assert.ok(
+      claspInkBox(clasp, BRAHMS_T).x0 - opening >= BRAHMS_T.claspMinBarlineAir - 1e-9,
+      `tick ${tick}: bracket ink keeps full barline air`
+    );
+  }
+});
+
+test('§2 LEFT-occupied downbeats keep the 19.86 floor under content pressure', () => {
+  // m.7/m.8 carry LEFT-rail members, so their floors are 19.86. Mid-system
+  // content (the previous measure's tail) legitimately pushes the columns
+  // further right — the floor is a minimum, never a shear: both columns
+  // stand past bar + 19.86, pinned absolutely so any drift fails.
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const l1 = layouts[1];
+  for (const [measureIdx, tick, col] of [
+    [2, 1200, 328.86],
+    [3, 1392, 464.73],
+  ] as const) {
+    const bar = getMeasureOpeningBarlineX(measureIdx, l1.geometry, 1, BRAHMS_T)!;
+    const column = l1.columns.get(tick)!;
+    assert.ok(column - bar >= 19.86 - 1e-9, `tick ${tick}: past the 19.86 floor`);
+    assert.equal(Number(column.toFixed(2)), col, `tick ${tick}: absolute column`);
   }
 });
 
