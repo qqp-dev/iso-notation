@@ -5772,6 +5772,37 @@ export function layoutJankoSystemShifted(
   };
 }
 
+export type LayoutJankoScoreObserver = (
+  score: QuantizedGridScore,
+  options: ResolvedJankoLayoutOptions,
+  tokens: ResolvedJankoTokens
+) => void;
+
+let layoutJankoScoreObserver: LayoutJankoScoreObserver | null = null;
+
+/** Install a layout observer to monitor layoutJankoScore calls (used by tests). */
+export function setLayoutJankoScoreObserver(
+  observer: LayoutJankoScoreObserver | null
+): void {
+  layoutJankoScoreObserver = observer;
+}
+
+/** Check if precomputed layouts are valid and match the required system count and layout options. */
+export function isMatchingPrecomputedLayouts(
+  layouts: readonly JankoSystemLayout[] | null | undefined,
+  totalSystems: number,
+  measuresPerSystem?: number
+): layouts is readonly JankoSystemLayout[] {
+  if (!layouts || !Array.isArray(layouts)) return false;
+  if (layouts.length < totalSystems) return false;
+  if (totalSystems > 0 && measuresPerSystem !== undefined) {
+    if (layouts[0]?.geometry?.measuresPerSystem !== measuresPerSystem) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Position every system of a score (used by the linter and the studio). */
 export function layoutJankoScore(
   score: QuantizedGridScore,
@@ -5780,6 +5811,7 @@ export function layoutJankoScore(
 ): JankoSystemLayout[] {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
+  layoutJankoScoreObserver?.(score, o, t);
   const geo = computePageGeometry(o, t, score);
   const total = countJankoSystems(score, o, t);
   const out: JankoSystemLayout[] = [];
@@ -6019,7 +6051,8 @@ export function renderSystemsBody(
   firstSystem: number,
   lastSystem: number,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  precomputedLayouts?: readonly JankoSystemLayout[] | null
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -6029,7 +6062,9 @@ export function renderSystemsBody(
   // Full-score layout: systems render at their placed (slot- or
   // content-aware) centres, so pages, crops, print, PDF and the linter
   // share one geometry.
-  const layouts = layoutJankoScore(score, o, t);
+  const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, total, o.measuresPerSystem)
+    ? precomputedLayouts
+    : layoutJankoScore(score, o, t);
   for (let s = Math.max(0, firstSystem); s <= last; s++) {
     out.push(renderSystem(score, layouts[s].geometry, s, o, t, layouts[s]));
   }
@@ -6059,7 +6094,8 @@ export function renderJankoPage(
   score: QuantizedGridScore,
   pageIndex: number = 0,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  precomputedLayouts?: readonly JankoSystemLayout[] | null
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -6070,7 +6106,9 @@ export function renderJankoPage(
   const body: string[] = [];
   const totalSystems = countJankoSystems(score, o, t);
   // Full-score layout: systems render at their placed centres (see above).
-  const layouts = layoutJankoScore(score, o, t);
+  const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, totalSystems, o.measuresPerSystem)
+    ? precomputedLayouts
+    : layoutJankoScore(score, o, t);
   for (let s = firstSystem; s < firstSystem + geo.systemsPerPage; s++) {
     if (s >= totalSystems) break;
     body.push(renderSystem(score, layouts[s].geometry, s, o, t, layouts[s]));
@@ -6122,7 +6160,8 @@ export function computeCropExtents(
   measureStart: number,
   measureCount: number,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  precomputedLayouts?: readonly JankoSystemLayout[] | null
 ): JankoCropExtents {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -6170,7 +6209,7 @@ export function computeCropExtents(
     const lastSystem = Math.floor((startIdx + count - 1) / mps);
     const total = countJankoSystems(score, o, t);
     for (let s = firstSystem; s <= Math.min(lastSystem, total - 1); s++) {
-      const layout = layoutJankoSystem(score, geo, s, o, t);
+      const layout = precomputedLayouts?.[s] ?? layoutJankoSystem(score, geo, s, o, t);
       const bounds = contourSystemInkBounds(score, layout, o, t);
       if (!bounds) continue;
       const middleCY = layout.geometry.middleCY;
@@ -6183,7 +6222,7 @@ export function computeCropExtents(
   const lastSystem = Math.floor((startIdx + count - 1) / mps);
   const total = countJankoSystems(score, o, t);
   for (let s = firstSystem; s <= Math.min(lastSystem, total - 1); s++) {
-    const layout = layoutJankoSystem(score, geo, s, o, t);
+    const layout = precomputedLayouts?.[s] ?? layoutJankoSystem(score, geo, s, o, t);
     if (layout.ottavaBrackets && layout.ottavaBrackets.length > 0) {
       const middleCY = layout.geometry.middleCY;
       for (const b of layout.ottavaBrackets) {
@@ -6290,23 +6329,38 @@ export function renderJankoCrop(
   measureCount: number,
   options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null,
-  caption?: string
+  captionOrLayouts?: string | readonly JankoSystemLayout[] | null,
+  precomputedLayouts?: readonly JankoSystemLayout[] | null
 ): string {
+  const caption = typeof captionOrLayouts === 'string' ? captionOrLayouts : undefined;
+  const rawPrecomputed = Array.isArray(captionOrLayouts) ? captionOrLayouts : precomputedLayouts;
+
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const geo = computePageGeometry(o, t, score);
+  const total = countJankoSystems(score, o, t);
+  let layouts: readonly JankoSystemLayout[] | undefined = isMatchingPrecomputedLayouts(
+    rawPrecomputed,
+    total,
+    o.measuresPerSystem
+  )
+    ? rawPrecomputed
+    : undefined;
+
   const box = computeCropBox(
     geo,
     measureStart,
     measureCount,
     true,
-    computeCropExtents(score, geo, measureStart, measureCount, o, t)
+    computeCropExtents(score, geo, measureStart, measureCount, o, t, layouts)
   );
   // Placed-system framing: the box derives from slot-template staff lines,
   // but systems render at their placed centres — shift the frame to cover
   // the placed ink (rigid per system; multi-system crops expand to cover).
   if (isContentAwarePlacement(o)) {
-    const layouts = layoutJankoScore(score, o, t);
+    if (!layouts) {
+      layouts = layoutJankoScore(score, o, t);
+    }
     let lo = Number.POSITIVE_INFINITY;
     let hi = Number.NEGATIVE_INFINITY;
     for (let s = box.firstSystem; s <= box.lastSystem; s++) {
@@ -6345,7 +6399,7 @@ export function renderJankoCrop(
     box.h += extra;
   }
 
-  const systems = renderSystemsBody(score, geo, box.firstSystem, box.lastSystem, o, t);
+  const systems = renderSystemsBody(score, geo, box.firstSystem, box.lastSystem, o, t, layouts);
 
   return [
     svgOpen(box),
