@@ -142,6 +142,14 @@ import {
   assignThreeRails,
 } from './three-rail';
 import {
+  JankoCompressedCluster,
+  groupOnsetNotes,
+  renderSpatialEchoSvg,
+  renderCompactCouplingSvg,
+  checkCompressionInkCollisions,
+} from './compression';
+
+import {
   ARCHITECTURAL_BRACKET_SPUR,
   ARCHITECTURAL_BRACKET_STROKE,
   SYSTEM_1_ARCHITECTURAL_BRACKET_SPUR,
@@ -1507,6 +1515,10 @@ export interface JankoSystemLayout {
    * lightweight fixtures stay valid; the engine always sets it.
    */
   railDiagnostics?: ThreeRailDiagnostic[];
+  /** Round 35: compressed clusters for semantic hand-cluster compression candidates. */
+  compressedClusters?: JankoCompressedCluster<PositionedJankoNote>[];
+  /** Note IDs whose noteheads are omitted/compressed (copies in spatial-echo or compact-coupling). */
+  compressedCopyIds?: Set<string>;
 }
 
 /**
@@ -1542,6 +1554,7 @@ export function suppressedStemIds(layout: JankoSystemLayout): Set<string> {
     ...layout.claspedStems,
     ...layout.verticalChords.flatMap((chord) => chord.suppressedIds),
     ...layout.sharedStems.flatMap((group) => group.suppressedIds),
+    ...(layout.compressedCopyIds ? [...layout.compressedCopyIds] : []),
   ]);
 }
 
@@ -5498,14 +5511,98 @@ export function layoutJankoSystemShifted(
     const member = clasp.notes.find((n) => n.id === id)!;
     return member.durationTicks !== claspMemberCarriedTicks(clasp, id);
   };
-  const clusters = collectClaspClusters(
-    notes,
+
+  // Round 35: Semantic hand-cluster compression (Candidate treatments A & B)
+  let compressedClusters: JankoCompressedCluster<PositionedJankoNote>[] | undefined;
+  let compressedCopyIds: Set<string> | undefined;
+  if (o.clusterCompression && o.clusterCompression !== 'literal') {
+    const res = groupOnsetNotes(notes);
+    const barlineXs: number[] = [];
+    const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
+    if (barlineAir) {
+      const anacrusis = t.anacrusisTicks ?? 0;
+      if (systemIndex === 0 && anacrusis > 0) {
+        const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geometry.measureWidth;
+        barlineXs.push(geometry.staffLeft + upbeatWidth);
+        for (let m = 1; m <= o.measuresPerSystem; m++) {
+          barlineXs.push(geometry.staffLeft + upbeatWidth + m * geometry.measureWidth);
+        }
+      } else {
+        for (let m = 0; m < o.measuresPerSystem; m++) {
+          barlineXs.push(geometry.staffLeft + (m + 1) * geometry.measureWidth);
+        }
+      }
+    }
+
+    const admittedClusters: JankoCompressedCluster<PositionedJankoNote>[] = [];
+    const admittedCopyIds = new Set<string>();
+
+    for (const cluster of res.clusters) {
+      const rendered =
+        o.clusterCompression === 'spatial-echo'
+          ? renderSpatialEchoSvg(cluster, o, t)
+          : renderCompactCouplingSvg(cluster, o, t);
+
+      const col = checkCompressionInkCollisions(
+        cluster,
+        rendered.inkBoxes ?? [rendered.inkBox],
+        barlineXs,
+        notes,
+        restLayer.rests,
+        0.8
+      );
+
+      if (col.collides) {
+        // Fall back to literal when clearance is unresolved or collision occurs
+        continue;
+      }
+
+      // Check if any independent note at this onset/hand shares a column with a copy note
+      const sameOnsetHandNotes = notes.filter(
+        (n) => n.note.startTick === cluster.startTick && n.note.hand === cluster.hand && !cluster.allNoteIds.has(n.note.id)
+      );
+      let stemPierces = false;
+      for (const ind of sameOnsetHandNotes) {
+        for (const copy of cluster.copies) {
+          for (const cn of copy.notes) {
+            if (Math.abs(ind.x - cn.x) < 2.0) {
+              stemPierces = true;
+              break;
+            }
+          }
+          if (stemPierces) break;
+        }
+        if (stemPierces) break;
+      }
+      if (stemPierces) {
+        // Fall back to literal
+        continue;
+      }
+
+      admittedClusters.push(cluster);
+      for (const id of cluster.copyNoteIds) {
+        admittedCopyIds.add(id);
+      }
+    }
+
+    if (admittedClusters.length > 0) {
+      compressedClusters = admittedClusters;
+      compressedCopyIds = admittedCopyIds;
+    }
+  }
+
+  const notesForClasps = compressedCopyIds && compressedCopyIds.size > 0
+    ? notes.filter((p) => !compressedCopyIds!.has(p.note.id))
+    : notes;
+  const claspClusters = collectClaspClusters(
+    notesForClasps,
     geometry,
     systemIndex,
     o,
     t,
     o.chordGrouping === 'bounding-phrase' ? null : chordColumns.claspTicks
-  )
+  );
+  const clusters = claspClusters
     .map((cluster) => ({
       cluster,
       geometry: computeClaspGeometry(
@@ -5614,6 +5711,7 @@ export function layoutJankoSystemShifted(
     );
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
+      if (compressedCopyIds?.has(p.note.id)) continue;
       const key = `${p.note.startTick}|${p.rhythm.hand}`;
       const bucket = byHandOnset.get(key);
       if (bucket) bucket.push(p);
@@ -5653,6 +5751,7 @@ export function layoutJankoSystemShifted(
     );
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
+      if (compressedCopyIds?.has(p.note.id)) continue;
       const key = `${p.note.startTick}|${p.rhythm.hand}`;
       const bucket = byHandOnset.get(key);
       if (bucket) bucket.push(p);
@@ -5710,6 +5809,11 @@ export function layoutJankoSystemShifted(
     const carrierIds = new Set(sharedStems.map((group) => group.carrierId));
     claspedStems = claspedStems.filter((id) => !carrierIds.has(id));
   }
+  if (compressedCopyIds) {
+    for (const id of compressedCopyIds) {
+      if (!claspedStems.includes(id)) claspedStems.push(id);
+    }
+  }
 
   // Round 23: flag crossed notes for tall knockouts. Paint-only — every head
   // keeps its column; the erasure grows to the stem-start line instead.
@@ -5717,6 +5821,7 @@ export function layoutJankoSystemShifted(
     ...claspedStems,
     ...verticalChords.flatMap((chord) => chord.suppressedIds),
     ...sharedStems.flatMap((group) => group.suppressedIds),
+    ...(compressedCopyIds ? [...compressedCopyIds] : []),
   ]);
   const crossed = new Set(
     detectStemDigitCrossings(notes, beams, ungrouped, o, t, suppressed).map((c) => c.digitNoteId)
@@ -5769,6 +5874,8 @@ export function layoutJankoSystemShifted(
     clusterDiagnostics: chordColumns.diagnostics,
     claspQualifiedIds: chordColumns.claspQualifiedIds,
     railDiagnostics: chordColumns.railDiagnostics,
+    compressedClusters,
+    compressedCopyIds,
   };
 }
 
@@ -5954,8 +6061,22 @@ function renderNotesLayer(
   //     their mask.
   if (gridInk.length > 0) out.push(gridInk);
 
+  // 2e. Round 35: Semantic hand-cluster compression candidate glyphs
+  if (layout.compressedClusters && layout.compressedClusters.length > 0) {
+    for (const cluster of layout.compressedClusters) {
+      if (o.clusterCompression === 'spatial-echo') {
+        const { svg } = renderSpatialEchoSvg(cluster, o, t);
+        out.push(svg);
+      } else if (o.clusterCompression === 'compact-coupling') {
+        const { svg } = renderCompactCouplingSvg(cluster, o, t);
+        out.push(svg);
+      }
+    }
+  }
+
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.
   for (const p of layout.notes) {
+    if (layout.compressedCopyIds?.has(p.note.id)) continue;
     out.push(
       renderNotehead(
         {

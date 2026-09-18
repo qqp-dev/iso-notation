@@ -319,7 +319,7 @@ test('Fresh data/options/tokens: subsequent render with changed options computes
 });
 
 test('Fresh data/options/tokens: candidate configurations remain separate from each other', () => {
-  // Round 34 candidates have different foldPairPresentation options
+  // Round 35 candidates have different clusterCompression options
   assert.equal(CURRENT_CANDIDATES.length, 3);
   const [candA, candB, candC] = CURRENT_CANDIDATES;
 
@@ -327,17 +327,17 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
   const optsB = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candB.options ?? {}) });
   const optsC = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candC.options ?? {}) });
 
-  assert.equal(optsA.foldPairPresentation, 'literal-fold');
-  assert.equal(optsB.foldPairPresentation, 'shared-ottava');
-  assert.equal(optsC.foldPairPresentation, 'split-octave');
+  assert.equal(optsA.clusterCompression, 'literal');
+  assert.equal(optsB.clusterCompression, 'spatial-echo');
+  assert.equal(optsC.clusterCompression, 'compact-coupling');
 
-  const svgA = renderJankoCrop(BRAHMS, 33, 4, optsA, BRAHMS_TOKS);
-  const svgB = renderJankoCrop(BRAHMS, 33, 4, optsB, BRAHMS_TOKS);
-  const svgC = renderJankoCrop(BRAHMS, 33, 4, optsC, BRAHMS_TOKS);
+  const svgA = renderJankoCrop(BRAHMS, 8, 2, optsA, BRAHMS_TOKS);
+  const svgB = renderJankoCrop(BRAHMS, 8, 2, optsB, BRAHMS_TOKS);
+  const svgC = renderJankoCrop(BRAHMS, 8, 2, optsC, BRAHMS_TOKS);
 
-  assert.notEqual(svgA, svgB, 'Literal fold and shared ottava produce distinct SVGs');
-  assert.notEqual(svgA, svgC, 'Literal fold and split octave produce distinct SVGs');
-  assert.notEqual(svgB, svgC, 'Shared ottava and split octave produce distinct SVGs');
+  assert.notEqual(svgA, svgB, 'Literal baseline and spatial echo produce distinct SVGs');
+  assert.notEqual(svgA, svgC, 'Literal baseline and compact coupling produce distinct SVGs');
+  assert.notEqual(svgB, svgC, 'Spatial echo and compact coupling produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------

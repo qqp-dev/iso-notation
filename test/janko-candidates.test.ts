@@ -151,6 +151,7 @@ const ROUND_30_CARDS: string[] = ['round-30-rings', 'round-30-double-dots'];
 const ROUND_31_CARDS: string[] = ['round-31-clasp-nudge'];
 const ROUND_32_CARDS: string[] = ['4-per-system-full-grid', '4-per-system-midpoint-grid'];
 const ROUND_33_CARDS: string[] = ['grid-full-vs-none-full', 'grid-full-vs-none-none'];
+const ROUND_34_CARDS: string[] = ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -236,10 +237,10 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 34 (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 34);
-  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
+test('CURRENT_ROUND_METADATA is the open Round 35 (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 35);
+  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -253,24 +254,23 @@ test('CURRENT_ROUND_METADATA is the open Round 34 (one open axis)', () => {
     ['grid-full-vs-none-full', 'grid-full-vs-none-none'],
     'R33 parked pair on record'
   );
+  assert.deepEqual(
+    ROUND_34_CARDS,
+    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
+    'R34 parked trio on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the Round 34 trio: A/B/C, one axis, no control', () => {
+test('CURRENT_CANDIDATES is the Round 35 trio: Control / A / B, one axis', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
+    ['cluster-compression-literal', 'cluster-compression-spatial-echo', 'cluster-compression-compact-coupling'],
     'three live cards'
   );
-  assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
-  assert.equal(
-    getCandidate('grid-full-vs-none-full'),
-    undefined,
-    'the parked full-grid card lives in the round-33 suite, not the registry'
-  );
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'foldPairPresentation', `${c.id}: per-candidate purity`);
-    assert.deepEqual(Object.keys(c.options ?? {}), ['foldPairPresentation'], `${c.id}: one-line delta`);
+    assert.equal(c.axis, 'clusterCompression', `${c.id}: per-candidate purity`);
+    assert.deepEqual(Object.keys(c.options ?? {}), ['clusterCompression'], `${c.id}: one-line delta`);
   }
 });
 
@@ -2030,14 +2030,14 @@ test('The live studio renders the open round with three cards', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
   assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="6"/, 'six windows');
+  assert.match(html, /data-window-count="12"/, 'twelve windows');
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 34/);
-  assert.match(html, /m\.33/i, 'the m33 title headlines the view');
+  assert.match(html, /Round 35/);
+  assert.match(html, /compression/i, 'the compression title headlines the view');
   for (const id of ROUND_33_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 1, 'only card C chips red');
+  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 0, 'all cards lint clean');
 });
 
 test('The closer-comparison strip is absent without a declared strip', () => {

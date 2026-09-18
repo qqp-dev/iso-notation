@@ -42,10 +42,10 @@ import {
 } from '../src/scores/brahms-op118-no1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  brahmsWindow,
   candidateBadges,
-  getCandidate,
+  type JankoCandidate,
+  type JankoCandidateRound,
 } from '../src/render/janko/candidates';
 import {
   createStudioConfig,
@@ -66,6 +66,58 @@ function read(file: string): string {
   return fs.readFileSync(path.join(REPO_ROOT, file), 'utf-8');
 }
 
+/** Historical Round 34 metadata (parked). */
+export const ROUND_34_METADATA: JankoCandidateRound = {
+  round: 34,
+  title: 'm.33 fold-coincident octave pair: literal fold vs shared transposition vs true octave',
+  description:
+    'Round 34: the m.33 (and m.53 twin) LH octave coincides only through folding. Card A keeps the literal fold (low note folded with its own ↓10, staggered, unbracketed — the incumbent). Card B shifts both notes up under one shared ↓10. Card C draws the low note at literal pitch as a true octave stack (carries extension findings). Sounding pitches preserved on every card; no arpeggio engraving; no selection — the Reference stays the literal fold.',
+  openAxes: ['foldPairPresentation'],
+};
+
+/** Historical Round 34 cards (parked). */
+export const ROUND_34_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'm33-literal-fold',
+    label: 'A · Literal fold',
+    description:
+      'The incumbent: the low note folds onto its octave twin’s row with its own ↓10, staggered one gap, unbracketed. Sounding pitches literal; the bracket alone transposes.',
+    axis: 'foldPairPresentation',
+    options: { foldPairPresentation: 'literal-fold' },
+    windows: [
+      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
+      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
+    ],
+    tags: ['brahms', 'm33', 'incumbent'],
+  },
+  {
+    id: 'm33-shared-ottava',
+    label: 'B · Shared ↓10',
+    description:
+      'Both notes written up one octave under one shared ↓10: the pair reads as a single transposition. Sounding pitches preserved; the bracket alone transposes and never adds a note.',
+    axis: 'foldPairPresentation',
+    options: { foldPairPresentation: 'shared-ottava' },
+    windows: [
+      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
+      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
+    ],
+    tags: ['brahms', 'm33'],
+  },
+  {
+    id: 'm33-split-octave',
+    label: 'C · Split octave',
+    description:
+      'The low note draws at literal pitch with no fold and no bracket: the pair reads as a true octave stack. Sounding pitches preserved; the low note exceeds core±1 coverage and carries its extension findings visibly.',
+    axis: 'foldPairPresentation',
+    options: { foldPairPresentation: 'split-octave' },
+    windows: [
+      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
+      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
+    ],
+    tags: ['brahms', 'm33'],
+  },
+];
+
 const BRAHMS = buildBrahmsOp118No1Score();
 const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const MODES: JankoFoldPairPresentation[] = ['literal-fold', 'shared-ottava', 'split-octave'];
@@ -80,17 +132,17 @@ const soundingLin = (writtenLin: number, shift: number): number => writtenLin - 
 // 1. Live registry
 // ---------------------------------------------------------------------------
 
-test('Round 34 live: one m33 axis, the A/B/C trio, literal windows', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 34);
-  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation']);
+test('Round 34 parked: one m33 axis, the A/B/C trio, literal windows', () => {
+  assert.equal(ROUND_34_METADATA.round, 34);
+  assert.match(ROUND_34_METADATA.title, /m\.33/i);
+  assert.deepEqual(ROUND_34_METADATA.openAxes, ['foldPairPresentation']);
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_34_CANDIDATES.map((c) => c.id),
     ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave']
   );
-  const modes = CURRENT_CANDIDATES.map((c) => c.options?.foldPairPresentation);
+  const modes = ROUND_34_CANDIDATES.map((c) => c.options?.foldPairPresentation);
   assert.deepEqual(modes, MODES, 'one card per presentation mode');
-  for (const c of CURRENT_CANDIDATES) {
+  for (const c of ROUND_34_CANDIDATES) {
     assert.equal(c.axis, 'foldPairPresentation', `${c.id}: per-candidate purity`);
     assert.deepEqual(Object.keys(c.options ?? {}), ['foldPairPresentation'], `${c.id}: one-line delta`);
     assert.deepEqual(
@@ -101,13 +153,13 @@ test('Round 34 live: one m33 axis, the A/B/C trio, literal windows', () => {
       ],
       `${c.id}: the literal m33 window plus the m53 twin`
     );
-    const badges = candidateBadges(c);
+    const badges = candidateBadges(c, ROUND_34_METADATA);
     assert.ok(
       badges.some((b) => b.key === 'foldPairPresentation' && b.axis === true),
       `${c.id} badges the open axis (including the incumbent value)`
     );
   }
-  assert.equal(getCandidate('control'), undefined, 'no control card — the Reference is the control');
+  assert.equal(ROUND_34_CANDIDATES.find((c) => c.id === 'control'), undefined, 'no control card');
 });
 
 // ---------------------------------------------------------------------------
@@ -275,7 +327,9 @@ test('m33 chips: A/B clean, C carries its two extension findings visibly', () =>
     ['extension-beyond-core'],
     'C findings are same-class coverage findings'
   );
-  const html = renderCandidatesView(createStudioConfig());
+  const html = renderCandidatesView(
+    createStudioConfig({ round: ROUND_34_METADATA, candidates: ROUND_34_CANDIDATES })
+  );
   for (const [id, lint] of [
     ['m33-literal-fold', 'clean'],
     ['m33-shared-ottava', 'clean'],
@@ -322,4 +376,11 @@ test('R33 decided by convention: historical consts parked, no live pins remain',
   );
   assert.ok(!/^import[^;]*CURRENT_CANDIDATES[^_]/m.test(suite), 'no live-registry cards import remains');
   assert.ok(!/assert\.equal\(CURRENT_ROUND_METADATA/m.test(suite), 'no live-registry pins remain');
+});
+
+test('R34 parked by convention: historical consts parked, live registry moved to Round 35', () => {
+  assert.equal(ROUND_34_METADATA.round, 34);
+  assert.equal(ROUND_34_CANDIDATES.length, 3);
+  const candFile = read('src/render/janko/candidates.ts');
+  assert.match(candFile, /Round 34 opened the m\.33 fold-coincident octave-pair comparison/);
 });

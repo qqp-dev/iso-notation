@@ -996,6 +996,14 @@ export interface JankoLayoutOptions {
    */
   foldPairPresentation?: JankoFoldPairPresentation;
   /**
+   * Semantic hand-cluster compression (Round 35):
+   * `'literal'` draws all notes with full heads across all registers;
+   * `'spatial-echo'` draws origin heads + lightweight echo markers at copied registers;
+   * `'compact-coupling'` draws origin heads + adjacent bounded additive structure (+10/+20).
+   * Defaults to `'literal'`.
+   */
+  clusterCompression?: JankoClusterCompression;
+  /**
    * Vertical page placement: `'slot'` centers staffs in fixed slots with
    * overflow-only correction; `'content-aware'` enforces facing ink
    * clearances (including ottava extent) then distributes residual page
@@ -1082,6 +1090,19 @@ export type JankoCore = 'adaptive' | 'fixed-3' | 'fixed-4';
 export type JankoFoldPairPresentation = 'literal-fold' | 'shared-ottava' | 'split-octave';
 
 /**
+ * Semantic hand-cluster compression style (Round 35).
+ * - `'literal'`: default golden behavior — all notes drawn literally with full
+ *   numeral-bearing noteheads across all registers.
+ * - `'spatial-echo'`: explicit numeral-bearing origin shape; lightweight group
+ *   marker at copied registers carrying occurrence rhythm via standard duration cues,
+ *   linked by local structural connector/enclosure.
+ * - `'compact-coupling'`: explicit origin shape with adjacent bounded additive-occurrence
+ *   structure (+10/+20 notation), binding distinct durations to occurrences.
+ */
+export type JankoClusterCompression = 'literal' | 'spatial-echo' | 'compact-coupling';
+
+
+/**
  * Vertical page placement.
  *
  * - `'slot'`: staffs center in fixed slots; overflow-only correction.
@@ -1143,6 +1164,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   gridPulseFilter: 'all',
   correctPageTopAnacrusisMeasureWidth: false,
   foldPairPresentation: 'literal-fold',
+  clusterCompression: 'literal',
   verticalPlacement: 'slot',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',

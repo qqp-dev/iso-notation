@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 34 open: the m33 A/B/C trio');
+assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 35 open: the compression trio');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -124,23 +124,19 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 34/);
-  assert.match(html, /m\.33/i);
+  assert.match(html, /Round 35/);
+  assert.match(html, /compression/i);
 });
 
-test('Round 34 open: m33 fold-pair trio, one axis, three cards', () => {
-  // Ordered contract change: Round 33 is judged (full grid canonical, parked
-  // historical consts) and Round 34 opens the m.33 fold-coincident
-  // octave-pair comparison: literal fold vs shared transposition vs true
-  // octave. No selection — the Reference stays the literal fold.
-  assert.equal(CURRENT_ROUND_METADATA.round, 34);
-  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
+test('Round 35 open: hand-cluster compression trio, one axis, three cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 35);
+  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
-    'the A/B/C trio'
+    ['cluster-compression-literal', 'cluster-compression-spatial-echo', 'cluster-compression-compact-coupling'],
+    'the Control/A/B trio'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -172,19 +168,21 @@ test('Round 34 open: m33 fold-pair trio, one axis, three cards', () => {
   );
 });
 
-test('The open studio renders the three m33 cards on six Brahms windows', () => {
+test('The open studio renders the three cluster-compression cards on twelve Brahms windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Three cards × two windows: the m33 A/B/C trio on mm.33–36 + mm.53–56.
+  // Three cards × four windows: control + A/B on mm.8–9, mm.33–34, mm.46–47, mm.66–67.
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 6, 'six windows');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'twelve windows');
   assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="6"/);
+  assert.match(html, /data-window-count="12"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 34/);
+  assert.match(html, /Round 35/);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
-  assert.ok(html.includes('data-window="brahms-op118-no1:33-36"'), 'the m33 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:53-56"'), 'the m53 twin');
+  assert.ok(html.includes('data-window="brahms-op118-no1:8-9"'), 'the mm.8-9 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:33-34"'), 'the mm.33-34 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:46-47"'), 'the mm.46-47 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:66-67"'), 'the mm.66-67 window');
 
   // No settled decision is badged as an open question.
   for (const key of [
@@ -480,10 +478,10 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 34);
-  assert.match(CURRENT_ROUND_METADATA.title, /m\.33/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 35);
+  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
