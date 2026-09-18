@@ -459,21 +459,20 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 35 open, one clusterCompression axis, three cards', () => {
-  // Ordered contract change: Round 34 is parked (historical consts in
-  // test/janko-round34.test.ts) and Round 35 opens the hand-cluster
-  // compression candidate comparison.
-  assert.equal(CURRENT_ROUND_METADATA.round, 35);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
+test('§F registry: round 36 open, one clusterPresentation axis, two cards', () => {
+  // Ordered contract change: Round 35 is parked (historical consts in
+  // test/janko-round35.test.ts) and Round 36 opens the mirrored handprint
+  // candidate comparison.
+  assert.equal(CURRENT_ROUND_METADATA.round, 36);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
     [
-      'cluster-compression-literal',
-      'cluster-compression-spatial-echo',
-      'cluster-compression-compact-coupling',
+      'mirrored-handprint-literal',
+      'mirrored-handprint',
     ],
-    'the control and A/B duo'
+    'the control and candidate A'
   );
 });
 

@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 35 open: the compression trio');
+assert.equal(CURRENT_CANDIDATES.length, 2, 'Round 36 open: the mirrored handprint pair');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -124,19 +124,19 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 35/);
-  assert.match(html, /compression/i);
+  assert.match(html, /Round 36/);
+  assert.match(html, /mirrored handprint/i);
 });
 
-test('Round 35 open: hand-cluster compression trio, one axis, three cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 35);
-  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
+test('Round 36 open: mirrored handprint candidate, one axis, two cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 36);
+  assert.match(CURRENT_ROUND_METADATA.title, /mirrored handprint/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['cluster-compression-literal', 'cluster-compression-spatial-echo', 'cluster-compression-compact-coupling'],
-    'the Control/A/B trio'
+    ['mirrored-handprint-literal', 'mirrored-handprint'],
+    'the Control and A candidate'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -172,16 +172,16 @@ test('The open studio renders the three cluster-compression cards on twelve Brah
   const html = renderCandidatesView(CONFIG);
 
   // Three cards × four windows: control + A/B on mm.8–9, mm.33–34, mm.46–47, mm.66–67.
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'twelve windows');
-  assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="12"/);
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 8, 'eight windows');
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /data-window-count="8"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 35/);
+  assert.match(html, /Round 36/);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
-  assert.ok(html.includes('data-window="brahms-op118-no1:8-9"'), 'the mm.8-9 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:33-34"'), 'the mm.33-34 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:7-9"'), 'the mm.7-9 window');
   assert.ok(html.includes('data-window="brahms-op118-no1:46-47"'), 'the mm.46-47 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:60-61"'), 'the mm.60-61 window');
   assert.ok(html.includes('data-window="brahms-op118-no1:66-67"'), 'the mm.66-67 window');
 
   // No settled decision is badged as an open question.
@@ -478,11 +478,11 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 35);
-  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 36);
+  assert.match(CURRENT_ROUND_METADATA.title, /mirrored handprint/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

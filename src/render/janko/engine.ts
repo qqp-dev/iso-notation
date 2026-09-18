@@ -148,6 +148,12 @@ import {
   renderCompactCouplingSvg,
   checkCompressionInkCollisions,
 } from './compression';
+import {
+  JankoHandprintCluster,
+  groupHandprintClusters,
+  renderHandprintSvg,
+  checkHandprintCollisions,
+} from './elements/handprint';
 
 import {
   ARCHITECTURAL_BRACKET_SPUR,
@@ -1519,6 +1525,10 @@ export interface JankoSystemLayout {
   compressedClusters?: JankoCompressedCluster<PositionedJankoNote>[];
   /** Note IDs whose noteheads are omitted/compressed (copies in spatial-echo or compact-coupling). */
   compressedCopyIds?: Set<string>;
+  /** Round 36: Mirrored handprint whole-form clusters. */
+  handprintClusters?: JankoHandprintCluster[];
+  /** Note IDs represented by mirrored handprint clusters (their literal heads and clasps are omitted). */
+  handprintNoteIds?: Set<string>;
 }
 
 /**
@@ -1555,6 +1565,7 @@ export function suppressedStemIds(layout: JankoSystemLayout): Set<string> {
     ...layout.verticalChords.flatMap((chord) => chord.suppressedIds),
     ...layout.sharedStems.flatMap((group) => group.suppressedIds),
     ...(layout.compressedCopyIds ? [...layout.compressedCopyIds] : []),
+    ...(layout.handprintNoteIds ? [...layout.handprintNoteIds] : []),
   ]);
 }
 
@@ -5591,8 +5602,66 @@ export function layoutJankoSystemShifted(
     }
   }
 
-  const notesForClasps = compressedCopyIds && compressedCopyIds.size > 0
-    ? notes.filter((p) => !compressedCopyIds!.has(p.note.id))
+  // Round 36: Mirrored handprint whole-form clusters
+  let handprintClusters: JankoHandprintCluster[] | undefined;
+  let handprintNoteIds: Set<string> | undefined;
+  if (o.clusterPresentation === 'mirrored-handprint') {
+    const res = groupHandprintClusters(notes);
+    const barlineXs: number[] = [];
+    const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
+    if (barlineAir) {
+      const anacrusis = t.anacrusisTicks ?? 0;
+      if (systemIndex === 0 && anacrusis > 0) {
+        const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geometry.measureWidth;
+        barlineXs.push(geometry.staffLeft + upbeatWidth);
+        for (let m = 1; m <= o.measuresPerSystem; m++) {
+          barlineXs.push(geometry.staffLeft + upbeatWidth + m * geometry.measureWidth);
+        }
+      } else {
+        for (let m = 0; m < o.measuresPerSystem; m++) {
+          barlineXs.push(geometry.staffLeft + (m + 1) * geometry.measureWidth);
+        }
+      }
+    }
+
+    const admittedHandprint: JankoHandprintCluster[] = [];
+    const admittedNoteIds = new Set<string>();
+
+    for (const cluster of res.clusters) {
+      const col = checkHandprintCollisions(
+        cluster,
+        barlineXs,
+        notes,
+        restLayer.rests,
+        1.0
+      );
+      if (col.collides) {
+        // Fall back to literal
+        continue;
+      }
+
+      admittedHandprint.push(cluster);
+      for (const id of cluster.allNoteIds) {
+        admittedNoteIds.add(id);
+      }
+    }
+
+    if (admittedHandprint.length > 0) {
+      handprintClusters = admittedHandprint;
+      handprintNoteIds = admittedNoteIds;
+    }
+  }
+
+  const excludedClaspNoteIds = new Set<string>();
+  if (compressedCopyIds) {
+    for (const id of compressedCopyIds) excludedClaspNoteIds.add(id);
+  }
+  if (handprintNoteIds) {
+    for (const id of handprintNoteIds) excludedClaspNoteIds.add(id);
+  }
+
+  const notesForClasps = excludedClaspNoteIds.size > 0
+    ? notes.filter((p) => !excludedClaspNoteIds.has(p.note.id))
     : notes;
   const claspClusters = collectClaspClusters(
     notesForClasps,
@@ -5711,7 +5780,7 @@ export function layoutJankoSystemShifted(
     );
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
-      if (compressedCopyIds?.has(p.note.id)) continue;
+      if (compressedCopyIds?.has(p.note.id) || handprintNoteIds?.has(p.note.id)) continue;
       const key = `${p.note.startTick}|${p.rhythm.hand}`;
       const bucket = byHandOnset.get(key);
       if (bucket) bucket.push(p);
@@ -5751,7 +5820,7 @@ export function layoutJankoSystemShifted(
     );
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
-      if (compressedCopyIds?.has(p.note.id)) continue;
+      if (compressedCopyIds?.has(p.note.id) || handprintNoteIds?.has(p.note.id)) continue;
       const key = `${p.note.startTick}|${p.rhythm.hand}`;
       const bucket = byHandOnset.get(key);
       if (bucket) bucket.push(p);
@@ -5814,6 +5883,11 @@ export function layoutJankoSystemShifted(
       if (!claspedStems.includes(id)) claspedStems.push(id);
     }
   }
+  if (handprintNoteIds) {
+    for (const id of handprintNoteIds) {
+      if (!claspedStems.includes(id)) claspedStems.push(id);
+    }
+  }
 
   // Round 23: flag crossed notes for tall knockouts. Paint-only — every head
   // keeps its column; the erasure grows to the stem-start line instead.
@@ -5822,6 +5896,7 @@ export function layoutJankoSystemShifted(
     ...verticalChords.flatMap((chord) => chord.suppressedIds),
     ...sharedStems.flatMap((group) => group.suppressedIds),
     ...(compressedCopyIds ? [...compressedCopyIds] : []),
+    ...(handprintNoteIds ? [...handprintNoteIds] : []),
   ]);
   const crossed = new Set(
     detectStemDigitCrossings(notes, beams, ungrouped, o, t, suppressed).map((c) => c.digitNoteId)
@@ -5876,6 +5951,8 @@ export function layoutJankoSystemShifted(
     railDiagnostics: chordColumns.railDiagnostics,
     compressedClusters,
     compressedCopyIds,
+    handprintClusters,
+    handprintNoteIds,
   };
 }
 
@@ -6022,7 +6099,7 @@ function renderNotesLayer(
       layout.clasps.flatMap((c) => c.notes.map((n) => [n.id, c] as const))
     );
     for (const n of layout.ungrouped) {
-      if (suppressed.has(n.id)) continue;
+      if (suppressed.has(n.id) || layout.handprintNoteIds?.has(n.id)) continue;
       const clasp = claspOf.get(n.id);
       const exception =
         o.chordGrouping === 'per-hand-clasp' &&
@@ -6074,9 +6151,17 @@ function renderNotesLayer(
     }
   }
 
+  // 2f. Round 36: Mirrored handprint whole-form cluster candidate glyphs
+  if (layout.handprintClusters && layout.handprintClusters.length > 0) {
+    for (const cluster of layout.handprintClusters) {
+      const { svg } = renderHandprintSvg(cluster, t);
+      out.push(svg);
+    }
+  }
+
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.
   for (const p of layout.notes) {
-    if (layout.compressedCopyIds?.has(p.note.id)) continue;
+    if (layout.compressedCopyIds?.has(p.note.id) || layout.handprintNoteIds?.has(p.note.id)) continue;
     out.push(
       renderNotehead(
         {

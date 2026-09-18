@@ -105,7 +105,7 @@ test('Output equivalence: Brahms macro focus crops are byte-identical standalone
   }
 });
 
-test('Output equivalence: Candidate windows across all Round 34 candidates are byte-identical', () => {
+test('Output equivalence: Candidate windows across all current candidates are byte-identical', () => {
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
     const opts = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candidate.options ?? {}) });
@@ -235,12 +235,12 @@ test('Deterministic counts: renderCandidatesView computes each candidate layout 
     const config = createStudioConfig();
     contentAwareCalls = 0;
     renderCandidatesView(config);
-    // 3 candidates * (1 lint call + 1 candidate layout reused across 2 windows) = 6 calls.
-    // Previously: 3 * (1 lint + 2 windows * 2 crop calls) = 15 calls.
+    // 2 candidates * (1 lint call + 1 candidate layout reused across 4 windows) = 4 calls.
+    // Previously: 2 * (1 lint + 4 windows * 2 crop calls) = 18 calls.
     assert.equal(
       contentAwareCalls,
-      6,
-      'renderCandidatesView must invoke content-aware layout exactly 6 times (3 lints + 3 candidate layouts)'
+      4,
+      'renderCandidatesView must invoke content-aware layout exactly 4 times (2 lints + 2 candidate layouts)'
     );
   } finally {
     setLayoutJankoScoreObserver(null);
@@ -269,7 +269,7 @@ test('Deterministic counts: renderReferenceView computes Brahms reference layout
   }
 });
 
-test('Deterministic counts: renderStudioMarkup eliminates 19 redundant content-aware calls (27 -> 8)', () => {
+test('Deterministic counts: renderStudioMarkup eliminates 24 redundant content-aware calls (30 -> 6)', () => {
   let contentAwareCalls = 0;
   setLayoutJankoScoreObserver((score, o) => {
     if (isContentAwarePlacement(o)) contentAwareCalls++;
@@ -280,12 +280,12 @@ test('Deterministic counts: renderStudioMarkup eliminates 19 redundant content-a
     contentAwareCalls = 0;
     renderStudioMarkup(config);
     // Reference view: 2 content-aware calls (1 lint + 1 layout)
-    // Candidates view: 6 content-aware calls (3 lints + 3 candidate layouts)
-    // Total: 8 calls (down from 27 calls, exactly 19 redundant eliminated)
+    // Candidates view: 4 content-aware calls (2 lints + 2 candidate layouts)
+    // Total: 6 calls (down from 30 calls, exactly 24 redundant eliminated)
     assert.equal(
       contentAwareCalls,
-      8,
-      'renderStudioMarkup must make exactly 8 content-aware layout calls (19 redundant eliminated)'
+      6,
+      'renderStudioMarkup must make exactly 6 content-aware layout calls (24 redundant eliminated)'
     );
   } finally {
     setLayoutJankoScoreObserver(null);
@@ -319,25 +319,20 @@ test('Fresh data/options/tokens: subsequent render with changed options computes
 });
 
 test('Fresh data/options/tokens: candidate configurations remain separate from each other', () => {
-  // Round 35 candidates have different clusterCompression options
-  assert.equal(CURRENT_CANDIDATES.length, 3);
-  const [candA, candB, candC] = CURRENT_CANDIDATES;
+  // Round 36 candidates have different clusterPresentation options
+  assert.equal(CURRENT_CANDIDATES.length, 2);
+  const [candA, candB] = CURRENT_CANDIDATES;
 
   const optsA = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candA.options ?? {}) });
   const optsB = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candB.options ?? {}) });
-  const optsC = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candC.options ?? {}) });
 
-  assert.equal(optsA.clusterCompression, 'literal');
-  assert.equal(optsB.clusterCompression, 'spatial-echo');
-  assert.equal(optsC.clusterCompression, 'compact-coupling');
+  assert.equal(optsA.clusterPresentation, 'literal');
+  assert.equal(optsB.clusterPresentation, 'mirrored-handprint');
 
   const svgA = renderJankoCrop(BRAHMS, 8, 2, optsA, BRAHMS_TOKS);
   const svgB = renderJankoCrop(BRAHMS, 8, 2, optsB, BRAHMS_TOKS);
-  const svgC = renderJankoCrop(BRAHMS, 8, 2, optsC, BRAHMS_TOKS);
 
-  assert.notEqual(svgA, svgB, 'Literal baseline and spatial echo produce distinct SVGs');
-  assert.notEqual(svgA, svgC, 'Literal baseline and compact coupling produce distinct SVGs');
-  assert.notEqual(svgB, svgC, 'Spatial echo and compact coupling produce distinct SVGs');
+  assert.notEqual(svgA, svgB, 'Literal baseline and mirrored handprint produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------
