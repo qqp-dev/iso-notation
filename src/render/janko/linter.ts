@@ -151,6 +151,11 @@ import {
   contourTickKind,
   placeContourTick,
 } from './elements/contour';
+import {
+  checkCompressionInkCollisions,
+  renderSpatialEchoSvg,
+  renderCompactCouplingSvg,
+} from './compression';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -211,7 +216,8 @@ export type JankoLintCode =
   | 'staff-anchor-missing'
   | 'staff-segment-degenerate'
   | 'dot-count-agreement'
-  | 'ring-geometry';
+  | 'ring-geometry'
+  | 'compression-collision';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -329,6 +335,7 @@ export const JANKO_LINT_CHECKS = [
   'staff-segments',
   'dot-count-agreement',
   'ring-geometry',
+  'compression-collision',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -4787,6 +4794,55 @@ export function checkStaffSegments(
   }
 }
 
+/**
+ * Audit semantic hand-cluster compression candidate glyphs for mathematical collisions
+ * against barlines, other noteheads, and rests.
+ */
+export function checkCompressionCollisions(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (!layout.compressedClusters || layout.compressedClusters.length === 0) return;
+  const barlines = systemBarlines(layout, o, t);
+  const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
+  const barlineXs = barlineAir ? barlines.map((b) => b.x) : [];
+
+  for (const cluster of layout.compressedClusters) {
+    const rendered =
+      o.clusterCompression === 'spatial-echo'
+        ? renderSpatialEchoSvg(cluster, o, t)
+        : renderCompactCouplingSvg(cluster, o, t);
+
+    const collision = checkCompressionInkCollisions(
+      cluster,
+      rendered.inkBoxes ?? [rendered.inkBox],
+      barlineXs,
+      layout.notes,
+      layout.rests,
+      lint.minClearance
+    );
+
+    if (collision.collides) {
+      out.push({
+        code: 'compression-collision',
+        severity: 'error',
+        message:
+          `Compression glyph for cluster ${cluster.id} collides with ${collision.obstacle}: ` +
+          `${collision.details}`,
+        system: layout.index,
+        measure: measureOfTick(cluster.startTick, t),
+        noteIds: [...cluster.allNoteIds],
+        x: rendered.inkBox[0],
+        y: rendered.inkBox[1],
+        metrics: { clearance: lint.minClearance },
+      });
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -4860,6 +4916,9 @@ export function lintJankoScore(
     checkOttavaExtensions(layout, o, diagnostics);
     checkStaffSegments(layout, o, t, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
+    if (o.clusterCompression && o.clusterCompression !== 'literal') {
+      checkCompressionCollisions(layout, o, t, thresholds, diagnostics);
+    }
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
       const attachment = getStemAttachmentRadii(t, o);

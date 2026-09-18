@@ -459,17 +459,21 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 34 open, one m33 axis, three cards', () => {
-  // Ordered contract change: Round 33 is judged (full grid canonical) and
-  // Round 34 opens the m.33 fold-pair comparison. Rounds 30–33 are parked
-  // (historical consts).
-  assert.equal(CURRENT_ROUND_METADATA.round, 34);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['foldPairPresentation'], 'one open axis');
+test('§F registry: round 35 open, one clusterCompression axis, three cards', () => {
+  // Ordered contract change: Round 34 is parked (historical consts in
+  // test/janko-round34.test.ts) and Round 35 opens the hand-cluster
+  // compression candidate comparison.
+  assert.equal(CURRENT_ROUND_METADATA.round, 35);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
-    'the A/B/C trio'
+    [
+      'cluster-compression-literal',
+      'cluster-compression-spatial-echo',
+      'cluster-compression-compact-coupling',
+    ],
+    'the control and A/B duo'
   );
 });
 

@@ -249,65 +249,66 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * The historical cards are parked as `ROUND_33_METADATA` / `ROUND_33_CANDIDATES`
  * in `test/janko-round33.test.ts`; nothing is lost.
  *
- * Round 34 opens the m.33 fold-coincident octave-pair comparison on Brahms:
- * the low LH note folds onto its octave twin's row — should the pair read
- * as a folded coincidence (A, the incumbent), a shared transposition (B),
- * or a true octave stack (C)? One axis, three answers, no selection yet —
- * the Reference stays the literal fold while the operator judges.
+ * Round 34 opened the m.33 fold-coincident octave-pair comparison on Brahms:
+ * literal fold vs shared transposition vs true octave. Parked by convention
+ * as ROUND_34_METADATA / ROUND_34_CANDIDATES in test/janko-round34.test.ts.
+ *
+ * Round 35 opens the hand-cluster compression candidate comparison on Brahms:
+ * write an absolute pitch shape once and represent its simultaneous occurrences
+ * in other registers, each with independently owned rhythm. Explores semantic
+ * compression to reduce repeated decoding. Three candidates on identical score
+ * windows: literal baseline control, spatial echo (Card A), compact coupling (Card B).
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 34,
-  title: 'm.33 fold-coincident octave pair: literal fold vs shared transposition vs true octave',
+  round: 35,
+  title: 'Hand-cluster compression: literal baseline vs spatial echo vs compact coupling',
   description:
-    'Round 34: the m.33 (and m.53 twin) LH octave coincides only through folding. Card A keeps the literal fold (low note folded with its own ↓10, staggered, unbracketed — the incumbent). Card B shifts both notes up under one shared ↓10. Card C draws the low note at literal pitch as a true octave stack (carries extension findings). Sounding pitches preserved on every card; no arpeggio engraving; no selection — the Reference stays the literal fold.',
-  openAxes: ['foldPairPresentation'],
+    'Round 35: explore semantic compression of simultaneous octave-repeated pitch shapes at the same onset and hand. Control keeps the literal baseline (all notes drawn with full numeral-bearing noteheads across all registers). Card A introduces spatial echo (explicit numeral-bearing origin shape with lightweight non-note group markers at copied registers carrying occurrence rhythm). Card B introduces compact coupling (explicit origin shape with an adjacent bounded additive-occurrence structure, +10/+20). Sounding pitches and provenance immutable; independent extra notes outside scope.',
+  openAxes: ['clusterCompression'],
 };
 
+const CANDIDATE_WINDOWS: JankoCandidateWindow[] = [
+  brahmsWindow(8, 2, 'mm.8–9 · Octave subsets, independent B, 144 vs 192 ticks'),
+  brahmsWindow(33, 2, 'mm.33–34 · Folded octave and unequal RH releases'),
+  brahmsWindow(46, 2, 'mm.46–47 · LH/RH independent tones and octave copies'),
+  brahmsWindow(66, 2, 'mm.66–67 · Triple-register repetition (D3/D4/D5 plus A2)'),
+];
+
 /**
- * Round 34: three answers to the fold-pair question, each a one-line option
- * delta against the golden master on the literal m.33 window (mm.33–36, the
- * full system) plus the m.53 twin. No card is marked canonical — the
- * operator judges on the live studio; the Reference stays the literal fold.
+ * Round 35: three answers to the semantic hand-cluster compression question,
+ * each demonstrated on identical literal Brahms windows. No card is marked
+ * canonical — the operator judges on the live studio; the Reference stays literal.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'm33-literal-fold',
-    label: 'A · Literal fold',
+    id: 'cluster-compression-literal',
+    label: 'Control · Literal baseline',
     description:
-      'The incumbent: the low note folds onto its octave twin’s row with its own ↓10, staggered one gap, unbracketed. Sounding pitches literal; the bracket alone transposes.',
-    axis: 'foldPairPresentation',
-    options: { foldPairPresentation: 'literal-fold' },
-    windows: [
-      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
-      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
-    ],
-    tags: ['brahms', 'm33', 'incumbent'],
+      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers. Preserves standard reading overhead for identical octave repetitions.',
+    axis: 'clusterCompression',
+    options: { clusterCompression: 'literal' },
+    windows: CANDIDATE_WINDOWS,
+    tags: ['control', 'literal'],
   },
   {
-    id: 'm33-shared-ottava',
-    label: 'B · Shared ↓10',
+    id: 'cluster-compression-spatial-echo',
+    label: 'A · Spatial echo',
     description:
-      'Both notes written up one octave under one shared ↓10: the pair reads as a single transposition. Sounding pitches preserved; the bracket alone transposes and never adds a note.',
-    axis: 'foldPairPresentation',
-    options: { foldPairPresentation: 'shared-ottava' },
-    windows: [
-      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
-      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
-    ],
-    tags: ['brahms', 'm33'],
+      'Explicit origin shape with an enclosure bracket; lightweight non-note group marker at each copied register carrying occurrence rhythm via standard duration cues. Falls back to literal when clearance is unresolved; requires learning echo marker grammar.',
+    axis: 'clusterCompression',
+    options: { clusterCompression: 'spatial-echo' },
+    windows: CANDIDATE_WINDOWS,
+    tags: ['spatial-echo', 'additive'],
   },
   {
-    id: 'm33-split-octave',
-    label: 'C · Split octave',
+    id: 'cluster-compression-compact-coupling',
+    label: 'B · Compact coupling',
     description:
-      'The low note draws at literal pitch with no fold and no bracket: the pair reads as a true octave stack. Sounding pitches preserved; the low note exceeds core±1 coverage and carries its extension findings visibly.',
-    axis: 'foldPairPresentation',
-    options: { foldPairPresentation: 'split-octave' },
-    windows: [
-      brahmsWindow(33, 4, 'mm.33–36 · The fold-coincident octave'),
-      brahmsWindow(53, 4, 'mm.53–56 · The m.53 twin'),
-    ],
-    tags: ['brahms', 'm33'],
+      'Explicit origin shape with an adjacent bounded additive badge (+10/+20) binding each occurrence’s duration cues. Copied registers require no noteheads; falls back to literal on collision; requires learning additive displacement grammar.',
+    axis: 'clusterCompression',
+    options: { clusterCompression: 'compact-coupling' },
+    windows: CANDIDATE_WINDOWS,
+    tags: ['compact-coupling', 'additive'],
   },
 ];
 
