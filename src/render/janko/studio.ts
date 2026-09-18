@@ -47,7 +47,13 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from './types';
-import { renderJankoCrop, renderJankoPage, countJankoSystems } from './engine';
+import {
+  renderJankoCrop,
+  renderJankoPage,
+  countJankoSystems,
+  layoutJankoScore,
+  JankoSystemLayout,
+} from './engine';
 import { getChannelLayoutSpec } from './geometry';
 import {
   BRAHMS_STUDIO_SCORE_ID,
@@ -377,7 +383,10 @@ function badgeHtml(badge: CandidateOptionBadge): string {
  * flick between schemes without scrolling. No lint chips — the strip is pure
  * comparison; the verdicts live on the cards below.
  */
-export function renderCompareStrip(config: JankoStudioConfig = createStudioConfig()): string {
+export function renderCompareStrip(
+  config: JankoStudioConfig = createStudioConfig(),
+  candidateLayouts?: ReadonlyMap<string, readonly JankoSystemLayout[]>
+): string {
   const { candidates, round, scores } = config;
   const strip = round.compareStrip;
   if (!strip) return '';
@@ -386,7 +395,16 @@ export function renderCompareStrip(config: JankoStudioConfig = createStudioConfi
   const panels = candidates.map((candidate) => {
     const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
     const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
-    const svg = renderJankoCrop(entry.score, strip.measureStart, strip.measureCount, options, tokens);
+    const layouts = candidateLayouts?.get(`${candidate.id}:${entry.id}`);
+    const svg = renderJankoCrop(
+      entry.score,
+      strip.measureStart,
+      strip.measureCount,
+      options,
+      tokens,
+      undefined,
+      layouts
+    );
     return [
       `<figure class="strip-panel" data-strip-panel="${escapeHtml(candidate.id)}">`,
       `  <figcaption><b>${escapeHtml(candidate.label)}</b></figcaption>`,
@@ -413,6 +431,26 @@ export function renderCompareStrip(config: JankoStudioConfig = createStudioConfi
  */
 export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig()): string {
   const { candidates, round, scores } = config;
+
+  // Compute once per distinct score/options/tokens configuration per candidate per render.
+  // Candidate configurations remain separate from each other and from the reference view.
+  const candidateLayouts = new Map<string, JankoSystemLayout[]>();
+  const getCandidateLayout = (
+    candidateId: string,
+    scoreId: string,
+    score: QuantizedGridScore,
+    options: ResolvedJankoLayoutOptions,
+    tokens: ResolvedJankoTokens
+  ): JankoSystemLayout[] => {
+    const key = `${candidateId}:${scoreId}`;
+    let layouts = candidateLayouts.get(key);
+    if (!layouts) {
+      layouts = layoutJankoScore(score, options, tokens);
+      candidateLayouts.set(key, layouts);
+    }
+    return layouts;
+  };
+
   const cards = candidates.map((candidate) => {
     const resolved = resolveCandidate(candidate);
     const reports: LintReport[] = [];
@@ -425,12 +463,15 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         seen.add(entry.id);
         reports.push(lintJankoScore(entry.score, options, tokens));
       }
+      const layouts = getCandidateLayout(candidate.id, entry.id, entry.score, options, tokens);
       const svg = renderJankoCrop(
         entry.score,
         window.measureStart,
         window.measureCount,
         options,
-        tokens
+        tokens,
+        undefined,
+        layouts
       );
       const lastMeasure = window.measureStart + window.measureCount - 1;
       return [
@@ -499,7 +540,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
           : `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
-    renderCompareStrip(config),
+    renderCompareStrip(config, candidateLayouts),
     `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}" data-decided="${decided}">`,
     cards.join('\n'),
     '  </div>',
@@ -548,8 +589,13 @@ function renderReferenceScore(
       ? report.violations.length
       : 0;
 
+  // Compute once per distinct score/options/tokens configuration per render
+  // and reuse for all pages and crops of this reference score.
+  const layouts =
+    pages.length > 0 || crops.length > 0 ? layoutJankoScore(score, options, tokens) : undefined;
+
   const pageCards = pages.map((page) => {
-    const svg = renderJankoPage(score, page, options, tokens);
+    const svg = renderJankoPage(score, page, options, tokens, layouts);
     const firstMeasure = page * options.measuresPerSystem * options.systemsPerPage + 1;
     const lastMeasure = Math.min(
       (page + 1) * options.measuresPerSystem * options.systemsPerPage,
@@ -570,7 +616,7 @@ function renderReferenceScore(
   });
 
   const cropCards = crops.map((crop) => {
-    const svg = renderJankoCrop(score, crop.start, crop.count, options, tokens);
+    const svg = renderJankoCrop(score, crop.start, crop.count, options, tokens, undefined, layouts);
     return [
       `<figure class="crop-card" data-crop="${crop.start}-${crop.start + crop.count - 1}">`,
       `  <figcaption><b>${escapeHtml(crop.title)}</b><span>${escapeHtml(crop.caption)}</span></figcaption>`,
