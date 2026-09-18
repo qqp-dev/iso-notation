@@ -253,62 +253,57 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * literal fold vs shared transposition vs true octave. Parked by convention
  * as ROUND_34_METADATA / ROUND_34_CANDIDATES in test/janko-round34.test.ts.
  *
- * Round 35 opens the hand-cluster compression candidate comparison on Brahms:
+ * Round 35 opened the hand-cluster compression candidate comparison on Brahms:
  * write an absolute pitch shape once and represent its simultaneous occurrences
- * in other registers, each with independently owned rhythm. Explores semantic
- * compression to reduce repeated decoding. Three candidates on identical score
- * windows: literal baseline control, spatial echo (Card A), compact coupling (Card B).
+ * in other registers. Rejected by operator judgment. Parked by convention
+ * as ROUND_35_METADATA / ROUND_35_CANDIDATES in test/janko-round35.test.ts.
+ *
+ * Round 36 opens the mirrored-handprint candidate comparison on Brahms:
+ * a dense hand cluster has one recognizable musical form, readable whole-first
+ * with exact internal detail recoverable. Rotated keyboard footprint supplies
+ * glyph-local geometry with two symmetric variants for the alternating Jánko
+ * row families. Tested against literal control on identical Brahms windows
+ * mm. 7–9, 46–47, 60–61, 66–67.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 35,
-  title: 'Hand-cluster compression: literal baseline vs spatial echo vs compact coupling',
+  round: 36,
+  title: 'Mirrored handprint: literal control vs whole-form cluster candidate',
   description:
-    'Round 35: explore semantic compression of simultaneous octave-repeated pitch shapes at the same onset and hand. Control keeps the literal baseline (all notes drawn with full numeral-bearing noteheads across all registers). Card A introduces spatial echo (explicit numeral-bearing origin shape with lightweight non-note group markers at copied registers carrying occurrence rhythm). Card B introduces compact coupling (explicit origin shape with an adjacent bounded additive-occurrence structure, +10/+20). Sounding pitches and provenance immutable; independent extra notes outside scope.',
-  openAxes: ['clusterCompression'],
+    'Round 36: explore a written-handprint direction for dense hand clusters (4- and 5-note groups at same onset and hand). Rotated keyboard footprint supplies glyph-local geometry with two symmetric variants for alternating Jánko row families. Connects landmarks in ascending order as a single connected calligraphic body with visible discrete articulations, base numeral integrated at origin, and clearly owned duration attachments. Judged against literal control on identical Brahms windows mm. 7–9, 46–47, 60–61, 66–67.',
+  openAxes: ['clusterPresentation'],
 };
 
 const CANDIDATE_WINDOWS: JankoCandidateWindow[] = [
-  brahmsWindow(8, 2, 'mm.8–9 · Octave subsets, independent B, 144 vs 192 ticks'),
-  brahmsWindow(33, 2, 'mm.33–34 · Folded octave and unequal RH releases'),
-  brahmsWindow(46, 2, 'mm.46–47 · LH/RH independent tones and octave copies'),
-  brahmsWindow(66, 2, 'mm.66–67 · Triple-register repetition (D3/D4/D5 plus A2)'),
+  brahmsWindow(7, 3, 'mm.7–9 · Dense chord clusters, mixed release, odd anchor family'),
+  brahmsWindow(46, 2, 'mm.46–47 · Dense chord cluster'),
+  brahmsWindow(60, 2, 'mm.60–61 · Alternating anchor row family (even anchor) & independent B'),
+  brahmsWindow(66, 2, 'mm.66–67 · Dense chord cluster'),
 ];
 
 /**
- * Round 35: three answers to the semantic hand-cluster compression question,
- * each demonstrated on identical literal Brahms windows. No card is marked
- * canonical — the operator judges on the live studio; the Reference stays literal.
+ * Round 36: two answers to the whole-form cluster question:
+ * literal control and the mirrored-handprint candidate.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'cluster-compression-literal',
+    id: 'mirrored-handprint-literal',
     label: 'Control · Literal baseline',
     description:
-      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers. Preserves standard reading overhead for identical octave repetitions.',
-    axis: 'clusterCompression',
-    options: { clusterCompression: 'literal' },
+      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers.',
+    axis: 'clusterPresentation',
+    options: { clusterPresentation: 'literal' },
     windows: CANDIDATE_WINDOWS,
     tags: ['control', 'literal'],
   },
   {
-    id: 'cluster-compression-spatial-echo',
-    label: 'A · Spatial echo',
+    id: 'mirrored-handprint',
+    label: 'A · Mirrored handprint',
     description:
-      'Explicit origin shape with an enclosure bracket; lightweight non-note group marker at each copied register carrying occurrence rhythm via standard duration cues. Falls back to literal when clearance is unresolved; requires learning echo marker grammar.',
-    axis: 'clusterCompression',
-    options: { clusterCompression: 'spatial-echo' },
+      'Whole-form cluster candidate: rotated keyboard footprint supplies glyph-local geometry with two symmetric variants for the alternating Jánko row families. Single calligraphic body with discrete articulations, base numeral integrated at origin, and clearly owned duration attachments.',
+    axis: 'clusterPresentation',
+    options: { clusterPresentation: 'mirrored-handprint' },
     windows: CANDIDATE_WINDOWS,
-    tags: ['spatial-echo', 'additive'],
-  },
-  {
-    id: 'cluster-compression-compact-coupling',
-    label: 'B · Compact coupling',
-    description:
-      'Explicit origin shape with an adjacent bounded additive badge (+10/+20) binding each occurrence’s duration cues. Copied registers require no noteheads; falls back to literal on collision; requires learning additive displacement grammar.',
-    axis: 'clusterCompression',
-    options: { clusterCompression: 'compact-coupling' },
-    windows: CANDIDATE_WINDOWS,
-    tags: ['compact-coupling', 'additive'],
+    tags: ['mirrored-handprint', 'candidate'],
   },
 ];
 

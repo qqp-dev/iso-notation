@@ -1004,6 +1004,15 @@ export interface JankoLayoutOptions {
    */
   clusterCompression?: JankoClusterCompression;
   /**
+   * Round 36 candidate: whole-form handprint cluster presentation.
+   *
+   * `'literal'` draws all constituent notes with standard noteheads.
+   * `'mirrored-handprint'` draws dense 4/5-note hand clusters as a single calligraphic body
+   * with base numeral integrated at origin and discrete landmark articulations.
+   * Defaults to `'literal'`.
+   */
+  clusterPresentation?: JankoClusterPresentation;
+  /**
    * Vertical page placement: `'slot'` centers staffs in fixed slots with
    * overflow-only correction; `'content-aware'` enforces facing ink
    * clearances (including ottava extent) then distributes residual page
@@ -1101,6 +1110,14 @@ export type JankoFoldPairPresentation = 'literal-fold' | 'shared-ottava' | 'spli
  */
 export type JankoClusterCompression = 'literal' | 'spatial-echo' | 'compact-coupling';
 
+/**
+ * Round 36: Whole-form handprint cluster presentation candidate.
+ *
+ * - `'literal'`: golden baseline (all constituent noteheads drawn with duodecimal digits).
+ * - `'mirrored-handprint'`: rotated keyboard footprint with two symmetric variants for alternating Jánko row families.
+ */
+export type JankoClusterPresentation = 'literal' | 'mirrored-handprint';
+
 
 /**
  * Vertical page placement.
@@ -1165,6 +1182,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   correctPageTopAnacrusisMeasureWidth: false,
   foldPairPresentation: 'literal-fold',
   clusterCompression: 'literal',
+  clusterPresentation: 'literal',
   verticalPlacement: 'slot',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',

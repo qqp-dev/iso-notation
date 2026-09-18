@@ -152,6 +152,11 @@ const ROUND_31_CARDS: string[] = ['round-31-clasp-nudge'];
 const ROUND_32_CARDS: string[] = ['4-per-system-full-grid', '4-per-system-midpoint-grid'];
 const ROUND_33_CARDS: string[] = ['grid-full-vs-none-full', 'grid-full-vs-none-none'];
 const ROUND_34_CARDS: string[] = ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'];
+const ROUND_35_CARDS: string[] = [
+  'cluster-compression-literal',
+  'cluster-compression-spatial-echo',
+  'cluster-compression-compact-coupling',
+];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -237,10 +242,10 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 35 (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 35);
-  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'one open axis');
+test('CURRENT_ROUND_METADATA is the open Round 36 (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 36);
+  assert.match(CURRENT_ROUND_METADATA.title, /mirrored handprint/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -259,18 +264,27 @@ test('CURRENT_ROUND_METADATA is the open Round 35 (one open axis)', () => {
     ['m33-literal-fold', 'm33-shared-ottava', 'm33-split-octave'],
     'R34 parked trio on record'
   );
+  assert.deepEqual(
+    ROUND_35_CARDS,
+    [
+      'cluster-compression-literal',
+      'cluster-compression-spatial-echo',
+      'cluster-compression-compact-coupling',
+    ],
+    'R35 parked trio on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the Round 35 trio: Control / A / B, one axis', () => {
+test('CURRENT_CANDIDATES is the Round 36 pair: Control / A, one axis', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['cluster-compression-literal', 'cluster-compression-spatial-echo', 'cluster-compression-compact-coupling'],
-    'three live cards'
+    ['mirrored-handprint-literal', 'mirrored-handprint'],
+    'two live cards'
   );
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'clusterCompression', `${c.id}: per-candidate purity`);
-    assert.deepEqual(Object.keys(c.options ?? {}), ['clusterCompression'], `${c.id}: one-line delta`);
+    assert.equal(c.axis, 'clusterPresentation', `${c.id}: per-candidate purity`);
+    assert.deepEqual(Object.keys(c.options ?? {}), ['clusterPresentation'], `${c.id}: one-line delta`);
   }
 });
 
@@ -2026,14 +2040,14 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two grid cards, twelve windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open round with three cards', () => {
+test('The live studio renders the open round with two cards', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
-  assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="12"/, 'twelve windows');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /data-window-count="8"/, 'eight windows');
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 35/);
-  assert.match(html, /compression/i, 'the compression title headlines the view');
+  assert.match(html, /Round 36/);
+  assert.match(html, /mirrored handprint/i, 'the mirrored handprint title headlines the view');
   for (const id of ROUND_33_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }

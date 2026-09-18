@@ -39,8 +39,7 @@ import {
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  brahmsWindow,
   candidateBadges,
   type JankoCandidate,
   type JankoCandidateRound,
@@ -511,24 +510,82 @@ test('checkCompressionInkCollisions: synthetic obstacle tripwire detects intenti
   assert.equal(noteCollideResult.obstacle, 'notehead');
 });
 
+/** Historical Round 35 metadata (parked). */
+export const ROUND_35_METADATA: JankoCandidateRound = {
+  round: 35,
+  title: 'Hand-cluster compression: literal baseline vs spatial echo vs compact coupling',
+  description:
+    'Round 35: explore semantic compression of simultaneous octave-repeated pitch shapes at the same onset and hand. Control keeps the literal baseline (all notes drawn with full numeral-bearing noteheads across all registers). Card A introduces spatial echo (explicit numeral-bearing origin shape with lightweight non-note group markers at copied registers carrying occurrence rhythm). Card B introduces compact coupling (explicit origin shape with an adjacent bounded additive-occurrence structure, +10/+20). Sounding pitches and provenance immutable; independent extra notes outside scope.',
+  openAxes: ['clusterCompression'],
+};
+
+/** Historical Round 35 cards (parked). */
+export const ROUND_35_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'cluster-compression-literal',
+    label: 'Control · Literal baseline',
+    description:
+      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers. Preserves standard reading overhead for identical octave repetitions.',
+    axis: 'clusterCompression',
+    options: { clusterCompression: 'literal' },
+    windows: [
+      brahmsWindow(8, 2, 'mm.8–9 · Octave subsets, independent B, 144 vs 192 ticks'),
+      brahmsWindow(33, 2, 'mm.33–34 · Folded octave and unequal RH releases'),
+      brahmsWindow(46, 2, 'mm.46–47 · LH/RH independent tones and octave copies'),
+      brahmsWindow(66, 2, 'mm.66–67 · Triple-register repetition (D3/D4/D5 plus A2)'),
+    ],
+    tags: ['control', 'literal'],
+  },
+  {
+    id: 'cluster-compression-spatial-echo',
+    label: 'A · Spatial echo',
+    description:
+      'Explicit origin shape with an enclosure bracket; lightweight non-note group marker at each copied register carrying occurrence rhythm via standard duration cues. Falls back to literal when clearance is unresolved; requires learning echo marker grammar.',
+    axis: 'clusterCompression',
+    options: { clusterCompression: 'spatial-echo' },
+    windows: [
+      brahmsWindow(8, 2, 'mm.8–9 · Octave subsets, independent B, 144 vs 192 ticks'),
+      brahmsWindow(33, 2, 'mm.33–34 · Folded octave and unequal RH releases'),
+      brahmsWindow(46, 2, 'mm.46–47 · LH/RH independent tones and octave copies'),
+      brahmsWindow(66, 2, 'mm.66–67 · Triple-register repetition (D3/D4/D5 plus A2)'),
+    ],
+    tags: ['spatial-echo', 'additive'],
+  },
+  {
+    id: 'cluster-compression-compact-coupling',
+    label: 'B · Compact coupling',
+    description:
+      'Explicit origin shape with an adjacent bounded additive badge (+10/+20) binding each occurrence’s duration cues. Copied registers require no noteheads; falls back to literal on collision; requires learning additive displacement grammar.',
+    axis: 'clusterCompression',
+    options: { clusterCompression: 'compact-coupling' },
+    windows: [
+      brahmsWindow(8, 2, 'mm.8–9 · Octave subsets, independent B, 144 vs 192 ticks'),
+      brahmsWindow(33, 2, 'mm.33–34 · Folded octave and unequal RH releases'),
+      brahmsWindow(46, 2, 'mm.46–47 · LH/RH independent tones and octave copies'),
+      brahmsWindow(66, 2, 'mm.66–67 · Triple-register repetition (D3/D4/D5 plus A2)'),
+    ],
+    tags: ['compact-coupling', 'additive'],
+  },
+];
+
 // ---------------------------------------------------------------------------
-// 4. Registry & Round 35 Studio Contract
+// 4. Registry & Round 35 Studio Contract (Parked)
 // ---------------------------------------------------------------------------
 
-test('Registry: Round 35 is declared with three cards on four identical Brahms windows', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 35);
-  assert.match(CURRENT_ROUND_METADATA.title, /compression/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterCompression'], 'open axis is clusterCompression');
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards: control, A, B');
+test('Registry: Round 35 parked with three cards on four identical Brahms windows', () => {
+  assert.equal(ROUND_35_METADATA.round, 35);
+  assert.match(ROUND_35_METADATA.title, /compression/i);
+  assert.deepEqual(ROUND_35_METADATA.openAxes, ['clusterCompression'], 'open axis is clusterCompression');
+  assert.equal(ROUND_35_CANDIDATES.length, 3, 'three cards: control, A, B');
 
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+  const ids = ROUND_35_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, [
     'cluster-compression-literal',
     'cluster-compression-spatial-echo',
     'cluster-compression-compact-coupling',
   ]);
 
-  for (const cand of CURRENT_CANDIDATES) {
+  for (const cand of ROUND_35_CANDIDATES) {
     assert.equal(cand.axis, 'clusterCompression', `${cand.id} declares clusterCompression axis`);
     assert.equal(cand.windows?.length, 4, `${cand.id} has four identical windows`);
     const winKeys = cand.windows!.map((w) => `${w.scoreId}:${w.measureStart}-${w.measureStart + w.measureCount - 1}`);
@@ -546,4 +603,11 @@ test('Registry: Round 35 is declared with three cards on four identical Brahms w
       assert.match(cand.description!, /grammar/i, `${cand.id} documents grammar learning cost`);
     }
   }
+});
+
+test('R35 parked by convention: historical consts parked, live registry moved to Round 36', () => {
+  assert.equal(ROUND_35_METADATA.round, 35);
+  assert.equal(ROUND_35_CANDIDATES.length, 3);
+  const candFile = fs.readFileSync(path.join(REPO_ROOT, 'src/render/janko/candidates.ts'), 'utf-8');
+  assert.match(candFile, /Round 35 opened the hand-cluster compression candidate comparison/);
 });

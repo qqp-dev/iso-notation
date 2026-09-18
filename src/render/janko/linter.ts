@@ -156,6 +156,7 @@ import {
   renderSpatialEchoSvg,
   renderCompactCouplingSvg,
 } from './compression';
+import { checkHandprintCollisions } from './elements/handprint';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -217,7 +218,8 @@ export type JankoLintCode =
   | 'staff-segment-degenerate'
   | 'dot-count-agreement'
   | 'ring-geometry'
-  | 'compression-collision';
+  | 'compression-collision'
+  | 'handprint-collision';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -1239,7 +1241,13 @@ export function checkStemThroughSimultaneity(
       const simultaneity = byHandTick.get(`${note.rhythm.hand}|${note.note.startTick}`) ?? [];
       if (simultaneity.length < 2) continue;
       for (const other of simultaneity) {
-        if (owned.has(other.note.id) || tested.has(other.note.id)) continue;
+        if (
+          owned.has(other.note.id) ||
+          tested.has(other.note.id) ||
+          layout.handprintNoteIds?.has(other.note.id)
+        ) {
+          continue;
+        }
         tested.add(other.note.id);
         const distance = pointToSegmentDistance(
           other.x,
@@ -4843,6 +4851,49 @@ export function checkCompressionCollisions(
   }
 }
 
+/**
+ * Round 36 candidate clearance check: verify that mirrored handprint cluster glyphs
+ * (body, base numeral, duration attachments) clear barlines, other-hand noteheads, and rests.
+ */
+export function checkHandprintClearance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  lint: JankoLintOptions,
+  out: LintViolation[]
+): void {
+  if (!layout.handprintClusters || layout.handprintClusters.length === 0) return;
+  const barlines = systemBarlines(layout, o, t);
+  const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
+  const barlineXs = barlineAir ? barlines.map((b) => b.x) : [];
+
+  for (const cluster of layout.handprintClusters) {
+    const collision = checkHandprintCollisions(
+      cluster,
+      barlineXs,
+      layout.notes,
+      layout.rests,
+      lint.minClearance
+    );
+
+    if (collision.collides) {
+      out.push({
+        code: 'handprint-collision',
+        severity: 'error',
+        message:
+          `Mirrored handprint glyph for cluster ${cluster.id} collides with ${collision.obstacle}: ` +
+          `${collision.details}`,
+        system: layout.index,
+        measure: measureOfTick(cluster.startTick, t),
+        noteIds: [...cluster.allNoteIds],
+        x: cluster.inkBox[0],
+        y: cluster.inkBox[1],
+        metrics: { clearance: lint.minClearance },
+      });
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -4918,6 +4969,9 @@ export function lintJankoScore(
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     if (o.clusterCompression && o.clusterCompression !== 'literal') {
       checkCompressionCollisions(layout, o, t, thresholds, diagnostics);
+    }
+    if (o.clusterPresentation === 'mirrored-handprint') {
+      checkHandprintClearance(layout, o, t, thresholds, diagnostics);
     }
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
