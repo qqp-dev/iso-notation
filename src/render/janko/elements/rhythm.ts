@@ -2206,6 +2206,60 @@ export function exceptionCarrierInkBox(
 }
 
 /**
+ * Round 43 repair — **one audited mark** of a horizontal exception carrier.
+ *
+ * The occlusion audit below needs the *individual* mark boxes, not just the
+ * whole-carrier union: a fixed carrier can be far too long for the next onset
+ * and lose a whole ring while its outer box still "fits". This is the same
+ * geometry {@link renderExceptionCarrier} paints and {@link exceptionCarrierInkBox}
+ * bounds — one metric, so an audit can never drift from the ink.
+ */
+export interface JankoExceptionCarrierMarkBox {
+  /** Which mark primitive the box belongs to. */
+  kind: 'cut' | 'ring' | 'dot';
+  /** Zero-based index of the mark in its own run (dots: 0 / 1). */
+  index: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Axis-aligned ink box of every mark one horizontal exception carrier paints —
+ * the union of these boxes is exactly {@link exceptionCarrierInkBox}. Reused by
+ * the engine's carrier-mark occlusion audit (Round 43 repair), so the check is
+ * bounded to the symbolic carrier ink and never to a coarse whole-run box.
+ */
+export function exceptionCarrierMarkBoxes(
+  g: JankoExceptionCarrierGeometry,
+  tokens?: Partial<JankoTokens> | null
+): JankoExceptionCarrierMarkBox[] {
+  const t = resolveJankoTokens(tokens);
+  const mm = g.grammar === 'midpoint' ? midpointMetrics(t) : null;
+  const cut = mm ? { hw: mm.slashHalfX, hh: mm.slashHalfY } : compactMarkHalfExtents(t, 'cut');
+  const ring = mm ? { hw: mm.ringHalf, hh: mm.ringHalf } : compactMarkHalfExtents(t, 'ring');
+  const centres = exceptionCarrierMarkCentres(g, t);
+  const boxes: JankoExceptionCarrierMarkBox[] = [];
+  centres.cuts.forEach((cx, index) =>
+    boxes.push({ kind: 'cut', index, x0: cx - cut.hw, y0: g.y - cut.hh, x1: cx + cut.hw, y1: g.y + cut.hh })
+  );
+  centres.rings.forEach((cx, index) =>
+    boxes.push({ kind: 'ring', index, x0: cx - ring.hw, y0: g.y - ring.hh, x1: cx + ring.hw, y1: g.y + ring.hh })
+  );
+  if (g.dots >= 1) {
+    const r = t.augmentationDotRadius;
+    const dotX = g.x1 + t.augmentationDotGap + r;
+    boxes.push({ kind: 'dot', index: 0, x0: dotX - r, y0: g.y - r, x1: dotX + r, y1: g.y + r });
+    if (g.dots >= 2) {
+      const dot2X = dotX + 2 * r + t.augmentationDotGap;
+      boxes.push({ kind: 'dot', index: 1, x0: dot2X - r, y0: g.y - r, x1: dot2X + r, y1: g.y + r });
+    }
+  }
+  return boxes;
+}
+
+/**
  * Paint one left clasp: the symmetrical `[` bracket plus the duration ink of the
  * active `claspDurationStyle` (Round 11). The group is engraved in the rhythm
  * layer (beneath the noteheads), so a knockout always erases whatever a clasp

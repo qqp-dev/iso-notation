@@ -140,6 +140,7 @@ import {
   compactDurationMarks,
   effectiveExceptionCarrierLength,
   exceptionCarrierInkBox,
+  exceptionCarrierMarkBoxes,
   renderExceptionCarrier,
   JankoExceptionCarrierGeometry,
   computeBeamGroupGeometry,
@@ -1538,6 +1539,57 @@ export interface JankoExceptionCarrierRefusal {
   reason: string;
 }
 
+/**
+ * Round 43 repair: one **refused** exception carrier whose member's value the
+ * active alphabet cannot state at all (no plain / dotted / double-dotted
+ * reading — e.g. the 120-tick tie-composite 96 + 24). A blank carrier is never
+ * painted for such a member (a mark-less carrier would read as a bare quarter),
+ * and its own canonical duration ink is never suppressed on account of the
+ * refusal: the member keeps its ordinary stem/flag statement, which is *not* an
+ * exact statement of the composite — a published limitation, not a solution.
+ */
+export interface JankoExceptionCarrierUnsupported {
+  /** Source note id of the owning exception member. */
+  noteId: string;
+  /** Onset tick of the member. */
+  startTick: number;
+  /** The member's own stated duration (ticks) the alphabet cannot state. */
+  durationTicks: number;
+  /** Human-readable, published reason (never a silent blank carrier). */
+  reason: string;
+}
+
+/**
+ * Round 43 repair: one exception-carrier mark **knocked out** by a later note's
+ * white erasure mask. The carrier is painted at its true length in the rhythm
+ * layer, *beneath* the noteheads, so a later onset's knockout rect erases
+ * whatever carrier ink lies inside it — the whole-run ink box can still "fit"
+ * the nearest free point while the marks that state the value are destroyed.
+ * This record is the honest per-mark occlusion the previous whole-run shortfall
+ * could not see (measured from the shared symbolic mark boxes, never a
+ * coarse box).
+ */
+export interface JankoExceptionCarrierOcclusion {
+  /** Source note id of the owning exception member. */
+  noteId: string;
+  /** Onset tick of the member. */
+  startTick: number;
+  /** The member's own stated duration. */
+  durationTicks: number;
+  /** Which mark of the carrier run is erased. */
+  markKind: 'cut' | 'ring' | 'dot';
+  /** Zero-based index of the mark in its own run. */
+  markIndex: number;
+  /** The later (paint-order) note whose erasure mask knocks the mark out. */
+  occluderId: string;
+  /** Onset tick of the occluding note. */
+  occluderTick: number;
+  /** Fraction (0–1] of the mark's own ink box the mask covers. */
+  erasedFraction: number;
+  /** Human-readable, published reason. */
+  reason: string;
+}
+
 export interface JankoSystemLayout {
   /** Zero-based global system index. */
   index: number;
@@ -1600,6 +1652,18 @@ export interface JankoSystemLayout {
    * next onset (or the staff edge) — published, never clipped or shortened.
    */
   exceptionCarrierRefusals: JankoExceptionCarrierRefusal[];
+  /**
+   * Round 43 repair: exception members the alphabet cannot state (see
+   * {@link JankoExceptionCarrierUnsupported}) — refused, never painted as a
+   * blank carrier, and never stripped of their own duration ink.
+   */
+  exceptionCarrierUnsupported: JankoExceptionCarrierUnsupported[];
+  /**
+   * Round 43 repair: per-mark carrier occlusions (see
+   * {@link JankoExceptionCarrierOcclusion}) — the destroyed duration ink a
+   * whole-run shortfall alone cannot name.
+   */
+  exceptionCarrierOcclusions: JankoExceptionCarrierOcclusion[];
   /**
    * Note ids whose standalone stem the clasp replaces. A clasp member that
    * belongs to a beam group keeps its stem: a real 16th-note beam is never cut
@@ -6452,6 +6516,8 @@ export function layoutJankoSystemShifted(
   // -------------------------------------------------------------------------
   const exceptionCarriers: JankoExceptionCarrierGeometry[] = [];
   const exceptionCarrierRefusals: JankoExceptionCarrierRefusal[] = [];
+  const exceptionCarrierUnsupported: JankoExceptionCarrierUnsupported[] = [];
+  const exceptionCarrierOcclusions: JankoExceptionCarrierOcclusion[] = [];
   if (o.exceptionCarrier === 'horizontal' && o.chordGrouping === 'per-hand-clasp') {
     const air = getClusterSpacingPreset(o.clusterSpacing).air;
     const solvedById = new Map(notes.map((p) => [p.note.id, p]));
@@ -6466,6 +6532,25 @@ export function layoutJankoSystemShifted(
         const carrierLength = effectiveExceptionCarrierLength(o.bracketDurationGrammar, t);
         const x1 = x0 + carrierLength;
         const marks = compactDurationMarks(member.durationTicks);
+        // Round 43 repair: an out-of-grammar value is refused outright. A
+        // mark-less carrier would read exactly like a bare quarter, so none is
+        // painted, and the member's own duration ink is NOT suppressed (the
+        // canonical exception statement it would otherwise keep). The fallback
+        // stem does not state a 120-tick composite exactly — published, not
+        // hidden, and never claimed to be a representation of the value.
+        if (!marks.inGrammar) {
+          exceptionCarrierUnsupported.push({
+            noteId: member.id,
+            startTick: member.startTick,
+            durationTicks: member.durationTicks,
+            reason:
+              `${member.durationTicks} ticks has no plain, dotted or double-dotted reading ` +
+              `in this alphabet: no carrier is painted (a mark-less carrier would read as a ` +
+              `bare quarter) and the member keeps its own ordinary duration ink, which does ` +
+              `not state this composite exactly`,
+          });
+          continue;
+        }
         const carrier: JankoExceptionCarrierGeometry = {
           noteId: member.id,
           tick: member.startTick,
@@ -6505,6 +6590,43 @@ export function layoutJankoSystemShifted(
               `but the nearest free point is x=${nearest.toFixed(2)} ` +
               `(${(nearest - x0).toFixed(2)}pt available) — painted at true length, never clipped`,
           });
+        }
+        // Round 43 repair: per-mark occlusion. The carrier is painted in the
+        // rhythm layer *beneath* the noteheads, so a later (or same-onset)
+        // note's white erasure mask knocks out whatever carrier marks lie
+        // inside it. The whole-run shortfall above measures only the extreme
+        // run box and cannot say which marks the value rests on are destroyed;
+        // this audit names each mark, from the same symbolic mark metric the
+        // painter and `exceptionCarrierInkBox` use.
+        const markBoxes = exceptionCarrierMarkBoxes(carrier, t);
+        for (const q of notes) {
+          if (q.note.id === member.id) continue;
+          if (q.note.startTick < member.startTick) continue;
+          const qe = knockoutHalfExtents(o, t, q.note.startTick, q);
+          const mx0 = q.x - qe.wx;
+          const mx1 = q.x + qe.wx;
+          const my0 = q.y - qe.hy;
+          const my1 = q.y + qe.hy;
+          for (const mb of markBoxes) {
+            const ox = Math.min(mx1, mb.x1) - Math.max(mx0, mb.x0);
+            const oy = Math.min(my1, mb.y1) - Math.max(my0, mb.y0);
+            if (ox <= 1e-9 || oy <= 1e-9) continue;
+            const erasedFraction = (ox * oy) / ((mb.x1 - mb.x0) * (mb.y1 - mb.y0));
+            exceptionCarrierOcclusions.push({
+              noteId: member.id,
+              startTick: member.startTick,
+              durationTicks: member.durationTicks,
+              markKind: mb.kind,
+              markIndex: mb.index,
+              occluderId: q.note.id,
+              occluderTick: q.note.startTick,
+              erasedFraction,
+              reason:
+                `the white erasure mask of the later note ${q.note.id} (tick ${q.note.startTick}) ` +
+                `overlaps the ${mb.kind} ${mb.index + 1} of ${member.id}’s carrier by ` +
+                `${(erasedFraction * 100).toFixed(1)}% of its ink box`,
+            });
+          }
         }
       }
     }
@@ -6565,6 +6687,8 @@ export function layoutJankoSystemShifted(
     holdRefusals,
     exceptionCarriers,
     exceptionCarrierRefusals,
+    exceptionCarrierUnsupported,
+    exceptionCarrierOcclusions,
     claspedStems,
     verticalChords,
     chordBridges,

@@ -511,7 +511,7 @@ export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 43,
   title: 'Reusable pitch + symbolic-duration study — Round 43',
   description:
-    'One proposed **midpoint** design is judged on fixed, reusable cases that stay put across later tuning: two-column whole-tone **parity** pitch placement (even family left, odd family right), and one **unified diagonal-slash** duration family painted **identically** on the shared bracket and on the horizontal exception carrier. The cut is the midpoint of the golden 7.5pt/1.0pt cut and the compact 2.4pt/0.42pt cut (4.95pt at 0.71pt stroke, page-raked 0.22 rail-so-equal rise), the ring the midpoint of the golden R2.40/0.80pt and compact R0.80/0.38pt rings (R1.60pt at 0.59pt stroke). Counts are shared with the compact study (4/3/2/1 cuts; bare; 1/2/3 rings). Only genuinely admitted bracket members take the 75 % pitch-symbol size; a clean two-note column stays full size. Every spacing and the fixed carrier length are derived from the emitted endpoints and stroke, never copied from the rejected memo. The canonical Reference, goldens and PDF are untouched.',
+    'One proposed **midpoint** design is judged on fixed, reusable cases that stay put across later tuning: two-column whole-tone **parity** pitch placement (even family left, odd family right), and one **unified diagonal-slash** duration family painted **identically** on the shared bracket and on the horizontal exception carrier. The cut is the midpoint of the golden 7.5pt/1.0pt cut and the compact 2.4pt/0.42pt cut (4.95pt at 0.71pt stroke, page-raked 0.22 rail-so-equal rise), the ring the midpoint of the golden R2.40/0.80pt and compact R0.80/0.38pt rings (R1.60pt at 0.59pt stroke). Counts are shared with the compact study (4/3/2/1 cuts; bare; 1/2/3 rings). Only genuinely admitted bracket members take the 75 % pitch-symbol size; a clean two-note column stays full size. Every spacing and the fixed carrier length are derived from the emitted endpoints and stroke, never copied from the rejected memo. The canonical Reference, goldens and PDF are untouched. Honest whole-score candidate reports, nothing filtered: applied to the whole Brahms score this single card reports exactly two stem-through-simultaneity errors and two chordal-overlap warnings — m. 33 (brahms-op118-no1-445/444) and m. 53 (brahms-op118-no1-731/730) — the pre-existing LH fold-coincident octave-pair folding findings scheduled for a future round, both OFF this round’s displayed windows and NOT Round-43 regressions; plus six carrier-duration-unsupported refusals for the 120-tick tie-composite exceptions (brahms-op118-no1-295 m. 22, 351 m. 26, 448 m. 33, 581 m. 42, 637 m. 46, 734 m. 53). The composites 120 = 96 + 24, 504 = 192 + 192 + 96 + 24 and 108 = 96 + 12 have no exact reading in this alphabet: no carrier is painted for them (a mark-less carrier would read as a bare quarter) and each member keeps its own ordinary duration ink, which does NOT state the composite exactly — a published limitation, not a solution. Applied to the duration-vocabulary specimen the same card reports the deliberately tight m. 33 stress row as a LABELLED failed-fit / capacity counterexample: the published grid-crossing-offset (head dvs-stress-12300-9_5 pushed past its beat cell) and the new carrier-mark-occlusion findings (the next-onset dyad’s erasure mask destroys the whole-value rings of dvs-stress-12288-9_5, the first ring almost entirely). The pitch-parity specimen is clean. Every whole-score report is listed in full and none is suppressed; no candidate card is claimed clean.',
   openAxes: ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
 };
 
@@ -558,31 +558,31 @@ function round43Windows(): JankoCandidateWindow[] {
       7,
       1,
       'Brahms m. 7 · dense five-note column — both columns',
-      'The RH downbeat 2/4 · 5/4 · 9/3 · 9/4 · 11/3 (all 96-tick) is the densest onset: its members split across both parity columns by absolute pitch parity, the odd family stacked on the right and the lone even 2/4 on the left, under one shared 96-tick bracket (one ring).'
+      'The RH downbeat 2/4 · 5/4 · 9/3 · 9/4 · b/3 (all 96-tick) is the densest onset: its members split across both parity columns by absolute pitch parity, the odd family stacked on the right and the lone even 2/4 on the left, under one shared 96-tick bracket (one ring).'
     ),
     brahmsWindow(
       8,
       1,
       'Brahms m. 8 · one-column 2-span pairs, 10-span repeats, second-onset exception',
-      'The RH downbeat 5/3 · 5/4 · 7/3 · 7/4 · 11/3 is ALL odd, so every member shares one parity column: the 2-span neighbours (5/3→7/3, 5/4→7/4) sit 5.0pt apart and the 10-span repeats (5/3→5/4) 30.0pt apart. At the second onset the 11/3 states 48 against its bracket’s carried 96 — a genuine exception, whose own value is marked on the carrier, not by the carrier’s length.'
+      'The RH downbeat 5/3 · 5/4 · 7/3 · 7/4 · b/3 is ALL odd, so every member shares one parity column: the 2-span neighbours (5/3→7/3, 5/4→7/4) sit 5.0pt apart and the 10-span repeats (5/3→5/4) 30.0pt apart. At the second onset the b/3 states 48 (a quarter) against its bracket’s carried 96 — a genuine exception, and a quarter’s carrier is deliberately bare (it paints no mark at all). Because it is bare it loses no value ink: the fixed run reaches about 1.4pt into the next onset’s erasure mask (20.49pt of 21.91pt free before it), a tail occlusion of a mark-less carrier — a published shortfall, not an unreadable row.'
     ),
     brahmsWindow(
       9,
       1,
       'Brahms m. 9 · multiple exceptions on one column',
-      'The RH downbeat 5/3 · 5/4 · 7/3 · 7/4 · 11/3 (all odd, one column) states 144 · 192 · 144 · 192 · 144: the two 192-tick members are exceptions against the carried 144, each stating its own value with the compact counts (2 rings) on its own carrier, so a single chord owns two exceptions without moving a pitch.'
+      'The RH downbeat 5/3 · 5/4 · 7/3 · 7/4 · b/3 (all odd, one column) states 144 · 192 · 144 · 192 · 144: the two 192-tick members are exceptions against the carried 144, each stating its own value with the compact counts (2 rings) on its own carrier, so a single chord owns two exceptions without moving a pitch.'
     ),
     brahmsWindow(
       35,
       2,
       'Brahms mm. 35–36 · transposed related triads (source-verified)',
-      'Literal source check: m. 35’s RH triad 7/4 · 7/5 · 0/5 is exactly m. 5’s 4/4 · 4/5 · 9/4 transposed up 3 semitones (same shape, both parity columns, one 96-tick value); m. 36 restates the SAME m. 5 shape one step off, its middle member raised a 1-span (4/4 · 10/4 · 4/5) — the same reading, re-spelled.'
+      'Literal source check: m. 35’s RH triad 7/4 · 7/5 · 0/5 is exactly m. 5’s 4/4 · 4/5 · 9/4 transposed up 3 semitones (same shape, both parity columns, one 96-tick value); m. 36 restates the SAME m. 5 shape one step off, its middle member raised a 1-span (4/4 · a/4 · 4/5) — the same reading, re-spelled.'
     ),
     brahmsWindow(
       37,
       1,
       'Brahms m. 37 · exception ownership on one column',
-      'The RH downbeat 0/4 · 0/5 · 6/4 (all even, one parity column) states 96 · 96 · 48: the 48-tick member is the exception against the bracket’s carried 96, and the carrier’s own marks — not its fixed length — state that value. Single-note ownership: the pitch symbol never moves.'
+      'The RH downbeat 0/4 · 0/5 · 6/4 (all even, one parity column) states 96 · 96 · 48: the 48-tick 6/4 is the exception against the bracket’s carried 96, and the carrier’s own marks — not its fixed length — state that value. The second onset restates the reading (b/3 · 2/4 · 8/4 · b/4), its own 48-tick 2/4 the second quarter exception against the carried 96 — so m. 37 owns TWO quarter exceptions, one bare carrier each, on their own columns. Single-note ownership: the pitch symbol never moves.'
     ),
     brahmsWindow(
       67,
@@ -602,8 +602,8 @@ function round43Windows(): JankoCandidateWindow[] {
     ),
     round43Specimen(
       ROUND_43_SPECIMEN.stress,
-      'Stress · specimen mm. 33–34 — next-onset full-size neighbour, staff rule, two exceptions',
-      'm. 33: an admitted bracket whose 192-tick top exception is re-taken a 16th later by a full-size, unbracketed 2-span same-column dyad — the true close neighbour under next-onset pressure; m. 34: two exceptions of different values (192 and 6) in one chord, the 192 sitting on the lin-60 octave-line rule. Shortfalls are published, never clipped.'
+      'FAILED-FIT · stress · specimen mm. 33–34 — fixed-carrier capacity ceiling, not a readable engraving',
+      'FAILED-FIT / capacity counterexample — kept to mark the fixed carrier’s limit, NOT shown as a readable engraving and NOT proposed as notation. m. 33: the 192-tick top exception’s fixed 21.91pt carrier runs into the next onset only a 16th later, and that later dyad’s white erasure mask knocks out the carrier’s marks: the first of the two whole-value rings is almost entirely wiped out (only its left rim survives — about 86% of the ring’s box, ≈93% of its diameter) and the second ring is eaten into, so the whole-note 192 the rings state is destroyed on the page. The same next-onset pressure fans the dyad’s upper 16th head (pitch 9/5) past its beat cell’s right grid line — head at x = 55.18 against the cell edge x = 53.28 — crossing out of its 16th-note cell into the next one (the published grid-crossing-offset). m. 34 is clean: two exceptions of different values (192 and 6) in one chord, the 192 sitting on the lin-60 octave-line rule. Both m. 33 findings are published, never hidden; this row is the capacity ceiling of a fixed-length carrier, not a readable value.'
     ),
     {
       kind: 'score',

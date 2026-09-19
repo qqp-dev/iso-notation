@@ -19,7 +19,9 @@
  * lint), the count alphabet, identical glyphs on both mounts, the page-raked
  * orientation, the collision fan, pitch-scale eligibility, owned-exception
  * suppression, the fixed carrier extent and its published shortfall, the literal
- * corpus source, canonical equivalence and the honest tight failed-fit.
+ * corpus source, canonical equivalence, the honest tight failed-fit, the
+ * per-mark carrier occlusion gate (real geometry + paint order) and the
+ * unsupported-duration refusal (no blank carrier, no suppression).
  */
 
 import { test } from 'node:test';
@@ -54,9 +56,11 @@ import {
 } from '../src/render/janko/types';
 import {
   fitParityColumns,
+  knockoutHalfExtents,
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
+  suppressedStemIds,
   JankoClusterFitMember,
 } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
@@ -64,6 +68,7 @@ import {
   CLASP_MARK_STACK_GAP,
   compactDurationMarks,
   effectiveExceptionCarrierLength,
+  exceptionCarrierMarkBoxes,
   midpointMetrics,
 } from '../src/render/janko/elements/rhythm';
 import { createStudioConfig, renderStudioMarkup } from '../src/render/janko/studio';
@@ -95,6 +100,8 @@ const PPS_OPTS = optsFor({ options: PITCH_PARITY_SPECIMEN_JANKO_OPTIONS });
 const PPS_TOKS = toksFor({ tokens: PITCH_PARITY_SPECIMEN_JANKO_TOKENS });
 const DVS_OPTS = optsFor({ options: DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS });
 const DVS_TOKS = toksFor({ tokens: DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS });
+const BRAHMS_OPTS = optsFor({ options: BRAHMS_OP118_NO1_JANKO_OPTIONS });
+const BRAHMS_TOKS = toksFor({ tokens: BRAHMS_OP118_NO1_JANKO_TOKENS });
 /** The specimen's own (golden-scale-free) options, for the parity geometry. */
 const PPS_OPTS_OWN = resolveJankoOptions(PITCH_PARITY_SPECIMEN_JANKO_OPTIONS);
 
@@ -606,13 +613,184 @@ test('The pitch specimen is clean; the tight stress row publishes its crossing, 
     DURATION_VOCABULARY_NOTES.filter((n) => n.band === 'stress').map((n) => n.id)
   );
   for (const v of dvsReport.violations) {
-    assert.equal(v.code, 'grid-crossing-offset', 'only the documented tight-fit code');
+    assert.ok(
+      ['grid-crossing-offset', 'carrier-mark-occlusion'].includes(v.code),
+      `only the published tight-fit codes (got ${v.code})`
+    );
     assert.equal(v.measure, DURATION_VOCABULARY_BANDS.stress.first, 'only on the tight stress row');
     assert.ok(
       (v.noteIds ?? []).every((n) => stressIds.has(n)),
-      'only a stress-row head is displaced'
+      'only a stress-row head is displaced or occluded'
     );
   }
+  // The destroyed whole-value ink is a gate now, not a silent caption claim.
+  const occlusionDiags = dvsReport.violations.filter((v) => v.code === 'carrier-mark-occlusion');
+  assert.ok(occlusionDiags.length >= 1, 'the destroyed duration ink is published as a violation');
+  assert.ok(
+    occlusionDiags.some((v) => v.noteIds?.includes('dvs-stress-12288-9_5')),
+    'the occluded carrier owner is named'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 10b. Carrier-mark occlusion: real geometry, real paint order (Round 43 repair)
+// ---------------------------------------------------------------------------
+
+test('Carrier-mark occlusion is detected by real geometry + paint order, not a nonempty SVG', () => {
+  const layouts = layoutJankoScore(DVS, DVS_OPTS, DVS_TOKS);
+  const carrier = layouts
+    .flatMap((l) => l.exceptionCarriers)
+    .find((c) => c.noteId === 'dvs-stress-12288-9_5');
+  assert.ok(carrier, 'the tight stress carrier exists');
+  assert.equal(carrier!.rings, 2, 'it states a whole (two rings), so its marks carry the value');
+
+  const occlusions = layouts.flatMap((l) =>
+    (l.exceptionCarrierOcclusions ?? []).map((o) => ({ o, l }))
+  );
+  // Later-only bound: an erasure mask can only be a later (or same-onset) note,
+  // since the carrier paints beneath every notehead.
+  for (const { o } of occlusions) {
+    assert.ok(o.occluderTick >= o.startTick, 'occluders never precede the carrier (paint order)');
+  }
+
+  const ring0 = occlusions.find(
+    (x) =>
+      x.o.noteId === 'dvs-stress-12288-9_5' &&
+      x.o.markKind === 'ring' &&
+      x.o.markIndex === 0 &&
+      x.o.occluderId === 'dvs-stress-12300-9_5'
+  );
+  const ring1 = occlusions.find(
+    (x) =>
+      x.o.noteId === 'dvs-stress-12288-9_5' &&
+      x.o.markKind === 'ring' &&
+      x.o.markIndex === 1 &&
+      x.o.occluderId === 'dvs-stress-12300-9_5'
+  );
+  assert.ok(ring0, 'the first whole-value ring is published as occluded');
+  assert.ok(ring1, 'the second whole-value ring is published as occluded');
+  assert.equal(ring0!.o.occluderId, 'dvs-stress-12300-9_5', 'the mask is the next-onset 16th dyad head');
+  assert.ok(ring0!.o.occluderTick > ring0!.o.startTick, 'the occluder is a genuinely later note');
+  assert.ok(ring0!.o.erasedFraction > 0.5, 'the first ring is mostly destroyed');
+  assert.ok(
+    ring1!.o.erasedFraction > 0.2 && ring1!.o.erasedFraction < 0.6,
+    'the second ring is bitten into, but not wiped out'
+  );
+
+  // Reproduce the published fraction from the SAME metric the painter uses:
+  // the carrier's symbolic mark box intersected with the later note's mask.
+  const host = ring0!.l;
+  const p = host.notes.find((n) => n.note.id === 'dvs-stress-12300-9_5')!;
+  const e = knockoutHalfExtents(DVS_OPTS, DVS_TOKS, p.note.startTick, p);
+  const box = exceptionCarrierMarkBoxes(carrier!, DVS_TOKS).find(
+    (b) => b.kind === 'ring' && b.index === 0
+  )!;
+  const ox = Math.min(p.x + e.wx, box.x1) - Math.max(p.x - e.wx, box.x0);
+  const oy = Math.min(p.y + e.hy, box.y1) - Math.max(p.y - e.hy, box.y0);
+  const expected = (ox * oy) / ((box.x1 - box.x0) * (box.y1 - box.y0));
+  assert.ok(approx(ring0!.o.erasedFraction, expected, 1e-9), 'the published fraction is the real mask∩mark fraction');
+
+  // No other carrier mark in the displayed windows loses ink.
+  const elsewhere = occlusions.filter((x) => x.o.noteId !== 'dvs-stress-12288-9_5');
+  assert.deepEqual(
+    elsewhere.map((x) => `${x.o.noteId}:${x.o.markKind}${x.o.markIndex}`),
+    [],
+    'the occlusion is confined to the labelled failed-fit stress carrier'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 10c. Unsupported durations: refused, never a blank carrier, never suppressed
+// ---------------------------------------------------------------------------
+
+test('Unsupported-duration exceptions are refused — no blank quarter-like carrier, no suppression', () => {
+  const UNSUPPORTED_IDS = [
+    'brahms-op118-no1-295',
+    'brahms-op118-no1-351',
+    'brahms-op118-no1-448',
+    'brahms-op118-no1-581',
+    'brahms-op118-no1-637',
+    'brahms-op118-no1-734',
+  ];
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
+  const unsupported = layouts.flatMap((l) => l.exceptionCarrierUnsupported ?? []);
+  assert.deepEqual(
+    unsupported.map((u) => u.noteId).sort(),
+    [...UNSUPPORTED_IDS].sort(),
+    'the six 120-tick tie-composite exceptions are refused, by id'
+  );
+  for (const u of unsupported) assert.equal(u.durationTicks, 120, 'the refused source duration is preserved');
+
+  // No blank (mark-less) carrier is painted for a refused member.
+  const carrierIds = new Set(layouts.flatMap((l) => l.exceptionCarriers).map((c) => c.noteId));
+  for (const u of unsupported) assert.ok(!carrierIds.has(u.noteId), `${u.noteId}: no blank carrier`);
+
+  // The refusal never suppresses the member's own ordinary duration ink.
+  const suppressed = new Set(layouts.flatMap((l) => [...suppressedStemIds(l)]));
+  for (const u of unsupported) {
+    assert.ok(!suppressed.has(u.noteId), `${u.noteId}: own-duration ink kept (refusal never suppresses)`);
+  }
+
+  // Published honestly in the whole-score report (never faked, never hidden).
+  const report = lintJankoScore(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
+  const refusedDiags = report.warnings.filter((w) => w.code === 'carrier-duration-unsupported');
+  assert.deepEqual(
+    refusedDiags.map((d) => d.noteIds?.[0]).sort(),
+    [...UNSUPPORTED_IDS].sort(),
+    'each refusal is republished as a diagnostic'
+  );
+  for (const d of refusedDiags) {
+    assert.match(d.message, /no plain, dotted or double-dotted reading/i, 'the reason states the limitation');
+    assert.equal(d.severity, 'warning');
+  }
+  // The refusal keeps values that ARE stateable out of the refusal path.
+  assert.ok(
+    !unsupported.some((u) => [3, 6, 12, 24, 48, 96, 192, 384, 36, 72, 144, 288, 42, 84].includes(u.durationTicks)),
+    'only genuinely unsupported values are refused'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 10d. Whole-score candidate reports: pinned by code, measure and ownership
+// ---------------------------------------------------------------------------
+
+test('Whole-score candidate reports are pinned by code, measure and ownership — nothing filtered', () => {
+  // Brahms: the only errors are the pre-existing off-window m.33/m.53 folding
+  // findings (NOT Round-43 regressions); plus the six unsupported refusals.
+  const brahms = lintJankoScore(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
+  assert.deepEqual(
+    brahms.violations.map((v) => `${v.code}@m${v.measure}:${(v.noteIds ?? []).join('|')}`).sort(),
+    [
+      'stem-through-simultaneity@m33:brahms-op118-no1-445|brahms-op118-no1-444',
+      'stem-through-simultaneity@m53:brahms-op118-no1-731|brahms-op118-no1-730',
+    ].sort(),
+    'the known folding findings only, attributed by code/measure/ownership'
+  );
+  assert.deepEqual(
+    brahms.warnings
+      .filter((w) => w.code === 'chordal-overlap')
+      .map((w) => `chordal-overlap@m${w.measure}`)
+      .sort(),
+    ['chordal-overlap@m33', 'chordal-overlap@m53'],
+    'the matching chordal-overlap warnings'
+  );
+  assert.equal(
+    brahms.warnings.filter((w) => w.code === 'carrier-duration-unsupported').length,
+    6,
+    'the six unsupported refusals ride along honestly'
+  );
+
+  // The specimen: the labelled m. 33 failed-fit only.
+  const dvs = lintJankoScore(DVS, DVS_OPTS, DVS_TOKS);
+  assert.deepEqual(
+    [...new Set(dvs.violations.map((v) => `${v.code}@m${v.measure}`))].sort(),
+    ['carrier-mark-occlusion@m33', 'grid-crossing-offset@m33'],
+    'the displayed synthetic failed-fit, published in full'
+  );
+
+  // The pitch specimen: clean.
+  const pps = lintJankoScore(PPS, PPS_OPTS, PPS_TOKS);
+  assert.deepEqual([pps.violations.length, pps.warnings.length], [0, 0], 'no invented findings');
 });
 
 // ---------------------------------------------------------------------------
