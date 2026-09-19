@@ -25,6 +25,7 @@
 import { Hand, QuantizedNote } from '../../../model/types';
 import { getDuodecimalDigit } from '../../types';
 import {
+  JankoClusterPresentation,
   ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
 } from '../types';
@@ -44,13 +45,13 @@ export const HANDPRINT_U = HANDPRINT_PITCH_UNIT_U;
 export const HANDPRINT_ROW_DISPLACEMENT_A = 3.0;
 export const HANDPRINT_A = HANDPRINT_ROW_DISPLACEMENT_A;
 
-/** Outward shoulder/lobe horizontal reach from landmark center (pt). */
+/** Outward shoulder/lobe horizontal reach from landmark center (pt) for Round 36. */
 export const HANDPRINT_LOBE_WIDTH = 2.0;
 
-/** Outward shoulder/lobe vertical half-height (pt). */
+/** Outward shoulder/lobe vertical half-height (pt) for Round 36. */
 export const HANDPRINT_LOBE_HALF_HEIGHT = 1.1;
 
-/** Narrow connecting calligraphic body half-width (pt). */
+/** Narrow connecting calligraphic body half-width (pt) for Round 36. */
 export const HANDPRINT_BODY_HALF_WIDTH = 0.8;
 
 /** Origin base numeral knockout half-width (pt). */
@@ -58,6 +59,29 @@ export const HANDPRINT_ORIGIN_KNOCKOUT_WX = 2.4;
 
 /** Origin base numeral knockout half-height (pt). */
 export const HANDPRINT_ORIGIN_KNOCKOUT_HY = 3.2;
+
+// --- Round 37 Constants (Intrinsically indexed symmetric cluster) ---
+
+/** Slender stroked body path stroke width for Round 37 indexed symmetric cluster (0.5 pt). */
+export const INDEXED_SYMMETRIC_BODY_STROKE = 0.5;
+
+/** Intrinsic scale reference division width (pt): centered inside the form (2.4 pt). */
+export const INDEXED_SYMMETRIC_DIVISION_WIDTH = 2.4;
+
+/** Intrinsic scale reference division stroke width (0.35 pt, lighter than body). */
+export const INDEXED_SYMMETRIC_DIVISION_STROKE = 0.35;
+
+/** Intrinsic scale octave (10-span boundary, multiple of 12) division width (4.0 pt). */
+export const INDEXED_SYMMETRIC_OCTAVE_DIVISION_WIDTH = 4.0;
+
+/** Intrinsic scale octave division stroke width (0.5 pt). */
+export const INDEXED_SYMMETRIC_OCTAVE_DIVISION_STROKE = 0.5;
+
+/** Paired outward articulation horizontal reach from landmark track (pt). */
+export const INDEXED_SYMMETRIC_LANDMARK_REACH = 1.8;
+
+/** Paired outward articulation stroke width (0.6 pt). */
+export const INDEXED_SYMMETRIC_LANDMARK_STROKE = 0.6;
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -93,6 +117,27 @@ export interface JankoHandprintDurationSubset {
   landmark: JankoHandprintLandmark;
 }
 
+/** Intrinsic scale reference division in an indexed symmetric cluster form. */
+export interface JankoHandprintScaleDivision {
+  /** Offset in semitones from anchor (0, 2, 4, ...). */
+  offset: number;
+  /** Page absolute Y coordinate (pt). */
+  y: number;
+  /** True if offset > 0 and offset is a multiple of 12 semitones (duodecimal 10-span). */
+  isOctave: boolean;
+  /** Transverse line width in pt. */
+  width: number;
+  /** Stroke width in pt. */
+  strokeWidth: number;
+}
+
+/** Contiguous run of landmarks sharing the exact same duration. */
+export interface JankoHandprintDurationRun {
+  durationTicks: number;
+  noteIds: string[];
+  landmarks: JankoHandprintLandmark[];
+}
+
 /** One candidate handprint cluster representing a dense 4/5-note chord. */
 export interface JankoHandprintCluster {
   id: string;
@@ -120,6 +165,16 @@ export interface JankoHandprintCluster {
   isUniformRhythm: boolean;
   /** The uniform duration in ticks (if uniform). */
   uniformDurationTicks?: number;
+  /** Active cluster presentation candidate. */
+  presentation?: JankoClusterPresentation;
+  /** True when anchor is shared with LH unison bass note (m.60). */
+  hasSharedAnchor?: boolean;
+  /** Note ID of the surviving shared bass anchor note (e.g. LH survivor in m.60). */
+  sharedBassSurvivorId?: string;
+  /** Transverse reference divisions (Round 37). */
+  scaleDivisions?: JankoHandprintScaleDivision[];
+  /** Contiguous duration runs for explicit visible ownership (Round 37). */
+  durationRuns?: JankoHandprintDurationRun[];
 }
 
 // ---------------------------------------------------------------------------
@@ -141,11 +196,14 @@ export function getSoundingPitch(note: QuantizedNote | PositionedJankoNote): num
 export function groupHandprintClusters(
   notes: readonly PositionedJankoNote[],
   u: number = HANDPRINT_PITCH_UNIT_U,
-  a: number = HANDPRINT_ROW_DISPLACEMENT_A
+  a: number = HANDPRINT_ROW_DISPLACEMENT_A,
+  presentation: JankoClusterPresentation = 'mirrored-handprint'
 ): {
   clusters: JankoHandprintCluster[];
   handprintNoteIds: Set<string>;
 } {
+  const isIndexedSymmetric = presentation === 'indexed-symmetric';
+
   // Group notes by startTick and hand
   const byOnset = new Map<string, PositionedJankoNote[]>();
   for (const n of notes) {
@@ -217,26 +275,95 @@ export function groupHandprintClusters(
     }
 
     // Sort duration subsets ascending by duration
-    durationSubsets.sort((a, b) => a.durationTicks - b.durationTicks);
+    durationSubsets.sort((x1, x2) => x1.durationTicks - x2.durationTicks);
 
-    // Compute ink bounding box
-    let minX = onsetX - a - HANDPRINT_LOBE_WIDTH;
-    let maxX = onsetX + a + HANDPRINT_LOBE_WIDTH;
-    let minY = landmarks[landmarks.length - 1].y - HANDPRINT_LOBE_HALF_HEIGHT;
-    let maxY = anchorStaffY + HANDPRINT_LOBE_HALF_HEIGHT;
+    let minX: number;
+    let maxX: number;
+    let minY: number;
+    let maxY: number;
+    let hasSharedAnchor: boolean | undefined;
+    let sharedBassSurvivorId: string | undefined;
+    let scaleDivisions: JankoHandprintScaleDivision[] | undefined;
+    let durationRuns: JankoHandprintDurationRun[] | undefined;
 
-    // Account for origin knockout/digit
-    minX = Math.min(minX, onsetX - a - HANDPRINT_ORIGIN_KNOCKOUT_WX);
-    maxX = Math.max(maxX, onsetX + a + HANDPRINT_ORIGIN_KNOCKOUT_WX);
-    minY = Math.min(minY, anchorStaffY - HANDPRINT_ORIGIN_KNOCKOUT_HY);
-    maxY = Math.max(maxY, anchorStaffY + HANDPRINT_ORIGIN_KNOCKOUT_HY);
+    if (isIndexedSymmetric) {
+      // Round 37: check for shared bass anchor (cross-hand unison merged survivor)
+      hasSharedAnchor = !!anchorNote.unisonSurvivorId;
+      sharedBassSurvivorId = anchorNote.unisonSurvivorId;
 
-    // Account for duration attachments (approx 6pt outward or 8pt upward)
-    if (isUniformRhythm) {
-      minY -= 9.0; // Summit duration cue extends upward
+      // Scale divisions at offsets 0, 2, 4, ... semitones from anchor
+      const maxOffset = getSoundingPitch(sorted[sorted.length - 1]) - baseLin;
+      const maxDivOffset = (maxOffset % 2 === 0) ? maxOffset : maxOffset + 1;
+      scaleDivisions = [];
+      for (let d = 0; d <= maxDivOffset; d += 2) {
+        const isOctave = d > 0 && d % 12 === 0;
+        scaleDivisions.push({
+          offset: d,
+          y: anchorStaffY - u * d,
+          isOctave,
+          width: isOctave ? INDEXED_SYMMETRIC_OCTAVE_DIVISION_WIDTH : INDEXED_SYMMETRIC_DIVISION_WIDTH,
+          strokeWidth: isOctave ? INDEXED_SYMMETRIC_OCTAVE_DIVISION_STROKE : INDEXED_SYMMETRIC_DIVISION_STROKE,
+        });
+      }
+
+      // Contiguous duration runs for explicit visible ownership
+      durationRuns = [];
+      let currentRun: JankoHandprintLandmark[] = [landmarks[0]];
+      for (let i = 1; i < landmarks.length; i++) {
+        if (landmarks[i].durationTicks === currentRun[0].durationTicks) {
+          currentRun.push(landmarks[i]);
+        } else {
+          durationRuns.push({
+            durationTicks: currentRun[0].durationTicks,
+            noteIds: currentRun.map((l) => l.noteId),
+            landmarks: currentRun,
+          });
+          currentRun = [landmarks[i]];
+        }
+      }
+      durationRuns.push({
+        durationTicks: currentRun[0].durationTicks,
+        noteIds: currentRun.map((l) => l.noteId),
+        landmarks: currentRun,
+      });
+
+      // Compute ink bounding box
+      minX = onsetX - a - INDEXED_SYMMETRIC_LANDMARK_REACH;
+      maxX = onsetX + a + INDEXED_SYMMETRIC_LANDMARK_REACH;
+      const topDivY = anchorStaffY - u * maxDivOffset;
+      minY = Math.min(topDivY, landmarks[landmarks.length - 1].y);
+      maxY = anchorStaffY;
+
+      if (!hasSharedAnchor) {
+        minX = Math.min(minX, onsetX - HANDPRINT_ORIGIN_KNOCKOUT_WX);
+        maxX = Math.max(maxX, onsetX + HANDPRINT_ORIGIN_KNOCKOUT_WX);
+        minY = Math.min(minY, anchorStaffY - HANDPRINT_ORIGIN_KNOCKOUT_HY);
+        maxY = Math.max(maxY, anchorStaffY + HANDPRINT_ORIGIN_KNOCKOUT_HY);
+      }
+
+      // Account for duration attachments on right side
+      maxX = Math.max(maxX, onsetX + a + INDEXED_SYMMETRIC_LANDMARK_REACH + 1.2 + 3.0 + 3.5);
+      minY = Math.min(minY, ...landmarks.map((l) => l.y - 3.5));
+      maxY = Math.max(maxY, ...landmarks.map((l) => l.y + 3.5));
     } else {
-      maxX += 8.0; // Differing release cues extend outward
-      minX -= 4.0;
+      // Round 36: mirrored handprint bounding box
+      minX = onsetX - a - HANDPRINT_LOBE_WIDTH;
+      maxX = onsetX + a + HANDPRINT_LOBE_WIDTH;
+      minY = landmarks[landmarks.length - 1].y - HANDPRINT_LOBE_HALF_HEIGHT;
+      maxY = anchorStaffY + HANDPRINT_LOBE_HALF_HEIGHT;
+
+      // Account for origin knockout/digit
+      minX = Math.min(minX, onsetX - a - HANDPRINT_ORIGIN_KNOCKOUT_WX);
+      maxX = Math.max(maxX, onsetX + a + HANDPRINT_ORIGIN_KNOCKOUT_WX);
+      minY = Math.min(minY, anchorStaffY - HANDPRINT_ORIGIN_KNOCKOUT_HY);
+      maxY = Math.max(maxY, anchorStaffY + HANDPRINT_ORIGIN_KNOCKOUT_HY);
+
+      if (isUniformRhythm) {
+        minY -= 9.0; // Summit duration cue extends upward
+      } else {
+        maxX += 8.0; // Differing release cues extend outward
+        minX -= 4.0;
+      }
     }
 
     const cluster: JankoHandprintCluster = {
@@ -254,6 +381,11 @@ export function groupHandprintClusters(
       durationSubsets,
       isUniformRhythm,
       uniformDurationTicks,
+      presentation,
+      hasSharedAnchor,
+      sharedBassSurvivorId,
+      scaleDivisions,
+      durationRuns,
     };
 
     clusters.push(cluster);
@@ -485,6 +617,195 @@ export function renderHandprintDurationCue(
 // ---------------------------------------------------------------------------
 
 /**
+ * Render the slender stroked body paths for an indexed symmetric cluster (Round 37):
+ * - Primary path connects ascending landmarks on parity tracks:
+ *   +a for odd pitch, -a for even pitch.
+ * - Reflected counterpart reflects the path about the central onset axis.
+ * - Reflected counterparts denote ONE note, not a second occurrence.
+ * - Central crossings are unadorned and never sound.
+ */
+export function renderIndexedSymmetricBodyPaths(
+  landmarks: readonly JankoHandprintLandmark[],
+  strokeWidth: number = INDEXED_SYMMETRIC_BODY_STROKE
+): string {
+  if (landmarks.length === 0) return '';
+  const primaryPoints: string[] = [];
+  const reflectedPoints: string[] = [];
+  const onsetX = landmarks[0].x - landmarks[0].localX;
+
+  for (let i = 0; i < landmarks.length; i++) {
+    const lm = landmarks[i];
+    const px = lm.x;
+    const py = lm.y;
+    const rx = 2 * onsetX - px;
+    const ry = py;
+    if (i === 0) {
+      primaryPoints.push(`M ${f(px)} ${f(py)}`);
+      reflectedPoints.push(`M ${f(rx)} ${f(ry)}`);
+    } else {
+      primaryPoints.push(`L ${f(px)} ${f(py)}`);
+      reflectedPoints.push(`L ${f(rx)} ${f(ry)}`);
+    }
+  }
+
+  return [
+    `    <path class="janko-symmetric-body" d="${primaryPoints.join(' ')}" fill="none" stroke="#111111" stroke-width="${f(strokeWidth)}"/>`,
+    `    <path class="janko-symmetric-body" d="${reflectedPoints.join(' ')}" fill="none" stroke="#111111" stroke-width="${f(strokeWidth)}"/>`,
+  ].join('\n');
+}
+
+/**
+ * Render short, light transverse scale divisions centered inside the form (Round 37).
+ * Placed at offsets 0, 2, 4, ... semitones from anchor; octave divisions (multiples of 12)
+ * are distinguished (10-span boundary). Offset 0 yields to the anchor's protected numeral.
+ */
+export function renderIndexedSymmetricDivisions(
+  divisions: readonly JankoHandprintScaleDivision[],
+  onsetX: number
+): string {
+  const parts: string[] = [];
+  for (const div of divisions) {
+    if (div.offset === 0) continue; // Origin division yields to anchor numeral
+    const halfW = div.width / 2;
+    const cls = div.isOctave ? 'janko-symmetric-division-octave' : 'janko-symmetric-division';
+    parts.push(
+      `    <line class="${cls}" x1="${f(onsetX - halfW)}" y1="${f(div.y)}" x2="${f(onsetX + halfW)}" y2="${f(div.y)}" stroke="#111111" stroke-width="${f(div.strokeWidth)}"/>`
+    );
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Render sounding landmarks as paired outward articulations (Round 37):
+ * Left tick reaches outward to the left from -a; right tick reaches outward to the right from +a.
+ * These stay external (|x - onsetX| >= a), distinguishing them from internal divisions and central crossings.
+ */
+export function renderIndexedSymmetricLandmarks(
+  landmarks: readonly JankoHandprintLandmark[],
+  onsetX: number,
+  a: number = HANDPRINT_ROW_DISPLACEMENT_A,
+  reach: number = INDEXED_SYMMETRIC_LANDMARK_REACH,
+  strokeWidth: number = INDEXED_SYMMETRIC_LANDMARK_STROKE
+): string {
+  const parts: string[] = [];
+  for (const lm of landmarks) {
+    // Left outward tick
+    parts.push(
+      `    <line class="janko-symmetric-landmark" x1="${f(onsetX - a)}" y1="${f(lm.y)}" x2="${f(onsetX - a - reach)}" y2="${f(lm.y)}" stroke="#111111" stroke-width="${f(strokeWidth)}"/>`
+    );
+    // Right outward tick
+    parts.push(
+      `    <line class="janko-symmetric-landmark" x1="${f(onsetX + a)}" y1="${f(lm.y)}" x2="${f(onsetX + a + reach)}" y2="${f(lm.y)}" stroke="#111111" stroke-width="${f(strokeWidth)}"/>`
+    );
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Render explicit visible duration ownership at sounding landmarks (Round 37):
+ * Single-member subsets attach individually; multi-member runs are joined by a visible
+ * connecting rail specifying every member of the run. Noncontiguous subsets remain decodable.
+ */
+export function renderIndexedSymmetricDurationAttachments(
+  cluster: JankoHandprintCluster,
+  a: number = HANDPRINT_ROW_DISPLACEMENT_A,
+  reach: number = INDEXED_SYMMETRIC_LANDMARK_REACH
+): string {
+  const parts: string[] = [];
+  const runs = cluster.durationRuns ?? [];
+  const onsetX = cluster.onsetX;
+  const artRightX = onsetX + a + reach;
+  const xConn = artRightX + 1.2;
+  const xCue = xConn + 3.0;
+
+  for (const run of runs) {
+    if (run.landmarks.length === 1) {
+      // Individual landmark attachment
+      const lm = run.landmarks[0];
+      parts.push(
+        `    <line class="janko-symmetric-dur-connector" x1="${f(artRightX)}" y1="${f(lm.y)}" x2="${f(xCue - 2.0)}" y2="${f(lm.y)}" stroke="#111111" stroke-width="0.75"/>`
+      );
+      parts.push(`    ${renderHandprintDurationCue(xCue, lm.y, run.durationTicks, 0.9)}`);
+    } else {
+      // Multi-note run: visible vertical rail connecting all members
+      const firstLm = run.landmarks[0];
+      const lastLm = run.landmarks[run.landmarks.length - 1];
+      const yMid = (firstLm.y + lastLm.y) / 2;
+
+      // Connect each landmark's articulation to the rail
+      for (const lm of run.landmarks) {
+        parts.push(
+          `    <line class="janko-symmetric-dur-connector" x1="${f(artRightX)}" y1="${f(lm.y)}" x2="${f(xConn)}" y2="${f(lm.y)}" stroke="#111111" stroke-width="0.75"/>`
+        );
+      }
+      // Vertical rail specifying every member of the run
+      parts.push(
+        `    <line class="janko-symmetric-dur-rail" x1="${f(xConn)}" y1="${f(lastLm.y)}" x2="${f(xConn)}" y2="${f(firstLm.y)}" stroke="#111111" stroke-width="0.75"/>`
+      );
+      // Connector from rail to cue
+      parts.push(
+        `    <line class="janko-symmetric-dur-connector" x1="${f(xConn)}" y1="${f(yMid)}" x2="${f(xCue - 2.0)}" y2="${f(yMid)}" stroke="#111111" stroke-width="0.75"/>`
+      );
+      // Shared duration cue
+      parts.push(`    ${renderHandprintDurationCue(xCue, yMid, run.durationTicks, 0.9)}`);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Render the complete Round 37 intrinsically indexed symmetric cluster SVG group:
+ * 1. Internal 2-semitone reference divisions
+ * 2. Slender stroked symmetric pitch body paths (0.5pt, fill none)
+ * 3. Paired outward sounding articulations (landmarks)
+ * 4. Origin base numeral knockout and upright digit (or reused shared bass anchor)
+ * 5. Explicit visible duration ownership at sounding landmarks
+ */
+export function renderIndexedSymmetricSvg(
+  cluster: JankoHandprintCluster,
+  tokens: ResolvedJankoTokens
+): { svg: string; inkBox: [number, number, number, number] } {
+  const parts: string[] = [];
+  parts.push(`  <g class="janko-indexed-symmetric" data-cluster-id="${cluster.id}">`);
+
+  // 1. Intrinsic scale reference divisions (internal)
+  if (cluster.scaleDivisions && cluster.scaleDivisions.length > 0) {
+    parts.push(renderIndexedSymmetricDivisions(cluster.scaleDivisions, cluster.onsetX));
+  }
+
+  // 2. Slender stroked symmetric pitch body paths (0.5pt, fill none)
+  parts.push(renderIndexedSymmetricBodyPaths(cluster.landmarks));
+
+  // 3. Sounding landmarks: paired outward articulations
+  parts.push(renderIndexedSymmetricLandmarks(cluster.landmarks, cluster.onsetX));
+
+  // 4. Anchor protected numeral (unless shared bass anchor)
+  if (!cluster.hasSharedAnchor) {
+    const digit = getDuodecimalDigit(cluster.basePitchClass);
+    const baseline = cluster.anchorStaffY + digitBaselineOffset(tokens.digitFontSize);
+    const kwx = HANDPRINT_ORIGIN_KNOCKOUT_WX;
+    const khy = HANDPRINT_ORIGIN_KNOCKOUT_HY;
+
+    parts.push(
+      `    <rect class="janko-knockout" x="${f(cluster.onsetX - kwx)}" y="${f(cluster.anchorStaffY - khy)}" width="${f(2 * kwx)}" height="${f(2 * khy)}" fill="#FFFFFF"/>`
+    );
+    parts.push(
+      `    <text class="janko-digit" x="${f(cluster.onsetX)}" y="${f(baseline)}" font-weight="700" font-size="${tokens.digitFontSize.toFixed(1)}pt" fill="#111111">${digit}</text>`
+    );
+  }
+
+  // 5. Explicit visible duration ownership at sounding landmarks
+  parts.push(renderIndexedSymmetricDurationAttachments(cluster));
+
+  parts.push('  </g>');
+  return {
+    svg: parts.join('\n'),
+    inkBox: cluster.inkBox,
+  };
+}
+
+/**
  * Render the complete mirrored handprint SVG group for one cluster:
  * 1. Connected calligraphic body `<path class="janko-handprint-body" ...>`
  * 2. Origin base numeral with white knockout and duodecimal digit
@@ -494,6 +815,10 @@ export function renderHandprintSvg(
   cluster: JankoHandprintCluster,
   tokens: ResolvedJankoTokens
 ): { svg: string; inkBox: [number, number, number, number] } {
+  if (cluster.presentation === 'indexed-symmetric') {
+    return renderIndexedSymmetricSvg(cluster, tokens);
+  }
+
   const parts: string[] = [];
   parts.push(`  <g class="janko-mirrored-handprint" data-cluster-id="${cluster.id}">`);
 
@@ -560,10 +885,7 @@ export function renderHandprintSvg(
 
 /**
  * Decode linear pitches from anchor pitch, displayed staff height, onset X,
- * and landmark coordinates.
- *
- * Demonstrates inverse pitch recovery strictly from geometric landmarks,
- * NOT by returning a hidden saved source-note array.
+ * and landmark coordinates (Round 36).
  */
 export function decodeHandprintLandmarks(
   baseLin: number,
@@ -595,11 +917,56 @@ export function decodeHandprintLandmarks(
 }
 
 /**
- * Return discrete bounding boxes for all ink primitives that make up a handprint cluster:
- * - Origin knockout and base numeral box
- * - Sounding landmark lobes
- * - Connecting calligraphic body segments
- * - Duration attachment cues and connectors
+ * Decode linear pitches for Round 37 intrinsically indexed symmetric cluster.
+ * Reconstructs pitches strictly from the drawn anchor, reference divisions,
+ * and sounding landmarks.
+ */
+export function decodeIndexedSymmetricCluster(
+  baseLin: number,
+  anchorStaffY: number,
+  onsetX: number,
+  divisions: readonly { offset: number; y: number; isOctave?: boolean }[],
+  landmarks: readonly { y: number }[],
+  u: number = HANDPRINT_PITCH_UNIT_U
+): number[] {
+  void onsetX;
+  const divByOffset = new Map<number, number>();
+  for (const d of divisions) {
+    divByOffset.set(d.offset, d.y);
+  }
+
+  return landmarks.map((lm) => {
+    const deltaY = anchorStaffY - lm.y;
+    const semitonesFromBase = Math.round(deltaY / u);
+    const recoveredPitch = baseLin + semitonesFromBase;
+
+    // Verify alignment with intrinsic scale divisions:
+    // Even offsets must align with a division level
+    // Odd offsets must sit midway between division levels
+    if (semitonesFromBase % 2 === 0) {
+      const expectedY = anchorStaffY - u * semitonesFromBase;
+      if (Math.abs(lm.y - expectedY) > 0.05) {
+        throw new Error(
+          `Even offset ${semitonesFromBase} does not sit at division level: y=${lm.y.toFixed(2)}, expected=${expectedY.toFixed(2)}`
+        );
+      }
+    } else {
+      const lowerDivY = anchorStaffY - u * (semitonesFromBase - 1);
+      const upperDivY = anchorStaffY - u * (semitonesFromBase + 1);
+      const midY = (lowerDivY + upperDivY) / 2;
+      if (Math.abs(lm.y - midY) > 0.05) {
+        throw new Error(
+          `Odd offset ${semitonesFromBase} does not sit midway between divisions: y=${lm.y.toFixed(2)}, expected mid=${midY.toFixed(2)}`
+        );
+      }
+    }
+
+    return recoveredPitch;
+  });
+}
+
+/**
+ * Return discrete bounding boxes for all ink primitives that make up a cluster.
  */
 export function getHandprintPrimitives(
   cluster: JankoHandprintCluster
@@ -607,6 +974,71 @@ export function getHandprintPrimitives(
   const boxes: Array<[number, number, number, number]> = [];
   const lms = cluster.landmarks;
   if (lms.length === 0) return boxes;
+
+  if (cluster.presentation === 'indexed-symmetric') {
+    const a = HANDPRINT_ROW_DISPLACEMENT_A;
+    const reach = INDEXED_SYMMETRIC_LANDMARK_REACH;
+    const onsetX = cluster.onsetX;
+
+    // 1. Anchor numeral (or shared bass anchor region)
+    if (!cluster.hasSharedAnchor) {
+      boxes.push([
+        onsetX - HANDPRINT_ORIGIN_KNOCKOUT_WX,
+        cluster.anchorStaffY - HANDPRINT_ORIGIN_KNOCKOUT_HY,
+        onsetX + HANDPRINT_ORIGIN_KNOCKOUT_WX,
+        cluster.anchorStaffY + HANDPRINT_ORIGIN_KNOCKOUT_HY,
+      ]);
+    } else {
+      boxes.push([
+        onsetX - 2.53,
+        cluster.anchorStaffY - 3.46,
+        onsetX + 2.53,
+        cluster.anchorStaffY + 3.46,
+      ]);
+    }
+
+    // 2. Sounding landmark paired outward articulations
+    for (const lm of lms) {
+      // Left tick
+      boxes.push([onsetX - a - reach, lm.y - 0.4, onsetX - a, lm.y + 0.4]);
+      // Right tick
+      boxes.push([onsetX + a, lm.y - 0.4, onsetX + a + reach, lm.y + 0.4]);
+    }
+
+    // 3. Scale reference divisions
+    if (cluster.scaleDivisions) {
+      for (const div of cluster.scaleDivisions) {
+        const halfW = div.width / 2;
+        boxes.push([onsetX - halfW, div.y - 0.3, onsetX + halfW, div.y + 0.3]);
+      }
+    }
+
+    // 4. Slender body path segments
+    for (let i = 0; i < lms.length - 1; i++) {
+      boxes.push([
+        onsetX - a - 0.3,
+        Math.min(lms[i].y, lms[i + 1].y),
+        onsetX + a + 0.3,
+        Math.max(lms[i].y, lms[i + 1].y),
+      ]);
+    }
+
+    // 5. Duration attachments
+    if (cluster.durationRuns) {
+      for (const run of cluster.durationRuns) {
+        const firstLm = run.landmarks[0];
+        const lastLm = run.landmarks[run.landmarks.length - 1];
+        boxes.push([
+          onsetX + a + reach,
+          lastLm.y - 3.5,
+          onsetX + a + reach + 9.0,
+          firstLm.y + 3.5,
+        ]);
+      }
+    }
+
+    return boxes;
+  }
 
   // 1. Origin knockout / digit box
   const origin = lms[0];
@@ -694,8 +1126,8 @@ function boxIntersectsBox(
 /**
  * Check whether handprint cluster ink collides with barlines, noteheads, or rests.
  * Uses a broad-phase bounding-box test followed by a narrow-phase check against
- * actual ink primitives (origin knockout, landmark lobes, connecting segments,
- * and duration attachment cues).
+ * actual ink primitives (origin knockout, landmark lobes/articulations, connecting segments,
+ * scale divisions, and duration attachment cues).
  */
 export function checkHandprintCollisions(
   cluster: JankoHandprintCluster,
@@ -726,19 +1158,23 @@ export function checkHandprintCollisions(
   for (const n of independentNotes) {
     const noteId = n.note?.id ?? (n as any).id;
     if (cluster.allNoteIds.has(noteId)) continue;
+    // Shared bass anchor is reused and intentionally co-located, not an obstacle
+    if (cluster.hasSharedAnchor && cluster.sharedBassSurvivorId && noteId === cluster.sharedBassSurvivorId) continue;
     const nx = n.x;
     const ny = n.y;
     if (nx === undefined || ny === undefined) continue;
     const wx = 2.53;
     const hy = 3.46;
     const noteBox: [number, number, number, number] = [nx - wx, ny - hy, nx + wx, ny + hy];
+    const nStartTick = n.note?.startTick ?? (n as any).startTick;
+    const requiredClearance = nStartTick === cluster.startTick ? 0 : minClearance;
 
     // Broad phase
-    if (!boxIntersectsBox(cluster.inkBox, noteBox, minClearance)) continue;
+    if (!boxIntersectsBox(cluster.inkBox, noteBox, requiredClearance)) continue;
 
     // Narrow phase
     for (const prim of primitives) {
-      if (boxIntersectsBox(prim, noteBox, minClearance)) {
+      if (boxIntersectsBox(prim, noteBox, requiredClearance)) {
         return {
           collides: true,
           obstacle: 'notehead',

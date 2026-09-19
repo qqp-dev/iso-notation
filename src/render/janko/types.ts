@@ -1115,8 +1115,9 @@ export type JankoClusterCompression = 'literal' | 'spatial-echo' | 'compact-coup
  *
  * - `'literal'`: golden baseline (all constituent noteheads drawn with duodecimal digits).
  * - `'mirrored-handprint'`: rotated keyboard footprint with two symmetric variants for alternating Jánko row families.
+ * - `'indexed-symmetric'`: intrinsically indexed symmetric cluster with discrete 2-semitone reference divisions, duodecimal 10-span boundaries, paired outward articulations, and explicit duration ownership.
  */
-export type JankoClusterPresentation = 'literal' | 'mirrored-handprint';
+export type JankoClusterPresentation = 'literal' | 'mirrored-handprint' | 'indexed-symmetric';
 
 
 /**

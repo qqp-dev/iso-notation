@@ -5602,11 +5602,14 @@ export function layoutJankoSystemShifted(
     }
   }
 
-  // Round 36: Mirrored handprint whole-form clusters
+  // Round 36/37: Mirrored handprint & indexed symmetric whole-form clusters
   let handprintClusters: JankoHandprintCluster[] | undefined;
   let handprintNoteIds: Set<string> | undefined;
-  if (o.clusterPresentation === 'mirrored-handprint') {
-    const res = groupHandprintClusters(notes);
+  if (o.clusterPresentation === 'mirrored-handprint' || o.clusterPresentation === 'indexed-symmetric') {
+    const inputNotes = o.clusterPresentation === 'indexed-symmetric'
+      ? [...notes, ...unisonVoices]
+      : notes;
+    const res = groupHandprintClusters(inputNotes, undefined, undefined, o.clusterPresentation);
     const barlineXs: number[] = [];
     const barlineAir = protectsBarlineInk(o.gridWritingPolicy);
     if (barlineAir) {
@@ -6440,6 +6443,15 @@ export function computeCropExtents(
         const bBot = Math.max(b.lineY, hookY, label.y1) - middleCY;
         top = Math.max(top, staffTop - CROP_PAD_TOP - bTop);
         bottom = Math.max(bottom, bBot - (staffBottom + CROP_PAD_BOTTOM));
+      }
+    }
+    if (layout.handprintClusters && layout.handprintClusters.length > 0) {
+      const middleCY = layout.geometry.middleCY;
+      for (const cluster of layout.handprintClusters) {
+        const cTop = cluster.inkBox[1] - middleCY;
+        const cBot = cluster.inkBox[3] - middleCY;
+        top = Math.max(top, staffTop - CROP_PAD_TOP - cTop);
+        bottom = Math.max(bottom, cBot - (staffBottom + CROP_PAD_BOTTOM));
       }
     }
   }

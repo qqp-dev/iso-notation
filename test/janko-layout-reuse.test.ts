@@ -225,7 +225,7 @@ test('Deterministic counts: renderJankoPage and renderSystemsBody with precomput
   }
 });
 
-test('Deterministic counts: renderCandidatesView computes each candidate layout once and reuses across windows', () => {
+test('Deterministic counts: renderCandidatesView computes each candidate layout once per score and reuses across windows', () => {
   let contentAwareCalls = 0;
   setLayoutJankoScoreObserver((score, o) => {
     if (isContentAwarePlacement(o)) contentAwareCalls++;
@@ -235,12 +235,11 @@ test('Deterministic counts: renderCandidatesView computes each candidate layout 
     const config = createStudioConfig();
     contentAwareCalls = 0;
     renderCandidatesView(config);
-    // 2 candidates * (1 lint call + 1 candidate layout reused across 4 windows) = 4 calls.
-    // Previously: 2 * (1 lint + 4 windows * 2 crop calls) = 18 calls.
+    // 2 candidates * 2 scores * (1 lint call + 1 candidate layout) = 8 calls.
     assert.equal(
       contentAwareCalls,
-      4,
-      'renderCandidatesView must invoke content-aware layout exactly 4 times (2 lints + 2 candidate layouts)'
+      8,
+      'renderCandidatesView must invoke content-aware layout exactly 8 times (2 candidates * 2 scores * (1 lint + 1 layout))'
     );
   } finally {
     setLayoutJankoScoreObserver(null);
@@ -269,7 +268,7 @@ test('Deterministic counts: renderReferenceView computes Brahms reference layout
   }
 });
 
-test('Deterministic counts: renderStudioMarkup eliminates 24 redundant content-aware calls (30 -> 6)', () => {
+test('Deterministic counts: renderStudioMarkup eliminates redundant content-aware calls across windows and pages', () => {
   let contentAwareCalls = 0;
   setLayoutJankoScoreObserver((score, o) => {
     if (isContentAwarePlacement(o)) contentAwareCalls++;
@@ -280,12 +279,12 @@ test('Deterministic counts: renderStudioMarkup eliminates 24 redundant content-a
     contentAwareCalls = 0;
     renderStudioMarkup(config);
     // Reference view: 2 content-aware calls (1 lint + 1 layout)
-    // Candidates view: 4 content-aware calls (2 lints + 2 candidate layouts)
-    // Total: 6 calls (down from 30 calls, exactly 24 redundant eliminated)
+    // Candidates view: 8 content-aware calls (2 candidates * 2 scores * (1 lint + 1 layout))
+    // Total: 10 calls
     assert.equal(
       contentAwareCalls,
-      6,
-      'renderStudioMarkup must make exactly 6 content-aware layout calls (24 redundant eliminated)'
+      10,
+      'renderStudioMarkup must make exactly 10 content-aware layout calls'
     );
   } finally {
     setLayoutJankoScoreObserver(null);
@@ -319,7 +318,7 @@ test('Fresh data/options/tokens: subsequent render with changed options computes
 });
 
 test('Fresh data/options/tokens: candidate configurations remain separate from each other', () => {
-  // Round 36 candidates have different clusterPresentation options
+  // Round 37 candidates have different clusterPresentation options
   assert.equal(CURRENT_CANDIDATES.length, 2);
   const [candA, candB] = CURRENT_CANDIDATES;
 
@@ -327,12 +326,12 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
   const optsB = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candB.options ?? {}) });
 
   assert.equal(optsA.clusterPresentation, 'literal');
-  assert.equal(optsB.clusterPresentation, 'mirrored-handprint');
+  assert.equal(optsB.clusterPresentation, 'indexed-symmetric');
 
   const svgA = renderJankoCrop(BRAHMS, 8, 2, optsA, BRAHMS_TOKS);
   const svgB = renderJankoCrop(BRAHMS, 8, 2, optsB, BRAHMS_TOKS);
 
-  assert.notEqual(svgA, svgB, 'Literal baseline and mirrored handprint produce distinct SVGs');
+  assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------

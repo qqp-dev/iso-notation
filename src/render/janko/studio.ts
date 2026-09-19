@@ -66,9 +66,11 @@ import {
   JankoCandidateRound,
   REST_SPECIMEN_STUDIO_SCORE_ID,
   SPECIMEN_STUDIO_SCORE_ID,
+  SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
   candidateBadges,
   resolveCandidate,
 } from './candidates';
+import { buildSyntheticM8DiagnosticScore } from '../../scores/synthetic-m8-diagnostic';
 import { LintReport, lintJankoScore } from './linter';
 
 /** One macro focus crop in the Golden Reference view. */
@@ -242,6 +244,15 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildDurationSpecimenScore(),
       options: resolveJankoOptions(DURATION_SPECIMEN_JANKO_OPTIONS),
       tokens: resolveJankoTokens(DURATION_SPECIMEN_JANKO_TOKENS),
+    },
+    [SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID]: {
+      id: SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
+      score: buildSyntheticM8DiagnosticScore(),
+      options: resolveJankoOptions({
+        ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+        measuresPerSystem: 1,
+      }),
+      tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
     },
     ...(overrides.scores ?? {}),
   };

@@ -124,18 +124,18 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 36/);
-  assert.match(html, /mirrored handprint/i);
+  assert.match(html, /Round 37/);
+  assert.match(html, /indexed symmetric/i);
 });
 
-test('Round 36 open: mirrored handprint candidate, one axis, two cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 36);
-  assert.match(CURRENT_ROUND_METADATA.title, /mirrored handprint/i);
+test('Round 37 open: indexed symmetric cluster candidate, one axis, two cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 37);
+  assert.match(CURRENT_ROUND_METADATA.title, /indexed symmetric/i);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['mirrored-handprint-literal', 'mirrored-handprint'],
+    ['indexed-symmetric-literal', 'indexed-symmetric'],
     'the Control and A candidate'
   );
   // The golden context the Reference view engraves, unchanged.
@@ -168,21 +168,23 @@ test('Round 36 open: mirrored handprint candidate, one axis, two cards', () => {
   );
 });
 
-test('The open studio renders the three cluster-compression cards on twelve Brahms windows', () => {
+test('The open studio renders the two indexed-symmetric cards on twelve declared windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Three cards × four windows: control + A/B on mm.8–9, mm.33–34, mm.46–47, mm.66–67.
+  // Two cards × six windows: control + A on mm.7–9, mm.46–47, mm.60–61, mm.66–67, m.71, and synthetic diagnostic.
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 8, 'eight windows');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'twelve windows');
   assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="8"/);
+  assert.match(html, /data-window-count="12"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 36/);
+  assert.match(html, /Round 37/);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
   assert.ok(html.includes('data-window="brahms-op118-no1:7-9"'), 'the mm.7-9 window');
   assert.ok(html.includes('data-window="brahms-op118-no1:46-47"'), 'the mm.46-47 window');
   assert.ok(html.includes('data-window="brahms-op118-no1:60-61"'), 'the mm.60-61 window');
   assert.ok(html.includes('data-window="brahms-op118-no1:66-67"'), 'the mm.66-67 window');
+  assert.ok(html.includes('data-window="brahms-op118-no1:71-71"'), 'the m.71 window');
+  assert.ok(html.includes('data-window="synthetic-m8-diagnostic:1-1"'), 'the synthetic diagnostic window');
 
   // No settled decision is badged as an open question.
   for (const key of [
@@ -478,8 +480,8 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 36);
-  assert.match(CURRENT_ROUND_METADATA.title, /mirrored handprint/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 37);
+  assert.match(CURRENT_ROUND_METADATA.title, /indexed symmetric/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the open round');
