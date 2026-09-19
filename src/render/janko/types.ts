@@ -1275,9 +1275,40 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   composer: 'Johann Sebastian Bach',
 };
 
+/**
+ * Private identity registry of values these two resolvers have already fully
+ * resolved.
+ *
+ * Resolving is called from every element engraver, so one studio render
+ * re-resolves the same options/tokens several million times and nearly every
+ * input is the output of an earlier resolve; spreading the defaults over such
+ * an input again is pure waste. This registry recognises exactly the objects
+ * produced by these functions. Every other input — caller-owned partials,
+ * override literals, `null`/`undefined`, primitives — takes the full
+ * fresh-spread path unchanged, so filled-in defaults, explicit `undefined`
+ * overrides and override values keep their exact previous semantics, and no
+ * arbitrary mutable input is ever cached.
+ *
+ * Ownership assumption (audited: no consumer writes to, deletes from, or
+ * `Object.assign`s into a resolved value — resolved values are read-only by
+ * contract): an already-resolved input may be returned as-is, because it is
+ * value-identical to the fresh spread it replaces. Values are deliberately
+ * left unfrozen (freezing would be a breaking change for callers), and the
+ * canonical defaults are never handed out as an alias: `resolve(DEFAULT_*)`
+ * still returns a private copy, so a caller mutating a resolved value cannot
+ * poison the canonical defaults.
+ */
+const RESOLVED_TOKEN_OBJECTS = new WeakSet<object>();
+const RESOLVED_OPTION_OBJECTS = new WeakSet<object>();
+
 /** Fill in every optional token with its canonical default. */
 export function resolveJankoTokens(tokens?: Partial<JankoTokens> | null): ResolvedJankoTokens {
-  return { ...DEFAULT_JANKO_TOKENS, ...(tokens ?? {}) };
+  if (tokens && typeof tokens === 'object' && RESOLVED_TOKEN_OBJECTS.has(tokens)) {
+    return tokens as ResolvedJankoTokens;
+  }
+  const resolved = { ...DEFAULT_JANKO_TOKENS, ...(tokens ?? {}) };
+  RESOLVED_TOKEN_OBJECTS.add(resolved);
+  return resolved;
 }
 
 /**
@@ -1289,7 +1320,12 @@ export function resolveJankoTokens(tokens?: Partial<JankoTokens> | null): Resolv
 export function resolveJankoOptions(
   options?: Partial<JankoLayoutOptions> | null
 ): ResolvedJankoLayoutOptions {
-  return { ...DEFAULT_JANKO_OPTIONS, ...(options ?? {}) };
+  if (options && typeof options === 'object' && RESOLVED_OPTION_OBJECTS.has(options)) {
+    return options as ResolvedJankoLayoutOptions;
+  }
+  const resolved = { ...DEFAULT_JANKO_OPTIONS, ...(options ?? {}) };
+  RESOLVED_OPTION_OBJECTS.add(resolved);
+  return resolved;
 }
 
 /** Human-readable names for the pluggable rhythm renderers. */
