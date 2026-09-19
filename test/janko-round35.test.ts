@@ -43,6 +43,7 @@ import {
   candidateBadges,
   type JankoCandidate,
   type JankoCandidateRound,
+  type JankoScoreCandidateWindow,
 } from '../src/render/janko/candidates';
 import {
   createStudioConfig,
@@ -588,7 +589,7 @@ test('Registry: Round 35 parked with three cards on four identical Brahms window
   for (const cand of ROUND_35_CANDIDATES) {
     assert.equal(cand.axis, 'clusterCompression', `${cand.id} declares clusterCompression axis`);
     assert.equal(cand.windows?.length, 4, `${cand.id} has four identical windows`);
-    const winKeys = cand.windows!.map((w) => `${w.scoreId}:${w.measureStart}-${w.measureStart + w.measureCount - 1}`);
+    const winKeys = (cand.windows as JankoScoreCandidateWindow[])!.map((w) => `${w.scoreId}:${w.measureStart}-${w.measureStart + w.measureCount - 1}`);
     assert.deepEqual(winKeys, [
       'brahms-op118-no1:8-9',
       'brahms-op118-no1:33-34',

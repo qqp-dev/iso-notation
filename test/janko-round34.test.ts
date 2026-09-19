@@ -46,6 +46,7 @@ import {
   candidateBadges,
   type JankoCandidate,
   type JankoCandidateRound,
+  type JankoScoreCandidateWindow,
 } from '../src/render/janko/candidates';
 import {
   createStudioConfig,
@@ -146,7 +147,7 @@ test('Round 34 parked: one m33 axis, the A/B/C trio, literal windows', () => {
     assert.equal(c.axis, 'foldPairPresentation', `${c.id}: per-candidate purity`);
     assert.deepEqual(Object.keys(c.options ?? {}), ['foldPairPresentation'], `${c.id}: one-line delta`);
     assert.deepEqual(
-      (c.windows ?? []).map((w) => [w.scoreId, w.measureStart, w.measureCount]),
+      ((c.windows ?? []) as JankoScoreCandidateWindow[]).map((w) => [w.scoreId, w.measureStart, w.measureCount]),
       [
         [BRAHMS_STUDIO_SCORE_ID, 33, 4],
         [BRAHMS_STUDIO_SCORE_ID, 53, 4],

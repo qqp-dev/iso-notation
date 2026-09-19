@@ -1355,3 +1355,34 @@ export interface JankoOttavaBracket {
   /** Note IDs covered by this bracket. */
   noteIds: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Abstract twelve-site geometry re-exports for declarative candidate registry
+// ---------------------------------------------------------------------------
+
+export type {
+  AbstractGeometryId,
+  AbstractGeometrySpec,
+  Point2D,
+  RectBounds,
+  ViewportBox,
+} from './elements/abstract-geometry';
+
+export {
+  ABSTRACT_NODE_RADIUS,
+  ABSTRACT_MIN_SEPARATION,
+  ABSTRACT_KEY_SCALE,
+  ABSTRACT_SITE_LABELS,
+  ABSTRACT_SUBSET_1,
+  ABSTRACT_SUBSET_2,
+  ABSTRACT_SUBSET_VIEWPORT,
+  ABSTRACT_KEY_VIEWPORT,
+  ABSTRACT_GEOMETRY_SPECS,
+  getDialSiteCoordinates,
+  getRosetteSiteCoordinates,
+  getAsymmetricSiteCoordinates,
+  getAbstractSiteCoordinates,
+  renderAbstractKeySvg,
+  renderAbstractSubsetSvg,
+  lintAbstractGeometry,
+} from './elements/abstract-geometry';

@@ -57,6 +57,7 @@ import {
   DEFAULT_STUDIO_SCORE_ID,
   JankoCandidate,
   JankoCandidateRound,
+  type JankoScoreCandidateWindow,
   brahmsWindow,
   candidateBadges,
   resolveCandidate,
@@ -414,7 +415,7 @@ test('Window census: each card window shows exactly its dot moved, visibly, noth
     { start: 2, count: 2, visible: 432, clipped: 48 },
   ];
   assert.deepEqual(
-    card.windows!.map((w) => [w.measureStart, w.measureCount]),
+    (card.windows as JankoScoreCandidateWindow[]).map((w) => [w.measureStart, w.measureCount]),
     windows.map((w) => [w.start, w.count]),
     'the card frames mm. 1–2 + mm. 2–3'
   );

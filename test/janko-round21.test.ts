@@ -459,20 +459,17 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 37 open, one clusterPresentation axis, two cards', () => {
-  // Ordered contract change: Round 36 is parked (historical consts in
-  // test/janko-round36.test.ts) and Round 37 opens the intrinsically indexed
-  // symmetric cluster candidate comparison.
-  assert.equal(CURRENT_ROUND_METADATA.round, 37);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
+test('§F registry: round 38 open, one arrangement axis, three cards', () => {
+  // Ordered contract change: Round 37 is parked (historical consts in
+  // test/janko-round37.test.ts) and Round 38 opens the twelve-site spatial
+  // alphabet candidate comparison.
+  assert.equal(CURRENT_ROUND_METADATA.round, 38);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    [
-      'indexed-symmetric-literal',
-      'indexed-symmetric',
-    ],
-    'the control and candidate A'
+    ['dial', 'rosette', 'asymmetric'],
+    'the three abstract candidates'
   );
 });
 

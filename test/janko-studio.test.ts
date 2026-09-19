@@ -69,7 +69,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 2, 'Round 36 open: the mirrored handprint pair');
+assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 38 open: three abstract candidates');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -112,11 +112,18 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       assert.ok(body.includes(`<b>${badge.key}</b>`), `${candidate.id} badge ${badge.key}`);
     }
     for (const window of resolveCandidate(candidate).windows) {
-      const last = window.measureStart + window.measureCount - 1;
-      assert.ok(
-        body.includes(`data-window="${window.scoreId}:${window.measureStart}-${last}"`),
-        `${candidate.id} engraves ${window.scoreId} mm. ${window.measureStart}–${last}`
-      );
+      if ('measureStart' in window) {
+        const last = window.measureStart + window.measureCount - 1;
+        assert.ok(
+          body.includes(`data-window="${window.scoreId}:${window.measureStart}-${last}"`),
+          `${candidate.id} engraves ${window.scoreId} mm. ${window.measureStart}–${last}`
+        );
+      } else {
+        assert.ok(
+          body.includes(`data-window="${window.geometryId}:${window.specimenType}"`),
+          `${candidate.id} renders abstract ${window.geometryId}:${window.specimenType}`
+        );
+      }
     }
     assert.equal(
       (body.match(/data-window="/g) ?? []).length,
@@ -124,19 +131,19 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 37/);
-  assert.match(html, /indexed symmetric/i);
+  assert.match(html, /Round 38/);
+  assert.match(html, /Twelve-site spatial alphabet/i);
 });
 
-test('Round 37 open: indexed symmetric cluster candidate, one axis, two cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 37);
-  assert.match(CURRENT_ROUND_METADATA.title, /indexed symmetric/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
+test('Round 38 open: three abstract candidates, one axis, three cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 38);
+  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site spatial alphabet/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['indexed-symmetric-literal', 'indexed-symmetric'],
-    'the Control and A candidate'
+    ['dial', 'rosette', 'asymmetric'],
+    'the Dial, Rosette, and Asymmetric candidates'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -168,23 +175,23 @@ test('Round 37 open: indexed symmetric cluster candidate, one axis, two cards', 
   );
 });
 
-test('The open studio renders the two indexed-symmetric cards on twelve declared windows', () => {
+test('The open studio renders the three abstract cards on nine declared windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Two cards × six windows: control + A on mm.7–9, mm.46–47, mm.60–61, mm.66–67, m.71, and synthetic diagnostic.
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 12, 'twelve windows');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="12"/);
+  // Three cards × three windows: Dial, Rosette, Asymmetric on key, subset-1, subset-2.
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 9, 'nine windows');
+  assert.match(html, /data-candidate-count="3"/);
+  assert.match(html, /data-window-count="9"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 37/);
+  assert.match(html, /Round 38/);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
-  assert.ok(html.includes('data-window="brahms-op118-no1:7-9"'), 'the mm.7-9 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:46-47"'), 'the mm.46-47 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:60-61"'), 'the mm.60-61 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:66-67"'), 'the mm.66-67 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:71-71"'), 'the m.71 window');
-  assert.ok(html.includes('data-window="synthetic-m8-diagnostic:1-1"'), 'the synthetic diagnostic window');
+  assert.ok(!html.includes('data-window="brahms-op118-no1:"'), 'Brahms carries no window this round');
+  assert.ok(html.includes('data-window="dial:key"'), 'the dial key window');
+  assert.ok(html.includes('data-window="dial:subset-1"'), 'the dial subset-1 window');
+  assert.ok(html.includes('data-window="dial:subset-2"'), 'the dial subset-2 window');
+  assert.ok(html.includes('data-window="rosette:key"'), 'the rosette key window');
+  assert.ok(html.includes('data-window="asymmetric:key"'), 'the asymmetric key window');
 
   // No settled decision is badged as an open question.
   for (const key of [
@@ -480,11 +487,11 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 37);
-  assert.match(CURRENT_ROUND_METADATA.title, /indexed symmetric/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 38);
+  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site spatial alphabet/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the open round');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.
