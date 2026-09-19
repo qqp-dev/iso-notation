@@ -60,6 +60,18 @@ export interface JankoNoteheadSpec {
    * resumes with the same breathing room as an own-stem attachment.
    */
   tallKnockout?: boolean;
+  /**
+   * Round 41: absolute pitch symbol scale of this head (`1` = canonical). A
+   * same-hand chord member under `chordSymbolScale` renders smaller; its mask,
+   * its digit size and every clearance audit derive from this one number, so
+   * paint, layout and lint can never disagree.
+   */
+  symbolScale?: number;
+  /**
+   * Round 41: true when this head belongs to a same-hand co-onset chord group,
+   * so the chord-margin/air tokens (not the standalone preset) size its mask.
+   */
+  chordMember?: boolean;
 }
 
 /** Stroke width of the Position of Honor halo ring (pt). */
@@ -142,6 +154,36 @@ export const JANKO_DIGIT_BASELINE_OFFSET = digitBaselineOffset(
  * explicit override is for callers that resolve the preset themselves;
  * otherwise the layout options select it (defaulting to the golden preset).
  */
+/**
+ * Round 41: knockout metrics of **one head** at an explicit symbol scale.
+ *
+ * `scale === 1` and `chordMember === false` returns {@link getKnockoutMetrics}
+ * untouched (bit-for-bit canonical for every existing surface). A chord member
+ * resolves against the Round 41 chord tokens (`chordKnockoutMargin` /
+ * `chordKnockoutAir`) and a scaled digit, both measured from the actual glyph
+ * half-extents — the same numbers {@link renderNotehead} paints and the linter
+ * audits.
+ */
+export function getScaledKnockoutMetrics(
+  layoutOptions: Partial<JankoLayoutOptions> | null | undefined,
+  tokens: Partial<JankoTokens> | null | undefined,
+  symbolScale = 1,
+  chordMember = false
+): KnockoutMetrics {
+  if (symbolScale === 1 && !chordMember) return getKnockoutMetrics(layoutOptions, tokens);
+  const o = resolveJankoOptions(layoutOptions);
+  const t = resolveJankoTokens(tokens);
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  const margin = chordMember
+    ? t.chordKnockoutMargin ?? t.knockoutMargin ?? preset.margin
+    : t.knockoutMargin ?? preset.margin;
+  const air = chordMember
+    ? t.chordKnockoutAir ?? t.knockoutAir ?? preset.air
+    : t.knockoutAir ?? preset.air;
+  const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize * symbolScale);
+  return { margin, air, wx: halfWidth + margin, hy: halfHeight + margin, pairGap: preset.pairGap };
+}
+
 /** Resolved metrics for a knockout mask and spacing. */
 export interface KnockoutMetrics {
   margin: number;
@@ -215,9 +257,11 @@ export function renderNoteheadDigit(
   pitchClass: number,
   hand: Hand = 'RH',
   tokens?: Partial<JankoTokens> | null,
-  digitOverride?: string
+  digitOverride?: string,
+  fontSizeOverride?: number
 ): string {
   const t = resolveJankoTokens(tokens);
+  const fontSize = fontSizeOverride ?? t.digitFontSize;
   const digit = digitOverride ?? getDuodecimalDigit(pitchClass);
   // One weight for every digit: the old even/odd 800/700 split was
   // indistinguishable (single-face fonts render both the same) and read as
@@ -226,9 +270,9 @@ export function renderNoteheadDigit(
   void hand;
   // The digit is positioned by its alphabetic baseline (not by
   // `dominant-baseline`), so the optical centring is renderer-independent.
-  const baseline = y + digitBaselineOffset(t.digitFontSize);
+  const baseline = y + digitBaselineOffset(fontSize);
   const sizeStr =
-    t.digitFontSize % 1 === 0 ? t.digitFontSize.toFixed(1) : Number(t.digitFontSize.toFixed(3));
+    fontSize % 1 === 0 ? fontSize.toFixed(1) : Number(fontSize.toFixed(3));
   return `    <text class="janko-digit" x="${f(x)}" y="${f(baseline)}" font-weight="${weight}" font-size="${sizeStr}pt" fill="#111111">${digit}</text>`;
 }
 
@@ -246,13 +290,29 @@ export function renderNotehead(
     parts.push(renderHalo(spec.x, spec.y, tokens));
   }
   const t = resolveJankoTokens(tokens);
-  const metrics = getKnockoutMetrics(layoutOptions, tokens);
-  const maskOverride = spec.tallKnockout
-    ? { wx: metrics.wx, hy: metrics.hy + t.stemAttachmentAir }
-    : undefined;
+  const scale = spec.symbolScale ?? 1;
+  const chordMember = spec.chordMember === true;
+  const metrics = getScaledKnockoutMetrics(layoutOptions, tokens, scale, chordMember);
+  // Round 41: the painted mask is the **same** box the layout and the linter
+  // audit — a scaled chord member paints its scaled mask (and a tall knockout
+  // still grows to the stem-start line). Canonical heads (`scale === 1`,
+  // standalone, no tall knockout) keep the untouched preset paint path.
+  const scaled = scale !== 1 || chordMember;
+  const maskOverride =
+    spec.tallKnockout || scaled
+      ? { wx: metrics.wx, hy: metrics.hy + (spec.tallKnockout ? t.stemAttachmentAir : 0) }
+      : undefined;
   parts.push(renderNoteheadKnockout(spec.x, spec.y, tokens, layoutOptions, maskOverride));
   parts.push(
-    renderNoteheadDigit(spec.x, spec.y, spec.pitchClass, spec.hand ?? 'RH', tokens, spec.digit)
+    renderNoteheadDigit(
+      spec.x,
+      spec.y,
+      spec.pitchClass,
+      spec.hand ?? 'RH',
+      tokens,
+      spec.digit,
+      t.digitFontSize * scale
+    )
   );
   return parts.join('\n');
 }

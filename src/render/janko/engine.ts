@@ -99,7 +99,25 @@ import {
   getBarStaffSegments,
   getBarStaffRows,
 } from './elements/staff';
-import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, renderNotehead, getKnockoutMetrics } from './elements/notehead';
+import {
+  JANKO_HALO_STROKE_WIDTH,
+  isPositionOfHonor,
+  renderNotehead,
+  getKnockoutMetrics,
+  getScaledKnockoutMetrics,
+} from './elements/notehead';
+import {
+  JankoHoldBlocker,
+  JankoHoldGeometry,
+  JankoHoldRefusal,
+  JankoHoldSeatReason,
+  JankoHoldTerminalShape,
+  holdTerminalHalfHeight,
+  holdTerminalReach,
+  holdUnderlays,
+  renderJankoHolds,
+  seatHoldTerminal,
+} from './elements/holds';
 import {
   JankoBeamGroupGeometry,
   JankoChordBridge,
@@ -557,6 +575,15 @@ export interface PositionedJankoNote {
    * Round 27: Written linear pitch after fold shift is applied.
    */
   writtenLin?: number;
+  /**
+   * Round 41: absolute pitch symbol scale of this head (`chordSymbolScale` for
+   * a same-hand chord member, `1` for a standalone symbol). Paint, layout and
+   * lint all read this one number, so the digit, its mask and every clearance
+   * audit can never disagree.
+   */
+  symbolScale?: number;
+  /** Round 41: true when this head belongs to a same-hand co-onset chord. */
+  symbolChord?: boolean;
 }
 
 /**
@@ -1001,7 +1028,7 @@ export function buildThreeRailMember(
   t: ResolvedJankoTokens,
   carriedTicks: number
 ): ThreeRailMember {
-  const e = knockoutHalfExtents(o, t, p.note.startTick);
+  const e = knockoutHalfExtents(o, t, p.note.startTick, p);
   const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
   const sourceLin = p.note.pitch.octave * 12 + pc;
   const dir = stemDirection(p.rhythm.hand);
@@ -1425,6 +1452,71 @@ export function railClearsLayout(
 }
 
 /** Every geometric fact one engraved system is built from. */
+/**
+ * Round 41: the painted ink a hold-to-release run has to reckon with, in the
+ * layout's own terms — one source of truth for the engine's seat solve **and**
+ * the linter's re-audit, so the two can never disagree about what is in the
+ * way.
+ */
+export interface JankoHoldClearance {
+  /**
+   * Ink the terminal mark may never be occluded by: every painted neighbour of
+   * the run (glyph masks, written rests, brackets, barlines).
+   */
+  seat: JankoHoldBlocker[];
+  /**
+   * Ink that refuses the connector corridor itself (glyph masks + written
+   * rests). Barlines and brackets are painted **after** the hold layer and
+   * occlude it exactly as a notehead mask occludes a stem, so they are crossed
+   * and republished instead of refusing.
+   */
+  corridor: JankoHoldBlocker[];
+  /** Measure-opening barlines of the system (crossed, and republished). */
+  barlines: JankoHoldBlocker[];
+  /** Bracket ink boxes of the system (crossed, and republished). */
+  brackets: JankoHoldBlocker[];
+}
+
+/**
+ * Collect the painted ink a hold has to clear (see {@link JankoHoldClearance}).
+ * Pure over the resolved layout: the engine's seat solve and the linter's
+ * audit call this same function.
+ */
+export function holdClearanceInk(
+  notes: readonly PositionedJankoNote[],
+  rests: readonly JankoRestGeometry[],
+  clasps: readonly JankoClaspGroupGeometry[],
+  geometry: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): JankoHoldClearance {
+  const corridor: JankoHoldBlocker[] = notes.map((p) => {
+    const { wx, hy } = knockoutHalfExtents(o, t, p.note.startTick, p);
+    return { x0: p.x - wx, x1: p.x + wx, y0: p.y - hy, y1: p.y + hy };
+  });
+  for (const rest of rests) {
+    const box = restInkBox(rest, t);
+    corridor.push({ x0: box.x0, x1: box.x1, y0: box.y0, y1: box.y1 });
+  }
+  const brackets: JankoHoldBlocker[] = clasps.map((clasp) => {
+    const box = claspInkBox(clasp, t);
+    return { x0: box.x0, x1: box.x1, y0: box.y0, y1: box.y1 };
+  });
+  const barlines: JankoHoldBlocker[] = [];
+  for (let m = 1; m <= geometry.measuresPerSystem; m++) {
+    const bx = getMeasureOpeningBarlineX(m, geometry, systemIndex, t);
+    if (bx === null) continue;
+    barlines.push({
+      x0: bx - 0.6,
+      x1: bx + 0.6,
+      y0: geometry.staffTopY,
+      y1: geometry.staffBotY,
+    });
+  }
+  return { seat: [...corridor, ...brackets, ...barlines], corridor, barlines, brackets };
+}
+
 export interface JankoSystemLayout {
   /** Zero-based global system index. */
   index: number;
@@ -1458,6 +1550,23 @@ export interface JankoSystemLayout {
   clasps: JankoClaspGroupGeometry[];
   /** Rails joining contiguous clasps (`'beamed-clasp-rail'` only). */
   claspRails: JankoClaspRailGeometry[];
+  /**
+   * Round 41: the system's exceptional-duration hold-to-release geometry
+   * (`durationEndpoint !== 'none'`; empty otherwise).
+   */
+  holds: JankoHoldGeometry[];
+  /**
+   * Round 41: note ids whose own duration statement the hold replaced — their
+   * stems/flags/dots are suppressed so no redundant exception stem rides
+   * alongside a hold.
+   */
+  holdOwnedIds: string[];
+  /**
+   * Round 41: exceptional members whose hold could not be laid out cleanly.
+   * They keep the canonical exception statement and the linter republishes each
+   * refusal, so nothing is hidden.
+   */
+  holdRefusals: JankoHoldRefusal[];
   /**
    * Note ids whose standalone stem the clasp replaces. A clasp member that
    * belongs to a beam group keeps its stem: a real 16th-note beam is never cut
@@ -1563,6 +1672,7 @@ export interface JankoSharedStemGroup {
 export function suppressedStemIds(layout: JankoSystemLayout): Set<string> {
   return new Set([
     ...layout.claspedStems,
+    ...layout.holdOwnedIds,
     ...layout.verticalChords.flatMap((chord) => chord.suppressedIds),
     ...layout.sharedStems.flatMap((group) => group.suppressedIds),
     ...(layout.compressedCopyIds ? [...layout.compressedCopyIds] : []),
@@ -1869,7 +1979,7 @@ export function resolveDotHighLane(
     const dotY = p.rhythm.dotY ?? p.y;
     for (const q of notes) {
       if (q === p || Math.abs(q.y - p.y) >= EPS) continue;
-      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
       const dx = Math.max(q.x - wx - dotX, 0, dotX - (q.x + wx));
       const dy = Math.max(q.y - hy - dotY, 0, dotY - (q.y + hy));
       if (Math.hypot(dx, dy) >= dotR - EPS) continue;
@@ -1943,7 +2053,7 @@ export function resolveDotFlagClearance(
     let rightBlocked = false;
     for (const q of notes) {
       if (q === p) continue;
-      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
       const qdx = Math.max(q.x - wx - rightX, 0, rightX - (q.x + wx));
       const qdy = Math.max(q.y - hy - curY, 0, curY - (q.y + hy));
       const d = isPositionOfHonor(q.note.startTick)
@@ -1971,7 +2081,7 @@ export function resolveDotFlagClearance(
     let upBlocked = false;
     for (const q of notes) {
       if (q === p) continue;
-      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
       const qdx = Math.max(q.x - wx - curX, 0, curX - (q.x + wx));
       const qdy = Math.max(q.y - hy - upY, 0, upY - (q.y + hy));
       const d = isPositionOfHonor(q.note.startTick)
@@ -2086,7 +2196,7 @@ export function resolveSecondDots(
           air = Math.min(air, Math.hypot(x - q.x, y - q.y) - haloOuter - dotR);
           continue;
         }
-        const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+        const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
         const dx = Math.max(q.x - wx - x, 0, x - (q.x + wx));
         const dy = Math.max(q.y - hy - y, 0, y - (q.y + hy));
         air = Math.min(air, Math.hypot(dx, dy) - dotR);
@@ -3075,12 +3185,42 @@ export const RELAX_SETTLE = 0.005;
  * Honor sound owns the box grown to its halo ring's outer edge on both axes
  * (the ring is drawn ink, so two rings may never cut into each other's box).
  */
+/**
+ * Round 41: ids of every source note that belongs to a **same-hand co-onset
+ * chord** — one onset carrying two or more notes in the same hand.
+ *
+ * Ownership is by source note id, so a merged cross-hand unison (one digit, one
+ * sound) is scaled once and never double-counted, and a note that stands alone
+ * in its hand keeps the canonical symbol size and mask.
+ */
+export function chordSymbolMemberIds(score: QuantizedGridScore): Set<string> {
+  const groups = new Map<string, string[]>();
+  for (const n of score.notes) {
+    const key = `${n.startTick}|${getNoteHand(n.hand, n.pitch.octave)}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(n.id);
+    else groups.set(key, [n.id]);
+  }
+  const ids = new Set<string>();
+  for (const bucket of groups.values()) {
+    if (bucket.length < 2) continue;
+    for (const id of bucket) ids.add(id);
+  }
+  return ids;
+}
+
 export function knockoutHalfExtents(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
-  startTick?: number
+  startTick?: number,
+  head?: { symbolScale?: number; symbolChord?: boolean }
 ): { wx: number; hy: number } {
-  const metrics = getKnockoutMetrics(o, t);
+  // Canonical heads (`scale === 1`, standalone) take the untouched preset path
+  // directly — the solver calls this helper in its innermost loops.
+  const canonical = (head?.symbolScale ?? 1) === 1 && head?.symbolChord !== true;
+  const metrics = canonical
+    ? getKnockoutMetrics(o, t)
+    : getScaledKnockoutMetrics(o, t, head?.symbolScale ?? 1, head?.symbolChord === true);
   if (startTick !== undefined && isPositionOfHonor(startTick)) {
     const halo = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
     return { wx: Math.max(metrics.wx, halo), hy: Math.max(metrics.hy, halo) };
@@ -3543,7 +3683,7 @@ export function perHandDownbeatGroups(
   for (const group of byHand.values()) {
     if (group.length < 2) continue;
     const members = group.map((p): JankoClusterFitMember => {
-      const e = knockoutHalfExtents(o, t, p.note.startTick);
+      const e = knockoutHalfExtents(o, t, p.note.startTick, p);
       const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
       return {
         id: p.note.id,
@@ -3745,7 +3885,7 @@ export function resolveChordColumns(
   // every mapping. Everything downstream (slots, clasps, solve) is geometric
   // over `unit.rows` and runs unchanged.
   const fitMemberOf = (p: PositionedJankoNote): JankoClusterFitMember => {
-    const e = knockoutHalfExtents(o, t, p.note.startTick);
+    const e = knockoutHalfExtents(o, t, p.note.startTick, p);
     const pc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
     return {
       id: p.note.id,
@@ -4402,7 +4542,7 @@ export function resolveChordColumns(
           .flatMap((c) => c.notes)
           .filter((p) => !memberIds.has(p.note.id))
           .map((p) => {
-            const e = knockoutHalfExtents(o, t, p.note.startTick);
+            const e = knockoutHalfExtents(o, t, p.note.startTick, p);
             return {
               id: p.note.id,
               x: unit.nominalX + (offsetsById.get(p.note.id) ?? 0),
@@ -4538,11 +4678,15 @@ export function resolveChordColumns(
   /** Halo-aware mask half-extents of one unit's widest/tallest member. */
   const unitMaskWX = (u: OnsetUnit): number =>
     Math.max(
-      ...u.rows.flatMap((c) => c.notes.map((p) => knockoutHalfExtents(o, t, p.note.startTick).wx))
+      ...u.rows.flatMap((c) =>
+        c.notes.map((p) => knockoutHalfExtents(o, t, p.note.startTick, p).wx)
+      )
     );
   const unitMaskHY = (u: OnsetUnit): number =>
     Math.max(
-      ...u.rows.flatMap((c) => c.notes.map((p) => knockoutHalfExtents(o, t, p.note.startTick).hy))
+      ...u.rows.flatMap((c) =>
+        c.notes.map((p) => knockoutHalfExtents(o, t, p.note.startTick, p).hy)
+      )
     );
   const ordered = [...units].sort((a, b) => a.tick - b.tick);
   /** Minimum head-to-head air (pt) two consecutive onsets keep in time order. */
@@ -4663,7 +4807,7 @@ export function resolveChordColumns(
     let wx = 0;
     let hy = 0;
     for (const p of c.notes) {
-      const e = knockoutHalfExtents(o, t, p.note.startTick);
+      const e = knockoutHalfExtents(o, t, p.note.startTick, p);
       wx = Math.max(wx, e.wx);
       hy = Math.max(hy, e.hy);
     }
@@ -4905,7 +5049,7 @@ export function resolveChordColumns(
     if (x === undefined) return unit ? { ...p, nominalX: unit.nominalX, beatCell: cell } : p;
     // A moved head carries its rhythm stem and its augmentation dot with it:
     // the dot stays hugging the rectangular mask (`x + wx + gap`).
-    const headWx = knockoutHalfExtents(o, t, p.note.startTick).wx;
+    const headWx = knockoutHalfExtents(o, t, p.note.startTick, p).wx;
     const rhythm =
       x === p.x ? p.rhythm : { ...p.rhythm, x, dotX: x + headWx + t.augmentationDotGap };
     return {
@@ -5064,7 +5208,7 @@ export function detectStemDigitCrossings(
   for (const seg of segs.values()) {
     for (const q of notes) {
       if (q.note.id === seg.id) continue;
-      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
       const x0 = q.x - wx - air;
       const x1 = q.x + wx + air;
       if (seg.x + halfStem <= x0 + EPS || seg.x - halfStem >= x1 - EPS) continue;
@@ -5438,11 +5582,17 @@ export function layoutJankoSystemShifted(
     claspQualifiedIds: new Set<string>(),
     railDiagnostics: [],
   };
+  // Round 41: the same-hand chord membership of this score is score-unique, and
+  // the symbol scale is stamped onto every head before any mask is read, so the
+  // column solve, the clearance audits and the paint all see one metric.
+  const chordSymbolIds = o.chordSymbolScale === 1 ? null : chordSymbolMemberIds(score);
   for (let attempt = 0; ; attempt++) {
     const raw = applyFoldPairPresentation(
-      sysNotes.map((n) =>
-        positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets)
-      ),
+      sysNotes.map((n) => {
+        const p = positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets);
+        if (!chordSymbolIds || !chordSymbolIds.has(n.id)) return p;
+        return { ...p, symbolScale: o.chordSymbolScale, symbolChord: true };
+      }),
       o.foldPairPresentation,
       geometry.middleCY,
       t
@@ -5924,10 +6074,166 @@ export function layoutJankoSystemShifted(
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Round 41 — exceptional-duration hold-to-release endpoints.
+  //
+  // An admitted bracket carries one duration for its group; a member whose own
+  // duration differs from that carried value keeps its exact statement (the
+  // golden exception rule). Under `durationEndpoint !== 'none'` that statement
+  // is *replaced* by one horizontal connector that starts flush at the member's
+  // protected right edge, runs at its true pitch y (the pitch symbol is never
+  // moved), and ends in the round's terminal mark.
+  //
+  // The release x is the **laid-out** time anchor: the solved column of the
+  // release tick when the layout has one, the authoritative linear time map
+  // otherwise — never a proportional guess taken independently of the final
+  // columns. Where that exact point already carries protected ink (the next
+  // attack's symbol, a barline, a bracket, a rest), the terminal is seated in
+  // the free lane immediately **before** it and the measured shortfall is
+  // published by the linter (`hold-endpoint-clearance`) — never a hidden mark
+  // and never a silent early clip. A release past the system's last tick is a
+  // **line break, not a release**: the connector runs to the line edge and no
+  // terminal is painted.
+  // -------------------------------------------------------------------------
+  const holdShape: JankoHoldTerminalShape | null =
+    o.durationEndpoint === 'none' ? null : (o.durationEndpoint as JankoHoldTerminalShape);
+  const holds: JankoHoldGeometry[] = [];
+  const holdOwnedIds: string[] = [];
+  const holdRefusals: JankoHoldRefusal[] = [];
+  if (holdShape !== null) {
+    const heldBeamIds = new Set(beams.flatMap((beam) => beam.notes.map((n) => n.id)));
+    const rules = pitchGridRules(geometry, o, t);
+    const clearance = holdClearanceInk(
+      notes,
+      restLayer.rests,
+      clasps,
+      geometry,
+      systemIndex,
+      o,
+      t
+    );
+    const blockers = clearance.seat;
+    const corridorBlockers = clearance.corridor;
+    const systemLastTick =
+      (t.anacrusisTicks ?? 0) +
+      (systemIndex + 1) * geometry.measuresPerSystem * t.ticksPerMeasure;
+    const solvedById = new Map(notes.map((p) => [p.note.id, p]));
+    const terminalReach = holdTerminalReach(t, holdShape);
+    const terminalHalf = holdTerminalHalfHeight(t, holdShape);
+    for (const clasp of clasps) {
+      for (const member of clasp.notes) {
+        const p = solvedById.get(member.id);
+        if (!p) continue;
+        if (p.note.durationTicks === claspMemberCarriedTicks(clasp, member.id)) continue;
+        // A member of a real beam keeps its beamed duration ink: the beam is the
+        // statement, and a hold on top of it would double-encode the value.
+        if (heldBeamIds.has(member.id)) continue;
+        const releaseTick = p.note.startTick + p.note.durationTicks;
+        const x1 = p.x + knockoutHalfExtents(o, t, p.note.startTick, p).wx;
+        const continues = releaseTick > systemLastTick;
+        let releaseX: number;
+        let terminalX: number;
+        let x2: number;
+        let shortfall = 0;
+        let seatReason: JankoHoldSeatReason = '';
+        if (continues) {
+          releaseX = geometry.staffRight;
+          x2 = geometry.staffRight;
+          terminalX = x2;
+        } else {
+          // The resolved time anchor of the release tick, clamped into the
+          // staff: ink never leaves the line, so a release at (or resolved
+          // past) the system edge anchors on the edge itself and the terminal
+          // seats clear of the closing barline with a published shortfall —
+          // never an endpoint painted outside the staff.
+          releaseX = Math.min(
+            chordColumns.columns.get(releaseTick) ??
+              getTickColumnX(releaseTick, geometry, systemIndex, o, t, claspInsets),
+            geometry.staffRight
+          );
+          const seat = seatHoldTerminal(
+            releaseX,
+            p.y,
+            holdShape,
+            blockers,
+            t,
+            x1 + terminalReach + 0.5
+          );
+          if (!seat) {
+            holdRefusals.push({
+              noteId: member.id,
+              startTick: p.note.startTick,
+              releaseTick,
+              reason:
+                `no free lane for the ${holdShape} terminal between the symbol edge ` +
+                `(x=${x1.toFixed(2)}) and the release point (x=${releaseX.toFixed(2)})`,
+            });
+            continue;
+          }
+          terminalX = seat.terminalX;
+          shortfall = seat.shortfall;
+          seatReason = seat.reason;
+          x2 = terminalX - terminalReach;
+        }
+        if (x2 <= x1 + 0.2) {
+          holdRefusals.push({
+            noteId: member.id,
+            startTick: p.note.startTick,
+            releaseTick,
+            reason:
+              `resolved release x=${releaseX.toFixed(2)} leaves no connector length from ` +
+              `the symbol edge x=${x1.toFixed(2)}`,
+          });
+          continue;
+        }
+        // The connector corridor itself must be free of protected ink: a stroke
+        // that would run under a glyph is exactly the hidden ink this round
+        // forbids, so the member keeps its canonical statement instead.
+        const corridor = corridorBlockers.find(
+          (b) =>
+            b.x1 > x1 && b.x0 < x2 && b.y1 > p.y - terminalHalf && b.y0 < p.y + terminalHalf
+        );
+        if (corridor) {
+          holdRefusals.push({
+            noteId: member.id,
+            startTick: p.note.startTick,
+            releaseTick,
+            reason:
+              `the connector corridor is occupied by protected ink ` +
+              `(x ${corridor.x0.toFixed(2)}–${corridor.x1.toFixed(2)})`,
+          });
+          continue;
+        }
+        holds.push({
+          noteId: member.id,
+          startTick: p.note.startTick,
+          releaseTick,
+          releaseX,
+          terminalX,
+          clearanceShortfall: shortfall,
+          seatReason,
+          y: p.y,
+          x1,
+          x2,
+          shape: holdShape,
+          continuesAtSystemBreak: continues,
+          underlays: holdUnderlays(x1, x2, p.y, rules, t, [
+            ...clearance.corridor,
+            ...clearance.brackets,
+          ]),
+          stroke: t.holdConnectorStroke,
+          underlayWidth: t.holdUnderlayWidth,
+        });
+        holdOwnedIds.push(member.id);
+      }
+    }
+  }
+
   // Round 23: flag crossed notes for tall knockouts. Paint-only — every head
   // keeps its column; the erasure grows to the stem-start line instead.
   const suppressed = new Set<string>([
     ...claspedStems,
+    ...holdOwnedIds,
     ...verticalChords.flatMap((chord) => chord.suppressedIds),
     ...sharedStems.flatMap((group) => group.suppressedIds),
     ...(compressedCopyIds ? [...compressedCopyIds] : []),
@@ -5973,6 +6279,9 @@ export function layoutJankoSystemShifted(
     unwrittenRests: restLayer.unwritten,
     clasps,
     claspRails,
+    holds,
+    holdOwnedIds,
+    holdRefusals,
     claspedStems,
     verticalChords,
     chordBridges,
@@ -6098,6 +6407,13 @@ function renderNotesLayer(
     out.push('    </g>');
   }
 
+  // 1b. Round 41 hold-to-release layer: the white underlays that replace the
+  //     local staff rule, the shared connector and the terminal marks. Painted
+  //     between the staff rules and the rhythm layer, so it erases exactly the
+  //     rule segments it names — and nothing painted later (stems, beams,
+  //     brackets, rests, noteheads) can be cut by it.
+  if (layout.holds.length > 0) out.push(renderJankoHolds(layout.holds, t));
+
   // 2. Rhythm layer (the beamed dialect renders its stems group-wise). It is
   //    painted *beneath* the noteheads so the white knockouts erase whatever
   //    stem or beam passes behind a glyph — the invariant the linter audits.
@@ -6206,6 +6522,8 @@ function renderNotesLayer(
           hand: p.coord.hand,
           isPositionOfHonor: p.note.startTick === 0 && o.showHonorHalo,
           tallKnockout: p.tallKnockout === true,
+          symbolScale: p.symbolScale,
+          chordMember: p.symbolChord,
         },
         t,
         o

@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   isAbstractCandidateWindow,
   resolveCandidate,
+  type JankoCandidate,
+  type JankoCandidateRound,
 } from '../src/render/janko/candidates.js';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -37,29 +37,108 @@ const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
 
 // ---------------------------------------------------------------------------
+// Historical Round 40 registry (parked)
+//
+// Round 41 opens the exceptional-duration release-endpoint comparison; the
+// Round 40 cards below are frozen verbatim so this round's proofs keep judging
+// the numbered two-column placement they were written for, independent of the
+// live registry.
+// ---------------------------------------------------------------------------
+
+/** Historical Round 40 metadata (parked). */
+export const ROUND_40_METADATA: JankoCandidateRound = {
+  round: 40,
+  title: 'Numbered two-column pitch placement — Round 40',
+  description:
+    'Evaluate numbered two-column whole-tone parity placement against canonical Brahms Op. 118 No. 1 m. 8. Compare conservative proportional protection (0.68× font, 0.408pt margin, 0.272pt air) with tightened protection (0.80× font, 0.10pt margin, 0.20pt air).',
+  openAxes: ['pitchPlacement'],
+};
+
+/** Historical Round 40 candidates (parked). */
+export const ROUND_40_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'control',
+    label: 'Literal canonical Brahms control',
+    description:
+      'Literal canonical Brahms control with standard three-rail placement and unscaled font/mask tokens.',
+    axis: 'pitchPlacement',
+    options: { pitchPlacement: 'standard' },
+    windows: [
+      {
+        scoreId: 'brahms-op118-no1',
+        measureStart: 8,
+        measureCount: 1,
+        title: 'Brahms Op. 118 No. 1 · m. 8',
+      },
+    ],
+    tags: ['brahms', 'canonical', 'control'],
+  },
+  {
+    id: 'parity-scale-068',
+    label: 'Numbered parity columns (scale 0.68)',
+    description:
+      'Numbered parity columns with digitFontSize = 3.944pt (0.68×), proportionally scaled knockoutMargin = 0.408pt and knockoutAir = 0.272pt.',
+    axis: 'pitchPlacement',
+    options: { pitchPlacement: 'parity-columns' },
+    tokens: { digitFontSize: 3.944, knockoutMargin: 0.408, knockoutAir: 0.272 },
+    windows: [
+      {
+        scoreId: 'brahms-op118-no1',
+        measureStart: 8,
+        measureCount: 1,
+        title: 'Brahms Op. 118 No. 1 · m. 8',
+        caption:
+          'm. 8 window lint clean · the card chip reports whole-score findings outside this one-bar window (experiment, not corpus adoption)',
+      },
+    ],
+    tags: ['brahms', 'parity', 'scale-068'],
+  },
+  {
+    id: 'parity-scale-080',
+    label: 'Numbered parity columns (scale 0.80)',
+    description:
+      'Numbered parity columns with digitFontSize = 4.64pt (0.80×), independently tightened knockoutMargin = 0.10pt and knockoutAir = 0.20pt.',
+    axis: 'pitchPlacement',
+    options: { pitchPlacement: 'parity-columns' },
+    tokens: { digitFontSize: 4.64, knockoutMargin: 0.10, knockoutAir: 0.20 },
+    windows: [
+      {
+        scoreId: 'brahms-op118-no1',
+        measureStart: 8,
+        measureCount: 1,
+        title: 'Brahms Op. 118 No. 1 · m. 8',
+        caption:
+          'm. 8 window lint clean · the card chip reports whole-score findings outside this one-bar window (experiment, not corpus adoption)',
+      },
+    ],
+    tags: ['brahms', 'parity', 'scale-080'],
+  },
+];
+
+// ---------------------------------------------------------------------------
 // 1. Registry: Round 40 exactly three real-score cards on identical Brahms m8
 // ---------------------------------------------------------------------------
 
-test('Round 40 metadata: Round 40 title, open axis pitchPlacement, no strip', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 40);
+test('Round 40 (parked) metadata: Round 40 title, open axis pitchPlacement, no strip', () => {
+  assert.equal(ROUND_40_METADATA.round, 40, 'the parked round is the historical Round 40');
   assert.match(
-    CURRENT_ROUND_METADATA.title,
+    ROUND_40_METADATA.title,
     /Numbered two-column pitch placement — Round 40/i
   );
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['pitchPlacement']);
+  assert.deepEqual(ROUND_40_METADATA.openAxes, ['pitchPlacement']);
   assert.equal(
-    CURRENT_ROUND_METADATA.compareStrip,
+    ROUND_40_METADATA.compareStrip,
     undefined,
     'no comparison strip declared (cards only)'
   );
 });
 
-test('Round 40 candidate registry: exactly three cards on Brahms m.8 window', () => {
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'exactly three active cards');
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+test('Round 40 (parked) candidate registry: exactly three cards on Brahms m.8 window', () => {
+  assert.equal(ROUND_40_CANDIDATES.length, 3, 'exactly three active cards');
+  const ids = ROUND_40_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, ['control', 'parity-scale-068', 'parity-scale-080']);
 
-  for (const c of CURRENT_CANDIDATES) {
+  for (const c of ROUND_40_CANDIDATES) {
     assert.equal(c.axis, 'pitchPlacement', `${c.id}: single open axis`);
     assert.equal(c.kind, undefined, `${c.id}: score candidate (not abstract)`);
     assert.ok(c.windows && c.windows.length === 1, `${c.id}: exactly one window`);
@@ -72,7 +151,7 @@ test('Round 40 candidate registry: exactly three cards on Brahms m.8 window', ()
 });
 
 test('Candidate card option and token deltas are correctly configured', () => {
-  const [control, card068, card080] = CURRENT_CANDIDATES;
+  const [control, card068, card080] = ROUND_40_CANDIDATES;
 
   // Card 1: Literal canonical Brahms control
   assert.equal(control.options?.pitchPlacement, 'standard');
@@ -120,7 +199,7 @@ test('Brahms m.8 downbeat source data verification: 5 RH notes at tick 1392', ()
 test('Actual engine placement: Cards 2 & 3 place all 5 RH odd notes in one parity column', () => {
   const pairGap = getClusterSpacingPreset('tight').pairGap;
 
-  for (const card of [CURRENT_CANDIDATES[1], CURRENT_CANDIDATES[2]]) {
+  for (const card of [ROUND_40_CANDIDATES[1], ROUND_40_CANDIDATES[2]]) {
     const resolved = resolveCandidate(card);
     const layouts = layoutJankoScore(BRAHMS, resolved.options, resolved.tokens);
 
@@ -188,7 +267,7 @@ test('Actual engine placement: Cards 2 & 3 place all 5 RH odd notes in one parit
 });
 
 test('Canonical control placement: three-rail staggering active (not all on pairGap)', () => {
-  const control = resolveCandidate(CURRENT_CANDIDATES[0]);
+  const control = resolveCandidate(ROUND_40_CANDIDATES[0]);
   const layouts = layoutJankoScore(BRAHMS, control.options, control.tokens);
   const system = layouts.find((sys) =>
     sys.notes.some((p) => p.note.startTick === 1392)
@@ -207,7 +286,7 @@ test('Canonical control placement: three-rail staggering active (not all on pair
 
 test('Scaling in emitted SVG: font-size and knockout rect dimensions match tokens', () => {
   // Render m.8 crop for card 2 (scale 0.68)
-  const card068 = resolveCandidate(CURRENT_CANDIDATES[1]);
+  const card068 = resolveCandidate(ROUND_40_CANDIDATES[1]);
   const svg068 = renderJankoCrop(BRAHMS, 8, 1, card068.options, card068.tokens);
   assert.ok(svg068.includes('font-size="3.944pt"'), 'card068 emits font-size 3.944pt');
 
@@ -220,7 +299,7 @@ test('Scaling in emitted SVG: font-size and knockout rect dimensions match token
   );
 
   // Render m.8 crop for card 3 (scale 0.80)
-  const card080 = resolveCandidate(CURRENT_CANDIDATES[2]);
+  const card080 = resolveCandidate(ROUND_40_CANDIDATES[2]);
   const svg080 = renderJankoCrop(BRAHMS, 8, 1, card080.options, card080.tokens);
   assert.ok(svg080.includes('font-size="4.64pt"'), 'card080 emits font-size 4.64pt');
 
@@ -234,7 +313,7 @@ test('Scaling in emitted SVG: font-size and knockout rect dimensions match token
 });
 
 test('Knockout protection and paint order in emitted SVGs', () => {
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_40_CANDIDATES) {
     const resolved = resolveCandidate(card);
     const svg = renderJankoCrop(BRAHMS, 8, 1, resolved.options, resolved.tokens);
     const metrics = getKnockoutMetrics(resolved.options, resolved.tokens);
@@ -289,7 +368,7 @@ test('Synthetic unit test: pitch-based parity assignment and diagonal clearance'
     ],
   };
 
-  for (const card of [CURRENT_CANDIDATES[1], CURRENT_CANDIDATES[2]]) {
+  for (const card of [ROUND_40_CANDIDATES[1], ROUND_40_CANDIDATES[2]]) {
     const resolved = resolveCandidate(card);
 
     for (const [label, score] of [['A', scoreA], ['B', scoreB]] as const) {
@@ -323,7 +402,7 @@ test('Synthetic unit test: pitch-based parity assignment and diagonal clearance'
 // ---------------------------------------------------------------------------
 
 test('Brahms m.8 downbeat shared half-duration bracket preserved', () => {
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_40_CANDIDATES) {
     const resolved = resolveCandidate(card);
     const layouts = layoutJankoScore(BRAHMS, resolved.options, resolved.tokens);
     const system = layouts.find((sys) =>
@@ -351,7 +430,7 @@ test('Brahms m.8 downbeat shared half-duration bracket preserved', () => {
 // ---------------------------------------------------------------------------
 
 test('Candidate linter coverage: all three cards lint cleanly on Brahms m.8', () => {
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_40_CANDIDATES) {
     const resolved = resolveCandidate(card);
     const report = lintJankoScore(BRAHMS, resolved.options, resolved.tokens);
     const m8Violations = report.violations.filter((v) => v.measure === 8);
