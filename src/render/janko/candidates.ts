@@ -503,65 +503,33 @@ export const HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID = 'hold-endpoint-specimen';
 /** Score id of the Phase-3 (Round 42) duration-vocabulary specimen. */
 export const DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID = 'duration-vocabulary-specimen';
 
-/** Metadata of the Round 42 decision round (duration vocabulary). */
+/** Score id of the Round 43 pitch-parity specimen (1-span / 2-span / octave). */
+export const PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID = 'pitch-parity-specimen';
+
+/** Metadata of the Round 43 decision round (reusable pitch + symbolic-duration study). */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 42,
-  title: 'Duration bracket vocabulary — Round 42',
+  round: 43,
+  title: 'Reusable pitch + symbolic-duration study — Round 43',
   description:
-    'Four complete, matched columns judge the shared-bracket duration vocabulary on one registered specimen, at one physical scale and on identical rows: the current ordinary lone-note carrier (canonical full-size symbols), the current shared bracket at 75 % admitted-member size, the proposed compact bracket family (2.4pt cuts at 0.42pt stroke; elongation rings of 1.60pt centreline diameter at 0.38pt stroke, outer Ø1.98pt; uniform 2.40pt mark pitch), and the proposed fixed-length 9.0pt horizontal exception carrier that repeats the member’s own compact marks. Every column states all eight plain values 3/6/12/24/48/96/192/384; small augmentation, beam and stress strips carry the shared dot, the real beams and the dense-neighbour / staff-rule / multiple-exception cases. Only genuinely admitted bracket members take the 75 % size — a clean two-note column stays full size. The canonical Reference and the PDF are untouched, and the composites 108/120/504 are stated as documented limitations, never faked.',
-  openAxes: ['bracketDurationGrammar', 'exceptionCarrier'],
+    'One proposed **midpoint** design is judged on fixed, reusable cases that stay put across later tuning: two-column whole-tone **parity** pitch placement (even family left, odd family right), and one **unified diagonal-slash** duration family painted **identically** on the shared bracket and on the horizontal exception carrier. The cut is the midpoint of the golden 7.5pt/1.0pt cut and the compact 2.4pt/0.42pt cut (4.95pt at 0.71pt stroke, page-raked 0.22 rail-so-equal rise), the ring the midpoint of the golden R2.40/0.80pt and compact R0.80/0.38pt rings (R1.60pt at 0.59pt stroke). Counts are shared with the compact study (4/3/2/1 cuts; bare; 1/2/3 rings). Only genuinely admitted bracket members take the 75 % pitch-symbol size; a clean two-note column stays full size. Every spacing and the fixed carrier length are derived from the emitted endpoints and stroke, never copied from the rejected memo. The canonical Reference, goldens and PDF are untouched. Honest whole-score candidate reports, nothing filtered: applied to the whole Brahms score this single card reports exactly two stem-through-simultaneity errors and two chordal-overlap warnings — m. 33 (brahms-op118-no1-445/444) and m. 53 (brahms-op118-no1-731/730) — the pre-existing LH fold-coincident octave-pair folding findings scheduled for a future round, both OFF this round’s displayed windows and NOT Round-43 regressions; plus six carrier-duration-unsupported refusals for the 120-tick tie-composite exceptions (brahms-op118-no1-295 m. 22, 351 m. 26, 448 m. 33, 581 m. 42, 637 m. 46, 734 m. 53). The composites 120 = 96 + 24, 504 = 192 + 192 + 96 + 24 and 108 = 96 + 12 have no exact reading in this alphabet: no carrier is painted for them (a mark-less carrier would read as a bare quarter) and each member keeps its own ordinary duration ink, which does NOT state the composite exactly — a published limitation, not a solution. Applied to the duration-vocabulary specimen the same card reports the deliberately tight m. 33 stress row as a LABELLED failed-fit / capacity counterexample: the published grid-crossing-offset (head dvs-stress-12300-9_5 pushed past its beat cell) and the new carrier-mark-occlusion findings (the next-onset dyad’s erasure mask destroys the whole-value rings of dvs-stress-12288-9_5, the first ring almost entirely). The pitch-parity specimen is clean. Every whole-score report is listed in full and none is suppressed; no candidate card is claimed clean.',
+  openAxes: ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
 };
 
-/** The specimen measure spans every Round 42 column is engraved on. */
-const ROUND_42_MAIN = {
-  ordinary: { measureStart: 1, measureCount: 8 },
-  bracket: { measureStart: 17, measureCount: 8 },
+/** Round 43 window spans on the duration-vocabulary specimen (the duration key + exceptions + stress). */
+const ROUND_43_SPECIMEN = {
+  bracketKey: { measureStart: 17, measureCount: 8 },
   exception: { measureStart: 25, measureCount: 8 },
+  stress: { measureStart: 33, measureCount: 2 },
 } as const;
 
-/**
- * Round 42: the shared supplementary strips every column carries, so the four
- * cards are rows-for-row comparable. The augmentation strip states single and
- * double dots (the shared satellite); the beam strip states real beams (never
- * replaced by flags); the stress strip states the dense cases the clean
- * single-value rows cannot.
- */
-function round42Strips(): JankoCandidateWindow[] {
-  return [
-    {
-      scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
-      measureStart: 9,
-      measureCount: 6,
-      title: 'Augmentation strip · mm. 9–14 — single and double dots',
-      caption:
-        'The shared augmentation dot (1.5× and 1.75×): 36/72/144/288 take one dot, 42/84 two. The dot is one primitive across every column — the compact bracket reads a dotted value as its own plain marks plus the same satellite.',
-    },
-    {
-      scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
-      measureStart: 15,
-      measureCount: 2,
-      title: 'Beamed ordinary strip · mm. 15–16 — the real beam set',
-      caption:
-        'Four 16ths beamed inside one beat, then four 8ths across two beats: the actual current beamed symbol set, engraved by the engine’s beam solver — never replaced by flags for the study.',
-    },
-    {
-      scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
-      measureStart: 33,
-      measureCount: 2,
-      title: 'Stress strip · mm. 33–34 — next onset, 2-span same-column pair, staff rule, two exceptions',
-      caption:
-        'm. 33 holds a top exception (192 against a carried 96) beside a full-size, unbracketed two-note dyad that re-takes its pitch on the next onset (a 2-span same-column pair) — the fixed 9.0pt carrier has no room and its shortfall is published, never clipped. m. 34 holds two exceptions of different values in one chord: the 192 exception’s carrier coincides with the lin-60 staff rule; the 6 exception sits in the opposite parity column, where its own stem clears.',
-    },
-  ];
-}
-
-/** A Round 42 main-band window (the eight plain values on one carrier). */
-function round42Main(
+/** A Round 43 window on the duration-vocabulary specimen. */
+function round43Specimen(
   span: { measureStart: number; measureCount: number },
   title: string,
   caption: string
-): JankoCandidateWindow {
+): JankoScoreCandidateWindow {
   return {
+    kind: 'score',
     scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
     measureStart: span.measureStart,
     measureCount: span.measureCount,
@@ -571,95 +539,112 @@ function round42Main(
 }
 
 /**
- * Round 42: the duration vocabulary — four matched columns, one physical scale.
+ * Round 43 — the fixed, reusable case set: seven authentic Brahms windows for
+ * the pitch columns and the duration vocabulary, the duration-vocabulary
+ * specimen's key / exception / stress bands, and the pitch-parity specimen's
+ * 1-span / 2-span / octave / next-onset rows. Every window states one reading
+ * question with its labels (ordinary duration names and duodecimal pitch/spans)
+ * directly associated.
+ */
+function round43Windows(): JankoCandidateWindow[] {
+  return [
+    brahmsWindow(
+      5,
+      1,
+      'Brahms m. 5 · uniform triad — both parity columns',
+      'The RH downbeat triad 4/4 · 4/5 · 9/4 (all 96-tick): 4/4 and its 10-span repeat 4/5 are both even, so they share the left parity column 30.0pt apart, while the odd 9/4 takes the right column — one bracket, one value (one ring), both columns read at a glance.'
+    ),
+    brahmsWindow(
+      7,
+      1,
+      'Brahms m. 7 · dense five-note column — both columns',
+      'The RH downbeat 2/4 · 5/4 · 9/3 · 9/4 · b/3 (all 96-tick) is the densest onset: its members split across both parity columns by absolute pitch parity, the odd family stacked on the right and the lone even 2/4 on the left, under one shared 96-tick bracket (one ring).'
+    ),
+    brahmsWindow(
+      8,
+      1,
+      'Brahms m. 8 · one-column 2-span pairs, 10-span repeats, second-onset exception',
+      'The RH downbeat 5/3 · 5/4 · 7/3 · 7/4 · b/3 is ALL odd, so every member shares one parity column: the 2-span neighbours (5/3→7/3, 5/4→7/4) sit 5.0pt apart and the 10-span repeats (5/3→5/4) 30.0pt apart. At the second onset the b/3 states 48 (a quarter) against its bracket’s carried 96 — a genuine exception, and a quarter’s carrier is deliberately bare (it paints no mark at all). Because it is bare it loses no value ink: the fixed run reaches about 1.4pt into the next onset’s erasure mask (20.49pt of 21.91pt free before it), a tail occlusion of a mark-less carrier — a published shortfall, not an unreadable row.'
+    ),
+    brahmsWindow(
+      9,
+      1,
+      'Brahms m. 9 · multiple exceptions on one column',
+      'The RH downbeat 5/3 · 5/4 · 7/3 · 7/4 · b/3 (all odd, one column) states 144 · 192 · 144 · 192 · 144: the two 192-tick members are exceptions against the carried 144, each stating its own value with the compact counts (2 rings) on its own carrier, so a single chord owns two exceptions without moving a pitch.'
+    ),
+    brahmsWindow(
+      35,
+      2,
+      'Brahms mm. 35–36 · transposed related triads (source-verified)',
+      'Literal source check: m. 35’s RH triad 7/4 · 7/5 · 0/5 is exactly m. 5’s 4/4 · 4/5 · 9/4 transposed up 3 semitones (same shape, both parity columns, one 96-tick value); m. 36 restates the SAME m. 5 shape one step off, its middle member raised a 1-span (4/4 · a/4 · 4/5) — the same reading, re-spelled.'
+    ),
+    brahmsWindow(
+      37,
+      1,
+      'Brahms m. 37 · exception ownership on one column',
+      'The RH downbeat 0/4 · 0/5 · 6/4 (all even, one parity column) states 96 · 96 · 48: the 48-tick 6/4 is the exception against the bracket’s carried 96, and the carrier’s own marks — not its fixed length — state that value. The second onset restates the reading (b/3 · 2/4 · 8/4 · b/4), its own 48-tick 2/4 the second quarter exception against the carried 96 — so m. 37 owns TWO quarter exceptions, one bare carrier each, on their own columns. Single-note ownership: the pitch symbol never moves.'
+    ),
+    brahmsWindow(
+      67,
+      1,
+      'Brahms m. 67 · long-value exception, 3 rings',
+      'The RH downbeat 0/4 · 0/5 · 5/4 splits across both parity columns (even 0/4, 0/5; odd 5/4) and states 288 · 288 · 384: the 384-tick member is the exception against the carried 288 (dotted whole) and reads as three elongation rings in the compact counts.'
+    ),
+    round43Specimen(
+      ROUND_43_SPECIMEN.bracketKey,
+      'Duration key · specimen mm. 17–24 — all eight plain values on the bracket',
+      'Read left to right 3 · 6 · 12 · 24 · 48 · 96 · 192 · 384 (64th · 32nd · 16th · 8th · quarter · half · whole · double-whole) as the direct value-to-ink key: 4/3/2/1 cuts, a bare quarter, then 1/2/3 rings — every plain value distinct on one bracket, cut 4.95pt × 0.71pt, ring R1.60pt × 0.59pt.'
+    ),
+    round43Specimen(
+      ROUND_43_SPECIMEN.exception,
+      'Exception carriers · specimen mm. 25–32 — every plain value as an exception',
+      'Each row’s top member states a different value from its bracket’s carried one, so all eight 3 · 6 · 12 · 24 · 48 · 96 · 192 · 384 appear as genuine exceptions. Each carrier is the SAME diagonal slash and ring as the bracket, stacked along a fixed 21.91pt carrier whose length never states the value or a release — the marks do.'
+    ),
+    round43Specimen(
+      ROUND_43_SPECIMEN.stress,
+      'FAILED-FIT · stress · specimen mm. 33–34 — fixed-carrier capacity ceiling, not a readable engraving',
+      'FAILED-FIT / capacity counterexample — kept to mark the fixed carrier’s limit, NOT shown as a readable engraving and NOT proposed as notation. m. 33: the 192-tick top exception’s fixed 21.91pt carrier runs into the next onset only a 16th later, and that later dyad’s white erasure mask knocks out the carrier’s marks: the first of the two whole-value rings is almost entirely wiped out (only its left rim survives — about 86% of the ring’s box, ≈93% of its diameter) and the second ring is eaten into, so the whole-note 192 the rings state is destroyed on the page. The same next-onset pressure fans the dyad’s upper 16th head (pitch 9/5) past its beat cell’s right grid line — head at x = 55.18 against the cell edge x = 53.28 — crossing out of its 16th-note cell into the next one (the published grid-crossing-offset). m. 34 is clean: two exceptions of different values (192 and 6) in one chord, the 192 sitting on the lin-60 octave-line rule. Both m. 33 findings are published, never hidden; this row is the capacity ceiling of a fixed-length carrier, not a readable value.'
+    ),
+    {
+      kind: 'score',
+      scoreId: PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID,
+      measureStart: 1,
+      measureCount: 4,
+      title: 'Pitch parity specimen · mm. 1–4 — 1-span, 2-span, octave repeat, next onset',
+      caption:
+        'm. 1: the 1-span pair 4/4 · 5/4 is one even + one odd, so the two notes take OPPOSITE parity columns — genuinely spread, so it is admitted to a bracket and its two heads take 0.75. m. 2: the 2-span pair 4/4 · 6/4 is both even, so it takes ONE column 5.0pt apart — a clean two-note column, NOT admitted, so both heads stay full size with the established fan. m. 3: the 10-span repeat 4/5 re-takes 4/4’s own column 30.0pt away. m. 4: a 1-span dyad (opposite columns → admitted, 0.75) with a lone note on the very next onset (full size).'
+    },
+  ];
+}
+
+/**
+ * Round 43 — one proposed **midpoint** design (no obligatory current control;
+ * the Reference already supplies the incumbent).
  *
- * Every card engraves the registered duration-vocabulary specimen
- * (`duration-vocabulary-specimen`): a main band stating all eight plain values
- * on its own carrier plus the three shared strips. The four columns differ only
- * in their duration vocabulary and admitted-member scale, never in placement,
- * row order or size:
+ * The single card states the round's whole design as one coherent family:
  *
- * 1. **current ordinary** — the canonical lone-note stem/flag/ring vocabulary at
- *    full size (3 and 6 DO paint their 4th/3rd flags);
- * 2. **current bracket** — the incumbent shared bracket at 75 % admitted-member
- *    size (short values saturate at two cuts, long at two open rings);
- * 3. **compact bracket** — the proposed compact family: 4/3/2/1 cuts, bare
- *    quarter, then 1/2/3 elongation rings, so all eight values are distinct;
- * 4. **compact horizontal exception** — the compact bracket plus the proposed
- *    fixed-length 9.0pt horizontal carrier for each genuine exception member.
- *
- * The option deltas are minimal: `chordSymbolScale` (the admitted-member size)
- * plus the round’s two axes. The specimen itself sets the shared
- * parity-column placement, so no card restates it.
+ * - **pitch** — two-column whole-tone parity (`pitchPlacement: 'parity-columns'`);
+ * - **duration** — the unified diagonal-slash family (`bracketDurationGrammar:
+ *   'midpoint'`) at midpoint dimensions, painted identically on the bracket and
+ *   on the fixed-length horizontal exception carrier (`exceptionCarrier:
+ *   'horizontal'`);
+ * - **size** — 0.75 for genuinely admitted bracket members only
+ *   (`chordSymbolScale: 0.75`); clean dyads and lone notes stay full size.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'duration-ordinary',
-    label: 'Duration — current ordinary (full size)',
+    id: 'midpoint-parity',
+    label: 'Midpoint design — two-column pitch + unified diagonal-slash duration',
     description:
-      'The canonical lone-note vocabulary at full size over all eight plain values: 3/6/12/24 carry 4/3/2/1 flags, 36 keeps its dot, and every value from 48 up is a bare stem — so 48/96/192/384 alias one another. This is the control column the bracket vocabulary is measured against.',
-    axis: 'bracketDurationGrammar',
-    options: { chordSymbolScale: 1, bracketDurationGrammar: 'golden', exceptionCarrier: 'none' },
-    windows: [
-      round42Main(
-        ROUND_42_MAIN.ordinary,
-        'Specimen mm. 1–8 — ordinary lone-note carrier (current)',
-        'One lone note per plain value, read left to right 3 · 6 · 12 · 24 · 48 · 96 · 192 · 384. The emitted current alphabet distinguishes only 12 / 24 / 36 (dotted); 3 and 6 DO show their 4th/3rd flags, and 48 and longer are a bare stem, so the long values alias one another. Full-size canonical symbols, no bracket.'
-      ),
-      ...round42Strips(),
-    ],
-    tags: ['specimen', 'ordinary', 'duration'],
-  },
-  {
-    id: 'duration-bracket-current',
-    label: 'Duration — current shared bracket (75 %)',
-    description:
-      'The incumbent shared-duration bracket over all eight plain values, with admitted members at 75 % symbol size. The bracket saturates at two transverse cuts for 3/6/12 and at two open rings for 192/384, so those values alias within each class.',
-    axis: 'bracketDurationGrammar',
-    options: { chordSymbolScale: 0.75, bracketDurationGrammar: 'golden' },
-    windows: [
-      round42Main(
-        ROUND_42_MAIN.bracket,
-        'Specimen mm. 17–24 — current shared bracket (75 %)',
-        'A three-note chord carries each value in turn (3 · 6 · 12 · 24 · 48 · 96 · 192 · 384). The current bracket paints two cuts for 3/6/12 and one cut for 24; a bare spine for 48; one open ring for 96; and two open rings for 192/384 — so 3/6/12 and 192/384 alias. Members at 75 % size; standalone symbols would stay full size.'
-      ),
-      ...round42Strips(),
-    ],
-    tags: ['specimen', 'bracket', 'current', 'duration'],
-  },
-  {
-    id: 'duration-bracket-compact',
-    label: 'Duration — compact bracket (proposed)',
-    description:
-      'The proposed compact bracket family over all eight plain values: 4/3/2/1 short cuts for 3/6/12/24, a bare quarter, then 1/2/3 elongation rings for 96/192/384. Cuts are 2.4pt long at 0.42pt stroke; rings are 1.60pt centreline diameter at 0.38pt stroke (outer Ø1.98pt); marks sit at a uniform 2.40pt pitch — so all eight values are distinct on one bracket.',
-    axis: 'bracketDurationGrammar',
-    options: { chordSymbolScale: 0.75, bracketDurationGrammar: 'compact' },
-    windows: [
-      round42Main(
-        ROUND_42_MAIN.bracket,
-        'Specimen mm. 17–24 — compact bracket family (proposed)',
-        'The same three-note chords as the current column, engraved with the compact alphabet: 4/3/2/1 cuts (3 · 6 · 12 · 24), a bare quarter (48), then 1/2/3 rings (96 · 192 · 384). Every plain value is now distinct. Cuts 2.4pt × 0.42pt; rings Ø1.60pt centreline / 0.38pt stroke (outer Ø1.98pt); mark pitch 2.40pt.'
-      ),
-      ...round42Strips(),
-    ],
-    tags: ['specimen', 'bracket', 'compact', 'duration'],
-  },
-  {
-    id: 'duration-bracket-exception',
-    label: 'Duration — fixed-length horizontal exception carrier (proposed)',
-    description:
-      'The compact bracket plus the proposed fixed-length 9.0pt horizontal exception carrier. Each row’s own-duration member differs from its bracket’s carried mode, so it is a genuine exception in every row: its own stem/flag ink is replaced by one horizontal 9.0pt carrier at its true pitch, repeating its own compact marks. The length is a typographic constant — independent of the member’s duration and of its release.',
-    axis: 'exceptionCarrier',
-    options: { chordSymbolScale: 0.75, bracketDurationGrammar: 'compact', exceptionCarrier: 'horizontal' },
-    windows: [
-      round42Main(
-        ROUND_42_MAIN.exception,
-        'Specimen mm. 25–32 — fixed-length horizontal exception carriers (proposed)',
-        'Each three-note chord carries a value in its inner members while its top member states a DIFFERENT one — a genuine exception in every row (3 · 6 · 12 · 24 · 48 · 96 · 192 · 384). The exception’s own stem is replaced by one 9.0pt horizontal carrier at its true pitch, marking its own value with the compact alphabet. The carrier length never encodes the duration or the release — only the marks do.'
-      ),
-      ...round42Strips(),
-    ],
-    tags: ['specimen', 'bracket', 'compact', 'exception', 'carrier', 'duration'],
+      'Two-column whole-tone parity pitch placement with the unified midpoint diagonal-slash duration family: 4/3/2/1 cuts (4.95pt × 0.71pt, page-raked 0.22), a bare quarter, then 1/2/3 rings (R1.60pt × 0.59pt), identical on the bracket and on the fixed 21.91pt horizontal exception carrier. Only genuinely admitted bracket members take 0.75 (a spread 1-span pair qualifies; a clean 2-span column stays full size).',
+    options: {
+      pitchPlacement: 'parity-columns',
+      chordSymbolScale: 0.75,
+      bracketDurationGrammar: 'midpoint',
+      exceptionCarrier: 'horizontal',
+    },
+    windows: round43Windows(),
+    tags: ['brahms', 'specimen', 'pitch', 'duration', 'midpoint'],
   },
 ];
 

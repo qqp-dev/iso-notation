@@ -21,13 +21,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
   candidateBadges,
   isAbstractCandidateWindow,
   resolveCandidate,
   type JankoCandidate,
+  type JankoCandidateRound,
+  type JankoCandidateWindow,
 } from '../src/render/janko/candidates.js';
 import {
   DURATION_VOCABULARY_AUGMENT_VALUES,
@@ -69,6 +69,174 @@ import {
 import { getKnockoutMetrics } from '../src/render/janko/elements/notehead.js';
 import { lintJankoScore } from '../src/render/janko/linter.js';
 
+// ---------------------------------------------------------------------------
+// Historical Round 42 registry (parked)
+//
+// Round 43 opens the reusable pitch + symbolic-duration study; the Round 42
+// cards below are frozen verbatim so this round's proofs keep judging the
+// duration-bracket vocabulary they were written for, independent of the live
+// registry.
+// ---------------------------------------------------------------------------
+
+export const ROUND_42_METADATA: JankoCandidateRound = {
+  round: 42,
+  title: 'Duration bracket vocabulary — Round 42',
+  description:
+    'Four complete, matched columns judge the shared-bracket duration vocabulary on one registered specimen, at one physical scale and on identical rows: the current ordinary lone-note carrier (canonical full-size symbols), the current shared bracket at 75 % admitted-member size, the proposed compact bracket family (2.4pt cuts at 0.42pt stroke; elongation rings of 1.60pt centreline diameter at 0.38pt stroke, outer Ø1.98pt; uniform 2.40pt mark pitch), and the proposed fixed-length 9.0pt horizontal exception carrier that repeats the member’s own compact marks. Every column states all eight plain values 3/6/12/24/48/96/192/384; small augmentation, beam and stress strips carry the shared dot, the real beams and the dense-neighbour / staff-rule / multiple-exception cases. Only genuinely admitted bracket members take the 75 % size — a clean two-note column stays full size. The canonical Reference and the PDF are untouched, and the composites 108/120/504 are stated as documented limitations, never faked.',
+  openAxes: ['bracketDurationGrammar', 'exceptionCarrier'],
+};
+
+/** The specimen measure spans every Round 42 column is engraved on. */
+const ROUND_42_MAIN = {
+  ordinary: { measureStart: 1, measureCount: 8 },
+  bracket: { measureStart: 17, measureCount: 8 },
+  exception: { measureStart: 25, measureCount: 8 },
+} as const;
+
+/**
+ * Round 42: the shared supplementary strips every column carries, so the four
+ * cards are rows-for-row comparable. The augmentation strip states single and
+ * double dots (the shared satellite); the beam strip states real beams (never
+ * replaced by flags); the stress strip states the dense cases the clean
+ * single-value rows cannot.
+ */
+function round42Strips(): JankoCandidateWindow[] {
+  return [
+    {
+      scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+      measureStart: 9,
+      measureCount: 6,
+      title: 'Augmentation strip · mm. 9–14 — single and double dots',
+      caption:
+        'The shared augmentation dot (1.5× and 1.75×): 36/72/144/288 take one dot, 42/84 two. The dot is one primitive across every column — the compact bracket reads a dotted value as its own plain marks plus the same satellite.',
+    },
+    {
+      scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+      measureStart: 15,
+      measureCount: 2,
+      title: 'Beamed ordinary strip · mm. 15–16 — the real beam set',
+      caption:
+        'Four 16ths beamed inside one beat, then four 8ths across two beats: the actual current beamed symbol set, engraved by the engine’s beam solver — never replaced by flags for the study.',
+    },
+    {
+      scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+      measureStart: 33,
+      measureCount: 2,
+      title: 'Stress strip · mm. 33–34 — next onset, 2-span same-column pair, staff rule, two exceptions',
+      caption:
+        'm. 33 holds a top exception (192 against a carried 96) beside a full-size, unbracketed two-note dyad that re-takes its pitch on the next onset (a 2-span same-column pair) — the fixed 9.0pt carrier has no room and its shortfall is published, never clipped. m. 34 holds two exceptions of different values in one chord: the 192 exception’s carrier coincides with the lin-60 staff rule; the 6 exception sits in the opposite parity column, where its own stem clears.',
+    },
+  ];
+}
+
+/** A Round 42 main-band window (the eight plain values on one carrier). */
+function round42Main(
+  span: { measureStart: number; measureCount: number },
+  title: string,
+  caption: string
+): JankoCandidateWindow {
+  return {
+    scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: span.measureStart,
+    measureCount: span.measureCount,
+    title,
+    caption,
+  };
+}
+
+/**
+ * Round 42: the duration vocabulary — four matched columns, one physical scale.
+ *
+ * Every card engraves the registered duration-vocabulary specimen
+ * (`duration-vocabulary-specimen`): a main band stating all eight plain values
+ * on its own carrier plus the three shared strips. The four columns differ only
+ * in their duration vocabulary and admitted-member scale, never in placement,
+ * row order or size:
+ *
+ * 1. **current ordinary** — the canonical lone-note stem/flag/ring vocabulary at
+ *    full size (3 and 6 DO paint their 4th/3rd flags);
+ * 2. **current bracket** — the incumbent shared bracket at 75 % admitted-member
+ *    size (short values saturate at two cuts, long at two open rings);
+ * 3. **compact bracket** — the proposed compact family: 4/3/2/1 cuts, bare
+ *    quarter, then 1/2/3 elongation rings, so all eight values are distinct;
+ * 4. **compact horizontal exception** — the compact bracket plus the proposed
+ *    fixed-length 9.0pt horizontal carrier for each genuine exception member.
+ *
+ * The option deltas are minimal: `chordSymbolScale` (the admitted-member size)
+ * plus the round’s two axes. The specimen itself sets the shared
+ * parity-column placement, so no card restates it.
+ */
+export const ROUND_42_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'duration-ordinary',
+    label: 'Duration — current ordinary (full size)',
+    description:
+      'The canonical lone-note vocabulary at full size over all eight plain values: 3/6/12/24 carry 4/3/2/1 flags, 36 keeps its dot, and every value from 48 up is a bare stem — so 48/96/192/384 alias one another. This is the control column the bracket vocabulary is measured against.',
+    axis: 'bracketDurationGrammar',
+    options: { chordSymbolScale: 1, bracketDurationGrammar: 'golden', exceptionCarrier: 'none' },
+    windows: [
+      round42Main(
+        ROUND_42_MAIN.ordinary,
+        'Specimen mm. 1–8 — ordinary lone-note carrier (current)',
+        'One lone note per plain value, read left to right 3 · 6 · 12 · 24 · 48 · 96 · 192 · 384. The emitted current alphabet distinguishes only 12 / 24 / 36 (dotted); 3 and 6 DO show their 4th/3rd flags, and 48 and longer are a bare stem, so the long values alias one another. Full-size canonical symbols, no bracket.'
+      ),
+      ...round42Strips(),
+    ],
+    tags: ['specimen', 'ordinary', 'duration'],
+  },
+  {
+    id: 'duration-bracket-current',
+    label: 'Duration — current shared bracket (75 %)',
+    description:
+      'The incumbent shared-duration bracket over all eight plain values, with admitted members at 75 % symbol size. The bracket saturates at two transverse cuts for 3/6/12 and at two open rings for 192/384, so those values alias within each class.',
+    axis: 'bracketDurationGrammar',
+    options: { chordSymbolScale: 0.75, bracketDurationGrammar: 'golden' },
+    windows: [
+      round42Main(
+        ROUND_42_MAIN.bracket,
+        'Specimen mm. 17–24 — current shared bracket (75 %)',
+        'A three-note chord carries each value in turn (3 · 6 · 12 · 24 · 48 · 96 · 192 · 384). The current bracket paints two cuts for 3/6/12 and one cut for 24; a bare spine for 48; one open ring for 96; and two open rings for 192/384 — so 3/6/12 and 192/384 alias. Members at 75 % size; standalone symbols would stay full size.'
+      ),
+      ...round42Strips(),
+    ],
+    tags: ['specimen', 'bracket', 'current', 'duration'],
+  },
+  {
+    id: 'duration-bracket-compact',
+    label: 'Duration — compact bracket (proposed)',
+    description:
+      'The proposed compact bracket family over all eight plain values: 4/3/2/1 short cuts for 3/6/12/24, a bare quarter, then 1/2/3 elongation rings for 96/192/384. Cuts are 2.4pt long at 0.42pt stroke; rings are 1.60pt centreline diameter at 0.38pt stroke (outer Ø1.98pt); marks sit at a uniform 2.40pt pitch — so all eight values are distinct on one bracket.',
+    axis: 'bracketDurationGrammar',
+    options: { chordSymbolScale: 0.75, bracketDurationGrammar: 'compact' },
+    windows: [
+      round42Main(
+        ROUND_42_MAIN.bracket,
+        'Specimen mm. 17–24 — compact bracket family (proposed)',
+        'The same three-note chords as the current column, engraved with the compact alphabet: 4/3/2/1 cuts (3 · 6 · 12 · 24), a bare quarter (48), then 1/2/3 rings (96 · 192 · 384). Every plain value is now distinct. Cuts 2.4pt × 0.42pt; rings Ø1.60pt centreline / 0.38pt stroke (outer Ø1.98pt); mark pitch 2.40pt.'
+      ),
+      ...round42Strips(),
+    ],
+    tags: ['specimen', 'bracket', 'compact', 'duration'],
+  },
+  {
+    id: 'duration-bracket-exception',
+    label: 'Duration — fixed-length horizontal exception carrier (proposed)',
+    description:
+      'The compact bracket plus the proposed fixed-length 9.0pt horizontal exception carrier. Each row’s own-duration member differs from its bracket’s carried mode, so it is a genuine exception in every row: its own stem/flag ink is replaced by one horizontal 9.0pt carrier at its true pitch, repeating its own compact marks. The length is a typographic constant — independent of the member’s duration and of its release.',
+    axis: 'exceptionCarrier',
+    options: { chordSymbolScale: 0.75, bracketDurationGrammar: 'compact', exceptionCarrier: 'horizontal' },
+    windows: [
+      round42Main(
+        ROUND_42_MAIN.exception,
+        'Specimen mm. 25–32 — fixed-length horizontal exception carriers (proposed)',
+        'Each three-note chord carries a value in its inner members while its top member states a DIFFERENT one — a genuine exception in every row (3 · 6 · 12 · 24 · 48 · 96 · 192 · 384). The exception’s own stem is replaced by one 9.0pt horizontal carrier at its true pitch, marking its own value with the compact alphabet. The carrier length never encodes the duration or the release — only the marks do.'
+      ),
+      ...round42Strips(),
+    ],
+    tags: ['specimen', 'bracket', 'compact', 'exception', 'carrier', 'duration'],
+  },
+];
+
 const SPECIMEN = buildDurationVocabularySpecimenScore();
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
@@ -79,7 +247,7 @@ const BRACKET_COMPACT = 'duration-bracket-compact';
 const EXCEPTION = 'duration-bracket-exception';
 const [O_VALUES, O_TICKS] = [DURATION_VOCABULARY_PLAIN_VALUES, DURATION_VOCABULARY_TICKS_PER_MEASURE];
 
-const cardById = (id: string): JankoCandidate => CURRENT_CANDIDATES.find((c) => c.id === id)!;
+const cardById = (id: string): JankoCandidate => ROUND_42_CANDIDATES.find((c) => c.id === id)!;
 const optsFor = (id: string) =>
   resolveJankoOptions({ ...DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS, ...(cardById(id).options ?? {}) });
 const toksFor = (id: string) =>
@@ -180,18 +348,18 @@ const EXPECTED: Record<number, { cuts: number; rings: number; dots: 0 | 1 | 2 }>
 // ---------------------------------------------------------------------------
 
 test('Round 42 registry: four matched duration-vocabulary columns, two axes, shared strips', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 42);
-  assert.match(CURRENT_ROUND_METADATA.title, /duration bracket vocabulary/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['bracketDurationGrammar', 'exceptionCarrier']);
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no comparison strip declared');
+  assert.equal(ROUND_42_METADATA.round, 42);
+  assert.match(ROUND_42_METADATA.title, /duration bracket vocabulary/i);
+  assert.deepEqual(ROUND_42_METADATA.openAxes, ['bracketDurationGrammar', 'exceptionCarrier']);
+  assert.equal(ROUND_42_METADATA.compareStrip, undefined, 'no comparison strip declared');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_42_CANDIDATES.map((c) => c.id),
     [ORDINARY, BRACKET_CURRENT, BRACKET_COMPACT, EXCEPTION]
   );
   // Every column engraves the one registered specimen, on four windows: its own
   // main band plus the three shared strips, so the columns are row-for-row
   // comparable at one physical scale.
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_42_CANDIDATES) {
     const windows = (card.windows ?? []) as Array<{ scoreId?: string; measureStart: number; measureCount: number; title: string; caption?: string }>;
     assert.equal(windows.length, 4, `${card.id}: four windows`);
     for (const w of windows) {
@@ -222,7 +390,7 @@ test('Round 42 registry: four matched duration-vocabulary columns, two axes, sha
   assert.equal(cardById(ORDINARY).axis, 'bracketDurationGrammar');
   assert.equal(cardById(EXCEPTION).axis, 'exceptionCarrier');
   const axisBadges = (id: string) =>
-    candidateBadges(cardById(id), CURRENT_ROUND_METADATA).filter((b) => b.axis).map((b) => b.key);
+    candidateBadges(cardById(id), ROUND_42_METADATA).filter((b) => b.axis).map((b) => b.key);
   assert.deepEqual(axisBadges(ORDINARY), ['bracketDurationGrammar']);
   assert.deepEqual(axisBadges(BRACKET_COMPACT), ['bracketDurationGrammar']);
   assert.deepEqual(axisBadges(EXCEPTION), ['exceptionCarrier']);
@@ -445,11 +613,39 @@ test('Stress strip: the fixed carrier’s shortfall is published, never clipped 
   assert.ok(refused, 'the refused carrier is still painted');
   assert.ok(Math.abs(refused.length - 9.0) < 1e-9, 'the refused carrier keeps its full 9.0pt length');
 
-  // Every column engraves its specimen windows without a violation (warnings,
-  // if any, stay visible and attributed rather than suppressed).
+  // Round 43 restores the two-column parity collision fan: the stress strip's
+  // deliberately tight next-onset 2-span same-column dyad is now separated
+  // (lower-on-snap, upper-right) instead of being mutilated by an overlap. The
+  // row attacks a 16th after the downbeat, so the fan honestly pushes a head
+  // past its beat cell — the ONLY surviving findings are those published m. 33
+  // grid crossings (warnings, if any, stay visible and attributed). Nothing is
+  // clipped or suppressed; the tight failed-fit is named, never hidden.
   for (const id of [ORDINARY, BRACKET_CURRENT, BRACKET_COMPACT, EXCEPTION]) {
     const report = lintJankoScore(SPECIMEN, optsFor(id), toksFor(id));
-    assert.deepEqual(report.violations, [], `${id}: no violation`);
+    assert.deepEqual(
+      [...new Set(report.violations.map((v) => `${v.code}@m${v.measure}`))].sort(),
+      ['grid-crossing-offset@m33'],
+      `${id}: only the published stress-row tight-fit crossing`
+    );
+    for (const v of report.violations) {
+      const stressHeadIds = new Set(
+        DURATION_VOCABULARY_NOTES.filter((n) => n.band === 'stress').map((n) => n.id)
+      );
+      assert.ok(
+        (v.noteIds ?? []).every((n) => stressHeadIds.has(n)),
+        `${id}: only a stress-row head is displaced`
+      );
+    }
+    // The fan genuinely separated the dyad: its two heads no longer overlap.
+    const dyad = layoutsFor(id)
+      .flatMap((l) => l.notes)
+      .filter((p) => p.note.id === 'dvs-stress-12300-7_5' || p.note.id === 'dvs-stress-12300-9_5')
+      .sort((a, b) => a.y - b.y);
+    assert.equal(dyad.length, 2, `${id}: both next-onset dyad heads are laid out`);
+    assert.ok(
+      Math.abs(dyad[1].x - dyad[0].x) >= 5.0,
+      `${id}: the next-onset 2-span dyad is fanned clear, never overlapped`
+    );
   }
   // The refusal is a measurement on the stress strip, not a hidden suppression.
   const stressIds = new Set(

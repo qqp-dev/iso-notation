@@ -60,6 +60,7 @@ import {
   DURATION_SPECIMEN_STUDIO_SCORE_ID,
   HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
   DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+  PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   CandidateOptionBadge,
@@ -98,6 +99,11 @@ import {
   DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
   DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
 } from '../../scores/duration-vocabulary-specimen';
+import {
+  buildPitchParitySpecimenScore,
+  PITCH_PARITY_SPECIMEN_JANKO_OPTIONS,
+  PITCH_PARITY_SPECIMEN_JANKO_TOKENS,
+} from '../../scores/pitch-parity-specimen';
 import { LintReport, lintJankoScore } from './linter';
 
 /** One macro focus crop in the Golden Reference view. */
@@ -292,6 +298,17 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildDurationVocabularySpecimenScore(),
       options: resolveJankoOptions(DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS),
       tokens: resolveJankoTokens(DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS),
+    },
+    // Round 43: the pitch-parity specimen — the two smallest pitch gaps
+    // (1-span, 2-span) and the octave repeat, under the study's two-column
+    // parity placement, so the pitch columns are judged without any
+    // duration-grammar exception. A spread 1-span pair is admitted to a bracket
+    // (0.75); a clean 2-span column stays unbracketed and full size.
+    [PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID]: {
+      id: PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID,
+      score: buildPitchParitySpecimenScore(),
+      options: resolveJankoOptions(PITCH_PARITY_SPECIMEN_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(PITCH_PARITY_SPECIMEN_JANKO_TOKENS),
     },
     [SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID]: {
       id: SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,

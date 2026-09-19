@@ -235,7 +235,9 @@ export type JankoLintCode =
   | 'hold-underlay'
   | 'hold-endpoint-clearance'
   | 'hold-connector-occluded'
-  | 'hold-unresolvable';
+  | 'hold-unresolvable'
+  | 'carrier-duration-unsupported'
+  | 'carrier-mark-occlusion';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -3176,6 +3178,56 @@ export function checkHoldIntegrity(
   }
 }
 
+/**
+ * Round 43 repair — the horizontal exception carrier audit.
+ *
+ * The study paints a fixed-length carrier whose marks alone state an exception
+ * member's own value. Two honest gaps the R42 gates did not name:
+ *
+ * - `carrier-duration-unsupported` (warning): the member's value has no exact
+ *   reading in the alphabet. No carrier is painted (a mark-less carrier reads
+ *   as a bare quarter) and the member keeps its own ordinary duration ink,
+ *   which does *not* state the composite exactly — a published limitation.
+ * - `carrier-mark-occlusion` (error): a later (or same-onset) note's white
+ *   erasure mask knocks out a carrier mark — the value ink is destroyed even
+ *   though the fixed run "fits" its extreme box. The whole-run shortfall alone
+ *   never named this, which is exactly how a destroyed ring passed the gates.
+ */
+export function checkExceptionCarrierIntegrity(
+  layout: JankoSystemLayout,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  for (const unsupported of layout.exceptionCarrierUnsupported ?? []) {
+    out.push({
+      code: 'carrier-duration-unsupported',
+      severity: 'warning',
+      message:
+        `Exception carrier refused for ${unsupported.noteId} (${unsupported.durationTicks} ticks): ` +
+        `${unsupported.reason}.`,
+      system: layout.index,
+      measure: measureOfTick(unsupported.startTick, t),
+      noteIds: [unsupported.noteId],
+      metrics: { durationTicks: unsupported.durationTicks },
+    });
+  }
+  for (const occlusion of layout.exceptionCarrierOcclusions ?? []) {
+    out.push({
+      code: 'carrier-mark-occlusion',
+      severity: 'error',
+      message: occlusion.reason + '.',
+      system: layout.index,
+      measure: measureOfTick(occlusion.startTick, t),
+      noteIds: [occlusion.noteId, occlusion.occluderId],
+      metrics: {
+        markIndex: occlusion.markIndex,
+        occluderTick: occlusion.occluderTick,
+        erasedFraction: occlusion.erasedFraction,
+      },
+    });
+  }
+}
+
 export function checkBarlineClearance(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
@@ -5306,6 +5358,7 @@ export function lintJankoScore(
     checkOttavaExtensions(layout, o, diagnostics);
     checkStaffSegments(layout, o, t, diagnostics);
     checkHoldIntegrity(layout, o, t, diagnostics);
+    checkExceptionCarrierIntegrity(layout, t, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     if (o.clusterCompression && o.clusterCompression !== 'literal') {
       checkCompressionCollisions(layout, o, t, thresholds, diagnostics);
