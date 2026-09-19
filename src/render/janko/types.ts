@@ -725,10 +725,17 @@ export interface JankoTokens {
   ottavaClearance?: number;
   /** Hairline stroke width for ottava dashed line and hook. */
   ottavaLineWidth?: number;
+  /** Knockout margin override around digit ink box (pt, Round 40). */
+  knockoutMargin?: number;
+  /** Knockout breathing air between neighbouring masks (pt, Round 40). */
+  knockoutAir?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
-export type ResolvedJankoTokens = Required<JankoTokens>;
+export type ResolvedJankoTokens = Required<Omit<JankoTokens, 'knockoutMargin' | 'knockoutAir'>> & {
+  knockoutMargin?: number;
+  knockoutAir?: number;
+};
 
 /**
  * Canonical Jánko Two-Row engraving tokens.
@@ -1020,6 +1027,14 @@ export interface JankoLayoutOptions {
    * (byte-identical for Goldberg).
    */
   verticalPlacement?: JankoVerticalPlacement;
+  /**
+   * Note placement scheme for chord / co-onset columns (Round 40).
+   *
+   * - `'standard'`: standard collision-assigned three-rail placement (default).
+   * - `'parity-columns'`: two-column placement by whole-tone pitch parity.
+   *   Even absolute pitch family on the left, odd family on the right.
+   */
+  pitchPlacement?: 'standard' | 'parity-columns';
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1185,6 +1200,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   clusterCompression: 'literal',
   clusterPresentation: 'literal',
   verticalPlacement: 'slot',
+  pitchPlacement: 'standard',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

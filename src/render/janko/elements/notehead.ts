@@ -142,6 +142,59 @@ export const JANKO_DIGIT_BASELINE_OFFSET = digitBaselineOffset(
  * explicit override is for callers that resolve the preset themselves;
  * otherwise the layout options select it (defaulting to the golden preset).
  */
+/** Resolved metrics for a knockout mask and spacing. */
+export interface KnockoutMetrics {
+  margin: number;
+  air: number;
+  wx: number;
+  hy: number;
+  pairGap: number;
+}
+
+/**
+ * Knockout mask extents and breathing air resolved for the active options/tokens.
+ *
+ * For canonical 5.8pt tokens, returns the preset wx/hy/margin/air exactly (bit-for-bit).
+ * For scaled candidates (e.g. Round 40 68% and 80%), derives wx and hy from actual
+ * digit glyph half-extents plus margin.
+ */
+export function getKnockoutMetrics(
+  layoutOptions?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null
+): KnockoutMetrics {
+  const o = resolveJankoOptions(layoutOptions);
+  const t = resolveJankoTokens(tokens);
+  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  const isCustom = t.knockoutMargin !== undefined || t.knockoutAir !== undefined;
+  if (isCustom) {
+    const margin = t.knockoutMargin ?? preset.margin;
+    const air = t.knockoutAir ?? preset.air;
+    const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize);
+    return {
+      margin,
+      air,
+      wx: halfWidth + margin,
+      hy: halfHeight + margin,
+      pairGap: preset.pairGap,
+    };
+  }
+  return {
+    margin: preset.margin,
+    air: preset.air,
+    wx: preset.wx,
+    hy: preset.hy,
+    pairGap: preset.pairGap,
+  };
+}
+
+/**
+ * Rectangular white knockout (erases staff lines and beams beneath the digit).
+ *
+ * `wx`/`hy` are the mask half-extents of the active cluster-spacing preset
+ * (2.73 × 3.66 on the golden `'snug'`), painted with sharp corners. The
+ * explicit override is for callers that resolve the preset themselves;
+ * otherwise the layout options select it (defaulting to the golden preset).
+ */
 export function renderNoteheadKnockout(
   x: number,
   y: number,
@@ -149,10 +202,9 @@ export function renderNoteheadKnockout(
   layoutOptions?: Partial<JankoLayoutOptions> | null,
   maskOverride?: { wx: number; hy: number }
 ): string {
-  void tokens;
-  const preset = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
-  const wx = maskOverride?.wx ?? preset.wx;
-  const hy = maskOverride?.hy ?? preset.hy;
+  const metrics = getKnockoutMetrics(layoutOptions, tokens);
+  const wx = maskOverride?.wx ?? metrics.wx;
+  const hy = maskOverride?.hy ?? metrics.hy;
   return `    <rect class="janko-knockout" x="${f(x - wx)}" y="${f(y - hy)}" width="${f(2 * wx)}" height="${f(2 * hy)}" fill="#FFFFFF"/>`;
 }
 
@@ -175,7 +227,9 @@ export function renderNoteheadDigit(
   // The digit is positioned by its alphabetic baseline (not by
   // `dominant-baseline`), so the optical centring is renderer-independent.
   const baseline = y + digitBaselineOffset(t.digitFontSize);
-  return `    <text class="janko-digit" x="${f(x)}" y="${f(baseline)}" font-weight="${weight}" font-size="${t.digitFontSize.toFixed(1)}pt" fill="#111111">${digit}</text>`;
+  const sizeStr =
+    t.digitFontSize % 1 === 0 ? t.digitFontSize.toFixed(1) : Number(t.digitFontSize.toFixed(3));
+  return `    <text class="janko-digit" x="${f(x)}" y="${f(baseline)}" font-weight="${weight}" font-size="${sizeStr}pt" fill="#111111">${digit}</text>`;
 }
 
 /**
@@ -192,9 +246,9 @@ export function renderNotehead(
     parts.push(renderHalo(spec.x, spec.y, tokens));
   }
   const t = resolveJankoTokens(tokens);
-  const preset = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
+  const metrics = getKnockoutMetrics(layoutOptions, tokens);
   const maskOverride = spec.tallKnockout
-    ? { wx: preset.wx, hy: preset.hy + t.stemAttachmentAir }
+    ? { wx: metrics.wx, hy: metrics.hy + t.stemAttachmentAir }
     : undefined;
   parts.push(renderNoteheadKnockout(spec.x, spec.y, tokens, layoutOptions, maskOverride));
   parts.push(

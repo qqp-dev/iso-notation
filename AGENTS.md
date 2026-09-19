@@ -117,3 +117,17 @@ Headless implementers must not render images to see a defect. Run the mathematic
 - **Bach Goldberg Var. 1 is GOLD = the frozen perfection standard.** Its engraving under `DEFAULT_JANKO_OPTIONS` is judged done: zero violations, and no open questions. Any future change to it requires a decision round plus operator judgment — never a drive-by.
 - **Brahms Op. 118/1 is BRONZE = the active iteration surface.** It renders under the fixed-3 golden config (the current practice), carries the whole spread so the operator can walk it producing suggestions, and lists its pre-existing findings honestly — each tagged in the Reference diagnostics as a known folding-geometry finding scheduled for a future round (never gated, never hidden).
 - The two Reference blocks carry visible `GOLD` / `BRONZE` badges (`ReferenceDesignation` in `src/render/janko/studio.ts`); the CLI keeps its own adaptive Brahms entry so deploy stays green.
+
+---
+
+## 8. Pitch & Interval Terminology: Symbols vs Duodecimal Spans (Round 40)
+
+- **Absolute pitch**: refer to as **absolute pitch symbols** or **solf** (e.g. duodecimal digits `0`–`b`, written/sounding pitch identities).
+- **Relative intervals / vertical distances**: refer to using **zero-based duodecimal spans**:
+  - `1-span` = 1 semitone (2.5pt vertical)
+  - `2-span` = 2 semitones / whole-tone neighbour (5.0pt vertical)
+  - `a-span` or `A-span` = decimal 10 semitones (25.0pt vertical)
+  - `b-span` or `B-span` = decimal 11 semitones (27.5pt vertical)
+  - `10-span` = decimal 12 semitones / octave (30.0pt vertical; duodecimal 10 = decimal 12)
+  - `20-span` = decimal 24 semitones / two octaves (60.0pt vertical; duodecimal 20 = decimal 24)
+- Do not invent novel pronunciations or modify existing numeral casing in code/tokens. Use this terminology consistently in design docs, captions, tests, and comments.
