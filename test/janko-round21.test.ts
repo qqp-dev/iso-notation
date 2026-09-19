@@ -459,27 +459,19 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 42 open, two duration-vocabulary axes, four columns', () => {
-  // Ordered contract change: Round 40 and Round 41 are parked (historical
-  // consts in test/janko-round40.test.ts and test/janko-round41.test.ts) and
-  // Round 42 opens the duration-bracket vocabulary comparison.
-  assert.equal(CURRENT_ROUND_METADATA.round, 42);
+test('§F registry: round 43 open, three reusable-case axes, one midpoint design', () => {
+  // Ordered contract change: Rounds 40–42 are parked (historical consts in
+  // test/janko-round40.test.ts, test/janko-round41.test.ts and
+  // test/janko-round42.test.ts) and Round 43 opens the reusable
+  // pitch + symbolic-duration study (pitch placement, bracket marks, carrier).
+  assert.equal(CURRENT_ROUND_METADATA.round, 43);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['bracketDurationGrammar', 'exceptionCarrier'],
-    'the bracket mark family and the exception carrier'
+    ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
+    'pitch placement, the bracket mark family and the exception carrier'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(
-    ids,
-    [
-      'duration-ordinary',
-      'duration-bracket-current',
-      'duration-bracket-compact',
-      'duration-bracket-exception',
-    ],
-    'the four Round 42 columns'
-  );
+  assert.deepEqual(ids, ['midpoint-parity'], 'the one proposed midpoint design');
 });
 
 // ---------------------------------------------------------------------------

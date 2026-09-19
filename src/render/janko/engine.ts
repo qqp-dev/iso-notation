@@ -138,6 +138,7 @@ import {
   claspInkBox,
   claspQualifies,
   compactDurationMarks,
+  effectiveExceptionCarrierLength,
   exceptionCarrierInkBox,
   renderExceptionCarrier,
   JankoExceptionCarrierGeometry,
@@ -3479,6 +3480,75 @@ export function fitClusterSlots(
 }
 
 /**
+ * Result of the two-column whole-tone-parity fit (Round 43).
+ */
+export interface JankoParityFit {
+  /** Resolved **signed** horizontal offset (page pt) of every member id. */
+  offsets: Map<string, number>;
+  /** The extent-derived fan gap between colliding neighbours (pt). */
+  gap: number;
+}
+
+/**
+ * Round 43 — the two-column whole-tone-parity fit (pure, engine-independent).
+ *
+ * The parity placement seats every head on one of two invisible rails: even
+ * source pitch parity (`lin % 2 === 0`) on the true onset column, odd parity
+ * one `pairGap` to its right. Heads that share a rail (or any pair whose
+ * knockout masks still overlap) are then **fanned right** by the established,
+ * extent-derived gap — the same gap {@link fitClusterSlots} derives for the
+ * `'column'` anchor — so the **lower head keeps its snap** and every
+ * conflicting upper head shifts right, never left and never merged.
+ *
+ * The fan **respects the rails**: the even (left) family is placed first, the
+ * odd (right) family after it, so a low odd head never displaces a higher even
+ * head off the left column (the `{C♯, D}` / `{D, C♯}` pair lands on the same
+ * `{0, pairGap}` diagonal either way the source orders it). Only heads of the
+ * same rail therefore collide and fan.
+ */
+export function fitParityColumns(
+  members: readonly JankoClusterFitMember[],
+  air: number,
+  pairGap: number
+): JankoParityFit {
+  const offsets = new Map<string, number>();
+  if (members.length === 0) return { offsets, gap: air };
+  const railOf = (m: JankoClusterFitMember): number => (m.lin % 2 === 0 ? 0 : pairGap);
+  // The reliable part of the established fit this reuses is its sufficient,
+  // extent-derived gap (the same metric the paint and the linter read).
+  const { gap } = fitClusterSlots(members, air, 'column');
+  const ordered = [...members].sort(
+    (a, b) =>
+      railOf(a) - railOf(b) ||
+      a.lin - b.lin ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+  // A pair that shares its drawn row only because octave folding transposed one
+  // member onto the other (m. 33 / m. 53 LH octaves) is **not** fanned: those
+  // known fold-coincident findings stay exactly as they are (out of scope),
+  // never silently "fixed" by the parity fan.
+  const foldCoincident = (a: JankoClusterFitMember, b: JankoClusterFitMember): boolean => {
+    if (Math.abs((a.lower + a.upper) / 2 - (b.lower + b.upper) / 2) > EPS) return false;
+    const diff = Math.abs(a.lin - b.lin);
+    return diff === 12 || diff === 24;
+  };
+  const placed: JankoClusterFitMember[] = [];
+  for (const m of ordered) {
+    let x = railOf(m);
+    for (const q of placed) {
+      if (foldCoincident(m, q)) continue;
+      const overlapY = Math.min(m.upper, q.upper) - Math.max(m.lower, q.lower);
+      if (overlapY <= EPS) continue;
+      const qx = offsets.get(q.id)!;
+      if (x < qx + gap - EPS) x = qx + gap;
+    }
+    offsets.set(m.id, x);
+    placed.push(m);
+  }
+  return { offsets, gap };
+}
+
+/**
  * One onset whose desired head slots do not fit its beat cell: the explicit
  * space-demand report of the permanent slot fit. The heads keep their desired
  * slots (honest residue for the column solve and the linter); nothing is
@@ -4044,16 +4114,13 @@ export function resolveChordColumns(
    * `anchorOf` sees the member ids of the group being fit; note ids are
    * score-unique, so a global bracketed set resolves every bucket.
    */
-  const fitPass = (anchorOf: (memberIds: readonly string[]) => JankoClusterAnchor): void => {
+  const fitPass = (fitOf: (memberIds: readonly string[]) => Map<string, number>): void => {
+    const fitGroup = (ids: readonly string[]): void => {
+      for (const [id, off] of fitOf(ids)) offsetsById.set(id, off);
+    };
     for (const unit of units) {
       for (const cluster of unit.rows) {
-        const ids = cluster.notes.map((p) => p.note.id);
-        const fit = fitClusterSlots(
-          ids.map((id) => fitById.get(id)!),
-          presetAir,
-          anchorOf(ids)
-        );
-        for (const [id, slot] of fit.slots) offsetsById.set(id, slot * fit.gap);
+        fitGroup(cluster.notes.map((p) => p.note.id));
       }
     }
     for (const unit of units) {
@@ -4103,18 +4170,37 @@ export function resolveChordColumns(
         for (const bucket of buckets.values()) {
           if (bucket.length < 2) continue;
           const ids = bucket.flatMap((c) => c.notes.map((p) => p.note.id));
-          const fit = fitClusterSlots(
-            ids.map((id) => fitById.get(id)!),
-            presetAir,
-            anchorOf(ids)
-          );
-          for (const [id, slot] of fit.slots) offsetsById.set(id, slot * fit.gap);
+          fitGroup(ids);
           refit = true;
         }
         if (!refit) break;
       }
     }
   };
+  /**
+   * The established {@link fitClusterSlots} anchor fit as a `fitPass` `fitOf`:
+   * the resolved offset of every member is its slot times the fit's own gap.
+   */
+  const anchorFit =
+    (anchorOf: (memberIds: readonly string[]) => JankoClusterAnchor) =>
+    (ids: readonly string[]): Map<string, number> => {
+      const fit = fitClusterSlots(
+        ids.map((id) => fitById.get(id)!),
+        presetAir,
+        anchorOf(ids)
+      );
+      const offsets = new Map<string, number>();
+      for (const [id, slot] of fit.slots) offsets.set(id, slot * fit.gap);
+      return offsets;
+    };
+  /**
+   * Frozen qualification offsets for the two-column parity placement (Round
+   * 43): bracket **qualification** reads the nominal parity rails, so the
+   * collision fan that later separates the masks of a clean same-rail pair can
+   * never promote that pair into a "spread" bracket. `null` off the parity
+   * placement, where qualification reads the live resolved offsets.
+   */
+  let qualifyingOffsets: Map<string, number> | null = null;
   /** Row-snapped horizontal offset (page pt) of every head of one onset unit. */
   const rowOffsetOf = (unit: OnsetUnit): Map<string, number> => {
     const offsets = new Map<string, number>();
@@ -4130,8 +4216,16 @@ export function resolveChordColumns(
    * measured in row-offset space here: the heads still share their nominal
    * column, before the solve.
    */
+  const qualificationOffsetOf = (unit: OnsetUnit): Map<string, number> => {
+    const source = qualifyingOffsets ?? offsetsById;
+    const offsets = new Map<string, number>();
+    for (const cluster of unit.rows) {
+      for (const p of cluster.notes) offsets.set(p.note.id, source.get(p.note.id) ?? 0);
+    }
+    return offsets;
+  };
   const handClaspGroups = (unit: OnsetUnit): PositionedJankoNote[][] => {
-    const offsets = rowOffsetOf(unit);
+    const offsets = qualificationOffsetOf(unit);
     const onset = unit.rows
       .flatMap((cluster) => cluster.notes)
       .sort((a, b) => a.y - b.y || a.x - b.x);
@@ -4159,6 +4253,13 @@ export function resolveChordColumns(
           offsetsById.set(members[0].note.id, 0);
         }
       }
+    }
+    // Bracket qualification reads the nominal parity rails, frozen **before**
+    // the collision fan below: a clean same-rail pair (a two-note whole-tone
+    // neighbour column) is not "spread", so it stays unbracketed and full
+    // size even after the fan separates its masks.
+    qualifyingOffsets = new Map(offsetsById);
+    for (const unit of units) {
       const groups = perHandClasps
         ? handClaspGroups(unit)
         : unit.rows.reduce((n, c) => n + c.notes.length, 0) >= 2
@@ -4166,9 +4267,22 @@ export function resolveChordColumns(
           : [];
       for (const p of groups.flat()) bracketedIds.add(p.note.id);
     }
+    // Restore the established lower-on-snap / upper-right collision fan on
+    // the parity rails: every head keeps at least its rail (even left, odd
+    // right) and any still-overlapping upper head steps right by the
+    // extent-derived gap. Duration-driven three-rail displacement stays
+    // retired here — the parity rails are geometric, never duration-led.
+    fitPass(
+      (ids) =>
+        fitParityColumns(
+          ids.map((id) => fitById.get(id)!),
+          presetAir,
+          pairGap
+        ).offsets
+    );
   } else {
     // Pass A: the minimal assumption — every group on the column.
-    fitPass(() => 'column');
+    fitPass(anchorFit(() => 'column'));
     // Bracket qualification on the Pass-A relative spread. Note ids are
     // score-unique, so one global set resolves every Pass-B bucket. Union
     // paradigms qualify a whole onset of two or more heads (as admission
@@ -4195,7 +4309,7 @@ export function resolveChordColumns(
         const fb = fitById.get(b)!;
         return fa.lin - fb.lin || (a < b ? -1 : a > b ? 1 : 0);
       })[0];
-    fitPass((ids) => (bracketedIds.has(lowestIdOf(ids)) ? 'inward' : 'column'));
+    fitPass(anchorFit((ids) => (bracketedIds.has(lowestIdOf(ids)) ? 'inward' : 'column')));
   }
   for (const unit of units) {
     for (const cluster of unit.rows) {
@@ -6349,7 +6463,8 @@ export function layoutJankoSystemShifted(
         if (!p) continue;
         const e = knockoutHalfExtents(o, t, p.note.startTick, p);
         const x0 = p.x + e.wx + air;
-        const x1 = x0 + t.exceptionCarrierLength;
+        const carrierLength = effectiveExceptionCarrierLength(o.bracketDurationGrammar, t);
+        const x1 = x0 + carrierLength;
         const marks = compactDurationMarks(member.durationTicks);
         const carrier: JankoExceptionCarrierGeometry = {
           noteId: member.id,
@@ -6363,6 +6478,7 @@ export function layoutJankoSystemShifted(
           dots: marks.dots,
           inGrammar: marks.inGrammar,
           stroke: t.claspStrokeWidth,
+          grammar: o.bracketDurationGrammar,
         };
         exceptionCarriers.push(carrier);
         if (!claspedStems.includes(member.id)) claspedStems.push(member.id);
@@ -6385,7 +6501,7 @@ export function layoutJankoSystemShifted(
             required: box.x1 - x0,
             available: Math.max(0, nearest - x0),
             reason:
-              `the fixed ${t.exceptionCarrierLength.toFixed(2)}pt carrier reaches x=${box.x1.toFixed(2)} ` +
+              `the fixed ${carrierLength.toFixed(2)}pt carrier reaches x=${box.x1.toFixed(2)} ` +
               `but the nearest free point is x=${nearest.toFixed(2)} ` +
               `(${(nearest - x0).toFixed(2)}pt available) — painted at true length, never clipped`,
           });

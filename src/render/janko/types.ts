@@ -770,8 +770,21 @@ export interface JankoTokens {
   /**
    * Round 42: fixed length (pt) of the horizontal exception carrier — a
    * typographic constant, **independent of the member's duration and release**.
+   * Used by the `'compact'` family; the `'midpoint'` family derives its own
+   * fixed carrier length from the mark ink (see {@link midpointCarrierLength}).
    */
   exceptionCarrierLength?: number;
+  // --- Round 43 (midpoint study): the unified diagonal-slash family ---
+  /** Midpoint slash: transverse (x) length (pt) of one page-raked slash. */
+  midpointSlashLength?: number;
+  /** Midpoint slash: stroke width (pt). */
+  midpointSlashStroke?: number;
+  /** Midpoint slash: rise/run (page orientation, up-raked left→right). */
+  midpointSlashSlope?: number;
+  /** Midpoint ring: centreline radius (pt). */
+  midpointRingRadius?: number;
+  /** Midpoint ring: stroke width (pt). */
+  midpointRingStroke?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -854,6 +867,15 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   compactRingStroke: 0.38,
   compactMarkSpacing: 2.4,
   exceptionCarrierLength: 9.0,
+  // Round 43 (midpoint study) — the unified diagonal-slash family. The cut is
+  // the midpoint between the golden 7.5pt/1.0pt cut and the compact 2.4pt/0.42pt
+  // cut; the ring is the midpoint between the golden R2.4pt/0.8pt bracket ring
+  // and the compact R0.8pt/0.38pt ring. Slope is the score's own beam rake.
+  midpointSlashLength: 4.95,
+  midpointSlashStroke: 0.71,
+  midpointSlashSlope: 0.22,
+  midpointRingRadius: 1.6,
+  midpointRingStroke: 0.59,
 };
 
 /**
@@ -1141,6 +1163,10 @@ export interface JankoLayoutOptions {
    *   at `compactMarkSpacing`pt, counting 4/3/2/1 cuts then bare then 1/2/3
    *   rings so all eight plain values are distinct. Experimental candidate
    *   vocabulary, never promoted to canonical.
+   * - `'midpoint'`: the Round 43 candidate — the shared counts of `'compact'`
+   *   painted with **one unified page-raked diagonal slash** and one ring size,
+   *   identical on the bracket spine and on the horizontal exception carrier.
+   *   Experimental candidate vocabulary, never promoted to canonical.
    */
   bracketDurationGrammar?: JankoBracketDurationGrammar;
   /**
@@ -1201,8 +1227,14 @@ export type JankoDurationGrammar = 'golden' | 'complete';
  * - `'golden'`: the incumbent transverse cuts / open rings (saturating at two).
  * - `'compact'`: the proposed compact cut/ring family (1–4 cuts, bare, 1–3
  *   rings) — candidates only, never canonical.
+ * - `'midpoint'`: the Round 43 candidate — one **unified diagonal-slash**
+ *   primitive (the existing page-raked slash, at the midpoint dimensions between
+ *   the golden cuts and the compact cuts) painted **identically** on the bracket
+ *   spine and on the horizontal exception carrier, only the stacking direction
+ *   differing. Counts match `'compact'` (1–4 cuts, bare, 1–3 rings); candidate
+ *   only, never canonical.
  */
-export type JankoBracketDurationGrammar = 'golden' | 'compact';
+export type JankoBracketDurationGrammar = 'golden' | 'compact' | 'midpoint';
 
 /**
  * Exception-member carrier (the Round 42 Phase-3 study axis): how an admitted
