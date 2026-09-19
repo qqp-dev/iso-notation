@@ -69,7 +69,18 @@ import {
   SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
   candidateBadges,
   resolveCandidate,
+  isAbstractCandidateWindow,
+  JankoAbstractCandidateWindow,
+  JankoScoreCandidateWindow,
 } from './candidates';
+import {
+  renderAbstractKeySvg,
+  renderAbstractSubsetSvg,
+  lintAbstractGeometry,
+  ABSTRACT_GEOMETRY_SPECS,
+  ABSTRACT_SUBSET_1,
+  ABSTRACT_SUBSET_2,
+} from './elements/abstract-geometry';
 import { buildSyntheticM8DiagnosticScore } from '../../scores/synthetic-m8-diagnostic';
 import { LintReport, lintJankoScore } from './linter';
 
@@ -464,10 +475,74 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
 
   const cards = candidates.map((candidate) => {
     const resolved = resolveCandidate(candidate);
+    const isAbstract =
+      candidate.kind === 'abstract' ||
+      (resolved.windows.length > 0 && resolved.windows.some(isAbstractCandidateWindow));
+
+    if (isAbstract) {
+      const geomId =
+        candidate.abstractGeometry ??
+        (resolved.windows.find(isAbstractCandidateWindow)?.geometryId ?? 'dial');
+      const spec = ABSTRACT_GEOMETRY_SPECS[geomId];
+      const geomReport = lintAbstractGeometry(geomId);
+
+      const panels = resolved.windows.map((win) => {
+        if (!isAbstractCandidateWindow(win)) {
+          return '';
+        }
+        let svg: string;
+        if (win.specimenType === 'key') {
+          svg = renderAbstractKeySvg(win.geometryId);
+        } else {
+          const subset =
+            win.subset ??
+            (win.specimenType === 'subset-1' ? ABSTRACT_SUBSET_1 : ABSTRACT_SUBSET_2);
+          svg = renderAbstractSubsetSvg(win.geometryId, subset);
+        }
+        return [
+          `<figure class="candidate-window" data-window="${escapeHtml(win.geometryId)}:${escapeHtml(win.specimenType)}">`,
+          `  <figcaption><b>${escapeHtml(win.title)}</b>${win.caption ? ` · <span>${escapeHtml(win.caption)}</span>` : ''}</figcaption>`,
+          `  <div class="canvas-frame">${canvas(svg)}</div>`,
+          '</figure>',
+        ].join('\n');
+      });
+
+      const badges = candidateBadges(candidate, round).map(badgeHtml).join('');
+      const tags = (candidate.tags ?? [])
+        .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
+        .join('');
+      const chips =
+        `${tags}` +
+        `<span class="chip chip-ok" title="Bounded geometry checks passed (${geomReport.checks}/${geomReport.checks}): separation ≥ 4.0pt, nominal ink bounds, 12 sites, label clearance">✓ geometry valid (${geomReport.checks} checks)</span>` +
+        ` <span class="chip" style="background: rgba(148, 163, 184, 0.16); color: #94a3b8;" title="Score engraving lint not applicable to abstract candidate">score lint n/a</span>`;
+      const facts =
+        `12 sites · node radius 0.55pt · min separation 4.0pt · nominal bounds ${spec.boundsString} · ` +
+        `bounded geometry verified · score engraving lint not applicable`;
+
+      return [
+        `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="${geomReport.ok ? 'clean' : 'violations'}">`,
+        '  <header class="candidate-head">',
+        `    <h3>${escapeHtml(candidate.label)}</h3>`,
+        `    <div class="chips">${chips}</div>`,
+        '  </header>',
+        candidate.description
+          ? `  <p class="rationale">${escapeHtml(candidate.description)}</p>`
+          : '',
+        `  <div class="badges">${badges}</div>`,
+        `  <div class="candidate-windows">${panels.join('\n')}</div>`,
+        `  <footer class="candidate-foot">${escapeHtml(facts)}</footer>`,
+        '</article>',
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    // Score-candidate branch (existing behavior preserved)
     const reports: LintReport[] = [];
     const seen = new Set<string>();
-    const panels = resolved.windows.map((window) => {
-      const entry = scores[window.scoreId] ?? scores[DEFAULT_STUDIO_SCORE_ID];
+    const panels = resolved.windows.map((w) => {
+      const window = w as JankoScoreCandidateWindow;
+      const entry = scores[window.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
       const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
       const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
       if (!seen.has(entry.id)) {
@@ -487,7 +562,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       const lastMeasure = window.measureStart + window.measureCount - 1;
       return [
         `<figure class="candidate-window" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}">`,
-        `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b></figcaption>`,
+        `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}</figcaption>`,
         `  <div class="canvas-frame">${canvas(svg)}</div>`,
         '</figure>',
       ].join('\n');

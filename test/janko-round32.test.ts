@@ -46,6 +46,7 @@ import {
   candidateBadges,
   type JankoCandidate,
   type JankoCandidateRound,
+  type JankoScoreCandidateWindow,
 } from '../src/render/janko/candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -228,7 +229,7 @@ test('Registry: historical Round 32 grid round, two cards, one open axis, no con
     );
     assert.equal(card.tokens, undefined, `${card.id} states no token delta`);
     assert.deepEqual(
-      card.windows!.map((w) => [w.scoreId, w.measureStart, w.measureCount]),
+      (card.windows as JankoScoreCandidateWindow[]).map((w) => [w.scoreId, w.measureStart, w.measureCount]),
       [
         [BRAHMS_STUDIO_SCORE_ID, 1, 4],
         [BRAHMS_STUDIO_SCORE_ID, 5, 4],

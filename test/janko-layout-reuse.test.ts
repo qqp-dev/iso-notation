@@ -65,6 +65,11 @@ import {
   CURRENT_CANDIDATES,
   resolveCandidate,
 } from '../src/render/janko/candidates';
+import { ROUND_37_CANDIDATES, ROUND_37_METADATA } from './janko-round37.test';
+import {
+  renderAbstractSubsetSvg,
+  ABSTRACT_SUBSET_1,
+} from '../src/render/janko/elements/abstract-geometry';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
@@ -105,14 +110,15 @@ test('Output equivalence: Brahms macro focus crops are byte-identical standalone
   }
 });
 
-test('Output equivalence: Candidate windows across all current candidates are byte-identical', () => {
-  for (const candidate of CURRENT_CANDIDATES) {
+test('Output equivalence: Candidate windows across score candidates are byte-identical standalone vs precomputed', () => {
+  for (const candidate of ROUND_37_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
     const opts = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candidate.options ?? {}) });
     const toks = resolveJankoTokens({ ...BRAHMS_TOKS, ...(candidate.tokens ?? {}) });
     const layouts = layoutJankoScore(BRAHMS, opts, toks);
 
     for (const window of resolved.windows) {
+      if (!('measureStart' in window)) continue;
       const standalone = renderJankoCrop(
         BRAHMS,
         window.measureStart,
@@ -232,14 +238,28 @@ test('Deterministic counts: renderCandidatesView computes each candidate layout 
   });
 
   try {
-    const config = createStudioConfig();
+    // Score candidate configuration (Round 37) computes layout once per score
+    const scoreConfig = createStudioConfig({
+      candidates: ROUND_37_CANDIDATES,
+      round: ROUND_37_METADATA,
+    });
     contentAwareCalls = 0;
-    renderCandidatesView(config);
+    renderCandidatesView(scoreConfig);
     // 2 candidates * 2 scores * (1 lint call + 1 candidate layout) = 8 calls.
     assert.equal(
       contentAwareCalls,
       8,
-      'renderCandidatesView must invoke content-aware layout exactly 8 times (2 candidates * 2 scores * (1 lint + 1 layout))'
+      'renderCandidatesView with score candidates must invoke content-aware layout exactly 8 times'
+    );
+
+    // Abstract candidate configuration (Round 38) makes zero score layout calls
+    const abstractConfig = createStudioConfig();
+    contentAwareCalls = 0;
+    renderCandidatesView(abstractConfig);
+    assert.equal(
+      contentAwareCalls,
+      0,
+      'renderCandidatesView with abstract candidates makes zero score layout calls'
     );
   } finally {
     setLayoutJankoScoreObserver(null);
@@ -275,16 +295,27 @@ test('Deterministic counts: renderStudioMarkup eliminates redundant content-awar
   });
 
   try {
-    const config = createStudioConfig();
+    // Score candidates: Reference view (2) + Candidates view (8) = 10 calls
+    const scoreConfig = createStudioConfig({
+      candidates: ROUND_37_CANDIDATES,
+      round: ROUND_37_METADATA,
+    });
     contentAwareCalls = 0;
-    renderStudioMarkup(config);
-    // Reference view: 2 content-aware calls (1 lint + 1 layout)
-    // Candidates view: 8 content-aware calls (2 candidates * 2 scores * (1 lint + 1 layout))
-    // Total: 10 calls
+    renderStudioMarkup(scoreConfig);
     assert.equal(
       contentAwareCalls,
       10,
-      'renderStudioMarkup must make exactly 10 content-aware layout calls'
+      'renderStudioMarkup with score candidates makes exactly 10 content-aware layout calls'
+    );
+
+    // Abstract candidates: Reference view (2) + Candidates view (0) = 2 calls
+    const abstractConfig = createStudioConfig();
+    contentAwareCalls = 0;
+    renderStudioMarkup(abstractConfig);
+    assert.equal(
+      contentAwareCalls,
+      2,
+      'renderStudioMarkup with abstract candidates makes exactly 2 content-aware layout calls (Reference view only)'
     );
   } finally {
     setLayoutJankoScoreObserver(null);
@@ -318,9 +349,9 @@ test('Fresh data/options/tokens: subsequent render with changed options computes
 });
 
 test('Fresh data/options/tokens: candidate configurations remain separate from each other', () => {
-  // Round 37 candidates have different clusterPresentation options
-  assert.equal(CURRENT_CANDIDATES.length, 2);
-  const [candA, candB] = CURRENT_CANDIDATES;
+  // Round 37 score candidates have different clusterPresentation options
+  assert.equal(ROUND_37_CANDIDATES.length, 2);
+  const [candA, candB] = ROUND_37_CANDIDATES;
 
   const optsA = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candA.options ?? {}) });
   const optsB = resolveJankoOptions({ ...BRAHMS_OPTS, ...(candB.options ?? {}) });
@@ -332,6 +363,15 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
   const svgB = renderJankoCrop(BRAHMS, 8, 2, optsB, BRAHMS_TOKS);
 
   assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
+
+  // Round 38 abstract candidates produce distinct SVGs
+  assert.equal(CURRENT_CANDIDATES.length, 3);
+  const svgDial = renderAbstractSubsetSvg('dial', ABSTRACT_SUBSET_1);
+  const svgRosette = renderAbstractSubsetSvg('rosette', ABSTRACT_SUBSET_1);
+  const svgAsym = renderAbstractSubsetSvg('asymmetric', ABSTRACT_SUBSET_1);
+  assert.notEqual(svgDial, svgRosette, 'Dial and Rosette produce distinct SVGs');
+  assert.notEqual(svgDial, svgAsym, 'Dial and Asymmetric produce distinct SVGs');
+  assert.notEqual(svgRosette, svgAsym, 'Rosette and Asymmetric produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------

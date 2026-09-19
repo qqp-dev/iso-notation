@@ -32,6 +32,10 @@ import {
   ResolvedJankoTokens,
   resolveJankoOptions,
   resolveJankoTokens,
+  AbstractGeometryId,
+  ABSTRACT_GEOMETRY_SPECS,
+  ABSTRACT_SUBSET_1,
+  ABSTRACT_SUBSET_2,
 } from './types';
 
 /** Metadata of the decision round currently on the table. */
@@ -75,8 +79,9 @@ export interface JankoCompareStrip {
   title: string;
 }
 
-/** One engraving window a candidate is demonstrated on. */
-export interface JankoCandidateWindow {
+/** One engraving window demonstrated on a score benchmark. */
+export interface JankoScoreCandidateWindow {
+  kind?: 'score';
   /**
    * Studio score id the window is engraved from. Defaults to the studio's
    * primary score (`'primary'` = the Bach Goldberg Var. 1 benchmark).
@@ -88,6 +93,68 @@ export interface JankoCandidateWindow {
   measureCount: number;
   /** Short label shown above the panel. */
   title: string;
+  /** Optional caption. */
+  caption?: string;
+}
+
+/** One engraving window demonstrated on an abstract twelve-site geometry specimen. */
+export interface JankoAbstractCandidateWindow {
+  kind: 'abstract';
+  /** Geometry arrangement evaluated. */
+  geometryId: AbstractGeometryId;
+  /** Specimen role: enlarged key (3×) or one of the two four-site subsets. */
+  specimenType: 'key' | 'subset-1' | 'subset-2';
+  /** Subset site indices (for subset specimens). */
+  subset?: readonly number[];
+  /** Short label shown above the panel. */
+  title: string;
+  /** Short caption (e.g. identifying changed site or nominal dimensions). */
+  caption?: string;
+}
+
+/** Discriminated union of score-engraving windows and abstract-geometry windows. */
+export type JankoCandidateWindow = JankoScoreCandidateWindow | JankoAbstractCandidateWindow;
+
+/** True if candidate window is an abstract geometry specimen. */
+export function isAbstractCandidateWindow(
+  w: JankoCandidateWindow
+): w is JankoAbstractCandidateWindow {
+  return (w as { kind?: string }).kind === 'abstract';
+}
+
+/** Constructor for a 3× enlarged twelve-site key window. */
+export function abstractKeyWindow(
+  geometryId: AbstractGeometryId,
+  title = 'Twelve-site key (3×)',
+  caption?: string
+): JankoAbstractCandidateWindow {
+  return {
+    kind: 'abstract',
+    geometryId,
+    specimenType: 'key',
+    title,
+    caption:
+      caption ??
+      `Full configuration (0–b) · ${ABSTRACT_GEOMETRY_SPECS[geometryId].boundsString} nominal ink bounds (enlarged 3×)`,
+  };
+}
+
+/** Constructor for a four-site subset sample window. */
+export function abstractSubsetWindow(
+  geometryId: AbstractGeometryId,
+  specimenType: 'subset-1' | 'subset-2',
+  title: string,
+  caption?: string
+): JankoAbstractCandidateWindow {
+  const subset = specimenType === 'subset-1' ? ABSTRACT_SUBSET_1 : ABSTRACT_SUBSET_2;
+  return {
+    kind: 'abstract',
+    geometryId,
+    specimenType,
+    subset,
+    title,
+    caption,
+  };
 }
 
 /** One exploratory engraving candidate for the current decision round. */
@@ -98,6 +165,10 @@ export interface JankoCandidate {
   label: string;
   /** One-line designer rationale. */
   description?: string;
+  /** Candidate kind: score candidate (default) or abstract geometry candidate. */
+  kind?: 'score' | 'abstract';
+  /** Abstract geometry arrangement (for abstract candidates). */
+  abstractGeometry?: AbstractGeometryId;
   /**
    * The **open axis** this candidate exists to decide. Only this axis is ever
    * badged, even when the round has more than one open axis: per-candidate
@@ -274,60 +345,120 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * full-score m.60 candidate eligibility retaining source-hand memberships and reusing
  * shared painted bass anchor; judged against literal control on identical Brahms windows
  * mm. 7–9, 46–47, 60–61, 66–67, m.71, plus a synthetic m.8 G3→A3 diagnostic.
+ * Rejected visually by operator judgment (PR73, 266bd65e98f7). Parked by convention
+ * as ROUND_37_METADATA / ROUND_37_CANDIDATES in test/janko-round37.test.ts.
+ *
+ * Round 38 opens the twelve-site spatial alphabet comparison:
+ * Which compact twelve-site arrangement makes selected subsets distinguishable
+ * and learnable with the least visual noise? No optimality or human-readability
+ * claim. Evaluates Dial, Rosette, and Asymmetric constellation across identical
+ * keys and {0,3,7,a} vs {0,5,7,a} subsets.
  */
 
-/** Score id of the synthetic m.8 diagnostic specimen (Round 37). */
+/** Score id of the synthetic m.8 diagnostic specimen (Round 37, parked). */
 export const SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID = 'synthetic-m8-diagnostic';
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 37,
-  title: 'Intrinsically indexed symmetric cluster candidate',
+  round: 38,
+  title: 'Twelve-site spatial alphabet — three abstract candidates',
   description:
-    'Round 37: intrinsically indexed symmetric cluster candidate (OPEN, candidate-only comparison; NOT canonical adoption). Features slender stroked pitch body paths (0.5pt, fill none) with discrete 2-semitone centered reference divisions, duodecimal 10-span (12-semitone) octave boundary markers, paired outward sounding articulations (landmarks), and explicit visible duration ownership (connecting rails for runs, individual connectors for singletons). Reuses shared painted bass anchor in m.60 cross-hand unisons while connecting RH form to lowest pitch. Judged against literal control on identical Brahms windows mm. 7–9, 46–47, 60–61, 66–67, m.71, plus synthetic m.8 G3→A3 diagnostic.',
-  openAxes: ['clusterPresentation'],
+    'Which compact twelve-site arrangement makes selected subsets distinguishable and learnable with the least visual noise? No optimality or human-readability claim. Site labels are identities for this geometry study, not an adopted pitch/interval convention. Evaluates Dial, Rosette, and Asymmetric constellation across identical keys and {0,3,7,a} vs {0,5,7,a} subsets.',
+  openAxes: ['arrangement'],
 };
 
-const CANDIDATE_WINDOWS: JankoCandidateWindow[] = [
-  brahmsWindow(7, 3, 'mm.7–9 · Dense chord clusters, mixed release, odd anchor family'),
-  brahmsWindow(46, 2, 'mm.46–47 · Dense chord cluster, vertical stacking clearance'),
-  brahmsWindow(60, 2, 'mm.60–61 · Alternating anchor row family, shared bass anchor & unison voice'),
-  brahmsWindow(66, 2, 'mm.66–67 · Dense chord cluster, compound span'),
-  brahmsWindow(71, 1, 'm.71 · Dense chord cluster'),
-  {
-    scoreId: SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
-    measureStart: 1,
-    measureCount: 1,
-    title: 'Synthetic diagnostic · m.8 inner G3→A3 perturbation (same span/count/parities)',
-  },
-];
-
 /**
- * Round 37: two answers to the whole-form cluster question:
- * literal control and the intrinsically indexed symmetric cluster candidate.
+ * Round 38: exactly three abstract candidates:
+ * Dial, Rosette, and Asymmetric constellation.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'indexed-symmetric-literal',
-    label: 'Control · Literal baseline',
+    id: 'dial',
+    label: 'Dial',
     description:
-      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers. Preserves standard reading overhead for dense clusters.',
-    axis: 'clusterPresentation',
-    options: { clusterPresentation: 'literal' },
-    windows: CANDIDATE_WINDOWS,
-    tags: ['control', 'literal'],
+      'Regular 12-gon circular dial. R = 2 / sin(π/12) ≈ 7.7274pt, site 0 at top, clockwise order. Nominal full ink bounds 16.5548 × 16.5548pt, min separation 4.0pt.',
+    kind: 'abstract',
+    abstractGeometry: 'dial',
+    axis: 'arrangement',
+    windows: [
+      abstractKeyWindow(
+        'dial',
+        'Twelve-site key (3×)',
+        'Full configuration (0–b) · 16.5548 × 16.5548pt nominal ink bounds (enlarged 3×)'
+      ),
+      abstractSubsetWindow(
+        'dial',
+        'subset-1',
+        'Subset {0,3,7,a}',
+        'Four sites · changed site 3 · 16.5548 × 16.5548pt nominal footprint'
+      ),
+      abstractSubsetWindow(
+        'dial',
+        'subset-2',
+        'Subset {0,5,7,a}',
+        'Four sites · changed site 3 to 5 · 16.5548 × 16.5548pt nominal footprint'
+      ),
+    ],
+    tags: ['abstract', 'dial'],
   },
   {
-    id: 'indexed-symmetric',
-    label: 'A · Intrinsically indexed symmetric cluster',
+    id: 'rosette',
+    label: 'Rosette',
     description:
-      'Intrinsically indexed symmetric cluster candidate: slender stroked paths (0.5pt) with discrete 2-semitone centered divisions and duodecimal 10-span octave boundaries. Sounding landmarks are paired outward articulations (ticks); central crossings are unadorned and silent; primary path and reflection denote ONE note. Explicit visible duration ownership at sounding landmarks via connecting rails or individual connectors. Reuses shared painted bass anchor in m.60. Remaining readability risks: optical density at tight intervals, interpolation of odd semitone steps, potential visual confusion between octave divisions and staff lines.',
-    axis: 'clusterPresentation',
-    options: { clusterPresentation: 'indexed-symmetric' },
-    windows: CANDIDATE_WINDOWS,
-    tags: ['indexed-symmetric', 'candidate'],
+      'Alternating rosette. Radii 4√3 ≈ 6.9282pt for even i, 4.0pt for odd i. Angular step π/6, site 0 at top. Nominal full ink bounds 13.1000 × 14.9564pt, min separation 4.0pt. Sites only, no star or polygon drawn.',
+    kind: 'abstract',
+    abstractGeometry: 'rosette',
+    axis: 'arrangement',
+    windows: [
+      abstractKeyWindow(
+        'rosette',
+        'Twelve-site key (3×)',
+        'Full configuration (0–b) · 13.1000 × 14.9564pt nominal ink bounds (enlarged 3×)'
+      ),
+      abstractSubsetWindow(
+        'rosette',
+        'subset-1',
+        'Subset {0,3,7,a}',
+        'Four sites · changed site 3 · 13.1000 × 14.9564pt nominal footprint'
+      ),
+      abstractSubsetWindow(
+        'rosette',
+        'subset-2',
+        'Subset {0,5,7,a}',
+        'Four sites · changed site 3 to 5 · 13.1000 × 14.9564pt nominal footprint'
+      ),
+    ],
+    tags: ['abstract', 'rosette'],
+  },
+  {
+    id: 'asymmetric',
+    label: 'Asymmetric constellation',
+    description:
+      'Planar constellation on 4pt coordinate steps. Nominal full ink bounds 17.1000 × 17.1000pt, min separation 4.0pt. No grid drawn.',
+    kind: 'abstract',
+    abstractGeometry: 'asymmetric',
+    axis: 'arrangement',
+    windows: [
+      abstractKeyWindow(
+        'asymmetric',
+        'Twelve-site key (3×)',
+        'Full configuration (0–b) · 17.1000 × 17.1000pt nominal ink bounds (enlarged 3×)'
+      ),
+      abstractSubsetWindow(
+        'asymmetric',
+        'subset-1',
+        'Subset {0,3,7,a}',
+        'Four sites · changed site 3 · 17.1000 × 17.1000pt nominal footprint'
+      ),
+      abstractSubsetWindow(
+        'asymmetric',
+        'subset-2',
+        'Subset {0,5,7,a}',
+        'Four sites · changed site 3 to 5 · 17.1000 × 17.1000pt nominal footprint'
+      ),
+    ],
+    tags: ['abstract', 'asymmetric'],
   },
 ];
-
 
 /** A fully resolved candidate, ready to engrave. */
 export interface ResolvedJankoCandidate {
@@ -337,21 +468,38 @@ export interface ResolvedJankoCandidate {
   measureStart: number;
   measureCount: number;
   /** Every window the candidate is demonstrated on (never empty). */
-  windows: Required<JankoCandidateWindow>[];
+  windows: JankoCandidateWindow[];
 }
 
 /** Fill a candidate's deltas in against the golden master. */
 export function resolveCandidate(candidate: JankoCandidate): ResolvedJankoCandidate {
-  const windows: Required<JankoCandidateWindow>[] =
+  const isAbstract =
+    candidate.kind === 'abstract' ||
+    (candidate.windows && candidate.windows.some(isAbstractCandidateWindow));
+  if (isAbstract && candidate.windows && candidate.windows.length > 0) {
+    return {
+      candidate,
+      options: resolveJankoOptions(DEFAULT_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
+      measureStart: 1,
+      measureCount: 1,
+      windows: candidate.windows,
+    };
+  }
+
+  const windows: JankoScoreCandidateWindow[] =
     candidate.windows && candidate.windows.length > 0
       ? candidate.windows.map((w) => ({
-          scoreId: w.scoreId ?? DEFAULT_STUDIO_SCORE_ID,
-          measureStart: w.measureStart,
-          measureCount: w.measureCount,
+          kind: 'score' as const,
+          scoreId: (w as JankoScoreCandidateWindow).scoreId ?? DEFAULT_STUDIO_SCORE_ID,
+          measureStart: (w as JankoScoreCandidateWindow).measureStart ?? 1,
+          measureCount: (w as JankoScoreCandidateWindow).measureCount ?? 1,
           title: w.title,
+          caption: (w as JankoScoreCandidateWindow).caption,
         }))
       : [
           {
+            kind: 'score' as const,
             scoreId: DEFAULT_STUDIO_SCORE_ID,
             measureStart: candidate.measureStart ?? 1,
             measureCount: candidate.measureCount ?? 1,
@@ -362,8 +510,8 @@ export function resolveCandidate(candidate: JankoCandidate): ResolvedJankoCandid
     candidate,
     options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, ...(candidate.options ?? {}) }),
     tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ...(candidate.tokens ?? {}) }),
-    measureStart: candidate.measureStart ?? windows[0].measureStart,
-    measureCount: candidate.measureCount ?? windows[0].measureCount,
+    measureStart: candidate.measureStart ?? (windows[0] ? windows[0].measureStart : 1),
+    measureCount: candidate.measureCount ?? (windows[0] ? windows[0].measureCount : 1),
     windows,
   };
 }
@@ -395,6 +543,17 @@ export function candidateBadges(
   candidate: JankoCandidate,
   round: JankoCandidateRound = CURRENT_ROUND_METADATA
 ): CandidateOptionBadge[] {
+  if (candidate.kind === 'abstract' || candidate.abstractGeometry) {
+    const geomId = candidate.abstractGeometry!;
+    const spec = ABSTRACT_GEOMETRY_SPECS[geomId];
+    return [
+      { key: 'arrangement', value: spec.name, golden: 'n/a', axis: true },
+      { key: 'nominalBounds', value: spec.boundsString, golden: spec.boundsString },
+      { key: 'minSeparation', value: '≥4.0pt', golden: '≥4.0pt' },
+      { key: 'nodeRadius', value: '0.55pt', golden: '0.55pt' },
+    ];
+  }
+
   const badges: CandidateOptionBadge[] = [];
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const goldenTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);

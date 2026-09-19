@@ -158,6 +158,7 @@ const ROUND_35_CARDS: string[] = [
   'cluster-compression-compact-coupling',
 ];
 const ROUND_36_CARDS: string[] = ['mirrored-handprint-literal', 'mirrored-handprint'];
+const ROUND_37_CARDS: string[] = ['indexed-symmetric-literal', 'indexed-symmetric'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -243,10 +244,10 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 37 (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 37);
-  assert.match(CURRENT_ROUND_METADATA.title, /indexed symmetric/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation'], 'one open axis');
+test('CURRENT_ROUND_METADATA is the open Round 38 (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 38);
+  assert.match(CURRENT_ROUND_METADATA.title, /twelve-site/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -279,18 +280,23 @@ test('CURRENT_ROUND_METADATA is the open Round 37 (one open axis)', () => {
     ['mirrored-handprint-literal', 'mirrored-handprint'],
     'R36 parked pair on record'
   );
+  assert.deepEqual(
+    ROUND_37_CARDS,
+    ['indexed-symmetric-literal', 'indexed-symmetric'],
+    'R37 parked pair on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the Round 37 pair: Control / A, one axis', () => {
+test('CURRENT_CANDIDATES is the Round 38 trio: Dial / Rosette / Asymmetric, one axis', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['indexed-symmetric-literal', 'indexed-symmetric'],
-    'two live cards'
+    ['dial', 'rosette', 'asymmetric'],
+    'three live cards'
   );
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'clusterPresentation', `${c.id}: per-candidate purity`);
-    assert.deepEqual(Object.keys(c.options ?? {}), ['clusterPresentation'], `${c.id}: one-line delta`);
+    assert.equal(c.axis, 'arrangement', `${c.id}: per-candidate purity`);
+    assert.equal(c.kind, 'abstract', `${c.id}: abstract candidate`);
   }
 });
 
@@ -2046,14 +2052,14 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two grid cards, twelve windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open round with two cards', () => {
+test('The live studio renders the open round with three cards', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="12"/, 'twelve windows');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.match(html, /data-candidate-count="3"/);
+  assert.match(html, /data-window-count="9"/, 'nine windows');
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 37/);
-  assert.match(html, /indexed symmetric/i, 'the indexed symmetric title headlines the view');
+  assert.match(html, /Round 38/);
+  assert.match(html, /Twelve-site spatial alphabet/i, 'the Twelve-site spatial alphabet title headlines the view');
   for (const id of ROUND_33_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
