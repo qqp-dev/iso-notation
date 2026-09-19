@@ -76,6 +76,10 @@ import {
 import {
   renderAbstractKeySvg,
   renderAbstractSubsetSvg,
+  renderAbstractTranspositionBatterySvg,
+  renderAbstractNearNeighboursBatterySvg,
+  renderAbstractDensityBatterySvg,
+  renderAbstractLadderOctaveProbeSvg,
   lintAbstractGeometry,
   ABSTRACT_GEOMETRY_SPECS,
   ABSTRACT_SUBSET_1,
@@ -493,6 +497,14 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         let svg: string;
         if (win.specimenType === 'key') {
           svg = renderAbstractKeySvg(win.geometryId);
+        } else if (win.specimenType === 'transposition') {
+          svg = renderAbstractTranspositionBatterySvg(win.geometryId);
+        } else if (win.specimenType === 'near-neighbours') {
+          svg = renderAbstractNearNeighboursBatterySvg(win.geometryId);
+        } else if (win.specimenType === 'density') {
+          svg = renderAbstractDensityBatterySvg(win.geometryId);
+        } else if (win.specimenType === 'octave-probe') {
+          svg = renderAbstractLadderOctaveProbeSvg();
         } else {
           const subset =
             win.subset ??

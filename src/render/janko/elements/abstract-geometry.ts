@@ -47,7 +47,7 @@ export const ABSTRACT_SITE_LABELS = [
 
 export type AbstractSiteLabel = (typeof ABSTRACT_SITE_LABELS)[number];
 
-export type AbstractGeometryId = 'dial' | 'rosette' | 'asymmetric';
+export type AbstractGeometryId = 'dial' | 'rosette' | 'ladder' | 'asymmetric';
 
 export interface Point2D {
   readonly x: number;
@@ -107,6 +107,136 @@ export const ABSTRACT_SUBSET_1 = [0, 3, 7, 10] as const;
 /** The second four-site subset sample {0, 5, 7, a}. Changed site is 3 to 5. */
 export const ABSTRACT_SUBSET_2 = [0, 5, 7, 10] as const;
 
+/** Shared base set S = {0, 3, 7, a} for the common stress battery. */
+export const ABSTRACT_BASE_SET = [0, 3, 7, 10] as const;
+
+/** Common cell dimensions across all three common stress batteries (Transposition, Near Neighbours, Density). */
+export const ABSTRACT_CELL_WIDTH = 54;
+export const ABSTRACT_CELL_HEIGHT = 54;
+export const ABSTRACT_BATTERY_VIEWPORT_WIDTH = 324;
+
+/** Format an integer in single-character or dozenal duodecimal notation (0..9, a, b, 10, 11, etc.). */
+export function formatDuodecimalDigit(n: number): string {
+  if (n < 0) return '-' + formatDuodecimalDigit(-n);
+  if (n < 10) return String(n);
+  if (n === 10) return 'a';
+  if (n === 11) return 'b';
+  return n.toString(12);
+}
+
+/** Format a sorted pitch-class set in duodecimal notation, e.g. {0,3,7,a}. */
+export function formatPitchClassSet(pitches: readonly number[]): string {
+  const sorted = [...new Set(pitches)].sort((a, b) => a - b);
+  return '{' + sorted.map(formatDuodecimalDigit).join(',') + '}';
+}
+
+/** Compute transposed pitch classes modulo 12: T+t(S), sorted. */
+export function computeTranspositionSet(base: readonly number[], t: number): number[] {
+  return [...new Set(base.map((p) => (((p + t) % 12) + 12) % 12))].sort((a, b) => a - b);
+}
+
+/** The four near-neighbour test samples on base S = {0, 3, 7, a}. */
+export const ABSTRACT_NEAR_NEIGHBOUR_SAMPLES = [
+  {
+    id: 'near-base',
+    title: 'Base S',
+    caption: '{0,3,7,a} · base set',
+    changeDescription: 'base set S',
+    subset: [0, 3, 7, 10] as const,
+  },
+  {
+    id: 'near-3to4',
+    title: '3→4 (1 semitone)',
+    caption: '{0,4,7,a} · 3→4 (1-semitone change)',
+    changeDescription: '3→4 (1-semitone change)',
+    subset: [0, 4, 7, 10] as const,
+  },
+  {
+    id: 'near-3to5',
+    title: '3→5 (2 semitones)',
+    caption: '{0,5,7,a} · 3→5 (2-semitone change)',
+    changeDescription: '3→5 (2-semitone change)',
+    subset: [0, 5, 7, 10] as const,
+  },
+  {
+    id: 'near-atob',
+    title: 'a→b (1 semitone)',
+    caption: '{0,3,7,b} · a→b (1-semitone change)',
+    changeDescription: 'a→b (1-semitone change)',
+    subset: [0, 3, 7, 11] as const,
+  },
+] as const;
+
+/** The five density test samples (2, 3, 6, 9, 11 selected sites). */
+export const ABSTRACT_DENSITY_SAMPLES = [
+  {
+    id: 'density-2',
+    title: '2 sites',
+    caption: '2 selected sites · {0,7}',
+    siteCount: 2,
+    subset: [0, 7] as const,
+  },
+  {
+    id: 'density-3',
+    title: '3 sites',
+    caption: '3 selected sites · {0,4,7}',
+    siteCount: 3,
+    subset: [0, 4, 7] as const,
+  },
+  {
+    id: 'density-6',
+    title: '6 sites',
+    caption: '6 selected sites · {0,1,2,3,4,5}',
+    siteCount: 6,
+    subset: [0, 1, 2, 3, 4, 5] as const,
+  },
+  {
+    id: 'density-9',
+    title: '9 sites',
+    caption: '9 selected sites · {0,1,2,3,4,5,6,7,8}',
+    siteCount: 9,
+    subset: [0, 1, 2, 3, 4, 5, 6, 7, 8] as const,
+  },
+  {
+    id: 'density-11',
+    title: '11 sites',
+    caption: '11 selected sites · {0,1,2,3,4,5,6,7,8,9,a}',
+    siteCount: 11,
+    subset: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const,
+  },
+] as const;
+
+/** The three ladder octave-boundary probe specimens. */
+export const ABSTRACT_LADDER_OCTAVE_PROBE_SAMPLES = [
+  {
+    id: 'probe-unfolded-s',
+    title: 'Original unfolded S',
+    caption: 'Unfolded S = {0,3,7,a} · 4.5641 × 21.1000pt',
+    description: 'Original unfolded S = {0,3,7,a}',
+    pitches: [0, 3, 7, 10] as const,
+    subset: [0, 3, 7, 10] as const,
+    dimensionsString: '4.5641 × 21.1000pt',
+  },
+  {
+    id: 'probe-unfolded-s-plus-3',
+    title: 'Unfolded S+3',
+    caption: 'Unfolded S+3 = {3,6,a,11} (decimal 3,6,10,13) · 4.5641 × 21.1000pt',
+    description: 'Unfolded S+3 = {3,6,a,11} in duodecimal (decimal 3,6,10,13)',
+    pitches: [3, 6, 10, 13] as const,
+    subset: [3, 6, 10, 13] as const,
+    dimensionsString: '4.5641 × 21.1000pt',
+  },
+  {
+    id: 'probe-folded-s-plus-3',
+    title: 'Folded S+3 (modulo 12)',
+    caption: 'Folded version = {1,3,6,a} · 4.5641 × 19.1000pt',
+    description: 'Folded version (same pitch classes as common T+3) = {1,3,6,a}',
+    pitches: [1, 3, 6, 10] as const,
+    subset: [1, 3, 6, 10] as const,
+    dimensionsString: '4.5641 × 19.1000pt',
+  },
+] as const;
+
 /**
  * 1. Dial coordinates:
  * theta = i * π / 6; R = 2 / sin(π/12); (x, y) = (R * sin(theta), -R * cos(theta)).
@@ -142,7 +272,21 @@ export function getRosetteSiteCoordinates(): Point2D[] {
 }
 
 /**
- * 3. Asymmetric constellation coordinates in pt:
+ * 3. Staggered pitch ladder coordinates:
+ * Two staggered columns with upward pitch:
+ * For integer pitch index p, x(p) = -√3pt if p even, +√3pt if p odd; y(p) = 11 - 2p pt (SVG downward y).
+ * Full ink bounds for p=0..11: (2√3 + 1.1) × 23.1pt ≈ 4.5641 × 23.1000pt.
+ * Minimum center separation: 4.0pt. Sites only, no rails or connector lines drawn.
+ */
+export function getLadderSiteCoordinates(pitchCount = 12): Point2D[] {
+  return Array.from({ length: pitchCount }, (_, p) => ({
+    x: p % 2 === 0 ? -Math.sqrt(3) : Math.sqrt(3),
+    y: 11 - 2 * p,
+  }));
+}
+
+/**
+ * 4. Asymmetric constellation coordinates in pt:
  * 0=(-8,-8), 1=(0,-8), 2=(4,-8), 3=(8,-8),
  * 4=(-8,0),  5=(0,0),  6=(-8,4), 7=(4,4),
  * 8=(8,4),   9=(-8,8), a=(4,8),  b=(8,8).
@@ -172,6 +316,8 @@ export function getAbstractSiteCoordinates(id: AbstractGeometryId): Point2D[] {
       return getDialSiteCoordinates();
     case 'rosette':
       return getRosetteSiteCoordinates();
+    case 'ladder':
+      return getLadderSiteCoordinates(12);
     case 'asymmetric':
       return getAsymmetricSiteCoordinates();
   }
@@ -227,7 +373,7 @@ export const ABSTRACT_GEOMETRY_SPECS: Record<AbstractGeometryId, AbstractGeometr
     nominalWidth: 16.5548,
     nominalHeight: 16.5548,
     boundsString: '16.5548 × 16.5548pt',
-    description: 'Circular 12-gon dial, site 0 at top, clockwise order. R = 2 / sin(π/12) ≈ 7.7274pt.',
+    description: 'Circular 12-gon dial, site 0 at top, clockwise order. R = 2 / sin(π/12) ≈ 7.7274pt. Modulo-12 transposition is rigid rotation.',
   },
   rosette: {
     id: 'rosette',
@@ -235,7 +381,15 @@ export const ABSTRACT_GEOMETRY_SPECS: Record<AbstractGeometryId, AbstractGeometr
     nominalWidth: 13.1,
     nominalHeight: 14.9564,
     boundsString: '13.1000 × 14.9564pt',
-    description: 'Alternating rosette, radii 4√3 (even) and 4 (odd). Sites only, no star or polygon drawn.',
+    description: 'Alternating rosette, radii 4√3 (even) and 4 (odd). Even transpositions rotate; odd transpositions exchange tiers.',
+  },
+  ladder: {
+    id: 'ladder',
+    name: 'Staggered pitch ladder',
+    nominalWidth: 2 * Math.sqrt(3) + 1.1,
+    nominalHeight: 23.1,
+    boundsString: '4.5641 × 23.1000pt',
+    description: 'Two staggered columns with upward pitch: x = ±√3pt (even/odd), y = 11 - 2p pt (p=0..11). Unfolded shifts translate/reflect; folded shifts wrap at octave.',
   },
   asymmetric: {
     id: 'asymmetric',
@@ -294,6 +448,230 @@ export function renderAbstractSubsetSvg(
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(viewport.x)} ${f(viewport.y)} ${f(viewport.width)} ${f(viewport.height)}" width="${f(viewport.width)}pt" height="${f(viewport.height)}pt">`,
     circles,
+    '</svg>',
+  ].join('\n');
+}
+
+/**
+ * Render the 12-sample transposition battery SVG.
+ * S = {0,3,7,a}, transposed modulo 12 for t=0..b.
+ * Laid out in 2 rows of 6 columns (cell 54 × 54pt).
+ * Total dimensions: 324 × 108pt.
+ * Native scale (radius 0.55pt, 4pt min separation), common origin in each cell.
+ */
+export function renderAbstractTranspositionBatterySvg(geometryId: AbstractGeometryId): string {
+  const coords = getAbstractSiteCoordinates(geometryId);
+  const cellWidth = ABSTRACT_CELL_WIDTH;
+  const cellHeight = ABSTRACT_CELL_HEIGHT;
+  const totalWidth = ABSTRACT_BATTERY_VIEWPORT_WIDTH;
+  const totalHeight = cellHeight * 2;
+
+  const cells: string[] = [];
+  for (let t = 0; t < 12; t++) {
+    const col = t % 6;
+    const row = Math.floor(t / 6);
+    const cellX = col * cellWidth;
+    const cellY = row * cellHeight;
+    const originX = cellX + cellWidth / 2;
+    const originY = cellY + 15;
+    const subset = computeTranspositionSet(ABSTRACT_BASE_SET, t);
+    const duodT = formatDuodecimalDigit(t);
+    const setStr = formatPitchClassSet(subset);
+
+    const dots = subset
+      .map((idx) => {
+        const p = coords[idx];
+        return `    <circle cx="${f(originX + p.x)}" cy="${f(originY + p.y)}" r="${f(ABSTRACT_NODE_RADIUS)}" fill="#111111" />`;
+      })
+      .join('\n');
+
+    const labelT = `    <text x="${f(originX)}" y="${f(cellY + 35)}" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.5pt" font-weight="bold" fill="#111111">t=${duodT}</text>`;
+    const labelSet = `    <text x="${f(originX)}" y="${f(cellY + 44)}" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" fill="#475569">${setStr}</text>`;
+
+    cells.push(
+      [
+        `  <g class="abstract-specimen" data-specimen="t-${duodT}">`,
+        dots,
+        labelT,
+        labelSet,
+        `  </g>`,
+      ].join('\n')
+    );
+  }
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(totalWidth)} ${f(totalHeight)}" width="${f(totalWidth)}pt" height="${f(totalHeight)}pt">`,
+    cells.join('\n'),
+    '</svg>',
+  ].join('\n');
+}
+
+/**
+ * Render the 4-sample near-neighbours battery SVG.
+ * Samples: S, {0,4,7,a} (3→4), {0,5,7,a} (3→5), {0,3,7,b} (a→b).
+ * Explicit captions distinguish 1-semitone from 2-semitone changes.
+ * Total dimensions: 324 × 54pt (4 cells centered, pitch 54pt).
+ */
+export function renderAbstractNearNeighboursBatterySvg(geometryId: AbstractGeometryId): string {
+  const coords = getAbstractSiteCoordinates(geometryId);
+  const cellWidth = ABSTRACT_CELL_WIDTH;
+  const totalWidth = ABSTRACT_BATTERY_VIEWPORT_WIDTH;
+  const totalHeight = ABSTRACT_CELL_HEIGHT;
+  const startX = (totalWidth - 4 * cellWidth) / 2;
+
+  const cells: string[] = [];
+  for (let i = 0; i < ABSTRACT_NEAR_NEIGHBOUR_SAMPLES.length; i++) {
+    const sample = ABSTRACT_NEAR_NEIGHBOUR_SAMPLES[i];
+    const cellX = startX + i * cellWidth;
+    const originX = cellX + cellWidth / 2;
+    const originY = 15;
+    const setStr = formatPitchClassSet(sample.subset);
+
+    const dots = sample.subset
+      .map((idx) => {
+        const p = coords[idx];
+        return `    <circle cx="${f(originX + p.x)}" cy="${f(originY + p.y)}" r="${f(ABSTRACT_NODE_RADIUS)}" fill="#111111" />`;
+      })
+      .join('\n');
+
+    const labelTitle = `    <text x="${f(originX)}" y="35" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" font-weight="bold" fill="#111111">${sample.title}</text>`;
+    const labelSet = `    <text x="${f(originX)}" y="44" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" fill="#475569">${setStr}</text>`;
+
+    cells.push(
+      [
+        `  <g class="abstract-specimen" data-specimen="${sample.id}">`,
+        dots,
+        labelTitle,
+        labelSet,
+        `  </g>`,
+      ].join('\n')
+    );
+  }
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(totalWidth)} ${f(totalHeight)}" width="${f(totalWidth)}pt" height="${f(totalHeight)}pt">`,
+    cells.join('\n'),
+    '</svg>',
+  ].join('\n');
+}
+
+/**
+ * Render the 5-sample density battery SVG.
+ * Samples: {0,7}, {0,4,7}, {0,1,2,3,4,5}, {0,1,2,3,4,5,6,7,8}, {0,1,2,3,4,5,6,7,8,9,a}.
+ * Total dimensions: 324 × 54pt (5 cells centered, pitch 54pt).
+ */
+export function renderAbstractDensityBatterySvg(geometryId: AbstractGeometryId): string {
+  const coords = getAbstractSiteCoordinates(geometryId);
+  const cellWidth = ABSTRACT_CELL_WIDTH;
+  const totalWidth = ABSTRACT_BATTERY_VIEWPORT_WIDTH;
+  const totalHeight = ABSTRACT_CELL_HEIGHT;
+  const startX = (totalWidth - 5 * cellWidth) / 2;
+
+  const cells: string[] = [];
+  for (let i = 0; i < ABSTRACT_DENSITY_SAMPLES.length; i++) {
+    const sample = ABSTRACT_DENSITY_SAMPLES[i];
+    const cellX = startX + i * cellWidth;
+    const originX = cellX + cellWidth / 2;
+    const originY = 15;
+
+    const dots = sample.subset
+      .map((idx) => {
+        const p = coords[idx];
+        return `    <circle cx="${f(originX + p.x)}" cy="${f(originY + p.y)}" r="${f(ABSTRACT_NODE_RADIUS)}" fill="#111111" />`;
+      })
+      .join('\n');
+
+    let textLabels: string;
+    if (sample.siteCount <= 6) {
+      const setStr = formatPitchClassSet(sample.subset);
+      textLabels = [
+        `    <text x="${f(originX)}" y="35" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" font-weight="bold" fill="#111111">${sample.siteCount} sites</text>`,
+        `    <text x="${f(originX)}" y="44" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" fill="#475569">${setStr}</text>`,
+      ].join('\n');
+    } else if (sample.siteCount === 9) {
+      textLabels = [
+        `    <text x="${f(originX)}" y="33" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" font-weight="bold" fill="#111111">9 sites</text>`,
+        `    <text x="${f(originX)}" y="40.5" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="4.8pt" fill="#475569">{0,1,2,3,4,</text>`,
+        `    <text x="${f(originX)}" y="48" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="4.8pt" fill="#475569">5,6,7,8}</text>`,
+      ].join('\n');
+    } else {
+      textLabels = [
+        `    <text x="${f(originX)}" y="33" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" font-weight="bold" fill="#111111">11 sites</text>`,
+        `    <text x="${f(originX)}" y="40.5" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="4.8pt" fill="#475569">{0,1,2,3,4,5,</text>`,
+        `    <text x="${f(originX)}" y="48" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="4.8pt" fill="#475569">6,7,8,9,a}</text>`,
+      ].join('\n');
+    }
+
+    cells.push(
+      [
+        `  <g class="abstract-specimen" data-specimen="${sample.id}">`,
+        dots,
+        textLabels,
+        `  </g>`,
+      ].join('\n')
+    );
+  }
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(totalWidth)} ${f(totalHeight)}" width="${f(totalWidth)}pt" height="${f(totalHeight)}pt">`,
+    cells.join('\n'),
+    '</svg>',
+  ].join('\n');
+}
+
+/**
+ * Render the Ladder Octave-Boundary Probe SVG.
+ * Compares:
+ * 1. Original unfolded S = {0,3,7,a}
+ * 2. Unfolded S+3 = {3,6,a,11} (decimal 3,6,10,13)
+ * 3. Folded version (T+3) = {1,3,6,a}
+ * Absolute coordinates, common scale, shared viewport accommodating p=13.
+ * Total dimensions: 324 × 82pt.
+ */
+export function renderAbstractLadderOctaveProbeSvg(): string {
+  const totalWidth = ABSTRACT_BATTERY_VIEWPORT_WIDTH;
+  const totalHeight = 82;
+  const cellWidth = 72;
+  const startX = (totalWidth - 3 * cellWidth) / 2;
+  const originY = 20;
+
+  const cells: string[] = [];
+  for (let i = 0; i < ABSTRACT_LADDER_OCTAVE_PROBE_SAMPLES.length; i++) {
+    const sample = ABSTRACT_LADDER_OCTAVE_PROBE_SAMPLES[i];
+    const cellX = startX + i * cellWidth;
+    const originX = cellX + cellWidth / 2;
+
+    const dots = sample.pitches
+      .map((p) => {
+        const x = originX + (p % 2 === 0 ? -Math.sqrt(3) : Math.sqrt(3));
+        const y = originY + (11 - 2 * p);
+        return `    <circle cx="${f(x)}" cy="${f(y)}" r="${f(ABSTRACT_NODE_RADIUS)}" fill="#111111" />`;
+      })
+      .join('\n');
+
+    const setStr = formatPitchClassSet(sample.subset);
+    const labelTitle = `    <text x="${f(originX)}" y="40" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.2pt" font-weight="bold" fill="#111111">${sample.title}</text>`;
+    const labelSet = `    <text x="${f(originX)}" y="48" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="4.8pt" fill="#475569">${setStr}</text>`;
+    const labelDims = `    <text x="${f(originX)}" y="56" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="4.8pt" fill="#64748b">${sample.dimensionsString}</text>`;
+
+    cells.push(
+      [
+        `  <g class="abstract-specimen" data-specimen="${sample.id}">`,
+        dots,
+        labelTitle,
+        labelSet,
+        labelDims,
+        `  </g>`,
+      ].join('\n')
+    );
+  }
+
+  const footer = `  <text x="${f(totalWidth / 2)}" y="74" text-anchor="middle" font-family=${ABSTRACT_KEY_FONT_FAMILY} font-size="5.0pt" fill="#64748b">Unfolded: translation + reflection; folded into twelve sites: shape breaks. Continuing pitch vertically costs height.</text>`;
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(totalWidth)} ${f(totalHeight)}" width="${f(totalWidth)}pt" height="${f(totalHeight)}pt">`,
+    cells.join('\n'),
+    footer,
     '</svg>',
   ].join('\n');
 }
