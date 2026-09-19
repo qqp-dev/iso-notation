@@ -162,6 +162,7 @@ const ROUND_37_CARDS: string[] = ['indexed-symmetric-literal', 'indexed-symmetri
 const ROUND_38_CARDS: string[] = ['dial', 'rosette', 'asymmetric'];
 const ROUND_39_CARDS: string[] = ['dial', 'rosette', 'ladder'];
 const ROUND_40_CARDS: string[] = ['control', 'parity-scale-068', 'parity-scale-080'];
+const ROUND_41_CARDS: string[] = ['hold-stop-bar', 'hold-diamond', 'hold-ring'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -247,10 +248,14 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 41 (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 41);
-  assert.match(CURRENT_ROUND_METADATA.title, /release endpoints|exceptional-duration/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationEndpoint'], 'one open axis');
+test('CURRENT_ROUND_METADATA is the open Round 42 (two duration-vocabulary axes)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 42);
+  assert.match(CURRENT_ROUND_METADATA.title, /duration bracket vocabulary/i);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['bracketDurationGrammar', 'exceptionCarrier'],
+    'the bracket mark family and the exception carrier are the round axes'
+  );
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -303,13 +308,30 @@ test('CURRENT_ROUND_METADATA is the open Round 41 (one open axis)', () => {
     ['control', 'parity-scale-068', 'parity-scale-080'],
     'R40 parked trio on record'
   );
+  assert.deepEqual(
+    ROUND_41_CARDS,
+    ['hold-stop-bar', 'hold-diamond', 'hold-ring'],
+    'R41 parked trio on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the Round 41 trio: stop bar / diamond / ring, one axis', () => {
+test('CURRENT_CANDIDATES is the Round 42 quartet: ordinary / current bracket / compact / exception', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['hold-stop-bar', 'hold-diamond', 'hold-ring'], 'three live cards');
+  assert.deepEqual(
+    ids,
+    [
+      'duration-ordinary',
+      'duration-bracket-current',
+      'duration-bracket-compact',
+      'duration-bracket-exception',
+    ],
+    'four live duration-vocabulary columns'
+  );
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'durationEndpoint', `${c.id}: per-candidate purity`);
+    assert.ok(
+      c.axis === 'bracketDurationGrammar' || c.axis === 'exceptionCarrier',
+      `${c.id}: per-candidate purity on one of the round's axes`
+    );
     assert.notEqual(c.kind, 'abstract', `${c.id}: score candidate`);
   }
 });
@@ -2066,54 +2088,64 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two grid cards, twelve windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open round with three cards', () => {
+test('The live studio renders the open Round 42 with four matched columns', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
-  assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="12"/, 'four windows on each of three cards');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
+  assert.match(html, /data-candidate-count="4"/);
+  assert.match(html, /data-window-count="16"/, 'four shared windows on each of four cards');
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 41/);
+  assert.match(html, /Round 42/);
   assert.match(
     html,
-    /Exceptional-duration release endpoints/i,
-    'the exceptional-duration release endpoint title headlines the view'
+    /Duration bracket vocabulary/i,
+    'the duration bracket vocabulary title headlines the view'
   );
-  for (const id of ROUND_33_CARDS) {
+  for (const id of ROUND_41_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  // Round 41 honesty: the card chip carries **whole-score** lint, not window
-  // lint. The three endpoint cards ride the Round 40 parity surface, so they
-  // report that surface's remaining findings (the two pre-existing m. 33 /
-  // m. 53 simultaneity pairs) plus the endpoint shortfalls and occluded
-  // crossings this round measures — nothing is suppressed and nothing is
-  // claimed clean that is not. The window-level specimens are asserted in
-  // test/janko-round41.test.ts.
+  // Round 42 honesty: the card chip carries **whole-score** lint. Every column
+  // of the registered specimen engraves without a violation on its own rows,
+  // so all four chips read clean — the ordinary column's two known chordal
+  // overlaps are non-blocking warnings, and the exception column's lone
+  // published carrier shortfall in the stress strip is a diagnostic, not a
+  // violation. Nothing is suppressed; the window-level proofs live in
+  // test/janko-round42.test.ts and test/janko-round41.test.ts.
+  for (const id of [
+    'duration-ordinary',
+    'duration-bracket-current',
+    'duration-bracket-compact',
+    'duration-bracket-exception',
+  ]) {
+    assert.equal(
+      (html.match(new RegExp(`data-candidate="${id}" data-lint="clean"`, 'g')) ?? []).length,
+      1,
+      `${id}: the specimen engraves without a violation`
+    );
+  }
+  // The main band is per column; the three strips are shared by all four.
   assert.equal(
-    (html.match(/data-candidate="hold-stop-bar" data-lint="violations"/g) ?? []).length,
+    (html.match(/data-window="duration-vocabulary-specimen:1-8"/g) ?? []).length,
     1,
-    'the stop bar card exposes its whole-score findings'
+    'only the ordinary column carries the lone-note main band'
   );
   assert.equal(
-    (html.match(/data-candidate="hold-diamond" data-lint="violations"/g) ?? []).length,
+    (html.match(/data-window="duration-vocabulary-specimen:17-24"/g) ?? []).length,
+    2,
+    'both bracket columns carry the shared-bracket main band'
+  );
+  assert.equal(
+    (html.match(/data-window="duration-vocabulary-specimen:25-32"/g) ?? []).length,
     1,
-    'the diamond card exposes its whole-score findings'
+    'only the exception column carries the exception main band'
   );
-  assert.equal(
-    (html.match(/data-candidate="hold-ring" data-lint="violations"/g) ?? []).length,
-    1,
-    'the ring card exposes its whole-score findings'
-  );
-  // The required comparison windows are present exactly once per card.
-  assert.equal(
-    (html.match(/data-window="brahms-op118-no1:8-8"/g) ?? []).length,
-    3,
-    'all three cards carry the required Brahms m. 8 window'
-  );
-  assert.equal(
-    (html.match(/data-window="hold-endpoint-specimen:1-4"/g) ?? []).length,
-    3,
-    'all three cards carry the registered specimen window'
-  );
+  for (const span of ['9-14', '15-16', '33-34']) {
+    assert.equal(
+      (html.match(new RegExp(`data-window="duration-vocabulary-specimen:${span}"`, 'g')) ?? [])
+        .length,
+      4,
+      `all four columns carry the ${span} strip`
+    );
+  }
 });
 
 test('The closer-comparison strip is absent without a declared strip', () => {

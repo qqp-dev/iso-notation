@@ -60,13 +60,10 @@ import {
   renderReferenceView,
   renderStudioMarkup,
 } from '../src/render/janko/studio';
-import {
-  BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  resolveCandidate,
-} from '../src/render/janko/candidates';
+import { BRAHMS_STUDIO_SCORE_ID, resolveCandidate } from '../src/render/janko/candidates';
 import { ROUND_37_CANDIDATES, ROUND_37_METADATA } from './janko-round37.test';
 import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './janko-round39.test';
+import { ROUND_41_CANDIDATES } from './janko-round41.test';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
@@ -367,18 +364,19 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
 
   assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
 
-  // Round 41 candidates produce distinct SVGs: identical layout ink, three
-  // different terminal shapes.
-  assert.equal(CURRENT_CANDIDATES.length, 3);
+  // The parked Round 41 candidates (imported from their own suite) still
+  // produce distinct SVGs: identical layout ink, three different terminal
+  // shapes. See test/janko-round41.test.ts for the live-round proofs.
+  assert.equal(ROUND_41_CANDIDATES.length, 3);
   // The studio engraves a candidate window as **entry options + candidate
   // delta** (the Brahms goldens are that entry: mps 4, cut time, anacrusis).
-  const optFor = (c: (typeof CURRENT_CANDIDATES)[number]) =>
+  const optFor = (c: (typeof ROUND_41_CANDIDATES)[number]) =>
     resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(c.options ?? {}) });
-  const tokFor = (c: (typeof CURRENT_CANDIDATES)[number]) =>
+  const tokFor = (c: (typeof ROUND_41_CANDIDATES)[number]) =>
     resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(c.tokens ?? {}) });
-  const svg0 = renderJankoCrop(BRAHMS, 8, 1, optFor(CURRENT_CANDIDATES[0]), tokFor(CURRENT_CANDIDATES[0]));
-  const svg1 = renderJankoCrop(BRAHMS, 8, 1, optFor(CURRENT_CANDIDATES[1]), tokFor(CURRENT_CANDIDATES[1]));
-  const svg2 = renderJankoCrop(BRAHMS, 8, 1, optFor(CURRENT_CANDIDATES[2]), tokFor(CURRENT_CANDIDATES[2]));
+  const svg0 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[0]), tokFor(ROUND_41_CANDIDATES[0]));
+  const svg1 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[1]), tokFor(ROUND_41_CANDIDATES[1]));
+  const svg2 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[2]), tokFor(ROUND_41_CANDIDATES[2]));
   for (const svg of [svg0, svg1, svg2]) {
     assert.ok(svg.includes('janko-hold-layer'), 'the hold layer paints in the window');
     assert.ok(svg.includes('janko-hold-connector'), 'the shared connector paints');
