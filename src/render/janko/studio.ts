@@ -59,6 +59,7 @@ import {
   BRAHMS_STUDIO_SCORE_ID,
   DURATION_SPECIMEN_STUDIO_SCORE_ID,
   HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
+  DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   CandidateOptionBadge,
@@ -92,6 +93,11 @@ import {
   HOLD_ENDPOINT_SPECIMEN_JANKO_OPTIONS,
   HOLD_ENDPOINT_SPECIMEN_JANKO_TOKENS,
 } from '../../scores/hold-endpoint-specimen';
+import {
+  buildDurationVocabularySpecimenScore,
+  DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
+  DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
+} from '../../scores/duration-vocabulary-specimen';
 import { LintReport, lintJankoScore } from './linter';
 
 /** One macro focus crop in the Golden Reference view. */
@@ -276,6 +282,16 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildHoldEndpointSpecimenScore(),
       options: resolveJankoOptions(HOLD_ENDPOINT_SPECIMEN_JANKO_OPTIONS),
       tokens: resolveJankoTokens(HOLD_ENDPOINT_SPECIMEN_JANKO_TOKENS),
+    },
+    // Round 42 (Phase 3 study): the duration-vocabulary specimen — every plain
+    // notated value on the ordinary lone carrier, the shared-duration bracket
+    // carrier and the genuine exception carrier, on 384-tick rows whose onset
+    // sits on the downbeat (so a 384-tick value ends exactly on its barline).
+    [DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID]: {
+      id: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+      score: buildDurationVocabularySpecimenScore(),
+      options: resolveJankoOptions(DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS),
     },
     [SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID]: {
       id: SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,

@@ -70,7 +70,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 41 open: three score candidates');
+assert.equal(CURRENT_CANDIDATES.length, 4, 'Round 42 open: four score candidates');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -132,19 +132,28 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 41/);
-  assert.match(html, /Exceptional-duration release endpoints/i);
+  assert.match(html, /Round 42/);
+  assert.match(html, /Duration bracket vocabulary/i);
 });
 
-test('Round 41 open: three score candidates, one axis, three cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 41);
-  assert.match(CURRENT_ROUND_METADATA.title, /Exceptional-duration release endpoints/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationEndpoint'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
+test('Round 42 open: four duration-vocabulary columns, two axes, four cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 42);
+  assert.match(CURRENT_ROUND_METADATA.title, /Duration bracket vocabulary/i);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['bracketDurationGrammar', 'exceptionCarrier'],
+    'the bracket mark family and the exception carrier'
+  );
+  assert.equal(CURRENT_CANDIDATES.length, 4, 'four cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['hold-stop-bar', 'hold-diamond', 'hold-ring'],
-    'the stop bar, diamond, and ring endpoint candidates'
+    [
+      'duration-ordinary',
+      'duration-bracket-current',
+      'duration-bracket-compact',
+      'duration-bracket-exception',
+    ],
+    'the four matched duration-vocabulary columns'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -176,27 +185,44 @@ test('Round 41 open: three score candidates, one axis, three cards', () => {
   );
 });
 
-test('The open studio renders the three cards on four declared windows each', () => {
+test('The open studio renders the four matched columns on four declared windows each', () => {
   const html = renderCandidatesView(CONFIG);
 
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
   assert.equal(
     (html.match(/data-window="/g) ?? []).length,
-    12,
-    'four windows on each of the three cards'
+    16,
+    'four windows on each of the four cards'
   );
-  assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="12"/);
+  assert.match(html, /data-candidate-count="4"/);
+  assert.match(html, /data-window-count="16"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 41/);
-  assert.match(html, /Exceptional-duration release endpoints/i);
+  assert.match(html, /Round 42/);
+  assert.match(html, /Duration bracket vocabulary/i);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
-  assert.ok(html.includes('data-window="brahms-op118-no1:8-8"'), 'Brahms carries the m. 8 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:9-10"'), 'Brahms carries the mm. 9–10 window');
-  assert.ok(html.includes('data-window="brahms-op118-no1:22-23"'), 'Brahms carries the mm. 22–23 window');
-  assert.ok(
-    html.includes('data-window="hold-endpoint-specimen:1-4"'),
-    'the registered specimen carries the mm. 1–4 window'
+  assert.ok(!html.includes('data-window="brahms-op118-no1:"'), 'Brahms carries no window this round');
+  // The shared strips ride every column; the main band is per column.
+  for (const span of ['9-14', '15-16', '33-34']) {
+    assert.equal(
+      (html.match(new RegExp(`data-window="duration-vocabulary-specimen:${span}"`, 'g')) ?? []).length,
+      4,
+      `all four columns carry the ${span} strip`
+    );
+  }
+  assert.equal(
+    (html.match(/data-window="duration-vocabulary-specimen:1-8"/g) ?? []).length,
+    1,
+    'only the ordinary column carries the lone-note main band'
+  );
+  assert.equal(
+    (html.match(/data-window="duration-vocabulary-specimen:17-24"/g) ?? []).length,
+    2,
+    'both bracket columns carry the shared-bracket main band'
+  );
+  assert.equal(
+    (html.match(/data-window="duration-vocabulary-specimen:25-32"/g) ?? []).length,
+    1,
+    'only the exception column carries the exception main band'
   );
 });
 
@@ -524,11 +550,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 41);
-  assert.match(CURRENT_ROUND_METADATA.title, /Exceptional-duration release endpoints/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 42);
+  assert.match(CURRENT_ROUND_METADATA.title, /Duration bracket vocabulary/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationEndpoint'], 'one open axis');
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['bracketDurationGrammar', 'exceptionCarrier'],
+    'the round axes'
+  );
+  assert.equal(CURRENT_CANDIDATES.length, 4, 'four cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

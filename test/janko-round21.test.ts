@@ -459,17 +459,26 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 41 open, one durationEndpoint axis, three cards', () => {
-  // Ordered contract change: Round 40 is parked (historical consts in
-  // test/janko-round40.test.ts) and Round 41 opens the exceptional-duration
-  // release-endpoint comparison.
-  assert.equal(CURRENT_ROUND_METADATA.round, 41);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['durationEndpoint'], 'one open axis');
+test('§F registry: round 42 open, two duration-vocabulary axes, four columns', () => {
+  // Ordered contract change: Round 40 and Round 41 are parked (historical
+  // consts in test/janko-round40.test.ts and test/janko-round41.test.ts) and
+  // Round 42 opens the duration-bracket vocabulary comparison.
+  assert.equal(CURRENT_ROUND_METADATA.round, 42);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    ['bracketDurationGrammar', 'exceptionCarrier'],
+    'the bracket mark family and the exception carrier'
+  );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['hold-stop-bar', 'hold-diamond', 'hold-ring'],
-    'the three Round 41 candidates'
+    [
+      'duration-ordinary',
+      'duration-bracket-current',
+      'duration-bracket-compact',
+      'duration-bracket-exception',
+    ],
+    'the four Round 42 columns'
   );
 });
 

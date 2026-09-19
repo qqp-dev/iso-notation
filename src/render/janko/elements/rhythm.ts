@@ -25,6 +25,7 @@
 
 import { Hand } from '../../../model/types';
 import {
+  JankoBracketDurationGrammar,
   JankoClaspDotNudge,
   JankoClaspDurationStyle,
   JankoClusterSpacing,
@@ -38,7 +39,7 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
-import { durationDotCount, durationFlagCount, durationRingCount } from './duration';
+import { analyzeNotatedDuration, durationDotCount, durationFlagCount, durationRingCount } from './duration';
 import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, getKnockoutMetrics } from './notehead';
 import { f } from './style';
 import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
@@ -776,6 +777,95 @@ export function claspDurationDotted(durationTicks: number): boolean {
 }
 
 /**
+ * Round 42 (Phase 3 study) — the **compact** duration-mark reading of one
+ * notated value, the study's proposed vocabulary.
+ *
+ * | plain value       | ticks | compact ink                          |
+ * | ----------------- | ----- | ------------------------------------ |
+ * | 64th              | 3     | 4 cuts                               |
+ * | 32nd              | 6     | 3 cuts                               |
+ * | 16th              | 12    | 2 cuts                               |
+ * | 8th               | 24    | 1 cut                                |
+ * | quarter           | 48    | bare (no mark)                       |
+ * | half              | 96    | 1 ring                               |
+ * | whole             | 192   | 2 rings                              |
+ * | double-whole      | 384   | 3 rings                              |
+ *
+ * Dots read exactly from {@link analyzeNotatedDuration} (single/double), shared
+ * across the vocabularies. A value with no exact plain/dotted/double-dotted
+ * reading (a tie, tuplet or MIDI hold) cannot be stated in this alphabet and
+ * reports `inGrammar: false` with **zero** marks — it is never rounded into a
+ * neighbouring value. Experimental candidate vocabulary, never canonical.
+ */
+export interface CompactDurationMarks {
+  /** Short transverse cuts along the carrier (0–4). */
+  cuts: number;
+  /** Open elongation rings along the carrier (0–3). */
+  rings: number;
+  /** Augmentation dots (shared with every vocabulary). */
+  dots: 0 | 1 | 2;
+  /** False when the value has no exact plain/dotted/double-dotted reading. */
+  inGrammar: boolean;
+}
+
+/** Read one duration in the compact vocabulary (see {@link CompactDurationMarks}). */
+export function compactDurationMarks(durationTicks: number): CompactDurationMarks {
+  const { base, dots, inGrammar } = analyzeNotatedDuration(durationTicks);
+  if (!inGrammar) return { cuts: 0, rings: 0, dots: 0, inGrammar: false };
+  switch (base) {
+    case 3:
+      return { cuts: 4, rings: 0, dots, inGrammar: true };
+    case 6:
+      return { cuts: 3, rings: 0, dots, inGrammar: true };
+    case 12:
+      return { cuts: 2, rings: 0, dots, inGrammar: true };
+    case 24:
+      return { cuts: 1, rings: 0, dots, inGrammar: true };
+    case 48:
+      return { cuts: 0, rings: 0, dots, inGrammar: true };
+    case 96:
+      return { cuts: 0, rings: 1, dots, inGrammar: true };
+    case 192:
+      return { cuts: 0, rings: 2, dots, inGrammar: true };
+    case 384:
+      return { cuts: 0, rings: 3, dots, inGrammar: true };
+    default:
+      return { cuts: 0, rings: 0, dots: 0, inGrammar: false };
+  }
+}
+
+/** Half-extents (pt) of one compact mark primitive, from the token set. */
+function compactMarkHalfExtents(
+  t: ResolvedJankoTokens,
+  kind: 'cut' | 'ring'
+): { hw: number; hh: number } {
+  if (kind === 'cut') {
+    return { hw: t.compactCutLength / 2, hh: t.compactMarkStroke / 2 };
+  }
+  const outer = t.compactRingRadius + t.compactRingStroke / 2;
+  return { hw: outer, hh: outer };
+}
+
+/**
+ * Longitudinal half-span (pt) of `count` marks stacked at
+ * {@link JankoTokens.compactMarkSpacing} centre-to-centre about a centre: the
+ * end-to-end centre distance is `(count − 1) · spacing`.
+ */
+function compactStackCentreSpan(t: ResolvedJankoTokens, count: number): number {
+  return count <= 1 ? 0 : ((count - 1) / 2) * t.compactMarkSpacing;
+}
+
+/** Mark centres (pt offsets from the group centre) of one compact mark run. */
+function compactMarkOffsets(t: ResolvedJankoTokens, count: number): number[] {
+  if (count <= 0) return [];
+  const span = compactStackCentreSpan(t, count);
+  const step = count <= 1 ? 0 : t.compactMarkSpacing;
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) out.push(-span + i * step);
+  return out;
+}
+
+/**
  * One **duration-ink group** of a clasp: a value painted at one point on the
  * bracket spine (Round 19).
  *
@@ -805,6 +895,15 @@ export interface ResolvedJankoClaspInk {
    * {@link claspDurationDotted}.
    */
   dots: 0 | 1 | 2;
+  /**
+   * Round 42 study: cuts this group paints in the compact family (0 = none).
+   * Zero under the canonical `'golden'` bracket grammar.
+   */
+  compactCuts: number;
+  /** Round 42 study: compact elongation rings this group paints (0 = none). */
+  compactRings: number;
+  /** Round 42 study: the active bracket duration grammar of this group. */
+  bracketGrammar: JankoBracketDurationGrammar;
 }
 
 /** A duration-ink group the caller asks for (unresolved: value + spine y). */
@@ -824,23 +923,52 @@ export interface JankoClaspDurationInk {
  */
 export function resolveClaspInk(
   ink: JankoClaspDurationInk,
-  grammar: JankoDurationGrammar = 'golden'
+  grammar: JankoDurationGrammar = 'golden',
+  bracketGrammar: JankoBracketDurationGrammar = 'golden'
 ): ResolvedJankoClaspInk {
   const duration = claspDurationClass(ink.durationTicks);
+  // Round 42 study: under the compact bracket family the dots read exactly from
+  // the notated value (single/double), shared with the horizontal carrier; the
+  // canonical dots stay byte-identical.
   const dots =
-    grammar === 'complete'
-      ? durationDotCount(ink.durationTicks, grammar)
-      : claspDurationDotted(ink.durationTicks)
-        ? 1
-        : 0;
+    bracketGrammar === 'compact'
+      ? compactDurationMarks(ink.durationTicks).dots
+      : grammar === 'complete'
+        ? durationDotCount(ink.durationTicks, grammar)
+        : claspDurationDotted(ink.durationTicks)
+          ? 1
+          : 0;
+  const compact =
+    bracketGrammar === 'compact'
+      ? compactDurationMarks(ink.durationTicks)
+      : { cuts: 0, rings: 0 };
   return {
     centerY: ink.centerY,
     durationTicks: ink.durationTicks,
     duration,
-    flags: duration === 'spire-two-flags' ? 2 : duration === 'spire-one-flag' ? 1 : 0,
-    pips: duration === 'double-pip' ? 2 : duration === 'pip' ? 1 : 0,
+    // The compact family is a different primitive set, so it never reports the
+    // golden flags/pips (they would paint the wrong ink).
+    flags:
+      bracketGrammar === 'compact'
+        ? 0
+        : duration === 'spire-two-flags'
+          ? 2
+          : duration === 'spire-one-flag'
+            ? 1
+            : 0,
+    pips:
+      bracketGrammar === 'compact'
+        ? 0
+        : duration === 'double-pip'
+          ? 2
+          : duration === 'pip'
+            ? 1
+            : 0,
     dotted: dots >= 1,
     dots,
+    compactCuts: compact.cuts,
+    compactRings: compact.rings,
+    bracketGrammar,
   };
 }
 
@@ -871,6 +999,8 @@ export interface JankoClaspGroupGeometry {
   duration: JankoClaspDuration;
   /** Round 11: the light transverse duration paradigm the bracket paints. */
   durationStyle: JankoClaspDurationStyle;
+  /** Round 42 study: the bracket's duration mark family (golden | compact). */
+  bracketGrammar: JankoBracketDurationGrammar;
   /** Duration notches (0 = quarter, 1 = 8th, 2 = 16th). */
   flags: number;
   /** Open knockout marks (0–2) painted at the spine midpoint. */
@@ -922,6 +1052,11 @@ export interface JankoClaspOptions {
    * Defaults to the settled `'kinetic-cross-slashes'`.
    */
   claspDurationStyle?: JankoClaspDurationStyle;
+  /**
+   * Round 42 study: the bracket's duration **mark family** (golden | compact).
+   * Defaults to the canonical `'golden'`.
+   */
+  bracketGrammar?: JankoBracketDurationGrammar;
   /**
    * Round 19: explicit duration-ink groups (value + spine y) for a **unified**
    * cross-hand bracket, which paints one group per hand. Omitted for a classic
@@ -998,11 +1133,12 @@ export function computeClaspGeometry(
   const botY = maxY + r;
   const durationTicks = options?.durationTicks ?? Math.min(...notes.map((n) => n.durationTicks));
   const grammar = options?.durationGrammar ?? 'golden';
+  const bracketGrammar = options?.bracketGrammar ?? 'golden';
   const durationInk = (
     options?.durationInk && options.durationInk.length > 0
       ? options.durationInk
       : [{ centerY: (topY + botY) / 2, durationTicks }]
-  ).map((ink) => resolveClaspInk(ink, grammar));
+  ).map((ink) => resolveClaspInk(ink, grammar, bracketGrammar));
   // `durationTicks` stays the **carried value** — the shortest member value,
   // which is what the cluster's first voice moves on, unified bracket or not.
   // The scalar mark fields mirror the bracket's primary ink group (the first
@@ -1025,6 +1161,7 @@ export function computeClaspGeometry(
     durationTicks,
     duration: claspDurationClass(durationTicks),
     durationStyle: options?.claspDurationStyle ?? 'kinetic-cross-slashes',
+    bracketGrammar,
     flags: primary.flags,
     pips: primary.pips,
     dotted: primary.dotted,
@@ -1563,51 +1700,71 @@ function renderClaspDurationInk(
 
   for (const [index, ink] of groups.entries()) {
     const yMid = ink.centerY;
-    const open = ink.pips > 0;
-    const hasMark = open || ink.flags > 0;
-    const mark = open
-      ? claspOpenMark(ink.pips)
-      : claspFlagMark(group.durationStyle, ink.flags, rake);
-    const centers = mark.stack === 0 ? [yMid] : [yMid - mark.stack, yMid + mark.stack];
-
-    for (const cy of hasMark ? centers : []) {
-      if (open) {
-        // Every paradigm shares the clean open white ring: its 100% white
-        // interior knocks the spine out with zero crosshairs. Bracket-circle
-        // family (scale 0.80), isolated from standalone stem rings.
+    if (ink.bracketGrammar === 'compact') {
+      // Round 42 study: the compact family paints 1-4 short cuts (transverse,
+      // stacked vertically at compactMarkSpacing) and 1-3 open elongation
+      // rings; both centred on the spine's midpoint, so the bracket stays a
+      // mirror-symmetrical `[`. The geometry is shared with onBracketCompactBox
+      // below (one metric), so render and audit can never drift.
+      const cutHalf = t.compactCutLength / 2;
+      const cutStroke = t.compactMarkStroke.toFixed(2);
+      for (const dy of compactMarkOffsets(t, ink.compactCuts)) {
         out.push(
-          `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(BRACKET_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${BRACKET_RING_STROKE.toFixed(2)}"/>`
+          `    <line class="janko-clasp-cut" x1="${f(claspX - cutHalf)}" y1="${f(yMid + dy)}" x2="${f(claspX + cutHalf)}" y2="${f(yMid + dy)}" stroke="#111111" stroke-width="${cutStroke}" stroke-linecap="butt"/>`
         );
-        continue;
       }
+      for (const dy of compactMarkOffsets(t, ink.compactRings)) {
+        out.push(
+          `    <circle class="janko-clasp-compact-ring" cx="${f(claspX)}" cy="${f(yMid + dy)}" r="${f(t.compactRingRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${t.compactRingStroke.toFixed(2)}"/>`
+        );
+      }
+    } else {
+      const open = ink.pips > 0;
+      const hasMark = open || ink.flags > 0;
+      const mark = open
+        ? claspOpenMark(ink.pips)
+        : claspFlagMark(group.durationStyle, ink.flags, rake);
+      const centers = mark.stack === 0 ? [yMid] : [yMid - mark.stack, yMid + mark.stack];
 
-      const half = CLASP_TRANSVERSE_WIDTH / 2;
-      const dy = half * rake;
-      switch (group.durationStyle) {
-        case 'kinetic-cross-slashes':
-          // Up-raked: the cut rises from left to right.
+      for (const cy of hasMark ? centers : []) {
+        if (open) {
+          // Every paradigm shares the clean open white ring: its 100% white
+          // interior knocks the spine out with zero crosshairs. Bracket-circle
+          // family (scale 0.80), isolated from standalone stem rings.
           out.push(
-            `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy + dy)}" x2="${f(claspX + half)}" y2="${f(cy - dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+            `    <circle class="janko-clasp-ring" cx="${f(claspX)}" cy="${f(cy)}" r="${f(BRACKET_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${BRACKET_RING_STROKE.toFixed(2)}"/>`
           );
-          break;
-        case 'down-raked-slashes':
-          // Down-raked: the mirrored cut falls from left to right.
-          out.push(
-            `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy - dy)}" x2="${f(claspX + half)}" y2="${f(cy + dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-          );
-          break;
-        case 'cross-hatch-stitches':
-          // A symmetrical `×`: both rakes cross on the spine's own centreline.
-          out.push(
-            `    <path class="janko-clasp-stitch" d="M ${f(claspX - half)} ${f(cy + dy)} L ${f(claspX + half)} ${f(cy - dy)} M ${f(claspX - half)} ${f(cy - dy)} L ${f(claspX + half)} ${f(cy + dy)}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-          );
-          break;
-        case 'transverse-cross-bars':
-        default:
-          out.push(
-            `    <line class="janko-clasp-bar" x1="${f(claspX - half)}" y1="${f(cy)}" x2="${f(claspX + half)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
-          );
-          break;
+          continue;
+        }
+
+        const half = CLASP_TRANSVERSE_WIDTH / 2;
+        const dy = half * rake;
+        switch (group.durationStyle) {
+          case 'kinetic-cross-slashes':
+            // Up-raked: the cut rises from left to right.
+            out.push(
+              `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy + dy)}" x2="${f(claspX + half)}" y2="${f(cy - dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+            );
+            break;
+          case 'down-raked-slashes':
+            // Down-raked: the mirrored cut falls from left to right.
+            out.push(
+              `    <line class="janko-clasp-slash" x1="${f(claspX - half)}" y1="${f(cy - dy)}" x2="${f(claspX + half)}" y2="${f(cy + dy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+            );
+            break;
+          case 'cross-hatch-stitches':
+            // A symmetrical `×`: both rakes cross on the spine's own centreline.
+            out.push(
+              `    <path class="janko-clasp-stitch" d="M ${f(claspX - half)} ${f(cy + dy)} L ${f(claspX + half)} ${f(cy - dy)} M ${f(claspX - half)} ${f(cy - dy)} L ${f(claspX + half)} ${f(cy + dy)}" fill="none" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+            );
+            break;
+          case 'transverse-cross-bars':
+          default:
+            out.push(
+              `    <line class="janko-clasp-bar" x1="${f(claspX - half)}" y1="${f(cy)}" x2="${f(claspX + half)}" y2="${f(cy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
+            );
+            break;
+        }
       }
     }
 
@@ -1657,7 +1814,31 @@ export function claspInkBox(
       : [resolveClaspInk({ centerY: (group.topY + group.botY) / 2, durationTicks: group.durationTicks })];
   for (const [index, ink] of inks.entries()) {
     const yMid = ink.centerY;
-    if (ink.pips > 0 || ink.flags > 0) {
+    if (ink.bracketGrammar === 'compact') {
+      // Round 42 study: the same compact-mark geometry the renderer paints.
+      const span = Math.max(
+        compactStackCentreSpan(t, ink.compactCuts),
+        compactStackCentreSpan(t, ink.compactRings)
+      );
+      let hw = 0;
+      let hh = 0;
+      if (ink.compactCuts > 0) {
+        const e = compactMarkHalfExtents(t, 'cut');
+        hw = Math.max(hw, e.hw);
+        hh = Math.max(hh, e.hh);
+      }
+      if (ink.compactRings > 0) {
+        const e = compactMarkHalfExtents(t, 'ring');
+        hw = Math.max(hw, e.hw);
+        hh = Math.max(hh, e.hh);
+      }
+      if (hw > 0 || hh > 0) {
+        x0 = Math.min(x0, group.claspX - hw);
+        x1 = Math.max(x1, group.claspX + hw);
+        y0 = Math.min(y0, yMid - span - hh);
+        y1 = Math.max(y1, yMid + span + hh);
+      }
+    } else if (ink.pips > 0 || ink.flags > 0) {
       const mark =
         ink.pips > 0
           ? claspOpenMark(ink.pips)
@@ -1684,6 +1865,136 @@ export function claspInkBox(
         y0 = Math.min(y0, dot2.y - t.augmentationDotRadius);
         y1 = Math.max(y1, dot2.y + t.augmentationDotRadius);
       }
+    }
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/**
+ * Round 42 study — one **horizontal exception carrier**.
+ *
+ * When a shared-duration bracket carries one value and one of its admitted
+ * members states a *different* one, that member is an **exception**. Under the
+ * study's `exceptionCarrier: 'horizontal'` the member gives up its own
+ * stem/flag ink for a **fixed-length** horizontal carrier at its true pitch y,
+ * painted with the member's own compact marks arranged **along** it. The
+ * carrier's length is a typographic token ({@link JankoTokens.exceptionCarrierLength}),
+ * **independent of the member's duration and of its release** — so it can never
+ * be misread as a release instant.
+ */
+export interface JankoExceptionCarrierGeometry {
+  /** Source note id that owns the carrier (single-note ownership). */
+  noteId: string;
+  /** Onset tick of the owning member. */
+  tick: number;
+  /** True pitch y of the owning member (the pitch symbol is never moved). */
+  y: number;
+  /** Left attachment edge (pt): the member's protected mask right edge + air. */
+  x0: number;
+  /** Right edge (pt) — `x0 + t.exceptionCarrierLength`, value-independent. */
+  x1: number;
+  /** The member's own stated duration (ticks). */
+  durationTicks: number;
+  /** Compact cuts along the carrier (0–4). */
+  cuts: number;
+  /** Compact elongation rings along the carrier (0–3). */
+  rings: number;
+  /** Augmentation dots of the member's own value. */
+  dots: 0 | 1 | 2;
+  /** False when the member's value has no exact reading (never faked). */
+  inGrammar: boolean;
+  /** Carrier stroke width (pt) — the family weight. */
+  stroke: number;
+}
+
+/**
+ * The marks of one compact run, centred on the carrier midpoint: the end-to-end
+ * centre distance is `(count − 1) · compactMarkSpacing`. Shared by the renderer
+ * and {@link exceptionCarrierInkBox}, so the audited box can never drift from
+ * the painted marks.
+ */
+function exceptionCarrierMarkCentres(
+  g: JankoExceptionCarrierGeometry,
+  t: ResolvedJankoTokens
+): { cuts: number[]; rings: number[] } {
+  const xm = (g.x0 + g.x1) / 2;
+  return {
+    cuts: compactMarkOffsets(t, g.cuts).map((dx) => xm + dx),
+    rings: compactMarkOffsets(t, g.rings).map((dx) => xm + dx),
+  };
+}
+
+/** Paint one horizontal exception carrier (Round 42 study). */
+export function renderExceptionCarrier(
+  g: JankoExceptionCarrierGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const out: string[] = [
+    `  <g class="janko-exception-carrier" data-exception-note="${g.noteId}" data-exception-ticks="${g.durationTicks}" data-exception-cuts="${g.cuts}" data-exception-rings="${g.rings}" data-exception-dots="${g.dots}" data-exception-in-grammar="${g.inGrammar}">`,
+    `    <line class="janko-exception-carrier-line" x1="${f(g.x0)}" y1="${f(g.y)}" x2="${f(g.x1)}" y2="${f(g.y)}" stroke="#111111" stroke-width="${g.stroke.toFixed(2)}" stroke-linecap="butt"/>`,
+  ];
+  const centres = exceptionCarrierMarkCentres(g, t);
+  const cutHalf = t.compactCutLength / 2;
+  const cutStroke = t.compactMarkStroke.toFixed(2);
+  for (const cx of centres.cuts) {
+    out.push(
+      `    <line class="janko-exception-cut" x1="${f(cx)}" y1="${f(g.y - cutHalf)}" x2="${f(cx)}" y2="${f(g.y + cutHalf)}" stroke="#111111" stroke-width="${cutStroke}" stroke-linecap="butt"/>`
+    );
+  }
+  for (const cx of centres.rings) {
+    out.push(
+      `    <circle class="janko-exception-ring" cx="${f(cx)}" cy="${f(g.y)}" r="${f(t.compactRingRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${t.compactRingStroke.toFixed(2)}"/>`
+    );
+  }
+  // The augmentation dot is the shared satellite of the run's right end.
+  if (g.dots >= 1) {
+    const dotX = g.x1 + t.augmentationDotGap + t.augmentationDotRadius;
+    out.push(
+      `    <circle class="janko-exception-dot" cx="${f(dotX)}" cy="${f(g.y)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
+    );
+    if (g.dots >= 2) {
+      const dot2X = dotX + 2 * t.augmentationDotRadius + t.augmentationDotGap;
+      out.push(
+        `    <circle class="janko-exception-dot" data-dot="2" cx="${f(dot2X)}" cy="${f(g.y)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
+      );
+    }
+  }
+  out.push('  </g>');
+  return out.join('\n');
+}
+
+/** Axis-aligned ink box of one horizontal exception carrier (shared metric). */
+export function exceptionCarrierInkBox(
+  g: JankoExceptionCarrierGeometry,
+  tokens?: Partial<JankoTokens> | null
+): { x0: number; y0: number; x1: number; y1: number } {
+  const t = resolveJankoTokens(tokens);
+  const cut = compactMarkHalfExtents(t, 'cut');
+  const ring = compactMarkHalfExtents(t, 'ring');
+  const stateHalf = Math.max(g.cuts > 0 ? cut.hh : 0, g.rings > 0 ? ring.hh : 0, g.stroke / 2);
+  let x0 = g.x0;
+  let x1 = g.x1;
+  let y0 = g.y - stateHalf;
+  let y1 = g.y + stateHalf;
+  if (g.cuts > 0) {
+    const cs = exceptionCarrierMarkCentres(g, t).cuts;
+    x0 = Math.min(x0, cs[0] - cut.hw);
+    x1 = Math.max(x1, cs[cs.length - 1] + cut.hw);
+  }
+  if (g.rings > 0) {
+    const rs = exceptionCarrierMarkCentres(g, t).rings;
+    x0 = Math.min(x0, rs[0] - ring.hw);
+    x1 = Math.max(x1, rs[rs.length - 1] + ring.hw);
+  }
+  if (g.dots >= 1) {
+    const dotX = g.x1 + t.augmentationDotGap + t.augmentationDotRadius;
+    x1 = Math.max(x1, dotX + t.augmentationDotRadius);
+    y0 = Math.min(y0, g.y - t.augmentationDotRadius);
+    y1 = Math.max(y1, g.y + t.augmentationDotRadius);
+    if (g.dots >= 2) {
+      const dot2X = dotX + 2 * t.augmentationDotRadius + t.augmentationDotGap;
+      x1 = Math.max(x1, dot2X + t.augmentationDotRadius);
     }
   }
   return { x0, y0, x1, y1 };

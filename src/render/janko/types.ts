@@ -753,6 +753,25 @@ export interface JankoTokens {
   holdRingDiameter?: number;
   /** Round 41: ring terminal stroke width (pt). */
   holdRingStroke?: number;
+  // --- Round 42 (Phase 3 study): compact bracket-duration vocabulary ---
+  /** Compact cut: transverse length (pt) of one subdivision cut. */
+  compactCutLength?: number;
+  /** Compact cut / ring: shared stroke width (pt) of one compact mark. */
+  compactMarkStroke?: number;
+  /** Compact ring: centreline radius (pt) of one elongation ring. */
+  compactRingRadius?: number;
+  /** Compact ring: stroke width (pt) of one elongation ring. */
+  compactRingStroke?: number;
+  /**
+   * Compact family: centre-to-centre spacing (pt) between adjacent stacked
+   * marks (cuts on the bracket, marks along the horizontal carrier).
+   */
+  compactMarkSpacing?: number;
+  /**
+   * Round 42: fixed length (pt) of the horizontal exception carrier — a
+   * typographic constant, **independent of the member's duration and release**.
+   */
+  exceptionCarrierLength?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -826,6 +845,15 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   holdDiamondSize: 1.60,
   holdRingDiameter: 2.20,
   holdRingStroke: 0.40,
+  // Round 42 (Phase 3 study) — compact family; the refinement's dimensioned
+  // recommendation (cut 2.4/0.42, ring centreline Ø1.60/0.38 → outer Ø1.98,
+  // mark spacing 2.40, fixed horizontal carrier 9.0). Experimental, not adopted.
+  compactCutLength: 2.4,
+  compactMarkStroke: 0.42,
+  compactRingRadius: 0.8,
+  compactRingStroke: 0.38,
+  compactMarkSpacing: 2.4,
+  exceptionCarrierLength: 9.0,
 };
 
 /**
@@ -1102,6 +1130,32 @@ export interface JankoLayoutOptions {
    * Standalone symbols always keep the canonical size and mask.
    */
   chordSymbolScale?: number;
+  /**
+   * Round 42 (Phase 3 study): the bracket's duration **mark family**.
+   *
+   * - `'golden'`: canonical — the incumbent transverse cuts / open rings
+   *   (7.5pt cuts at 0.85/1.0pt, R=2.4pt rings), saturating at two marks.
+   * - `'compact'`: the proposed compact family — short cuts
+   *   ({@link JankoTokens.compactCutLength}pt / `compactMarkStroke`pt) and small
+   *   elongation rings (`compactRingRadius`/`compactRingStroke`, outer Ø1.98pt)
+   *   at `compactMarkSpacing`pt, counting 4/3/2/1 cuts then bare then 1/2/3
+   *   rings so all eight plain values are distinct. Experimental candidate
+   *   vocabulary, never promoted to canonical.
+   */
+  bracketDurationGrammar?: JankoBracketDurationGrammar;
+  /**
+   * Round 42 (Phase 3 study): the **exception member** treatment for an
+   * admitted bracket member whose own duration differs from the group's
+   * carried value.
+   *
+   * - `'none'`: canonical — the exception keeps its own exact statement.
+   * - `'horizontal'`: the member's own stem/flag ink is replaced by a
+   *   fixed-length ({@link JankoTokens.exceptionCarrierLength}pt) horizontal
+   *   carrier at its true pitch y, carrying the member's own compact marks
+   *   **along** the carrier. A typographic statement of the member's own
+   *   duration — never a release-time length.
+   */
+  exceptionCarrier?: JankoExceptionCarrier;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1139,6 +1193,24 @@ export type ExtensionJunctionStyle = 'default' | 'conjoin' | 'wide-gap';
  *   keep their current rendering under both grammars.
  */
 export type JankoDurationGrammar = 'golden' | 'complete';
+
+/**
+ * Bracket duration **mark family** (the Round 42 Phase-3 study axis): which
+ * primitives a shared-duration bracket paints for each plain value.
+ *
+ * - `'golden'`: the incumbent transverse cuts / open rings (saturating at two).
+ * - `'compact'`: the proposed compact cut/ring family (1–4 cuts, bare, 1–3
+ *   rings) — candidates only, never canonical.
+ */
+export type JankoBracketDurationGrammar = 'golden' | 'compact';
+
+/**
+ * Exception-member carrier (the Round 42 Phase-3 study axis): how an admitted
+ * bracket member whose own duration differs from the carried value states that
+ * value. `'none'` is canonical (the member keeps its own statement);
+ * `'horizontal'` replaces it with the fixed-length horizontal carrier.
+ */
+export type JankoExceptionCarrier = 'none' | 'horizontal';
 
 /**
  * Situational clasp-dot translation (the Round 31 preview axis): a rigid
@@ -1270,6 +1342,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   pitchPlacement: 'standard',
   durationEndpoint: 'none',
   chordSymbolScale: 1,
+  bracketDurationGrammar: 'golden',
+  exceptionCarrier: 'none',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

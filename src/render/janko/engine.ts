@@ -137,6 +137,10 @@ import {
   claspDurationClass,
   claspInkBox,
   claspQualifies,
+  compactDurationMarks,
+  exceptionCarrierInkBox,
+  renderExceptionCarrier,
+  JankoExceptionCarrierGeometry,
   computeBeamGroupGeometry,
   computeClaspGeometry,
   computeVerticalChordGroup,
@@ -1517,6 +1521,22 @@ export function holdClearanceInk(
   return { seat: [...corridor, ...brackets, ...barlines], corridor, barlines, brackets };
 }
 
+/** Round 42 study: one exception carrier that could not clear the next onset. */
+export interface JankoExceptionCarrierRefusal {
+  /** Source note id of the owning exception member. */
+  noteId: string;
+  /** Onset tick of the member. */
+  startTick: number;
+  /** The member's own stated duration. */
+  durationTicks: number;
+  /** Required carrier ink width (pt) — the fixed length plus its marks. */
+  required: number;
+  /** Free width (pt) before the nearest blocking mask / the staff edge. */
+  available: number;
+  /** Human-readable, published reason (never a silent clip). */
+  reason: string;
+}
+
 export interface JankoSystemLayout {
   /** Zero-based global system index. */
   index: number;
@@ -1567,6 +1587,18 @@ export interface JankoSystemLayout {
    * refusal, so nothing is hidden.
    */
   holdRefusals: JankoHoldRefusal[];
+  /**
+   * Round 42 study: the system's horizontal exception carriers
+   * (`exceptionCarrier === 'horizontal'`; empty otherwise). Each is owned by
+   * one exception member, painted at its true pitch y, and states that member's
+   * own duration with the compact marks — never a release-time length.
+   */
+  exceptionCarriers: JankoExceptionCarrierGeometry[];
+  /**
+   * Round 42 study: exception carriers whose fixed length could not clear the
+   * next onset (or the staff edge) — published, never clipped or shortened.
+   */
+  exceptionCarrierRefusals: JankoExceptionCarrierRefusal[];
   /**
    * Note ids whose standalone stem the clasp replaces. A clasp member that
    * belongs to a beam group keeps its stem: a real 16th-note beam is never cut
@@ -3616,6 +3648,7 @@ export function predictDownbeatInset(
         ...claspAuditDurationOptions(group, unified),
         claspDurationStyle: o.claspDurationStyle,
         durationGrammar: o.durationGrammar,
+        bracketGrammar: o.bracketDurationGrammar,
         claspDotNudge: o.claspDotNudge,
         clusterSpacing: o.clusterSpacing,
         honorHalo: o.showHonorHalo,
@@ -3796,6 +3829,15 @@ export interface JankoChordColumnResolution {
    * offsets; any entry on the literal corpus is a STOP condition.
    */
   railDiagnostics: ThreeRailDiagnostic[];
+  /**
+   * Round 42: note ids of every **actually admitted** bracket member of this
+   * system — the union of the members of the units whose clasp survived the
+   * fit rule (`unit.clasp` after the `claspFits` demotion). This is the exact
+   * ownership the candidate chord-member **symbol scale** may touch; a clean
+   * two-note column that `claspQualifies` never brackets is absent, so the
+   * dyad keeps full-size symbols. Empty when nothing is bracketed.
+   */
+  admittedBracketIds: ReadonlySet<string>;
 }
 
 /** Full result of the chord-column solve (see {@link resolveRowSnappedChordOffsets}). */
@@ -4239,6 +4281,7 @@ export function resolveChordColumns(
             ...claspAuditDurationOptions(group, unified),
             claspDurationStyle: o.claspDurationStyle,
             durationGrammar: o.durationGrammar,
+            bracketGrammar: o.bracketDurationGrammar,
             claspDotNudge: o.claspDotNudge,
             clusterSpacing: o.clusterSpacing,
             honorHalo: o.showHonorHalo,
@@ -4331,6 +4374,7 @@ export function resolveChordColumns(
               ...claspAuditDurationOptions(group, unified),
               claspDurationStyle: o.claspDurationStyle,
               durationGrammar: o.durationGrammar,
+              bracketGrammar: o.bracketDurationGrammar,
               claspDotNudge: o.claspDotNudge,
               clusterSpacing: o.clusterSpacing,
               honorHalo: o.showHonorHalo,
@@ -4361,6 +4405,7 @@ export function resolveChordColumns(
         {
           claspDurationStyle: o.claspDurationStyle,
           durationGrammar: o.durationGrammar,
+          bracketGrammar: o.bracketDurationGrammar,
           claspDotNudge: o.claspDotNudge,
           clusterSpacing: o.clusterSpacing,
           honorHalo: o.showHonorHalo,
@@ -4421,6 +4466,7 @@ export function resolveChordColumns(
           ...auditDuration,
           claspDurationStyle: o.claspDurationStyle,
           durationGrammar: o.durationGrammar,
+          bracketGrammar: o.bracketDurationGrammar,
           claspDotNudge: o.claspDotNudge,
           clusterSpacing: o.clusterSpacing,
           honorHalo: o.showHonorHalo,
@@ -4439,6 +4485,7 @@ export function resolveChordColumns(
                 ...auditDuration,
                 claspDurationStyle: o.claspDurationStyle,
                 durationGrammar: o.durationGrammar,
+                bracketGrammar: o.bracketDurationGrammar,
                 claspDotNudge: o.claspDotNudge,
                 clusterSpacing: o.clusterSpacing,
                 honorHalo: o.showHonorHalo,
@@ -4491,6 +4538,18 @@ export function resolveChordColumns(
     for (const unit of units) {
       if (unit.clasp && !claspFits(unit)) unit.clasp = false;
     }
+  }
+  // Round 42: the admitted bracket ownership — only the units whose clasp
+  // survived the fit rule above, and only the members of the hand-groups that
+  // actually carry the bracket. The candidate symbol scale reads exactly this
+  // set, so a bare two-note column (never bracketed) stays full size.
+  const admittedBracketIds = new Set<string>();
+  for (const unit of units) {
+    if (!unit.clasp) continue;
+    const groups = perHandClasps
+      ? handClaspGroups(unit)
+      : [unit.rows.flatMap((c) => c.notes)];
+    for (const p of groups.flat()) admittedBracketIds.add(p.note.id);
   }
   // -------------------------------------------------------------------------
   // 1a-Pass-C′. Fixed three-rail seating with duration-ink precedence (§1).
@@ -4630,6 +4689,7 @@ export function resolveChordColumns(
             ...claspAuditDurationOptions(group, unified),
             claspDurationStyle: o.claspDurationStyle,
             durationGrammar: o.durationGrammar,
+            bracketGrammar: o.bracketDurationGrammar,
             claspDotNudge: o.claspDotNudge,
             clusterSpacing: o.clusterSpacing,
             honorHalo: o.showHonorHalo,
@@ -4667,6 +4727,7 @@ export function resolveChordColumns(
       diagnostics: clusterDiagnostics,
       claspQualifiedIds: bracketedIds,
       railDiagnostics,
+      admittedBracketIds: new Set<string>(),
     };
   }
 
@@ -5069,6 +5130,7 @@ export function resolveChordColumns(
     diagnostics: clusterDiagnostics,
     claspQualifiedIds: bracketedIds,
     railDiagnostics,
+    admittedBracketIds,
   };
 }
 
@@ -5581,11 +5643,40 @@ export function layoutJankoSystemShifted(
     diagnostics: [],
     claspQualifiedIds: new Set<string>(),
     railDiagnostics: [],
+    admittedBracketIds: new Set<string>(),
   };
-  // Round 41: the same-hand chord membership of this score is score-unique, and
-  // the symbol scale is stamped onto every head before any mask is read, so the
-  // column solve, the clearance audits and the paint all see one metric.
-  const chordSymbolIds = o.chordSymbolScale === 1 ? null : chordSymbolMemberIds(score);
+  // Round 41/42: the same-hand **co-onset** membership of this score is
+  // score-unique and cheap, but it is only the *candidate* set — a clean
+  // two-note column belongs to it without ever being bracketed. The candidate
+  // symbol scale may touch **actual admitted bracket members only**, and
+  // admission reads the very masks the scale changes (`knockoutHalfExtents` of
+  // a stamped head), so the fixpoint is closed in a bounded way: one pre-solve
+  // over the co-onset candidate set reads the admitted ownership, and the real
+  // solve then scales exactly those members. Canonical (`chordSymbolScale: 1`)
+  // takes the untouched path — `chordSymbolIds` stays null.
+  const coOnsetIds = o.chordSymbolScale === 1 ? null : chordSymbolMemberIds(score);
+  let chordSymbolIds: ReadonlySet<string> | null = coOnsetIds;
+  if (coOnsetIds) {
+    const preRaw = applyFoldPairPresentation(
+      sysNotes.map((n) => {
+        const p = positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets);
+        if (!coOnsetIds.has(n.id)) return p;
+        return { ...p, symbolScale: o.chordSymbolScale, symbolChord: true };
+      }),
+      o.foldPairPresentation,
+      geometry.middleCY,
+      t
+    );
+    const pre = resolveChordColumns(
+      mergeUnisonHeads(preRaw).notes,
+      geometry,
+      systemIndex,
+      o,
+      t,
+      claspInsets
+    );
+    chordSymbolIds = pre.admittedBracketIds;
+  }
   for (let attempt = 0; ; attempt++) {
     const raw = applyFoldPairPresentation(
       sysNotes.map((n) => {
@@ -5880,6 +5971,7 @@ export function layoutJankoSystemShifted(
           // Round 30: the bracket's dots derive from the active grammar
           // (a double-dotted carried value dots twice under complete).
           durationGrammar: o.durationGrammar,
+          bracketGrammar: o.bracketDurationGrammar,
           // Round 31: the situational dot translation (default [0, 0]).
           claspDotNudge: o.claspDotNudge,
           clusterSpacing: o.clusterSpacing,
@@ -6229,6 +6321,79 @@ export function layoutJankoSystemShifted(
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Round 42 (Phase 3 study) — the horizontal exception carrier.
+  //
+  // An admitted bracket carries one duration; a member stating a *different*
+  // value is an exception. Under `exceptionCarrier: 'horizontal'` that member
+  // gives up its own stem/flag ink for one **fixed-length** horizontal carrier
+  // at its true pitch y (the pitch symbol is never moved). The length is a
+  // typographic token (`exceptionCarrierLength`), independent of the member's
+  // duration and release, so it can never be misread as a release instant —
+  // the compact marks alone state the member's own value. Where the fixed
+  // length cannot clear the next onset's mask (or the staff edge) the carrier
+  // is still painted at its true length and the shortfall is published
+  // (`exceptionCarrierRefusals`): never clipped, shortened or hidden. A member
+  // that belongs to a real beam keeps its beam.
+  // -------------------------------------------------------------------------
+  const exceptionCarriers: JankoExceptionCarrierGeometry[] = [];
+  const exceptionCarrierRefusals: JankoExceptionCarrierRefusal[] = [];
+  if (o.exceptionCarrier === 'horizontal' && o.chordGrouping === 'per-hand-clasp') {
+    const air = getClusterSpacingPreset(o.clusterSpacing).air;
+    const solvedById = new Map(notes.map((p) => [p.note.id, p]));
+    for (const clasp of clasps) {
+      for (const member of clasp.notes) {
+        if (member.durationTicks === claspMemberCarriedTicks(clasp, member.id)) continue;
+        if (beamedIds.has(member.id)) continue;
+        const p = solvedById.get(member.id);
+        if (!p) continue;
+        const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+        const x0 = p.x + e.wx + air;
+        const x1 = x0 + t.exceptionCarrierLength;
+        const marks = compactDurationMarks(member.durationTicks);
+        const carrier: JankoExceptionCarrierGeometry = {
+          noteId: member.id,
+          tick: member.startTick,
+          y: p.y,
+          x0,
+          x1,
+          durationTicks: member.durationTicks,
+          cuts: marks.cuts,
+          rings: marks.rings,
+          dots: marks.dots,
+          inGrammar: marks.inGrammar,
+          stroke: t.claspStrokeWidth,
+        };
+        exceptionCarriers.push(carrier);
+        if (!claspedStems.includes(member.id)) claspedStems.push(member.id);
+        // Honest shortfall: the fixed length measured against the nearest
+        // foreign mask in the carrier's own row band, and the staff edge.
+        const box = exceptionCarrierInkBox(carrier, t);
+        let nearest = geometry.staffRight;
+        for (const q of notes) {
+          if (q.note.id === member.id) continue;
+          const qe = knockoutHalfExtents(o, t, q.note.startTick, q);
+          if (q.y + qe.hy < box.y0 || q.y - qe.hy > box.y1) continue;
+          const left = q.x - qe.wx;
+          if (left >= x0 && left < nearest) nearest = left;
+        }
+        if (box.x1 > nearest + 1e-9) {
+          exceptionCarrierRefusals.push({
+            noteId: member.id,
+            startTick: member.startTick,
+            durationTicks: member.durationTicks,
+            required: box.x1 - x0,
+            available: Math.max(0, nearest - x0),
+            reason:
+              `the fixed ${t.exceptionCarrierLength.toFixed(2)}pt carrier reaches x=${box.x1.toFixed(2)} ` +
+              `but the nearest free point is x=${nearest.toFixed(2)} ` +
+              `(${(nearest - x0).toFixed(2)}pt available) — painted at true length, never clipped`,
+          });
+        }
+      }
+    }
+  }
+
   // Round 23: flag crossed notes for tall knockouts. Paint-only — every head
   // keeps its column; the erasure grows to the stem-start line instead.
   const suppressed = new Set<string>([
@@ -6282,6 +6447,8 @@ export function layoutJankoSystemShifted(
     holds,
     holdOwnedIds,
     holdRefusals,
+    exceptionCarriers,
+    exceptionCarrierRefusals,
     claspedStems,
     verticalChords,
     chordBridges,
@@ -6413,6 +6580,18 @@ function renderNotesLayer(
   //     rule segments it names — and nothing painted later (stems, beams,
   //     brackets, rests, noteheads) can be cut by it.
   if (layout.holds.length > 0) out.push(renderJankoHolds(layout.holds, t));
+
+  // 1c. Round 42 study: the horizontal exception-carrier layer. Painted at the
+  //     members' true pitch y, between the staff rules and the rhythm layer, so
+  //     every notehead knockout erases any overlap exactly as it does for a
+  //     stem or bracket — the carrier never sits above a glyph.
+  if (layout.exceptionCarriers.length > 0) {
+    out.push('    <g class="janko-exception-layer">');
+    for (const carrier of layout.exceptionCarriers) {
+      out.push(renderExceptionCarrier(carrier, t));
+    }
+    out.push('    </g>');
+  }
 
   // 2. Rhythm layer (the beamed dialect renders its stems group-wise). It is
   //    painted *beneath* the noteheads so the white knockouts erase whatever
