@@ -364,14 +364,14 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
 
   assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
 
-  // Round 38 abstract candidates produce distinct SVGs
+  // Round 39 abstract candidates produce distinct SVGs
   assert.equal(CURRENT_CANDIDATES.length, 3);
   const svgDial = renderAbstractSubsetSvg('dial', ABSTRACT_SUBSET_1);
   const svgRosette = renderAbstractSubsetSvg('rosette', ABSTRACT_SUBSET_1);
-  const svgAsym = renderAbstractSubsetSvg('asymmetric', ABSTRACT_SUBSET_1);
+  const svgLadder = renderAbstractSubsetSvg('ladder', ABSTRACT_SUBSET_1);
   assert.notEqual(svgDial, svgRosette, 'Dial and Rosette produce distinct SVGs');
-  assert.notEqual(svgDial, svgAsym, 'Dial and Asymmetric produce distinct SVGs');
-  assert.notEqual(svgRosette, svgAsym, 'Rosette and Asymmetric produce distinct SVGs');
+  assert.notEqual(svgDial, svgLadder, 'Dial and Ladder produce distinct SVGs');
+  assert.notEqual(svgRosette, svgLadder, 'Rosette and Ladder produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------

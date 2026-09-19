@@ -459,16 +459,16 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 38 open, one arrangement axis, three cards', () => {
-  // Ordered contract change: Round 37 is parked (historical consts in
-  // test/janko-round37.test.ts) and Round 38 opens the twelve-site spatial
-  // alphabet candidate comparison.
-  assert.equal(CURRENT_ROUND_METADATA.round, 38);
+test('§F registry: round 39 open, one arrangement axis, three cards', () => {
+  // Ordered contract change: Round 38 is parked (historical consts in
+  // test/janko-round38.test.ts) and Round 39 opens the twelve-site alphabets
+  // under strain comparison.
+  assert.equal(CURRENT_ROUND_METADATA.round, 39);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['dial', 'rosette', 'asymmetric'],
+    ['dial', 'rosette', 'ladder'],
     'the three abstract candidates'
   );
 });

@@ -159,6 +159,7 @@ const ROUND_35_CARDS: string[] = [
 ];
 const ROUND_36_CARDS: string[] = ['mirrored-handprint-literal', 'mirrored-handprint'];
 const ROUND_37_CARDS: string[] = ['indexed-symmetric-literal', 'indexed-symmetric'];
+const ROUND_38_CARDS: string[] = ['dial', 'rosette', 'asymmetric'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -244,8 +245,8 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 38 (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 38);
+test('CURRENT_ROUND_METADATA is the open Round 39 (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 39);
   assert.match(CURRENT_ROUND_METADATA.title, /twelve-site/i);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
@@ -285,13 +286,18 @@ test('CURRENT_ROUND_METADATA is the open Round 38 (one open axis)', () => {
     ['indexed-symmetric-literal', 'indexed-symmetric'],
     'R37 parked pair on record'
   );
+  assert.deepEqual(
+    ROUND_38_CARDS,
+    ['dial', 'rosette', 'asymmetric'],
+    'R38 parked trio on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the Round 38 trio: Dial / Rosette / Asymmetric, one axis', () => {
+test('CURRENT_CANDIDATES is the Round 39 trio: Dial / Rosette / Staggered pitch ladder, one axis', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['dial', 'rosette', 'asymmetric'],
+    ['dial', 'rosette', 'ladder'],
     'three live cards'
   );
   for (const c of CURRENT_CANDIDATES) {
@@ -2056,10 +2062,10 @@ test('The live studio renders the open round with three cards', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
   assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="9"/, 'nine windows');
+  assert.match(html, /data-window-count="13"/, 'thirteen windows');
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 38/);
-  assert.match(html, /Twelve-site spatial alphabet/i, 'the Twelve-site spatial alphabet title headlines the view');
+  assert.match(html, /Round 39/);
+  assert.match(html, /Twelve-site alphabets under strain/i, 'the Twelve-site alphabets under strain title headlines the view');
   for (const id of ROUND_33_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }

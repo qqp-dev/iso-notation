@@ -36,6 +36,13 @@ import {
   ABSTRACT_GEOMETRY_SPECS,
   ABSTRACT_SUBSET_1,
   ABSTRACT_SUBSET_2,
+  ABSTRACT_BASE_SET,
+  ABSTRACT_NEAR_NEIGHBOUR_SAMPLES,
+  ABSTRACT_DENSITY_SAMPLES,
+  ABSTRACT_LADDER_OCTAVE_PROBE_SAMPLES,
+  formatDuodecimalDigit,
+  formatPitchClassSet,
+  computeTranspositionSet,
 } from './types';
 
 /** Metadata of the decision round currently on the table. */
@@ -97,18 +104,39 @@ export interface JankoScoreCandidateWindow {
   caption?: string;
 }
 
+/** Abstract specimen role: enlarged key, common test batteries, or historical subsets. */
+export type AbstractSpecimenType =
+  | 'key'
+  | 'transposition'
+  | 'near-neighbours'
+  | 'density'
+  | 'octave-probe'
+  | 'subset-1'
+  | 'subset-2';
+
+/** Single specimen item metadata within an abstract specimen window. */
+export interface AbstractSpecimenSample {
+  readonly id: string;
+  readonly title: string;
+  readonly caption?: string;
+  readonly subset: readonly number[];
+  readonly description?: string;
+}
+
 /** One engraving window demonstrated on an abstract twelve-site geometry specimen. */
 export interface JankoAbstractCandidateWindow {
   kind: 'abstract';
   /** Geometry arrangement evaluated. */
   geometryId: AbstractGeometryId;
-  /** Specimen role: enlarged key (3×) or one of the two four-site subsets. */
-  specimenType: 'key' | 'subset-1' | 'subset-2';
-  /** Subset site indices (for subset specimens). */
+  /** Specimen role: enlarged key, common battery, or octave probe. */
+  specimenType: AbstractSpecimenType;
+  /** Subset site indices (for single-subset specimens). */
   subset?: readonly number[];
+  /** Detailed samples list when window represents a battery. */
+  samples?: readonly AbstractSpecimenSample[];
   /** Short label shown above the panel. */
   title: string;
-  /** Short caption (e.g. identifying changed site or nominal dimensions). */
+  /** Short caption. */
   caption?: string;
 }
 
@@ -136,6 +164,80 @@ export function abstractKeyWindow(
     caption:
       caption ??
       `Full configuration (0–b) · ${ABSTRACT_GEOMETRY_SPECS[geometryId].boundsString} nominal ink bounds (enlarged 3×)`,
+  };
+}
+
+/** Constructor for a 12-sample transposition battery window. */
+export function abstractTranspositionWindow(
+  geometryId: AbstractGeometryId,
+  title = 'Transposition battery (T+0 .. T+b)',
+  caption = 'All twelve transpositions of S={0,3,7,a} modulo 12 · Fixed origin and 1:1 scale'
+): JankoAbstractCandidateWindow {
+  const samples: AbstractSpecimenSample[] = Array.from({ length: 12 }, (_, t) => {
+    const subset = computeTranspositionSet(ABSTRACT_BASE_SET, t);
+    const duodT = formatDuodecimalDigit(t);
+    const setStr = formatPitchClassSet(subset);
+    return {
+      id: `t-${duodT}`,
+      title: `T+${duodT}`,
+      caption: `t=${duodT} · ${setStr}`,
+      subset,
+    };
+  });
+  return {
+    kind: 'abstract',
+    geometryId,
+    specimenType: 'transposition',
+    title,
+    caption,
+    samples,
+  };
+}
+
+/** Constructor for a 4-sample near-neighbours battery window. */
+export function abstractNearNeighboursWindow(
+  geometryId: AbstractGeometryId,
+  title = 'Near neighbours',
+  caption = 'Four close variants on base S={0,3,7,a} · 1-semitone vs 2-semitone changes'
+): JankoAbstractCandidateWindow {
+  return {
+    kind: 'abstract',
+    geometryId,
+    specimenType: 'near-neighbours',
+    title,
+    caption,
+    samples: ABSTRACT_NEAR_NEIGHBOUR_SAMPLES,
+  };
+}
+
+/** Constructor for a 5-sample density battery window. */
+export function abstractDensityWindow(
+  geometryId: AbstractGeometryId,
+  title = 'Density battery',
+  caption = 'Sparse and adjacent occupancy (2, 3, 6, 9, 11 selected sites) · Fixed origin and 1:1 scale'
+): JankoAbstractCandidateWindow {
+  return {
+    kind: 'abstract',
+    geometryId,
+    specimenType: 'density',
+    title,
+    caption,
+    samples: ABSTRACT_DENSITY_SAMPLES,
+  };
+}
+
+/** Constructor for the supplemental ladder octave-boundary probe window. */
+export function abstractLadderOctaveProbeWindow(
+  title = 'Supplemental octave-boundary probe (ladder only)',
+  caption = 'Unfolded: translation + reflection; folded into twelve sites: shape breaks. Continuing pitch vertically costs height.'
+): JankoAbstractCandidateWindow {
+  return {
+    kind: 'abstract',
+    geometryId: 'ladder',
+    specimenType: 'octave-probe',
+    title,
+    caption,
+    samples: ABSTRACT_LADDER_OCTAVE_PROBE_SAMPLES,
   };
 }
 
@@ -352,30 +454,41 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * Which compact twelve-site arrangement makes selected subsets distinguishable
  * and learnable with the least visual noise? No optimality or human-readability
  * claim. Evaluates Dial, Rosette, and Asymmetric constellation across identical
- * keys and {0,3,7,a} vs {0,5,7,a} subsets.
+ * keys and {0,3,7,a} vs {0,5,7,a} subsets. Parked by convention as
+ * ROUND_38_METADATA / ROUND_38_CANDIDATES in test/janko-round38.test.ts.
+ *
+ * Round 39 opens the twelve-site alphabets under strain comparison:
+ * Exactly three active cards: Dial, Rosette, Staggered pitch ladder.
+ * Identical common stress battery:
+ * 1. Enlarged labelled key (3×)
+ * 2. Transposition battery: 12 transpositions of S={0,3,7,a} modulo 12
+ * 3. Near neighbours: four samples S, {0,4,7,a}, {0,5,7,a}, {0,3,7,b}
+ * 4. Density battery: five samples (2, 3, 6, 9, 11 selected sites)
+ * Supplemental octave-boundary probe (ladder only):
+ * tests unfolded lattice vs modulo-12 folding.
  */
 
 /** Score id of the synthetic m.8 diagnostic specimen (Round 37, parked). */
 export const SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID = 'synthetic-m8-diagnostic';
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 38,
-  title: 'Twelve-site spatial alphabet — three abstract candidates',
+  round: 39,
+  title: 'Twelve-site alphabets under strain — Round 39',
   description:
-    'Which compact twelve-site arrangement makes selected subsets distinguishable and learnable with the least visual noise? No optimality or human-readability claim. Site labels are identities for this geometry study, not an adopted pitch/interval convention. Evaluates Dial, Rosette, and Asymmetric constellation across identical keys and {0,3,7,a} vs {0,5,7,a} subsets.',
+    'Identical common stress battery evaluating Dial, Rosette, and Staggered pitch ladder under twelve modulo-12 transpositions, near neighbours, and density extremes, with an explicit ladder octave-boundary probe. Fixed coordinate origin and scale across candidates; no auto-rotation or subset recentering.',
   openAxes: ['arrangement'],
 };
 
 /**
- * Round 38: exactly three abstract candidates:
- * Dial, Rosette, and Asymmetric constellation.
+ * Round 39: exactly three active abstract candidates:
+ * Dial, Rosette, and Staggered pitch ladder.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
     id: 'dial',
     label: 'Dial',
     description:
-      'Regular 12-gon circular dial. R = 2 / sin(π/12) ≈ 7.7274pt, site 0 at top, clockwise order. Nominal full ink bounds 16.5548 × 16.5548pt, min separation 4.0pt.',
+      'Regular 12-gon circular dial. R = 2 / sin(π/12) ≈ 7.7274pt, site 0 at top, clockwise order. Modulo-12 transposition is rigid rotation. Nominal full ink bounds 16.5548 × 16.5548pt, min separation 4.0pt.',
     kind: 'abstract',
     abstractGeometry: 'dial',
     axis: 'arrangement',
@@ -385,18 +498,9 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
         'Twelve-site key (3×)',
         'Full configuration (0–b) · 16.5548 × 16.5548pt nominal ink bounds (enlarged 3×)'
       ),
-      abstractSubsetWindow(
-        'dial',
-        'subset-1',
-        'Subset {0,3,7,a}',
-        'Four sites · changed site 3 · 16.5548 × 16.5548pt nominal footprint'
-      ),
-      abstractSubsetWindow(
-        'dial',
-        'subset-2',
-        'Subset {0,5,7,a}',
-        'Four sites · changed site 3 to 5 · 16.5548 × 16.5548pt nominal footprint'
-      ),
+      abstractTranspositionWindow('dial'),
+      abstractNearNeighboursWindow('dial'),
+      abstractDensityWindow('dial'),
     ],
     tags: ['abstract', 'dial'],
   },
@@ -404,7 +508,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
     id: 'rosette',
     label: 'Rosette',
     description:
-      'Alternating rosette. Radii 4√3 ≈ 6.9282pt for even i, 4.0pt for odd i. Angular step π/6, site 0 at top. Nominal full ink bounds 13.1000 × 14.9564pt, min separation 4.0pt. Sites only, no star or polygon drawn.',
+      'Alternating rosette. Radii 4√3 ≈ 6.9282pt for even i, 4.0pt for odd i. Angular step π/6, site 0 at top. Even transpositions rotate rigidly; odd transpositions exchange inner/outer tiers and deform configuration. Nominal full ink bounds 13.1000 × 14.9564pt, min separation 4.0pt. Sites only, no star or polygon drawn.',
     kind: 'abstract',
     abstractGeometry: 'rosette',
     axis: 'arrangement',
@@ -414,49 +518,32 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
         'Twelve-site key (3×)',
         'Full configuration (0–b) · 13.1000 × 14.9564pt nominal ink bounds (enlarged 3×)'
       ),
-      abstractSubsetWindow(
-        'rosette',
-        'subset-1',
-        'Subset {0,3,7,a}',
-        'Four sites · changed site 3 · 13.1000 × 14.9564pt nominal footprint'
-      ),
-      abstractSubsetWindow(
-        'rosette',
-        'subset-2',
-        'Subset {0,5,7,a}',
-        'Four sites · changed site 3 to 5 · 13.1000 × 14.9564pt nominal footprint'
-      ),
+      abstractTranspositionWindow('rosette'),
+      abstractNearNeighboursWindow('rosette'),
+      abstractDensityWindow('rosette'),
     ],
     tags: ['abstract', 'rosette'],
   },
   {
-    id: 'asymmetric',
-    label: 'Asymmetric constellation',
+    id: 'ladder',
+    label: 'Staggered pitch ladder',
     description:
-      'Planar constellation on 4pt coordinate steps. Nominal full ink bounds 17.1000 × 17.1000pt, min separation 4.0pt. No grid drawn.',
+      'Staggered pitch ladder. Two staggered columns with upward pitch: x = ±√3pt (even/odd), y = 11 - 2p pt (SVG downward y). Unfolded shifts translate/reflect; modulo-12 folding breaks shape at octave boundary. Nominal full ink bounds 4.5641 × 23.1000pt, min separation 4.0pt. Sites only, no rails or connector lines drawn.',
     kind: 'abstract',
-    abstractGeometry: 'asymmetric',
+    abstractGeometry: 'ladder',
     axis: 'arrangement',
     windows: [
       abstractKeyWindow(
-        'asymmetric',
+        'ladder',
         'Twelve-site key (3×)',
-        'Full configuration (0–b) · 17.1000 × 17.1000pt nominal ink bounds (enlarged 3×)'
+        'Full configuration (0–b) · 4.5641 × 23.1000pt nominal ink bounds (enlarged 3×)'
       ),
-      abstractSubsetWindow(
-        'asymmetric',
-        'subset-1',
-        'Subset {0,3,7,a}',
-        'Four sites · changed site 3 · 17.1000 × 17.1000pt nominal footprint'
-      ),
-      abstractSubsetWindow(
-        'asymmetric',
-        'subset-2',
-        'Subset {0,5,7,a}',
-        'Four sites · changed site 3 to 5 · 17.1000 × 17.1000pt nominal footprint'
-      ),
+      abstractTranspositionWindow('ladder'),
+      abstractNearNeighboursWindow('ladder'),
+      abstractDensityWindow('ladder'),
+      abstractLadderOctaveProbeWindow(),
     ],
-    tags: ['abstract', 'asymmetric'],
+    tags: ['abstract', 'ladder'],
   },
 ];
 

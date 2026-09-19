@@ -131,19 +131,19 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 38/);
-  assert.match(html, /Twelve-site spatial alphabet/i);
+  assert.match(html, /Round 39/);
+  assert.match(html, /Twelve-site alphabets under strain/i);
 });
 
-test('Round 38 open: three abstract candidates, one axis, three cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 38);
-  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site spatial alphabet/i);
+test('Round 39 open: three abstract candidates, one axis, three cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 39);
+  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site alphabets under strain/i);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['dial', 'rosette', 'asymmetric'],
-    'the Dial, Rosette, and Asymmetric candidates'
+    ['dial', 'rosette', 'ladder'],
+    'the Dial, Rosette, and Ladder candidates'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -175,23 +175,31 @@ test('Round 38 open: three abstract candidates, one axis, three cards', () => {
   );
 });
 
-test('The open studio renders the three abstract cards on nine declared windows', () => {
+test('The open studio renders the three abstract cards on thirteen declared windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  // Three cards × three windows: Dial, Rosette, Asymmetric on key, subset-1, subset-2.
+  // Dial (4) + Rosette (4) + Ladder (5) = 13 windows
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
-  assert.equal((html.match(/data-window="/g) ?? []).length, 9, 'nine windows');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 13, 'thirteen windows');
   assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="9"/);
+  assert.match(html, /data-window-count="13"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 38/);
+  assert.match(html, /Round 39/);
   assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
   assert.ok(!html.includes('data-window="brahms-op118-no1:"'), 'Brahms carries no window this round');
   assert.ok(html.includes('data-window="dial:key"'), 'the dial key window');
-  assert.ok(html.includes('data-window="dial:subset-1"'), 'the dial subset-1 window');
-  assert.ok(html.includes('data-window="dial:subset-2"'), 'the dial subset-2 window');
+  assert.ok(html.includes('data-window="dial:transposition"'), 'the dial transposition window');
+  assert.ok(html.includes('data-window="dial:near-neighbours"'), 'the dial near-neighbours window');
+  assert.ok(html.includes('data-window="dial:density"'), 'the dial density window');
   assert.ok(html.includes('data-window="rosette:key"'), 'the rosette key window');
-  assert.ok(html.includes('data-window="asymmetric:key"'), 'the asymmetric key window');
+  assert.ok(html.includes('data-window="rosette:transposition"'), 'the rosette transposition window');
+  assert.ok(html.includes('data-window="rosette:near-neighbours"'), 'the rosette near-neighbours window');
+  assert.ok(html.includes('data-window="rosette:density"'), 'the rosette density window');
+  assert.ok(html.includes('data-window="ladder:key"'), 'the ladder key window');
+  assert.ok(html.includes('data-window="ladder:transposition"'), 'the ladder transposition window');
+  assert.ok(html.includes('data-window="ladder:near-neighbours"'), 'the ladder near-neighbours window');
+  assert.ok(html.includes('data-window="ladder:density"'), 'the ladder density window');
+  assert.ok(html.includes('data-window="ladder:octave-probe"'), 'the ladder octave-probe window');
 
   // No settled decision is badged as an open question.
   for (const key of [
@@ -487,8 +495,8 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 38);
-  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site spatial alphabet/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 39);
+  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site alphabets under strain/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');

@@ -26,11 +26,13 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  abstractKeyWindow,
+  abstractSubsetWindow,
   candidateBadges,
   resolveCandidate,
   isAbstractCandidateWindow,
+  type JankoCandidate,
+  type JankoCandidateRound,
   type JankoAbstractCandidateWindow,
 } from '../src/render/janko/candidates';
 import {
@@ -70,23 +72,123 @@ import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
 
+/** Historical Round 38 metadata (parked). */
+export const ROUND_38_METADATA: JankoCandidateRound = {
+  round: 38,
+  title: 'Twelve-site spatial alphabet — three abstract candidates',
+  description:
+    'Which compact twelve-site arrangement makes selected subsets distinguishable and learnable with the least visual noise? No optimality or human-readability claim. Site labels are identities for this geometry study, not an adopted pitch/interval convention. Evaluates Dial, Rosette, and Asymmetric constellation across identical keys and {0,3,7,a} vs {0,5,7,a} subsets.',
+  openAxes: ['arrangement'],
+};
+
+/** Historical Round 38 candidates (parked). */
+export const ROUND_38_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'dial',
+    label: 'Dial',
+    description:
+      'Regular 12-gon circular dial. R = 2 / sin(π/12) ≈ 7.7274pt, site 0 at top, clockwise order. Nominal full ink bounds 16.5548 × 16.5548pt, min separation 4.0pt.',
+    kind: 'abstract',
+    abstractGeometry: 'dial',
+    axis: 'arrangement',
+    windows: [
+      abstractKeyWindow(
+        'dial',
+        'Twelve-site key (3×)',
+        'Full configuration (0–b) · 16.5548 × 16.5548pt nominal ink bounds (enlarged 3×)'
+      ),
+      abstractSubsetWindow(
+        'dial',
+        'subset-1',
+        'Subset {0,3,7,a}',
+        'Four sites · changed site 3 · 16.5548 × 16.5548pt nominal footprint'
+      ),
+      abstractSubsetWindow(
+        'dial',
+        'subset-2',
+        'Subset {0,5,7,a}',
+        'Four sites · changed site 3 to 5 · 16.5548 × 16.5548pt nominal footprint'
+      ),
+    ],
+    tags: ['abstract', 'dial'],
+  },
+  {
+    id: 'rosette',
+    label: 'Rosette',
+    description:
+      'Alternating rosette. Radii 4√3 ≈ 6.9282pt for even i, 4.0pt for odd i. Angular step π/6, site 0 at top. Nominal full ink bounds 13.1000 × 14.9564pt, min separation 4.0pt. Sites only, no star or polygon drawn.',
+    kind: 'abstract',
+    abstractGeometry: 'rosette',
+    axis: 'arrangement',
+    windows: [
+      abstractKeyWindow(
+        'rosette',
+        'Twelve-site key (3×)',
+        'Full configuration (0–b) · 13.1000 × 14.9564pt nominal ink bounds (enlarged 3×)'
+      ),
+      abstractSubsetWindow(
+        'rosette',
+        'subset-1',
+        'Subset {0,3,7,a}',
+        'Four sites · changed site 3 · 13.1000 × 14.9564pt nominal footprint'
+      ),
+      abstractSubsetWindow(
+        'rosette',
+        'subset-2',
+        'Subset {0,5,7,a}',
+        'Four sites · changed site 3 to 5 · 13.1000 × 14.9564pt nominal footprint'
+      ),
+    ],
+    tags: ['abstract', 'rosette'],
+  },
+  {
+    id: 'asymmetric',
+    label: 'Asymmetric constellation',
+    description:
+      'Planar constellation on 4pt coordinate steps. Nominal full ink bounds 17.1000 × 17.1000pt, min separation 4.0pt. No grid drawn.',
+    kind: 'abstract',
+    abstractGeometry: 'asymmetric',
+    axis: 'arrangement',
+    windows: [
+      abstractKeyWindow(
+        'asymmetric',
+        'Twelve-site key (3×)',
+        'Full configuration (0–b) · 17.1000 × 17.1000pt nominal ink bounds (enlarged 3×)'
+      ),
+      abstractSubsetWindow(
+        'asymmetric',
+        'subset-1',
+        'Subset {0,3,7,a}',
+        'Four sites · changed site 3 · 17.1000 × 17.1000pt nominal footprint'
+      ),
+      abstractSubsetWindow(
+        'asymmetric',
+        'subset-2',
+        'Subset {0,5,7,a}',
+        'Four sites · changed site 3 to 5 · 17.1000 × 17.1000pt nominal footprint'
+      ),
+    ],
+    tags: ['abstract', 'asymmetric'],
+  },
+];
+
 // ---------------------------------------------------------------------------
 // 1. Candidate Registry: Exactly Three Abstract Cards
 // ---------------------------------------------------------------------------
 
 test('Criterion 1: Exactly three abstract cards in candidate registry', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 38);
-  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site spatial alphabet/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement']);
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'exactly three cards');
+  assert.equal(ROUND_38_METADATA.round, 38);
+  assert.match(ROUND_38_METADATA.title, /Twelve-site spatial alphabet/i);
+  assert.deepEqual(ROUND_38_METADATA.openAxes, ['arrangement']);
+  assert.equal(ROUND_38_CANDIDATES.length, 3, 'exactly three cards');
 
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+  const ids = ROUND_38_CANDIDATES.map((c) => c.id);
   assert.deepEqual(ids, ['dial', 'rosette', 'asymmetric']);
 
-  const labels = CURRENT_CANDIDATES.map((c) => c.label);
+  const labels = ROUND_38_CANDIDATES.map((c) => c.label);
   assert.deepEqual(labels, ['Dial', 'Rosette', 'Asymmetric constellation']);
 
-  for (const c of CURRENT_CANDIDATES) {
+  for (const c of ROUND_38_CANDIDATES) {
     assert.equal(c.kind, 'abstract');
     assert.equal(c.axis, 'arrangement');
     assert.ok(c.abstractGeometry, `${c.id} has abstractGeometry`);
@@ -94,7 +196,7 @@ test('Criterion 1: Exactly three abstract cards in candidate registry', () => {
 });
 
 test('Criterion 1: Each card has one enlarged key (3×) and the same two four-site subsets', () => {
-  for (const c of CURRENT_CANDIDATES) {
+  for (const c of ROUND_38_CANDIDATES) {
     const resolved = resolveCandidate(c);
     assert.equal(resolved.windows.length, 3, `${c.id} has exactly three windows`);
 
@@ -409,7 +511,10 @@ test('Criterion 5: Studio candidates view dispatches abstract specimens without 
   });
 
   try {
-    const config = createStudioConfig();
+    const config = createStudioConfig({
+      candidates: ROUND_38_CANDIDATES,
+      round: ROUND_38_METADATA,
+    });
     scoreLayoutCalls = 0;
     const viewHtml = renderCandidatesView(config);
 
@@ -453,8 +558,8 @@ test('Criterion 5: Studio candidates view dispatches abstract specimens without 
     assert.ok(viewHtml.includes('score engraving lint not applicable'));
 
     // Badges report arrangement as round open axis
-    for (const c of CURRENT_CANDIDATES) {
-      const badges = candidateBadges(c, CURRENT_ROUND_METADATA);
+    for (const c of ROUND_38_CANDIDATES) {
+      const badges = candidateBadges(c, ROUND_38_METADATA);
       const axisBadge = badges.find((b) => b.key === 'arrangement');
       assert.ok(axisBadge, `${c.id} has arrangement badge`);
       assert.equal(axisBadge.axis, true, 'arrangement is marked as active open axis');
@@ -479,4 +584,12 @@ test('Criterion 6: Canonical Reference view (Bach & Brahms) remains unchanged', 
   assert.ok(refHtml.includes('GOLD · frozen standard'));
   assert.ok(refHtml.includes('Goldberg Variations, BWV 988'));
   assert.ok(refHtml.includes('Intermezzo in A minor, Op. 118 No. 1'));
+});
+
+test('R38 parked by convention: historical consts parked, live registry moved to Round 39', () => {
+  assert.equal(ROUND_38_METADATA.round, 38);
+  assert.equal(ROUND_38_CANDIDATES.length, 3);
+  const candFile = fs.readFileSync(path.join(REPO_ROOT, 'src/render/janko/candidates.ts'), 'utf-8');
+  assert.match(candFile, /Round 38 opens the twelve-site spatial alphabet/);
+  assert.match(candFile, /Round 39 opens the twelve-site alphabets under strain/);
 });
