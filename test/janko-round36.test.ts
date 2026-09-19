@@ -38,9 +38,8 @@ import {
   BRAHMS_STUDIO_SCORE_ID,
   brahmsWindow,
   candidateBadges,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
   type JankoCandidate,
+  type JankoCandidateRound,
 } from '../src/render/janko/candidates';
 import {
   createStudioConfig,
@@ -580,12 +579,55 @@ test('Criterion 5: Golden master defaults and canonical rendering unchanged', ()
   assert.equal(layouts1[0].notes.length, layouts2[0].notes.length);
 });
 
+/** Historical Round 36 metadata (parked). */
+export const ROUND_36_METADATA: JankoCandidateRound = {
+  round: 36,
+  title: 'Mirrored handprint: literal control vs whole-form cluster candidate',
+  description:
+    'Round 36: explore a written-handprint direction for dense hand clusters (4- and 5-note groups at same onset and hand). Rotated keyboard footprint supplies glyph-local geometry with two symmetric variants for alternating Jánko row families. Connects landmarks in ascending order as a single connected calligraphic body with visible discrete articulations, base numeral integrated at origin, and clearly owned duration attachments. Judged against literal control on identical Brahms windows mm. 7–9, 46–47, 60–61, 66–67.',
+  openAxes: ['clusterPresentation'],
+};
+
+/** Historical Round 36 cards (parked). */
+export const ROUND_36_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'mirrored-handprint-literal',
+    label: 'Control · Literal baseline',
+    description:
+      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers.',
+    axis: 'clusterPresentation',
+    options: { clusterPresentation: 'literal' },
+    windows: [
+      brahmsWindow(7, 3, 'mm.7–9 · Dense chord clusters, mixed release, odd anchor family'),
+      brahmsWindow(46, 2, 'mm.46–47 · Dense chord cluster'),
+      brahmsWindow(60, 2, 'mm.60–61 · Alternating anchor row family (even anchor) & independent B'),
+      brahmsWindow(66, 2, 'mm.66–67 · Dense chord cluster'),
+    ],
+    tags: ['control', 'literal'],
+  },
+  {
+    id: 'mirrored-handprint',
+    label: 'A · Mirrored handprint',
+    description:
+      'Whole-form cluster candidate: rotated keyboard footprint supplies glyph-local geometry with two symmetric variants for the alternating Jánko row families. Single calligraphic body with discrete articulations, base numeral integrated at origin, and clearly owned duration attachments.',
+    axis: 'clusterPresentation',
+    options: { clusterPresentation: 'mirrored-handprint' },
+    windows: [
+      brahmsWindow(7, 3, 'mm.7–9 · Dense chord clusters, mixed release, odd anchor family'),
+      brahmsWindow(46, 2, 'mm.46–47 · Dense chord cluster'),
+      brahmsWindow(60, 2, 'mm.60–61 · Alternating anchor row family (even anchor) & independent B'),
+      brahmsWindow(66, 2, 'mm.66–67 · Dense chord cluster'),
+    ],
+    tags: ['mirrored-handprint', 'candidate'],
+  },
+];
+
 // ---------------------------------------------------------------------------
 // 6. Reviewer Semantics & Readability Risk Reporting
 // ---------------------------------------------------------------------------
 
 test('Criterion 6: Honest description of construction, grammar, and readability risk', () => {
-  const candidate = CURRENT_CANDIDATES.find((c) => c.id === 'mirrored-handprint');
+  const candidate = ROUND_36_CANDIDATES.find((c) => c.id === 'mirrored-handprint');
   assert.ok(candidate, 'mirrored-handprint candidate is registered');
   assert.ok(candidate.description, 'description exists');
   assert.match(candidate.description, /rotated keyboard footprint/i, 'documents keyboard footprint geometry');
@@ -594,18 +636,17 @@ test('Criterion 6: Honest description of construction, grammar, and readability 
 });
 
 // ---------------------------------------------------------------------------
-// 7. Studio Candidates View & Registry Badges
+// 7. Studio Candidates View & Registry Badges (Parked)
 // ---------------------------------------------------------------------------
 
-test('Criterion 7: Studio candidates view renders open Round 36 with 2 cards and 8 panels', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 36);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['clusterPresentation']);
-  assert.equal(CURRENT_CANDIDATES.length, 2);
+test('Criterion 7: Round 36 parked with 2 cards and 4 identical windows', () => {
+  assert.equal(ROUND_36_METADATA.round, 36);
+  assert.deepEqual(ROUND_36_METADATA.openAxes, ['clusterPresentation']);
+  assert.equal(ROUND_36_CANDIDATES.length, 2);
 
-  const config = createStudioConfig({ score: BRAHMS });
+  const config = createStudioConfig({ score: BRAHMS, candidates: ROUND_36_CANDIDATES });
   const viewHtml = renderCandidatesView(config);
 
-  assert.ok(viewHtml.includes('Mirrored handprint'), 'contains Round 36 title');
   assert.ok(viewHtml.includes('mirrored-handprint-literal'), 'contains literal control card');
   assert.ok(viewHtml.includes('mirrored-handprint'), 'contains handprint candidate card');
 
@@ -614,10 +655,18 @@ test('Criterion 7: Studio candidates view renders open Round 36 with 2 cards and
   assert.equal(panelMatches.length, 8, 'renders exactly 8 candidate window panels');
 
   // Badges report open axis clusterPresentation
-  for (const c of CURRENT_CANDIDATES) {
-    const badges = candidateBadges(c, CURRENT_ROUND_METADATA);
+  for (const c of ROUND_36_CANDIDATES) {
+    const badges = candidateBadges(c, ROUND_36_METADATA);
     const axisBadge = badges.find((b) => b.key === 'clusterPresentation');
     assert.ok(axisBadge, `${c.id} has clusterPresentation badge`);
     assert.equal(axisBadge.axis, true, 'marked as active open axis');
   }
+});
+
+test('R36 parked by convention: historical consts parked, live registry moved to Round 37', () => {
+  assert.equal(ROUND_36_METADATA.round, 36);
+  assert.equal(ROUND_36_CANDIDATES.length, 2);
+  const candFile = fs.readFileSync(path.join(REPO_ROOT, 'src/render/janko/candidates.ts'), 'utf-8');
+  assert.match(candFile, /Round 36 opened the mirrored-handprint candidate comparison/);
+  assert.match(candFile, /Round 37 opens the intrinsically indexed symmetric cluster candidate/);
 });

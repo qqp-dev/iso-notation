@@ -258,52 +258,73 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * in other registers. Rejected by operator judgment. Parked by convention
  * as ROUND_35_METADATA / ROUND_35_CANDIDATES in test/janko-round35.test.ts.
  *
- * Round 36 opens the mirrored-handprint candidate comparison on Brahms:
+ * Round 36 opened the mirrored-handprint candidate comparison on Brahms:
  * a dense hand cluster has one recognizable musical form, readable whole-first
  * with exact internal detail recoverable. Rotated keyboard footprint supplies
  * glyph-local geometry with two symmetric variants for the alternating Jánko
  * row families. Tested against literal control on identical Brahms windows
- * mm. 7–9, 46–47, 60–61, 66–67.
+ * mm. 7–9, 46–47, 60–61, 66–67. Parked by convention as ROUND_36_METADATA /
+ * ROUND_36_CANDIDATES in test/janko-round36.test.ts.
+ *
+ * Round 37 opens the intrinsically indexed symmetric cluster candidate comparison on Brahms:
+ * slender stroked paths (~0.5pt) rather than solid 1.6pt body; discrete 2-semitone
+ * reference divisions with duodecimal 10-span (12-semitone) octave boundary markers;
+ * sounding landmarks are paired outward articulations; duration vocabulary with explicit
+ * visible ownership (connecting rails for runs, individual connectors for singletons);
+ * full-score m.60 candidate eligibility retaining source-hand memberships and reusing
+ * shared painted bass anchor; judged against literal control on identical Brahms windows
+ * mm. 7–9, 46–47, 60–61, 66–67, m.71, plus a synthetic m.8 G3→A3 diagnostic.
  */
+
+/** Score id of the synthetic m.8 diagnostic specimen (Round 37). */
+export const SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID = 'synthetic-m8-diagnostic';
+
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 36,
-  title: 'Mirrored handprint: literal control vs whole-form cluster candidate',
+  round: 37,
+  title: 'Intrinsically indexed symmetric cluster candidate',
   description:
-    'Round 36: explore a written-handprint direction for dense hand clusters (4- and 5-note groups at same onset and hand). Rotated keyboard footprint supplies glyph-local geometry with two symmetric variants for alternating Jánko row families. Connects landmarks in ascending order as a single connected calligraphic body with visible discrete articulations, base numeral integrated at origin, and clearly owned duration attachments. Judged against literal control on identical Brahms windows mm. 7–9, 46–47, 60–61, 66–67.',
+    'Round 37: intrinsically indexed symmetric cluster candidate (OPEN, candidate-only comparison; NOT canonical adoption). Features slender stroked pitch body paths (0.5pt, fill none) with discrete 2-semitone centered reference divisions, duodecimal 10-span (12-semitone) octave boundary markers, paired outward sounding articulations (landmarks), and explicit visible duration ownership (connecting rails for runs, individual connectors for singletons). Reuses shared painted bass anchor in m.60 cross-hand unisons while connecting RH form to lowest pitch. Judged against literal control on identical Brahms windows mm. 7–9, 46–47, 60–61, 66–67, m.71, plus synthetic m.8 G3→A3 diagnostic.',
   openAxes: ['clusterPresentation'],
 };
 
 const CANDIDATE_WINDOWS: JankoCandidateWindow[] = [
   brahmsWindow(7, 3, 'mm.7–9 · Dense chord clusters, mixed release, odd anchor family'),
-  brahmsWindow(46, 2, 'mm.46–47 · Dense chord cluster'),
-  brahmsWindow(60, 2, 'mm.60–61 · Alternating anchor row family (even anchor) & independent B'),
-  brahmsWindow(66, 2, 'mm.66–67 · Dense chord cluster'),
+  brahmsWindow(46, 2, 'mm.46–47 · Dense chord cluster, vertical stacking clearance'),
+  brahmsWindow(60, 2, 'mm.60–61 · Alternating anchor row family, shared bass anchor & unison voice'),
+  brahmsWindow(66, 2, 'mm.66–67 · Dense chord cluster, compound span'),
+  brahmsWindow(71, 1, 'm.71 · Dense chord cluster'),
+  {
+    scoreId: SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
+    measureStart: 1,
+    measureCount: 1,
+    title: 'Synthetic diagnostic · m.8 inner G3→A3 perturbation (same span/count/parities)',
+  },
 ];
 
 /**
- * Round 36: two answers to the whole-form cluster question:
- * literal control and the mirrored-handprint candidate.
+ * Round 37: two answers to the whole-form cluster question:
+ * literal control and the intrinsically indexed symmetric cluster candidate.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'mirrored-handprint-literal',
+    id: 'indexed-symmetric-literal',
     label: 'Control · Literal baseline',
     description:
-      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers.',
+      'The golden baseline: every notehead rendered literally with duodecimal digits across all registers. Preserves standard reading overhead for dense clusters.',
     axis: 'clusterPresentation',
     options: { clusterPresentation: 'literal' },
     windows: CANDIDATE_WINDOWS,
     tags: ['control', 'literal'],
   },
   {
-    id: 'mirrored-handprint',
-    label: 'A · Mirrored handprint',
+    id: 'indexed-symmetric',
+    label: 'A · Intrinsically indexed symmetric cluster',
     description:
-      'Whole-form cluster candidate: rotated keyboard footprint supplies glyph-local geometry with two symmetric variants for the alternating Jánko row families. Single calligraphic body with discrete articulations, base numeral integrated at origin, and clearly owned duration attachments.',
+      'Intrinsically indexed symmetric cluster candidate: slender stroked paths (0.5pt) with discrete 2-semitone centered divisions and duodecimal 10-span octave boundaries. Sounding landmarks are paired outward articulations (ticks); central crossings are unadorned and silent; primary path and reflection denote ONE note. Explicit visible duration ownership at sounding landmarks via connecting rails or individual connectors. Reuses shared painted bass anchor in m.60. Remaining readability risks: optical density at tight intervals, interpolation of odd semitone steps, potential visual confusion between octave divisions and staff lines.',
     axis: 'clusterPresentation',
-    options: { clusterPresentation: 'mirrored-handprint' },
+    options: { clusterPresentation: 'indexed-symmetric' },
     windows: CANDIDATE_WINDOWS,
-    tags: ['mirrored-handprint', 'candidate'],
+    tags: ['indexed-symmetric', 'candidate'],
   },
 ];
 

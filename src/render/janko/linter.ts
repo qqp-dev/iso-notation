@@ -2604,6 +2604,12 @@ export function systemInkExtents(
       bottom = Math.max(bottom, label.y1);
     }
   }
+  if (layout.handprintClusters) {
+    for (const cluster of layout.handprintClusters) {
+      top = Math.min(top, cluster.inkBox[1]);
+      bottom = Math.max(bottom, cluster.inkBox[3]);
+    }
+  }
   return { top, bottom };
 }
 
@@ -4970,7 +4976,7 @@ export function lintJankoScore(
     if (o.clusterCompression && o.clusterCompression !== 'literal') {
       checkCompressionCollisions(layout, o, t, thresholds, diagnostics);
     }
-    if (o.clusterPresentation === 'mirrored-handprint') {
+    if (o.clusterPresentation === 'mirrored-handprint' || o.clusterPresentation === 'indexed-symmetric') {
       checkHandprintClearance(layout, o, t, thresholds, diagnostics);
     }
     extents.push(systemInkExtents(layout, t, thresholds, o));
