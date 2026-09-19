@@ -75,6 +75,7 @@ import {
   computePageGeometry,
   detectStemDigitCrossings,
   getMarginFurniture,
+  holdClearanceInk,
   isContentAwarePlacement,
   knockoutHalfExtents,
   layoutJankoScore,
@@ -125,8 +126,14 @@ import {
   digitBaselineOffset,
   digitHalfExtents,
   getKnockoutMetrics,
+  getScaledKnockoutMetrics,
   isPositionOfHonor,
 } from './elements/notehead';
+import {
+  JankoHoldBlocker,
+  holdTerminalHalfHeight,
+  holdTerminalReach,
+} from './elements/holds';
 import {
   JankoRestGeometry,
   isBarRestValue,
@@ -220,7 +227,15 @@ export type JankoLintCode =
   | 'dot-count-agreement'
   | 'ring-geometry'
   | 'compression-collision'
-  | 'handprint-collision';
+  | 'handprint-collision'
+  | 'hold-endpoint-hidden'
+  | 'hold-connector-hidden'
+  | 'hold-timing-anchor'
+  | 'hold-redundant-stem'
+  | 'hold-underlay'
+  | 'hold-endpoint-clearance'
+  | 'hold-connector-occluded'
+  | 'hold-unresolvable';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -339,6 +354,7 @@ export const JANKO_LINT_CHECKS = [
   'dot-count-agreement',
   'ring-geometry',
   'compression-collision',
+  'hold-integrity',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -521,13 +537,13 @@ export function checkNoteheadClearance(
   void lint;
   const pairGap = getClusterSpacingPreset(o.clusterSpacing).pairGap;
   const boxOf = (p: PositionedJankoNote): Box => {
-    const { wx, hy } = knockoutHalfExtents(o, t, p.note.startTick);
+    const { wx, hy } = knockoutHalfExtents(o, t, p.note.startTick, p);
     return box(p.x - wx, p.y - hy, p.x + wx, p.y + hy);
   };
   const boxes = new Map<string, Box>(layout.notes.map((p) => [p.note.id, boxOf(p)]));
   const maxHalf = Math.max(
     ...layout.notes.map((p) => {
-      const { wx } = knockoutHalfExtents(o, t, p.note.startTick);
+      const { wx } = knockoutHalfExtents(o, t, p.note.startTick, p);
       return wx;
     }),
     0
@@ -632,19 +648,43 @@ export function checkKnockoutCoverage(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  const { wx, hy, margin } = getKnockoutMetrics(o, t);
-  const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize);
-  const horizontal = wx - halfWidth;
-  const vertical = hy - halfHeight;
-  // The preset's construction bases are rounded to two decimals for humans
-  // (1.93/2.86 vs the exact 1.9333/2.8577 optical box), so the containment
-  // carries a hundredth-point construction tolerance.
-  const required =
-    t.knockoutMargin !== undefined
-      ? margin
-      : Math.max(margin, lint.digitClearance);
+  // Round 41: the containment is audited per head — a chord member renders at
+  // its own scale with its own chord margin/air, a standalone symbol at the
+  // canonical size — from the same metrics the painter used.
   const TOL = 0.01;
+  // The metric bundle depends only on (scale, chordMember), so resolve it once
+  // per distinct combination instead of once per head.
+  const metricCache = new Map<string, {
+    wx: number;
+    hy: number;
+    margin: number;
+    halfWidth: number;
+    halfHeight: number;
+  }>();
   for (const p of layout.notes) {
+    const scale = p.symbolScale ?? 1;
+    const chordMember = p.symbolChord === true;
+    const key = `${scale}:${chordMember}`;
+    let bundle = metricCache.get(key);
+    if (!bundle) {
+      const { wx, hy, margin } = getScaledKnockoutMetrics(o, t, scale, chordMember);
+      const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize * scale);
+      bundle = { wx, hy, margin, halfWidth, halfHeight };
+      metricCache.set(key, bundle);
+    }
+    const { wx, hy, margin, halfWidth, halfHeight } = bundle;
+    const horizontal = wx - halfWidth;
+    const vertical = hy - halfHeight;
+    // The preset's construction bases are rounded to two decimals for humans
+    // (1.93/2.86 vs the exact 1.9333/2.8577 optical box), so the containment
+    // carries a hundredth-point construction tolerance. A token-driven margin
+    // (Round 40's knockoutMargin, Round 41's chordKnockoutMargin) *is* the
+    // judged requirement.
+    const required =
+      chordMember || t.knockoutMargin !== undefined
+        ? margin
+        : Math.max(margin, lint.digitClearance);
+    const digitFontSize = t.digitFontSize * scale;
     if (horizontal + TOL >= required && vertical + TOL >= required) {
       continue;
     }
@@ -652,7 +692,7 @@ export function checkKnockoutCoverage(
       code: 'knockout-undersized',
       severity: 'error',
       message:
-        `Knockout ${wx.toFixed(2)}×${hy.toFixed(2)}pt cannot shield the ${t.digitFontSize}pt digit ` +
+        `Knockout ${wx.toFixed(2)}×${hy.toFixed(2)}pt cannot shield the ${digitFontSize}pt digit ` +
         `(needs ${required.toFixed(2)}pt of white on every side; left/right ${horizontal.toFixed(2)}pt, ` +
         `top/bottom ${vertical.toFixed(2)}pt): staff lines would graze the glyph.`,
       system: layout.index,
@@ -664,7 +704,7 @@ export function checkKnockoutCoverage(
         wx,
         hy,
         required,
-        digitFontSize: t.digitFontSize,
+        digitFontSize,
         digitHalfWidth: halfWidth,
         digitHalfHeight: halfHeight,
         horizontal,
@@ -1124,7 +1164,7 @@ function isHandledStemTuck(
     return false;
   }
   if (other.tallKnockout !== true) return false;
-  const { wx, hy } = knockoutHalfExtents(o, t, other.note.startTick);
+  const { wx, hy } = knockoutHalfExtents(o, t, other.note.startTick, other);
   return Math.abs(ex - other.x) <= wx && Math.abs(ey - other.y) <= hy + air;
 }
 
@@ -1380,11 +1420,13 @@ export function checkDotCollision(
     // The dot the engine resolved: hugging the rectangular mask. Hand-built
     // rhythm notes fall back to the head row and the golden mask offset,
     // exactly as the renderer paints them.
-    const cx = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + t.augmentationDotGap;
+    const cx =
+      p.rhythm.dotX ??
+      p.x + knockoutHalfExtents(o, t, p.note.startTick, p).wx + t.augmentationDotGap;
     const cy = p.rhythm.dotY ?? p.y;
     const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
     const maskOf = (q: PositionedJankoNote): Box => {
-      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
       return box(q.x - wx, q.y - hy, q.x + wx, q.y + hy);
     };
     /** One painted dot against every obstacle (first and second alike). */
@@ -1686,7 +1728,7 @@ export function checkStemRingGeometry(
         const air = isPositionOfHonor(q.note.startTick)
           ? Math.hypot(center.x - q.x, center.y - q.y) - haloOuter - ringOuter
           : (() => {
-              const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+              const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick, q);
               const dx = Math.max(q.x - wx - center.x, 0, center.x - (q.x + wx));
               const dy = Math.max(q.y - hy - center.y, 0, center.y - (q.y + hy));
               return Math.hypot(dx, dy) - ringOuter;
@@ -2268,7 +2310,12 @@ export function checkContourTicks(
   const masks = layout.notes.map((q) => {
     // The audited mask matches the paint: halo-sized only when the halo ring
     // is actually drawn, tall only for stem-crossed heads.
-    const { wx, hy } = knockoutHalfExtents(o, t, o.showHonorHalo ? q.note.startTick : undefined);
+    const { wx, hy } = knockoutHalfExtents(
+      o,
+      t,
+      o.showHonorHalo ? q.note.startTick : undefined,
+      q
+    );
     const hyEff = q.tallKnockout ? hy + (t.stemAttachmentAir ?? 1.0) : hy;
     return box(q.x - wx, q.y - hyEff, q.x + wx, q.y + hyEff);
   });
@@ -2277,7 +2324,9 @@ export function checkContourTicks(
     const dur = p.note.durationTicks;
     if (dur <= 26 || dur > 38) continue;
     dots.push({
-      x: p.rhythm.dotX ?? p.x + preset.wx + t.augmentationDotGap,
+      x:
+        p.rhythm.dotX ??
+        p.x + knockoutHalfExtents(o, t, p.note.startTick, p).wx + t.augmentationDotGap,
       y: p.rhythm.dotY ?? p.y,
       r: t.augmentationDotRadius,
     });
@@ -2865,6 +2914,268 @@ export function systemBarlines(
 }
 
 /** No glyph (head, stem or beam) may collide with a barline. */
+/**
+ * Round 41 — the hold-to-release audit.
+ *
+ * The treatment replaces an exceptional bracket member's own duration statement
+ * with a horizontal connector plus a terminal mark. Every number the engine
+ * used to place it is re-derived here from the **final** layout, so a run can
+ * never quietly drift from the time it claims:
+ *
+ * - `hold-timing-anchor` (error): the run's release is not the head's own
+ *   `startTick + durationTicks`, its start is not flush with the head's
+ *   protected right edge, or the terminal is seated **past** the release point.
+ * - `hold-endpoint-hidden` (error): the terminal's ink disc intersects any
+ *   painted neighbour (a glyph mask, a written rest, a bracket, a barline) —
+ *   the endpoint disappears under a knockout, which this round forbids and the
+ *   tests detect rather than accept.
+ * - `hold-connector-hidden` (error): the connector's band runs under a glyph
+ *   mask or a written rest.
+ * - `hold-redundant-stem` (error): the member paints its own duration ink next
+ *   to its hold (a doubled statement).
+ * - `hold-underlay` (error): the white underlay is not justified by a painted
+ *   staff rule at that row, or it would erase something other than that rule.
+ * - `hold-endpoint-clearance` (warning): the terminal left the exact release x
+ *   to stay visible (measured shortfall, never silent).
+ * - `hold-connector-occluded` (warning): the connector crosses ink painted
+ *   after the hold layer (a barline or a bracket), which occludes it.
+ * - `hold-unresolvable` (warning): an exceptional member whose hold was refused
+ *   and therefore keeps its canonical exception statement.
+ */
+export function checkHoldIntegrity(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  if (o.durationEndpoint === 'none') return;
+  const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
+  const clearance = holdClearanceInk(
+    layout.notes,
+    layout.rests,
+    layout.clasps,
+    layout.geometry,
+    layout.index,
+    o,
+    t
+  );
+  const rules = pitchGridRules(layout.geometry, o, t);
+  const owned = new Set(layout.holdOwnedIds);
+  const suppressed = suppressedStemIds(layout);
+  const overlaps = (b: JankoHoldBlocker, x0: number, x1: number, y0: number, y1: number): boolean =>
+    b.x1 > x0 + EPS && b.x0 < x1 - EPS && b.y1 > y0 + EPS && b.y0 < y1 - EPS;
+
+  for (const refusal of layout.holdRefusals) {
+    out.push({
+      code: 'hold-unresolvable',
+      severity: 'warning',
+      message:
+        `Hold refused for ${refusal.noteId} (release tick ${refusal.releaseTick}): ` +
+        `${refusal.reason}. The member keeps its canonical exception statement.`,
+      system: layout.index,
+      measure: measureOfTick(refusal.startTick, t),
+      noteIds: [refusal.noteId],
+      metrics: { releaseTick: refusal.releaseTick },
+    });
+  }
+
+  for (const hold of layout.holds) {
+    const p = byId.get(hold.noteId);
+    const shape = hold.shape;
+    const reach = holdTerminalReach(t, shape);
+    const half = holdTerminalHalfHeight(t, shape);
+    if (!p) {
+      out.push({
+        code: 'hold-timing-anchor',
+        severity: 'error',
+        message: `Hold ${hold.noteId} has no laid-out head in system ${layout.index + 1}.`,
+        system: layout.index,
+        noteIds: [hold.noteId],
+      });
+      continue;
+    }
+    const measure = measureOfTick(p.note.startTick, t);
+    const expectedRelease = p.note.startTick + p.note.durationTicks;
+    if (hold.releaseTick !== expectedRelease) {
+      out.push({
+        code: 'hold-timing-anchor',
+        severity: 'error',
+        message:
+          `Hold ${hold.noteId} releases at tick ${hold.releaseTick} but the head's own ` +
+          `duration ends at ${expectedRelease}: the run does not state the note's time.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        metrics: { releaseTick: hold.releaseTick, expectedRelease },
+      });
+    }
+    const flushX = p.x + knockoutHalfExtents(o, t, p.note.startTick, p).wx;
+    if (Math.abs(hold.x1 - flushX) > 0.01) {
+      out.push({
+        code: 'hold-timing-anchor',
+        severity: 'error',
+        message:
+          `Hold ${hold.noteId} starts at x=${hold.x1.toFixed(2)} instead of the symbol's ` +
+          `protected edge x=${flushX.toFixed(2)}: a gap or an overlap breaks the flush rule.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: hold.x1,
+        y: hold.y,
+        metrics: { startX: hold.x1, flushX },
+      });
+    }
+    if (!hold.continuesAtSystemBreak && hold.terminalX > hold.releaseX + 0.01) {
+      out.push({
+        code: 'hold-timing-anchor',
+        severity: 'error',
+        message:
+          `Hold ${hold.noteId} seats its ${shape} at x=${hold.terminalX.toFixed(2)}, past the ` +
+          `release anchor x=${hold.releaseX.toFixed(2)}: that reads as a later release.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: hold.terminalX,
+        y: hold.y,
+        metrics: { terminalX: hold.terminalX, releaseX: hold.releaseX },
+      });
+    }
+    // The terminal is never hidden: its ink disc must clear every painted
+    // neighbour. A hold that runs past the system's last tick paints **no**
+    // terminal at all (a line break is not a release), so there is no ink to
+    // audit there.
+    for (const b of hold.continuesAtSystemBreak ? [] : clearance.seat) {
+      if (!overlaps(b, hold.terminalX - reach, hold.terminalX + reach, hold.y - half, hold.y + half)) {
+        continue;
+      }
+      out.push({
+        code: 'hold-endpoint-hidden',
+        severity: 'error',
+        message:
+          `The ${shape} terminal of ${hold.noteId} at x=${hold.terminalX.toFixed(2)} is ` +
+          `occluded by painted ink (x ${b.x0.toFixed(2)}–${b.x1.toFixed(2)}): the endpoint ` +
+          `would disappear under it.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: hold.terminalX,
+        y: hold.y,
+        metrics: { terminalX: hold.terminalX, blockerX0: b.x0, blockerX1: b.x1 },
+      });
+      break;
+    }
+    const halfStroke = hold.stroke / 2;
+    for (const b of clearance.corridor) {
+      if (b.x1 <= hold.x1 + EPS) continue;
+      if (!overlaps(b, hold.x1, hold.x2, hold.y - halfStroke, hold.y + halfStroke)) continue;
+      out.push({
+        code: 'hold-connector-hidden',
+        severity: 'error',
+        message:
+          `The hold connector of ${hold.noteId} runs under painted ink ` +
+          `(x ${b.x0.toFixed(2)}–${b.x1.toFixed(2)}) between x=${hold.x1.toFixed(2)} and ` +
+          `x=${hold.x2.toFixed(2)}.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: hold.x1,
+        y: hold.y,
+        metrics: { connectorX1: hold.x1, connectorX2: hold.x2, blockerX0: b.x0, blockerX1: b.x1 },
+      });
+      break;
+    }
+    if (!owned.has(hold.noteId) || !suppressed.has(hold.noteId)) {
+      out.push({
+        code: 'hold-redundant-stem',
+        severity: 'error',
+        message:
+          `Hold member ${hold.noteId} still paints its own duration ink: an exception stem ` +
+          `beside a hold double-encodes the value.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: p.x,
+        y: p.y,
+      });
+    }
+    for (const underlay of hold.underlays) {
+      const rule = rules.find(
+        (r) =>
+          Math.abs(r.y - underlay.y) <= hold.underlayWidth / 2 &&
+          r.x1 <= underlay.x1 + 0.01 &&
+          r.x2 >= underlay.x2 - 0.01
+      );
+      if (!rule) {
+        out.push({
+          code: 'hold-underlay',
+          severity: 'error',
+          message:
+            `The white underlay of ${hold.noteId} (x ${underlay.x1.toFixed(2)}–` +
+            `${underlay.x2.toFixed(2)}) at y=${underlay.y.toFixed(2)} erases no painted ` +
+            `staff rule: an underlay is only legal where it replaces a rule.`,
+          system: layout.index,
+          measure,
+          noteIds: [hold.noteId],
+          x: underlay.x1,
+          y: underlay.y,
+        });
+        continue;
+      }
+      const erases = [...clearance.corridor, ...clearance.brackets].some((b) =>
+        overlaps(b, underlay.x1, underlay.x2, underlay.y - hold.underlayWidth / 2, underlay.y + hold.underlayWidth / 2)
+      );
+      if (erases) {
+        out.push({
+          code: 'hold-underlay',
+          severity: 'error',
+          message:
+            `The white underlay of ${hold.noteId} would erase protected ink besides its ` +
+            `staff rule (indiscriminate erasure).`,
+          system: layout.index,
+          measure,
+          noteIds: [hold.noteId],
+          x: underlay.x1,
+          y: underlay.y,
+        });
+      }
+    }
+    if (hold.clearanceShortfall > 0.01) {
+      out.push({
+        code: 'hold-endpoint-clearance',
+        severity: 'warning',
+        message:
+          `The ${shape} terminal of ${hold.noteId} sits ${hold.clearanceShortfall.toFixed(2)}pt ` +
+          `before the release anchor x=${hold.releaseX.toFixed(2)} (${hold.seatReason}): it is ` +
+          `seated clear of the ink that occupies the release instant, not clipped silently.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: hold.terminalX,
+        y: hold.y,
+        metrics: { shortfall: hold.clearanceShortfall, releaseX: hold.releaseX },
+      });
+    }
+    for (const crossing of [...clearance.barlines, ...clearance.brackets]) {
+      if (!overlaps(crossing, hold.x1, hold.x2, hold.y - halfStroke, hold.y + halfStroke)) continue;
+      out.push({
+        code: 'hold-connector-occluded',
+        severity: 'warning',
+        message:
+          `The hold connector of ${hold.noteId} crosses ink painted after the hold layer ` +
+          `(x ${crossing.x0.toFixed(2)}–${crossing.x1.toFixed(2)}): the crossing is occluded, ` +
+          `the run's endpoints stay visible.`,
+        system: layout.index,
+        measure,
+        noteIds: [hold.noteId],
+        x: hold.x1,
+        y: hold.y,
+        metrics: { crossingX0: crossing.x0, crossingX1: crossing.x1 },
+      });
+      break;
+    }
+  }
+}
+
 export function checkBarlineClearance(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
@@ -3056,7 +3367,12 @@ export function checkClaspClearance(
     // excluded (owned by `clasp-dot-fusion`).
     for (const p of layout.notes) {
       if (!own.has(p.note.id)) continue;
-      const { wx, hy } = knockoutHalfExtents(o, t, o.showHonorHalo ? p.note.startTick : undefined);
+      const { wx, hy } = knockoutHalfExtents(
+        o,
+        t,
+        o.showHonorHalo ? p.note.startTick : undefined,
+        p
+      );
       const gap = claspOwnMemberAir(clasp, p.x, p.y, wx, hy, t);
       if (gap >= -EPS) continue;
       out.push({
@@ -4016,6 +4332,19 @@ export function auditKnockoutProtection(
   const tol = options.tolerance ?? 0.05;
   const baseline = options.digitBaselineOffset ?? JANKO_DIGIT_BASELINE_OFFSET;
   const nodes = parseSvgNodes(svg);
+  // Round 41: the digit's own `font-size` attribute supplies its optical
+  // baseline, so a chord member's smaller glyph and its smaller mask are
+  // matched exactly like a canonical head (canonical heads are unchanged).
+  const baselineCache = new Map<number, number>();
+  const baselineOf = (node: SvgNode): number => {
+    const fs = num(node.attrs, 'font-size');
+    if (!Number.isFinite(fs) || fs <= 0) return baseline;
+    const hit = baselineCache.get(fs);
+    if (hit !== undefined) return hit;
+    const value = digitBaselineOffset(fs);
+    baselineCache.set(fs, value);
+    return value;
+  };
 
   const knockouts = nodes.filter(
     (n) => n.tag === 'rect' && n.cls.includes('janko-knockout')
@@ -4035,7 +4364,7 @@ export function auditKnockoutProtection(
   // 1. Every digit must be shielded by a knockout painted before it.
   for (const digit of digits) {
     const dx = num(digit.attrs, 'x');
-    const dy = num(digit.attrs, 'y') - baseline;
+    const dy = num(digit.attrs, 'y') - baselineOf(digit);
     const shield = knockouts.find((k) => {
       const m = maskOf(k);
       return (
@@ -4067,7 +4396,7 @@ export function auditKnockoutProtection(
       (d) =>
         d.index > k.index &&
         Math.abs(num(d.attrs, 'x') - cx) < 0.02 &&
-        Math.abs(num(d.attrs, 'y') - baseline - cy) < 0.02
+        Math.abs(num(d.attrs, 'y') - baselineOf(d) - cy) < 0.02
     );
     if (!digit) {
       out.push({
@@ -4976,6 +5305,7 @@ export function lintJankoScore(
     checkOttavaCoverage(layout, diagnostics);
     checkOttavaExtensions(layout, o, diagnostics);
     checkStaffSegments(layout, o, t, diagnostics);
+    checkHoldIntegrity(layout, o, t, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     if (o.clusterCompression && o.clusterCompression !== 'literal') {
       checkCompressionCollisions(layout, o, t, thresholds, diagnostics);

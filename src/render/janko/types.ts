@@ -729,6 +729,30 @@ export interface JankoTokens {
   knockoutMargin?: number;
   /** Knockout breathing air between neighbouring masks (pt, Round 40). */
   knockoutAir?: number;
+  // --- Round 41: per-note symbol metrics and hold-to-release endpoints ---
+  /** Round 41: knockout margin around a **chord member** symbol's ink box (pt). */
+  chordKnockoutMargin?: number;
+  /** Round 41: breathing air around a chord member's mask (pt). */
+  chordKnockoutAir?: number;
+  /** Round 41: stroke width (pt) of the hold-to-release connector. */
+  holdConnectorStroke?: number;
+  /**
+   * Round 41: height (pt) of the white underlay band that *replaces* the local
+   * staff rule where a hold connector is coincident with it.
+   */
+  holdUnderlayWidth?: number;
+  /** Round 41: air (pt) a release terminal keeps from foreign protected ink. */
+  holdTerminalAir?: number;
+  /** Round 41: stop-bar terminal height (pt). */
+  holdStopBarHeight?: number;
+  /** Round 41: stop-bar terminal stroke width (pt). */
+  holdStopBarStroke?: number;
+  /** Round 41: diamond terminal span across (pt, both axes). */
+  holdDiamondSize?: number;
+  /** Round 41: ring terminal diameter (pt). */
+  holdRingDiameter?: number;
+  /** Round 41: ring terminal stroke width (pt). */
+  holdRingStroke?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -790,7 +814,33 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   ottavaHookLength: 4.0,
   ottavaClearance: 6.0,
   ottavaLineWidth: 0.35,
+  // Round 41 — provisional starting values (the ticket's dimensions; bounded
+  // optical adjustment is recorded in the round's rationale, never hidden).
+  chordKnockoutMargin: 0.10,
+  chordKnockoutAir: 0.20,
+  holdConnectorStroke: 0.40,
+  holdUnderlayWidth: 0.90,
+  holdTerminalAir: 0.20,
+  holdStopBarHeight: 2.40,
+  holdStopBarStroke: 0.55,
+  holdDiamondSize: 1.60,
+  holdRingDiameter: 2.20,
+  holdRingStroke: 0.40,
 };
+
+/**
+ * Round 41: the release-endpoint shapes of the exceptional-duration
+ * hold-to-release treatment. The connector is shared; this is the round's only
+ * open axis.
+ */
+export type JankoDurationEndpoint = 'none' | 'stop-bar' | 'diamond' | 'ring';
+
+/** The three judged endpoint shapes, in the round's canonical order. */
+export const JANKO_DURATION_ENDPOINTS: readonly JankoDurationEndpoint[] = [
+  'stop-bar',
+  'diamond',
+  'ring',
+];
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */
 export interface JankoLayoutOptions {
@@ -1035,6 +1085,23 @@ export interface JankoLayoutOptions {
    *   Even absolute pitch family on the left, odd family on the right.
    */
   pitchPlacement?: 'standard' | 'parity-columns';
+  /**
+   * Round 41: exceptional-duration **release endpoint** treatment.
+   *
+   * - `'none'`: canonical — an exceptional bracket member keeps its own exact
+   *   duration statement (stem / flags / dot), the golden rule.
+   * - `'stop-bar'` / `'diamond'` / `'ring'`: the member's own duration ink is
+   *   replaced by a horizontal hold-to-release connector that starts flush at
+   *   its protected right edge, runs at its true pitch y, and ends in the named
+   *   terminal mark centred on the resolved release time.
+   */
+  durationEndpoint?: JankoDurationEndpoint;
+  /**
+   * Round 41: absolute pitch symbol scale for **same-hand chord members** — a
+   * co-onset group of two or more source notes in one hand (`1` = canonical).
+   * Standalone symbols always keep the canonical size and mask.
+   */
+  chordSymbolScale?: number;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1201,6 +1268,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   clusterPresentation: 'literal',
   verticalPlacement: 'slot',
   pitchPlacement: 'standard',
+  durationEndpoint: 'none',
+  chordSymbolScale: 1,
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',

@@ -367,17 +367,25 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
 
   assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
 
-  // Round 40 candidates produce distinct SVGs
+  // Round 41 candidates produce distinct SVGs: identical layout ink, three
+  // different terminal shapes.
   assert.equal(CURRENT_CANDIDATES.length, 3);
-  const cand0 = resolveCandidate(CURRENT_CANDIDATES[0]);
-  const cand1 = resolveCandidate(CURRENT_CANDIDATES[1]);
-  const cand2 = resolveCandidate(CURRENT_CANDIDATES[2]);
-  const svg0 = renderJankoCrop(BRAHMS, 8, 1, cand0.options, cand0.tokens);
-  const svg1 = renderJankoCrop(BRAHMS, 8, 1, cand1.options, cand1.tokens);
-  const svg2 = renderJankoCrop(BRAHMS, 8, 1, cand2.options, cand2.tokens);
-  assert.notEqual(svg0, svg1, 'Control and parity-scale-068 produce distinct SVGs');
-  assert.notEqual(svg0, svg2, 'Control and parity-scale-080 produce distinct SVGs');
-  assert.notEqual(svg1, svg2, 'parity-scale-068 and parity-scale-080 produce distinct SVGs');
+  // The studio engraves a candidate window as **entry options + candidate
+  // delta** (the Brahms goldens are that entry: mps 4, cut time, anacrusis).
+  const optFor = (c: (typeof CURRENT_CANDIDATES)[number]) =>
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(c.options ?? {}) });
+  const tokFor = (c: (typeof CURRENT_CANDIDATES)[number]) =>
+    resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(c.tokens ?? {}) });
+  const svg0 = renderJankoCrop(BRAHMS, 8, 1, optFor(CURRENT_CANDIDATES[0]), tokFor(CURRENT_CANDIDATES[0]));
+  const svg1 = renderJankoCrop(BRAHMS, 8, 1, optFor(CURRENT_CANDIDATES[1]), tokFor(CURRENT_CANDIDATES[1]));
+  const svg2 = renderJankoCrop(BRAHMS, 8, 1, optFor(CURRENT_CANDIDATES[2]), tokFor(CURRENT_CANDIDATES[2]));
+  for (const svg of [svg0, svg1, svg2]) {
+    assert.ok(svg.includes('janko-hold-layer'), 'the hold layer paints in the window');
+    assert.ok(svg.includes('janko-hold-connector'), 'the shared connector paints');
+  }
+  assert.notEqual(svg0, svg1, 'Stop bar and diamond endpoints produce distinct SVGs');
+  assert.notEqual(svg0, svg2, 'Stop bar and ring endpoints produce distinct SVGs');
+  assert.notEqual(svg1, svg2, 'Diamond and ring endpoints produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------

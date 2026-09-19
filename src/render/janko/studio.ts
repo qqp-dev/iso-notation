@@ -58,6 +58,7 @@ import { getChannelLayoutSpec } from './geometry';
 import {
   BRAHMS_STUDIO_SCORE_ID,
   DURATION_SPECIMEN_STUDIO_SCORE_ID,
+  HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
   CandidateOptionBadge,
@@ -86,6 +87,11 @@ import {
   ABSTRACT_SUBSET_2,
 } from './elements/abstract-geometry';
 import { buildSyntheticM8DiagnosticScore } from '../../scores/synthetic-m8-diagnostic';
+import {
+  buildHoldEndpointSpecimenScore,
+  HOLD_ENDPOINT_SPECIMEN_JANKO_OPTIONS,
+  HOLD_ENDPOINT_SPECIMEN_JANKO_TOKENS,
+} from '../../scores/hold-endpoint-specimen';
 import { LintReport, lintJankoScore } from './linter';
 
 /** One macro focus crop in the Golden Reference view. */
@@ -259,6 +265,17 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       score: buildDurationSpecimenScore(),
       options: resolveJankoOptions(DURATION_SPECIMEN_JANKO_OPTIONS),
       tokens: resolveJankoTokens(DURATION_SPECIMEN_JANKO_TOKENS),
+    },
+    // Round 41: the hold-endpoint specimen — the three exceptional-duration
+    // situations the corpus never states (a three-duration chord with an
+    // octave-line exception, a release with no attack at its tick, a genuine
+    // system-boundary continuation) on clean common-time material, two
+    // measures per system so the line break is a real one.
+    [HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID]: {
+      id: HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
+      score: buildHoldEndpointSpecimenScore(),
+      options: resolveJankoOptions(HOLD_ENDPOINT_SPECIMEN_JANKO_OPTIONS),
+      tokens: resolveJankoTokens(HOLD_ENDPOINT_SPECIMEN_JANKO_TOKENS),
     },
     [SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID]: {
       id: SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
