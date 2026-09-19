@@ -37,6 +37,7 @@
  */
 
 import { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
+import { wholeToneParity } from '../../model/pitch';
 import {
   CONTINUOUS_PITCH_ANCHOR_LIN,
   DEFAULT_PITCH_WINDOW,
@@ -98,7 +99,7 @@ import {
   getBarStaffSegments,
   getBarStaffRows,
 } from './elements/staff';
-import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, renderNotehead } from './elements/notehead';
+import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, renderNotehead, getKnockoutMetrics } from './elements/notehead';
 import {
   JankoBeamGroupGeometry,
   JankoChordBridge,
@@ -1817,7 +1818,7 @@ export function positionJankoNote(
     flank ?? null
   );
   const y = geo.middleCY + coord.y;
-  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  const knockoutMetrics = getKnockoutMetrics(o, t);
   const honor = isPositionOfHonor(note.startTick) && o.showHonorHalo;
   const pc = ((note.pitch.pitchClass % 12) + 12) % 12;
   const origLin = note.pitch.octave * 12 + pc;
@@ -1837,11 +1838,11 @@ export function positionJankoNote(
       hand,
       x,
       y,
-      dotX: x + preset.wx + t.augmentationDotGap,
+      dotX: x + knockoutMetrics.wx + t.augmentationDotGap,
       dotY: resolveAugmentationDotY(y, geo, hand, o, t),
       stemAttachR: honor
         ? t.haloRadius + HONOR_STEM_ATTACHMENT_AIR
-        : preset.hy + t.stemAttachmentAir,
+        : knockoutMetrics.hy + t.stemAttachmentAir,
     },
   };
 }
@@ -3079,12 +3080,12 @@ export function knockoutHalfExtents(
   t: ResolvedJankoTokens,
   startTick?: number
 ): { wx: number; hy: number } {
-  const preset = getClusterSpacingPreset(o.clusterSpacing);
+  const metrics = getKnockoutMetrics(o, t);
   if (startTick !== undefined && isPositionOfHonor(startTick)) {
     const halo = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
-    return { wx: Math.max(preset.wx, halo), hy: Math.max(preset.hy, halo) };
+    return { wx: Math.max(metrics.wx, halo), hy: Math.max(metrics.hy, halo) };
   }
-  return { wx: preset.wx, hy: preset.hy };
+  return { wx: metrics.wx, hy: metrics.hy };
 }
 
 /**
@@ -3954,36 +3955,66 @@ export function resolveChordColumns(
       .sort((a, b) => a.y - b.y || a.x - b.x);
     return resolveOnsetClaspGroups(onset, t, (p) => offsets.get(p.note.id) ?? 0);
   };
-  // Pass A: the minimal assumption — every group on the column.
-  fitPass(() => 'column');
-  // Bracket qualification on the Pass-A relative spread. Note ids are
-  // score-unique, so one global set resolves every Pass-B bucket. Union
-  // paradigms qualify a whole onset of two or more heads (as admission
-  // does); per-hand qualification is the shared relative-spread predicate.
   const bracketedIds = new Set<string>();
-  for (const unit of units) {
-    const groups = perHandClasps
-      ? handClaspGroups(unit)
-      : unit.rows.reduce((n, c) => n + c.notes.length, 0) >= 2
-        ? [unit.rows.flatMap((c) => c.notes)]
-        : [];
-    for (const p of groups.flat()) bracketedIds.add(p.note.id);
+  const isParityColumns = o.pitchPlacement === 'parity-columns';
+  if (isParityColumns) {
+    for (const unit of units) {
+      const stored = membersByTick.get(unit.tick) ?? [];
+      const byHand = new Map<Hand, PositionedJankoNote[]>();
+      for (const p of stored) {
+        const bucket = byHand.get(p.rhythm.hand);
+        if (bucket) bucket.push(p);
+        else byHand.set(p.rhythm.hand, [p]);
+      }
+      for (const members of byHand.values()) {
+        if (members.length >= 2) {
+          for (const p of members) {
+            const parity = wholeToneParity(p.note.pitch);
+            const offset = parity === 0 ? 0 : pairGap;
+            offsetsById.set(p.note.id, offset);
+          }
+        } else if (members.length === 1) {
+          offsetsById.set(members[0].note.id, 0);
+        }
+      }
+      const groups = perHandClasps
+        ? handClaspGroups(unit)
+        : unit.rows.reduce((n, c) => n + c.notes.length, 0) >= 2
+          ? [unit.rows.flatMap((c) => c.notes)]
+          : [];
+      for (const p of groups.flat()) bracketedIds.add(p.note.id);
+    }
+  } else {
+    // Pass A: the minimal assumption — every group on the column.
+    fitPass(() => 'column');
+    // Bracket qualification on the Pass-A relative spread. Note ids are
+    // score-unique, so one global set resolves every Pass-B bucket. Union
+    // paradigms qualify a whole onset of two or more heads (as admission
+    // does); per-hand qualification is the shared relative-spread predicate.
+    for (const unit of units) {
+      const groups = perHandClasps
+        ? handClaspGroups(unit)
+        : unit.rows.reduce((n, c) => n + c.notes.length, 0) >= 2
+          ? [unit.rows.flatMap((c) => c.notes)]
+          : [];
+      for (const p of groups.flat()) bracketedIds.add(p.note.id);
+    }
+    // Pass B: a group anchors inward iff its lowest-source-pitch member
+    // qualified for a bracket — the inward seat faces the bracket ink, so it
+    // belongs to a bracket member (exempt from the veto); a bucket led by a
+    // foreign head (e.g. a joint cross-hand pair whose lowest is the other
+    // hand's lone note) seats that head ON the column and staggers right, so
+    // no foreign head is ever manufactured into the bracket-ink lane. Order
+    // stays lowest-pitch-first under either anchor. Residuals re-resolve
+    // under the final anchors.
+    const lowestIdOf = (ids: readonly string[]): string =>
+      [...ids].sort((a, b) => {
+        const fa = fitById.get(a)!;
+        const fb = fitById.get(b)!;
+        return fa.lin - fb.lin || (a < b ? -1 : a > b ? 1 : 0);
+      })[0];
+    fitPass((ids) => (bracketedIds.has(lowestIdOf(ids)) ? 'inward' : 'column'));
   }
-  // Pass B: a group anchors inward iff its lowest-source-pitch member
-  // qualified for a bracket — the inward seat faces the bracket ink, so it
-  // belongs to a bracket member (exempt from the veto); a bucket led by a
-  // foreign head (e.g. a joint cross-hand pair whose lowest is the other
-  // hand's lone note) seats that head ON the column and staggers right, so
-  // no foreign head is ever manufactured into the bracket-ink lane. Order
-  // stays lowest-pitch-first under either anchor. Residuals re-resolve
-  // under the final anchors.
-  const lowestIdOf = (ids: readonly string[]): string =>
-    [...ids].sort((a, b) => {
-      const fa = fitById.get(a)!;
-      const fb = fitById.get(b)!;
-      return fa.lin - fb.lin || (a < b ? -1 : a > b ? 1 : 0);
-    })[0];
-  fitPass((ids) => (bracketedIds.has(lowestIdOf(ids)) ? 'inward' : 'column'));
   for (const unit of units) {
     for (const cluster of unit.rows) {
       const offs = cluster.notes.map((p) => offsetsById.get(p.note.id) ?? 0);
@@ -4347,7 +4378,7 @@ export function resolveChordColumns(
   //     its unspread column.
   // -------------------------------------------------------------------------
   const railDiagnostics: ThreeRailDiagnostic[] = [];
-  if (perHandClasps && claspsActive) {
+  if (perHandClasps && claspsActive && !isParityColumns) {
     const debugPassC = typeof process !== 'undefined' && process.env?.JANKO_DEBUG_PASSC === '1';
     for (const unit of units) {
       if (!unit.clasp) continue;
@@ -5033,11 +5064,12 @@ export function detectStemDigitCrossings(
   for (const seg of segs.values()) {
     for (const q of notes) {
       if (q.note.id === seg.id) continue;
-      const x0 = q.x - preset.wx - air;
-      const x1 = q.x + preset.wx + air;
+      const { wx, hy } = knockoutHalfExtents(o, t, q.note.startTick);
+      const x0 = q.x - wx - air;
+      const x1 = q.x + wx + air;
       if (seg.x + halfStem <= x0 + EPS || seg.x - halfStem >= x1 - EPS) continue;
-      const y0 = q.y - preset.hy - air;
-      const y1 = q.y + preset.hy + air;
+      const y0 = q.y - hy - air;
+      const y1 = q.y + hy + air;
       if (seg.y1 <= y0 + EPS || seg.y0 >= y1 - EPS) continue;
       const shortfall = Math.min(seg.x + halfStem - x0, x1 - (seg.x - halfStem));
       out.push({ stemNoteId: seg.id, digitNoteId: q.note.id, shortfall });

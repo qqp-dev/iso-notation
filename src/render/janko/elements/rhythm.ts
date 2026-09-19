@@ -39,7 +39,7 @@ import {
   resolveJankoTokens,
 } from '../types';
 import { durationDotCount, durationFlagCount, durationRingCount } from './duration';
-import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor } from './notehead';
+import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, getKnockoutMetrics } from './notehead';
 import { f } from './style';
 import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
 
@@ -141,7 +141,7 @@ export function getStemAttachmentRadii(
   honor: number;
 } {
   const t = resolveJankoTokens(tokens);
-  const { hy } = getClusterSpacingPreset(resolveJankoOptions(layoutOptions).clusterSpacing);
+  const { hy } = getKnockoutMetrics(layoutOptions, tokens);
   return {
     regular: hy + t.stemAttachmentAir,
     honor: t.haloRadius + HONOR_STEM_ATTACHMENT_AIR,

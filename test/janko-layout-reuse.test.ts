@@ -66,10 +66,7 @@ import {
   resolveCandidate,
 } from '../src/render/janko/candidates';
 import { ROUND_37_CANDIDATES, ROUND_37_METADATA } from './janko-round37.test';
-import {
-  renderAbstractSubsetSvg,
-  ABSTRACT_SUBSET_1,
-} from '../src/render/janko/elements/abstract-geometry';
+import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './janko-round39.test';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
@@ -252,8 +249,11 @@ test('Deterministic counts: renderCandidatesView computes each candidate layout 
       'renderCandidatesView with score candidates must invoke content-aware layout exactly 8 times'
     );
 
-    // Abstract candidate configuration (Round 38) makes zero score layout calls
-    const abstractConfig = createStudioConfig();
+    // Abstract candidate configuration (Round 39) makes zero score layout calls
+    const abstractConfig = createStudioConfig({
+      candidates: ROUND_39_CANDIDATES,
+      round: ROUND_39_METADATA,
+    });
     contentAwareCalls = 0;
     renderCandidatesView(abstractConfig);
     assert.equal(
@@ -309,7 +309,10 @@ test('Deterministic counts: renderStudioMarkup eliminates redundant content-awar
     );
 
     // Abstract candidates: Reference view (2) + Candidates view (0) = 2 calls
-    const abstractConfig = createStudioConfig();
+    const abstractConfig = createStudioConfig({
+      candidates: ROUND_39_CANDIDATES,
+      round: ROUND_39_METADATA,
+    });
     contentAwareCalls = 0;
     renderStudioMarkup(abstractConfig);
     assert.equal(
@@ -364,14 +367,17 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
 
   assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
 
-  // Round 39 abstract candidates produce distinct SVGs
+  // Round 40 candidates produce distinct SVGs
   assert.equal(CURRENT_CANDIDATES.length, 3);
-  const svgDial = renderAbstractSubsetSvg('dial', ABSTRACT_SUBSET_1);
-  const svgRosette = renderAbstractSubsetSvg('rosette', ABSTRACT_SUBSET_1);
-  const svgLadder = renderAbstractSubsetSvg('ladder', ABSTRACT_SUBSET_1);
-  assert.notEqual(svgDial, svgRosette, 'Dial and Rosette produce distinct SVGs');
-  assert.notEqual(svgDial, svgLadder, 'Dial and Ladder produce distinct SVGs');
-  assert.notEqual(svgRosette, svgLadder, 'Rosette and Ladder produce distinct SVGs');
+  const cand0 = resolveCandidate(CURRENT_CANDIDATES[0]);
+  const cand1 = resolveCandidate(CURRENT_CANDIDATES[1]);
+  const cand2 = resolveCandidate(CURRENT_CANDIDATES[2]);
+  const svg0 = renderJankoCrop(BRAHMS, 8, 1, cand0.options, cand0.tokens);
+  const svg1 = renderJankoCrop(BRAHMS, 8, 1, cand1.options, cand1.tokens);
+  const svg2 = renderJankoCrop(BRAHMS, 8, 1, cand2.options, cand2.tokens);
+  assert.notEqual(svg0, svg1, 'Control and parity-scale-068 produce distinct SVGs');
+  assert.notEqual(svg0, svg2, 'Control and parity-scale-080 produce distinct SVGs');
+  assert.notEqual(svg1, svg2, 'parity-scale-068 and parity-scale-080 produce distinct SVGs');
 });
 
 // ---------------------------------------------------------------------------

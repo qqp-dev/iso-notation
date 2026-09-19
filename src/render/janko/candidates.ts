@@ -314,13 +314,15 @@ export const BRAHMS_STUDIO_SCORE_ID = 'brahms-op118-no1';
 export function brahmsWindow(
   measureStart: number,
   measureCount: number,
-  title: string
+  title: string,
+  caption?: string
 ): JankoCandidateWindow {
   return {
     scoreId: BRAHMS_STUDIO_SCORE_ID,
     measureStart,
     measureCount,
     title,
+    ...(caption ? { caption } : {}),
   };
 }
 
@@ -472,78 +474,63 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
 export const SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID = 'synthetic-m8-diagnostic';
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 39,
-  title: 'Twelve-site alphabets under strain — Round 39',
+  round: 40,
+  title: 'Numbered two-column pitch placement — Round 40',
   description:
-    'Identical common stress battery evaluating Dial, Rosette, and Staggered pitch ladder under twelve modulo-12 transpositions, near neighbours, and density extremes, with an explicit ladder octave-boundary probe. Fixed coordinate origin and scale across candidates; no auto-rotation or subset recentering.',
-  openAxes: ['arrangement'],
+    'Evaluate numbered two-column whole-tone parity placement against canonical Brahms Op. 118 No. 1 m. 8. Compare conservative proportional protection (0.68× font, 0.408pt margin, 0.272pt air) with tightened protection (0.80× font, 0.10pt margin, 0.20pt air).',
+  openAxes: ['pitchPlacement'],
 };
 
 /**
- * Round 39: exactly three active abstract candidates:
- * Dial, Rosette, and Staggered pitch ladder.
+ * Round 40: exactly three active score candidates:
+ * Literal canonical Brahms control, parity-scale-068, and parity-scale-080.
  */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'dial',
-    label: 'Dial',
+    id: 'control',
+    label: 'Literal canonical Brahms control',
     description:
-      'Regular 12-gon circular dial. R = 2 / sin(π/12) ≈ 7.7274pt, site 0 at top, clockwise order. Modulo-12 transposition is rigid rotation. Nominal full ink bounds 16.5548 × 16.5548pt, min separation 4.0pt.',
-    kind: 'abstract',
-    abstractGeometry: 'dial',
-    axis: 'arrangement',
-    windows: [
-      abstractKeyWindow(
-        'dial',
-        'Twelve-site key (3×)',
-        'Full configuration (0–b) · 16.5548 × 16.5548pt nominal ink bounds (enlarged 3×)'
-      ),
-      abstractTranspositionWindow('dial'),
-      abstractNearNeighboursWindow('dial'),
-      abstractDensityWindow('dial'),
-    ],
-    tags: ['abstract', 'dial'],
+      'Literal canonical Brahms control with standard three-rail placement and unscaled font/mask tokens.',
+    axis: 'pitchPlacement',
+    options: { pitchPlacement: 'standard' },
+    windows: [brahmsWindow(8, 1, 'Brahms Op. 118 No. 1 · m. 8')],
+    tags: ['brahms', 'canonical', 'control'],
   },
   {
-    id: 'rosette',
-    label: 'Rosette',
+    id: 'parity-scale-068',
+    label: 'Numbered parity columns (scale 0.68)',
     description:
-      'Alternating rosette. Radii 4√3 ≈ 6.9282pt for even i, 4.0pt for odd i. Angular step π/6, site 0 at top. Even transpositions rotate rigidly; odd transpositions exchange inner/outer tiers and deform configuration. Nominal full ink bounds 13.1000 × 14.9564pt, min separation 4.0pt. Sites only, no star or polygon drawn.',
-    kind: 'abstract',
-    abstractGeometry: 'rosette',
-    axis: 'arrangement',
+      'Numbered parity columns with digitFontSize = 3.944pt (0.68×), proportionally scaled knockoutMargin = 0.408pt and knockoutAir = 0.272pt.',
+    axis: 'pitchPlacement',
+    options: { pitchPlacement: 'parity-columns' },
+    tokens: { digitFontSize: 3.944, knockoutMargin: 0.408, knockoutAir: 0.272 },
     windows: [
-      abstractKeyWindow(
-        'rosette',
-        'Twelve-site key (3×)',
-        'Full configuration (0–b) · 13.1000 × 14.9564pt nominal ink bounds (enlarged 3×)'
+      brahmsWindow(
+        8,
+        1,
+        'Brahms Op. 118 No. 1 · m. 8',
+        'm. 8 window lint clean · the card chip reports whole-score findings outside this one-bar window (experiment, not corpus adoption)'
       ),
-      abstractTranspositionWindow('rosette'),
-      abstractNearNeighboursWindow('rosette'),
-      abstractDensityWindow('rosette'),
     ],
-    tags: ['abstract', 'rosette'],
+    tags: ['brahms', 'parity', 'scale-068'],
   },
   {
-    id: 'ladder',
-    label: 'Staggered pitch ladder',
+    id: 'parity-scale-080',
+    label: 'Numbered parity columns (scale 0.80)',
     description:
-      'Staggered pitch ladder. Two staggered columns with upward pitch: x = ±√3pt (even/odd), y = 11 - 2p pt (SVG downward y). Unfolded shifts translate/reflect; modulo-12 folding breaks shape at octave boundary. Nominal full ink bounds 4.5641 × 23.1000pt, min separation 4.0pt. Sites only, no rails or connector lines drawn.',
-    kind: 'abstract',
-    abstractGeometry: 'ladder',
-    axis: 'arrangement',
+      'Numbered parity columns with digitFontSize = 4.64pt (0.80×), independently tightened knockoutMargin = 0.10pt and knockoutAir = 0.20pt.',
+    axis: 'pitchPlacement',
+    options: { pitchPlacement: 'parity-columns' },
+    tokens: { digitFontSize: 4.64, knockoutMargin: 0.10, knockoutAir: 0.20 },
     windows: [
-      abstractKeyWindow(
-        'ladder',
-        'Twelve-site key (3×)',
-        'Full configuration (0–b) · 4.5641 × 23.1000pt nominal ink bounds (enlarged 3×)'
+      brahmsWindow(
+        8,
+        1,
+        'Brahms Op. 118 No. 1 · m. 8',
+        'm. 8 window lint clean · the card chip reports whole-score findings outside this one-bar window (experiment, not corpus adoption)'
       ),
-      abstractTranspositionWindow('ladder'),
-      abstractNearNeighboursWindow('ladder'),
-      abstractDensityWindow('ladder'),
-      abstractLadderOctaveProbeWindow(),
     ],
-    tags: ['abstract', 'ladder'],
+    tags: ['brahms', 'parity', 'scale-080'],
   },
 ];
 

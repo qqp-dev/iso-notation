@@ -160,6 +160,7 @@ const ROUND_35_CARDS: string[] = [
 const ROUND_36_CARDS: string[] = ['mirrored-handprint-literal', 'mirrored-handprint'];
 const ROUND_37_CARDS: string[] = ['indexed-symmetric-literal', 'indexed-symmetric'];
 const ROUND_38_CARDS: string[] = ['dial', 'rosette', 'asymmetric'];
+const ROUND_39_CARDS: string[] = ['dial', 'rosette', 'ladder'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -245,10 +246,10 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 39 (one open axis)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 39);
-  assert.match(CURRENT_ROUND_METADATA.title, /twelve-site/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
+test('CURRENT_ROUND_METADATA is the open Round 40 (one open axis)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 40);
+  assert.match(CURRENT_ROUND_METADATA.title, /numbered two-column|parity/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['pitchPlacement'], 'one open axis');
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
@@ -291,18 +292,23 @@ test('CURRENT_ROUND_METADATA is the open Round 39 (one open axis)', () => {
     ['dial', 'rosette', 'asymmetric'],
     'R38 parked trio on record'
   );
+  assert.deepEqual(
+    ROUND_39_CARDS,
+    ['dial', 'rosette', 'ladder'],
+    'R39 parked trio on record'
+  );
 });
 
-test('CURRENT_CANDIDATES is the Round 39 trio: Dial / Rosette / Staggered pitch ladder, one axis', () => {
+test('CURRENT_CANDIDATES is the Round 40 trio: control / parity-scale-068 / parity-scale-080, one axis', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['dial', 'rosette', 'ladder'],
+    ['control', 'parity-scale-068', 'parity-scale-080'],
     'three live cards'
   );
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'arrangement', `${c.id}: per-candidate purity`);
-    assert.equal(c.kind, 'abstract', `${c.id}: abstract candidate`);
+    assert.equal(c.axis, 'pitchPlacement', `${c.id}: per-candidate purity`);
+    assert.notEqual(c.kind, 'abstract', `${c.id}: score candidate`);
   }
 });
 
@@ -2062,14 +2068,40 @@ test('The live studio renders the open round with three cards', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
   assert.match(html, /data-candidate-count="3"/);
-  assert.match(html, /data-window-count="13"/, 'thirteen windows');
+  assert.match(html, /data-window-count="3"/, 'three windows');
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 39/);
-  assert.match(html, /Twelve-site alphabets under strain/i, 'the Twelve-site alphabets under strain title headlines the view');
+  assert.match(html, /Round 40/);
+  assert.match(html, /Numbered two-column pitch placement/i, 'the Numbered two-column pitch placement title headlines the view');
   for (const id of ROUND_33_CARDS) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  assert.equal((html.match(/data-lint="violations"/g) ?? []).length, 0, 'all cards lint clean');
+  // Round 40 honesty: the card chip carries **whole-score** lint, not window
+  // lint. The literal canonical control is clean everywhere; the two
+  // experimental parity-column cards legitimately expose the findings their
+  // out-of-window options produce. Nothing is suppressed and nothing is
+  // claimed clean that is not — the one-bar m. 8 window itself is asserted
+  // clean in test/janko-round40.test.ts.
+  assert.equal(
+    (html.match(/data-candidate="control" data-lint="clean"/g) ?? []).length,
+    1,
+    'the literal canonical control card lints clean'
+  );
+  assert.equal(
+    (html.match(/data-candidate="parity-scale-068" data-lint="violations"/g) ?? []).length,
+    1,
+    'the 0.68 parity-column card exposes its whole-score findings'
+  );
+  assert.equal(
+    (html.match(/data-candidate="parity-scale-080" data-lint="violations"/g) ?? []).length,
+    1,
+    'the 0.80 parity-column card exposes its whole-score findings'
+  );
+  // The required comparison window is present exactly once per card.
+  assert.equal(
+    (html.match(/data-window="brahms-op118-no1:8-8"/g) ?? []).length,
+    3,
+    'all three cards carry the required Brahms m. 8 window'
+  );
 });
 
 test('The closer-comparison strip is absent without a declared strip', () => {

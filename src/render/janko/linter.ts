@@ -124,6 +124,7 @@ import {
   JANKO_HALO_STROKE_WIDTH,
   digitBaselineOffset,
   digitHalfExtents,
+  getKnockoutMetrics,
   isPositionOfHonor,
 } from './elements/notehead';
 import {
@@ -631,14 +632,17 @@ export function checkKnockoutCoverage(
   lint: JankoLintOptions,
   out: LintViolation[]
 ): void {
-  const { wx, hy, margin } = getClusterSpacingPreset(o.clusterSpacing);
+  const { wx, hy, margin } = getKnockoutMetrics(o, t);
   const { halfWidth, halfHeight } = digitHalfExtents(t.digitFontSize);
   const horizontal = wx - halfWidth;
   const vertical = hy - halfHeight;
   // The preset's construction bases are rounded to two decimals for humans
   // (1.93/2.86 vs the exact 1.9333/2.8577 optical box), so the containment
   // carries a hundredth-point construction tolerance.
-  const required = Math.max(margin, lint.digitClearance);
+  const required =
+    t.knockoutMargin !== undefined
+      ? margin
+      : Math.max(margin, lint.digitClearance);
   const TOL = 0.01;
   for (const p of layout.notes) {
     if (horizontal + TOL >= required && vertical + TOL >= required) {
@@ -4982,12 +4986,12 @@ export function lintJankoScore(
     extents.push(systemInkExtents(layout, t, thresholds, o));
     if (thresholds.auditPaintOrder) {
       const attachment = getStemAttachmentRadii(t, o);
-      const preset = getClusterSpacingPreset(o.clusterSpacing);
+      const metrics = getKnockoutMetrics(o, t);
       const svg = renderSystem(score, layout.geometry, layout.index, o, t, layout);
       const audit = [
         ...auditKnockoutProtection(svg, {
-          knockoutWx: preset.wx,
-          knockoutHy: preset.hy,
+          knockoutWx: metrics.wx,
+          knockoutHy: metrics.hy,
           haloRadius: t.haloRadius,
           // The audit recovers the notehead centre from the digit's baseline,
           // so it must know the offset the renderer actually used.

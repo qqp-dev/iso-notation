@@ -61,6 +61,7 @@ import {
   renderStatusLine,
   renderStudioMarkup,
 } from '../src/render/janko/studio';
+import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './janko-round39.test';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -69,7 +70,7 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 38 open: three abstract candidates');
+assert.equal(CURRENT_CANDIDATES.length, 3, 'Round 40 open: three score candidates');
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -131,19 +132,19 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 39/);
-  assert.match(html, /Twelve-site alphabets under strain/i);
+  assert.match(html, /Round 40/);
+  assert.match(html, /Numbered two-column pitch placement/i);
 });
 
-test('Round 39 open: three abstract candidates, one axis, three cards', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 39);
-  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site alphabets under strain/i);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
+test('Round 40 open: three score candidates, one axis, three cards', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 40);
+  assert.match(CURRENT_ROUND_METADATA.title, /Numbered two-column pitch placement/i);
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['pitchPlacement'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['dial', 'rosette', 'ladder'],
-    'the Dial, Rosette, and Ladder candidates'
+    ['control', 'parity-scale-068', 'parity-scale-080'],
+    'the control, parity-scale-068, and parity-scale-080 candidates'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -175,8 +176,25 @@ test('Round 39 open: three abstract candidates, one axis, three cards', () => {
   );
 });
 
-test('The open studio renders the three abstract cards on thirteen declared windows', () => {
+test('The open studio renders the three cards on three declared windows', () => {
   const html = renderCandidatesView(CONFIG);
+
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.equal((html.match(/data-window="/g) ?? []).length, 3, 'three windows');
+  assert.match(html, /data-candidate-count="3"/);
+  assert.match(html, /data-window-count="3"/);
+  assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
+  assert.match(html, /Round 40/);
+  assert.ok(!html.includes('data-window="primary:"'), 'Bach carries no window this round');
+  assert.ok(html.includes('data-window="brahms-op118-no1:8-8"'), 'Brahms carries m.8 window');
+});
+
+test('Parked Round 39 renders the three abstract cards on thirteen declared windows', () => {
+  const r39Config = createStudioConfig({
+    candidates: ROUND_39_CANDIDATES,
+    round: ROUND_39_METADATA,
+  });
+  const html = renderCandidatesView(r39Config);
 
   // Dial (4) + Rosette (4) + Ladder (5) = 13 windows
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
@@ -495,10 +513,10 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 39);
-  assert.match(CURRENT_ROUND_METADATA.title, /Twelve-site alphabets under strain/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 40);
+  assert.match(CURRENT_ROUND_METADATA.title, /Numbered two-column pitch placement/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['arrangement'], 'one open axis');
+  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['pitchPlacement'], 'one open axis');
   assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
