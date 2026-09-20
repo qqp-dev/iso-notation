@@ -646,16 +646,16 @@ export function getPitchCoordinate(
     const writtenOctave = Math.floor(writtenLin / 12);
     const y = continuousPitchY(writtenLin, t.semitoneScale);
     const rank = getWholeToneRank(pc);
-    // Round 45 (`lowPitchFolding: 'literal'`): a written octave outside the
-    // grand staff states its register with the **established dynamic ledger
-    // vocabulary** — the same equators the twin-row mapping draws for an
-    // out-of-staff octave — instead of a fold under a displaced-note
-    // indicator. Every other configuration keeps the historical empty list.
-    const literalRegister =
-      o.lowPitchFolding === 'literal' && isOutOfStaffOctave(writtenOctave, hand);
-    const ledgerYs = literalRegister
-      ? getLedgerEquators(pc, writtenOctave, hand, t, o)
-      : [];
+    // Round 46: the continuous mapping draws **no** ledger ink of its own —
+    // the head stands at its exact pitch and the register is the head's own
+    // position. Round 45 had stated an out-of-staff octave with the dynamic
+    // ledger vocabulary under `lowPitchFolding: 'literal'`; that ink was
+    // rejected by the operator as unwanted extended rules/dashes (the high
+    // octave-6 side effect was never needed and the low dashes added a second
+    // register statement beside the literal head). The literal *position* is
+    // kept exactly as Round 45 drew it; only this extra ink is suppressed, so
+    // no down-10 fold is restored and no twin-row vocabulary is applied here.
+    const ledgerYs: number[] = [];
     return {
       pitchClass: pc,
       octave: writtenOctave,
@@ -667,9 +667,9 @@ export function getPitchCoordinate(
       offsetFromEquator: 0,
       equatorY: y,
       y,
-      isOutOfStaff: literalRegister,
+      isOutOfStaff: false,
       ledgerYs,
-      ledgerY: ledgerYs.length > 0 ? ledgerYs[0] : null,
+      ledgerY: null,
     };
   }
   const rank = getWholeToneRank(pc);

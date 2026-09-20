@@ -24,7 +24,6 @@ import {
   ExtensionJunctionStyle,
   JankoCore,
   JankoLayoutOptions,
-  JankoLowPitchFolding,
   JankoSystemGeometry,
   JankoTokens,
   ResolvedJankoTokens,
@@ -34,7 +33,7 @@ import {
 } from '../types';
 import {
   DEFAULT_PITCH_WINDOW,
-  resolveFoldShift,
+  computeFoldShift,
   continuousPitchY,
   getMeasureIndexOfTick,
 } from '../geometry';
@@ -312,14 +311,7 @@ export function computeSystemStaffSegments(
   measureWidth: number,
   core: JankoCore,
   t: ResolvedJankoTokens,
-  extensionJunction: ExtensionJunctionStyle = 'default',
-  /**
-   * Round 45: the row table is computed on **written** pitches, so an opt-in
-   * literal low pitch (`'literal'`) must be read here too — otherwise a bar
-   * whose only reason to draw its bottom extension row is a low literal note
-   * would lose that row.
-   */
-  lowPitchFolding: JankoLowPitchFolding = 'core'
+  extensionJunction: ExtensionJunctionStyle = 'default'
 ): {
   segments: StaffLineSegment[];
   staffLines: number[];
@@ -336,7 +328,12 @@ export function computeSystemStaffSegments(
   for (const n of sysNotes) {
     const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
     const lin = n.pitch.octave * 12 + pc;
-    const shift = resolveFoldShift(lin, core, lowPitchFolding);
+    // Round 46: the need-based row table is computed on the **core fold**
+    // (the Round 44 baseline) — the literal low positions Round 45 introduced
+    // are drawn without the extra bottom-row segments they used to earn, which
+    // the operator rejected together with the outlier rules and ledger dashes.
+    // Every row the baseline earned is unchanged; nothing else moves.
+    const shift = computeFoldShift(lin, core);
     const writtenLin = lin + shift;
     const m = getMeasureIndexOfTick(n, mockGeo, systemIndex, t);
     if (m >= 0 && m < numBars) {

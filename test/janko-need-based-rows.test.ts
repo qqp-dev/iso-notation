@@ -355,10 +355,21 @@ test('Folds Invariant: the working literal Brahms folds 0; the core-fold present
       0,
       `literal Brahms ${core} paints no ottava bracket`
     );
+    // Round 46: the literal position **is** the register statement — Round
+    // 45's dynamic ledger ink is gone, so no head is flagged out-of-staff and
+    // no ledger list is drawn. The corpus still draws octaves 0–2 below the
+    // core rows and octave 6 above them, at their exact source octave.
+    const heads = literal.flatMap((s) => s.notes);
+    const outsideCoreRows = heads.filter((n) => n.coord.octave <= 2 || n.coord.octave >= 6);
     assert.ok(
-      literal.flatMap((s) => s.notes).some((n) => n.coord.isOutOfStaff),
-      `literal Brahms ${core} states its low register out of staff`
+      outsideCoreRows.length > 0,
+      `literal Brahms ${core} draws its low/high registers at their literal source octave`
     );
+    for (const n of outsideCoreRows) {
+      assert.equal(n.coord.ledgerYs.length, 0, `${n.note.id}: no extra ledger ink`);
+      assert.equal(n.coord.isOutOfStaff, false, `${n.note.id}: no out-of-staff flag`);
+      assert.equal(n.ottavaShift ?? 0, 0, `${n.note.id}: no fold shift`);
+    }
   }
 
   // The historical core-fold presentation stays implemented and keeps its

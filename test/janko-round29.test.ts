@@ -344,29 +344,42 @@ test('Dots golden: Brahms m.1/m.4/m.19 dots share the 45° rule-B seat at the §
   // (per-measure downbeat insets replace the blanket 15.35pt) and §3 shrinks
   // every ring seat from radius 5.45 to 4.75 (outer 2.8 + hug 1.2 + dot
   // r 0.75). Rule B still holds absolutely: m.1, m.4 and m.19 all sit at
-  // exactly 45.00° off their own ring centres at exactly 4.75.
-  // Round 45 re-pins the absolute seats once more: the working Brahms
-  // Reference moves to the agreed 90 % symbols with declared optical spacing,
-  // so the columns (and with them claspX) shift while the 45° / 4.75-radius
-  // seat rule holds absolutely.
-  assert.equal(d1[0]!.x, 73.35032700645606, 'm.1 clasp dot x (§2 column + §3 4.75 seat; was 73.92816897534193)');
-  assert.equal(d1[0]!.y, 129.49924278936393, 'm.1 clasp dot y (content-aware page 1; 45° seat kept)');
-  assert.equal(m1.claspX, 69.99156979582, 'm.1 clasp spine x (column − r − offset)');
-  assert.equal(d4[0]!.x, 329.1056211241031, 'm.4 clasp dot x (§2 column + §3 4.75 seat; was 329.683463092989)');
-  assert.equal(d4[0]!.y, 136.99924278936393, 'm.4 clasp dot y (content-aware page 1; 45° seat kept)');
+  // exactly 45.00° off their own mark centres, and their seats are the nearest
+  // clean 45° position against the mark's **actual** ink.
+  //
+  // Round 46 re-pins the absolute seats once more. All three marks are the
+  // same 144-tick value (96 half-ring + attenuation dot) at the 95 % admitted
+  // scale, and the bracket mount's half-ring grows another 20 % (r 2.0064pt,
+  // stroke 0.73986pt). The half-ring bulges LEFT, so the dot's 45° up-right
+  // ray stands on the open side of the arc: the nearest position that keeps
+  // the house hug from the arc's real ink is r = 3.36pt (the Round 45 full
+  // ring's annulus forced 4.75pt). The 45° angle is the invariant and holds
+  // exactly; the columns (and with them claspX) follow the Round 46 §2
+  // geometry.
+  assert.equal(d1[0]!.x, 72.64669054949266, 'm.1 clasp dot x (§2 column + 3.36 half-ring seat)');
+  assert.equal(d1[0]!.y, 130.48212121521323, 'm.1 clasp dot y (content-aware page 1; 45° seat kept)');
+  assert.equal(m1.claspX, 70.27081176470588, 'm.1 clasp spine x (column − r − offset)');
+  assert.equal(d4[0]!.x, 328.4019846671397, 'm.4 clasp dot x (§2 column + 3.36 half-ring seat)');
+  assert.equal(d4[0]!.y, 137.98212121521323, 'm.4 clasp dot y (content-aware page 1; 45° seat kept)');
   // The consistency the ticket orders: opening and m.19 sit at the same
-  // 45.00° off their ring centres at the same 4.75 radius.
+  // 45.00° off their mark centres at the same radius.
   const angleOf = (clasp: typeof m1, dot: NonNullable<(typeof d1)[number]>): number => {
     const ink = clasp.durationInk[clasp.durationDots.indexOf(dot)];
     return (Math.atan2(-(dot.y - ink.centerY), dot.x - clasp.claspX) * 180) / Math.PI;
   };
+  const radiusOf = (clasp: typeof m1, dot: NonNullable<(typeof d1)[number]>): number => {
+    const ink = clasp.durationInk[clasp.durationDots.indexOf(dot)];
+    return Math.hypot(dot.x - clasp.claspX, dot.y - ink.centerY);
+  };
   assert.ok(Math.abs(angleOf(m1, d1[0]!) - 45) < 1e-9, 'm.1 sits at 45°');
   assert.ok(Math.abs(angleOf(m19, d19[0]!) - 45) < 1e-9, 'm.19 sits at 45°');
+  assert.ok(Math.abs(radiusOf(m1, d1[0]!) - 3.36) < 1e-9, 'm.1 seat is 3.36pt off its own mark centre');
+  assert.ok(Math.abs(radiusOf(m19, d19[0]!) - 3.36) < 1e-9, 'm.19 seat is the same 3.36pt');
   // m.19's column rides the §2 within-system redistribution (its system
   // reclaims the shrunk downbeat insets), so its absolute seat re-pins; the
   // 45° seat relative to its own spine is the invariant, and it holds.
-  assert.equal(d19[0]!.x, 313.1209152417502, 'm.19 dot x (was 319.15875721063605 pre-Round-45)');
-  assert.equal(d19[0]!.y, 153.99924278936393, 'm.19 dot y (content-aware page 2; 45° seat kept)');
+  assert.equal(d19[0]!.x, 312.4172787847868, 'm.19 dot x (Round 46 §2 column + 3.36 seat)');
+  assert.equal(d19[0]!.y, 154.98212121521323, 'm.19 dot y (content-aware page 2; 45° seat kept)');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {
@@ -631,45 +644,35 @@ test('Rests golden: dormant dialects keep #111111 ink and unscaled extents', () 
   assert.ok(Math.abs(box.y1 - box.y0 - 11.5594) < 1e-3, 'dormant kinetic quarter height unscaled');
 });
 
-test('npm run lint:engraving gates the canonical record: green non-strict, six published composites strict', () => {
-  // Canonical fixed-3 everywhere. Bach GOLD and the curator specimens stay
-  // strict-clean; the working Brahms Reference — Round 45's agreed 90 %
-  // treatment — carries exactly the six published `carrier-duration-unsupported`
-  // 120-tick composites the operator deferred to the tied-duration follow-up.
-  // So the gate is green without `--strict`, and `--strict` exits 1 on those
-  // six by name. Nothing else may ever warn: a new warning breaks this test.
+test('npm run lint:engraving gates the canonical record: green non-strict AND strict', () => {
+  // Canonical fixed-3 everywhere. Bach GOLD, the curator specimens and — as of
+  // Round 46 — the working Brahms Reference are strict-clean: the six former
+  // `carrier-duration-unsupported` 120-tick composites are stated exactly by
+  // their written components (first 96 + tied 24), so both gates exit 0 with
+  // zero violations and zero warnings. Nothing may ever warn: a new warning
+  // breaks this test.
   const plain = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--quiet'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
   assert.equal(plain.status, 0, 'the canonical non-strict gate stays green');
-  assert.match(plain.stdout, /clean violations=0 warnings=6/, 'exactly six published warnings');
+  assert.match(plain.stdout, /clean violations=0 warnings=0/, 'zero violations and zero warnings');
   const strict = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--strict'],
     { cwd: REPO_ROOT, encoding: 'utf-8' }
   );
-  assert.equal(strict.status, 1, 'strict fails on the six deferred composites');
-  const warnings = `${strict.stdout}${strict.stderr}`
-    .split('\n')
-    .filter((line) => line.includes('[carrier-duration-unsupported]'));
-  assert.equal(warnings.length, 6, 'exactly six warnings, no broad count allowance');
-  for (const [id, measure] of [
-    ['brahms-op118-no1-295', 'm. 22'],
-    ['brahms-op118-no1-351', 'm. 26'],
-    ['brahms-op118-no1-448', 'm. 33'],
-    ['brahms-op118-no1-581', 'm. 42'],
-    ['brahms-op118-no1-637', 'm. 46'],
-    ['brahms-op118-no1-734', 'm. 53'],
-  ]) {
+  assert.equal(strict.status, 0, 'strict is green too — the former six refusals are solved');
+  const strictText = `${strict.stdout}${strict.stderr}`;
+  assert.ok(
+    !strictText.includes('[carrier-duration-unsupported]'),
+    'no composite refusal survives under any name'
+  );
+  for (const id of [295, 351, 448, 581, 637, 734]) {
     assert.ok(
-      warnings.some((line) => line.includes(`(${id} (`) || line.includes(`${id} (`)),
-      `${id} (${measure}) is named by exact identity`
-    );
-    assert.ok(
-      warnings.some((line) => line.includes(`${measure}:`)),
-      `${measure} is named`
+      !strictText.includes(`brahms-op118-no1-${id}`),
+      `brahms-op118-no1-${id}: the former refusal is never re-published`
     );
   }
 });

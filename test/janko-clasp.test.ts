@@ -847,9 +847,18 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
   for (const layout of brahms) {
     for (const id of layout.claspedStems) {
       assert.ok(!beamed.has(id), `${id} is not inside a beam`);
+      // Round 46: a suppressed standalone stem is legitimate when the head is
+      // either a bracket member (the bracket states its value) or the owner of
+      // a horizontal exception carrier — a written tie component whose 96-tick
+      // value the mark family states with a half-ring keeps its own carrier
+      // even outside any bracket. Nothing may be suppressed with no ink at all.
+      const inClasp = clasps.some((c) => c.notes.some((n) => n.id === id));
+      const carrierOwned = layout.exceptionCarriers.some(
+        (c) => c.noteId === id || c.partnerId === id
+      );
       assert.ok(
-        clasps.some((c) => c.notes.some((n) => n.id === id)),
-        `${id} belongs to a per-hand clasp`
+        inClasp || carrierOwned,
+        `${id} belongs to a per-hand clasp or owns its own duration carrier`
       );
     }
     // Round 16 shared stems: the carrier keeps its stem — the one stem the
@@ -863,15 +872,19 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
       for (const n of clasp.notes) {
         const exception = n.durationTicks !== claspMemberCarriedTicks(clasp, n.id);
         if (exception) {
-          // Round 45: an independent member duration is stated exactly once —
-          // either by the member's own vertical stem, or by its own horizontal
-          // exception carrier (`exceptionCarrier: 'horizontal'`). A cluster
-          // must never carry a residual vertical shared-duration stem just
-          // because its owner was the top RH / bottom LH member.
-          const carried = layout.exceptionCarriers.some((c) => c.noteId === n.id);
+          // Round 45/46: an independent member duration is stated exactly once —
+          // by the member's own vertical stem, by its own horizontal exception
+          // carrier (`exceptionCarrier: 'horizontal'`), or (Round 46) by the
+          // **one shared indicator** of a same-hand/same-onset/exact-duration
+          // 2-span pair it belongs to (`partnerId` names the second owner). A
+          // cluster must never carry a residual vertical shared-duration stem
+          // just because its owner was the top RH / bottom LH member.
+          const carried = layout.exceptionCarriers.some(
+            (c) => c.noteId === n.id || c.partnerId === n.id
+          );
           assert.ok(
             carried || !layout.claspedStems.includes(n.id),
-            `${n.id} keeps its exact exception statement (own stem or its own carrier)`
+            `${n.id} keeps its exact exception statement (own stem, own carrier, or the shared indicator)`
           );
         } else {
           assert.ok(
@@ -919,14 +932,15 @@ test('Round 8 bracket scope: spread clusters and 3-note chords qualify, 2-note c
     baseline.violations.map(keyOf).sort(),
     'the per-hand refinement adds no finding over the default grouping'
   );
-  // Round 45: both surfaces carry exactly the six deferred 120-tick composites
-  // (identical to the baseline), so the refinement still adds nothing.
+  // Round 46: both surfaces are genuinely warning-free (the six former
+  // 120-tick composites are stated by their written components), so the
+  // refinement still adds nothing.
   assert.deepEqual(
     report.warnings.map((w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]).sort(),
     baseline.warnings.map((w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]).sort(),
     'the per-hand refinement adds no warning over the default grouping'
   );
-  assert.equal(report.warnings.length, 6, 'exactly the six published composites');
+  assert.equal(report.warnings.length, 0, 'both surfaces publish no warning');
 });
 
 // ---------------------------------------------------------------------------
@@ -1087,18 +1101,54 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
   // The 2-note columns of the earlier systems stay with Option 3.
   const optionThree = systems.flatMap((l) => l.verticalChords);
   assert.ok(optionThree.length > 0, 'clean 2-note columns keep the gap-gated grammar');
-  // The tick-12432 and tick-12624 3+-note chords carry brackets (the
-  // true-ink pre-step makes the room the packing-only audit could not see),
-  // so Option 3 handles 2-note columns only — no refused-bracket fallback.
-  for (const tick of [12432, 12624]) {
-    const sys = systems.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
+  // The tick-12432 and tick-12624 3+-note chords carry brackets on the
+  // canonical fixed-3 surface (the true-ink pre-step makes the room the
+  // packing-only audit could not see), so Option 3 handles 2-note columns
+  // only — no refused-bracket fallback.
+  //
+  // Round 46: this test's own `systems` are the *adaptive* core. The enlarged
+  // bracket ring (r 2.0064pt, 20 % over the Round 45 size) grows the bracket's
+  // ink box, and under the adaptive geometry the m. 66 LH chord's fit is
+  // refused there — the canonical fixed-3 surface still brackets it. The pin
+  // below is therefore stated on each surface where it is true: 12432 on the
+  // adaptive systems, 12624 on the canonical ones.
+  const canonicalLayouts = layoutJankoScore(
+    BRAHMS,
+    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, chordGrouping: 'per-hand-clasp' },
+    BRAHMS_T
+  );
+  for (const [tick, systemsFor] of [
+    [12432, systems],
+    [12624, canonicalLayouts],
+  ] as const) {
+    const sys = systemsFor.find((l) => l.notes.some((p) => p.note.startTick === tick))!;
     assert.ok(
       sys.clasps.some((c) => c.tick === tick),
       `tick-${tick} carries its bracket`
     );
   }
+  // The adaptive m. 66 chord is not bracketed, but no head is left unstated:
+  // each LH member states its written value with its own horizontal carrier,
+  // and the chord's tie chain still closes on head 912~c1.
+  const adaptiveM66 = systems.find((l) => l.notes.some((p) => p.note.startTick === 12624))!;
+  for (const memberId of ['brahms-op118-no1-914', 'brahms-op118-no1-913', 'brahms-op118-no1-912~c1']) {
+    assert.ok(
+      adaptiveM66.exceptionCarriers.some((c) => c.noteId === memberId && c.durationTicks === 96),
+      `adaptive m. 66: ${memberId} states its own 96-tick value`
+    );
+  }
   for (const group of optionThree) {
-    assert.equal(group.suppressedIds.length, 1, 'Option 3 now handles 2-note columns only');
+    // Round 46: a written tie continuation may join a 2-note column as a third
+    // statement — m. 39's D3 continuation (544~c1) lands on the LH chord at
+    // tick 7440 — and the gap-gated grammar then suppresses both interior
+    // heads exactly as it does for any 3-note column. Every other Option-3
+    // column stays a 2-note column, and no bracketed chord is ever
+    // double-encoded (asserted for m. 8 and m. 66 above).
+    const tieExtended = group.suppressedIds.length === 2 && group.carrier.startTick === 7440;
+    assert.ok(
+      group.suppressedIds.length === 1 || tieExtended,
+      `Option 3 handles 2-note columns only (saw ${group.suppressedIds.length} interior heads @${group.carrier.startTick})`
+    );
   }
 
   const svg = renderJankoCrop(BRAHMS, 8, 1, o, BRAHMS_T);
@@ -1238,37 +1288,38 @@ test('The admission loop demotes a measure whose own content cannot absorb the s
   }
 });
 
-test('§2 downbeat insets are predicted per measure: 13.82 plain, 19.28 LEFT-occupied', () => {
+test('§2 downbeat insets are predicted per measure: 14.10 plain, 19.56 LEFT-occupied', () => {
   // The blanket 15.35pt retires to a conservative fallback. The predictor
   // seats the downbeat group on three rails and reserves exactly the
-  // complete bracket ink plus barline air: 13.82 (spine 7.6 + admitted-scale
-  // ring 2.22 + air 4.0) when CENTER/RIGHT carry the ink, plus one rail
-  // (5.46) when a member occupies LEFT. Round 45 shrinks the ring term from
-  // 2.8 to 2.22 because the working Brahms Reference engraves its admitted
-  // brackets at 0.90 — the reservation follows the real ink, it is not a
-  // constant. Measures without a downbeat clasp stay absent (the 6pt
+  // complete bracket ink plus barline air: 14.10 (spine 7.6 + admitted-scale
+  // bracket ring reach 2.50 + air 4.0) when CENTER/RIGHT carry the ink, plus
+  // one rail (5.46) when a member occupies LEFT. Round 46 engraves the
+  // admitted brackets at 0.95 and grows the bracket's ring/half-ring another
+  // 20 % (r 1.672 → 2.0064pt, stroke 0.61655 → 0.73986pt), so the term grows
+  // from Round 45's 2.22 to 2.5014 — the reservation follows the real ink, it
+  // is not a constant. Measures without a downbeat clasp stay absent (the 6pt
   // default); nothing pins the blanket for this paradigm.
   // Compact seating reclaims the LEFT-rail air on the fixed-3 corpus (all
-  // plain 13.82 — 5.46 returned to later beats wherever a pair went outer
-  // before); the adaptive solver surface keeps genuine 19.28 floors where
+  // plain 14.10 — 5.46 returned to later beats wherever a pair went outer
+  // before); the adaptive solver surface keeps genuine 19.56 floors where
   // triple cliques occupy LEFT.
   const o = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   const geo = computePageGeometry(o, BRAHMS_T);
   const expected: Record<number, Array<[number, number]>> = {
     0: [
-      [1, 13.82],
-      [3, 13.82],
+      [1, 14.1],
+      [3, 14.1],
     ],
     1: [
-      [0, 13.82],
-      [1, 13.82],
-      [2, 13.82],
-      [3, 13.82],
+      [0, 14.1],
+      [1, 14.1],
+      [2, 14.1],
+      [3, 14.1],
     ],
     2: [
-      [0, 13.82],
-      [1, 13.82],
-      [2, 13.82],
+      [0, 14.1],
+      [1, 14.1],
+      [2, 14.1],
     ],
   };
   for (const [sys, rows] of Object.entries(expected)) {
@@ -1284,19 +1335,19 @@ test('§2 downbeat insets are predicted per measure: 13.82 plain, 19.28 LEFT-occ
   const geoAdaptive = computePageGeometry(oAdaptive, BRAHMS_T);
   const expectedAdaptive: Record<number, Array<[number, number]>> = {
     0: [
-      [1, 19.28],
-      [3, 13.82],
+      [1, 19.56],
+      [3, 14.1],
     ],
     1: [
-      [0, 13.82],
-      [1, 13.82],
-      [2, 13.82],
-      [3, 19.28],
+      [0, 14.1],
+      [1, 14.1],
+      [2, 14.1],
+      [3, 19.56],
     ],
     2: [
-      [0, 19.28],
-      [1, 13.82],
-      [2, 19.28],
+      [0, 19.56],
+      [1, 14.1],
+      [2, 19.56],
     ],
   };
   for (const [sys, rows] of Object.entries(expectedAdaptive)) {
@@ -1317,10 +1368,10 @@ test('§2 downbeat insets are predicted per measure: 13.82 plain, 19.28 LEFT-occ
 
 test('§2 measured geometry: m.1/m.3 onsets move 0.95 left, barlines byte-identical, m.2/m.4 controls at 6.00', () => {
   // Independent of the inset map: on the real laid-out page the m.1/m.3
-  // downbeat columns stand exactly 13.82pt past their (unmoved) opening
-  // barlines — Round 45's 90 % bracket ink plus the 4pt air, realized ink
-  // rather than a reserved number — while the unclasped m.2/m.4 downbeats
-  // hold the 6pt control.
+  // downbeat columns stand exactly 14.10pt past their (unmoved) opening
+  // barlines — the Round 46 95 % bracket ink (ring enlarged 20 % on the
+  // bracket mount) plus the 4pt air, realized ink rather than a reserved
+  // number — while the unclasped m.2/m.4 downbeats hold the 6pt control.
   const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const l0 = layouts[0];
   const leading = (measureIdx: number, tick: number): [number, number, number] => {
@@ -1330,12 +1381,12 @@ test('§2 measured geometry: m.1/m.3 onsets move 0.95 left, barlines byte-identi
   };
   const [bar1, col1, lead1] = leading(1, 48);
   assert.equal(bar1.toFixed(4), '63.7694', 'm.1 barline unmoved (base: 63.7694)');
-  assert.equal(col1.toFixed(4), '77.5916', 'm.1 onset at the admitted-scale floor (was 78.1694)');
-  assert.ok(Math.abs(lead1 - 13.8222) < 1e-3, 'm.1 leading exactly 13.82 (real bracket ink + air)');
+  assert.equal(col1.toFixed(4), '77.8708', 'm.1 onset at the admitted-scale floor (Round 45 was 77.5916)');
+  assert.ok(Math.abs(lead1 - 14.1014) < 1e-3, 'm.1 leading exactly 14.10 (real bracket ink + air)');
   const [bar3, col3, lead3] = leading(3, 432);
   assert.equal(bar3.toFixed(4), '319.5247', 'm.3 barline unmoved (base: 319.5247)');
-  assert.equal(col3.toFixed(4), '333.3469', 'm.3 onset at the admitted-scale floor (was 333.9247)');
-  assert.ok(Math.abs(lead3 - 13.8222) < 1e-3, 'm.3 leading exactly 13.82');
+  assert.equal(col3.toFixed(4), '333.6261', 'm.3 onset at the admitted-scale floor (Round 45 was 333.3469)');
+  assert.ok(Math.abs(lead3 - 14.1014) < 1e-3, 'm.3 leading exactly 14.10');
   assert.ok(Math.abs(leading(2, 240)[2] - 6.0) < 1e-9, 'm.2 control at 6.00');
   assert.ok(Math.abs(leading(4, 624)[2] - 6.0) < 1e-9, 'm.4 control at 6.00');
   // The saved 0.95pt per clasped downbeat is genuine: the bracket ink still
@@ -1350,36 +1401,37 @@ test('§2 measured geometry: m.1/m.3 onsets move 0.95 left, barlines byte-identi
   }
 });
 
-test('§2 compact downbeats keep the 13.82 floor under content pressure', () => {
+test('§2 compact downbeats keep the 14.10 floor under content pressure', () => {
   // m.7/m.8 seat compactly (no LEFT occupancy), so their floors are the
-  // plain 13.82 (Round 45's admitted-scale bracket ink + the 4pt air).
-  // Mid-system content (the previous measure's tail) legitimately pushes the
-  // columns further right — the floor is a minimum, never a shear: both
-  // columns stand past bar + 13.82, pinned absolutely so any drift fails.
+  // plain 14.10 (Round 46's admitted 95 % bracket ink with the 20 % enlarged
+  // bracket ring + the 4pt air). Mid-system content (the previous measure's
+  // tail) legitimately pushes the columns further right — the floor is a
+  // minimum, never a shear: both columns stand past bar + 14.10, pinned
+  // absolutely so any drift fails.
   const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const l1 = layouts[1];
   for (const [measureIdx, tick, col] of [
-    [2, 1200, 317.36],
-    [3, 1392, 453.23],
+    [2, 1200, 317.64],
+    [3, 1392, 453.51],
   ] as const) {
     const bar = getMeasureOpeningBarlineX(measureIdx, l1.geometry, 1, BRAHMS_T)!;
     const column = l1.columns.get(tick)!;
-    assert.ok(column - bar >= 13.82 - 1e-9, `tick ${tick}: past the 13.82 floor`);
+    assert.ok(column - bar >= 14.1 - 1e-9, `tick ${tick}: past the 14.10 floor`);
     assert.equal(Number(column.toFixed(2)), col, `tick ${tick}: absolute column`);
   }
 });
 
-test('§2 LEFT-occupied downbeats keep the 19.28 floor (adaptive solver)', () => {
+test('§2 LEFT-occupied downbeats keep the 19.56 floor (adaptive solver)', () => {
   // The LEFT-occupancy mechanism stays live: adaptive triple cliques occupy
-  // LEFT, so their columns stand past bar + 13.82 + one 5.46 rail = 19.28 —
+  // LEFT, so their columns stand past bar + 14.10 + one 5.46 rail = 19.56 —
   // pinned on sys1 m.8 (tick 1392, the {96,97,98} clique), measured at
-  // 19.2822 exactly.
+  // 19.5614 exactly.
   const oAdaptive = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
   const layouts = layoutJankoScore(BRAHMS, oAdaptive, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const l1 = layouts[1];
   const bar = getMeasureOpeningBarlineX(3, l1.geometry, 1, BRAHMS_T)!;
   const column = l1.columns.get(1392)!;
-  assert.ok(Math.abs(column - bar - 19.2822) < 1e-3, 'tick 1392: exactly the 19.28 LEFT-occupied floor');
+  assert.ok(Math.abs(column - bar - 19.5614) < 1e-3, 'tick 1392: exactly the 19.56 LEFT-occupied floor');
 });
 
 test('§2 first-beat reclaim: mm.1/3/5/6/7–9 keep multi-row clasps on plain insets', () => {
@@ -1556,29 +1608,46 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the spines, in
   // (systems 2/6/11/18/21) are seated here too — zero warnings, and no folding
   // finding. The paradigm never touches slots.
   //
-  // Round 45 publishes FOUR last-system findings at this retired packing:
-  // brahms-op118-no1-895/896 (the m. 64 closing column) are displaced by the
-  // working golden's parity placement past their beat cell and onto the
-  // closing barline (x = 212.96). The same four appear under
-  // `left-clasp-spire` at the same packing — they are a packing interaction of
-  // the Round 45 columns, not a rail artifact. None of them exists on any
-  // Round 45 surface: the three candidates, the working Reference and the
-  // canonical CLI entry (4-per packing) carry zero violations.
+  // Round 46: the former four last-system findings (the m. 64 closing column
+  // 895/896 displaced onto the closing barline by the Round 45 parity
+  // placement) are gone — the Round 46 chord-column repair that reads foreign
+  // units at their **solved** columns (the same expression the pre-step
+  // demands clearance from; reverting it restores the four findings) seats
+  // that column clear of the barline again. What remains at this retired
+  // packing is a single
+  // `stem-through-simultaneity` in the m. 66 written-tie window (the two
+  // continuation heads 905~c1 / 906~c1), and it is a packing interaction, not
+  // a rail artifact: the identical finding appears under `left-clasp-spire` at
+  // the same mps3 override. No active surface carries it: the canonical
+  // four-per packing is clean under this paradigm too, and the canonical
+  // per-hand surface is clean everywhere.
   assert.deepEqual(
     report.violations.map((v) => [v.code, v.system + 1]),
-    [
-      ['grid-crossing-offset', 22],
-      ['barline-collision', 22],
-      ['barline-collision', 22],
-      ['barline-collision', 22],
-    ],
-    'the railed engraving publishes the four m. 64 packing findings, nothing else'
+    [['stem-through-simultaneity', 22]],
+    'the railed engraving publishes the one m. 66 tie-head packing finding, nothing else'
   );
   assert.ok(
-    report.violations.every((v) => (v.measure ?? 64) === 64),
-    'every one of them is in the last system'
+    report.violations.every((v) => (v.measure ?? 66) === 66),
+    'it is in the m. 66 written-tie window'
   );
   assert.equal(report.warnings.length, 0, 'the rail adds no warning');
+  // The same override under the sibling retired paradigm: one shared packing
+  // artifact, no rail-specific ink.
+  const sibling = lintJankoScore(
+    BRAHMS,
+    {
+      ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+      chordGrouping: 'left-clasp-spire',
+      measuresPerSystem: 3,
+      correctPageTopAnacrusisMeasureWidth: false,
+    },
+    BRAHMS_T
+  );
+  assert.deepEqual(
+    sibling.violations.map((v) => [v.code, v.system + 1]),
+    [['stem-through-simultaneity', 22]],
+    'the sibling retired paradigm publishes the same single finding'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1686,18 +1755,17 @@ test('Every clasping paradigm engraves Bach clean; canonical Brahms fixed-3 carr
         [],
         'canonical per-hand Brahms fixed-3 carries no hard error'
       );
-      assert.deepEqual(
-        brahms.warnings.map((w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]),
-        [
-          'brahms-op118-no1-295',
-          'brahms-op118-no1-351',
-          'brahms-op118-no1-448',
-          'brahms-op118-no1-581',
-          'brahms-op118-no1-637',
-          'brahms-op118-no1-734',
-        ],
-        'exactly the six deferred 120-tick composites — nothing else warns'
-      );
+      // Round 46: the committed written ties state the six former 120-tick
+      // composites exactly (first 96 + tied 24), so the canonical record is
+      // genuinely 0/0 — nothing warns and nothing is hidden.
+      assert.deepEqual(brahms.warnings, [], 'canonical per-hand Brahms fixed-3 carries no warning');
+      for (const id of [295, 351, 448, 581, 637, 734]) {
+        const noteId = `brahms-op118-no1-${id}`;
+        assert.ok(
+          brahms.diagnostics.every((d) => !(d.noteIds ?? []).includes(noteId)),
+          `${noteId}: the former refusal is solved, never re-published`
+        );
+      }
       continue;
     }
     // Retired experimental surface (adaptive, mps3): the committed mm. 1–9
@@ -1718,27 +1786,17 @@ test('Every clasping paradigm engraves Bach clean; canonical Brahms fixed-3 carr
       `Brahms · ${mode}: the experimental slot pair is exactly [23, 24]`
     );
   }
-  // Round 45: the golden per-hand paradigm carries zero hard errors over the
-  // complete Intermezzo and exactly the six published 120-tick composites as
-  // warnings (deferred to the tied-duration follow-up, never hidden).
+  // Round 46: the golden per-hand paradigm carries zero hard errors over the
+  // complete Intermezzo and **zero warnings** — the six former 120-tick
+  // composite refusals are stated exactly by their written components (first
+  // 96 + tied 24), never hidden.
   const golden = lintJankoScore(BRAHMS, { ...BRAHMS_OP118_NO1_JANKO_OPTIONS }, BRAHMS_T);
   assert.deepEqual(
     golden.violations.map((d) => `${d.code}: ${d.message}`),
     [],
     'the golden per-hand paradigm is clean on canonical fixed-3 over the complete Intermezzo'
   );
-  assert.deepEqual(
-    golden.warnings.map((w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]),
-    [
-      'brahms-op118-no1-295',
-      'brahms-op118-no1-351',
-      'brahms-op118-no1-448',
-      'brahms-op118-no1-581',
-      'brahms-op118-no1-637',
-      'brahms-op118-no1-734',
-    ],
-    'exactly the six published 120-tick composites'
-  );
+  assert.deepEqual(golden.warnings, [], 'the golden per-hand paradigm publishes no warning');
   assert.ok(
     JANKO_LINT_CHECKS.includes('clasp-clearance'),
     'the clasp audit is part of the published check list'

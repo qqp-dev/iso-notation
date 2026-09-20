@@ -58,6 +58,21 @@ import {
   usesContourFlanks,
 } from './geometry';
 import {
+  JankoTieAnchorShortfall,
+  JankoTieArcGeometry,
+  JankoTieChainPlan,
+  JankoTieDisplayPlan,
+  JankoTieStemCrossing,
+  deriveTieDisplayPlan,
+  JankoTieBox,
+  renderJankoTieArcs,
+  tieArcDepth,
+  tieArcEntersBoxes,
+  tieArcInkBox,
+  tieArcPath,
+  tieSideOrder,
+} from './ties';
+import {
   JANKO_RHYTHM_STYLE_LABELS,
   OPTICAL_DISPLACEMENT_CAP,
   JankoChordGrouping,
@@ -317,8 +332,7 @@ export function computePageGeometry(
         measureWidth,
         o.core,
         t,
-        o.extensionJunction,
-        o.lowPitchFolding
+        o.extensionJunction
       );
 
       const writtenLins: number[] = [];
@@ -1371,6 +1385,18 @@ export function claspClearsLayout(
   return true;
 }
 
+/**
+ * Round 46 float-safety margin (pt) on the true-ink bracket-air pre-step.
+ *
+ * The step exists to make the bracket *actually fit*; without a margin a case
+ * whose exact demand lands on the clearance limit is decided by the fit rule's
+ * `CLASP_EPS`, not by the step — the bracket then loses its admission (and with
+ * it its admitted symbols' scale and spread) for a sub-micron residue. The
+ * margin is a solver safety margin, never a clearance policy: the fit rule
+ * still audits the painted ink against the published air.
+ */
+export const CLASP_STEP_MARGIN = 0.01;
+
 /** One candidate rail run, offered to the caller's verdict before it is engraved. */
 export interface JankoClaspRailRun {
   /** Indices into the `groups` array {@link computeClaspRails} received. */
@@ -1750,6 +1776,29 @@ export interface JankoSystemLayout {
    * record behind every `opticalOffsetY` on the system's heads.
    */
   opticalClusters?: JankoOpticalCluster[];
+  /**
+   * Round 46: the system's **written tie arcs** (`writtenTies: 'source'`), one
+   * per consecutive written component pair — the paint, the ink model and the
+   * linter share these exact curves.
+   */
+  tieArcs?: JankoTieArcGeometry[];
+  /**
+   * Round 46: the rendered written tie chains whose heads live in this system
+   * (plans only — the geometry is {@link JankoSystemLayout.tieArcs}).
+   */
+  tieChains?: JankoTieChainPlan[];
+  /**
+   * Round 46: rendered chain components the layout could not resolve to a head.
+   * Always empty for a score whose tie sidecar matches its notes; published so
+   * a tie can never silently lose its endpoint.
+   */
+  tieAnchorShortfalls?: JankoTieAnchorShortfall[];
+  /**
+   * Round 46: painted tie arcs whose ink could not be routed clear of a
+   * coincident mask on either side. Published (the linter republishes each as
+   * a `tie-endpoint-clearance` diagnostic) rather than hidden.
+   */
+  tieBlockedArcs?: JankoTieAnchorShortfall[];
   /** Round 35: compressed clusters for semantic hand-cluster compression candidates. */
   compressedClusters?: JankoCompressedCluster<PositionedJankoNote>[];
   /** Note IDs whose noteheads are omitted/compressed (copies in spatial-echo or compact-coupling). */
@@ -3034,8 +3083,20 @@ export function computeJankoRestLayer(
     if (ticks.length === 0) continue;
     const activeMeasures = new Set(ticks.map((tick) => measureIndexOfTick(tick, geo, systemIndex, t)));
 
+    // The hand is silent from the moment **everything it has stated so far**
+    // has released — not merely from the release of the latest onset. Round 46
+    // exposed the difference: a written tie continuation adds an onset whose
+    // release is *shorter* than an earlier, still-sustaining voice of the same
+    // hand (m. 66's RH: 905/906 release at 12552 while 907 sustains to 12576),
+    // and reading only the latest onset's release swallowed the real 48-tick
+    // silence at 12576 — a quarter rest the hand genuinely needs. The running
+    // maximum states exactly the same rests as before wherever the latest
+    // onset really is the last release (every pre-Round-46 surface), and it
+    // keeps the rest when an earlier voice still sounds.
+    let soundingTo = Number.NEGATIVE_INFINITY;
     for (let i = 0; i < ticks.length - 1; i++) {
-      const releaseTick = release.get(ticks[i])!;
+      soundingTo = Math.max(soundingTo, release.get(ticks[i])!);
+      const releaseTick = soundingTo;
       const gap = ticks[i + 1] - releaseTick;
       if (gap <= 0 || !isStandardRestValue(gap)) continue;
       const value = restValueForTicks(gap);
@@ -4906,8 +4967,8 @@ export function resolveChordColumns(
               if (dy >= limit) continue;
               const need = Math.sqrt(limit * limit - dy * dy);
               const dx = box.x0 - hx;
-              if (dx >= need) continue;
-              demand = Math.max(demand, need - dx);
+              if (dx >= need + CLASP_STEP_MARGIN) continue;
+              demand = Math.max(demand, need - dx + CLASP_STEP_MARGIN);
             }
           }
         }
@@ -4933,7 +4994,7 @@ export function resolveChordColumns(
       if (debugPreStep) {
         // eslint-disable-next-line no-console
         console.error(
-          `PRESTEP tick=${unit.tick} demand=${demand.toFixed(2)} shift=${unit.shift.toFixed(2)}→${stepped.toFixed(2)}` +
+          `PRESTEP tick=${unit.tick} demand=${demand.toFixed(4)} loCell=${loCell.toFixed(3)} hiCell=${hiCell.toFixed(3)} shift=${unit.shift.toFixed(3)}→${stepped.toFixed(3)} y=${unit.nominalX.toFixed(2)}` +
             (stepped < unit.shift + demand - 1e-9 ? ' CLAMPED' : '')
         );
       }
@@ -5057,11 +5118,20 @@ export function resolveChordColumns(
               groups.length === 1 && members.length === onsetSize
             )
           : {};
+      // Round 46 repair: the audit builds the bracket with the **admitted
+      // cluster's symbol scale** — the very scale the paint, the pre-step and
+      // `collectClaspClusters` use. Before, the fit fell back to `durationScale
+      // 1`, so a reduced cluster's bracket was audited ~5 % wider than the ink
+      // it then painted: a bracket whose true ink cleared by hundredths of a
+      // point could be refused (losing its admitted scale and parity spread)
+      // on ink that is never drawn.
+      const auditScale = Math.min(...members.map((p) => p.symbolScale ?? 1));
       const geometry = computeClaspGeometry(
         members.map((p) => ({ ...p.rhythm, x: p.x + unit.shift })),
         t,
         {
           ...auditDuration,
+          durationScale: auditScale,
           claspDurationStyle: o.claspDurationStyle,
           durationGrammar: o.durationGrammar,
           bracketGrammar: o.bracketDurationGrammar,
@@ -5081,6 +5151,7 @@ export function resolveChordColumns(
               t,
               {
                 ...auditDuration,
+                durationScale: auditScale,
                 claspDurationStyle: o.claspDurationStyle,
                 durationGrammar: o.durationGrammar,
                 bracketGrammar: o.bracketDurationGrammar,
@@ -5111,7 +5182,16 @@ export function resolveChordColumns(
             // exactly what the audit would name — never a bracket the audit
             // then collides with a halo.
             if (other === unit && members.includes(p)) continue;
-            const px = other === unit ? displacedX(p) : p.x + other.shift;
+            // Foreign units are read at their **solved** columns — the same
+            // expression the pre-step above demands clearance from — so the
+            // step and the fit can never disagree about where a neighbour's
+            // head stands (Round 46 repair; before it, a fanned left neighbour
+            // could be judged at its pre-solve x and refuse the bracket the
+            // step had just made room for).
+            const px =
+              other === unit
+                ? displacedX(p)
+                : other.nominalX + other.shift + (offsetsById.get(p.note.id) ?? 0);
             const dx = Math.max(disk.x0 - px, 0, px - disk.x1);
             const dy = Math.max(disk.y0 - p.y, 0, p.y - disk.y1);
             const air = other === unit ? 0 : CLASP_NOTEHEAD_AIR;
@@ -5761,7 +5841,16 @@ export function resolveChordColumns(
  * The returned voices are positioned on the survivor's solved column by
  * {@link layoutJankoSystem} once the column solve has settled.
  */
-function mergeUnisonHeads(positioned: readonly PositionedJankoNote[]): {
+function mergeUnisonHeads(
+  positioned: readonly PositionedJankoNote[],
+  /**
+   * Round 46: the written-tie display plan. A same-hand coincident group is
+   * merged **only** when it contains a tie-chain head (a source-proven
+   * attack/carry group); every other same-hand group keeps its heads, exactly
+   * as before. `null` (or an empty plan) is the canonical, pre-Round-46 path.
+   */
+  tiePlan: JankoTieDisplayPlan | null = null
+): {
   notes: PositionedJankoNote[];
   voices: PositionedJankoNote[];
   merges: JankoUnisonMerge[];
@@ -5778,15 +5867,39 @@ function mergeUnisonHeads(positioned: readonly PositionedJankoNote[]): {
   const merges: JankoUnisonMerge[] = [];
   for (const group of groups.values()) {
     const hands = new Set(group.map((p) => p.rhythm.hand));
-    if (group.length < 2 || hands.size < 2) {
+    if (group.length < 2) {
       notes.push(...group);
       continue;
     }
-    // Lower-first: a cross-hand unison ties on pitch, so the *lower voice*
-    // (LH) keeps the column and the digit.
-    const survivor = group.find((p) => p.rhythm.hand === 'LH') ?? group[0];
+    // Round 46: a same-hand group whose members state one written tie chain —
+    // one visible attack head, the chain owns it. Chosen by the source-proven
+    // chain (longest sounding statement first, id as the deterministic
+    // tie-break) rather than by a hand or duration heuristic.
+    const chainMembers = tiePlan
+      ? group.filter((p) => tiePlan.chains.some((c) => c.noteId === p.note.id))
+      : [];
+    const sameHandChainGroup = hands.size < 2 && chainMembers.length > 0;
+    if (hands.size < 2 && !sameHandChainGroup) {
+      notes.push(...group);
+      continue;
+    }
+    const survivor = sameHandChainGroup
+      ? [...chainMembers].sort(
+          (a, b) =>
+            b.note.durationTicks - a.note.durationTicks ||
+            (a.note.id < b.note.id ? -1 : a.note.id > b.note.id ? 1 : 0)
+        )[0]
+      : // Lower-first: a cross-hand unison ties on pitch, so the *lower voice*
+        // (LH) keeps the column and the digit.
+        group.find((p) => p.rhythm.hand === 'LH') ?? group[0];
     const others = group.filter((p) => p !== survivor);
-    const exact = others.every((p) => p.note.durationTicks === survivor.note.durationTicks);
+    // The state a merged group's one head owns is the **engraved** value of its
+    // survivor (Round 46: the chain's first written component). A simultaneous
+    // voice whose written value equals it is absorbed whole — one visible
+    // attack head for that group — while an *unequal* voice keeps its own
+    // rhythm statement as a mixed-duration voice, so no simultaneous voice
+    // duration is silently erased.
+    const exact = others.every((p) => p.rhythm.durationTicks === survivor.rhythm.durationTicks);
     notes.push(survivor);
     for (const p of others) {
       if (!exact) voices.push({ ...p, unisonSurvivorId: survivor.note.id });
@@ -6400,9 +6513,50 @@ export function layoutJankoSystemShifted(
   const startTick =
     systemIndex === 0 ? 0 : anacrusis + systemIndex * mps * t.ticksPerMeasure;
   const endTick = anacrusis + (systemIndex + 1) * mps * t.ticksPerMeasure;
+  // -------------------------------------------------------------------------
+  // Round 46 — written ties.
+  //
+  // `writtenTies: 'source'` renders the score's committed written-tie sidecar:
+  //
+  // * every chain head states its **first written component** (so a composite
+  //   total is never asked of the duration alphabet), and
+  // * every continuation no existing head states joins the layout as an
+  //   explicit continuation head (`<id>~c<k>`) carrying its own component value.
+  //
+  // Sounding data is never touched — the plan is display metadata derived from
+  // the sidecar. Rests read the *source* totals (plus the added written heads),
+  // so the repair can neither invent a silence nor lose one: a tie is a
+  // sustain, and an added head is a written statement the hand really has.
+  // -------------------------------------------------------------------------
+  const tiePlan = o.writtenTies === 'source' ? getTieDisplayPlan(score) : null;
+  const tieHeads = (tiePlan?.heads ?? []).filter(
+    (n) => n.startTick >= startTick && n.startTick < endTick
+  );
+  const displayTicks = tiePlan?.displayTicks ?? null;
+  /**
+   * The system's own notes with every rendered chain head stating its **first
+   * written component** instead of the composite total. Sounding data is never
+   * touched: this is the engraving value of the head, and the tie chain (arcs +
+   * continuation heads) states the rest. The continuation heads themselves are
+   * injected *after* the column solve — a written continuation never moves a
+   * column, changes a downbeat inset or re-decides a bracket.
+   */
   const sysNotes = score.notes
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
+    .map((n) => {
+      const engraved = displayTicks?.get(n.id);
+      return engraved === undefined || engraved === n.durationTicks
+        ? n
+        : { ...n, durationTicks: engraved };
+    })
     .sort((a, b) => a.startTick - b.startTick || a.pitch.pitchClass - b.pitch.pitchClass);
+  /**
+   * The rest layer reads the **source** totals plus the written continuation
+   * heads: a tie is a sustain (it may neither invent a silence nor lose one),
+   * while every added head is a written statement the hand really has.
+   */
+  const restScore: QuantizedGridScore =
+    tieHeads.length === 0 ? score : { ...score, notes: [...score.notes, ...tieHeads] };
 
   let geometry = geometryBase;
   if (o.core === 'fixed-3' || o.core === 'fixed-4') {
@@ -6421,8 +6575,7 @@ export function layoutJankoSystemShifted(
       geometry.measureWidth,
       o.core,
       t,
-      o.extensionJunction,
-      o.lowPitchFolding
+      o.extensionJunction
     );
 
     const writtenLins: number[] = [];
@@ -6498,7 +6651,7 @@ export function layoutJankoSystemShifted(
       t
     );
     const pre = resolveChordColumns(
-      mergeUnisonHeads(preRaw).notes,
+      mergeUnisonHeads(preRaw, tiePlan).notes,
       geometry,
       systemIndex,
       o,
@@ -6519,8 +6672,9 @@ export function layoutJankoSystemShifted(
       t
     );
     // Round 20: one sound, one digit — cross-hand unisons merge before the
-    // column solve, so the survivor keeps its column with no fan.
-    const merged = mergeUnisonHeads(raw);
+    // column solve, so the survivor keeps its column with no fan. Round 46 adds
+    // the source-proven same-hand attack/carry groups (see `mergeUnisonHeads`).
+    const merged = mergeUnisonHeads(raw, tiePlan);
     positioned = merged.notes;
     mergedVoices = merged.voices;
     unisonMerges = merged.merges;
@@ -6551,9 +6705,65 @@ export function layoutJankoSystemShifted(
     if (demoted.length === 0) break;
     for (const m of demoted) claspInsets.delete(m);
   }
+  // -------------------------------------------------------------------------
+  // Round 46 — inject the written continuation heads.
+  //
+  // Injected **after** the column solve, so no continuation can move a column,
+  // re-decide a downbeat inset or change a bracket admission: each head stands
+  // on its own component onset's solved column (the onset column when the tick
+  // carries other heads, the nominal column when it is new). It then joins the
+  // ordinary machinery below — dot lanes, the rest layer, beam partitioning,
+  // clasp grouping, stems, knockouts and the linter — exactly as if the source
+  // had written it as its own head. A coincident head of the same hand lends it
+  // that head's admitted symbol scale and optical displacement, so a continued
+  // chord tone is engraved like its chord.
+  // -------------------------------------------------------------------------
+  const injectedHeads: PositionedJankoNote[] = tieHeads.map((head) => {
+    const p = positionJankoNote(head, geometry, systemIndex, o, t, flanks?.get(head.id) ?? null, claspInsets);
+    const column = chordColumns.columns.get(head.startTick);
+    const x = column ?? getTickColumnX(head.startTick, geometry, systemIndex, o, t, claspInsets);
+    const template = chordColumns.notes.find(
+      (q) => q.note.startTick === head.startTick && q.rhythm.hand === head.hand
+    );
+    const optical = (chordColumns.opticalClusters ?? []).find((c) => c.tick === head.startTick);
+    let offsetY = 0;
+    if (optical) {
+      const lin = head.pitch.octave * 12 + head.pitch.pitchClass;
+      let best = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      optical.lins.forEach((level, k) => {
+        const d = Math.abs(level - lin);
+        if (d < bestDistance) {
+          bestDistance = d;
+          best = optical.offsets[k] ?? 0;
+        }
+      });
+      offsetY = best;
+    }
+    return {
+      ...p,
+      x,
+      nominalX: x,
+      y: p.y + offsetY,
+      ...(offsetY === 0 ? {} : { opticalOffsetY: offsetY }),
+      symbolScale: template?.symbolScale,
+      symbolChord: template?.symbolChord,
+      rhythm: { ...p.rhythm, x, y: p.y + offsetY },
+    };
+  });
+  const solvedNotes =
+    injectedHeads.length === 0
+      ? chordColumns.notes
+      : [...chordColumns.notes, ...injectedHeads].sort(
+          (a, b) =>
+            a.note.startTick - b.note.startTick ||
+            a.note.pitch.pitchClass - b.note.pitch.pitchClass ||
+            (a.note.id < b.note.id ? -1 : a.note.id > b.note.id ? 1 : 0)
+        );
+
   // Round 17: the dot high-lane fallback resolves on the solved columns, where
   // same-row neighbours sit at their final x.
-  const notesAfterHighLane = resolveDotHighLane(chordColumns.notes, geometry, o, t);
+  const notesAfterHighLane = resolveDotHighLane(solvedNotes, geometry, o, t);
   // Round 29: dot flag-clearance standard escapes flagged singles right then up
   const notesAfterFlagClearance = resolveDotFlagClearance(notesAfterHighLane, geometry, o, t);
   // Round 30: the second dot of every double-dotted value (complete grammar
@@ -6588,7 +6798,7 @@ export function layoutJankoSystemShifted(
 
   // Round 17B: rests resolve before beams — bridging re-joins runs across the
   // admitted printed rests, and every connector clears their ink.
-  const restLayer = computeJankoRestLayer(score, geometry, systemIndex, o, t, notes);
+  const restLayer = computeJankoRestLayer(restScore, geometry, systemIndex, o, t, notes);
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
@@ -7225,14 +7435,169 @@ export function layoutJankoSystemShifted(
   if (o.exceptionCarrier === 'horizontal' && o.chordGrouping === 'per-hand-clasp') {
     const air = getClusterSpacingPreset(o.clusterSpacing).air;
     const solvedById = new Map(notes.map((p) => [p.note.id, p]));
+    /**
+     * Round 46: the carrier is the **agreed horizontal marker** of a long value,
+     * so a written tie component whose value the mark family states with a ring
+     * (96 half-ring / 192 ring / 384 two rings) gets one too — unless the
+     * member's own bracket already carries that exact value (no double
+     * statement), the member is beamed (the beam states its eighth) or the
+     * value is bare (48, a quarter: the stem alone) / a cut (24: the flag).
+     */
+    interface JankoCarrierRequest {
+      id: string;
+      startTick: number;
+      durationTicks: number;
+      p: PositionedJankoNote;
+      /**
+       * Round 46: a **shared** indicator overrides the carrier's placement — the
+       * fixed-length line is centred on the pair's painted columns at `y`
+       * instead of starting at the member's own right edge. `partnerId` names
+       * the second owner (both members' duration statements are then this one
+       * mark) and `partner` carries the request restored if the shared mark
+       * cannot be placed (that member then keeps its own exact statement).
+       */
+      x0?: number;
+      y?: number;
+      partnerId?: string;
+      partner?: JankoCarrierRequest;
+      pairedAway?: boolean;
+    }
+    const requests: JankoCarrierRequest[] = [];
+    const bracketOwnedIds = new Set<string>();
     for (const clasp of clasps) {
       for (const member of clasp.notes) {
-        if (member.durationTicks === claspMemberCarriedTicks(clasp, member.id)) continue;
+        if (member.durationTicks === claspMemberCarriedTicks(clasp, member.id)) {
+          bracketOwnedIds.add(member.id);
+          continue;
+        }
         if (beamedIds.has(member.id)) continue;
         const p = solvedById.get(member.id);
         if (!p) continue;
+        requests.push({
+          id: member.id,
+          startTick: member.startTick,
+          durationTicks: member.durationTicks,
+          p,
+        });
+      }
+    }
+    for (const chain of tiePlan?.chains ?? []) {
+      for (const component of chain.components) {
+        if (bracketOwnedIds.has(component.headId)) continue;
+        if (beamedIds.has(component.headId)) continue;
+        const p = solvedById.get(component.headId);
+        if (!p) continue;
+        const marks = compactDurationMarks(component.durationTicks, o.bracketDurationGrammar);
+        if (marks.rings === 0) continue;
+        if (requests.some((r) => r.id === component.headId)) continue;
+        requests.push({
+          id: component.headId,
+          startTick: component.startTick,
+          durationTicks: component.durationTicks,
+          p,
+        });
+      }
+    }
+    /**
+     * Round 46 — the **shared indicator** of two 2-span neighbours.
+     *
+     * Two exception members of one bracket that agree on hand, onset and
+     * *exact* duration and stand exactly one 2-span apart are two voices of one
+     * value: they may share **one** horizontal indicator instead of painting two
+     * parallel carriers for it. The indicator is centred on the pair's painted
+     * columns and sits in the freer of the two lanes just outside the pair (the
+     * channel between the two heads when it can hold the ink); the established
+     * fit rule then judges it exactly like a single carrier, and a shared mark
+     * that cannot be placed is never painted — each member keeps its own exact
+     * statement.
+     *
+     * Exclusions (all mandatory): a duration the bracket already owns is never
+     * re-stated (`bracketOwnedIds`), a member whose value a written tie chain
+     * states is never absorbed into a shared mark (matching *displayed*
+     * durations across independent sustain chains must never merge them), and
+     * pairs are formed in id order and never overlap.
+     */
+    const pairedIds = new Set<string>();
+    const tieOwnedIds = new Set<string>();
+    for (const chain of tiePlan?.chains ?? []) {
+      for (const component of chain.components) tieOwnedIds.add(component.headId);
+    }
+    for (const a of requests) {
+      if (pairedIds.has(a.id) || tieOwnedIds.has(a.id)) continue;
+      const pairPartner = requests.find(
+        (candidate) =>
+          candidate !== a &&
+          !pairedIds.has(candidate.id) &&
+          !tieOwnedIds.has(candidate.id) &&
+          candidate.startTick === a.startTick &&
+          candidate.p.rhythm.hand === a.p.rhythm.hand &&
+          candidate.durationTicks === a.durationTicks &&
+          Math.abs(
+            candidate.p.note.pitch.octave * 12 +
+              candidate.p.note.pitch.pitchClass -
+              (a.p.note.pitch.octave * 12 + a.p.note.pitch.pitchClass)
+          ) === 2
+      );
+      if (!pairPartner) continue;
+      const upper = a.p.y <= pairPartner.p.y ? a : pairPartner;
+      const lower = upper === a ? pairPartner : a;
+      const upperMask = knockoutHalfExtents(o, t, upper.p.note.startTick, upper.p);
+      const lowerMask = knockoutHalfExtents(o, t, lower.p.note.startTick, lower.p);
+      const sharedScale = Math.max(a.p.symbolScale ?? 1, pairPartner.p.symbolScale ?? 1);
+      const stroke = t.claspStrokeWidth * sharedScale;
+      const channelTop = upper.p.y + upperMask.hy;
+      const channelBottom = lower.p.y - lowerMask.hy;
+      const upperLane = upper.p.y - upperMask.hy - air - stroke / 2;
+      const lowerLane = lower.p.y + lowerMask.hy + air + stroke / 2;
+      // The freer lane, measured against the coincident heads of the onset
+      // (either hand — a carrier is not a voice). Ties go to the upper lane.
+      const coincident = notes.filter(
+        (p) => p.note.startTick === a.startTick && p.note.id !== a.id && p.note.id !== pairPartner.id
+      );
+      const laneClearance = (lane: number): number =>
+        coincident.reduce((best, p) => {
+          const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+          const gap = Math.max(p.y - e.hy - lane, lane - (p.y + e.hy));
+          return Math.min(best, gap);
+        }, Number.POSITIVE_INFINITY);
+      const lane =
+        channelBottom - channelTop >= stroke + 2 * air
+          ? (channelTop + channelBottom) / 2
+          : laneClearance(upperLane) >= laneClearance(lowerLane)
+            ? upperLane
+            : lowerLane;
+      const mid = (a.p.x + pairPartner.p.x) / 2;
+      const sharedLength = effectiveExceptionCarrierLength(
+        o.bracketDurationGrammar,
+        t,
+        sharedScale
+      );
+      a.x0 = mid - sharedLength / 2;
+      a.y = lane;
+      a.partnerId = pairPartner.id;
+      a.partner = pairPartner;
+      pairPartner.pairedAway = true;
+      pairedIds.add(a.id);
+      pairedIds.add(pairPartner.id);
+    }
+
+    /**
+     * A shared indicator that cannot be placed must not swallow a member's
+     * value: the partner is re-offered as its own single carrier (with its own
+     * refusal diagnostic if that also cannot be placed).
+     */
+    const placeCarrierFallback = (partner: JankoCarrierRequest): void => {
+      pendingFallbacks.push(partner);
+    };
+    const pendingFallbacks: JankoCarrierRequest[] = [];
+
+    for (const request of requests) {
+      if (request.pairedAway) continue; // stated by its shared indicator
+      {
+        const member = request.p.rhythm;
+        const p = request.p;
         const e = knockoutHalfExtents(o, t, p.note.startTick, p);
-        const x0 = p.x + e.wx + air;
+        const x0 = request.x0 ?? p.x + e.wx + air;
         // Round 44: the member's own admitted symbol scale drives the whole
         // duration-mark family — its fixed length, its stroke and every mark —
         // so a reduced cluster's duration ink shrinks with its numerals.
@@ -7243,7 +7608,7 @@ export function layoutJankoSystemShifted(
           durationScale
         );
         const x1 = x0 + carrierLength;
-        const marks = compactDurationMarks(member.durationTicks);
+        const marks = compactDurationMarks(member.durationTicks, o.bracketDurationGrammar);
         // Round 43 repair: an out-of-grammar value is refused outright. A
         // mark-less carrier would read exactly like a bare quarter, so none is
         // painted, and the member's own duration ink is NOT suppressed (the
@@ -7251,6 +7616,7 @@ export function layoutJankoSystemShifted(
         // stem does not state a 120-tick composite exactly — published, not
         // hidden, and never claimed to be a representation of the value.
         if (!marks.inGrammar) {
+          if (request.partner) placeCarrierFallback(request.partner);
           exceptionCarrierUnsupported.push({
             noteId: member.id,
             startTick: member.startTick,
@@ -7266,12 +7632,13 @@ export function layoutJankoSystemShifted(
         const carrier: JankoExceptionCarrierGeometry = {
           noteId: member.id,
           tick: member.startTick,
-          y: p.y,
+          y: request.y ?? p.y,
           x0,
           x1,
           durationTicks: member.durationTicks,
           cuts: marks.cuts,
           rings: marks.rings,
+          halfRing: marks.halfRing,
           dots: marks.dots,
           inGrammar: marks.inGrammar,
           scale: durationScale,
@@ -7297,6 +7664,7 @@ export function layoutJankoSystemShifted(
           if (left >= x0 && left < nearest) nearest = left;
         }
         if (box.x1 > nearest + 1e-9) {
+          if (request.partner) placeCarrierFallback(request.partner);
           exceptionCarrierRefusals.push({
             noteId: member.id,
             startTick: member.startTick,
@@ -7311,8 +7679,15 @@ export function layoutJankoSystemShifted(
           });
           continue;
         }
+        if (request.partnerId !== undefined) carrier.partnerId = request.partnerId;
         exceptionCarriers.push(carrier);
-        if (!claspedStems.includes(member.id)) claspedStems.push(member.id);
+        if (request.partner) {
+          for (const id of [member.id, request.partner.id]) {
+            if (!claspedStems.includes(id)) claspedStems.push(id);
+          }
+        } else if (!claspedStems.includes(member.id)) {
+          claspedStems.push(member.id);
+        }
         // Round 43 repair: per-mark occlusion. The carrier is painted in the
         // rhythm layer *beneath* the noteheads, so a later (or same-onset)
         // note's white erasure mask knocks out whatever carrier marks lie
@@ -7352,6 +7727,62 @@ export function layoutJankoSystemShifted(
         }
       }
     }
+    // Shared marks that could not be placed: each partner states its own value.
+    for (const partner of pendingFallbacks) {
+      const p = partner.p;
+      const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+      const x0 = p.x + e.wx + air;
+      const durationScale = p.symbolScale ?? 1;
+      const carrierLength = effectiveExceptionCarrierLength(
+        o.bracketDurationGrammar,
+        t,
+        durationScale
+      );
+      const marks = compactDurationMarks(partner.durationTicks, o.bracketDurationGrammar);
+      if (!marks.inGrammar) continue;
+      const carrier: JankoExceptionCarrierGeometry = {
+        noteId: partner.id,
+        tick: partner.startTick,
+        y: p.y,
+        x0,
+        x1: x0 + carrierLength,
+        durationTicks: partner.durationTicks,
+        cuts: marks.cuts,
+        rings: marks.rings,
+        halfRing: marks.halfRing,
+        dots: marks.dots,
+        inGrammar: marks.inGrammar,
+        scale: durationScale,
+        stroke: t.claspStrokeWidth * durationScale,
+        grammar: o.bracketDurationGrammar,
+      };
+      const box = exceptionCarrierInkBox(carrier, t);
+      let nearest = geometry.staffRight;
+      for (const q of notes) {
+        if (q.note.id === partner.id) continue;
+        const qe = knockoutHalfExtents(o, t, q.note.startTick, q);
+        if (q.y + qe.hy < box.y0 || q.y - qe.hy > box.y1) continue;
+        const left = q.x - qe.wx;
+        if (left >= x0 && left < nearest) nearest = left;
+      }
+      if (box.x1 > nearest + 1e-9) {
+        exceptionCarrierRefusals.push({
+          noteId: partner.id,
+          startTick: partner.startTick,
+          durationTicks: partner.durationTicks,
+          required: box.x1 - x0,
+          available: Math.max(0, nearest - x0),
+          reason:
+            `the fixed ${carrierLength.toFixed(2)}pt carrier would reach ` +
+            `x=${box.x1.toFixed(2)} but the nearest free point is x=${nearest.toFixed(2)} ` +
+            `(${(nearest - x0).toFixed(2)}pt available): the carrier is withheld and the ` +
+            `member keeps its own duration ink — never clipped, never painted-and-refused`,
+        });
+        continue;
+      }
+      exceptionCarriers.push(carrier);
+      if (!claspedStems.includes(partner.id)) claspedStems.push(partner.id);
+    }
   }
 
   // Round 23: flag crossed notes for tall knockouts. Paint-only — every head
@@ -7371,6 +7802,285 @@ export function layoutJankoSystemShifted(
     crossed.size === 0
       ? notes
       : notes.map((p) => (crossed.has(p.note.id) ? { ...p, tallKnockout: true } : p));
+
+  // -------------------------------------------------------------------------
+  // Round 46 — the written tie arcs.
+  //
+  // One arc per consecutive component pair, connecting the two **heads** that
+  // state the components: the arc's chord is the written time between their
+  // onsets and its ink is the only ink the tie adds (no new attack, no new
+  // duration statement). The endpoints sit outside both knockout boxes by
+  // `tokens.tieEndpointAir`, on the side opposite the owning voice's stem
+  // (RH stems up → the tie hangs below; LH stems down → it rides above), and
+  // the axis is nudged clear of a coincident staff rule. Ties are painted
+  // *beneath* the rhythm layer, so a stem or beam that crosses one stays
+  // unbroken; every measured crossing is published on the arc
+  // (`stemCrossings`) rather than hidden.
+  // -------------------------------------------------------------------------
+  const tieArcs: JankoTieArcGeometry[] = [];
+  const tieMissingAnchors: JankoTieAnchorShortfall[] = [];
+  const tieBlockedArcs: JankoTieAnchorShortfall[] = [];
+  if (tiePlan) {
+    const solvedById = new Map(notes.map((p) => [p.note.id, p]));
+    const rules = drawnStaffRuleYs(geometry, o, t);
+    const ruleHalf = t.tieStroke / 2 + t.tieRuleAir;
+    // Painted stems of this system (beamed stems at their beam-extended
+    // extents, standalone stems at their own), skipping every suppressed stem
+    // the paint never draws.
+    const stems: Array<{ id: string; x: number; y0: number; y1: number }> = [];
+    // One resolved stem per beam note, same order (`JankoBeamGroupGeometry`).
+    for (const beam of beams) {
+      beam.stems.forEach((stem, index) => {
+        const owner = beam.notes[index];
+        stems.push({
+          id: owner?.id ?? '',
+          x: stem.stemX,
+          y0: Math.min(stem.stemStartY, stem.stemEndY),
+          y1: Math.max(stem.stemStartY, stem.stemEndY),
+        });
+      });
+    }
+    for (const n of ungrouped) {
+      if (suppressed.has(n.id)) continue;
+      const stem = getStemGeometry(n, t);
+      stems.push({
+        id: n.id,
+        x: stem.stemX,
+        y0: Math.min(stem.stemStartY, stem.stemEndY),
+        y1: Math.max(stem.stemStartY, stem.stemEndY),
+      });
+    }
+    const inSystem = (tick: number): boolean => tick >= startTick && tick < endTick;
+    for (const chain of tiePlan.chains) {
+      for (const [k, component] of chain.components.entries()) {
+        const next = chain.components[k + 1];
+        if (!next) break;
+        const here = inSystem(component.startTick);
+        const there = inSystem(next.startTick);
+        if (!here && !there) continue; // another system's arc
+        if (here !== there) {
+          tieMissingAnchors.push({
+            noteId: chain.noteId,
+            component: k + 1,
+            headId: next.headId,
+            reason:
+              `the tie from tick ${component.startTick} to ${next.startTick} spans a system ` +
+              `break (${geometry.systemTopY.toFixed(1)}..${geometry.staffBotY.toFixed(1)}): no ` +
+              `arc is drawn across it and no diagnostic is suppressed`,
+          });
+          continue;
+        }
+        const from = solvedById.get(component.headId);
+        const to = solvedById.get(next.headId);
+        if (!from || !to) {
+          tieMissingAnchors.push({
+            noteId: chain.noteId,
+            component: k + 1,
+            headId: next.headId,
+            reason: !from
+              ? `the chain head ${component.headId} is not laid out in this system`
+              : `the continuation head ${next.headId} is not laid out in this system`,
+          });
+          continue;
+        }
+        // ---- side and axis ------------------------------------------------
+        //
+        // The conventional tie sits on the side opposite the owning voice's
+        // stem (RH stems up → below, LH stems down → above). A coincident
+        // head of the same hand may block that corridor (a 2-span chord tone
+        // squeezed between two neighbours, the m39 D3 case): the controller
+        // then measures the **detour** each side needs — the wall of
+        // contiguous coincident boxes is walked outward and the axis pushed
+        // past it — and takes the smaller one, the conventional side winning
+        // ties. A side whose natural position needs no detour is therefore
+        // never abandoned, so the flip only ever happens where geometry
+        // demands it.
+        const localHeads = notes.filter(
+          (p) =>
+            (p.note.startTick === from.note.startTick || p.note.startTick === to.note.startTick) &&
+            p.rhythm.hand === from.rhythm.hand
+        );
+        const boxes: JankoTieBox[] = notes.map((p) => {
+          const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+          return { id: p.note.id, x0: p.x - e.wx, y0: p.y - e.hy, x1: p.x + e.wx, y1: p.y + e.hy };
+        });
+        const fromMask = knockoutHalfExtents(o, t, from.note.startTick, from);
+        const toMask = knockoutHalfExtents(o, t, to.note.startTick, to);
+        const wallTolerance = t.tieEndpointAir + t.tieMaxDepth + t.tieStroke;
+        const axisFor = (candidate: -1 | 1): { y: number; detour: number } => {
+          const natural = (p: PositionedJankoNote, e: { hy: number }): number =>
+            p.y + candidate * (e.hy + t.tieEndpointAir);
+          // The tied heads' own natural positions.
+          let y = candidate < 0
+            ? Math.min(natural(from, fromMask), natural(to, toMask))
+            : Math.max(natural(from, fromMask), natural(to, toMask));
+          const detourOf = (value: number): number =>
+            candidate < 0
+              ? Math.max(0, Math.min(natural(from, fromMask), natural(to, toMask)) - value)
+              : Math.max(0, value - Math.max(natural(from, fromMask), natural(to, toMask)));
+          // Walk the contiguous wall of coincident heads outward from the tied
+          // heads and push the axis past it.
+          for (const tiedOnset of [from.note.startTick, to.note.startTick]) {
+            let edge = y;
+            for (let guard = 0; guard < localHeads.length; guard++) {
+              const blocker = localHeads
+                .filter((p) => p.note.startTick === tiedOnset)
+                .map((p) => {
+                  const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+                  const far = candidate < 0 ? p.y + e.hy : p.y - e.hy;
+                  const limit = candidate < 0 ? far + t.tieEndpointAir : far - t.tieEndpointAir;
+                  return { limit, far };
+                })
+                .filter((candidateEdge) =>
+                  candidate < 0
+                    ? candidateEdge.limit < edge - 1e-9 && edge - candidateEdge.limit <= wallTolerance
+                    : candidateEdge.limit > edge + 1e-9 && candidateEdge.limit - edge <= wallTolerance
+                )
+                .sort((a, b) => (candidate < 0 ? a.limit - b.limit : b.limit - a.limit))[0];
+              if (!blocker) break;
+              edge = blocker.limit;
+            }
+            y = candidate < 0 ? Math.min(y, edge) : Math.max(y, edge);
+          }
+          return { y, detour: detourOf(y) };
+        };
+        /**
+         * Rule clearance: a staff rule the axis sits on, or the curve's flat
+         * crown coincides with, would read as fused with the tie. The bulge
+         * shrinks to keep the crown clear (never below `tieMinDepth`), and only
+         * when even that cannot help does the whole axis step outward past the
+         * rule — the tie never lies on a staff line. Applied to the side that is
+         * finally chosen, so a flipped tie is cleared exactly like the
+         * conventional one.
+         */
+        const clearRules = (input: { y: number; side: -1 | 1; depth: number }): void => {
+          for (let guard = 0; guard < 8; guard++) {
+            const crownY = input.y + input.side * input.depth;
+            const near = rules
+              .map((rule) => ({ rule, crown: Math.abs(rule - crownY), axis: Math.abs(rule - input.y) }))
+              .filter((d) => d.crown < ruleHalf || d.axis < ruleHalf)
+              .sort((a, b) => Math.min(a.crown, a.axis) - Math.min(b.crown, b.axis))[0];
+            if (!near) return;
+            if (near.axis < ruleHalf) {
+              input.y = near.rule + input.side * (ruleHalf + CLASP_STEP_MARGIN);
+              continue;
+            }
+            const crownDepth = Math.abs(near.rule - input.y) - ruleHalf - CLASP_STEP_MARGIN;
+            if (crownDepth >= t.tieMinDepth) {
+              input.depth = Math.max(t.tieMinDepth, Math.min(input.depth, crownDepth));
+              continue;
+            }
+            input.y = near.rule + input.side * (ruleHalf + CLASP_STEP_MARGIN);
+          }
+        };
+        const candidates: Array<-1 | 1> = tieSideOrder(from.rhythm.hand);
+        const measured = candidates.map((candidate) => ({ candidate, ...axisFor(candidate) }));
+        const chosen =
+          measured.length === 2 && measured[1].detour + 1e-9 < measured[0].detour
+            ? measured[1]
+            : measured[0];
+        let side = chosen.candidate;
+        let y = chosen.y;
+        const x1 = from.x + fromMask.wx;
+        const x2 = to.x - toMask.wx;
+        let depth = tieArcDepth(x1, x2, t);
+        {
+          // The chosen side is rule-cleared before anything is measured against
+          // it, so the fit, the paint and the linter read one axis.
+          const state = { y, side, depth };
+          clearRules(state);
+          y = state.y;
+          side = state.side;
+          depth = state.depth;
+        }
+        let probe = { x1, x2, y, side, depth } as Pick<
+          JankoTieArcGeometry,
+          'x1' | 'x2' | 'y' | 'side' | 'depth'
+        >;
+        let blocking = tieArcEntersBoxes(probe, boxes, t);
+        if (blocking) {
+          // The chosen side still touches a mask (a same-onset head the wall
+          // walk did not name). Try the other side, then a shallower curve on
+          // the first: the paint never enters a glyph box.
+          const alternative = measured.find((m) => m.candidate !== side);
+          if (alternative) {
+            const altState = { y: alternative.y, side: alternative.candidate, depth };
+            clearRules(altState);
+            const altProbe = {
+              x1,
+              x2,
+              y: altState.y,
+              side: altState.side,
+              depth: altState.depth,
+            };
+            if (!tieArcEntersBoxes(altProbe, boxes, t)) {
+              side = altState.side;
+              y = altState.y;
+              depth = altState.depth;
+              probe = altProbe;
+              blocking = null;
+            }
+          }
+        }
+        if (blocking) {
+          const shallow = { x1, x2, y, side, depth: t.tieMinDepth };
+          if (!tieArcEntersBoxes(shallow, boxes, t)) {
+            depth = t.tieMinDepth;
+            probe = shallow;
+            blocking = null;
+          }
+        }
+        const unresolvedBlock = blocking !== null;
+        const arc: JankoTieArcGeometry = {
+          noteId: chain.noteId,
+          index: component.index,
+          fromTick: component.startTick,
+          toTick: next.startTick,
+          fromHeadId: component.headId,
+          toHeadId: next.headId,
+          side,
+          y,
+          x1,
+          x2,
+          depth,
+          path: tieArcPath(x1, y, x2, side, depth),
+          crossesBarline: false,
+          stemCrossings: [],
+        };
+        if (unresolvedBlock) {
+          tieBlockedArcs.push({
+            noteId: chain.noteId,
+            component: component.index + 1,
+            headId: blocking ? blocking.id : '',
+            reason:
+              `no side of the tie between ${component.headId} and ${next.headId} clears ` +
+              `${blocking ? blocking.id : 'a coincident mask'}: the arc is painted on the ` +
+              `conventional side and the collision is published (never clipped, never hidden)`,
+          });
+        }
+        // The tie's **time** is its chord, so a barline the chord spans is a
+        // crossing even where the endpoint masks inset the painted curve just
+        // inside it (the m65 → m66 carries land on the barline's own onset).
+        arc.crossesBarline = score.barlines.some(
+          (barline) => barline.tick > component.startTick && barline.tick <= next.startTick
+        );
+        const bandY0 = Math.min(y, y + side * depth) - t.tieStroke / 2;
+        const bandY1 = Math.max(y, y + side * depth) + t.tieStroke / 2;
+        for (const stem of stems) {
+          if (stem.x <= Math.min(x1, x2) - 1e-9 || stem.x >= Math.max(x1, x2) + 1e-9) continue;
+          const overlap = Math.min(stem.y1, bandY1) - Math.max(stem.y0, bandY0);
+          if (overlap <= 1e-9) continue;
+          if (stem.id === from.note.id || stem.id === to.note.id) continue;
+          arc.stemCrossings.push({
+            stemNoteId: stem.id,
+            x: stem.x,
+            overlap,
+          });
+        }
+        tieArcs.push(arc);
+      }
+    }
+  }
 
   // Ticket §5: the ottava resolver reads the complete laid-out rhythm ink
   // (beams, painted stems, flags, dots, rings, brackets, rests), so each
@@ -7415,7 +8125,16 @@ export function layoutJankoSystemShifted(
     verticalChords,
     chordBridges,
     sharedStems,
-    columns: chordColumns.columns,
+    // Round 46: an injected continuation head states an onset the column solve
+    // never saw; its own column joins the published map so every consumer (the
+    // beat grid, the shared-stem audits, the tests) reads one time map.
+    columns:
+      injectedHeads.length === 0
+        ? chordColumns.columns
+        : new Map<number, number>([
+            ...chordColumns.columns,
+            ...injectedHeads.map((p) => [p.note.startTick, p.x] as const),
+          ]),
     unisonMerges,
     unisonVoices,
     ottavaBrackets,
@@ -7423,11 +8142,40 @@ export function layoutJankoSystemShifted(
     claspQualifiedIds: chordColumns.claspQualifiedIds,
     railDiagnostics: chordColumns.railDiagnostics,
     opticalClusters: chordColumns.opticalClusters,
+    tieArcs,
+    tieChains: (
+      tiePlan
+        ? tiePlan.chains.filter((chain) =>
+            chain.components.some((c) => notes.some((p) => p.note.id === c.headId))
+          )
+        : []
+    ),
+    tieAnchorShortfalls: tieMissingAnchors,
+    tieBlockedArcs,
     compressedClusters,
     compressedCopyIds,
     handprintClusters,
     handprintNoteIds,
   };
+}
+
+/**
+ * Round 46: the written-tie display plan of one score, cached by identity.
+ *
+ * The plan is a pure function of the score (its committed `tieChains`
+ * sidecar), so caching it is safe and keeps the per-system layout passes cheap:
+ * the layout runs twice per system (uncorrected + slot-corrected) and again for
+ * the content-aware page pass.
+ */
+const tieDisplayPlans = new WeakMap<QuantizedGridScore, JankoTieDisplayPlan>();
+
+/** The (cached) written-tie display plan of one score. */
+export function getTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplayPlan {
+  const cached = tieDisplayPlans.get(score);
+  if (cached) return cached;
+  const plan = deriveTieDisplayPlan(score);
+  tieDisplayPlans.set(score, plan);
+  return plan;
 }
 
 export type LayoutJankoScoreObserver = (
@@ -7543,6 +8291,14 @@ function renderNotesLayer(
   //     rule segments it names — and nothing painted later (stems, beams,
   //     brackets, rests, noteheads) can be cut by it.
   if (layout.holds.length > 0) out.push(renderJankoHolds(layout.holds, t));
+
+  // 1b-2. Round 46 written tie arcs: painted on the same layer band as the
+  //      holds (above the staff rules, beneath every carrier mark, stem, beam,
+  //      rest and notehead), so nothing a tie crosses is ever cut — a stem
+  //      that meets one simply paints over it.
+  if (layout.tieArcs && layout.tieArcs.length > 0) {
+    out.push(renderJankoTieArcs(layout.tieArcs, t));
+  }
 
   // 1c. Round 42 study: the horizontal exception-carrier layer. Painted at the
   //     members' true pitch y, between the staff rules and the rhythm layer, so

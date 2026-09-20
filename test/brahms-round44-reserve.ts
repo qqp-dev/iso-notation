@@ -38,6 +38,10 @@ export const BRAHMS_ROUND44_RESERVE_OPTIONS: Partial<JankoLayoutOptions> = {
   exceptionCarrier: 'none',
   opticalSpacing: false,
   lowPitchFolding: 'core',
+  // Round 46: written ties are a *display* treatment of the same committed
+  // sidecar, so the historical reserve turns them off and keeps the Round 44
+  // geometry (one head per sounding event, the composite total on it).
+  writtenTies: 'none',
 };
 
 /**
@@ -49,5 +53,8 @@ export const BRAHMS_ROUND44_RESERVE_TOKENS: Partial<JankoTokens> = {
   ...BRAHMS_OP118_NO1_JANKO_TOKENS,
   midpointSlashLengthFactor: 1,
   midpointRingScale: 1,
+  // Round 46: the bracket ring's extra enlargement is a mount policy of the
+  // new round; at its no-op default both mounts share one ring size again.
+  midpointBracketRingScale: 1,
   midpointSpacingFactor: 1,
 };

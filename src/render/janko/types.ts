@@ -753,6 +753,19 @@ export interface JankoTokens {
   holdRingDiameter?: number;
   /** Round 41: ring terminal stroke width (pt). */
   holdRingStroke?: number;
+  // --- Round 46: written tie arcs ---
+  /** Round 46: stroke width (pt) of one written tie arc. */
+  tieStroke?: number;
+  /** Round 46: air (pt) a tie's endpoint keeps from its own head's knockout box. */
+  tieEndpointAir?: number;
+  /** Round 46: bulge of the shallowest tie (pt). */
+  tieMinDepth?: number;
+  /** Round 46: bulge cap of the widest tie (pt). */
+  tieMaxDepth?: number;
+  /** Round 46: bulge as a fraction of the arc's chord length (before the caps). */
+  tieDepthRatio?: number;
+  /** Round 46: air (pt) a tie's ink keeps from a coincident staff rule. */
+  tieRuleAir?: number;
   // --- Round 42 (Phase 3 study): compact bracket-duration vocabulary ---
   /** Compact cut: transverse length (pt) of one subdivision cut. */
   compactCutLength?: number;
@@ -808,17 +821,32 @@ export interface JankoTokens {
    * Round 45: multiplier on the midpoint **ring**'s radius *and* stroke
    * (`R = 1.60·s·factor`, `stroke = 0.59·s·factor`) — the group value reads
    * more authoritatively beside larger numerals. `1` is the Round 43/44 ring
-   * (default).
+   * (default). Round 46 reads this as the **carrier mount's** factor and the
+   * shared base of the bracket mount's (see
+   * {@link JankoTokens.midpointBracketRingScale}): the horizontal long-value
+   * marks keep exactly this size.
    */
   midpointRingScale?: number;
   /**
+   * Round 46: the **bracket mount's** extra ring multiplier on top of
+   * {@link JankoTokens.midpointRingScale} — the bracket's ring and half-ring
+   * (radius *and* stroke) grow by this factor, so a spine-mounted long value
+   * reads authoritatively at the numerals' left edge; the horizontal carrier's
+   * rings/half-rings stay at the Round 45 size. Shared meaning does not require
+   * identical physical size, and the *envelope* shrinks (two rings max plus a
+   * half-ring) even as each mark grows. `1` (default) keeps both mounts equal.
+   */
+  midpointBracketRingScale?: number;
+  /**
    * Round 45: multiplier on the **cut** centre-to-centre spacing, applied on
    * both mounts (bracket spine and horizontal carrier). `1` is the Round 43/44
-   * family (default); the Round 45 candidates and the working Brahms Reference
-   * paint `7/6`, which makes the 90 % Reference's cut centre pitch exactly
-   * `1.40 ×` the Round 44 `.75` baseline (`P45(s) = P44(.75)·1.40·(s/.90)`).
-   * The ring pitch is never multiplied — it follows the enlarged ring's own
-   * outer diameter plus the nominal ink gap.
+   * family (default); the Round 45 candidates painted `7/6`, which made the
+   * 90 % Reference's cut centre pitch exactly `1.40 ×` the Round 44 `.75`
+   * baseline (`P45(s) = P44(.75)·1.40·(s/.90)`). Round 46 keeps the same
+   * multiplicative mechanism and re-derives the factor so the **95 % working
+   * scale gains another 0.20pt** of cut centre pitch (1.89658 → 2.09658pt) —
+   * cut readability is addressed by spacing alone, never by re-angling or
+   * lengthening the 45-degree slash.
    */
   midpointSpacingFactor?: number;
   /**
@@ -901,6 +929,13 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   holdDiamondSize: 1.60,
   holdRingDiameter: 2.20,
   holdRingStroke: 0.40,
+  // Round 46: the written tie arc (see {@link JankoTokens.tieStroke}).
+  tieStroke: 0.70,
+  tieEndpointAir: 1.00,
+  tieMinDepth: 1.20,
+  tieMaxDepth: 3.00,
+  tieDepthRatio: 0.10,
+  tieRuleAir: 0.35,
   // Round 42 (Phase 3 study) — compact family; the refinement's dimensioned
   // recommendation (cut 2.4/0.42, ring centreline Ø1.60/0.38 → outer Ø1.98,
   // mark spacing 2.40, fixed horizontal carrier 9.0). Experimental, not adopted.
@@ -924,6 +959,7 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   // and the three Round 45 candidates opt into the readability ratios.
   midpointSlashLengthFactor: 1,
   midpointRingScale: 1,
+  midpointBracketRingScale: 1,
   midpointSpacingFactor: 1,
   opticalClearanceAir: 0.20,
 };
@@ -953,6 +989,12 @@ export const JANKO_DURATION_ENDPOINTS: readonly JankoDurationEndpoint[] = [
  *   semantics, no displaced-note indicator.
  */
 export type JankoLowPitchFolding = 'core' | 'literal';
+
+/**
+ * Round 46: how a score's committed written-tie chains are rendered
+ * (see {@link JankoLayoutOptions.writtenTies}).
+ */
+export type JankoWrittenTies = 'none' | 'source';
 
 /** Per-glyph optical displacement cap (pt): one 1-span, Round 45. */
 export const OPTICAL_DISPLACEMENT_CAP = 2.5;
@@ -1270,13 +1312,35 @@ export interface JankoLayoutOptions {
    * - `'core'` (default): the historical behavior — a source pitch below the
    *   core's coverage folds up by an octave (or two) under its ↓10/↓20 ottava
    *   indicator so it fits the drawn rows.
-   * - `'literal'`: the note is drawn at its **literal written pitch** and the
-   *   established ledger/extension vocabulary states its register (the
-   *   dynamic ledger equators of its out-of-staff octave(s)); no fold shift
-   *   and no ottava indicator are emitted for it. Nothing else moves: the
-   *   system spacing and pagination are unchanged.
+   * - `'literal'`: the note is drawn at its **literal written pitch** — no fold
+   *   shift and no ottava indicator are emitted for it, so its register is the
+   *   head's own position. Round 45 additionally stated that register with
+   *   dynamic ledger equators; Round 46 removed that extra ink (the operator
+   *   rejected the recurring outlier rules, ledger dashes and the bottom-row
+   *   segments they earned) while keeping every literal position exactly as
+   *   drawn. Nothing else moves: the system spacing and pagination are
+   *   unchanged.
    */
   lowPitchFolding?: JankoLowPitchFolding;
+  /**
+   * Round 46: **written tie rendering** (the m66/composite repair).
+   *
+   * - `'none'` (default): the historical surface — a sounding event whose
+   *   written value is a tie/composite paints one head carrying the *total*
+   *   value, and a value the alphabet cannot state is published as an
+   *   unrepresented composite. Every pre-Round-46 geometry is unchanged.
+   * - `'source'`: the score's committed written-tie sidecar
+   *   (`QuantizedGridScore.tieChains`) is rendered: each component gets an
+   *   explicit statement (its own duration ink), consecutive components are
+   *   joined by a conventional tie arc, a continuation that coincides with an
+   *   existing same-pitch head reuses that head, and the *only* heads added are
+   *   the written continuation components that no head already states.
+   *   Coincident same-hand attack/carry groups merge to one visible attack head
+   *   (the tie chain owns it), and non-grammar composites disappear because
+   *   their components are now stated exactly. Sounding pitch, onset and total
+   *   duration are never touched, and no new attack is ever introduced.
+   */
+  writtenTies?: JankoWrittenTies;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1473,6 +1537,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   exceptionCarrier: 'none',
   opticalSpacing: false,
   lowPitchFolding: 'core',
+  writtenTies: 'none',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
@@ -1503,6 +1568,16 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
  */
 const RESOLVED_TOKEN_OBJECTS = new WeakSet<object>();
 const RESOLVED_OPTION_OBJECTS = new WeakSet<object>();
+
+/**
+ * True when `tokens` is already a value that {@link resolveJankoTokens} itself
+ * produced (see the private identity registry below). Such an object is
+ * read-only by contract, so a memo may key on its identity; caller-owned
+ * partials always answer `false` and are never cached.
+ */
+export function isResolvedJankoTokens(tokens: unknown): tokens is ResolvedJankoTokens {
+  return !!tokens && typeof tokens === 'object' && RESOLVED_TOKEN_OBJECTS.has(tokens);
+}
 
 /** Fill in every optional token with its canonical default. */
 export function resolveJankoTokens(tokens?: Partial<JankoTokens> | null): ResolvedJankoTokens {

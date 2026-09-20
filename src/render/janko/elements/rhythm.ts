@@ -36,6 +36,7 @@ import {
   JankoTokens,
   ResolvedJankoTokens,
   getClusterSpacingPreset,
+  isResolvedJankoTokens,
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../types';
@@ -800,38 +801,86 @@ export function claspDurationDotted(durationTicks: number): boolean {
 export interface CompactDurationMarks {
   /** Short transverse cuts along the carrier (0–4). */
   cuts: number;
-  /** Open elongation rings along the carrier (0–3). */
+  /** Elongation ring marks along the mount (0–3; Round 46 midpoint: 0–2). */
   rings: number;
+  /**
+   * Round 46 (midpoint family): the single ring mark of this run is a
+   * **half-ring** (96 ticks = one half of a full 192-tick ring). Always false
+   * for the compact family and for every multi-ring run.
+   */
+  halfRing: boolean;
   /** Augmentation dots (shared with every vocabulary). */
   dots: 0 | 1 | 2;
   /** False when the value has no exact plain/dotted/double-dotted reading. */
   inGrammar: boolean;
 }
 
-/** Read one duration in the compact vocabulary (see {@link CompactDurationMarks}). */
-export function compactDurationMarks(durationTicks: number): CompactDurationMarks {
+/**
+ * Read one duration in a mark vocabulary (see {@link CompactDurationMarks}).
+ *
+ * Round 46 splits the two long-value readings:
+ *
+ * - `'compact'` (the Round 42 study family, and the default so every
+ *   pre-Round-46 pin keeps its exact numbers): `96 → 1 ring`, `192 → 2 rings`,
+ *   `384 → 3 rings`.
+ * - `'midpoint'` (the active family on the Round 46 Brahms Reference and its
+ *   candidates): `96 → half-ring`, `192 → one full ring`, `384 → two full
+ *   rings` — the mnemonic is exact (one ring = one whole = 192, half ring =
+ *   half of it, two rings = breve) and **three-ring stacks no longer exist in
+ *   the active family**. Dots and cuts are unchanged, and `48` stays bare.
+ */
+export function compactDurationMarks(
+  durationTicks: number,
+  grammar: JankoBracketDurationGrammar = 'compact'
+): CompactDurationMarks {
   const { base, dots, inGrammar } = analyzeNotatedDuration(durationTicks);
-  if (!inGrammar) return { cuts: 0, rings: 0, dots: 0, inGrammar: false };
+  const long =
+    grammar === 'midpoint'
+      ? { 96: { rings: 1, halfRing: true }, 192: { rings: 1, halfRing: false }, 384: { rings: 2, halfRing: false } }
+      : { 96: { rings: 1, halfRing: false }, 192: { rings: 2, halfRing: false }, 384: { rings: 3, halfRing: false } };
+  const mark = (cuts: number, rings: number, halfRing = false): CompactDurationMarks => ({
+    cuts,
+    rings,
+    halfRing,
+    dots,
+    inGrammar: true,
+  });
+  if (!inGrammar) return { cuts: 0, rings: 0, halfRing: false, dots: 0, inGrammar: false };
   switch (base) {
     case 3:
-      return { cuts: 4, rings: 0, dots, inGrammar: true };
+      return mark(4, 0);
     case 6:
-      return { cuts: 3, rings: 0, dots, inGrammar: true };
+      return mark(3, 0);
     case 12:
-      return { cuts: 2, rings: 0, dots, inGrammar: true };
+      return mark(2, 0);
     case 24:
-      return { cuts: 1, rings: 0, dots, inGrammar: true };
+      return mark(1, 0);
     case 48:
-      return { cuts: 0, rings: 0, dots, inGrammar: true };
+      return mark(0, 0);
     case 96:
-      return { cuts: 0, rings: 1, dots, inGrammar: true };
+      return mark(0, long[96].rings, long[96].halfRing);
     case 192:
-      return { cuts: 0, rings: 2, dots, inGrammar: true };
+      return mark(0, long[192].rings, long[192].halfRing);
     case 384:
-      return { cuts: 0, rings: 3, dots, inGrammar: true };
+      return mark(0, long[384].rings, long[384].halfRing);
     default:
-      return { cuts: 0, rings: 0, dots: 0, inGrammar: false };
+      return { cuts: 0, rings: 0, halfRing: false, dots: 0, inGrammar: false };
   }
+}
+
+/**
+ * Round 46: the **maximum ring count of one mount's long-value run**. The
+ * midpoint family's largest long value (384 = breve) states two full rings;
+ * the compact family keeps its three. A run longer than this can never be
+ * painted, so it is the one number the carrier length and every ink box share.
+ */
+export const MIDPOINT_MAX_RINGS = 2;
+/** Round 42/compact family maximum ring count (three-ring whole-note stack). */
+export const COMPACT_MAX_RINGS = 3;
+
+/** Ring count of the largest long value of one mark family. */
+export function maxRingCount(grammar: JankoBracketDurationGrammar): number {
+  return grammar === 'midpoint' ? MIDPOINT_MAX_RINGS : COMPACT_MAX_RINGS;
 }
 
 /** Half-extents (pt) of one compact mark primitive, from the token set. */
@@ -915,20 +964,32 @@ export interface JankoMidpointMetrics {
   slashHalfX: number;
   /** Axis-aligned ink half-height of one slash (pt). */
   slashHalfY: number;
-  /** Round 45: ring radius *and* stroke multiplier (`1` = Round 43/44). */
+  /** Round 45: ring radius *and* stroke multiplier on the carrier mount. */
   ringScale: number;
-  /** Ring centreline radius (pt) — `midpointRingRadius · ringScale · s`. */
+  /**
+   * Round 46: the **bracket mount's** extra ring multiplier on top of
+   * {@link JankoMidpointMetrics.ringScale} (`1` = both mounts equal). The
+   * bracket's ring/half-ring grow by it; the carrier's do not.
+   */
+  bracketRingScale: number;
+  /** Carrier ring centreline radius (pt) — `midpointRingRadius · ringScale · s`. */
   ringRadius: number;
-  /** Ring stroke width (pt) — `midpointRingStroke · ringScale · s`. */
+  /** Carrier ring stroke width (pt) — `midpointRingStroke · ringScale · s`. */
   ringStroke: number;
-  /** Ring axis-aligned ink half-extent (pt) — `ringRadius + ringStroke/2`. */
+  /** Carrier ring axis-aligned ink half-extent (pt) — `ringRadius + ringStroke/2`. */
   ringHalf: number;
+  /** Bracket ring centreline radius (pt) — `ringRadius · bracketRingScale`. */
+  bracketRingRadius: number;
+  /** Bracket ring stroke width (pt) — `ringStroke · bracketRingScale`. */
+  bracketRingStroke: number;
+  /** Bracket ring ink half-extent (pt) — `bracketRingRadius + bracketRingStroke/2`. */
+  bracketRingHalf: number;
   /** Minimum clear ink gap `g` between two marks (pt) — `CLASP_MARK_STACK_GAP · s`. */
   gap: number;
   /**
-   * Round 45: **cut** centre-spacing multiplier (`1` = the Round 43/44
-   * family; the Round 45 candidates and the working Brahms Reference paint
-   * `7/6`, i.e. 1.40× the Round 44 `.75` baseline at `s = .90`).
+   * Round 45/46: **cut** centre-spacing multiplier (`1` = the Round 43/44
+   * family). Round 46's value re-derives the Round 45 `7/6` so the 95 %
+   * working scale gains a further 0.20pt of cut centre pitch.
    */
   spacingFactor: number;
   /**
@@ -938,21 +999,27 @@ export interface JankoMidpointMetrics {
    * multiplier only *adds* clear air, it never steals any.
    */
   cutSpacing: number;
-  /** Identical ring centre pitch along either mount (pt) — outer Ø + `g`. */
+  /** Carrier ring centre pitch along the mount (pt) — outer Ø + `g`. */
   ringSpacing: number;
+  /** Bracket ring centre pitch along the spine (pt) — bracket outer Ø + `g`. */
+  bracketRingSpacing: number;
   /** Full four-cut run along its mount (pt), end of ink to end of ink. */
   cutsRun: number;
-  /** Full three-ring run along its mount (pt), end of ink to end of ink. */
+  /** Full carrier ring run of the family's largest value (pt) — Round 46: two rings. */
   ringsRun: number;
+  /** Full bracket ring run of the family's largest value (pt) — Round 46: two rings. */
+  bracketRingsRun: number;
+  /** A lone half-ring's along-mount ink span (pt) — its chord plus the stroke. */
+  halfRingRun: number;
   /** Fixed carrier length (pt): the largest run plus `g` at each end. */
   carrierLength: number;
   /** Bracket (vertical stacking) centre pitch of cuts (pt) — identical. */
   bracketCutSpacing: number;
-  /** Bracket (vertical stacking) centre pitch of rings (pt) — identical. */
-  bracketRingSpacing: number;
+  /** Bracket (vertical stacking) centre pitch of rings (pt). */
+  bracketRingPitch: number;
   /** Carrier (horizontal stacking) centre pitch of cuts (pt) — identical. */
   carrierCutSpacing: number;
-  /** Carrier (horizontal stacking) centre pitch of rings (pt) — identical. */
+  /** Carrier (horizontal stacking) centre pitch of rings (pt). */
   carrierRingSpacing: number;
 }
 
@@ -964,12 +1031,32 @@ export interface JankoMidpointMetrics {
  * (`chordSymbolScale` for an admitted bracket member, 1 for canonical ink), so
  * a reduced cluster's duration ink shrinks with its numerals instead of
  * staying full size on smaller symbols.
+ *
+ * Round 46 rounds the family off:
+ *
+ * - **long values** — `96 → one half-ring`, `192 → one full ring`,
+ *   `384 → two full rings` (no three-ring stack exists in this family);
+ * - **mount-specific ring size** — the bracket's ring and half-ring are
+ *   `midpointBracketRingScale` (1.20 on the Round 46 Reference) larger than the
+ *   carrier's, which keeps the Round 45 size; the *shared meaning* is the
+ *   value, not the physical size;
+ * - **fixed carrier length** — re-derived from the largest run the new
+ *   vocabulary can paint (two carrier rings, a four-cut run, or a lone
+ *   half-ring), so the length still states nothing about release or duration.
  */
-export function midpointMetrics(
-  tokens?: Partial<JankoTokens> | null,
-  scale: number = 1
-): JankoMidpointMetrics {
-  const t = resolveJankoTokens(tokens);
+/**
+ * Round 46 performance guard: `midpointMetrics` is a pure function of one
+ * **resolved** token set and the scale, but it sits inside the dot-seat search
+ * (every candidate position of every dotted mark re-measures the mark's own
+ * ink) and is therefore called millions of times per engraving. Resolved token
+ * sets are read-only by contract ({@link isResolvedJankoTokens}), so the value
+ * is memoized per token-set identity and scale; caller-owned partials never
+ * enter the cache and always take the full fresh path (so a mutated partial
+ * keeps its exact previous semantics).
+ */
+const MIDPOINT_METRICS_CACHE = new WeakMap<ResolvedJankoTokens, Map<number, JankoMidpointMetrics>>();
+
+function computeMidpointMetrics(t: ResolvedJankoTokens, scale: number): JankoMidpointMetrics {
   const s = scale;
   // The pre-change centreline length is the SOURCE constant: the old
   // `midpointSlashLength` run and its `midpointSlashSlope` rise. The 45-degree
@@ -979,11 +1066,13 @@ export function midpointMetrics(
     t.midpointSlashLength,
     t.midpointSlashLength * t.midpointSlashSlope
   );
-  // Round 45 readability ratios: the length and the ring grow for countable
-  // ink, and the cut pitch gains clear air. All three are no-ops at `1`, so
-  // the Round 43/44 family (and every canonical surface) is untouched.
+  // Round 45/46 readability ratios: the length and the ring grow for countable
+  // ink, and the cut pitch gains clear air. The length and the base ring scale
+  // are no-ops at `1`, so the Round 43/44 family is untouched; the bracket's
+  // extra ring factor is a Round 46 mount policy.
   const slashLengthFactor = t.midpointSlashLengthFactor ?? 1;
   const ringScale = t.midpointRingScale ?? 1;
+  const bracketRingScale = t.midpointBracketRingScale ?? 1;
   const spacingFactor = t.midpointSpacingFactor ?? 1;
   const paintedCenterline = slashCenterline * slashLengthFactor;
   const component = (paintedCenterline / Math.SQRT2) * s;
@@ -992,14 +1081,21 @@ export function midpointMetrics(
   const ringRadius = t.midpointRingRadius * ringScale * s;
   const ringStroke = t.midpointRingStroke * ringScale * s;
   const ringHalf = ringRadius + ringStroke / 2;
+  const bracketRingRadius = t.midpointRingRadius * ringScale * bracketRingScale * s;
+  const bracketRingStroke = t.midpointRingStroke * ringScale * bracketRingScale * s;
+  const bracketRingHalf = bracketRingRadius + bracketRingStroke / 2;
   const gap = CLASP_MARK_STACK_GAP * s;
   // True stroke clearance between parallel 45-degree cuts, and ring-ink
   // clearance: one pitch along either mount.
   const cutSpacing = Math.SQRT2 * (slashStroke + gap) * spacingFactor;
   const ringSpacing = 2 * ringHalf + gap;
+  const bracketRingSpacing = 2 * bracketRingHalf + gap;
   const cutsRun = 3 * cutSpacing + 2 * slashHalf;
-  const ringsRun = 2 * ringSpacing + 2 * ringHalf;
-  const carrierLength = Math.max(cutsRun, ringsRun) + 2 * gap;
+  const rings = MIDPOINT_MAX_RINGS;
+  const ringsRun = (rings - 1) * ringSpacing + 2 * ringHalf;
+  const bracketRingsRun = (rings - 1) * bracketRingSpacing + 2 * bracketRingHalf;
+  const halfRingRun = 2 * ringHalf;
+  const carrierLength = Math.max(cutsRun, ringsRun, halfRingRun) + 2 * gap;
   return {
     scale: s,
     slashCenterline,
@@ -1012,29 +1108,113 @@ export function midpointMetrics(
     slashHalfX: slashHalf,
     slashHalfY: slashHalf,
     ringScale,
+    bracketRingScale,
     ringRadius,
     ringStroke,
     ringHalf,
+    bracketRingRadius,
+    bracketRingStroke,
+    bracketRingHalf,
     gap,
     spacingFactor,
     cutSpacing,
     ringSpacing,
+    bracketRingSpacing,
     cutsRun,
     ringsRun,
+    bracketRingsRun,
+    halfRingRun,
     carrierLength,
     bracketCutSpacing: cutSpacing,
-    bracketRingSpacing: ringSpacing,
+    bracketRingPitch: bracketRingSpacing,
     carrierCutSpacing: cutSpacing,
     carrierRingSpacing: ringSpacing,
   };
 }
 
+/** Memoized façade over {@link computeMidpointMetrics} (see the cache note). */
+export function midpointMetrics(
+  tokens?: Partial<JankoTokens> | null,
+  scale: number = 1
+): JankoMidpointMetrics {
+  if (isResolvedJankoTokens(tokens)) {
+    let byScale = MIDPOINT_METRICS_CACHE.get(tokens);
+    if (!byScale) {
+      byScale = new Map();
+      MIDPOINT_METRICS_CACHE.set(tokens, byScale);
+    }
+    const hit = byScale.get(scale);
+    if (hit) return hit;
+    const value = computeMidpointMetrics(tokens, scale);
+    byScale.set(scale, value);
+    return value;
+  }
+  return computeMidpointMetrics(resolveJankoTokens(tokens), scale);
+}
+
 /**
- * The fixed length (pt) of the horizontal exception carrier for the active
- * bracket grammar: the compact token for `'compact'`, the derived midpoint
- * metric for `'midpoint'`. The length is a typographic constant — independent
- * of the member's duration and release.
+ * Round 46 — the **ink box of one ring mark on a mount**, shared by the
+ * renderer, the fit rule and the linter.
+ *
+ * A full ring is a disc of outer radius `half` about its centre. A **half-ring**
+ * keeps its diameter (chord) on the mount axis and bulges perpendicular to it —
+ * left on the vertical bracket spine, up on the horizontal carrier (the
+ * intentional mount rotation, half-rings only) — so its ink is one-sided: the
+ * box is the full box on the bulge axis and the stroke's own half-width on the
+ * chord axis.
  */
+export function midpointRingInkBox(
+  mount: 'bracket' | 'carrier',
+  m: JankoMidpointMetrics,
+  cx: number,
+  cy: number,
+  halfRing: boolean
+): { x0: number; y0: number; x1: number; y1: number } {
+  const half = mount === 'bracket' ? m.bracketRingHalf : m.ringHalf;
+  const strokeHalf = (mount === 'bracket' ? m.bracketRingStroke : m.ringStroke) / 2;
+  if (!halfRing) return { x0: cx - half, y0: cy - half, x1: cx + half, y1: cy + half };
+  if (mount === 'bracket') {
+    // Chord on the spine, bulge left: ink reaches `half` to the left and only
+    // the stroke's own half-width to the right.
+    return { x0: cx - half, y0: cy - half, x1: cx + strokeHalf, y1: cy + half };
+  }
+  // Chord on the carrier, bulge up: ink reaches `half` upward and only the
+  // stroke's own half-width below the carrier axis.
+  return { x0: cx - half, y0: cy - half, x1: cx + half, y1: cy + strokeHalf };
+}
+
+/**
+ * Round 46 — paint one ring/half-ring mark. The full ring keeps its white fill
+ * (its interior knocks the mount line out); the **half-ring is `fill="none"`**
+ * — its chord *is* the mount line, so a white fill would erase the very line
+ * the endpoints stand on.
+ */
+export function midpointRingSvg(
+  mount: 'bracket' | 'carrier',
+  m: JankoMidpointMetrics,
+  cx: number,
+  cy: number,
+  halfRing: boolean,
+  className: string
+): string {
+  if (mount === 'bracket') {
+    if (!halfRing) {
+      return `    <circle class="${className}" cx="${f(cx)}" cy="${f(cy)}" r="${f(m.bracketRingRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${m.bracketRingStroke.toFixed(2)}"/>`;
+    }
+    const r = m.bracketRingRadius;
+    // Left semicircle: from the top of the chord, `sweep-flag 0` (the screen
+    // anticlockwise direction) bulges toward the left, away from the spine.
+    return `    <path class="${className}" data-half-ring="true" d="M ${f(cx)} ${f(cy - r)} A ${f(r)} ${f(r)} 0 0 0 ${f(cx)} ${f(cy + r)}" fill="none" stroke="#111111" stroke-width="${m.bracketRingStroke.toFixed(2)}"/>`;
+  }
+  if (!halfRing) {
+    return `    <circle class="${className}" cx="${f(cx)}" cy="${f(cy)}" r="${f(m.ringRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${m.ringStroke.toFixed(2)}"/>`;
+  }
+  const r = m.ringRadius;
+  // Upper semicircle: from the left end of the chord, `sweep-flag 1` (the
+  // screen clockwise direction) bulges upward, away from the carrier line.
+  return `    <path class="${className}" data-half-ring="true" d="M ${f(cx - r)} ${f(cy)} A ${f(r)} ${f(r)} 0 0 1 ${f(cx + r)} ${f(cy)}" fill="none" stroke="#111111" stroke-width="${m.ringStroke.toFixed(2)}"/>`;
+}
+
 export function effectiveExceptionCarrierLength(
   grammar: JankoBracketDurationGrammar,
   t: ResolvedJankoTokens,
@@ -1057,7 +1237,7 @@ function midpointSpacingFor(
   mount: 'bracket' | 'carrier',
   kind: 'cut' | 'ring'
 ): number {
-  if (mount === 'bracket') return kind === 'cut' ? m.bracketCutSpacing : m.bracketRingSpacing;
+  if (mount === 'bracket') return kind === 'cut' ? m.bracketCutSpacing : m.bracketRingPitch;
   return kind === 'cut' ? m.carrierCutSpacing : m.carrierRingSpacing;
 }
 
@@ -1113,6 +1293,12 @@ export interface ResolvedJankoClaspInk {
   compactCuts: number;
   /** Round 42 study: compact elongation rings this group paints (0 = none). */
   compactRings: number;
+  /**
+   * Round 46: the single ring mark of this run is a **half-ring** (midpoint
+   * family, 96 ticks). Always false when {@link ResolvedJankoClaspInk.compactRings}
+   * is 0 or 2, and false for the compact family.
+   */
+  compactHalfRing: boolean;
   /** Round 42 study: the active bracket duration grammar of this group. */
   bracketGrammar: JankoBracketDurationGrammar;
 }
@@ -1143,7 +1329,7 @@ export function resolveClaspInk(
   // canonical dots stay byte-identical.
   const dots =
     bracketGrammar === 'compact' || bracketGrammar === 'midpoint'
-      ? compactDurationMarks(ink.durationTicks).dots
+      ? compactDurationMarks(ink.durationTicks, bracketGrammar).dots
       : grammar === 'complete'
         ? durationDotCount(ink.durationTicks, grammar)
         : claspDurationDotted(ink.durationTicks)
@@ -1151,8 +1337,8 @@ export function resolveClaspInk(
           : 0;
   const compact =
     bracketGrammar === 'compact' || bracketGrammar === 'midpoint'
-      ? compactDurationMarks(ink.durationTicks)
-      : { cuts: 0, rings: 0 };
+      ? compactDurationMarks(ink.durationTicks, bracketGrammar)
+      : { cuts: 0, rings: 0, halfRing: false };
   return {
     centerY: ink.centerY,
     durationTicks: ink.durationTicks,
@@ -1179,6 +1365,7 @@ export function resolveClaspInk(
     dots,
     compactCuts: compact.cuts,
     compactRings: compact.rings,
+    compactHalfRing: 'halfRing' in compact ? compact.halfRing : false,
     bracketGrammar,
   };
 }
@@ -1568,7 +1755,80 @@ function pointToSegment(x: number, y: number, s: ClaspMarkSegment): number {
   return Math.hypot(x - (s.x1 + u * dx), y - (s.y1 + u * dy));
 }
 
-/** Air (pt) the dot's ink at `(x, y)` keeps from all of its own mark's ink. */
+/**
+ * Round 46 performance guard: the midpoint mark's **daylight primitives** —
+ * the fixed cut segments and ring descriptors of one ink chip on one mount.
+ *
+ * The dot seat search evaluates {@link claspMarkDaylight} at every candidate
+ * position of every dotted mark (~5.7M calls on the Brahms Reference), and the
+ * primitives depend only on the ink chip, the group's mount x/scale and the
+ * token set — never on the point being tested. They are therefore derived once
+ * per ink chip (weakly, so nothing is retained) and the per-call work is the
+ * same arithmetic the previous code did, without re-deriving the metrics or
+ * re-allocating the mark-offset arrays.
+ */
+interface ClaspDaylightPrimitives {
+  claspX: number;
+  strokeWidth: number;
+  durationScale: number;
+  t: ResolvedJankoTokens;
+  /** 45-degree cut strokes: centre y plus the fixed slash vector/half-width. */
+  cuts: number[];
+  slashDx: number;
+  slashDy: number;
+  slashStrokeHalf: number;
+  /** Rings: centre y, centreline radius and stroke half-width. */
+  rings: { cy: number; radius: number; strokeHalf: number; halfRing: boolean }[];
+}
+
+const CLASP_DAYLIGHT_PRIMITIVES = new WeakMap<ResolvedJankoClaspInk, ClaspDaylightPrimitives>();
+
+function claspDaylightPrimitives(
+  group: JankoClaspGroupGeometry,
+  ink: ResolvedJankoClaspInk,
+  t: ResolvedJankoTokens
+): ClaspDaylightPrimitives {
+  const cached = CLASP_DAYLIGHT_PRIMITIVES.get(ink);
+  if (
+    cached &&
+    cached.claspX === group.claspX &&
+    cached.strokeWidth === group.strokeWidth &&
+    cached.durationScale === group.durationScale &&
+    cached.t === t
+  ) {
+    return cached;
+  }
+  const m = midpointMetrics(t, group.durationScale);
+  const cuts = midpointMarkOffsets(m, 'bracket', 'cut', ink.compactCuts).map((dy) => ink.centerY + dy);
+  const rings = midpointMarkOffsets(m, 'bracket', 'ring', ink.compactRings).map((dy) => ({
+    cy: ink.centerY + dy,
+    radius: m.bracketRingRadius,
+    strokeHalf: m.bracketRingStroke / 2,
+    halfRing: ink.compactHalfRing,
+  }));
+  const primitives: ClaspDaylightPrimitives = {
+    claspX: group.claspX,
+    strokeWidth: group.strokeWidth,
+    durationScale: group.durationScale,
+    t,
+    cuts,
+    slashDx: m.slashDx,
+    slashDy: m.slashDy,
+    slashStrokeHalf: m.slashStroke / 2,
+    rings,
+  };
+  CLASP_DAYLIGHT_PRIMITIVES.set(ink, primitives);
+  return primitives;
+}
+
+/**
+ * Air (pt) the dot's ink at `(x, y)` keeps from all of its own mark's ink.
+ *
+ * The midpoint branch measures the **actual** family ink: the cuts' 45-degree
+ * strokes, the full ring's annulus, and the half-ring's **one-sided** arc (its
+ * chord is the spine, so a dot on the right of the spine only has the stroke's
+ * own half-width to clear).
+ */
 export function claspMarkDaylight(
   group: JankoClaspGroupGeometry,
   ink: ResolvedJankoClaspInk,
@@ -1579,6 +1839,41 @@ export function claspMarkDaylight(
   const r = t.augmentationDotRadius;
   const half = group.strokeWidth / 2;
   let air = Math.abs(x - group.claspX) - half - r;
+  if (ink.bracketGrammar === 'midpoint') {
+    const c = claspDaylightPrimitives(group, ink, t);
+    const { claspX } = c;
+    for (const cy of c.cuts) {
+      air = Math.min(
+        air,
+        pointToSegment(x, y, {
+          x1: claspX - c.slashDx / 2,
+          y1: cy + c.slashDy / 2,
+          x2: claspX + c.slashDx / 2,
+          y2: cy - c.slashDy / 2,
+        }) -
+          c.slashStrokeHalf -
+          r
+      );
+    }
+    for (const ring of c.rings) {
+      const dx = x - claspX;
+      const dyy = y - ring.cy;
+      if (!ring.halfRing) {
+        air = Math.min(
+          air,
+          Math.abs(Math.hypot(dx, dyy) - ring.radius) - ring.strokeHalf - r
+        );
+        continue;
+      }
+      // Half-ring (left bulge): the arc's ink only exists for dx <= 0.
+      const onArc = dx <= 1e-9;
+      const d = onArc
+        ? Math.abs(Math.hypot(dx, dyy) - ring.radius)
+        : Math.hypot(Math.max(dx, 0), Math.max(Math.abs(dyy) - ring.radius, 0));
+      air = Math.min(air, d - ring.strokeHalf - r);
+    }
+    return air;
+  }
   for (const cy of claspMarkCenters(group, ink, t.maxBeamSlope)) {
     if (ink.pips > 0) {
       air = Math.min(
@@ -1941,9 +2236,12 @@ function renderClaspDurationInk(
           `    <line class="janko-clasp-cut" x1="${f(claspX - sx)}" y1="${f(yMid + dy + sy)}" x2="${f(claspX + sx)}" y2="${f(yMid + dy - sy)}" stroke="#111111" stroke-width="${stroke}" stroke-linecap="butt"/>`
         );
       }
+      // Round 46: the bracket mount's ring/half-ring is the larger one
+      // (`midpointBracketRingScale`); a lone half-ring bulges LEFT, its chord
+      // resting on the spine and its ink `fill="none"` so the spine survives.
       for (const dy of midpointMarkOffsets(m, 'bracket', 'ring', ink.compactRings)) {
         out.push(
-          `    <circle class="janko-clasp-compact-ring" cx="${f(claspX)}" cy="${f(yMid + dy)}" r="${f(m.ringRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${m.ringStroke.toFixed(2)}"/>`
+          midpointRingSvg('bracket', m, claspX, yMid + dy, ink.compactHalfRing, 'janko-clasp-compact-ring')
         );
       }
     } else if (ink.bracketGrammar === 'compact') {
@@ -2077,12 +2375,23 @@ export function claspInkBox(
           : 0;
       let hw = m.slashHalfX;
       let hh = m.slashHalfY;
+      let leftReach = m.slashHalfX;
       if (ink.compactRings > 0) {
-        hw = Math.max(hw, m.ringHalf);
-        hh = Math.max(hh, m.ringHalf);
+        // Round 46: the bracket mount's own (larger) ring box; a half-ring
+        // reaches only to its chord on the right.
+        const box = midpointRingInkBox(
+          'bracket',
+          m,
+          group.claspX,
+          yMid + (midpointMarkOffsets(m, 'bracket', 'ring', ink.compactRings)[0] ?? 0),
+          ink.compactHalfRing
+        );
+        hw = Math.max(hw, box.x1 - group.claspX);
+        hh = Math.max(hh, (box.y1 - box.y0) / 2);
+        leftReach = Math.max(leftReach, group.claspX - box.x0);
       }
       if (ink.compactCuts > 0 || ink.compactRings > 0) {
-        x0 = Math.min(x0, group.claspX - hw);
+        x0 = Math.min(x0, group.claspX - leftReach);
         x1 = Math.max(x1, group.claspX + hw);
         y0 = Math.min(y0, yMid - Math.max(cutSpan, ringSpan) - hh);
         y1 = Math.max(y1, yMid + Math.max(cutSpan, ringSpan) + hh);
@@ -2158,6 +2467,14 @@ export function claspInkBox(
 export interface JankoExceptionCarrierGeometry {
   /** Source note id that owns the carrier (single-note ownership). */
   noteId: string;
+  /**
+   * Round 46: the **second owner** of a shared indicator. Two same-hand,
+   * same-onset, exactly-equal-duration 2-span neighbours may share one
+   * horizontal indicator (centred on their painted columns) instead of
+   * painting two parallel carriers for one shared value; the carrier then owns
+   * both members' duration statements.
+   */
+  partnerId?: string;
   /** Onset tick of the owning member. */
   tick: number;
   /** True pitch y of the owning member (the pitch symbol is never moved). */
@@ -2170,8 +2487,10 @@ export interface JankoExceptionCarrierGeometry {
   durationTicks: number;
   /** Compact cuts along the carrier (0–4). */
   cuts: number;
-  /** Compact elongation rings along the carrier (0–3). */
+  /** Elongation rings along the carrier (0–2 in the Round 46 midpoint family). */
   rings: number;
+  /** Round 46: the single ring mark of this run is a half-ring (bulge up). */
+  halfRing: boolean;
   /** Augmentation dots of the member's own value. */
   dots: 0 | 1 | 2;
   /** False when the member's value has no exact reading (never faked). */
@@ -2220,7 +2539,7 @@ export function renderExceptionCarrier(
 ): string {
   const t = resolveJankoTokens(tokens);
   const out: string[] = [
-    `  <g class="janko-exception-carrier" data-exception-note="${g.noteId}" data-exception-ticks="${g.durationTicks}" data-exception-cuts="${g.cuts}" data-exception-rings="${g.rings}" data-exception-dots="${g.dots}" data-exception-in-grammar="${g.inGrammar}">`,
+    `  <g class="janko-exception-carrier" data-exception-note="${g.noteId}"${g.partnerId ? ` data-exception-partner="${g.partnerId}"` : ''} data-exception-ticks="${g.durationTicks}" data-exception-cuts="${g.cuts}" data-exception-rings="${g.rings}" data-exception-dots="${g.dots}" data-exception-in-grammar="${g.inGrammar}">`,
     `    <line class="janko-exception-carrier-line" x1="${f(g.x0)}" y1="${f(g.y)}" x2="${f(g.x1)}" y2="${f(g.y)}" stroke="#111111" stroke-width="${g.stroke.toFixed(2)}" stroke-linecap="butt"/>`,
   ];
   const centres = exceptionCarrierMarkCentres(g, t);
@@ -2237,10 +2556,12 @@ export function renderExceptionCarrier(
         `    <line class="janko-exception-cut" x1="${f(cx - sx)}" y1="${f(g.y + sy)}" x2="${f(cx + sx)}" y2="${f(g.y - sy)}" stroke="#111111" stroke-width="${m.slashStroke.toFixed(2)}" stroke-linecap="butt"/>`
       );
     }
+    // Round 46: the horizontal mount keeps the Round 45 ring size (the 20 %
+    // enlargement is bracket-only) and a lone half-ring bulges UP, its
+    // endpoints on the carrier line, painted `fill="none"` so the line it
+    // stands on survives.
     for (const cx of centres.rings) {
-      out.push(
-        `    <circle class="janko-exception-ring" cx="${f(cx)}" cy="${f(g.y)}" r="${f(m.ringRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${m.ringStroke.toFixed(2)}"/>`
-      );
+      out.push(midpointRingSvg('carrier', m, cx, g.y, g.halfRing, 'janko-exception-ring'));
     }
   } else {
     const cutHalf = t.compactCutLength / 2;
@@ -2298,8 +2619,17 @@ export function exceptionCarrierInkBox(
   }
   if (g.rings > 0) {
     const rs = exceptionCarrierMarkCentres(g, t).rings;
-    x0 = Math.min(x0, rs[0] - ring.hw);
-    x1 = Math.max(x1, rs[rs.length - 1] + ring.hw);
+    if (mm) {
+      const first = midpointRingInkBox('carrier', mm, rs[0], g.y, g.halfRing);
+      const last = midpointRingInkBox('carrier', mm, rs[rs.length - 1], g.y, g.halfRing);
+      x0 = Math.min(x0, first.x0);
+      x1 = Math.max(x1, last.x1);
+      y0 = Math.min(y0, first.y0);
+      y1 = Math.max(y1, last.y1);
+    } else {
+      x0 = Math.min(x0, rs[0] - ring.hw);
+      x1 = Math.max(x1, rs[rs.length - 1] + ring.hw);
+    }
   }
   if (g.dots >= 1) {
     const dotX = g.x1 + t.augmentationDotGap + t.augmentationDotRadius;
@@ -2353,9 +2683,14 @@ export function exceptionCarrierMarkBoxes(
   centres.cuts.forEach((cx, index) =>
     boxes.push({ kind: 'cut', index, x0: cx - cut.hw, y0: g.y - cut.hh, x1: cx + cut.hw, y1: g.y + cut.hh })
   );
-  centres.rings.forEach((cx, index) =>
-    boxes.push({ kind: 'ring', index, x0: cx - ring.hw, y0: g.y - ring.hh, x1: cx + ring.hw, y1: g.y + ring.hh })
-  );
+  centres.rings.forEach((cx, index) => {
+    if (mm) {
+      const box = midpointRingInkBox('carrier', mm, cx, g.y, g.halfRing);
+      boxes.push({ kind: 'ring', index, ...box });
+      return;
+    }
+    boxes.push({ kind: 'ring', index, x0: cx - ring.hw, y0: g.y - ring.hh, x1: cx + ring.hw, y1: g.y + ring.hh });
+  });
   if (g.dots >= 1) {
     const r = t.augmentationDotRadius;
     const dotX = g.x1 + t.augmentationDotGap + r;

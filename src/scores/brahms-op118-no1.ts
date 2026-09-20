@@ -3,9 +3,10 @@ import path from "node:path";
 import { QuantizedGridScore } from "../model/types";
 import { parseMidiToScore } from "../model/midi";
 import { detectHandCrossings } from "../model/grid";
-import { applyWrittenDurations } from "./brahms-source-fidelity";
+import { applyWrittenDurations, deriveWrittenTieChains } from "./brahms-source-fidelity";
 import { applyBrahmsHandCorrections } from "./brahms-hand-corrections";
 import writtenDurationsFixture from "./data/brahms-op118-no1-written-durations.json";
+import writtenDurationsProvenance from "./data/brahms-op118-no1-written-durations.provenance.json";
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -71,19 +72,24 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   title: "6 Klavierstücke, Op. 118",
   subtitle: "No. 1. Intermezzo in A minor — Allegro non assai",
   composer: "Johannes Brahms",
-  // Round 45 (working Brahms golden experiment): the same treatment the three
-  // candidates declare, at the operator's chosen 90 % — larger readable
-  // symbols with declared, centred optical cluster spacing, the one 45-degree
-  // duration family on both mounts, horizontal carriers for the remaining
-  // cluster durations, and literal low pitches under the established ledger
-  // vocabulary. The 90 % Reference and the `brahms-scale-90` candidate must
-  // agree for the same score/options; Bach GOLD stays frozen.
+  // Round 46 (working Brahms Reference): the operator's settled 95 % reading —
+  // larger readable symbols with declared, centred optical cluster spacing and
+  // 0.30pt of extra optical air, the one 45-degree duration family on both
+  // mounts with the Round 46 long-value vocabulary (96 = half-ring,
+  // 192 = one ring, 384 = two rings), a bracket-only 20 % ring enlargement,
+  // horizontal carriers for the remaining cluster durations, literal low
+  // pitches (Round 45's unwanted ledger/outlier ink removed) and the committed
+  // source ties rendered component-by-component. The surface is declared by
+  // `CURRENT_CANDIDATES` as two real-engine variants (95 % at 0.30pt air and
+  // the 95 % at 0.20pt air spacing control), both carrying every Round 46 fix;
+  // Bach GOLD stays frozen.
   pitchPlacement: 'parity-columns',
-  chordSymbolScale: 0.9,
+  chordSymbolScale: 0.95,
   bracketDurationGrammar: 'midpoint',
   exceptionCarrier: 'horizontal',
   opticalSpacing: true,
   lowPitchFolding: 'literal',
+  writtenTies: 'source',
 };
 
 /** Jánko micro-typography for this score. */
@@ -91,15 +97,20 @@ export const BRAHMS_OP118_NO1_JANKO_TOKENS: Partial<JankoTokens> = {
   ...DEFAULT_JANKO_TOKENS,
   ticksPerMeasure: BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   anacrusisTicks: BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
-  // Round 45 readability ratios (vs the Round 44 .75 family): slash centreline
-  // length ×1.10, ring radius/stroke ×1.10, cut centre spacing ×7/6 — which
-  // makes the 90 % Reference's cut pitch exactly 1.40 × the Round 44 `.75`
-  // baseline (P45(s) = P44(.75)·1.40·(s/.90) = 1.7967583311pt at s = .90).
-  // The 0.20pt vertical optical clearance is the round's explicit new policy.
+  // Round 45/46 readability ratios (vs the Round 44 .75 family): the slash
+  // centreline length stays ×1.10 and the **horizontal** ring keeps its ×1.10
+  // radius/stroke (the existing 95 % size); the **bracket** ring and half-ring
+  // grow a further ×1.20 (`midpointBracketRingScale`) — r 1.672 → 2.0064pt,
+  // stroke 0.61655 → 0.73986pt, ring centre pitch 4.43555 → 5.22766pt.
+  // The cut centre pitch gains another **0.20pt at the 95 % working scale**
+  // (1.8965782383 → 2.09658pt) by spacing alone: the 45-degree angle, slash
+  // length and stroke are untouched. 0.30pt is the round's working vertical
+  // optical clearance (the 0.20 control variant overrides it back).
   midpointSlashLengthFactor: 1.1,
   midpointRingScale: 1.1,
-  midpointSpacingFactor: 7 / 6,
-  opticalClearanceAir: 0.2,
+  midpointBracketRingScale: 1.2,
+  midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
+  opticalClearanceAir: 0.3,
 };
 
 /** Embedded base64 fallback for browser and headless execution without filesystem. */
@@ -169,6 +180,17 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
   // and its phrase continuation in mm. 24/44, applied AFTER the validated
   // duration overlay (original track keys) and BEFORE hand-crossing
   // computation. Preserves order and every other field.
+  // Round 46 — committed written tie chains (display only), derived on the
+  // very keys the duration overlay just validated (before the hand corrections
+  // retarget five notes away from the provenance's MIDI-track hands). Keyed by
+  // note id, so the chains follow the corrected notes unchanged. Sounding
+  // identities/timing are untouched and the fixture's 964-key bijection is
+  // unchanged.
+  const tieChains = deriveWrittenTieChains(
+    durationOverlaid,
+    (writtenDurationsProvenance as { events: Parameters<typeof deriveWrittenTieChains>[1][number][] }).events
+  );
+
   const notes = applyBrahmsHandCorrections(durationOverlaid);
 
   // One barline per measure opening plus the score's closing boundary. The
@@ -203,6 +225,7 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
     dynamics: [],
     pedals: [],
     notes,
+    tieChains,
   };
 
   score.handCrossings = detectHandCrossings(score);

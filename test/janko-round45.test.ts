@@ -1,5 +1,6 @@
 /**
- * Round 45 — larger readable Brahms clusters + phone review continuity.
+ * Round 45 — larger readable Brahms clusters + phone review continuity
+ * (historical; superseded where Round 46 changed a decision).
  * ===================================================================
  *
  * The operator rejected Round 44's globally small notes/duration ink as the
@@ -12,12 +13,32 @@
  * `test/janko-studio-session.test.ts` — it is deliberately *not* re-implemented
  * here.
  *
- * What this file verifies, on the real engine, for **all three** actually
- * declared candidates (`0.85` / `0.90` / `0.95`) *and* the working 90 %
- * Brahms Reference:
+ * **Round 46 supersessions this file records.** The live round is the two-card
+ * 95 % registry (pinned in `test/janko-round46.test.ts`), so the 0.85/0.90/0.95
+ * ladder this file was written for is kept as an **explicit historical
+ * fixture** (`ROUND_45_FAMILY` / `ROUND_45_TOKENS` below) rather than read from
+ * the registry: it still reproduces the Round 45 geometry exactly (the same six
+ * spread clusters with δ = 0.25769 / 0.54344 / 0.82919pt, the same 7/6 cut
+ * pitch) and is the honest control for the round's own claims. Where Round 46
+ * changed a decision the assertion is restated to the new contract and the
+ * superseded value is quoted at the site:
  *
- * 1. **Registry** — three otherwise identical full-score Brahms cards on one
- *    shared family, and the 90 % card equal to the adopted Reference.
+ * * the long-value vocabulary is now 96 = half-ring, 192 = one ring,
+ *   384 = two rings (no three-ring stack), and the fixed carrier length is
+ *   recomputed from that maximum run;
+ * * the same-hand/same-onset/exact-duration 2-span pairs of mm. 9/19 share one
+ *   centred indicator, so 32 statements paint as 30 carriers;
+ * * written ties are rendered, so the m. 66 attack/carry groups merge to one
+ *   visible attack head each and the six former 120-tick refusals are solved
+ *   (the canonical 0.95/.30 Reference carries zero warnings);
+ * * the literal low pitches keep their Round 45 positions but Round 45's extra
+ *   ledger/outlier ink is gone.
+ *
+ * What this file verifies, on the real engine, for the historical **0.85 /
+ * 0.90 / 0.95** ladder and the working 95 % Brahms Reference:
+ *
+ * 1. **Registry** — the round's shared family, at the values the live Round 46
+ *    registry declares (and the historical ladder as a fixture).
  * 2. **Admission** — the same six spread clusters at every scale, no
  *    scale-dependent stale admission, unbracketed heads untouched.
  * 3. **Declared optical spacing** — placement metadata only (sounding and
@@ -32,24 +53,22 @@
  *    independent values are routed through the horizontal grammar; genuine
  *    beams and rests are untouched.
  * 5. **The 45-degree family** — measured length/pitch/scale/counts on **both**
- *    mounts, with the cut centre pitch at 90 % exactly 1.40 × the Round 44
- *    `.75` baseline (`1.7967583311pt`) and `.85`/`.95` proportional, and the
- *    four-cut run individually countable.
- * 6. **m. 66** — the tick-12624 “9222” column reads two-handed (A2/D3 left,
- *    D4/D5 right) with the tied 120-tick F3 and every sustained voice
- *    preserved; the correction is bounded to the fifteen authorized records.
+ *    mounts, with the historical cut centre pitch at 90 % exactly 1.40 × the
+ *    Round 44 `.75` baseline (`1.7967583311pt`) and `.85`/`.95` proportional,
+ *    and the four-cut run individually countable.
+ * 6. **m. 66** — the tick-12624 column reads two-handed (A2/D3 left, D4/D5
+ *    right) with the written F3 tie and every sustained voice preserved; the
+ *    correction is bounded to the fifteen authorized records.
  * 7. **Literal low pitches** — the nine unwarranted ↓10 folds of mm. 5/15/22/
- *    33/42/53/67/68/69 are gone, the established ledger vocabulary states the
- *    register, and system spacing / pagination are unchanged.
+ *    33/42/53/67/68/69 are gone and the literal positions are exact; system
+ *    spacing / pagination are unchanged.
  * 8. **The whole spread** — page completeness, source-note accounting, true
- *    ink bounds, the six published 120-tick composite warnings by exact
- *    identity, zero hard errors, and the frozen Bach GOLD bytes.
+ *    ink bounds, zero hard errors and zero warnings on the working Reference,
+ *    and the frozen Bach GOLD bytes.
  *
  * Everything here is measured on emitted geometry. Nothing in this file claims
- * optical acceptance: glanceability and the acceptability of the 0.52–1.66pt
- * distributed displacements are the operator's judgement, and the six 120-tick
- * tie composites remain the deferred follow-up ticket
- * (`npm run lint:engraving -- --strict` still exits 1 on them).
+ * optical acceptance: glanceability and the acceptability of the distributed
+ * displacements are the operator's judgement.
  */
 
 import { test } from 'node:test';
@@ -79,6 +98,7 @@ import {
 import {
   claspMemberCarriedTicks,
   countJankoPages,
+  getTieDisplayPlan,
   knockoutHalfExtents,
   layoutJankoScore,
   renderJankoCrop,
@@ -122,46 +142,52 @@ const REFERENCE_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const R44_OPTIONS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
 const R44_TOKENS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 
-/** The three declared scales, in card order. */
+/** The three Round 45 scales, kept as an explicit historical fixture (the
+ * live Round 46 registry declares two 95 % variants instead). */
 const SCALES = [0.85, 0.9, 0.95] as const;
 
 /** The six clusters whose masks actually demanded the optical gap (Round 45). */
 const SPREAD_TICKS = [1200, 1392, 1584, 3120, 3312, 3504] as const;
 
-/** Card id per declared scale. */
-const CARD_ID: Record<(typeof SCALES)[number], string> = {
-  0.85: 'brahms-scale-85',
-  0.9: 'brahms-scale-90',
-  0.95: 'brahms-scale-95',
-};
+/**
+ * The Round 45 shared family, reconstructed explicitly so the historical scale
+ * ladder stays measurable after the registry moved on: the parity admission,
+ * the one 45-degree family, horizontal carriers, literal lows, the Round 45
+ * readability ratios / 7·6 cut pitch / 0.20pt air, **no** written ties (ties
+ * arrived in Round 46) and no bracket-only ring enlargement.
+ */
+const ROUND_45_FAMILY = {
+  pitchPlacement: 'parity-columns',
+  bracketDurationGrammar: 'midpoint',
+  exceptionCarrier: 'horizontal',
+  opticalSpacing: true,
+  lowPitchFolding: 'literal',
+  writtenTies: 'none',
+} as const;
+const ROUND_45_TOKENS = {
+  midpointSlashLengthFactor: 1.1,
+  midpointRingScale: 1.1,
+  midpointBracketRingScale: 1,
+  midpointSpacingFactor: 7 / 6,
+  opticalClearanceAir: 0.2,
+} as const;
 
-function cardOf(scale: (typeof SCALES)[number]) {
-  const card = CURRENT_CANDIDATES.find((c) => c.id === CARD_ID[scale]);
-  assert.ok(card, `the Round 45 registry declares ${CARD_ID[scale]}`);
-  return card!;
-}
-
-/** A Brahms layout of one declared scale — the studio's own merge. */
+/** A Brahms layout of one historical scale — the studio's own merge shape. */
 function brahmsScale(scale: (typeof SCALES)[number]): readonly JankoSystemLayout[] {
-  const card = cardOf(scale);
-  return layoutJankoScore(
-    BRAHMS,
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
-    resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) })
-  );
+  return layoutJankoScore(BRAHMS, optionsForScale(scale), tokensForScale());
 }
 
-/** A DVS layout of one declared scale — the studio's own entry merge. */
+function optionsForScale(scale: number, base = BRAHMS_OP118_NO1_JANKO_OPTIONS) {
+  return resolveJankoOptions({ ...base, ...ROUND_45_FAMILY, chordSymbolScale: scale });
+}
+function tokensForScale(base = BRAHMS_OP118_NO1_JANKO_TOKENS) {
+  return resolveJankoTokens({ ...base, ...ROUND_45_TOKENS });
+}
+
+/** A DVS layout of one historical scale — the studio's own entry merge. */
 function dvsScale(scale: (typeof SCALES)[number]) {
-  const card = cardOf(scale);
-  const options = resolveJankoOptions({
-    ...DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
-    ...(card.options ?? {}),
-  });
-  const tokens = resolveJankoTokens({
-    ...DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
-    ...(card.tokens ?? {}),
-  });
+  const options = optionsForScale(scale, DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS);
+  const tokens = tokensForScale(DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS);
   return { options, tokens, layouts: layoutJankoScore(DVS, options, tokens) };
 }
 
@@ -189,13 +215,7 @@ const noOpticalLayouts = (): readonly JankoSystemLayout[] =>
 const coreFoldingLayouts = (): readonly JankoSystemLayout[] =>
   cachedLayouts('core-folding', BRAHMS, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS);
 function scaleLayouts(scale: (typeof SCALES)[number]): readonly JankoSystemLayout[] {
-  return cachedLayouts(`scale-${scale}`, BRAHMS, resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
-    ...(cardOf(scale).options ?? {}),
-  }), resolveJankoTokens({
-    ...BRAHMS_OP118_NO1_JANKO_TOKENS,
-    ...(cardOf(scale).tokens ?? {}),
-  }));
+  return cachedLayouts(`scale-${scale}`, BRAHMS, optionsForScale(scale), tokensForScale());
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +305,8 @@ interface PaintedCarrier {
   cutCentres: number[];
   ringRadii: number[];
   ringStrokes: number[];
+  /** Round 46: painted half-ring paths (their chord lies on the carrier). */
+  halfRings: number;
 }
 function paintedCarriers(svg: string): PaintedCarrier[] {
   return svg
@@ -299,6 +321,9 @@ function paintedCarriers(svg: string): PaintedCarrier[] {
         )!;
       const cuts = linesOf(chunk, 'janko-exception-cut');
       const rings = circlesOf(chunk, 'janko-exception-ring');
+      const halfRings = [
+        ...chunk.matchAll(/<path class="janko-exception-ring" data-half-ring="true"/g),
+      ].length;
       return {
         noteId: attr('data-exception-note'),
         ticks: Number(attr('data-exception-ticks')),
@@ -310,6 +335,7 @@ function paintedCarriers(svg: string): PaintedCarrier[] {
         cutCentres: cuts.map((c) => (c.x1 + c.x2) / 2),
         ringRadii: rings.map((r) => r.r),
         ringStrokes: rings.map((r) => r.stroke),
+        halfRings,
       };
     });
 }
@@ -324,81 +350,110 @@ const PAIR_GAP = 5.46;
 // 1. Registry: three cards on one shared family, 0.85 / 0.90 / 0.95
 // ---------------------------------------------------------------------------
 
-test('Round 45 registry: three full-score Brahms cards on one shared family', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 45, 'the open round');
-  assert.match(CURRENT_ROUND_METADATA.title, /larger readable Brahms clusters/i);
+test('Round 46 registry: two 95 % real-engine variants on one shared family', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 46, 'the open round');
+  assert.match(CURRENT_ROUND_METADATA.title, /readable 95 % clusters/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    [
-      'chordSymbolScale',
-      'opticalSpacing',
-      'lowPitchFolding',
-      'bracketDurationGrammar',
-      'exceptionCarrier',
-    ],
-    'the round opens exactly the five settled axes'
+    ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
+    'the round opens exactly the three settled axes (the other family keys are locked context)'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards, no more');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards, no more');
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => c.id),
+    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
+    'both real-engine variants: the working Reference and its spacing control'
+  );
 
-  const family: Array<Record<string, unknown>> = [];
-  for (const scale of SCALES) {
-    const card = cardOf(scale);
+  for (const [index, air] of [
+    [0, 0.3],
+    [1, 0.2],
+  ] as const) {
+    const card = CURRENT_CANDIDATES[index];
     const options = card.options ?? {};
     const tokens = card.tokens ?? {};
-    assert.equal(options.chordSymbolScale, scale, `${card.id}: the declared admitted-cluster scale`);
-    assert.equal(card.axis, 'chordSymbolScale', `${card.id}: the one varying axis`);
+    assert.equal(options.chordSymbolScale, 0.95, `${card.id}: the adopted admitted-cluster scale`);
+    assert.equal(card.axis, 'opticalClearanceAir', `${card.id}: the one varying axis`);
     // The bounded review set the operator asked for: full score first, then the
-    // close-cluster windows, the pitch/hand/duration windows and the compact
-    // short-duration key. No extra control card, no separate viewer.
+    // windows that expose the round's decisions and the compact short-value key.
     assert.deepEqual(
       (card.windows ?? [])
         .filter((w): w is JankoScoreCandidateWindow => 'measureStart' in w)
         .map((w) => `${w.measureStart}-${w.measureStart + w.measureCount - 1}`),
-      ['1-71', '5-5', '7-9', '17-19', '66-71', '17-24'],
+      ['1-71', '1-3', '7-9', '17-19', '33-33', '53-53', '61-63', '65-71', '17-24'],
       `${card.id}: exactly the declared review surfaces`
     );
     assert.ok(
       (card.windows ?? []).some((w) => (w as { fullScore?: boolean }).fullScore === true),
       `${card.id}: the whole score stays a genuine page spread`
     );
-    const rest = { ...options } as Record<string, unknown>;
-    delete rest.chordSymbolScale;
-    family.push(rest);
     assert.deepEqual(
       { ...tokens },
       {
         midpointSlashLengthFactor: 1.1,
         midpointRingScale: 1.1,
-        midpointSpacingFactor: 7 / 6,
-        opticalClearanceAir: 0.2,
+        midpointBracketRingScale: 1.2,
+        midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
+        opticalClearanceAir: air,
       },
-      `${card.id}: the Round 45 readability ratios and the explicit 0.20pt optical air`
+      `${card.id}: the Round 46 readability ratios, the bracket-only enlargement and the declared air`
+    );
+    const { chordSymbolScale, ...rest } = options as Record<string, unknown>;
+    void chordSymbolScale;
+    assert.deepEqual(
+      rest,
+      {
+        pitchPlacement: 'parity-columns',
+        bracketDurationGrammar: 'midpoint',
+        exceptionCarrier: 'horizontal',
+        opticalSpacing: true,
+        lowPitchFolding: 'literal',
+        writtenTies: 'source',
+      },
+      `${card.id}: one coherent family (ties rendered, literal lows, the 45-degree grammar)`
     );
   }
-  assert.deepEqual(family[1], family[0], 'the 85 % and 90 % cards differ only in scale');
-  assert.deepEqual(family[2], family[0], 'the 95 % card differs only in scale');
+  // The two variants differ in exactly one declared number.
+  const [a, b] = CURRENT_CANDIDATES;
   assert.deepEqual(
-    family[0],
-    {
-      pitchPlacement: 'parity-columns',
-      bracketDurationGrammar: 'midpoint',
-      exceptionCarrier: 'horizontal',
-      opticalSpacing: true,
-      lowPitchFolding: 'literal',
-    },
-    'one coherent family: parity admission, the 45-degree family, horizontal remaining-value carriers'
+    { ...a.options },
+    { ...b.options },
+    'the variants declare the same option deltas'
+  );
+  assert.deepEqual(
+    { ...a.tokens, opticalClearanceAir: b.tokens?.opticalClearanceAir },
+    { ...b.tokens },
+    'and the same token deltas except the declared air'
   );
   // The shared family's knobs are all opt-in; the golden defaults stay no-ops.
   assert.equal(DEFAULT_JANKO_OPTIONS.opticalSpacing, false, 'optical spacing is opt-in');
   assert.equal(DEFAULT_JANKO_OPTIONS.lowPitchFolding, 'core', 'literal low pitches are opt-in');
+  assert.equal(DEFAULT_JANKO_OPTIONS.writtenTies, 'none', 'written ties are opt-in');
   assert.equal(DEFAULT_JANKO_TOKENS.midpointSlashLengthFactor, 1, 'the slash ratio is a no-op by default');
   assert.equal(DEFAULT_JANKO_TOKENS.midpointRingScale, 1, 'the ring ratio is a no-op by default');
+  assert.equal(
+    DEFAULT_JANKO_TOKENS.midpointBracketRingScale,
+    1,
+    'the bracket enlargement is a no-op by default'
+  );
   assert.equal(DEFAULT_JANKO_TOKENS.midpointSpacingFactor, 1, 'the cut-spacing ratio is a no-op by default');
-  assert.equal(DEFAULT_JANKO_TOKENS.opticalClearanceAir, 0.2, 'the new vertical air policy');
+  assert.equal(DEFAULT_JANKO_TOKENS.opticalClearanceAir, 0.2, 'the historical air default');
+  // The superseded Round 45 ladder is preserved as an explicit fixture and
+  // still measures the same family (see the admission test below).
+  for (const scale of SCALES) {
+    const options = optionsForScale(scale);
+    assert.equal(options.chordSymbolScale, scale, `s=${scale}: the historical fixture states its scale`);
+    assert.equal(options.writtenTies, 'none', `s=${scale}: the fixture keeps the Round 45 geometry`);
+    assert.equal(
+      tokensForScale().midpointBracketRingScale,
+      1,
+      `s=${scale}: the historical fixture keeps both mounts equal`
+    );
+  }
 });
 
-test('The 90 % card and the working Brahms Reference are the same engraving', () => {
-  const card = cardOf(0.9);
+test('The 0.30pt card and the working Brahms Reference are the same engraving', () => {
+  const card = CURRENT_CANDIDATES.find((c) => c.id === 'brahms-scale-95-air30')!;
   const studioMerge = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) });
   const studioTokens = resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) });
   assert.deepEqual(studioMerge, REFERENCE_OPTIONS, 'the studio merge IS the Reference option set');
@@ -424,13 +479,13 @@ test('The 90 % card and the working Brahms Reference are the same engraving', ()
   const brahmsAt = reference.indexOf('data-score="brahms-op118-no1"');
   const bachAt = reference.indexOf('data-score="primary"');
   const referencePages = pageSvgs(reference.slice(brahmsAt, bachAt));
-  assert.equal(cardPages.length, 5, 'the 90 % card carries the whole score as five genuine pages');
+  assert.equal(cardPages.length, 5, 'the 0.30pt card carries the whole score as five genuine pages');
   assert.equal(referencePages.length, 5, 'and the Reference view carries the same five');
   for (const [i, figure] of cardFigures.entries()) {
     assert.ok(figure.includes(`data-page="${i + 1}"`), `page card ${i + 1} is labelled, not an anonymous crop`);
     assert.ok(figure.includes(`<b>Page ${i + 1}</b> · mm. `), `page card ${i + 1} states its real measure range`);
   }
-  assert.deepEqual(cardPages, referencePages, 'the 90 % candidate and the Reference agree byte for byte');
+  assert.deepEqual(cardPages, referencePages, 'the 0.30pt candidate and the Reference agree byte for byte');
 });
 
 // ---------------------------------------------------------------------------
@@ -589,8 +644,11 @@ test('Optical spacing is declared placement metadata: musical fields and columns
     assert.equal(p.x, q.x, `${p.note.id}: an unbracketed head keeps its established column`);
     assert.equal(p.y, q.y, `${p.note.id}: and its established pitch y`);
   }
-  assert.equal(headsOf(on).length, 959, 'the surface is complete');
-  assert.equal(headsOf(off).length, 959, 'and the control surface is the same spread');
+  // Round 46: the spread paints the source heads once (964 − 7 merged) plus
+  // the 13 written continuation heads = 970; the control surface is the same
+  // spread (the optical pass is placement metadata only).
+  assert.equal(headsOf(on).length, 970, 'the surface is complete');
+  assert.equal(headsOf(off).length, 970, 'and the control surface is the same spread');
   assert.deepEqual(
     on.flatMap((l) => l.clasps.map((c) => c.tick)),
     off.flatMap((l) => l.clasps.map((c) => c.tick)),
@@ -795,9 +853,11 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
         // An independent value lives on the horizontal carrier; a stem may only
         // remain as the connector of two *equal* independent voices.
         assert.equal(p.note.durationTicks, 192, `t${cluster.tick}: ${id} is the independent value`);
-        const own = carriers.find((c) => c.noteId === id);
+        // Round 46: the 192-tick independent value reads as **one** full ring,
+        // and the m. 9/m. 19 pairs share one indicator (the partner is named).
+        const own = carriers.find((c) => c.noteId === id || c.partnerId === id);
         assert.ok(own, `${id}: its duration is routed through the horizontal grammar`);
-        assert.deepEqual([own!.cuts, own!.rings, own!.dots], [0, 2, 0], `${id}: two rings = a whole note`);
+        assert.deepEqual([own!.cuts, own!.rings, own!.dots], [0, 1, 0], `${id}: one full ring = a whole note`);
         assert.equal(inGroup, true, `${id}: it keeps the equal-duration pair connector`);
       }
     }
@@ -809,9 +869,44 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
     layouts
       .flatMap((l) => l.beams)
       .map((b) => b.notes.map((n) => n.id).sort().join('+'));
-  assert.deepEqual(beamGroups(working), beamGroups(reserve), 'the real beams are the same groups, unchanged');
-  assert.equal(beamGroups(working).length, 236, 'and there are 236 of them');
-  assert.equal(working.flatMap((l) => l.rests).length, reserve.flatMap((l) => l.rests).length, 'rests unchanged');
+  // Round 46: with the written ties off, the canonical beam partition is
+  // byte-identical to the Round 44 reserve (236 groups) — the tie treatment
+  // re-partitions nothing by itself. With ties on, the thirteen continuation
+  // heads beam under the ordinary rules: 245 groups, of which 7 carry a
+  // written-continuation id and exactly 2 more are the m. 66 groups whose
+  // merged-voice ids changed (898+901, 910+912).
+  const noTies = layoutJankoScore(
+    BRAHMS,
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, writtenTies: 'none' }),
+    REFERENCE_TOKENS
+  );
+  assert.deepEqual(beamGroups(noTies), beamGroups(reserve), 'the real beams are the same groups, unchanged');
+  assert.equal(beamGroups(reserve).length, 236, 'and there are 236 of them');
+  assert.equal(beamGroups(working).length, 245, 'the canonical spread adds the written continuations\u2019 groups');
+  assert.equal(
+    beamGroups(working).filter((g) => g.includes('~c')).length,
+    7,
+    'seven beam groups carry a written continuation head'
+  );
+  assert.ok(
+    beamGroups(working).includes('brahms-op118-no1-898+brahms-op118-no1-901') &&
+      beamGroups(working).includes('brahms-op118-no1-910+brahms-op118-no1-912'),
+    'the two m. 66 merged-voice groups are the only other new partition'
+  );
+  // Round 46: the written ties neither invent nor lose a rest — the canonical
+  // spread states exactly the reserve's rest set (the running release resolves
+  // each hand's true silence, so the m. 66 RH quarter at 12576 survives the
+  // added written continuation onset at 12528).
+  const restKey = (layouts: readonly JankoSystemLayout[]): string[] =>
+    layouts
+      .flatMap((l) => l.rests)
+      .map((r) => `${r.tick}:${r.hand}:${r.value}`)
+      .sort();
+  assert.deepEqual(
+    restKey(working),
+    restKey(reserve),
+    'rests byte-identical to the Round 44 reserve'
+  );
   const beamed = new Set(working.flatMap((l) => l.beams).flatMap((b) => b.notes.map((n) => n.id)));
   for (const group of workingStems) {
     for (const id of [group.carrierId, ...group.suppressedIds]) {
@@ -827,7 +922,11 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
   const suppressedOf = (layouts: readonly JankoSystemLayout[]): Set<string> =>
     new Set(layouts.flatMap((l) => [...suppressedStemIds(l)]));
   const workingSuppressed = suppressedOf(working);
-  assert.equal(workingSuppressed.size, 269, 'the Round 45 suppression census');
+  // Round 46: 282 suppressed ids — the two shared 192-tick indicators own
+  // both members of their pairs (`+2` vs 269's two carriers, each still with
+  // its own suppressed partner), and the seven written tie components that
+  // state their value on an added or reused head add their own suppression.
+  assert.equal(workingSuppressed.size, 282, 'the Round 46 suppression census (Round 45: 269)');
   assert.equal(suppressedOf(reserve).size, 203, 'against the Round 44 reserve');
   assert.equal(
     suppressedOf(noOpticalLayouts()).size,
@@ -858,13 +957,14 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
 test('The 45-degree family measured: cut centre pitch is exactly 1.40 × the Round 44 .75 baseline at 90 %', () => {
   const base = midpointMetrics(R44_TOKENS, 0.75);
   assert.ok(approx(base.cutSpacing, 1.2833988079, 1e-9), 'the Round 44 .75 baseline is the ruled one');
-  assert.ok(approx(base.carrierLength, 10.0275, 1e-9), 'and its fixed carrier length');
+  // Round 46 recomputed the fixed carrier length from the new maximum run
+  // (the two-ring breve, not a three-ring stack): 10.0275 → 7.664642317.
+  assert.ok(approx(base.carrierLength, 7.664642317, 1e-9), 'and its recomputed carrier length');
   assert.ok(approx(base.slashDx, 2.6879115324, 1e-9), 'and its slash component');
 
   const measured: Record<number, { cut: number; carrier: number; slash: number }> = {};
   for (const scale of SCALES) {
-    const card = cardOf(scale);
-    const t = resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) });
+    const t = tokensForScale();
     const m = midpointMetrics(t, scale);
     // Length: the Round 45 factor on the 45-degree centreline, equal x/y.
     assert.ok(approx(m.slashCenterline, 5.0683745915, 1e-9), `s=${scale}: the family centreline is unchanged`);
@@ -903,9 +1003,13 @@ test('The 45-degree family measured: cut centre pitch is exactly 1.40 × the Rou
   assert.ok(approx(measured[0.85].cut, 1.6969384237, 1e-9), 's=.85 cut pitch');
   assert.ok(approx(measured[0.9].cut, 1.7967583311, 1e-9), 's=.90 cut pitch — the 1.40× target');
   assert.ok(approx(measured[0.95].cut, 1.8965782383, 1e-9), 's=.95 cut pitch');
-  assert.ok(approx(measured[0.85].carrier, 12.33095, 1e-9), 's=.85 carrier length');
-  assert.ok(approx(measured[0.9].carrier, 13.0563, 1e-9), 's=.90 carrier length');
-  assert.ok(approx(measured[0.95].carrier, 13.78165, 1e-9), 's=.95 carrier length');
+  // Round 46 recomputed the fixed length from the two-ring run: the historical
+  // 12.33095 / 13.0563 / 13.78165 (three-ring stacks) become 9.71848392404654 /
+  // 10.290159448990453 / 10.861834973934368 — the envelope shrinks even as the
+  // bracket ring grows.
+  assert.ok(approx(measured[0.85].carrier, 9.71848392404654, 1e-9), 's=.85 carrier length');
+  assert.ok(approx(measured[0.9].carrier, 10.290159448990453, 1e-9), 's=.90 carrier length');
+  assert.ok(approx(measured[0.95].carrier, 10.861834973934368, 1e-9), 's=.95 carrier length');
   // The agreed ratios vs Round 44 .75: scale ×1.2 (13.3 % / 20 % / 26.7 % larger
   // notes), slash stroke +20 %, slash length +32 %, ring +32 %, cut pitch +40 %.
   assert.ok(approx((0.71 * 0.9) / (0.71 * 0.75), 1.2, 1e-9), 'slash stroke +20 % at 90 %');
@@ -945,11 +1049,19 @@ test('Painted duration ink: the same 45-degree marks on both mounts, the four-cu
       );
     }
 
+    // Round 46 vocabulary (the historical fixture keeps both mounts equal):
+    // 96 = one half-ring path, 192 = one ring, 384 = two rings — three circles
+    // and one half-ring path in the key band, down from six circles.
     const bracketRings = circlesOf(key, 'janko-clasp-compact-ring');
-    assert.equal(bracketRings.length, 6, `s=${scale}: the key band paints its ring runs`);
+    assert.equal(bracketRings.length, 3, `s=${scale}: the key band paints three full rings`);
     for (const ring of bracketRings) {
-      assert.ok(approx(ring.r, m.ringRadius, SVG_EPS), `s=${scale}: the bracket ring radius`);
-      assert.ok(approx(ring.stroke, m.ringStroke, SVG_EPS), `s=${scale}: the bracket ring stroke`);
+      assert.ok(approx(ring.r, m.bracketRingRadius, SVG_EPS), `s=${scale}: the bracket ring radius`);
+      assert.ok(approx(ring.stroke, m.bracketRingStroke, SVG_EPS), `s=${scale}: the bracket ring stroke`);
+    }
+    const bracketHalfRings = [...key.matchAll(/<path class="janko-clasp-compact-ring" data-half-ring="true"[^>]*>/g)];
+    assert.equal(bracketHalfRings.length, 1, `s=${scale}: and the 96-tick half-ring`);
+    for (const [tag] of bracketHalfRings) {
+      assert.match(tag, /fill="none"/, `s=${scale}: the half-ring keeps the spine alive`);
     }
 
     // The horizontal mount paints the SAME ink at the same scale.
@@ -965,7 +1077,14 @@ test('Painted duration ink: the same 45-degree marks on both mounts, the four-cu
       assert.equal(c.rings, declared.rings, `${c.noteId}: declared rings`);
       assert.equal(c.dots, declared.dots, `${c.noteId}: declared dots`);
       assert.equal(c.cutCentres.length, c.cuts, `${c.noteId}: painted cuts match the declared marks`);
-      assert.equal(c.ringRadii.length, c.rings, `${c.noteId}: painted rings match the declared marks`);
+      // Round 46: a 96-tick value paints a half-ring **path**, so the painted
+      // marks are the circles plus the half-ring paths.
+      assert.equal(
+        c.ringRadii.length + c.halfRings,
+        c.rings,
+        `${c.noteId}: painted rings match the declared marks`
+      );
+      assert.ok(c.halfRings <= 1, `${c.noteId}: at most one half-ring in the family`);
       for (const stride of strides(c.cutCentres)) {
         assert.ok(approx(stride, m.cutSpacing, SVG_EPS), `${c.noteId}: carrier cuts stack at the same pitch`);
       }
@@ -973,9 +1092,15 @@ test('Painted duration ink: the same 45-degree marks on both mounts, the four-cu
         assert.ok(approx(r, m.ringRadius, SVG_EPS), `${c.noteId}: ring ${i} radius identical to the bracket mount`);
         assert.ok(approx(c.ringStrokes[i], m.ringStroke, SVG_EPS), `${c.noteId}: ring ${i} stroke identical`);
       }
+      if (c.halfRings === 1) {
+        // The half-ring keeps the carrier's own radius (the mount rotation is
+        // orientation, and in this historical fixture both mounts are equal).
+        assert.equal(Number(c.ticks), 96, `${c.noteId}: the half-ring states 96 ticks`);
+      }
       // Every carrier states its own value exactly (the bare quarter is the
-      // alphabet's one mark-less reading, and it is declared as such).
-      const marks = compactDurationMarks(c.ticks);
+      // alphabet's one mark-less reading, and it is declared as such) — in the
+      // active Round 46 midpoint vocabulary, the one the paint reads.
+      const marks = compactDurationMarks(c.ticks, 'midpoint');
       assert.equal(marks.inGrammar, true, `${c.noteId}: its value has an exact reading`);
       assert.deepEqual([c.cuts, c.rings, c.dots], [marks.cuts, marks.rings, marks.dots], `${c.noteId}: marks state the value`);
       if (c.cuts === 0 && c.rings === 0 && c.dots === 0) {
@@ -988,50 +1113,81 @@ test('Painted duration ink: the same 45-degree marks on both mounts, the four-cu
 test('Every admitted owner is correct; the one specimen stress refusal is published, never painted-and-refused', () => {
   const layouts = referenceLayouts();
   const carriers = layouts.flatMap((l) => l.exceptionCarriers);
-  assert.equal(carriers.length, 32, '32 painted carriers across the working Reference');
+  // Round 46: 37 carriers = 30 member statements (the two 192-tick pairs share
+  // one indicator, so 32 member statements paint as 30 marks) + the 7 written
+  // tie components whose 96/192-tick value the mark family states with a ring.
+  // The six former `carrier-duration-unsupported` composites are solved: their
+  // first 96 component is a half-ring and the remaining 24 is tied.
+  assert.equal(carriers.length, 37, '37 painted carriers across the working Reference (Round 45: 32)');
   assert.equal(layouts.flatMap((l) => l.exceptionCarrierRefusals).length, 0, 'no withheld carrier on Brahms');
   assert.equal(layouts.flatMap((l) => l.exceptionCarrierOcclusions).length, 0, 'no destroyed duration ink on Brahms');
   assert.deepEqual(
-    layouts.flatMap((l) => l.exceptionCarrierUnsupported).map((u) => [u.noteId, u.durationTicks]),
-    [
-      ['brahms-op118-no1-295', 120],
-      ['brahms-op118-no1-351', 120],
-      ['brahms-op118-no1-448', 120],
-      ['brahms-op118-no1-581', 120],
-      ['brahms-op118-no1-637', 120],
-      ['brahms-op118-no1-734', 120],
-    ],
-    'the six unsupported composites are refused as exact values, by identity'
+    layouts.flatMap((l) => l.exceptionCarrierUnsupported),
+    [],
+    'no composite is left unstated — the six former refusals are solved by components and ties'
   );
+  const plan = getTieDisplayPlan(BRAHMS);
+  const chainHeads = new Map<string, number>();
+  for (const chain of plan.chains) {
+    for (const component of chain.components) chainHeads.set(component.headId, component.durationTicks);
+  }
   const heads = byIdOf(layouts);
   const admitted = memberIdsOf(layouts);
   for (const c of carriers) {
-    assert.equal(admitted.has(c.noteId), true, `${c.noteId}: a carrier belongs to an admitted cluster`);
-    assert.equal(c.scale, 0.9, `${c.noteId}: the carrier ink rides the admitted symbol scale`);
     const p = heads.get(c.noteId)!;
-    assert.equal(
-      c.durationTicks !== claspMemberCarriedTicks(
-        layouts
-          .find((l) => l.notes.some((x) => x.note.id === c.noteId))!
-          .clasps.find((k) => k.notes.some((n) => n.id === c.noteId))!,
-        c.noteId
-      ),
-      true,
-      `${c.noteId}: only a genuine exception (a duration the bracket does not state) owns a carrier`
-    );
-    assert.ok(approx(c.y, p.y, 1e-9), `${c.noteId}: the carrier sits at the member's true pitch y`);
-    const marks = compactDurationMarks(c.durationTicks);
+    assert.ok(p, `${c.noteId}: the carrier's head is laid out`);
+    if (!admitted.has(c.noteId)) {
+      // A written tie component outside any bracket states its own component
+      // value with the carrier — never a bracket exception.
+      assert.equal(
+        chainHeads.has(c.noteId),
+        true,
+        `${c.noteId}: an unadmitted carrier owner is a written tie component`
+      );
+      assert.equal(c.scale, 1, `${c.noteId}: it rides the canonical symbol scale`);
+      assert.equal(chainHeads.get(c.noteId), c.durationTicks, `${c.noteId}: the mark states the component value`);
+      assert.ok(approx(c.y, p.y, 1e-9), `${c.noteId}: the carrier sits at the component's true pitch y`);
+      continue;
+    }
+    assert.equal(c.scale, 0.95, `${c.noteId}: the carrier ink rides the admitted symbol scale`);
+    if (c.partnerId === undefined) {
+      assert.ok(approx(c.y, p.y, 1e-9), `${c.noteId}: the carrier sits at the member's true pitch y`);
+    } else {
+      // A shared indicator sits in the freer lane just outside the pair: both
+      // members are its owners (asserted by the m. 9/m. 19 tests above).
+      assert.ok(
+        c.partnerId.length > 0,
+        `${c.noteId}: the shared indicator names its second owner`
+      );
+    }
+    const marks = compactDurationMarks(c.durationTicks, 'midpoint');
     assert.equal(marks.inGrammar, true, `${c.noteId}: its value has an exact reading`);
-    assert.deepEqual([c.cuts, c.rings, c.dots], [marks.cuts, marks.rings, marks.dots], `${c.noteId}: marks state the value`);
+    assert.deepEqual(
+      [c.cuts, c.rings, c.dots],
+      [marks.cuts, marks.rings, marks.dots],
+      `${c.noteId}: marks state the value`
+    );
     if (c.cuts === 0 && c.rings === 0 && c.dots === 0) {
       assert.equal(c.durationTicks, 48, `${c.noteId}: only the bare quarter may be mark-less`);
     }
   }
+  // An admitted carrier that is not a tie component is a genuine bracket
+  // exception (a duration the bracket's own carried value does not state).
+  for (const c of carriers) {
+    if (!admitted.has(c.noteId) || chainHeads.has(c.noteId)) continue;
+    const layout = layouts.find((l) => l.notes.some((x) => x.note.id === c.noteId))!;
+    const clasp = layout.clasps.find((k) => k.notes.some((n) => n.id === c.noteId))!;
+    assert.notEqual(
+      c.durationTicks,
+      claspMemberCarriedTicks(clasp, c.noteId),
+      `${c.noteId}: only a genuine exception (a duration the bracket does not state) owns a carrier`
+    );
+  }
 
   // The DVS key is rendered by the cards; its deliberately tight stress row
   // publishes exactly one refused carrier — the same finding the Round 44
-  // reserve family reports on the same score at the same identity, so Round 45
-  // introduced no new warning class — and it is never painted.
+  // reserve family reports on the same score at the same identity — and it is
+  // never painted.
   const reserveDvs = lintJankoScore(
     DVS,
     resolveJankoOptions({
@@ -1047,6 +1203,7 @@ test('Every admitted owner is correct; the one specimen stress refusal is publis
       ...DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
       midpointSlashLengthFactor: 1,
       midpointRingScale: 1,
+      midpointBracketRingScale: 1,
       midpointSpacingFactor: 1,
     })
   );
@@ -1074,50 +1231,58 @@ test('Every admitted owner is correct; the one specimen stress refusal is publis
 // 6. m. 66: the two-handed “9222” column and the preserved sustained voices
 // ---------------------------------------------------------------------------
 
-test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the tied F3 and the sustained voices preserved', () => {
+test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the written F3 and the sustained voices preserved', () => {
   assert.equal(BRAHMS_HAND_CORRECTIONS.length, 15, 'the bounded overlay: ten LH→RH + five RH→LH, no more');
   const layouts = referenceLayouts();
   const onset = (tick: number) => headsOf(layouts).filter((p) => p.note.startTick === tick);
   const rows = (tick: number) =>
     onset(tick).map((p) => [p.note.id, p.rhythm.hand, p.note.durationTicks, p.note.pitch.pitchClass, p.note.pitch.octave]);
 
-  // The tick-12624 “9222” column: source A2(9/2) and D3(2/3) on the left, the
-  // D4/D5 pair on the right — the column reads two-handed in the printed
-  // (linear) source, not by the MIDI track label.
+  // The tick-12624 column: source A2(9/2) and D3(2/3) on the left — the A2 and
+  // D3 arrive as the written continuations of their 12552/12576 attacks — plus
+  // the F3 continuation, and the D4/D5 pair on the right. The column reads
+  // two-handed in the printed (linear) source, not by the MIDI track label.
   assert.deepEqual(
     rows(12624),
     [
       ['brahms-op118-no1-914', 'LH', 96, 2, 3],
       ['brahms-op118-no1-915', 'RH', 96, 2, 4],
       ['brahms-op118-no1-916', 'RH', 96, 2, 5],
+      ['brahms-op118-no1-912~c1', 'LH', 96, 5, 3],
       ['brahms-op118-no1-913', 'LH', 96, 9, 2],
     ],
-    'the two-handed tick-12624 column'
+    'the two-handed tick-12624 column, including the written F3 continuation head'
   );
+  // Round 46: one visible attack head per source-proven attack/carry group —
+  // the A2 group (908/909) and the D3 group (910/911) each paint one head,
+  // stating the chain's first written component.
   assert.deepEqual(
     rows(12552),
-    [
-      ['brahms-op118-no1-908', 'LH', 24, 9, 2],
-      ['brahms-op118-no1-909', 'LH', 168, 9, 2],
-    ],
-    'the A2 reattack joins its preserved sustained voice on the left'
+    [['brahms-op118-no1-909', 'LH', 24, 9, 2]],
+    'the A2 attack/carry group paints one visible attack head (24 ticks)'
   );
   assert.deepEqual(
     rows(12576),
-    [
-      ['brahms-op118-no1-910', 'LH', 24, 2, 3],
-      ['brahms-op118-no1-911', 'LH', 144, 2, 3],
-    ],
-    'the D3 reattack joins its preserved sustained voice on the left'
+    [['brahms-op118-no1-911', 'LH', 48, 2, 3]],
+    'the D3 attack/carry group paints one visible attack head (48 ticks)'
   );
   assert.deepEqual(
     rows(12600),
-    [['brahms-op118-no1-912', 'LH', 120, 5, 3]],
-    'the 120-tick tied F3 is a left-hand event sounding into the column'
+    [['brahms-op118-no1-912', 'LH', 24, 5, 3]],
+    'the F3 states its first written component (24) and ties into 12624'
   );
-  // No onset was invented and no event was deleted: the two former cross-hand
-  // unison merges are gone (the reattacks are now same-hand unisons), and the
-  // five remaining merges are the pinned unrelated ones.
+  // The unequal simultaneous voice keeps its own rhythm statement.
+  assert.deepEqual(
+    layouts
+      .flatMap((l) => l.unisonVoices)
+      .filter((v) => v.note.startTick >= 12552 && v.note.startTick < 12624)
+      .map((v) => [v.note.id, v.note.durationTicks]),
+    [['brahms-op118-no1-910', 24]],
+    'the shorter A2 voice is preserved as a mixed-duration voice'
+  );
+  // No onset was invented and no event was deleted: seven source heads merge
+  // (the five pinned unrelated cross-hand unisons plus the two m. 66
+  // attack/carry groups) and thirteen written continuation heads are added.
   const merges = layouts.flatMap((l) => l.unisonMerges);
   assert.deepEqual(
     merges.map((m) => [m.tick, m.survivorId, [...m.mergedIds]]),
@@ -1127,31 +1292,59 @@ test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the tied F3 an
       [12336, 'brahms-op118-no1-898', ['brahms-op118-no1-897']],
       [12360, 'brahms-op118-no1-901', ['brahms-op118-no1-900']],
       [12384, 'brahms-op118-no1-903', ['brahms-op118-no1-902']],
+      [12552, 'brahms-op118-no1-909', ['brahms-op118-no1-908']],
+      [12576, 'brahms-op118-no1-911', ['brahms-op118-no1-910']],
     ],
-    'the m. 66 unison pairs no longer merge; nothing else does either'
+    'the two m. 66 attack/carry groups merge; nothing else does'
   );
-  assert.equal(merges.some((m) => m.tick >= 12552 && m.tick <= 12624), false, 'no m. 66 merge remains');
-  // The 120-tick tie keeps its published unsupported-duration finding: the
-  // correction changed the hand only, never the value.
+  assert.deepEqual(
+    layouts
+      .flatMap((l) => l.notes)
+      .filter((p) => p.note.id.includes('~c'))
+      .map((p) => p.note.id)
+      .sort(),
+    [
+      'brahms-op118-no1-295~c1',
+      'brahms-op118-no1-351~c1',
+      'brahms-op118-no1-448~c1',
+      'brahms-op118-no1-544~c1',
+      'brahms-op118-no1-581~c1',
+      'brahms-op118-no1-637~c1',
+      'brahms-op118-no1-734~c1',
+      'brahms-op118-no1-858~c1',
+      'brahms-op118-no1-858~c2',
+      'brahms-op118-no1-858~c3',
+      'brahms-op118-no1-905~c1',
+      'brahms-op118-no1-906~c1',
+      'brahms-op118-no1-912~c1',
+    ],
+    'exactly the thirteen written continuation heads the ties state'
+  );
+  // The former 120-tick composite is now a rendered chain, so it is no longer
+  // published as an unsupported duration.
   assert.equal(
     layouts
       .flatMap((l) => l.exceptionCarrierUnsupported)
       .some((u) => u.noteId === 'brahms-op118-no1-912'),
     false,
-    'the 120-tick F3 itself is a tie member, not a carrier owner'
+    'the 120-tick F3 is a rendered tie chain, not an unstated composite'
   );
   assert.equal(
     layouts.flatMap((l) => l.notes).filter((p) => p.note.startTick === 12600).length,
     1,
     'exactly one F3 onset exists (no invented duplicate)'
   );
+  // The written ties are painted as arcs, and none is blocked.
+  assert.equal(layouts.flatMap((l) => l.tieArcs ?? []).length, 19, 'nineteen tie arcs join the chains');
+  assert.deepEqual(layouts.flatMap((l) => l.tieAnchorShortfalls ?? []), [], 'every arc found its heads');
+  assert.deepEqual(layouts.flatMap((l) => l.tieBlockedArcs ?? []), [], 'every arc clears the glyph masks');
 });
 
 // ---------------------------------------------------------------------------
 // 7. Literal low pitches: the ↓10 folds are gone, the ledgers state the register
 // ---------------------------------------------------------------------------
 
-test('Literal low pitches: the nine unwarranted ↓10 folds are gone, the ledger vocabulary states the register', () => {
+test('Literal low pitches: the nine unwarranted ↓10 folds are gone and the literal positions are exact', () => {
   // Every source pitch of this score is at or above the literal floor, so the
   // working Reference folds nothing and writes no ottava indicator.
   assert.equal(JANKO_LITERAL_LOW_FLOOR_LIN, 0, 'the literal vocabulary reaches the source floor');
@@ -1199,8 +1392,12 @@ test('Literal low pitches: the nine unwarranted ↓10 folds are gone, the ledger
     assert.equal(p.note.pitch.pitchClass, pitchClass, `${id}: literal pitch class`);
     assert.equal(p.ottavaShift, undefined, `${id}: no fold shift`);
     assert.equal(p.writtenLin, octave * 12 + pitchClass, `${id}: written = sounding (exact pitch semantics)`);
-    assert.equal(p.coord.isOutOfStaff, true, `${id}: the register is stated, not hidden`);
-    assert.ok(p.coord.ledgerYs.length > 0, `${id}: by the established ledger equators`);
+    // Round 46: the literal position **is** the register statement. Round 45
+    // drew dynamic ledger equators beside the head; that extra ink (and the
+    // `isOutOfStaff` flag that described it) is gone, and the head's own
+    // position states the register exactly.
+    assert.equal(p.coord.isOutOfStaff, false, `${id}: no extra register ink`);
+    assert.deepEqual(p.coord.ledgerYs, [], `${id}: no ledger dash beside the literal head`);
     const system = working.find((l) => l.notes.some((x) => x.note.id === id))!;
     assert.ok(
       approx(
@@ -1211,9 +1408,11 @@ test('Literal low pitches: the nine unwarranted ↓10 folds are gone, the ledger
       `${id}: painted at its literal staff position (the middle-C equator plus its written pitch)`
     );
   }
-  // The register ink is actually painted (m. 67's literal low A1 downbeat).
+  // Round 45's extra ink is gone from the real paint too (m. 67's literal low
+  // A1 downbeat), while the resolved-position claim stays exact.
   const m67 = renderJankoCrop(BRAHMS, 67, 1, REFERENCE_OPTIONS, REFERENCE_TOKENS);
-  assert.ok((m67.match(/class="janko-ledger"/g) ?? []).length > 0, 'm. 67 paints its ledger extensions');
+  assert.equal((m67.match(/class="janko-ledger"/g) ?? []).length, 0, 'm. 67 paints no ledger ink');
+  assert.equal((m67.match(/class="janko-outlier-rule"/g) ?? []).length, 0, 'and no outlier rule');
   assert.equal((m67.match(/janko-ottava/g) ?? []).length, 0, 'and no displaced-note indicator');
   const m67Core = renderJankoCrop(BRAHMS, 67, 1, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS);
   assert.ok((m67Core.match(/janko-ottava/g) ?? []).length > 0, 'the core folding would have written the ↓10 instead');
@@ -1273,9 +1472,19 @@ test('System spacing and pagination are unchanged by the literal placement; the 
   // Page completeness and source accounting across the whole spread.
   assert.equal(BRAHMS.notes.length, 964, 'the source carries 964 notes');
   const paintedHeads = headsOf(literal);
-  assert.equal(paintedHeads.length, 959, 'the spread paints one head per non-merged note');
+  // Round 46 head accounting: 964 source notes − 7 merged source heads (five
+  // cross-hand unisons + the two m. 66 attack/carry groups) + 13 written
+  // continuation heads = 970 painted heads.
+  assert.equal(paintedHeads.length, 970, 'the spread paints every source head once plus the written continuations');
   const merged = literal.flatMap((l) => l.unisonMerges).flatMap((m) => m.mergedIds);
-  assert.equal(paintedHeads.length + merged.length, BRAHMS.notes.length, '964 = 959 painted + 5 merged');
+  assert.equal(merged.length, 7, 'seven source heads merge');
+  const addedTieHeads = paintedHeads.filter((p) => p.note.id.includes('~c')).length;
+  assert.equal(addedTieHeads, 13, 'thirteen written continuation heads are added');
+  assert.equal(
+    paintedHeads.length + merged.length - addedTieHeads,
+    BRAHMS.notes.length,
+    '964 = 970 painted − 13 continuations + 7 merged'
+  );
   const perPage: number[] = [];
   const stemsPerPage: number[] = [];
   const flagsPerPage: number[] = [];
@@ -1295,62 +1504,56 @@ test('System spacing and pagination are unchanged by the literal placement; the 
     stemsPerPage.push((svg.match(/class="janko-stem"/g) ?? []).length);
     flagsPerPage.push((svg.match(/class="janko-flag"/g) ?? []).length);
   }
-  assert.deepEqual(perPage, [211, 232, 232, 219, 65], 'the engine page census');
+  assert.deepEqual(perPage, [211, 234, 236, 223, 66], 'the engine page census');
   assert.equal(perPage.reduce((a, b) => a + b, 0), paintedHeads.length, 'every laid-out head paints once');
   // No missing rhythm ink: every page paints its stems/flags, and the whole
-  // spread's stem census is the measured 694 (the 959 heads minus the 269
+  // spread's stem census is the measured 692 (the 970 heads minus the 282
   // suppressed standalone stems, plus the shared-stem/beam carriers).
-  assert.deepEqual(stemsPerPage, [136, 172, 170, 169, 47], 'the page stem census');
-  assert.equal(stemsPerPage.reduce((a, b) => a + b, 0), 694, '694 painted stems across the spread');
-  assert.deepEqual(flagsPerPage, [18, 26, 22, 14, 5], 'and the flag census is complete');
+  assert.deepEqual(stemsPerPage, [136, 172, 169, 169, 46], 'the page stem census');
+  assert.equal(stemsPerPage.reduce((a, b) => a + b, 0), 692, '692 painted stems across the spread');
+  assert.deepEqual(flagsPerPage, [18, 24, 20, 12, 3], 'and the flag census is complete');
 });
 
 // ---------------------------------------------------------------------------
 // 8. Honesty: the whole-score report, the Reference ≡ 90 % rule, frozen Bach
 // ---------------------------------------------------------------------------
 
-test('Honest whole-score report: six composites by identity, zero hard errors, Reference ≡ the 90 % card, Bach GOLD frozen', () => {
+test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ the 0.30pt card, Bach GOLD frozen', () => {
   const report = lintJankoScore(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS);
   assert.equal(report.ok, true, 'the working Reference is free of hard errors');
   assert.deepEqual(report.violations, [], 'zero violations — by identity, not by a count allowance');
-  assert.deepEqual(
-    report.warnings.map((w) => [w.code, w.noteIds?.[0], w.measure]),
-    [
-      ['carrier-duration-unsupported', 'brahms-op118-no1-295', 22],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-351', 26],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-448', 33],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-581', 42],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-637', 46],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-734', 53],
-    ],
-    'the six 120-tick tie composites stay explicitly visible (the deferred follow-up, not a claim of completeness)'
-  );
-  assert.equal(report.stats.notes, 959, 'the report walks the same painted heads');
+  // Round 46: the six former 120-tick composite refusals are stated exactly by
+  // their written components (first 96 = one half-ring, the remaining 24 tied),
+  // so the record is genuinely empty — nothing suppressed, nothing hidden, and
+  // no refusal reappears under another name.
+  assert.deepEqual(report.warnings, [], 'zero warnings — the six composites are solved, not suppressed');
+  for (const id of [295, 351, 448, 581, 637, 734]) {
+    assert.ok(
+      report.diagnostics.every((d) => !(d.noteIds ?? []).includes(`brahms-op118-no1-${id}`)),
+      `brahms-op118-no1-${id}: the former refusal never reappears`
+    );
+  }
+  assert.equal(report.stats.notes, 970, 'the report walks the painted heads (964 − 7 merged + 13 continuations)');
   assert.equal(report.stats.systems, 18, 'and the same systems');
-  // The three candidate cards report the same Brahms surface plus the single
-  // specimen stress refusal — 7 warnings each, by identity, nothing filtered.
-  for (const scale of SCALES) {
-    const card = cardOf(scale);
+  // Both candidate cards report the same clean Brahms surface (the round's own
+  // spacing control differs by one declared number, never by diagnostics).
+  for (const card of CURRENT_CANDIDATES) {
     const brahmsReport = lintJankoScore(
       BRAHMS,
       resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
       resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) })
     );
-    assert.deepEqual(brahmsReport.violations, [], `s=${scale}: no hard error on the whole Brahms score`);
-    assert.deepEqual(
-      brahmsReport.warnings.map((w) => w.noteIds?.[0]),
-      report.warnings.map((w) => w.noteIds?.[0]),
-      `s=${scale}: the same six composites, by identity`
-    );
+    assert.deepEqual(brahmsReport.violations, [], `${card.id}: no hard error on the whole Brahms score`);
+    assert.deepEqual(brahmsReport.warnings, [], `${card.id}: no warning on the whole Brahms score`);
   }
 
-  // The 90 % card and the Reference are one engraving (options, tokens and
+  // The 0.30pt card and the Reference are one engraving (options, tokens and
   // bytes — the served-page equality is pinned in the studio test above).
-  const card90 = cardOf(0.9);
+  const card30 = CURRENT_CANDIDATES.find((c) => c.id === 'brahms-scale-95-air30')!;
   assert.deepEqual(
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card90.options ?? {}) }),
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card30.options ?? {}) }),
     REFERENCE_OPTIONS,
-    'candidate 90 = the working Brahms Reference'
+    'candidate 0.30pt = the working Brahms Reference'
   );
 
   // Frozen canonicals: Bach GOLD is byte-identical to the landed Round 44
@@ -1378,25 +1581,25 @@ test('Honest whole-score report: six composites by identity, zero hard errors, R
   );
   // The Brahms Reference is the intentional golden change of this round: pin
   // the adopted artifact through the engine (the committed PDF is pinned by
-  // `test/janko-pdf.test.ts`, regenerated by `npm run pdf`).
+  // `test/janko-pdf.test.ts`; the export is Bach-only, so it carries no churn).
   const brahmsPages = [
-    '55d606e5b1b50bed15ddb16a4ad53a17c21eef401bfbd1e013377fd09a9f83b9',
-    'f7f2fef428b52aa78d2e827f711967bb0984bb5b6bb53113a7d16bb6f3167098',
-    'f33bf7c762f3f96f2b354e90b2c51a3a270adf1f9506f46e9a1213afdb851765',
-    '705936c03d9002cdd7b443920aa0fa24ba9ffeff6af4d6f01643df9c9c2240b8',
-    '8f128a67eac371d154a0d55bda7c4e4cf33d585d296d9fb18987ee389e73d6a1',
+    '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b',
+    'fdd1acad9b018b77259acf3f08a791deaa094108b8ce64cce340363afd9a163a',
+    '8a7a2a0bee8351927c6a6005f5b4840a4db3cafcf424c6986aaa97134633a6f2',
+    'a37be98646e7a09daa2becb01ab46fc3e290651954cb01b55329b5033dfef805',
+    '6db87101cbf85faead7834164d2e7dab8e0876ba855b6c58922f68804314e0c0',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
       sha(renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
       brahmsPages[page],
-      `Brahms Reference page ${page} is the adopted Round 45 engraving`
+      `Brahms Reference page ${page} is the adopted Round 46 engraving`
     );
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
-    '5ed2c9c79285266f03ac9ca4398669d836f624253006f98f5b666401c23ef543',
-    'the whole-score crop is the adopted Round 45 engraving'
+    '43f95a224a860e46eb4f554f921ff6a34bb8099ac83db6af27adf2047b04ad8f',
+    'the whole-score crop is the adopted Round 46 engraving'
   );
 });
 
@@ -1404,25 +1607,27 @@ test('Honest whole-score report: six composites by identity, zero hard errors, R
 // 9. The served studio: labels, inventory and phone-session continuity
 // ---------------------------------------------------------------------------
 
-test('The served studio carries the three labelled cards and the honest inventory for both views', () => {
+test('The served studio carries the two labelled cards and the honest inventory for both views', () => {
   const candidates = candidatesView();
-  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 3, 'three candidate cards');
-  assert.match(candidates, /data-candidate-count="3"/);
-  assert.match(candidates, /data-window-count="18"/, 'six review surfaces per card');
-  assert.equal((candidates.match(/data-pages="5"/g) ?? []).length, 3, 'a genuine five-page spread per card');
-  assert.equal((candidates.match(/<figure class="page-card"/g) ?? []).length, 15, 'fifteen real page cards');
-  for (const label of ['Brahms 85 %', 'Brahms 90 %', 'Brahms 95 %']) {
+  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 2, 'two candidate cards');
+  assert.match(candidates, /data-candidate-count="2"/);
+  assert.match(candidates, /data-window-count="18"/, 'nine review surfaces per card');
+  assert.equal((candidates.match(/data-pages="5"/g) ?? []).length, 2, 'a genuine five-page spread per card');
+  assert.equal((candidates.match(/<figure class="page-card"/g) ?? []).length, 10, 'ten real page cards');
+  for (const label of ['Brahms 95 % · 0.30pt air', 'Brahms 95 % · 0.20pt air']) {
     assert.ok(candidates.includes(label), `the served grid labels the ${label} card`);
   }
-  // The honest chip inventory: 6 Brahms composite warnings + the single DVS
-  // stress refusal on every card (the round's own candidate warning census).
-  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 3, 'every card is free of hard errors');
-  assert.equal((candidates.match(/⚠ 7 warnings/g) ?? []).length, 3, 'and reports its seven warnings honestly');
+  // The honest chip inventory: the canonical Brahms is 0/0 and the synthetic
+  // DVS key publishes its single stress refusal (the one independently labeled
+  // diagnostic outside the score).
+  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 2, 'every card is free of hard errors');
+  assert.equal((candidates.match(/⚠ 1 warning/g) ?? []).length, 2, 'and reports its one warning honestly');
+  assert.equal((candidates.match(/⚠ 7 warnings/g) ?? []).length, 0, 'the former six-composite inventory is gone');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(candidates), 'no screenshots, no raster review artifacts');
   assert.ok(!/localhost/i.test(candidates), 'Tailscale access only — no localhost reference');
 
   const reference = referenceView();
-  assert.match(reference, /⚠ 6 warnings/, 'the BRONZE Brahms Reference reports its six composites');
+  assert.match(reference, /0 violations, 0 warnings/, 'the BRONZE Brahms Reference reports its clean record');
   assert.equal((reference.match(/data-page="/g) ?? []).length, 7, 'two Bach pages + five Brahms pages');
   // Phone continuity (§F) is studio-wide and lives in the shared session
   // module: both views are served by the same document, and the behavioural

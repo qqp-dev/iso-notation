@@ -333,15 +333,18 @@ function carrierInks(svg: string): CarrierInk[] {
 }
 
 /** The compact reading of one plain value (the study's expected alphabet). */
-const EXPECTED: Record<number, { cuts: number; rings: number; dots: 0 | 1 | 2 }> = {
-  3: { cuts: 4, rings: 0, dots: 0 },
-  6: { cuts: 3, rings: 0, dots: 0 },
-  12: { cuts: 2, rings: 0, dots: 0 },
-  24: { cuts: 1, rings: 0, dots: 0 },
-  48: { cuts: 0, rings: 0, dots: 0 },
-  96: { cuts: 0, rings: 1, dots: 0 },
-  192: { cuts: 0, rings: 2, dots: 0 },
-  384: { cuts: 0, rings: 3, dots: 0 },
+// Round 46 added the `halfRing` field to the shared mark record; this fixture is
+// the **compact** family (the Round 42 study), whose long-value readings are
+// unchanged (only the midpoint family re-read 96/192/384).
+const EXPECTED: Record<number, { cuts: number; rings: number; halfRing: boolean; dots: 0 | 1 | 2 }> = {
+  3: { cuts: 4, rings: 0, halfRing: false, dots: 0 },
+  6: { cuts: 3, rings: 0, halfRing: false, dots: 0 },
+  12: { cuts: 2, rings: 0, halfRing: false, dots: 0 },
+  24: { cuts: 1, rings: 0, halfRing: false, dots: 0 },
+  48: { cuts: 0, rings: 0, halfRing: false, dots: 0 },
+  96: { cuts: 0, rings: 1, halfRing: false, dots: 0 },
+  192: { cuts: 0, rings: 2, halfRing: false, dots: 0 },
+  384: { cuts: 0, rings: 3, halfRing: false, dots: 0 },
 };
 
 // ---------------------------------------------------------------------------
@@ -745,22 +748,24 @@ test('Canonical equivalence: new fields default to no-ops; both goldens stay cle
 
   const bach = lintJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.deepEqual([bach.violations.length, bach.warnings.length], [0, 0], 'Bach GOLD stays 0/0');
-  // Round 45: the working Brahms Reference adopts the agreed 90 % treatment, so
-  // the BRONZE block is 0 violations / 6 warnings — the six published
-  // `carrier-duration-unsupported` 120-tick composites the operator deferred to
-  // the tied-duration follow-up. They are named by identity below; nothing else
-  // may ever warn.
+  // Round 46: the working Brahms Reference renders the committed written ties,
+  // so the BRONZE block is 0 violations / **0 warnings** — the six
+  // `carrier-duration-unsupported` composites that Round 45 published are now
+  // stated exactly by their written components (first 96 + tied 24). They are
+  // named by identity below; nothing else may ever warn.
   const brahms = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   assert.deepEqual(
     [brahms.violations.length, brahms.warnings.length],
-    [0, 6],
-    'Brahms BRONZE: zero hard errors, the six deferred composites published'
+    [0, 0],
+    'Brahms BRONZE: zero hard errors, zero warnings — the six composites are solved, not suppressed'
   );
-  assert.deepEqual(
-    brahms.warnings.map((w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]),
-    ['brahms-op118-no1-295', 'brahms-op118-no1-351', 'brahms-op118-no1-448', 'brahms-op118-no1-581', 'brahms-op118-no1-637', 'brahms-op118-no1-734'],
-    'the six composites are named by exact identity'
-  );
+  for (const id of [295, 351, 448, 581, 637, 734]) {
+    const noteId = `brahms-op118-no1-${id}`;
+    assert.ok(
+      brahms.diagnostics.every((d) => !(d.noteIds ?? []).includes(noteId)),
+      `${noteId}: the former refusal is gone, not re-published under another name`
+    );
+  }
 
   // The new option fields are canonical no-ops: the Bach page renders byte-for-
   // byte identically with them stated explicitly as their defaults.

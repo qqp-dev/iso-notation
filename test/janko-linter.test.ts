@@ -1129,12 +1129,15 @@ test("Clasp audit: the engine's own brackets pass every clearance rule", () => {
   );
   const rails = brahms.flatMap((l) => l.claspRails);
   assert.ok(rails.length > 0, 'the Brahms chord sequences produce rails');
-  // Round 45: the working golden's parity columns sit further left for two
-  // trailing downbeat clusters, so the RETIRED union paradigms' brackets
-  // (beamed-clasp-rail and left-clasp-spire) stand 2.75pt from their opening
-  // barlines at m. 27 and m. 47 (4.0pt required). Published by exact identity
-  // here; the canonical per-hand paradigm carries no clasp-clearance finding at
-  // all, and neither do the three Round 45 candidates or the working Reference.
+  // Round 46: the Round 45 rail-paradigm findings at m. 27 and m. 47 are gone.
+  // The Round 46 chord-column repair reads foreign units at their **solved**
+  // columns in the bracket fit, so the pre-step and the fit no longer disagree
+  // about where a neighbour's head stands (reverting that one repair restores
+  // the two 2.75pt barline findings); the two trailing downbeat clusters now
+  // stand clear of their opening barlines under this retired union paradigm.
+  // Published by exact identity here: the retired rail paradigm now carries
+  // **no** clasp-clearance finding, and neither does the canonical per-hand
+  // paradigm (asserted below).
   const findings: Array<[string, number]> = [];
   for (const layout of brahms) {
     const out = run(
@@ -1145,11 +1148,8 @@ test("Clasp audit: the engine's own brackets pass every clearance rule", () => {
   }
   assert.deepEqual(
     findings,
-    [
-      ['clasp-barline-collision', 27],
-      ['clasp-barline-collision', 47],
-    ],
-    'the retired rail paradigm publishes its two barline-air findings, nothing else'
+    [],
+    'the retired rail paradigm now publishes no barline-air finding (Round 46 columns)'
   );
   const canonicalOptions = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   for (const layout of layoutJankoScore(
@@ -1827,11 +1827,12 @@ test('golden pitch grid weight audit: extension rows 0.35pt, core rows 0.50pt', 
 // ---------------------------------------------------------------------------
 
 test('npm run lint:engraving reports canonical clean and exits 0', () => {
-  // Canonical fixed-3 everywhere: the gate exits 0 with zero violations. Bach
-  // GOLD and the three curator specimens carry no warning at all; the working
-  // Brahms Reference publishes exactly the six deferred 120-tick composites
-  // (Round 45 §B/C — the tied-duration grammar is a separate follow-up), so its
-  // warning list is pinned by identity below, never by a broad count.
+  // Canonical fixed-3 everywhere: the gate exits 0 with zero violations and —
+  // as of Round 46 — zero warnings. Bach GOLD and the three curator specimens
+  // carry no warning at all, and the working Brahms Reference's six former
+  // 120-tick composites are now stated exactly by their written components
+  // (first 96 + tied 24), so its warning list must be empty; the former
+  // refusals are checked below to be gone by identity, never by a broad count.
   const run = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/lint_engraving.ts', '--quiet'],
@@ -1840,8 +1841,8 @@ test('npm run lint:engraving reports canonical clean and exits 0', () => {
   assert.equal(run.status, 0, 'the gate exits 0 on the canonical clean record');
   assert.match(
     run.stdout,
-    /clean violations=0 warnings=6/,
-    'zero violations, and exactly the six published Brahms composites'
+    /clean violations=0 warnings=0/,
+    'zero violations and zero warnings — the six composites are solved, not suppressed'
   );
   const json = spawnSync(
     process.execPath,
@@ -1855,20 +1856,14 @@ test('npm run lint:engraving reports canonical clean and exits 0', () => {
   assert.deepEqual(reports.bach.violations, [], 'Bach GOLD: zero violations');
   assert.deepEqual(reports.bach.warnings, [], 'Bach GOLD: zero warnings');
   assert.deepEqual(reports.brahms.violations, [], 'Brahms canonical: zero violations');
-  assert.deepEqual(
-    (reports.brahms.warnings as Array<{ message: string }>).map(
-      (w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]
-    ),
-    [
-      'brahms-op118-no1-295',
-      'brahms-op118-no1-351',
-      'brahms-op118-no1-448',
-      'brahms-op118-no1-581',
-      'brahms-op118-no1-637',
-      'brahms-op118-no1-734',
-    ],
-    'Brahms canonical: the six deferred composites, named by identity'
-  );
+  assert.deepEqual(reports.brahms.warnings, [], 'Brahms canonical: zero warnings');
+  const brahmsWarningText = JSON.stringify(reports.brahms.warnings);
+  for (const id of [295, 351, 448, 581, 637, 734]) {
+    assert.ok(
+      !brahmsWarningText.includes(`brahms-op118-no1-${id}`),
+      `Brahms canonical: the former ${id} refusal never reappears`
+    );
+  }
   for (const key of ['chordSpecimen', 'restSpecimen', 'durationSpecimen']) {
     assert.deepEqual(reports[key].violations, [], `${key}: zero violations`);
     assert.deepEqual(reports[key].warnings, [], `${key}: zero warnings`);

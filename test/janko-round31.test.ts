@@ -252,42 +252,38 @@ test('GOLD/BRONZE badges on the two Reference blocks + AGENTS.md convention', ()
 });
 
 test('The BRONZE block displays honestly: zero hard errors, the six composites itemized, ungated', () => {
-  // Round 45: the working Brahms Reference carries zero hard errors and
-  // exactly the six published `carrier-duration-unsupported` composites for
-  // the 120-tick ties (the operator-deferred follow-up). Every warning is
-  // itemized by exact identity — nothing suppressed, nothing gated, nothing
-  // counted away.
+  // Round 46: the working Brahms Reference renders the committed written ties,
+  // so the BRONZE block is 0 violations / **0 warnings** — the six
+  // `carrier-duration-unsupported` composites Round 45 published are now stated
+  // exactly by their written components (first 96 + tied 24), never re-published
+  // under another name.
   const report = lintJankoScore(
     BRAHMS,
     resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
     resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
   );
   assert.equal(report.violations.length, 0, 'zero violations');
-  assert.equal(report.warnings.length, 6, 'the six published composites');
+  assert.equal(report.warnings.length, 0, 'zero warnings — the six composites are solved, not suppressed');
+  for (const id of [295, 351, 448, 581, 637, 734]) {
+    const noteId = `brahms-op118-no1-${id}`;
+    assert.ok(
+      report.diagnostics.every((d) => !(d.noteIds ?? []).includes(noteId)),
+      `${noteId}: nothing is re-published under another name`
+    );
+  }
   // The fixed-3 reserve this suite's own layout pins read is the historical
   // Round 44 surface, and it stays 0/0 (asserted by its own census tests).
   assert.equal(lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS).warnings.length, 0, 'the reserve stays warning-free');
   assert.equal(report.ok, true, 'the BRONZE surface is honestly ok');
-  assert.deepEqual(
-    report.warnings.map((w) => [w.code, w.noteIds?.[0]]),
-    [
-      ['carrier-duration-unsupported', 'brahms-op118-no1-295'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-351'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-448'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-581'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-637'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-734'],
-    ],
-    'the six are named by note id, never by a broad allowance'
-  );
   const { bach, brahms } = referenceBlocks();
   assert.match(brahms, /data-lint-ok="true"/, 'the BRONZE chip stays honestly clean');
-  assert.match(brahms, /⚠ 6 warnings/, 'the count is shown, never folded away');
-  assert.match(brahms, /0 violations, 6 warnings/, 'the ok line prints both counts');
-  assert.match(brahms, /Diagnostics \(6\)/, 'every warning is itemized in the list');
-  assert.ok(!brahms.includes('diag-ok'), 'no clean-master line on a surface with published warnings');
-  assert.ok(!brahms.includes('known-note'), 'a published warning is not a known-folding note');
-  assert.ok(!brahms.includes('known-finding'), 'and never re-badged as a known finding');
+  assert.match(brahms, /0 violations, 0 warnings/, 'the ok line prints both counts');
+  assert.match(brahms, /Diagnostics \(0\)/, 'the empty diagnostics list is still there — nothing folded away');
+  assert.match(brahms, /zero violations, zero warnings/, 'the clean-master line is back on the clean surface');
+  assert.ok(!brahms.includes('data-lint-ok="false"'), 'the BRONZE chip is never red');
+  assert.ok(!brahms.includes('carrier-duration-unsupported'), 'no former composite refusal survives in the markup');
+  assert.ok(!brahms.includes('known-note'), 'no stale known-folding note');
+  assert.ok(!brahms.includes('known-finding'), 'and never a known finding');
   assert.match(bach, /data-lint-ok="true"/, 'the GOLD block stays clean');
   assert.ok(!bach.includes('known-finding'), 'no known tags on GOLD');
   assert.ok(!bach.includes('known-note'), 'no known note on GOLD');
@@ -652,8 +648,12 @@ test('Card chip honestly inherits the surface: clean, preview adds 0', () => {
   assert.match(html, /data-lint="clean"/, 'the chip inherits the surface honestly');
   assert.match(
     html,
-    /⚠ 6 warnings/,
-    'the count is shown, never folded away — the working Reference publishes its six composites'
+    /data-lint="clean"/,
+    'the nudge card inherits the clean surface — no warning chip on a clean surface'
+  );
+  assert.ok(
+    !html.includes('⚠'),
+    'the Round 46 working Reference publishes no warnings at all (the six composites are solved)'
   );
   // Parked: badges render against the live CURRENT round (Round 32), so the
   // historical claspDotNudge delta shows without the axis class (the live
