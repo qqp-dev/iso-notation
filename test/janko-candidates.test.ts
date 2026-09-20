@@ -263,16 +263,16 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 45 (five declared axes)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 45);
-  assert.match(CURRENT_ROUND_METADATA.title, /larger readable Brahms clusters/i);
+test('CURRENT_ROUND_METADATA is the open Round 46 (three declared axes)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 46);
+  assert.match(CURRENT_ROUND_METADATA.title, /readable 95 % clusters/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['chordSymbolScale', 'opticalSpacing', 'lowPitchFolding', 'bracketDurationGrammar', 'exceptionCarrier'],
-    'the admitted scale, the declared optical spacing, the literal lows and the cluster-duration grammar are the round axes'
+    ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
+    'the declared optical air, the admitted scale and the written ties are the round axes'
   );
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
-  assert.match(CURRENT_ROUND_METADATA.description, /0\.792|0\.54344/, 'the measured delta is published');
+  assert.match(CURRENT_ROUND_METADATA.description, /0\.30|2\.09658|970/, 'the measured deltas are published');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
   assert.deepEqual(
@@ -343,69 +343,75 @@ test('CURRENT_ROUND_METADATA is the open Round 45 (five declared axes)', () => {
   assert.deepEqual(ROUND_44_CARDS, ['anchored-45-ink'], 'R44 parked singleton on record');
 });
 
-test('CURRENT_CANDIDATES is the Round 45 trio: three admitted-cluster scales', () => {
+test('CURRENT_CANDIDATES is the Round 46 pair: two 95 % real-engine variants', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['brahms-scale-85', 'brahms-scale-90', 'brahms-scale-95'],
-    'the three scale cards, no obligatory control and no 100 % candidate'
+    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
+    'the 0.30pt working Reference and its 0.20pt spacing control'
   );
   const scales = CURRENT_CANDIDATES.map((c) => c.options?.chordSymbolScale);
-  assert.deepEqual(scales, [0.85, 0.9, 0.95], 'the judged axis is the admitted cluster scale');
+  assert.deepEqual(scales, [0.95, 0.95], 'both at the adopted admitted-cluster scale');
   const family = {
     pitchPlacement: 'parity-columns',
     bracketDurationGrammar: 'midpoint',
     exceptionCarrier: 'horizontal',
     opticalSpacing: true,
     lowPitchFolding: 'literal',
+    writtenTies: 'source',
   };
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'chordSymbolScale', `${c.id}: the one open axis it claims`);
+    assert.equal(c.axis, 'opticalClearanceAir', `${c.id}: the one open axis it claims`);
     assert.notEqual(c.kind, 'abstract', `${c.id}: score candidate`);
-    // Otherwise identical: every non-axis key is the shared Round 45 family.
+    // Otherwise identical: every non-axis key is the shared Round 46 family.
     const { chordSymbolScale, ...rest } = c.options ?? {};
     assert.deepEqual(rest, family, `${c.id}: otherwise identical to the family`);
-    assert.deepEqual(
-      c.tokens,
-      {
-        midpointSlashLengthFactor: 1.1,
-        midpointRingScale: 1.1,
-        midpointSpacingFactor: 7 / 6,
-        opticalClearanceAir: 0.2,
-      },
-      `${c.id}: the Round 45 readability ratios and the explicit 0.20pt air`
-    );
-    assert.equal(c.windows?.length, 6, `${c.id}: full score + four focus windows + the key`);
+    assert.equal(c.windows?.length, 9, `${c.id}: full score + seven focus windows + the key`);
   }
-  // The 90 % card and the working Brahms Reference must agree for the same
+  // The two cards differ in exactly the one declared air token.
+  const [air30, air20] = CURRENT_CANDIDATES;
+  assert.deepEqual({ ...air30.options }, { ...air20.options }, 'one option set, both cards');
+  assert.equal(air30.tokens?.opticalClearanceAir, 0.3, 'the working Reference declares 0.30pt');
+  assert.equal(air20.tokens?.opticalClearanceAir, 0.2, 'the control keeps the 0.20pt');
+  assert.deepEqual(
+    { ...air30.tokens },
+    {
+      midpointSlashLengthFactor: 1.1,
+      midpointRingScale: 1.1,
+      midpointBracketRingScale: 1.2,
+      midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
+      opticalClearanceAir: 0.3,
+    },
+    'the Round 46 readability ratios, the bracket-only enlargement and the air'
+  );
+  // The 0.30pt card and the working Brahms Reference must agree for the same
   // score/options — the round's declared coherence rule. The Reference also
   // carries its settled meter/pagination/title block, so the coherence is
   // exact on every key the card declares: no declared key may disagree, and
   // the card may not smuggle a key the adopted treatment does not state.
-  const ninety = CURRENT_CANDIDATES[1];
-  assert.equal(ninety.options?.chordSymbolScale, 0.9, 'the 90 % card');
   const adopted = BRAHMS_OP118_NO1_JANKO_OPTIONS as Record<string, unknown>;
-  for (const [key, value] of Object.entries(ninety.options ?? {})) {
-    assert.ok(key in adopted, `the 0.90 card's ${key} is part of the adopted treatment`);
-    assert.deepEqual(adopted[key], value, `the 0.90 card states the adopted ${key}`);
+  for (const [key, value] of Object.entries(air30.options ?? {})) {
+    assert.ok(key in adopted, `the 0.30pt card's ${key} is part of the adopted treatment`);
+    assert.deepEqual(adopted[key], value, `the 0.30pt card states the adopted ${key}`);
   }
   const adoptedTokens = BRAHMS_OP118_NO1_JANKO_TOKENS as Record<string, unknown>;
-  for (const [key, value] of Object.entries(ninety.tokens ?? {})) {
-    assert.ok(key in adoptedTokens, `the 0.90 card's ${key} token is part of the adopted treatment`);
-    assert.deepEqual(adoptedTokens[key], value, `the 0.90 card states the adopted ${key} token`);
+  for (const [key, value] of Object.entries(air30.tokens ?? {})) {
+    assert.ok(key in adoptedTokens, `the 0.30pt card's ${key} token is part of the adopted treatment`);
+    assert.deepEqual(adoptedTokens[key], value, `the 0.30pt card states the adopted ${key} token`);
   }
-  // And the whole Round 45 family — not only the scale — is what the working
-  // Reference adopted (a regression to the literal/golden grammar would leave
-  // the card coherent with a surface the operator never chose).
+  // And the whole Round 46 family — not only the scale — is what the working
+  // Reference adopted (a regression to the golden grammar would leave the card
+  // coherent with a surface the operator never chose).
   const working = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   for (const key of Object.keys(family) as Array<keyof typeof family>) {
     assert.deepEqual(
       working[key],
       (family as Record<string, unknown>)[key],
-      `the working Reference carries the Round 45 ${key}`
+      `the working Reference carries the Round 46 ${key}`
     );
   }
-  assert.equal(working.chordSymbolScale, 0.9, 'at the operator-chosen 90 %');
+  assert.equal(working.chordSymbolScale, 0.95, 'at the adopted 95 %');
+  assert.equal(working.writtenTies, 'source', 'with the committed written ties rendered');
 });
 
 // ---------------------------------------------------------------------------
@@ -2157,24 +2163,24 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: one grid card, nine windows, no strip
+// 17. Studio: two variants, nine windows each, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open Round 45: three scale cards on 18 windows', () => {
+test('The live studio renders the open Round 46: two 95 % variants on 18 windows', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
-  assert.match(html, /data-candidate-count="3"/);
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.match(html, /data-candidate-count="2"/);
   assert.match(
     html,
     /data-window-count="18"/,
-    'per card: the full-score spread + four Brahms focus windows + the compact duration key'
+    'per card: the full-score spread + seven Brahms focus windows + the compact duration key'
   );
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 45/);
+  assert.match(html, /Round 46/);
   assert.match(
     html,
-    /larger readable Brahms clusters/i,
-    'the larger-readable-clusters title headlines the view'
+    /readable 95 % clusters/i,
+    'the readable-95 %-clusters title headlines the view'
   );
   for (const id of [
     ...ROUND_41_CARDS,
@@ -2184,45 +2190,45 @@ test('The live studio renders the open Round 45: three scale cards on 18 windows
   ]) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  // Round 45 honesty: each card's chip carries whole-score lint across every
-  // score it renders — zero hard errors on the three scales, the six published
-  // 120-tick composite refusals, and the duration key's one withheld carrier
-  // (seven warnings), and nothing is suppressed. The measured treatment,
+  // Round 46 honesty: each card's chip carries whole-score lint across every
+  // score it renders — zero hard errors and zero warnings on the canonical
+  // Brahms (the six former 120-tick composites are solved), plus the duration
+  // key's one independently labeled withheld carrier. The measured treatment,
   // membership and window proofs live in test/janko-round45.test.ts.
   assert.equal(
     (html.match(/data-lint="clean"/g) ?? []).length,
-    3,
-    'every chip honestly reads clean with published warnings'
+    2,
+    'every chip honestly reads clean'
   );
   assert.equal(
-    (html.match(/\u26a0 7 warnings/g) ?? []).length,
-    3,
-    'six composite refusals + the key band\'s withheld carrier, per card'
+    (html.match(/\u26a0 1 warning/g) ?? []).length,
+    2,
+    'the key band\'s one withheld carrier, per card'
   );
   // The whole score as genuine pages: one full-score window per card, five
   // page cards each.
   assert.equal(
     (html.match(/data-window="brahms-op118-no1:1-71" data-pages="5"/g) ?? []).length,
-    3,
+    2,
     'the full-score window on every card'
   );
   assert.equal(
     (html.match(/<figure class="page-card" data-page="\d+">/g) ?? []).length,
-    15,
+    10,
     'one real page card per page, per card'
   );
-  // Four authentic Brahms focus windows per card, one each.
-  for (const span of ['5-5', '7-9', '17-19', '66-71']) {
+  // Seven authentic Brahms focus windows per card, one each.
+  for (const span of ['1-3', '7-9', '17-19', '33-33', '53-53', '61-63', '65-71']) {
     assert.equal(
       (html.match(new RegExp(`data-window="brahms-op118-no1:${span}"`, 'g')) ?? []).length,
-      3,
+      2,
       `Brahms window ${span} on every card`
     );
   }
   // The compact labelled duration key: the short values the corpus never states.
   assert.equal(
     (html.match(/data-window="duration-vocabulary-specimen:17-24"/g) ?? []).length,
-    3,
+    2,
     'the duration-vocabulary key band, once per card'
   );
   // The synthetic pitch specimen is no longer a review medium.

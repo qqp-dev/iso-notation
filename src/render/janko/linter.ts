@@ -75,6 +75,7 @@ import {
   PositionedJankoNote,
   computePageGeometry,
   detectStemDigitCrossings,
+  drawnStaffRuleYs,
   getMarginFurniture,
   holdClearanceInk,
   isContentAwarePlacement,
@@ -168,6 +169,7 @@ import {
   renderCompactCouplingSvg,
 } from './compression';
 import { checkHandprintCollisions } from './elements/handprint';
+import { JankoTieBox, tieArcEntersBoxes } from './ties';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -241,7 +243,15 @@ export type JankoLintCode =
   | 'hold-unresolvable'
   | 'carrier-duration-unsupported'
   | 'carrier-mark-occlusion'
-  | 'carrier-fit-refused';
+  | 'carrier-fit-refused'
+  // Round 46 written ties.
+  | 'tie-anchor-shortfall'
+  | 'tie-missing-head'
+  | 'tie-arc-missing'
+  | 'tie-endpoint-clearance'
+  | 'tie-component-value'
+  | 'tie-gap-unpublished'
+  | 'tie-rule-fusion';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -4994,14 +5004,15 @@ export function checkOttavaCoverage(
  *
  * Round 45: `lowPitchFolding: 'literal'` deliberately draws a **low** source
  * pitch at its literal written pitch — the octave is never displaced and no
- * ↓10/↓20 indicator is emitted — and states the register with the established
- * dynamic ledger equators (the same vocabulary the twin-row layouts use for an
- * out-of-staff octave). Such a note is legal exactly while the vocabulary can
- * state it: it must actually carry those equators, it must be a *low* pitch
- * (high pitches keep folding), and it must stay inside the vocabulary's
- * two-octave reach ({@link JANKO_LITERAL_LOW_FLOOR_LIN}) — below that floor the
+ * ↓10/↓20 indicator is emitted. Round 46 keeps that literal *position* while
+ * removing the extra ledger ink Round 45 added beside it (the operator rejected
+ * the recurring outlier rules / ledger dashes and the row extensions they
+ * earned), so the allowance no longer asks for equators: the head's own
+ * literal position is the register statement. It stays bounded — the pitch must
+ * be *low* (high pitches keep folding) and inside the literal vocabulary's
+ * two-octave reach ({@link JANKO_LITERAL_LOW_FLOOR_LIN}); below that floor the
  * note still has to fold. Everything else in this check is unchanged, so the
- * allowance is bounded and can never hide an unstated register.
+ * allowance can never hide an unstated register.
  */
 export function checkOttavaExtensions(
   layout: JankoSystemLayout,
@@ -5039,12 +5050,10 @@ export function checkOttavaExtensions(
       wLin !== undefined &&
       wLin < minWritten &&
       wLin >= JANKO_LITERAL_LOW_FLOOR_LIN &&
-      (p.ottavaShift === undefined || p.ottavaShift === 0) &&
-      p.coord.isOutOfStaff &&
-      p.coord.ledgerYs.length > 0
+      (p.ottavaShift === undefined || p.ottavaShift === 0)
     ) {
-      // Round 45 literal low pitch: not folded, register stated by the ledger
-      // equators of its own out-of-staff octave(s).
+      // Round 45/46 literal low pitch: not folded, drawn at the source octave
+      // itself (Round 46 draws no extra ledger ink beside it).
       continue;
     }
     if (wLin !== undefined && (wLin < minWritten || wLin > maxWritten)) {
@@ -5375,6 +5384,172 @@ export function checkHandprintClearance(
  * @param tokens   micro-typography tokens (defaults to the golden master)
  * @param lint     linter thresholds (defaults to {@link DEFAULT_JANKO_LINT_OPTIONS})
  */
+/**
+ * Round 46 — the written tie audit.
+ *
+ * A tie is only honest if it is complete and if its ink stays out of the
+ * glyphs: this check names every way one can fail.
+ *
+ * - `tie-anchor-shortfall` (warning): a rendered chain component the layout
+ *   could not resolve to a head (a system break, or a sidecar that no longer
+ *   matches the notes). Published, never swallowed.
+ * - `tie-missing-head` (error): a chain component whose head is not among this
+ *   system's laid-out notes — the component would be unstated.
+ * - `tie-arc-missing` (error): a consecutive component pair with no arc.
+ * - `tie-component-value` (error): a head whose engraved value is not the
+ *   component's written value (the whole point of the treatment).
+ * - `tie-gap-unpublished` (error): a component pair whose spans neither abut
+ *   nor carry the source's `tieWaitForNote` — an implicit hold with no source
+ *   warrant.
+ * - `tie-endpoint-clearance` (error): tie ink inside a head's knockout box
+ *   (the tie would knock a glyph or its own mask out).
+ * - `tie-rule-fusion` (warning): tie ink fused with a coincident staff rule
+ *   (the arc's axis could not be nudged clear).
+ *
+ * Every number comes from the very geometry the renderer paints
+ * (`JankoTieArcGeometry` / `tieArcInkBox`), so paint and audit cannot drift.
+ */
+export function checkTieIntegrity(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  for (const blocked of layout.tieBlockedArcs ?? []) {
+    out.push({
+      code: 'tie-endpoint-clearance',
+      severity: 'error',
+      message: `Tie chain ${blocked.noteId} component ${blocked.component}: ${blocked.reason}`,
+      system: layout.index,
+      noteIds: [blocked.noteId, blocked.headId].filter((id) => id.length > 0),
+    });
+  }
+  for (const shortfall of layout.tieAnchorShortfalls ?? []) {
+    out.push({
+      code: 'tie-anchor-shortfall',
+      severity: 'warning',
+      message: `Tie chain ${shortfall.noteId}: ${shortfall.reason}`,
+      system: layout.index,
+      noteIds: [shortfall.noteId, shortfall.headId],
+    });
+  }
+  const chains = layout.tieChains ?? [];
+  const arcs = layout.tieArcs ?? [];
+  if (chains.length === 0 && arcs.length === 0) return;
+  const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
+  for (const chain of chains) {
+    for (const component of chain.components) {
+      const head = byId.get(component.headId);
+      if (!head) {
+        out.push({
+          code: 'tie-missing-head',
+          severity: 'error',
+          message:
+            `Written tie chain ${chain.noteId} component ${component.index + 1} names head ` +
+            `${component.headId}, which this system does not lay out — the component is unstated`,
+          system: layout.index,
+          noteIds: [chain.noteId, component.headId],
+        });
+        continue;
+      }
+      if (head.note.durationTicks !== component.durationTicks) {
+        out.push({
+          code: 'tie-component-value',
+          severity: 'error',
+          message:
+            `Head ${component.headId} of tie chain ${chain.noteId} is engraved at ` +
+            `${head.note.durationTicks} ticks, but its written component states ` +
+            `${component.durationTicks} — the component value must be explicit`,
+          system: layout.index,
+          noteIds: [component.headId],
+          x: head.x,
+          y: head.y,
+          metrics: {
+            engraved: head.note.durationTicks,
+            component: component.durationTicks,
+          },
+        });
+      }
+      const next = chain.components[component.index + 1];
+      if (!next) continue;
+      const arc = arcs.find(
+        (a) => a.noteId === chain.noteId && a.fromHeadId === component.headId && a.toHeadId === next.headId
+      );
+      if (!arc) {
+        out.push({
+          code: 'tie-arc-missing',
+          severity: 'error',
+          message:
+            `Written tie chain ${chain.noteId} states components ${component.durationTicks} → ` +
+            `${next.durationTicks} with no tie arc between their heads`,
+          system: layout.index,
+          noteIds: [chain.noteId, component.headId, next.headId],
+          x: head.x,
+          y: head.y,
+        });
+      }
+      const gap = next.startTick - (component.startTick + component.durationTicks);
+      if (gap > 0 && !component.tieWait) {
+        out.push({
+          code: 'tie-gap-unpublished',
+          severity: 'error',
+          message:
+            `Written tie chain ${chain.noteId} leaves ${gap} ticks between component ` +
+            `${component.index + 1} (ends at ${component.startTick + component.durationTicks}) ` +
+            `and component ${next.index + 1} (starts at ${next.startTick}) with no ` +
+            `tieWaitForNote in the source`,
+          system: layout.index,
+          noteIds: [chain.noteId],
+          metrics: { gap },
+        });
+      }
+    }
+  }
+  const rules = drawnStaffRuleYs(layout.geometry, o, t);
+  const ruleHalf = t.tieStroke / 2 + t.tieRuleAir;
+  const boxes: JankoTieBox[] = layout.notes.map((p) => {
+    const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+    return { id: p.note.id, x0: p.x - e.wx, y0: p.y - e.hy, x1: p.x + e.wx, y1: p.y + e.hy };
+  });
+  for (const arc of arcs) {
+    // The very predicate the engine routes with (`tieArcEntersBoxes`): the exact
+    // sampled curve plus the stroke's half-width against every knockout box.
+    const hit = tieArcEntersBoxes(arc, boxes, t);
+    if (hit) {
+      out.push({
+        code: 'tie-endpoint-clearance',
+        severity: 'error',
+        message:
+          `Tie ${arc.noteId} component ${arc.index + 1} (${arc.fromHeadId} → ${arc.toHeadId}) ` +
+          `enters the knockout box of ${hit.id} — the tie must clear every glyph mask`,
+        system: layout.index,
+        noteIds: [arc.fromHeadId, arc.toHeadId, hit.id],
+        x: arc.x1,
+        y: arc.y,
+      });
+    }
+    for (const rule of rules) {
+      const band = [Math.min(arc.y, arc.y + arc.side * arc.depth), Math.max(arc.y, arc.y + arc.side * arc.depth)];
+      for (const y of band.length === 2 ? [band[0], band[1]] : band) {
+        if (Math.abs(rule - y) > ruleHalf - 1e-9) continue;
+        out.push({
+          code: 'tie-rule-fusion',
+          severity: 'warning',
+          message:
+            `Tie ${arc.noteId} component ${arc.index + 1} runs ` +
+            `${Math.abs(rule - y).toFixed(2)}pt from a painted staff rule at y=${rule.toFixed(2)}: ` +
+            `the axis nudge could not clear it`,
+          system: layout.index,
+          noteIds: [arc.fromHeadId, arc.toHeadId],
+          x: arc.x1,
+          y: arc.y,
+          metrics: { ruleY: rule, axisY: y },
+        });
+      }
+    }
+  }
+}
+
 export function lintJankoScore(
   score: QuantizedGridScore,
   options?: Partial<JankoLayoutOptions> | null,
@@ -5437,6 +5612,7 @@ export function lintJankoScore(
     checkStaffSegments(layout, o, t, diagnostics);
     checkHoldIntegrity(layout, o, t, diagnostics);
     checkExceptionCarrierIntegrity(layout, t, diagnostics);
+    checkTieIntegrity(layout, o, t, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     if (o.clusterCompression && o.clusterCompression !== 'literal') {
       checkCompressionCollisions(layout, o, t, thresholds, diagnostics);

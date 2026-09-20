@@ -157,12 +157,14 @@ test('Brahms pagination arithmetic: 71 measures → 18 systems → 5 pages canon
   assert.ok(Math.max(...s0ticks) >= 48 + 3 * 192, 'system 1 reaches m. 4');
 });
 
-test('Brahms canonical lint record: fixed-3 zero hard errors on studio and CLI, six composites published', () => {
-  // Canonical fixed-3 (the live Reference surface): zero hard errors and
-  // exactly the six published 120-tick composite refusals (the deferred
-  // tied/composite follow-up). The CLI lints this same entry — studio,
-  // production commands and acceptance tests agree.
-  const compositeIds = [
+test('Brahms canonical lint record: fixed-3 zero hard errors and zero warnings on studio and CLI', () => {
+  // Canonical fixed-3 (the live Reference surface): zero hard errors and — as
+  // of Round 46 — **zero warnings**. The six former 120-tick composite
+  // refusals are stated exactly by their written components (first 96 + tied
+  // 24), so nothing is left unrepresented and nothing may be re-published under
+  // a new code. The CLI lints this same entry — studio, production commands and
+  // acceptance tests agree.
+  const resolvedIds = [
     'brahms-op118-no1-295',
     'brahms-op118-no1-351',
     'brahms-op118-no1-448',
@@ -172,22 +174,16 @@ test('Brahms canonical lint record: fixed-3 zero hard errors on studio and CLI, 
   ];
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.violations.length, 0, 'canonical fixed-3: zero violations');
-  assert.deepEqual(
-    studio.warnings.map((w) => [w.code, w.noteIds?.[0]]),
-    compositeIds.map((id) => ['carrier-duration-unsupported', id]),
-    'canonical fixed-3: exactly the six composites, by identity'
-  );
+  assert.equal(studio.warnings.length, 0, 'canonical fixed-3: zero warnings');
+  assert.deepEqual(studio.diagnostics, [], 'the diagnostic record is genuinely empty');
   assert.equal(studio.ok, true, 'the BRONZE surface is honestly ok');
-  // The chip reads the honest count; diagnostics carry both counts and
-  // itemize every warning.
+  // The chip reads the honest count; diagnostics carry both counts.
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
-  assert.match(brahms, /⚠ 6 warnings/, 'the BRONZE chip reads the published count');
-  assert.match(brahms, /0 violations, 6 warnings/, 'and the ok line prints both counts');
-  assert.match(brahms, /Diagnostics \(6\)/, 'every warning is itemized');
-  for (const id of compositeIds) {
-    assert.ok(brahms.includes(id), `${id} is itemized by name`);
-  }
+  assert.match(brahms, /0 violations, 0 warnings/, 'the ok line prints both counts');
+  assert.match(brahms, /Diagnostics \(0\)/, 'the diagnostics list states the empty record');
+  assert.ok(!brahms.includes('⚠'), 'no warning chip on a clean surface');
+  assert.ok(!brahms.includes('carrier-duration-unsupported'), 'no composite refusal survives anywhere');
   // The CLI spread is this same const (see the single-source test below).
   const cli = lintJankoScore(
     BRAHMS,
@@ -195,11 +191,13 @@ test('Brahms canonical lint record: fixed-3 zero hard errors on studio and CLI, 
     resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
   );
   assert.equal(cli.violations.length, 0, 'CLI canonical: zero violations');
-  assert.deepEqual(
-    cli.warnings.map((w) => w.noteIds?.[0]),
-    compositeIds,
-    'CLI canonical: the same six composites'
-  );
+  assert.equal(cli.warnings.length, 0, 'CLI canonical: zero warnings');
+  for (const id of resolvedIds) {
+    assert.ok(
+      cli.diagnostics.every((d) => !(d.noteIds ?? []).includes(id)),
+      `${id}: the former refusal never reappears under any code`
+    );
+  }
 });
 
 test('Brahms pagination has one source of truth; every surface agrees', () => {
@@ -277,6 +275,7 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
     'exceptionCarrier',
     'opticalSpacing',
     'lowPitchFolding',
+    'writtenTies',
   ]);
   for (const key of Object.keys(golden) as Array<keyof typeof golden>) {
     if (allowed.has(key)) continue;
@@ -297,16 +296,18 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
       exceptionCarrier: brahms.exceptionCarrier,
       opticalSpacing: brahms.opticalSpacing,
       lowPitchFolding: brahms.lowPitchFolding,
+      writtenTies: brahms.writtenTies,
     },
     {
       pitchPlacement: 'parity-columns',
-      chordSymbolScale: 0.9,
+      chordSymbolScale: 0.95,
       bracketDurationGrammar: 'midpoint',
       exceptionCarrier: 'horizontal',
       opticalSpacing: true,
       lowPitchFolding: 'literal',
+      writtenTies: 'source',
     },
-    'the adopted Round 45 working treatment, at the operator-chosen 90 %'
+    'the adopted Round 46 working treatment, at the 95 % admitted-cluster scale'
   );
   const brahmsT = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const goldenT = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
@@ -315,6 +316,7 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
     'anacrusisTicks',
     'midpointSlashLengthFactor',
     'midpointRingScale',
+    'midpointBracketRingScale',
     'midpointSpacingFactor',
     'opticalClearanceAir',
   ]);
@@ -322,23 +324,30 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
     if (allowedT.has(key as string)) continue;
     assert.deepEqual(brahmsT[key], goldenT[key], `Brahms token ${key} equals the golden master`);
   }
-  // The Round 45 token ratios: slash centreline ×1.10, ring radius/stroke
-  // ×1.10, cut centre spacing ×7/6 (1.40 × the Round 44 `.75` baseline at
-  // 0.90) and the explicit 0.20pt vertical optical air.
+  // The Round 46 token ratios: slash centreline ×1.10, carrier ring
+  // radius/stroke ×1.10, **bracket** ring/half-ring another ×1.20 on top, the
+  // cut centre spacing re-derived so the 95 % scale gains a further 0.20pt
+  // (1.89658 → 2.09658) and the explicit 0.30pt vertical optical air.
   assert.deepEqual(
     {
       midpointSlashLengthFactor: brahmsT.midpointSlashLengthFactor,
       midpointRingScale: brahmsT.midpointRingScale,
-      midpointSpacingFactor: brahmsT.midpointSpacingFactor,
+      midpointBracketRingScale: brahmsT.midpointBracketRingScale,
       opticalClearanceAir: brahmsT.opticalClearanceAir,
     },
     {
       midpointSlashLengthFactor: 1.1,
       midpointRingScale: 1.1,
-      midpointSpacingFactor: 7 / 6,
-      opticalClearanceAir: 0.2,
+      midpointBracketRingScale: 1.2,
+      opticalClearanceAir: 0.3,
     },
-    'the adopted Round 45 readability ratios and optical air'
+    'the adopted Round 46 readability ratios, the bracket enlargement and optical air'
+  );
+  assert.ok(
+    Math.abs(
+      brahmsT.midpointSpacingFactor - 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95)
+    ) < 1e-12,
+    'the cut centre pitch is exactly 2.09658pt at 95 % (+0.20pt over the Round 45 reading)'
   );
 });
 

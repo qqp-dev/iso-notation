@@ -72,6 +72,45 @@ export interface HandCrossingEvent {
   description?: string;
 }
 
+/**
+ * One **written component** of a sounding event (Round 46 display metadata).
+ *
+ * A tie (or a `tieWaitForNote` carry) splits one sounding note into written
+ * components: each is a real statement of the source, the last one carrying the
+ * release. Nothing here changes the sounding event — its pitch, onset and total
+ * duration stay exactly as the importer produced them.
+ */
+export interface WrittenTieComponent {
+  /** Onset tick of the component (the sounding onset for the first one). */
+  startTick: number;
+  /** Written value of the component in ticks. */
+  durationTicks: number;
+  /** Outgoing written tie on this component (source `~`). */
+  tieForward: boolean;
+  /** This component sits under the source's `\set tieWaitForNote = ##t`. */
+  tieWait: boolean;
+  /** Source voice name the component was written in. */
+  voice: string;
+}
+
+/**
+ * Round 46 — the **written tie chain of one sounding event**, derived from the
+ * committed source provenance (`src/scores/brahms-source-fidelity.ts`) and
+ * attached by the score builder. Display metadata only: it is never sounded,
+ * never counted as a note, and never replaces the event key bijection the
+ * written-duration fixture validates.
+ */
+export interface WrittenTieChain {
+  /** Id of the sounding note the chain belongs to. */
+  noteId: string;
+  /** Ordered written components (first = the attack statement). */
+  components: WrittenTieComponent[];
+  /** The sounding total (ticks) of the event — unchanged source data. */
+  soundingTicks: number;
+  /** Source voice the chain was written in (the dominant one when several). */
+  voice: string;
+}
+
 export interface QuantizedGridScore {
   id: string;
   title: string;
@@ -87,6 +126,12 @@ export interface QuantizedGridScore {
   notes: QuantizedNote[];
   handCrossings?: HandCrossingEvent[];
   gridResolution?: number;
+  /**
+   * Round 46: committed written tie chains, one per sounding event that the
+   * source writes as more than one tied component. Omitted entirely when the
+   * score has no such provenance.
+   */
+  tieChains?: WrittenTieChain[];
 }
 
 export type JankoRowIndex = 0 | 1;

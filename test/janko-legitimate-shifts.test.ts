@@ -176,11 +176,36 @@ test('legitimate shifts: m.37 keeps its clasp, zero stem-through (canonical)', (
   );
 });
 
-test('legitimate shifts: m.37 inward demand names its leaving member (adaptive solver)', () => {
+test('legitimate shifts: m.37 inward demand is now absorbed by the solve (adaptive solver)', () => {
   const layouts = layoutJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
   const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === 7056))!;
   assert.ok(sys.clasps.some((c) => c.tick === 7056), 'the m.37 onset keeps its bracket (no demotion)');
-  const diag = (sys.clusterDiagnostics ?? []).find((d) => d.tick === 7056);
-  assert.ok(diag, 'the inward demand is reported');
-  assert.deepEqual(diag!.memberIds, ['brahms-op118-no1-515'], 'the diagnostic names the leaving member');
+  // Round 46: the chord-column repairs — foreign units are read at their
+  // **solved** columns in the bracket fit and the pre-step reserves its step
+  // margin — let the two-column parity step seat the whole m.37 group inside
+  // its beat cell. The Round 45 surface reported head 515 as a *leaving*
+  // member whose inward demand could not be honoured; that demand is now
+  // satisfied before it can leave, so the honest diagnostic list is empty
+  // (0 diagnostics on the whole adaptive corpus, was 4).
+  assert.deepEqual(
+    (sys.clusterDiagnostics ?? []).filter((d) => d.tick === 7056),
+    [],
+    'the inward demand is met, so no leaving member has to be reported'
+  );
+  const group = sys.notes.filter((p) => ['515', '516', '514', '517', '513'].some((n) => p.note.id.endsWith(`-${n}`)));
+  assert.equal(group.length, 5, 'the m.37 group is fully laid out');
+  const xs = group.map((p) => p.x);
+  const cellLeft = Math.min(...xs);
+  const cellRight = Math.max(...xs);
+  assert.ok(
+    xs.every((x) => x >= cellLeft - 1e-9 && x <= cellRight + 1e-9) && cellRight - cellLeft < 5.46,
+    'every member of the fanned group stands inside the onset group'
+  );
+  // The canonical fixed-3 surface is unaffected and stays clean (its own test
+  // above); the adaptive diagnostic list simply has nothing left to name.
+  assert.deepEqual(
+    layouts.flatMap((l) => l.clusterDiagnostics ?? []),
+    [],
+    'no cluster anywhere on the adaptive corpus has to leave its cell'
+  );
 });

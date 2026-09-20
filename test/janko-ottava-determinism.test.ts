@@ -192,12 +192,16 @@ test('§5 m.69: the spanner drops exactly 1.60 and the label clears beam ink by 
   const b = l.ottavaBrackets[0];
   assert.equal(Number(b.lineY.toFixed(2)), 438.8, 'line resolved at 438.80 (content-aware page 5)');
   assert.equal(Number((b.lineY - 437.2).toFixed(2)), 1.6, 'exactly overlap + air above the moved frame');
-  assert.equal(Number(b.x0.toFixed(2)), 40.37, 'span start (Round 45 admitted-scale column)');
-  assert.equal(Number(b.x1.toFixed(2)), 61.87, 'span end');
+  // Round 46: the m.69 column stands 0.28pt further right — the admitted-scale
+  // bracket reservation grew with the enlarged bracket ring (see the §2 floor
+  // in test/janko-clasp.test.ts), and the literal low A0 rides its own onset
+  // column exactly as before.
+  assert.equal(Number(b.x0.toFixed(2)), 40.65, 'span start (Round 46 admitted-scale column)');
+  assert.equal(Number(b.x1.toFixed(2)), 62.15, 'span end');
   const label = ottavaLabelBox(b, BRAHMS_T);
   assert.deepEqual(
     [label.x0, label.y0, label.x1, label.y1].map((v) => Number(v.toFixed(2))),
-[40.37, 433.3, 50.87, 439.3],
+    [40.65, 433.3, 51.15, 439.3],
     'label box rides the line'
   );
   // Complete music ink over the span, from the shared collector (the same

@@ -462,24 +462,24 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 45 open, five axes, the three admitted-cluster scales', () => {
-  // Ordered contract change: Rounds 40–44 are parked (historical consts in
-  // test/janko-round40.test.ts … test/janko-round44.test.ts) and Round 45
-  // opens the larger-readable-clusters round on the working Brahms Reference:
-  // three otherwise identical full-score cards at 0.85 / 0.90 / 0.95 beside
-  // the adopted 0.90 treatment (declared optical spacing, the Round 45
-  // duration ratios, horizontal carriers, literal low pitches).
-  assert.equal(CURRENT_ROUND_METADATA.round, 45);
+test('§F registry: round 46 open, three axes, the two 95 % real-engine variants', () => {
+  // Ordered contract change: Rounds 40–45 are parked (historical consts in
+  // test/janko-round40.test.ts … test/janko-round45.test.ts) and Round 46
+  // opens the literal-ink / readable-cluster / long-value / written-tie round
+  // on the working Brahms Reference: two otherwise identical whole-score cards
+  // at the adopted 95 % scale, differing only in the declared optical air
+  // (0.30pt working Reference / 0.20pt spacing control).
+  assert.equal(CURRENT_ROUND_METADATA.round, 46);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['chordSymbolScale', 'opticalSpacing', 'lowPitchFolding', 'bracketDurationGrammar', 'exceptionCarrier'],
-    'the admitted scale, optical spacing, the literal lows and the cluster-duration grammar'
+    ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
+    'the declared optical air, the admitted scale and the written ties'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['brahms-scale-85', 'brahms-scale-90', 'brahms-scale-95'],
-    'the three admitted-cluster scale cards'
+    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
+    'the two real-engine variants (0.30pt working Reference, 0.20pt control)'
   );
 });
 

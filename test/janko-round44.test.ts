@@ -81,6 +81,7 @@ import {
   exceptionCarrierInkBox,
   exceptionCarrierMarkBoxes,
   midpointMetrics,
+  MIDPOINT_MAX_RINGS,
 } from '../src/render/janko/elements/rhythm';
 import { createStudioConfig, renderCandidatesView, renderStudioMarkup } from '../src/render/janko/studio';
 import {
@@ -576,26 +577,27 @@ test('Parked Round 44 registry: one anchored 45-degree design on the full score 
     'the parked round keeps its eleven windows'
   );
 
-  // Round 45 is the live round now: three scale cards beside the adopted 0.90
-  // Reference. The full Round 45 contract is pinned in
-  // test/janko-candidates.test.ts; here the history only has to point at it.
-  assert.equal(CURRENT_ROUND_METADATA.round, 45, 'the open round');
+  // Round 46 is the live round now: two 95 % real-engine variants differing
+  // only in the declared optical air. The full Round 46 contract is pinned in
+  // test/janko-round46.test.ts; here the history only has to point at it.
+  assert.equal(CURRENT_ROUND_METADATA.round, 46, 'the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['brahms-scale-85', 'brahms-scale-90', 'brahms-scale-95'],
-    'the three Round 45 scale cards'
+    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
+    'the two Round 46 variants (0.30pt working Reference / 0.20pt control)'
   );
-  // The 0.90 card and the working Brahms Reference must agree for the same
+  // The 0.30pt card and the working Brahms Reference must agree for the same
   // score/options: this is the round's declared coherence rule.
   assert.deepEqual(
-    { ...CURRENT_CANDIDATES[1].options },
+    { ...CURRENT_CANDIDATES[0].options },
     {
       pitchPlacement: 'parity-columns',
       bracketDurationGrammar: 'midpoint',
       exceptionCarrier: 'horizontal',
       opticalSpacing: true,
       lowPitchFolding: 'literal',
-      chordSymbolScale: 0.9,
+      writtenTies: 'source',
+      chordSymbolScale: 0.95,
     },
     'the 0.90 card states the adopted Reference treatment'
   );
@@ -634,13 +636,27 @@ test('45-degree metric: preserved centreline length, equal components, one pitch
   assert.ok(approx(m.cutSpacing / Math.SQRT2, m.slashStroke + m.gap), 'true stroke clearance between cuts');
   assert.ok(approx(m.ringSpacing, 2 * m.ringHalf + m.gap), 'ring pitch = outer diameter + g');
   assert.equal(m.bracketCutSpacing, m.carrierCutSpacing, 'one cut pitch on both mounts');
+  // Round 46: the mount rotation is a *size* policy now (the bracket ring grows
+  // by `midpointBracketRingScale`), so the two ring pitches are equal only
+  // while that token is at its no-op default — which is what this historical
+  // fixture pins.
   assert.equal(m.bracketRingSpacing, m.carrierRingSpacing, 'one ring pitch on both mounts');
+  assert.equal(m.bracketRingScale, 1, 'no bracket ring enlargement by default');
 
   // The fixed carrier is the largest supported run plus one gap at each end.
+  // Round 46 recomputed that run for the new long-value vocabulary: the largest
+  // carrier run is the **two-ring** breve (384), not a three-ring stack.
   assert.ok(approx(m.cutsRun, 3 * m.cutSpacing + 2 * m.slashHalfX), 'the four-cut run');
-  assert.ok(approx(m.ringsRun, 2 * m.ringSpacing + 2 * m.ringHalf), 'the three-ring run');
-  assert.ok(approx(m.carrierLength, Math.max(m.cutsRun, m.ringsRun) + 2 * m.gap), 'fixed length = max run + 2g');
-  assert.ok(approx(m.carrierLength, 13.37), 's = 1 fixed length');
+  assert.ok(
+    approx(m.ringsRun, (MIDPOINT_MAX_RINGS - 1) * m.ringSpacing + 2 * m.ringHalf),
+    'the family’s largest ring run (two rings, Round 46)'
+  );
+  assert.ok(approx(m.halfRingRun, 2 * m.ringHalf), 'a lone half-ring’s own span');
+  assert.ok(
+    approx(m.carrierLength, Math.max(m.cutsRun, m.ringsRun, m.halfRingRun) + 2 * m.gap),
+    'fixed length = max run + 2g'
+  );
+  assert.ok(approx(m.carrierLength, 10.2195230893, 1e-9), 's = 1 fixed length (four-cut run + 2g)');
   assert.ok(approx(effectiveExceptionCarrierLength('midpoint', DEFAULT_JANKO_TOKENS), m.carrierLength), 'one metric for paint and layout');
 });
 
@@ -655,10 +671,11 @@ test('At the admitted 0.75: the contract’s literal targets and the 10.0275pt c
   assert.ok(approx(m.cutSpacing, 1.2833988079, 1e-9), 'cut pitch 1.2833988079');
   assert.ok(approx(m.cutsRun, 6.914642317, 1e-9), 'four-cut run 6.914642317');
   assert.ok(approx(m.ringSpacing, 3.2175, 1e-12), 'ring pitch 3.2175');
-  assert.ok(approx(m.ringsRun, 9.2775, 1e-12), 'three-ring run 9.2775');
-  assert.ok(approx(m.carrierLength, 10.0275, 1e-12), 'fixed carrier length 10.0275');
+  assert.ok(approx(m.ringsRun, 6.06, 1e-12), 'two-ring run 6.06 (Round 46 vocabulary)');
+  assert.ok(approx(m.halfRingRun, 2.8425, 1e-12), 'half-ring span 2.8425');
+  assert.ok(approx(m.carrierLength, 7.664642317, 1e-9), 'fixed carrier length 7.664642317');
   assert.ok(
-    approx(effectiveExceptionCarrierLength('midpoint', DEFAULT_JANKO_TOKENS, 0.75), 10.0275, 1e-12),
+    approx(effectiveExceptionCarrierLength('midpoint', DEFAULT_JANKO_TOKENS, 0.75), 7.664642317, 1e-9),
     'the layout reads the admitted-scale length'
   );
   // Coherent scaling: every mark and the stroke shrink with the cluster.
@@ -750,7 +767,10 @@ test('Identical 45-degree ink and identical centre pitch on both mounts', () => 
   const carriers = carrierInks(exceptionSvg);
   assert.ok(carriers.length > 0, 'the exception band paints carriers');
   for (const c of carriers) {
-    assert.ok(approx(c.length, 10.0275, 0.011), `${c.noteId}: the fixed 10.0275pt admitted-scale carrier`);
+    assert.ok(
+      approx(c.length, 7.664642317, 0.011),
+      `${c.noteId}: the fixed 7.664642317pt admitted-scale carrier (Round 46 recomputed the run)`
+    );
     assert.ok(
       approx(c.stroke, DVS_TOKS.claspStrokeWidth * 0.75, 0.011),
       `${c.noteId}: the carrier line scales with s`
@@ -1243,7 +1263,14 @@ test('The carrier length is fixed by the stack, never by the elapsed duration', 
   const layouts = layoutsOf(BRAHMS_STUDIO_SCORE_ID);
   const m = midpointMetrics(BRAHMS_TOKS, 0.75);
   const carriers = layouts.flatMap((l) => l.exceptionCarriers);
-  assert.equal(carriers.length, 32, 'every supported exception member paints its own carrier');
+  // Round 46: two same-hand/same-onset/exact-duration 2-span pairs (m. 9 and
+  // m. 19) now share **one** centred indicator, so the 32 member statements
+  // paint as 30 carriers.
+  assert.equal(
+    carriers.length,
+    30,
+    'every supported exception member is stated — two 192-tick pairs share one indicator'
+  );
   assert.equal(
     new Set(carriers.map((c) => (c.x1 - c.x0).toFixed(6))).size,
     1,
@@ -1261,12 +1288,13 @@ test('The carrier length is fixed by the stack, never by the elapsed duration', 
     'five distinct values share the one length — the marks alone state the value'
   );
 
-  // The three-ring m. 67 value: three rings, centred on the fixed carrier.
+  // The m. 67 longest value: 384 ticks reads as **two** full rings in the
+  // Round 46 midpoint vocabulary (the three-ring stack is retired).
   const m67 = carriers.find((c) => c.noteId === 'brahms-op118-no1-919')!;
   assert.equal(m67.durationTicks, 384, 'the longest supported value');
-  assert.deepEqual([m67.cuts, m67.rings, m67.dots], [0, 3, 0], 'three rings, no cuts, no dots');
+  assert.deepEqual([m67.cuts, m67.rings, m67.dots], [0, 2, 0], 'two rings, no cuts, no dots');
   const markBoxes = exceptionCarrierMarkBoxes(m67, BRAHMS_TOKS);
-  assert.equal(markBoxes.length, 3, 'three painted rings');
+  assert.equal(markBoxes.length, 2, 'two painted rings');
   const lo = Math.min(...markBoxes.map((b) => b.x0));
   const hi = Math.max(...markBoxes.map((b) => b.x1));
   assert.ok(
@@ -1298,14 +1326,20 @@ test('The carrier length is fixed by the stack, never by the elapsed duration', 
   // carriers state the 192-tick half (two rings each, at their true pitch y),
   // and m. 37's two state the 48-tick quarter with the bare carrier line only
   // — the counts alone state the value, never the fixed length.
+  // m. 9's 192-tick pair now shares one indicator, centred on the two painted
+  // heads (the partner is named, so both statements remain owned).
   const m9 = carriers.filter((c) => c.tick === 1584);
+  assert.equal(m9.length, 1, 'm. 9: one shared indicator for the 192-tick pair');
+  const shared9 = m9[0];
   assert.deepEqual(
-    m9.map((c) => [c.noteId, c.durationTicks, c.cuts, c.rings, c.dots]).sort(),
-    [
-      ['brahms-op118-no1-117', 192, 0, 2, 0],
-      ['brahms-op118-no1-118', 192, 0, 2, 0],
-    ].sort(),
-    'm. 9: two horizontal carriers, two rings each'
+    [shared9.noteId, shared9.partnerId].sort(),
+    ['brahms-op118-no1-117', 'brahms-op118-no1-118'],
+    'both members of the pair own the shared indicator'
+  );
+  assert.deepEqual(
+    [shared9.durationTicks, shared9.cuts, shared9.rings, shared9.dots],
+    [192, 0, 1, 0],
+    'it states the shared 192-tick value as one full ring'
   );
   const m37 = carriers.filter((c) => c.tick === 6960 || c.tick === 7056);
   assert.deepEqual(
@@ -1341,7 +1375,10 @@ test('Fit before paint: a refused carrier is withheld, published and unpainted',
   const refusal = refusals[0];
   assert.equal(refusal.noteId, 'dvs-stress-12288-9_5');
   assert.equal(refusal.durationTicks, 192);
-  assert.ok(approx(refusal.required, 10.0275, 1e-9), 'the fixed 10.0275pt length is required');
+  assert.ok(
+    approx(refusal.required, 7.664642317, 1e-9),
+    'the fixed 7.664642317pt length is required (Round 46 recomputed the run)'
+  );
   assert.ok(approx(refusal.available, 5.06, 1e-9), 'only the clear span is available');
   assert.ok(refusal.available < refusal.required, 'the shortfall is real, not a rounding artifact');
   assert.ok(
@@ -1463,9 +1500,13 @@ test('Whole-score candidate report: exactly the six composite refusals, nothing 
   // pitch) rails, so neither is promoted into an admitted bracket under the
   // Round 43 nominal-rail doctrine — the 72-bracket census is unchanged on
   // this card's own parity surface.
-  assert.equal(layouts.flatMap((l) => l.notes).length, 959, 'every laid-out head of the score');
+  assert.equal(layouts.flatMap((l) => l.notes).length, 959, 'every laid-out head of this Round 44 reserve surface');
   assert.equal(layouts.flatMap((l) => l.clasps).length, 72, 'the clasp furniture is complete');
-  assert.equal(layouts.flatMap((l) => l.exceptionCarriers).length, 32, '32 painted carriers');
+  assert.equal(
+    layouts.flatMap((l) => l.exceptionCarriers).length,
+    30,
+    '30 painted carriers — two 192-tick pairs share one indicator'
+  );
   assert.equal(layouts.length, 18, '18 systems of music');
   assert.equal(report.stats.notes, 959, 'the report walks the same notes');
   assert.equal(report.stats.systems, 18, 'and the same systems');
@@ -1481,7 +1522,7 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
   assert.equal(countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS), 5, 'the candidate spread is five A4 pages');
 
   // The parked registry verbatim: the historical card renders on its own nine
-  // declared windows (the live registry is Round 45; the served page is pinned
+  // declared windows (the live registry is Round 46; the served page is pinned
   // in test/janko-studio.test.ts and test/janko-candidates.test.ts).
   const html = renderCandidatesView(
     createStudioConfig({ candidates: ROUND_44_CANDIDATES, round: ROUND_44_METADATA })
@@ -1551,21 +1592,23 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
     assert.ok(digits > 0, `page ${i + 1}: the page carries music`);
     perPage.push(digits);
   }
-  // Round 45 — the card rides the working Brahms entry (the adopted 0.90
-  // treatment), and the m. 66 correction paints the two same-hand unison pairs
-  // the cross-hand merge used to fold away: the closing page carries 65
-  // painted digits, and the spread totals 959 heads.
-  assert.deepEqual(perPage, [211, 232, 232, 219, 65], 'the engine page census');
+  // Round 46 — the card rides the working Brahms entry (the adopted 95 %
+  // treatment with the committed written ties), so the studio's full-score
+  // window paints 970 digits: 964 source notes − 7 merged source heads (five
+  // cross-hand unisons + the two m. 66 attack/carry groups) + 13 written
+  // continuation heads. The `heads` count this test's own Round 44 reserve
+  // surface lays out (959) is the historical control, not the served page.
+  assert.deepEqual(perPage, [211, 234, 236, 223, 66], 'the engine page census');
   assert.equal(
     perPage.reduce((sum, n) => sum + n, 0),
-    heads.length,
-    'every laid-out source head paints exactly one digit across the five pages'
+    970,
+    'every painted head of the served Round 46 engraving has its digit across the five pages'
   );
-  assert.equal(heads.length, 959, 'the whole Brahms candidate spread');
+  assert.equal(heads.length, 959, 'the Round 44 reserve control layout');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(html), 'no raster artifact anywhere in the served view');
 });
 
-test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is the adopted Round 45 treatment', () => {
+test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is the adopted Round 46 treatment', () => {
   // The golden knobs the candidate deltas ride on top of.
   assert.equal(DEFAULT_JANKO_OPTIONS.pitchPlacement, 'standard');
   assert.equal(DEFAULT_JANKO_OPTIONS.bracketDurationGrammar, 'golden');
@@ -1574,46 +1617,49 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
   assert.equal(DEFAULT_JANKO_OPTIONS.opticalSpacing, false, 'the optical spacing is opt-in');
   assert.equal(DEFAULT_JANKO_OPTIONS.lowPitchFolding, 'core', 'the core folding stays the default');
   assert.equal(DEFAULT_JANKO_TOKENS.midpointSlashLength, 4.95, 'the midpoint family stays a study token');
-  // Round 45 adopted the agreed 0.90 treatment for the working Brahms
+  // Round 46 adopted the agreed 95 % treatment for the working Brahms
   // Reference (the operator-chosen working golden experiment): the same one
-  // coherent family the three candidate cards declare, at 0.90.
+  // coherent family the two candidate cards declare, with the committed
+  // written ties rendered and 0.30pt of optical air.
   const referenceOptions = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   assert.equal(referenceOptions.pitchPlacement, 'parity-columns', 'the adopted parity placement');
-  assert.equal(referenceOptions.chordSymbolScale, 0.9, 'at the operator-chosen 90 %');
+  assert.equal(referenceOptions.chordSymbolScale, 0.95, 'at the adopted 95 % admitted-cluster scale');
   assert.equal(referenceOptions.bracketDurationGrammar, 'midpoint', 'the one 45-degree family');
   assert.equal(referenceOptions.exceptionCarrier, 'horizontal', 'horizontal remaining-value carriers');
   assert.equal(referenceOptions.opticalSpacing, true, 'declared, centred optical spacing');
   assert.equal(referenceOptions.lowPitchFolding, 'literal', 'literal low pitches');
+  assert.equal(referenceOptions.writtenTies, 'source', 'the committed written ties are rendered');
   const referenceTokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  assert.equal(referenceTokens.midpointSlashLengthFactor, 1.1, 'the Round 45 slash ratio');
-  assert.equal(referenceTokens.midpointRingScale, 1.1, 'the Round 45 ring ratio');
-  assert.equal(referenceTokens.midpointSpacingFactor, 7 / 6, 'the 40 % total cut-spacing increase');
-  assert.equal(referenceTokens.opticalClearanceAir, 0.2, 'the explicit 0.20pt optical air');
+  assert.equal(referenceTokens.midpointSlashLengthFactor, 1.1, 'the slash ratio');
+  assert.equal(referenceTokens.midpointRingScale, 1.1, 'the carrier ring ratio');
+  assert.equal(referenceTokens.midpointBracketRingScale, 1.2, 'the bracket-only ring enlargement');
+  assert.ok(
+    Math.abs(referenceTokens.midpointSpacingFactor - 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95)) < 1e-12,
+    'the cut centre pitch is exactly 2.09658pt at 95 % (+0.20pt over Round 45)'
+  );
+  assert.equal(referenceTokens.opticalClearanceAir, 0.3, 'the explicit 0.30pt optical air');
 
   const bach = lintJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.deepEqual(bach.diagnostics, [], 'Bach GOLD: zero violations, zero warnings');
-  // The Brahms Reference is honest, not clean: zero hard errors and exactly
-  // the six published 120-tick composite refusals (the deferred follow-up).
+  // The Brahms Reference is honest AND clean as of Round 46: zero hard errors
+  // and zero warnings — the six former 120-tick composites are stated exactly
+  // by their written components, and they never reappear under another name.
   const reference = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   assert.equal(reference.violations.length, 0, 'Brahms Reference: zero hard errors');
-  assert.deepEqual(
-    reference.warnings.map((w) => [w.code, w.noteIds?.[0]]),
-    [
-      ['carrier-duration-unsupported', 'brahms-op118-no1-295'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-351'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-448'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-581'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-637'],
-      ['carrier-duration-unsupported', 'brahms-op118-no1-734'],
-    ],
-    'the six 120-tick composites are published by exact identity, nothing filtered'
-  );
+  assert.deepEqual(reference.warnings, [], 'Brahms Reference: zero warnings');
+  for (const id of [295, 351, 448, 581, 637, 734]) {
+    assert.ok(
+      reference.diagnostics.every((d) => !(d.noteIds ?? []).includes(`brahms-op118-no1-${id}`)),
+      `brahms-op118-no1-${id}: the former refusal is solved, never re-published`
+    );
+  }
 
   // Full-page byte pins (SHA-256). Bach GOLD is pinned to the pristine
   // pre-Round-44 worktree (PR #80 / d796043): untouched, byte for byte, by any
   // candidate-only or Brahms treatment work. The Brahms Reference pages are
-  // re-pinned to the adopted Round 45 treatment — the operator-chosen change,
-  // regenerated through the required `npm run pdf` release step.
+  // re-pinned to the adopted Round 46 treatment — the operator-chosen change,
+  // regenerated through the required `npm run pdf` release step (the PDF export
+  // itself is Bach-only, so it carries no churn).
   const sha = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
   const bachPages = [
     '2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f',
@@ -1627,22 +1673,22 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
     );
   }
   const brahmsPages = [
-    '55d606e5b1b50bed15ddb16a4ad53a17c21eef401bfbd1e013377fd09a9f83b9',
-    'f7f2fef428b52aa78d2e827f711967bb0984bb5b6bb53113a7d16bb6f3167098',
-    'f33bf7c762f3f96f2b354e90b2c51a3a270adf1f9506f46e9a1213afdb851765',
-    '705936c03d9002cdd7b443920aa0fa24ba9ffeff6af4d6f01643df9c9c2240b8',
-    '8f128a67eac371d154a0d55bda7c4e4cf33d585d296d9fb18987ee389e73d6a1',
+    '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b',
+    'fdd1acad9b018b77259acf3f08a791deaa094108b8ce64cce340363afd9a163a',
+    '8a7a2a0bee8351927c6a6005f5b4840a4db3cafcf424c6986aaa97134633a6f2',
+    'a37be98646e7a09daa2becb01ab46fc3e290651954cb01b55329b5033dfef805',
+    '6db87101cbf85faead7834164d2e7dab8e0876ba855b6c58922f68804314e0c0',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
       sha(renderJankoPage(BRAHMS, page, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)),
       brahmsPages[page],
-      `Brahms Reference page ${page} is the adopted Round 45 engraving`
+      `Brahms Reference page ${page} is the adopted Round 46 engraving`
     );
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)),
-    '5ed2c9c79285266f03ac9ca4398669d836f624253006f98f5b666401c23ef543',
-    'the Brahms Reference 1–71 crop is the adopted Round 45 engraving'
+    '43f95a224a860e46eb4f554f921ff6a34bb8099ac83db6af27adf2047b04ad8f',
+    'the Brahms Reference 1–71 crop is the adopted Round 46 engraving'
   );
 });

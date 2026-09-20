@@ -14,6 +14,7 @@
  */
 
 import { fromMidi } from '../model/pitch';
+import { WrittenTieChain, WrittenTieComponent } from '../model/types';
 
 /** Whole-note grid: LilyPond moments scale by 192 to repo ticks. */
 export const BRAHMS_WRITTEN_TICKS_PER_WHOLE = 192;
@@ -479,6 +480,83 @@ export function normalizeWrittenDurations(
     });
   }
   return { events, provenance };
+}
+
+/**
+ * Round 46 — **display tie chains** from the committed provenance.
+ *
+ * For every sounding note, the provenance holds the ordered written segments
+ * of every voice that produced it (cross-voice unisons are deduped into one
+ * event with the max sounding duration). A voice with **two or more** segments
+ * is a written tie chain: the segments are the components, `tieForward` the
+ * outgoing tie of each, `tieWait` its `tieWaitForNote` context. When several
+ * voices of one event carry a chain (the m61 E2, whose coincident RH statement
+ * is subsumed) the **dominant** one — the longest total written value, ties
+ * broken by voice name — is the chain the display states.
+ *
+ * Pure and non-mutating: no fixture, note, pitch, onset or duration is changed,
+ * and the (pitchClass, octave, startTick, hand) bijection the duration overlay
+ * validates is untouched. A note with no multi-segment voice gets no chain.
+ */
+export function deriveWrittenTieChains<
+  T extends {
+    id: string;
+    pitch: { pitchClass: number; octave: number };
+    startTick: number;
+    hand: 'RH' | 'LH';
+  },
+>(notes: readonly T[], provenance: readonly BrahmsProvenanceEvent[]): WrittenTieChain[] {
+  const byKey = new Map<string, BrahmsProvenanceEvent>();
+  for (const p of provenance) {
+    const k = brahmsEventKey(p.pitchClass, p.octave, p.startTick, p.hand);
+    if (byKey.has(k)) {
+      throw new Error(`Brahms written tie chains: provenance has duplicate key ${k}`);
+    }
+    byKey.set(k, p);
+  }
+  const chains: WrittenTieChain[] = [];
+  for (const note of notes) {
+    const k = brahmsEventKey(note.pitch.pitchClass, note.pitch.octave, note.startTick, note.hand);
+    const event = byKey.get(k);
+    if (!event) {
+      throw new Error(`Brahms written tie chains: no provenance entry for note ${note.id} key ${k}`);
+    }
+    const byVoice = new Map<string, BrahmsProvenanceEvent['segments']>();
+    for (const seg of event.segments) {
+      const bucket = byVoice.get(seg.voice);
+      if (bucket) bucket.push(seg);
+      else byVoice.set(seg.voice, [seg]);
+    }
+    let best: { voice: string; segs: BrahmsProvenanceEvent['segments'] } | null = null;
+    for (const [voice, segs] of byVoice) {
+      if (segs.length < 2) continue;
+      const total = segs.reduce((a, b) => a + b.durationTicks, 0);
+      if (
+        best === null ||
+        total > best.segs.reduce((a, b) => a + b.durationTicks, 0) ||
+        (total === best.segs.reduce((a, b) => a + b.durationTicks, 0) && voice < best.voice)
+      ) {
+        best = { voice, segs };
+      }
+    }
+    if (!best) continue;
+    const components: WrittenTieComponent[] = [...best.segs]
+      .sort((a, b) => a.startTick - b.startTick || a.durationTicks - b.durationTicks)
+      .map((seg) => ({
+        startTick: seg.startTick,
+        durationTicks: seg.durationTicks,
+        tieForward: seg.tieForward,
+        tieWait: seg.tieWait,
+        voice: seg.voice,
+      }));
+    chains.push({
+      noteId: note.id,
+      components,
+      soundingTicks: event.durationTicks,
+      voice: best.voice,
+    });
+  }
+  return chains;
 }
 
 /**
