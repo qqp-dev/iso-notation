@@ -19,11 +19,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   REST_DURATION_SPECIMEN_JANKO_OPTIONS,
   REST_DURATION_SPECIMEN_JANKO_TOKENS,
@@ -264,7 +265,7 @@ test('Optical seats: the painted centroid stands on the seat point — every val
 test('Corpus seats: every engraved rest paints its centroid on the seat point and its row', () => {
   const cases = [
     ['Bach', BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS],
-    ['Brahms', BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS],
+    ['Brahms', BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS],
     [
       'RestSpec',
       REST_SPECIMEN,
@@ -396,21 +397,24 @@ test('Bach’s final bar paints one seven: 550/551 merge to a single digit', () 
   assert.equal(report.violations.filter((v) => v.code === 'unison-double-digit').length, 0);
 });
 
-test('All seven Brahms unisons paint one digit with every rhythm voice intact', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+test('All five remaining Brahms unisons paint one digit with every rhythm voice intact', () => {
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const tokens = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
   const layouts = layoutJankoScore(BRAHMS, options, tokens);
   const merges = layouts.flatMap((l) => l.unisonMerges);
-  assert.equal(merges.length, 7, 'the complete Brahms unison census');
+  // Round 45: the m. 66 RH→LH correction turns the t12552/t12576 pairs into
+  // same-hand two-voice unisons (both heads paint), so the cross-hand merge
+  // census is five, not seven.
+  assert.equal(merges.length, 5, 'the complete Brahms unison census');
   assert.deepEqual(
     merges.map((m) => m.tick),
-    [11376, 11472, 12336, 12360, 12384, 12552, 12576]
+    [11376, 11472, 12336, 12360, 12384]
   );
   assert.equal(merges.filter((m) => m.exact).length, 1, 'the 21/21 pair is the one exact duplicate');
   assert.deepEqual(
     merges.filter((m) => !m.exact).map((m) => m.tick),
-    [11376, 11472, 12360, 12384, 12552, 12576],
-    'the six mixed-duration unisons'
+    [11376, 11472, 12360, 12384],
+    'the four mixed-duration unisons'
   );
   for (const layout of layouts) {
     const beatIds = new Set(layout.beams.flatMap((b) => b.notes.map((n) => n.id)));
@@ -479,8 +483,8 @@ test('Violation fixture: two digits on one sound report unison-double-digit', ()
 // ---------------------------------------------------------------------------
 
 test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const tokens = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
   const layouts = layoutJankoScore(BRAHMS, options, tokens);
   const hug = tokens.augmentationDotGap;
   const r = tokens.augmentationDotRadius;
@@ -530,7 +534,10 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
   // [96,144,144] carry 144, not the 96 min; 6192/10032: [120,144,144] carry
   // 144, not the undotted 120 min) and removes one (7344: [144,192,192]
   // carries the undotted 192 whole, not the dotted 144 min): 22 total.
-  assert.equal(dots, 22, 'the complete Brahms dotted-clasp census');
+  // Round 45: the m. 66 correction makes t12552 a two-voice LH clasp whose
+  // carried value is the sustained A2's 168 ticks — a legitimate
+  // double-dotted quarter (96+48+24) — so the census gains one (was 22).
+  assert.equal(dots, 23, 'the complete Brahms dotted-clasp census');
   assert.ok(worstMark >= hug - 1e-9, `worst mark daylight ${worstMark.toFixed(3)}pt`);
   // The true-masks margin, pinned: the tightest seat (tick 13488) clears by
   // 0.466pt. Any future erosion fails here before ink ever touches.
@@ -544,8 +551,8 @@ test('The nib: every dotted clasp’s dot is a clean satellite of its mark', () 
 });
 
 test('The nib: m. 3’s tick-432 dot is the case window, clean by every measure', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const tokens = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
   const layouts = layoutJankoScore(BRAHMS, options, tokens);
   const clasp = layouts.flatMap((l) => l.clasps).find((c) => c.tick === 432)!;
   assert.ok(clasp.dotted, 'the tick-432 bracket carries a dotted value');
@@ -567,8 +574,8 @@ test('The nib: m. 3’s tick-432 dot is the case window, clean by every measure'
 });
 
 test('Violation fixture: the retired fused geometry is caught by clasp-dot-fusion', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const tokens = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
   const layout = layoutJankoScore(BRAHMS, options, tokens).find((l) =>
     l.clasps.some((c) => c.tick === 432)
   )!;

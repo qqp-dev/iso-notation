@@ -102,7 +102,7 @@ function tok() {
 // 1. Forward / Inverse Pitch & Register Fidelity
 // ---------------------------------------------------------------------------
 
-test('Criterion 1: Forward/inverse pitch/register fidelity on dense corpus chords (mm. 7, 8, 9, 46, 60, 66)', () => {
+test('Criterion 1: Forward/inverse pitch/register fidelity on dense corpus chords (mm. 7, 8, 9, 46, 60)', () => {
   const m7_rh = BRAHMS.notes.filter((n) => n.hand === 'RH' && n.startTick === 1200);
   assert.equal(m7_rh.length, 5, 'm.7 RH has 5 notes');
 
@@ -121,8 +121,19 @@ test('Criterion 1: Forward/inverse pitch/register fidelity on dense corpus chord
   const m60_rh = BRAHMS.notes.filter((n) => n.hand === 'RH' && n.startTick === 10896);
   assert.equal(m60_rh.length, 4, 'm.60 RH has 4 notes');
 
+  // Round 45 §D: performed m. 66 is two-handed — the low A2/D3 of the
+  // tick-12624 column moved to the left hand (the source-verified correction),
+  // so the right hand keeps the two upper heads D4/D5. Two-note groups stay
+  // literal by the grouping rule below, so m. 66 is pinned here and the dense
+  // four/five-note corpus chords carry the handprint coverage.
   const m66_rh = BRAHMS.notes.filter((n) => n.hand === 'RH' && n.startTick === 12624);
-  assert.equal(m66_rh.length, 4, 'm.66 RH has 4 notes');
+  assert.equal(m66_rh.length, 2, 'm.66 RH has 2 notes (D4, D5)');
+  const m66_lh = BRAHMS.notes.filter((n) => n.hand === 'LH' && n.startTick === 12624);
+  assert.deepEqual(
+    m66_lh.map((n) => `${n.pitch.pitchClass}/${n.pitch.octave}`).sort(),
+    ['2/3', '9/2'],
+    'm.66 LH carries the corrected low A2/D3 (plus the held F3 sounding into the column)'
+  );
 
   const testGroups = [
     { label: 'm.7 RH', notes: m7_rh },
@@ -131,7 +142,6 @@ test('Criterion 1: Forward/inverse pitch/register fidelity on dense corpus chord
     { label: 'm.9 RH', notes: m9_rh },
     { label: 'm.46 RH', notes: m46_rh },
     { label: 'm.60 RH', notes: m60_rh },
-    { label: 'm.66 RH', notes: m66_rh },
   ];
 
   const staffHeightFn = (lin: number) => 800 - lin * 2.4;

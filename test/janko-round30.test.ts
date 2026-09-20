@@ -28,11 +28,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   BRAHMS_STUDIO_SCORE_ID,
   JankoCandidate,
@@ -93,10 +94,10 @@ const BRAHMS = buildBrahmsOp118No1Score();
 const O_BACH = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const T_BACH = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 /** The studio's Brahms golden: the lint-gated adaptive config. */
-const O_BRAHMS = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
-const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const O_BRAHMS = resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' });
+const T_BRAHMS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 const O_BRAHMS_PREVIEW = resolveJankoOptions({
-  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  ...BRAHMS_ROUND44_RESERVE_OPTIONS,
   core: 'adaptive',
   durationGrammar: 'complete',
 });
@@ -349,23 +350,39 @@ test('resolveClaspInk reads bracket dots from the notated value (complete)', () 
   assert.deepEqual(resolveClaspInk({ centerY: 0, durationTicks: 144 }).dots, 1, 'golden: dotted halves dot');
 });
 
-test('claspSecondDotCenter: no double-dotted brackets remain in source-correct Brahms', () => {
+test('claspSecondDotCenter: one m.66 double-dotted bracket, the m.25 bracket undotted', () => {
   // Source correction eliminated all 42/84/336 brackets (shortened quarters/
   // halves); the m.25 bracket at tick 4800 now carries a standard 48-tick
   // quarter (fixture: all tick-4800 notes 48, provenance lines 65/132/215/287)
-  // with no second dot under either grammar. Second-dot positioning logic
-  // stays covered by the synthetic
-  // resolveClaspInk unit test above (42/84/336 → 2 dots) and the historical
-  // record; engine rules unchanged (Bach byte-identical).
+  // with no second dot under either grammar. Second-dot positioning logic also
+  // stays covered by the synthetic resolveClaspInk unit test above (42/84/336
+  // → 2 dots) and the historical record; engine rules unchanged (Bach
+  // byte-identical).
+  //
+  // Round 45: the m. 66 RH→LH correction gives t12552 a two-voice LH clasp
+  // (the sustained A2 909 + the reattacked 908) whose carried value is the
+  // sustained A2's own 168 ticks — a legitimate double-dotted quarter
+  // (96 + 48 + 24) — so exactly one double-dotted bracket exists now, named
+  // here by tick and carried value rather than hidden.
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
   const clasp = layouts.flatMap((s) => s.clasps).find((c) => c.tick === 4800)!;
   assert.equal(clasp.durationTicks, 48, 'm.25 bracket corrected 42→48 (standard quarter)');
   assert.ok(
     clasp.durationSecondDots.every((d) => d === null),
-    'no second dot under the preview'
+    'no second dot on the m.25 bracket'
   );
   const withSecond = layouts.flatMap((s) => s.clasps).filter((c) => c.durationSecondDots.some(Boolean));
-  assert.equal(withSecond.length, 0, 'zero double-dotted brackets in corrected Brahms');
+  assert.deepEqual(
+    withSecond.map((c) => [c.tick, c.durationTicks]),
+    [[12552, 168]],
+    'exactly the m. 66 clasp carries a second dot'
+  );
+  assert.deepEqual(DOUBLE_DOT_CLASPS, [[12552, 168]], 'and the census names the same instance');
+  assert.deepEqual(
+    withSecond[0].notes.map((n) => n.id).sort(),
+    ['brahms-op118-no1-908', 'brahms-op118-no1-909'],
+    'the double-dotted clasp is the corrected two-voice LH t12552 pair'
+  );
   const goldenLayouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const goldenClasp = goldenLayouts.flatMap((s) => s.clasps).find((c) => c.tick === 4800)!;
   assert.equal(goldenClasp.durationInk[0].dots, 0, 'golden: undotted');
@@ -392,13 +409,20 @@ type Num = number;
 // Option-3 carriers (346, 632), each gaining its preview ring.
 const RING_96: Num[] = [
   290, 321, 346, 368, 375, 383, 390, 407, 414, 545, 553, 576, 607, 632, 654, 661, 669, 676,
-  693, 700, 840, 849, 934,
+  693, 700, 840, 849, 913, 916, 934,
 ];
 // Lone dotted halves (144) gain one stem ring plus their dot. Historical pair
 // (332, 618) plus ten more lone 144s now that shortenings are corrected. The
+// Round 45: the m. 66 RH→LH correction moves notes 913 and 916 into the left
+// hand (they join the LH t12624 clasp, so their own ink no longer changes —
+// each reads 0d/1r) and gives the t12552/t12576 pairs new LH clasps. The
+// sustained A2 909 and the sustained D3 911 are now clasp members (the
+// bracket owns their value), so they leave the changed set; the t12552 clasp
+// carries the double-dotted 168 (DOUBLE_DOT_CLASPS below).
+//
 // m.1 downbeat pair (4, 6) leaves the census: the tick-48 bracket is admitted
 // (§2 true-ink pre-step), so both are bracketed and suppressed.
-const RING_DOT_144: Num[] = [16, 38, 151, 173, 332, 435, 543, 618, 721, 903, 904, 911];
+const RING_DOT_144: Num[] = [16, 38, 151, 173, 332, 435, 543, 618, 721, 903, 904];
 // Lone whole (192): empty. Note 5 (m.1 downbeat, 192) was the first whole in
 // the census while tick-48 stood bare; the admitted bracket carries it as
 // the 192 exception (preview stays golden for clasp members), so no whole
@@ -407,7 +431,7 @@ const RING2_192: Num[] = [];
 // Lone double-dotted halves (168, legitimate hidden-8th + dotted-half ties)
 // gain two dots plus one ring. The 8 source-anchored 168s (e.g. tick 216:
 // lines 268+269; tick 12360: line 320 tieWait gap).
-const DOTS2_168: Num[] = [15, 37, 150, 172, 434, 720, 901, 909];
+const DOTS2_168: Num[] = [15, 37, 150, 172, 434, 720, 901];
 // Lone dotted quarters (72) gain their dot. Two newly in-grammar 72s
 // (previously out-of-grammar 63s, byte-identical under both grammars).
 const DOT_72: Num[] = [554, 899];
@@ -419,7 +443,7 @@ const BEAMED_21_PAIRS: Array<[Num, Num]> = [];
 /** The beamed [24 + 18] pair: eliminated (956/957 now 24+24, no delta). */
 const BEAMED_18_PAIR: [Num, Num] | null = null;
 /** Brackets carrying double-dotted values: none (no 42/84/336 brackets remain). */
-const DOUBLE_DOT_CLASPS: Array<[tick: Num, carried: Num]> = [];
+const DOUBLE_DOT_CLASPS: Array<[tick: Num, carried: Num]> = [[12552, 168]];
 
 const id = (n: Num): string => `brahms-op118-no1-${n}`;
 
@@ -619,13 +643,13 @@ test('Unchanged: option-off renders equal the current golden on both scores', ()
   const brahmsPages = Math.ceil(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS) / O_BRAHMS.systemsPerPage);
   for (let page = 0; page < brahmsPages; page++) {
     assert.equal(
-      renderJankoCrop(BRAHMS, page * 9 + 1, 9, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS),
+      renderJankoCrop(BRAHMS, page * 9 + 1, 9, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS),
       renderJankoCrop(
         BRAHMS,
         page * 9 + 1,
         9,
-        { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, durationGrammar: 'golden' },
-        BRAHMS_OP118_NO1_JANKO_TOKENS
+        { ...BRAHMS_ROUND44_RESERVE_OPTIONS, durationGrammar: 'golden' },
+        BRAHMS_ROUND44_RESERVE_TOKENS
       ),
       `Brahms crop ${page + 1} byte-identical`
     );

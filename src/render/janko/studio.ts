@@ -57,6 +57,15 @@ import {
 } from './engine';
 import { getChannelLayoutSpec } from './geometry';
 import {
+  STUDIO_SCROLL_CAPTURE_DELAY_MS,
+  clampStudioScroll,
+  openStudioReviewSession,
+  type StudioReviewSession,
+  type StudioScrollPort,
+  type StudioSessionHost,
+  type StudioStorageLike,
+} from './studio-session';
+import {
   BRAHMS_STUDIO_SCORE_ID,
   DURATION_SPECIMEN_STUDIO_SCORE_ID,
   HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
@@ -928,23 +937,17 @@ const ZOOM_STEP = 0.25;
 
 /**
  * Listeners installed by the previous mount. HMR re-executes this module, so
- * each re-mount first detaches the previous handlers instead of piling up
- * duplicates on the long-lived shell elements.
+ * each re-mount first detaches the previous handlers — plus the pending scroll
+ * debounce — instead of piling up duplicates on the long-lived shell elements
+ * and the document.
  */
 interface StudioListeners {
-  wheelTarget: HTMLElement;
-  wheel: (event: WheelEvent) => void;
-  keydown: (event: KeyboardEvent) => void;
-  hashchange: () => void;
+  detach: () => void;
 }
 const GLOBAL_SCOPE = globalThis as unknown as { __jankoStudioListeners?: StudioListeners };
 
 function detachPreviousListeners(): void {
-  const previous = GLOBAL_SCOPE.__jankoStudioListeners;
-  if (!previous) return;
-  previous.wheelTarget.removeEventListener('wheel', previous.wheel);
-  if (typeof document !== 'undefined') document.removeEventListener('keydown', previous.keydown);
-  if (typeof window !== 'undefined') window.removeEventListener('hashchange', previous.hashchange);
+  GLOBAL_SCOPE.__jankoStudioListeners?.detach();
   GLOBAL_SCOPE.__jankoStudioListeners = undefined;
 }
 
@@ -985,9 +988,80 @@ function showView(dom: StudioDom, view: string): void {
 
 /** View requested by the URL hash (`#reference`), if any. */
 function viewFromHash(fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const hash = window.location.hash.replace(/^#/, '');
+  const hash = explicitViewFromHash();
   return hash === 'candidates' || hash === 'reference' ? hash : fallback;
+}
+
+/**
+ * The view named by an explicit URL hash — `undefined` when the address names
+ * no view at all (then the stored session / default decides). `#foo` is not a
+ * view, so it is not a hash claim either.
+ */
+function explicitViewFromHash(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const hash = window.location.hash.replace(/^#/, '');
+  return hash === '' ? undefined : hash;
+}
+
+/**
+ * Round 45 §F: the studio's own scroll/viewport port. Absent DOM → no-op, so
+ * the module stays SSR-safe.
+ */
+function studioScrollPort(): StudioScrollPort {
+  return {
+    get: () =>
+      typeof window === 'undefined' ? 0 : window.scrollY || window.pageYOffset || 0,
+    set: (top) => {
+      if (typeof window !== 'undefined') window.scrollTo(0, top);
+    },
+    max: () => {
+      if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
+      const height = Math.max(
+        document.documentElement?.scrollHeight ?? 0,
+        document.body?.scrollHeight ?? 0
+      );
+      return Math.max(0, height - (window.innerHeight ?? 0));
+    },
+  };
+}
+
+/** sessionStorage, or `undefined` when storage is unavailable (private mode). */
+function studioSessionStorage(): StudioStorageLike | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    return window.sessionStorage ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Apply a restored place once the layout can host it: after the fonts have
+ * settled and two frames have been painted, never on `unload`-style timing.
+ */
+function afterLayoutReady(apply: () => void): void {
+  if (typeof window === 'undefined') return;
+  const raf =
+    typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame.bind(window)
+      : (callback: (time: number) => void): number =>
+          window.setTimeout(() => callback(Date.now()), 0) as unknown as number;
+  const fonts = (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
+  const ready = fonts?.ready ? Promise.resolve(fonts.ready).catch(() => undefined) : Promise.resolve();
+  void ready.then(() => raf(() => raf(() => apply())));
+}
+
+/**
+ * The browser's own scroll restoration would race ours (and would put the page
+ * back before the re-rendered content exists), so the studio claims it.
+ */
+function claimScrollRestoration(): void {
+  if (typeof history === 'undefined' || !('scrollRestoration' in history)) return;
+  try {
+    history.scrollRestoration = 'manual';
+  } catch {
+    /* A read-only policy is not fatal: the studio still restores its place. */
+  }
 }
 
 /**
@@ -1005,39 +1079,84 @@ export function mountJankoStudio(
   if (!root) return false;
 
   detachPreviousListeners();
+
+  // Round 45 §F: the session lives on the **document**, so an HMR re-mount of
+  // this document continues from the live state (and never re-reads storage),
+  // while a real reload — e.g. the stock Vite reconnect after a phone
+  // backgrounding — gets a fresh document and restores the stored session.
+  const host = document as unknown as StudioSessionHost;
+  const remount = host.__jankoStudioSession !== undefined;
+  const port = studioScrollPort();
+  const liveView = host.__jankoStudioSession?.view;
+  const livePlace = remount ? port.get() : 0;
+
   root.innerHTML = renderStudioMarkup(config);
   const dom = collectDom(root);
 
   // Decided round (zero cards): the studio opens on the Reference — there is
-  // no comparison to show. An explicit `#candidates` hash still wins, and any
-  // future round's cards restore the normal candidates-first behavior.
+  // no comparison to show. An explicit `#candidates` hash still wins, a stored
+  // session decides next, and any future round's cards restore the normal
+  // candidates-first default.
   const initialView =
     root.dataset.initialView ?? (config.candidates.length === 0 ? 'reference' : 'candidates');
-  const showFromHash = (): void => showView(dom, viewFromHash(initialView));
+  const views = dom.panels
+    .map((panel) => panel.dataset.view)
+    .filter((view): view is string => typeof view === 'string' && view.length > 0);
+  const session = openStudioReviewSession({
+    storage: studioSessionStorage(),
+    host,
+    views: views.length > 0 ? views : [initialView],
+    fallbackView: initialView,
+    hashView: explicitViewFromHash(),
+    initialZoom: Number(root.dataset.zoom ?? '1') || 1,
+    scroll: port,
+    zoomBounds: { min: ZOOM_MIN, max: ZOOM_MAX },
+  });
+  if (remount) {
+    // The re-rendered markup may be a different height; keep the reader's own
+    // live place as the session's truth rather than any older stored value.
+    if (liveView && Number.isFinite(livePlace) && livePlace > 0) session.recordPlace(livePlace, liveView);
+    else session.captureScroll();
+  }
+
+  const showCurrentView = (): void => showView(dom, session.state.view);
+  const showFromHash = (): void => {
+    const view = viewFromHash(initialView);
+    session.setView(view);
+    showView(dom, view);
+    session.capture();
+    session.restorePlace(afterLayoutReady);
+  };
 
   for (const tab of dom.tabs) {
     tab.addEventListener('click', () => {
       const view = tab.dataset.viewTarget ?? 'candidates';
+      session.setView(view);
       showView(dom, view);
       if (typeof window !== 'undefined') window.location.hash = view;
+      session.capture();
+      session.restorePlace(afterLayoutReady);
     });
   }
-  showFromHash();
+  showCurrentView();
 
-  let zoom = Number(root.dataset.zoom ?? '1') || 1;
+  let zoom = session.state.zoom;
   applyZoom(dom, zoom);
-  const step = (delta: number): void => {
-    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta));
+  const setZoom = (next: number): void => {
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
     applyZoom(dom, zoom);
+    session.setZoom(zoom);
+    session.capture();
   };
+  const step = (delta: number): void => setZoom(zoom + delta);
   document.getElementById('janko-zoom-in')?.addEventListener('click', () => step(ZOOM_STEP));
   document.getElementById('janko-zoom-out')?.addEventListener('click', () => step(-ZOOM_STEP));
-  document.getElementById('janko-zoom-reset')?.addEventListener('click', () => {
-    zoom = 1;
-    applyZoom(dom, 1);
-  });
+  document.getElementById('janko-zoom-reset')?.addEventListener('click', () => setZoom(1));
 
   const wheel = (event: WheelEvent): void => {
+    // Any wheel is the reader taking over: a restore still waiting for layout
+    // must never fight them.
+    session.cancelRestore();
     if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
     step(event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP);
@@ -1045,17 +1164,77 @@ export function mountJankoStudio(
   root.addEventListener('wheel', wheel, { passive: false });
 
   const keydown = (event: KeyboardEvent): void => {
+    session.cancelRestore();
     if (event.key === '+' || event.key === '=') step(ZOOM_STEP);
     else if (event.key === '-' || event.key === '_') step(-ZOOM_STEP);
-    else if (event.key === '0') {
-      zoom = 1;
-      applyZoom(dom, 1);
-    }
+    else if (event.key === '0') setZoom(1);
   };
   document.addEventListener('keydown', keydown);
 
-  GLOBAL_SCOPE.__jankoStudioListeners = { wheelTarget: root, wheel, keydown, hashchange: showFromHash };
-  if (typeof window !== 'undefined') window.addEventListener('hashchange', showFromHash);
+  // Capture the place after scrolling settles (debounced), and immediately
+  // when the document is hidden or goes away — never on `unload`.
+  let scrollTimer: number | undefined;
+  const clearScrollTimer = (): void => {
+    if (typeof window !== 'undefined' && scrollTimer !== undefined) window.clearTimeout(scrollTimer);
+    scrollTimer = undefined;
+  };
+  const scroll = (): void => {
+    if (session.restorePending()) {
+      const top = port.get();
+      const target = session.place();
+      if (target !== top && top > 0) session.cancelRestore();
+    }
+    if (typeof window === 'undefined') return;
+    clearScrollTimer();
+    scrollTimer = window.setTimeout(() => {
+      scrollTimer = undefined;
+      session.capture();
+    }, STUDIO_SCROLL_CAPTURE_DELAY_MS);
+  };
+  const pagehide = (): void => {
+    clearScrollTimer();
+    session.capture();
+  };
+  const visibilitychange = (): void => {
+    if (document.visibilityState === 'hidden') pagehide();
+  };
+  const gesture = (): void => {
+    session.cancelRestore();
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('scroll', scroll, { passive: true });
+    window.addEventListener('pagehide', pagehide);
+    window.addEventListener('hashchange', showFromHash);
+    window.addEventListener('pointerdown', gesture, { passive: true });
+    window.addEventListener('touchstart', gesture, { passive: true });
+  }
+  document.addEventListener('visibilitychange', visibilitychange);
+
+  claimScrollRestoration();
+  // Restore view + zoom before the first paint, then the clamped place once
+  // the layout can host it (cancelled by any interaction in between). The
+  // second pass writes back what is actually on screen — the settled place,
+  // the live view, the live zoom — so a reload restores exactly the review
+  // that was interrupted.
+  session.restorePlace(afterLayoutReady);
+  afterLayoutReady(() => session.capture());
+
+  GLOBAL_SCOPE.__jankoStudioListeners = {
+    detach: () => {
+      clearScrollTimer();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('scroll', scroll);
+        window.removeEventListener('pagehide', pagehide);
+        window.removeEventListener('hashchange', showFromHash);
+        window.removeEventListener('pointerdown', gesture);
+        window.removeEventListener('touchstart', gesture);
+      }
+      document.removeEventListener('visibilitychange', visibilitychange);
+      document.removeEventListener('keydown', keydown);
+      root.removeEventListener('wheel', wheel);
+      session.cancelRestore();
+    },
+  };
 
   if (dom.status) {
     dom.status.textContent = renderStatusLine(config, new Date());

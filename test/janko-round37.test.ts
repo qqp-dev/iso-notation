@@ -25,13 +25,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
+import {  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { buildSyntheticM8DiagnosticScore } from '../src/scores/synthetic-m8-diagnostic';
 import {
@@ -92,13 +94,13 @@ const linOf = (pc: number, oct: number) => oct * 12 + (((pc % 12) + 12) % 12);
 
 function optFor(presentation: JankoClusterPresentation) {
   return resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     clusterPresentation: presentation,
   });
 }
 
 function tok() {
-  return resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  return resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +217,7 @@ test('Criterion 1: Transposition and reflection preserve decoding and symmetry r
   );
 });
 
-test('Criterion 1: Deterministic pitch reconstruction on all 18 dense Brahms source groups', () => {
+test('Criterion 1: Deterministic pitch reconstruction on all 17 dense Brahms source groups', () => {
   const byOnset = new Map<string, QuantizedNote[]>();
   for (const n of BRAHMS.notes) {
     const k = `${n.startTick}_${n.hand}`;
@@ -224,7 +226,12 @@ test('Criterion 1: Deterministic pitch reconstruction on all 18 dense Brahms sou
     byOnset.set(k, list);
   }
   const denseGroups = [...byOnset.values()].filter((g) => g.length >= 4);
-  assert.equal(denseGroups.length, 18, 'exactly 18 dense source groups in Brahms Op. 118 No. 1');
+  // Round 45 — 17, not 18: the authorized m. 66 RH → LH correction splits the
+  // tick-12624 "9222" column into the two-handed 2 + 2 form the operator
+  // required (A2/D3 left, D4/D5 right), so that four-note RH bucket — the
+  // only 4-note group at that tick — is gone. Every other dense group is
+  // unchanged and still decodes exactly.
+  assert.equal(denseGroups.length, 17, 'exactly 17 dense source groups in Brahms Op. 118 No. 1');
 
   for (const group of denseGroups) {
     const sorted = [...group].sort(
@@ -318,9 +325,10 @@ test('Criterion 2: Real-engine candidate paths and divisions appear; literal hea
     }
   }
 
-  // All 18 dense clusters are admitted
-  assert.equal(totalClusters, 18, 'all 18 dense clusters admitted in full score');
-  assert.ok(totalSuppressedNotes >= 18 * 4, 'all constituent source notes tracked in handprintNoteIds');
+  // All 17 dense clusters are admitted (Round 45: the m. 66 hand correction
+  // leaves 17 four-or-more-note hand groups — see Criterion 1).
+  assert.equal(totalClusters, 17, 'all 17 dense clusters admitted in full score');
+  assert.ok(totalSuppressedNotes >= 17 * 4, 'all constituent source notes tracked in handprintNoteIds');
 
   // Verify page rendering includes symmetric body and divisions, and suppresses notehead digits
   const pageSvg = renderJankoPage(BRAHMS, 0, optFor('indexed-symmetric'), tok(), layouts);
@@ -555,7 +563,7 @@ test('Criterion 6: Synthetic real-engine diagnostic disambiguates inner G3→A3 
   const synthScore = buildSyntheticM8DiagnosticScore();
   const synthLayouts = layoutJankoScore(
     synthScore,
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, measuresPerSystem: 1, clusterPresentation: 'indexed-symmetric' }),
+    resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, measuresPerSystem: 1, clusterPresentation: 'indexed-symmetric' }),
     tok()
   );
 

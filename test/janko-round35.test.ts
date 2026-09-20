@@ -29,13 +29,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
+import {  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
   BRAHMS_STUDIO_SCORE_ID,
@@ -86,13 +88,13 @@ const CONFIG = createStudioConfig({ score: BACH });
 
 function optFor(mode: JankoClusterCompression) {
   return resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     clusterCompression: mode,
   });
 }
 
 function tok() {
-  return resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  return resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 }
 
 // ---------------------------------------------------------------------------
@@ -380,7 +382,7 @@ test('Literal baseline: Brahms and Bach remain byte-identical to golden master u
   const t = tok();
 
   const brahmsLiteralSvg = renderJankoPage(BRAHMS, 0, literalOpts, t);
-  const brahmsDefaultSvg = renderJankoPage(BRAHMS, 0, resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS), t);
+  const brahmsDefaultSvg = renderJankoPage(BRAHMS, 0, resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS), t);
   assert.equal(brahmsLiteralSvg, brahmsDefaultSvg, 'Brahms literal output matches default options byte-for-byte');
 
   const bachLiteralOpts = resolveJankoOptions({

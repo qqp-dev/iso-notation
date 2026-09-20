@@ -32,11 +32,12 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   BRAHMS_STUDIO_SCORE_ID,
   brahmsWindow,
@@ -71,17 +72,17 @@ const read = (file: string): string => fs.readFileSync(path.join(REPO_ROOT, file
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
-const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const T_BRAHMS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 /** Full-grid card options: settled packing + correction + full grid. */
 const O_FULL = resolveJankoOptions({
-  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  ...BRAHMS_ROUND44_RESERVE_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'all',
 });
 /** No-grid card options: settled packing + correction + no interior grid. */
 const O_NONE = resolveJankoOptions({
-  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  ...BRAHMS_ROUND44_RESERVE_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'none',

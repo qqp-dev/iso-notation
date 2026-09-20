@@ -796,6 +796,38 @@ export interface JankoTokens {
   midpointRingRadius?: number;
   /** Midpoint ring: stroke width (pt) at scale 1 — painted `× s`. */
   midpointRingStroke?: number;
+  // --- Round 45: readability ratios and the optical clearance policy ---
+  /**
+   * Round 45: multiplier on the 45-degree slash's painted centreline length
+   * (`L0`), preserving the 45-degree page orientation. `1` is the Round 43/44
+   * family (default); the Round 45 candidates and the working Brahms Reference
+   * paint `1.10`.
+   */
+  midpointSlashLengthFactor?: number;
+  /**
+   * Round 45: multiplier on the midpoint **ring**'s radius *and* stroke
+   * (`R = 1.60·s·factor`, `stroke = 0.59·s·factor`) — the group value reads
+   * more authoritatively beside larger numerals. `1` is the Round 43/44 ring
+   * (default).
+   */
+  midpointRingScale?: number;
+  /**
+   * Round 45: multiplier on the **cut** centre-to-centre spacing, applied on
+   * both mounts (bracket spine and horizontal carrier). `1` is the Round 43/44
+   * family (default); the Round 45 candidates and the working Brahms Reference
+   * paint `7/6`, which makes the 90 % Reference's cut centre pitch exactly
+   * `1.40 ×` the Round 44 `.75` baseline (`P45(s) = P44(.75)·1.40·(s/.90)`).
+   * The ring pitch is never multiplied — it follows the enlarged ring's own
+   * outer diameter plus the nominal ink gap.
+   */
+  midpointSpacingFactor?: number;
+  /**
+   * Round 45: **vertical optical clearance air** (pt) between two masks of one
+   * admitted bracket cluster — an explicit new policy of this round, not the
+   * (never enforced) `chordKnockoutAir` field. Read only under
+   * `options.opticalSpacing`.
+   */
+  opticalClearanceAir?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -887,6 +919,13 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   midpointSlashSlope: 0.22,
   midpointRingRadius: 1.6,
   midpointRingStroke: 0.59,
+  // Round 45 — no-ops by default: `1` keeps the Round 43/44 midpoint family
+  // (and the canonical engraving) byte-identical; the working Brahms Reference
+  // and the three Round 45 candidates opt into the readability ratios.
+  midpointSlashLengthFactor: 1,
+  midpointRingScale: 1,
+  midpointSpacingFactor: 1,
+  opticalClearanceAir: 0.20,
 };
 
 /**
@@ -904,6 +943,20 @@ export const JANKO_DURATION_ENDPOINTS: readonly JankoDurationEndpoint[] = [
 ];
 
 /** Macro-layout options for a Jánko Two-Row page or crop. */
+/**
+ * Round 45: how a source pitch below the core's drawn coverage is presented.
+ *
+ * - `'core'`: fold it up into the core and mark the octave with the ↓10/↓20
+ *   ottava indicator (the historical behavior, default).
+ * - `'literal'`: draw it at its literal written pitch with the established
+ *   dynamic ledger equators of its out-of-staff octave(s) — exact pitch
+ *   semantics, no displaced-note indicator.
+ */
+export type JankoLowPitchFolding = 'core' | 'literal';
+
+/** Per-glyph optical displacement cap (pt): one 1-span, Round 45. */
+export const OPTICAL_DISPLACEMENT_CAP = 2.5;
+
 export interface JankoLayoutOptions {
   /** Measures engraved per horizontal system. */
   measuresPerSystem: number;
@@ -1195,6 +1248,35 @@ export interface JankoLayoutOptions {
    *   duration — never a release-time length.
    */
   exceptionCarrier?: JankoExceptionCarrier;
+  /**
+   * Round 45: **declared, centred optical cluster spacing**.
+   *
+   * When `true`, every *actually admitted* bracket cluster (the exact
+   * `admittedBracketIds` ownership of the chord-column solve) may distribute a
+   * minimum uniform extra vertical gap across its distinct true pitch levels so
+   * the members' own masks keep `tokens.opticalClearanceAir` of clear air. The
+   * offsets are **optical position metadata, never a musical transposition**:
+   * sounding pitch, written pitch, source onset/duration and the staff lattice
+   * are untouched, the offsets are centred on the member-weighted mean (the
+   * cluster centroid never translates), a cluster that already clears needs
+   * zero delta, and any per-glyph displacement is capped at
+   * {@link OPTICAL_DISPLACEMENT_CAP} (one 1-span). Defaults to `false` — the
+   * canonical (and Round 44) layout, byte-identical.
+   */
+  opticalSpacing?: boolean;
+  /**
+   * Round 45: **low-pitch presentation**.
+   *
+   * - `'core'` (default): the historical behavior — a source pitch below the
+   *   core's coverage folds up by an octave (or two) under its ↓10/↓20 ottava
+   *   indicator so it fits the drawn rows.
+   * - `'literal'`: the note is drawn at its **literal written pitch** and the
+   *   established ledger/extension vocabulary states its register (the
+   *   dynamic ledger equators of its out-of-staff octave(s)); no fold shift
+   *   and no ottava indicator are emitted for it. Nothing else moves: the
+   *   system spacing and pagination are unchanged.
+   */
+  lowPitchFolding?: JankoLowPitchFolding;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1389,6 +1471,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   chordSymbolScale: 1,
   bracketDurationGrammar: 'golden',
   exceptionCarrier: 'none',
+  opticalSpacing: false,
+  lowPitchFolding: 'core',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
@@ -1564,6 +1648,19 @@ export const JANKO_HOME_OCTAVES: Record<Hand, JankoStaffOctaveRange> = {
   RH: JANKO_STAFF_OCTAVES,
   LH: JANKO_STAFF_OCTAVES,
 };
+
+/**
+ * Round 45: deepest written linear pitch the **literal low-pitch vocabulary**
+ * states (`lowPitchFolding: 'literal'`).
+ *
+ * The literal register is written with the established dynamic ledger equators
+ * of the note's own octave(s) ({@link getLedgerEquators}); the vocabulary runs
+ * two octaves below the grand staff — the same two-octave reach the historical
+ * fold family used — so a source pitch below this floor still has to fold.
+ * Shared by the renderer's register statement and the linter's
+ * `extension-beyond-core` allowance so the two can never disagree.
+ */
+export const JANKO_LITERAL_LOW_FLOOR_LIN = (JANKO_STAFF_OCTAVES[0] - 2) * 12;
 
 /**
  * The four duodecimal octave sign kinds: arrow + dozenal span.

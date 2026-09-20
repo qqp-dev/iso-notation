@@ -120,23 +120,48 @@ test('Round 27 registry purity: exactly 2 cards, control = fixed-4, single open 
 // 2. Fold counts on Brahms and Bach
 // ---------------------------------------------------------------------------
 
-test('Brahms fold counts: exactly 9 under fixed-3, 1 under fixed-4, 0 on Bach golden', () => {
+test('Brahms fold counts: the literal golden folds 0; the core-fold presentation keeps 9 under fixed-3, 1 under fixed-4', () => {
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 
-  // Fixed-3 on Brahms: exactly 9 folded notes
-  const f3Opts = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
+  // Round 45 §E: the working Brahms Reference draws its low LH octaves at
+  // their literal written pitch (`lowPitchFolding: 'literal'`), so neither
+  // core folds anything; the register is stated by the established ledger
+  // vocabulary instead of a ↓10 displacement.
+  for (const core of ['fixed-3', 'fixed-4'] as const) {
+    const literal = layoutJankoScore(
+      BRAHMS,
+      resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core }),
+      t
+    );
+    assert.equal(
+      literal.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined).length,
+      0,
+      `the working literal golden folds nothing under ${core}`
+    );
+  }
+
+  // Fixed-3 on the core-fold presentation: exactly 9 folded notes
+  const f3Opts = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'fixed-3',
+    lowPitchFolding: 'core',
+  });
   const f3Layouts = layoutJankoScore(BRAHMS, f3Opts, t);
   const f3Folded = f3Layouts.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
-  assert.equal(f3Folded.length, 9, 'fixed-3 on Brahms has exactly 9 folded notes');
+  assert.equal(f3Folded.length, 9, 'core-fold fixed-3 on Brahms has exactly 9 folded notes');
   for (const n of f3Folded) {
     assert.equal(n.ottavaShift, 12, 'all folded notes in Brahms are down10 (shift = +12)');
   }
 
-  // Fixed-4 on Brahms: exactly 1 folded note (m. 69, A0, lin 9)
-  const f4Opts = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-4' });
+  // Fixed-4 on the core-fold presentation: exactly 1 folded note (m. 69, A0, lin 9)
+  const f4Opts = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'fixed-4',
+    lowPitchFolding: 'core',
+  });
   const f4Layouts = layoutJankoScore(BRAHMS, f4Opts, t);
   const f4Folded = f4Layouts.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
-  assert.equal(f4Folded.length, 1, 'fixed-4 on Brahms has exactly 1 folded note');
+  assert.equal(f4Folded.length, 1, 'core-fold fixed-4 on Brahms has exactly 1 folded note');
   assert.equal(f4Folded[0].ottavaShift, 12, 'm. 69 A0 folded note is down10 (shift = +12)');
   assert.equal(f4Folded[0].note.pitch.octave * 12 + f4Folded[0].note.pitch.pitchClass, 9, 'm. 69 note is A0 (lin 9)');
 
@@ -152,11 +177,15 @@ test('Brahms fold counts: exactly 9 under fixed-3, 1 under fixed-4, 0 on Bach go
 // 3. Bracket coverage
 // ---------------------------------------------------------------------------
 
-test('Every folded note is covered by exactly one bracket', () => {
+test('Every folded note is covered by exactly one bracket (the core-fold presentation)', () => {
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 
   for (const core of ['fixed-3', 'fixed-4'] as const) {
-    const opts = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core });
+    const opts = resolveJankoOptions({
+      ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+      core,
+      lowPitchFolding: 'core',
+    });
     const layouts = layoutJankoScore(BRAHMS, opts, t);
 
     let totalFolded = 0;
@@ -199,7 +228,7 @@ test('Every folded note is covered by exactly one bracket', () => {
 // 4. Densest macro contains folded bass under fixed-3
 // ---------------------------------------------------------------------------
 
-test('Densest macro window (mm. 33–34) contains folded bass under fixed-3', () => {
+test('Densest macro window (mm. 33–34) contains literal bass under the working golden, folded bass under core', () => {
   const strip = ROUND_27_METADATA.compareStrip;
   assert.ok(strip, 'compare strip is declared');
   assert.equal(strip.scoreId, BRAHMS_STUDIO_SCORE_ID);
@@ -207,7 +236,11 @@ test('Densest macro window (mm. 33–34) contains folded bass under fixed-3', ()
   assert.equal(strip.measureCount, 2);
 
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const f3Opts = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
+  const f3Opts = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'fixed-3',
+    lowPitchFolding: 'core',
+  });
   const f3Layouts = layoutJankoScore(BRAHMS, f3Opts, t);
 
   // m. 33 start tick: cut time = 192 ticks/measure, anacrusis = 48

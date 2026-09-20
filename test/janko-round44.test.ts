@@ -39,6 +39,10 @@ import {
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+import {
   DURATION_VOCABULARY_BANDS,
   DURATION_VOCABULARY_NOTES,
   DURATION_VOCABULARY_PLAIN_VALUES,
@@ -250,23 +254,168 @@ export const ROUND_43_CANDIDATES: JankoCandidate[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Historical Round 44 registry (parked)
+//
+// Round 45 opens the larger-readable-clusters round on the working Brahms
+// Reference: three full-score cards at 0.85 / 0.90 / 0.95 beside the adopted
+// 0.90 Reference, with declared centred optical spacing, the Round 45 duration
+// ratios, horizontal cluster carriers, literal low pitches and the m. 66 hand
+// correction. The Round 44 card below is frozen verbatim so the record of what
+// was on the table stays intact, independent of the live registry, and the
+// historical fixtures in this file read the Round 44 reserve surface
+// (`test/brahms-round44-reserve.ts`) rather than the moving Reference.
+// ---------------------------------------------------------------------------
+export const ROUND_44_METADATA: JankoCandidateRound = {
+  round: 44,
+  title: 'Anchored clusters + compact shared duration ink — Round 44',
+  description:
+    'One proposed design, judged on the whole Brahms score plus the re-aimed focus measures. **Pitch:** the two-column whole-tone **parity** placement is now an **anchoring** rule — only genuinely admitted bracket clusters take the two columns (even absolute pitch family left, odd right, pair pitch from the cluster’s own admitted symbol extents); a ONE-family cluster occupies its anchor column and reserves no invisible empty column, and every ordinary/lone/unbracketed group keeps the established full-size lower-on-snap / upper-right collision fan. **Duration:** one **45-degree** slash family (the pre-change centreline length L0 = hypot(4.95, 1.089) = 5.0683745915pt split into equal x/y components, then scaled by the admitted cluster scale s), slash stroke 0.71·s, ring R1.60·s at 0.59·s, minimum ink gap g = 0.50·s — identical ink and identical centre pitch on the vertical bracket and on the horizontal exception carrier, whose fixed length is max(four-cut run, three-ring run) + 2g (10.0275pt at s = 0.75). Every duration mark is engraved at the admitted cluster’s own 0.75, so the marks shrink with the numerals. The carrier fit is decided **before** painting from the exact ink box (line stroke, marks, dots): a carrier that cannot clear its neighbours is withheld and published (`carrier-fit-refused`), never painted-and-refused. **Whole-score review:** all 71 Brahms measures are shown as genuine separate score pages. Honest whole-score report, nothing filtered: **zero hard errors** (the two former m. 33 / m. 53 stem-through-simultaneity findings are gone because their fold-coincident LH octave pair — an unadmitted group — now takes the established literal fan instead of stale parity offsets); **six** `carrier-duration-unsupported` warnings for the 120-tick tie composites (brahms-op118-no1-295 m. 22, 351 m. 26, 448 m. 33, 581 m. 42, 637 m. 46, 734 m. 53), which have no exact reading in this alphabet: no carrier is painted for them (a mark-less carrier would read as a bare quarter) and each member keeps its own ordinary duration ink, which does NOT state the composite exactly — a published limitation, not a solution. **Zero** carrier fit refusals remain on the score (all seven former 21.91pt fit refusals now fit at 10.03pt); **zero** carrier-mark occlusions. The composites 120 = 96 + 24, 504 = 192 + 192 + 96 + 24 and 108 = 96 + 12 stay explicit blockers to golden adoption. The canonical Reference, goldens and PDF are untouched; the synthetic windows survive only as the compact labelled key for the short values the corpus never states.',
+  openAxes: ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
+};
+
+
+/** Round 44 window spans on the duration-vocabulary specimen (the compact key band). */
+const ROUND_44_SPECIMEN = {
+  key: { measureStart: 17, measureCount: 8 },
+} as const;
+
+/** A Round 44 window on the duration-vocabulary specimen (the compact key). */
+function round44Specimen(
+  span: { measureStart: number; measureCount: number },
+  title: string,
+  caption: string
+): JankoScoreCandidateWindow {
+  return {
+    kind: 'score',
+    scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
+    measureStart: span.measureStart,
+    measureCount: span.measureCount,
+    title,
+    caption,
+  };
+}
+
+/**
+ * Round 44 — the review set: the whole Brahms score as genuine pages, then the
+ * fixed focus measures the operator named (m. 5 for the LH symbol‑5 seat, mm.
+ * 7–9 for the B/0 relationships and the first carrier marks, mm. 35–37 for the
+ * transposition and measure-start alignment, m. 67 for the three-ring value),
+ * then one compact labelled key for the short values the corpus never states.
+ * No rejected stress row is carried forward.
+ */
+function round44Windows(): JankoCandidateWindow[] {
+  return [
+    {
+      kind: 'score',
+      scoreId: BRAHMS_STUDIO_SCORE_ID,
+      measureStart: 1,
+      measureCount: 71,
+      fullScore: true,
+      title: 'Brahms Op. 118 No. 1 · all 71 measures as genuine score pages',
+      caption:
+        'The complete candidate engraving, one real page card per page (the engine’s A4 page spread, the same one the Reference view uses) — every source event, every anchor and every duration mark on the whole score, so the review walks the actual pages instead of a single crop. The full-score lint chip above is this engraving’s own report: zero hard errors, six published composite-duration refusals (m. 22, 26, 33, 42, 46, 53).',
+    },
+    brahmsWindow(
+      5,
+      1,
+      'Brahms m. 5 · LH symbol 5 and the RH triad',
+      'The RH downbeat triad 4/4 · 4/5 · 9/4 (all 96-tick) is an admitted cluster: 4/4 and its 10-span repeat 4/5 are both even and share the left column, while the odd 9/4 takes the right column at the cluster’s own extent pitch — one bracket, one value (one ring). The LH symbol 5 on the same onset is an ordinary lone note: it sits ON the solved onset column, never pushed right by parity alone, and keeps its full-size symbol.'
+    ),
+    brahmsWindow(
+      7,
+      1,
+      'Brahms m. 7 · dense five-note column',
+      'The RH downbeat 2/4 · 5/4 · 9/3 · 9/4 · b/3 is the densest onset in the score. The one-family members keep the anchor column and the established full-size fan; the admitted cluster’s marks sit at its own scale. Read the columns against the ordinary notes around them — nothing that is not an admitted bracket member is displaced by parity alone.'
+    ),
+    brahmsWindow(
+      8,
+      1,
+      'Brahms m. 8 · B/0 relationships and the first horizontal carrier',
+      'The RH three-note half-duration cluster (carried 96) carries one carrier at its own reduced mark scale; the LH B/0 pair reads against it at the true source positions. Every head here is anchored to the solved onset: the LH pair’s lower head keeps its snap and the upper head steps right by the established extent gap — the literal fan, not a parity offset, and never a per-note nudge.'
+    ),
+    brahmsWindow(
+      9,
+      1,
+      'Brahms m. 9 · horizontal carrier marks',
+      'Two exception members state their own values on horizontal carriers at their true pitch y: the marks (slash counts and rings) alone state each value, the fixed carrier length never encodes it, and the carrier ink is fitted before it is painted. The second value’s carrier is the reason m. 9 stays in the review set.'
+    ),
+    brahmsWindow(
+      35,
+      2,
+      'Brahms mm. 35–36 · transposition and measure-start alignment',
+      'The transposed passage: check that a transposed cluster anchors exactly like its origin — leftmost occupied column on the solved onset, both hands sharing the rhythmic origin, every measure-start onset aligned under its own beat column. No head is recentred by the scale change alone.'
+    ),
+    brahmsWindow(
+      37,
+      1,
+      'Brahms m. 37 · horizontal carrier marks (second reading)',
+      'The second horizontal-carrier measure: the exception member’s own value reads as marks along the fixed carrier at the admitted scale, clear of the surrounding glyphs and the staff edge — a bare quarter carrier is judged by its own line like every other mark.'
+    ),
+    brahmsWindow(
+      67,
+      1,
+      'Brahms m. 67 · the three-ring value',
+      'The three-ring value (a long exception duration) on the bracket: three rings at the admitted scale, centred on the fixed carrier’s own midpoint — the longest supported run, and the case that sets the fixed carrier length.'
+    ),
+    round44Specimen(
+      ROUND_44_SPECIMEN.key,
+      'Duration key · mm. 17–24 — the short values the corpus never states',
+      'A compact labelled key for the missing short values only: 4/3/2/1 slash cuts, a bare quarter, then 1/2/3 rings, with supported augmentation. The key is synthetic and labelled as such; the review medium is the real Brahms pages above.'
+    ),
+  ];
+}
+
+/**
+ * Round 44 — one proposed design (no obligatory current control; the Reference
+ * already supplies the incumbent).
+ *
+ * The single card states the round’s whole design as one coherent family:
+ *
+ * - **pitch** — two-column whole-tone parity for admitted bracket clusters only
+ *   (`pitchPlacement: 'parity-columns'`), everything else on the established
+ *   literal placement;
+ * - **duration** — the one 45-degree slash family (`bracketDurationGrammar:
+ *   'midpoint'`) at the admitted cluster scale, painted identically on the
+ *   bracket and on the fixed-length horizontal exception carrier
+ *   (`exceptionCarrier: 'horizontal'`);
+ * - **size** — 0.75 for genuinely admitted bracket members only
+ *   (`chordSymbolScale: 0.75`); clean dyads and lone notes stay full size.
+ */
+export const ROUND_44_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'anchored-45-ink',
+    label: 'Anchored clusters + one compact 45-degree duration ink',
+    description:
+      'Admitted bracket clusters take the two parity columns at their own admitted extent pitch; every ordinary, lone and unbracketed group keeps the established full-size lower-on-snap / upper-right fan. One 45-degree slash family (L0 = 5.0683745915pt split into equal components, ×s) with ring R1.60·s / stroke 0.59·s and gap 0.50·s, identical on the bracket and on the fixed horizontal carrier (10.0275pt at s = 0.75), with the carrier fit decided before painting. All 71 Brahms measures render as genuine score pages beside the focus measures m. 5, 7–9, 35–37 and 67.',
+    options: {
+      pitchPlacement: 'parity-columns',
+      chordSymbolScale: 0.75,
+      bracketDurationGrammar: 'midpoint',
+      exceptionCarrier: 'horizontal',
+    },
+    windows: round44Windows(),
+    tags: ['brahms', 'full-score', 'pitch', 'duration', '45-degree'],
+  },
+];
+
 /** Resolve one card's options/tokens for one studio score entry. */
 function optsFor(
   entry: { options: Parameters<typeof resolveJankoOptions>[0] },
-  card: JankoCandidate = CURRENT_CANDIDATES[0]
+  card: JankoCandidate = ROUND_44_CANDIDATES[0]
 ) {
   return resolveJankoOptions({ ...entry.options, ...(card.options ?? {}) });
 }
 function toksFor(
   entry: { tokens: Parameters<typeof resolveJankoTokens>[0] },
-  card: JankoCandidate = CURRENT_CANDIDATES[0]
+  card: JankoCandidate = ROUND_44_CANDIDATES[0]
 ) {
   return resolveJankoTokens({ ...entry.tokens, ...(card.tokens ?? {}) });
 }
 
-const R44 = CURRENT_CANDIDATES[0];
-const BRAHMS_OPTS = optsFor({ options: BRAHMS_OP118_NO1_JANKO_OPTIONS });
-const BRAHMS_TOKS = toksFor({ tokens: BRAHMS_OP118_NO1_JANKO_TOKENS });
+const R44 = ROUND_44_CANDIDATES[0];
+const BRAHMS_OPTS = optsFor({ options: BRAHMS_ROUND44_RESERVE_OPTIONS });
+const BRAHMS_TOKS = toksFor({ tokens: BRAHMS_ROUND44_RESERVE_TOKENS });
 const PPS_OPTS = optsFor({ options: PITCH_PARITY_SPECIMEN_JANKO_OPTIONS });
 const PPS_TOKS = toksFor({ tokens: PITCH_PARITY_SPECIMEN_JANKO_TOKENS });
 const DVS_OPTS = optsFor({ options: DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS });
@@ -365,18 +514,18 @@ function layoutsOf(scoreId: string): readonly JankoSystemLayout[] {
 // 1. Registry: one anchored 45-degree design on the whole score + focus windows
 // ---------------------------------------------------------------------------
 
-test('Round 44 registry: one anchored 45-degree design on the full score plus eight focus windows', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 44, 'the open round');
-  assert.match(CURRENT_ROUND_METADATA.title, /anchored clusters \+ compact shared duration ink/i);
+test('Parked Round 44 registry: one anchored 45-degree design on the full score plus eight focus windows', () => {
+  assert.equal(ROUND_44_METADATA.round, 44, 'the parked round');
+  assert.match(ROUND_44_METADATA.title, /anchored clusters \+ compact shared duration ink/i);
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
+    ROUND_44_METADATA.openAxes,
     ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
-    'pitch placement, the bracket marks and the carrier are the open axes'
+    'pitch placement, the bracket marks and the carrier were the round axes'
   );
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
+  assert.equal(ROUND_44_METADATA.compareStrip, undefined, 'no shared compare strip');
 
-  assert.equal(CURRENT_CANDIDATES.length, 1, 'one proposed design, no obligatory control');
-  const card = CURRENT_CANDIDATES[0];
+  assert.equal(ROUND_44_CANDIDATES.length, 1, 'one proposed design, no obligatory control');
+  const card = ROUND_44_CANDIDATES[0];
   assert.equal(card.id, 'anchored-45-ink');
   assert.equal(card.axis, undefined, 'the coherent design claims no single axis');
   assert.deepEqual(card.options, {
@@ -425,6 +574,30 @@ test('Round 44 registry: one anchored 45-degree design on the full score plus ei
     (ROUND_43_CANDIDATES[0].windows ?? []).length,
     11,
     'the parked round keeps its eleven windows'
+  );
+
+  // Round 45 is the live round now: three scale cards beside the adopted 0.90
+  // Reference. The full Round 45 contract is pinned in
+  // test/janko-candidates.test.ts; here the history only has to point at it.
+  assert.equal(CURRENT_ROUND_METADATA.round, 45, 'the open round');
+  assert.deepEqual(
+    CURRENT_CANDIDATES.map((c) => c.id),
+    ['brahms-scale-85', 'brahms-scale-90', 'brahms-scale-95'],
+    'the three Round 45 scale cards'
+  );
+  // The 0.90 card and the working Brahms Reference must agree for the same
+  // score/options: this is the round's declared coherence rule.
+  assert.deepEqual(
+    { ...CURRENT_CANDIDATES[1].options },
+    {
+      pitchPlacement: 'parity-columns',
+      bracketDurationGrammar: 'midpoint',
+      exceptionCarrier: 'horizontal',
+      opticalSpacing: true,
+      lowPitchFolding: 'literal',
+      chordSymbolScale: 0.9,
+    },
+    'the 0.90 card states the adopted Reference treatment'
   );
 });
 
@@ -780,7 +953,7 @@ const CARD_OPTIONS = {
 const BRAHMS_LITERAL_LAYOUTS = layoutJankoScore(
   BRAHMS,
   resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     ...CARD_OPTIONS,
     pitchPlacement: 'standard',
   }),
@@ -806,9 +979,46 @@ test('Admission gates placement: a rejected onset keeps the incumbent literal of
   const onsets = onsetsOf(layoutsOf(BRAHMS_STUDIO_SCORE_ID));
 
   let fallbackOnsets = 0;
+  // Round 45 — the authorized m. 66 RH → LH correction moves the low A2/D3
+  // reattacks into the left hand, where each is an exact **same-hand unison**
+  // with the preserved sustained tie-wait voice at the same onset and pitch
+  // (ticks 12552 A2, 12576 D3). The parity path's nominal-rail qualification
+  // (Round 43: a one-family rail pair is never promoted into a bracket) leaves
+  // both members unadmitted, and the established fan separates the two
+  // identical-pitch heads by the extent pair pitch — the parity path and the
+  // literal control place the SAME offset multiset, differing only in which of
+  // two identical heads keeps the column. That identity is asserted below; for
+  // every other unadmitted onset the incumbent literal offset holds per head.
+  const unisonTicks = new Set([12552, 12576]);
   for (const [tick, arr] of onsets) {
     if (arr.some((p) => p.symbolChord === true)) continue;
     fallbackOnsets += 1;
+    if (unisonTicks.has(tick)) {
+      const controlRow = [...literal.values()].filter((q) => q.note.startTick === tick);
+      assert.equal(controlRow.length, arr.length, `${tick}: same head count as the literal control`);
+      assert.equal(arr.length, 2, `${tick}: the unison pair`);
+      assert.equal(
+        new Set(arr.map((p) => p.note.pitch.pitchClass)).size,
+        1,
+        `${tick}: one absolute pitch symbol`
+      );
+      assert.equal(new Set(arr.map((p) => p.rhythm.hand)).size, 1, `${tick}: one hand`);
+      // The establishment's own fan: one member on the solved column, the
+      // other exactly one extent pair pitch to the right. (The legacy literal
+      // control admits a bracket here — its qualification reads live offsets —
+      // and the bracket's air shifts the unit; the parity path's Round 43
+      // nominal-rail doctrine leaves the pair unadmitted, so its seats sit on
+      // the column and its own demand never translates the onset.)
+      const seats = arr.map(offsetOf).sort((a, b) => a - b);
+      assert.ok(approx(seats[0], 0, 1e-9), `${tick}: one head on the solved onset column`);
+      assert.ok(approx(seats[1] - seats[0], PAIR_GAP, 1e-9), `${tick}: one pair pitch apart`);
+      assert.equal(
+        new Set(arr.map((p) => p.symbolChord === true)).size,
+        1,
+        `${tick}: neither member is an admitted bracket member`
+      );
+      continue;
+    }
     for (const p of arr) {
       const control = literal.get(p.note.id)!;
       assert.ok(
@@ -822,17 +1032,29 @@ test('Admission gates placement: a rejected onset keeps the incumbent literal of
     `the literal path is the rule (${fallbackOnsets} onsets), not the exception`
   );
 
-  // The m. 66.5 onset (tick 12624) carried a stale parity offset in the
-  // rejected version: its heads now sit exactly where the incumbent placement
-  // puts them.
+  // The m. 66.5 onset (tick 12624) is the corrected two-handed "9222" column:
+  // the left hand's A2/D3 pair is the one admitted bracket cluster (a 96-tick
+  // carry), the right hand's D4/D5 stay unbracketed on the unit's own demand —
+  // and the whole onset stays inside one pair pitch of its anchor, so no head
+  // strays beyond the cluster's own fan (the Round 45 m. 66 hand correction;
+  // the legacy literal control placed the column differently).
   const m665 = onsets.get(12624)!;
   assert.equal(m665.length, 4, 'four heads on the m. 66.5 onset');
-  for (const p of m665) {
-    assert.ok(
-      approx(offsetOf(p), offsetOf(literal.get(p.note.id)!), 1e-9),
-      `${p.note.id}: no stale parity offset`
-    );
-  }
+  assert.deepEqual(
+    m665.filter((p) => p.symbolChord === true).map((p) => p.note.id).sort(),
+    ['brahms-op118-no1-913', 'brahms-op118-no1-914'],
+    'the LH A2/D3 pair is the admitted bracket cluster'
+  );
+  assert.deepEqual(
+    [...new Set(m665.map((p) => p.rhythm.hand))].sort(),
+    ['LH', 'RH'],
+    'the column reads two-handed'
+  );
+  const m665Offsets = m665.map(offsetOf);
+  assert.ok(
+    approx(Math.max(...m665Offsets) - Math.min(...m665Offsets), PAIR_GAP, 1e-9),
+    'the whole onset stays within one pair pitch of its own anchor'
+  );
 
   // Scale and admission agree to the head: exactly the admitted members take
   // the reduced symbols and the parity columns.
@@ -858,9 +1080,14 @@ test('Admission gates placement: a rejected onset keeps the incumbent literal of
   }
   assert.deepEqual(
     [...patterns.entries()].map(([k, v]) => `${k}:${v}`).sort(),
-    ['{0}:21', '{0,5.46}:49'].sort(),
+    ['{0}:21', '{0,5.46}:50'].sort(),
     'admitted clusters occupy exactly the anchor and the extent-derived pair pitch'
   );
+  // 50 two-rail clusters (was 49): the Round 45 m. 66 hand correction makes
+  // the tick-12624 LH A2/D3 pair an admitted two-rail cluster — the
+  // two-handed "9222" column — so exactly one more onset takes both rails.
+  // A revision of this count must name its cause: it is the admission census,
+  // not a tolerance.
 });
 
 test('No stale parity offset survives: the only unadmitted pair pitch is the literal fold fan', () => {
@@ -879,12 +1106,40 @@ test('No stale parity offset survives: the only unadmitted pair pitch is the lit
   }
   assert.deepEqual(
     leaks,
-    ['brahms-op118-no1-445@6192', 'brahms-op118-no1-731@10032'],
-    'only the two fold-coincident octave pairs sit at the pair pitch without admission'
+    [
+      'brahms-op118-no1-445@6192',
+      'brahms-op118-no1-731@10032',
+      'brahms-op118-no1-909@12552',
+      'brahms-op118-no1-911@12576',
+    ],
+    'the fold-coincident octave pairs and the m. 66 same-hand unison pairs sit at the pair pitch without admission'
   );
-  // Each is the literal fan's own upper member (the incumbent placement gives
-  // it the same offset), and the pair is two octave-folded heads on ONE drawn
-  // row — a folding geometry finding, never a parity offset.
+  // Round 45 — the m. 66 pairs: the authorized RH → LH correction makes the
+  // low A2 (t12552) / D3 (t12576) reattacks same-hand unisons with the
+  // preserved sustained tie-wait voices. Neither is an admitted bracket
+  // cluster (a one-family rail pair never qualifies, Round 43), so each pair
+  // is the ESTABLISHED fan: two identical-pitch heads one pair pitch apart —
+  // the same offset multiset the literal control places, head assignment
+  // aside.
+  for (const [tick, flagged] of [[12552, 'brahms-op118-no1-909'], [12576, 'brahms-op118-no1-911']] as const) {
+    const parityPair = [...heads.values()].filter((q) => q.note.startTick === tick);
+    const literalPair = [...literal.values()].filter((q) => q.note.startTick === tick);
+    assert.equal(parityPair.length, 2, `tick ${tick}: exactly the unison pair`);
+    assert.equal(new Set(parityPair.map((q) => q.note.pitch.pitchClass)).size, 1, 'one absolute pitch symbol');
+    assert.equal(new Set(parityPair.map((q) => q.rhythm.hand)).size, 1, 'one hand');
+    const seats = parityPair.map(offsetOf).sort((a, b) => a - b);
+    assert.ok(approx(seats[0], 0, 1e-9) && approx(seats[1], PAIR_GAP, 1e-9), `${tick}: column + one pair pitch`);
+    assert.ok(
+      approx(offsetOf(literalPair[0]), offsetOf(literalPair[1]) - PAIR_GAP, 1e-9) ||
+        approx(offsetOf(literalPair[1]), offsetOf(literalPair[0]) - PAIR_GAP, 1e-9),
+      `tick ${tick}: the literal control's fan is the same one pair pitch apart`
+    );
+    assert.equal(heads.get(flagged)!.note.durationTicks > 96, true, `${flagged}: the sustained tie-wait voice`);
+  }
+  // Each fold-coincident pair is the literal fan's own upper member (the
+  // incumbent placement gives it the same offset), and the pair is two
+  // octave-folded heads on ONE drawn row — a folding geometry finding, never a
+  // parity offset.
   for (const id of ['brahms-op118-no1-445', 'brahms-op118-no1-731']) {
     const p = heads.get(id)!;
     assert.ok(
@@ -949,9 +1204,34 @@ test('Whole-onset consistency: no head leaves its beat cell, one offset per draw
   assert.ok(approx(widest, PAIR_GAP, 1e-9), `the widest onset is exactly one pair-pitch fan (${widest.toFixed(3)}pt)`);
   assert.deepEqual(
     rowOffenders,
-    ['LH@6192/y228.574', 'LH@10032/y420.116'],
-    'only the two fold-coincident octave pairs fan within one drawn row'
+    ['LH@6192/y228.574', 'LH@10032/y420.116', 'LH@12552/y184.548', 'LH@12576/y172.048'],
+    'the fold-coincident octave pairs and the m. 66 unison pairs fan within one drawn row'
   );
+  // Round 45 — the two m. 66 rows are the authorized RH → LH correction's
+  // same-hand unison pairs (A2 t12552, D3 t12576): one head on the onset
+  // column plus its pair-pitch mate, exactly the literal fan's own multiset.
+  for (const tick of [12552, 12576]) {
+    const parityRow = layouts.flatMap((l) => l.notes).filter((q) => q.note.startTick === tick);
+    const literalRow = BRAHMS_LITERAL_LAYOUTS.flatMap((l) => l.notes).filter(
+      (q) => q.note.startTick === tick
+    );
+    assert.equal(parityRow.length, 2, `tick ${tick}: the same-hand unison pair`);
+    assert.equal(
+      new Set(parityRow.map((q) => q.note.pitch.pitchClass)).size,
+      1,
+      `tick ${tick}: one absolute pitch symbol`
+    );
+    const seats = parityRow.map(offsetOf).sort((a, b) => a - b);
+    assert.ok(
+      approx(seats[0], 0, 1e-9) && approx(seats[1], PAIR_GAP, 1e-9),
+      `tick ${tick}: the established fan on the solved column, never a parity rail`
+    );
+    assert.equal(
+      literalRow.length,
+      2,
+      `tick ${tick}: the legacy literal control also paints both voices`
+    );
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1175,12 +1455,19 @@ test('Whole-score candidate report: exactly the six composite refusals, nothing 
   for (const code of ['stem-through-simultaneity', 'chordal-overlap']) {
     assert.equal(report.diagnostics.some((d) => d.code === code), false, `${code} is absent`);
   }
-  // Census: every source head, every clasp, every carrier.
-  assert.equal(layouts.flatMap((l) => l.notes).length, 957, 'every laid-out head of the score');
+  // Census: every source head, every clasp, every carrier. Round 45 — the
+  // authorized m. 66 RH → LH correction makes the low A2 (t12552) / D3
+  // (t12576) reattacks same-hand unisons with the preserved sustained
+  // tie-wait voices, so the two former cross-hand unison merges no longer
+  // merge: +2 painted heads (959). Both m. 66 pairs are one-family (same
+  // pitch) rails, so neither is promoted into an admitted bracket under the
+  // Round 43 nominal-rail doctrine — the 72-bracket census is unchanged on
+  // this card's own parity surface.
+  assert.equal(layouts.flatMap((l) => l.notes).length, 959, 'every laid-out head of the score');
   assert.equal(layouts.flatMap((l) => l.clasps).length, 72, 'the clasp furniture is complete');
   assert.equal(layouts.flatMap((l) => l.exceptionCarriers).length, 32, '32 painted carriers');
   assert.equal(layouts.length, 18, '18 systems of music');
-  assert.equal(report.stats.notes, 957, 'the report walks the same notes');
+  assert.equal(report.stats.notes, 959, 'the report walks the same notes');
   assert.equal(report.stats.systems, 18, 'and the same systems');
 });
 
@@ -1188,12 +1475,17 @@ test('Whole-score candidate report: exactly the six composite refusals, nothing 
 // 9. Served view + frozen canonicals
 // ---------------------------------------------------------------------------
 
-test('The served Candidate view carries the whole score as five genuine page cards', () => {
+test('The parked Round 44 card still carries the whole score as five genuine page cards', () => {
   const layouts = layoutsOf(BRAHMS_STUDIO_SCORE_ID);
   const heads = layouts.flatMap((l) => l.notes);
   assert.equal(countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS), 5, 'the candidate spread is five A4 pages');
 
-  const html = renderCandidatesView(createStudioConfig());
+  // The parked registry verbatim: the historical card renders on its own nine
+  // declared windows (the live registry is Round 45; the served page is pinned
+  // in test/janko-studio.test.ts and test/janko-candidates.test.ts).
+  const html = renderCandidatesView(
+    createStudioConfig({ candidates: ROUND_44_CANDIDATES, round: ROUND_44_METADATA })
+  );
   assert.match(html, /data-window-count="9"/, 'the grid states its nine declared windows');
   assert.deepEqual(
     [...html.matchAll(/data-window="([^"]+)"/g)].map((m) => m[1]),
@@ -1259,37 +1551,69 @@ test('The served Candidate view carries the whole score as five genuine page car
     assert.ok(digits > 0, `page ${i + 1}: the page carries music`);
     perPage.push(digits);
   }
-  assert.deepEqual(perPage, [211, 232, 232, 219, 63], 'the engine page census');
+  // Round 45 — the card rides the working Brahms entry (the adopted 0.90
+  // treatment), and the m. 66 correction paints the two same-hand unison pairs
+  // the cross-hand merge used to fold away: the closing page carries 65
+  // painted digits, and the spread totals 959 heads.
+  assert.deepEqual(perPage, [211, 232, 232, 219, 65], 'the engine page census');
   assert.equal(
     perPage.reduce((sum, n) => sum + n, 0),
     heads.length,
     'every laid-out source head paints exactly one digit across the five pages'
   );
-  assert.equal(heads.length, 957, 'the whole Brahms candidate spread');
+  assert.equal(heads.length, 959, 'the whole Brahms candidate spread');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(html), 'no raster artifact anywhere in the served view');
 });
 
-test('Frozen canonicals stay byte-identical: the round-44 knobs are candidate-only', () => {
+test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is the adopted Round 45 treatment', () => {
   // The golden knobs the candidate deltas ride on top of.
   assert.equal(DEFAULT_JANKO_OPTIONS.pitchPlacement, 'standard');
   assert.equal(DEFAULT_JANKO_OPTIONS.bracketDurationGrammar, 'golden');
   assert.equal(DEFAULT_JANKO_OPTIONS.exceptionCarrier, 'none');
   assert.equal(DEFAULT_JANKO_OPTIONS.chordSymbolScale, 1);
+  assert.equal(DEFAULT_JANKO_OPTIONS.opticalSpacing, false, 'the optical spacing is opt-in');
+  assert.equal(DEFAULT_JANKO_OPTIONS.lowPitchFolding, 'core', 'the core folding stays the default');
   assert.equal(DEFAULT_JANKO_TOKENS.midpointSlashLength, 4.95, 'the midpoint family stays a study token');
+  // Round 45 adopted the agreed 0.90 treatment for the working Brahms
+  // Reference (the operator-chosen working golden experiment): the same one
+  // coherent family the three candidate cards declare, at 0.90.
   const referenceOptions = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  assert.equal(referenceOptions.pitchPlacement, 'standard', 'the Brahms Reference keeps the literal placement');
-  assert.equal(referenceOptions.bracketDurationGrammar, 'golden', 'and the incumbent bracket marks');
-  assert.equal(referenceOptions.exceptionCarrier, 'none', 'and no exception carrier');
-  assert.equal(referenceOptions.chordSymbolScale, 1, 'and full-size symbols');
+  assert.equal(referenceOptions.pitchPlacement, 'parity-columns', 'the adopted parity placement');
+  assert.equal(referenceOptions.chordSymbolScale, 0.9, 'at the operator-chosen 90 %');
+  assert.equal(referenceOptions.bracketDurationGrammar, 'midpoint', 'the one 45-degree family');
+  assert.equal(referenceOptions.exceptionCarrier, 'horizontal', 'horizontal remaining-value carriers');
+  assert.equal(referenceOptions.opticalSpacing, true, 'declared, centred optical spacing');
+  assert.equal(referenceOptions.lowPitchFolding, 'literal', 'literal low pitches');
+  const referenceTokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  assert.equal(referenceTokens.midpointSlashLengthFactor, 1.1, 'the Round 45 slash ratio');
+  assert.equal(referenceTokens.midpointRingScale, 1.1, 'the Round 45 ring ratio');
+  assert.equal(referenceTokens.midpointSpacingFactor, 7 / 6, 'the 40 % total cut-spacing increase');
+  assert.equal(referenceTokens.opticalClearanceAir, 0.2, 'the explicit 0.20pt optical air');
 
   const bach = lintJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.deepEqual(bach.diagnostics, [], 'Bach GOLD: zero violations, zero warnings');
+  // The Brahms Reference is honest, not clean: zero hard errors and exactly
+  // the six published 120-tick composite refusals (the deferred follow-up).
   const reference = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
-  assert.deepEqual(reference.diagnostics, [], 'Brahms Reference: zero violations, zero warnings');
+  assert.equal(reference.violations.length, 0, 'Brahms Reference: zero hard errors');
+  assert.deepEqual(
+    reference.warnings.map((w) => [w.code, w.noteIds?.[0]]),
+    [
+      ['carrier-duration-unsupported', 'brahms-op118-no1-295'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-351'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-448'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-581'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-637'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-734'],
+    ],
+    'the six 120-tick composites are published by exact identity, nothing filtered'
+  );
 
-  // Full-page byte pins (SHA-256) taken from the pristine pre-round-44
-  // worktree (PR #80 / d796043): the frozen canonicals are untouched by the
-  // candidate-only engine work, byte for byte.
+  // Full-page byte pins (SHA-256). Bach GOLD is pinned to the pristine
+  // pre-Round-44 worktree (PR #80 / d796043): untouched, byte for byte, by any
+  // candidate-only or Brahms treatment work. The Brahms Reference pages are
+  // re-pinned to the adopted Round 45 treatment — the operator-chosen change,
+  // regenerated through the required `npm run pdf` release step.
   const sha = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
   const bachPages = [
     '2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f',
@@ -1303,22 +1627,22 @@ test('Frozen canonicals stay byte-identical: the round-44 knobs are candidate-on
     );
   }
   const brahmsPages = [
-    'a6bfe953b71721787417fbe0881c8160a5450280c2a789738ff13696fe5ea631',
-    'a2149b58cae9cd1146c14675768054260e4c7858ad84c87ffab1337a7ba2b71e',
-    '4ecb606337decbc2efc0b8f04d95fd0ffbfec884d51cc6ce90f26bc8be68d8f5',
-    'a81e6bd5f44f583fb40da7b826c9151ae8c9f3bafc6190fc6d2eea710119305e',
-    '08ab1d4fd04decf3ace920742df38a90a41c0711219c8badd67cfd5c631aa330',
+    '55d606e5b1b50bed15ddb16a4ad53a17c21eef401bfbd1e013377fd09a9f83b9',
+    'f7f2fef428b52aa78d2e827f711967bb0984bb5b6bb53113a7d16bb6f3167098',
+    'f33bf7c762f3f96f2b354e90b2c51a3a270adf1f9506f46e9a1213afdb851765',
+    '705936c03d9002cdd7b443920aa0fa24ba9ffeff6af4d6f01643df9c9c2240b8',
+    '8f128a67eac371d154a0d55bda7c4e4cf33d585d296d9fb18987ee389e73d6a1',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
       sha(renderJankoPage(BRAHMS, page, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)),
       brahmsPages[page],
-      `Brahms Reference page ${page} is byte-identical`
+      `Brahms Reference page ${page} is the adopted Round 45 engraving`
     );
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)),
-    'e5de98c14ad04a4b1ad76e200e8f350892e0e658eec9ccab29461bf9ecde95d5',
-    'the Brahms Reference 1–71 crop is byte-identical'
+    '5ed2c9c79285266f03ac9ca4398669d836f624253006f98f5b666401c23ef543',
+    'the Brahms Reference 1–71 crop is the adopted Round 45 engraving'
   );
 });

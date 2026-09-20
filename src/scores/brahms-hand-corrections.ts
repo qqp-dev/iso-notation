@@ -28,7 +28,7 @@
  * m. 43 (ticks 8232/8256/8280) and m. 44 (ticks 8304/8400).
  */
 
-export const BRAHMS_HAND_CORRECTIONS_VERSION = 2;
+export const BRAHMS_HAND_CORRECTIONS_VERSION = 3;
 
 /** One authorized hand retargeting. All guards must match exactly. */
 export interface BrahmsHandCorrection {
@@ -53,9 +53,20 @@ export interface BrahmsHandCorrection {
 const SOURCE_FILE = 'includes/intermezzo-op118-no1-parts.ily';
 
 /**
- * The exact ten authorized corrections (all LH → RH): six 24-tick eighths
- * plus the four phrase-continuation notes (96/48 ticks). Ordered by onset
- * for determinism.
+ * The exact fifteen authorized corrections, ordered by onset:
+ *
+ * - the original ten (all **LH → RH**): six 24-tick eighths plus the four
+ *   phrase-continuation notes (96/48 ticks) of the descending RH line in
+ *   performed mm. 23/43 and its mm. 24/44 continuation;
+ * - Round 45, five **RH → LH** corrections in performed m. 66 — the printed
+ *   (linear) reading of bar 37 / second ending: `leftHandUpper` :254 prints on
+ *   the **lower** staff there, so the low A2/D3 reattacks and the tied F3 are
+ *   left-hand events and the tick-12624 “9222” column must read two-handed
+ *   (A2, D3 left; D4, D5 right). The performed (unfolded) run applies
+ *   :232's \voiceUp a second time, so the MIDI track says “upper” for these
+ *   events — the reported mistake this bounded correction repairs. The
+ *   distinct sustained `leftHandLower` A2 (168t) / D3 (144t) tie-wait events at
+ *   the same pitches are preserved exactly, and no new onset is invented.
  */
 export const BRAHMS_HAND_CORRECTIONS: readonly BrahmsHandCorrection[] = [
   {
@@ -197,6 +208,94 @@ export const BRAHMS_HAND_CORRECTIONS: readonly BrahmsHandCorrection[] = [
     logicalPart: 'rightHandUpper (e4 continuation, repeat)',
     performedOccurrence: 'performed m. 44, beat 3 (repeat of m. 24 continuation E quarter)',
     rationale: 'Same source passage under repeat; same limited editorial assignment as m. 24.',
+  },  // --- Round 45: performed m. 66 (printed bar 37, second ending), RH -> LH ---
+  {
+    expectedId: 'brahms-op118-no1-908',
+    pitchClass: 9,
+    octave: 2,
+    startTick: 12552,
+    durationTicks: 24,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'LH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '254:23',
+    logicalPart: 'leftHandUpper (\\voiceThree a eighth)',
+    performedOccurrence: 'performed m. 66, A2 reattack (tick 12552)',
+    rationale:
+      'The second ending contains no staff change of its own; in the PRINTED reading :243\'s ' +
+      '\\voiceDown is still in force, so this leftHandUpper eighth prints on the lower staff. ' +
+      'The performed (unfolded) run re-applies :232\'s \\voiceUp, so the MIDI track label is ' +
+      '“upper” — the low A2 belongs to the left hand, as the part name, the printed staff and ' +
+      'the operator\'s two-handed reading of the “9222” column all agree.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-910',
+    pitchClass: 2,
+    octave: 3,
+    startTick: 12576,
+    durationTicks: 24,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'LH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '254:25',
+    logicalPart: 'leftHandUpper (\\voiceThree d eighth)',
+    performedOccurrence: 'performed m. 66, D3 reattack (tick 12576)',
+    rationale:
+      'Same leftHandUpper eighth pair as the A2 reattack: printed lower staff, performed upper ' +
+      'staff; the low D3 is a left-hand event under the printed reading.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-912',
+    pitchClass: 5,
+    octave: 3,
+    startTick: 12600,
+    durationTicks: 120,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'LH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '254:27,254:38',
+    logicalPart: 'leftHandUpper (f!~ tied into the half-note chord)',
+    performedOccurrence:
+      'performed m. 66, F3 eighth tied into the tick-12624 half chord (120 ticks)',
+    rationale:
+      'The tied F3 is a leftHandUpper event; the tie makes it sound into the tick-12624 column, ' +
+      'so its hand must agree with the A2/D3 chord members the operator requires on the left. ' +
+      'The 120-tick tie composite keeps its published unsupported-duration finding — this ' +
+      'correction changes only the hand.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-913',
+    pitchClass: 9,
+    octave: 2,
+    startTick: 12624,
+    durationTicks: 96,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'LH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '254:33',
+    logicalPart: 'leftHandUpper (<a, d f>2 half chord, a,)',
+    performedOccurrence: 'performed m. 66, third quarter, low A2 of the “9222” column',
+    rationale:
+      'Operator two-handed reading of the tick-12624 column (A2/D3 left, D4/D5 right); the ' +
+      'printed lower staff and the leftHandUpper part both assign the low head to the left hand. ' +
+      'The distinct sustained leftHandLower A2 (brahms-op118-no1-909, 168 ticks) is untouched.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-914',
+    pitchClass: 2,
+    octave: 3,
+    startTick: 12624,
+    durationTicks: 96,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'LH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '254:36',
+    logicalPart: 'leftHandUpper (<a, d f>2 half chord, d)',
+    performedOccurrence: 'performed m. 66, third quarter, low D3 of the “9222” column',
+    rationale:
+      'Companion of the low A2 in the same leftHandUpper half chord; with it the tick-12624 ' +
+      'column reads two-handed while D4/D5 stay right hand. The distinct sustained ' +
+      'leftHandLower D3 (brahms-op118-no1-911, 144 ticks) is untouched.',
   },
 ];
 

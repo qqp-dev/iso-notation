@@ -899,7 +899,11 @@ export interface JankoMidpointMetrics {
   scale: number;
   /** Pre-change slash centreline length (pt, scale-free source `L0`). */
   slashCenterline: number;
-  /** Transverse (x) component of one slash (pt): `L0/√2 · s`. */
+  /** Round 45: painted centreline multiplier (`1` = the Round 43/44 family). */
+  slashLengthFactor: number;
+  /** Painted slash centreline length (pt, scale-free): `L0 · slashLengthFactor`. */
+  paintedCenterline: number;
+  /** Transverse (x) component of one slash (pt): `L0·factor/√2 · s`. */
   slashDx: number;
   /** Rise of one slash (pt): `L0/√2 · s` — the 45-degree page orientation. */
   slashDy: number;
@@ -911,15 +915,28 @@ export interface JankoMidpointMetrics {
   slashHalfX: number;
   /** Axis-aligned ink half-height of one slash (pt). */
   slashHalfY: number;
-  /** Ring centreline radius (pt) — `midpointRingRadius · s`. */
+  /** Round 45: ring radius *and* stroke multiplier (`1` = Round 43/44). */
+  ringScale: number;
+  /** Ring centreline radius (pt) — `midpointRingRadius · ringScale · s`. */
   ringRadius: number;
-  /** Ring stroke width (pt) — `midpointRingStroke · s`. */
+  /** Ring stroke width (pt) — `midpointRingStroke · ringScale · s`. */
   ringStroke: number;
   /** Ring axis-aligned ink half-extent (pt) — `ringRadius + ringStroke/2`. */
   ringHalf: number;
   /** Minimum clear ink gap `g` between two marks (pt) — `CLASP_MARK_STACK_GAP · s`. */
   gap: number;
-  /** Identical cut centre pitch along either mount (pt) — `√2 · (stroke + g)`. */
+  /**
+   * Round 45: **cut** centre-spacing multiplier (`1` = the Round 43/44
+   * family; the Round 45 candidates and the working Brahms Reference paint
+   * `7/6`, i.e. 1.40× the Round 44 `.75` baseline at `s = .90`).
+   */
+  spacingFactor: number;
+  /**
+   * Identical cut centre pitch along either mount (pt) —
+   * `√2 · (stroke + g) · spacingFactor`. At factor 1 this is exactly the
+   * Round 43/44 pitch (true stroke clearance between the parallel cuts); the
+   * multiplier only *adds* clear air, it never steals any.
+   */
   cutSpacing: number;
   /** Identical ring centre pitch along either mount (pt) — outer Ø + `g`. */
   ringSpacing: number;
@@ -962,16 +979,23 @@ export function midpointMetrics(
     t.midpointSlashLength,
     t.midpointSlashLength * t.midpointSlashSlope
   );
-  const component = (slashCenterline / Math.SQRT2) * s;
+  // Round 45 readability ratios: the length and the ring grow for countable
+  // ink, and the cut pitch gains clear air. All three are no-ops at `1`, so
+  // the Round 43/44 family (and every canonical surface) is untouched.
+  const slashLengthFactor = t.midpointSlashLengthFactor ?? 1;
+  const ringScale = t.midpointRingScale ?? 1;
+  const spacingFactor = t.midpointSpacingFactor ?? 1;
+  const paintedCenterline = slashCenterline * slashLengthFactor;
+  const component = (paintedCenterline / Math.SQRT2) * s;
   const slashStroke = t.midpointSlashStroke * s;
   const slashHalf = (component + slashStroke / Math.SQRT2) / 2;
-  const ringRadius = t.midpointRingRadius * s;
-  const ringStroke = t.midpointRingStroke * s;
+  const ringRadius = t.midpointRingRadius * ringScale * s;
+  const ringStroke = t.midpointRingStroke * ringScale * s;
   const ringHalf = ringRadius + ringStroke / 2;
   const gap = CLASP_MARK_STACK_GAP * s;
   // True stroke clearance between parallel 45-degree cuts, and ring-ink
   // clearance: one pitch along either mount.
-  const cutSpacing = Math.SQRT2 * (slashStroke + gap);
+  const cutSpacing = Math.SQRT2 * (slashStroke + gap) * spacingFactor;
   const ringSpacing = 2 * ringHalf + gap;
   const cutsRun = 3 * cutSpacing + 2 * slashHalf;
   const ringsRun = 2 * ringSpacing + 2 * ringHalf;
@@ -979,16 +1003,20 @@ export function midpointMetrics(
   return {
     scale: s,
     slashCenterline,
+    slashLengthFactor,
+    paintedCenterline,
     slashDx: component,
     slashDy: component,
     slashStroke,
     slashSlope: 1,
     slashHalfX: slashHalf,
     slashHalfY: slashHalf,
+    ringScale,
     ringRadius,
     ringStroke,
     ringHalf,
     gap,
+    spacingFactor,
     cutSpacing,
     ringSpacing,
     cutsRun,

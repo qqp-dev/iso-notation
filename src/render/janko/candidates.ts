@@ -500,17 +500,26 @@ export const DURATION_SPECIMEN_STUDIO_SCORE_ID = 'duration-specimen';
  * diagonal-slash duration family on both mounts). Parked by convention as
  * ROUND_43_METADATA / ROUND_43_CANDIDATES in test/janko-round44.test.ts.
  *
- * Round 44 opens the anchored-cluster + compact shared-duration-ink round:
- * exactly one active card (`anchored-45-ink`) judged on the **whole** Brahms
- * score — all 71 measures as genuine engine page spreads — plus the
- * re-aimed focus measures m. 5, 7–9, 35–37 and 67, with the compact labelled
- * duration key (the duration-vocabulary specimen mm. 17–24) as the only
- * synthetic surface. Parity placement becomes an **anchoring** rule gated by
- * admission, the duration ink is one 45-degree family at the admitted cluster
- * scale on both mounts, and the fixed carrier's fit is decided before paint.
- * The canonical Reference, the goldens and the PDF stay frozen; the six
- * 120-tick composites (m. 22:295, m. 26:351, m. 33:448, m. 42:581, m. 46:637,
- * m. 53:734) remain published `carrier-duration-unsupported` blockers.
+ * Round 44 opened the anchored-cluster + compact shared-duration-ink round:
+ * exactly one card (`anchored-45-ink`) judged on the **whole** Brahms score —
+ * all 71 measures as genuine engine page spreads — plus the re-aimed focus
+ * measures and the compact labelled duration key. Parity placement became an
+ * **anchoring** rule gated by admission, the duration ink one 45-degree family
+ * at the admitted cluster scale on both mounts, and the fixed carrier's fit was
+ * decided before paint.
+ *
+ * Round 45 opens the larger-readable-clusters round on the **working** Brahms
+ * Reference: three otherwise identical full-score cards at admitted cluster
+ * scales 0.85 / 0.90 / 0.95 beside the 0.90 Reference, with declared centred
+ * optical cluster spacing (0.20pt air, ≤2.5pt per glyph), the Round 45 duration
+ * ratios on both mounts, no residual vertical shared-duration stem for an
+ * eligible cluster, literal low pitches for m. 5/15/22/33/42/53/67/68/69, the
+ * source-verified m. 66 RH → LH correction, and the studio's phone-safe review
+ * session. Round 44's card is parked as ROUND_44_METADATA /
+ * ROUND_44_CANDIDATES in test/janko-round44.test.ts. Bach GOLD stays frozen and
+ * the six 120-tick composites (m. 22:295, m. 26:351, m. 33:448, m. 42:581,
+ * m. 46:637, m. 53:734) remain published `carrier-duration-unsupported`
+ * warnings — deferred to the tied-duration follow-up, never hidden.
  */
 
 /** Score id of the synthetic m.8 diagnostic specimen (Round 37, parked). */
@@ -532,32 +541,42 @@ export const DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID = 'duration-vocabulary
 export const PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID = 'pitch-parity-specimen';
 
 /**
- * Metadata of the Round 44 decision round — anchored clusters and one compact
- * 45-degree duration family across the whole Brahms score.
+ * Metadata of the Round 45 decision round — larger, readable Brahms clusters
+ * with declared centred optical spacing, one horizontal cluster-duration
+ * grammar, literal low pitches, the m. 66 hand correction and the phone-safe
+ * review session.
  *
- * Round 43's single midpoint card rides along as the incumbent study: the same
- * two-column whole-tone parity pitch placement and the same unified duration
- * family, now **anchored** (only admitted bracket clusters take parity columns;
- * everything else keeps the established literal placement) and **compact**
- * (one 45-degree slash family at the admitted cluster's own symbol scale, one
- * fixed carrier length, fit decided before a single mark is painted). The
- * canonical Reference, the goldens and the PDF stay frozen.
+ * Round 44's single `anchored-45-ink` card is parked by convention as
+ * ROUND_44_METADATA / ROUND_44_CANDIDATES in test/janko-round44.test.ts.
+ *
+ * Round 45 keeps exactly two consistent surfaces: the **working Brahms
+ * Reference** (the agreed 0.90 treatment, adopted by
+ * `BRAHMS_OP118_NO1_JANKO_OPTIONS`) and the three candidate scales 0.85 /
+ * 0.90 / 0.95, which are otherwise identical and engrave the whole score on
+ * the real engine. The 0.90 candidate and the Reference must agree for the
+ * same score/options. Bach GOLD stays frozen.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 44,
-  title: 'Anchored clusters + compact shared duration ink — Round 44',
+  round: 45,
+  title: 'Larger readable Brahms clusters + phone review continuity — Round 45',
   description:
-    'One proposed design, judged on the whole Brahms score plus the re-aimed focus measures. **Pitch:** the two-column whole-tone **parity** placement is now an **anchoring** rule — only genuinely admitted bracket clusters take the two columns (even absolute pitch family left, odd right, pair pitch from the cluster’s own admitted symbol extents); a ONE-family cluster occupies its anchor column and reserves no invisible empty column, and every ordinary/lone/unbracketed group keeps the established full-size lower-on-snap / upper-right collision fan. **Duration:** one **45-degree** slash family (the pre-change centreline length L0 = hypot(4.95, 1.089) = 5.0683745915pt split into equal x/y components, then scaled by the admitted cluster scale s), slash stroke 0.71·s, ring R1.60·s at 0.59·s, minimum ink gap g = 0.50·s — identical ink and identical centre pitch on the vertical bracket and on the horizontal exception carrier, whose fixed length is max(four-cut run, three-ring run) + 2g (10.0275pt at s = 0.75). Every duration mark is engraved at the admitted cluster’s own 0.75, so the marks shrink with the numerals. The carrier fit is decided **before** painting from the exact ink box (line stroke, marks, dots): a carrier that cannot clear its neighbours is withheld and published (`carrier-fit-refused`), never painted-and-refused. **Whole-score review:** all 71 Brahms measures are shown as genuine separate score pages. Honest whole-score report, nothing filtered: **zero hard errors** (the two former m. 33 / m. 53 stem-through-simultaneity findings are gone because their fold-coincident LH octave pair — an unadmitted group — now takes the established literal fan instead of stale parity offsets); **six** `carrier-duration-unsupported` warnings for the 120-tick tie composites (brahms-op118-no1-295 m. 22, 351 m. 26, 448 m. 33, 581 m. 42, 637 m. 46, 734 m. 53), which have no exact reading in this alphabet: no carrier is painted for them (a mark-less carrier would read as a bare quarter) and each member keeps its own ordinary duration ink, which does NOT state the composite exactly — a published limitation, not a solution. **Zero** carrier fit refusals remain on the score (all seven former 21.91pt fit refusals now fit at 10.03pt); **zero** carrier-mark occlusions. The composites 120 = 96 + 24, 504 = 192 + 192 + 96 + 24 and 108 = 96 + 12 stay explicit blockers to golden adoption. The canonical Reference, goldens and PDF are untouched; the synthetic windows survive only as the compact labelled key for the short values the corpus never states.',
-  openAxes: ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
+    'Three otherwise identical full-score Brahms candidates at chord-symbol scale 0.85 / 0.90 / 0.95, plus the working Brahms Reference at 0.90 — the operator asked for larger notes with subtle distributed cluster spacing instead of shrinking every cluster for rare close pairs, and explicitly deferred tied/composite duration grammar to a separate follow-up ticket. **Size:** only the genuinely admitted bracket clusters (never a lone note, a clean column or an unbracketed group) take the scale with duration ink scaled to match — slash centreline length ×1.10, ring radius and stroke ×1.10, cut centre spacing ×7/6, nominal ink gap 0.50·s unchanged, all at 45 degrees on both mounts. The 90 % Reference’s cut centre pitch is therefore exactly 1.40 × the Round 44 `.75` baseline (P45(s) = P44(.75)·1.40·(s/.90) = 1.7967583311pt at s = .90); .85 and .95 follow the same formula. **Optical spacing** is opt-in and admitted-cluster-only: distinct true pitch levels keep their horizontal layout and take one uniform extra gap delta = the maximum relevant nonnegative pair-clearance deficit ÷ that pair’s distinct-level index distance; required clearance = the two masks’ actual vertical half-extents + 0.20pt of air (an explicit new vertical optical-clearance policy, not the old `chordKnockoutAir`); offsets are centred on the member-weighted mean (no cluster-centroid translation), a cluster that already clears gets zero delta, and any per-glyph displacement is capped at 2.5pt = one 1-span. Measured on the diagnosed five-level [5,15,10,5]pt cluster: delta = 0.25769 / 0.54344 / 0.82919pt, span growth = 1.0308 / 2.1738 / 3.3167pt, maximum optical displacement = 0.5154 / 1.0869 / 1.6584pt — all uncapped. Sounding pitch, written pitch, source onset/duration and the staff lattice are never mutated: the offset is declared placement metadata, and masks, digit ink, duration attachments, grouping, crossings and the linter all agree on the painted position. **Cluster duration:** the grouping bracket carries the group’s shared value and horizontal carriers carry the remaining independent durations, so an eligible admitted cluster keeps no residual vertical shared-duration stem (the Round 16 shared-stem routing is suppressed only when the bracket already states that member’s value — genuine beams and the bracket stay, nothing is lost or duplicated). **Pitch:** the low LH notes in m. 5, 15, 22, 33, 42, 53, 67, 68 and 69 are drawn at their literal written pitch with the established ledger/extension vocabulary instead of an unnecessary ↓10 displacement — within the existing system spacing and pagination (no gap increase, no repacking, no added page). **Hand:** m. 66 (printed bar 37, second ending) is corrected RH → LH from the vendored parts.ily evidence: the left hand keeps its sustained A2/D3 statements while A2 (t12552), D3 (t12576), F3 (t12600, a 120-tick tie into this onset), A2 and D3 (both t12624) join it; D4/D5 stay right hand, and no source event is invented or deleted. **Honest whole-score report, nothing filtered:** zero hard errors, and exactly six published `carrier-duration-unsupported` warnings for the 120-tick tie composites — m. 22 (brahms-op118-no1-295), m. 26 (351), m. 33 (448), m. 42 (581), m. 46 (637), m. 53 (734) — which have no exact reading in this alphabet; no carrier is painted for them and each member keeps its own ordinary ink, which does NOT state the composite exactly. Those six are the deferred follow-up, not a claim of duration completeness, and `npm run lint:engraving -- --strict` still exits 1 on them (the non-strict gate stays green). Phone review continuity is **studio** behavior (per-tab zoom / view / scroll in versioned sessionStorage), never an engraving axis.',
+  openAxes: [
+    'chordSymbolScale',
+    'opticalSpacing',
+    'lowPitchFolding',
+    'bracketDurationGrammar',
+    'exceptionCarrier',
+  ],
 };
 
-/** Round 44 window spans on the duration-vocabulary specimen (the compact key band). */
-const ROUND_44_SPECIMEN = {
+/** Round 45 window spans on the duration-vocabulary specimen (the compact key band). */
+const ROUND_45_SPECIMEN = {
   key: { measureStart: 17, measureCount: 8 },
 } as const;
 
-/** A Round 44 window on the duration-vocabulary specimen (the compact key). */
-function round44Specimen(
+/** A Round 45 window on the duration-vocabulary specimen (the compact key). */
+function round45Specimen(
   span: { measureStart: number; measureCount: number },
   title: string,
   caption: string
@@ -573,14 +592,15 @@ function round44Specimen(
 }
 
 /**
- * Round 44 — the review set: the whole Brahms score as genuine pages, then the
- * fixed focus measures the operator named (m. 5 for the LH symbol‑5 seat, mm.
- * 7–9 for the B/0 relationships and the first carrier marks, mm. 35–37 for the
- * transposition and measure-start alignment, m. 67 for the three-ring value),
- * then one compact labelled key for the short values the corpus never states.
- * No rejected stress row is carried forward.
+ * Round 45 — the review set: the whole Brahms score as genuine engine pages
+ * first, then the bounded focus windows the operator named (m. 5 for the
+ * literal low LH statement, mm. 7–9 and 17–19 for the close clusters and the
+ * distributed optical spacing, mm. 66–71 for the corrected hands, the literal
+ * bass and the duration carriers), then the compact labelled key for the short
+ * values the corpus never states. No rejected stress row is carried forward and
+ * no synthetic surface replaces a real passage.
  */
-function round44Windows(): JankoCandidateWindow[] {
+function round45Windows(): JankoCandidateWindow[] {
   return [
     {
       kind: 'score',
@@ -590,89 +610,114 @@ function round44Windows(): JankoCandidateWindow[] {
       fullScore: true,
       title: 'Brahms Op. 118 No. 1 · all 71 measures as genuine score pages',
       caption:
-        'The complete candidate engraving, one real page card per page (the engine’s A4 page spread, the same one the Reference view uses) — every source event, every anchor and every duration mark on the whole score, so the review walks the actual pages instead of a single crop. The full-score lint chip above is this engraving’s own report: zero hard errors, six published composite-duration refusals (m. 22, 26, 33, 42, 46, 53).',
+        'The complete candidate engraving, one real page card per page (the engine’s A4 page spread — the same one the Reference view uses), so the review walks the actual pages instead of a single crop. The chip above is this engraving’s own report: zero hard errors and exactly six published composite-duration refusals (m. 22, 26, 33, 42, 46, 53), which the operator deferred to the tied-duration follow-up.',
     },
     brahmsWindow(
       5,
       1,
-      'Brahms m. 5 · LH symbol 5 and the RH triad',
-      'The RH downbeat triad 4/4 · 4/5 · 9/4 (all 96-tick) is an admitted cluster: 4/4 and its 10-span repeat 4/5 are both even and share the left column, while the odd 9/4 takes the right column at the cluster’s own extent pitch — one bracket, one value (one ring). The LH symbol 5 on the same onset is an ordinary lone note: it sits ON the solved onset column, never pushed right by parity alone, and keeps its full-size symbol.'
+      'Brahms m. 5 · literal low LH statement and the RH triad',
+      'The LH symbol 5 is an ordinary lone note: it sits ON the solved onset column, never pushed right by parity alone, and keeps its full-size symbol. Its low octave is drawn at the literal written pitch under the established ledger vocabulary — no ↓10 displacement, no indicator. The RH downbeat triad 4/4 · 4/5 · 9/4 (all 96-tick) is an admitted cluster: 4/4 and its 10-span repeat 4/5 are both even and share the left column, the odd 9/4 takes the right column at the cluster’s own extent pitch, and one bracket states one value.'
     ),
     brahmsWindow(
       7,
-      1,
-      'Brahms m. 7 · dense five-note column',
-      'The RH downbeat 2/4 · 5/4 · 9/3 · 9/4 · b/3 is the densest onset in the score. The one-family members keep the anchor column and the established full-size fan; the admitted cluster’s marks sit at its own scale. Read the columns against the ordinary notes around them — nothing that is not an admitted bracket member is displaced by parity alone.'
+      3,
+      'Brahms mm. 7–9 · the dense clusters and the distributed optical spacing',
+      'm. 7 carries the densest onset in the score (2/4 · 5/4 · 9/3 · 9/4 · b/3): the five distinct true pitch levels keep their horizontal layout and take one uniform extra gap each, centred on the member-weighted mean, so the numerals read apart without any cluster translation. m. 8 states the B/0 relationships and the first horizontal carrier; m. 9 the exception members’ own values as marks on their carriers. Compare the marks’ size and the cut spacing at each scale against the Reference.'
     ),
     brahmsWindow(
-      8,
-      1,
-      'Brahms m. 8 · B/0 relationships and the first horizontal carrier',
-      'The RH three-note half-duration cluster (carried 96) carries one carrier at its own reduced mark scale; the LH B/0 pair reads against it at the true source positions. Every head here is anchored to the solved onset: the LH pair’s lower head keeps its snap and the upper head steps right by the established extent gap — the literal fan, not a parity offset, and never a per-note nudge.'
+      17,
+      3,
+      'Brahms mm. 17–19 · close clusters at each scale',
+      'The second dense passage, where the raw 1.00 cluster scale previously refused its fits: with the notes enlarged and the cluster spread distributed, check that every head still sits on its solved onset column, that no head leaves its beat cell, and that the carriers clear the surrounding ink at 0.85, 0.90 and 0.95. Nothing outside an admitted bracket cluster is displaced.'
     ),
     brahmsWindow(
-      9,
-      1,
-      'Brahms m. 9 · horizontal carrier marks',
-      'Two exception members state their own values on horizontal carriers at their true pitch y: the marks (slash counts and rings) alone state each value, the fixed carrier length never encodes it, and the carrier ink is fitted before it is painted. The second value’s carrier is the reason m. 9 stays in the review set.'
+      66,
+      6,
+      'Brahms mm. 66–71 · corrected hands, literal bass and the duration carriers',
+      'm. 66 (printed bar 37, second ending) must read as two hands: the left hand holds its sustained A2/D3 while the reattacked A2, D3, the tied-in 120-tick F3 and the t12624 A2/D3 join it, with D4/D5 staying in the right hand. mm. 67–71 carry the literal low pitches (m. 67, 68, 69), the three-ring value on m. 67’s bracket, and the closing system — check the ledger extensions against the staff edge and that no system gap, packing or page count changed to make room.'
     ),
-    brahmsWindow(
-      35,
-      2,
-      'Brahms mm. 35–36 · transposition and measure-start alignment',
-      'The transposed passage: check that a transposed cluster anchors exactly like its origin — leftmost occupied column on the solved onset, both hands sharing the rhythmic origin, every measure-start onset aligned under its own beat column. No head is recentred by the scale change alone.'
-    ),
-    brahmsWindow(
-      37,
-      1,
-      'Brahms m. 37 · horizontal carrier marks (second reading)',
-      'The second horizontal-carrier measure: the exception member’s own value reads as marks along the fixed carrier at the admitted scale, clear of the surrounding glyphs and the staff edge — a bare quarter carrier is judged by its own line like every other mark.'
-    ),
-    brahmsWindow(
-      67,
-      1,
-      'Brahms m. 67 · the three-ring value',
-      'The three-ring value (a long exception duration) on the bracket: three rings at the admitted scale, centred on the fixed carrier’s own midpoint — the longest supported run, and the case that sets the fixed carrier length.'
-    ),
-    round44Specimen(
-      ROUND_44_SPECIMEN.key,
+    round45Specimen(
+      ROUND_45_SPECIMEN.key,
       'Duration key · mm. 17–24 — the short values the corpus never states',
-      'A compact labelled key for the missing short values only: 4/3/2/1 slash cuts, a bare quarter, then 1/2/3 rings, with supported augmentation. The key is synthetic and labelled as such; the review medium is the real Brahms pages above.'
+      'A compact labelled key for the missing short values only: 4/3/2/1 slash cuts, a bare quarter, then 1/2/3 rings, with supported augmentation, at the same ratio family as the candidates. Four marks must be individually countable; the key is synthetic and labelled as such, and the review medium is the real Brahms pages above.'
     ),
   ];
 }
 
 /**
- * Round 44 — one proposed design (no obligatory current control; the Reference
- * already supplies the incumbent).
+ * Round 45 — three otherwise identical full-score candidates, differing only in
+ * the admitted cluster’s chord-symbol scale (the round’s judged axis), beside
+ * the working 0.90 Brahms Reference.
  *
- * The single card states the round’s whole design as one coherent family:
+ * All three declare the same coherent family, because the scale is only
+ * readable together with it:
  *
- * - **pitch** — two-column whole-tone parity for admitted bracket clusters only
- *   (`pitchPlacement: 'parity-columns'`), everything else on the established
- *   literal placement;
+ * - **size** — 0.85 / 0.90 / 0.95 for genuinely admitted bracket members only
+ *   (`chordSymbolScale`); clean dyads and lone notes stay full size;
+ * - **optical spacing** — declared, centred and capped extra clearance between
+ *   the distinct pitch levels of an admitted cluster (`opticalSpacing: true`);
+ * - **pitch** — two-column whole-tone parity for admitted clusters only
+ *   (`pitchPlacement: 'parity-columns'`), everything else literal;
  * - **duration** — the one 45-degree slash family (`bracketDurationGrammar:
- *   'midpoint'`) at the admitted cluster scale, painted identically on the
- *   bracket and on the fixed-length horizontal exception carrier
- *   (`exceptionCarrier: 'horizontal'`);
- * - **size** — 0.75 for genuinely admitted bracket members only
- *   (`chordSymbolScale: 0.75`); clean dyads and lone notes stay full size.
+ *   'midpoint'`) on the bracket and on the fixed horizontal carrier
+ *   (`exceptionCarrier: 'horizontal'`), at the Round 45 readability ratios;
+ * - **low pitches** — literal written pitch with ledger extensions
+ *   (`lowPitchFolding: 'literal'`).
  */
+const ROUND_45_FAMILY: Partial<JankoLayoutOptions> = {
+  pitchPlacement: 'parity-columns',
+  bracketDurationGrammar: 'midpoint',
+  exceptionCarrier: 'horizontal',
+  opticalSpacing: true,
+  lowPitchFolding: 'literal',
+};
+
+/** The Round 45 readability ratios + the explicit 0.20pt optical air. */
+const ROUND_45_TOKENS: Partial<JankoTokens> = {
+  midpointSlashLengthFactor: 1.1,
+  midpointRingScale: 1.1,
+  midpointSpacingFactor: 7 / 6,
+  opticalClearanceAir: 0.2,
+};
+
+/** One Round 45 scale card: the shared family at one admitted cluster scale. */
+function round45Card(
+  scale: 0.85 | 0.9 | 0.95,
+  id: string,
+  label: string,
+  description: string
+): JankoCandidate {
+  return {
+    id,
+    label,
+    description,
+    axis: 'chordSymbolScale',
+    options: { ...ROUND_45_FAMILY, chordSymbolScale: scale },
+    tokens: { ...ROUND_45_TOKENS },
+    windows: round45Windows(),
+    tags: ['brahms', 'full-score', 'scale', 'optical-spacing', 'duration', 'literal-lows'],
+  };
+}
+
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
-  {
-    id: 'anchored-45-ink',
-    label: 'Anchored clusters + one compact 45-degree duration ink',
-    description:
-      'Admitted bracket clusters take the two parity columns at their own admitted extent pitch; every ordinary, lone and unbracketed group keeps the established full-size lower-on-snap / upper-right fan. One 45-degree slash family (L0 = 5.0683745915pt split into equal components, ×s) with ring R1.60·s / stroke 0.59·s and gap 0.50·s, identical on the bracket and on the fixed horizontal carrier (10.0275pt at s = 0.75), with the carrier fit decided before painting. All 71 Brahms measures render as genuine score pages beside the focus measures m. 5, 7–9, 35–37 and 67.',
-    options: {
-      pitchPlacement: 'parity-columns',
-      chordSymbolScale: 0.75,
-      bracketDurationGrammar: 'midpoint',
-      exceptionCarrier: 'horizontal',
-    },
-    windows: round44Windows(),
-    tags: ['brahms', 'full-score', 'pitch', 'duration', '45-degree'],
-  },
+  round45Card(
+    0.85,
+    'brahms-scale-85',
+    'Brahms 85 % — larger readable clusters (tightest of the three)',
+    'The conservative end of the size experiment: admitted clusters at 85 % of the golden symbol size — 13.3 % larger than the Round 44 75 % treatment — with the Round 45 duration ratios (slash centreline ×1.10, ring ×1.10, cut spacing ×7/6) and the declared centred optical spacing. The smallest displacement of the three (measured δ = 0.25769pt, span growth 1.0308pt, maximum optical displacement 0.5154pt on the diagnosed five-level cluster). Everything else is identical to the 0.90 and 0.95 cards.'
+  ),
+  round45Card(
+    0.9,
+    'brahms-scale-90',
+    'Brahms 90 % — larger readable clusters (the working Reference scale)',
+    'The operator’s chosen working scale, and the card the Brahms Reference must agree with: admitted clusters at 90 % of the golden symbol size — 20 % larger than the Round 44 75 % treatment — with duration ink scaled to match, so the cut centre pitch is exactly 1.40 × the Round 44 baseline (1.7967583311pt). Measured δ = 0.54344pt, span growth 2.1738pt, maximum optical displacement 1.0869pt on the diagnosed five-level cluster. Everything else is identical to the 0.85 and 0.95 cards.'
+  ),
+  round45Card(
+    0.95,
+    'brahms-scale-95',
+    'Brahms 95 % — larger readable clusters (the boldest size)',
+    'The largest of the three: admitted clusters at 95 % of the golden symbol size — 26.7 % larger than the Round 44 75 % treatment — with the same duration ratios and optical-spacing rule. The largest displacement of the three (measured δ = 0.82919pt, span growth 3.3167pt, maximum optical displacement 1.6584pt, still well inside the 2.5pt per-glyph cap). Everything else is identical to the 0.85 and 0.90 cards.'
+  ),
 ];
 
 /** A fully resolved candidate, ready to engrave. */

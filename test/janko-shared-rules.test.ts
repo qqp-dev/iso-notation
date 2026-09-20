@@ -25,10 +25,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
+
 } from '../src/scores/brahms-op118-no1';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -73,8 +76,8 @@ import type { QuantizedGridScore, QuantizedNote } from '../src/model/types';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
-const O_BRAHMS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const O_BRAHMS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+const T_BRAHMS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 const O_BACH = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const T_BACH = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 /** Ordinary tight head footprint + style air (the 5.46pt pair gap). */
@@ -479,7 +482,7 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   const seatOpts = { clusterSpacing: O_BRAHMS.clusterSpacing, honorHalo };
   const walled = claspDotMemberAir(75.37314372217251, 128.13251804253335, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
   assert.ok(walled < 0, `the 45° seat is a real collision (air ${walled.toFixed(2)}pt)`);
-  const alt = claspDotCenter(group, ink, BRAHMS_OP118_NO1_JANKO_TOKENS, seatOpts);
+  const alt = claspDotCenter(group, ink, BRAHMS_ROUND44_RESERVE_TOKENS, seatOpts);
   const angle = (Math.atan2(-(alt.y - ink.centerY), alt.x - group.claspX) * 180) / Math.PI;
   assert.ok(Math.abs(angle - -45) < 1e-9, 'the fallback seats on −45° (lower channel)');
   assert.ok(
@@ -488,7 +491,7 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   );
   const air = claspDotMemberAir(alt.x, alt.y, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
   assert.ok(air > 0, `positive true daylight on the fallback (air ${air.toFixed(3)}pt)`);
-  const again = claspDotCenter(group, ink, BRAHMS_OP118_NO1_JANKO_TOKENS, seatOpts);
+  const again = claspDotCenter(group, ink, BRAHMS_ROUND44_RESERVE_TOKENS, seatOpts);
   assert.deepEqual(again, alt, 'the fallback is deterministic');
 });
 

@@ -33,13 +33,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
+import {  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   BRAHMS_STUDIO_SCORE_ID,
   brahmsWindow,
@@ -120,10 +122,10 @@ export const ROUND_34_CANDIDATES: JankoCandidate[] = [
 ];
 
 const BRAHMS = buildBrahmsOp118No1Score();
-const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const T_BRAHMS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 const MODES: JankoFoldPairPresentation[] = ['literal-fold', 'shared-ottava', 'split-octave'];
 const O_MODE = (mode: JankoFoldPairPresentation) =>
-  resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, foldPairPresentation: mode });
+  resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, foldPairPresentation: mode });
 const at = (measure: number): number =>
   BRAHMS_OP118_NO1_ANACRUSIS_TICKS + (measure - 1) * BRAHMS_OP118_NO1_TICKS_PER_MEASURE;
 /** Sounding linear pitch: written minus the bracket's transposition. */
@@ -328,8 +330,23 @@ test('m33 chips: A/B clean, C carries its two extension findings visibly', () =>
     ['extension-beyond-core'],
     'C findings are same-class coverage findings'
   );
+  // Round 45: the parked trio is rendered against the historical fixed-3
+  // surface it was ruled on (the Round 44 reserve), not against the moving
+  // working Reference — the m. 33 split-octave extension findings are this
+  // round's own record and must stay visible on its card.
   const html = renderCandidatesView(
-    createStudioConfig({ round: ROUND_34_METADATA, candidates: ROUND_34_CANDIDATES })
+    createStudioConfig({
+      round: ROUND_34_METADATA,
+      candidates: ROUND_34_CANDIDATES,
+      scores: {
+        [BRAHMS_STUDIO_SCORE_ID]: {
+          id: BRAHMS_STUDIO_SCORE_ID,
+          score: BRAHMS,
+          options: resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS),
+          tokens: resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS),
+        },
+      },
+    })
   );
   for (const [id, lint] of [
     ['m33-literal-fold', 'clean'],
@@ -351,8 +368,8 @@ test('Reference stays the literal fold: m33 staggers unbracketed', () => {
   assert.ok(html.includes('brahms-op118-no1'), 'the Brahms Reference renders');
   const layouts = layoutJankoScore(
     BRAHMS,
-    resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
-    resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
+    resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS),
+    resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS)
   );
   const sys = layouts.find((l) => l.notes.some((p) => p.note.startTick === at(33)))!;
   const lhPair = sys.clasps.filter(

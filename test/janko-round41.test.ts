@@ -38,11 +38,11 @@ import {
   type JankoHoldGeometry,
 } from '../src/render/janko/elements/holds.js';
 import { digitHalfExtents, getKnockoutMetrics } from '../src/render/janko/elements/notehead.js';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1.js';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1.js';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1.js';
 import { wholeToneParity } from '../src/model/pitch.js';
 import {
@@ -187,8 +187,8 @@ function cardOptions(id: string) {
   const card = ROUND_41_CANDIDATES.find((c) => c.id === id)!;
   return {
     card,
-    brahms: resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
-    brahmsTokens: resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) }),
+    brahms: resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, ...(card.options ?? {}) }),
+    brahmsTokens: resolveJankoTokens({ ...BRAHMS_ROUND44_RESERVE_TOKENS, ...(card.tokens ?? {}) }),
     specimen: resolveJankoOptions({
       ...HOLD_ENDPOINT_SPECIMEN_JANKO_OPTIONS,
       ...(card.options ?? {}),
@@ -822,8 +822,8 @@ test('Canonical reference: Bach GOLD and Brahms BRONZE still lint 0/0 unchanged'
   assert.deepEqual(bach.warnings, [], 'Bach Goldberg Var. 1: zero warnings');
   const brahms = lintJankoScore(
     BRAHMS,
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS }),
-    resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
+    resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS }),
+    resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS)
   );
   assert.deepEqual(brahms.violations, [], 'Brahms Op. 118/1 golden: zero violations');
   assert.deepEqual(brahms.warnings, [], 'Brahms Op. 118/1 golden: zero warnings');
@@ -835,8 +835,8 @@ test('The Reference view stays the untouched control: no hold ink anywhere in it
   // The Reference view engraves the golden options (asserted in
   // test/janko-studio.test.ts); those options state no hold at all, and the
   // golden ink paints none.
-  const golden = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const goldenTokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const golden = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const goldenTokens = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
   assert.deepEqual(
     layoutJankoScore(BRAHMS, golden, goldenTokens).flatMap((l) => l.holds),
     [],

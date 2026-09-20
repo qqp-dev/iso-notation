@@ -17,11 +17,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   DURATION_SPECIMEN_JANKO_OPTIONS,
   DURATION_SPECIMEN_JANKO_TOKENS,
@@ -225,12 +226,12 @@ const LOWER_FIRST_ROWS: ReadonlyArray<readonly [string, number]> = [
 ];
 
 const BACH_ADAPTIVE_OPTIONS = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const };
-const BRAHMS_ADAPTIVE_OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
+const BRAHMS_ADAPTIVE_OPTIONS = { ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' as const };
 
 test('§D lower-first: all sixteen rows put the lower head on the column', () => {
   const layouts = {
     bach: layoutJankoScore(BACH, BACH_ADAPTIVE_OPTIONS, DEFAULT_JANKO_TOKENS),
-    brahms: layoutJankoScore(BRAHMS, BRAHMS_ADAPTIVE_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS),
+    brahms: layoutJankoScore(BRAHMS, BRAHMS_ADAPTIVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS),
   };
   let seen = 0;
   for (const [scoreKey, tick] of LOWER_FIRST_ROWS) {
@@ -269,7 +270,7 @@ test('§D stem tripwire: the retired R19 stem-through-simultaneity signatures ar
   // tripwire FAILS if either signature reappears.
   for (const [label, score, options, tokens] of [
     ['Bach', BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS],
-    ['Brahms', BRAHMS, BRAHMS_ADAPTIVE_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS],
+    ['Brahms', BRAHMS, BRAHMS_ADAPTIVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS],
   ] as const) {
     const report = lintJankoScore(score, options, tokens);
     assert.equal(
@@ -305,9 +306,11 @@ test('§D unison survivor: the lower voice keeps the digit', () => {
     'LH',
     'the lower voice (LH) survives the cross-hand unison'
   );
-  const brahmsLayouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const brahmsLayouts = layoutJankoScore(BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   const brahmsMerges = brahmsLayouts.flatMap((l) => l.unisonMerges);
-  assert.equal(brahmsMerges.length, 7, 'the Brahms unison census is unchanged');
+  // Round 45: the m. 66 RH→LH correction removes the two t12552/t12576
+  // cross-hand merges (7 → 5); the surviving census is otherwise unchanged.
+  assert.equal(brahmsMerges.length, 5, 'the Brahms unison census is five after the m. 66 correction');
   for (const system of brahmsLayouts) {
     for (const m of system.unisonMerges) {
       const survivorHead = system.notes.find((p) => p.note.id === m.survivorId)!;
@@ -459,20 +462,25 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 44 open, three anchored-cluster axes, one 45-degree design', () => {
-  // Ordered contract change: Rounds 40–43 are parked (historical consts in
-  // test/janko-round40.test.ts, test/janko-round41.test.ts,
-  // test/janko-round42.test.ts and test/janko-round44.test.ts) and Round 44
-  // re-aims the reusable pitch + symbolic-duration study at the whole Brahms
-  // score (anchored parity placement, bracket marks, carrier).
-  assert.equal(CURRENT_ROUND_METADATA.round, 44);
+test('§F registry: round 45 open, five axes, the three admitted-cluster scales', () => {
+  // Ordered contract change: Rounds 40–44 are parked (historical consts in
+  // test/janko-round40.test.ts … test/janko-round44.test.ts) and Round 45
+  // opens the larger-readable-clusters round on the working Brahms Reference:
+  // three otherwise identical full-score cards at 0.85 / 0.90 / 0.95 beside
+  // the adopted 0.90 treatment (declared optical spacing, the Round 45
+  // duration ratios, horizontal carriers, literal low pitches).
+  assert.equal(CURRENT_ROUND_METADATA.round, 45);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
-    'pitch placement, the bracket mark family and the exception carrier'
+    ['chordSymbolScale', 'opticalSpacing', 'lowPitchFolding', 'bracketDurationGrammar', 'exceptionCarrier'],
+    'the admitted scale, optical spacing, the literal lows and the cluster-duration grammar'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['anchored-45-ink'], 'the one proposed anchored 45-degree design');
+  assert.deepEqual(
+    ids,
+    ['brahms-scale-85', 'brahms-scale-90', 'brahms-scale-95'],
+    'the three admitted-cluster scale cards'
+  );
 });
 
 // ---------------------------------------------------------------------------

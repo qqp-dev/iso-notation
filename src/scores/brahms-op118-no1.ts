@@ -71,6 +71,19 @@ export const BRAHMS_OP118_NO1_JANKO_OPTIONS: Partial<JankoLayoutOptions> = {
   title: "6 Klavierstücke, Op. 118",
   subtitle: "No. 1. Intermezzo in A minor — Allegro non assai",
   composer: "Johannes Brahms",
+  // Round 45 (working Brahms golden experiment): the same treatment the three
+  // candidates declare, at the operator's chosen 90 % — larger readable
+  // symbols with declared, centred optical cluster spacing, the one 45-degree
+  // duration family on both mounts, horizontal carriers for the remaining
+  // cluster durations, and literal low pitches under the established ledger
+  // vocabulary. The 90 % Reference and the `brahms-scale-90` candidate must
+  // agree for the same score/options; Bach GOLD stays frozen.
+  pitchPlacement: 'parity-columns',
+  chordSymbolScale: 0.9,
+  bracketDurationGrammar: 'midpoint',
+  exceptionCarrier: 'horizontal',
+  opticalSpacing: true,
+  lowPitchFolding: 'literal',
 };
 
 /** Jánko micro-typography for this score. */
@@ -78,6 +91,15 @@ export const BRAHMS_OP118_NO1_JANKO_TOKENS: Partial<JankoTokens> = {
   ...DEFAULT_JANKO_TOKENS,
   ticksPerMeasure: BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   anacrusisTicks: BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
+  // Round 45 readability ratios (vs the Round 44 .75 family): slash centreline
+  // length ×1.10, ring radius/stroke ×1.10, cut centre spacing ×7/6 — which
+  // makes the 90 % Reference's cut pitch exactly 1.40 × the Round 44 `.75`
+  // baseline (P45(s) = P44(.75)·1.40·(s/.90) = 1.7967583311pt at s = .90).
+  // The 0.20pt vertical optical clearance is the round's explicit new policy.
+  midpointSlashLengthFactor: 1.1,
+  midpointRingScale: 1.1,
+  midpointSpacingFactor: 7 / 6,
+  opticalClearanceAir: 0.2,
 };
 
 /** Embedded base64 fallback for browser and headless execution without filesystem. */

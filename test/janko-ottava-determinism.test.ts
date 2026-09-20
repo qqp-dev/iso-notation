@@ -159,6 +159,20 @@ const BRAHMS_T = resolveJankoTokens({
 });
 const BRAHMS_LAYOUTS = layoutJankoScore(BRAHMS, BRAHMS_O, BRAHMS_T);
 
+/**
+ * Round 45 §E: the working Brahms Reference draws its low LH octaves at their
+ * **literal** written pitch (`lowPitchFolding: 'literal'`), so it folds nothing
+ * and paints no ottava spanner. The historical **core-fold** presentation is
+ * still implemented and still fully verified — every §5 spanner assertion below
+ * runs on `BRAHMS_FOLD_*`, and each test also states what the literal golden
+ * does instead.
+ */
+const BRAHMS_FOLD_O = resolveJankoOptions({
+  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  lowPitchFolding: 'core',
+});
+const BRAHMS_FOLD_LAYOUTS = layoutJankoScore(BRAHMS, BRAHMS_FOLD_O, BRAHMS_T);
+
 test('§5 m.69: the spanner drops exactly 1.60 and the label clears beam ink by 1.20', () => {
   // The judged defect: the down10 label box top (431.70) overlapped the
   // downward beam ink bottom (432.10) by 0.40pt. The resolver seats the
@@ -166,17 +180,24 @@ test('§5 m.69: the spanner drops exactly 1.60 and the label clears beam ink by 
   // spanner by 0.40 + 1.20 = 1.60 — line, label, and hook ride rigidly.
   // (Content-aware page 5 seats sys17 8.26pt higher than slots; the
   // within-system drop is unchanged.)
-  const l = BRAHMS_LAYOUTS[17];
-  assert.equal(l.ottavaBrackets.length, 1, 'sys17 carries the m.69 spanner');
+  // The literal golden paints none of this; the core-fold presentation — the
+  // one that folds — is the subject of the resolved-spanner assertions.
+  assert.equal(
+    BRAHMS_LAYOUTS.reduce((n, system) => n + system.ottavaBrackets.length, 0),
+    0,
+    'the working literal golden paints no ottava spanner at all'
+  );
+  const l = BRAHMS_FOLD_LAYOUTS[17];
+  assert.equal(l.ottavaBrackets.length, 1, 'sys17 carries the m.69 spanner under core folding');
   const b = l.ottavaBrackets[0];
   assert.equal(Number(b.lineY.toFixed(2)), 438.8, 'line resolved at 438.80 (content-aware page 5)');
   assert.equal(Number((b.lineY - 437.2).toFixed(2)), 1.6, 'exactly overlap + air above the moved frame');
-  assert.equal(Number(b.x0.toFixed(2)), 40.95, 'span start');
-  assert.equal(Number(b.x1.toFixed(2)), 62.45, 'span end');
+  assert.equal(Number(b.x0.toFixed(2)), 40.37, 'span start (Round 45 admitted-scale column)');
+  assert.equal(Number(b.x1.toFixed(2)), 61.87, 'span end');
   const label = ottavaLabelBox(b, BRAHMS_T);
   assert.deepEqual(
     [label.x0, label.y0, label.x1, label.y1].map((v) => Number(v.toFixed(2))),
-[40.95, 433.3, 51.45, 439.3],
+[40.37, 433.3, 50.87, 439.3],
     'label box rides the line'
   );
   // Complete music ink over the span, from the shared collector (the same
@@ -219,7 +240,7 @@ test('§5 the old notehead-only criterion was blind to m.69; complete ink was no
   // notehead bottom over the span clears by 17.20pt — the retired 6pt
   // check passes with room, blind to the beam the label actually hits.
   // Complete ink names the 0.40 overlap.
-  const l = BRAHMS_LAYOUTS[17];
+  const l = BRAHMS_FOLD_LAYOUTS[17];
   const b = l.ottavaBrackets[0];
   const r = BRAHMS_T.noteheadRadius;
   const lowestBottom = Math.max(
@@ -234,49 +255,108 @@ test('§5 the old notehead-only criterion was blind to m.69; complete ink was no
   assert.ok(oldLabelTop < 432.1, 'old label top inside the 432.10 beam ink (0.40 overlap)');
 });
 
-test('§5 all nine spanners clear complete ink: the audit is silent score-wide', () => {
+test('§5 all nine folded spanners clear complete ink: the audit is silent score-wide', () => {
   let brackets = 0;
-  for (const l of BRAHMS_LAYOUTS) {
+  for (const l of BRAHMS_FOLD_LAYOUTS) {
     brackets += l.ottavaBrackets.length;
     const out: Parameters<typeof checkOttavaClearance>[3] = [];
-    checkOttavaClearance(l, BRAHMS_O, BRAHMS_T, out);
+    checkOttavaClearance(l, BRAHMS_FOLD_O, BRAHMS_T, out);
     assert.deepEqual(out, [], `system ${l.index}: line, label, and hook clear`);
   }
-  assert.equal(brackets, 9, 'nine literal runs, all resolved');
+  assert.equal(brackets, 9, 'nine folded runs under core, all resolved');
+  // The literal golden has nothing to audit and nothing to paint.
+  for (const l of BRAHMS_LAYOUTS) {
+    assert.equal(l.ottavaBrackets.length, 0, `literal system ${l.index}: no spanner`);
+    const out: Parameters<typeof checkOttavaClearance>[3] = [];
+    checkOttavaClearance(l, BRAHMS_O, BRAHMS_T, out);
+    assert.deepEqual(out, [], `literal system ${l.index}: the audit is silent`);
+  }
 });
 
 test('§5 slot, page, and crop agree on the resolved sys17 ink', () => {
-  // The resolved label bottom (439.30) is the system's bottom ink: it fits
-  // the nominal slot (445.94) because content-aware page 5 seats sys17
-  // from ink — no trailing-space extension needed. The audit that gates
-  // the page measures the ALLOCATION, never the nominal frame.
-  const page = computePageGeometry(BRAHMS_O, BRAHMS_T, BRAHMS);
+  // Under core folding the resolved label bottom (439.30) is the system's
+  // bottom ink: it fits the nominal slot (445.94) because content-aware page 5
+  // seats sys17 from ink — no trailing-space extension needed. The audit that
+  // gates the page measures the ALLOCATION, never the nominal frame.
+  const page = computePageGeometry(BRAHMS_FOLD_O, BRAHMS_T, BRAHMS);
   const slots = resolveAllocatedPageSlots(
-    BRAHMS_LAYOUTS,
+    BRAHMS_FOLD_LAYOUTS,
     page,
     BRAHMS_T,
     DEFAULT_JANKO_LINT_OPTIONS,
-    BRAHMS_O
+    BRAHMS_FOLD_O
   );
   const sys17 = slots.find((s) => s.index === 17)!;
-  const ink = systemInkExtents(BRAHMS_LAYOUTS[17], BRAHMS_T, DEFAULT_JANKO_LINT_OPTIONS, BRAHMS_O);
+  const ink = systemInkExtents(
+    BRAHMS_FOLD_LAYOUTS[17],
+    BRAHMS_T,
+    DEFAULT_JANKO_LINT_OPTIONS,
+    BRAHMS_FOLD_O
+  );
   assert.equal(Number(ink.bottom.toFixed(2)), 439.3, 'label bottom is bottom ink');
   assert.equal(Number(sys17.nominalBottom.toFixed(2)), 445.94, 'nominal slot bound');
   assert.ok(ink.bottom <= sys17.nominalBottom, 'content-aware fits the nominal frame');
   assert.equal(Number(sys17.bottom.toFixed(2)), 445.94, 'allocated stays nominal (no extension)');
   // Page and crop render the resolved spanner alike.
-  const sheet = renderJankoPage(BRAHMS, 4, BRAHMS_O, BRAHMS_T);
+  const sheet = renderJankoPage(BRAHMS, 4, BRAHMS_FOLD_O, BRAHMS_T);
   assert.ok(sheet.includes('janko-ottava'), 'final page carries the spanner');
-  const crop = renderJankoCrop(BRAHMS, 69, 1, BRAHMS_O, BRAHMS_T);
+  const crop = renderJankoCrop(BRAHMS, 69, 1, BRAHMS_FOLD_O, BRAHMS_T);
   assert.ok(/ottava/i.test(crop), 'the m.69 crop frames the resolved spanner');
+
+  // Round 45 §E: under the working **literal** golden the same system carries
+  // its literal low ink instead of a label (beam ink bottom 470.46), and the
+  // allocation extends the last slot to hold it — with NO change to the page
+  // count, the paper bound or any other system's seat (the real ink is not a
+  // reason to repack).
+  const literalPage = computePageGeometry(BRAHMS_O, BRAHMS_T, BRAHMS);
+  const literalSlots = resolveAllocatedPageSlots(
+    BRAHMS_LAYOUTS,
+    literalPage,
+    BRAHMS_T,
+    DEFAULT_JANKO_LINT_OPTIONS,
+    BRAHMS_O
+  );
+  const literal17 = literalSlots.find((s) => s.index === 17)!;
+  const literalInk = systemInkExtents(
+    BRAHMS_LAYOUTS[17],
+    BRAHMS_T,
+    DEFAULT_JANKO_LINT_OPTIONS,
+    BRAHMS_O
+  );
+  assert.equal(Number(literalInk.bottom.toFixed(2)), 469.46, 'literal beam ink is the bottom ink');
+  assert.ok(
+    literalInk.bottom <= literal17.bottom + 1e-6,
+    'the allocated last slot holds the literal ink (no clipping)'
+  );
+  assert.ok(
+    literal17.bottom <= literalPage.pageHeight - literalPage.marginBottom,
+    'the last system still seats above the page margin'
+  );
+  const literalSheet = renderJankoPage(BRAHMS, 4, BRAHMS_O, BRAHMS_T);
+  assert.ok(!literalSheet.includes('janko-ottava'), 'no spanner under the literal golden');
+  const literalCrop = renderJankoCrop(BRAHMS, 69, 1, BRAHMS_O, BRAHMS_T);
+  assert.ok(!/ottava/i.test(literalCrop), 'the m.69 crop frames a literal low note, no spanner');
 });
 
-test('Solf remains absolute: folding keeps every pitch-class syllable', () => {
+test('Solf remains absolute: literal and folded registers keep every pitch-class syllable', () => {
   // Folding transposes by whole octaves (±12/±24), so sounding pitch class
-  // — and its dozenal solfège — is invariant under the bracket.
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_O, BRAHMS_T);
+  // — and its dozenal solfège — is invariant under the bracket. The literal
+  // presentation states the same pitch class directly, one further check that
+  // the Round 45 change is a presentation change, never a pitch change.
+  const literal = BRAHMS_LAYOUTS.flatMap((l) => l.notes);
+  assert.equal(
+    literal.filter((p) => (p.ottavaShift ?? 0) !== 0).length,
+    0,
+    'the literal golden folds nothing'
+  );
+  for (const p of literal.filter((n) => (n.writtenLin ?? 0) < 0 || n.coord?.isOutOfStaff)) {
+    const soundingPc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
+    const writtenPc = (((p.writtenLin ?? 0) % 12) + 12) % 12;
+    assert.equal(writtenPc, soundingPc, `${p.note.id} literal written pitch keeps its pitch class`);
+  }
+  const layouts = BRAHMS_FOLD_LAYOUTS;
   const folded = layouts.flatMap((l) => l.notes).filter((p) => (p.ottavaShift ?? 0) !== 0);
-  assert.equal(folded.length, 9, 'nine folded notes under fixed-3');
+  assert.equal(folded.length, 9, 'nine folded notes under core folding');
   for (const p of folded) {
     const soundingPc = ((p.note.pitch.pitchClass % 12) + 12) % 12;
     const writtenLin = p.writtenLin ?? p.note.pitch.octave * 12 + soundingPc;

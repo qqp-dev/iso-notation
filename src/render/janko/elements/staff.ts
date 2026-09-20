@@ -24,6 +24,7 @@ import {
   ExtensionJunctionStyle,
   JankoCore,
   JankoLayoutOptions,
+  JankoLowPitchFolding,
   JankoSystemGeometry,
   JankoTokens,
   ResolvedJankoTokens,
@@ -33,7 +34,7 @@ import {
 } from '../types';
 import {
   DEFAULT_PITCH_WINDOW,
-  computeFoldShift,
+  resolveFoldShift,
   continuousPitchY,
   getMeasureIndexOfTick,
 } from '../geometry';
@@ -311,7 +312,14 @@ export function computeSystemStaffSegments(
   measureWidth: number,
   core: JankoCore,
   t: ResolvedJankoTokens,
-  extensionJunction: ExtensionJunctionStyle = 'default'
+  extensionJunction: ExtensionJunctionStyle = 'default',
+  /**
+   * Round 45: the row table is computed on **written** pitches, so an opt-in
+   * literal low pitch (`'literal'`) must be read here too — otherwise a bar
+   * whose only reason to draw its bottom extension row is a low literal note
+   * would lose that row.
+   */
+  lowPitchFolding: JankoLowPitchFolding = 'core'
 ): {
   segments: StaffLineSegment[];
   staffLines: number[];
@@ -328,7 +336,7 @@ export function computeSystemStaffSegments(
   for (const n of sysNotes) {
     const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
     const lin = n.pitch.octave * 12 + pc;
-    const shift = computeFoldShift(lin, core);
+    const shift = resolveFoldShift(lin, core, lowPitchFolding);
     const writtenLin = lin + shift;
     const m = getMeasureIndexOfTick(n, mockGeo, systemIndex, t);
     if (m >= 0 && m < numBars) {
