@@ -751,20 +751,21 @@ test('The whole-score chips stay truthful: nothing hidden, nothing suppressed', 
       const hit = report.diagnostics.filter((d) => d.code === code);
       assert.deepEqual(hit, [], `${id}: no ${code} anywhere in the spread`);
     }
-    // The two remaining hard findings are the Round-40 parity surface's own
-    // m. 33 / m. 53 simultaneity pairs — the same pairs the plain parity
-    // baseline reports, so this round introduced none.
-    const baselinePairs = new Set(
-      parityBaselineReport().violations.map((v) => (v.noteIds ?? []).slice().sort().join('+'))
+    // Round 44's anchored parity placement resolved the m. 33 / m. 53
+    // fold-pair findings this round inherited from the Round-40 parity
+    // surface: that LH octave pair is a fold-coincident, never-admitted group,
+    // so it keeps the established literal placement instead of a parity offset
+    // and no stem is painted through a simultaneity tone. Zero hard findings
+    // remain on the whole score (the endpoint treatment's own cleanliness was
+    // already pinned above); the plain parity baseline that used to carry them
+    // is no longer the card's attribution set.
+    void parityBaselineReport();
+    assert.equal(report.violations.length, 0, `${id}: no hard findings remain`);
+    assert.deepEqual(
+      report.warnings.filter((w) => w.code === 'chordal-overlap').map((w) => `m${w.measure}`),
+      [],
+      `${id}: and no chordal-overlap warning rides along`
     );
-    assert.equal(report.violations.length, 2, `${id}: two hard findings remain`);
-    for (const v of report.violations) {
-      assert.equal(v.code, 'stem-through-simultaneity');
-      assert.ok(
-        baselinePairs.has((v.noteIds ?? []).slice().sort().join('+')),
-        `${id}: ${(v.noteIds ?? []).join('+')} is pre-existing on the parity surface`
-      );
-    }
   }
 });
 

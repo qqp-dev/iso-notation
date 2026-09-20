@@ -237,7 +237,8 @@ export type JankoLintCode =
   | 'hold-connector-occluded'
   | 'hold-unresolvable'
   | 'carrier-duration-unsupported'
-  | 'carrier-mark-occlusion';
+  | 'carrier-mark-occlusion'
+  | 'carrier-fit-refused';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -3192,6 +3193,11 @@ export function checkHoldIntegrity(
  *   erasure mask knocks out a carrier mark — the value ink is destroyed even
  *   though the fixed run "fits" its extreme box. The whole-run shortfall alone
  *   never named this, which is exactly how a destroyed ring passed the gates.
+ * - `carrier-fit-refused` (warning): Round 44 — the proposed carrier's exact
+ *   ink box (line stroke + marks) could not clear the protected neighbour
+ *   knockouts in its own row band, so the carrier is **withheld before paint**
+ *   and the member keeps its own ordinary duration ink. Published so a withheld
+ *   carrier is never a silent omission.
  */
 export function checkExceptionCarrierIntegrity(
   layout: JankoSystemLayout,
@@ -3209,6 +3215,19 @@ export function checkExceptionCarrierIntegrity(
       measure: measureOfTick(unsupported.startTick, t),
       noteIds: [unsupported.noteId],
       metrics: { durationTicks: unsupported.durationTicks },
+    });
+  }
+  for (const refusal of layout.exceptionCarrierRefusals ?? []) {
+    out.push({
+      code: 'carrier-fit-refused',
+      severity: 'warning',
+      message:
+        `Exception carrier withheld for ${refusal.noteId} (${refusal.durationTicks} ticks): ` +
+        `${refusal.reason}.`,
+      system: layout.index,
+      measure: measureOfTick(refusal.startTick, t),
+      noteIds: [refusal.noteId],
+      metrics: { required: refusal.required, available: refusal.available },
     });
   }
   for (const occlusion of layout.exceptionCarrierOcclusions ?? []) {

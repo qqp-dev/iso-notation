@@ -50,6 +50,7 @@ import {
 import {
   renderJankoCrop,
   renderJankoPage,
+  countJankoPages,
   countJankoSystems,
   layoutJankoScore,
   JankoSystemLayout,
@@ -612,6 +613,37 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         reports.push(lintJankoScore(entry.score, options, tokens));
       }
       const layouts = getCandidateLayout(candidate.id, entry.id, entry.score, options, tokens);
+      const lastMeasure = window.measureStart + window.measureCount - 1;
+      // Round 44: a full-score window renders the score's **genuine pages**
+      // (one real `renderJankoPage` card per page — the same A4 spread the
+      // Reference view uses), never one crop whose viewBox happens to cover
+      // the whole score. Every other window stays the established macro crop.
+      if (window.fullScore) {
+        const pages = countJankoPages(entry.score, options, tokens);
+        const perPage = Math.max(1, options.measuresPerSystem * options.systemsPerPage);
+        const pageCards: string[] = [];
+        for (let page = 0; page < pages; page++) {
+          const svg = renderJankoPage(entry.score, page, options, tokens, layouts);
+          const firstMeasure = page * perPage + 1;
+          const last = Math.min((page + 1) * perPage, lastMeasure);
+          pageCards.push(
+            [
+              `<figure class="page-card" data-page="${page + 1}">`,
+              '  <figcaption>',
+              `    <b>Page ${page + 1}</b> · mm. ${firstMeasure}–${last}`,
+              '  </figcaption>',
+              `  <div class="canvas-frame">${canvas(svg)}</div>`,
+              '</figure>',
+            ].join('\n')
+          );
+        }
+        return [
+          `<figure class="candidate-window candidate-window-pages" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}" data-pages="${pages}">`,
+          `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}</figcaption>`,
+          `  <div class="page-grid">${pageCards.join('\n')}</div>`,
+          '</figure>',
+        ].join('\n');
+      }
       const svg = renderJankoCrop(
         entry.score,
         window.measureStart,
@@ -621,7 +653,6 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         undefined,
         layouts
       );
-      const lastMeasure = window.measureStart + window.measureCount - 1;
       return [
         `<figure class="candidate-window" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}">`,
         `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}</figcaption>`,

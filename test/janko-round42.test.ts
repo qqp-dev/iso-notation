@@ -59,6 +59,7 @@ import {
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
+  suppressedStemIds,
   type JankoSystemLayout,
 } from '../src/render/janko/engine.js';
 import {
@@ -599,7 +600,7 @@ test('Exception column: each carrier is a genuine exception against its own brac
 // 5. Dense-case diagnostics: published, never clipped
 // ---------------------------------------------------------------------------
 
-test('Stress strip: the fixed carrier’s shortfall is published, never clipped or hidden', () => {
+test('Stress strip: the fixed carrier’s shortfall is published and the carrier withheld, never clipped', () => {
   const svg = renderJankoCrop(SPECIMEN, DURATION_VOCABULARY_BANDS.stress.first, 2, optsFor(EXCEPTION), toksFor(EXCEPTION));
   const carriers = carrierInks(svg);
   const refusals = layoutsFor(EXCEPTION).flatMap((l) => l.exceptionCarrierRefusals);
@@ -608,25 +609,51 @@ test('Stress strip: the fixed carrier’s shortfall is published, never clipped 
   assert.equal(refusal.required, 9.0, 'the required ink is the fixed carrier length');
   assert.ok(refusal.available < refusal.required, 'the available free run is short');
   assert.match(refusal.reason, /never clipped/i, 'the shortfall states it is never clipped');
-  // The refused carrier is still painted at its true length — never shortened.
-  const refused = carriers.find((c) => c.noteId === refusal.noteId)!;
-  assert.ok(refused, 'the refused carrier is still painted');
-  assert.ok(Math.abs(refused.length - 9.0) < 1e-9, 'the refused carrier keeps its full 9.0pt length');
+  assert.match(refusal.reason, /withheld/i, 'and states that the carrier is withheld');
+  // Round 44 fit-before-paint: a refused carrier is **withheld** — never
+  // painted at a true length and never shortened. No carrier ink exists for
+  // the refused member, so a refusal can no longer describe ink that is on
+  // the page.
+  assert.ok(
+    !carriers.some((c) => c.noteId === refusal.noteId),
+    'the refused carrier is withheld, never painted'
+  );
+  // Painted and refused are mutually exclusive by construction.
+  const paintedIds = new Set(carriers.map((c) => c.noteId));
+  for (const r of refusals) {
+    assert.ok(!paintedIds.has(r.noteId), `${r.noteId}: painted and refused never overlap`);
+    assert.ok(
+      !suppressedStemIds(layoutsFor(EXCEPTION).find((l) => l.exceptionCarrierRefusals.some((x) => x.noteId === r.noteId))!).has(r.noteId),
+      `${r.noteId}: own ordinary duration ink is kept`
+    );
+  }
 
-  // Round 43 restores the two-column parity collision fan: the stress strip's
-  // deliberately tight next-onset 2-span same-column dyad is now separated
-  // (lower-on-snap, upper-right) instead of being mutilated by an overlap. The
-  // row attacks a 16th after the downbeat, so the fan honestly pushes a head
-  // past its beat cell — the ONLY surviving findings are those published m. 33
-  // grid crossings (warnings, if any, stay visible and attributed). Nothing is
-  // clipped or suppressed; the tight failed-fit is named, never hidden.
+  // Round 44: the stress strip's deliberately tight next-onset 2-span dyad is
+  // separated by the established fan (lower-on-snap, upper-right) on every
+  // card. The bracket/exception cards now keep both dyad heads inside their
+  // beat cell — their former m. 33 grid crossing is gone — while the ordinary
+  // column (no bracket, no exception treatment) publishes its two crossings by
+  // head id. Nothing is clipped, suppressed or hidden.
   for (const id of [ORDINARY, BRACKET_CURRENT, BRACKET_COMPACT, EXCEPTION]) {
     const report = lintJankoScore(SPECIMEN, optsFor(id), toksFor(id));
-    assert.deepEqual(
-      [...new Set(report.violations.map((v) => `${v.code}@m${v.measure}`))].sort(),
-      ['grid-crossing-offset@m33'],
-      `${id}: only the published stress-row tight-fit crossing`
-    );
+    if (id === ORDINARY) {
+      assert.deepEqual(
+        report.violations.map(
+          (v) => `${v.code}@m${v.measure}:${(v.noteIds ?? []).join('+')}`
+        ),
+        [
+          'grid-crossing-offset@m33:dvs-stress-12300-7_5',
+          'grid-crossing-offset@m33:dvs-stress-12300-9_5',
+        ],
+        `${id}: the ordinary column's own tight-fit crossings stay published by name`
+      );
+    } else {
+      assert.deepEqual(
+        report.violations.map((v) => `${v.code}@m${v.measure}`),
+        [],
+        `${id}: the bracket/exception treatment keeps both dyad heads inside the cell`
+      );
+    }
     for (const v of report.violations) {
       const stressHeadIds = new Set(
         DURATION_VOCABULARY_NOTES.filter((n) => n.band === 'stress').map((n) => n.id)

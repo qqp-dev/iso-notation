@@ -196,9 +196,7 @@ test('Brahms m.8 downbeat source data verification: 5 RH notes at tick 1392', ()
   }
 });
 
-test('Actual engine placement: Cards 2 & 3 place all 5 RH odd notes in one parity column', () => {
-  const pairGap = getClusterSpacingPreset('tight').pairGap;
-
+test('Actual engine placement: Cards 2 & 3 keep all 5 RH odd notes on the solved onset anchor', () => {
   for (const card of [ROUND_40_CANDIDATES[1], ROUND_40_CANDIDATES[2]]) {
     const resolved = resolveCandidate(card);
     const layouts = layoutJankoScore(BRAHMS, resolved.options, resolved.tokens);
@@ -214,15 +212,18 @@ test('Actual engine placement: Cards 2 & 3 place all 5 RH odd notes in one parit
     );
     assert.equal(rhHeads.length, 5, `${card.id}: all 5 RH heads positioned`);
 
-    // All 5 odd heads MUST share the exact same X coordinate = nominalX + pairGap
+    // Round 44 anchoring: the downbeat occupies ONE whole-tone family (all five
+    // RH heads are odd), so the cluster takes its anchor column. No invisible
+    // empty parity column is reserved and no head is pushed onto the parity
+    // pitch — every head of the onset, both hands included, sits exactly on the
+    // solved onset column.
+    const onsetHeads = system.notes.filter((p) => p.note.startTick === 1392);
     const nominalX = rhHeads[0].nominalX!;
     assert.ok(nominalX !== undefined, 'nominalX must be defined');
-    const expectedX = nominalX + pairGap;
-
-    for (const p of rhHeads) {
+    for (const p of onsetHeads) {
       assert.ok(
-        Math.abs(p.x - expectedX) < 1e-3,
-        `${card.id}: head ${p.note.id} at x=${p.x.toFixed(3)}, expected ${expectedX.toFixed(3)}`
+        Math.abs(p.x - nominalX) < 1e-3,
+        `${card.id}: head ${p.note.id} at x=${p.x.toFixed(3)}, expected the anchor ${nominalX.toFixed(3)}`
       );
     }
 

@@ -771,19 +771,30 @@ export interface JankoTokens {
    * Round 42: fixed length (pt) of the horizontal exception carrier — a
    * typographic constant, **independent of the member's duration and release**.
    * Used by the `'compact'` family; the `'midpoint'` family derives its own
-   * fixed carrier length from the mark ink (see {@link midpointCarrierLength}).
+   * fixed carrier length from the mark ink (see `midpointMetrics`), scaled by
+   * the admitted cluster's own symbol scale.
    */
   exceptionCarrierLength?: number;
-  // --- Round 43 (midpoint study): the unified diagonal-slash family ---
-  /** Midpoint slash: transverse (x) length (pt) of one page-raked slash. */
+  // --- Round 43/44 (midpoint study): the one 45-degree slash family ---
+  /**
+   * Midpoint slash: the pre-change run (pt) of the slash's centreline. Round 44
+   * keeps this and {@link midpointSlashSlope} as the **source constants** of the
+   * scale-free centreline length `L0 = hypot(midpointSlashLength,
+   * midpointSlashLength · midpointSlashSlope)` (4.95 → `L0 = 5.0683745915pt`);
+   * the painted 45-degree components are each `L0/√2 · s`.
+   */
   midpointSlashLength?: number;
-  /** Midpoint slash: stroke width (pt). */
+  /** Midpoint slash: stroke width (pt) at scale 1 — the painted width is `× s`. */
   midpointSlashStroke?: number;
-  /** Midpoint slash: rise/run (page orientation, up-raked left→right). */
+  /**
+   * Midpoint slash: the pre-change rise/run of the source slash (0.22), kept so
+   * `L0` is derived from the original dimensions. The painted slash is always
+   * the page-oriented **positive 45 degrees** — the orientation is not a token.
+   */
   midpointSlashSlope?: number;
-  /** Midpoint ring: centreline radius (pt). */
+  /** Midpoint ring: centreline radius (pt) at scale 1 — painted `× s`. */
   midpointRingRadius?: number;
-  /** Midpoint ring: stroke width (pt). */
+  /** Midpoint ring: stroke width (pt) at scale 1 — painted `× s`. */
   midpointRingStroke?: number;
 }
 
@@ -1163,10 +1174,12 @@ export interface JankoLayoutOptions {
    *   at `compactMarkSpacing`pt, counting 4/3/2/1 cuts then bare then 1/2/3
    *   rings so all eight plain values are distinct. Experimental candidate
    *   vocabulary, never promoted to canonical.
-   * - `'midpoint'`: the Round 43 candidate — the shared counts of `'compact'`
-   *   painted with **one unified page-raked diagonal slash** and one ring size,
-   *   identical on the bracket spine and on the horizontal exception carrier.
-   *   Experimental candidate vocabulary, never promoted to canonical.
+   * - `'midpoint'`: the Round 43/44 candidate — the shared counts of
+   *   `'compact'` painted with **one page-oriented positive-45-degree slash**
+   *   and one ring size, at the admitted cluster's own symbol scale, identical
+   *   in every dimension and centre pitch on the bracket spine and on the
+   *   horizontal exception carrier. Experimental candidate vocabulary, never
+   *   promoted to canonical.
    */
   bracketDurationGrammar?: JankoBracketDurationGrammar;
   /**
@@ -1227,12 +1240,12 @@ export type JankoDurationGrammar = 'golden' | 'complete';
  * - `'golden'`: the incumbent transverse cuts / open rings (saturating at two).
  * - `'compact'`: the proposed compact cut/ring family (1–4 cuts, bare, 1–3
  *   rings) — candidates only, never canonical.
- * - `'midpoint'`: the Round 43 candidate — one **unified diagonal-slash**
- *   primitive (the existing page-raked slash, at the midpoint dimensions between
- *   the golden cuts and the compact cuts) painted **identically** on the bracket
- *   spine and on the horizontal exception carrier, only the stacking direction
- *   differing. Counts match `'compact'` (1–4 cuts, bare, 1–3 rings); candidate
- *   only, never canonical.
+ * - `'midpoint'`: the Round 43/44 candidate — one **45-degree slash**
+ *   primitive (the pre-change centreline length `L0 = 5.0683745915pt` split
+ *   into equal x/y components and scaled by the admitted cluster scale)
+ *   painted **identically** on the bracket spine and on the horizontal
+ *   exception carrier, only the stacking direction differing. Counts match
+ *   `'compact'` (1–4 cuts, bare, 1–3 rings); candidate only, never canonical.
  */
 export type JankoBracketDurationGrammar = 'golden' | 'compact' | 'midpoint';
 

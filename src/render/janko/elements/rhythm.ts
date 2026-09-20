@@ -866,91 +866,138 @@ function compactMarkOffsets(t: ResolvedJankoTokens, count: number): number[] {
 }
 
 /**
- * Round 43 (midpoint study) — the **unified diagonal-slash** mark metric.
+ * Round 43 (midpoint study) / Round 44 — the **one 45-degree slash** mark
+ * metric, scaled by the admitted cluster's symbol scale `s`.
  *
- * One mark primitive is used for every midpoint cut — a single page-raked
- * diagonal slash (`midpointSlashLength` × `midpointSlashSlope`, `midpointSlashStroke`
- * wide) rising left→right — and one ring (`midpointRingRadius` /
- * `midpointRingStroke`). The **same ink** is painted on both mounts; only the
- * stacking direction differs (the bracket stacks marks vertically along its
- * spine, the horizontal exception carrier stacks them along its own axis).
+ * One mark primitive is used for every midpoint cut — a single
+ * **page-oriented positive-45-degree** slash rising left→right, with the
+ * **pre-change physical centreline length preserved**:
+ * `L0 = hypot(midpointSlashLength, midpointSlashLength · midpointSlashSlope)`
+ * (4.95pt × 0.22 → `L0 = 5.0683745915pt`); each axis component is
+ * `L0 / √2 · s`, so the cut rises exactly as far as it runs — increasing the
+ * rake no longer lengthens the slash. One ring
+ * (`midpointRingRadius · s` / `midpointRingStroke · s`) completes the family.
+ * The **same ink** is painted on both mounts; only the stacking direction
+ * differs (the bracket stacks marks vertically along its spine, the
+ * horizontal exception carrier stacks them along its own axis).
  *
- * Every number the paint, the layout and the linter read is derived here from
- * the emitted endpoints and stroke width, so the three can never drift. For a
- * stroked segment centred on the origin the axis-aligned ink half-extents are
- * `dx/2 + (s/2)·sinθ` (x) and `dy/2 + (s/2)·cosθ` (y), with `θ = atan(slope)`;
- * a ring's is `r + s/2` on both axes. The per-mount, per-family spacing then
- * clears the *along-axis* extent plus the established stack gap, and the fixed
- * carrier length is the largest supported run (four cuts, or three rings).
+ * Every number the paint, the layout, the fit and the linter read is derived
+ * here from the emitted endpoints and stroke width, so they can never drift.
+ * For a butt-ended 45-degree segment the projected ink extent along **either**
+ * page axis is `component + stroke/√2`, so an axis-aligned ink half-extent is
+ * half of that. Two parallel cuts one above the other keep true *stroke*
+ * clearance when their centre pitch is `√2 · (stroke + g)` — the
+ * perpendicular distance between the 45-degree centrelines. A ring's ink
+ * half-extent is `r + stroke/2` on both axes and its centre pitch is the
+ * outer diameter plus `g`. The fixed carrier length is the largest supported
+ * run (four cuts, or three rings) plus one `g` margin at each end; the
+ * vertical bracket keeps its chord-connecting extent but carries the *same*
+ * mark unit and stack bounds.
  */
 export interface JankoMidpointMetrics {
-  /** Transverse (x) length of one slash (pt). */
+  /** Admitted cluster symbol scale the metric was resolved for. */
+  scale: number;
+  /** Pre-change slash centreline length (pt, scale-free source `L0`). */
+  slashCenterline: number;
+  /** Transverse (x) component of one slash (pt): `L0/√2 · s`. */
   slashDx: number;
-  /** Rise of one slash (pt) — `slashDx · slope`. */
+  /** Rise of one slash (pt): `L0/√2 · s` — the 45-degree page orientation. */
   slashDy: number;
-  /** Slash stroke width (pt). */
+  /** Slash stroke width (pt) — `midpointSlashStroke · s`. */
   slashStroke: number;
-  /** Slash rise/run. */
+  /** Slash rise/run — exactly 1 (the page-oriented positive 45 degrees). */
   slashSlope: number;
   /** Axis-aligned ink half-width of one slash (pt). */
   slashHalfX: number;
   /** Axis-aligned ink half-height of one slash (pt). */
   slashHalfY: number;
-  /** Ring centreline radius (pt). */
+  /** Ring centreline radius (pt) — `midpointRingRadius · s`. */
   ringRadius: number;
-  /** Ring stroke width (pt). */
+  /** Ring stroke width (pt) — `midpointRingStroke · s`. */
   ringStroke: number;
   /** Ring axis-aligned ink half-extent (pt) — `ringRadius + ringStroke/2`. */
   ringHalf: number;
-  /** Bracket (vertical stacking) centre pitch of cuts (pt). */
-  bracketCutSpacing: number;
-  /** Bracket (vertical stacking) centre pitch of rings (pt). */
-  bracketRingSpacing: number;
-  /** Carrier (horizontal stacking) centre pitch of cuts (pt). */
-  carrierCutSpacing: number;
-  /** Carrier (horizontal stacking) centre pitch of rings (pt). */
-  carrierRingSpacing: number;
-  /** Fixed carrier length (pt) that fits the maximal supported run (4 cuts). */
+  /** Minimum clear ink gap `g` between two marks (pt) — `CLASP_MARK_STACK_GAP · s`. */
+  gap: number;
+  /** Identical cut centre pitch along either mount (pt) — `√2 · (stroke + g)`. */
+  cutSpacing: number;
+  /** Identical ring centre pitch along either mount (pt) — outer Ø + `g`. */
+  ringSpacing: number;
+  /** Full four-cut run along its mount (pt), end of ink to end of ink. */
+  cutsRun: number;
+  /** Full three-ring run along its mount (pt), end of ink to end of ink. */
+  ringsRun: number;
+  /** Fixed carrier length (pt): the largest run plus `g` at each end. */
   carrierLength: number;
+  /** Bracket (vertical stacking) centre pitch of cuts (pt) — identical. */
+  bracketCutSpacing: number;
+  /** Bracket (vertical stacking) centre pitch of rings (pt) — identical. */
+  bracketRingSpacing: number;
+  /** Carrier (horizontal stacking) centre pitch of cuts (pt) — identical. */
+  carrierCutSpacing: number;
+  /** Carrier (horizontal stacking) centre pitch of rings (pt) — identical. */
+  carrierRingSpacing: number;
 }
 
-/** One metric for the midpoint family, from the token set (paint · layout · lint). */
-export function midpointMetrics(tokens?: Partial<JankoTokens> | null): JankoMidpointMetrics {
+/**
+ * One metric for the midpoint family, from the token set and the **admitted
+ * cluster symbol scale** `s` (paint · layout · fit · lint).
+ *
+ * `s` is the actual scale the admitted cluster's symbols are engraved at
+ * (`chordSymbolScale` for an admitted bracket member, 1 for canonical ink), so
+ * a reduced cluster's duration ink shrinks with its numerals instead of
+ * staying full size on smaller symbols.
+ */
+export function midpointMetrics(
+  tokens?: Partial<JankoTokens> | null,
+  scale: number = 1
+): JankoMidpointMetrics {
   const t = resolveJankoTokens(tokens);
-  const slashDx = t.midpointSlashLength;
-  const slashSlope = t.midpointSlashSlope;
-  const slashDy = slashDx * slashSlope;
-  const slashStroke = t.midpointSlashStroke;
-  const theta = Math.atan(slashSlope);
-  const slashHalfX = slashDx / 2 + (slashStroke / 2) * Math.sin(theta);
-  const slashHalfY = slashDy / 2 + (slashStroke / 2) * Math.cos(theta);
-  const ringRadius = t.midpointRingRadius;
-  const ringStroke = t.midpointRingStroke;
+  const s = scale;
+  // The pre-change centreline length is the SOURCE constant: the old
+  // `midpointSlashLength` run and its `midpointSlashSlope` rise. The 45-degree
+  // orientation splits that physical length into two equal components, so the
+  // slash never grows longer merely because it rises.
+  const slashCenterline = Math.hypot(
+    t.midpointSlashLength,
+    t.midpointSlashLength * t.midpointSlashSlope
+  );
+  const component = (slashCenterline / Math.SQRT2) * s;
+  const slashStroke = t.midpointSlashStroke * s;
+  const slashHalf = (component + slashStroke / Math.SQRT2) / 2;
+  const ringRadius = t.midpointRingRadius * s;
+  const ringStroke = t.midpointRingStroke * s;
   const ringHalf = ringRadius + ringStroke / 2;
-  const gap = CLASP_MARK_STACK_GAP;
-  const bracketCutSpacing = 2 * slashHalfY + gap;
-  const bracketRingSpacing = 2 * ringHalf + gap;
-  const carrierCutSpacing = 2 * slashHalfX + gap;
-  const carrierRingSpacing = 2 * ringHalf + gap;
-  // Maximal supported run: four cuts, or three rings (the compact counts).
-  const cutsRun = 3 * carrierCutSpacing + 2 * slashHalfX;
-  const ringsRun = 2 * carrierRingSpacing + 2 * ringHalf;
-  const carrierLength = Math.max(cutsRun, ringsRun);
+  const gap = CLASP_MARK_STACK_GAP * s;
+  // True stroke clearance between parallel 45-degree cuts, and ring-ink
+  // clearance: one pitch along either mount.
+  const cutSpacing = Math.SQRT2 * (slashStroke + gap);
+  const ringSpacing = 2 * ringHalf + gap;
+  const cutsRun = 3 * cutSpacing + 2 * slashHalf;
+  const ringsRun = 2 * ringSpacing + 2 * ringHalf;
+  const carrierLength = Math.max(cutsRun, ringsRun) + 2 * gap;
   return {
-    slashDx,
-    slashDy,
+    scale: s,
+    slashCenterline,
+    slashDx: component,
+    slashDy: component,
     slashStroke,
-    slashSlope,
-    slashHalfX,
-    slashHalfY,
+    slashSlope: 1,
+    slashHalfX: slashHalf,
+    slashHalfY: slashHalf,
     ringRadius,
     ringStroke,
     ringHalf,
-    bracketCutSpacing,
-    bracketRingSpacing,
-    carrierCutSpacing,
-    carrierRingSpacing,
+    gap,
+    cutSpacing,
+    ringSpacing,
+    cutsRun,
+    ringsRun,
     carrierLength,
+    bracketCutSpacing: cutSpacing,
+    bracketRingSpacing: ringSpacing,
+    carrierCutSpacing: cutSpacing,
+    carrierRingSpacing: ringSpacing,
   };
 }
 
@@ -962,12 +1009,21 @@ export function midpointMetrics(tokens?: Partial<JankoTokens> | null): JankoMidp
  */
 export function effectiveExceptionCarrierLength(
   grammar: JankoBracketDurationGrammar,
-  t: ResolvedJankoTokens
+  t: ResolvedJankoTokens,
+  scale: number = 1
 ): number {
-  return grammar === 'midpoint' ? midpointMetrics(t).carrierLength : t.exceptionCarrierLength;
+  return grammar === 'midpoint'
+    ? midpointMetrics(t, scale).carrierLength
+    : t.exceptionCarrierLength;
 }
 
-/** Centre-to-centre pitch (pt) of one midpoint mark run on its mount. */
+/**
+ * Centre-to-centre pitch (pt) of one midpoint mark run on its mount. Round 44:
+ * the 45-degree family has **one** pitch per mark family — the bracket's
+ * vertical stack and the carrier's horizontal stack are identical, so the two
+ * mounts cannot diverge. The `mount` argument is retained (and read) so the
+ * shared metric still names the mount it is asked about.
+ */
 function midpointSpacingFor(
   m: JankoMidpointMetrics,
   mount: 'bracket' | 'carrier',
@@ -1120,6 +1176,14 @@ export interface JankoClaspGroupGeometry {
   capWidth: number;
   /** Stroke thickness of the bracket and its duration ink (token `claspStrokeWidth`). */
   strokeWidth: number;
+  /**
+   * Round 44: the **admitted cluster symbol scale** every midpoint mark of this
+   * bracket is engraved at (`chordSymbolScale` for an admitted, reduced
+   * bracket; 1 for canonical ink). The bracket's mark unit, its stack pitch
+   * and the fixed carrier length all scale coherently with it, so a reduced
+   * cluster's duration ink never stays full size on smaller numerals.
+   */
+  durationScale: number;
   /** Shortest member value — the duration the clasp carries. */
   durationTicks: number;
   /** Resolved duration grammar. */
@@ -1204,6 +1268,12 @@ export interface JankoClaspOptions {
    */
   claspDotNudge?: JankoClaspDotNudge;
   /**
+   * Round 44: the admitted cluster's symbol scale the duration ink is engraved
+   * at (see {@link JankoClaspGroupGeometry.durationScale}). Defaults to 1
+   * (canonical ink).
+   */
+  durationScale?: number;
+  /**
    * Permanent dot-consistency rule: the active cluster-spacing preset, whose
    * rectangular knockout half-extents are the actual member geometry the dot
    * seat clears. Defaults to the golden `'tight'`.
@@ -1285,6 +1355,7 @@ export function computeClaspGeometry(
     botY,
     capWidth: cap,
     strokeWidth: t.claspStrokeWidth,
+    durationScale: options?.durationScale ?? 1,
     durationTicks,
     duration: claspDurationClass(durationTicks),
     durationStyle: options?.claspDurationStyle ?? 'kinetic-cross-slashes',
@@ -1828,11 +1899,12 @@ function renderClaspDurationInk(
   for (const [index, ink] of groups.entries()) {
     const yMid = ink.centerY;
     if (ink.bracketGrammar === 'midpoint') {
-      // Round 43 study: the midpoint family paints 1-4 page-raked diagonal
-      // slashes (stacked vertically) and 1-3 rings, centred on the spine's
-      // midpoint. Every dimension comes from {@link midpointMetrics}, the one
-      // metric the renderer, the ink box and the linter share.
-      const m = midpointMetrics(t);
+      // Round 43 study / Round 44: the one 45-degree family paints 1-4
+      // page-oriented positive-45-degree slashes (stacked vertically) and 1-3
+      // rings, centred on the spine's midpoint — at the admitted cluster's own
+      // symbol scale. Every dimension comes from {@link midpointMetrics}, the
+      // one metric the renderer, the ink box, the fit rule and the linter share.
+      const m = midpointMetrics(t, group.durationScale);
       const sx = m.slashDx / 2;
       const sy = m.slashDy / 2;
       const stroke = m.slashStroke.toFixed(2);
@@ -1961,11 +2033,12 @@ export function claspInkBox(
   for (const [index, ink] of inks.entries()) {
     const yMid = ink.centerY;
     if (ink.bracketGrammar === 'midpoint') {
-      // Round 43 study: the same midpoint-mark geometry the renderer paints,
-      // from the shared {@link midpointMetrics}. Every cut offset is a vertical
+      // Round 43 study / Round 44: the same 45-degree mark geometry the
+      // renderer paints, from the shared {@link midpointMetrics} at the
+      // bracket's own admitted cluster scale. Every cut offset is a vertical
       // stacking offset; the ink box spans the largest run half-span plus the
       // mark's own along-axis half-extent.
-      const m = midpointMetrics(t);
+      const m = midpointMetrics(t, group.durationScale);
       const cutSpan =
         ink.compactCuts > 0
           ? (midpointMarkOffsets(m, 'bracket', 'cut', ink.compactCuts).at(-1) ?? 0)
@@ -2075,7 +2148,14 @@ export interface JankoExceptionCarrierGeometry {
   dots: 0 | 1 | 2;
   /** False when the member's value has no exact reading (never faked). */
   inGrammar: boolean;
-  /** Carrier stroke width (pt) — the family weight. */
+  /**
+   * Round 44: the admitted cluster's **symbol scale** the carrier's ink is
+   * engraved at — the member's own reduced scale, so the duration ink shrinks
+   * with its numerals. The carrier stroke, every mark and the fixed length all
+   * scale coherently with it.
+   */
+  scale: number;
+  /** Carrier stroke width (pt) — the family weight at the admitted scale. */
   stroke: number;
   /** The active bracket/mark family (`'compact'` or `'midpoint'`). */
   grammar: JankoBracketDurationGrammar;
@@ -2093,7 +2173,7 @@ function exceptionCarrierMarkCentres(
 ): { cuts: number[]; rings: number[] } {
   const xm = (g.x0 + g.x1) / 2;
   if (g.grammar === 'midpoint') {
-    const m = midpointMetrics(t);
+    const m = midpointMetrics(t, g.scale);
     return {
       cuts: midpointMarkOffsets(m, 'carrier', 'cut', g.cuts).map((dx) => xm + dx),
       rings: midpointMarkOffsets(m, 'carrier', 'ring', g.rings).map((dx) => xm + dx),
@@ -2117,10 +2197,11 @@ export function renderExceptionCarrier(
   ];
   const centres = exceptionCarrierMarkCentres(g, t);
   if (g.grammar === 'midpoint') {
-    // Round 43 study: the SAME page-raked diagonal slash and ring the bracket
-    // paints, here stacked along the carrier. Every number is the shared
+    // Round 43 study / Round 44: the SAME page-oriented positive-45-degree
+    // slash and ring the bracket paints — at the SAME admitted symbol scale —
+    // here stacked along the carrier. Every number is the shared
     // {@link midpointMetrics} value, so the two mounts cannot diverge.
-    const m = midpointMetrics(t);
+    const m = midpointMetrics(t, g.scale);
     const sx = m.slashDx / 2;
     const sy = m.slashDy / 2;
     for (const cx of centres.cuts) {
@@ -2170,7 +2251,7 @@ export function exceptionCarrierInkBox(
   tokens?: Partial<JankoTokens> | null
 ): { x0: number; y0: number; x1: number; y1: number } {
   const t = resolveJankoTokens(tokens);
-  const mm = g.grammar === 'midpoint' ? midpointMetrics(t) : null;
+  const mm = g.grammar === 'midpoint' ? midpointMetrics(t, g.scale) : null;
   const cut = mm
     ? { hw: mm.slashHalfX, hh: mm.slashHalfY }
     : compactMarkHalfExtents(t, 'cut');
@@ -2236,7 +2317,7 @@ export function exceptionCarrierMarkBoxes(
   tokens?: Partial<JankoTokens> | null
 ): JankoExceptionCarrierMarkBox[] {
   const t = resolveJankoTokens(tokens);
-  const mm = g.grammar === 'midpoint' ? midpointMetrics(t) : null;
+  const mm = g.grammar === 'midpoint' ? midpointMetrics(t, g.scale) : null;
   const cut = mm ? { hw: mm.slashHalfX, hh: mm.slashHalfY } : compactMarkHalfExtents(t, 'cut');
   const ring = mm ? { hw: mm.ringHalf, hh: mm.ringHalf } : compactMarkHalfExtents(t, 'ring');
   const centres = exceptionCarrierMarkCentres(g, t);
