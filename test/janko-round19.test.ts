@@ -26,11 +26,12 @@ import assert from 'node:assert/strict';
 
 import { QuantizedGridScore, QuantizedNote, Hand } from '../src/model/types';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -50,9 +51,9 @@ import { pointToSegmentDistance } from '../src/render/janko/geometry';
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH_OPTIONS = { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' as const };
-const BRAHMS_OPTIONS = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' as const };
+const BRAHMS_OPTIONS = { ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' as const };
 const T = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-const BRAHMS_T = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const BRAHMS_T = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 const PAIR_GAP = getClusterSpacingPreset(DEFAULT_JANKO_OPTIONS.clusterSpacing).pairGap;
 
 /** Brahms m. 46 downbeat: the ticket's six-head cluster (tick 8688). */
@@ -126,7 +127,7 @@ test('The RH anchor is the only anchor rule: the option is retired', () => {
 // ---------------------------------------------------------------------------
 
 test('m. 46 slots compactly: bracketed pairs go {0, +G}, mixed rows {0, +G}', () => {
-  const layout = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layout = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   const n = onset(layout, M46);
   const x = (id: string): number => n.get(id)!.x;
   // The retired Round 19 symmetric tuck is deleted: F5 / D3 (the single-head
@@ -302,11 +303,14 @@ test('Slots are score-wide: three-rail seats on every solved column', () => {
     }
     assert.ok(singletons > 100, `${name} carries clear heads (${singletons})`);
     if (name === 'Brahms') {
-      assert.equal(slotted, 50, `Brahms carries its fifty slotted rows (${slotted})`);
+      // Round 45: the m. 66 RH→LH correction makes the t12552/t12576 A2 and
+      // D3 reattacks same-hand pairs, so two more rows seat as exceptions
+      // (was 50 rows / 12 exceptions on the landed Round 44 source).
+      assert.equal(slotted, 52, `Brahms carries its fifty-two slotted rows (${slotted})`);
       assert.deepEqual(
         kinds,
-        { ordinaryPair: 22, cliqueTriple: 4, jointPair: 8, mixed: 4, exception: 12 },
-        'the fifty rows split 22/4/8/4/12 by seating kind'
+        { ordinaryPair: 22, cliqueTriple: 4, jointPair: 8, mixed: 4, exception: 14 },
+        'the fifty-two rows split 22/4/8/4/14 by seating kind'
       );
       assert.equal(
         offColumnSingletons,
@@ -384,12 +388,12 @@ test('Slots report their cells: demands diagnosed, legitimate shifts fit, no cro
 // ---------------------------------------------------------------------------
 
 test('Per-hand brackets at interlocking onsets: m. 46 and m. 26 bracket the qualifying RH only', () => {
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   // The retired 3-up frames, for the relative-invariance proof below.
   const layouts3 = layoutJankoScore(
     BRAHMS,
     { ...BRAHMS_OPTIONS, systemsPerPage: 3 },
-    BRAHMS_OP118_NO1_JANKO_TOKENS
+    BRAHMS_ROUND44_RESERVE_TOKENS
   );
   // Unification needs two INDEPENDENTLY qualifying hands (§2 line 19). Each
   // onset's LH pair is a clean 2-note column (no spread, under 3 heads) that
@@ -455,7 +459,7 @@ test('Per-hand brackets at interlocking onsets: m. 46 and m. 26 bracket the qual
 });
 
 test('A gapped onset keeps Round 6 per-hand brackets: the m. 3 guard', () => {
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   const system = layouts.find((l) => l.notes.some((p) => p.note.startTick === M3))!;
   const clasps = system.clasps.filter((c) => c.tick === M3);
   assert.equal(clasps.length, 1, 'the 90pt hand gap stays split');
@@ -512,7 +516,7 @@ test('A unified bracket paints one duration group per hand', () => {
 // ---------------------------------------------------------------------------
 
 test('The mixed row resolves {0, +G} against the same-hand {0, +G}', () => {
-  const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS), M46);
+  const rh = onset(layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS), M46);
   // Compact seating: the mixed-hand row's unbracketed lower head — D4 (LH)
   // — holds the column and the bracketed G#4 (RH) staggers right off it,
   // while the same-hand bracketed pair (F4/B4) seats lower CENTER / higher
@@ -534,8 +538,8 @@ test('Per-hand brackets own their member stems: no stem-through at m. 46/m. 26',
   // keeps a stem that clears upward, away from the column), and the LH pair
   // takes the gap-gated grammar (one carrier stem, one suppressed head) — so
   // no stem can pierce a fellow onset member at m. 46 or m. 26.
-  const report = lintJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const report = lintJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   const members = new Set(
     layouts
       .flatMap((l) => l.clasps)
@@ -574,8 +578,8 @@ function pulsesOf(score: QuantizedGridScore, layouts: ReturnType<typeof layoutJa
 }
 
 test('m. 3’s pulses move onto their own note columns', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   const pulses = pulsesOf(BRAHMS, layouts, 0, options, BRAHMS_T);
   // Brahms is cut time: 4 pulses per measure, 3 dashed lines each. System 0 is
   // the anacrusis + mm. 1–4, so m. 3's pulses are indices 6–8.
@@ -606,8 +610,8 @@ test('m. 3’s pulses move onto their own note columns', () => {
 });
 
 test('The anacrusis system maps its pulses to the right measures', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   const system = layouts[0];
   const pulses = pulsesOf(BRAHMS, layouts, 0, options, BRAHMS_T);
   // System 0 opens on the 48-tick upbeat, so its first cell is m. 1 (tick 48):
@@ -620,8 +624,8 @@ test('The anacrusis system maps its pulses to the right measures', () => {
 });
 
 test('An empty beat keeps the proportional line', () => {
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_ROUND44_RESERVE_TOKENS);
   // System 15 (Brahms mm. 61–64) has no onset on its first beat's pulse (tick 11616).
   const system = layouts[15];
   assert.equal(system.columns.has(11616), false, 'tick 11616 is empty');
@@ -638,8 +642,8 @@ test('Pulses never borrow a neighbour: each stands 10pt+ from every wrong column
   // Brahms system 0). Every rendered pulse's nearest occupied column is its
   // own beat's (exact), and the next-nearest is over 10pt away — a mix-up
   // cannot hide in float dust.
-  const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  const layouts = layoutJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T);
+  const options = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+  const layouts = layoutJankoScore(BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_T);
   const system = layouts[0];
   const pulses = pulsesOf(BRAHMS, layouts, 0, options, BRAHMS_T);
   const columns = [...system.columns.values()];
@@ -660,7 +664,7 @@ test('Pulses never borrow a neighbour: each stands 10pt+ from every wrong column
 test('Score-wide: every occupied pulse stands on its column, every empty one proportionally', () => {
   for (const [score, options, tokens] of [
     [BACH, DEFAULT_JANKO_OPTIONS, T],
-    [BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_T],
+    [BRAHMS, BRAHMS_ROUND44_RESERVE_OPTIONS, BRAHMS_T],
   ] as const) {
     const o = resolveJankoOptions(options);
     const t = resolveJankoTokens(tokens);

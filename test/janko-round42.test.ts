@@ -745,8 +745,22 @@ test('Canonical equivalence: new fields default to no-ops; both goldens stay cle
 
   const bach = lintJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   assert.deepEqual([bach.violations.length, bach.warnings.length], [0, 0], 'Bach GOLD stays 0/0');
+  // Round 45: the working Brahms Reference adopts the agreed 90 % treatment, so
+  // the BRONZE block is 0 violations / 6 warnings — the six published
+  // `carrier-duration-unsupported` 120-tick composites the operator deferred to
+  // the tied-duration follow-up. They are named by identity below; nothing else
+  // may ever warn.
   const brahms = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
-  assert.deepEqual([brahms.violations.length, brahms.warnings.length], [0, 0], 'Brahms BRONZE stays 0/0');
+  assert.deepEqual(
+    [brahms.violations.length, brahms.warnings.length],
+    [0, 6],
+    'Brahms BRONZE: zero hard errors, the six deferred composites published'
+  );
+  assert.deepEqual(
+    brahms.warnings.map((w) => w.message.match(/brahms-op118-no1-\d+/)?.[0]),
+    ['brahms-op118-no1-295', 'brahms-op118-no1-351', 'brahms-op118-no1-448', 'brahms-op118-no1-581', 'brahms-op118-no1-637', 'brahms-op118-no1-734'],
+    'the six composites are named by exact identity'
+  );
 
   // The new option fields are canonical no-ops: the Bach page renders byte-for-
   // byte identically with them stated explicitly as their defaults.

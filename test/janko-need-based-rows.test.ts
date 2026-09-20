@@ -332,21 +332,57 @@ test('Segments Pin: Non-consecutive earning bars render disjoint unbroken segmen
 });
 
 // ---------------------------------------------------------------------------
-// 6. Folds Invariant (9/1 on Brahms, 0 on Bach)
+// 6. Folds Invariant (literal 0/0 on Brahms; the core-fold presentation still 9/1; Bach 0)
 // ---------------------------------------------------------------------------
 
-test('Folds Invariant: Brahms 9 under fixed-3, 1 under fixed-4, Bach 0', () => {
+test('Folds Invariant: the working literal Brahms folds 0; the core-fold presentation still 9/1; Bach 0', () => {
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 
-  const f3Opts = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
-  const f3Brahms = layoutJankoScore(BRAHMS, f3Opts, t);
-  const f3Folded = f3Brahms.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
-  assert.equal(f3Folded.length, 9, 'Brahms fixed-3 fold count holds at exactly 9');
+  // Round 45 §E: the working Brahms Reference draws its low LH octaves at
+  // their literal written pitch, so NOTHING folds under either core — the
+  // notes keep their exact pitch semantics and state their register with the
+  // established ledger vocabulary instead of a ↓10 displacement.
+  for (const core of ['fixed-3', 'fixed-4'] as const) {
+    const literal = layoutJankoScore(
+      BRAHMS,
+      resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core }),
+      t
+    );
+    const folded = literal.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
+    assert.equal(folded.length, 0, `literal Brahms ${core} folds nothing`);
+    assert.equal(
+      literal.reduce((n, s) => n + s.ottavaBrackets.length, 0),
+      0,
+      `literal Brahms ${core} paints no ottava bracket`
+    );
+    assert.ok(
+      literal.flatMap((s) => s.notes).some((n) => n.coord.isOutOfStaff),
+      `literal Brahms ${core} states its low register out of staff`
+    );
+  }
 
-  const f4Opts = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-4' });
-  const f4Brahms = layoutJankoScore(BRAHMS, f4Opts, t);
-  const f4Folded = f4Brahms.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
-  assert.equal(f4Folded.length, 1, 'Brahms fixed-4 fold count holds at exactly 1');
+  // The historical core-fold presentation stays implemented and keeps its
+  // exact fold counts (9 under fixed-3, 1 under fixed-4) — the machinery is
+  // verified, it is simply no longer the working golden.
+  const f3Opts = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'fixed-3',
+    lowPitchFolding: 'core',
+  });
+  const f3Folded = layoutJankoScore(BRAHMS, f3Opts, t)
+    .flatMap((s) => s.notes)
+    .filter((n) => n.ottavaShift !== undefined);
+  assert.equal(f3Folded.length, 9, 'core-fold fixed-3 fold count holds at exactly 9');
+
+  const f4Opts = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    core: 'fixed-4',
+    lowPitchFolding: 'core',
+  });
+  const f4Folded = layoutJankoScore(BRAHMS, f4Opts, t)
+    .flatMap((s) => s.notes)
+    .filter((n) => n.ottavaShift !== undefined);
+  assert.equal(f4Folded.length, 1, 'core-fold fixed-4 fold count holds at exactly 1');
 
   const bachLayouts = layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   const bachFolded = bachLayouts.flatMap((s) => s.notes).filter((n) => n.ottavaShift !== undefined);
@@ -506,7 +542,11 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   assert.equal(Number(rest552.y.toFixed(1)), 179.5, 'Rest y pinned at 179.5');
   assert.ok(Math.abs(rest552.y - 179.48625) < 0.01, 'Rest seats at exactly 179.48625');
 
-  // Hanging rest counts: Bach 9 (frozen), Brahms 20 (was 94 pre-correction).
+  // Hanging rest counts: Bach 9 (frozen), Brahms 21 (was 20 before Round 45).
+  // The m. 66 RH → LH hand correction (§D) re-hands the tick-12552/12576
+  // reattacks, which opens exactly one further genuine hanging rest
+  // (t12576, quarter, RH); the source correction's 74 false hanging rests
+  // stay gone and the engine's rest rules are untouched.
   // Source correction filled 74 false hanging rests opened by playback
   // shortenings (e.g. the m.68 t13092 12-tick gap from 96→84 halves, now full
   // 96; staccato 24→18 gaps, now abutting). Engine rules unchanged.
@@ -517,7 +557,7 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   const brahmsTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const brahmsLayouts = layoutJankoScore(BRAHMS, brahmsOpts, brahmsTokens);
   const brahmsHanging = brahmsLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
-  assert.equal(brahmsHanging.length, 20, 'Brahms hanging-rest count holds at exactly 20');
+  assert.equal(brahmsHanging.length, 21, 'Brahms hanging-rest count holds at exactly 21');
 
   // Unwritten rest count across Bach and Brahms: 0
   const bachUnwritten = bachLayouts.flatMap((s) => s.unwrittenRests ?? []);

@@ -62,6 +62,8 @@ import {
   JankoStaffOctaveRange,
   JankoTokens,
   JankoLayoutOptions,
+  JankoLowPitchFolding,
+  ResolvedJankoLayoutOptions,
   ResolvedJankoTokens,
   resolveJankoOptions,
   resolveJankoTokens,
@@ -303,6 +305,33 @@ export function computeFoldShift(lin: number, core?: JankoCore): number {
     return 0;
   }
   return 0;
+}
+
+/**
+ * Round 45: the fold shift actually applied to one source pitch under the
+ * resolved options.
+ *
+ * `lowPitchFolding: 'core'` (default) is exactly {@link computeFoldShift}.
+ * `'literal'` draws every **low** source pitch below the core's drawn coverage
+ * at its literal written pitch — zero shift — so the note is never displaced by
+ * an octave and no ↓10/↓20 ottava indicator is emitted for it; the register is
+ * stated by the established dynamic ledger equators instead
+ * ({@link getLedgerEquators}, populated for out-of-staff written octaves under
+ * this opt-in). High folds are untouched.
+ */
+export function resolveFoldShift(
+  lin: number,
+  core: JankoCore | undefined,
+  lowPitchFolding: JankoLowPitchFolding = 'core'
+): number {
+  const shift = computeFoldShift(lin, core);
+  if (lowPitchFolding === 'literal' && shift > 0) return 0;
+  return shift;
+}
+
+/** Option-aware fold shift for call sites that hold the resolved options. */
+export function foldShiftFor(lin: number, o: ResolvedJankoLayoutOptions): number {
+  return resolveFoldShift(lin, o.core, o.lowPitchFolding);
 }
 
 /** Exact linear-pitch range of a score: the continuous window. */
@@ -612,11 +641,21 @@ export function getPitchCoordinate(
     // Rank/row/side stay parity facts so head-relative consumers keep working.
     const t = resolveJankoTokens(tokens);
     const origLin = octave * 12 + pc;
-    const shift = computeFoldShift(origLin, o.core);
+    const shift = resolveFoldShift(origLin, o.core, o.lowPitchFolding);
     const writtenLin = origLin + shift;
     const writtenOctave = Math.floor(writtenLin / 12);
     const y = continuousPitchY(writtenLin, t.semitoneScale);
     const rank = getWholeToneRank(pc);
+    // Round 45 (`lowPitchFolding: 'literal'`): a written octave outside the
+    // grand staff states its register with the **established dynamic ledger
+    // vocabulary** — the same equators the twin-row mapping draws for an
+    // out-of-staff octave — instead of a fold under a displaced-note
+    // indicator. Every other configuration keeps the historical empty list.
+    const literalRegister =
+      o.lowPitchFolding === 'literal' && isOutOfStaffOctave(writtenOctave, hand);
+    const ledgerYs = literalRegister
+      ? getLedgerEquators(pc, writtenOctave, hand, t, o)
+      : [];
     return {
       pitchClass: pc,
       octave: writtenOctave,
@@ -628,9 +667,9 @@ export function getPitchCoordinate(
       offsetFromEquator: 0,
       equatorY: y,
       y,
-      isOutOfStaff: false,
-      ledgerYs: [],
-      ledgerY: null,
+      isOutOfStaff: literalRegister,
+      ledgerYs,
+      ledgerY: ledgerYs.length > 0 ? ledgerYs[0] : null,
     };
   }
   const rank = getWholeToneRank(pc);

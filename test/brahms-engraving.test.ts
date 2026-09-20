@@ -10,13 +10,26 @@
  *     chord tone keeps its true whole-tone row and is spread horizontally,
  *     including the three-note cluster of m. 8. Canonical fixed-3 asserts
  *     compact clusters separately (no same-row fan on continuous height).
- *  3. The complete canonical fixed-3 engraving: zero notehead collisions,
- *     zero violations, zero warnings.
+ *  3. The working Round 45 Brahms Reference: zero notehead collisions, zero
+ *     violations, and the six published 120-tick composite warnings (the
+ *     deferred tied-duration follow-up), which `npm run lint:engraving
+ *     -- --strict` still fails on — published, never hidden.
+ *
+ * Round 45 turned the Brahms Reference into the working 0.90 experiment
+ * (larger admitted-cluster symbols, declared centred optical spacing, the
+ * Round 45 duration ratios, literal low pitches and the source-verified m. 66
+ * hand correction). Fixtures that pin the *landed* Round 44 geometry (the
+ * adaptive row-fan, the crop extensions) read the Round 44 reserve surface
+ * (`test/brahms-round44-reserve.ts`), which reproduces PR81 sha 081e5cdf0459.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
 import {
   BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
@@ -87,10 +100,10 @@ function allNotesAdaptive(): PositionedJankoNote[] {
   return LAYOUTS_ADAPTIVE.flatMap((layout) => layout.notes);
 }
 
-/** Onsets whose notes share one whole-tone row, keyed by tick and row y. */
-function sameRowGroups(): Map<string, PositionedJankoNote[]> {
+/** Onsets whose notes share one painted row, keyed by tick and row y. */
+function sameRowGroupsOf(notes: readonly PositionedJankoNote[]): Map<string, PositionedJankoNote[]> {
   const groups = new Map<string, PositionedJankoNote[]>();
-  for (const p of allNotesAdaptive()) {
+  for (const p of notes) {
     const key = `${p.note.startTick}|${(p.y + 0).toFixed(3)}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(p);
@@ -98,6 +111,11 @@ function sameRowGroups(): Map<string, PositionedJankoNote[]> {
   }
   for (const [key, group] of [...groups]) if (group.length < 2) groups.delete(key);
   return groups;
+}
+
+/** The adaptive solver's painted row groups on the working Reference. */
+function sameRowGroups(): Map<string, PositionedJankoNote[]> {
+  return sameRowGroupsOf(allNotesAdaptive());
 }
 
 // ---------------------------------------------------------------------------
@@ -188,9 +206,12 @@ test('Authentic lossless score contains 964 notes across 71 measures and upbeat'
   const rh = SCORE.notes.filter((n) => n.hand === 'RH');
   // §4 bounded hand correction: ten authorized LH→RH retargetings — six
   // descending-line eighths (mm. 23/43) plus the four phrase-continuation
-  // notes (mm. 24/44) — by source-part continuity (was 497/467 pre-correction).
-  assert.equal(lh.length, 487, '487 LH notes');
-  assert.equal(rh.length, 477, '477 RH notes');
+  // notes (mm. 24/44) — by source-part continuity. Round 45 adds the
+  // source-verified m. 66 RH→LH correction (five notes: the A2/D3 reattacks
+  // t12552/t12576, the tied-in 120-tick F3 at t12600 and the t12624 A2/D3),
+  // so the split moves 5 for each hand (was 487/477 after the Round 44 set).
+  assert.equal(lh.length, 492, '492 LH notes');
+  assert.equal(rh.length, 472, '472 RH notes');
 });
 
 // ---------------------------------------------------------------------------
@@ -259,7 +280,18 @@ test('Row collisions are fanned at the judged pair gap (adaptive solver, Round 1
 });
 
 test('mm. 8–9 stack three heads on one row and fan the triplet at the judged pair gap (adaptive solver)', () => {
-  const groups = sameRowGroups();
+  // Round 45: the working Reference declares optical cluster spacing, which
+  // spreads the distinct pitch levels of every admitted cluster — so the
+  // *painted* one-row fan this fixture pins is read on the Round 44 reserve
+  // surface (the landed PR81 configuration), where the horizontal fan is the
+  // only treatment and three octave-3 heads still share one painted row.
+  const layouts = layoutJankoScore(
+    SCORE,
+    { ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' as const },
+    BRAHMS_ROUND44_RESERVE_TOKENS
+  );
+  const reserveNotes = layouts.flatMap((layout) => layout.notes);
+  const groups = sameRowGroupsOf(reserveNotes);
   const inMm89 = (tick: number): boolean => tick >= at(8, 0) && tick < at(10, 0);
   const triplets = [...groups.entries()].filter(
     ([key, group]) => group.length === 3 && inMm89(Number(key.split('|')[0]))
@@ -276,7 +308,7 @@ test('mm. 8–9 stack three heads on one row and fan the triplet at the judged p
     const middle = group.find((p) => p.coord.pitchClass === 7)!;
     assert.equal(xs[1], middle.x, 'the middle head anchors the fan');
     const tick = middle.note.startTick;
-    const fellowTraveller = allNotesAdaptive().some(
+    const fellowTraveller = reserveNotes.some(
       (p) => p.note.startTick === tick && p.y !== middle.y && Math.abs(p.x - middle.x) < 1e-9
     );
     assert.ok(fellowTraveller, 'the anchored head shares its column with the onset');
@@ -336,14 +368,17 @@ test('A spread chord never crosses its measure band', () => {
 
 test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => {
   const notes = allNotes();
-  // Round 20: seven cross-hand unisons (one same-duration pair, six
-  // mixed-duration) draw one digit each, so the painted heads number the score's
-  // notes minus the merged duplicates.
+  // Round 20: the cross-hand unisons (one same-duration pair, six
+  // mixed-duration) draw one digit each, so the painted heads number the
+  // score's notes minus the merged duplicates. Round 45's m. 66 hand
+  // correction moves the t12552/t12576 pairs into the left hand, and a
+  // same-hand pair is a genuine two-voice unison: those two former cross-hand
+  // merges disappear (7 → 5), and both heads paint.
   const merged = LAYOUTS.reduce(
     (sum, layout) => sum + layout.unisonMerges.reduce((n, m) => n + m.mergedIds.length, 0),
     0
   );
-  assert.equal(merged, 7, 'the seven Brahms unisons merge to one head each');
+  assert.equal(merged, 5, 'the five remaining cross-hand Brahms unisons merge to one head each');
   assert.equal(notes.length, SCORE.notes.length - merged, 'every note is engraved, merged unisons once');
   assert.equal(LAYOUTS.length, 18, 'the complete Intermezzo lays out as 18 systems, four measures each');
   // Every layout is engraved in its own system frame and later pages reuse the
@@ -361,8 +396,11 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
       // Round 17: the knockout is a sharp rectangle, so two masks overlap
       // only when their boxes intersect on both axes — a same-row pair at the
       // 5.46pt judged gap clears with air to spare.
-      const a = knockoutHalfExtents(resolvedOptions, resolvedTokens, notes[i].note.startTick);
-      const b = knockoutHalfExtents(resolvedOptions, resolvedTokens, notes[j].note.startTick);
+      // Round 45: the mask test reads the head's **own** painted metrics
+      // (`symbolScale`/`symbolChord`), the same numbers the paint, the fit and
+      // the linter use — a reduced admitted member is measured reduced.
+      const a = knockoutHalfExtents(resolvedOptions, resolvedTokens, notes[i].note.startTick, notes[i]);
+      const b = knockoutHalfExtents(resolvedOptions, resolvedTokens, notes[j].note.startTick, notes[j]);
       const dx = Math.abs(notes[i].x - notes[j].x);
       const dy = Math.abs(notes[i].y - notes[j].y);
       if (dx < a.wx + b.wx - 1e-6 && dy < a.hy + b.hy - 1e-6) collisions++;
@@ -377,15 +415,26 @@ test('Brahms Op. 118 No. 1 canonical fixed-3 is clean', () => {
     [],
     'zero violations on the canonical fixed-3 surface'
   );
+  // Round 45 publishes exactly six warnings and hides none of them: the
+  // 120-tick tie composites have no exact reading in this alphabet, are
+  // deferred to the tied-duration follow-up ticket, and `npm run
+  // lint:engraving -- --strict` still exits 1 on them.
   assert.deepEqual(
-    REPORT.warnings.map((v) => `${v.code}: ${v.message}`),
-    [],
-    'zero warnings — the five-voice chords are fully resolved'
+    REPORT.warnings.map((v) => [v.code, v.noteIds?.[0]]),
+    [
+      ['carrier-duration-unsupported', 'brahms-op118-no1-295'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-351'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-448'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-581'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-637'],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-734'],
+    ],
+    'exactly the six published composite refusals (m. 22, 26, 33, 42, 46, 53)'
   );
   assert.equal(REPORT.ok, true, 'the canonical surface is honestly ok');
   assert.equal(REPORT.stats.systems, 18);
   assert.equal(REPORT.stats.measures, 71);
-  assert.equal(REPORT.stats.notes, SCORE.notes.length - 7, 'the seven merged unison heads are painted once');
+  assert.equal(REPORT.stats.notes, SCORE.notes.length - 5, 'every note but the five merged unison heads is painted');
   assert.ok(REPORT.stats.beams > 0, 'the eighths are beamed');
 });
 
@@ -427,16 +476,28 @@ test('The mm. 7–8 macro crop keeps the bass extension whole (canonical fixed-3
     );
   }
   // The bass really does reach octave 1: the crop would clip it without the
-  // extension-aware extent. Fixed-3 draws need-based extension rows (not
-  // twin-row ledger dashes), so ledgerYs stays empty here.
+  // extension-aware extent. Round 45 draws those low pitches literally
+  // (`lowPitchFolding: 'literal'`) with the established dynamic ledger
+  // equators, so the out-of-staff octave states its register without any ↓10
+  // displacement — and every ledger line must stay inside the crop too.
   assert.ok(
     framed.some((p) => p.coord.octave === 1),
     'the framed measures contain an octave-1 bass note'
   );
+  const ledgerNotes = framed.filter((p) => p.coord.ledgerYs.length > 0);
   assert.ok(
-    framed.every((p) => p.coord.ledgerYs.length === 0),
-    'fixed-3 carries no twin-row ledger dashes in mm. 7–8'
+    ledgerNotes.some((p) => p.coord.octave === 1),
+    'the literal octave-1 bass states its register with ledger equators'
   );
+  for (const p of ledgerNotes) {
+    for (const ledgerY of p.coord.ledgerYs) {
+      const y = system.geometry.middleCY + ledgerY;
+      assert.ok(
+        y >= vy && y <= vy + vh,
+        `${p.note.id} keeps ledger y=${y.toFixed(2)} inside the crop`
+      );
+    }
+  }
 });
 
 test('The mm. 7–8 adaptive crop keeps the octave-1 ledger stack whole (solver)', () => {

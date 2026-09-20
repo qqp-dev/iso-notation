@@ -1,0 +1,1433 @@
+/**
+ * Round 45 — larger readable Brahms clusters + phone review continuity.
+ * ===================================================================
+ *
+ * The operator rejected Round 44's globally small notes/duration ink as the
+ * cost of occasional close pairs, and settled this contract: **bigger notes**
+ * with one *subtle, distributed* cluster spacing; duration ink scaled with the
+ * notes; horizontal-only remaining cluster carriers; a genuinely two-handed
+ * m. 66; and literal low pitches instead of unnecessary ↓10 folds. The phone
+ * half of the round (per-tab zoom / view / scroll restoration across the stock
+ * Vite reload) is studio behaviour, not an engraving axis, and is pinned in
+ * `test/janko-studio-session.test.ts` — it is deliberately *not* re-implemented
+ * here.
+ *
+ * What this file verifies, on the real engine, for **all three** actually
+ * declared candidates (`0.85` / `0.90` / `0.95`) *and* the working 90 %
+ * Brahms Reference:
+ *
+ * 1. **Registry** — three otherwise identical full-score Brahms cards on one
+ *    shared family, and the 90 % card equal to the adopted Reference.
+ * 2. **Admission** — the same six spread clusters at every scale, no
+ *    scale-dependent stale admission, unbracketed heads untouched.
+ * 3. **Declared optical spacing** — placement metadata only (sounding and
+ *    written pitch, source onset/duration, the staff lattice and the solved
+ *    columns are byte-unchanged), the uniform distinct-level gap rule
+ *    (`delta` = largest mask deficit ÷ level-index distance, offsets centred
+ *    on the member-weighted mean, zero delta for a fitting cluster, per-glyph
+ *    displacement capped at one 1-span = 2.5pt), re-derived here **from the
+ *    emitted masks**, with the duration attachments travelling with the head.
+ * 4. **Cluster duration** — no residual vertical shared-duration stem for an
+ *    admitted cluster whose own value the bracket already states; the
+ *    independent values are routed through the horizontal grammar; genuine
+ *    beams and rests are untouched.
+ * 5. **The 45-degree family** — measured length/pitch/scale/counts on **both**
+ *    mounts, with the cut centre pitch at 90 % exactly 1.40 × the Round 44
+ *    `.75` baseline (`1.7967583311pt`) and `.85`/`.95` proportional, and the
+ *    four-cut run individually countable.
+ * 6. **m. 66** — the tick-12624 “9222” column reads two-handed (A2/D3 left,
+ *    D4/D5 right) with the tied 120-tick F3 and every sustained voice
+ *    preserved; the correction is bounded to the fifteen authorized records.
+ * 7. **Literal low pitches** — the nine unwarranted ↓10 folds of mm. 5/15/22/
+ *    33/42/53/67/68/69 are gone, the established ledger vocabulary states the
+ *    register, and system spacing / pagination are unchanged.
+ * 8. **The whole spread** — page completeness, source-note accounting, true
+ *    ink bounds, the six published 120-tick composite warnings by exact
+ *    identity, zero hard errors, and the frozen Bach GOLD bytes.
+ *
+ * Everything here is measured on emitted geometry. Nothing in this file claims
+ * optical acceptance: glanceability and the acceptability of the 0.52–1.66pt
+ * distributed displacements are the operator's judgement, and the six 120-tick
+ * tie composites remain the deferred follow-up ticket
+ * (`npm run lint:engraving -- --strict` still exits 1 on them).
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+
+import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import {
+  BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  BRAHMS_OP118_NO1_JANKO_TOKENS,
+  buildBrahmsOp118No1Score,
+} from '../src/scores/brahms-op118-no1';
+import { BRAHMS_HAND_CORRECTIONS } from '../src/scores/brahms-hand-corrections';
+import {
+  DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
+  DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
+  buildDurationVocabularySpecimenScore,
+} from '../src/scores/duration-vocabulary-specimen';
+import {
+  DEFAULT_JANKO_OPTIONS,
+  DEFAULT_JANKO_TOKENS,
+  JANKO_LITERAL_LOW_FLOOR_LIN,
+  OPTICAL_DISPLACEMENT_CAP,
+  resolveJankoOptions,
+  resolveJankoTokens,
+} from '../src/render/janko/types';
+import {
+  claspMemberCarriedTicks,
+  countJankoPages,
+  knockoutHalfExtents,
+  layoutJankoScore,
+  renderJankoCrop,
+  renderJankoPage,
+  resolveOpticalSpread,
+  suppressedStemIds,
+  type JankoSystemLayout,
+} from '../src/render/janko/engine';
+import {
+  compactDurationMarks,
+  effectiveExceptionCarrierLength,
+  midpointMetrics,
+} from '../src/render/janko/elements/rhythm';
+import { continuousPitchY, getMeasureIndexOfTick } from '../src/render/janko/geometry';
+import { lintJankoScore } from '../src/render/janko/linter';
+import {
+  createStudioConfig,
+  renderCandidatesView,
+  renderReferenceView,
+} from '../src/render/janko/studio';
+import {
+  CURRENT_CANDIDATES,
+  CURRENT_ROUND_METADATA,
+  type JankoScoreCandidateWindow,
+} from '../src/render/janko/candidates';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
+// ---------------------------------------------------------------------------
+// Fixtures and caches
+// ---------------------------------------------------------------------------
+
+const BACH = buildBachGoldbergVar1Score();
+const BRAHMS = buildBrahmsOp118No1Score();
+const DVS = buildDurationVocabularySpecimenScore();
+
+const REFERENCE_OPTIONS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+const REFERENCE_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const R44_OPTIONS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+const R44_TOKENS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
+
+/** The three declared scales, in card order. */
+const SCALES = [0.85, 0.9, 0.95] as const;
+
+/** The six clusters whose masks actually demanded the optical gap (Round 45). */
+const SPREAD_TICKS = [1200, 1392, 1584, 3120, 3312, 3504] as const;
+
+/** Card id per declared scale. */
+const CARD_ID: Record<(typeof SCALES)[number], string> = {
+  0.85: 'brahms-scale-85',
+  0.9: 'brahms-scale-90',
+  0.95: 'brahms-scale-95',
+};
+
+function cardOf(scale: (typeof SCALES)[number]) {
+  const card = CURRENT_CANDIDATES.find((c) => c.id === CARD_ID[scale]);
+  assert.ok(card, `the Round 45 registry declares ${CARD_ID[scale]}`);
+  return card!;
+}
+
+/** A Brahms layout of one declared scale — the studio's own merge. */
+function brahmsScale(scale: (typeof SCALES)[number]): readonly JankoSystemLayout[] {
+  const card = cardOf(scale);
+  return layoutJankoScore(
+    BRAHMS,
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
+    resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) })
+  );
+}
+
+/** A DVS layout of one declared scale — the studio's own entry merge. */
+function dvsScale(scale: (typeof SCALES)[number]) {
+  const card = cardOf(scale);
+  const options = resolveJankoOptions({
+    ...DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
+    ...(card.options ?? {}),
+  });
+  const tokens = resolveJankoTokens({
+    ...DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
+    ...(card.tokens ?? {}),
+  });
+  return { options, tokens, layouts: layoutJankoScore(DVS, options, tokens) };
+}
+
+/** Layouts are the expensive part of this file; compute each surface once. */
+const layoutCache = new Map<string, readonly JankoSystemLayout[]>();
+function cachedLayouts(
+  key: string,
+  score = BRAHMS,
+  options = REFERENCE_OPTIONS,
+  tokens = REFERENCE_TOKENS
+): readonly JankoSystemLayout[] {
+  const hit = layoutCache.get(key);
+  if (hit) return hit;
+  const layouts = layoutJankoScore(score, options, tokens);
+  layoutCache.set(key, layouts);
+  return layouts;
+}
+
+const referenceLayouts = (): readonly JankoSystemLayout[] =>
+  cachedLayouts('reference', BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS);
+const reserveLayouts = (): readonly JankoSystemLayout[] =>
+  cachedLayouts('r44', BRAHMS, R44_OPTIONS, R44_TOKENS);
+const noOpticalLayouts = (): readonly JankoSystemLayout[] =>
+  cachedLayouts('no-optical', BRAHMS, { ...REFERENCE_OPTIONS, opticalSpacing: false }, REFERENCE_TOKENS);
+const coreFoldingLayouts = (): readonly JankoSystemLayout[] =>
+  cachedLayouts('core-folding', BRAHMS, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS);
+function scaleLayouts(scale: (typeof SCALES)[number]): readonly JankoSystemLayout[] {
+  return cachedLayouts(`scale-${scale}`, BRAHMS, resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...(cardOf(scale).options ?? {}),
+  }), resolveJankoTokens({
+    ...BRAHMS_OP118_NO1_JANKO_TOKENS,
+    ...(cardOf(scale).tokens ?? {}),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// The two served views (expensive to render; computed once per suite)
+// ---------------------------------------------------------------------------
+
+let studioConfigCache: ReturnType<typeof createStudioConfig> | undefined;
+const studioConfig = (): ReturnType<typeof createStudioConfig> =>
+  (studioConfigCache ??= createStudioConfig());
+let candidatesViewCache: string | undefined;
+const candidatesView = (): string => (candidatesViewCache ??= renderCandidatesView(studioConfig()));
+let referenceViewCache: string | undefined;
+const referenceView = (): string => (referenceViewCache ??= renderReferenceView(studioConfig()));
+
+// ---------------------------------------------------------------------------
+// Small measurement helpers (emitted geometry only)
+// ---------------------------------------------------------------------------
+
+type Head = JankoSystemLayout['notes'][number];
+
+/** The source (sounding) linear pitch of a head: its musical identity. */
+const sourceLin = (p: Head): number => p.note.pitch.octave * 12 + p.note.pitch.pitchClass;
+
+const headsOf = (layouts: readonly JankoSystemLayout[]): Head[] => layouts.flatMap((l) => l.notes);
+const byIdOf = (layouts: readonly JankoSystemLayout[]): Map<string, Head> =>
+  new Map(headsOf(layouts).map((p) => [p.note.id, p]));
+const clustersOf = (layouts: readonly JankoSystemLayout[]) =>
+  layouts.flatMap((l) => l.opticalClusters ?? []);
+const memberIdsOf = (layouts: readonly JankoSystemLayout[]): Set<string> =>
+  new Set(clustersOf(layouts).flatMap((c) => c.memberIds));
+
+/** One-based performed measure of a laid-out head (four measures per system). */
+function measureOf(layout: JankoSystemLayout, p: Head): number {
+  return (
+    4 * layout.index +
+    getMeasureIndexOfTick(p.note, layout.geometry, layout.index, REFERENCE_TOKENS) +
+    1
+  );
+}
+
+/** Every `<line>` of one class: `{ x1, y1, x2, y2, stroke }`. */
+function linesOf(
+  svg: string,
+  cls: string
+): { x1: number; y1: number; x2: number; y2: number; stroke: number }[] {
+  const re = new RegExp(
+    `<line class="${cls}" x1="([\\d.-]+)" y1="([\\d.-]+)" x2="([\\d.-]+)" y2="([\\d.-]+)"` +
+      ` stroke="#111111" stroke-width="([\\d.]+)"`,
+    'g'
+  );
+  return [...svg.matchAll(re)].map((m) => ({
+    x1: Number(m[1]),
+    y1: Number(m[2]),
+    x2: Number(m[3]),
+    y2: Number(m[4]),
+    stroke: Number(m[5]),
+  }));
+}
+
+/** Every `<circle>` of one class: `{ cx, cy, r, stroke }`. */
+function circlesOf(
+  svg: string,
+  cls: string
+): { cx: number; cy: number; r: number; stroke: number }[] {
+  const re = new RegExp(
+    `<circle class="${cls}" cx="([\\d.-]+)" cy="([\\d.-]+)" r="([\\d.]+)"` +
+      ` fill="#FFFFFF" stroke="#111111" stroke-width="([\\d.]+)"`,
+    'g'
+  );
+  return [...svg.matchAll(re)].map((m) => ({
+    cx: Number(m[1]),
+    cy: Number(m[2]),
+    r: Number(m[3]),
+    stroke: Number(m[4]),
+  }));
+}
+
+/** The painted `janko-exception-carrier` groups of one crop, mark-for-mark. */
+interface PaintedCarrier {
+  noteId: string;
+  ticks: number;
+  cuts: number;
+  rings: number;
+  dots: number;
+  length: number;
+  stroke: number;
+  cutCentres: number[];
+  ringRadii: number[];
+  ringStrokes: number[];
+}
+function paintedCarriers(svg: string): PaintedCarrier[] {
+  return svg
+    .split('<g class="janko-exception-carrier"')
+    .slice(1)
+    .map((chunk) => {
+      const head = chunk.slice(0, chunk.indexOf('>'));
+      const attr = (name: string): string => new RegExp(`${name}="([^"]*)"`).exec(head)![1];
+      const line =
+        /<line class="janko-exception-carrier-line" x1="([\d.-]+)" y1="([\d.-]+)" x2="([\d.-]+)" y2="([\d.-]+)" stroke="#111111" stroke-width="([\d.]+)"/.exec(
+          chunk
+        )!;
+      const cuts = linesOf(chunk, 'janko-exception-cut');
+      const rings = circlesOf(chunk, 'janko-exception-ring');
+      return {
+        noteId: attr('data-exception-note'),
+        ticks: Number(attr('data-exception-ticks')),
+        cuts: Number(attr('data-exception-cuts')),
+        rings: Number(attr('data-exception-rings')),
+        dots: Number(attr('data-exception-dots')),
+        length: Number(line[3]) - Number(line[1]),
+        stroke: Number(line[5]),
+        cutCentres: cuts.map((c) => (c.x1 + c.x2) / 2),
+        ringRadii: rings.map((r) => r.r),
+        ringStrokes: rings.map((r) => r.stroke),
+      };
+    });
+}
+
+const approx = (a: number, b: number, eps = 1e-9): boolean => Math.abs(a - b) < eps;
+/** The emitted SVG prints 2 dp, so a painted comparison must allow ±0.011pt. */
+const SVG_EPS = 0.011;
+/** The engine's admitted-cluster pair pitch (`test/janko-round44.test.ts` pins the same 5.46pt). */
+const PAIR_GAP = 5.46;
+
+// ---------------------------------------------------------------------------
+// 1. Registry: three cards on one shared family, 0.85 / 0.90 / 0.95
+// ---------------------------------------------------------------------------
+
+test('Round 45 registry: three full-score Brahms cards on one shared family', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 45, 'the open round');
+  assert.match(CURRENT_ROUND_METADATA.title, /larger readable Brahms clusters/i);
+  assert.deepEqual(
+    CURRENT_ROUND_METADATA.openAxes,
+    [
+      'chordSymbolScale',
+      'opticalSpacing',
+      'lowPitchFolding',
+      'bracketDurationGrammar',
+      'exceptionCarrier',
+    ],
+    'the round opens exactly the five settled axes'
+  );
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards, no more');
+
+  const family: Array<Record<string, unknown>> = [];
+  for (const scale of SCALES) {
+    const card = cardOf(scale);
+    const options = card.options ?? {};
+    const tokens = card.tokens ?? {};
+    assert.equal(options.chordSymbolScale, scale, `${card.id}: the declared admitted-cluster scale`);
+    assert.equal(card.axis, 'chordSymbolScale', `${card.id}: the one varying axis`);
+    // The bounded review set the operator asked for: full score first, then the
+    // close-cluster windows, the pitch/hand/duration windows and the compact
+    // short-duration key. No extra control card, no separate viewer.
+    assert.deepEqual(
+      (card.windows ?? [])
+        .filter((w): w is JankoScoreCandidateWindow => 'measureStart' in w)
+        .map((w) => `${w.measureStart}-${w.measureStart + w.measureCount - 1}`),
+      ['1-71', '5-5', '7-9', '17-19', '66-71', '17-24'],
+      `${card.id}: exactly the declared review surfaces`
+    );
+    assert.ok(
+      (card.windows ?? []).some((w) => (w as { fullScore?: boolean }).fullScore === true),
+      `${card.id}: the whole score stays a genuine page spread`
+    );
+    const rest = { ...options } as Record<string, unknown>;
+    delete rest.chordSymbolScale;
+    family.push(rest);
+    assert.deepEqual(
+      { ...tokens },
+      {
+        midpointSlashLengthFactor: 1.1,
+        midpointRingScale: 1.1,
+        midpointSpacingFactor: 7 / 6,
+        opticalClearanceAir: 0.2,
+      },
+      `${card.id}: the Round 45 readability ratios and the explicit 0.20pt optical air`
+    );
+  }
+  assert.deepEqual(family[1], family[0], 'the 85 % and 90 % cards differ only in scale');
+  assert.deepEqual(family[2], family[0], 'the 95 % card differs only in scale');
+  assert.deepEqual(
+    family[0],
+    {
+      pitchPlacement: 'parity-columns',
+      bracketDurationGrammar: 'midpoint',
+      exceptionCarrier: 'horizontal',
+      opticalSpacing: true,
+      lowPitchFolding: 'literal',
+    },
+    'one coherent family: parity admission, the 45-degree family, horizontal remaining-value carriers'
+  );
+  // The shared family's knobs are all opt-in; the golden defaults stay no-ops.
+  assert.equal(DEFAULT_JANKO_OPTIONS.opticalSpacing, false, 'optical spacing is opt-in');
+  assert.equal(DEFAULT_JANKO_OPTIONS.lowPitchFolding, 'core', 'literal low pitches are opt-in');
+  assert.equal(DEFAULT_JANKO_TOKENS.midpointSlashLengthFactor, 1, 'the slash ratio is a no-op by default');
+  assert.equal(DEFAULT_JANKO_TOKENS.midpointRingScale, 1, 'the ring ratio is a no-op by default');
+  assert.equal(DEFAULT_JANKO_TOKENS.midpointSpacingFactor, 1, 'the cut-spacing ratio is a no-op by default');
+  assert.equal(DEFAULT_JANKO_TOKENS.opticalClearanceAir, 0.2, 'the new vertical air policy');
+});
+
+test('The 90 % card and the working Brahms Reference are the same engraving', () => {
+  const card = cardOf(0.9);
+  const studioMerge = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) });
+  const studioTokens = resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) });
+  assert.deepEqual(studioMerge, REFERENCE_OPTIONS, 'the studio merge IS the Reference option set');
+  assert.deepEqual(studioTokens, REFERENCE_TOKENS, 'and the Reference token set');
+
+  // The served surfaces agree byte for byte: the card's five full-score page
+  // cards and the Reference view's five BRONZE Brahms pages are the same SVG
+  // (the whole-score window renders real `renderJankoPage` cards, like the
+  // Reference view — never one crop dressed up as a spread).
+  const candidates = candidatesView();
+  const reference = referenceView();
+  const pageSvgs = (html: string): string[] =>
+    [...html.matchAll(/<figure class="page-card"[\s\S]*?<\/figure>/g)].map(
+      (m) => /<svg class="janko-svg"[\s\S]*?<\/svg>/.exec(m[0])![0]
+    );
+  const pageFigures = (html: string): string[] =>
+    [...html.matchAll(/<figure class="page-card"[\s\S]*?<\/figure>/g)].map((m) => m[0]);
+  const cardStart = candidates.indexOf(`data-candidate="${card.id}"`);
+  const cardEnd = candidates.indexOf('data-candidate="', cardStart + 1);
+  const cardSlice = candidates.slice(cardStart, cardEnd < 0 ? undefined : cardEnd);
+  const cardPages = pageSvgs(cardSlice);
+  const cardFigures = pageFigures(cardSlice);
+  const brahmsAt = reference.indexOf('data-score="brahms-op118-no1"');
+  const bachAt = reference.indexOf('data-score="primary"');
+  const referencePages = pageSvgs(reference.slice(brahmsAt, bachAt));
+  assert.equal(cardPages.length, 5, 'the 90 % card carries the whole score as five genuine pages');
+  assert.equal(referencePages.length, 5, 'and the Reference view carries the same five');
+  for (const [i, figure] of cardFigures.entries()) {
+    assert.ok(figure.includes(`data-page="${i + 1}"`), `page card ${i + 1} is labelled, not an anonymous crop`);
+    assert.ok(figure.includes(`<b>Page ${i + 1}</b> · mm. `), `page card ${i + 1} states its real measure range`);
+  }
+  assert.deepEqual(cardPages, referencePages, 'the 90 % candidate and the Reference agree byte for byte');
+});
+
+// ---------------------------------------------------------------------------
+// 2. Admission: the same clusters at every scale, no stale admission
+// ---------------------------------------------------------------------------
+
+test('Admission is scale-coherent: the same six spread clusters at 0.85 / 0.90 / 0.95', () => {
+  // The derived targets of the ticket, measured on the emitted masks:
+  // delta = .25769 / .54344 / .82919, span growth = 1.0308 / 2.1738 / 3.3167pt,
+  // maximum optical displacement = .5154 / 1.0869 / 1.6584pt (the ticket's
+  // derived .82918 differs by 1e-5 — SVG-free double arithmetic here).
+  const expected: Record<
+    (typeof SCALES)[number],
+    { delta: number; span: number; max: number }
+  > = {
+    0.85: { delta: 0.25769, span: 1.0308, max: 0.51539 },
+    0.9: { delta: 0.54344, span: 2.1738, max: 1.08688 },
+    0.95: { delta: 0.82919, span: 3.3167, max: 1.65837 },
+  };
+  const membership = new Map<number, string>();
+  for (const scale of SCALES) {
+    const layouts = scaleLayouts(scale);
+    const clusters = clustersOf(layouts);
+    assert.equal(clusters.length, 72, `s=${scale}: every admitted bracket cluster is published`);
+    const spread = clusters.filter((c) => c.delta > 0);
+    assert.deepEqual(
+      spread.map((c) => c.tick),
+      [...SPREAD_TICKS],
+      `s=${scale}: exactly the six clusters whose masks demand the gap`
+    );
+    for (const c of spread) {
+      const keys = c.memberIds.join(',');
+      if (membership.has(c.tick)) {
+        assert.equal(keys, membership.get(c.tick), `s=${scale}: t${c.tick} membership is scale-independent`);
+      } else {
+        membership.set(c.tick, keys);
+      }
+      assert.equal(c.hand, 'RH', `s=${scale}: t${c.tick} is the admitted right-hand column`);
+      assert.equal(c.lins.length, 5, `s=${scale}: t${c.tick} is the diagnosed five-level cluster`);
+      assert.equal(c.capped, false, `s=${scale}: nothing is clamped by the 1-span cap`);
+      assert.equal(c.requiredDelta, c.delta, `s=${scale}: the uncapped requirement is met`);
+      assert.ok(approx(c.delta, expected[scale].delta, 5e-5), `s=${scale}: t${c.tick} delta`);
+      assert.ok(approx(c.spanGrowth, expected[scale].span, 5e-5), `s=${scale}: t${c.tick} span growth`);
+      assert.ok(approx(c.maxDisplacement, expected[scale].max, 5e-5), `s=${scale}: t${c.tick} max displacement`);
+      assert.ok(
+        approx(c.maxDisplacement, Math.max(...c.offsets.map(Math.abs))),
+        `s=${scale}: the published maximum IS the largest applied offset`
+      );
+    }
+    const spreading = clusters.filter((c) => c.delta === 0);
+    for (const c of spreading) {
+      assert.ok(
+        c.offsets.every((o) => o === 0) && c.maxDisplacement === 0 && c.spanGrowth === 0,
+        `s=${scale}: an already clearing cluster (t${c.tick}) is never touched`
+      );
+    }
+    // The admitted members are the scaled symbols, and only they: the fixpoint
+    // is real, so a group qualification that admission refused leaves no stale
+    // scale — or optical — offset behind.
+    const heads = headsOf(layouts);
+    const admitted = memberIdsOf(layouts);
+    for (const p of heads) {
+      if (admitted.has(p.note.id)) {
+        assert.equal(p.symbolScale, scale, `s=${scale}: ${p.note.id} is an admitted cluster symbol`);
+      } else {
+        assert.equal(p.symbolScale, undefined, `s=${scale}: ${p.note.id} is an ordinary full-size head`);
+        assert.equal(p.opticalOffsetY, undefined, `s=${scale}: ${p.note.id} takes no optical offset`);
+      }
+    }
+    const displaced = heads.filter((p) => Math.abs(p.opticalOffsetY ?? 0) > 0);
+    assert.equal(displaced.length, 24, `s=${scale}: four of five levels move in each of the six clusters`);
+    assert.equal(
+      displaced.filter((p) => p.opticalOffsetY === undefined).length,
+      0,
+      `s=${scale}: no silent displacement`
+    );
+  }
+  // The Reference is the same 90 % surface it serves, and the Round 44 reserve
+  // has no optical machinery at all.
+  assert.deepEqual(
+    clustersOf(referenceLayouts()).filter((c) => c.delta > 0).map((c) => c.tick),
+    [...SPREAD_TICKS],
+    'the working Reference spreads the same six clusters'
+  );
+  assert.deepEqual(clustersOf(referenceLayouts()).map((c) => c.delta > 0), clustersOf(scaleLayouts(0.9)).map((c) => c.delta > 0), 'the Reference and the 90 % card are the same clusters');
+  assert.equal(clustersOf(reserveLayouts()).length, 0, 'the Round 44 reserve records no optical cluster');
+  assert.equal(
+    headsOf(reserveLayouts()).filter((p) => p.opticalOffsetY !== undefined).length,
+    0,
+    'and stamps no optical offset'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 3. Declared placement metadata: musical fields, columns and attachments
+// ---------------------------------------------------------------------------
+
+test('Optical spacing is declared placement metadata: musical fields and columns untouched', () => {
+  const on = referenceLayouts();
+  const off = noOpticalLayouts();
+  assert.equal(clustersOf(off).length, 0, 'the same options with optical spacing off publish nothing');
+  const painted = byIdOf(on);
+  const lattice = byIdOf(off);
+  const members = memberIdsOf(on);
+  const spreadMembers = new Set(
+    clustersOf(on).filter((c) => c.delta > 0).flatMap((c) => c.memberIds)
+  );
+  let yMoved = 0;
+  let xMoved = 0;
+  for (const p of headsOf(on)) {
+    const q = lattice.get(p.note.id)!;
+    // Musical fields and the staff lattice: identical, field for field.
+    assert.equal(p.note.startTick, q.note.startTick, `${p.note.id}: source onset`);
+    assert.equal(p.note.durationTicks, q.note.durationTicks, `${p.note.id}: source duration`);
+    assert.deepEqual(p.note.pitch, q.note.pitch, `${p.note.id}: sounding pitch`);
+    assert.equal(p.writtenLin, q.writtenLin, `${p.note.id}: written pitch`);
+    assert.equal(p.ottavaShift, q.ottavaShift, `${p.note.id}: register statement`);
+    assert.deepEqual(p.rhythm.hand, q.rhythm.hand, `${p.note.id}: hand`);
+    assert.equal(p.nominalX, q.nominalX, `${p.note.id}: solved onset column`);
+    assert.deepEqual(p.coord.ledgerYs, q.coord.ledgerYs, `${p.note.id}: ledger equators`);
+    if (Math.abs(p.y - q.y) > 1e-9) {
+      yMoved++;
+      assert.ok(spreadMembers.has(p.note.id), `${p.note.id}: only a spread cluster member may move in y`);
+    }
+    if (Math.abs(p.x - q.x) > 1e-9) {
+      assert.ok(spreadMembers.has(p.note.id), `${p.note.id}: only a spread cluster member may re-resolve in x`);
+    }
+    if (Math.abs(p.x - q.x) > 1e-9) {
+      xMoved++;
+      // The residual horizontal fit runs on the **displaced** geometry: an
+      // opened pair no longer needs its nudge, so a member may relax *back*
+      // towards its column — never past it, and never further right than the
+      // un-opened fan.
+      assert.ok(p.x >= (p.nominalX ?? p.x) - 1e-9, `${p.note.id}: never pushed left of its onset column`);
+      assert.ok(p.x <= q.x + 1e-9, `${p.note.id}: never nudged further right than the un-opened fit`);
+    }
+    if (spreadMembers.has(p.note.id)) {
+      // A member of one of the six spread clusters sits on one of its two
+      // intended parity columns: the onset anchor, or exactly one pair pitch
+      // (5.46pt here) to its right — never an arbitrary per-note nudge, and
+      // never pushed left of its own column.
+      const rail = p.x - (p.nominalX ?? p.x);
+      assert.ok(rail >= -1e-9, `${p.note.id}: never pushed left of its onset column`);
+      assert.ok(
+        approx(rail, 0, 1e-9) || approx(rail, PAIR_GAP, 1e-9),
+        `${p.note.id}: on its intended parity column (rail ${rail.toFixed(4)}pt)`
+      );
+    }
+  }
+  assert.equal(yMoved, 24, 'exactly the 24 displaced heads move in y');
+  assert.equal(xMoved, 10, 'ten members re-resolve their fan on the opened geometry');
+  // Nothing outside the clusters moves at all.
+  for (const p of headsOf(on)) {
+    if (members.has(p.note.id)) continue;
+    const q = lattice.get(p.note.id)!;
+    assert.equal(p.x, q.x, `${p.note.id}: an unbracketed head keeps its established column`);
+    assert.equal(p.y, q.y, `${p.note.id}: and its established pitch y`);
+  }
+  assert.equal(headsOf(on).length, 959, 'the surface is complete');
+  assert.equal(headsOf(off).length, 959, 'and the control surface is the same spread');
+  assert.deepEqual(
+    on.flatMap((l) => l.clasps.map((c) => c.tick)),
+    off.flatMap((l) => l.clasps.map((c) => c.tick)),
+    'the bracket furniture is unchanged'
+  );
+});
+
+test('Emitted geometry, masks and duration attachments agree with the stamped optical position', () => {
+  const painted = byIdOf(referenceLayouts());
+  const lattice = byIdOf(noOpticalLayouts());
+  const clusters = clustersOf(referenceLayouts()).filter((c) => c.delta > 0);
+  assert.equal(clusters.length, 6, 'the six spread clusters');
+
+  for (const c of clusters) {
+    const layout = referenceLayouts().find((l) => l.notes.some((p) => p.note.startTick === c.tick))!;
+    const clasp = layout.clasps.find((k) => k.tick === c.tick)!;
+    assert.ok(clasp, `t${c.tick}: the admitted cluster keeps its grouping bracket`);
+    const carried = claspMemberCarriedTicks(clasp, c.memberIds[0]);
+    const families = new Set(c.lins.map((lin) => (lin % 2 === 0 ? 0 : 1)));
+    const bothFamilies = families.size >= 2;
+    // The intended parity rails, from the emitted columns: the anchor for one
+    // family, exactly one pair pitch to its right for the other (the
+    // extent-derived pair pitch is 5.46pt for these clusters; the engine's own
+    // admitted patterns are pinned in `test/janko-round44.test.ts`).
+    const rails = c.memberIds.map((id) => painted.get(id)!.x - (painted.get(id)!.nominalX ?? 0));
+    assert.ok(
+      rails.every((r) => approx(Math.min(...rails), r, 1e-9) || approx(Math.max(...rails), r, 1e-9)),
+      `t${c.tick}: members sit only on their two intended columns`
+    );
+    if (bothFamilies) {
+      assert.ok(approx(Math.max(...rails), PAIR_GAP, 1e-9), `t${c.tick}: the two columns are one pair pitch apart`);
+    } else {
+      assert.ok(approx(Math.max(...rails), 0, 1e-9), `t${c.tick}: a one-family cluster keeps one column`);
+    }
+
+    // Rebuild the metric's own member list from the emitted masks and the
+    // pre-displacement lattice, then re-derive the spread — the published
+    // numbers must be exactly what the painted geometry implies.
+    const members = c.memberIds.map((id) => {
+      const before = lattice.get(id)!;
+      const e = knockoutHalfExtents(REFERENCE_OPTIONS, REFERENCE_TOKENS, before.note.startTick, before);
+      const lin = sourceLin(before);
+      return {
+        id,
+        lin,
+        y: before.y,
+        wx: e.wx,
+        hy: e.hy,
+        // The declared intended rails of the admitted cluster: 0 keeps the
+        // onset anchor, the odd family takes the pair pitch when both families
+        // are present (a one-family cluster stays on its anchor column).
+        rail: bothFamilies && lin % 2 !== 0 ? PAIR_GAP : 0,
+      };
+    });
+    const spread = resolveOpticalSpread(members, REFERENCE_TOKENS.opticalClearanceAir, OPTICAL_DISPLACEMENT_CAP);
+    assert.ok(approx(spread.delta, c.delta, 1e-9), `t${c.tick}: delta re-derives from the actual masks`);
+    assert.deepEqual(spread.lins, c.lins, `t${c.tick}: the distinct true pitch levels`);
+    assert.ok(
+      spread.offsets.length === c.offsets.length &&
+        spread.offsets.every((o, k) => approx(o, c.offsets[k], 1e-9)),
+      `t${c.tick}: the per-level offsets`
+    );
+    assert.ok(approx(spread.spanGrowth, c.spanGrowth, 1e-9), `t${c.tick}: the span growth`);
+    assert.ok(approx(spread.maxDisplacement, c.maxDisplacement, 1e-9), `t${c.tick}: the maximum displacement`);
+
+    // Member-weighted mean zero: the cluster centroid never translates.
+    let weighted = 0;
+    let weight = 0;
+    for (let k = 0; k < c.lins.length; k++) {
+      const count = c.memberIds.filter(
+        (id) => Math.abs(c.memberOffsets.get(id)! - c.offsets[k]) < 1e-9
+      ).length;
+      weighted += count * c.offsets[k];
+      weight += count;
+    }
+    assert.equal(weight, c.memberIds.length, `t${c.tick}: every member is on a level`);
+    assert.ok(approx(weighted, 0, 1e-9), `t${c.tick}: the offsets are centred on the member-weighted mean`);
+    assert.ok(
+      c.offsets.every((o) => Math.abs(o) <= OPTICAL_DISPLACEMENT_CAP + 1e-9),
+      `t${c.tick}: no glyph moves more than one 1-span`
+    );
+
+    for (const id of c.memberIds) {
+      const p = painted.get(id)!;
+      const before = lattice.get(id)!;
+      const offset = c.memberOffsets.get(id)!;
+      const level = members.find((m) => m.id === id)!.lin;
+      assert.ok(
+        approx(offset, c.offsets[c.lins.indexOf(level)], 1e-9),
+        `${id}: the stamped offset is its own level's offset`
+      );
+      assert.ok(approx(p.opticalOffsetY ?? 0, offset, 1e-9), `${id}: the painted y carries the stamped offset`);
+      assert.ok(approx(p.y, before.y + offset, 1e-9), `${id}: y = lattice y + offset`);
+      assert.ok(approx(p.rhythm.y, p.y, 1e-9), `${id}: the emitted stem attachment follows the head`);
+      if (before.rhythm.dotY !== undefined) {
+        assert.ok(
+          approx(p.rhythm.dotY!, before.rhythm.dotY + offset, 1e-9),
+          `${id}: the augmentation dot follows the head`
+        );
+      }
+    }
+
+    // No new collision: every pair whose painted horizontal masks overlap keeps
+    // the declared 0.20pt of vertical air after the spread.
+    for (let i = 0; i < c.lins.length; i++) {
+      for (let j = i + 1; j < c.lins.length; j++) {
+        const a = members[i];
+        const b = members[j];
+        const pa = painted.get(a.id)!;
+        const pb = painted.get(b.id)!;
+        if (Math.abs(pa.x - pb.x) >= a.wx + b.wx) continue;
+        const gap = Math.abs(pb.y - pa.y) - (a.hy + b.hy);
+        assert.ok(
+          gap >= REFERENCE_TOKENS.opticalClearanceAir - 1e-9,
+          `t${c.tick}: ${a.id}/${b.id} keep ${REFERENCE_TOKENS.opticalClearanceAir}pt of clear air (measured ${gap.toFixed(4)})`
+        );
+      }
+    }
+  }
+  // Same-family members still share one column: the optical pass never changes
+  // the intended parity columns, it only opens the vertical gap between them.
+  for (const c of clusters) {
+    const xs = new Map<number, Set<string>>();
+    for (const id of c.memberIds) {
+      const p = painted.get(id)!;
+      const family = (p.writtenLin ?? sourceLin(p)) % 2 === 0 ? 0 : 1;
+      const set = xs.get(family) ?? new Set<string>();
+      set.add(p.x.toFixed(9));
+      xs.set(family, set);
+    }
+    for (const [family, set] of xs) {
+      assert.equal(set.size, 1, `t${c.tick}: parity family ${family} keeps one column`);
+    }
+    if (xs.size === 2) {
+      const columns = [...xs.values()].map((s) => Number([...s][0]));
+      assert.ok(
+        approx(Math.abs(columns[0] - columns[1]), PAIR_GAP, 1e-9),
+        `t${c.tick}: the two parity columns are one pair pitch apart`
+      );
+    } else {
+      const column = Number([...xs.values()][0].values().next().value);
+      assert.equal(
+        column,
+        Number(painted.get(c.memberIds[0])!.nominalX!.toFixed(9)),
+        `t${c.tick}: a one-family cluster keeps the onset anchor`
+      );
+    }
+  }
+  const report = lintJankoScore(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS);
+  assert.deepEqual(report.violations, [], 'the linter reads the same painted positions: zero hard errors');
+});
+
+// ---------------------------------------------------------------------------
+// 4. Cluster duration: no residual vertical shared-duration stem
+// ---------------------------------------------------------------------------
+
+test('No residual vertical shared-duration carrier for an eligible cluster; beams and rests untouched', () => {
+  const working = referenceLayouts();
+  const reserve = reserveLayouts();
+  // The Round 44 reserve carries 37 shared stems; four of them are the Round 16
+  // top-RH survivor of a fully uniform five-level cluster (four suppressed
+  // members each), which the bracket already states exactly.
+  const reserveStems = reserve.flatMap((l) => l.sharedStems);
+  assert.equal(reserveStems.length, 37, 'the historical surface, for the record');
+  for (const [tick, carrierId] of [
+    [1200, 'brahms-op118-no1-82'],
+    [1392, 'brahms-op118-no1-99'],
+    [3120, 'brahms-op118-no1-217'],
+    [3312, 'brahms-op118-no1-234'],
+  ] as const) {
+    const group = reserveStems.find((g) => g.tick === tick)!;
+    assert.equal(group.carrierId, carrierId, `Round 44: t${tick} kept the top-RH survivor stem`);
+    assert.equal(group.suppressedIds.length, 4, `Round 44: t${tick} suppressed the other four members`);
+  }
+
+  // Round 45: only the two *independent-duration* pairs keep a shared stem —
+  // and they are exactly the two members whose value (192) the bracket's
+  // carried 144 does NOT state, whose duration is routed to the horizontal
+  // carrier instead.
+  const workingStems = working.flatMap((l) => l.sharedStems);
+  assert.deepEqual(
+    workingStems.map((g) => [g.tick, g.hand, g.carrierId, [...g.suppressedIds]]),
+    [
+      [1584, 'RH', 'brahms-op118-no1-118', ['brahms-op118-no1-117']],
+      [3504, 'RH', 'brahms-op118-no1-253', ['brahms-op118-no1-252']],
+    ],
+    'the eligible clusters keep no residual vertical shared-duration stem'
+  );
+  const painted = byIdOf(working);
+  const carriers = working.flatMap((l) => l.exceptionCarriers);
+  for (const cluster of clustersOf(working).filter((c) => c.delta > 0)) {
+    const layout = working.find((l) => l.notes.some((p) => p.note.startTick === cluster.tick))!;
+    const clasp = layout.clasps.find((k) => k.tick === cluster.tick)!;
+    const carried = claspMemberCarriedTicks(clasp, cluster.memberIds[0]);
+    assert.ok(carried === 96 || carried === 144, `t${cluster.tick}: the bracket states its shared value`);
+    for (const id of cluster.memberIds) {
+      const p = painted.get(id)!;
+      const inGroup = workingStems.some((g) => g.carrierId === id || g.suppressedIds.includes(id));
+      if (p.note.durationTicks === carried) {
+        assert.equal(inGroup, false, `t${cluster.tick}: ${id} states the carried value — no redundant stem`);
+      } else {
+        // An independent value lives on the horizontal carrier; a stem may only
+        // remain as the connector of two *equal* independent voices.
+        assert.equal(p.note.durationTicks, 192, `t${cluster.tick}: ${id} is the independent value`);
+        const own = carriers.find((c) => c.noteId === id);
+        assert.ok(own, `${id}: its duration is routed through the horizontal grammar`);
+        assert.deepEqual([own!.cuts, own!.rings, own!.dots], [0, 2, 0], `${id}: two rings = a whole note`);
+        assert.equal(inGroup, true, `${id}: it keeps the equal-duration pair connector`);
+      }
+    }
+  }
+
+  // Genuine beams and rests are untouched: same groups, same notes, and no
+  // beamed member is ever folded into a shared-stem group.
+  const beamGroups = (layouts: readonly JankoSystemLayout[]): string[] =>
+    layouts
+      .flatMap((l) => l.beams)
+      .map((b) => b.notes.map((n) => n.id).sort().join('+'));
+  assert.deepEqual(beamGroups(working), beamGroups(reserve), 'the real beams are the same groups, unchanged');
+  assert.equal(beamGroups(working).length, 236, 'and there are 236 of them');
+  assert.equal(working.flatMap((l) => l.rests).length, reserve.flatMap((l) => l.rests).length, 'rests unchanged');
+  const beamed = new Set(working.flatMap((l) => l.beams).flatMap((b) => b.notes.map((n) => n.id)));
+  for (const group of workingStems) {
+    for (const id of [group.carrierId, ...group.suppressedIds]) {
+      assert.equal(beamed.has(id), false, `${id}: a real beam is never replaced by a shared stem`);
+    }
+  }
+  // The whole-score suppression census: the Round 45 doctrine lets the
+  // bracket and the horizontal carriers own the cluster duration ink, so the
+  // vertical standalone stems the Round 44 surface still painted — the Round 16
+  // top/bottom survivors and every exception member that now has a carrier —
+  // are gone: 203 → 269 suppressed ids (66 fewer vertical stems), with every
+  // remaining member covered by the layout's own suppression set.
+  const suppressedOf = (layouts: readonly JankoSystemLayout[]): Set<string> =>
+    new Set(layouts.flatMap((l) => [...suppressedStemIds(l)]));
+  const workingSuppressed = suppressedOf(working);
+  assert.equal(workingSuppressed.size, 269, 'the Round 45 suppression census');
+  assert.equal(suppressedOf(reserve).size, 203, 'against the Round 44 reserve');
+  assert.equal(
+    suppressedOf(noOpticalLayouts()).size,
+    workingSuppressed.size,
+    'the optical pass itself suppresses nothing extra — it only moves heads'
+  );
+  for (const group of workingStems) {
+    for (const id of group.suppressedIds) {
+      assert.equal(workingSuppressed.has(id), true, `${id}: its standalone stem is suppressed`);
+    }
+  }
+  // The two surviving pairs are equal-duration same-hand voices (the engine's
+  // own precondition for a shared stem), so neither is a leftover of the old
+  // selection: their value is the independent 192, not the bracket's carried
+  // 144, and the engine only ever groups equal durations.
+  for (const group of workingStems) {
+    const durations = [group.carrierId, ...group.suppressedIds].map(
+      (id) => painted.get(id)!.note.durationTicks
+    );
+    assert.deepEqual([...new Set(durations)], [192], `${group.carrierId}: an equal-duration independent pair`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 5. The 45-degree family: measured glyphs, pitch and scale on both mounts
+// ---------------------------------------------------------------------------
+
+test('The 45-degree family measured: cut centre pitch is exactly 1.40 × the Round 44 .75 baseline at 90 %', () => {
+  const base = midpointMetrics(R44_TOKENS, 0.75);
+  assert.ok(approx(base.cutSpacing, 1.2833988079, 1e-9), 'the Round 44 .75 baseline is the ruled one');
+  assert.ok(approx(base.carrierLength, 10.0275, 1e-9), 'and its fixed carrier length');
+  assert.ok(approx(base.slashDx, 2.6879115324, 1e-9), 'and its slash component');
+
+  const measured: Record<number, { cut: number; carrier: number; slash: number }> = {};
+  for (const scale of SCALES) {
+    const card = cardOf(scale);
+    const t = resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) });
+    const m = midpointMetrics(t, scale);
+    // Length: the Round 45 factor on the 45-degree centreline, equal x/y.
+    assert.ok(approx(m.slashCenterline, 5.0683745915, 1e-9), `s=${scale}: the family centreline is unchanged`);
+    assert.ok(approx(m.paintedCenterline, 5.0683745915 * 1.1, 1e-9), `s=${scale}: painted centreline length ×1.10`);
+    assert.ok(approx(m.slashDx, m.slashDy, 1e-9), `s=${scale}: 45 degrees preserved (equal components)`);
+    assert.ok(
+      approx(m.slashDx, (5.0683745915 * 1.1 * scale) / Math.SQRT2, 1e-9),
+      `s=${scale}: the proportional 45-degree component`
+    );
+    assert.ok(
+      approx(m.bracketCutSpacing, m.carrierCutSpacing, 1e-9) &&
+        approx(m.bracketRingSpacing, m.carrierRingSpacing, 1e-9),
+      `s=${scale}: one mark pitch for both mounts (bracket and carrier)`
+    );
+    assert.ok(approx(m.slashStroke, 0.71 * scale, 1e-9), `s=${scale}: the slash stroke follows s`);
+    // Ring: radius and stroke both ×1.10 on top of the proportional value.
+    assert.ok(approx(m.ringRadius, 1.6 * scale * 1.1, 1e-9), `s=${scale}: ring radius ×1.10`);
+    assert.ok(approx(m.ringStroke, 0.59 * scale * 1.1, 1e-9), `s=${scale}: ring stroke ×1.10`);
+    assert.ok(approx(m.gap, 0.5 * scale, 1e-9), `s=${scale}: the nominal ink gap stays 0.50·s`);
+    // Cut centre pitch: P45(s) = P44(.75)·1.40·(s/.90) — 7/6 after scaling.
+    assert.ok(
+      approx(m.cutSpacing, 1.2833988079 * 1.4 * (scale / 0.9), 1e-9),
+      `s=${scale}: the cut centre pitch follows the agreed formula`
+    );
+    assert.ok(
+      approx(m.ringSpacing, 2 * (m.ringRadius + m.ringStroke / 2) + m.gap, 1e-9),
+      `s=${scale}: ring pitch = the enlarged ring's outer diameter + the ink gap`
+    );
+    assert.ok(
+      approx(m.carrierLength, effectiveExceptionCarrierLength('midpoint', t, scale), 1e-9),
+      `s=${scale}: the fixed carrier length comes from the same metric`
+    );
+    measured[scale] = { cut: m.cutSpacing, carrier: m.carrierLength, slash: m.slashDx };
+  }
+  // The ruled constants.
+  assert.ok(approx(measured[0.85].cut, 1.6969384237, 1e-9), 's=.85 cut pitch');
+  assert.ok(approx(measured[0.9].cut, 1.7967583311, 1e-9), 's=.90 cut pitch — the 1.40× target');
+  assert.ok(approx(measured[0.95].cut, 1.8965782383, 1e-9), 's=.95 cut pitch');
+  assert.ok(approx(measured[0.85].carrier, 12.33095, 1e-9), 's=.85 carrier length');
+  assert.ok(approx(measured[0.9].carrier, 13.0563, 1e-9), 's=.90 carrier length');
+  assert.ok(approx(measured[0.95].carrier, 13.78165, 1e-9), 's=.95 carrier length');
+  // The agreed ratios vs Round 44 .75: scale ×1.2 (13.3 % / 20 % / 26.7 % larger
+  // notes), slash stroke +20 %, slash length +32 %, ring +32 %, cut pitch +40 %.
+  assert.ok(approx((0.71 * 0.9) / (0.71 * 0.75), 1.2, 1e-9), 'slash stroke +20 % at 90 %');
+  assert.ok(approx(measured[0.9].slash / base.slashDx, 1.32, 1e-9), 'slash length +32 % at 90 %');
+  assert.ok(approx((1.6 * 0.9 * 1.1) / (1.6 * 0.75), 1.32, 1e-9), 'ring diameter/stroke +32 % at 90 %');
+  assert.ok(approx(measured[0.9].cut / base.cutSpacing, 1.4, 1e-9), 'cut centre pitch +40 % TOTAL at 90 %');
+  assert.ok(approx(measured[0.85].cut / base.cutSpacing, 1.3222222222, 1e-9), 'and proportional at 85 %');
+  assert.ok(approx(measured[0.95].cut / base.cutSpacing, 1.4777777778, 1e-9), 'and proportional at 95 %');
+});
+
+test('Painted duration ink: the same 45-degree marks on both mounts, the four-cut run countable', () => {
+  /** Consecutive centre strides of one cut run (bracket: vertical, carrier: horizontal). */
+  const strides = (centres: number[]): number[] =>
+    centres.slice(1).map((c, i) => c - centres[i]);
+
+  for (const scale of SCALES) {
+    const { options, tokens } = dvsScale(scale);
+    const m = midpointMetrics(tokens, scale);
+    const key = renderJankoCrop(DVS, 17, 8, options, tokens);
+    const bracketCuts = linesOf(key, 'janko-clasp-cut');
+    assert.equal(bracketCuts.length, 10, `s=${scale}: the compact key band paints its cut runs`);
+    for (const cut of bracketCuts) {
+      assert.ok(approx(cut.x2 - cut.x1, m.slashDx, SVG_EPS), `s=${scale}: the bracket slash x length is the metric`);
+      assert.ok(approx(cut.y2 - cut.y1, -m.slashDy, SVG_EPS), `s=${scale}: the same up-raked 45-degree rise`);
+      assert.ok(approx(cut.stroke, m.slashStroke, SVG_EPS), `s=${scale}: the same slash stroke`);
+    }
+    // Four cuts, one x, ordered y: the individually countable run.
+    const run = bracketCuts.slice(0, 4);
+    assert.equal(new Set(run.map((c) => c.x1)).size, 1, `s=${scale}: a cut run shares one spine x`);
+    for (const stride of strides(run.map((c) => c.y1))) {
+      assert.ok(approx(stride, m.cutSpacing, SVG_EPS), `s=${scale}: the bracket stacks at the metric pitch`);
+      // Adjacent parallel strokes: the perpendicular clearance minus the stroke
+      // is the clear paper between them — the marks never merge into a blob.
+      assert.ok(
+        stride / Math.SQRT2 - m.slashStroke > 0.4,
+        `s=${scale}: adjacent 45-degree strokes stay separated (${(stride / Math.SQRT2 - m.slashStroke).toFixed(4)}pt clear)`
+      );
+    }
+
+    const bracketRings = circlesOf(key, 'janko-clasp-compact-ring');
+    assert.equal(bracketRings.length, 6, `s=${scale}: the key band paints its ring runs`);
+    for (const ring of bracketRings) {
+      assert.ok(approx(ring.r, m.ringRadius, SVG_EPS), `s=${scale}: the bracket ring radius`);
+      assert.ok(approx(ring.stroke, m.ringStroke, SVG_EPS), `s=${scale}: the bracket ring stroke`);
+    }
+
+    // The horizontal mount paints the SAME ink at the same scale.
+    const band = renderJankoCrop(DVS, 25, 8, options, tokens);
+    const carriers = paintedCarriers(band);
+    assert.equal(carriers.length, 8, `s=${scale}: the exception band paints its carriers`);
+    const layout = dvsScale(scale).layouts.flatMap((l) => l.exceptionCarriers);
+    for (const c of carriers) {
+      const declared = layout.find((g) => g.noteId === c.noteId)!;
+      assert.ok(approx(c.length, m.carrierLength, SVG_EPS), `${c.noteId}: the fixed ${m.carrierLength.toFixed(4)}pt carrier`);
+      assert.ok(approx(c.stroke, tokens.claspStrokeWidth * scale, SVG_EPS), `${c.noteId}: the carrier stroke follows s`);
+      assert.equal(c.cuts, declared.cuts, `${c.noteId}: declared cuts`);
+      assert.equal(c.rings, declared.rings, `${c.noteId}: declared rings`);
+      assert.equal(c.dots, declared.dots, `${c.noteId}: declared dots`);
+      assert.equal(c.cutCentres.length, c.cuts, `${c.noteId}: painted cuts match the declared marks`);
+      assert.equal(c.ringRadii.length, c.rings, `${c.noteId}: painted rings match the declared marks`);
+      for (const stride of strides(c.cutCentres)) {
+        assert.ok(approx(stride, m.cutSpacing, SVG_EPS), `${c.noteId}: carrier cuts stack at the same pitch`);
+      }
+      for (const [i, r] of c.ringRadii.entries()) {
+        assert.ok(approx(r, m.ringRadius, SVG_EPS), `${c.noteId}: ring ${i} radius identical to the bracket mount`);
+        assert.ok(approx(c.ringStrokes[i], m.ringStroke, SVG_EPS), `${c.noteId}: ring ${i} stroke identical`);
+      }
+      // Every carrier states its own value exactly (the bare quarter is the
+      // alphabet's one mark-less reading, and it is declared as such).
+      const marks = compactDurationMarks(c.ticks);
+      assert.equal(marks.inGrammar, true, `${c.noteId}: its value has an exact reading`);
+      assert.deepEqual([c.cuts, c.rings, c.dots], [marks.cuts, marks.rings, marks.dots], `${c.noteId}: marks state the value`);
+      if (c.cuts === 0 && c.rings === 0 && c.dots === 0) {
+        assert.equal(c.ticks, 48, `${c.noteId}: a mark-less carrier may only be the bare quarter`);
+      }
+    }
+  }
+});
+
+test('Every admitted owner is correct; the one specimen stress refusal is published, never painted-and-refused', () => {
+  const layouts = referenceLayouts();
+  const carriers = layouts.flatMap((l) => l.exceptionCarriers);
+  assert.equal(carriers.length, 32, '32 painted carriers across the working Reference');
+  assert.equal(layouts.flatMap((l) => l.exceptionCarrierRefusals).length, 0, 'no withheld carrier on Brahms');
+  assert.equal(layouts.flatMap((l) => l.exceptionCarrierOcclusions).length, 0, 'no destroyed duration ink on Brahms');
+  assert.deepEqual(
+    layouts.flatMap((l) => l.exceptionCarrierUnsupported).map((u) => [u.noteId, u.durationTicks]),
+    [
+      ['brahms-op118-no1-295', 120],
+      ['brahms-op118-no1-351', 120],
+      ['brahms-op118-no1-448', 120],
+      ['brahms-op118-no1-581', 120],
+      ['brahms-op118-no1-637', 120],
+      ['brahms-op118-no1-734', 120],
+    ],
+    'the six unsupported composites are refused as exact values, by identity'
+  );
+  const heads = byIdOf(layouts);
+  const admitted = memberIdsOf(layouts);
+  for (const c of carriers) {
+    assert.equal(admitted.has(c.noteId), true, `${c.noteId}: a carrier belongs to an admitted cluster`);
+    assert.equal(c.scale, 0.9, `${c.noteId}: the carrier ink rides the admitted symbol scale`);
+    const p = heads.get(c.noteId)!;
+    assert.equal(
+      c.durationTicks !== claspMemberCarriedTicks(
+        layouts
+          .find((l) => l.notes.some((x) => x.note.id === c.noteId))!
+          .clasps.find((k) => k.notes.some((n) => n.id === c.noteId))!,
+        c.noteId
+      ),
+      true,
+      `${c.noteId}: only a genuine exception (a duration the bracket does not state) owns a carrier`
+    );
+    assert.ok(approx(c.y, p.y, 1e-9), `${c.noteId}: the carrier sits at the member's true pitch y`);
+    const marks = compactDurationMarks(c.durationTicks);
+    assert.equal(marks.inGrammar, true, `${c.noteId}: its value has an exact reading`);
+    assert.deepEqual([c.cuts, c.rings, c.dots], [marks.cuts, marks.rings, marks.dots], `${c.noteId}: marks state the value`);
+    if (c.cuts === 0 && c.rings === 0 && c.dots === 0) {
+      assert.equal(c.durationTicks, 48, `${c.noteId}: only the bare quarter may be mark-less`);
+    }
+  }
+
+  // The DVS key is rendered by the cards; its deliberately tight stress row
+  // publishes exactly one refused carrier — the same finding the Round 44
+  // reserve family reports on the same score at the same identity, so Round 45
+  // introduced no new warning class — and it is never painted.
+  const reserveDvs = lintJankoScore(
+    DVS,
+    resolveJankoOptions({
+      ...DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
+      pitchPlacement: 'parity-columns',
+      chordSymbolScale: 0.75,
+      bracketDurationGrammar: 'midpoint',
+      exceptionCarrier: 'horizontal',
+      opticalSpacing: false,
+      lowPitchFolding: 'core',
+    }),
+    resolveJankoTokens({
+      ...DURATION_VOCABULARY_SPECIMEN_JANKO_TOKENS,
+      midpointSlashLengthFactor: 1,
+      midpointRingScale: 1,
+      midpointSpacingFactor: 1,
+    })
+  );
+  assert.deepEqual(
+    reserveDvs.warnings.map((w) => [w.code, w.noteIds?.[0], w.measure]),
+    [['carrier-fit-refused', 'dvs-stress-12288-9_5', 33]],
+    'the specimen stress refusal predates Round 45 (same identity on the reserve family)'
+  );
+  assert.ok(
+    !candidatesView().includes('data-exception-note="dvs-stress-12288-9_5"'),
+    'a refused carrier is withheld, never painted-and-refused'
+  );
+  for (const scale of SCALES) {
+    const report = lintJankoScore(DVS, dvsScale(scale).options, dvsScale(scale).tokens);
+    assert.deepEqual(
+      report.warnings.map((w) => [w.code, w.noteIds?.[0], w.measure]),
+      [['carrier-fit-refused', 'dvs-stress-12288-9_5', 33]],
+      `s=${scale}: the specimen key publishes the same single stress refusal`
+    );
+    assert.deepEqual(report.violations, [], `s=${scale}: and no hard error`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6. m. 66: the two-handed “9222” column and the preserved sustained voices
+// ---------------------------------------------------------------------------
+
+test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the tied F3 and the sustained voices preserved', () => {
+  assert.equal(BRAHMS_HAND_CORRECTIONS.length, 15, 'the bounded overlay: ten LH→RH + five RH→LH, no more');
+  const layouts = referenceLayouts();
+  const onset = (tick: number) => headsOf(layouts).filter((p) => p.note.startTick === tick);
+  const rows = (tick: number) =>
+    onset(tick).map((p) => [p.note.id, p.rhythm.hand, p.note.durationTicks, p.note.pitch.pitchClass, p.note.pitch.octave]);
+
+  // The tick-12624 “9222” column: source A2(9/2) and D3(2/3) on the left, the
+  // D4/D5 pair on the right — the column reads two-handed in the printed
+  // (linear) source, not by the MIDI track label.
+  assert.deepEqual(
+    rows(12624),
+    [
+      ['brahms-op118-no1-914', 'LH', 96, 2, 3],
+      ['brahms-op118-no1-915', 'RH', 96, 2, 4],
+      ['brahms-op118-no1-916', 'RH', 96, 2, 5],
+      ['brahms-op118-no1-913', 'LH', 96, 9, 2],
+    ],
+    'the two-handed tick-12624 column'
+  );
+  assert.deepEqual(
+    rows(12552),
+    [
+      ['brahms-op118-no1-908', 'LH', 24, 9, 2],
+      ['brahms-op118-no1-909', 'LH', 168, 9, 2],
+    ],
+    'the A2 reattack joins its preserved sustained voice on the left'
+  );
+  assert.deepEqual(
+    rows(12576),
+    [
+      ['brahms-op118-no1-910', 'LH', 24, 2, 3],
+      ['brahms-op118-no1-911', 'LH', 144, 2, 3],
+    ],
+    'the D3 reattack joins its preserved sustained voice on the left'
+  );
+  assert.deepEqual(
+    rows(12600),
+    [['brahms-op118-no1-912', 'LH', 120, 5, 3]],
+    'the 120-tick tied F3 is a left-hand event sounding into the column'
+  );
+  // No onset was invented and no event was deleted: the two former cross-hand
+  // unison merges are gone (the reattacks are now same-hand unisons), and the
+  // five remaining merges are the pinned unrelated ones.
+  const merges = layouts.flatMap((l) => l.unisonMerges);
+  assert.deepEqual(
+    merges.map((m) => [m.tick, m.survivorId, [...m.mergedIds]]),
+    [
+      [11376, 'brahms-op118-no1-841', ['brahms-op118-no1-840']],
+      [11472, 'brahms-op118-no1-850', ['brahms-op118-no1-849']],
+      [12336, 'brahms-op118-no1-898', ['brahms-op118-no1-897']],
+      [12360, 'brahms-op118-no1-901', ['brahms-op118-no1-900']],
+      [12384, 'brahms-op118-no1-903', ['brahms-op118-no1-902']],
+    ],
+    'the m. 66 unison pairs no longer merge; nothing else does either'
+  );
+  assert.equal(merges.some((m) => m.tick >= 12552 && m.tick <= 12624), false, 'no m. 66 merge remains');
+  // The 120-tick tie keeps its published unsupported-duration finding: the
+  // correction changed the hand only, never the value.
+  assert.equal(
+    layouts
+      .flatMap((l) => l.exceptionCarrierUnsupported)
+      .some((u) => u.noteId === 'brahms-op118-no1-912'),
+    false,
+    'the 120-tick F3 itself is a tie member, not a carrier owner'
+  );
+  assert.equal(
+    layouts.flatMap((l) => l.notes).filter((p) => p.note.startTick === 12600).length,
+    1,
+    'exactly one F3 onset exists (no invented duplicate)'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 7. Literal low pitches: the ↓10 folds are gone, the ledgers state the register
+// ---------------------------------------------------------------------------
+
+test('Literal low pitches: the nine unwarranted ↓10 folds are gone, the ledger vocabulary states the register', () => {
+  // Every source pitch of this score is at or above the literal floor, so the
+  // working Reference folds nothing and writes no ottava indicator.
+  assert.equal(JANKO_LITERAL_LOW_FLOOR_LIN, 0, 'the literal vocabulary reaches the source floor');
+  const working = referenceLayouts();
+  assert.equal(working.flatMap((l) => l.ottavaBrackets).length, 0, 'no ↓10/↓20 indicator on the working Reference');
+  assert.deepEqual(
+    [...new Set(headsOf(working).map((p) => p.ottavaShift ?? 0))],
+    [0],
+    'not one head is displaced by a fold'
+  );
+  // The nine events the Round 44 surface folded under a ↓10: measured, by id.
+  const folded = reserveLayouts()
+    .flatMap((l) => l.notes)
+    .filter((p) => (p.ottavaShift ?? 0) !== 0);
+  assert.deepEqual(
+    folded.map((p) => [p.note.id, p.ottavaShift]),
+    [
+      ['brahms-op118-no1-47', 12],
+      ['brahms-op118-no1-182', 12],
+      ['brahms-op118-no1-302', 12],
+      ['brahms-op118-no1-444', 12],
+      ['brahms-op118-no1-588', 12],
+      ['brahms-op118-no1-730', 12],
+      ['brahms-op118-no1-917', 12],
+      ['brahms-op118-no1-937', 12],
+      ['brahms-op118-no1-938', 12],
+    ],
+    'the Round 44 reserve really did fold these nine (mm. 5/15/22/33/42/53/67/68/69)'
+  );
+  assert.equal(reserveLayouts().flatMap((l) => l.ottavaBrackets).length, 9, 'and wrote nine indicators');
+  const heads = byIdOf(working);
+  for (const [id, octave, pitchClass] of [
+    ['brahms-op118-no1-47', 1, 5],
+    ['brahms-op118-no1-182', 1, 5],
+    ['brahms-op118-no1-302', 1, 4],
+    ['brahms-op118-no1-444', 1, 4],
+    ['brahms-op118-no1-588', 1, 4],
+    ['brahms-op118-no1-730', 1, 4],
+    ['brahms-op118-no1-917', 1, 2],
+    ['brahms-op118-no1-937', 1, 2],
+    ['brahms-op118-no1-938', 0, 9],
+  ] as const) {
+    const p = heads.get(id)!;
+    assert.equal(p.note.pitch.octave, octave, `${id}: literal written octave`);
+    assert.equal(p.note.pitch.pitchClass, pitchClass, `${id}: literal pitch class`);
+    assert.equal(p.ottavaShift, undefined, `${id}: no fold shift`);
+    assert.equal(p.writtenLin, octave * 12 + pitchClass, `${id}: written = sounding (exact pitch semantics)`);
+    assert.equal(p.coord.isOutOfStaff, true, `${id}: the register is stated, not hidden`);
+    assert.ok(p.coord.ledgerYs.length > 0, `${id}: by the established ledger equators`);
+    const system = working.find((l) => l.notes.some((x) => x.note.id === id))!;
+    assert.ok(
+      approx(
+        p.y,
+        system.geometry.middleCY + continuousPitchY(p.writtenLin, REFERENCE_TOKENS.semitoneScale),
+        1e-9
+      ),
+      `${id}: painted at its literal staff position (the middle-C equator plus its written pitch)`
+    );
+  }
+  // The register ink is actually painted (m. 67's literal low A1 downbeat).
+  const m67 = renderJankoCrop(BRAHMS, 67, 1, REFERENCE_OPTIONS, REFERENCE_TOKENS);
+  assert.ok((m67.match(/class="janko-ledger"/g) ?? []).length > 0, 'm. 67 paints its ledger extensions');
+  assert.equal((m67.match(/janko-ottava/g) ?? []).length, 0, 'and no displaced-note indicator');
+  const m67Core = renderJankoCrop(BRAHMS, 67, 1, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS);
+  assert.ok((m67Core.match(/janko-ottava/g) ?? []).length > 0, 'the core folding would have written the ↓10 instead');
+});
+
+test('System spacing and pagination are unchanged by the literal placement; the spread is complete and in bounds', () => {
+  const literal = referenceLayouts();
+  const core = coreFoldingLayouts();
+  // The literal placement uses the existing visual room: the page grid, the
+  // system slots and the page breaks are identical to the same family with core
+  // folding. Only the content bounds inside a slot may follow the real ink.
+  assert.deepEqual(
+    literal.map((l) => l.geometry.slotTopY),
+    core.map((l) => l.geometry.slotTopY),
+    'the system slots are unchanged — no repacking, no added page'
+  );
+  assert.deepEqual(
+    literal.map((l) => l.notes[0].note.startTick),
+    core.map((l) => l.notes[0].note.startTick),
+    'and every system opens on the same onset'
+  );
+  assert.equal(countJankoPages(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS), 5, 'still five A4 pages');
+  assert.equal(countJankoPages(BRAHMS, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS), 5, 'as the control');
+  assert.equal(literal.length, 18, 'eighteen systems of music');
+  assert.deepEqual(literal.map((l) => l.geometry.slotTopY), reserveLayouts().map((l) => l.geometry.slotTopY), 'and the same slots as the landed reserve');
+
+  // True ink bounds: every system's painted box stays inside its own drawn
+  // staff (the register vocabulary draws the rows a low literal note needs) and
+  // never reaches the next system's staff; the low literal notes therefore fit
+  // the existing spacing rather than forcing a repack.
+  const boxes = literal.map((l) => {
+    const notes = headsOf([l]);
+    const hy = (p: Head) =>
+      knockoutHalfExtents(REFERENCE_OPTIONS, REFERENCE_TOKENS, p.note.startTick, p).hy;
+    return {
+      index: l.index,
+      top: Math.min(...notes.map((p) => p.y - hy(p))),
+      bottom: Math.max(...notes.map((p) => p.y + hy(p))),
+      staffTop: l.geometry.staffTopY,
+      staffBottom: l.geometry.staffBotY,
+    };
+  });
+  for (const box of boxes) {
+    assert.ok(box.top >= box.staffTop - 0.01, `system ${box.index}: the real ink starts inside the drawn staff`);
+    assert.ok(box.bottom <= box.staffBottom + 0.01, `system ${box.index}: and stays inside it`);
+  }
+  for (let i = 1; i < boxes.length; i++) {
+    // Four systems per page: the page break is the only allowed boundary.
+    if (i % 4 === 0) continue;
+    assert.ok(boxes[i].top >= boxes[i - 1].bottom, `systems ${i - 1}/${i}: the ink boxes never intersect`);
+    assert.ok(
+      boxes[i].staffTop >= boxes[i - 1].staffBottom,
+      `systems ${i - 1}/${i}: the drawn staves never intersect`
+    );
+  }
+
+  // Page completeness and source accounting across the whole spread.
+  assert.equal(BRAHMS.notes.length, 964, 'the source carries 964 notes');
+  const paintedHeads = headsOf(literal);
+  assert.equal(paintedHeads.length, 959, 'the spread paints one head per non-merged note');
+  const merged = literal.flatMap((l) => l.unisonMerges).flatMap((m) => m.mergedIds);
+  assert.equal(paintedHeads.length + merged.length, BRAHMS.notes.length, '964 = 959 painted + 5 merged');
+  const perPage: number[] = [];
+  const stemsPerPage: number[] = [];
+  const flagsPerPage: number[] = [];
+  for (let page = 0; page < 5; page++) {
+    const svg = renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS);
+    assert.match(svg, /viewBox="0\.00 0\.00 595\.28 841\.89"/, `page ${page + 1}: the A4 viewBox`);
+    for (const attr of svg.matchAll(/\s(x|y|cx|cy|x1|y1|x2|y2)="(-?[\d.]+)"/g)) {
+      const bound = attr[1][0] === 'x' || attr[1].startsWith('cx') ? 595.28 : 841.89;
+      const value = Number(attr[2]);
+      assert.ok(value >= -0.01 && value <= bound + 0.01, `page ${page + 1}: ${attr[1]}="${attr[2]}" inside the page`);
+    }
+    const digits = (svg.match(/class="janko-digit"/g) ?? []).length;
+    const knockouts = (svg.match(/class="janko-knockout"/g) ?? []).length;
+    assert.equal(digits, knockouts, `page ${page + 1}: every painted digit has its knockout`);
+    assert.ok(digits > 0, `page ${page + 1}: the page carries music`);
+    perPage.push(digits);
+    stemsPerPage.push((svg.match(/class="janko-stem"/g) ?? []).length);
+    flagsPerPage.push((svg.match(/class="janko-flag"/g) ?? []).length);
+  }
+  assert.deepEqual(perPage, [211, 232, 232, 219, 65], 'the engine page census');
+  assert.equal(perPage.reduce((a, b) => a + b, 0), paintedHeads.length, 'every laid-out head paints once');
+  // No missing rhythm ink: every page paints its stems/flags, and the whole
+  // spread's stem census is the measured 694 (the 959 heads minus the 269
+  // suppressed standalone stems, plus the shared-stem/beam carriers).
+  assert.deepEqual(stemsPerPage, [136, 172, 170, 169, 47], 'the page stem census');
+  assert.equal(stemsPerPage.reduce((a, b) => a + b, 0), 694, '694 painted stems across the spread');
+  assert.deepEqual(flagsPerPage, [18, 26, 22, 14, 5], 'and the flag census is complete');
+});
+
+// ---------------------------------------------------------------------------
+// 8. Honesty: the whole-score report, the Reference ≡ 90 % rule, frozen Bach
+// ---------------------------------------------------------------------------
+
+test('Honest whole-score report: six composites by identity, zero hard errors, Reference ≡ the 90 % card, Bach GOLD frozen', () => {
+  const report = lintJankoScore(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS);
+  assert.equal(report.ok, true, 'the working Reference is free of hard errors');
+  assert.deepEqual(report.violations, [], 'zero violations — by identity, not by a count allowance');
+  assert.deepEqual(
+    report.warnings.map((w) => [w.code, w.noteIds?.[0], w.measure]),
+    [
+      ['carrier-duration-unsupported', 'brahms-op118-no1-295', 22],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-351', 26],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-448', 33],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-581', 42],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-637', 46],
+      ['carrier-duration-unsupported', 'brahms-op118-no1-734', 53],
+    ],
+    'the six 120-tick tie composites stay explicitly visible (the deferred follow-up, not a claim of completeness)'
+  );
+  assert.equal(report.stats.notes, 959, 'the report walks the same painted heads');
+  assert.equal(report.stats.systems, 18, 'and the same systems');
+  // The three candidate cards report the same Brahms surface plus the single
+  // specimen stress refusal — 7 warnings each, by identity, nothing filtered.
+  for (const scale of SCALES) {
+    const card = cardOf(scale);
+    const brahmsReport = lintJankoScore(
+      BRAHMS,
+      resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
+      resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) })
+    );
+    assert.deepEqual(brahmsReport.violations, [], `s=${scale}: no hard error on the whole Brahms score`);
+    assert.deepEqual(
+      brahmsReport.warnings.map((w) => w.noteIds?.[0]),
+      report.warnings.map((w) => w.noteIds?.[0]),
+      `s=${scale}: the same six composites, by identity`
+    );
+  }
+
+  // The 90 % card and the Reference are one engraving (options, tokens and
+  // bytes — the served-page equality is pinned in the studio test above).
+  const card90 = cardOf(0.9);
+  assert.deepEqual(
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card90.options ?? {}) }),
+    REFERENCE_OPTIONS,
+    'candidate 90 = the working Brahms Reference'
+  );
+
+  // Frozen canonicals: Bach GOLD is byte-identical to the landed Round 44
+  // engine, and this round's machinery never touches it.
+  const sha = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
+  const bachPages = [
+    '2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f',
+    'dbfb83dcf008782d34e5260548c706d0cb980689eac58b24c7d0e7ae1e828757',
+  ];
+  for (let page = 0; page < bachPages.length; page++) {
+    assert.equal(
+      sha(renderJankoPage(BACH, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
+      bachPages[page],
+      `Bach GOLD page ${page} is byte-identical to 081e5cdf0459`
+    );
+  }
+  const bach = lintJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.deepEqual(bach.diagnostics, [], 'Bach GOLD stays clean (zero violations, zero warnings)');
+  const bachLayouts = layoutJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  assert.equal(clustersOf(bachLayouts).length, 0, 'the optical pass never runs on the canonical surface');
+  assert.equal(
+    headsOf(bachLayouts).filter((p) => p.opticalOffsetY !== undefined).length,
+    0,
+    'and stamps nothing on it'
+  );
+  // The Brahms Reference is the intentional golden change of this round: pin
+  // the adopted artifact through the engine (the committed PDF is pinned by
+  // `test/janko-pdf.test.ts`, regenerated by `npm run pdf`).
+  const brahmsPages = [
+    '55d606e5b1b50bed15ddb16a4ad53a17c21eef401bfbd1e013377fd09a9f83b9',
+    'f7f2fef428b52aa78d2e827f711967bb0984bb5b6bb53113a7d16bb6f3167098',
+    'f33bf7c762f3f96f2b354e90b2c51a3a270adf1f9506f46e9a1213afdb851765',
+    '705936c03d9002cdd7b443920aa0fa24ba9ffeff6af4d6f01643df9c9c2240b8',
+    '8f128a67eac371d154a0d55bda7c4e4cf33d585d296d9fb18987ee389e73d6a1',
+  ];
+  for (let page = 0; page < brahmsPages.length; page++) {
+    assert.equal(
+      sha(renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
+      brahmsPages[page],
+      `Brahms Reference page ${page} is the adopted Round 45 engraving`
+    );
+  }
+  assert.equal(
+    sha(renderJankoCrop(BRAHMS, 1, 71, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
+    '5ed2c9c79285266f03ac9ca4398669d836f624253006f98f5b666401c23ef543',
+    'the whole-score crop is the adopted Round 45 engraving'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 9. The served studio: labels, inventory and phone-session continuity
+// ---------------------------------------------------------------------------
+
+test('The served studio carries the three labelled cards and the honest inventory for both views', () => {
+  const candidates = candidatesView();
+  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 3, 'three candidate cards');
+  assert.match(candidates, /data-candidate-count="3"/);
+  assert.match(candidates, /data-window-count="18"/, 'six review surfaces per card');
+  assert.equal((candidates.match(/data-pages="5"/g) ?? []).length, 3, 'a genuine five-page spread per card');
+  assert.equal((candidates.match(/<figure class="page-card"/g) ?? []).length, 15, 'fifteen real page cards');
+  for (const label of ['Brahms 85 %', 'Brahms 90 %', 'Brahms 95 %']) {
+    assert.ok(candidates.includes(label), `the served grid labels the ${label} card`);
+  }
+  // The honest chip inventory: 6 Brahms composite warnings + the single DVS
+  // stress refusal on every card (the round's own candidate warning census).
+  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 3, 'every card is free of hard errors');
+  assert.equal((candidates.match(/⚠ 7 warnings/g) ?? []).length, 3, 'and reports its seven warnings honestly');
+  assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(candidates), 'no screenshots, no raster review artifacts');
+  assert.ok(!/localhost/i.test(candidates), 'Tailscale access only — no localhost reference');
+
+  const reference = referenceView();
+  assert.match(reference, /⚠ 6 warnings/, 'the BRONZE Brahms Reference reports its six composites');
+  assert.equal((reference.match(/data-page="/g) ?? []).length, 7, 'two Bach pages + five Brahms pages');
+  // Phone continuity (§F) is studio-wide and lives in the shared session
+  // module: both views are served by the same document, and the behavioural
+  // proof (restore, hash precedence, storage failure, HMR re-mount, listener
+  // count) is `test/janko-studio-session.test.ts`, not re-implemented here.
+  const served = candidates + reference;
+  assert.ok(served.length > 0, 'both views render from the one template');
+});

@@ -30,10 +30,13 @@ import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
+
 } from '../src/scores/brahms-op118-no1';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -67,8 +70,8 @@ import { ROUND_41_CANDIDATES } from './janko-round41.test';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
-const BRAHMS_OPTS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-const BRAHMS_TOKS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const BRAHMS_OPTS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+const BRAHMS_TOKS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 const BACH_OPTS = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const BACH_TOKS = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 
@@ -371,9 +374,9 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
   // The studio engraves a candidate window as **entry options + candidate
   // delta** (the Brahms goldens are that entry: mps 4, cut time, anacrusis).
   const optFor = (c: (typeof ROUND_41_CANDIDATES)[number]) =>
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(c.options ?? {}) });
+    resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, ...(c.options ?? {}) });
   const tokFor = (c: (typeof ROUND_41_CANDIDATES)[number]) =>
-    resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(c.tokens ?? {}) });
+    resolveJankoTokens({ ...BRAHMS_ROUND44_RESERVE_TOKENS, ...(c.tokens ?? {}) });
   const svg0 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[0]), tokFor(ROUND_41_CANDIDATES[0]));
   const svg1 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[1]), tokFor(ROUND_41_CANDIDATES[1]));
   const svg2 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[2]), tokFor(ROUND_41_CANDIDATES[2]));

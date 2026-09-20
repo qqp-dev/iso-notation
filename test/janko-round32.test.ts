@@ -36,10 +36,13 @@ import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
+
 } from '../src/scores/brahms-op118-no1';
+import {
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
 import {
   BRAHMS_STUDIO_SCORE_ID,
   brahmsWindow,
@@ -80,24 +83,24 @@ const BRAHMS = buildBrahmsOp118No1Score();
 const O_BACH = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const T_BACH = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 /** Studio Brahms golden: fixed-3, 4/system, 4/page — the canonical reference. */
-const O_BRAHMS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+const O_BRAHMS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+const T_BRAHMS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 /** Packing-only diagnostic: mps4, no correction, full grid. */
 const O_PACK = resolveJankoOptions({
-  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  ...BRAHMS_ROUND44_RESERVE_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: false,
   verticalPlacement: 'slot',
 });
 const O_CORR_ALL = resolveJankoOptions({
-  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  ...BRAHMS_ROUND44_RESERVE_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'all',
   verticalPlacement: 'slot',
 });
 const O_CORR_MID = resolveJankoOptions({
-  ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  ...BRAHMS_ROUND44_RESERVE_OPTIONS,
   measuresPerSystem: 4,
   correctPageTopAnacrusisMeasureWidth: true,
   gridPulseFilter: 'midpoint-only',
@@ -301,7 +304,7 @@ test('Candidates view: parked Round 32 renders two cards × four windows, Brahms
 // 2. Geometry: ticks, widths, correction, partial, crop/page agreement
 // ---------------------------------------------------------------------------
 
-test('System tick ranges: sys0 pickup + 4×192, sys1 follows; 964 events, 7 merges', () => {
+test('System tick ranges: sys0 pickup + 4×192, sys1 follows; 964 events, 5 merges', () => {
   assert.equal(countJankoSystems(BRAHMS, O_CORR_ALL, T_BRAHMS), 18, '18 systems at 4/system');
   assert.equal(BRAHMS.notes.length, 964, '964 underlying score events');
   assert.equal(BRAHMS.totalTicks, 13632);
@@ -321,8 +324,23 @@ test('System tick ranges: sys0 pickup + 4×192, sys1 follows; 964 events, 7 merg
   const positioned = layouts.flatMap((l) => l.notes).length;
   const merges = layouts.flatMap((l) => l.unisonMerges);
   const mergedIds = merges.flatMap((m) => m.mergedIds).length;
-  assert.equal(merges.length, 7, 'the existing 7 cross-hand unison merges');
-  assert.equal(positioned, 957, '957 physical noteheads');
+  // Round 45 — five, not seven: the authorized m. 66 RH → LH correction makes
+  // the low A2 (t12552) / D3 (t12576) reattacks same-hand unisons with the
+  // preserved sustained tie-wait voices, so those two former cross-hand merges
+  // are gone and both voices paint (959 = 964 − 5). The remaining five
+  // cross-hand unisons are pinned by identity, not by count alone.
+  assert.deepEqual(
+    merges.map((m) => [m.tick, m.survivorId]),
+    [
+      [11376, 'brahms-op118-no1-841'],
+      [11472, 'brahms-op118-no1-850'],
+      [12336, 'brahms-op118-no1-898'],
+      [12360, 'brahms-op118-no1-901'],
+      [12384, 'brahms-op118-no1-903'],
+    ],
+    'the five cross-hand unison merges, by exact identity'
+  );
+  assert.equal(positioned, 959, '959 physical noteheads');
   assert.equal(positioned + mergedIds, 964, 'every score event accounted for once');
   const seen = new Set<string>();
   for (const l of layouts) {
@@ -410,12 +428,12 @@ test('Correction preserves slot verticals; no pickup repeats; generic opt-in', (
   }
   // Non-four-measure packing corrects generically (mps3: 543.48/3.25 → /3).
   const o3n = resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     measuresPerSystem: 3,
     correctPageTopAnacrusisMeasureWidth: false,
   });
   const o3c = resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     measuresPerSystem: 3,
     correctPageTopAnacrusisMeasureWidth: true,
   });
@@ -505,9 +523,9 @@ test('Paired crop mm. 57–64 retains the page-relative inter-system gap', () =>
 // ---------------------------------------------------------------------------
 
 test('Omitted and explicit all are byte-identical canonical output', () => {
-  const oOmitted = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, measuresPerSystem: 4 });
+  const oOmitted = resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, measuresPerSystem: 4 });
   const oExplicit = resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     measuresPerSystem: 4,
     gridPulseFilter: 'all',
   });
@@ -571,7 +589,7 @@ test('192/48 lattice: midpoint-only keeps offset 96, drops 48/144; music untouch
     assert.equal(lM[s].beams.length, lA[s].beams.length, `sys${s} beams untouched`);
     assert.equal(lM[s].rests.length, lA[s].rests.length, `sys${s} rests untouched`);
   }
-  assert.equal(notes, 957, 'all noteheads compared');
+  assert.equal(notes, 959, 'all noteheads compared (the m. 66 correction paints both unison voices)');
 });
 
 test('Retained pulses equal solved-column twins; grid edge cases preserved', () => {
@@ -600,7 +618,7 @@ test('Retained pulses equal solved-column twins; grid edge cases preserved', () 
   for (const x of mid17) assert.ok(all17.includes(x));
   // Odd subdivision (144/48: offsets 48/96, half 72 absent) yields empty set.
   const oddO = resolveJankoOptions({
-    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    ...BRAHMS_ROUND44_RESERVE_OPTIONS,
     measuresPerSystem: 4,
     correctPageTopAnacrusisMeasureWidth: true,
     gridPulseFilter: 'midpoint-only',
@@ -738,8 +756,8 @@ test('Canonical frozen: Bach 0/0, Brahms studio clean, adaptive solver 2, defaul
   assert.equal(studio.warnings.length, 0);
   const solver = lintJankoScore(
     BRAHMS,
-    { ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' },
-    BRAHMS_OP118_NO1_JANKO_TOKENS
+    { ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' },
+    BRAHMS_ROUND44_RESERVE_TOKENS
   );
   assert.equal(solver.violations.length, 2, 'adaptive solver 2 at canonical packing (historical surface, not the CLI)');
   assert.equal(solver.warnings.length, 0);

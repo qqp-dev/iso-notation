@@ -56,6 +56,7 @@
 import { QuantizedGridScore } from '../../model/types';
 import {
   DEFAULT_JANKO_TOKENS,
+  JANKO_LITERAL_LOW_FLOOR_LIN,
   JankoLayoutOptions,
   JankoPageGeometry,
   JankoSystemStartStyle,
@@ -80,8 +81,10 @@ import {
   knockoutHalfExtents,
   layoutJankoScore,
   nearestLatticeRow,
+  paintedFacingGap,
   renderSystem,
   suppressedStemIds,
+  systemPaintedInkBoxes,
 } from './engine';
 import { getBarStaffSegments, getEquatorRuleYs, outlierLedgerSpans, pitchGridRules } from './elements/staff';
 import {
@@ -2077,10 +2080,29 @@ export function resolveAllocatedPageSlots(
  * alongside its two grandfathered findings — not newly gated here).
  */
 /**
- * Content-aware page fit: every system's ink stays inside the page's
- * occupied slot block, and consecutive facing inks clear by at least
+ * Content-aware page fit: every system's **painted** ink stays inside its page
+ * body, and consecutive **facing** inks clear by at least
  * {@link CONTENT_AWARE_MIN_FACING_GAP}. Slot bounds do not apply — the
  * placement distributes from ink, so the audit measures ink.
+ *
+ * Round 45 makes the measured ink *real* (`systemPaintedInkBoxes`) instead of
+ * the worst-case pitch-window reserve (`staffTopY`/`staffBotY`), because a
+ * **reserved envelope crossing a limit is not a visible collision**:
+ *
+ * 1. **Page bound** — the bound painted ink must respect is the page body
+ *    (`pageHeight − marginBottom − footerHeight`). On a page whose slots are
+ *    all occupied that is exactly the old occupied-block bottom, so full pages
+ *    are gated precisely as before; on a sparse page the last system's genuine
+ *    ink may use that page's own trailing space — the same allowance the
+ *    allocated-slot convention grants non-content-aware pages. Ink past the
+ *    paper is still a hard finding, and nothing is ever clipped.
+ * 2. **Facing** — the clearance is measured between inks that can actually
+ *    meet (`paintedFacingGap`: the pair that overlaps horizontally), and the
+ *    report names both exact objects with their boxes. The requirement itself
+ *    is unchanged ({@link CONTENT_AWARE_MIN_FACING_GAP}); a y-band comparison of
+ *    horizontally disjoint inks could only ever measure the margin furniture
+ *    against a neighbour's mid-measure beam, which is not a crowding the reader
+ *    can see.
  */
 export function checkContentAwarePageFit(
   layouts: readonly JankoSystemLayout[],
@@ -2102,10 +2124,12 @@ export function checkContentAwarePageFit(
   for (const [pageIndex, systems] of byPage) {
     const ordered = [...systems].sort((a, b) => a.index - b.index);
     const contentTop = Math.min(...ordered.map((l) => l.geometry.slotTopY));
-    const contentBottom = Math.max(
-      ...ordered.map((l) => l.geometry.slotTopY + page.slotHeight)
-    );
-    const extents = ordered.map((l) => systemInkExtents(l, t, lint, o));
+    const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
+    const boxes = ordered.map((l) => systemPaintedInkBoxes(l, o, t));
+    const extents = boxes.map((bs) => ({
+      top: Math.min(...bs.map((b) => b.y0)),
+      bottom: Math.max(...bs.map((b) => b.y1)),
+    }));
     const first = extents[0];
     const last = extents[extents.length - 1];
     if (first.top < contentTop - EPS) {
@@ -2120,31 +2144,41 @@ export function checkContentAwarePageFit(
         metrics: { inkTop: first.top, blockTop: contentTop },
       });
     }
-    if (last.bottom > contentBottom + EPS) {
+    if (last.bottom > bodyBottom + EPS) {
       out.push({
         code: 'system-slot-overlap',
         severity: 'error',
         message:
           `System ${ordered[ordered.length - 1].index + 1}'s ink reaches down to y=${last.bottom.toFixed(2)}, ` +
-          `past page ${pageIndex + 1}'s block bottom ${contentBottom.toFixed(2)}.`,
+          `past page ${pageIndex + 1}'s body bottom ${bodyBottom.toFixed(2)} ` +
+          `(paper ${page.pageHeight.toFixed(2)}, margin ${page.marginBottom.toFixed(2)}, ` +
+          `footer ${page.footerHeight.toFixed(2)}).`,
         system: ordered[ordered.length - 1].index,
         y: last.bottom,
-        metrics: { inkBottom: last.bottom, blockBottom: contentBottom },
+        metrics: { inkBottom: last.bottom, bodyBottom, pageHeight: page.pageHeight },
       });
     }
     for (let i = 1; i < ordered.length; i++) {
-      const gap = extents[i].top - extents[i - 1].bottom;
-      if (gap >= CONTENT_AWARE_MIN_FACING_GAP - EPS) continue;
+      const facing = paintedFacingGap(boxes[i - 1], boxes[i]);
+      if (!Number.isFinite(facing.gap) || facing.gap >= CONTENT_AWARE_MIN_FACING_GAP - EPS) continue;
+      const detail = (b: typeof facing.upper): string =>
+        b === null ? 'no ink' : `${b.what} [${b.x0.toFixed(1)},${b.x1.toFixed(1)}]×[${b.y0.toFixed(2)},${b.y1.toFixed(2)}]`;
       out.push({
         code: 'system-slot-overlap',
         severity: 'error',
         message:
           `Systems ${ordered[i - 1].index + 1}/${ordered[i].index + 1} face across ` +
-          `y=${extents[i].top.toFixed(2)} with ${gap.toFixed(2)}pt, below the ` +
-          `${CONTENT_AWARE_MIN_FACING_GAP.toFixed(2)}pt facing minimum.`,
+          `y=${facing.lower === null ? 'n/a' : facing.lower.y0.toFixed(2)} with ${facing.gap.toFixed(2)}pt ` +
+          `(${detail(facing.upper)} above ${detail(facing.lower)}), below the ` +
+          `${CONTENT_AWARE_MIN_FACING_GAP.toFixed(2)}pt real-ink facing minimum.`,
         system: ordered[i].index,
-        y: extents[i].top,
-        metrics: { gap, minimum: CONTENT_AWARE_MIN_FACING_GAP },
+        y: facing.lower === null ? extents[i].top : facing.lower.y0,
+        metrics: {
+          gap: facing.gap,
+          minimum: CONTENT_AWARE_MIN_FACING_GAP,
+          upperBottom: facing.upper?.y1 ?? Number.NaN,
+          lowerTop: facing.lower?.y0 ?? Number.NaN,
+        },
       });
     }
   }
@@ -4957,6 +4991,17 @@ export function checkOttavaCoverage(
 /**
  * Enforce core±1 extensions: extensions must not exceed core±1 octave,
  * and notes beyond core±1 must fold instead of extending further.
+ *
+ * Round 45: `lowPitchFolding: 'literal'` deliberately draws a **low** source
+ * pitch at its literal written pitch — the octave is never displaced and no
+ * ↓10/↓20 indicator is emitted — and states the register with the established
+ * dynamic ledger equators (the same vocabulary the twin-row layouts use for an
+ * out-of-staff octave). Such a note is legal exactly while the vocabulary can
+ * state it: it must actually carry those equators, it must be a *low* pitch
+ * (high pitches keep folding), and it must stay inside the vocabulary's
+ * two-octave reach ({@link JANKO_LITERAL_LOW_FLOOR_LIN}) — below that floor the
+ * note still has to fold. Everything else in this check is unchanged, so the
+ * allowance is bounded and can never hide an unstated register.
  */
 export function checkOttavaExtensions(
   layout: JankoSystemLayout,
@@ -4986,8 +5031,22 @@ export function checkOttavaExtensions(
     }
   }
 
+  const literalLow = o.lowPitchFolding === 'literal';
   for (const p of layout.notes) {
     const wLin = p.writtenLin;
+    if (
+      literalLow &&
+      wLin !== undefined &&
+      wLin < minWritten &&
+      wLin >= JANKO_LITERAL_LOW_FLOOR_LIN &&
+      (p.ottavaShift === undefined || p.ottavaShift === 0) &&
+      p.coord.isOutOfStaff &&
+      p.coord.ledgerYs.length > 0
+    ) {
+      // Round 45 literal low pitch: not folded, register stated by the ledger
+      // equators of its own out-of-staff octave(s).
+      continue;
+    }
     if (wLin !== undefined && (wLin < minWritten || wLin > maxWritten)) {
       out.push({
         code: 'extension-beyond-core',

@@ -157,18 +157,37 @@ test('Brahms pagination arithmetic: 71 measures → 18 systems → 5 pages canon
   assert.ok(Math.max(...s0ticks) >= 48 + 3 * 192, 'system 1 reaches m. 4');
 });
 
-test('Brahms canonical lint record: fixed-3 clean on studio and CLI', () => {
-  // Canonical fixed-3 (the live Reference surface): zero violations, zero
-  // warnings. The CLI lints this same entry — studio, production commands
-  // and acceptance tests agree.
+test('Brahms canonical lint record: fixed-3 zero hard errors on studio and CLI, six composites published', () => {
+  // Canonical fixed-3 (the live Reference surface): zero hard errors and
+  // exactly the six published 120-tick composite refusals (the deferred
+  // tied/composite follow-up). The CLI lints this same entry — studio,
+  // production commands and acceptance tests agree.
+  const compositeIds = [
+    'brahms-op118-no1-295',
+    'brahms-op118-no1-351',
+    'brahms-op118-no1-448',
+    'brahms-op118-no1-581',
+    'brahms-op118-no1-637',
+    'brahms-op118-no1-734',
+  ];
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.violations.length, 0, 'canonical fixed-3: zero violations');
-  assert.equal(studio.warnings.length, 0, 'canonical fixed-3: zero warnings');
+  assert.deepEqual(
+    studio.warnings.map((w) => [w.code, w.noteIds?.[0]]),
+    compositeIds.map((id) => ['carrier-duration-unsupported', id]),
+    'canonical fixed-3: exactly the six composites, by identity'
+  );
   assert.equal(studio.ok, true, 'the BRONZE surface is honestly ok');
-  // The chip reads the clean count; diagnostics carry the ok line.
+  // The chip reads the honest count; diagnostics carry both counts and
+  // itemize every warning.
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
-  assert.match(brahms, /✓ zero violations/, 'the BRONZE chip reads clean');
+  assert.match(brahms, /⚠ 6 warnings/, 'the BRONZE chip reads the published count');
+  assert.match(brahms, /0 violations, 6 warnings/, 'and the ok line prints both counts');
+  assert.match(brahms, /Diagnostics \(6\)/, 'every warning is itemized');
+  for (const id of compositeIds) {
+    assert.ok(brahms.includes(id), `${id} is itemized by name`);
+  }
   // The CLI spread is this same const (see the single-source test below).
   const cli = lintJankoScore(
     BRAHMS,
@@ -176,7 +195,11 @@ test('Brahms canonical lint record: fixed-3 clean on studio and CLI', () => {
     resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS)
   );
   assert.equal(cli.violations.length, 0, 'CLI canonical: zero violations');
-  assert.equal(cli.warnings.length, 0, 'CLI canonical: zero warnings');
+  assert.deepEqual(
+    cli.warnings.map((w) => w.noteIds?.[0]),
+    compositeIds,
+    'CLI canonical: the same six composites'
+  );
 });
 
 test('Brahms pagination has one source of truth; every surface agrees', () => {
@@ -228,9 +251,16 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
   );
 });
 
-test('Brahms option diff is pagination/meter/grid/title-data only — rows/ink/grammar identical', () => {
+test('Brahms option diff is the pagination block plus the adopted Round 45 treatment — nothing else', () => {
   const brahms = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  // The pagination/meter/grid/title block was settled in earlier rounds; the
+  // Round 45 keys below are the operator's explicitly authorized working-
+  // Reference change (three candidates scored the same family at 0.85/0.90/
+  // 0.95; the 0.90 treatment was chosen): larger admitted-cluster symbols with
+  // declared centred optical spacing, the one 45-degree duration family on
+  // both mounts, horizontal carriers and literal low pitches. Every other key
+  // must still equal the golden master — the diff may never grow silently.
   const allowed = new Set([
     'ticksPerMeasure',
     'anacrusisTicks',
@@ -241,6 +271,12 @@ test('Brahms option diff is pagination/meter/grid/title-data only — rows/ink/g
     'title',
     'subtitle',
     'composer',
+    'pitchPlacement',
+    'chordSymbolScale',
+    'bracketDurationGrammar',
+    'exceptionCarrier',
+    'opticalSpacing',
+    'lowPitchFolding',
   ]);
   for (const key of Object.keys(golden) as Array<keyof typeof golden>) {
     if (allowed.has(key)) continue;
@@ -250,13 +286,60 @@ test('Brahms option diff is pagination/meter/grid/title-data only — rows/ink/g
       `Brahms layout option ${key} equals the golden master (rows/ink/grammar identical)`
     );
   }
+  // The six adopted keys, to the value (a drift back to the literal/golden
+  // grammar would pass the "allowed key" gate above without the operator's
+  // decision — so the values are pinned here too).
+  assert.deepEqual(
+    {
+      pitchPlacement: brahms.pitchPlacement,
+      chordSymbolScale: brahms.chordSymbolScale,
+      bracketDurationGrammar: brahms.bracketDurationGrammar,
+      exceptionCarrier: brahms.exceptionCarrier,
+      opticalSpacing: brahms.opticalSpacing,
+      lowPitchFolding: brahms.lowPitchFolding,
+    },
+    {
+      pitchPlacement: 'parity-columns',
+      chordSymbolScale: 0.9,
+      bracketDurationGrammar: 'midpoint',
+      exceptionCarrier: 'horizontal',
+      opticalSpacing: true,
+      lowPitchFolding: 'literal',
+    },
+    'the adopted Round 45 working treatment, at the operator-chosen 90 %'
+  );
   const brahmsT = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const goldenT = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  const allowedT = new Set(['ticksPerMeasure', 'anacrusisTicks']);
+  const allowedT = new Set([
+    'ticksPerMeasure',
+    'anacrusisTicks',
+    'midpointSlashLengthFactor',
+    'midpointRingScale',
+    'midpointSpacingFactor',
+    'opticalClearanceAir',
+  ]);
   for (const key of Object.keys(goldenT) as Array<keyof typeof goldenT>) {
     if (allowedT.has(key as string)) continue;
     assert.deepEqual(brahmsT[key], goldenT[key], `Brahms token ${key} equals the golden master`);
   }
+  // The Round 45 token ratios: slash centreline ×1.10, ring radius/stroke
+  // ×1.10, cut centre spacing ×7/6 (1.40 × the Round 44 `.75` baseline at
+  // 0.90) and the explicit 0.20pt vertical optical air.
+  assert.deepEqual(
+    {
+      midpointSlashLengthFactor: brahmsT.midpointSlashLengthFactor,
+      midpointRingScale: brahmsT.midpointRingScale,
+      midpointSpacingFactor: brahmsT.midpointSpacingFactor,
+      opticalClearanceAir: brahmsT.opticalClearanceAir,
+    },
+    {
+      midpointSlashLengthFactor: 1.1,
+      midpointRingScale: 1.1,
+      midpointSpacingFactor: 7 / 6,
+      opticalClearanceAir: 0.2,
+    },
+    'the adopted Round 45 readability ratios and optical air'
+  );
 });
 
 test('Reference completeness: Brahms systems 1–18 each render exactly once across the 5-page spread', () => {

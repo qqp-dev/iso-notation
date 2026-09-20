@@ -18,11 +18,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+  BRAHMS_ROUND44_RESERVE_OPTIONS,
+  BRAHMS_ROUND44_RESERVE_TOKENS,
+} from './brahms-round44-reserve';
+
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -50,9 +51,9 @@ const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const O_BACH = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
 const T_BACH = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-const O_BRAHMS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-const T_BRAHMS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-const O_ADAPTIVE = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
+const O_BRAHMS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
+const T_BRAHMS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
+const O_ADAPTIVE = resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' });
 
 /**
  * Canonical fixed-3 shifts (page pt, +down), systems 0-based.

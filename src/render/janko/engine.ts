@@ -44,7 +44,7 @@ import {
   JankoChannelFlank,
   JankoPitchCoordinate,
   JankoTickInsets,
-  computeFoldShift,
+  resolveFoldShift,
   continuousPitchY,
   getEquatorYForOctave,
   getMeasureIndexOfTick,
@@ -59,6 +59,7 @@ import {
 } from './geometry';
 import {
   JANKO_RHYTHM_STYLE_LABELS,
+  OPTICAL_DISPLACEMENT_CAP,
   JankoChordGrouping,
   JankoFoldPairPresentation,
   JankoLayoutOptions,
@@ -80,7 +81,9 @@ import {
 import {
   OttavaInkContext,
   buildSystemOttavaBrackets,
+  ottavaHookBox,
   ottavaLabelBox,
+  ottavaLineBox,
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
@@ -125,6 +128,7 @@ import {
   JankoClaspGroupGeometry,
   JankoClaspRailGeometry,
   JankoRhythmNote,
+  JankoStemGeometry,
   JankoVerticalChordGroup,
   BRACKET_RING_OUTER,
   CLASP_MARK_REACH,
@@ -199,6 +203,8 @@ import {
 import {
   MEASURE_NUMBER_LEFT_OFFSET,
   getMeasureNumberBaselineY,
+  gridBotY,
+  gridTopY,
   renderBarlines,
   renderBeatGrid,
   renderMeasureNumber,
@@ -311,14 +317,15 @@ export function computePageGeometry(
         measureWidth,
         o.core,
         t,
-        o.extensionJunction
+        o.extensionJunction,
+        o.lowPitchFolding
       );
 
       const writtenLins: number[] = [];
       for (const n of sysNotes) {
         const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
         const lin = n.pitch.octave * 12 + pc;
-        const shift = computeFoldShift(lin, o.core);
+        const shift = resolveFoldShift(lin, o.core, o.lowPitchFolding);
         writtenLins.push(lin + shift);
       }
 
@@ -590,6 +597,15 @@ export interface PositionedJankoNote {
   symbolScale?: number;
   /** Round 41: true when this head belongs to a same-hand co-onset chord. */
   symbolChord?: boolean;
+  /**
+   * Round 45: this head's **optical** vertical displacement (pt, page sign) —
+   * zero except for a member of an actually admitted bracket cluster whose
+   * masks needed the declared optical clearance. `y` already includes it; this
+   * field is the auditable number behind that painted position, never a
+   * musical transposition: the source pitch, the written pitch and the staff
+   * lattice are untouched.
+   */
+  opticalOffsetY?: number;
 }
 
 /**
@@ -1728,6 +1744,12 @@ export interface JankoSystemLayout {
    * lightweight fixtures stay valid; the engine always sets it.
    */
   railDiagnostics?: ThreeRailDiagnostic[];
+  /**
+   * Round 45: every applied **optical cluster** of the system (admitted
+   * clusters only, empty when `options.opticalSpacing` is off) — the measured
+   * record behind every `opticalOffsetY` on the system's heads.
+   */
+  opticalClusters?: JankoOpticalCluster[];
   /** Round 35: compressed clusters for semantic hand-cluster compression candidates. */
   compressedClusters?: JankoCompressedCluster<PositionedJankoNote>[];
   /** Note IDs whose noteheads are omitted/compressed (copies in spatial-echo or compact-coupling). */
@@ -2029,7 +2051,7 @@ export function positionJankoNote(
   const honor = isPositionOfHonor(note.startTick) && o.showHonorHalo;
   const pc = ((note.pitch.pitchClass % 12) + 12) % 12;
   const origLin = note.pitch.octave * 12 + pc;
-  const shift = computeFoldShift(origLin, o.core);
+  const shift = resolveFoldShift(origLin, o.core, o.lowPitchFolding);
   const writtenLin = origLin + shift;
   return {
     note,
@@ -3665,6 +3687,261 @@ export function fanParityColumns(
 }
 
 /**
+ * Round 45 — one member of an admitted bracket cluster, as the **optical
+ * spacing** metric sees it: its true source pitch, its painted centre y, its
+ * own mask extents and the intended parity **column** (rail) the horizontal
+ * layout gives it. The member is never transposed by this pass; only its y is
+ * displaced, and only as optical position metadata.
+ */
+export interface JankoOpticalMember {
+  id: string;
+  /** True (source) linear pitch — the musical identity of the level. */
+  lin: number;
+  /** Painted centre y (page pt) before any optical displacement. */
+  y: number;
+  /** Horizontal mask half-width (pt) of this member's own symbol. */
+  wx: number;
+  /** Vertical mask half-extent (pt) of this member's own symbol. */
+  hy: number;
+  /** Intended parity column offset (pt) of this member's rail. */
+  rail: number;
+}
+
+/** Result of the Round 45 optical cluster metric (pure; scale-free of paint). */
+export interface JankoOpticalSpread {
+  /** Resolved uniform extra gap (pt) added to every successive level gap. */
+  delta: number;
+  /** The uncapped requirement (pt) — reported when the cap binds. */
+  requiredDelta: number;
+  /** True when the per-glyph {@link OPTICAL_DISPLACEMENT_CAP} clamped the delta. */
+  capped: boolean;
+  /** Distinct true pitch levels, ascending (linear pitch). */
+  lins: number[];
+  /** Per-level optical displacement (pt, page sign): zero member-weighted mean. */
+  offsets: number[];
+  /** Total span growth (pt): `(levels − 1) · delta`. */
+  spanGrowth: number;
+  /** Largest per-glyph displacement (pt): `max |offset|`. */
+  maxDisplacement: number;
+  /** The pair that demanded the delta (member ids, for the record). */
+  demandingPairs: Array<{ a: string; b: string; deficit: number; levelDistance: number }>;
+}
+
+/**
+ * Round 45 — the **declared, centred optical spacing** metric over one actually
+ * admitted bracket cluster.
+ *
+ * 1. The cluster's members are sorted into their **distinct true pitch
+ *    levels** (equal pitch keeps equal placement: a unison is never split into
+ *    invented levels).
+ * 2. Two levels demand clearance only when their **horizontal masks overlap**
+ *    (`|Δrail| < wxᵢ + wxⱼ` — same-column members, i.e. the pair the horizontal
+ *    layout leaves in one parity column); the requirement is the two members'
+ *    *actual* vertical mask half-extents plus `air` of optical clearance.
+ * 3. `delta` is the maximum non-negative pair deficit divided by the pair's
+ *    distinct-level index distance, so one uniform extra gap added to every
+ *    successive level opens exactly the pairs that need it and nothing more.
+ * 4. The per-level offsets `(k − weightedMeanIndex) · delta` are **centred** on
+ *    the member-weighted mean, so the cluster never translates as a whole, and
+ *    each glyph's displacement is capped at `cap` (one 1-span): a cluster that
+ *    would need more is clamped and reported (`capped`, `requiredDelta`) rather
+ *    than silently exceeding the cap or shrinking any symbol.
+ *
+ * A cluster that already clears yields `delta = 0` and all-zero offsets: no
+ * optical displacement at all.
+ */
+export function resolveOpticalSpread(
+  members: readonly JankoOpticalMember[],
+  air: number,
+  cap: number = OPTICAL_DISPLACEMENT_CAP
+): JankoOpticalSpread {
+  const sorted = [...members].sort(
+    (a, b) => a.lin - b.lin || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+  const lins: number[] = [];
+  const levelMembers: JankoOpticalMember[][] = [];
+  for (const m of sorted) {
+    if (lins.length === 0 || lins[lins.length - 1] !== m.lin) {
+      lins.push(m.lin);
+      levelMembers.push([m]);
+    } else {
+      levelMembers[levelMembers.length - 1].push(m);
+    }
+  }
+  const empty: JankoOpticalSpread = {
+    delta: 0,
+    requiredDelta: 0,
+    capped: false,
+    lins,
+    offsets: lins.map(() => 0),
+    spanGrowth: 0,
+    maxDisplacement: 0,
+    demandingPairs: [],
+  };
+  if (lins.length < 2) return empty;
+  const levelWx = levelMembers.map((ms) => Math.max(...ms.map((m) => m.wx)));
+  const levelHy = levelMembers.map((ms) => Math.max(...ms.map((m) => m.hy)));
+  const levelY = levelMembers.map((ms) => ms[0].y);
+  const levelRail = levelMembers.map((ms) => ms[0].rail);
+  let requiredDelta = 0;
+  const demandingPairs: JankoOpticalSpread['demandingPairs'] = [];
+  for (let i = 0; i < lins.length; i++) {
+    for (let j = i + 1; j < lins.length; j++) {
+      // Horizontal-mask overlap: the pair shares (or almost shares) a column.
+      if (Math.abs(levelRail[i] - levelRail[j]) >= levelWx[i] + levelWx[j] - EPS) continue;
+      const dy = Math.abs(levelY[j] - levelY[i]);
+      const deficit = levelHy[i] + levelHy[j] + air - dy;
+      if (deficit <= EPS) continue;
+      const share = deficit / (j - i);
+      demandingPairs.push({
+        a: levelMembers[i][0].id,
+        b: levelMembers[j][0].id,
+        deficit,
+        levelDistance: j - i,
+      });
+      if (share > requiredDelta) requiredDelta = share;
+    }
+  }
+  if (requiredDelta <= EPS) return empty;
+  const weights = levelMembers.map((ms) => ms.length);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const weightedMeanIndex =
+    weights.reduce((acc, w, k) => acc + w * k, 0) / Math.max(1, totalWeight);
+  // Page y grows downward while the levels ascend in pitch, so opening every
+  // successive gap by `delta` displaces level k by `(mean − k)·delta`: the
+  // members above the weighted centre rise, the members below it drop, and
+  // the two are exactly the "uniform extra gap on every successive level"
+  // rule. Subtracting the member-weighted mean IS this centring term, so the
+  // cluster's centroid never translates.
+  let offsets = lins.map((_, k) => (weightedMeanIndex - k) * requiredDelta);
+  let maxAbs = Math.max(...offsets.map((o) => Math.abs(o)));
+  let delta = requiredDelta;
+  let capped = false;
+  if (maxAbs > cap + EPS) {
+    const factor = cap / maxAbs;
+    offsets = offsets.map((o) => o * factor);
+    delta = requiredDelta * factor;
+    maxAbs = cap;
+    capped = true;
+  }
+  return {
+    delta,
+    requiredDelta,
+    capped,
+    lins,
+    offsets,
+    spanGrowth: (lins.length - 1) * delta,
+    maxDisplacement: maxAbs,
+    demandingPairs,
+  };
+}
+
+/**
+ * Round 45 — apply the optical spread to one actually admitted cluster.
+ *
+ * The members keep their musical fields, their horizontal layout and their
+ * rail assignment; only `y` moves, by the centred per-level displacement, and
+ * the exact applied number is stamped on every member
+ * ({@link PositionedJankoNote.opticalOffsetY}) so paint, marks, crossings and
+ * the linter all read the same painted position. The cluster's mask intervals
+ * travel with it, so the horizontal fan that runs next reads the displaced
+ * geometry. Returns the published cluster record (also for a cluster that
+ * needed no displacement at all, `delta: 0`).
+ */
+export function applyOpticalClusterSpacing(
+  group: readonly PositionedJankoNote[],
+  fitById: Map<string, JankoClusterFitMember>,
+  rails: ReadonlyMap<string, number>,
+  t: ResolvedJankoTokens,
+  o: ResolvedJankoLayoutOptions,
+  air: number = t.opticalClearanceAir
+): JankoOpticalCluster | null {
+  if (group.length < 2) return null;
+  const members: JankoOpticalMember[] = [];
+  for (const p of group) {
+    const fit = fitById.get(p.note.id);
+    if (!fit) continue;
+    members.push({
+      id: p.note.id,
+      lin: fit.lin,
+      y: p.y,
+      wx: fit.wx,
+      // The fit member stores its vertical interval, not a half-extent; the
+      // half-extent IS `(upper − lower)/2` of the very mask every audit reads.
+      hy: (fit.upper - fit.lower) / 2,
+      rail: rails.get(p.note.id) ?? 0,
+    });
+  }
+  if (members.length < 2) return null;
+  const spread = resolveOpticalSpread(members, air, OPTICAL_DISPLACEMENT_CAP);
+  const memberOffsets = new Map<string, number>();
+  const hand = group[0].rhythm.hand;
+  for (let k = 0; k < spread.lins.length; k++) {
+    const offset = spread.offsets[k];
+    for (const p of group) {
+      const fit = fitById.get(p.note.id);
+      if (!fit || fit.lin !== spread.lins[k]) continue;
+      memberOffsets.set(p.note.id, offset);
+      if (offset === 0) {
+        if (p.opticalOffsetY !== undefined) p.opticalOffsetY = 0;
+        continue;
+      }
+      p.y += offset;
+      p.opticalOffsetY = offset;
+      fit.lower += offset;
+      fit.upper += offset;
+      // The **glyph travels whole**: the duration ink (the stem's attach point
+      // and the augmentation dot) hangs off the head, so its resolved y moves
+      // with the displaced centre. Without this the painted stem would start
+      // `delta` away from its own mask edge (and the linter would name exactly
+      // that: a stem detached from the head it belongs to).
+      p.rhythm.y = p.y;
+      if (p.rhythm.dotY !== undefined) p.rhythm.dotY += offset;
+    }
+  }
+  return {
+    tick: group[0].note.startTick,
+    hand,
+    memberIds: group.map((p) => p.note.id),
+    lins: spread.lins,
+    delta: spread.delta,
+    requiredDelta: spread.requiredDelta,
+    capped: spread.capped,
+    spanGrowth: spread.spanGrowth,
+    maxDisplacement: spread.maxDisplacement,
+    offsets: spread.offsets,
+    memberOffsets,
+  };
+}
+
+/** One applied optical cluster of a system (Round 45, published for review). */
+export interface JankoOpticalCluster {
+  /** Onset tick of the cluster. */
+  tick: number;
+  /** Hand of the admitted bracket group. */
+  hand: Hand;
+  /** Member note ids, source order. */
+  memberIds: string[];
+  /** Distinct true pitch levels, ascending. */
+  lins: number[];
+  /** Resolved uniform extra gap (pt). */
+  delta: number;
+  /** Uncapped requirement (pt) — equals `delta` unless the cap bound. */
+  requiredDelta: number;
+  /** True when the per-glyph cap clamped the displacement. */
+  capped: boolean;
+  /** Total span growth (pt). */
+  spanGrowth: number;
+  /** Largest per-glyph optical displacement (pt). */
+  maxDisplacement: number;
+  /** Applied optical displacement per distinct level (pt, zero mean). */
+  offsets: number[];
+  /** Applied optical displacement per member id (pt). */
+  memberOffsets: Map<string, number>;
+}
+
+/** One onset whose desired head slots do not fit its beat cell: the explicit
+ * space-demand report of the permanent slot fit./**
  * One onset whose desired head slots do not fit its beat cell: the explicit
  * space-demand report of the permanent slot fit. The heads keep their desired
  * slots (honest residue for the column solve and the linter); nothing is
@@ -4024,6 +4301,14 @@ export interface JankoChordColumnResolution {
    * dyad keeps full-size symbols. Empty when nothing is bracketed.
    */
   admittedBracketIds: ReadonlySet<string>;
+  /**
+   * Round 45: every **optical cluster** this solve applied (under
+   * `options.opticalSpacing`), admitted clusters only, with the resolved
+   * uniform gap, the span growth and the largest per-glyph displacement — the
+   * measured record the review and the tests read. Empty when the option is
+   * off.
+   */
+  opticalClusters: JankoOpticalCluster[];
 }
 
 /** Full result of the chord-column solve (see {@link resolveRowSnappedChordOffsets}). */
@@ -4223,6 +4508,8 @@ export function resolveChordColumns(
   //     monotonically, so each pass terminates.
   // -------------------------------------------------------------------------
   const offsetsById = new Map<string, number>();
+  /** Round 45: every optical cluster actually applied in this solve. */
+  const opticalClusters: JankoOpticalCluster[] = [];
   const byX = [...units].sort((a, b) => a.nominalX - b.nominalX || a.tick - b.tick);
   const xOf = (unit: OnsetUnit, id: string): number => unit.nominalX + (offsetsById.get(id) ?? 0);
   /**
@@ -4421,6 +4708,47 @@ export function resolveChordColumns(
       for (const group of groups) {
         if (!group.every((p) => parityPlacedIds.has(p.note.id))) continue;
         const members = group.map((p) => fitById.get(p.note.id)!);
+        // Round 45 — declared, centred optical spacing. Only an ACTUALLY
+        // admitted cluster spreads vertically, and only where its intended
+        // parity columns leave two members' horizontal masks overlapping: the
+        // uniform extra gap opens exactly those pairs (`delta` is the largest
+        // deficit per distance between distinct levels), the offsets are
+        // centred on the member-weighted mean so the cluster never translates,
+        // and the applied displacement is published per member. The pass runs
+        // **before** the fan, so the horizontal fit reads the same painted
+        // geometry the paint, the marks, the crossings and the linter read —
+        // an opened pair no longer needs a rightward nudge, and a residual
+        // overlap (a capped cluster) still gets one.
+        if (o.opticalSpacing) {
+          // The **intended parity columns** (the rails before the collision
+          // fan): a pair the horizontal layout leaves in one column is the
+          // pair whose vertical clearance the optical gap must provide.
+          const families = new Set(members.map((m) => (m.lin % 2 === 0 ? 0 : 1)));
+          const bothFamilies = families.size >= 2;
+          const intendedRails = new Map(
+            members.map((m) => [m.id, bothFamilies && m.lin % 2 !== 0 ? pairGap : 0] as const)
+          );
+          const spread = applyOpticalClusterSpacing(
+            group,
+            fitById,
+            intendedRails,
+            t,
+            o,
+            t.opticalClearanceAir
+          );
+          if (spread) {
+            opticalClusters.push(spread);
+            // Keep the unit's own vertical span (used by the column solve's
+            // barline/time air) consistent with the displaced heads.
+            unit.claspTop = Math.min(...unit.rows.flatMap((c) => c.notes.map((p) => p.y))) - t.noteheadRadius;
+            unit.claspBot = Math.max(...unit.rows.flatMap((c) => c.notes.map((p) => p.y))) + t.noteheadRadius;
+          }
+        }
+        // The parity rails and the fan are resolved on the **painted**
+        // geometry: a pair the optical gap already opened no longer needs a
+        // rightward nudge, while any residual overlap (a capped cluster, or a
+        // rail-separated pair whose masks still cross) is fanned exactly as
+        // before.
         const fit = fitParityColumns(members, presetAir, pairGap);
         const { gap } = fitClusterSlots(members, presetAir, 'column');
         for (const id of fit.offsets.keys()) {
@@ -4998,6 +5326,7 @@ export function resolveChordColumns(
       claspQualifiedIds: bracketedIds,
       railDiagnostics,
       admittedBracketIds: new Set<string>(),
+      opticalClusters,
     };
   }
 
@@ -5387,12 +5716,18 @@ export function resolveChordColumns(
       ...p,
       x,
       rhythm,
+      // Round 45: the optical displacement is metadata — `y` already carries
+      // it (the pass displaced the head before this map) and the reviewer can
+      // read the exact number that opened the pair without ever mistaking it
+      // for a musical transposition.
+      ...(Math.abs(p.opticalOffsetY ?? 0) > 0 ? { opticalOffsetY: p.opticalOffsetY } : {}),
       ...(unit ? { nominalX: unit.nominalX, beatCell: cell } : {}),
     };
   });
 
   return {
     notes: placed,
+    opticalClusters,
     claspTicks: new Set(ordered.filter((unit) => unit.clasp).map((unit) => unit.tick)),
     // Round 19: the beat's laid-out x — the unit's column after its rigid
     // translation, which is what the beat grid and the shared stem follow.
@@ -5687,6 +6022,229 @@ export function systemCompleteInkBounds(
 }
 
 /**
+ * Round 45 — one **painted** ink box of a laid-out system (page pt).
+ *
+ * Boxes, not scalars, because a facing requirement is only meaningful between
+ * inks that can actually meet: the margin furniture of one system and the
+ * music of its neighbour are metres apart horizontally and cannot crowd each
+ * other however close their y bands come.
+ */
+export interface JankoPaintedInkBox {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  /** Stable identity of the ink, quoted by reports and tests. */
+  what: string;
+}
+
+/**
+ * Round 45 — every **painted** ink box of one laid-out system: the real
+ * geometry the page-fit audits measure, so a *reserved envelope* crossing a
+ * limit can never masquerade as a visible collision.
+ *
+ * The model names the same ink as {@link systemCompleteInkBounds} — the pitch
+ * grid, the noteheads (their masks and honour halos), the dynamic ledger
+ * equators and continuous outlier rules, the stems and beam connectors, the
+ * brackets, the rests, the ottava ink, the handprint clusters and the margin
+ * furniture — but is **seeded by the painted staff furniture** (the grid tips)
+ * instead of the system's worst-case pitch-window reserve box
+ * (`staffTopY`/`staffBotY`). The reserve is a booking convention, not ink: with
+ * literal low pitches it can reach far past the occupied block (Brahms
+ * Op. 118/1's last system: 24.5pt, on a page whose painted ink then still has
+ * 344pt of paper below it) while every painted object stays well inside the
+ * page.
+ */
+export function systemPaintedInkBoxes(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): JankoPaintedInkBox[] {
+  const g = layout.geometry;
+  const out: JankoPaintedInkBox[] = [];
+  const push = (x0: number, x1: number, y0: number, y1: number, what: string): void => {
+    out.push({
+      x0: Math.min(x0, x1),
+      x1: Math.max(x0, x1),
+      y0: Math.min(y0, y1),
+      y1: Math.max(y0, y1),
+      what,
+    });
+  };
+
+  // 1. The painted pitch grid. The need-based rows, the barlines' tips and the
+  //    dashed beat pulses all live inside the grid's outer span
+  //    (`gridTopY … gridBotY` = the extreme rows ± the measure inset), which is
+  //    the honest bound of that furniture.
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+    push(g.staffLeft, g.staffRight, gridTopY(g, o, t), gridBotY(g, o, t), 'pitch grid');
+  } else {
+    for (const rule of pitchGridRules(g, o, t)) {
+      push(rule.x1, rule.x2, rule.y - rule.width / 2, rule.y + rule.width / 2, 'grid rule');
+    }
+  }
+
+  // 2. Ledger ink: the continuous outlier rules and the per-notehead equator
+  //    dashes (a dash inside a continuous span is not painted twice).
+  const spans = outlierLedgerSpans(layout.notes, g, layout.index, t);
+  const continuous = new Set(spans.map((s) => s.key));
+  for (const span of spans) {
+    push(span.x1, span.x2, span.y - 0.375, span.y + 0.375, 'outlier rule');
+  }
+  for (const p of layout.notes) {
+    for (const ledgerY of p.coord.ledgerYs) {
+      if (continuous.has(Math.round(ledgerY * 100))) continue;
+      const y = g.middleCY + ledgerY;
+      push(
+        p.x - t.ledgerHalfWidth,
+        p.x + t.ledgerHalfWidth,
+        y - 0.375,
+        y + 0.375,
+        `ledger of ${p.note.id}`
+      );
+    }
+  }
+
+  // 3. Noteheads: the erasure mask (or the wider honour halo) at the painted
+  //    centre — the optical position, never the source pitch's nominal row.
+  for (const p of layout.notes) {
+    const { wx, hy } = knockoutHalfExtents(o, t, p.note.startTick, p);
+    push(p.x - wx, p.x + wx, p.y - hy, p.y + hy, `notehead ${p.note.id}`);
+    if (o.showHonorHalo && isPositionOfHonor(p.note.startTick)) {
+      const R = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
+      push(p.x - R, p.x + R, p.y - R, p.y + R, `halo of ${p.note.id}`);
+    }
+  }
+
+  // 4. Stems (exactly the painted ones) and the beam strips.
+  const hidden = suppressedStemIds(layout);
+  const stemBox = (id: string, s: JankoStemGeometry, endY: number): void => {
+    push(
+      s.stemX - JANKO_STEM_STROKE_WIDTH / 2,
+      s.stemX + JANKO_STEM_STROKE_WIDTH / 2,
+      s.stemStartY,
+      endY,
+      `stem ${id}`
+    );
+  };
+  for (const beam of layout.beams) {
+    for (let i = 0; i < beam.stems.length; i++) {
+      // A beam stem runs from the head's mask edge to the beam centerline.
+      const s = beam.stems[i];
+      stemBox(beam.notes[i]?.id ?? 'beam', s, beam.beamY(s.stemX));
+    }
+    for (const connector of [beam.primary, ...beam.levels.map((l) => l.connector)]) {
+      if (!connector) continue;
+      const half = beam.thickness / 2;
+      push(
+        connector.x1,
+        connector.x2,
+        Math.min(connector.y1, connector.y2) - half,
+        Math.max(connector.y1, connector.y2) + half,
+        'beam'
+      );
+    }
+  }
+  if (o.rhythmStyle === 'beamed') {
+    for (const n of layout.ungrouped) {
+      if (hidden.has(n.id)) continue;
+      const s = getStemGeometry(n, t);
+      stemBox(n.id, s, s.stemEndY);
+    }
+  } else {
+    for (const p of layout.notes) {
+      if (hidden.has(p.rhythm.id)) continue;
+      const s = getStemGeometry(p.rhythm, t);
+      stemBox(p.note.id, s, s.stemEndY);
+    }
+  }
+
+  // 5. Brackets, rests, ottava ink, handprint clusters and margin furniture.
+  for (const clasp of layout.clasps) {
+    const box = claspInkBox(clasp, t);
+    push(box.x0, box.x1, box.y0, box.y1, 'bracket');
+  }
+  for (const rest of layout.rests) {
+    const box = restInkBox(rest, t);
+    push(box.x0, box.x1, box.y0, box.y1, 'rest');
+  }
+  for (const b of layout.ottavaBrackets ?? []) {
+    const label = ottavaLabelBox(b, t);
+    if ([label.x0, label.y0, label.x1, label.y1].every(Number.isFinite)) {
+      push(label.x0, label.x1, label.y0, label.y1, 'ottava label');
+    }
+    if (Number.isFinite(b.dashX1)) {
+      const line = ottavaLineBox(b, t);
+      push(line.x0, line.x1, line.y0, line.y1, 'ottava line');
+      const hook = ottavaHookBox(b, t);
+      push(hook.x0, hook.x1, hook.y0, hook.y1, 'ottava hook');
+    }
+  }
+  for (const cluster of layout.handprintClusters ?? []) {
+    push(cluster.inkBox[0], cluster.inkBox[2], cluster.inkBox[1], cluster.inkBox[3], 'handprint');
+  }
+  const { numeral, accolade } = getMarginFurniture(
+    g,
+    t,
+    1,
+    undefined,
+    o.systemStartStyle,
+    layout.index === 0
+  );
+  push(numeral.x0, numeral.x1, numeral.y0, numeral.y1, 'measure numeral');
+  if (accolade) push(accolade.x0, accolade.x1, accolade.y0, accolade.y1, 'system start');
+  return out;
+}
+
+/** Round 45 — the painted-ink extents of one system (`min y0 … max y1`). */
+export function systemPaintedInkBounds(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): { top: number; bottom: number } {
+  const boxes = systemPaintedInkBoxes(layout, o, t);
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const b of boxes) {
+    top = Math.min(top, b.y0);
+    bottom = Math.max(bottom, b.y1);
+  }
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) {
+    return { top: layout.geometry.staffTopY, bottom: layout.geometry.staffBotY };
+  }
+  return { top, bottom };
+}
+
+/**
+ * Round 45 — the **physical** facing clearance between two stacked systems:
+ * the smallest vertical air between two inks that overlap horizontally, with
+ * the exact pair named. `Infinity` when no pair of inks faces the other (a
+ * pair of columns standing side by side never crowds vertically), and a
+ * negative number when two inks actually overlap — which is the collision the
+ * facing requirement exists to prevent.
+ */
+export function paintedFacingGap(
+  upper: readonly JankoPaintedInkBox[],
+  lower: readonly JankoPaintedInkBox[]
+): { gap: number; upper: JankoPaintedInkBox | null; lower: JankoPaintedInkBox | null } {
+  let gap = Number.POSITIVE_INFINITY;
+  let bestUpper: JankoPaintedInkBox | null = null;
+  let bestLower: JankoPaintedInkBox | null = null;
+  for (const p of upper) {
+    for (const q of lower) {
+      if (Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0) <= 0) continue;
+      const air = q.y0 - p.y1;
+      if (air < gap) {
+        gap = air;
+        bestUpper = p;
+        bestLower = q;
+      }
+    }
+  }
+  return { gap, upper: bestUpper, lower: bestLower };
+}
+
+/**
  * Minimum facing ink clearance (pt) between consecutive systems under
  * content-aware vertical placement. Inter-system gaps carry this plus an
  * even share of residual page space; top/bottom page margins share the
@@ -5863,14 +6421,15 @@ export function layoutJankoSystemShifted(
       geometry.measureWidth,
       o.core,
       t,
-      o.extensionJunction
+      o.extensionJunction,
+      o.lowPitchFolding
     );
 
     const writtenLins: number[] = [];
     for (const n of sysNotes) {
       const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
       const lin = n.pitch.octave * 12 + pc;
-      const shift = computeFoldShift(lin, o.core);
+      const shift = resolveFoldShift(lin, o.core, o.lowPitchFolding);
       writtenLins.push(lin + shift);
     }
 
@@ -5914,6 +6473,7 @@ export function layoutJankoSystemShifted(
     claspQualifiedIds: new Set<string>(),
     railDiagnostics: [],
     admittedBracketIds: new Set<string>(),
+    opticalClusters: [],
   };
   // Round 41/42: the same-hand **co-onset** membership of this score is
   // score-unique and cheap, but it is only the *candidate* set — a clean
@@ -6388,7 +6948,41 @@ export function layoutJankoSystemShifted(
       if (bucket) bucket.push(p);
       else byHandOnset.set(key, [p]);
     }
-    for (const group of byHandOnset.values()) {
+    for (const rawGroup of byHandOnset.values()) {
+      if (rawGroup.length < 2) continue;
+      // Round 45 — no residual vertical shared-duration stem for an admitted
+      // cluster. The bracket already carries the group's shared value in its
+      // own duration ink, so a member whose own value **is** that carried value
+      // must not keep a vertical stem merely because it happens to be the
+      // Round 16 top-RH / bottom-LH survivor of this hand; and a member whose
+      // own duration is independent is routed through the horizontal grammar
+      // (the exception carrier) instead — never through a leftover vertical
+      // stem. This is scoped to cluster duration carriers: a genuine beam is
+      // untouched (`beamedIds`) and ordinary unclustered notation keeps the
+      // established shared-stem rule.
+      //
+      // The suppression is scoped to the Round 45 carrier doctrine itself
+      // (`exceptionCarrier: 'horizontal'`, the only setting under which the
+      // independent values have a horizontal home — see the Round 41/42
+      // carrier block above). With the golden default `exceptionCarrier:
+      // 'none'` — the Round 44 reserve, the Bach GOLD path — the vertical
+      // shared stem is the *only* carrier of the one-duration onset, so it
+      // stays exactly as landed: the reserve reproduces the Round 44 geometry
+      // bit for bit.
+      const group =
+        o.exceptionCarrier === 'horizontal'
+          ? rawGroup.filter((p) => {
+              if (!chordColumns.admittedBracketIds.has(p.note.id)) return true;
+              const clasp = clasps.find(
+                (c) => c.tick === p.note.startTick && c.notes.some((n) => n.id === p.note.id)
+              );
+              if (!clasp) return true;
+              // The bracket states this member's own value exactly: the stem is
+              // redundant. (An independent duration is an exception and already
+              // belongs to the horizontal carrier path.)
+              return !(p.note.durationTicks === claspMemberCarriedTicks(clasp, p.note.id));
+            })
+          : rawGroup;
       if (group.length < 2) continue;
       if (group.every((p) => chordedIds.has(p.note.id))) continue;
       if (group.some((p) => beamedIds.has(p.note.id))) continue;
@@ -6828,6 +7422,7 @@ export function layoutJankoSystemShifted(
     clusterDiagnostics: chordColumns.diagnostics,
     claspQualifiedIds: chordColumns.claspQualifiedIds,
     railDiagnostics: chordColumns.railDiagnostics,
+    opticalClusters: chordColumns.opticalClusters,
     compressedClusters,
     compressedCopyIds,
     handprintClusters,
