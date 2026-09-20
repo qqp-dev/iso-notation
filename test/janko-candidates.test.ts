@@ -145,6 +145,9 @@ const REST_STYLES: JankoRestStyle[] = [
  * (parked as the named singleton). Round 32 asked full vs midpoint-only grid
  * (parked as the named pair; midpoint rejected). Round 33 asked full vs none
  * (parked as the named pair; DECIDED — full grid selected, zero live cards).
+ * Round 43 opened the reusable pitch + symbolic-duration study (parked as the
+ * named singleton). Round 44 re-aims it at the whole Brahms score: one
+ * anchored-cluster + compact shared-duration-ink card.
  */
 const ROUND_29_CARDS: string[] = [];
 const ROUND_30_CARDS: string[] = ['round-30-rings', 'round-30-double-dots'];
@@ -169,6 +172,7 @@ const ROUND_42_CARDS: string[] = [
   'duration-bracket-compact',
   'duration-bracket-exception',
 ];
+const ROUND_43_CARDS: string[] = ['midpoint-parity'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -254,9 +258,9 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 43 (three reusable-case axes)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 43);
-  assert.match(CURRENT_ROUND_METADATA.title, /reusable pitch \+ symbolic-duration study/i);
+test('CURRENT_ROUND_METADATA is the open Round 44 (three anchored-cluster axes)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 44);
+  assert.match(CURRENT_ROUND_METADATA.title, /anchored clusters \+ compact shared duration ink/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
     ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
@@ -329,11 +333,12 @@ test('CURRENT_ROUND_METADATA is the open Round 43 (three reusable-case axes)', (
     ],
     'R42 parked quartet on record'
   );
+  assert.deepEqual(ROUND_43_CARDS, ['midpoint-parity'], 'R43 parked singleton on record');
 });
 
-test('CURRENT_CANDIDATES is the Round 43 singleton: the one proposed midpoint design', () => {
+test('CURRENT_CANDIDATES is the Round 44 singleton: the one anchored 45-degree design', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['midpoint-parity'], 'one proposed midpoint design, no obligatory control');
+  assert.deepEqual(ids, ['anchored-45-ink'], 'one anchored 45-degree design, no obligatory control');
   for (const c of CURRENT_CANDIDATES) {
     // The single card states the round's whole design (pitch + duration), so it
     // declares no single `axis` — every open axis is badged, none is claimed
@@ -2092,36 +2097,48 @@ test('The dialect material contains no same-column collision (the independence p
 });
 
 // ---------------------------------------------------------------------------
-// 17. Studio: two grid cards, twelve windows, no strip
+// 17. Studio: one grid card, nine windows, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open Round 43: one midpoint card on 11 windows', () => {
+test('The live studio renders the open Round 44: one anchored card on 9 windows', () => {
   const html = renderCandidatesView(CONFIG);
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 1, 'one card');
   assert.match(html, /data-candidate-count="1"/);
-  assert.match(html, /data-window-count="11"/, 'seven Brahms windows + four specimen windows');
-  assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 43/);
   assert.match(
     html,
-    /Reusable pitch \+ symbolic-duration study/i,
-    'the reusable pitch + duration title headlines the view'
+    /data-window-count="9"/,
+    'the full-score spread + seven Brahms focus windows + the compact duration key'
   );
-  for (const id of [...ROUND_41_CARDS, ...ROUND_42_CARDS]) {
+  assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
+  assert.match(html, /Round 44/);
+  assert.match(
+    html,
+    /Anchored clusters \+ compact shared duration ink/i,
+    'the anchored-cluster title headlines the view'
+  );
+  for (const id of [...ROUND_41_CARDS, ...ROUND_42_CARDS, ...ROUND_43_CARDS]) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  // Round 43 honesty: the single card's chip carries **whole-score** lint. The
-  // Brahms spread carries the two pre-existing m. 33 / m. 53 parity folding
-  // findings (scheduled for a future round), and the duration-vocabulary
-  // specimen's deliberately tight stress row carries its published fan crossing
-  // — so the chip honestly reads violations, and nothing is suppressed (the
-  // window-level proofs live in test/janko-round43.test.ts).
+  // Round 44 honesty: the single card's chip carries whole-score lint across
+  // every score it renders. The Brahms candidate is clean with six published
+  // composite refusals; the duration key contributes its one published
+  // fit-refusal — so the chip reads clean with seven warnings, and nothing is
+  // suppressed (the window/identity proofs live in test/janko-round44.test.ts).
   assert.equal(
-    (html.match(/data-candidate="midpoint-parity" data-lint="violations"/g) ?? []).length,
+    (html.match(/data-candidate="anchored-45-ink" data-lint="clean"/g) ?? []).length,
     1,
-    'the chip honestly reports the published findings'
+    'the chip honestly reads clean with published warnings'
   );
-  // Seven authentic Brahms windows, one each.
+  assert.match(html, /\u26a0 7 warnings/, 'six composite refusals + one withheld carrier');
+  // The whole score as genuine pages: one full-score window, five page cards.
+  assert.match(html, /data-window="brahms-op118-no1:1-71"/, 'the full-score window');
+  assert.match(html, /data-pages="5"/, 'five genuine page cards');
+  assert.equal(
+    (html.match(/<figure class="page-card" data-page="\d+">/g) ?? []).length,
+    5,
+    'one real page card per page'
+  );
+  // Seven authentic Brahms focus windows, one each.
   for (const span of ['5-5', '7-7', '8-8', '9-9', '35-36', '37-37', '67-67']) {
     assert.equal(
       (html.match(new RegExp(`data-window="brahms-op118-no1:${span}"`, 'g')) ?? []).length,
@@ -2129,20 +2146,16 @@ test('The live studio renders the open Round 43: one midpoint card on 11 windows
       `Brahms window ${span}`
     );
   }
-  // The duration key, the exception band and the stress band on the specimen.
-  for (const span of ['17-24', '25-32', '33-34']) {
-    assert.equal(
-      (html.match(new RegExp(`data-window="duration-vocabulary-specimen:${span}"`, 'g')) ?? [])
-        .length,
-      1,
-      `duration-vocabulary specimen window ${span}`
-    );
-  }
-  // The 1-span / 2-span / octave / next-onset pitch-parity specimen.
+  // The compact labelled duration key: the short values the corpus never states.
   assert.equal(
-    (html.match(/data-window="pitch-parity-specimen:1-4"/g) ?? []).length,
+    (html.match(/data-window="duration-vocabulary-specimen:17-24"/g) ?? []).length,
     1,
-    'the pitch-parity specimen window'
+    'the duration-vocabulary key band'
+  );
+  // The synthetic pitch specimen is no longer a review medium.
+  assert.ok(
+    !html.includes('data-window="pitch-parity-specimen:'),
+    'the pitch specimen contributes no window this round'
   );
 });
 

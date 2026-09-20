@@ -459,19 +459,20 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 43 open, three reusable-case axes, one midpoint design', () => {
-  // Ordered contract change: Rounds 40–42 are parked (historical consts in
-  // test/janko-round40.test.ts, test/janko-round41.test.ts and
-  // test/janko-round42.test.ts) and Round 43 opens the reusable
-  // pitch + symbolic-duration study (pitch placement, bracket marks, carrier).
-  assert.equal(CURRENT_ROUND_METADATA.round, 43);
+test('§F registry: round 44 open, three anchored-cluster axes, one 45-degree design', () => {
+  // Ordered contract change: Rounds 40–43 are parked (historical consts in
+  // test/janko-round40.test.ts, test/janko-round41.test.ts,
+  // test/janko-round42.test.ts and test/janko-round44.test.ts) and Round 44
+  // re-aims the reusable pitch + symbolic-duration study at the whole Brahms
+  // score (anchored parity placement, bracket marks, carrier).
+  assert.equal(CURRENT_ROUND_METADATA.round, 44);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
     ['pitchPlacement', 'bracketDurationGrammar', 'exceptionCarrier'],
     'pitch placement, the bracket mark family and the exception carrier'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
-  assert.deepEqual(ids, ['midpoint-parity'], 'the one proposed midpoint design');
+  assert.deepEqual(ids, ['anchored-45-ink'], 'the one proposed anchored 45-degree design');
 });
 
 // ---------------------------------------------------------------------------
