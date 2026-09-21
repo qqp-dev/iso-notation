@@ -178,6 +178,8 @@ const ROUND_42_CARDS: string[] = [
 ];
 const ROUND_43_CARDS: string[] = ['midpoint-parity'];
 const ROUND_44_CARDS: string[] = ['anchored-45-ink'];
+const ROUND_45_CARDS: string[] = [];
+const ROUND_46_CARDS: string[] = ['brahms-scale-95-air30', 'brahms-scale-95-air20'];
 
 /** One synthetic note: pitch class + octave address the Jánko rows directly. */
 function note(
@@ -263,16 +265,22 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 46 (three declared axes)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 46);
-  assert.match(CURRENT_ROUND_METADATA.title, /readable 95 % clusters/i);
+test('CURRENT_ROUND_METADATA is the open Round 47 (three declared duration axes)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 47);
+  assert.match(CURRENT_ROUND_METADATA.title, /half-ring flat face/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
-    'the declared optical air, the admitted scale and the written ties are the round axes'
+    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
+    'the flat face, the exception mount and the long-value family are the round axes'
   );
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
-  assert.match(CURRENT_ROUND_METADATA.description, /0\.30|2\.09658|970/, 'the measured deltas are published');
+  assert.match(
+    CURRENT_ROUND_METADATA.description,
+    /0\.30|53|16|504/,
+    'the measured deltas and the omitted-mark census are published'
+  );
+  assert.deepEqual(ROUND_46_CARDS, ['brahms-scale-95-air30', 'brahms-scale-95-air20'], 'R46 parked pair on record');
+  assert.deepEqual(ROUND_45_CARDS, [], 'R45 parked (its ladder is an explicit fixture, no live cards)');
   assert.deepEqual(ROUND_30_CARDS, ['round-30-rings', 'round-30-double-dots'], 'R30 parked pair on record');
   assert.deepEqual(ROUND_31_CARDS, ['round-31-clasp-nudge'], 'R31 parked singleton on record');
   assert.deepEqual(
@@ -343,61 +351,122 @@ test('CURRENT_ROUND_METADATA is the open Round 46 (three declared axes)', () => 
   assert.deepEqual(ROUND_44_CARDS, ['anchored-45-ink'], 'R44 parked singleton on record');
 });
 
-test('CURRENT_CANDIDATES is the Round 46 pair: two 95 % real-engine variants', () => {
+test('CURRENT_CANDIDATES is the Round 47 quartet: four real-engine long-value readings', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
-    'the 0.30pt working Reference and its 0.20pt spacing control'
+    [
+      'round47-mounted-control',
+      'round47-half-ring-cutout',
+      'round47-detached-symbols',
+      'round47-detached-ovals',
+    ],
+    'the mounted control, the cutout, the detached rings and the detached ovals'
   );
   const scales = CURRENT_CANDIDATES.map((c) => c.options?.chordSymbolScale);
-  assert.deepEqual(scales, [0.95, 0.95], 'both at the adopted admitted-cluster scale');
+  assert.deepEqual(scales, [0.95, 0.95, 0.95, 0.95], 'all four at the adopted admitted-cluster scale');
+  /** The landed Round 46 family every card states as fixed context. */
   const family = {
     pitchPlacement: 'parity-columns',
     bracketDurationGrammar: 'midpoint',
-    exceptionCarrier: 'horizontal',
     opticalSpacing: true,
     lowPitchFolding: 'literal',
     writtenTies: 'source',
+    chordSymbolScale: 0.95,
   };
+  /** The round's own axes: only these keys may leave the adopted treatment. */
+  const roundKeys = new Set(['halfRingGap', 'exceptionCarrier', 'longDurationStyle', 'tieOriginIndicator']);
   for (const c of CURRENT_CANDIDATES) {
-    assert.equal(c.axis, 'opticalClearanceAir', `${c.id}: the one open axis it claims`);
+    assert.ok(
+      (CURRENT_ROUND_METADATA.openAxes ?? []).includes(c.axis ?? ''),
+      `${c.id}: it badges a declared round axis`
+    );
     assert.notEqual(c.kind, 'abstract', `${c.id}: score candidate`);
-    // Otherwise identical: every non-axis key is the shared Round 46 family.
-    const { chordSymbolScale, ...rest } = c.options ?? {};
-    assert.deepEqual(rest, family, `${c.id}: otherwise identical to the family`);
-    assert.equal(c.windows?.length, 9, `${c.id}: full score + seven focus windows + the key`);
+    // Otherwise identical: every key outside the round's own axes is the
+    // shared Round 46 family, key for key.
+    for (const [key, value] of Object.entries(c.options ?? {})) {
+      if (roundKeys.has(key)) continue;
+      assert.deepEqual(value, (family as Record<string, unknown>)[key], `${c.id}: the shared ${key}`);
+    }
+    assert.equal(
+      c.options?.tieOriginIndicator,
+      'omit-outgoing',
+      `${c.id}: the round's shared outgoing-tie rule rides on every card`
+    );
+    // One and the same literal window set on all four cards.
+    const windows = (c.windows ?? []).map((w) => [
+      (w as { scoreId?: string }).scoreId,
+      (w as { measureStart: number }).measureStart,
+      (w as { measureCount: number }).measureCount,
+    ]);
+    assert.deepEqual(
+      windows,
+      [
+        ['brahms-op118-no1', 1, 3],
+        ['brahms-op118-no1', 7, 3],
+        ['brahms-op118-no1', 33, 1],
+        ['brahms-op118-no1', 61, 3],
+        ['brahms-op118-no1', 64, 3],
+        ['brahms-op118-no1', 67, 1],
+      ],
+      `${c.id}: the common literal windows (m. 67 is the documented 384 cue)`
+    );
   }
-  // The two cards differ in exactly the one declared air token.
-  const [air30, air20] = CURRENT_CANDIDATES;
-  assert.deepEqual({ ...air30.options }, { ...air20.options }, 'one option set, both cards');
-  assert.equal(air30.tokens?.opticalClearanceAir, 0.3, 'the working Reference declares 0.30pt');
-  assert.equal(air20.tokens?.opticalClearanceAir, 0.2, 'the control keeps the 0.20pt');
+  // The four cards' declared deltas: the flat face (1 ↔ 2), the exception mount
+  // (2 ↔ 3) and the long-value family (3 ↔ 4).
+  const [control, cutout, detached, ovals] = CURRENT_CANDIDATES;
+  assert.deepEqual({ ...control.options }, { ...cutout.options }, 'cards 1 and 2: one option set');
+  assert.equal(control.tokens?.halfRingGap, 0, 'card 1 states the incumbent unbroken spine');
+  assert.equal(cutout.tokens?.halfRingGap, 0.3, 'card 2 declares the 0.30pt flat-face air');
   assert.deepEqual(
-    { ...air30.tokens },
+    { ...control.tokens },
+    { ...cutout.tokens, halfRingGap: 0 },
+    'and nothing else differs: the same Round 46 tokens'
+  );
+  assert.equal(detached.options?.exceptionCarrier, 'symbol', 'card 3 detaches the long marks');
+  assert.equal(detached.options?.longDurationStyle, 'midpoint', 'card 3 keeps the ring vocabulary');
+  assert.equal(detached.tokens?.halfRingGap, 0.3, 'card 3 inherits the bracket cutout');
+  assert.equal(ovals.options?.exceptionCarrier, 'symbol', 'card 4 detaches too');
+  assert.equal(ovals.options?.longDurationStyle, 'open-oval', 'card 4 declares the oval family');
+  assert.equal(ovals.tokens?.halfRingGap, undefined, 'the oval family needs no flat-face gap');
+  assert.deepEqual(
+    { ...detached.tokens },
+    { ...cutout.tokens },
+    'cards 2 and 3 differ in the exception mount alone'
+  );
+  assert.deepEqual(
+    { ...control.tokens },
     {
       midpointSlashLengthFactor: 1.1,
       midpointRingScale: 1.1,
       midpointBracketRingScale: 1.2,
       midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
       opticalClearanceAir: 0.3,
+      halfRingGap: 0,
     },
-    'the Round 46 readability ratios, the bracket-only enlargement and the air'
+    'the Round 46 readability ratios, the bracket-only enlargement, the air and the stated zero gap'
   );
   // The 0.30pt card and the working Brahms Reference must agree for the same
   // score/options — the round's declared coherence rule. The Reference also
   // carries its settled meter/pagination/title block, so the coherence is
   // exact on every key the card declares: no declared key may disagree, and
   // the card may not smuggle a key the adopted treatment does not state.
+  // No smuggling: every key a card declares *outside* the round's own axes is
+  // part of the adopted Round 46 treatment and states exactly its value, so a
+  // card can never quietly re-open a settled decision.
   const adopted = BRAHMS_OP118_NO1_JANKO_OPTIONS as Record<string, unknown>;
-  for (const [key, value] of Object.entries(air30.options ?? {})) {
-    assert.ok(key in adopted, `the 0.30pt card's ${key} is part of the adopted treatment`);
-    assert.deepEqual(adopted[key], value, `the 0.30pt card states the adopted ${key}`);
-  }
   const adoptedTokens = BRAHMS_OP118_NO1_JANKO_TOKENS as Record<string, unknown>;
-  for (const [key, value] of Object.entries(air30.tokens ?? {})) {
-    assert.ok(key in adoptedTokens, `the 0.30pt card's ${key} token is part of the adopted treatment`);
-    assert.deepEqual(adoptedTokens[key], value, `the 0.30pt card states the adopted ${key} token`);
+  for (const c of CURRENT_CANDIDATES) {
+    for (const [key, value] of Object.entries(c.options ?? {})) {
+      if (roundKeys.has(key)) continue;
+      assert.ok(key in adopted, `${c.id}: the ${key} is part of the adopted treatment`);
+      assert.deepEqual(adopted[key], value, `${c.id}: it states the adopted ${key}`);
+    }
+    for (const [key, value] of Object.entries(c.tokens ?? {})) {
+      if (roundKeys.has(key)) continue;
+      assert.ok(key in adoptedTokens, `${c.id}: the ${key} token is part of the adopted treatment`);
+      assert.deepEqual(adoptedTokens[key], value, `${c.id}: it states the adopted ${key} token`);
+    }
   }
   // And the whole Round 46 family — not only the scale — is what the working
   // Reference adopted (a regression to the golden grammar would leave the card
@@ -2166,21 +2235,21 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two variants, nine windows each, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open Round 46: two 95 % variants on 18 windows', () => {
+test('The live studio renders the open Round 47: four long-value readings on 24 windows', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
+  assert.match(html, /data-candidate-count="4"/);
   assert.match(
     html,
-    /data-window-count="18"/,
-    'per card: the full-score spread + seven Brahms focus windows + the compact duration key'
+    /data-window-count="24"/,
+    'per card: the six common literal Brahms windows (m. 67 is the documented 384 cue)'
   );
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 46/);
+  assert.match(html, /Round 47/);
   assert.match(
     html,
-    /readable 95 % clusters/i,
-    'the readable-95 %-clusters title headlines the view'
+    /half-ring flat face/i,
+    'the half-ring flat-face title headlines the view'
   );
   for (const id of [
     ...ROUND_41_CARDS,
@@ -2190,51 +2259,47 @@ test('The live studio renders the open Round 46: two 95 % variants on 18 windows
   ]) {
     assert.ok(!html.includes(`data-candidate="${id}"`), `${id} stays parked`);
   }
-  // Round 46 honesty: each card's chip carries whole-score lint across every
-  // score it renders — zero hard errors and zero warnings on the canonical
-  // Brahms (the six former 120-tick composites are solved), plus the duration
-  // key's one independently labeled withheld carrier. The measured treatment,
-  // membership and window proofs live in test/janko-round45.test.ts.
+  // Round 47 honesty: every card's chip carries whole-score lint on the
+  // canonical Brahms — zero hard errors and zero warnings on all four (the
+  // six Round 46 composites are solved and this round omits five redundant
+  // originator marks with none orphaned). The measured geometry, ownership and
+  // window proofs live in test/janko-round47.test.ts.
   assert.equal(
     (html.match(/data-lint="clean"/g) ?? []).length,
-    2,
+    4,
     'every chip honestly reads clean'
   );
   assert.equal(
-    (html.match(/\u26a0 1 warning/g) ?? []).length,
-    2,
-    'the key band\'s one withheld carrier, per card'
+    (html.match(/\u26a0/g) ?? []).length,
+    0,
+    'no card publishes a withheld carrier, a refused seat or a warning'
   );
-  // The whole score as genuine pages: one full-score window per card, five
-  // page cards each.
-  assert.equal(
-    (html.match(/data-window="brahms-op118-no1:1-71" data-pages="5"/g) ?? []).length,
-    2,
-    'the full-score window on every card'
-  );
-  assert.equal(
-    (html.match(/<figure class="page-card" data-page="\d+">/g) ?? []).length,
-    10,
-    'one real page card per page, per card'
-  );
-  // Seven authentic Brahms focus windows per card, one each.
-  for (const span of ['1-3', '7-9', '17-19', '33-33', '53-53', '61-63', '65-71']) {
+  // The six common literal Brahms windows per card, one each.
+  for (const span of ['1-3', '7-9', '33-33', '61-63', '64-66', '67-67']) {
     assert.equal(
       (html.match(new RegExp(`data-window="brahms-op118-no1:${span}"`, 'g')) ?? []).length,
-      2,
+      4,
       `Brahms window ${span} on every card`
     );
   }
-  // The compact labelled duration key: the short values the corpus never states.
+  // No invented review surface: no page spread, no specimen key, no synthetic
+  // pitch specimen, no rejected stress row.
   assert.equal(
-    (html.match(/data-window="duration-vocabulary-specimen:17-24"/g) ?? []).length,
-    2,
-    'the duration-vocabulary key band, once per card'
+    (html.match(/<figure class="page-card"/g) ?? []).length,
+    0,
+    'the round declares literal crops only'
   );
-  // The synthetic pitch specimen is no longer a review medium.
+  assert.ok(
+    !html.includes('data-window="duration-vocabulary-specimen:17-24"'),
+    'the duration-vocabulary key is not carried into this round'
+  );
   assert.ok(
     !html.includes('data-window="pitch-parity-specimen:'),
     'the pitch specimen contributes no window this round'
+  );
+  assert.ok(
+    !html.includes('data-window="duration-vocabulary-specimen:33-34"'),
+    'the rejected stress row is not carried forward'
   );
 });
 

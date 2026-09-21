@@ -109,6 +109,7 @@ import {
   JankoRhythmNote,
   claspDotCenter,
   claspInkBox,
+  detachedSymbolInkBox,
   claspOwnMemberAir,
   claspMarkDaylight,
   claspSecondDotCenter,
@@ -213,6 +214,11 @@ export type JankoLintCode =
   | 'time-inversion'
   | 'system-slot-overlap'
   | 'corridor-intrusion'
+  | 'duration-mark-orphan'
+  | 'duration-mark-suppressed-owner'
+  | 'duration-mark-unknown-owner'
+  | 'symbol-seat-refused'
+  | 'symbol-seat-rule-conflict'
   | 'contour-thread-vertex'
   | 'contour-thread-pen-lift'
   | 'contour-thread-coverage'
@@ -3289,6 +3295,116 @@ export function checkExceptionCarrierIntegrity(
       },
     });
   }
+  // Round 47: a detached long-value symbol that found no legal seat — the
+  // member keeps its own ordinary duration ink (published, never silent).
+  for (const refusal of layout.detachedSeatRefusals ?? []) {
+    out.push({
+      code: 'symbol-seat-refused',
+      severity: 'warning',
+      message:
+        `Detached symbol withheld for ${refusal.noteId} (${refusal.durationTicks} ticks): ` +
+        `${refusal.reason}.`,
+      system: layout.index,
+      measure: measureOfTick(refusal.startTick, t),
+      noteIds: [refusal.noteId],
+      metrics: { durationTicks: refusal.durationTicks },
+    });
+  }
+}
+
+/**
+ * Round 47 — **duration-ink ownership**.
+ *
+ * The round's first contract is that every painted long-duration mark names the
+ * owners whose value it states, and that nothing is left over: a mark with no
+ * owner is an orphan statement, a mark whose owners are all **suppressed** by
+ * the outgoing-tie simplification is a redundant double statement, an owner id
+ * that is not laid out in its own system is a stale attribution, and a
+ * **detached** symbol whose ink crosses a drawn staff rule has broken the
+ * seat contract its flat face or hollow interior depends on. All four are hard
+ * errors: the marks are the value statements themselves.
+ *
+ * Every number is read from the same data the engine publishes
+ * (`durationInkOwners`, `tieOriginSuppressions`, `detachedSymbols`), so the
+ * check can never drift from the paint.
+ */
+export function checkDurationInkOwnership(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  const census = layout.durationInkOwners ?? [];
+  const suppressed = new Set((layout.tieOriginSuppressions ?? []).map((s) => s.noteId));
+  const painted = new Set(layout.notes.map((p) => p.note.id));
+  for (const entry of census) {
+    if (entry.ownerIds.length === 0) {
+      out.push({
+        code: 'duration-mark-orphan',
+        severity: 'error',
+        message:
+          `A painted ${entry.run} mark on the ${entry.mount} at tick ${entry.tick} names no ` +
+          `owning note: every duration mark must state whose value it is.`,
+        system: layout.index,
+        measure: measureOfTick(entry.tick, t),
+        noteIds: [],
+        metrics: { x: entry.x, y: entry.y },
+      });
+      continue;
+    }
+    const live = entry.ownerIds.filter((id) => !suppressed.has(id));
+    if (live.length === 0) {
+      out.push({
+        code: 'duration-mark-suppressed-owner',
+        severity: 'error',
+        message:
+          `The ${entry.run} mark on the ${entry.mount} at tick ${entry.tick} states only ` +
+          `suppressed origins (${entry.ownerIds.join(', ')}): a mark whose owners are all ` +
+          `continued by written ties is a redundant second statement.`,
+        system: layout.index,
+        measure: measureOfTick(entry.tick, t),
+        noteIds: entry.ownerIds,
+        metrics: { x: entry.x, y: entry.y },
+      });
+      continue;
+    }
+    for (const id of live) {
+      if (painted.has(id)) continue;
+      out.push({
+        code: 'duration-mark-unknown-owner',
+        severity: 'error',
+        message:
+          `The ${entry.run} mark on the ${entry.mount} at tick ${entry.tick} names ${id}, which ` +
+          `is not laid out in this system: a duration mark may only state ink that is present.`,
+        system: layout.index,
+        measure: measureOfTick(entry.tick, t),
+        noteIds: [id],
+        metrics: { x: entry.x, y: entry.y },
+      });
+    }
+  }
+  // The detached seats: no symbol may cross a drawn rule (the doctrine every
+  // open shape and every flat face depends on). Read from the same drawn rule
+  // set the seat solver used.
+  for (const symbol of layout.detachedSymbols ?? []) {
+    const box = detachedSymbolInkBox(symbol, t);
+    for (const rule of drawnStaffRuleYs(layout.geometry, o, t)) {
+      if (rule > box.y0 - 1e-9 && rule < box.y1 + 1e-9) {
+        out.push({
+          code: 'symbol-seat-rule-conflict',
+          severity: 'error',
+          message:
+            `The detached ${symbol.base}-tick symbol of ${symbol.noteId} crosses the drawn staff ` +
+            `rule at y=${rule.toFixed(2)} (its ink box spans ${box.y0.toFixed(2)}..${box.y1.toFixed(2)}): ` +
+            `detached marks are seated clear of every rule.`,
+          system: layout.index,
+          measure: measureOfTick(symbol.tick, t),
+          noteIds: [symbol.noteId],
+          metrics: { ruleY: rule, y0: box.y0, y1: box.y1 },
+        });
+      }
+    }
+  }
 }
 
 export function checkBarlineClearance(
@@ -5612,6 +5728,7 @@ export function lintJankoScore(
     checkStaffSegments(layout, o, t, diagnostics);
     checkHoldIntegrity(layout, o, t, diagnostics);
     checkExceptionCarrierIntegrity(layout, t, diagnostics);
+    checkDurationInkOwnership(layout, o, t, diagnostics);
     checkTieIntegrity(layout, o, t, diagnostics);
     checkSystemSlotFit(layout, page, o, t, thresholds, diagnostics);
     if (o.clusterCompression && o.clusterCompression !== 'literal') {

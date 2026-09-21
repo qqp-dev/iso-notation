@@ -856,6 +856,61 @@ export interface JankoTokens {
    * `options.opticalSpacing`.
    */
   opticalClearanceAir?: number;
+  // --- Round 47: the half-ring flat face and the experimental open-oval family ---
+  /**
+   * Round 47: **optical air at a half-ring's flat face** (pt). A half-ring's
+   * chord is a straight line: wherever the mark stands *on a mount* (the
+   * bracket spine, the horizontal exception carrier) that mount line would
+   * close the semicircle and make the mark read as a full ring. With a
+   * positive value the mount is **interrupted** across the chord and resumes
+   * `halfRingGap` clear of each chord end — the flat face becomes a deliberate
+   * break, nothing is drawn to close it, and no glyph ink is ever erased
+   * (the gap is cut out of the mount's own path, never masked). Where a
+   * **detached** long-value mark stands on no mount of its own
+   * ({@link JankoLayoutOptions.exceptionCarrier} `'symbol'`), the same number
+   * is the air its chord band keeps from any drawn staff rule, so the flat
+   * face stays unambiguous there too. `0` (default) is the incumbent
+   * engraving: the chord is coincident with the unbroken mount line,
+   * byte-identical.
+   */
+  halfRingGap?: number;
+  /**
+   * Round 47 (`longDurationStyle: 'open-oval'`): tilt (degrees, clockwise) of
+   * the **96-tick** open oval. `-30` lifts the compact oval's major axis to the
+   * right, so 96 reads by *orientation* as well as by size.
+   */
+  openOvalTiltDegrees?: number;
+  /**
+   * Round 47 (`longDurationStyle: 'open-oval'`): the 96-tick oval's semi-major
+   * axis, as a fraction of the mount's ring radius.
+   */
+  openOvalNarrowFactor?: number;
+  /**
+   * Round 47 (`longDurationStyle: 'open-oval'`): the 192- and 384-tick oval's
+   * semi-major axis, as a fraction of the mount's ring radius — measurably
+   * broader than {@link JankoTokens.openOvalNarrowFactor}, so the distinction
+   * is never size alone.
+   */
+  openOvalBroadFactor?: number;
+  /**
+   * Round 47 (`longDurationStyle: 'open-oval'`): every open oval's semi-minor
+   * axis, as a fraction of the mount's ring radius (one height for the whole
+   * family, so the three values differ by orientation, breadth and the breve
+   * flanks alone).
+   */
+  openOvalHeightFactor?: number;
+  /**
+   * Round 47 (`longDurationStyle: 'open-oval'`): clear air between an oval's
+   * major vertex and the centreline of the 384-tick breve's flank stroke, as a
+   * fraction of the mount's ring radius — the conventional breve's two short
+   * vertical lines stand clear of the oval instead of touching it.
+   */
+  openOvalFlankGap?: number;
+  /**
+   * Round 47 (`longDurationStyle: 'open-oval'`): half-length of one breve flank
+   * stroke, as a fraction of the oval's semi-minor axis.
+   */
+  openOvalFlankFactor?: number;
 }
 
 /** Fully resolved token set (every optional token filled in). */
@@ -962,6 +1017,19 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   midpointBracketRingScale: 1,
   midpointSpacingFactor: 1,
   opticalClearanceAir: 0.20,
+  // Round 47 — inert by default: `halfRingGap: 0` keeps the half-ring's chord
+  // exactly on the unbroken mount line (the incumbent engraving), and the
+  // open-oval geometry is read only under `longDurationStyle: 'open-oval'`.
+  // The ratios are the experimental adaptation's declared geometry: 96 is a
+  // compact oval tilted 30 degrees, 192 a 1.10:0.62 broad horizontal oval, and
+  // 384 that oval with two short flank strokes 0.30 radii clear of its vertices.
+  halfRingGap: 0,
+  openOvalTiltDegrees: -30,
+  openOvalNarrowFactor: 0.66,
+  openOvalBroadFactor: 1.10,
+  openOvalHeightFactor: 0.62,
+  openOvalFlankGap: 0.30,
+  openOvalFlankFactor: 0.95,
 };
 
 /**
@@ -1288,6 +1356,14 @@ export interface JankoLayoutOptions {
    *   carrier at its true pitch y, carrying the member's own compact marks
    *   **along** the carrier. A typographic statement of the member's own
    *   duration — never a release-time length.
+ * - `'symbol'` (Round 47): the **long-value** exception marks are detached
+ *   symbols. A member whose own value the active family states with a long
+ *   mark (96 = half-ring, 192 = ring, 384 = two rings / the breve) keeps that
+ *   mark but **not** the horizontal arm: the pure symbol run is seated
+ *   directly beside its owning head (or beside the pair it belongs to) at the
+ *   nearest legal, collision-free seat, with its exact dots. Short-value
+ *   exception members (the 1–4 cut values) keep the horizontal carrier
+ *   unchanged, so the round only ever touches the long-value family.
    */
   exceptionCarrier?: JankoExceptionCarrier;
   /**
@@ -1341,6 +1417,49 @@ export interface JankoLayoutOptions {
    *   duration are never touched, and no new attack is ever introduced.
    */
   writtenTies?: JankoWrittenTies;
+  /**
+   * Round 47: **long-value symbol family** (the round's duration axis).
+   *
+   * - `'midpoint'` (default): the incumbent Round 43/44/46 vocabulary — the
+   *   45-degree slash cuts and the ring family, whose long values read
+   *   `96 → half-ring`, `192 → one full ring`, `384 → two full rings`; the
+   *   golden / compact grammars are untouched.
+   * - `'open-oval'` (Round 47 candidate): the same in-grammar values and the
+   *   same short-value cuts and dots, but the **long** values are the
+   *   conventional hollow-oval distinctions: `96 → one compact tilted oval`,
+   *   `192 → one distinguishably broader horizontal oval`, `384 → that oval
+   *   with the breve's two short vertical flank strokes`. The same shape
+   *   vocabulary is painted on the bracket mount and on every detached seat;
+   *   the mount line is knocked out under the oval's interior (never under a
+   *   neighbour's ink) and no three-mark stack exists in this family. This is
+   *   an **experimental adaptation** of the traditional shapes to this
+   *   notation's ratio algebra, not a claim to reproduce traditional notation.
+   */
+  longDurationStyle?: JankoLongDurationStyle;
+  /**
+   * Round 47: **outgoing-tie originator simplification** (the round's
+   * redundancy axis).
+   *
+   * - `'source'` (default): every component of a written tie chain states its
+   *   own duration — the Round 46 behavior, byte-identical.
+   * - `'omit-outgoing'` (Round 47 candidate): a note or written component of
+   *   an admitted cluster whose own value the active family states with a
+   *   **long** mark (96 / 192 / 384) **omits that individual mark** when the
+   *   committed written-tie chain gives it an *outgoing* tie — the
+   *   continuation is stated by the arc plus the next component, so the
+   *   origin's own exception mark is redundant. The decision reads the **true
+   *   source chain topology** (never a rendered system or a crop boundary), so
+   *   a continuation in another system or outside a review window still
+   *   counts. Never omitted: the terminal component (its value has no
+   *   continuation to lean on), the bracket's own carried value (the bracket
+   *   is the statement), pitches, onsets, sounding totals, tie chains,
+   *   playback and continuation heads. A shared indicator is only withdrawn
+   *   when it is redundant for **all** of its owners; otherwise it survives
+   *   with the surviving owners named. Every omission is published on the
+   *   system's `tieOriginSuppressions` and checked against the duration-ink
+   *   census.
+   */
+  tieOriginIndicator?: JankoTieOriginIndicator;
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1401,7 +1520,25 @@ export type JankoBracketDurationGrammar = 'golden' | 'compact' | 'midpoint';
  * value. `'none'` is canonical (the member keeps its own statement);
  * `'horizontal'` replaces it with the fixed-length horizontal carrier.
  */
-export type JankoExceptionCarrier = 'none' | 'horizontal';
+export type JankoExceptionCarrier = 'none' | 'horizontal' | 'symbol';
+
+/**
+ * Round 47: the **long-value symbol family** of the bracket / carrier / seat
+ * mounts. `'midpoint'` is the incumbent ring family; `'open-oval'` is the
+ * round's experimental hollow-oval adaptation (see
+ * {@link JankoLayoutOptions.longDurationStyle}). The short-value cut grammar
+ * and every augmentation dot are shared by both families and are never
+ * affected by this axis.
+ */
+export type JankoLongDurationStyle = 'midpoint' | 'open-oval';
+
+/**
+ * Round 47: whether an admitted cluster member or written tie component keeps
+ * its own long-duration exception mark, or omits it when an outgoing written
+ * tie already states the continuation (see
+ * {@link JankoLayoutOptions.tieOriginIndicator}).
+ */
+export type JankoTieOriginIndicator = 'source' | 'omit-outgoing';
 
 /**
  * Situational clasp-dot translation (the Round 31 preview axis): a rigid
@@ -1535,6 +1672,8 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   chordSymbolScale: 1,
   bracketDurationGrammar: 'golden',
   exceptionCarrier: 'none',
+  longDurationStyle: 'midpoint',
+  tieOriginIndicator: 'source',
   opticalSpacing: false,
   lowPitchFolding: 'core',
   writtenTies: 'none',

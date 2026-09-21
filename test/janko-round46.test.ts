@@ -67,6 +67,38 @@ const SCORE = buildBrahmsOp118No1Score();
 const OPTIONS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
 const TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 const LAYOUTS = layoutJankoScore(SCORE, OPTIONS, TOKENS);
+
+/**
+ * The parked Round 46 pair, kept as this file's own historical fixtures now
+ * that Round 47 has opened its own candidate set: the 0.30pt working Reference
+ * card and its 0.20pt spacing control (the live registry is pinned in section E
+ * below, never used to identify the Reference).
+ */
+const ROUND_46_FAMILY = {
+  pitchPlacement: 'parity-columns',
+  bracketDurationGrammar: 'midpoint',
+  exceptionCarrier: 'horizontal',
+  opticalSpacing: true,
+  lowPitchFolding: 'literal',
+  writtenTies: 'source',
+  chordSymbolScale: 0.95,
+} as const;
+const ROUND_46_TOKENS = {
+  midpointSlashLengthFactor: 1.1,
+  midpointRingScale: 1.1,
+  midpointBracketRingScale: 1.2,
+  midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
+} as const;
+const ROUND_46_CONTROL_CARD = {
+  id: 'brahms-scale-95-air20',
+  options: { ...ROUND_46_FAMILY },
+  tokens: { ...ROUND_46_TOKENS, opticalClearanceAir: 0.2 },
+};
+const ROUND_46_REFERENCE_CARD = {
+  id: 'brahms-scale-95-air30',
+  options: { ...ROUND_46_FAMILY },
+  tokens: { ...ROUND_46_TOKENS, opticalClearanceAir: 0.3 },
+};
 const PLAN = getTieDisplayPlan(SCORE);
 const REPORTS = lintJankoScore(SCORE, OPTIONS, TOKENS);
 
@@ -152,7 +184,7 @@ test('B. The 95 % Reference declares 0.30pt of air on the six five-level cluster
     assert.ok(Math.abs(sum) < 5e-3, 'the cluster never translates as a whole');
   }
   // The control variant differs in exactly this number.
-  const control = CURRENT_CANDIDATES.find((c) => c.id === 'brahms-scale-95-air20')!;
+  const control = ROUND_46_CONTROL_CARD;
   const controlClusters = layoutJankoScore(
     SCORE,
     resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(control.options ?? {}) }),
@@ -571,7 +603,7 @@ test('D. Ties clear every glyph mask and never erase ink (paint order and stem c
 // E. Surfaces.
 // ---------------------------------------------------------------------------
 
-test('E. Bach GOLD is byte-frozen, and the two Round 46 variants are the only active candidates', () => {
+test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family as its shared base', () => {
   const bach = buildBachGoldbergVar1Score();
   let svg = '';
   for (let i = 0; i < countJankoPages(bach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); i++) {
@@ -582,11 +614,22 @@ test('E. Bach GOLD is byte-frozen, and the two Round 46 variants are the only ac
     'ccfcaecca058aa1ed7d37291d765a8ef58ed79e428c732f338f298fb5b7a104f',
     'Bach GOLD is unchanged'
   );
-  assert.equal(CURRENT_ROUND_METADATA.round, 46);
+  // Round 47 has opened its own candidate set on this baseline (the round's
+  // four long-value readings; the Round 46 pair is on record in
+  // test/janko-candidates.test.ts and test/janko-round45.test.ts). Every one of
+  // them still states this round's adopted family as fixed context, and the
+  // working Reference they are measured against is untouched — the assertions
+  // below are the Round 46 contract, checked through the live registry.
+  assert.equal(CURRENT_ROUND_METADATA.round, 47, 'Round 47 is the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
-    'two real-engine variants, both at 95 %'
+    [
+      'round47-mounted-control',
+      'round47-half-ring-cutout',
+      'round47-detached-symbols',
+      'round47-detached-ovals',
+    ],
+    'the Round 47 quartet'
   );
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
@@ -594,13 +637,27 @@ test('E. Bach GOLD is byte-frozen, and the two Round 46 variants are the only ac
     assert.equal(resolved.options.writtenTies, 'source', `${candidate.id}: ties are rendered`);
     assert.equal(resolved.options.bracketDurationGrammar, 'midpoint');
     assert.equal(resolved.tokens.midpointBracketRingScale, 1.2, 'the bracket enlargement is declared');
+    assert.equal(resolved.options.pitchPlacement, 'parity-columns', `${candidate.id}: the literal parity columns`);
+    assert.equal(resolved.options.lowPitchFolding, 'literal', `${candidate.id}: the literal lows`);
+    assert.equal(resolved.tokens.opticalClearanceAir, 0.3, `${candidate.id}: the adopted 0.30pt air`);
   }
+  // The working Reference itself is the frozen baseline the cards are judged
+  // against: its options and tokens are exactly the Round 46 declaration, so no
+  // Round 47 axis can have leaked into it.
+  const reference = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+  const referenceTokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  assert.equal(reference.exceptionCarrier, 'horizontal', 'the Reference keeps the horizontal arm');
+  assert.equal(reference.longDurationStyle, 'midpoint', 'and the ring vocabulary');
+  assert.equal(reference.tieOriginIndicator, 'source', 'and states every originator mark itself');
+  assert.equal(referenceTokens.halfRingGap, 0, 'and the unbroken half-ring mount');
+  assert.equal(OPTIONS.chordSymbolScale, 0.95, 'the Reference is the 95 % engraving');
+  assert.equal(TOKENS.midpointSpacingFactor, 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95));
   // The working Reference and the 0.30pt card engrave the same music: every
   // layout fact of all 18 systems is identical (the studio cards declare the
   // engraving, not the score's title block).
   // The studio resolves a card exactly like this: the score's own options and
   // tokens first, then the card's declared deltas.
-  const card = CURRENT_CANDIDATES[0];
+  const card = ROUND_46_REFERENCE_CARD;
   const cardLayouts = layoutJankoScore(
     SCORE,
     resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
