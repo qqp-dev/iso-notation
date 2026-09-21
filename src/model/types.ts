@@ -18,6 +18,36 @@ export type ArticulationType = 'staccato' | 'tenuto' | 'accent' | 'fermata' | 'm
 
 export type DynamicMark = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff' | 'sfz';
 
+/**
+ * Round 48 — **source-voice provenance of one sounding event** (import layer).
+ *
+ * The hand a *note is displayed in* is the performance/notation reading (the
+ * committed hand corrections, the staff destination); the hand the **source
+ * parts assign it** is a different fact, and the two disagree wherever repeats
+ * unfold to a different performed staff than the printed one. The engine may
+ * not invent a hand-rest from a staff or track label alone, so the import layer
+ * carries the source fact explicitly: which source voices state the event, on
+ * which source staves, and which hand the source's own part grouping assigns
+ * (see `brahms-source-fidelity.BRAHMS_VOICE_HAND`, cited there). Display
+ * metadata only: nothing here sounds, and no displayed hand is rewritten.
+ */
+export interface NoteSourceProvenance {
+  /** Source voices that state this sounding event, sorted. */
+  voices: string[];
+  /** Source staves those voices print on, sorted. */
+  staves: string[];
+  /**
+   * Hand(s) the source parts assign this event, sorted — `leftHand*` → LH,
+   * `rightHand*` → RH. A cross-voice unison can be stated by voices of both
+   * hands (the m. 61 E2 is written in `leftHandLower` *and* `rightHandUpper`),
+   * and then **both** hands really sound: the list keeps that fact instead of
+   * collapsing it to one hand.
+   */
+  hands: Hand[];
+  /** True when more than one source voice states the same event. */
+  unison: boolean;
+}
+
 export interface QuantizedNote {
   id: string;
   pitch: PitchCoordinate;
@@ -30,6 +60,41 @@ export interface QuantizedNote {
   articulation?: ArticulationType;
   tieStart?: boolean;
   tieEnd?: boolean;
+  /** Round 48: committed source-voice provenance (absent when the score has none). */
+  sourceProvenance?: NoteSourceProvenance;
+}
+
+/**
+ * Round 48 — **one authored source silence**: a written rest (`r`/`R`) or an
+ * invisible spacer (`\skip`/`s`), read from the pinned source by the exporter.
+ *
+ * The two are different facts and are preserved as different facts: a written
+ * rest states that the *voice* is silent, a spacer states only that the voice
+ * occupies time. Neither is whole-hand silence — the engine's rest layer checks
+ * the hand that actually sounds before painting anything.
+ */
+export interface VoiceSilence {
+  /** Source voice the silence is written in. */
+  voice: string;
+  /** Hand the source parts assign that voice. */
+  hand: Hand;
+  /** Absolute tick the silence opens on. */
+  startTick: number;
+  /** Length of the silence (ticks). */
+  durationTicks: number;
+  /** `'rest'` = a written rest; `'skip'` = a spacer (`\skip` / `s`). */
+  kind: 'rest' | 'skip';
+  /** Source staff the voice prints on. */
+  staff: string;
+  /** Source file (relative to the vendored source root). */
+  file: string;
+  /** Source line and column of the written silence. */
+  line: number;
+  col: number;
+  /** Source bar number as the compiler reported it. */
+  bar: number;
+  /** Occurrence of that exact origin in the unfolded performance (1-based). */
+  occurrence: number;
 }
 
 export interface TimeSignatureOverlay {
@@ -132,6 +197,12 @@ export interface QuantizedGridScore {
    * score has no such provenance.
    */
   tieChains?: WrittenTieChain[];
+  /**
+   * Round 48: the source's **authored silences** (written rests and spacers),
+   * in source order. Omitted entirely when the score has no such provenance, so
+   * every pre-Round-48 surface and score is untouched.
+   */
+  sourceSilences?: VoiceSilence[];
 }
 
 export type JankoRowIndex = 0 | 1;

@@ -556,7 +556,7 @@ export const PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID = 'pitch-parity-specimen';
  * the real engine. The 0.90 candidate and the Reference must agree for the
  * same score/options. Bach GOLD stays frozen.
  */
-export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
+export const ROUND_47_METADATA: JankoCandidateRound = {
   round: 47,
   title: 'Long-value symbols, the half-ring flat face and the tie-origin simplification — Round 47',
   description:
@@ -667,13 +667,13 @@ function round47Windows(): JankoCandidateWindow[] {
       33,
       1,
       'Brahms m. 33 · a 96-tick exception whose continuation the tie already states',
-      'The D6 figure of m. 33: the bracket carries 144, the member states 96 (a half note) and its committed written tie continues into the 24-tick written component. Under the round\u2019s shared rule that member no longer paints its own long mark \u2014 the outgoing arc plus the 24-tick continuation head state the hold \u2014 so the window is where the operator sees exactly what the simplification removes and what remains (the member\u2019s own stem, the arc, the continuing head).'
+      'The D6 figure of m. 33: the member\u2019s own value is stated by the bracket\u2019s inheritance together with the written tie that continues it into the 24-tick component, so no individual long mark is painted for the member: the outgoing arc plus the continuation head already instruct the reader what is held. The window is where the operator sees exactly what the rule removes and what remains (the member\u2019s own stem, the arc, the continuing head). No fabricated 96/144 ownership is claimed anywhere: the bracket states its own carried value, the member\u2019s source value is untouched, and the sounding total is never restated by a vertical badge.'
     ),
     brahmsWindow(
       61,
       3,
       'Brahms mm. 61–63 · the 504-tick E2 chain, component by component',
-      'The four written components (192 · 192 · 96 · 24) are stated by four heads joined by three tie arcs across the barlines. Three of them are long values and have outgoing ties, so under the round\u2019s shared rule they paint no individual long mark: the chain reads as one sustained hold whose length is carried by the components and the arcs. The terminal 24-tick component keeps its exact statement \u2014 a terminal value is never omitted.'
+      'The four written components (192 · 192 · 96 · 24) are stated by four heads joined by three tie arcs across the barlines. The three non-terminal long components have outgoing ties, so their individual long marks are redundant against the arc that continues them and are omitted; the terminal 24-tick component keeps its exact statement, because a terminal value has no continuation to lean on and is never omitted. The chain therefore reads as one sustained hold whose length is carried by the components and the arcs \u2014 not by a vertical badge restating a written component.'
     ),
     brahmsWindow(
       64,
@@ -713,7 +713,7 @@ function round47Card(spec: {
 }
 
 
-export const CURRENT_CANDIDATES: JankoCandidate[] = [
+export const ROUND_47_CANDIDATES: JankoCandidate[] = [
   round47Card({
     id: 'round47-mounted-control',
     label: 'Round 47 · 1 — Mounted control (half-ring closed by the spine)',
@@ -840,6 +840,179 @@ export interface CandidateOptionBadge {
  * states its value on the round's question (including the incumbent one) while
  * a locked decision that rides along as shared context never shows up.
  */
+/**
+ * Round 48 — **two circle-size/spacing readings of the same corrected surface.**
+ *
+ * The round's operator-approved delivery is a *set of corrections*, not a new
+ * vocabulary: every card carries all of them and the two cards differ in exactly
+ * one declared axis, the detached closed circle's size and its air from the
+ * owning pitch symbol. Nothing else — no measure-specific override, no
+ * alternative grammar, no second tie family.
+ *
+ * **Shared by every card (the corrections):**
+ *
+ * - **rest provenance** (`sourceSilences` + `note.sourceProvenance` at the score
+ *   builder, the engine's two sounding-ink maps): an inferred hand-rest is never
+ *   painted when the **source's own hand** sounds through its span, is never
+ *   painted inside the displayed hand's own sustaining ink from another system,
+ *   and is classified `authored` when a source-written rest covers it. The m. 66
+ *   `leftHandUpper` eighth and the m. 70 quarter are withheld (published as
+ *   `rest-inference-withheld`), the m. 66 `r`-authored RH quarter stays;
+ * - **no redundant member stem** in any carrier mode: a bracket-member whose own
+ *   value *is* the bracket's carried value never keeps a shared stem, so the
+ *   m. 7 first RH cluster paints none (the confirmed Round 47 `'symbol'`
+ *   regression is gone);
+ * - **one tie contour, faithfully traced**: the round's shared tie treatment is
+ *   the two-cubic filled contour traced from LilyPond 2.26.0's own tie
+ *   (`options.tieProfile: 'traced'`) — pointed tips, `tokens.tieApexThickness`
+ *   (0.45pt) mid thickness, control points at `tokens.tieControlFraction` (0.21)
+ *   of the chord — with the engine's own span law kept as the recorded
+ *   adaptation;
+ * - **measured tie routing**: the side is chosen by measured ink (heads, stems,
+ *   brackets, rests, holds), one side per written chain, the chord is clipped
+ *   clear of any bracket between its heads. The m. 61–63 chain therefore routes
+ *   **below** its E2 (the A2/A3 stems it used to cross live above it), the m. 33
+ *   D6 tie sits **above** its note (the D5 head of its own measure stands under
+ *   the conventional side), and no arc crosses a stem or a bracket;
+ * - **detached long-value symbols always to the right**, on the head's own pitch
+ *   line, with the local staff-rule knockout inside the hollow interior (a staff
+ *   line is not an obstacle) and the m. 3 / m. 13 seats no longer displaced
+ *   above the note; the half-ring keeps its shape and size;
+ * - **the accepted flat face**: `halfRingGap: 0.30` — the bracket spine is
+ *   interrupted across a half-ring's chord (0.30pt clear of each end), nothing
+ *   drawn to close it, no ink masked;
+ * - **the accepted inheritance rule**: `tieOriginIndicator: 'omit-outgoing'` —
+ *   a long-value origin whose committed written tie continues states itself by
+ *   the arc plus the next component, never by a redundant mark; the terminal
+ *   component and the bracket's own carried value are never omitted.
+ *
+ * **The one axis:** card A states the detached closed circles at 0.90 of their
+ * Round 47 size with 0.60pt of air to the owning head; card B at 0.88 with
+ * 0.80pt. Both were measured against the pitch numerals (the closed ring's outer
+ * diameter was 3.96pt against the `0` digit's 3.67pt advance, with only a 0.30pt
+ * gap): the two cards are the modest, real-engine readings the operator asked to
+ * judge. Neither is promoted by this round and the Reference keeps its Round 46
+ * detached geometry (`detachedRingScale: 1`, `detachedSymbolAir: 0.30`).
+ */
+export const ROUND_48_METADATA: JankoCandidateRound = {
+  round: 48,
+  title: 'Rest provenance, the traced tie and the detached circle — Round 48',
+  description:
+    'Round 48 compares **two circle-size/spacing readings of one corrected Brahms surface** — the same literal windows, the same 95 % clusters, the same written ties, the same source pitches, and *all* of the round\u2019s corrections on both cards: **A. Rest provenance** \u2014 the score now carries the source\u2019s own voice\u2192hand mapping and its authored silences (written rests *and* spacers), and the engine checks the source\u2019s hand before it paints any inferred hand-rest: the m. 66 `leftHandUpper` eighth rest is **withheld** (the source\u2019s own LH sounds through 12528\u201312552) and the m. 70 LH quarter is withheld the same way, while the m. 66 RH quarter \u2014 which the source writes as an `r` \u2014 stays and is classified **authored**. Each withheld rest and each inferred (unauthored) rest is published as a `\u2019info\u2019` diagnostic: visible in the Reference record, gating nothing. **B. No redundant member stem** \u2014 a bracket member whose own value is the bracket\u2019s carried value never keeps a shared stem in *any* carrier mode, so the m. 7 first RH cluster paints none (Round 47\u2019s detached cards had painted 93 redundant shared members; the Reference\u2019s two independently justified pairs are untouched). **C. The traced tie** \u2014 both cards paint the tie as the **two-cubic filled contour measured from LilyPond 2.26.0\u2019s own tie** (the compiler of this score\u2019s pinned source): pointed tips where both boundaries meet, a constant 0.449pt mid thickness, control points at 21 % of the chord \u2014 a flat wide crown instead of the Round 46 single quadratic of uniform 0.70pt stroke with blunt butt ends. **D. Measured tie routing** \u2014 the side is chosen on real ink (heads, stems, brackets, rests, holds), one side per chain, and the chord is clipped clear of any bracket between its heads: the m. 61\u201363 E2 chain now runs **below** its note (the A2/A3 stems it used to cross stand above it), the m. 33 D6 tie sits **above** (the D5 head of its own measure stands below), the m. 65\u201366 residue is gone, and no arc crosses a stem or bracket. **E. Detached symbols always right** \u2014 every detached long-value statement stands on its head\u2019s own pitch line immediately to its right, with the staff line it stands on cleaned out of its hollow interior (m. 3 and m. 13 are no longer displaced above the note) and no other ink ever covered; **F. The accepted flat face** \u2014 the bracket spine is interrupted across a half-ring\u2019s chord at 0.30pt. **G. The accepted inheritance** \u2014 `omit-outgoing` states a long value by the arc plus its continuation, never by a redundant origin mark. **The one axis** is the detached closed circle: card A at 0.90 of its size with 0.60pt of air, card B at 0.88 with 0.80pt \u2014 both readings of the measured 0.30pt gap between the 3.96pt ring and the 3.67pt `0` glyph.',
+  openAxes: ['detachedRingScale', 'detachedSymbolAir'],
+};
+
+/** Round 48 — the shared corrections both cards carry, verbatim. */
+const ROUND_48_BASE: Partial<JankoLayoutOptions> = {
+  ...ROUND_46_FAMILY,
+  // The operator-approved corrections: the source-evidence rest rule needs no
+  // option (it reads the committed provenance), the outgoing-tie inheritance
+  // rule and the traced tie contour do.
+  tieOriginIndicator: 'omit-outgoing',
+  tieProfile: 'traced',
+  // Round 47's accepted direction: the detached mount states the long-value
+  // exceptions; both cards read it, so the axis below is the only difference.
+  exceptionCarrier: 'symbol',
+};
+
+/**
+ * Round 48 — the shared tokens both cards state: the Round 46 readability ratios
+ * plus the Round 47 **accepted flat face** (`halfRingGap: 0.30`). Exported so the
+ * registry test reads the same object the cards are built from.
+ */
+export const ROUND_48_SHARED_TOKENS: Partial<JankoTokens> = {
+  ...ROUND_46_TOKENS,
+  halfRingGap: ROUND_47_HALF_RING_GAP,
+};
+
+/** Round 48 — the literal windows both cards must render, never one fewer. */
+function round48Windows(): JankoCandidateWindow[] {
+  return [
+    brahmsWindow(
+      1,
+      3,
+      'Brahms mm. 1–3 · the attached circle and the staff line it stands on',
+      'The opening clusters: the 192-tick exceptions (E5 at m. 1, C5 at m. 3) are detached closed rings seated to the **right** of their heads on the head\u2019s own pitch line. The m. 3 ring (tick 432) stands exactly on a drawn octave rule and cleans it out of its own hollow interior — before this round it was the one seat displaced *above* the note because that rule used to be treated as an obstacle. The m. 1 ring shows the increased air: the ring\u2019s ink starts 0.60pt (card A) / 0.80pt (card B) from the head\u2019s knockout edge.'
+    ),
+    brahmsWindow(
+      7,
+      4,
+      'Brahms mm. 7–10 · no redundant member stem, and the half-ring beside B',
+      'The m. 7–9 clusters are where the Round 47 detached cards had re-painted redundant vertical member stems: a member whose own value is the bracket\u2019s carried value keeps **none** now, in every carrier mode, while the genuinely independent 48-tick members keep their horizontal arms. m. 10 carries a half-ring (96) beside a B: the half-ring keeps its shape and size and receives the increased spacing only.'
+    ),
+    brahmsWindow(
+      13,
+      1,
+      'Brahms m. 13 · the second staff-rule seat',
+      'The m. 13 192-tick exception is the round\u2019s second rule-crossing seat: like m. 3 it stands to the right of its head on its own pitch line with the octave rule cleaned out of its interior, instead of being lifted above the note.'
+    ),
+    brahmsWindow(
+      33,
+      1,
+      'Brahms m. 33 · a 96-tick exception whose continuation the tie already states, tied above',
+      'The D6 figure of m. 33: the bracket carries 144, the member states 96, and its committed written tie continues into the 24-tick written component — so under the accepted inheritance rule the member paints **no** individual long mark: the arc plus the continuation head state the hold. The tie itself now sits **above** the D6 head (the D5 head of the same measure stands under the conventional side), where before this round it threaded between the two note rows.'
+    ),
+    brahmsWindow(
+      61,
+      6,
+      'Brahms mm. 61–66 · the 504-tick chain routed below its note, and the two withheld rests',
+      'The four written components of the E2 chain (192 · 192 · 96 · 24) are joined by three tie arcs, all three now **below** their note: the A2/A3 stems the first arc used to cross stand above it and the chain no longer alternates sides. mm. 64–66: the m. 65 A2/D3 ties keep clear of the D3 stem they crossed, and m. 66 reads as the source does — the `leftHandUpper` eighth rest the import implied is **withheld** (the source\u2019s own left hand sounds through 12528\u201312552) and is published as `rest-inference-withheld`, while the RH quarter rest the source writes as `r` stays and is classified **authored**.'
+    ),
+    brahmsWindow(
+      70,
+      1,
+      'Brahms m. 70 · the second false hand-rest, withheld the same way',
+      'The m. 70 tick-13440 LH quarter rest is withheld for exactly the m. 66 reason: the committed source provenance assigns the sounding notes there to `leftHandUpper`/`leftHandLower`, so the displayed LH gap is a staff/track label artefact. The rule is general — no bar-specific exclusion list — and the evidence (note ids and source voices) is published with the withheld rest.'
+    ),
+  ];
+}
+
+/** One Round 48 card: the shared corrections, one declared size/spacing delta. */
+function round48Card(spec: {
+  id: string;
+  label: string;
+  description: string;
+  axis: string;
+  tokens: Partial<JankoTokens>;
+  tags: string[];
+}): JankoCandidate {
+  return {
+    id: spec.id,
+    label: spec.label,
+    description: spec.description,
+    axis: spec.axis,
+    options: { ...ROUND_48_BASE },
+    tokens: { ...ROUND_48_SHARED_TOKENS, ...spec.tokens },
+    windows: round48Windows(),
+    tags: spec.tags,
+  };
+}
+
+export const ROUND_48_CANDIDATES: JankoCandidate[] = [
+  round48Card({
+    id: 'round48-circle-090-air-060',
+    label: 'Round 48 · A — Circle 0.90 · air 0.60pt',
+    description:
+      'The first of the round\u2019s two detached-circle readings, on the corrected surface every card shares: the closed duration circle is engraved at **0.90** of its Round 47 size and stands **0.60pt** clear of its owning head\u2019s knockout edge (the incumbent air was 0.30pt, and the measured gap between the 3.96pt ring and the 3.67pt `0` digit was exactly that 0.30pt). The half-ring keeps its shape and size and receives the same spacing only, and neither the bracket mount nor the horizontal carrier is resized. Everything else — the traced tie, its measured routing, the rest provenance, the suppressed redundant stems, the 0.30pt flat face \u2014 is identical to card B and to the Reference.',
+    axis: 'detachedRingScale',
+    tokens: { detachedRingScale: 0.90, detachedSymbolAir: 0.60 },
+    tags: ['brahms', 'duration', 'detached-symbols', 'ties', 'rests', 'experimental'],
+  }),
+  round48Card({
+    id: 'round48-circle-088-air-080',
+    label: 'Round 48 · B — Circle 0.88 · air 0.80pt',
+    description:
+      'The second reading: the closed circle at **0.88** of its Round 47 size with **0.80pt** of air from the owning head — the more generous end of the modest range the operator asked to judge, and the same corrected surface as card A (traced tie, measured routing, rest provenance, no redundant member stems, 0.30pt flat face, half-ring untouched in shape and size). The two cards are the whole comparison: the token pair is the only difference between them.',
+    axis: 'detachedSymbolAir',
+    tokens: { detachedRingScale: 0.88, detachedSymbolAir: 0.80 },
+    tags: ['brahms', 'duration', 'detached-symbols', 'ties', 'rests', 'experimental'],
+  }),
+];
+
+export const CURRENT_ROUND_METADATA: JankoCandidateRound = ROUND_48_METADATA;
+
+export const CURRENT_CANDIDATES: JankoCandidate[] = ROUND_48_CANDIDATES;
+
 export function candidateBadges(
   candidate: JankoCandidate,
   round: JankoCandidateRound = CURRENT_ROUND_METADATA
@@ -885,7 +1058,13 @@ export function candidateBadges(
   return badges;
 }
 
-/** Look one candidate up by id. */
+/**
+ * Look one candidate up by id — the live registry first, then the **parked**
+ * Round 47 registry, so a historical card stays addressable (and re-renderable)
+ * after the next round opens. Nothing else is registered.
+ */
 export function getCandidate(id: string): JankoCandidate | undefined {
-  return CURRENT_CANDIDATES.find((c) => c.id === id);
+  return (
+    CURRENT_CANDIDATES.find((c) => c.id === id) ?? ROUND_47_CANDIDATES.find((c) => c.id === id)
+  );
 }

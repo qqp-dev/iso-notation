@@ -60,6 +60,8 @@ import {
 import {
   JankoTieAnchorShortfall,
   JankoTieArcGeometry,
+  JankoTieComponentPlan,
+  JankoTieProfile,
   JankoTieChainPlan,
   JankoTieDisplayPlan,
   JankoTieStemCrossing,
@@ -186,6 +188,8 @@ import {
   stemDirection,
   subdivisionMarkCount,
   withClaspRail,
+  detachedSymbolInteriors,
+  renderDetachedRuleKnockout,
 } from './elements/rhythm';
 import { durationDotCount } from './elements/duration';
 import {
@@ -1794,6 +1798,13 @@ export interface JankoSystemLayout {
    * refused rest is never a silent omission.
    */
   unwrittenRests: JankoUnwrittenRest[];
+  /**
+   * Round 48: inferred hand-rests the **source evidence withheld** — a gap in
+   * the displayed hand that the source's own hand does not corroborate (see
+   * {@link JankoRestWithheld}). Published for the linter and the hand-off; never
+   * painted, never silent.
+   */
+  withheldRests: JankoRestWithheld[];
   /** External left clasps of the chord-grouping paradigm ([] for `'none'`). */
   clasps: JankoClaspGroupGeometry[];
   /** Rails joining contiguous clasps (`'beamed-clasp-rail'` only). */
@@ -2927,6 +2938,28 @@ export function drawnStaffRuleYs(
 }
 
 /**
+ * Round 48 — the drawn staff rules as **bands** (`y` plus ink half-height):
+ * the same painter's line set as {@link drawnStaffRuleYs} (`pitchGridRules` on
+ * the continuous fixed-core grids, the four octave equators otherwise), carried
+ * with the width each rule is painted at, so a seat test can decide whether a
+ * rule passes wholly inside a closed ring's hollow interior and the local
+ * knockout can band exactly that ink.
+ */
+export function drawnStaffRuleBands(
+  geo: JankoSystemGeometry,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): Array<{ y: number; half: number }> {
+  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
+    return pitchGridRules(geo, o, t)
+      .map((rule) => ({ y: rule.y, half: rule.width / 2 }))
+      .sort((a, b) => a.y - b.y);
+  }
+  const half = Math.max(...pitchGridRules(geo, o, t).map((rule) => rule.width), 0) / 2 || 0.5;
+  return drawnStaffRuleYs(geo, o, t).map((y) => ({ y, half }));
+}
+
+/**
  * The drawn staff rule nearest `y`; an exact tie goes to the rule **nearer
  * Middle C** (and then to the upper rule), exactly as §C specifies.
  */
@@ -3163,12 +3196,48 @@ export interface JankoUnwrittenRest {
   reason: 'no-slot' | 'protected-barline';
 }
 
+/**
+ * Round 48 — **one inferred hand-rest the source evidence refused to prove.**
+ *
+ * The rest layer walks one *displayed* hand's onsets, so a track/staff label
+ * that disagrees with the source part grouping can present a hand as silent
+ * while the source's own hand is sounding (m. 66's `leftHandUpper` eighth pair,
+ * m. 70's `leftHandUpper`/`leftHandLower` quarter). The operator's accepted
+ * policy is to **withhold** such an unproven hand-rest and publish why, never to
+ * silently relabel the displayed notes and never to promote a `\skip` spacer
+ * into visible silence.
+ */
+export interface JankoRestWithheld {
+  /** Absolute tick the silence would have opened on. */
+  tick: number;
+  /** Length of the silence that was withheld (ticks). */
+  durationTicks: number;
+  /** Hand whose silence could not be proven. */
+  hand: Hand;
+  /** Standard value the silence would have been written as. */
+  value: JankoRestGeometry['value'];
+  /**
+   * Why it was withheld: the **source's own hand** sounds inside the span
+   * (`'source-hand-sounding'`), or the displayed hand still has sounding ink
+   * inside the span from outside this system (`'displayed-hand-sustaining'`).
+   */
+  reason: 'source-hand-sounding' | 'displayed-hand-sustaining';
+  /** Ids of the sounding notes that overlap the span (published evidence). */
+  soundingNoteIds: string[];
+  /** Source voices of those notes, sorted (empty when the score has no provenance). */
+  soundingVoices: string[];
+  /** Human-readable evidence line for the hand-off and the linter. */
+  detail: string;
+}
+
 /** The written silences of one system plus every silence the fit rule refused. */
 export interface JankoRestLayer {
   /** The rests actually painted, in engraving order. */
   rests: JankoRestGeometry[];
   /** The silences refused by the fit rule, with the reason for each. */
   unwritten: JankoUnwrittenRest[];
+  /** Round 48: inferred hand-rests the source evidence refused to prove. */
+  withheld: JankoRestWithheld[];
 }
 
 /**
@@ -3231,6 +3300,59 @@ export function computeJankoRestLayer(
   const sysNotes = score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick);
   const out: JankoRestGeometry[] = [];
   const unwritten: JankoUnwrittenRest[] = [];
+  const withheld: JankoRestWithheld[] = [];
+
+  /**
+   * Round 48 — **the two sounding-ink maps** an inferred rest must clear.
+   *
+   * `displayed` holds every note of the *displayed* hand, including notes that
+   * start in another system and sustain into this one (a written tie
+   * continuation, a long value): the walk's own running release maximum only
+   * sees onsets of this system, and no hand may be declared silent while ink of
+   * its own still sounds under the span.
+   *
+   * `source` holds the same spans under the hand the **source parts** assign
+   * (`note.sourceProvenance.hands`), which is the evidence that decides an
+   * inferred hand-rest's validity. A score without provenance has no source map,
+   * so every pre-Round-48 surface keeps its exact rests.
+   */
+  const displayed = new Map<Hand, Array<{ start: number; end: number; id: string }>>();
+  const source = new Map<
+    Hand,
+    Array<{ start: number; end: number; id: string; voices: string[] }>
+  >();
+  for (const n of score.notes) {
+    const end = n.startTick + n.durationTicks;
+    const hand = handForNote(n);
+    const bucket = displayed.get(hand);
+    if (bucket) bucket.push({ start: n.startTick, end, id: n.id });
+    else displayed.set(hand, [{ start: n.startTick, end, id: n.id }]);
+    for (const sourceHand of n.sourceProvenance?.hands ?? []) {
+      const sourceBucket = source.get(sourceHand);
+      const entry = {
+        start: n.startTick,
+        end,
+        id: n.id,
+        voices: n.sourceProvenance?.voices ?? [],
+      };
+      if (sourceBucket) sourceBucket.push(entry);
+      else source.set(sourceHand, [entry]);
+    }
+  }
+  /** Does any span of `list` overlap the half-open silence `[from, to)`? */
+  const overlaps = (
+    list: Array<{ start: number; end: number }> | undefined,
+    from: number,
+    to: number
+  ): boolean => Boolean(list?.some((span) => span.start < to - 1e-9 && span.end > from + 1e-9));
+  /**
+   * The authored source rests, for the classification of a painted silence.
+   * `known` states whether the score carries silence provenance at all: without
+   * it there is nothing to classify, and every rest is left exactly as it was
+   * (no `authored` flag, no provenance diagnostic) — the pre-Round-48 surfaces.
+   */
+  const authoredRests = (score.sourceSilences ?? []).filter((silence) => silence.kind === 'rest');
+  const silenceProvenanceKnown = (score.sourceSilences?.length ?? 0) > 0;
 
   for (const hand of ['RH', 'LH'] as const) {
     // One release per onset: a chord is silent only when every member is.
@@ -3277,6 +3399,42 @@ export function computeJankoRestLayer(
       const close = value === 'whole' ? getMeasureClosingBarlineX(measureIdx, geo, systemIndex, t) : null;
       const restX = value === 'whole' && open !== null && close !== null ? (open + close) / 2 : colX;
       const targetY = restSeatY(rowY, o.restStyle, value, t, geo, o, restX);
+      // Round 48 — the silence must be provable before it is painted.
+      const spanEnd = ticks[i + 1];
+      if (overlaps(displayed.get(hand), releaseTick, spanEnd)) {
+        // The hand's own ink (from any system) still sounds under the span:
+        // never a rest, and nothing to publish — the walk's onset list merely
+        // missed a sustain that started earlier.
+        continue;
+      }
+      const sourceInk = source.get(hand);
+      if (sourceInk && overlaps(sourceInk, releaseTick, spanEnd)) {
+        const sounding = sourceInk.filter(
+          (span) => span.start < spanEnd - 1e-9 && span.end > releaseTick + 1e-9
+        );
+        const voices = [...new Set(sounding.flatMap((span) => span.voices))].sort();
+        withheld.push({
+          tick: releaseTick,
+          durationTicks: gap,
+          hand,
+          value,
+          reason: 'source-hand-sounding',
+          soundingNoteIds: sounding.map((span) => span.id),
+          soundingVoices: voices,
+          detail:
+            `the source's own ${hand} part sounds through ticks ${releaseTick}–${spanEnd} ` +
+            `(${sounding.map((span) => span.id).join(', ')}` +
+            `${voices.length > 0 ? `, voices ${voices.join('/')}` : ''}), so the displayed ` +
+            `${hand} hand's gap is a staff/track label artefact, not whole-hand silence`,
+        });
+        continue;
+      }
+      const authored = authoredRests.find(
+        (silence) =>
+          silence.hand === hand &&
+          silence.startTick <= releaseTick + 1e-9 &&
+          silence.startTick + silence.durationTicks >= spanEnd - 1e-9
+      );
       const candidate: JankoRestGeometry = {
         tick: releaseTick,
         durationTicks: gap,
@@ -3285,6 +3443,10 @@ export function computeJankoRestLayer(
         y: targetY,
         value,
         style: o.restStyle,
+        ...(silenceProvenanceKnown
+          ? { authored: authored !== undefined }
+          : {}),
+        ...(authored ? { sourceOrigin: `${authored.file}:${authored.line}` } : {}),
       };
       const refused = (reason: JankoUnwrittenRest['reason']): void => {
         unwritten.push({
@@ -3465,6 +3627,7 @@ export function computeJankoRestLayer(
   return {
     rests: out.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1)),
     unwritten: unwritten.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1)),
+    withheld: withheld.sort((a, b) => a.tick - b.tick || (a.hand < b.hand ? -1 : 1)),
   };
 }
 
@@ -3490,6 +3653,18 @@ export function computeJankoRests(
 
 /** Vertical tolerance (pt) of the exact-row and disc-clearance tests. */
 const EPS = 1e-6;
+/**
+ * Round 48 — the tie's outside-texture clearance scoring. An arc whose span
+ * carries no foreign ink at all is *open* (`TIE_CLEARANCE_OPEN` scores like a
+ * comfortable corridor rather than infinity, so one measure's accidental void
+ * never outweighs a real comparison), and two sides count as equally clear
+ * within `TIE_CLEARANCE_TOLERANCE` (pt) — inside that band the conventional side
+ * wins, which keeps the rule stable against sub-point geometry noise.
+ */
+const TIE_CLEARANCE_OPEN = 12.0;
+/** Round 48: shortest tie chord a bracket clip may leave (pt). */
+const TIE_MIN_CHORD = 3.0;
+const TIE_CLEARANCE_TOLERANCE = 0.5;
 
 /**
  * Air (pt) a row-snapped head keeps from the nearest head of a *different*
@@ -7349,15 +7524,25 @@ export function layoutJankoSystemShifted(
       // established shared-stem rule.
       //
       // The suppression is scoped to the Round 45 carrier doctrine itself
-      // (`exceptionCarrier: 'horizontal'`, the only setting under which the
-      // independent values have a horizontal home — see the Round 41/42
-      // carrier block above). With the golden default `exceptionCarrier:
-      // 'none'` — the Round 44 reserve, the Bach GOLD path — the vertical
-      // shared stem is the *only* carrier of the one-duration onset, so it
-      // stays exactly as landed: the reserve reproduces the Round 44 geometry
-      // bit for bit.
+      // (`exceptionCarrier !== 'none'`: under `'horizontal'` and Round 47's
+      // detached `'symbol'` mount the independent values state themselves on a
+      // carrier or a detached symbol, so the redundant vertical stem is never
+      // the member's only statement). Round 48 makes that rule **independent of
+      // the carrier mode** exactly as Round 45's ticket required: the bracket
+      // owns the carried value in both modes, so no member whose own value *is*
+      // the carried value may keep a shared stem merely because the detached
+      // mount replaced the horizontal arm (the confirmed Round 47 regression:
+      // cards 3/4 painted 93 suppressed members against the Reference's two
+      // independently justified pairs).
+      //
+      // With the canonical default `exceptionCarrier: 'none'` — the Round 44
+      // reserve, the Bach GOLD path — the doctrine has no home at all: the
+      // vertical shared stem is the *only* carrier of the one-duration onset,
+      // so it stays exactly as landed and the reserve reproduces the Round 44
+      // geometry bit for bit. Setting `'none'` remains a historical surface,
+      // never a carrier vocabulary.
       const group =
-        o.exceptionCarrier === 'horizontal'
+        o.exceptionCarrier !== 'none'
           ? rawGroup.filter((p) => {
               if (!chordColumns.admittedBracketIds.has(p.note.id)) return true;
               const clasp = clasps.find(
@@ -7783,7 +7968,7 @@ export function layoutJankoSystemShifted(
      * a silent drop, never an erasure.
      */
     const detachedBoxes: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
-    const staffRules = drawnStaffRuleYs(geometry, o, t);
+    const staffRules = drawnStaffRuleBands(geometry, o, t);
     const claspBoxes = clasps.map((clasp) => claspInkBox(clasp, t));
 
     /**
@@ -7816,6 +8001,7 @@ export function layoutJankoSystemShifted(
         y: 0,
         seat: 'right',
         distance: 0,
+        ruleKnockouts: [],
         ...(request.partnerId !== undefined ? { partnerId: request.partnerId } : {}),
       };
       // The run's own ink box at the origin: every candidate is this box moved,
@@ -7823,53 +8009,56 @@ export function layoutJankoSystemShifted(
       const origin = detachedSymbolInkBox(probe, t);
       const kind = longMarkKindForBase(marks.base, longStyle);
       const halfRing = kind === 'half-ring';
+      const seatAir = Math.max(air, t.detachedSymbolAir);
       const e = knockoutHalfExtents(o, t, p.note.startTick, p);
-      const midX = (origin.x0 + origin.x1) / 2;
-      const centre = { x: p.x - midX };
-      const candidates: Array<{ seat: JankoDetachedSeatKind; x: number; y: number }> = [
-        // Adjacent to the owning head: the symbol stands on the head's own
-        // pitch line (its chord/axis y is the member's y, exactly like the
-        // horizontal mount), just clear of the head's knockout box.
-        { seat: 'right', x: p.x + e.wx + air - origin.x0, y: p.y },
-        { seat: 'left', x: p.x - e.wx - air - origin.x1, y: p.y },
-        { seat: 'above', x: centre.x, y: p.y - e.hy - air - origin.y1 },
-        { seat: 'below', x: centre.x, y: p.y + e.hy + air - origin.y0 },
-      ];
+      // Round 48 — **one consistent seat: to the right of the owned glyph.**
+      // A detached long-value symbol is a duration statement, not a decoration
+      // of the head: it always stands on the head's own pitch line, immediately
+      // to the right of its knockout box, at `t.detachedSymbolAir` of clear air
+      // and at the same axis pitch. The former left/above/below/pair-channel
+      // fallbacks existed for one measured reason — the right seat's ink used to
+      // be rejected where it crossed a drawn staff rule — and that obstacle is
+      // gone: a closed ring cleans the rule out of its own hollow interior (see
+      // `ruleKnockouts` below), exactly as the operator directed. A seat is now
+      // refused only for real foreign ink (a head, a bracket, a sibling symbol,
+      // a dot) or for leaving the staff, and a refused species keeps its own
+      // ordinary duration ink rather than jumping to a different lane.
+      const candidates: Array<{ seat: JankoDetachedSeatKind; x: number; y: number }> = [];
       if (partner) {
-        const upper = p.y <= partner.y ? p : partner;
-        const lower = upper === p ? partner : p;
-        const upperMask = knockoutHalfExtents(o, t, upper.note.startTick, upper);
-        const lowerMask = knockoutHalfExtents(o, t, lower.note.startTick, lower);
-        const pairMidX = (p.x + partner.x) / 2;
-        const channelTop = upper.y + upperMask.hy;
-        const channelBottom = lower.y - lowerMask.hy;
-        if (channelBottom - channelTop >= origin.y1 - origin.y0 + 2 * air) {
-          candidates.unshift({
-            seat: 'pair-channel',
-            x: pairMidX - midX,
-            y: (channelTop + channelBottom) / 2 - (origin.y0 + origin.y1) / 2,
-          });
-        }
+        // A shared statement for a same-onset 2-span pair: it stands to the
+        // right of the pair's own right edge at the pair's mid pitch — the
+        // empty channel between the two heads, read as one value for both.
+        const rightOfPair =
+          p.x + e.wx >= partner.x + knockoutHalfExtents(o, t, partner.note.startTick, partner).wx
+            ? p
+            : partner;
+        const pairMask = knockoutHalfExtents(o, t, rightOfPair.note.startTick, rightOfPair);
         candidates.push({
-          seat: 'above',
-          x: pairMidX - midX,
-          y: upper.y - upperMask.hy - air - origin.y1,
+          seat: 'right',
+          x: rightOfPair.x + pairMask.wx + seatAir - origin.x0,
+          y: (p.y + partner.y) / 2 - (origin.y0 + origin.y1) / 2,
         });
-        candidates.push({
-          seat: 'below',
-          x: pairMidX - midX,
-          y: lower.y + lowerMask.hy + air - origin.y0,
-        });
+      } else {
+        candidates.push({ seat: 'right', x: p.x + e.wx + seatAir - origin.x0, y: p.y });
       }
       const chordHalf = midpointMetrics(t, durationScale).ringStroke / 2;
-      const blocked = (box: { x0: number; y0: number; x1: number; y1: number }, axisY: number): string | null => {
+      /**
+       * Round 48 — the seat verdict of one placed candidate. `ok` carries the
+       * drawn rules the closed ring cleans out of its hollow interior (empty
+       * when the seat crosses none); otherwise the first blocking reason, which
+       * is published in the refusal exactly as before.
+       */
+      const verdictOf = (
+        placed: JankoDetachedSymbolGeometry
+      ): { ok: true; knockouts: Array<{ y: number; half: number }> } | { ok: false; reason: string } => {
+        const box = detachedSymbolInkBox(placed, t);
         if (
           box.x0 < geometry.staffLeft - 1e-9 ||
           box.x1 > geometry.staffRight + 1e-9 ||
           box.y0 < geometry.staffTopY - 1e-9 ||
           box.y1 > geometry.staffBotY + 1e-9
         ) {
-          return 'it would leave the staff';
+          return { ok: false, reason: 'it would leave the staff' };
         }
         for (const q of notes) {
           const qe = knockoutHalfExtents(o, t, q.note.startTick, q);
@@ -7880,43 +8069,88 @@ export function layoutJankoSystemShifted(
               0
             )
           ) {
-            return `it would overlap the knockout of ${q.note.id}`;
+            return { ok: false, reason: `it would overlap the knockout of ${q.note.id}` };
           }
         }
         for (const claspBox of claspBoxes) {
-          if (boxesWithin(box, claspBox, 0)) return 'it would overlap a bracket';
-        }
-        for (const placed of detachedBoxes) {
-          if (boxesWithin(box, placed, 0)) return 'it would overlap an already seated symbol';
-        }
-        for (const rule of staffRules) {
-          if (rule > box.y0 - 1e-9 && rule < box.y1 + 1e-9) return 'a drawn staff rule crosses it';
-          if (halfRing && Math.abs(rule - axisY) <= chordHalf + halfRingGap + 1e-9) {
-            return 'a drawn staff rule would close its flat face';
+          if (boxesWithin(box, claspBox, 0)) {
+            return { ok: false, reason: 'it would overlap a bracket' };
           }
         }
-        return null;
+        for (const placedBox of detachedBoxes) {
+          if (boxesWithin(box, placedBox, 0)) {
+            return { ok: false, reason: 'it would overlap an already seated symbol' };
+          }
+        }
+        const interiors = detachedSymbolInteriors(placed, t);
+        const knockouts: Array<{ y: number; half: number }> = [];
+        for (const rule of staffRules) {
+          const crossing = rule.y > box.y0 - 1e-9 && rule.y < box.y1 + 1e-9;
+          // Round 48: a drawn rule is **not** an obstacle for a hollow mark. It
+          // may cross the mark only through a hollow counter, with the whole
+          // rule ink band (plus the declared knockout air) strictly inside that
+          // counter's inscribed circle; the rule is then cleaned out of the
+          // counter (`ruleKnockouts`, painted on the pre-tie layer) and the seat
+          // keeps its consistent right position. A half-ring — whose flat face
+          // must stay unbroken — is still refused outright.
+          const bandHalf = rule.half + t.staffRuleKnockoutHalfHeight;
+          const throughCounter = interiors.some(
+            (interior) =>
+              Math.abs(rule.y - interior.cy) + bandHalf < interior.r - 1e-9
+          );
+          if (crossing && throughCounter) {
+            knockouts.push({ y: rule.y, half: rule.half });
+            continue;
+          }
+          if (crossing) {
+            return {
+              ok: false,
+              reason: interiors.length > 0
+                ? `a drawn staff rule at ${rule.y.toFixed(2)} would cross its painted stroke`
+                : 'a drawn staff rule crosses it',
+            };
+          }
+          if (halfRing && Math.abs(rule.y - placed.y) <= chordHalf + halfRingGap + 1e-9) {
+            return { ok: false, reason: 'a drawn staff rule would close its flat face' };
+          }
+        }
+        return { ok: true, knockouts };
       };
-      let best: { seat: JankoDetachedSeatKind; x: number; y: number; distance: number } | null = null;
+      let best:
+        | {
+            seat: JankoDetachedSeatKind;
+            x: number;
+            y: number;
+            distance: number;
+            knockouts: Array<{ y: number; half: number }>;
+          }
+        | null = null;
       const reasons: string[] = [];
       for (const candidate of candidates) {
-        const box = {
-          x0: origin.x0 + candidate.x,
-          y0: origin.y0 + candidate.y,
-          x1: origin.x1 + candidate.x,
-          y1: origin.y1 + candidate.y,
+        const placed: JankoDetachedSymbolGeometry = {
+          ...probe,
+          x: candidate.x,
+          y: candidate.y,
+          seat: candidate.seat,
         };
-        const reason = blocked(box, candidate.y);
-        if (reason !== null) {
-          reasons.push(`${candidate.seat}: ${reason}`);
+        const verdict = verdictOf(placed);
+        if (!verdict.ok) {
+          reasons.push(`${candidate.seat}: ${verdict.reason}`);
           continue;
         }
+        const box = detachedSymbolInkBox(placed, t);
         const distance = Math.hypot(
           Math.max(box.x0 - p.x, 0, p.x - box.x1),
           Math.max(box.y0 - p.y, 0, p.y - box.y1)
         );
         if (best === null || distance < best.distance - 1e-9) {
-          best = { seat: candidate.seat, x: candidate.x, y: candidate.y, distance };
+          best = {
+            seat: candidate.seat,
+            x: candidate.x,
+            y: candidate.y,
+            distance,
+            knockouts: verdict.knockouts,
+          };
         }
       }
       if (best === null) {
@@ -7938,14 +8172,10 @@ export function layoutJankoSystemShifted(
         y: best.y,
         seat: best.seat,
         distance: best.distance,
+        ruleKnockouts: best.knockouts,
       };
       detachedSymbols.push(placed);
-      detachedBoxes.push({
-        x0: origin.x0 + best.x,
-        y0: origin.y0 + best.y,
-        x1: origin.x1 + best.x,
-        y1: origin.y1 + best.y,
-      });
+      detachedBoxes.push(detachedSymbolInkBox(placed, t));
       durationInkOwners.push({
         mount: 'symbol',
         run,
@@ -8410,7 +8640,73 @@ export function layoutJankoSystemShifted(
         y1: Math.max(stem.stemStartY, stem.stemEndY),
       });
     }
+    /**
+     * Round 48 — **the tie's real ink neighbours.** The Round 46 controller
+     * only ever walked coincident *heads*, so a tie could be routed straight
+     * through the stems, brackets, rests or holds it crossed and the crossing
+     * was merely published. The measured mm. 61–63 chain (its axis grazing the
+     * A2/A3 stems of its own span) and the m. 65 tie (crossing the D3 stem) are
+     * exactly that. A tie is now routed on measured ink: every painted stem of
+     * the system at its own x and extent, every bracket's ink box, every rest
+     * glyph and every hold connector is an obstacle the side decision reads,
+     * and the **conventional side still wins whenever it is clear** (no
+     * measure-specific coordinates, no passage table: one general rule).
+     */
+    const tieObstacles: JankoTieBox[] = [];
+    for (const stem of stems) {
+      tieObstacles.push({
+        id: stem.id,
+        x0: stem.x - JANKO_STEM_STROKE_WIDTH / 2,
+        y0: stem.y0,
+        x1: stem.x + JANKO_STEM_STROKE_WIDTH / 2,
+        y1: stem.y1,
+      });
+    }
+    for (const clasp of clasps) {
+      tieObstacles.push({ id: `clasp:${clasp.tick}`, ...claspInkBox(clasp, t) });
+    }
+    for (const rest of restLayer.rests) {
+      const box = restInkBox(rest, t);
+      tieObstacles.push({ id: `rest:${rest.tick}:${rest.hand}`, ...box });
+    }
+    for (const hold of holds) {
+      const reach = holdTerminalReach(t, hold.shape);
+      const half = holdTerminalHalfHeight(t, hold.shape);
+      tieObstacles.push({
+        id: `hold:${hold.noteId}`,
+        x0: hold.x1,
+        x1: Math.max(hold.x2, hold.terminalX) + reach,
+        y0: hold.y - half - hold.stroke,
+        y1: hold.y + half + hold.stroke,
+      });
+    }
     const inSystem = (tick: number): boolean => tick >= startTick && tick < endTick;
+    const profile = o.tieProfile;
+    const thickness = profile === 'traced' ? t.tieApexThickness : t.tieStroke;
+    const wallTolerance = t.tieEndpointAir + t.tieMaxDepth + t.tieStroke;
+    // Every head's knockout box: the same set for every arc, measured once.
+    const boxes: JankoTieBox[] = notes.map((p) => {
+      const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+      return { id: p.note.id, x0: p.x - e.wx, y0: p.y - e.hy, x1: p.x + e.wx, y1: p.y + e.hy };
+    });
+
+    /** One arc the system must resolve (a consecutive written-tie component pair). */
+    interface TieArcJob {
+      chain: JankoTieChainPlan;
+      component: JankoTieComponentPlan;
+      next: JankoTieComponentPlan;
+      k: number;
+      from: PositionedJankoNote;
+      to: PositionedJankoNote;
+      fromMask: { wx: number; hy: number };
+      toMask: { wx: number; hy: number };
+      /** Coincident heads of the tied hand (the wall the axis may walk past). */
+      localHeads: PositionedJankoNote[];
+      x1: number;
+      x2: number;
+    }
+
+    const jobs: TieArcJob[] = [];
     for (const chain of tiePlan.chains) {
       for (const [k, component] of chain.components.entries()) {
         const next = chain.components[k + 1];
@@ -8443,202 +8739,349 @@ export function layoutJankoSystemShifted(
           });
           continue;
         }
-        // ---- side and axis ------------------------------------------------
-        //
-        // The conventional tie sits on the side opposite the owning voice's
-        // stem (RH stems up → below, LH stems down → above). A coincident
-        // head of the same hand may block that corridor (a 2-span chord tone
-        // squeezed between two neighbours, the m39 D3 case): the controller
-        // then measures the **detour** each side needs — the wall of
-        // contiguous coincident boxes is walked outward and the axis pushed
-        // past it — and takes the smaller one, the conventional side winning
-        // ties. A side whose natural position needs no detour is therefore
-        // never abandoned, so the flip only ever happens where geometry
-        // demands it.
-        const localHeads = notes.filter(
-          (p) =>
-            (p.note.startTick === from.note.startTick || p.note.startTick === to.note.startTick) &&
-            p.rhythm.hand === from.rhythm.hand
-        );
-        const boxes: JankoTieBox[] = notes.map((p) => {
-          const e = knockoutHalfExtents(o, t, p.note.startTick, p);
-          return { id: p.note.id, x0: p.x - e.wx, y0: p.y - e.hy, x1: p.x + e.wx, y1: p.y + e.hy };
-        });
         const fromMask = knockoutHalfExtents(o, t, from.note.startTick, from);
         const toMask = knockoutHalfExtents(o, t, to.note.startTick, to);
-        const wallTolerance = t.tieEndpointAir + t.tieMaxDepth + t.tieStroke;
-        const axisFor = (candidate: -1 | 1): { y: number; detour: number } => {
-          const natural = (p: PositionedJankoNote, e: { hy: number }): number =>
-            p.y + candidate * (e.hy + t.tieEndpointAir);
-          // The tied heads' own natural positions.
-          let y = candidate < 0
-            ? Math.min(natural(from, fromMask), natural(to, toMask))
-            : Math.max(natural(from, fromMask), natural(to, toMask));
-          const detourOf = (value: number): number =>
-            candidate < 0
-              ? Math.max(0, Math.min(natural(from, fromMask), natural(to, toMask)) - value)
-              : Math.max(0, value - Math.max(natural(from, fromMask), natural(to, toMask)));
-          // Walk the contiguous wall of coincident heads outward from the tied
-          // heads and push the axis past it.
-          for (const tiedOnset of [from.note.startTick, to.note.startTick]) {
-            let edge = y;
-            for (let guard = 0; guard < localHeads.length; guard++) {
-              const blocker = localHeads
-                .filter((p) => p.note.startTick === tiedOnset)
-                .map((p) => {
-                  const e = knockoutHalfExtents(o, t, p.note.startTick, p);
-                  const far = candidate < 0 ? p.y + e.hy : p.y - e.hy;
-                  const limit = candidate < 0 ? far + t.tieEndpointAir : far - t.tieEndpointAir;
-                  return { limit, far };
-                })
-                .filter((candidateEdge) =>
-                  candidate < 0
-                    ? candidateEdge.limit < edge - 1e-9 && edge - candidateEdge.limit <= wallTolerance
-                    : candidateEdge.limit > edge + 1e-9 && candidateEdge.limit - edge <= wallTolerance
-                )
-                .sort((a, b) => (candidate < 0 ? a.limit - b.limit : b.limit - a.limit))[0];
-              if (!blocker) break;
-              edge = blocker.limit;
-            }
-            y = candidate < 0 ? Math.min(y, edge) : Math.max(y, edge);
-          }
-          return { y, detour: detourOf(y) };
-        };
         /**
-         * Rule clearance: a staff rule the axis sits on, or the curve's flat
-         * crown coincides with, would read as fused with the tie. The bulge
-         * shrinks to keep the crown clear (never below `tieMinDepth`), and only
-         * when even that cannot help does the whole axis step outward past the
-         * rule — the tie never lies on a staff line. Applied to the side that is
-         * finally chosen, so a flipped tie is cleared exactly like the
-         * conventional one.
+         * Round 48 — the **bracket** is ink between the two tied heads. A
+         * cluster bracket stands to the left of its members, so a tie whose
+         * chord runs into it would pass through the spine (the measured
+         * `clasp:12432` / `clasp:12624` cases of mm. 65–66). The chord is
+         * clipped to stop `tokens.tieEndpointAir` short of every bracket whose
+         * ink the tie's own band would reach; a clip that would leave no chord
+         * at all is not applied (the arc is then painted and published).
          */
-        const clearRules = (input: { y: number; side: -1 | 1; depth: number }): void => {
-          for (let guard = 0; guard < 8; guard++) {
-            const crownY = input.y + input.side * input.depth;
-            const near = rules
-              .map((rule) => ({ rule, crown: Math.abs(rule - crownY), axis: Math.abs(rule - input.y) }))
-              .filter((d) => d.crown < ruleHalf || d.axis < ruleHalf)
-              .sort((a, b) => Math.min(a.crown, a.axis) - Math.min(b.crown, b.axis))[0];
-            if (!near) return;
-            if (near.axis < ruleHalf) {
-              input.y = near.rule + input.side * (ruleHalf + CLASP_STEP_MARGIN);
-              continue;
-            }
-            const crownDepth = Math.abs(near.rule - input.y) - ruleHalf - CLASP_STEP_MARGIN;
-            if (crownDepth >= t.tieMinDepth) {
-              input.depth = Math.max(t.tieMinDepth, Math.min(input.depth, crownDepth));
-              continue;
-            }
-            input.y = near.rule + input.side * (ruleHalf + CLASP_STEP_MARGIN);
-          }
-        };
-        const candidates: Array<-1 | 1> = tieSideOrder(from.rhythm.hand);
-        const measured = candidates.map((candidate) => ({ candidate, ...axisFor(candidate) }));
-        const chosen =
-          measured.length === 2 && measured[1].detour + 1e-9 < measured[0].detour
-            ? measured[1]
-            : measured[0];
-        let side = chosen.candidate;
-        let y = chosen.y;
-        const x1 = from.x + fromMask.wx;
-        const x2 = to.x - toMask.wx;
-        let depth = tieArcDepth(x1, x2, t);
-        {
-          // The chosen side is rule-cleared before anything is measured against
-          // it, so the fit, the paint and the linter read one axis.
-          const state = { y, side, depth };
-          clearRules(state);
-          y = state.y;
-          side = state.side;
-          depth = state.depth;
+        let x1 = from.x + fromMask.wx;
+        let x2 = to.x - toMask.wx;
+        const bandTop = Math.min(from.y, to.y) - fromMask.hy - t.tieMaxDepth;
+        const bandBottom = Math.max(from.y, to.y) + toMask.hy + t.tieMaxDepth;
+        for (const clasp of clasps) {
+          const ink = claspInkBox(clasp, t);
+          if (ink.y1 < bandTop - 1e-9 || ink.y0 > bandBottom + 1e-9) continue;
+          if (ink.x0 <= x1 + 1e-9 || ink.x1 >= x2 - 1e-9) continue; // outside the open chord
+          // The bracket stands between the two heads. Either end is clipped —
+          // the chord keeps whichever side survives **longer**, so the tie stays
+          // attached to the head it can still reach; a clip that would leave no
+          // usable chord is not applied (the arc is painted and published).
+          const keepLeft = ink.x0 - t.tieEndpointAir - x1;
+          const keepRight = x2 - (ink.x1 + t.tieEndpointAir);
+          if (Math.max(keepLeft, keepRight) < TIE_MIN_CHORD) continue;
+          if (keepLeft >= keepRight) x2 = ink.x0 - t.tieEndpointAir;
+          else x1 = ink.x1 + t.tieEndpointAir;
         }
-        let probe = { x1, x2, y, side, depth } as Pick<
-          JankoTieArcGeometry,
-          'x1' | 'x2' | 'y' | 'side' | 'depth'
-        >;
-        let blocking = tieArcEntersBoxes(probe, boxes, t);
-        if (blocking) {
-          // The chosen side still touches a mask (a same-onset head the wall
-          // walk did not name). Try the other side, then a shallower curve on
-          // the first: the paint never enters a glyph box.
-          const alternative = measured.find((m) => m.candidate !== side);
-          if (alternative) {
-            const altState = { y: alternative.y, side: alternative.candidate, depth };
-            clearRules(altState);
-            const altProbe = {
-              x1,
-              x2,
-              y: altState.y,
-              side: altState.side,
-              depth: altState.depth,
-            };
-            if (!tieArcEntersBoxes(altProbe, boxes, t)) {
-              side = altState.side;
-              y = altState.y;
-              depth = altState.depth;
-              probe = altProbe;
-              blocking = null;
-            }
-          }
-        }
-        if (blocking) {
-          const shallow = { x1, x2, y, side, depth: t.tieMinDepth };
-          if (!tieArcEntersBoxes(shallow, boxes, t)) {
-            depth = t.tieMinDepth;
-            probe = shallow;
-            blocking = null;
-          }
-        }
-        const unresolvedBlock = blocking !== null;
-        const arc: JankoTieArcGeometry = {
-          noteId: chain.noteId,
-          index: component.index,
-          fromTick: component.startTick,
-          toTick: next.startTick,
-          fromHeadId: component.headId,
-          toHeadId: next.headId,
-          side,
-          y,
+        jobs.push({
+          chain,
+          component,
+          next,
+          k,
+          from,
+          to,
+          fromMask,
+          toMask,
+          localHeads: notes.filter(
+            (p) =>
+              (p.note.startTick === from.note.startTick || p.note.startTick === to.note.startTick) &&
+              p.rhythm.hand === from.rhythm.hand
+          ),
           x1,
           x2,
-          depth,
-          path: tieArcPath(x1, y, x2, side, depth),
-          crossesBarline: false,
-          stemCrossings: [],
-        };
-        if (unresolvedBlock) {
-          tieBlockedArcs.push({
-            noteId: chain.noteId,
-            component: component.index + 1,
-            headId: blocking ? blocking.id : '',
-            reason:
-              `no side of the tie between ${component.headId} and ${next.headId} clears ` +
-              `${blocking ? blocking.id : 'a coincident mask'}: the arc is painted on the ` +
-              `conventional side and the collision is published (never clipped, never hidden)`,
-          });
-        }
-        // The tie's **time** is its chord, so a barline the chord spans is a
-        // crossing even where the endpoint masks inset the painted curve just
-        // inside it (the m65 → m66 carries land on the barline's own onset).
-        arc.crossesBarline = score.barlines.some(
-          (barline) => barline.tick > component.startTick && barline.tick <= next.startTick
-        );
-        const bandY0 = Math.min(y, y + side * depth) - t.tieStroke / 2;
-        const bandY1 = Math.max(y, y + side * depth) + t.tieStroke / 2;
-        for (const stem of stems) {
-          if (stem.x <= Math.min(x1, x2) - 1e-9 || stem.x >= Math.max(x1, x2) + 1e-9) continue;
-          const overlap = Math.min(stem.y1, bandY1) - Math.max(stem.y0, bandY0);
-          if (overlap <= 1e-9) continue;
-          if (stem.id === from.note.id || stem.id === to.note.id) continue;
-          arc.stemCrossings.push({
-            stemNoteId: stem.id,
-            x: stem.x,
-            overlap,
-          });
-        }
-        tieArcs.push(arc);
+        });
       }
+    }
+
+    // ---- side and axis ---------------------------------------------------
+    //
+    // The conventional tie sits on the side opposite the owning voice's stem
+    // (RH stems up → below, LH stems down → above). A coincident head of the
+    // same hand may block that corridor (a 2-span chord tone squeezed between
+    // two neighbours, the m39 D3 case): the controller then measures the
+    // **detour** each side needs — the wall of contiguous coincident boxes is
+    // walked outward and the axis pushed past it — and takes the smaller one,
+    // the conventional side winning ties.
+    //
+    // Round 48 adds **measured ink** to that decision, and one side per chain:
+    //
+    // 1. every painted stem of the system (at its own x and extent), every
+    //    bracket's ink box, every rest glyph and every hold connector is an
+    //    obstacle the evaluation reads, so a tie no longer crosses the ink of a
+    //    note it does not belong to (the measured mm. 61–63 axis grazing the
+    //    A2/A3 stems, the m. 65 tie through the D3 stem);
+    // 2. a written tie **chain** keeps one side across all of its arcs in the
+    //    system: the side is chosen once per chain, by the summed measured cost
+    //    over the chain's own arcs, so consecutive arcs never alternate above
+    //    and below their pitch. Individual arcs still take their own axis,
+    //    depth and rule clearance.
+    //
+    // Nothing here is measure-specific: the same general rule produced the
+    // operator's requests — the mm. 61–63 chain routes below its E2 (the A2/A3
+    // stems it used to cross live above it) and the m. 33 tie may leave its
+    // previous side when that side is the one with ink.
+
+    /** Rule clearance: a staff rule the axis sits on, or the curve's flat crown
+     * coincides with, would read as fused with the tie. The bulge shrinks to keep
+     * the crown clear (never below `tieMinDepth`), and only when even that cannot
+     * help does the whole axis step outward past the rule — the tie never lies on
+     * a staff line. Applied to every evaluated side, so a flipped tie is cleared
+     * exactly like the conventional one. */
+    const clearRules = (input: { y: number; side: -1 | 1; depth: number }): void => {
+      for (let guard = 0; guard < 8; guard++) {
+        const crownY = input.y + input.side * input.depth;
+        const near = rules
+          .map((rule) => ({ rule, crown: Math.abs(rule - crownY), axis: Math.abs(rule - input.y) }))
+          .filter((d) => d.crown < ruleHalf || d.axis < ruleHalf)
+          .sort((a, b) => Math.min(a.crown, a.axis) - Math.min(b.crown, b.axis))[0];
+        if (!near) return;
+        if (near.axis < ruleHalf) {
+          input.y = near.rule + input.side * (ruleHalf + CLASP_STEP_MARGIN);
+          continue;
+        }
+        const crownDepth = Math.abs(near.rule - input.y) - ruleHalf - CLASP_STEP_MARGIN;
+        if (crownDepth >= t.tieMinDepth) {
+          input.depth = Math.max(t.tieMinDepth, Math.min(input.depth, crownDepth));
+          continue;
+        }
+        input.y = near.rule + input.side * (ruleHalf + CLASP_STEP_MARGIN);
+      }
+    };
+
+    /** Natural axis of one candidate side, with the outward wall walk. */
+    const axisFor = (job: TieArcJob, candidate: -1 | 1): { y: number; detour: number } => {
+      const { from, to, fromMask, toMask, localHeads } = job;
+      const natural = (p: PositionedJankoNote, e: { hy: number }): number =>
+        p.y + candidate * (e.hy + t.tieEndpointAir);
+      let y =
+        candidate < 0
+          ? Math.min(natural(from, fromMask), natural(to, toMask))
+          : Math.max(natural(from, fromMask), natural(to, toMask));
+      const detourOf = (value: number): number =>
+        candidate < 0
+          ? Math.max(0, Math.min(natural(from, fromMask), natural(to, toMask)) - value)
+          : Math.max(0, value - Math.max(natural(from, fromMask), natural(to, toMask)));
+      // Walk the contiguous wall of coincident heads outward from the tied
+      // heads and push the axis past it.
+      for (const tiedOnset of [from.note.startTick, to.note.startTick]) {
+        let edge = y;
+        for (let guard = 0; guard < localHeads.length; guard++) {
+          const blocker = localHeads
+            .filter((p) => p.note.startTick === tiedOnset)
+            .map((p) => {
+              const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+              const far = candidate < 0 ? p.y + e.hy : p.y - e.hy;
+              const limit = candidate < 0 ? far + t.tieEndpointAir : far - t.tieEndpointAir;
+              return { limit, far };
+            })
+            .filter((candidateEdge) =>
+              candidate < 0
+                ? candidateEdge.limit < edge - 1e-9 && edge - candidateEdge.limit <= wallTolerance
+                : candidateEdge.limit > edge + 1e-9 && candidateEdge.limit - edge <= wallTolerance
+            )
+            .sort((a, b) => (candidate < 0 ? a.limit - b.limit : b.limit - a.limit))[0];
+          if (!blocker) break;
+          edge = blocker.limit;
+        }
+        y = candidate < 0 ? Math.min(y, edge) : Math.max(y, edge);
+      }
+      return { y, detour: detourOf(y) };
+    };
+
+    /**
+     * One resolved candidate side of one arc: the natural axis (or the wall-walk
+     * detour), rule-cleared, with its measured collisions — the heads the ink
+     * would enter and the foreign ink bands (stems, brackets, rests, holds) it
+     * would cross.
+     */
+    const evaluatedSide = (job: TieArcJob, candidate: -1 | 1) => {
+      const resolved = axisFor(job, candidate);
+      const depth = tieArcDepth(job.x1, job.x2, t);
+      const state = { y: resolved.y, side: candidate, depth };
+      clearRules(state);
+      const probe = {
+        x1: job.x1,
+        x2: job.x2,
+        y: state.y,
+        side: state.side,
+        depth: state.depth,
+        profile,
+        thickness,
+      } as Pick<JankoTieArcGeometry, 'x1' | 'x2' | 'y' | 'side' | 'depth'> & {
+        profile: JankoTieProfile;
+        thickness: number;
+      };
+      const band = tieArcInkBox(probe, t);
+      const inSpan = [...boxes, ...tieObstacles].filter(
+        (obstacle) => obstacle.x1 >= band.x0 - 1e-9 && obstacle.x0 <= band.x1 + 1e-9
+      );
+      const own = new Set([job.from.note.id, job.to.note.id]);
+      const head = tieArcEntersBoxes(probe, boxes, t);
+      const foreign = tieObstacles.filter((obstacle) =>
+        tieArcEntersBoxes(probe, [{ id: obstacle.id, x0: obstacle.x0, y0: obstacle.y0, x1: obstacle.x1, y1: obstacle.y1 }], t)
+      );
+      /**
+       * **Outside-texture clearance** (pt): how far the arc's own ink band stands
+       * from the nearest foreign ink of its span — the heads it does not belong
+       * to, the stems, the brackets, the rests, the holds. A colliding neighbour
+       * measures zero, an empty corridor measures the free distance, and an arc
+       * with no foreign ink anywhere in its span is unbounded. This is the
+       * number the side decision maximizes after collisions: the same general
+       * rule that routes the mm. 61–63 chain below its E2 (the A2/A3 stems stand
+       * above it) also lifts the m. 33 D6 tie above its note (the D5 head of its
+       * own measure stands 6pt under the conventional side).
+       */
+      let clearance = Number.POSITIVE_INFINITY;
+      for (const obstacle of inSpan) {
+        if (own.has(obstacle.id)) continue;
+        const dx = Math.max(0, band.x0 - obstacle.x1, obstacle.x0 - band.x1);
+        const dy = Math.max(0, band.y0 - obstacle.y1, obstacle.y0 - band.y1);
+        clearance = Math.min(clearance, Math.hypot(dx, dy));
+      }
+      return {
+        candidate,
+        order: 0,
+        detour: resolved.detour,
+        y: state.y,
+        side: state.side,
+        depth: state.depth,
+        probe,
+        head,
+        foreign,
+        clearance,
+        score: head ? 1 : 0,
+      };
+    };
+
+    /** The chain's one side: the summed measured cost over its own arcs. */
+    const chainSideOf = (job: TieArcJob): -1 | 1 => {
+      const chainJobs = jobs.filter((candidate) => candidate.chain.noteId === job.chain.noteId);
+      let best:
+        | { side: -1 | 1; score: number; crossings: number; detour: number; clearance: number }
+        | null = null;
+      const order = tieSideOrder(job.from.rhythm.hand);
+      for (let index = 0; index < order.length; index++) {
+        const candidate = order[index];
+        let score = 0;
+        let crossings = 0;
+        let detour = 0;
+        let clearance = 0;
+        for (const chainJob of chainJobs) {
+          const evaluated = evaluatedSide(chainJob, candidate);
+          score += evaluated.head ? 1 : 0;
+          crossings += evaluated.foreign.length;
+          detour += evaluated.detour;
+          clearance += Number.isFinite(evaluated.clearance) ? evaluated.clearance : TIE_CLEARANCE_OPEN;
+        }
+        const better =
+          best === null ||
+          score < best.score - 1e-9 ||
+          (score <= best.score + 1e-9 &&
+            (crossings < best.crossings - 1e-9 ||
+              (crossings <= best.crossings + 1e-9 &&
+                (clearance > best.clearance + TIE_CLEARANCE_TOLERANCE ||
+                  (clearance >= best.clearance - TIE_CLEARANCE_TOLERANCE &&
+                    (detour < best.detour - 1e-9 ||
+                      (detour <= best.detour + 1e-9 && index === 0)))))));
+        if (better) best = { side: candidate, score, crossings, detour, clearance };
+      }
+      return best === null ? order[0] : best.side;
+    };
+
+    for (const job of jobs) {
+      const { chain, component, next, from, to } = job;
+      const { x1, x2 } = job;
+      const preferred = chainSideOf(job);
+      const alternates: Array<-1 | 1> = preferred === 1 ? [1, -1] : [-1, 1];
+      const evaluated = alternates.map((candidate, order) => ({
+        ...evaluatedSide(job, candidate),
+        order,
+      }));
+      evaluated.sort(
+        (a, b) =>
+          a.score - b.score ||
+          a.foreign.length - b.foreign.length ||
+          (b.clearance >= a.clearance + TIE_CLEARANCE_TOLERANCE ? 1 : 0) -
+            (a.clearance >= b.clearance + TIE_CLEARANCE_TOLERANCE ? 1 : 0) ||
+          a.detour - b.detour ||
+          a.order - b.order
+      );
+      const chosen = evaluated[0];
+      let side = chosen.side;
+      let y = chosen.y;
+      let depth = chosen.depth;
+      let probe = chosen.probe;
+      let blocking = chosen.head;
+      if (blocking) {
+        // A coincident head still stands in the way: a shallower curve on the
+        // same side is the last resort before the collision is published.
+        const shallow = { x1, x2, y, side, depth: t.tieMinDepth, profile, thickness };
+        if (!tieArcEntersBoxes(shallow, boxes, t)) {
+          depth = t.tieMinDepth;
+          probe = shallow;
+          blocking = null;
+        }
+      }
+      const arc: JankoTieArcGeometry = {
+        noteId: chain.noteId,
+        index: component.index,
+        fromTick: component.startTick,
+        toTick: next.startTick,
+        fromHeadId: component.headId,
+        toHeadId: next.headId,
+        side,
+        y,
+        x1,
+        x2,
+        depth,
+        profile,
+        thickness,
+        path: tieArcPath(x1, y, x2, side, depth, profile, thickness, t.tieControlFraction),
+        crossesBarline: false,
+        stemCrossings: [],
+      };
+      const unresolvedBlock = blocking !== null;
+      const foreignCrossings = tieObstacles.filter((obstacle) =>
+        tieArcEntersBoxes(probe, [{ id: obstacle.id, x0: obstacle.x0, y0: obstacle.y0, x1: obstacle.x1, y1: obstacle.y1 }], t)
+      );
+      if (unresolvedBlock) {
+        tieBlockedArcs.push({
+          noteId: chain.noteId,
+          component: component.index + 1,
+          headId: blocking ? blocking.id : '',
+          reason:
+            `no side of the tie between ${component.headId} and ${next.headId} clears ` +
+            `${blocking ? blocking.id : 'a coincident mask'}: the arc is painted on the ` +
+            `side with the fewest measured collisions and the crossing is published ` +
+            `(never clipped, never hidden)`,
+        });
+      } else if (foreignCrossings.length > 0) {
+        tieBlockedArcs.push({
+          noteId: chain.noteId,
+          component: component.index + 1,
+          headId: foreignCrossings.map((obstacle) => obstacle.id).join(','),
+          reason:
+            `the tie between ${component.headId} and ${next.headId} still crosses ` +
+            `${foreignCrossings.map((obstacle) => obstacle.id).join(', ')} on the better side ` +
+            `(${evaluated.map((e) => `${e.candidate < 0 ? 'above' : 'below'}: ${e.foreign.length}`).join('; ')}): ` +
+            `the arc is painted on the side with fewer measured crossings and the crossing ` +
+            `is published, never hidden`,
+        });
+      }
+      // The tie's **time** is its chord, so a barline the chord spans is a
+      // crossing even where the endpoint masks inset the painted curve just
+      // inside it (the m65 → m66 carries land on the barline's own onset).
+      arc.crossesBarline = score.barlines.some(
+        (barline) => barline.tick > component.startTick && barline.tick <= next.startTick
+      );
+      const inkBox = tieArcInkBox(arc, t);
+      for (const stem of stems) {
+        if (stem.x <= inkBox.x0 - 1e-9 || stem.x >= inkBox.x1 + 1e-9) continue;
+        const overlap = Math.min(stem.y1, inkBox.y1) - Math.max(stem.y0, inkBox.y0);
+        if (overlap <= 1e-9) continue;
+        if (stem.id === from.note.id || stem.id === to.note.id) continue;
+        arc.stemCrossings.push({
+          stemNoteId: stem.id,
+          x: stem.x,
+          overlap,
+        });
+      }
+      tieArcs.push(arc);
     }
   }
 
@@ -8672,6 +9115,7 @@ export function layoutJankoSystemShifted(
     ungrouped,
     rests: restLayer.rests,
     unwrittenRests: restLayer.unwritten,
+    withheldRests: restLayer.withheld,
     clasps,
     claspRails,
     holds,
@@ -8856,6 +9300,22 @@ function renderNotesLayer(
   //     brackets, rests, noteheads) can be cut by it.
   if (layout.holds.length > 0) out.push(renderJankoHolds(layout.holds, t));
 
+  // 1b-1b. Round 48 detached-symbol rule knockouts: one white band per drawn
+  //       staff rule a closed ring's hollow interior stands on, painted on the
+  //       same band as the holds — above the staff rules it names and **beneath
+  //       every tie arc, carrier mark, stem, beam, rest and notehead**, so the
+  //       only ink it can ever clean is the rule. A tie that crosses a ring's
+  //       interior therefore paints over the erased band unbroken; the seat test
+  //       and the linter still keep foreign ink out of the ring.
+  const detachedRuleKnockouts = layout.detachedSymbols
+    .map((symbol) => renderDetachedRuleKnockout(symbol, t))
+    .filter((svg) => svg.length > 0);
+  if (detachedRuleKnockouts.length > 0) {
+    out.push('    <g class="janko-detached-rule-layer">');
+    out.push(...detachedRuleKnockouts);
+    out.push('    </g>');
+  }
+
   // 1b-2. Round 46 written tie arcs: painted on the same layer band as the
   //      holds (above the staff rules, beneath every carrier mark, stem, beam,
   //      rest and notehead), so nothing a tie crosses is ever cut — a stem
@@ -8873,10 +9333,10 @@ function renderNotesLayer(
     for (const carrier of layout.exceptionCarriers) {
       out.push(renderExceptionCarrier(carrier, t));
     }
-    // Round 47: the detached long-value symbols stand on the same layer band
-    // as the carriers (above the staff rules and the tie arcs, beneath every
-    // note knockout), so a symbol can never erase ink and only a notehead can
-    // ever paint over it.
+    // Round 47/48: the detached long-value symbols stand on the same layer band
+    // as the carriers (above the staff rules, the local rule knockouts and the
+    // tie arcs, beneath every note knockout), so a symbol's own ink can never
+    // erase anything and only a notehead can ever paint over it.
     for (const symbol of layout.detachedSymbols) {
       out.push(renderDetachedSymbol(symbol, t));
     }

@@ -1,5 +1,16 @@
 # Round 47 — long-value symbols, the half-ring flat face and the tie-origin simplification
 
+> **Round 48 correction (authoritative).** The operator rejected two explanations
+> this document used: (1) that a long-value member "must explicitly state 96" and
+> (2) that the m. 33 D6 carries 144 "while the member states 96". The settled rule
+> is: a member's indicator may be **absent** where the bracket's inheritance
+> together with the following written tie/destination instruction makes the value
+> clear, and a misleading indicator is never added merely to label a written
+> component. The source durations, the bracket's own carried value and the
+> sounding totals are all untouched — see `docs/round48-rest-provenance-and-tie-trace.md`
+> §2 and the Round 48 card captions for the corrected wording.
+
+
 Status: **implemented, review-repaired, not judged.** Everything below is measured on the real
 engine (`layoutJankoScore` / `renderSystem` / `renderJankoCrop`) and on the visual linter's own
 report. Aesthetic acceptance is the operator's, at normal size, on the live studio; this

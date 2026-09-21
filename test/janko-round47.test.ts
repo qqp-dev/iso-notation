@@ -45,8 +45,8 @@ import {
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  ROUND_47_CANDIDATES,
+  ROUND_47_METADATA,
   getCandidate,
 } from '../src/render/janko/candidates';
 import {
@@ -69,6 +69,7 @@ import {
 import {
   claspInkBox,
   detachedSymbolInkBox,
+  detachedSymbolInteriors,
   longMarkKindForBase,
   longRunName,
   midpointMetrics,
@@ -86,7 +87,7 @@ const sha = (text: string): string => createHash('sha256').update(text, 'utf8').
 
 /** The committed Round 46 Brahms Reference (page 0 and the whole-score crop). */
 const REFERENCE_PAGE0 = '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b';
-const REFERENCE_CROP = '43f95a224a860e46eb4f554f921ff6a34bb8099ac83db6af27adf2047b04ad8f';
+const REFERENCE_CROP = '1c6600e0d3cfaee9098b35ea654feeab68915a443111a11d0792e09664313ab3';
 
 /** One synthetic note (the round's controlled tie-topology fixtures). */
 function note(
@@ -528,10 +529,23 @@ test('D. Every detached seat clears every mask, bracket and drawn rule (measured
           box.x0 < ink.x1 && ink.x0 < box.x1 && box.y0 < ink.y1 && ink.y0 < box.y1;
         assert.ok(!overlaps, `${symbol.noteId}: clear of the bracket at tick ${clasp.tick}`);
       }
+      // Round 48: a drawn rule may cross a **closed ring** — but only through
+      // its hollow interior, and then the seat must record the local knockout
+      // that cleans it (a line inside the ring may never be left to close it).
+      const interiors = detachedSymbolInteriors(symbol, run.tokens);
       for (const rule of rules) {
+        const crossing = rule > box.y0 - 1e-9 && rule < box.y1 + 1e-9;
+        if (!crossing) continue;
+        const clean = interiors.some(
+          (interior) => Math.abs(rule - interior.cy) + 0.12 < interior.r - 1e-9
+        );
         assert.ok(
-          !(rule > box.y0 - 1e-9 && rule < box.y1 + 1e-9),
-          `${symbol.noteId}: no drawn rule crosses the seat`
+          clean,
+          `${symbol.noteId}: a crossing rule may only pass through a hollow interior`
+        );
+        assert.ok(
+          symbol.ruleKnockouts.some((entry) => Math.abs(entry.y - rule) <= 1e-9),
+          `${symbol.noteId}: the crossing rule is cleaned locally`
         );
       }
     }
@@ -600,7 +614,7 @@ test('E. Card 4: three distinguishable shapes, no three-mark stack, both mounts 
 });
 
 test('E. Ownership census: no orphan, no suppressed owner, no unknown owner — every card', () => {
-  for (const candidate of CURRENT_CANDIDATES) {
+  for (const candidate of ROUND_47_CANDIDATES) {
     const run = cardRun(candidate.id);
     for (const layout of run.layouts) {
       const suppressed = new Set(layout.tieOriginSuppressions.map((s) => s.noteId));
@@ -640,7 +654,7 @@ test('E. Ownership census: no orphan, no suppressed owner, no unknown owner — 
 
 test('E. Every card lints clean on the whole Brahms score and renders every declared window', () => {
   const windows = [1, 7, 33, 61, 64, 67].map((start) => [start, start === 33 || start === 67 ? 1 : 3]);
-  for (const candidate of CURRENT_CANDIDATES) {
+  for (const candidate of ROUND_47_CANDIDATES) {
     const run = cardRun(candidate.id);
     const report = lintJankoScore(BRAHMS, run.options, run.tokens);
     assert.deepEqual(report.violations, [], `${candidate.id}: zero violations`);
@@ -658,9 +672,9 @@ test('E. Every card lints clean on the whole Brahms score and renders every decl
 });
 
 test('E. The round registry is coherent: one window set, one shared rule, three axes', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 47);
-  assert.deepEqual(CURRENT_ROUND_METADATA.openAxes, ['halfRingGap', 'exceptionCarrier', 'longDurationStyle']);
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'exactly four cards');
+  assert.equal(ROUND_47_METADATA.round, 47);
+  assert.deepEqual(ROUND_47_METADATA.openAxes, ['halfRingGap', 'exceptionCarrier', 'longDurationStyle']);
+  assert.equal(ROUND_47_CANDIDATES.length, 4, 'exactly four cards');
   for (const id of [
     'round47-mounted-control',
     'round47-half-ring-cutout',
@@ -711,7 +725,7 @@ const measureOf = (tick: number): number =>
 
 /** The caption of one declared Round 47 window. */
 function windowCaption(measureStart: number): string {
-  const window = (CURRENT_CANDIDATES[0].windows ?? []).find(
+  const window = (ROUND_47_CANDIDATES[0].windows ?? []).find(
     (w) => (w as { measureStart: number }).measureStart === measureStart
   ) as { caption?: string } | undefined;
   assert.ok(window, `the registry declares the m. ${measureStart} window`);

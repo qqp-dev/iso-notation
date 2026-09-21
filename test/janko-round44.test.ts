@@ -577,21 +577,17 @@ test('Parked Round 44 registry: one anchored 45-degree design on the full score 
     'the parked round keeps its eleven windows'
   );
 
-  // Round 47 is the live round now: four real-engine readings of the long
-  // values on the same accepted Brahms surface. The full Round 47 contract is
-  // pinned in test/janko-round47.test.ts; here the history only has to point at
-  // it — and every card still states the landed Round 46 family as fixed
-  // context.
-  assert.equal(CURRENT_ROUND_METADATA.round, 47, 'the open round');
+  // Round 48 is the live round now: two real-engine circle-size/spacing readings
+  // of one fully corrected Brahms surface (rest provenance, the traced tie, its
+  // measured routing, the detached right seats and the accepted flat face). The
+  // full Round 48 contract is pinned in test/janko-round48.test.ts; the Round 47
+  // quartet is parked in candidates.ts as ROUND_47_CANDIDATES and pinned in
+  // test/janko-round47.test.ts. Here the history only has to point at it.
+  assert.equal(CURRENT_ROUND_METADATA.round, 48, 'the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    [
-      'round47-mounted-control',
-      'round47-half-ring-cutout',
-      'round47-detached-symbols',
-      'round47-detached-ovals',
-    ],
-    'the four Round 47 long-value readings (the Round 46 pair is parked on record)'
+    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
+    'the two Round 48 circle readings (the Round 47 quartet is parked on record)'
   );
   for (const card of CURRENT_CANDIDATES) {
     for (const [key, value] of Object.entries({
@@ -1680,12 +1676,18 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
       `Bach GOLD page ${page} is byte-identical`
     );
   }
+  // Round 48 note: the **tie-routing** correction (measured ink clearance, one
+  // side per chain, bracket clipping — see engine's tie block) lands on every
+  // surface, the working Reference included: it removes real collisions, so the
+  // Reference bytes below were regenerated with it. The tie *contour* remains
+  // candidate-scoped (`options.tieProfile`), so the Reference keeps its Round 46
+  // uniform-stroke arcs.
   const brahmsPages = [
     '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b',
-    'fdd1acad9b018b77259acf3f08a791deaa094108b8ce64cce340363afd9a163a',
-    '8a7a2a0bee8351927c6a6005f5b4840a4db3cafcf424c6986aaa97134633a6f2',
-    'a37be98646e7a09daa2becb01ab46fc3e290651954cb01b55329b5033dfef805',
-    '6db87101cbf85faead7834164d2e7dab8e0876ba855b6c58922f68804314e0c0',
+    '2a5611137a1cc0ba489c8da6fbc24c48d5c76e2131087506b1b117f8f400d063',
+    'f248763aabc00a94c903f73b063d7c75aa4edc68f49a230e84235cbfecbb843c',
+    '3d50b6312d752dac4c27d7f33bb1c20737f78b5b47b16c673fd7b5e324b951ce',
+    '4e459d38b42593051093e192ba8efd330d6500aa6ee8bb892931b7f6e91ebc97',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
@@ -1696,7 +1698,7 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)),
-    '43f95a224a860e46eb4f554f921ff6a34bb8099ac83db6af27adf2047b04ad8f',
+    '1c6600e0d3cfaee9098b35ea654feeab68915a443111a11d0792e09664313ab3',
     'the Brahms Reference 1–71 crop is the adopted Round 46 engraving'
   );
 });

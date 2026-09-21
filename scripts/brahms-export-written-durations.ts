@@ -20,7 +20,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeWrittenDurations } from '../src/scores/brahms-source-fidelity';
+import {
+  BrahmsRawSilence,
+  normalizeSourceSilences,
+  normalizeWrittenDurations,
+} from '../src/scores/brahms-source-fidelity';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -35,6 +39,14 @@ const PROVENANCE_PATH = path.join(
   'scores',
   'data',
   'brahms-op118-no1-written-durations.provenance.json'
+);
+/** Round 48: the source's authored silences (rests versus spacers). */
+const SILENCES_PATH = path.join(
+  REPO_ROOT,
+  'src',
+  'scores',
+  'data',
+  'brahms-op118-no1-source-silences.json'
 );
 
 const args = new Set(process.argv.slice(2));
@@ -158,9 +170,14 @@ function runLilyPondOnce(bin: string, wrapperPath: string, outDir: string): void
   }
 }
 
-function collectEvidence(outDir: string): { evidence: Parameters<typeof normalizeWrittenDurations>[0]; rawBytes: string } {
+function collectEvidence(outDir: string): {
+  evidence: Parameters<typeof normalizeWrittenDurations>[0];
+  silences: BrahmsRawSilence[];
+  rawBytes: string;
+} {
   const voices = ['rightHandUpper', 'rightHandLower', 'leftHandUpper', 'leftHandLower'];
   const evidence: Parameters<typeof normalizeWrittenDurations>[0] = [];
+  const silences: BrahmsRawSilence[] = [];
   const chunks: string[] = [];
   for (const v of voices) {
     const file = path.join(outDir, `voice-${v}.jsonl`);
@@ -202,8 +219,34 @@ function collectEvidence(outDir: string): { evidence: Parameters<typeof normaliz
       }
     }
     evidence.push({ voice: v, segments: segments as never, ties: ties as never });
+    // Round 48 — the authored silences of this voice (written rests and
+    // invisible spacers). They live in their own file so the committed note
+    // evidence above stays byte-identical; their content is still part of the
+    // determinism check (it is appended to the raw evidence digest).
+    const silenceFile = path.join(outDir, `silences-${v}.jsonl`);
+    if (!fs.existsSync(silenceFile)) throw new Error(`Exporter produced no silences for voice ${v}`);
+    const silenceText = fs.readFileSync(silenceFile, 'utf8');
+    chunks.push(`## silences ${v}\n${silenceText}`);
+    for (const line of silenceText.split('\n')) {
+      if (!line.trim()) continue;
+      const o = JSON.parse(line) as Record<string, unknown>;
+      const absFile = String(o.file ?? '');
+      silences.push({
+        type: String(o.type ?? ''),
+        voice: v,
+        onsetNum: o.onsetNum as number,
+        onsetDen: o.onsetDen as number,
+        durNum: o.durNum as number,
+        durDen: o.durDen as number,
+        file: `includes/${path.basename(absFile)}`,
+        line: o.line as number,
+        col: o.col as number,
+        staff: String(o.staff ?? ''),
+        bar: o.bar as number,
+      });
+    }
   }
-  return { evidence, rawBytes: chunks.join('\n') };
+  return { evidence, silences, rawBytes: chunks.join('\n') };
 }
 
 function canonicalJson(value: unknown): string {
@@ -234,6 +277,7 @@ function main(): void {
       throw new Error('Exporter is not deterministic: two LilyPond runs disagree on raw evidence');
     }
     const { events, provenance } = normalizeWrittenDurations(a.evidence);
+    const silences = normalizeSourceSilences(a.silences);
     if (events.length !== 964) {
       throw new Error(`Expected 964 normalized events, got ${events.length} — refusing to write fixture`);
     }
@@ -259,10 +303,23 @@ function main(): void {
       events: provenance,
     };
     const provenanceBytes = canonicalJson(provenanceDoc);
+    const silencesDoc = {
+      version: 1,
+      fixtureSha256: fixtureSha,
+      totalTicks,
+      count: silences.length,
+      rests: silences.filter((entry) => entry.kind === 'rest').length,
+      skips: silences.filter((entry) => entry.kind === 'skip').length,
+      silences,
+    };
+    const silencesBytes = canonicalJson(silencesDoc);
 
     if (CHECK) {
       const committedFixture = fs.existsSync(FIXTURE_PATH) ? fs.readFileSync(FIXTURE_PATH, 'utf8') : null;
       const committedProv = fs.existsSync(PROVENANCE_PATH) ? fs.readFileSync(PROVENANCE_PATH, 'utf8') : null;
+      const committedSilences = fs.existsSync(SILENCES_PATH)
+        ? fs.readFileSync(SILENCES_PATH, 'utf8')
+        : null;
       // Compare semantically where the compiler version may legitimately
       // differ (provenance records actual); bytes must match when the same
       // compiler produced the committed files. Normalize the compiler block
@@ -284,20 +341,38 @@ function main(): void {
       const committedProvEvents = committedProv
         ? JSON.stringify((JSON.parse(committedProv) as { events: unknown }).events)
         : null;
-      if (freshFixtureNorm !== committedFixtureNorm || freshProvEvents !== committedProvEvents) {
+      const freshSilences = JSON.stringify(
+        (JSON.parse(silencesBytes) as { silences: unknown }).silences
+      );
+      const committedSilenceList = committedSilences
+        ? JSON.stringify((JSON.parse(committedSilences) as { silences: unknown }).silences)
+        : null;
+      if (
+        freshFixtureNorm !== committedFixtureNorm ||
+        freshProvEvents !== committedProvEvents ||
+        freshSilences !== committedSilenceList
+      ) {
         console.error('Brahms written durations are STALE: fresh export disagrees with committed fixture.');
         console.error(`Run ${CHECK ? '' : ''}npm run brahms:export-durations and commit the result.`);
         process.exit(1);
       }
-      console.log(`Brahms written durations check passed (${events.length} events, fixture sha ${fixtureSha.slice(0, 12)}…).`);
+      console.log(
+        `Brahms written durations check passed (${events.length} events, ` +
+          `${silences.length} source silences, fixture sha ${fixtureSha.slice(0, 12)}…).`
+      );
       return;
     }
 
     fs.mkdirSync(path.dirname(FIXTURE_PATH), { recursive: true });
     fs.writeFileSync(FIXTURE_PATH, fixtureBytes, 'utf8');
     fs.writeFileSync(PROVENANCE_PATH, provenanceBytes, 'utf8');
+    fs.writeFileSync(SILENCES_PATH, silencesBytes, 'utf8');
     console.log(`Wrote ${path.relative(REPO_ROOT, FIXTURE_PATH)} (${events.length} events, total ${totalTicks} ticks)`);
     console.log(`Wrote ${path.relative(REPO_ROOT, PROVENANCE_PATH)} (fixture sha ${fixtureSha.slice(0, 12)}…)`);
+    console.log(
+      `Wrote ${path.relative(REPO_ROOT, SILENCES_PATH)} (${silencesDoc.rests} rests, ` +
+        `${silencesDoc.skips} spacers)`
+    );
   } finally {
     fs.rmSync(tmpA, { recursive: true, force: true });
     fs.rmSync(tmpB, { recursive: true, force: true });

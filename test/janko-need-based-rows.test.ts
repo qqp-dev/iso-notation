@@ -568,7 +568,17 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   const brahmsTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const brahmsLayouts = layoutJankoScore(BRAHMS, brahmsOpts, brahmsTokens);
   const brahmsHanging = brahmsLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
-  assert.equal(brahmsHanging.length, 21, 'Brahms hanging-rest count holds at exactly 21');
+  // Round 48: two of the three former false silences are gone — the m. 66 LH
+  // eighth and the m. 70 LH quarter are **withheld** because the source's own
+  // hand sounds through their spans (the m. 66 RH quarter is authored and
+  // stays), so 24 hanging/whole rests become 22 and the hanging classes drop by
+  // two.
+  assert.equal(brahmsHanging.length, 19, 'Brahms hanging-rest count holds at exactly 19');
+  assert.equal(
+    brahmsLayouts.flatMap((s) => s.withheldRests).length,
+    2,
+    'the two withheld inferred rests are published, never painted'
+  );
 
   // Unwritten rest count across Bach and Brahms: 0
   const bachUnwritten = bachLayouts.flatMap((s) => s.unwrittenRests ?? []);

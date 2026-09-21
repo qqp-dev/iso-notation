@@ -766,6 +766,22 @@ export interface JankoTokens {
   tieDepthRatio?: number;
   /** Round 46: air (pt) a tie's ink keeps from a coincident staff rule. */
   tieRuleAir?: number;
+  /**
+   * Round 48: **apex thickness (pt) of the traced tie contour** — the mid
+   * thickness of the filled two-cubic profile measured from LilyPond 2.26.0's
+   * own tie (0.12 staff space = 0.598pt of control offset, i.e. 0.449pt of ink
+   * at the apex; the boundary offset is this number divided by 0.75). Read only
+   * under `options.tieProfile: 'traced'`.
+   */
+  tieApexThickness?: number;
+  /**
+   * Round 48: **crown flatness of the traced tie contour** — where the outer
+   * and inner cubic control points stand along the chord (0.21 = 21% from each
+   * tip, the median of the four LilyPond ties measured: 14.3%, 19.9%, 22.7%,
+   * 25.3%). A larger fraction flattens the crown. Read only under
+   * `options.tieProfile: 'traced'`.
+   */
+  tieControlFraction?: number;
   // --- Round 42 (Phase 3 study): compact bracket-duration vocabulary ---
   /** Compact cut: transverse length (pt) of one subdivision cut. */
   compactCutLength?: number;
@@ -874,6 +890,40 @@ export interface JankoTokens {
    * byte-identical.
    */
   halfRingGap?: number;
+  /**
+   * Round 48: **detached closed-circle scale**. The long-value mark families
+   * were measured against the pitch numerals: the closed carrier ring's outer
+   * diameter is 3.96pt against the `0` digit's 3.67pt advance, so a detached
+   * ring reads almost as wide as the absolute pitch symbol it stands beside and
+   * the two compete. This multiplier is applied to the **detached, cluster,
+   * closed-ring** geometry alone — radius, stroke and stack pitch of a full
+   * ring on a detached seat (`exceptionCarrier: 'symbol'`) — never to a
+   * half-ring (its shape and size are unchanged), never to the bracket mount,
+   * never to a horizontal carrier and never to the canonical engraving.
+   * `1` (default) is the Round 47 geometry, byte-identical.
+   */
+  detachedRingScale?: number;
+  /**
+   * Round 48: **air (pt) a detached long-value symbol keeps from its owning
+   * head's knockout box**. Round 47 seated the mark at the cluster's own
+   * optical air (0.30pt on the working Brahms surface), which measured as a
+   * 0.30pt gap between the head's knockout edge and the symbol's ink — legible
+   * at 300% zoom, ambiguous at 100%. This is the token the size/spacing
+   * variants of the round differ in: the seat, the ink box, the rule-knockout
+   * band and the linter all read it. The half-ring keeps its shape and size and
+   * receives the same increased spacing only.
+   */
+  detachedSymbolAir?: number;
+  /**
+   * Round 48: **half-height (pt) of a detached ring's local staff-rule
+   * knockout**. The band is the rule's own ink height plus this air on each
+   * side (`rule ink + 2 × half`): the line is cleaned just inside the ring's
+   * hollow interior, exactly as a notehead knockout cleans the line behind its
+   * glyph, and nothing wider is ever erased. Default `0.12` clears the drawn
+   * octave/extension rules (0.65pt) and the Middle-C spine (1.35pt) inside a
+   * closed ring whose interior is at least 3.2pt across.
+   */
+  staffRuleKnockoutHalfHeight?: number;
   /**
    * Round 47 (`longDurationStyle: 'open-oval'`): tilt (degrees, clockwise) of
    * the **96-tick** open oval. `-30` lifts the compact oval's major axis to the
@@ -991,6 +1041,12 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   tieMaxDepth: 3.00,
   tieDepthRatio: 0.10,
   tieRuleAir: 0.35,
+  // Round 48 — the **traced** profile (`options.tieProfile: 'traced'`): the mid
+  // thickness and crown flatness measured from LilyPond's own tie contour (see
+  // `ties.tieTracedGeometry`). Inert unless the option selects the traced
+  // profile, so the canonical surface paints the Round 46 arc unchanged.
+  tieApexThickness: 0.45,
+  tieControlFraction: 0.21,
   // Round 42 (Phase 3 study) — compact family; the refinement's dimensioned
   // recommendation (cut 2.4/0.42, ring centreline Ø1.60/0.38 → outer Ø1.98,
   // mark spacing 2.40, fixed horizontal carrier 9.0). Experimental, not adopted.
@@ -1024,6 +1080,13 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   // compact oval tilted 30 degrees, 192 a 1.10:0.62 broad horizontal oval, and
   // 384 that oval with two short flank strokes 0.30 radii clear of its vertices.
   halfRingGap: 0,
+  // Round 48 — inert by default: `detachedRingScale: 1` and
+  // `detachedSymbolAir: 0.30` (the round's own optical air) reproduce the
+  // Round 47 detached geometry exactly, so every canonical surface stays
+  // byte-identical; the round's two candidates set them explicitly.
+  detachedRingScale: 1,
+  detachedSymbolAir: 0.30,
+  staffRuleKnockoutHalfHeight: 0.12,
   openOvalTiltDegrees: -30,
   openOvalNarrowFactor: 0.66,
   openOvalBroadFactor: 1.10,
@@ -1460,6 +1523,24 @@ export interface JankoLayoutOptions {
    *   census.
    */
   tieOriginIndicator?: JankoTieOriginIndicator;
+  /**
+   * Round 48: **the tie's own contour** (the round's shared tie treatment).
+   *
+   * - `'uniform'` (default): the Round 46 single quadratic path of constant
+   *   `tokens.tieStroke` width with butt caps — the canonical surface,
+   *   byte-identical.
+   * - `'traced'`: the filled **two-cubic** contour traced from the tie LilyPond
+   *   2.26.0 paints (the compiler of this score's pinned source): pointed tips
+   *   where both boundaries meet, a constant `tokens.tieApexThickness` mid
+   *   thickness tapering to zero, and control points at
+   *   `tokens.tieControlFraction` of the chord — a flat, wide crown instead of
+   *   a peaked arc. The span adaptation (the apex height) stays this engine's
+   *   own declared law; the contour and the tips are the traced source's. Only
+   *   the *shape* changes: endpoints, side, routing and the published stem
+   *   crossings are shared with the uniform profile.
+   */
+  tieProfile?: JankoTieProfile;
+
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1539,6 +1620,13 @@ export type JankoLongDurationStyle = 'midpoint' | 'open-oval';
  * {@link JankoLayoutOptions.tieOriginIndicator}).
  */
 export type JankoTieOriginIndicator = 'source' | 'omit-outgoing';
+
+/**
+ * Round 48: the tie's own contour — the Round 46 uniform stroke or the faithful
+ * trace of LilyPond's filled two-cubic tie (see
+ * {@link JankoLayoutOptions.tieProfile} and `ties.tieTracedGeometry`).
+ */
+export type JankoTieProfile = 'uniform' | 'traced';
 
 /**
  * Situational clasp-dot translation (the Round 31 preview axis): a rigid
@@ -1674,6 +1762,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   exceptionCarrier: 'none',
   longDurationStyle: 'midpoint',
   tieOriginIndicator: 'source',
+  tieProfile: 'uniform',
   opticalSpacing: false,
   lowPitchFolding: 'core',
   writtenTies: 'none',
