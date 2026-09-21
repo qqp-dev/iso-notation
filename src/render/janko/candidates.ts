@@ -557,104 +557,12 @@ export const PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID = 'pitch-parity-specimen';
  * same score/options. Bach GOLD stays frozen.
  */
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 46,
-  title: 'Literal-pitch clean-up, readable 95 % clusters, long-value grammar and written ties — Round 46',
+  round: 47,
+  title: 'Long-value symbols, the half-ring flat face and the tie-origin simplification — Round 47',
   description:
-    'The operator settled Round 46 as a **correctness and readability** round, and this registry declares its decision surface as **two real-engine variants of the whole Brahms score** — both at the adopted 95 % cluster scale and both carrying every Round 46 fix, differing only in the one spacing axis the round exists to isolate. **A. The unwanted literal-mode ink is gone.** Round 45 stated the register of an unadmitted low pitch with the dynamic ledger vocabulary; the operator rejected the recurring continuous outlier rules, the 42 per-note ledger dashes and the bottom-row segments they earned (including the mm. 69–71 region). The literal *positions* are untouched — no ↓10 fold is restored — and the core staff, the legitimate Round 44 row extensions, the beams, the carriers and every other element are exactly as before: zero `janko-outlier-rule`, zero ledger dashes, back to the Round 44 row census. **B. 95 % with real breathing room.** The working Reference is the 95 % admitted-cluster scale with 0.30pt of vertical optical air on the five-level clusters of mm. 7/8/9/17/18/19 (the Round 45 0.20pt plus 0.10pt), centred on the member-weighted mean and capped at 2.5pt as before; the second card keeps 0.20pt as the *spacing control* so the extra breathing room can be judged on the same engraving. Two same-hand, same-onset, exactly-equal-duration 2-span neighbours of one bracket may now share **one** horizontal indicator centred on their painted columns instead of painting two parallel carriers for one value (mm. 9 and 19’s 192-tick pairs) — never where the bracket already owns that value, never across independent tie chains. **C. The long-value vocabulary.** On both mounts, 96 ticks is a **half-ring** (left semicircle on the bracket, upper semicircle on the carrier — the intentional mount rotation), 192 one full ring and 384 two full rings; 48 stays bare, the diagonal cuts and the augmentation dots keep their meanings, and no three-ring glyph exists in this family any more. The bracket mount’s ring and half-ring grow 20 % (r 1.672 → 2.0064pt, stroke 0.61655 → 0.73986pt, ring centre pitch 5.22766pt) while the horizontal mount keeps the existing 95 % size, the fixed carrier length is recomputed from the family’s real maximum run, and the cut centre spacing gains a further 0.20pt (1.89658 → 2.09658pt) — spacing only, with the 45-degree angle, slash length and stroke untouched. **D. Written ties.** The committed provenance’s written components are rendered: each chain head states its first component, consecutive components are joined by conventional tie arcs, the six hidden `tieWaitForNote` carries land on heads that already exist, 13 written continuation heads are added where no head stated the component, and the coincident same-hand attack/carry groups of m. 66 merge to **one** visible attack head per group (9, 2, 5 before the chord) with unequal simultaneous voices keeping their own stems. m. 65’s bare 120-tick bracket becomes its valid first component 96 with the remaining 24 tied, and the six former `carrier-duration-unsupported` refusals are gone because their composites are now stated exactly — nothing is suppressed: `npm run lint:engraving -- --strict` is green on the canonical Brahms for the first time. Sounding pitch, onset and total duration are never touched, Bach GOLD stays frozen byte-for-byte, and the two variants differ only in `opticalClearanceAir` (0.30pt working Reference / 0.20pt spacing control).',
-  openAxes: ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
+    'Round 47 compares **four real-engine readings of the accepted Brahms surface** — same score, same literal windows, same 95 % cluster scale, same 0.30pt optical air, same written ties, same literal pitches — differing only in how a **long value** is stated and in the one redundancy rule every card shares. **A. The shared rule (all four cards):** a note or written component of an admitted cluster whose own value the active family states with a long mark (96 / 192 / 384) and whose committed written-tie chain gives it an **outgoing** tie no longer paints that individual mark: the arc plus the next component state the hold. It reads the true source chain topology (a continuation in another system still counts), it is deliberately **not** restricted to values the bracket owns, it never touches the terminal component, the bracket\u2019s own carried value, pitches, onsets, sounding totals, tie chains, playback or continuation heads, and it is published: this round omits five marks — m. 33\u2019s 96-tick D6, m. 53\u2019s repeat, and the three non-terminal long components of the m. 61–63 E2 chain (192 · 192 · 96) — while the engine\u2019s duration-ink census and the linter\u2019s ownership check prove no mark is left orphaned. **The legend (all cards):** this notation counts 48 ticks to the quarter, so the three long values are the familiar note values \u2014 `96` = a **half note**, `192` = a **whole note** and `384` = a **breve (double whole)**. Every card states those three values with its own symbols, never with the internal tick counts. **B. Card 1 (mounted control):** the incumbent vocabulary on the incumbent mounts — 96 = one half-ring, 192 = one full ring, 384 = two full rings, the 192/384 exceptions on the fixed horizontal arm — with the half-ring\u2019s chord still closed by the unbroken bracket spine. **C. Card 2 (cutout):** byte-identical vocabulary and arm geometry with one deliberate change: the bracket spine (and, where a half-ring stands on the horizontal mount, that carrier line) is **interrupted across the half-ring\u2019s chord** and resumes 0.30pt clear of each chord end. The semicircle is never completed by a diameter stroke, nothing is masked and no unrelated ink is erased — the gap is cut out of the mount\u2019s own path. 53 bracket half-rings across the score carry the break. **D. Card 3 (detached ratio symbols):** the same ring vocabulary and bracket cutout, but a long-value exception statement is a **pure symbol run** seated directly beside its owning head (or its 2-span pair) at the nearest legal seat — no horizontal arm. The seat solve reuses the real collision/ownership machinery with the symbol\u2019s own ink bounds: 16 long statements are seated (14 beside a head, 2 above one), each with its exact dots, none refused, and the 48-tick exception members keep their historical arms because this round changes the long-value family alone. **E. Card 4 (detached open ovals):** an explicitly **experimental adaptation** of the conventional hollow-oval distinctions, not a claim to reproduce traditional notation: 96 = one compact oval tilted 30°, 192 = one distinguishably broader (1.10 : 0.62) horizontal oval, 384 = that oval with the breve\u2019s two short vertical flank strokes; the same three shapes are painted on the bracket mount and on every detached seat, the oval\u2019s white interior knocks the mount line out locally, and no three-ring stack exists in the family. Every card reports zero violations and zero warnings on the canonical Brahms lint, and the Reference engravings (Bach GOLD and the Round 46 Brahms baseline) stay byte-identical under every default.',
+  openAxes: ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
 };
-
-/** Round 46 window spans on the duration-vocabulary specimen (the short-value key). */
-const ROUND_46_SPECIMEN = {
-  key: { measureStart: 17, measureCount: 8 },
-} as const;
-
-/** A Round 46 window on the duration-vocabulary specimen (the short-value key). */
-function round46Specimen(
-  span: { measureStart: number; measureCount: number },
-  title: string,
-  caption: string
-): JankoScoreCandidateWindow {
-  return {
-    kind: 'score',
-    scoreId: DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
-    measureStart: span.measureStart,
-    measureCount: span.measureCount,
-    title,
-    caption,
-  };
-}
-
-/**
- * Round 46 — the review set: the whole Brahms score as genuine engine pages
- * first, then the bounded focus windows the operator named (mm. 1–3 for the
- * suppressed outlier rules, mm. 7–9 and 17–19 for the clusters and the shared
- * 192-tick indicators, mm. 33 and 53 for the six former 120-tick refusals,
- * m. 61 for the 504-tick E2 chain, mm. 65–71 for the corrected hands, the
- * written ties, the carriers and the long values), then the short-value key the
- * corpus never states.
- */
-function round46Windows(): JankoCandidateWindow[] {
-  return [
-    {
-      kind: 'score',
-      scoreId: BRAHMS_STUDIO_SCORE_ID,
-      measureStart: 1,
-      measureCount: 71,
-      fullScore: true,
-      title: 'Brahms Op. 118 No. 1 · all 71 measures as genuine score pages',
-      caption:
-        'The complete engraving, one real page card per page (the engine’s A4 page spread — the same one the Reference view uses), so the review walks the actual pages instead of a single crop. The chip above is this engraving’s own report: zero hard errors and **zero warnings** — the six 120-tick composites that were published refusals through Round 45 are now stated exactly by their written components and ties.',
-    },
-    brahmsWindow(
-      1,
-      3,
-      'Brahms mm. 1–3 · the unwanted literal-mode rules are gone',
-      'The system opening that used to float a continuous rule across mm. 1–3 and stud the literal-low bars with ledger dashes now carries the core staff and the legitimate Round 44 row extensions only: no `janko-outlier-rule`, no ledger dash, and the octave-6 notes that never needed unfolding keep their plain heads. Compare this opening against the Round 45 candidate: the pitches are identical, the extra ink is not.'
-    ),
-    brahmsWindow(
-      7,
-      3,
-      'Brahms mm. 7–9 · 95 % clusters, 0.30pt breathing room and the shared 192-tick indicator',
-      'm. 7 carries the densest onset in the score (2/4 · 5/4 · 9/3 · 9/4 · b/3): the five distinct true pitch levels keep their horizontal layout and take one uniform extra gap each, centred on the member-weighted mean, with 0.30pt of declared air on the binding pair (δ = 0.9292pt, span growth 3.7167pt, maximum displacement 1.8584pt). m. 9’s two 192-tick exception members state **one** shared indicator centred between their painted heads instead of two parallel carriers; the 144-tick pair is already owned by their bracket and paints no second mark. Compare the extra 0.10pt against the 0.20pt card at the same scale.'
-    ),
-    brahmsWindow(
-      17,
-      3,
-      'Brahms mm. 17–19 · the second dense passage and m. 19’s shared pair',
-      'The same six-cluster family, where the raw 1.00 cluster scale previously refused its fits: with the notes enlarged and the cluster spread distributed, every head still sits on its solved onset column and no head leaves its beat cell. m. 19 repeats m. 9’s 192-tick pair and its shared indicator.'
-    ),
-    brahmsWindow(
-      33,
-      1,
-      'Brahms m. 33 · a former 120-tick refusal, stated exactly',
-      'The D6 figure that used to publish `carrier-duration-unsupported`: the head now states its first component (96 = one half-ring) and a tie arc leads to the written 24-tick continuation head. Half-ring + tie + eighth = 120 ticks exactly, with no invented attack.'
-    ),
-    brahmsWindow(
-      53,
-      1,
-      'Brahms m. 53 · the second former refusal, and the tie past a neighbour’s stem',
-      'The same D6 figure in the repeat, plus the measured tie corridor: the arc is routed on the side opposite its own stem and passes a neighbouring stem without erasing it (ties paint beneath the rhythm layer, so the stem stays unbroken).'
-    ),
-    brahmsWindow(
-      61,
-      3,
-      'Brahms mm. 61–63 · the 504-tick E2 chain, component by component',
-      'The four written components of the E2 chain (192 · 192 · 96 · 24) each get their own statement: the attack head carries a full ring, the m. 62 and m. 63 continuations carry a ring and a half-ring, and the closing eighth joins the eighth run — three tie arcs state the continuous hold across the barlines that separate them.'
-    ),
-    brahmsWindow(
-      65,
-      7,
-      'Brahms mm. 65–71 · corrected hands, the written m. 66 ties, the repaired bracket and the long values',
-      'm. 65’s bracket now carries its valid first component (96 = one half-ring, 20 % larger on the bracket mount) with the remaining 24 ticks tied into the m. 66 chord; m. 66 (printed bar 37, second ending) reads as two hands with **one visible attack head per coincident attack/carry group** — 9, 2, 5 before the A2/D3/F3 chord — while the unequal simultaneous voice keeps its own stem; the F3’s 24 + 96 is stated by its own flag and tie. mm. 67–71 carry the literal low pitches with no extra rules or dashes, 384 ticks read as **two** full rings (never three), and the closing system keeps the established ledger extensions.'
-    ),
-    round46Specimen(
-      ROUND_46_SPECIMEN.key,
-      'Duration key · mm. 17–24 — the short values the corpus never states',
-      'A compact labelled key for the short values only: 4/3/2/1 diagonal cuts, a bare quarter, then the half-ring / one ring / two rings with their supported augmentation, at the same ratio family as the candidates. Four marks must be individually countable and the cut centre pitch is the round’s +0.20pt spacing; the key is synthetic and labelled as such, and the review medium is the real Brahms pages above.'
-    ),
-  ];
-}
 
 /**
  * Round 46 — **two real-engine variants of the whole Brahms score**, both at the
@@ -681,6 +589,13 @@ function round46Windows(): JankoCandidateWindow[] {
  * - **the report** — zero hard errors and zero warnings, the six former
  *   composite refusals stated exactly.
  */
+/**
+ * Round 46 — the **landed** family, kept as the shared base of the Round 47
+ * cards: the Brahms Reference's own options (95 % admitted scale, 0.30pt air,
+ * literal lows, the one 45-degree duration family and the written ties) are
+ * these values, and the two Round 46 cards (95 % at 0.30pt air and at 0.20pt
+ * air) are on record in `test/janko-round46.test.ts`.
+ */
 const ROUND_46_FAMILY: Partial<JankoLayoutOptions> = {
   pitchPlacement: 'parity-columns',
   bracketDurationGrammar: 'midpoint',
@@ -700,38 +615,147 @@ const ROUND_46_TOKENS: Partial<JankoTokens> = {
   opticalClearanceAir: 0.3,
 };
 
-/** One Round 46 spacing card: the shared family at one optical-air value. */
-function round46Card(
-  air: 0.2 | 0.3,
-  id: string,
-  label: string,
-  description: string
-): JankoCandidate {
+/**
+ * Round 47 — the shared base of every card: the landed Round 46 family plus the
+ * round's shared **outgoing-tie simplification** (`tieOriginIndicator:
+ * 'omit-outgoing'`), which every card carries so the four duration questions
+ * are compared on one and the same redundancy rule.
+ */
+const ROUND_47_BASE: Partial<JankoLayoutOptions> = {
+  ...ROUND_46_FAMILY,
+  tieOriginIndicator: 'omit-outgoing',
+};
+
+/** Round 47 — the Round 46 readability ratios, unchanged by this round. */
+const ROUND_47_TOKENS: Partial<JankoTokens> = { ...ROUND_46_TOKENS };
+
+/**
+ * Round 47 — the accepted **flat-face air** (pt): the same 0.30pt the round
+ * already declares as its vertical optical clearance, now owed by a half-ring's
+ * chord to the mount line it stands on (`halfRingGap`).
+ */
+const ROUND_47_HALF_RING_GAP = 0.3;
+
+/**
+ * Round 47 — the common literal windows of all four cards: mm. 1–3 (the system
+ * opening with its tuned 144 clusters and a 192-tick exception), mm. 7–9 (the
+ * dense five-level clusters, four 96-tick half-note brackets and m. 9's
+ * 144-tick dotted-half bracket, plus the shared 192-tick pair), m. 33 (a
+ * 96-tick exception whose outgoing written tie now states the hold),
+ * mm. 61–63 (the 504-tick E2 chain, component by component) and
+ * mm. 64–66 (the m. 65 / m. 66 half-ring brackets, the written m. 66 ties and
+ * the two voiced rests) — plus the single literal m. 67, added **only** because
+ * the score's 384-tick values (m. 67's F4, m. 69's chord) lie outside the
+ * requested range and 384 is the one long value the other five windows never
+ * state. No window is invented and no card may drop one.
+ */
+function round47Windows(): JankoCandidateWindow[] {
+  return [
+    brahmsWindow(
+      1,
+      3,
+      'Brahms mm. 1–3 · tuned 144 clusters, a 192-tick exception and the flat face on the bracket',
+      'The opening system: each tuned cluster is held by one bracket carrying 144 ticks (a half-note value, 96, plus its augmentation dot) whose mark is one half-ring on the spine, and the two 192-tick exceptions (E5 at m. 1, C5 at m. 3) are the round\u2019s only long exception statements in the window. On the control card the spine runs unbroken through the half-ring\u2019s chord; on the cutout cards the spine is interrupted across that chord and resumes 0.30pt clear of each end. Nothing else differs: the same vocabulary, the same arm geometry, the same dots.'
+    ),
+    brahmsWindow(
+      7,
+      3,
+      'Brahms mm. 7–9 · four 96-tick half-note brackets, m. 9\u2019s 144-tick dotted-half bracket, 48-tick exceptions and the shared 192-tick pair',
+      'The densest passage: four 96-tick brackets (each stating a half note as one half-ring) plus m. 9\u2019s 144-tick bracket (a dotted half — a half note and its augmentation dot, one half-ring on the spine) stand beside 48-tick exception members that keep their historical arms — the round touches the long values only. m. 9\u2019s two 192-tick neighbours (F4/G4, one 2-span apart, same hand, same onset) are stated **once** by a shared mark centred on their column; under the round\u2019s shared outgoing-tie rule both members are untied, so the shared statement survives exactly as in Round 46.'
+    ),
+    brahmsWindow(
+      33,
+      1,
+      'Brahms m. 33 · a 96-tick exception whose continuation the tie already states',
+      'The D6 figure of m. 33: the bracket carries 144, the member states 96 (a half note) and its committed written tie continues into the 24-tick written component. Under the round\u2019s shared rule that member no longer paints its own long mark \u2014 the outgoing arc plus the 24-tick continuation head state the hold \u2014 so the window is where the operator sees exactly what the simplification removes and what remains (the member\u2019s own stem, the arc, the continuing head).'
+    ),
+    brahmsWindow(
+      61,
+      3,
+      'Brahms mm. 61–63 · the 504-tick E2 chain, component by component',
+      'The four written components (192 · 192 · 96 · 24) are stated by four heads joined by three tie arcs across the barlines. Three of them are long values and have outgoing ties, so under the round\u2019s shared rule they paint no individual long mark: the chain reads as one sustained hold whose length is carried by the components and the arcs. The terminal 24-tick component keeps its exact statement \u2014 a terminal value is never omitted.'
+    ),
+    brahmsWindow(
+      64,
+      3,
+      'Brahms mm. 64–66 · the m. 65 / m. 66 brackets, the written ties and the two voiced rests',
+      'm. 65\u2019s bracket carries its valid first component (96 = one half-ring, 20 % larger on the bracket mount) with the remaining 24 ticks tied, and m. 66 (= printed bar 37, second ending) reads as two hands: one visible attack head per coincident attack/carry group before the A2/D3/F3 chord, an LH eighth rest for the genuine 24-tick lower-voice silence, an RH quarter rest for the upper voice\u2019s own silence, and the m. 66 ties drawn beneath the rhythm layer. The bracket-owned half-rings here are the mount question at its largest size.'
+    ),
+    brahmsWindow(
+      67,
+      1,
+      'Brahms m. 67 (literal, added for 384) · the one long value the requested range never states',
+      'Nothing outside mm. 1–3, 7–9, 33 and 61–66 is invented here: m. 67 is a literal measure added for the single reason that the score\u2019s breve (384-tick) values \u2014 this F4 and the m. 69 chord, whose written tie carries it on through m. 70 \u2014 lie beyond the requested range. It states 384 exactly \u2014 two full rings on the control/cutout/detached cards, one broad oval with the breve\u2019s two short flank strokes on the oval card \u2014 beside a 288-tick bracket (a 192-value ring plus its dot), so the whole long-value family can be compared in one window.'
+    ),
+  ];
+}
+
+/** One Round 47 card: the shared base, the card's own duration deltas and one declared axis. */
+function round47Card(spec: {
+  id: string;
+  label: string;
+  description: string;
+  axis: string;
+  options: Partial<JankoLayoutOptions>;
+  tokens: Partial<JankoTokens>;
+  tags: string[];
+}): JankoCandidate {
   return {
-    id,
-    label,
-    description,
-    axis: 'opticalClearanceAir',
-    options: { ...ROUND_46_FAMILY },
-    tokens: { ...ROUND_46_TOKENS, opticalClearanceAir: air },
-    windows: round46Windows(),
-    tags: ['brahms', 'full-score', 'scale', 'optical-spacing', 'duration', 'ties', 'literal-lows'],
+    id: spec.id,
+    label: spec.label,
+    description: spec.description,
+    axis: spec.axis,
+    options: { ...ROUND_47_BASE, ...spec.options },
+    tokens: { ...ROUND_47_TOKENS, ...spec.tokens },
+    windows: round47Windows(),
+    tags: spec.tags,
   };
 }
 
+
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
-  round46Card(
-    0.3,
-    'brahms-scale-95-air30',
-    'Brahms 95 % · 0.30pt air — the Round 46 working Reference',
-    'The round’s working Reference, and the card the Brahms Reference must agree with byte for byte: admitted clusters at 95 % of the golden symbol size with **0.30pt** of declared vertical optical air between the successive distinct pitch levels. On the six five-level clusters this measures δ = 0.92919pt, span growth 3.71675pt and a maximum per-glyph displacement of 1.85837pt — the Round 45 0.20pt result plus exactly 0.10pt of centred extra breathing room, still far inside the 2.5pt cap. Every other Round 46 decision (the literal-ink clean-up, the long-value vocabulary with the bracket-only 20 % ring enlargement, the +0.20pt cut spacing, the shared 2-span indicator and the written ties) is identical on both cards.'
-  ),
-  round46Card(
-    0.2,
-    'brahms-scale-95-air20',
-    'Brahms 95 % · 0.20pt air — the spacing control',
-    'The spacing control for the same engraving: byte-identical to the working Reference except that `opticalClearanceAir` stays at the Round 45 0.20pt, so the operator can judge the extra 0.10pt of breathing room on two otherwise identical real-engine pages. Measured on the same six clusters: δ = 0.82919pt, span growth 3.31675pt, maximum displacement 1.65837pt. Nothing else differs — this card exists to isolate one declared number, not to propose a second design.'
-  ),
+  round47Card({
+    id: 'round47-mounted-control',
+    label: 'Round 47 · 1 — Mounted control (half-ring closed by the spine)',
+    description:
+      'The measured control of the round: the landed Round 46 long-value vocabulary on both mounts — 96 = one half-ring, 192 = one full ring, 384 = two full rings, with the 192/384 exceptions stated on the fixed horizontal arm — plus the shared outgoing-tie simplification every card carries. The half-ring\u2019s chord is coincident with the unbroken bracket spine, which is exactly the treatment the operator asked to make deliberate (card 2 cuts it). This card is the round\u2019s mount/size baseline: the other three differ from it only in the keys their badges name, and none of them is promoted until the operator judges at normal size.',
+    axis: 'halfRingGap',
+    options: { exceptionCarrier: 'horizontal', longDurationStyle: 'midpoint' },
+    // The axis value is stated explicitly (`0` = the incumbent unbroken mount),
+    // so the control badges the number the cutout card changes.
+    tokens: { halfRingGap: 0 },
+    tags: ['brahms', 'duration', 'long-values', 'control', 'ties', 'experimental'],
+  }),
+  round47Card({
+    id: 'round47-half-ring-cutout',
+    label: 'Round 47 · 2 — Cutout (the flat face breaks the bracket)',
+    description:
+      'The same exact vocabulary, arm geometry, dots and mounts as card 1: the only difference is `halfRingGap: 0.30` — the mount line is interrupted across a half-ring\u2019s chord and resumes 0.30pt clear of each chord end (53 bracket half-rings across the score). Nothing is drawn to close the semicircle, so the flat face reads as a deliberate break rather than an accidental ring; the gap is a hole in the mount\u2019s own path, so it can never erase a notehead, stem, tie or neighbouring mark. 0.30pt is the round\u2019s already-declared optical air, and it is a judgement cue, not an accepted aesthetic.',
+    axis: 'halfRingGap',
+    options: { exceptionCarrier: 'horizontal', longDurationStyle: 'midpoint' },
+    tokens: { halfRingGap: ROUND_47_HALF_RING_GAP },
+    tags: ['brahms', 'duration', 'long-values', 'flat-face', 'ties', 'experimental'],
+  }),
+  round47Card({
+    id: 'round47-detached-symbols',
+    label: 'Round 47 · 3 — Detached ratio symbols (no horizontal arm)',
+    description:
+      'The ring vocabulary and the bracket cutout of card 2, with the **long** exception statements detached: 96 = one half-ring, 192 = one ring, 384 = two rings, seated as pure symbol ink directly beside their owning head (or beside the 2-span pair they share) at the nearest **legal** seat — the same collision/ownership machinery, but the symbol\u2019s own ink bounds instead of a fixed 11.46pt arm. A seat is legal only when it stays inside the staff, clear of every note knockout, every bracket ink box, every symbol already seated and every drawn staff rule (a half-ring\u2019s chord band additionally keeps the 0.30pt flat-face air), so a detached mark never erases anything and never stands on a line. The seat, its owner(s) and its distance are published; 16 statements are seated and none refused on the canonical score. The 48-tick exception members keep their historical arms — this round changes the long-value family alone.',
+    axis: 'exceptionCarrier',
+    options: { exceptionCarrier: 'symbol', longDurationStyle: 'midpoint' },
+    tokens: { halfRingGap: ROUND_47_HALF_RING_GAP },
+    tags: ['brahms', 'duration', 'long-values', 'detached', 'ties', 'experimental'],
+  }),
+  round47Card({
+    id: 'round47-detached-ovals',
+    label: 'Round 47 · 4 — Detached open ovals (half / whole / breve shapes)',
+    description:
+      'The experimental oval adaptation, detached like card 3 and **shared by both mounts**: 96 = one compact hollow oval tilted 30°, 192 = one distinguishably broader (1.10 : 0.62) horizontal hollow oval, 384 = that whole-value oval with the breve\u2019s two short vertical flank strokes. The three values differ by orientation, breadth and the breve flanks — never by size alone — and the same shapes are painted on the bracket spine, on any long exception statement and on every detached seat, so one vocabulary reads everywhere. On a mount the oval\u2019s white interior knocks the line out locally (the full ring\u2019s own behaviour); on a detached seat the oval is hollow and erases nothing. No three-mark stack exists in this family, the augmentation dots stay a separate modifier, the short cut values and the bracket grammar are untouched, and this is an **adaptation to this notation\u2019s ratio algebra** — it is not claimed to reproduce traditional notation, and no aesthetic acceptance is implied.',
+    axis: 'longDurationStyle',
+    options: { exceptionCarrier: 'symbol', longDurationStyle: 'open-oval' },
+    tokens: {},
+    tags: ['brahms', 'duration', 'long-values', 'open-ovals', 'breve', 'ties', 'experimental'],
+  }),
 ];
 
 /** A fully resolved candidate, ready to engrave. */

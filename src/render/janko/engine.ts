@@ -157,7 +157,9 @@ import {
   claspInkBox,
   claspQualifies,
   compactDurationMarks,
+  CompactDurationMarks,
   effectiveExceptionCarrierLength,
+  midpointMetrics,
   exceptionCarrierInkBox,
   exceptionCarrierMarkBoxes,
   renderExceptionCarrier,
@@ -171,6 +173,14 @@ import {
   partitionBeamGroups,
   renderBeamGroup,
   renderChordBridges,
+  detachedSymbolInkBox,
+  isLongValueBase,
+  longMarkKindForBase,
+  longRunName,
+  renderDetachedSymbol,
+  JankoDetachedSeatKind,
+  JankoDetachedSymbolGeometry,
+  JankoLongRunName,
   renderClaspGroup,
   renderRhythm,
   stemDirection,
@@ -1632,6 +1642,129 @@ export interface JankoExceptionCarrierOcclusion {
   reason: string;
 }
 
+/**
+ * Round 47 — one outgoing written tie, keyed by the head that states the
+ * component it leaves. The map is built from the **whole committed chain**
+ * (`JankoTieDisplayPlan`), so a component whose continuation lies in another
+ * system — or outside the crop a reviewer is looking at — still counts as
+ * tied: the rule reads source topology, never rendered geometry or a
+ * synthetic window-end note.
+ */
+export interface JankoTieOutgoing {
+  /** Sounding note that owns the chain. */
+  chainId: string;
+  /** Index of the component this tie leaves. */
+  component: number;
+  /** Head id that states the component. */
+  headId: string;
+  /** Head id that states the next component. */
+  toHeadId: string;
+  /** Written onset of the next component (ticks). */
+  toTick: number;
+}
+
+/**
+ * Round 47 — one long-duration origin the outgoing-tie rule omitted: a note or
+ * written component of an admitted cluster that has an outgoing written tie, so
+ * the arc plus the next component already state its continuation and its own
+ * exception mark would be redundant. The bracket's own carried value is never
+ * listed here (the bracket is the statement), and the terminal component of a
+ * chain is never listed (nothing continues it).
+ */
+export interface JankoTieOriginSuppression {
+  /** Source note id whose individual mark was omitted. */
+  noteId: string;
+  /** Onset tick of that component. */
+  tick: number;
+  /** Written value the omitted mark would have stated (ticks). */
+  durationTicks: number;
+  /** Family run name of that value (`'half-ring'` / `'ring'` / `'two-rings'` / oval names). */
+  run: JankoLongRunName;
+  /** Index of this component in its chain (0 = the sounding attack). */
+  component: number;
+  /** Head that states the continuation. */
+  toHeadId: string;
+  /** Onset of the continuation (ticks). */
+  toTick: number;
+  /** Human-readable, published reason. */
+  reason: string;
+}
+
+/**
+ * Round 47 — one painted **long-duration mark** in the census: every such mark
+ * names the exact owners whose value it states, so ownership is inspectable and
+ * an orphaned mark is detectable. A bracket mark names the members the bracket
+ * carries; a carrier / detached symbol names its owner (and its partner, when
+ * the statement is shared).
+ */
+export interface JankoDurationInkOwner {
+  /** Which mount paints the mark. */
+  mount: 'bracket' | 'carrier' | 'symbol';
+  /** Family run name of the value it states. */
+  run: JankoLongRunName;
+  /** Every source id this one mark states. */
+  ownerIds: string[];
+  /** Onset tick the mark belongs to. */
+  tick: number;
+  /** Mark-run centre: the bracket's spine x / the carrier's run centre / the seat's run centre. */
+  x: number;
+  /** Mark-run y on the mount. */
+  y: number;
+  /** True when the mark states two owners at once (a shared indicator/symbol). */
+  shared: boolean;
+}
+
+/** Round 47 — one detached symbol that found no legal seat (the member keeps its own ink). */
+export interface JankoDetachedSeatRefusal {
+  /** Source note id of the exception member. */
+  noteId: string;
+  /** Onset tick of the member. */
+  startTick: number;
+  /** The member's own stated duration. */
+  durationTicks: number;
+  /** Human-readable, published reason. */
+  reason: string;
+}
+
+/**
+ * Round 47 — the **effective long-value family** of one option set.
+ *
+ * The open-oval family re-shapes the *long* marks of the `'midpoint'` grammar
+ * only: the golden and compact grammars own their own mark counts and ring
+ * runs, so the axis is inert for them (see
+ * {@link JankoLayoutOptions.longDurationStyle}).
+ */
+export function effectiveLongDurationStyle(
+  o: ResolvedJankoLayoutOptions
+): 'midpoint' | 'open-oval' {
+  return o.bracketDurationGrammar === 'midpoint' ? o.longDurationStyle : 'midpoint';
+}
+
+/**
+ * Round 47 — the outgoing-tie map of one written-tie plan, keyed by the head
+ * that states each **non-terminal** component. Pure over the plan, so the
+ * omission rule, the layout and a reviewer all read the same topology.
+ */
+export function outgoingTieByHeadId(
+  tiePlan: JankoTieDisplayPlan | null
+): Map<string, JankoTieOutgoing> {
+  const out = new Map<string, JankoTieOutgoing>();
+  for (const chain of tiePlan?.chains ?? []) {
+    for (const [index, component] of chain.components.entries()) {
+      const next = chain.components[index + 1];
+      if (!next) continue; // the terminal component has no outgoing tie
+      out.set(component.headId, {
+        chainId: chain.noteId,
+        component: index,
+        headId: component.headId,
+        toHeadId: next.headId,
+        toTick: next.startTick,
+      });
+    }
+  }
+  return out;
+}
+
 export interface JankoSystemLayout {
   /** Zero-based global system index. */
   index: number;
@@ -1700,6 +1833,33 @@ export interface JankoSystemLayout {
    * blank carrier, and never stripped of their own duration ink.
    */
   exceptionCarrierUnsupported: JankoExceptionCarrierUnsupported[];
+  /**
+   * Round 47: every long-duration origin the outgoing-tie rule omitted — one
+   * entry per written component whose own long mark is stated by the
+   * continuation instead (see `options.tieOriginIndicator`). Published, never
+   * silent: the id, its component index, the value's run name and the head
+   * that continues it.
+   */
+  tieOriginSuppressions: JankoTieOriginSuppression[];
+  /**
+   * Round 47: the **duration-ink census** — one entry per painted long-value
+   * mark, with the exact owner ids it states (a shared indicator names both
+   * members). The linter reads it to prove that no duration mark is orphaned
+   * and that no suppressed owner still has a mark.
+   */
+  durationInkOwners: JankoDurationInkOwner[];
+  /**
+   * Round 47: the placed **detached long-value symbols**
+   * (`exceptionCarrier: 'symbol'`), each with the seat it took and the distance
+   * that seat keeps from its owning head.
+   */
+  detachedSymbols: JankoDetachedSymbolGeometry[];
+  /**
+   * Round 47: detached long-value symbols that found **no legal seat** — the
+   * member then keeps its own ordinary duration ink, exactly like a refused
+   * carrier (published, never silently dropped).
+   */
+  detachedSeatRefusals: JankoDetachedSeatRefusal[];
   /**
    * Round 43 repair: per-mark carrier occlusions (see
    * {@link JankoExceptionCarrierOcclusion}) — the destroyed duration ink a
@@ -4171,6 +4331,7 @@ export function predictDownbeatInset(
       {
         ...claspAuditDurationOptions(group, unified),
         claspDurationStyle: o.claspDurationStyle,
+        longDurationStyle: effectiveLongDurationStyle(o),
         durationGrammar: o.durationGrammar,
         bracketGrammar: o.bracketDurationGrammar,
         claspDotNudge: o.claspDotNudge,
@@ -4939,6 +5100,7 @@ export function resolveChordColumns(
             ...claspAuditDurationOptions(group, unified),
             durationScale: Math.min(...group.map((p) => p.symbolScale ?? 1)),
             claspDurationStyle: o.claspDurationStyle,
+            longDurationStyle: effectiveLongDurationStyle(o),
             durationGrammar: o.durationGrammar,
             bracketGrammar: o.bracketDurationGrammar,
             claspDotNudge: o.claspDotNudge,
@@ -5032,6 +5194,7 @@ export function resolveChordColumns(
             {
               ...claspAuditDurationOptions(group, unified),
               claspDurationStyle: o.claspDurationStyle,
+              longDurationStyle: effectiveLongDurationStyle(o),
               durationGrammar: o.durationGrammar,
               bracketGrammar: o.bracketDurationGrammar,
               claspDotNudge: o.claspDotNudge,
@@ -5063,6 +5226,7 @@ export function resolveChordColumns(
         t,
         {
           claspDurationStyle: o.claspDurationStyle,
+          longDurationStyle: effectiveLongDurationStyle(o),
           durationGrammar: o.durationGrammar,
           bracketGrammar: o.bracketDurationGrammar,
           claspDotNudge: o.claspDotNudge,
@@ -5133,6 +5297,7 @@ export function resolveChordColumns(
           ...auditDuration,
           durationScale: auditScale,
           claspDurationStyle: o.claspDurationStyle,
+          longDurationStyle: effectiveLongDurationStyle(o),
           durationGrammar: o.durationGrammar,
           bracketGrammar: o.bracketDurationGrammar,
           claspDotNudge: o.claspDotNudge,
@@ -5153,6 +5318,7 @@ export function resolveChordColumns(
                 ...auditDuration,
                 durationScale: auditScale,
                 claspDurationStyle: o.claspDurationStyle,
+                longDurationStyle: effectiveLongDurationStyle(o),
                 durationGrammar: o.durationGrammar,
                 bracketGrammar: o.bracketDurationGrammar,
                 claspDotNudge: o.claspDotNudge,
@@ -5366,6 +5532,7 @@ export function resolveChordColumns(
           {
             ...claspAuditDurationOptions(group, unified),
             claspDurationStyle: o.claspDurationStyle,
+            longDurationStyle: effectiveLongDurationStyle(o),
             durationGrammar: o.durationGrammar,
             bracketGrammar: o.bracketDurationGrammar,
             claspDotNudge: o.claspDotNudge,
@@ -6528,8 +6695,14 @@ export function layoutJankoSystemShifted(
   // so the repair can neither invent a silence nor lose one: a tie is a
   // sustain, and an added head is a written statement the hand really has.
   // -------------------------------------------------------------------------
-  const tiePlan = o.writtenTies === 'source' ? getTieDisplayPlan(score) : null;
-  const tieHeads = (tiePlan?.heads ?? []).filter(
+  // Round 47: the outgoing-tie simplification reads the **same** committed
+  // chain topology even when the written ties themselves are not rendered, so
+  // the suppression rule never depends on which mounts are painted.
+  const tiePlan =
+    o.writtenTies === 'source' || o.tieOriginIndicator === 'omit-outgoing'
+      ? getTieDisplayPlan(score)
+      : null;
+  const tieHeads = (o.writtenTies === 'source' ? (tiePlan?.heads ?? []) : []).filter(
     (n) => n.startTick >= startTick && n.startTick < endTick
   );
   const displayTicks = tiePlan?.displayTicks ?? null;
@@ -7023,6 +7196,10 @@ export function layoutJankoSystemShifted(
           // vertical column keeps its stems.
           requireBracketScope: o.chordGrouping === 'per-hand-clasp',
           claspDurationStyle: o.claspDurationStyle,
+          longDurationStyle: effectiveLongDurationStyle(o),
+          // Round 47: the paint-time spine interruption this group's half-rings
+          // claim (the audited ink boxes are unaffected — a gap removes ink).
+          halfRingGap: t.halfRingGap,
           // Round 30: the bracket's dots derive from the active grammar
           // (a double-dotted carried value dots twice under complete).
           durationGrammar: o.durationGrammar,
@@ -7432,9 +7609,49 @@ export function layoutJankoSystemShifted(
   const exceptionCarrierRefusals: JankoExceptionCarrierRefusal[] = [];
   const exceptionCarrierUnsupported: JankoExceptionCarrierUnsupported[] = [];
   const exceptionCarrierOcclusions: JankoExceptionCarrierOcclusion[] = [];
-  if (o.exceptionCarrier === 'horizontal' && o.chordGrouping === 'per-hand-clasp') {
+  // Round 47: the detached long-value mount, its refusals, the outgoing-tie
+  // omissions and the duration-ink census (published on the layout).
+  const detachedSymbols: JankoDetachedSymbolGeometry[] = [];
+  const detachedSeatRefusals: JankoDetachedSeatRefusal[] = [];
+  const tieOriginSuppressions: JankoTieOriginSuppression[] = [];
+  const durationInkOwners: JankoDurationInkOwner[] = [];
+  /**
+   * Round 47: record one painted long-value carrier in the census (a short-value
+   * carrier states a cut value and is not a long-duration symbol).
+   */
+  const pushCarrierCensus = (carrier: JankoExceptionCarrierGeometry): void => {
+    if (!isLongValueBase(carrier.base, carrier.longStyle)) return;
+    durationInkOwners.push({
+      mount: 'carrier',
+      run: longRunName(carrier.base, carrier.longStyle) ?? 'ring',
+      ownerIds:
+        carrier.partnerId !== undefined ? [carrier.noteId, carrier.partnerId] : [carrier.noteId],
+      tick: carrier.tick,
+      x: (carrier.x0 + carrier.x1) / 2,
+      y: carrier.y,
+      shared: carrier.partnerId !== undefined,
+    });
+  };
+  if (
+    (o.exceptionCarrier === 'horizontal' || o.exceptionCarrier === 'symbol') &&
+    o.chordGrouping === 'per-hand-clasp'
+  ) {
     const air = getClusterSpacingPreset(o.clusterSpacing).air;
     const solvedById = new Map(notes.map((p) => [p.note.id, p]));
+    /**
+     * Round 47: the long-value symbol family — read only for the `'midpoint'`
+     * mark grammar (the golden / compact families own their own counts and are
+     * never re-shaped by this axis).
+     */
+    const longStyle = effectiveLongDurationStyle(o);
+    const halfRingGap = t.halfRingGap;
+    /**
+     * Round 47: the outgoing-tie map of the committed chains, computed
+     * **before** any carrier or seat is requested (source topology, never the
+     * rendered system).
+     */
+    const outgoingTies =
+      o.tieOriginIndicator === 'omit-outgoing' ? outgoingTieByHeadId(tiePlan) : null;
     /**
      * Round 46: the carrier is the **agreed horizontal marker** of a long value,
      * so a written tie component whose value the mark family states with a ring
@@ -7487,8 +7704,12 @@ export function layoutJankoSystemShifted(
         if (beamedIds.has(component.headId)) continue;
         const p = solvedById.get(component.headId);
         if (!p) continue;
-        const marks = compactDurationMarks(component.durationTicks, o.bracketDurationGrammar);
-        if (marks.rings === 0) continue;
+        const marks = compactDurationMarks(
+          component.durationTicks,
+          o.bracketDurationGrammar,
+          longStyle
+        );
+        if (!isLongValueBase(marks.base, longStyle)) continue;
         if (requests.some((r) => r.id === component.headId)) continue;
         requests.push({
           id: component.headId,
@@ -7498,6 +7719,252 @@ export function layoutJankoSystemShifted(
         });
       }
     }
+    /**
+     * Round 47 — the **outgoing-tie simplification**.
+     *
+     * The committed chain topology is read *before* anything is requested: a
+     * note or written component of an admitted cluster whose own value the
+     * active family states with a long mark and whose chain declares an
+     * outgoing tie omits that individual mark — the arc plus the next component
+     * already state the continuation, so the mark would be a second, redundant
+     * statement of the same hold. This is deliberately **not** restricted to
+     * values the bracket owns: an exception value the bracket does not carry is
+     * exactly the case the operator raised. The terminal component is never
+     * omitted (nothing continues it), the bracket's own carried value is never
+     * omitted (the bracket is the statement, not this member's mark), and a
+     * value the family states with a cut keeps its stick/flag statement
+     * untouched — this axis is the long-value family's alone.
+     */
+    const suppressedRequestIds = new Set<string>();
+    if (outgoingTies !== null) {
+      for (const request of requests) {
+        const outgoing = outgoingTies.get(request.id);
+        if (!outgoing) continue;
+        const marks = compactDurationMarks(
+          request.durationTicks,
+          o.bracketDurationGrammar,
+          longStyle
+        );
+        const run = longRunName(marks.base, longStyle);
+        if (run === null) continue;
+        suppressedRequestIds.add(request.id);
+        tieOriginSuppressions.push({
+          noteId: request.id,
+          tick: request.startTick,
+          durationTicks: request.durationTicks,
+          run,
+          component: outgoing.component,
+          toHeadId: outgoing.toHeadId,
+          toTick: outgoing.toTick,
+          reason:
+            `the committed written tie of ${outgoing.chainId} continues at tick ` +
+            `${outgoing.toTick} (head ${outgoing.toHeadId}): the arc states the hold, so ` +
+            `${request.id}'s own ${run} mark is redundant and is omitted`,
+        });
+      }
+    }
+
+    /**
+     * Round 47 — **detached long-value seats** (`exceptionCarrier: 'symbol'`).
+     *
+     * The member's own long mark is seated as a **pure symbol run** beside its
+     * head (or beside its 2-span pair) at the nearest **legal** seat: the
+     * candidates are the four adjacent positions around the owning head, and —
+     * for a pair — the channel between the two heads or the free lane just
+     * outside them. A candidate is legal only when its exact symbol ink box
+     * (marks, breve flanks and dots — the same box the painter draws) stays
+     * inside the staff, clear of every note knockout, every bracket ink box,
+     * every symbol already seated in this system and every drawn staff rule; a
+     * half-ring's chord band additionally keeps the declared `halfRingGap` of
+     * air from any rule, so its flat face is never closed by the line beneath
+     * it. The nearest legal seat is taken, its distance published; with no
+     * legal seat the symbol is **refused** (published) and the member keeps its
+     * own ordinary duration ink — never a distant arm-like displacement, never
+     * a silent drop, never an erasure.
+     */
+    const detachedBoxes: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+    const staffRules = drawnStaffRuleYs(geometry, o, t);
+    const claspBoxes = clasps.map((clasp) => claspInkBox(clasp, t));
+
+    /**
+     * Seat one detached long-value symbol for `request` and publish the result.
+     * Returns false when no candidate seat is legal (the refusal is published
+     * by the caller-facing record).
+     */
+    const seatDetachedSymbol = (
+      request: JankoCarrierRequest,
+      marks: CompactDurationMarks,
+      durationScale: number
+    ): { ok: true } | { ok: false; refusal: JankoDetachedSeatRefusal } => {
+      const p = request.p;
+      const partner = request.partner?.p;
+      const run = longRunName(marks.base, longStyle) ?? 'ring';
+      const probe: JankoDetachedSymbolGeometry = {
+        noteId: request.id,
+        tick: request.startTick,
+        durationTicks: request.durationTicks,
+        base: marks.base,
+        rings: marks.rings,
+        dots: marks.dots,
+        inGrammar: marks.inGrammar,
+        scale: durationScale,
+        stroke: t.claspStrokeWidth * durationScale,
+        grammar: o.bracketDurationGrammar,
+        longStyle,
+        halfRingGap,
+        x: 0,
+        y: 0,
+        seat: 'right',
+        distance: 0,
+        ...(request.partnerId !== undefined ? { partnerId: request.partnerId } : {}),
+      };
+      // The run's own ink box at the origin: every candidate is this box moved,
+      // so the audit, the seat test and the paint can never disagree.
+      const origin = detachedSymbolInkBox(probe, t);
+      const kind = longMarkKindForBase(marks.base, longStyle);
+      const halfRing = kind === 'half-ring';
+      const e = knockoutHalfExtents(o, t, p.note.startTick, p);
+      const midX = (origin.x0 + origin.x1) / 2;
+      const centre = { x: p.x - midX };
+      const candidates: Array<{ seat: JankoDetachedSeatKind; x: number; y: number }> = [
+        // Adjacent to the owning head: the symbol stands on the head's own
+        // pitch line (its chord/axis y is the member's y, exactly like the
+        // horizontal mount), just clear of the head's knockout box.
+        { seat: 'right', x: p.x + e.wx + air - origin.x0, y: p.y },
+        { seat: 'left', x: p.x - e.wx - air - origin.x1, y: p.y },
+        { seat: 'above', x: centre.x, y: p.y - e.hy - air - origin.y1 },
+        { seat: 'below', x: centre.x, y: p.y + e.hy + air - origin.y0 },
+      ];
+      if (partner) {
+        const upper = p.y <= partner.y ? p : partner;
+        const lower = upper === p ? partner : p;
+        const upperMask = knockoutHalfExtents(o, t, upper.note.startTick, upper);
+        const lowerMask = knockoutHalfExtents(o, t, lower.note.startTick, lower);
+        const pairMidX = (p.x + partner.x) / 2;
+        const channelTop = upper.y + upperMask.hy;
+        const channelBottom = lower.y - lowerMask.hy;
+        if (channelBottom - channelTop >= origin.y1 - origin.y0 + 2 * air) {
+          candidates.unshift({
+            seat: 'pair-channel',
+            x: pairMidX - midX,
+            y: (channelTop + channelBottom) / 2 - (origin.y0 + origin.y1) / 2,
+          });
+        }
+        candidates.push({
+          seat: 'above',
+          x: pairMidX - midX,
+          y: upper.y - upperMask.hy - air - origin.y1,
+        });
+        candidates.push({
+          seat: 'below',
+          x: pairMidX - midX,
+          y: lower.y + lowerMask.hy + air - origin.y0,
+        });
+      }
+      const chordHalf = midpointMetrics(t, durationScale).ringStroke / 2;
+      const blocked = (box: { x0: number; y0: number; x1: number; y1: number }, axisY: number): string | null => {
+        if (
+          box.x0 < geometry.staffLeft - 1e-9 ||
+          box.x1 > geometry.staffRight + 1e-9 ||
+          box.y0 < geometry.staffTopY - 1e-9 ||
+          box.y1 > geometry.staffBotY + 1e-9
+        ) {
+          return 'it would leave the staff';
+        }
+        for (const q of notes) {
+          const qe = knockoutHalfExtents(o, t, q.note.startTick, q);
+          if (
+            boxesWithin(
+              box,
+              { x0: q.x - qe.wx, y0: q.y - qe.hy, x1: q.x + qe.wx, y1: q.y + qe.hy },
+              0
+            )
+          ) {
+            return `it would overlap the knockout of ${q.note.id}`;
+          }
+        }
+        for (const claspBox of claspBoxes) {
+          if (boxesWithin(box, claspBox, 0)) return 'it would overlap a bracket';
+        }
+        for (const placed of detachedBoxes) {
+          if (boxesWithin(box, placed, 0)) return 'it would overlap an already seated symbol';
+        }
+        for (const rule of staffRules) {
+          if (rule > box.y0 - 1e-9 && rule < box.y1 + 1e-9) return 'a drawn staff rule crosses it';
+          if (halfRing && Math.abs(rule - axisY) <= chordHalf + halfRingGap + 1e-9) {
+            return 'a drawn staff rule would close its flat face';
+          }
+        }
+        return null;
+      };
+      let best: { seat: JankoDetachedSeatKind; x: number; y: number; distance: number } | null = null;
+      const reasons: string[] = [];
+      for (const candidate of candidates) {
+        const box = {
+          x0: origin.x0 + candidate.x,
+          y0: origin.y0 + candidate.y,
+          x1: origin.x1 + candidate.x,
+          y1: origin.y1 + candidate.y,
+        };
+        const reason = blocked(box, candidate.y);
+        if (reason !== null) {
+          reasons.push(`${candidate.seat}: ${reason}`);
+          continue;
+        }
+        const distance = Math.hypot(
+          Math.max(box.x0 - p.x, 0, p.x - box.x1),
+          Math.max(box.y0 - p.y, 0, p.y - box.y1)
+        );
+        if (best === null || distance < best.distance - 1e-9) {
+          best = { seat: candidate.seat, x: candidate.x, y: candidate.y, distance };
+        }
+      }
+      if (best === null) {
+        return {
+          ok: false,
+          refusal: {
+            noteId: request.id,
+            startTick: request.startTick,
+            durationTicks: request.durationTicks,
+            reason:
+              `no legal detached seat for the ${run} statement (${reasons.join('; ')}): ` +
+              `the member keeps its own ordinary duration ink`,
+          },
+        };
+      }
+      const placed: JankoDetachedSymbolGeometry = {
+        ...probe,
+        x: best.x,
+        y: best.y,
+        seat: best.seat,
+        distance: best.distance,
+      };
+      detachedSymbols.push(placed);
+      detachedBoxes.push({
+        x0: origin.x0 + best.x,
+        y0: origin.y0 + best.y,
+        x1: origin.x1 + best.x,
+        y1: origin.y1 + best.y,
+      });
+      durationInkOwners.push({
+        mount: 'symbol',
+        run,
+        ownerIds: request.partnerId !== undefined ? [request.id, request.partnerId] : [request.id],
+        tick: request.startTick,
+        x: best.x,
+        y: best.y,
+        shared: request.partnerId !== undefined,
+      });
+      // The symbol states the members' duration: their own stem/flag ink stays
+      // suppressed exactly as the horizontal carrier suppresses it.
+      for (const id of request.partnerId !== undefined
+        ? [request.id, request.partnerId]
+        : [request.id]) {
+        if (!claspedStems.includes(id)) claspedStems.push(id);
+      }
+      return { ok: true };
+    };
+
     /**
      * Round 46 — the **shared indicator** of two 2-span neighbours.
      *
@@ -7524,11 +7991,15 @@ export function layoutJankoSystemShifted(
     }
     for (const a of requests) {
       if (pairedIds.has(a.id) || tieOwnedIds.has(a.id)) continue;
+      // Round 47: an omitted origin states nothing, so it can neither own nor
+      // dilute a shared mark — the surviving (untied) member keeps its own.
+      if (suppressedRequestIds.has(a.id)) continue;
       const pairPartner = requests.find(
         (candidate) =>
           candidate !== a &&
           !pairedIds.has(candidate.id) &&
           !tieOwnedIds.has(candidate.id) &&
+          !suppressedRequestIds.has(candidate.id) &&
           candidate.startTick === a.startTick &&
           candidate.p.rhythm.hand === a.p.rhythm.hand &&
           candidate.durationTicks === a.durationTicks &&
@@ -7593,6 +8064,8 @@ export function layoutJankoSystemShifted(
 
     for (const request of requests) {
       if (request.pairedAway) continue; // stated by its shared indicator
+      // Round 47: an omitted origin states nothing (see the suppression set).
+      if (suppressedRequestIds.has(request.id)) continue;
       {
         const member = request.p.rhythm;
         const p = request.p;
@@ -7608,7 +8081,11 @@ export function layoutJankoSystemShifted(
           durationScale
         );
         const x1 = x0 + carrierLength;
-        const marks = compactDurationMarks(member.durationTicks, o.bracketDurationGrammar);
+        const marks = compactDurationMarks(
+          member.durationTicks,
+          o.bracketDurationGrammar,
+          longStyle
+        );
         // Round 43 repair: an out-of-grammar value is refused outright. A
         // mark-less carrier would read exactly like a bare quarter, so none is
         // painted, and the member's own duration ink is NOT suppressed (the
@@ -7629,6 +8106,48 @@ export function layoutJankoSystemShifted(
           });
           continue;
         }
+        // Round 47: under the detached mount a **long** value is seated as a
+        // pure symbol run (no arm); every short value (the 1–4 cut family, a
+        // bare quarter) keeps the horizontal carrier unchanged, so only the
+        // long-value family ever moves.
+        if (o.exceptionCarrier === 'symbol' && longMarkKindForBase(marks.base, longStyle) !== null) {
+          if (request.partner) {
+            // One shared statement for the 2-span pair when it can be seated;
+            // otherwise each member states its own value on its own head.
+            const shared = seatDetachedSymbol(request, marks, durationScale);
+            if (!shared.ok) {
+              const alone: JankoCarrierRequest = {
+                id: request.id,
+                startTick: request.startTick,
+                durationTicks: request.durationTicks,
+                p: request.p,
+              };
+              const first = seatDetachedSymbol(alone, marks, durationScale);
+              const partnerRequest = request.partner;
+              const partnerMarks = compactDurationMarks(
+                partnerRequest.durationTicks,
+                o.bracketDurationGrammar,
+                longStyle
+              );
+              const second = seatDetachedSymbol(
+                {
+                  id: partnerRequest.id,
+                  startTick: partnerRequest.startTick,
+                  durationTicks: partnerRequest.durationTicks,
+                  p: partnerRequest.p,
+                },
+                partnerMarks,
+                partnerRequest.p.symbolScale ?? 1
+              );
+              if (!first.ok) detachedSeatRefusals.push(first.refusal);
+              if (!second.ok) detachedSeatRefusals.push(second.refusal);
+            }
+          } else {
+            const single = seatDetachedSymbol(request, marks, durationScale);
+            if (!single.ok) detachedSeatRefusals.push(single.refusal);
+          }
+          continue;
+        }
         const carrier: JankoExceptionCarrierGeometry = {
           noteId: member.id,
           tick: member.startTick,
@@ -7644,6 +8163,9 @@ export function layoutJankoSystemShifted(
           scale: durationScale,
           stroke: t.claspStrokeWidth * durationScale,
           grammar: o.bracketDurationGrammar,
+          base: marks.base,
+          longStyle,
+          halfRingGap,
         };
         // Round 44 — fit BEFORE paint. The exact ink box of the proposed carrier
         // (its line stroke, every mark, the dots — the same box the painter and
@@ -7681,6 +8203,7 @@ export function layoutJankoSystemShifted(
         }
         if (request.partnerId !== undefined) carrier.partnerId = request.partnerId;
         exceptionCarriers.push(carrier);
+        pushCarrierCensus(carrier);
         if (request.partner) {
           for (const id of [member.id, request.partner.id]) {
             if (!claspedStems.includes(id)) claspedStems.push(id);
@@ -7738,7 +8261,11 @@ export function layoutJankoSystemShifted(
         t,
         durationScale
       );
-      const marks = compactDurationMarks(partner.durationTicks, o.bracketDurationGrammar);
+      const marks = compactDurationMarks(
+        partner.durationTicks,
+        o.bracketDurationGrammar,
+        longStyle
+      );
       if (!marks.inGrammar) continue;
       const carrier: JankoExceptionCarrierGeometry = {
         noteId: partner.id,
@@ -7755,6 +8282,9 @@ export function layoutJankoSystemShifted(
         scale: durationScale,
         stroke: t.claspStrokeWidth * durationScale,
         grammar: o.bracketDurationGrammar,
+        base: marks.base,
+        longStyle,
+        halfRingGap,
       };
       const box = exceptionCarrierInkBox(carrier, t);
       let nearest = geometry.staffRight;
@@ -7781,7 +8311,37 @@ export function layoutJankoSystemShifted(
         continue;
       }
       exceptionCarriers.push(carrier);
+      pushCarrierCensus(carrier);
       if (!claspedStems.includes(partner.id)) claspedStems.push(partner.id);
+    }
+  }
+
+  /**
+   * Round 47 — the census's **bracket** marks: one entry per long-value ink
+   * group a bracket paints, naming the members whose value the bracket carries
+   * (the group's own value decides), so a bracket mark's owners are as
+   * inspectable as a carrier's or a detached symbol's.
+   */
+  for (const clasp of clasps) {
+    for (const ink of clasp.durationInk) {
+      const run = longRunName(ink.compactBase, clasp.longDurationStyle);
+      if (run === null) continue;
+      // The bracket's owners are exactly the members whose **own** duration the
+      // carried value states (the engine's own ownership test, the same one the
+      // carrier loop uses) — an exception member is never attributed to the
+      // bracket, because its own mark states it.
+      const owners = clasp.notes
+        .filter((member) => member.durationTicks === claspMemberCarriedTicks(clasp, member.id))
+        .map((member) => member.id);
+      durationInkOwners.push({
+        mount: 'bracket',
+        run,
+        ownerIds: owners.length > 0 ? owners : clasp.notes.map((member) => member.id),
+        tick: clasp.tick,
+        x: clasp.claspX,
+        y: ink.centerY,
+        shared: owners.length > 1,
+      });
     }
   }
 
@@ -8119,6 +8679,10 @@ export function layoutJankoSystemShifted(
     holdRefusals,
     exceptionCarriers,
     exceptionCarrierRefusals,
+    detachedSymbols,
+    detachedSeatRefusals,
+    tieOriginSuppressions,
+    durationInkOwners,
     exceptionCarrierUnsupported,
     exceptionCarrierOcclusions,
     claspedStems,
@@ -8304,10 +8868,17 @@ function renderNotesLayer(
   //     members' true pitch y, between the staff rules and the rhythm layer, so
   //     every notehead knockout erases any overlap exactly as it does for a
   //     stem or bracket — the carrier never sits above a glyph.
-  if (layout.exceptionCarriers.length > 0) {
+  if (layout.exceptionCarriers.length > 0 || layout.detachedSymbols.length > 0) {
     out.push('    <g class="janko-exception-layer">');
     for (const carrier of layout.exceptionCarriers) {
       out.push(renderExceptionCarrier(carrier, t));
+    }
+    // Round 47: the detached long-value symbols stand on the same layer band
+    // as the carriers (above the staff rules and the tie arcs, beneath every
+    // note knockout), so a symbol can never erase ink and only a notehead can
+    // ever paint over it.
+    for (const symbol of layout.detachedSymbols) {
+      out.push(renderDetachedSymbol(symbol, t));
     }
     out.push('    </g>');
   }

@@ -35,7 +35,14 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
 } from '../src/render/janko/types';
-import { JankoSystemLayout, layoutJankoScore, renderSystem, computePageGeometry, getSystemGeometry } from '../src/render/janko/engine';
+import {
+  JankoSystemLayout,
+  computePageGeometry,
+  drawnStaffRuleYs,
+  getSystemGeometry,
+  layoutJankoScore,
+  renderSystem,
+} from '../src/render/janko/engine';
 import { getStemAttachmentRadius, getStemGeometry, stemRingCenters } from '../src/render/janko/elements/rhythm';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
@@ -58,6 +65,7 @@ import {
   checkClaspDotFusion,
   checkDotCollision,
   checkDotCountAgreement,
+  checkDurationInkOwnership,
   checkHaloClearance,
   checkKnockoutCoverage,
   checkMeasureNumeralClearance,
@@ -85,6 +93,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
 
 const SCORE = buildBachGoldbergVar1Score();
+/** The Round 47 linter fixtures engrave the real Brahms Intermezzo. */
+const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const LINT = DEFAULT_JANKO_LINT_OPTIONS;
 const TOKENS = DEFAULT_JANKO_TOKENS;
@@ -1233,6 +1243,83 @@ test('Defect: a clasp pushed into the system-start column is caught', () => {
   );
 });
 
+// ---------------------------------------------------------------------------
+// 3c. Round 47 — duration-ink ownership (no orphaned long-value marks)
+// ---------------------------------------------------------------------------
+
+test('Round 47 defect: an orphaned, suppressed-only or unknown-owner duration mark is caught', () => {
+  // The round's own candidate engraving: detached long-value symbols with a
+  // published census and five published originator omissions.
+  const options = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    exceptionCarrier: 'symbol',
+    longDurationStyle: 'open-oval',
+    tieOriginIndicator: 'omit-outgoing',
+  });
+  const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, options, tokens);
+  const withCensus = layouts.find(
+    (l) => l.durationInkOwners.length > 0 && l.tieOriginSuppressions.length > 0
+  );
+  assert.ok(withCensus, 'the card publishes a duration-ink census and omitted origins');
+  const clean = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), withCensus);
+  assert.deepEqual(clean, [], 'the engine\u2019s own marks own themselves');
+
+  const owner = withCensus.durationInkOwners[0];
+  // 1. A mark with no owner at all.
+  const orphan: JankoSystemLayout = {
+    ...withCensus,
+    durationInkOwners: [...withCensus.durationInkOwners, { ...owner, ownerIds: [] }],
+  };
+  const orphanHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), orphan);
+  assert.equal(orphanHits.length, 1);
+  assert.equal(orphanHits[0].code, 'duration-mark-orphan');
+  assert.match(orphanHits[0].message, /names no\s+owning note/);
+
+  // 2. A mark whose every owner the outgoing-tie rule suppressed.
+  const suppression = withCensus.tieOriginSuppressions[0];
+  assert.ok(suppression, 'the card omits at least one originator mark');
+  const redundant: JankoSystemLayout = {
+    ...withCensus,
+    durationInkOwners: [
+      ...withCensus.durationInkOwners,
+      { ...owner, ownerIds: [suppression.noteId] },
+    ],
+  };
+  const redundantHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), redundant);
+  assert.equal(redundantHits.length, 1);
+  assert.equal(redundantHits[0].code, 'duration-mark-suppressed-owner');
+  assert.match(redundantHits[0].message, /redundant second statement/);
+
+  // 3. A mark naming a head that is not laid out in its own system.
+  const stale: JankoSystemLayout = {
+    ...withCensus,
+    durationInkOwners: [...withCensus.durationInkOwners, { ...owner, ownerIds: ['not-a-head'] }],
+  };
+  const staleHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), stale);
+  assert.equal(staleHits.length, 1);
+  assert.equal(staleHits[0].code, 'duration-mark-unknown-owner');
+  assert.match(staleHits[0].message, /not laid out in this system/);
+
+  // 4. A detached symbol moved onto a drawn staff rule (the seat contract).
+  const withSymbols = layouts.find((l) => l.detachedSymbols.length > 0)!;
+  const rule = drawnStaffRuleYs(withSymbols.geometry, options, tokens)[0];
+  const symbol = withSymbols.detachedSymbols[0];
+  const seated: JankoSystemLayout = {
+    ...withSymbols,
+    detachedSymbols: [{ ...symbol, y: rule }],
+  };
+  const seatHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), seated).filter(
+    (v) => v.code === 'symbol-seat-rule-conflict'
+  );
+  assert.ok(seatHits.length >= 1, 'the rule crossing the mark is caught');
+  assert.ok(
+    seatHits.every((v) => (v.noteIds ?? []).includes(symbol.noteId)),
+    'and it names the symbol that was moved'
+  );
+  assert.match(seatHits[0]!.message, /crosses the drawn staff rule/);
+});
+
 test('Defect: a rail that crosses a barline is caught', () => {
   const brahmsOptions = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
@@ -1825,6 +1912,33 @@ test('golden pitch grid weight audit: extension rows 0.35pt, core rows 0.50pt', 
 // ---------------------------------------------------------------------------
 // 5. CLI contract
 // ---------------------------------------------------------------------------
+
+test('npm run forwards --strict to the engraving CLI — the `--` separator is required', () => {
+  // The round's canonical gate is `npm run lint:engraving -- --strict`: npm
+  // parses a flag that directly follows the script name as its own config
+  // (`npm run lint:engraving --strict` warns `Unknown cli config "--strict"`
+  // and drops it), so only the separator form reaches the linter. npm echoes
+  // the executed script line, which is the observable proof of forwarding
+  // (npm is present by construction — the canonical suite runs under `npm
+  // test`). The flag's own effect on the exit code is covered by the direct
+  // strict spawn above; here the forwarding itself is what is asserted.
+  const run = spawnSync(
+    process.platform === 'win32' ? 'npm.cmd' : 'npm',
+    ['run', 'lint:engraving', '--', '--quiet', '--strict'],
+    { cwd: REPO_ROOT, encoding: 'utf-8' }
+  );
+  assert.equal(run.status, 0, 'the canonical strict gate exits 0');
+  assert.match(
+    run.stdout,
+    /clean violations=0 warnings=0/,
+    'and reports zero violations and zero warnings'
+  );
+  assert.match(
+    run.stdout,
+    /tsx scripts\/lint_engraving\.ts --quiet --strict/,
+    'npm handed --strict to the script, not to its own config parser'
+  );
+});
 
 test('npm run lint:engraving reports canonical clean and exits 0', () => {
   // Canonical fixed-3 everywhere: the gate exits 0 with zero violations and —

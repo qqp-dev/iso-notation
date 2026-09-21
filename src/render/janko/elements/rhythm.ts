@@ -31,6 +31,7 @@ import {
   JankoClusterSpacing,
   JankoDurationGrammar,
   JankoLayoutOptions,
+  JankoLongDurationStyle,
   JankoRhythmStyle,
   JankoSubdivisionStyle,
   JankoTokens,
@@ -813,6 +814,13 @@ export interface CompactDurationMarks {
   dots: 0 | 1 | 2;
   /** False when the value has no exact plain/dotted/double-dotted reading. */
   inGrammar: boolean;
+  /**
+   * Round 47: the analysed **base value** of the reading (`0` when out of
+   * grammar) — `3 / 6 / 12 / 24 / 48 / 96 / 192 / 384`. The long-value family
+   * of one mark is selected from this base, never from the dotted total, so a
+   * dotted half states the half's symbol plus its own dot.
+   */
+  base: number;
 }
 
 /**
@@ -831,12 +839,18 @@ export interface CompactDurationMarks {
  */
 export function compactDurationMarks(
   durationTicks: number,
-  grammar: JankoBracketDurationGrammar = 'compact'
+  grammar: JankoBracketDurationGrammar = 'compact',
+  longStyle: JankoLongDurationStyle = 'midpoint'
 ): CompactDurationMarks {
   const { base, dots, inGrammar } = analyzeNotatedDuration(durationTicks);
   const long =
     grammar === 'midpoint'
-      ? { 96: { rings: 1, halfRing: true }, 192: { rings: 1, halfRing: false }, 384: { rings: 2, halfRing: false } }
+      ? longStyle === 'open-oval'
+        ? // Round 47 `'open-oval'`: one mark per long value — the oval carries
+          // the value, the breve's flanks are that oval's own decoration, so a
+          // three-mark stack cannot exist.
+          { 96: { rings: 1, halfRing: false }, 192: { rings: 1, halfRing: false }, 384: { rings: 1, halfRing: false } }
+        : { 96: { rings: 1, halfRing: true }, 192: { rings: 1, halfRing: false }, 384: { rings: 2, halfRing: false } }
       : { 96: { rings: 1, halfRing: false }, 192: { rings: 2, halfRing: false }, 384: { rings: 3, halfRing: false } };
   const mark = (cuts: number, rings: number, halfRing = false): CompactDurationMarks => ({
     cuts,
@@ -844,8 +858,9 @@ export function compactDurationMarks(
     halfRing,
     dots,
     inGrammar: true,
+    base,
   });
-  if (!inGrammar) return { cuts: 0, rings: 0, halfRing: false, dots: 0, inGrammar: false };
+  if (!inGrammar) return { cuts: 0, rings: 0, halfRing: false, dots: 0, inGrammar: false, base: 0 };
   switch (base) {
     case 3:
       return mark(4, 0);
@@ -864,7 +879,7 @@ export function compactDurationMarks(
     case 384:
       return mark(0, long[384].rings, long[384].halfRing);
     default:
-      return { cuts: 0, rings: 0, halfRing: false, dots: 0, inGrammar: false };
+      return { cuts: 0, rings: 0, halfRing: false, dots: 0, inGrammar: false, base: 0 };
   }
 }
 
@@ -881,6 +896,236 @@ export const COMPACT_MAX_RINGS = 3;
 /** Ring count of the largest long value of one mark family. */
 export function maxRingCount(grammar: JankoBracketDurationGrammar): number {
   return grammar === 'midpoint' ? MIDPOINT_MAX_RINGS : COMPACT_MAX_RINGS;
+}
+
+/**
+ * Round 47 — one **single long-mark shape**. The `'midpoint'` family has two
+ * primitives (the half-ring and the full ring, the 384-tick run stacking two
+ * rings); the `'open-oval'` family distinguishes the three values by shape:
+ * 96 a compact tilted oval, 192 a measurably broader horizontal oval, 384 that
+ * oval with the breve's two short flank strokes.
+ */
+export type JankoLongMarkKind = 'half-ring' | 'ring' | 'oval-narrow' | 'oval-broad' | 'oval-breve';
+
+/**
+ * Round 47 — the family-level **name of one value's long ink** on a mount or a
+ * detached seat. It names the *run* (`'two-rings'` is the 384-tick midpoint
+ * run's two stacked rings; the open-oval family names single shapes only), so
+ * the diagnostic, the test and the paint all state the same word for the value
+ * the operator reads.
+ */
+export type JankoLongRunName =
+  | 'half-ring'
+  | 'ring'
+  | 'two-rings'
+  | 'oval-narrow'
+  | 'oval-broad'
+  | 'oval-breve';
+
+/**
+ * The single mark shape one in-grammar **base value** paints in `style`, or
+ * `null` for a value the family does not state with a long mark (48 and the
+ * cut values).
+ */
+export function longMarkKindForBase(
+  base: number,
+  style: JankoLongDurationStyle = 'midpoint'
+): JankoLongMarkKind | null {
+  if (style === 'open-oval') {
+    return base === 96 ? 'oval-narrow' : base === 192 ? 'oval-broad' : base === 384 ? 'oval-breve' : null;
+  }
+  return base === 96 ? 'half-ring' : base === 192 || base === 384 ? 'ring' : null;
+}
+
+/** The run name of one in-grammar base value in `style` (see {@link JankoLongRunName}). */
+export function longRunName(
+  base: number,
+  style: JankoLongDurationStyle = 'midpoint'
+): JankoLongRunName | null {
+  if (style === 'midpoint') {
+    return base === 96 ? 'half-ring' : base === 192 ? 'ring' : base === 384 ? 'two-rings' : null;
+  }
+  const kind = longMarkKindForBase(base, style);
+  return kind === null ? null : (kind as JankoLongRunName);
+}
+
+/** True when `style` states the value `base` with the long (ring/oval) family. */
+export function isLongValueBase(base: number, style: JankoLongDurationStyle = 'midpoint'): boolean {
+  return longMarkKindForBase(base, style) !== null;
+}
+
+/**
+ * Round 47 — the **flat face** of a half-mark: the interval of the mount line
+ * the mark interrupts, plus the air the operator asked for at each end. A
+ * closed mark (ring, oval) has no flat face and claims no gap.
+ */
+export interface JankoMountGap {
+  /** Axis the mount runs along: `'y'` on the vertical bracket spine, `'x'` on a horizontal mount. */
+  axis: 'x' | 'y';
+  /** The chord's own extent along that axis (pt) — the mark's real ink line. */
+  chordFrom: number;
+  chordTo: number;
+  /** The interrupted interval (pt): the chord expanded by the gap air at both ends. */
+  from: number;
+  to: number;
+}
+
+/** One painted long-value mark: its ink, its audited box and its flat-face claim. */
+export interface JankoLongValueMark {
+  /** The single primitive this mark paints (see {@link JankoLongMarkKind}). */
+  kind: JankoLongMarkKind;
+  /** SVG elements, each already indented and newline-free. */
+  svg: string[];
+  /** Axis-aligned ink box of this mark alone (pt), stroke-padded. */
+  box: { x0: number; y0: number; x1: number; y1: number };
+  /** The mount interval this mark's flat face interrupts (half-marks only). */
+  gap?: JankoMountGap;
+}
+
+/**
+ * Round 47 — the geometry of one **open oval** on one mount.
+ *
+ * The family is derived from the mount's own ring metrics (radius and stroke,
+ * so the bracket's larger mount policy carries over unchanged) and the token
+ * ratios: one height for every value, two breadths (the 96-tick oval is
+ * `openOvalNarrowFactor` wide and tilted `openOvalTiltDegrees`; the 192/384
+ * oval is `openOvalBroadFactor` wide and horizontal), and — for the breve — two
+ * short vertical flank strokes standing `openOvalFlankGap` clear of the oval's
+ * vertices.
+ */
+export interface JankoOpenOvalShape {
+  /** Semi-major axis (pt) before rotation — the oval's own long axis. */
+  rx: number;
+  /** Semi-minor axis (pt) — the family's one height. */
+  ry: number;
+  /** Clockwise tilt (radians); `0` for the 192/384 horizontal oval. */
+  tilt: number;
+  /** Stroke width (pt) of the oval and of its flank strokes. */
+  stroke: number;
+  /** True when the breve's two flank strokes paint. */
+  flanks: boolean;
+  /** Half-length (pt) of one flank stroke. */
+  flankHalf: number;
+  /** Centre distance (pt) from the oval centre to a flank stroke's centreline. */
+  flankOffset: number;
+  /** Axis-aligned ink half-extents of the whole mark (oval plus flanks). */
+  halfX: number;
+  halfY: number;
+}
+
+/** The open-oval geometry of one mark shape on one mount (see {@link JankoOpenOvalShape}). */
+export function openOvalShape(
+  kind: JankoLongMarkKind,
+  mount: 'bracket' | 'carrier',
+  m: JankoMidpointMetrics,
+  t: ResolvedJankoTokens
+): JankoOpenOvalShape {
+  const radius = mount === 'bracket' ? m.bracketRingRadius : m.ringRadius;
+  const stroke = mount === 'bracket' ? m.bracketRingStroke : m.ringStroke;
+  const narrow = kind === 'oval-narrow';
+  const rx = (narrow ? t.openOvalNarrowFactor : t.openOvalBroadFactor) * radius;
+  const ry = t.openOvalHeightFactor * radius;
+  const tilt = narrow ? (t.openOvalTiltDegrees * Math.PI) / 180 : 0;
+  const flanks = kind === 'oval-breve';
+  const flankHalf = t.openOvalFlankFactor * ry;
+  const flankOffset = rx + t.openOvalFlankGap * radius;
+  // Rotated-ellipse bounding half-extents, plus the stroke's own half-width.
+  const cos = Math.abs(Math.cos(tilt));
+  const sin = Math.abs(Math.sin(tilt));
+  const ovalX = Math.hypot(rx * cos, ry * sin) + stroke / 2;
+  const ovalY = Math.hypot(rx * sin, ry * cos) + stroke / 2;
+  const halfX = flanks ? Math.max(ovalX, flankOffset + stroke / 2) : ovalX;
+  const halfY = flanks ? Math.max(ovalY, flankHalf + stroke / 2) : ovalY;
+  return { rx, ry, tilt, stroke, flanks, flankHalf, flankOffset, halfX, halfY };
+}
+
+/**
+ * Round 47 — paint the long-value mark of the active family at `(cx, cy)`.
+ *
+ * `fill` is the closed marks' interior: `'#FFFFFF'` on a **mount** (the white
+ * interior knocks the mount line out locally, exactly as the full ring always
+ * has), `'none'` on a **detached seat** (a detached mark is seated clear of
+ * every other ink, so it must never erase anything at all). Half-marks are
+ * always `fill="none"` — their chord *is* the line their endpoints stand on,
+ * and the interruption is declared through {@link JankoLongValueMark.gap}
+ * instead of being faked with a mask. Every number comes from the shared
+ * {@link JankoMidpointMetrics} / {@link JankoOpenOvalShape}, so the paint, the
+ * box, the fit and the linter can never drift.
+ */
+export function longValueMark(
+  kind: JankoLongMarkKind,
+  mount: 'bracket' | 'carrier',
+  m: JankoMidpointMetrics,
+  t: ResolvedJankoTokens,
+  cx: number,
+  cy: number,
+  className: string,
+  halfRingGap: number = 0,
+  fill: '#FFFFFF' | 'none' = '#FFFFFF'
+): JankoLongValueMark {
+  if (kind === 'half-ring' || kind === 'ring') {
+    const box = midpointRingInkBox(mount, m, cx, cy, kind === 'half-ring');
+    const mark: JankoLongValueMark = {
+      kind,
+      svg: [midpointRingSvg(mount, m, cx, cy, kind === 'half-ring', className, fill)],
+      box,
+    };
+    if (kind === 'half-ring') {
+      const r = mount === 'bracket' ? m.bracketRingRadius : m.ringRadius;
+      mark.gap =
+        mount === 'bracket'
+          ? {
+              axis: 'y',
+              chordFrom: cy - r,
+              chordTo: cy + r,
+              from: cy - r - halfRingGap,
+              to: cy + r + halfRingGap,
+            }
+          : {
+              axis: 'x',
+              chordFrom: cx - r,
+              chordTo: cx + r,
+              from: cx - r - halfRingGap,
+              to: cx + r + halfRingGap,
+            };
+    }
+    return mark;
+  }
+  const shape = openOvalShape(kind, mount, m, t);
+  const tiltDegrees = (shape.tilt * 180) / Math.PI;
+  const svg = [
+    `    <ellipse class="${className}" data-open-oval="${kind}" cx="${f(cx)}" cy="${f(cy)}" rx="${f(shape.rx)}" ry="${f(shape.ry)}"${shape.tilt === 0 ? '' : ` transform="rotate(${f(tiltDegrees)} ${f(cx)} ${f(cy)})"`} fill="${fill}" stroke="#111111" stroke-width="${shape.stroke.toFixed(2)}"/>`,
+  ];
+  if (shape.flanks) {
+    for (const side of [-1, 1]) {
+      const fx = cx + side * shape.flankOffset;
+      svg.push(
+        `    <line class="janko-open-oval-flank" data-open-oval-flank="${side < 0 ? 'left' : 'right'}" x1="${f(fx)}" y1="${f(cy - shape.flankHalf)}" x2="${f(fx)}" y2="${f(cy + shape.flankHalf)}" stroke="#111111" stroke-width="${shape.stroke.toFixed(2)}" stroke-linecap="butt"/>`
+      );
+    }
+  }
+  return {
+    kind,
+    svg,
+    box: { x0: cx - shape.halfX, y0: cy - shape.halfY, x1: cx + shape.halfX, y1: cy + shape.halfY },
+  };
+}
+
+/** One long-value mark of an in-grammar `base` value, or `null` for other values. */
+export function longValueMarkForBase(
+  base: number,
+  style: JankoLongDurationStyle,
+  mount: 'bracket' | 'carrier',
+  m: JankoMidpointMetrics,
+  t: ResolvedJankoTokens,
+  cx: number,
+  cy: number,
+  className: string,
+  halfRingGap: number = 0,
+  fill: '#FFFFFF' | 'none' = '#FFFFFF'
+): JankoLongValueMark | null {
+  const kind = longMarkKindForBase(base, style);
+  return kind === null ? null : longValueMark(kind, mount, m, t, cx, cy, className, halfRingGap, fill);
 }
 
 /** Half-extents (pt) of one compact mark primitive, from the token set. */
@@ -1195,11 +1440,18 @@ export function midpointRingSvg(
   cx: number,
   cy: number,
   halfRing: boolean,
-  className: string
+  className: string,
+  /**
+   * Round 47: the closed ring's interior. `'#FFFFFF'` (default: the canonical
+   * engraving, byte-identical) knocks the mount line out under the ring; a
+   * detached seat passes `'none'`, because a mark that stands on no mount must
+   * never erase anything. Half-rings are always `fill="none"`.
+   */
+  fill: '#FFFFFF' | 'none' = '#FFFFFF'
 ): string {
   if (mount === 'bracket') {
     if (!halfRing) {
-      return `    <circle class="${className}" cx="${f(cx)}" cy="${f(cy)}" r="${f(m.bracketRingRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${m.bracketRingStroke.toFixed(2)}"/>`;
+      return `    <circle class="${className}" cx="${f(cx)}" cy="${f(cy)}" r="${f(m.bracketRingRadius)}" fill="${fill}" stroke="#111111" stroke-width="${m.bracketRingStroke.toFixed(2)}"/>`;
     }
     const r = m.bracketRingRadius;
     // Left semicircle: from the top of the chord, `sweep-flag 0` (the screen
@@ -1207,7 +1459,7 @@ export function midpointRingSvg(
     return `    <path class="${className}" data-half-ring="true" d="M ${f(cx)} ${f(cy - r)} A ${f(r)} ${f(r)} 0 0 0 ${f(cx)} ${f(cy + r)}" fill="none" stroke="#111111" stroke-width="${m.bracketRingStroke.toFixed(2)}"/>`;
   }
   if (!halfRing) {
-    return `    <circle class="${className}" cx="${f(cx)}" cy="${f(cy)}" r="${f(m.ringRadius)}" fill="#FFFFFF" stroke="#111111" stroke-width="${m.ringStroke.toFixed(2)}"/>`;
+    return `    <circle class="${className}" cx="${f(cx)}" cy="${f(cy)}" r="${f(m.ringRadius)}" fill="${fill}" stroke="#111111" stroke-width="${m.ringStroke.toFixed(2)}"/>`;
   }
   const r = m.ringRadius;
   // Upper semicircle: from the left end of the chord, `sweep-flag 1` (the
@@ -1299,6 +1551,15 @@ export interface ResolvedJankoClaspInk {
    * is 0 or 2, and false for the compact family.
    */
   compactHalfRing: boolean;
+  /**
+   * Round 47: the analysed **base value** of this group's statement (`0` out of
+   * grammar) — the value whose long mark shape the active
+   * {@link JankoLongDurationStyle} selects (half-ring / ring, or the narrow /
+   * broad / breve open oval).
+   */
+  compactBase: number;
+  /** Round 47: the long-value symbol family this group's marks belong to. */
+  longStyle: JankoLongDurationStyle;
   /** Round 42 study: the active bracket duration grammar of this group. */
   bracketGrammar: JankoBracketDurationGrammar;
 }
@@ -1321,7 +1582,14 @@ export interface JankoClaspDurationInk {
 export function resolveClaspInk(
   ink: JankoClaspDurationInk,
   grammar: JankoDurationGrammar = 'golden',
-  bracketGrammar: JankoBracketDurationGrammar = 'golden'
+  bracketGrammar: JankoBracketDurationGrammar = 'golden',
+  /**
+   * Round 47: the long-value symbol family of the marks resolved here. The
+   * golden / compact grammars ignore it (their ring counts are untouched);
+   * under `'midpoint'` it selects the ring family or the experimental
+   * open-oval family (see {@link JankoLongDurationStyle}).
+   */
+  longStyle: JankoLongDurationStyle = 'midpoint'
 ): ResolvedJankoClaspInk {
   const duration = claspDurationClass(ink.durationTicks);
   // Round 42 study: under the compact bracket family the dots read exactly from
@@ -1329,7 +1597,7 @@ export function resolveClaspInk(
   // canonical dots stay byte-identical.
   const dots =
     bracketGrammar === 'compact' || bracketGrammar === 'midpoint'
-      ? compactDurationMarks(ink.durationTicks, bracketGrammar).dots
+      ? compactDurationMarks(ink.durationTicks, bracketGrammar, longStyle).dots
       : grammar === 'complete'
         ? durationDotCount(ink.durationTicks, grammar)
         : claspDurationDotted(ink.durationTicks)
@@ -1337,8 +1605,8 @@ export function resolveClaspInk(
           : 0;
   const compact =
     bracketGrammar === 'compact' || bracketGrammar === 'midpoint'
-      ? compactDurationMarks(ink.durationTicks, bracketGrammar)
-      : { cuts: 0, rings: 0, halfRing: false };
+      ? compactDurationMarks(ink.durationTicks, bracketGrammar, longStyle)
+      : { cuts: 0, rings: 0, halfRing: false, base: 0 };
   return {
     centerY: ink.centerY,
     durationTicks: ink.durationTicks,
@@ -1366,6 +1634,8 @@ export function resolveClaspInk(
     compactCuts: compact.cuts,
     compactRings: compact.rings,
     compactHalfRing: 'halfRing' in compact ? compact.halfRing : false,
+    compactBase: 'base' in compact ? compact.base : 0,
+    longStyle,
     bracketGrammar,
   };
 }
@@ -1407,6 +1677,22 @@ export interface JankoClaspGroupGeometry {
   durationStyle: JankoClaspDurationStyle;
   /** Round 42 study: the bracket's duration mark family (golden | compact). */
   bracketGrammar: JankoBracketDurationGrammar;
+  /** Round 47: the long-value symbol family of this bracket's marks. */
+  longDurationStyle: JankoLongDurationStyle;
+  /**
+   * Round 47: the air (pt) this bracket cuts out of its spine across a
+   * half-ring's chord. Read by the mark paint and by the ink box, so the two
+   * can never disagree about the flat face; `0` is the incumbent unbroken
+   * spine.
+   */
+  halfRingGap: number;
+  /**
+   * Round 47: the spine intervals this bracket's half-rings interrupt — the
+   * chord plus {@link JankoClaspGroupGeometry.halfRingGap} at each end. Empty
+   * whenever the gap is 0 or the group paints no half-ring, so the incumbent
+   * path is byte-identical.
+   */
+  spineGaps: Array<{ from: number; to: number }>;
   /** Duration notches (0 = quarter, 1 = 8th, 2 = 16th). */
   flags: number;
   /** Open knockout marks (0–2) painted at the spine midpoint. */
@@ -1500,14 +1786,63 @@ export interface JankoClaspOptions {
    * exactly as the knockout does. Defaults to `false`.
    */
   honorHalo?: boolean;
+  /**
+   * Round 47: the long-value symbol family of the bracket's marks (see
+   * {@link JankoLongDurationStyle}). Defaults to the incumbent `'midpoint'`.
+   */
+  longDurationStyle?: JankoLongDurationStyle;
+  /**
+   * Round 47: the air (pt) cut out of the bracket spine across a half-ring's
+   * chord (see {@link JankoTokens.halfRingGap}). Defaults to 0 (the incumbent
+   * unbroken spine, byte-identical).
+   */
+  halfRingGap?: number;
 }
 
-/** The bracket `[` path: cap → spine → cap. */
-function claspBracketPath(claspX: number, topY: number, botY: number, cap: number): string {
-  return (
-    `M ${f(claspX + cap)} ${f(topY)} L ${f(claspX)} ${f(topY)} ` +
-    `L ${f(claspX)} ${f(botY)} L ${f(claspX + cap)} ${f(botY)}`
+/**
+ * The bracket `[` path: cap → spine → cap.
+ *
+ * Round 47: `gaps` interrupts the **spine only** — each interval removes the
+ * spine segment it covers (plus the declared air) and the path is emitted as
+ * several subpaths, so the flat face of a half-ring reads as a deliberate
+ * break. The caps always paint, nothing is drawn across a gap, and no mask or
+ * erasure is ever involved. An empty `gaps` returns the canonical single
+ * subpath byte-for-byte.
+ */
+function claspBracketPath(
+  claspX: number,
+  topY: number,
+  botY: number,
+  cap: number,
+  gaps: readonly { from: number; to: number }[] = []
+): string {
+  const cuts = gaps
+    .map((gap) => ({ from: Math.max(topY, gap.from), to: Math.min(botY, gap.to) }))
+    .filter((gap) => gap.to > gap.from + 1e-9)
+    .sort((a, b) => a.from - b.from);
+  if (cuts.length === 0) {
+    return (
+      `M ${f(claspX + cap)} ${f(topY)} L ${f(claspX)} ${f(topY)} ` +
+      `L ${f(claspX)} ${f(botY)} L ${f(claspX + cap)} ${f(botY)}`
+    );
+  }
+  const parts: string[] = [];
+  let cursor = topY;
+  for (const cut of cuts) {
+    const from = Math.max(cursor, cut.from);
+    parts.push(
+      cursor === topY
+        ? `M ${f(claspX + cap)} ${f(topY)} L ${f(claspX)} ${f(topY)} L ${f(claspX)} ${f(from)}`
+        : `M ${f(claspX)} ${f(cursor)} L ${f(claspX)} ${f(from)}`
+    );
+    cursor = Math.max(cursor, cut.to);
+  }
+  parts.push(
+    cursor === topY
+      ? `M ${f(claspX + cap)} ${f(topY)} L ${f(claspX)} ${f(topY)} L ${f(claspX)} ${f(botY)} L ${f(claspX + cap)} ${f(botY)}`
+      : `M ${f(claspX)} ${f(cursor)} L ${f(claspX)} ${f(botY)} L ${f(claspX + cap)} ${f(botY)}`
   );
+  return parts.join(' ');
 }
 
 /**
@@ -1546,11 +1881,14 @@ export function computeClaspGeometry(
   const durationTicks = options?.durationTicks ?? Math.min(...notes.map((n) => n.durationTicks));
   const grammar = options?.durationGrammar ?? 'golden';
   const bracketGrammar = options?.bracketGrammar ?? 'golden';
+  const longStyle = options?.longDurationStyle ?? 'midpoint';
+  const halfRingGap = options?.halfRingGap ?? 0;
+  const durationScale = options?.durationScale ?? 1;
   const durationInk = (
     options?.durationInk && options.durationInk.length > 0
       ? options.durationInk
       : [{ centerY: (topY + botY) / 2, durationTicks }]
-  ).map((ink) => resolveClaspInk(ink, grammar, bracketGrammar));
+  ).map((ink) => resolveClaspInk(ink, grammar, bracketGrammar, longStyle));
   // `durationTicks` stays the **carried value** — the shortest member value,
   // which is what the cluster's first voice moves on, unified bracket or not.
   // The scalar mark fields mirror the bracket's primary ink group (the first
@@ -1558,6 +1896,23 @@ export function computeClaspGeometry(
   // bracket its open half/whole group.
   const primary = durationInk[0];
   const cap = t.claspWidth;
+  // Round 47: every half-ring the bracket carries claims a break in the spine
+  // across its chord (plus the declared air at both ends). Resolved here, once,
+  // from the same mark metric the paint, the box and the linter read — the
+  // bracket path and the mark can therefore never disagree about where the
+  // flat face is.
+  const spineGaps =
+    halfRingGap > 0 && longStyle === 'midpoint'
+      ? durationInk
+          .filter((ink) => ink.compactHalfRing)
+          .map((ink) => {
+            const radius = midpointMetrics(t, durationScale).bracketRingRadius;
+            return {
+              from: ink.centerY - radius - halfRingGap,
+              to: ink.centerY + radius + halfRingGap,
+            };
+          })
+      : [];
   const geometry: JankoClaspGroupGeometry = {
     tick: notes[0].startTick,
     notes: sorted,
@@ -1570,7 +1925,7 @@ export function computeClaspGeometry(
     botY,
     capWidth: cap,
     strokeWidth: t.claspStrokeWidth,
-    durationScale: options?.durationScale ?? 1,
+    durationScale,
     durationTicks,
     duration: claspDurationClass(durationTicks),
     durationStyle: options?.claspDurationStyle ?? 'kinetic-cross-slashes',
@@ -1581,7 +1936,10 @@ export function computeClaspGeometry(
     durationInk,
     durationDots: [],
     durationSecondDots: [],
-    path: claspBracketPath(claspX, topY, botY, cap),
+    longDurationStyle: longStyle,
+    halfRingGap,
+    spineGaps,
+    path: claspBracketPath(claspX, topY, botY, cap, spineGaps),
   };
   // Round 20: the augmentation dot of every dotted group is resolved here, once,
   // against the group's own mark ink and member masks.
@@ -1627,7 +1985,7 @@ export function withClaspRail(
   return {
     ...group,
     topY: railY,
-    path: claspBracketPath(group.claspX, railY, group.botY, group.capWidth),
+    path: claspBracketPath(group.claspX, railY, group.botY, group.capWidth, group.spineGaps),
     flags: 0,
   };
 }
@@ -2238,11 +2596,23 @@ function renderClaspDurationInk(
       }
       // Round 46: the bracket mount's ring/half-ring is the larger one
       // (`midpointBracketRingScale`); a lone half-ring bulges LEFT, its chord
-      // resting on the spine and its ink `fill="none"` so the spine survives.
+      // resting on the spine. Round 47: the mount's own long-value family
+      // paints the mark (the same ring/half-ring pair, or the open ovals), and
+      // a half-ring's flat face is declared as a spine interruption
+      // (`group.spineGaps`) instead of being closed by the spine line.
       for (const dy of midpointMarkOffsets(m, 'bracket', 'ring', ink.compactRings)) {
-        out.push(
-          midpointRingSvg('bracket', m, claspX, yMid + dy, ink.compactHalfRing, 'janko-clasp-compact-ring')
+        const mark = longValueMarkForBase(
+          ink.compactBase,
+          group.longDurationStyle,
+          'bracket',
+          m,
+          t,
+          claspX,
+          yMid + dy,
+          'janko-clasp-compact-ring',
+          group.halfRingGap
         );
+        if (mark) out.push(...mark.svg);
       }
     } else if (ink.bracketGrammar === 'compact') {
       // Round 42 study: the compact family paints 1-4 short cuts (transverse,
@@ -2377,18 +2747,27 @@ export function claspInkBox(
       let hh = m.slashHalfY;
       let leftReach = m.slashHalfX;
       if (ink.compactRings > 0) {
-        // Round 46: the bracket mount's own (larger) ring box; a half-ring
-        // reaches only to its chord on the right.
-        const box = midpointRingInkBox(
-          'bracket',
-          m,
-          group.claspX,
-          yMid + (midpointMarkOffsets(m, 'bracket', 'ring', ink.compactRings)[0] ?? 0),
-          ink.compactHalfRing
-        );
-        hw = Math.max(hw, box.x1 - group.claspX);
-        hh = Math.max(hh, (box.y1 - box.y0) / 2);
-        leftReach = Math.max(leftReach, group.claspX - box.x0);
+        // Round 46/47: the bracket mount's own (larger) mark box — a half-ring
+        // reaches only to its chord on the right, an open oval reaches both
+        // ways and adds its breve flanks. Read from the same
+        // {@link longValueMark} the renderer paints.
+        for (const dy of midpointMarkOffsets(m, 'bracket', 'ring', ink.compactRings)) {
+          const mark = longValueMarkForBase(
+            ink.compactBase,
+            group.longDurationStyle,
+            'bracket',
+            m,
+            t,
+            group.claspX,
+            yMid + dy,
+            'janko-clasp-compact-ring',
+            group.halfRingGap
+          );
+          if (!mark) continue;
+          hw = Math.max(hw, mark.box.x1 - group.claspX);
+          hh = Math.max(hh, (mark.box.y1 - mark.box.y0) / 2);
+          leftReach = Math.max(leftReach, group.claspX - mark.box.x0);
+        }
       }
       if (ink.compactCuts > 0 || ink.compactRings > 0) {
         x0 = Math.min(x0, group.claspX - leftReach);
@@ -2506,6 +2885,20 @@ export interface JankoExceptionCarrierGeometry {
   stroke: number;
   /** The active bracket/mark family (`'compact'` or `'midpoint'`). */
   grammar: JankoBracketDurationGrammar;
+  /**
+   * Round 47: the analysed **base value** of the member's own statement (`0`
+   * out of grammar) — the value that selects the long mark shape of the active
+   * {@link JankoLongDurationStyle}.
+   */
+  base: number;
+  /** Round 47: the long-value symbol family this carrier's marks belong to. */
+  longStyle: JankoLongDurationStyle;
+  /**
+   * Round 47: the air (pt) the horizontal mount is interrupted by across a
+   * half-ring's chord (`halfRingGap`). `0` keeps the incumbent unbroken
+   * carrier line.
+   */
+  halfRingGap: number;
 }
 
 /**
@@ -2539,10 +2932,29 @@ export function renderExceptionCarrier(
 ): string {
   const t = resolveJankoTokens(tokens);
   const out: string[] = [
-    `  <g class="janko-exception-carrier" data-exception-note="${g.noteId}"${g.partnerId ? ` data-exception-partner="${g.partnerId}"` : ''} data-exception-ticks="${g.durationTicks}" data-exception-cuts="${g.cuts}" data-exception-rings="${g.rings}" data-exception-dots="${g.dots}" data-exception-in-grammar="${g.inGrammar}">`,
-    `    <line class="janko-exception-carrier-line" x1="${f(g.x0)}" y1="${f(g.y)}" x2="${f(g.x1)}" y2="${f(g.y)}" stroke="#111111" stroke-width="${g.stroke.toFixed(2)}" stroke-linecap="butt"/>`,
+    `  <g class="janko-exception-carrier" data-exception-note="${g.noteId}"${g.partnerId ? ` data-exception-partner="${g.partnerId}"` : ''} data-exception-ticks="${g.durationTicks}" data-exception-cuts="${g.cuts}" data-exception-rings="${g.rings}" data-exception-dots="${g.dots}" data-exception-in-grammar="${g.inGrammar}"${g.longStyle === 'open-oval' ? ` data-exception-long-style="open-oval" data-exception-base="${g.base}"` : ''}>`,
   ];
   const centres = exceptionCarrierMarkCentres(g, t);
+  // Round 47: a half-ring's flat face interrupts the **carrier's own line**.
+  // The carrier is emitted as the line's own intervals (nothing is masked and
+  // no glyph ink is touched); an empty gap list is the canonical single line,
+  // byte-for-byte.
+  const mounts =
+    g.grammar === 'midpoint' && g.halfRingGap > 0 && g.halfRing && centres.rings.length === 1
+      ? (() => {
+          const radius = midpointMetrics(t, g.scale).ringRadius;
+          const chord = centres.rings[0];
+          return [
+            { x1: g.x0, x2: chord - radius - g.halfRingGap },
+            { x1: chord + radius + g.halfRingGap, x2: g.x1 },
+          ].filter((segment) => segment.x2 > segment.x1 + 1e-9);
+        })()
+      : [{ x1: g.x0, x2: g.x1 }];
+  for (const segment of mounts) {
+    out.push(
+      `    <line class="janko-exception-carrier-line" x1="${f(segment.x1)}" y1="${f(g.y)}" x2="${f(segment.x2)}" y2="${f(g.y)}" stroke="#111111" stroke-width="${g.stroke.toFixed(2)}" stroke-linecap="butt"/>`
+    );
+  }
   if (g.grammar === 'midpoint') {
     // Round 43 study / Round 44: the SAME page-oriented positive-45-degree
     // slash and ring the bracket paints — at the SAME admitted symbol scale —
@@ -2559,9 +2971,21 @@ export function renderExceptionCarrier(
     // Round 46: the horizontal mount keeps the Round 45 ring size (the 20 %
     // enlargement is bracket-only) and a lone half-ring bulges UP, its
     // endpoints on the carrier line, painted `fill="none"` so the line it
-    // stands on survives.
+    // stands on survives. Round 47: the mount's own long-value family paints
+    // the mark, and the line is cut at the flat face.
     for (const cx of centres.rings) {
-      out.push(midpointRingSvg('carrier', m, cx, g.y, g.halfRing, 'janko-exception-ring'));
+      const mark = longValueMarkForBase(
+        g.base,
+        g.longStyle,
+        'carrier',
+        m,
+        t,
+        cx,
+        g.y,
+        'janko-exception-ring',
+        g.halfRingGap
+      );
+      if (mark) out.push(...mark.svg);
     }
   } else {
     const cutHalf = t.compactCutLength / 2;
@@ -2620,8 +3044,12 @@ export function exceptionCarrierInkBox(
   if (g.rings > 0) {
     const rs = exceptionCarrierMarkCentres(g, t).rings;
     if (mm) {
-      const first = midpointRingInkBox('carrier', mm, rs[0], g.y, g.halfRing);
-      const last = midpointRingInkBox('carrier', mm, rs[rs.length - 1], g.y, g.halfRing);
+      const first =
+        longValueMarkForBase(g.base, g.longStyle, 'carrier', mm, t, rs[0], g.y, 'janko-exception-ring', g.halfRingGap)?.box ??
+        midpointRingInkBox('carrier', mm, rs[0], g.y, g.halfRing);
+      const last =
+        longValueMarkForBase(g.base, g.longStyle, 'carrier', mm, t, rs[rs.length - 1], g.y, 'janko-exception-ring', g.halfRingGap)?.box ??
+        midpointRingInkBox('carrier', mm, rs[rs.length - 1], g.y, g.halfRing);
       x0 = Math.min(x0, first.x0);
       x1 = Math.max(x1, last.x1);
       y0 = Math.min(y0, first.y0);
@@ -2685,7 +3113,9 @@ export function exceptionCarrierMarkBoxes(
   );
   centres.rings.forEach((cx, index) => {
     if (mm) {
-      const box = midpointRingInkBox('carrier', mm, cx, g.y, g.halfRing);
+      const box =
+        longValueMarkForBase(g.base, g.longStyle, 'carrier', mm, t, cx, g.y, 'janko-exception-ring', g.halfRingGap)?.box ??
+        midpointRingInkBox('carrier', mm, cx, g.y, g.halfRing);
       boxes.push({ kind: 'ring', index, ...box });
       return;
     }
@@ -2701,6 +3131,189 @@ export function exceptionCarrierMarkBoxes(
     }
   }
   return boxes;
+}
+
+
+/**
+ * Round 47 — one **detached long-value symbol** (`exceptionCarrier: 'symbol'`).
+ *
+ * The Round 46 doctrine placed a long value on a **fixed-length horizontal
+ * arm**: the marks sat along a line whose length is a typographic constant, so
+ * the statement always read as one wide gesture. This mount keeps the mark and
+ * drops the arm: the member's own long ink (half-ring / ring / two rings, or
+ * the open-oval family) is seated as a **pure symbol run** directly beside the
+ * head (or the pair) it belongs to, at the nearest legal seat the collision
+ * solve finds — never at a distant arm endpoint, never over foreign ink and
+ * never on a drawn staff rule (a seat whose chord band crosses a rule is
+ * rejected, so a half-ring's flat face is always legible). Everything else is
+ * the member's own exact statement: the run's mark count and the augmentation
+ * dots are the value's, and the seat is published with its distance.
+ *
+ * The member keeps **no** arm: `renderDetachedSymbol` paints marks and dots
+ * only, with `fill="none"` — a detached statement erases nothing at all.
+ */
+export type JankoDetachedSeatKind = 'right' | 'left' | 'above' | 'below' | 'pair-channel';
+
+/** One placed detached long-value symbol. */
+export interface JankoDetachedSymbolGeometry {
+  /** Source note id that owns the symbol (single-note ownership). */
+  noteId: string;
+  /**
+   * Round 47: the second owner of a **shared** detached symbol — the same
+   * same-hand / same-onset / exact-duration 2-span pair the Round 46 shared
+   * indicator serves, which needs one statement, not two.
+   */
+  partnerId?: string;
+  /** Onset tick of the owning member. */
+  tick: number;
+  /** The member's own stated duration (ticks). */
+  durationTicks: number;
+  /** Analysed base value of that statement (`0` out of grammar). */
+  base: number;
+  /** Long marks in the run (2 only for the midpoint 384 = two rings). */
+  rings: number;
+  /** Augmentation dots of the member's own value (0–2, exact). */
+  dots: 0 | 1 | 2;
+  /** False when the member's value has no exact reading (never seated). */
+  inGrammar: boolean;
+  /** Admitted cluster symbol scale the symbol ink is engraved at. */
+  scale: number;
+  /** Mark stroke width (pt) at that scale. */
+  stroke: number;
+  /** Active bracket/mark family of the run. */
+  grammar: JankoBracketDurationGrammar;
+  /** Round 47: the long-value symbol family of the run. */
+  longStyle: JankoLongDurationStyle;
+  /** Round 47: the air kept from a drawn rule under a half-ring's flat face. */
+  halfRingGap: number;
+  /** Mark-run centre (pt): the run is centred here, marks stacked along x. */
+  x: number;
+  /** True pitch y of the owning member (the run's own axis, never moved). */
+  y: number;
+  /** Which candidate seat was taken. */
+  seat: JankoDetachedSeatKind;
+  /**
+   * Distance (pt) from the owning head's centre to the symbol's ink box — the
+   * "nearest legal seat" the seat was chosen by, published rather than implied.
+   */
+  distance: number;
+}
+
+/** Mark centres of one detached symbol run (the carrier run's own geometry). */
+function detachedSymbolMarkCentres(
+  g: JankoDetachedSymbolGeometry,
+  t: ResolvedJankoTokens
+): number[] {
+  if (g.grammar === 'midpoint') {
+    const m = midpointMetrics(t, g.scale);
+    return midpointMarkOffsets(m, 'carrier', 'ring', g.rings).map((dx) => g.x + dx);
+  }
+  return compactMarkOffsets(t, g.rings).map((dx) => g.x + dx);
+}
+
+/** The class one detached mark paints with (shared by paint, box and audit). */
+const DETACHED_MARK_CLASS = 'janko-detached-mark';
+
+/** One detached mark's own ink box, from the same geometry the paint uses. */
+function detachedMarkBox(
+  g: JankoDetachedSymbolGeometry,
+  t: ResolvedJankoTokens,
+  cx: number
+): { x0: number; y0: number; x1: number; y1: number } {
+  if (g.grammar === 'midpoint') {
+    const m = midpointMetrics(t, g.scale);
+    const kind = longMarkKindForBase(g.base, g.longStyle);
+    if (kind === null) return { x0: cx, y0: g.y, x1: cx, y1: g.y };
+    return longValueMark(kind, 'carrier', m, t, cx, g.y, DETACHED_MARK_CLASS, g.halfRingGap, 'none').box;
+  }
+  const outer = t.compactRingRadius + t.compactRingStroke / 2;
+  return { x0: cx - outer, y0: g.y - outer, x1: cx + outer, y1: g.y + outer };
+}
+
+/** Right ink edge of one detached run (the augmentation dots' anchor). */
+function detachedRunRight(g: JankoDetachedSymbolGeometry, t: ResolvedJankoTokens): number {
+  let right = g.x;
+  for (const cx of detachedSymbolMarkCentres(g, t)) {
+    right = Math.max(right, detachedMarkBox(g, t, cx).x1);
+  }
+  return right;
+}
+
+/** The augmentation-dot centres of one detached run (exact dots / double dots). */
+function detachedSymbolDotCentres(
+  g: JankoDetachedSymbolGeometry,
+  t: ResolvedJankoTokens
+): number[] {
+  if (g.dots < 1) return [];
+  const right = detachedRunRight(g, t);
+  const first = right + t.augmentationDotGap + t.augmentationDotRadius;
+  return g.dots >= 2
+    ? [first, first + 2 * t.augmentationDotRadius + t.augmentationDotGap]
+    : [first];
+}
+
+/** Axis-aligned ink box of one detached symbol — pure symbol ink, dots included. */
+export function detachedSymbolInkBox(
+  g: JankoDetachedSymbolGeometry,
+  tokens?: Partial<JankoTokens> | null
+): { x0: number; y0: number; x1: number; y1: number } {
+  const t = resolveJankoTokens(tokens);
+  let x0 = g.x;
+  let x1 = g.x;
+  let y0 = g.y;
+  let y1 = g.y;
+  for (const cx of detachedSymbolMarkCentres(g, t)) {
+    const box = detachedMarkBox(g, t, cx);
+    x0 = Math.min(x0, box.x0);
+    x1 = Math.max(x1, box.x1);
+    y0 = Math.min(y0, box.y0);
+    y1 = Math.max(y1, box.y1);
+  }
+  for (const cx of detachedSymbolDotCentres(g, t)) {
+    x0 = Math.min(x0, cx - t.augmentationDotRadius);
+    x1 = Math.max(x1, cx + t.augmentationDotRadius);
+    y0 = Math.min(y0, g.y - t.augmentationDotRadius);
+    y1 = Math.max(y1, g.y + t.augmentationDotRadius);
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/**
+ * Paint one detached long-value symbol: the member's own mark run and its
+ * augmentation dots, and **nothing else** — no arm, no line, no mask.
+ */
+export function renderDetachedSymbol(
+  g: JankoDetachedSymbolGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const t = resolveJankoTokens(tokens);
+  const run = longRunName(g.base, g.longStyle) ?? 'ring';
+  const out: string[] = [
+    `  <g class="janko-detached-symbol" data-symbol-note="${g.noteId}"${g.partnerId ? ` data-symbol-partner="${g.partnerId}"` : ''} data-symbol-seat="${g.seat}" data-symbol-ticks="${g.durationTicks}" data-symbol-base="${g.base}" data-symbol-run="${run}" data-symbol-marks="${g.rings}" data-symbol-dots="${g.dots}" data-symbol-distance="${g.distance.toFixed(2)}">`,
+  ];
+  const centres = detachedSymbolMarkCentres(g, t);
+  if (g.grammar === 'midpoint') {
+    const m = midpointMetrics(t, g.scale);
+    const kind = longMarkKindForBase(g.base, g.longStyle);
+    if (kind) {
+      for (const cx of centres) {
+        out.push(...longValueMark(kind, 'carrier', m, t, cx, g.y, DETACHED_MARK_CLASS, g.halfRingGap, 'none').svg);
+      }
+    }
+  } else {
+    for (const cx of centres) {
+      out.push(
+        `    <circle class="${DETACHED_MARK_CLASS}" cx="${f(cx)}" cy="${f(g.y)}" r="${f(t.compactRingRadius)}" fill="none" stroke="#111111" stroke-width="${t.compactRingStroke.toFixed(2)}"/>`
+      );
+    }
+  }
+  for (const cx of detachedSymbolDotCentres(g, t)) {
+    out.push(
+      `    <circle class="janko-detached-dot" cx="${f(cx)}" cy="${f(g.y)}" r="${f(t.augmentationDotRadius)}" fill="#111111"/>`
+    );
+  }
+  out.push('  </g>');
+  return out.join('\n');
 }
 
 /**

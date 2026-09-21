@@ -506,8 +506,11 @@ test('Augmentation and composites stay honest: exact dots, no faked composite gl
 test('Compact alphabet: 4/3/2/1 cuts, bare quarter, 1/2/3 rings — counts and painted dimensions', () => {
   for (const v of O_VALUES) {
     assert.deepEqual(
+      // Round 47 adds the analysed `base` (the value's own plain reading, the
+      // long-mark family selector) to the reading; every compact count above
+      // stays pinned exactly as before.
       compactDurationMarks(v),
-      { ...EXPECTED[v], inGrammar: true },
+      { ...EXPECTED[v], inGrammar: true, base: v },
       `${v}: the compact reading`
     );
   }

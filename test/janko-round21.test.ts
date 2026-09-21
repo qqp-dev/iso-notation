@@ -462,24 +462,30 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 46 open, three axes, the two 95 % real-engine variants', () => {
-  // Ordered contract change: Rounds 40–45 are parked (historical consts in
-  // test/janko-round40.test.ts … test/janko-round45.test.ts) and Round 46
-  // opens the literal-ink / readable-cluster / long-value / written-tie round
-  // on the working Brahms Reference: two otherwise identical whole-score cards
-  // at the adopted 95 % scale, differing only in the declared optical air
-  // (0.30pt working Reference / 0.20pt spacing control).
-  assert.equal(CURRENT_ROUND_METADATA.round, 46);
+test('§F registry: round 47 open, three duration axes, the four real-engine long-value readings', () => {
+  // Ordered contract change: Rounds 40–46 are parked (historical consts in
+  // test/janko-round40.test.ts … test/janko-round46.test.ts) and Round 47 opens
+  // the long-value-symbol round on the same working Brahms Reference: four
+  // otherwise identical cards — the same six literal windows, the same 95 %
+  // scale, the same 0.30pt air, the same written ties and the same shared
+  // outgoing-tie rule — differing only in the half-ring flat face, the
+  // exception mount and the long-value family.
+  assert.equal(CURRENT_ROUND_METADATA.round, 47);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
-    'the declared optical air, the admitted scale and the written ties'
+    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
+    'the flat face, the exception mount and the long-value family'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
-    'the two real-engine variants (0.30pt working Reference, 0.20pt control)'
+    [
+      'round47-mounted-control',
+      'round47-half-ring-cutout',
+      'round47-detached-symbols',
+      'round47-detached-ovals',
+    ],
+    'the four real-engine long-value readings'
   );
 });
 

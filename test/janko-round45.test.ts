@@ -139,6 +139,61 @@ const DVS = buildDurationVocabularySpecimenScore();
 
 const REFERENCE_OPTIONS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
 const REFERENCE_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+
+/**
+ * The landed **Round 46** card the working Brahms Reference *is* — kept as this
+ * round's own historical fixture now that Round 47 opens its own candidate set
+ * (the live registry is pinned, never read, for this identity).
+ */
+const ROUND_46_REFERENCE_CARD: { options: Record<string, unknown>; tokens: Record<string, unknown> } = {
+  options: {
+    pitchPlacement: 'parity-columns',
+    bracketDurationGrammar: 'midpoint',
+    exceptionCarrier: 'horizontal',
+    opticalSpacing: true,
+    lowPitchFolding: 'literal',
+    writtenTies: 'source',
+    chordSymbolScale: 0.95,
+  },
+  tokens: {
+    midpointSlashLengthFactor: 1.1,
+    midpointRingScale: 1.1,
+    midpointBracketRingScale: 1.2,
+    midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
+    opticalClearanceAir: 0.3,
+  },
+};
+
+/** The review surfaces the parked Round 46 pair shipped (historical record). */
+const ROUND_46_WINDOW_SPANS = [
+  '1-71',
+  '1-3',
+  '7-9',
+  '17-19',
+  '33-33',
+  '53-53',
+  '61-63',
+  '65-71',
+  '17-24',
+];
+
+/** The parked Round 46 pair: the working Reference card and its 0.20pt spacing control. */
+const ROUND_46_CARDS = [
+  {
+    id: 'brahms-scale-95-air30',
+    axis: 'opticalClearanceAir',
+    air: 0.3,
+    options: { ...ROUND_46_REFERENCE_CARD.options },
+    tokens: { ...ROUND_46_REFERENCE_CARD.tokens, opticalClearanceAir: 0.3 },
+  },
+  {
+    id: 'brahms-scale-95-air20',
+    axis: 'opticalClearanceAir',
+    air: 0.2,
+    options: { ...ROUND_46_REFERENCE_CARD.options },
+    tokens: { ...ROUND_46_REFERENCE_CARD.tokens, opticalClearanceAir: 0.2 },
+  },
+] as const;
 const R44_OPTIONS = resolveJankoOptions(BRAHMS_ROUND44_RESERVE_OPTIONS);
 const R44_TOKENS = resolveJankoTokens(BRAHMS_ROUND44_RESERVE_TOKENS);
 
@@ -350,43 +405,39 @@ const PAIR_GAP = 5.46;
 // 1. Registry: three cards on one shared family, 0.85 / 0.90 / 0.95
 // ---------------------------------------------------------------------------
 
-test('Round 46 registry: two 95 % real-engine variants on one shared family', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 46, 'the open round');
-  assert.match(CURRENT_ROUND_METADATA.title, /readable 95 % clusters/i);
+test('Round 47 registry: four real-engine long-value readings on one shared family', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 47, 'the open round');
+  assert.match(CURRENT_ROUND_METADATA.title, /half-ring flat face/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['opticalClearanceAir', 'chordSymbolScale', 'writtenTies'],
-    'the round opens exactly the three settled axes (the other family keys are locked context)'
+    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
+    'the Round 47 axes (every other family key is locked context)'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards, no more');
+  assert.equal(CURRENT_CANDIDATES.length, 4, 'the Round 47 quartet, no more');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
-    'both real-engine variants: the working Reference and its spacing control'
+    [
+      'round47-mounted-control',
+      'round47-half-ring-cutout',
+      'round47-detached-symbols',
+      'round47-detached-ovals',
+    ],
+    'both Round 45/46 95 % variants are parked on record; the live cards are the Round 47 readings'
   );
 
-  for (const [index, air] of [
-    [0, 0.3],
-    [1, 0.2],
-  ] as const) {
-    const card = CURRENT_CANDIDATES[index];
-    const options = card.options ?? {};
-    const tokens = card.tokens ?? {};
+  // The parked Round 46 pair is pinned as this round's own historical fixtures
+  // (the live Round 47 registry is pinned above): the review surfaces it
+  // shipped, and one coherent family differing in exactly the declared air.
+  assert.deepEqual(
+    ROUND_46_WINDOW_SPANS,
+    ['1-71', '1-3', '7-9', '17-19', '33-33', '53-53', '61-63', '65-71', '17-24'],
+    'the review surfaces the Round 46 pair shipped'
+  );
+  for (const card of ROUND_46_CARDS) {
+    const options = card.options as Record<string, unknown>;
+    const tokens = card.tokens as Record<string, unknown>;
     assert.equal(options.chordSymbolScale, 0.95, `${card.id}: the adopted admitted-cluster scale`);
     assert.equal(card.axis, 'opticalClearanceAir', `${card.id}: the one varying axis`);
-    // The bounded review set the operator asked for: full score first, then the
-    // windows that expose the round's decisions and the compact short-value key.
-    assert.deepEqual(
-      (card.windows ?? [])
-        .filter((w): w is JankoScoreCandidateWindow => 'measureStart' in w)
-        .map((w) => `${w.measureStart}-${w.measureStart + w.measureCount - 1}`),
-      ['1-71', '1-3', '7-9', '17-19', '33-33', '53-53', '61-63', '65-71', '17-24'],
-      `${card.id}: exactly the declared review surfaces`
-    );
-    assert.ok(
-      (card.windows ?? []).some((w) => (w as { fullScore?: boolean }).fullScore === true),
-      `${card.id}: the whole score stays a genuine page spread`
-    );
     assert.deepEqual(
       { ...tokens },
       {
@@ -394,11 +445,11 @@ test('Round 46 registry: two 95 % real-engine variants on one shared family', ()
         midpointRingScale: 1.1,
         midpointBracketRingScale: 1.2,
         midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
-        opticalClearanceAir: air,
+        opticalClearanceAir: card.air,
       },
       `${card.id}: the Round 46 readability ratios, the bracket-only enlargement and the declared air`
     );
-    const { chordSymbolScale, ...rest } = options as Record<string, unknown>;
+    const { chordSymbolScale, ...rest } = options;
     void chordSymbolScale;
     assert.deepEqual(
       rest,
@@ -414,7 +465,7 @@ test('Round 46 registry: two 95 % real-engine variants on one shared family', ()
     );
   }
   // The two variants differ in exactly one declared number.
-  const [a, b] = CURRENT_CANDIDATES;
+  const [a, b] = ROUND_46_CARDS;
   assert.deepEqual(
     { ...a.options },
     { ...b.options },
@@ -452,17 +503,20 @@ test('Round 46 registry: two 95 % real-engine variants on one shared family', ()
   }
 });
 
-test('The 0.30pt card and the working Brahms Reference are the same engraving', () => {
-  const card = CURRENT_CANDIDATES.find((c) => c.id === 'brahms-scale-95-air30')!;
+test('The landed Round 46 card IS the working Brahms Reference; the Reference view serves the engine pages', () => {
+  // Round 47 opens its own candidate set, so the card that the working
+  // Reference *is* is kept here as the round's own historical fixture (the
+  // Round 46 pair is on record in test/janko-round46.test.ts).
+  const card = ROUND_46_REFERENCE_CARD;
   const studioMerge = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) });
   const studioTokens = resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(card.tokens ?? {}) });
   assert.deepEqual(studioMerge, REFERENCE_OPTIONS, 'the studio merge IS the Reference option set');
   assert.deepEqual(studioTokens, REFERENCE_TOKENS, 'and the Reference token set');
 
-  // The served surfaces agree byte for byte: the card's five full-score page
-  // cards and the Reference view's five BRONZE Brahms pages are the same SVG
-  // (the whole-score window renders real `renderJankoPage` cards, like the
-  // Reference view — never one crop dressed up as a spread).
+  // The served surfaces agree byte for byte: the Reference view's five BRONZE
+  // Brahms page cards ARE the engine's own `renderJankoPage` pages (never one
+  // crop dressed up as a spread), and the Round 47 cards carry no page cards at
+  // all — their windows are the six labelled literal crops the round declares.
   const candidates = candidatesView();
   const reference = referenceView();
   const pageSvgs = (html: string): string[] =>
@@ -471,21 +525,43 @@ test('The 0.30pt card and the working Brahms Reference are the same engraving', 
     );
   const pageFigures = (html: string): string[] =>
     [...html.matchAll(/<figure class="page-card"[\s\S]*?<\/figure>/g)].map((m) => m[0]);
-  const cardStart = candidates.indexOf(`data-candidate="${card.id}"`);
-  const cardEnd = candidates.indexOf('data-candidate="', cardStart + 1);
-  const cardSlice = candidates.slice(cardStart, cardEnd < 0 ? undefined : cardEnd);
-  const cardPages = pageSvgs(cardSlice);
-  const cardFigures = pageFigures(cardSlice);
+  assert.ok(
+    !candidates.includes('brahms-scale-95-air30'),
+    'the landed Round 46 cards are parked — Round 47 declares its own set'
+  );
   const brahmsAt = reference.indexOf('data-score="brahms-op118-no1"');
   const bachAt = reference.indexOf('data-score="primary"');
   const referencePages = pageSvgs(reference.slice(brahmsAt, bachAt));
-  assert.equal(cardPages.length, 5, 'the 0.30pt card carries the whole score as five genuine pages');
-  assert.equal(referencePages.length, 5, 'and the Reference view carries the same five');
-  for (const [i, figure] of cardFigures.entries()) {
+  assert.equal(referencePages.length, 5, 'the Reference view carries the whole score as five genuine pages');
+  const enginePages = [0, 1, 2, 3, 4].map((page) =>
+    // The studio wraps each engine page in its own `<svg class="janko-svg">`
+    // element, so the class is the only markup the comparison normalises away.
+    renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS).replace(
+      /^<svg /,
+      '<svg class="janko-svg" '
+    )
+  );
+  assert.deepEqual(referencePages, enginePages, 'and those pages are the engine page renders, byte for byte');
+  for (const [i, figure] of pageFigures(reference.slice(brahmsAt, bachAt)).entries()) {
     assert.ok(figure.includes(`data-page="${i + 1}"`), `page card ${i + 1} is labelled, not an anonymous crop`);
-    assert.ok(figure.includes(`<b>Page ${i + 1}</b> · mm. `), `page card ${i + 1} states its real measure range`);
+    assert.ok(
+      /<b>Page \d+<\/b> · \d+ systems? · mm\. \d+–\d+/.test(figure),
+      `page card ${i + 1} states its real measure range`
+    );
   }
-  assert.deepEqual(cardPages, referencePages, 'the 0.30pt candidate and the Reference agree byte for byte');
+  // Every Round 47 card renders its six declared literal windows, each labelled.
+  for (const round47Card of CURRENT_CANDIDATES) {
+    const start = candidates.indexOf(`data-candidate="${round47Card.id}"`);
+    const end = candidates.indexOf('data-candidate="', start + 1);
+    const slice = candidates.slice(start, end < 0 ? undefined : end);
+    assert.ok(start >= 0, `${round47Card.id}: the card is served`);
+    assert.equal(
+      (slice.match(/class="candidate-window"/g) ?? []).length,
+      6,
+      `${round47Card.id}: six literal windows, no page card`
+    );
+    assert.ok(!slice.includes('class="page-card"'), `${round47Card.id}: no invented page spread`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1547,13 +1623,19 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
     assert.deepEqual(brahmsReport.warnings, [], `${card.id}: no warning on the whole Brahms score`);
   }
 
-  // The 0.30pt card and the Reference are one engraving (options, tokens and
-  // bytes — the served-page equality is pinned in the studio test above).
-  const card30 = CURRENT_CANDIDATES.find((c) => c.id === 'brahms-scale-95-air30')!;
+  // The landed Round 46 card and the Reference are one engraving (options,
+  // tokens and bytes — the served-page equality is pinned in the studio test
+  // above); Round 47's own four cards deliberately differ and are pinned in
+  // test/janko-round47.test.ts.
   assert.deepEqual(
-    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card30.options ?? {}) }),
+    resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...ROUND_46_REFERENCE_CARD.options }),
     REFERENCE_OPTIONS,
-    'candidate 0.30pt = the working Brahms Reference'
+    'the landed Round 46 card = the working Brahms Reference'
+  );
+  assert.deepEqual(
+    resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...ROUND_46_REFERENCE_CARD.tokens }),
+    REFERENCE_TOKENS,
+    'and its token set'
   );
 
   // Frozen canonicals: Bach GOLD is byte-identical to the landed Round 44
@@ -1607,21 +1689,29 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
 // 9. The served studio: labels, inventory and phone-session continuity
 // ---------------------------------------------------------------------------
 
-test('The served studio carries the two labelled cards and the honest inventory for both views', () => {
+test('The served studio carries the four labelled cards and the honest inventory for both views', () => {
   const candidates = candidatesView();
-  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 2, 'two candidate cards');
-  assert.match(candidates, /data-candidate-count="2"/);
-  assert.match(candidates, /data-window-count="18"/, 'nine review surfaces per card');
-  assert.equal((candidates.match(/data-pages="5"/g) ?? []).length, 2, 'a genuine five-page spread per card');
-  assert.equal((candidates.match(/<figure class="page-card"/g) ?? []).length, 10, 'ten real page cards');
-  for (const label of ['Brahms 95 % · 0.30pt air', 'Brahms 95 % · 0.20pt air']) {
+  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 4, 'four candidate cards');
+  assert.match(candidates, /data-candidate-count="4"/);
+  assert.match(candidates, /data-window-count="24"/, 'six review surfaces per card');
+  assert.equal(
+    (candidates.match(/<figure class="page-card"/g) ?? []).length,
+    0,
+    'the Round 47 cards declare literal crops only — no page cards'
+  );
+  for (const label of [
+    'Mounted control',
+    'Cutout',
+    'Detached ratio symbols',
+    'Detached open ovals',
+  ]) {
     assert.ok(candidates.includes(label), `the served grid labels the ${label} card`);
   }
-  // The honest chip inventory: the canonical Brahms is 0/0 and the synthetic
-  // DVS key publishes its single stress refusal (the one independently labeled
-  // diagnostic outside the score).
-  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 2, 'every card is free of hard errors');
-  assert.equal((candidates.match(/⚠ 1 warning/g) ?? []).length, 2, 'and reports its one warning honestly');
+  // The honest chip inventory: the canonical Brahms is 0/0 for every card, and
+  // the round publishes no withheld carrier or refused seat (the ownership
+  // check reports nothing orphaned).
+  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 4, 'every card is free of hard errors');
+  assert.equal((candidates.match(/⚠ 1 warning/g) ?? []).length, 0, 'no card publishes a withheld seat');
   assert.equal((candidates.match(/⚠ 7 warnings/g) ?? []).length, 0, 'the former six-composite inventory is gone');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(candidates), 'no screenshots, no raster review artifacts');
   assert.ok(!/localhost/i.test(candidates), 'Tailscale access only — no localhost reference');

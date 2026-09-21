@@ -577,30 +577,38 @@ test('Parked Round 44 registry: one anchored 45-degree design on the full score 
     'the parked round keeps its eleven windows'
   );
 
-  // Round 46 is the live round now: two 95 % real-engine variants differing
-  // only in the declared optical air. The full Round 46 contract is pinned in
-  // test/janko-round46.test.ts; here the history only has to point at it.
-  assert.equal(CURRENT_ROUND_METADATA.round, 46, 'the open round');
+  // Round 47 is the live round now: four real-engine readings of the long
+  // values on the same accepted Brahms surface. The full Round 47 contract is
+  // pinned in test/janko-round47.test.ts; here the history only has to point at
+  // it — and every card still states the landed Round 46 family as fixed
+  // context.
+  assert.equal(CURRENT_ROUND_METADATA.round, 47, 'the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['brahms-scale-95-air30', 'brahms-scale-95-air20'],
-    'the two Round 46 variants (0.30pt working Reference / 0.20pt control)'
+    [
+      'round47-mounted-control',
+      'round47-half-ring-cutout',
+      'round47-detached-symbols',
+      'round47-detached-ovals',
+    ],
+    'the four Round 47 long-value readings (the Round 46 pair is parked on record)'
   );
-  // The 0.30pt card and the working Brahms Reference must agree for the same
-  // score/options: this is the round's declared coherence rule.
-  assert.deepEqual(
-    { ...CURRENT_CANDIDATES[0].options },
-    {
+  for (const card of CURRENT_CANDIDATES) {
+    for (const [key, value] of Object.entries({
       pitchPlacement: 'parity-columns',
       bracketDurationGrammar: 'midpoint',
-      exceptionCarrier: 'horizontal',
       opticalSpacing: true,
       lowPitchFolding: 'literal',
       writtenTies: 'source',
       chordSymbolScale: 0.95,
-    },
-    'the 0.90 card states the adopted Reference treatment'
-  );
+    })) {
+      assert.deepEqual(
+        (card.options as Record<string, unknown>)[key],
+        value,
+        `${card.id}: the landed Round 46 ${key} is the shared base`
+      );
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
