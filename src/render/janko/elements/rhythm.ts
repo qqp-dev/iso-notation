@@ -3197,6 +3197,52 @@ export interface JankoDetachedSymbolGeometry {
    * "nearest legal seat" the seat was chosen by, published rather than implied.
    */
   distance: number;
+  /**
+   * Round 48: the drawn staff rule(s) this seat paints **locally out of the
+   * closed ring's hollow interior** (pt, page y — empty when the seat crosses
+   * no rule). A staff line is not a placement obstacle for a hollow duration
+   * circle: the ring keeps its consistent right seat and its interior is
+   * cleaned of the line it stands on, exactly the way a notehead knockout
+   * cleans the line behind its glyph. The list is part of the geometry, so the
+   * seat test, the paint and the linter read one number; only the rule band
+   * inside the interior is erased — never a tie, hold, head, stem, bracket or
+   * sibling symbol.
+   */
+  ruleKnockouts: Array<{ y: number; half: number }>;
+}
+
+/**
+ * Round 48: the metric set a **detached** seat paints with. The closed
+ * carrier ring is the only primitive the round re-sizes
+ * ({@link JankoTokens.detachedRingScale}): radius, stroke, ink half-extent and
+ * the stack pitch between two rings all scale together, so a two-ring run stays
+ * one coherent statement; the half-ring, the slash family and the compact
+ * family are returned untouched. One function for the seat box, the paint, the
+ * interior and the linter, so the four can never disagree.
+ */
+export function detachedMetrics(
+  g: JankoDetachedSymbolGeometry,
+  t: ResolvedJankoTokens
+): JankoMidpointMetrics {
+  const m = midpointMetrics(t, g.scale);
+  // Scope: the **closed ring** only. A half-ring keeps its shape and size by the
+  // operator's direction (it receives the increased spacing alone), and the
+  // open-oval family states its own geometry.
+  const closedRing = g.grammar === 'midpoint' && longMarkKindForBase(g.base, g.longStyle) === 'ring';
+  const factor = closedRing ? t.detachedRingScale : 1;
+  if (factor === 1) return m;
+  const r = m.ringRadius * factor;
+  const stroke = m.ringStroke * factor;
+  return {
+    ...m,
+    ringRadius: r,
+    ringStroke: stroke,
+    ringHalf: r + stroke / 2,
+    ringSpacing: m.ringSpacing * factor,
+    carrierRingSpacing: m.carrierRingSpacing * factor,
+    ringsRun: m.ringsRun * factor,
+    carrierLength: m.carrierLength,
+  };
 }
 
 /** Mark centres of one detached symbol run (the carrier run's own geometry). */
@@ -3205,10 +3251,78 @@ function detachedSymbolMarkCentres(
   t: ResolvedJankoTokens
 ): number[] {
   if (g.grammar === 'midpoint') {
-    const m = midpointMetrics(t, g.scale);
+    const m = detachedMetrics(g, t);
     return midpointMarkOffsets(m, 'carrier', 'ring', g.rings).map((dx) => g.x + dx);
   }
   return compactMarkOffsets(t, g.rings).map((dx) => g.x + dx);
+}
+
+/**
+ * Round 48: the **hollow interiors** of a detached symbol's closed rings (pt
+ * boxes): the region a rule knockout may clean. Empty for a half-ring (a
+ * semicircle has no interior to clean: its flat face must stay unbroken, which
+ * the seat test keeps refusing), for the compact family (no closed ring in the
+ * detached vocabulary) and out of the open-oval family (an oval's counter is
+ * not a circle the rule band is cut from).
+ */
+export function detachedSymbolInteriors(
+  g: JankoDetachedSymbolGeometry,
+  t: ResolvedJankoTokens
+): Array<{ cx: number; cy: number; r: number }> {
+  if (g.grammar !== 'midpoint') return [];
+  const kind = longMarkKindForBase(g.base, g.longStyle);
+  if (kind === null || kind === 'half-ring') return [];
+  const m = detachedMetrics(g, t);
+  const out: Array<{ cx: number; cy: number; r: number }> = [];
+  if (kind === 'ring') {
+    const inner = m.ringRadius - m.ringStroke / 2;
+    if (inner <= 0) return [];
+    for (const cx of detachedSymbolMarkCentres(g, t)) out.push({ cx, cy: g.y, r: inner });
+    return out;
+  }
+  // The open-oval family's counters are ellipses; the **inscribed circle** is
+  // the region a rule band may be cleaned from, so an erasure can never reach
+  // outside the counter (the 96 oval is tilted, which only makes the inscribed
+  // circle the safer bound).
+  const shape = openOvalShape(kind, 'carrier', m, t);
+  const inner = Math.min(shape.rx, shape.ry) - shape.stroke / 2;
+  if (inner <= 0) return [];
+  for (const cx of detachedSymbolMarkCentres(g, t)) out.push({ cx, cy: g.y, r: inner });
+  return out;
+}
+
+/**
+ * Round 48: the exact **eraser bands** of one detached symbol — for every rule
+ * the seat recorded, the widest rectangle that still lies inside that rule's
+ * interior circle. Seat test, paint and linter all call this one function, so
+ * the erased rectangle can never exceed the hollow counter it cleans and the
+ * band always covers the rule's own ink (`rule.half`) plus the declared air
+ * (`tokens.staffRuleKnockoutHalfHeight`).
+ */
+export function detachedRuleKnockoutBands(
+  g: JankoDetachedSymbolGeometry,
+  tokens?: Partial<JankoTokens> | null
+): Array<{ ruleY: number; x0: number; x1: number; y0: number; y1: number }> {
+  const t = resolveJankoTokens(tokens);
+  const interiors = detachedSymbolInteriors(g, t);
+  if (interiors.length === 0) return [];
+  const out: Array<{ ruleY: number; x0: number; x1: number; y0: number; y1: number }> = [];
+  for (const rule of g.ruleKnockouts) {
+    const half = rule.half + t.staffRuleKnockoutHalfHeight;
+    for (const interior of interiors) {
+      const dy = Math.abs(rule.y - interior.cy);
+      if (dy + half >= interior.r - 1e-9) continue;
+      const dx = Math.sqrt(interior.r * interior.r - (dy + half) * (dy + half));
+      out.push({
+        ruleY: rule.y,
+        x0: interior.cx - dx,
+        x1: interior.cx + dx,
+        y0: rule.y - half,
+        y1: rule.y + half,
+      });
+    }
+  }
+  return out;
 }
 
 /** The class one detached mark paints with (shared by paint, box and audit). */
@@ -3221,7 +3335,7 @@ function detachedMarkBox(
   cx: number
 ): { x0: number; y0: number; x1: number; y1: number } {
   if (g.grammar === 'midpoint') {
-    const m = midpointMetrics(t, g.scale);
+    const m = detachedMetrics(g, t);
     const kind = longMarkKindForBase(g.base, g.longStyle);
     if (kind === null) return { x0: cx, y0: g.y, x1: cx, y1: g.y };
     return longValueMark(kind, 'carrier', m, t, cx, g.y, DETACHED_MARK_CLASS, g.halfRingGap, 'none').box;
@@ -3279,8 +3393,37 @@ export function detachedSymbolInkBox(
 }
 
 /**
+ * Round 48 — the **local rule knockout** of one detached symbol: for every rule
+ * recorded on {@link JankoDetachedSymbolGeometry.ruleKnockouts}, one white band
+ * inside the closed ring's hollow interior, at the rule's own ink height. It is
+ * painted on its own layer band **before** the written tie arcs and every
+ * carrier mark, so it can only ever clean the staff rule it names: a tie, hold,
+ * head, stem, bracket or sibling symbol that crosses the interior paints after
+ * it and stays unbroken. Together with `renderDetachedSymbol` it is the whole
+ * ink of a detached statement — the ring keeps its consistent right seat
+ * instead of being displaced to a bare lane above the note.
+ */
+export function renderDetachedRuleKnockout(
+  g: JankoDetachedSymbolGeometry,
+  tokens?: Partial<JankoTokens> | null
+): string {
+  const bands = detachedRuleKnockoutBands(g, tokens);
+  if (bands.length === 0) return '';
+  return bands
+    .map(
+      (band) =>
+        `    <rect class="janko-detached-rule-knockout" data-symbol-note="${g.noteId}" ` +
+        `data-rule-y="${f(band.ruleY)}" x="${f(band.x0)}" y="${f(band.y0)}" ` +
+        `width="${f(band.x1 - band.x0)}" height="${f(band.y1 - band.y0)}" fill="#FFFFFF"/>`
+    )
+    .join('\n');
+}
+
+/**
  * Paint one detached long-value symbol: the member's own mark run and its
- * augmentation dots, and **nothing else** — no arm, no line, no mask.
+ * augmentation dots, and **nothing else** — no arm, no line, no mask. The
+ * Round 48 rule knockout, when the seat recorded one, is a separate band
+ * ({@link renderDetachedRuleKnockout}).
  */
 export function renderDetachedSymbol(
   g: JankoDetachedSymbolGeometry,
@@ -3293,7 +3436,7 @@ export function renderDetachedSymbol(
   ];
   const centres = detachedSymbolMarkCentres(g, t);
   if (g.grammar === 'midpoint') {
-    const m = midpointMetrics(t, g.scale);
+    const m = detachedMetrics(g, t);
     const kind = longMarkKindForBase(g.base, g.longStyle);
     if (kind) {
       for (const cx of centres) {

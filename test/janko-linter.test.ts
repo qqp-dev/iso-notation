@@ -146,7 +146,18 @@ test('lintJankoScore returns structured diagnostics for the canonical score', ()
   assert.ok(Array.isArray(report.violations), 'violations is an array');
   assert.ok(Array.isArray(report.warnings));
   assert.ok(Array.isArray(report.diagnostics));
-  assert.equal(report.diagnostics.length, report.violations.length + report.warnings.length);
+  // Round 48 adds the `'info'` severity: a **published fact**, not a defect. It
+  // is listed in `diagnostics` (so the Reference view can show it) but is
+  // neither a violation nor a warning, and `--strict` never gated it.
+  const notes = report.diagnostics.filter((d) => d.severity === 'info');
+  assert.equal(
+    report.diagnostics.length,
+    report.violations.length + report.warnings.length + notes.length
+  );
+  assert.equal(
+    report.diagnostics.filter((d) => d.severity === 'error').length,
+    report.violations.length
+  );
   assert.equal(report.ok, report.violations.length === 0);
   assert.equal(report.stats.systems, 8, 'four measures x eight systems of Bach Var. 1');
   assert.equal(report.stats.measures, 32);
@@ -1244,6 +1255,101 @@ test('Defect: a clasp pushed into the system-start column is caught', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 3b-2. Round 48 — the detached-seat contract and the published rest facts
+// ---------------------------------------------------------------------------
+
+test('Round 48 defect: a detached symbol off its right seat, inside a tie, or inside a sibling is caught', () => {
+  const options = resolveJankoOptions({
+    ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+    exceptionCarrier: 'symbol',
+    tieProfile: 'traced',
+    tieOriginIndicator: 'omit-outgoing',
+  });
+  const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
+  const layouts = layoutJankoScore(BRAHMS, options, tokens);
+  const clean = layouts.filter((l) => l.detachedSymbols.length > 0);
+  assert.ok(clean.length > 0, 'the card seats detached symbols');
+  for (const layout of clean) {
+    assert.deepEqual(
+      run((l, o) => checkDurationInkOwnership(l, options, tokens, o), layout),
+      [],
+      'the engine\u2019s own seats satisfy the contract they are checked against'
+    );
+  }
+
+  // 1. A symbol that took any lane but the right one.
+  const first = clean[0];
+  const symbol = first.detachedSymbols[0];
+  const offSeat: JankoSystemLayout = {
+    ...first,
+    detachedSymbols: [{ ...symbol, seat: 'above' }],
+  };
+  const seatHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), offSeat).filter(
+    (v) => v.code === 'symbol-seat-inconsistent'
+  );
+  assert.equal(seatHits.length, 1);
+  assert.match(seatHits[0]!.message, /stands to the right/);
+
+  // 2. A symbol moved into a tie arc's own ink (its own chain excepted).
+  const tieLayout = clean.find((l) => (l.tieArcs ?? []).length > 0)!;
+  const arc = (tieLayout.tieArcs ?? []).find(
+    (a) => !tieLayout.detachedSymbols.some((s) => s.noteId === a.fromHeadId || s.noteId === a.toHeadId)
+  );
+  assert.ok(arc, 'a system carries a tie arc and a foreign detached symbol');
+  const moved: JankoSystemLayout = {
+    ...tieLayout,
+    detachedSymbols: [
+      {
+        ...tieLayout.detachedSymbols[0],
+        x: (arc!.x1 + arc!.x2) / 2,
+        // Centre the moved mark **in** the arc's ink band (the filled contour's
+        // own extent), not on its endpoint axis.
+        y: arc!.y + arc!.side * (arc!.depth * 0.75),
+      },
+      ...tieLayout.detachedSymbols.slice(1),
+    ],
+  };
+  const tieHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), moved).filter(
+    (v) => v.code === 'symbol-tie-conflict'
+  );
+  assert.equal(tieHits.length, 1);
+  assert.match(tieHits[0]!.message, /duration symbol and a tie may never share ink/);
+
+  // 3. Two sibling symbols sharing ink.
+  const pair = first.detachedSymbols[0];
+  const twin: JankoSystemLayout = {
+    ...first,
+    detachedSymbols: [pair, { ...first.detachedSymbols[1], x: pair.x, y: pair.y }],
+  };
+  const twinHits = run((l, o) => checkDurationInkOwnership(l, options, tokens, o), twin).filter(
+    (v) => v.code === 'symbol-symbol-conflict'
+  );
+  // Each sharing symbol reports the pair once (two sides, one defect).
+  assert.equal(twinHits.length, 2);
+  assert.ok(twinHits.every((v) => /share ink/.test(v.message)));
+});
+
+test('Round 48 fact: the withheld and inferred rests are published as info, never as defects', () => {
+  const report = lintJankoScore(BRAHMS, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
+  assert.equal(report.ok, true, 'the surface is ok');
+  assert.deepEqual(report.violations, [], 'no violation');
+  assert.deepEqual(report.warnings, [], 'no warning');
+  const info = report.diagnostics.filter((d) => d.severity === 'info');
+  assert.ok(info.length > 0, 'the facts are listed');
+  assert.ok(
+    info.every((d) => d.code === 'rest-inference-withheld' || d.code === 'rest-inferred'),
+    'and every listed fact is a published rest-provenance note'
+  );
+  // A score without silence provenance publishes nothing new.
+  const bach = lintJankoScore(
+    buildBachGoldbergVar1Score(),
+    DEFAULT_JANKO_OPTIONS,
+    DEFAULT_JANKO_TOKENS
+  );
+  assert.deepEqual(bach.diagnostics, [], 'Bach GOLD: the record stays empty');
+});
+
+// ---------------------------------------------------------------------------
 // 3c. Round 47 — duration-ink ownership (no orphaned long-value marks)
 // ---------------------------------------------------------------------------
 
@@ -1317,7 +1423,11 @@ test('Round 47 defect: an orphaned, suppressed-only or unknown-owner duration ma
     seatHits.every((v) => (v.noteIds ?? []).includes(symbol.noteId)),
     'and it names the symbol that was moved'
   );
-  assert.match(seatHits[0]!.message, /crosses the drawn staff rule/);
+  // Round 48: a rule inside a hollow interior is legal **only** when the seat
+  // records its local knockout; a moved symbol that keeps the old record (or
+  // loses it) is caught with the ownership of the crossing named.
+  assert.match(seatHits[0]!.message, /drawn staff rule/);
+  assert.match(seatHits[0]!.message, /knockout|hollow interior|staff rule/);
 });
 
 test('Defect: a rail that crosses a barline is caught', () => {

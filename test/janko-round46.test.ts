@@ -577,11 +577,19 @@ test('D. Ties clear every glyph mask and never erase ink (paint order and stem c
     ] as const) {
       const head = heads.get(headId)!;
       const mask = knockoutHalfExtents(OPTIONS, TOKENS, head.note.startTick, head);
-      // The endpoint stands on the head's own outer edge (x) and outside its
-      // knockout box by the declared air (y): the tie never enters a glyph.
+      // The endpoint stands on (or outside) the head's own outer edge (x) and
+      // outside its knockout box by the declared air (y): the tie never enters
+      // a glyph. Round 48: when a bracket stands between the two tied heads the
+      // chord is clipped short of that bracket, so the endpoint may only move
+      // **outward** — never into the head — and the clip is bounded by the
+      // bracket's own edge (asserted with the clip margin below).
+      const edge =
+        headId === arc.fromHeadId ? head.x + mask.wx : head.x - mask.wx;
+      const outward = headId === arc.fromHeadId ? x >= edge - 1e-6 : x <= edge + 1e-6;
+      assert.ok(outward, `${headId}: the endpoint does not enter the head's knockout edge`);
       assert.ok(
-        Math.abs(Math.abs(x - head.x) - mask.wx) < 1e-6,
-        `${headId}: the endpoint stands on the head's knockout edge`
+        Math.abs(x - edge) <= 40,
+        `${headId}: the endpoint stays within a bracket clip of the head's edge`
       );
       assert.ok(
         Math.abs(arc.y - head.y) >= mask.hy + TOKENS.tieEndpointAir - 1e-6,
@@ -589,9 +597,12 @@ test('D. Ties clear every glyph mask and never erase ink (paint order and stem c
       );
     }
   }
-  // The measured crossings are published, never suppressed.
+  // The measured crossings are published, never suppressed. Round 48's routing
+  // (measured ink clearance + one side per chain) removed the family's
+  // crossings — the Reference keeps at most one measured residual, and every
+  // one of them is still published on its arc.
   const crossings = arcs.reduce((n, a) => n + a.stemCrossings.length, 0);
-  assert.ok(crossings >= 5, `${crossings} measured stem crossings are published on the arcs`);
+  assert.ok(crossings <= 1, `${crossings} measured stem crossings remain on the Reference`);
   assert.equal(
     (svg.match(/data-tie-stem-crossings="/g) ?? []).length,
     arcs.filter((a) => a.stemCrossings.length > 0).length,
@@ -614,22 +625,18 @@ test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family a
     'ccfcaecca058aa1ed7d37291d765a8ef58ed79e428c732f338f298fb5b7a104f',
     'Bach GOLD is unchanged'
   );
-  // Round 47 has opened its own candidate set on this baseline (the round's
-  // four long-value readings; the Round 46 pair is on record in
-  // test/janko-candidates.test.ts and test/janko-round45.test.ts). Every one of
-  // them still states this round's adopted family as fixed context, and the
-  // working Reference they are measured against is untouched — the assertions
-  // below are the Round 46 contract, checked through the live registry.
-  assert.equal(CURRENT_ROUND_METADATA.round, 47, 'Round 47 is the open round');
+  // Round 48 has opened its own candidate set on this baseline (the two circle
+  // readings of one corrected surface; the Round 46 and Round 47 sets are on
+  // record in test/janko-candidates.test.ts, test/janko-round45.test.ts and
+  // test/janko-round47.test.ts). Every one of them still states this round's
+  // adopted family as fixed context, and the working Reference they are measured
+  // against is untouched — the assertions below are the Round 46 contract,
+  // checked through the live registry.
+  assert.equal(CURRENT_ROUND_METADATA.round, 48, 'Round 48 is the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    [
-      'round47-mounted-control',
-      'round47-half-ring-cutout',
-      'round47-detached-symbols',
-      'round47-detached-ovals',
-    ],
-    'the Round 47 quartet'
+    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
+    'the Round 48 pair'
   );
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
@@ -649,7 +656,10 @@ test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family a
   assert.equal(reference.exceptionCarrier, 'horizontal', 'the Reference keeps the horizontal arm');
   assert.equal(reference.longDurationStyle, 'midpoint', 'and the ring vocabulary');
   assert.equal(reference.tieOriginIndicator, 'source', 'and states every originator mark itself');
+  assert.equal(reference.tieProfile, 'uniform', 'and paints the Round 46 uniform tie contour');
   assert.equal(referenceTokens.halfRingGap, 0, 'and the unbroken half-ring mount');
+  assert.equal(referenceTokens.detachedRingScale, 1, 'and the full-size detached circle');
+  assert.equal(referenceTokens.detachedSymbolAir, 0.3, 'at the round\u2019s own 0.30pt air');
   assert.equal(OPTIONS.chordSymbolScale, 0.95, 'the Reference is the 95 % engraving');
   assert.equal(TOKENS.midpointSpacingFactor, 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95));
   // The working Reference and the 0.30pt card engrave the same music: every

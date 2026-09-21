@@ -14,7 +14,7 @@
  */
 
 import { fromMidi } from '../model/pitch';
-import { WrittenTieChain, WrittenTieComponent } from '../model/types';
+import { Hand, VoiceSilence, WrittenTieChain, WrittenTieComponent } from '../model/types';
 
 /** Whole-note grid: LilyPond moments scale by 192 to repo ticks. */
 export const BRAHMS_WRITTEN_TICKS_PER_WHOLE = 192;
@@ -27,6 +27,156 @@ export const BRAHMS_SOURCE_VOICES = [
   'leftHandLower',
 ] as const;
 export type BrahmsSourceVoice = (typeof BRAHMS_SOURCE_VOICES)[number];
+
+/**
+ * Round 48 — **the source's own voice → hand mapping**, authored here from the
+ * pinned witness, never inferred in the engine.
+ *
+ * `includes/intermezzo-op118-no1-parts.ily` defines exactly two logical parts,
+ * `rightHand` and `leftHand`, and each owns the voices that carry it:
+ * `rightHand = { \rightHandUpper \rightHandLower }` (the upper staff's two
+ * voices) and `leftHand = { \leftHandUpper \leftHandLower }` (the lower
+ * staff's two). The names are the source's own part names — the hand assignment
+ * is a *source fact*, not a string heuristic the renderer may guess at. `staff`
+ * is deliberately **not** consulted: a repeat can unfold to a different
+ * performed staff than the printed one (the m. 66 / m. 70 witnesses), and the
+ * source's hand identity survives that unfolding while the staff destination
+ * does not.
+ */
+export const BRAHMS_VOICE_HAND: Readonly<Record<BrahmsSourceVoice, Hand>> = {
+  rightHandUpper: 'RH',
+  rightHandLower: 'RH',
+  leftHandUpper: 'LH',
+  leftHandLower: 'LH',
+};
+
+/**
+ * The source **hand(s)** of one committed provenance event: the mapped hands of
+ * every voice that states it, sorted. One voice of one part is the ordinary
+ * case; a cross-voice unison stated by both `leftHandLower` and
+ * `rightHandUpper` (the m. 61 E2) legitimately yields both hands, because both
+ * hands really sound. An unknown voice is refused — never guessed.
+ */
+export function brahmsSourceHandsOf(
+  event: { voices: string[]; unison: boolean },
+  where: string
+): Hand[] {
+  const hands = new Set<Hand>();
+  for (const voice of event.voices) {
+    const hand = BRAHMS_VOICE_HAND[voice as BrahmsSourceVoice];
+    if (!hand) {
+      throw new Error(
+        `Brahms source hand: ${where} names unknown source voice "${voice}" — ` +
+          `want one of ${BRAHMS_SOURCE_VOICES.join(', ')}`
+      );
+    }
+    hands.add(hand);
+  }
+  if (hands.size === 0) {
+    throw new Error(`Brahms source hand: ${where} names no source voice`);
+  }
+  return [...hands].sort();
+}
+
+/** Raw authored-silence record from the LilyPond listener. */
+export interface BrahmsRawSilence {
+  /** `'rest'` (written rest) or `'skip'` (invisible spacer). */
+  type: string;
+  /** Voice id the collector read the record from (the listener's own file). */
+  voice: string;
+  onsetNum: number;
+  onsetDen: number;
+  durNum: number;
+  durDen: number;
+  file: string;
+  line: number;
+  col: number;
+  staff: string;
+  bar: number;
+}
+
+/**
+ * Round 48 — normalize the pinned source's **authored silences**.
+ *
+ * Pure and deterministic: validates every voice/staff/origin, converts each
+ * exact rational onset/duration to grid ticks (refusing fractional ticks),
+ * records the occurrence of each origin in unfolded order, and sorts by
+ * (tick, voice, kind). A written rest (`rest`) and an invisible spacer (`skip`)
+ * stay distinct: the first states that the voice is silent, the second states
+ * only that the source occupied the time.
+ */
+export function normalizeSourceSilences(raw: readonly BrahmsRawSilence[]): VoiceSilence[] {
+  const allowedVoices = new Set<string>(BRAHMS_SOURCE_VOICES);
+  const working = raw.map((entry, index) => {
+    const where = `silence #${index + 1} (${entry.file}:${entry.line}:${entry.col})`;
+    if (entry.type !== 'rest' && entry.type !== 'skip') {
+      throw new Error(`Brahms source silences: ${where} has unknown kind "${entry.type}"`);
+    }
+    if (!allowedVoices.has(entry.voice)) {
+      throw new Error(
+        `Brahms source silences: ${where} names unknown voice "${entry.voice}" — ` +
+          `want one of ${BRAHMS_SOURCE_VOICES.join(', ')}`
+      );
+    }
+    if (entry.staff !== 'upper' && entry.staff !== 'lower') {
+      throw new Error(`Brahms source silences: ${where} has unknown staff "${entry.staff}"`);
+    }
+    if (!Number.isInteger(entry.line) || entry.line <= 0) {
+      throw new Error(`Brahms source silences: ${where} lacks a source location`);
+    }
+    // The staff is recorded, never used as hand evidence: a voice may print on
+    // either staff through the source's own `\staffUp` / `\staffDown` /
+    // `\voiceUp` / `\voiceDown` and still belong to its part (the existing
+    // correction doctrine: a staff change is not a hand change).
+    const hand = BRAHMS_VOICE_HAND[entry.voice as BrahmsSourceVoice];
+    staffToHand(entry.staff, where); // validates the staff vocabulary only
+    const startTick = brahmsRationalToTicks(entry.onsetNum, entry.onsetDen, `${where} onset`);
+    const durationTicks = brahmsRationalToTicks(entry.durNum, entry.durDen, `${where} duration`);
+    if (durationTicks <= 0) {
+      throw new Error(`Brahms source silences: ${where} has non-positive duration`);
+    }
+    return {
+      startTick,
+      durationTicks,
+      kind: entry.type as 'rest' | 'skip',
+      staff: entry.staff,
+      file: entry.file,
+      line: entry.line,
+      col: entry.col,
+      bar: entry.bar,
+      voice: entry.voice,
+      hand,
+    };
+  });
+  const seen = new Map<string, number>();
+  const out: VoiceSilence[] = working
+    .map((entry) => {
+      const origin = `${entry.file}:${entry.line}:${entry.col}:${entry.voice}:${entry.kind}`;
+      const occurrence = (seen.get(origin) ?? 0) + 1;
+      seen.set(origin, occurrence);
+      return {
+        voice: entry.voice,
+        hand: entry.hand,
+        startTick: entry.startTick,
+        durationTicks: entry.durationTicks,
+        kind: entry.kind,
+        staff: entry.staff,
+        file: entry.file,
+        line: entry.line,
+        col: entry.col,
+        bar: entry.bar,
+        occurrence,
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.startTick - b.startTick ||
+        a.voice.localeCompare(b.voice) ||
+        a.kind.localeCompare(b.kind) ||
+        a.occurrence - b.occurrence
+    );
+  return out;
+}
 
 /** Raw pre-playback NoteEvent segment from the LilyPond listener. */
 export interface BrahmsRawSegment {

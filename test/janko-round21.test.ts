@@ -462,30 +462,26 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 47 open, three duration axes, the four real-engine long-value readings', () => {
-  // Ordered contract change: Rounds 40–46 are parked (historical consts in
-  // test/janko-round40.test.ts … test/janko-round46.test.ts) and Round 47 opens
-  // the long-value-symbol round on the same working Brahms Reference: four
-  // otherwise identical cards — the same six literal windows, the same 95 %
-  // scale, the same 0.30pt air, the same written ties and the same shared
-  // outgoing-tie rule — differing only in the half-ring flat face, the
-  // exception mount and the long-value family.
-  assert.equal(CURRENT_ROUND_METADATA.round, 47);
+test('§F registry: round 48 open, two detached-circle axes, the two real-engine readings', () => {
+  // Ordered contract change: Rounds 40–47 are parked (historical consts in
+  // test/janko-round40.test.ts … test/janko-round47.test.ts plus the exported
+  // ROUND_47_* registry) and Round 48 opens the corrections round on the same
+  // working Brahms Reference: two otherwise identical cards — the same six
+  // literal windows, the same 95 % scale, the same 0.30pt air and flat face,
+  // the same written ties, the same traced tie contour, the same measured
+  // routing, the same rest provenance and the same suppressed redundant stems —
+  // differing only in the detached closed circle's size and air.
+  assert.equal(CURRENT_ROUND_METADATA.round, 48);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
-    'the flat face, the exception mount and the long-value family'
+    ['detachedRingScale', 'detachedSymbolAir'],
+    'the detached circle size and its air from the owning head'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    [
-      'round47-mounted-control',
-      'round47-half-ring-cutout',
-      'round47-detached-symbols',
-      'round47-detached-ovals',
-    ],
-    'the four real-engine long-value readings'
+    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
+    'the two real-engine detached-circle readings'
   );
 });
 

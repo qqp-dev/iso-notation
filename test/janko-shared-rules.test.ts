@@ -705,10 +705,13 @@ test('§D rule: one side present wins — resume-only rests follow the resume', 
   // with BOTH sides present has no corpus specimen — every both-sides rest
   // is a tie or release-nearer; the tie→preceding and nearer-release pins
   // above cover the expressed branches.)
+  // Round 48: the former third case (12528 LH) was the m. 66 eighth rest the
+  // source evidence now **withholds** (the source's own leftHandUpper pair
+  // sounds through 12528–12552), so a resume-only seat no longer exists there;
+  // the withheld fact is pinned in test/janko-round48.test.ts instead.
   for (const [tick, hand, resume] of [
     [5616, 'RH', 5640],
     [9456, 'RH', 9480],
-    [12528, 'LH', 12552],
   ] as const) {
     const { seatY, geoIndex } = restSeat(tick, hand);
     const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);

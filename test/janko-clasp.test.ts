@@ -1738,13 +1738,22 @@ test('Every clasping paradigm engraves Bach clean; canonical Brahms fixed-3 carr
       // chord tone, straight through the discs of its own simultaneity.
       // Canonical fixed-3 carries no slot findings; nothing else may appear.
       assert.ok(brahms.diagnostics.length > 0, 'Brahms · none trips the simultaneity audit');
+      // Round 48 adds the `'info'` rest-provenance facts (published, never
+      // gating): the semantic record of the unclasped read, kept apart from the
+      // hard defect this assertion is about.
       assert.deepEqual(
-        [...new Set(brahms.diagnostics.map((d) => d.code))].sort(),
+        [
+          ...new Set(
+            brahms.diagnostics.filter((d) => d.severity !== 'info').map((d) => d.code)
+          ),
+        ].sort(),
         ['stem-through-simultaneity'],
         'the unclasped paradigm fails on stems through chord tones only'
       );
       assert.ok(
-        brahms.diagnostics.every((d) => d.severity === 'error'),
+        brahms.diagnostics
+          .filter((d) => d.severity !== 'info')
+          .every((d) => d.severity === 'error'),
         'a painted stem through a chord tone is a violation, never a warning'
       );
       continue;

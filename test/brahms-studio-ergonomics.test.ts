@@ -175,14 +175,40 @@ test('Brahms canonical lint record: fixed-3 zero hard errors and zero warnings o
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.violations.length, 0, 'canonical fixed-3: zero violations');
   assert.equal(studio.warnings.length, 0, 'canonical fixed-3: zero warnings');
-  assert.deepEqual(studio.diagnostics, [], 'the diagnostic record is genuinely empty');
+  // Round 48: the record is not *empty* any more — it carries exactly the two
+  // published rest-provenance facts of this score (the withheld inferred rests,
+  // and every painted rest the source does not write as a rest). They are
+  // `'info'`: published for review, gating nothing.
+  const provenanceRecord = studio.diagnostics.reduce<Record<string, number>>((acc, d) => {
+    assert.equal(d.severity, 'info', `${d.code}: published as a fact, never a defect`);
+    acc[d.code] = (acc[d.code] ?? 0) + 1;
+    return acc;
+  }, {});
+  assert.deepEqual(
+    provenanceRecord,
+    { 'rest-inference-withheld': 2, 'rest-inferred': 4 },
+    'the diagnostic record carries exactly the published rest provenance'
+  );
+  assert.deepEqual(
+    studio.violations.concat(studio.warnings ?? []),
+    [],
+    'and nothing gating: zero violations and zero warnings'
+  );
   assert.equal(studio.ok, true, 'the BRONZE surface is honestly ok');
   // The chip reads the honest count; diagnostics carry both counts.
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
   assert.match(brahms, /0 violations, 0 warnings/, 'the ok line prints both counts');
-  assert.match(brahms, /Diagnostics \(0\)/, 'the diagnostics list states the empty record');
+  assert.match(
+    brahms,
+    /Diagnostics \(6\)/,
+    'the diagnostics list states the published record (two withheld, four inferred rests)'
+  );
   assert.ok(!brahms.includes('⚠'), 'no warning chip on a clean surface');
+  assert.ok(
+    brahms.includes('rest-inference-withheld') && brahms.includes('rest-inferred'),
+    'the published rest facts are visible in the Reference diagnostics list'
+  );
   assert.ok(!brahms.includes('carrier-duration-unsupported'), 'no composite refusal survives anywhere');
   // The CLI spread is this same const (see the single-source test below).
   const cli = lintJankoScore(

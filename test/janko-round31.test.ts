@@ -278,7 +278,14 @@ test('The BRONZE block displays honestly: zero hard errors, the six composites i
   const { bach, brahms } = referenceBlocks();
   assert.match(brahms, /data-lint-ok="true"/, 'the BRONZE chip stays honestly clean');
   assert.match(brahms, /0 violations, 0 warnings/, 'the ok line prints both counts');
-  assert.match(brahms, /Diagnostics \(0\)/, 'the empty diagnostics list is still there — nothing folded away');
+  // Round 48: the list holds exactly the published rest-provenance facts (two
+  // withheld inferred rests, four inferred rests), all `'info'` — nothing is
+  // folded away and nothing gating appears.
+  assert.match(brahms, /Diagnostics \(6\)/, 'the published provenance facts are listed in full');
+  assert.ok(
+    !brahms.includes('⚠'),
+    'and none of them is a warning chip: the info severity is not a defect'
+  );
   assert.match(brahms, /zero violations, zero warnings/, 'the clean-master line is back on the clean surface');
   assert.ok(!brahms.includes('data-lint-ok="false"'), 'the BRONZE chip is never red');
   assert.ok(!brahms.includes('carrier-duration-unsupported'), 'no former composite refusal survives in the markup');

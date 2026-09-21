@@ -12,9 +12,63 @@
 #(define (brahms-durations-listener context)
    (let* ((voice-id (ly:context-id context))
           (fname (string-append outDir "/voice-" voice-id ".jsonl"))
-          (out-port (open-output-file fname)))
+          (out-port (open-output-file fname))
+          (sfname (string-append outDir "/silences-" voice-id ".jsonl"))
+          (silence-port (open-output-file sfname)))
      (make-engraver
        (listeners
+         ;; Round 48 — authored silences. `rest-event` is a written rest (r /
+         ;; R), `skip-event` the invisible spacer (\skip / s): the source
+         ;; distinguishes them and the exporter must too, because a spacer is
+         ;; not a written rest and the engine may never promote one into a
+         ;; visible hand-rest. One JSONL per voice, separate from the note
+         ;; evidence file so the committed note fixture stays byte-identical.
+         ((rest-event engraver event)
+          (let* ((now (ly:context-current-moment context))
+                 (cause (ly:event-property event 'music-cause))
+                 (len (if (ly:music? cause) (ly:music-length cause) (ly:make-moment 0)))
+                 (orig (ly:event-property event 'origin))
+                 (loc (if (ly:input-location? orig)
+                          (ly:input-file-line-char-column orig)
+                          '("?" 0 0 0)))
+                 (parent (ly:context-parent context))
+                 (staff-id (catch #t
+                             (lambda () (ly:context-id parent))
+                             (lambda (k . args) "unknown")))
+                 (score (ly:context-find context 'Score))
+                 (barnum (catch #t
+                           (lambda () (ly:context-property score 'currentBarNumber))
+                           (lambda (k . args) 0))))
+            (format silence-port "{\"type\":\"rest\",\"onsetNum\":~a,\"onsetDen\":~a,\"durNum\":~a,\"durDen\":~a,\"file\":\"~a\",\"line\":~a,\"col\":~a,\"staff\":\"~a\",\"bar\":~a}\n"
+              (ly:moment-main-numerator now)
+              (ly:moment-main-denominator now)
+              (ly:moment-main-numerator len)
+              (ly:moment-main-denominator len)
+              (car loc) (cadr loc) (cadddr loc)
+              staff-id barnum)))
+         ((skip-event engraver event)
+          (let* ((now (ly:context-current-moment context))
+                 (cause (ly:event-property event 'music-cause))
+                 (len (if (ly:music? cause) (ly:music-length cause) (ly:make-moment 0)))
+                 (orig (ly:event-property event 'origin))
+                 (loc (if (ly:input-location? orig)
+                          (ly:input-file-line-char-column orig)
+                          '("?" 0 0 0)))
+                 (parent (ly:context-parent context))
+                 (staff-id (catch #t
+                             (lambda () (ly:context-id parent))
+                             (lambda (k . args) "unknown")))
+                 (score (ly:context-find context 'Score))
+                 (barnum (catch #t
+                           (lambda () (ly:context-property score 'currentBarNumber))
+                           (lambda (k . args) 0))))
+            (format silence-port "{\"type\":\"skip\",\"onsetNum\":~a,\"onsetDen\":~a,\"durNum\":~a,\"durDen\":~a,\"file\":\"~a\",\"line\":~a,\"col\":~a,\"staff\":\"~a\",\"bar\":~a}\n"
+              (ly:moment-main-numerator now)
+              (ly:moment-main-denominator now)
+              (ly:moment-main-numerator len)
+              (ly:moment-main-denominator len)
+              (car loc) (cadr loc) (cadddr loc)
+              staff-id barnum)))
          ((tie-event engraver event)
           (let ((now (ly:context-current-moment context)))
             (format out-port "{\"type\":\"tie\",\"onsetNum\":~a,\"onsetDen\":~a}\n"
@@ -58,4 +112,6 @@
               has-tie
               (car loc) (cadr loc) (cadddr loc)
               staff-id barnum tie-wait))))
-       ((finalize engraver) (close-output-port out-port)))))
+       ((finalize engraver)
+        (close-output-port out-port)
+        (close-output-port silence-port)))))

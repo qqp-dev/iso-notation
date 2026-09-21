@@ -3,10 +3,17 @@ import path from "node:path";
 import { QuantizedGridScore } from "../model/types";
 import { parseMidiToScore } from "../model/midi";
 import { detectHandCrossings } from "../model/grid";
-import { applyWrittenDurations, deriveWrittenTieChains } from "./brahms-source-fidelity";
+import {
+  BRAHMS_VOICE_HAND,
+  BrahmsSourceVoice,
+  applyWrittenDurations,
+  brahmsSourceHandsOf,
+  deriveWrittenTieChains,
+} from "./brahms-source-fidelity";
 import { applyBrahmsHandCorrections } from "./brahms-hand-corrections";
 import writtenDurationsFixture from "./data/brahms-op118-no1-written-durations.json";
 import writtenDurationsProvenance from "./data/brahms-op118-no1-written-durations.provenance.json";
+import sourceSilences from "./data/brahms-op118-no1-source-silences.json";
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -191,7 +198,62 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
     (writtenDurationsProvenance as { events: Parameters<typeof deriveWrittenTieChains>[1][number][] }).events
   );
 
-  const notes = applyBrahmsHandCorrections(durationOverlaid);
+  // Round 48 — committed **source provenance** on every sounding event: the source voices
+  // and staves that state the event and the hand the source's own parts assign
+  // it (`BRAHMS_VOICE_HAND`, cited there). Display metadata only: no displayed
+  // hand, pitch, onset or duration is touched. The engine's rest layer reads the
+  // source hand *in addition to* the displayed one, so a spacer in one voice can
+  // never be promoted into a hand-rest while another voice of the same hand
+  // sounds.
+  const provenanceByKey = new Map(
+    (writtenDurationsProvenance as {
+      events: Array<{
+        pitchClass: number;
+        octave: number;
+        startTick: number;
+        hand: 'RH' | 'LH';
+        voices: string[];
+        staves: string[];
+        unison: boolean;
+      }>;
+    }).events.map((event) => [
+      `${event.pitchClass}|${event.octave}|${event.startTick}|${event.hand}`,
+      event,
+    ])
+  );
+  const withSourceProvenance = (list: typeof durationOverlaid): typeof durationOverlaid =>
+    list.map((note) => {
+      const key = `${note.pitch.pitchClass}|${note.pitch.octave}|${note.startTick}|${note.hand}`;
+      const event = provenanceByKey.get(key);
+      if (!event) return note;
+      return {
+        ...note,
+        sourceProvenance: {
+          voices: [...event.voices].sort(),
+          staves: [...event.staves].sort(),
+          hands: brahmsSourceHandsOf(event, `event ${key}`),
+          unison: event.unison,
+        },
+      };
+    });
+  // The added written-tie continuation heads carry no provenance event of their
+  // own (they are display components of one sounding event): their source hand
+  // is the chain's own source voice.
+  const chainVoiceById = new Map(tieChains.map((chain) => [chain.noteId, chain.voice]));
+  const sourcedNotes = withSourceProvenance(durationOverlaid).map((note) => {
+    if (note.sourceProvenance) return note;
+    const voice = chainVoiceById.get(note.id);
+    if (!voice) return note;
+    const hand = BRAHMS_VOICE_HAND[voice as BrahmsSourceVoice];
+    return hand
+      ? { ...note, sourceProvenance: { voices: [voice], staves: [], hands: [hand], unison: false } }
+      : note;
+  });
+  // The bounded hand corrections run **after** the provenance is attached: the
+  // table retargets the displayed hand only, and the source fact rides along
+  // untouched (the correction's own rationale is the source part grouping).
+  const notes = applyBrahmsHandCorrections(sourcedNotes);
+
 
   // One barline per measure opening plus the score's closing boundary. The
   // final measure is 144 ticks long (the piece's own closing bar), so the last
@@ -226,6 +288,10 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
     pedals: [],
     notes,
     tieChains,
+    // Round 48: the source's authored silences (written rests *and* spacers),
+    // straight from the exporter's committed sidecar — the evidence the rest
+    // layer checks before it ever paints a hand-rest.
+    sourceSilences: (sourceSilences as { silences: QuantizedGridScore['sourceSilences'] }).silences,
   };
 
   score.handCrossings = detectHandCrossings(score);

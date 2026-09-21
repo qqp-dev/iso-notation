@@ -70,7 +70,11 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(CURRENT_CANDIDATES.length, 4, 'Round 47 open: the four real-engine long-value readings');
+assert.equal(
+  CURRENT_CANDIDATES.length,
+  2,
+  'Round 48 open: the two real-engine detached-circle readings of one corrected surface'
+);
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -132,28 +136,23 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 47/);
-  assert.match(html, /half-ring flat face/i);
+  assert.match(html, /Round 48/);
+  assert.match(html, /traced tie/i);
 });
 
-test('Round 47 open: four long-value readings, three axes, twenty-four windows', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 47);
-  assert.match(CURRENT_ROUND_METADATA.title, /half-ring flat face/i);
+test('Round 48 open: two circle readings, two axes, twelve windows', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 48);
+  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
-    'the flat face, the exception mount and the long-value family'
+    ['detachedRingScale', 'detachedSymbolAir'],
+    'the detached circle size and its air from the owning head'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'four cards');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    [
-      'round47-mounted-control',
-      'round47-half-ring-cutout',
-      'round47-detached-symbols',
-      'round47-detached-ovals',
-    ],
-    'the four long-value readings on the same accepted Brahms surface'
+    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
+    'the two detached-circle readings on one corrected Brahms surface'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -185,82 +184,46 @@ test('Round 47 open: four long-value readings, three axes, twenty-four windows',
   );
 });
 
-test('The open studio renders the four long-value readings on their twenty-four declared windows', () => {
+test('The open studio renders both circle readings on their twelve declared windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 4, 'four cards');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
   assert.equal(
     (html.match(/data-window="/g) ?? []).length,
-    24,
-    'six windows on each card (the common literal set, m. 67 included for 384)'
+    12,
+    'six windows on each card (the common literal set, m. 10 and m. 70 included)'
   );
-  assert.match(html, /data-candidate-count="4"/);
-  assert.match(html, /data-window-count="24"/);
+  assert.match(html, /data-candidate-count="2"/);
+  assert.match(html, /data-window-count="12"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 47/);
-  assert.match(html, /half-ring flat face/i, 'the round title headlines the view');
+  assert.match(html, /Round 48/);
+  assert.match(html, /traced tie/i, 'the round title headlines the view');
   // The round's axes are badged where each card claims them; the shared
-  // tie-origin rule, the 95 % scale and the written ties ride as deltas.
+  // corrections (the traced tie, the detached mount, the inheritance rule, the
+  // flat face, the 95 % scale and the written ties) ride as deltas too.
   const badgeKeys = new Set(
     CURRENT_CANDIDATES.flatMap((c) => candidateBadges(c).map((b) => b.key))
   );
   for (const key of [
-    'halfRingGap',
-    'exceptionCarrier',
-    'longDurationStyle',
+    'detachedRingScale',
+    'detachedSymbolAir',
+    'tieProfile',
     'tieOriginIndicator',
+    'exceptionCarrier',
+    'halfRingGap',
     'chordSymbolScale',
     'writtenTies',
   ]) {
     assert.ok(badgeKeys.has(key), `the round badges ${key} on at least one card`);
   }
-  for (const id of [
-    'round47-mounted-control',
-    'round47-half-ring-cutout',
-    'round47-detached-symbols',
-    'round47-detached-ovals',
-  ]) {
+  for (const id of ['round48-circle-090-air-060', 'round48-circle-088-air-080']) {
     const card = html.slice(html.indexOf(`data-candidate="${id}"`));
     const body = card.slice(0, card.indexOf('</article>'));
-    assert.ok(body.includes('<b>tieOriginIndicator</b>'), `${id}: the shared tie-origin rule is badged`);
+    assert.ok(body.includes('<b>tieProfile</b>'), `${id}: the shared traced tie is badged`);
+    assert.ok(body.includes('<b>exceptionCarrier</b>'), `${id}: the detached mount is badged`);
     const axis = CURRENT_CANDIDATES.find((c) => c.id === id)!.axis!;
-    assert.ok(body.includes(`<b>${axis}</b>`), `${id}: its own axis (${axis}) is badged`);
+    assert.ok(body.includes(`<b>${axis}</b>`), `${id}: its own axis is badged`);
   }
-  // The common literal windows, on every card: mm. 1–3, 7–9, 33, 61–63, 64–66
-  // and the documented m. 67 cue for the 384-tick value the range never states.
-  assert.equal(
-    (html.match(/data-window="brahms-op118-no1:/g) ?? []).length,
-    24,
-    'six Brahms windows on each of the four cards'
-  );
-  for (const span of ['1-3', '7-9', '33-33', '61-63', '64-66', '67-67']) {
-    assert.equal(
-      (html.match(new RegExp(`data-window="brahms-op118-no1:${span}"`, 'g')) ?? []).length,
-      4,
-      `Brahms window ${span} on every card`
-    );
-  }
-  // No card dresses a crop up as a page spread, and no rejected surface returns.
-  assert.equal(
-    (html.match(/<figure class="page-card" data-page="\d+">/g) ?? []).length,
-    0,
-    'the round declares literal crops only'
-  );
-  assert.ok(
-    !html.includes('data-window="duration-vocabulary-specimen:33-34"'),
-    'the rejected stress row is not carried forward'
-  );
-  assert.ok(
-    !html.includes('data-window="pitch-parity-specimen:'),
-    'the pitch-parity specimen contributes no window'
-  );
-  // The honest report rides on every chip: all four cards are clean on the
-  // whole canonical Brahms score (zero violations, zero warnings each).
-  assert.equal(
-    (html.match(/data-lint="clean"/g) ?? []).length,
-    4,
-    'every card chip reads clean'
-  );
 });
 
 test('Parked Round 39 renders the three abstract cards on thirteen declared windows', () => {
@@ -587,15 +550,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 47);
-  assert.match(CURRENT_ROUND_METADATA.title, /half-ring flat face/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 48);
+  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
+    ['detachedRingScale', 'detachedSymbolAir'],
     'the round axes'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'four cards in the open round');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

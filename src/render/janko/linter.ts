@@ -75,6 +75,7 @@ import {
   PositionedJankoNote,
   computePageGeometry,
   detectStemDigitCrossings,
+  drawnStaffRuleBands,
   drawnStaffRuleYs,
   getMarginFurniture,
   holdClearanceInk,
@@ -110,6 +111,8 @@ import {
   claspDotCenter,
   claspInkBox,
   detachedSymbolInkBox,
+  detachedRuleKnockoutBands,
+  detachedSymbolInteriors,
   claspOwnMemberAir,
   claspMarkDaylight,
   claspSecondDotCenter,
@@ -177,7 +180,15 @@ import { JankoTieBox, tieArcEntersBoxes } from './ties';
 // ---------------------------------------------------------------------------
 
 /** Diagnostics are either hard engraving defects (`error`) or known risks. */
-export type JankoLintSeverity = 'error' | 'warning';
+/**
+ * Round 48 adds a third severity: `'info'` is a **published fact, not a
+ * defect** — the withheld inferred rest (an unproven hand-rest the source
+ * evidence refused) and the inferred rest with no authored source rest behind
+ * it. Info entries appear in `LintReport.diagnostics` (so the Reference view
+ * lists them and a reviewer can read them) but they are neither violations nor
+ * warnings: `--strict` gates only the two defect severities, exactly as before.
+ */
+export type JankoLintSeverity = 'error' | 'warning' | 'info';
 
 /** Stable diagnostic identifiers (safe to assert on in tests). */
 export type JankoLintCode =
@@ -203,6 +214,8 @@ export type JankoLintCode =
   | 'accolade-collision'
   | 'rest-collision'
   | 'rest-unwritable'
+  | 'rest-inference-withheld'
+  | 'rest-inferred'
   | 'rest-centroid-off-row'
   | 'rest-slab-off-line'
   | 'unison-double-digit'
@@ -219,6 +232,10 @@ export type JankoLintCode =
   | 'duration-mark-unknown-owner'
   | 'symbol-seat-refused'
   | 'symbol-seat-rule-conflict'
+  | 'symbol-seat-inconsistent'
+  | 'symbol-tie-conflict'
+  | 'symbol-symbol-conflict'
+  | 'symbol-rest-conflict'
   | 'contour-thread-vertex'
   | 'contour-thread-pen-lift'
   | 'contour-thread-coverage'
@@ -355,6 +372,7 @@ export const JANKO_LINT_CHECKS = [
   'accolade-clearance',
   'rest-clearance',
   'rest-unwritable',
+  'rest-provenance',
   'rest-seat',
   'unison-merge',
   'clasp-dot-fusion',
@@ -3383,27 +3401,198 @@ export function checkDurationInkOwnership(
       });
     }
   }
-  // The detached seats: no symbol may cross a drawn rule (the doctrine every
-  // open shape and every flat face depends on). Read from the same drawn rule
-  // set the seat solver used.
+  // ---------------------------------------------------------------------
+  // Round 48 — the detached-seat contract, now the operator's rule:
+  //
+  // - **one consistent seat** — every detached long-value symbol stands to the
+  //   right of the glyph it belongs to (`seat: 'right'`); a symbol that found
+  //   any other lane is a placement regression, not a fallback;
+  // - **a staff line is not an obstacle** — a drawn rule may cross a *closed
+  //   ring* only through its hollow interior, with the whole rule ink band
+  //   inside it, and then the rule **must** be cleaned out locally
+  //   (`ruleKnockouts`) exactly as a notehead knockout cleans the line behind
+  //   its glyph. A rule that touches the painted stroke, or one that crosses an
+  //   interior without being recorded, is a hard error; a half-ring or an open
+  //   oval may not be crossed at all (its flat face / counter must stay
+  //   legible);
+  // - **foreign ink is still protected** — the symbol's own ink box may not
+  //   meet a note knockout, a bracket, a sibling symbol, a rest, a hold or a
+  //   painted tie arc (measured on the arc's real curve, the same predicate the
+  //   tie solver fits with).
+  // ---------------------------------------------------------------------
+  const detachedBoxes: JankoTieBox[] = (layout.detachedSymbols ?? []).map((symbol) => ({
+    id: symbol.noteId,
+    ...detachedSymbolInkBox(symbol, t),
+  }));
   for (const symbol of layout.detachedSymbols ?? []) {
     const box = detachedSymbolInkBox(symbol, t);
-    for (const rule of drawnStaffRuleYs(layout.geometry, o, t)) {
-      if (rule > box.y0 - 1e-9 && rule < box.y1 + 1e-9) {
-        out.push({
-          code: 'symbol-seat-rule-conflict',
-          severity: 'error',
-          message:
-            `The detached ${symbol.base}-tick symbol of ${symbol.noteId} crosses the drawn staff ` +
-            `rule at y=${rule.toFixed(2)} (its ink box spans ${box.y0.toFixed(2)}..${box.y1.toFixed(2)}): ` +
-            `detached marks are seated clear of every rule.`,
-          system: layout.index,
-          measure: measureOfTick(symbol.tick, t),
-          noteIds: [symbol.noteId],
-          metrics: { ruleY: rule, y0: box.y0, y1: box.y1 },
-        });
-      }
+    const interiors = detachedSymbolInteriors(symbol, t);
+    const knockouts = symbol.ruleKnockouts ?? [];
+    const bands = detachedRuleKnockoutBands(symbol, t);
+    for (const rule of drawnStaffRuleBands(layout.geometry, o, t)) {
+      const crossing = rule.y > box.y0 - 1e-9 && rule.y < box.y1 + 1e-9;
+      if (!crossing) continue;
+      const recorded = knockouts.some(
+        (entry) => Math.abs(entry.y - rule.y) <= 1e-9 && Math.abs(entry.half - rule.half) <= 1e-9
+      );
+      const bandHalf = rule.half + t.staffRuleKnockoutHalfHeight;
+      const throughInterior = interiors.some(
+        (interior) => Math.abs(rule.y - interior.cy) + bandHalf < interior.r - 1e-9
+      );
+      const cleaned = recorded && bands.some((band) => Math.abs(band.ruleY - rule.y) <= 1e-9);
+      if (cleaned) continue;
+      out.push({
+        code: 'symbol-seat-rule-conflict',
+        severity: 'error',
+        message: recorded
+          ? `The detached ${symbol.base}-tick symbol of ${symbol.noteId} records a rule knockout ` +
+            `at y=${rule.y.toFixed(2)} that does not fit inside its hollow interior: the local ` +
+            `knockout may only clean the rule band it actually contains.`
+          : throughInterior
+            ? `The detached ${symbol.base}-tick symbol of ${symbol.noteId} stands on the drawn staff ` +
+              `rule at y=${rule.y.toFixed(2)} inside a hollow interior but does not record its ` +
+              `knockout: a line inside the ring must be cleaned out locally, never left to close it.`
+            : `The detached ${symbol.base}-tick symbol of ${symbol.noteId} crosses the drawn staff ` +
+              `rule at y=${rule.y.toFixed(2)} (its ink box spans ${box.y0.toFixed(2)}..${box.y1.toFixed(2)}): ` +
+              `a rule may only pass through a closed ring's hollow interior.`,
+        system: layout.index,
+        measure: measureOfTick(symbol.tick, t),
+        noteIds: [symbol.noteId],
+        metrics: { ruleY: rule.y, y0: box.y0, y1: box.y1 },
+      });
     }
+    if (symbol.seat !== 'right') {
+      out.push({
+        code: 'symbol-seat-inconsistent',
+        severity: 'error',
+        message:
+          `The detached ${symbol.base}-tick symbol of ${symbol.noteId} took the ` +
+          `"${symbol.seat}" seat: every detached duration circle stands to the right of the ` +
+          `glyph it belongs to, so the vocabulary reads the same way in every measure.`,
+        system: layout.index,
+        measure: measureOfTick(symbol.tick, t),
+        noteIds: [symbol.noteId],
+        metrics: { seat: -1 },
+      });
+    }
+    for (const arc of layout.tieArcs ?? []) {
+      if (!tieArcEntersBoxes(arc, [{ id: symbol.noteId, ...box }], t)) continue;
+      if (arc.fromHeadId === symbol.noteId || arc.toHeadId === symbol.noteId) continue;
+      out.push({
+        code: 'symbol-tie-conflict',
+        severity: 'error',
+        message:
+          `The tie arc ${arc.fromHeadId}→${arc.toHeadId} passes through the detached ` +
+          `${symbol.base}-tick symbol of ${symbol.noteId}: a duration symbol and a tie may ` +
+          `never share ink.`,
+        system: layout.index,
+        measure: measureOfTick(symbol.tick, t),
+        noteIds: [symbol.noteId, arc.fromHeadId, arc.toHeadId],
+        metrics: { x: symbol.x, y: symbol.y },
+      });
+    }
+    for (const other of detachedBoxes) {
+      if (other.id === symbol.noteId) continue;
+      if (other.x1 <= box.x0 || other.x0 >= box.x1 || other.y1 <= box.y0 || other.y0 >= box.y1) {
+        continue;
+      }
+      out.push({
+        code: 'symbol-symbol-conflict',
+        severity: 'error',
+        message:
+          `The detached symbols of ${symbol.noteId} and ${other.id} share ink: sibling duration ` +
+          `circles are seated clear of one another.`,
+        system: layout.index,
+        measure: measureOfTick(symbol.tick, t),
+        noteIds: [symbol.noteId, other.id],
+        metrics: { x: symbol.x, y: symbol.y },
+      });
+    }
+    for (const rest of layout.rests) {
+      const restBox = restInkBox(rest, t);
+      if (
+        restBox.x1 <= box.x0 ||
+        restBox.x0 >= box.x1 ||
+        restBox.y1 <= box.y0 ||
+        restBox.y0 >= box.y1
+      ) {
+        continue;
+      }
+      out.push({
+        code: 'symbol-rest-conflict',
+        severity: 'error',
+        message:
+          `The detached ${symbol.base}-tick symbol of ${symbol.noteId} shares ink with the rest at ` +
+          `tick ${rest.tick}: a duration symbol never covers a rest glyph.`,
+        system: layout.index,
+        measure: measureOfTick(symbol.tick, t),
+        noteIds: [symbol.noteId],
+        metrics: { x: symbol.x, y: symbol.y },
+      });
+    }
+  }
+}
+
+/**
+ * Round 48 — **rest provenance**: was a painted silence actually authored?
+ *
+ * The rest layer paints a hand's gap whenever the imported notes offer one, and
+ * a track/staff label can disagree with the source part grouping (the m. 66 and
+ * m. 70 witnesses). Two facts are published, both as `'info'` — they are
+ * questions for the operator's semantic review, never engraving defects:
+ *
+ * - `rest-inference-withheld`: an inferred hand-rest the source evidence
+ *   **refused** (the source's own hand, or the displayed hand's own sustaining
+ *   ink, sounds inside the span). Nothing was painted for it: the silence the
+ *   import implied is not a proven hand silence, and the displayed hand
+ *   assignments are left exactly as the committed corrections state them.
+ * - `rest-inferred`: a rest that **is** painted and whose span no source-written
+ *   rest covers — the engine's own reading of a gap. A rest whose span a source
+ *   `r` covers is authored and reports nothing.
+ */
+export function checkRestProvenance(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  out: LintViolation[]
+): void {
+  void o;
+  for (const withheld of layout.withheldRests ?? []) {
+    out.push({
+      code: 'rest-inference-withheld',
+      severity: 'info',
+      message:
+        `Inferred ${withheld.hand} rest at tick ${withheld.tick} (${withheld.value}, ` +
+        `${withheld.durationTicks} ticks) is withheld: ${withheld.detail}. No rest is painted ` +
+        `there and the displayed hand assignments are untouched — the staff/track label and the ` +
+        `source part grouping disagree, so the silence is not proven.`,
+      system: layout.index,
+      measure: measureOfTick(withheld.tick, t),
+      noteIds: withheld.soundingNoteIds,
+      metrics: {
+        tick: withheld.tick,
+        durationTicks: withheld.durationTicks,
+        soundingNotes: withheld.soundingNoteIds.length,
+      },
+    });
+  }
+  for (const rest of layout.rests) {
+    // Only a score with silence provenance can classify a rest at all; without
+    // it every rest is the engine's own reading and says nothing new.
+    if (rest.authored === undefined || rest.authored === true) continue;
+    out.push({
+      code: 'rest-inferred',
+      severity: 'info',
+      message:
+        `The ${rest.hand} ${rest.value} rest at tick ${rest.tick} (${rest.durationTicks} ticks) ` +
+        `is the engine's reading of a gap: no source-written rest of that hand covers its span` +
+        `${(layout.notes.some((p) => p.note.sourceProvenance) ? ' (checked against the committed source silences)' : '')}.`,
+      system: layout.index,
+      measure: measureOfTick(rest.tick, t),
+      x: rest.x,
+      y: rest.y,
+      metrics: { tick: rest.tick, durationTicks: rest.durationTicks },
+    });
   }
 }
 
@@ -5707,6 +5896,7 @@ export function lintJankoScore(
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
     checkRestClearance(layout, o, t, thresholds, diagnostics);
+    checkRestProvenance(layout, o, t, diagnostics);
     checkUnwrittenRests(layout, t, diagnostics);
     checkRestSeat(layout, o, t, diagnostics);
     checkUnisonDigits(score, layout, t, diagnostics);
@@ -5825,7 +6015,12 @@ export function formatLintReport(report: LintReport): string {
   const s = report.stats;
   lines.push(
     `Jánko visual lint: ${report.ok ? '✓ clean' : `✗ ${s.violations} violation(s)`}` +
-      `${s.warnings > 0 ? ` · ${s.warnings} warning(s)` : ''}`
+      `${s.warnings > 0 ? ` · ${s.warnings} warning(s)` : ''}` +
+      `${
+        report.diagnostics.length > s.violations + s.warnings
+          ? ` · ${report.diagnostics.length - s.violations - s.warnings} note(s)`
+          : ''
+      }`
   );
   lines.push(
     `  ${s.systems} systems · ${s.measures} measures · ${s.notes} noteheads · ${s.beams} beams · ` +
@@ -5833,7 +6028,8 @@ export function formatLintReport(report: LintReport): string {
   );
   for (const v of report.diagnostics) {
     const where = `system ${v.system + 1}${v.measure ? `, m. ${v.measure}` : ''}`;
-    lines.push(`  ${v.severity === 'error' ? '✗' : '⚠'} [${v.code}] ${where}: ${v.message}`);
+    const mark = v.severity === 'error' ? '✗' : v.severity === 'warning' ? '⚠' : '·';
+    lines.push(`  ${mark} [${v.code}] ${where}: ${v.message}`);
   }
   return lines.join('\n');
 }

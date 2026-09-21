@@ -405,28 +405,23 @@ const PAIR_GAP = 5.46;
 // 1. Registry: three cards on one shared family, 0.85 / 0.90 / 0.95
 // ---------------------------------------------------------------------------
 
-test('Round 47 registry: four real-engine long-value readings on one shared family', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 47, 'the open round');
-  assert.match(CURRENT_ROUND_METADATA.title, /half-ring flat face/i);
+test('Round 48 registry: two circle readings of one corrected shared family', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 48, 'the open round');
+  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['halfRingGap', 'exceptionCarrier', 'longDurationStyle'],
-    'the Round 47 axes (every other family key is locked context)'
+    ['detachedRingScale', 'detachedSymbolAir'],
+    'the Round 48 axes (every other family key is locked context)'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 4, 'the Round 47 quartet, no more');
+  assert.equal(CURRENT_CANDIDATES.length, 2, 'the Round 48 pair, no more');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    [
-      'round47-mounted-control',
-      'round47-half-ring-cutout',
-      'round47-detached-symbols',
-      'round47-detached-ovals',
-    ],
-    'both Round 45/46 95 % variants are parked on record; the live cards are the Round 47 readings'
+    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
+    'both Round 45/46/47 variants are parked on record; the live cards are the Round 48 readings'
   );
 
   // The parked Round 46 pair is pinned as this round's own historical fixtures
-  // (the live Round 47 registry is pinned above): the review surfaces it
+  // (the live registry is pinned above): the review surfaces it
   // shipped, and one coherent family differing in exactly the declared air.
   assert.deepEqual(
     ROUND_46_WINDOW_SPANS,
@@ -1666,10 +1661,10 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   // `test/janko-pdf.test.ts`; the export is Bach-only, so it carries no churn).
   const brahmsPages = [
     '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b',
-    'fdd1acad9b018b77259acf3f08a791deaa094108b8ce64cce340363afd9a163a',
-    '8a7a2a0bee8351927c6a6005f5b4840a4db3cafcf424c6986aaa97134633a6f2',
-    'a37be98646e7a09daa2becb01ab46fc3e290651954cb01b55329b5033dfef805',
-    '6db87101cbf85faead7834164d2e7dab8e0876ba855b6c58922f68804314e0c0',
+    '2a5611137a1cc0ba489c8da6fbc24c48d5c76e2131087506b1b117f8f400d063',
+    'f248763aabc00a94c903f73b063d7c75aa4edc68f49a230e84235cbfecbb843c',
+    '3d50b6312d752dac4c27d7f33bb1c20737f78b5b47b16c673fd7b5e324b951ce',
+    '4e459d38b42593051093e192ba8efd330d6500aa6ee8bb892931b7f6e91ebc97',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
@@ -1680,7 +1675,7 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
-    '43f95a224a860e46eb4f554f921ff6a34bb8099ac83db6af27adf2047b04ad8f',
+    '1c6600e0d3cfaee9098b35ea654feeab68915a443111a11d0792e09664313ab3',
     'the whole-score crop is the adopted Round 46 engraving'
   );
 });
@@ -1689,28 +1684,23 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
 // 9. The served studio: labels, inventory and phone-session continuity
 // ---------------------------------------------------------------------------
 
-test('The served studio carries the four labelled cards and the honest inventory for both views', () => {
+test('The served studio carries the two labelled cards and the honest inventory for both views', () => {
   const candidates = candidatesView();
-  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 4, 'four candidate cards');
-  assert.match(candidates, /data-candidate-count="4"/);
-  assert.match(candidates, /data-window-count="24"/, 'six review surfaces per card');
+  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 2, 'two candidate cards');
+  assert.match(candidates, /data-candidate-count="2"/);
+  assert.match(candidates, /data-window-count="12"/, 'six review surfaces per card');
   assert.equal(
     (candidates.match(/<figure class="page-card"/g) ?? []).length,
     0,
-    'the Round 47 cards declare literal crops only — no page cards'
+    'the Round 48 cards declare literal crops only — no page cards'
   );
-  for (const label of [
-    'Mounted control',
-    'Cutout',
-    'Detached ratio symbols',
-    'Detached open ovals',
-  ]) {
+  for (const label of ['Circle 0.90', 'Circle 0.88']) {
     assert.ok(candidates.includes(label), `the served grid labels the ${label} card`);
   }
   // The honest chip inventory: the canonical Brahms is 0/0 for every card, and
-  // the round publishes no withheld carrier or refused seat (the ownership
-  // check reports nothing orphaned).
-  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 4, 'every card is free of hard errors');
+  // the round publishes no withheld carrier, refused seat or withheld rest as a
+  // warning (the rest facts are `'info'` notes, visible in the Reference record).
+  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 2, 'every card is free of hard errors');
   assert.equal((candidates.match(/⚠ 1 warning/g) ?? []).length, 0, 'no card publishes a withheld seat');
   assert.equal((candidates.match(/⚠ 7 warnings/g) ?? []).length, 0, 'the former six-composite inventory is gone');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(candidates), 'no screenshots, no raster review artifacts');
@@ -1718,6 +1708,11 @@ test('The served studio carries the four labelled cards and the honest inventory
 
   const reference = referenceView();
   assert.match(reference, /0 violations, 0 warnings/, 'the BRONZE Brahms Reference reports its clean record');
+  assert.match(
+    reference,
+    /rest-inference-withheld/,
+    'and lists the published withheld-rest facts of this score'
+  );
   assert.equal((reference.match(/data-page="/g) ?? []).length, 7, 'two Bach pages + five Brahms pages');
   // Phone continuity (§F) is studio-wide and lives in the shared session
   // module: both views are served by the same document, and the behavioural

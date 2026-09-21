@@ -1478,6 +1478,15 @@ export interface JankoRestGeometry {
   value: JankoRestValue;
   /** Active dialect. */
   style: JankoRestStyle;
+  /**
+   * Round 48: true when a **source-written rest** of the same hand covers this
+   * span exactly — the silence is authored, not merely inferred from a gap in
+   * the imported notes. `false` (or absent on a score without silences
+   * provenance) means the value is the engine's own reading of a gap.
+   */
+  authored?: boolean;
+  /** Round 48: the authored source rest's own origin (`file:line`). */
+  sourceOrigin?: string;
 }
 
 /**

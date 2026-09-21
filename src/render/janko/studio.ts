@@ -896,19 +896,29 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
 }
 
 function renderDiagnostics(report: LintReport, knownCode?: string): string {
-  if (report.diagnostics.length === 0) {
-    return '<li class="diag-ok">✓ zero violations, zero warnings — the golden master is clean.</li>';
+  // Round 48: the `'info'` entries are **published facts**, not defects. A
+  // surface with no violation and no warning keeps its clean line and lists the
+  // facts beside it, so "clean" and "nothing to read" stay different statements.
+  const gating = report.diagnostics.filter((d) => d.severity !== 'info');
+  const lines: string[] = [];
+  if (gating.length === 0) {
+    lines.push(
+      '<li class="diag-ok">✓ zero violations, zero warnings — the golden master is clean.</li>'
+    );
   }
-  return report.diagnostics
-    .map((d) => {
+  if (report.diagnostics.length === 0) return lines.join('');
+  lines.push(
+    ...report.diagnostics
+      .map((d) => {
       const where = `system ${d.system + 1}${d.measure ? `, m. ${d.measure}` : ''}`;
-      const known =
-        knownCode !== undefined && d.code === knownCode
-          ? ' <span class="known-finding">known folding-geometry finding · scheduled for a future round</span>'
-          : '';
-      return `<li class="diag-${d.severity}"><b>${escapeHtml(d.code)}</b> · ${escapeHtml(where)} — ${escapeHtml(d.message)}${known}</li>`;
-    })
-    .join('');
+        const known =
+          knownCode !== undefined && d.code === knownCode
+            ? ' <span class="known-finding">known folding-geometry finding · scheduled for a future round</span>'
+            : '';
+        return `<li class="diag-${d.severity}"><b>${escapeHtml(d.code)}</b> · ${escapeHtml(where)} — ${escapeHtml(d.message)}${known}</li>`;
+      })
+  );
+  return lines.join('');
 }
 
 // ---------------------------------------------------------------------------

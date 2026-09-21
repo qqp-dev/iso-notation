@@ -732,7 +732,12 @@ test('The hold audit is registered and reports the required windows exactly', ()
       ],
       `${id}: mm. 9–10 state the boundary crossings, the 2.03pt seat and the m. 10 seat`
     );
-    const m22 = report.diagnostics.filter((d) => d.measure === 22);
+    // Round 48 adds published `'info'` rest-provenance facts; this assertion is
+    // about **hold** findings, so it reads the gating severities (and the same
+    // filter proves no hold finding hides among the info notes).
+    const m22 = report.diagnostics.filter(
+      (d) => d.measure === 22 && d.severity !== 'info'
+    );
     assert.deepEqual(m22, [], `${id}: m. 22's rule-row release lands exactly on its anchor`);
   }
 });
