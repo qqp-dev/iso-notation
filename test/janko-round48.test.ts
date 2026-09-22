@@ -44,7 +44,7 @@ import {
   BRAHMS_VOICE_HAND,
   normalizeSourceSilences,
 } from '../src/scores/brahms-source-fidelity';
-import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA } from '../src/render/janko/candidates';
+import { getCandidate, ROUND_48_CANDIDATES, ROUND_48_METADATA } from '../src/render/janko/candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -65,7 +65,7 @@ import {
   renderDetachedSymbol,
 } from '../src/render/janko/elements/rhythm';
 import { restInkBox } from '../src/render/janko/elements/rests';
-import { tieArcEntersBoxes, tieTracedGeometry } from '../src/render/janko/ties';
+import { tieArcEntersBoxes, tieTracedDepth, tieTracedGeometry, tieTracedIndent } from '../src/render/janko/ties';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const BRAHMS = buildBrahmsOp118No1Score();
@@ -77,7 +77,9 @@ function cardRun(id: string): {
   tokens: ReturnType<typeof resolveJankoTokens>;
   layouts: JankoSystemLayout[];
 } {
-  const candidate = CURRENT_CANDIDATES.find((c) => c.id === id);
+  // Round 48 is parked: its cards are read from the parked registry, so the
+  // round's own contract keeps running against the current engine.
+  const candidate = getCandidate(id);
   assert.ok(candidate, `card ${id} is registered`);
   const options = resolveJankoOptions({
     ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
@@ -171,20 +173,28 @@ test('A. Every sounding note carries its source voice and the source hand mappin
   assert.deepEqual(e2.sourceProvenance?.hands, ['LH', 'RH'], 'both hands state the m. 61 E2');
 });
 
-test('A. The engine withholds exactly the two false hand-rests and keeps the authored one', () => {
+test('A. The engine withholds the m66 false hand-rest and paints the truthful m70 one', () => {
   const layouts = layoutJankoScore(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS);
   const rests = layouts.flatMap((l) => l.rests);
   const withheld = layouts.flatMap((l) => l.withheldRests);
-  assert.equal(rests.length, 22, 'the score states 22 silences (24 before the correction)');
+  // Round 49 §4 (corrected): the m70 editorial authority *resolves* the run's
+  // hand — 953/954 are editorially RH even though the raw source label keeps
+  // them LH — so the displayed LH silence at 13392–13440 is truthful whole-
+  // hand silence and the quarter rest is *painted* (derived from full
+  // occupancy, never invented: the gap is a standard 48-tick value). No LH
+  // rest at 13440 while the editorial LH bass 955 sounds. The m. 66 case
+  // keeps the conservative veto: no authority there, so the source's own LH
+  // part still sounds through 12528–12552 and the eighth rest stays withheld.
   assert.equal(rests.filter((r) => r.hand === 'LH' && r.tick === 12528).length, 0, 'no m. 66 LH eighth rest');
-  assert.equal(rests.filter((r) => r.hand === 'LH' && r.tick === 13440).length, 0, 'no m. 70 LH quarter rest');
+  const m70 = rests.filter((r) => r.hand === 'LH' && r.tick === 13392);
+  assert.equal(m70.length, 1, 'the m. 70 LH quarter rest is painted at the editorial gap');
+  assert.equal(m70[0]!.value, 'quarter');
+  assert.equal(m70[0]!.authored, false, 'unauthored: the source writes no rest there — it is the inference');
+  assert.equal(rests.filter((r) => r.hand === 'LH' && r.tick === 13440).length, 0, 'no LH rest at 13440 while the LH bass 955 sounds');
   assert.deepEqual(
     withheld.map((w) => [w.tick, w.durationTicks, w.hand, w.value, w.reason]),
-    [
-      [12528, 24, 'LH', 'eighth', 'source-hand-sounding'],
-      [13440, 48, 'LH', 'quarter', 'source-hand-sounding'],
-    ],
-    'the two withheld inferred rests, published with their reason'
+    [[12528, 24, 'LH', 'eighth', 'source-hand-sounding']],
+    'the one remaining withheld inferred rest, published with its reason'
   );
   for (const entry of withheld) {
     assert.ok(entry.soundingNoteIds.length > 0, 'the sounding ink is named');
@@ -196,11 +206,16 @@ test('A. The engine withholds exactly the two false hand-rests and keeps the aut
   assert.equal(kept.value, 'quarter');
   assert.equal(kept.authored, true, 'classified as authored: the source writes this rest');
   assert.match(kept.sourceOrigin ?? '', /intermezzo-op118-no1-parts\.ily:99$/);
-  // The general invariant: no painted rest overlaps any ink of the source hand
-  // it claims to silence — checked over the whole score, not just the witnesses.
+  // The general invariant: no painted rest overlaps any ink of the hand it
+  // claims to silence, read through the **authoritative occupancy** — raw
+  // source hands where no editorial authority exists, the resolved hand where
+  // it does (the same rule the rest layer applies).
   const sourceSpans = new Map<string, Array<{ start: number; end: number }>>();
   for (const note of BRAHMS.notes) {
-    for (const hand of note.sourceProvenance?.hands ?? []) {
+    const authoritative = note.editorialHand
+      ? [note.editorialHand.hand]
+      : (note.sourceProvenance?.hands ?? []);
+    for (const hand of authoritative) {
       const list = sourceSpans.get(hand) ?? [];
       list.push({ start: note.startTick, end: note.startTick + note.durationTicks });
       sourceSpans.set(hand, list);
@@ -225,8 +240,8 @@ test('A. The classification is published as info: visible, never gating', () => 
   const info = report.diagnostics.filter((d) => d.severity === 'info');
   assert.deepEqual(
     info.reduce<Record<string, number>>((acc, d) => ({ ...acc, [d.code]: (acc[d.code] ?? 0) + 1 }), {}),
-    { 'rest-inference-withheld': 2, 'rest-inferred': 4 },
-    'two withheld facts and four inferred rests, published'
+    { 'rest-inference-withheld': 1, 'rest-inferred': 5 },
+    'one withheld fact (m. 66, conservative) and five inferred rests (incl. the truthful m. 70 quarter), published'
   );
   for (const entry of info) {
     assert.equal(entry.severity, 'info', `${entry.code}: never a violation, never a warning`);
@@ -314,16 +329,25 @@ test('C. Every detached long-value symbol takes the right seat, on its own pitch
   for (const id of [CARD_A, CARD_B]) {
     const run = cardRun(id);
     const symbols = run.layouts.flatMap((l) => l.detachedSymbols);
-    assert.equal(symbols.length, 16, `${id}: the score's long-value exceptions`);
+    // Round 49 §1 renders every authenticated chain, so the standalone
+    // components state their own values here too: 16 → 27 seated statements.
+    assert.equal(symbols.length, 27, `${id}: the score's long-value exceptions`);
     assert.deepEqual(
       [...new Set(symbols.map((s) => s.seat))],
       ['right'],
-      `${id}: one consistent seat — no left, above, below or channel fallback`
+      `${id}: one consistent seat — no left, below or channel fallback`
     );
-    assert.equal(
-      run.layouts.flatMap((l) => l.detachedSeatRefusals).length,
-      0,
-      `${id}: no refused seat`
+    // Round 49 §1 adds the m. 68 half-rings whose right seats a drawn staff
+    // rule refuses; this parked right-seat card publishes the refusal (the
+    // member keeps its ordinary duration ink), and the live Round 49 cards
+    // seat those values above the numeral instead.
+    assert.deepEqual(
+      run.layouts
+        .flatMap((l) => l.detachedSeatRefusals)
+        .map((r) => r.noteId)
+        .sort(),
+      ['brahms-op118-no1-918~c1', 'brahms-op118-no1-920~c1'],
+      `${id}: exactly the two published m. 68 right-seat refusals`
     );
     for (const symbol of symbols) {
       assert.equal(symbol.y, symbol.partnerId ? symbol.y : symbol.y, 'the symbol has a resolved y');
@@ -435,7 +459,9 @@ test('C. The two cards differ only in the declared circle size and air', () => {
     );
   const aBoxes = boxesOf(a);
   const bBoxes = boxesOf(b);
-  assert.equal(aBoxes.length, 16);
+  // Round 49 §1: the standalone chain components state their own values here
+  // too, so the seated statements number 27 (was 16).
+  assert.equal(aBoxes.length, 27);
   for (let i = 0; i < aBoxes.length; i++) {
     const [id, aw, ah] = aBoxes[i];
     const [, bw, bh] = bBoxes[i];
@@ -517,14 +543,16 @@ test('C. Detached ink never covers a head, bracket, rest, sibling or tie arc', (
 // D. Duration inheritance and the untouched source
 // ---------------------------------------------------------------------------
 
-test('D. m. 33 and the m. 61–63 chain: the arc states the hold, the source is untouched', () => {
+test('D. m. 33 and the m. 61–63 chain: the scoped omission and the untouched source', () => {
   const run = cardRun(CARD_A);
   const suppressions = run.layouts.flatMap((l) => l.tieOriginSuppressions);
   const byId = new Map(suppressions.map((s) => [s.noteId, s]));
-  // The m. 33 D6 member (96 ticks, outgoing tie): its own long mark is omitted.
+  // The m. 33 D6 member (96 ticks, outgoing tie, an admitted cluster member):
+  // its own long mark is omitted under the scoped rule.
   assert.ok(byId.has('brahms-op118-no1-448'), 'the m. 33 D6 member omits its individual mark');
   assert.match(byId.get('brahms-op118-no1-448')!.reason, /arc states the hold/);
-  // The m. 61–63 chain: three non-terminal long components omitted, terminal kept.
+  // Round 49 §2 scopes the omission to clusters: the standalone E2 chain keeps
+  // every non-terminal component's own mark (27 seated statements state them).
   const chain = run.layouts
     .flatMap((l) => l.tieArcs ?? [])
     .filter((a) => a.noteId === 'brahms-op118-no1-858');
@@ -534,7 +562,7 @@ test('D. m. 33 and the m. 61–63 chain: the arc states the hold, the source is 
     'brahms-op118-no1-858~c1',
     'brahms-op118-no1-858~c2',
   ].filter((id) => byId.has(id));
-  assert.equal(chainSuppressions.length, 3, 'all three non-terminal components omit their mark');
+  assert.equal(chainSuppressions.length, 0, 'the standalone chain states its own components');
   // Nothing about the source is touched: pitches, onsets, sounding totals and
   // the committed tie chains are the same in every mode.
   const referenceChains = new Map((BRAHMS.tieChains ?? []).map((c) => [c.noteId, c]));
@@ -545,7 +573,7 @@ test('D. m. 33 and the m. 61–63 chain: the arc states the hold, the source is 
     [192, 192, 96, 24],
     'the written components are the source components, unchanged'
   );
-  for (const candidate of CURRENT_CANDIDATES) {
+  for (const candidate of ROUND_48_CANDIDATES) {
     const modes = layoutJankoScore(
       BRAHMS,
       resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(candidate.options ?? {}) }),
@@ -577,7 +605,7 @@ test('D. m. 33 and the m. 61–63 chain: the arc states the hold, the source is 
 });
 
 test('D. The caption states the operator\u2019s rule, not the rejected explanation', () => {
-  const description = CURRENT_ROUND_METADATA.description;
+  const description = ROUND_48_METADATA.description;
   assert.match(description, /omit-outgoing/, 'the inheritance rule is named');
   assert.match(description, /arc plus its continuation|arc states|continuation/, 'with its actual mechanism');
   assert.doesNotMatch(
@@ -594,7 +622,8 @@ test('D. The caption states the operator\u2019s rule, not the rejected explanati
 test('E. The traced contour is the measured two-cubic profile with pointed tips', () => {
   const run = cardRun(CARD_A);
   const arcs = run.layouts.flatMap((l) => l.tieArcs ?? []);
-  assert.equal(arcs.length, 19, 'the score states nineteen arcs');
+  // Round 49 §1 renders every authenticated chain: 19 → 35 arcs.
+  assert.equal(arcs.length, 35, 'the score states thirty-five arcs');
   for (const arc of arcs) {
     assert.equal(arc.profile, 'traced', 'the card paints the traced profile');
     assert.equal(arc.thickness, run.tokens.tieApexThickness, 'at the traced apex thickness');
@@ -607,9 +636,10 @@ test('E. The traced contour is the measured two-cubic profile with pointed tips'
     assert.equal(mx, Number(arc.x1.toFixed(2)), 'the contour opens on the from-head axis');
     assert.equal(my, Number(arc.y.toFixed(2)), 'at the endpooint axis y');
   }
-  // The contour's thickness tapers from the apex to both tips.
+  // The contour's thickness tapers from the apex to both tips, and the
+  // control indent is the height law's (Round 49 §6), not a fixed fraction.
   const arc = arcs.find((a) => a.noteId === 'brahms-op118-no1-858')!;
-  const geometry = tieTracedGeometry(arc.x1, arc.y, arc.x2, arc.side, arc.depth, arc.thickness, run.tokens.tieControlFraction);
+  const geometry = tieTracedGeometry(arc.x1, arc.y, arc.x2, arc.side, arc.depth, arc.thickness, tieTracedIndent(Math.abs(arc.x2 - arc.x1), run.tokens));
   assert.ok(
     arc.side * (geometry.outerControlY - arc.y) > 0,
     'the outer control point pushes the ink to the chosen side'
@@ -624,13 +654,15 @@ test('E. The traced contour is the measured two-cubic profile with pointed tips'
     Number(arc.depth.toFixed(4)),
     'and the ink apex is exactly the resolved depth'
   );
-  // The paint: filled contour, no stroke, no round caps anywhere in the family.
+  // The paint: filled contour PLUS the round edging stroke (Round 49 §6) —
+  // the reference stencil's softened tips, round joins and caps.
   const system15 = run.layouts[15];
   const svg = renderSystem(BRAHMS, system15.geometry, 15, run.options, run.tokens, system15);
   const tiePath = svg.slice(svg.indexOf('janko-tie-layer'), svg.indexOf('janko-exception-layer'));
   assert.ok(tiePath.includes('janko-tie-traced'), 'the traced class is painted');
-  assert.ok(tiePath.includes('fill="#111111" stroke="none"'), 'as a filled contour');
-  assert.ok(!tiePath.includes('stroke-linecap'), 'with no blunt cap geometry');
+  assert.ok(tiePath.includes('fill="#111111" stroke="#111111"'), 'as a filled contour with its edge');
+  assert.ok(tiePath.includes('stroke-linejoin="round" stroke-linecap="round"'), 'edged with round joins and caps');
+  assert.ok(tiePath.includes(`stroke-width="${run.tokens.tieEdgeStroke.toFixed(2)}"`), 'at the declared edge stroke');
 });
 
 test('E. Measured routing: m. 33 above, mm. 61–63 below, no stem or bracket crossing', () => {
@@ -676,6 +708,12 @@ test('E. Measured routing: m. 33 above, mm. 61–63 below, no stem or bracket cr
   }
 });
 
+/** The resolved token set of card A, for the span-law assertions. */
+function runTokensOfCardA() {
+  const candidate = getCandidate(CARD_A)!;
+  return resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...(candidate.tokens ?? {}) });
+}
+
 test('E. The Reference keeps its uniform contour but receives the measured routing', () => {
   const reference = layoutJankoScore(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS);
   const referenceArcs = reference.flatMap((l) => l.tieArcs ?? []);
@@ -686,17 +724,36 @@ test('E. The Reference keeps its uniform contour but receives the measured routi
     assert.equal(arc.thickness, REFERENCE_TOKENS.tieStroke, 'at its uniform stroke width');
     assert.match(arc.path, /^M [\d.]+ [\d.]+ Q /, 'a single quadratic, stroked');
   }
-  // Routing is shared: the same chords, sides and depths on both surfaces.
+  // Routing is shared: the same chords, endpoints and sides on both surfaces.
+  // The depth is profile-specific since Round 49 §6 (the traced card reads the
+  // reference height law, the Reference the fixed-fraction clamp), and a
+  // profile's own depth can move a *walked* axis by a step — the m. 66 stack's
+  // below-side walk — so the axis itself is compared per side verdict, not
+  // byte-for-byte across profiles.
   assert.deepEqual(
-    referenceArcs.map((a) => [a.noteId, a.index, a.x1, a.x2, a.y, a.side, a.depth]),
-    cardArcs.map((a) => [a.noteId, a.index, a.x1, a.x2, a.y, a.side, a.depth]),
+    referenceArcs.map((a) => [a.noteId, a.index, a.x1, a.x2, a.side]),
+    cardArcs.map((a) => [a.noteId, a.index, a.x1, a.x2, a.side]),
     'one routing, two contours'
   );
-  // The Reference does receive the rest-provenance correction (shared engine).
+  for (const arc of cardArcs) {
+    const law = tieTracedDepth(arc.x2 - arc.x1, runTokensOfCardA());
+    // The depth is the span law's, bounded below by the shallow last resort
+    // (`tieMinDepth`) and clamped only where a drawn staff rule would fuse
+    // with the crown (the documented rule-clearance clamp, not a second law).
+    assert.ok(
+      (Math.abs(arc.depth - law) < 1e-9 ||
+        (arc.depth <= law + 1e-9 && arc.depth >= runTokensOfCardA().tieMinDepth - 1e-9)),
+      `${arc.noteId}: the traced depth is the reference span law's, rule-clamped or shallow-rescued`
+    );
+  }
+  // The Reference does receive the rest-provenance correction (shared
+  // engine) — and the §4 editorial authority: the m. 70 LH quarter is now
+  // truthfully painted (the resolved hand decides), so only the m. 66 case
+  // (no authority, conservative veto) stays withheld.
   assert.equal(
     reference.flatMap((l) => l.withheldRests).length,
-    2,
-    'the Reference withholds the same two false rests'
+    1,
+    'the Reference withholds the one remaining (m. 66) false rest'
   );
   assert.equal(reference.flatMap((l) => l.detachedSymbols).length, 0, 'and paints no detached symbol');
 });
@@ -710,7 +767,17 @@ test('F. Both cards lint clean and render every declared window', () => {
     const run = cardRun(id);
     const report = lintJankoScore(BRAHMS, run.options, run.tokens);
     assert.deepEqual(report.violations, [], `${id}: zero violations`);
-    assert.deepEqual(report.warnings, [], `${id}: zero warnings`);
+    // Round 49 §1 adds the m. 68 half-rings whose right seats a drawn staff
+    // rule refuses; the parked right-seat cards publish the refusal (the live
+    // Round 49 cards seat those values above the numeral instead).
+    assert.deepEqual(
+      report.warnings.map((w) => `${w.code}:${(w.noteIds ?? []).join(',')}`).sort(),
+      [
+        'symbol-seat-refused:brahms-op118-no1-918~c1',
+        'symbol-seat-refused:brahms-op118-no1-920~c1',
+      ],
+      `${id}: exactly the two published m. 68 right-seat refusals`
+    );
     assert.equal(
       report.diagnostics.filter((d) => d.severity === 'info').length,
       6,
@@ -720,7 +787,7 @@ test('F. Both cards lint clean and render every declared window', () => {
       const svg = renderSystem(BRAHMS, layout.geometry, layout.index, run.options, run.tokens, layout);
       assert.ok(svg.includes('janko-notes'), `${id}: system ${layout.index} renders`);
     }
-    const candidate = CURRENT_CANDIDATES.find((c) => c.id === id)!;
+    const candidate = getCandidate(id)!;
     assert.equal((candidate.windows ?? []).length, 6, `${id}: six declared windows`);
   }
 });

@@ -1141,10 +1141,16 @@ test('Round 8: B - 2 - 8 keeps its clasp, and B - 4 - 7 becomes a 3-note bracket
     // Round 46: a written tie continuation may join a 2-note column as a third
     // statement — m. 39's D3 continuation (544~c1) lands on the LH chord at
     // tick 7440 — and the gap-gated grammar then suppresses both interior
-    // heads exactly as it does for any 3-note column. Every other Option-3
-    // column stays a 2-note column, and no bracketed chord is ever
+    // heads exactly as it does for any 3-note column. Round 49 §1 renders every
+    // authenticated written chain, so more continuations land on 2-note
+    // columns (the m. 4 F3, the m. 14 E3, the m. 61–66 stack): the allowance
+    // reads the topology, not one measure — a two-suppression column qualifies
+    // exactly when its carrier is a written continuation head. Every other
+    // Option-3 column stays a 2-note column, and no bracketed chord is ever
     // double-encoded (asserted for m. 8 and m. 66 above).
-    const tieExtended = group.suppressedIds.length === 2 && group.carrier.startTick === 7440;
+    const tieExtended =
+      group.suppressedIds.length === 2 &&
+      (group.carrier.id.includes('~c') || group.suppressedIds.some((id) => id.includes('~c')));
     assert.ok(
       group.suppressedIds.length === 1 || tieExtended,
       `Option 3 handles 2-note columns only (saw ${group.suppressedIds.length} interior heads @${group.carrier.startTick})`
@@ -1613,22 +1619,31 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the spines, in
   // placement) are gone — the Round 46 chord-column repair that reads foreign
   // units at their **solved** columns (the same expression the pre-step
   // demands clearance from; reverting it restores the four findings) seats
-  // that column clear of the barline again. What remains at this retired
-  // packing is a single
-  // `stem-through-simultaneity` in the m. 66 written-tie window (the two
-  // continuation heads 905~c1 / 906~c1), and it is a packing interaction, not
-  // a rail artifact: the identical finding appears under `left-clasp-spire` at
-  // the same mps3 override. No active surface carries it: the canonical
-  // four-per packing is clean under this paradigm too, and the canonical
-  // per-hand surface is clean everywhere.
+  // that column clear of the barline again.
+  //
+  // Round 49 §1 renders every authenticated written chain, so the m. 66/68/70
+  // continuation stacks grow: the same accepted packing-interaction class
+  // (a fanned continuation's stem beside its same-onset neighbours on the
+  // adaptive surface where the bracket fit is refused) now publishes four
+  // findings in the m. 66 window, two in m. 68 and one in m. 70. No active
+  // surface carries them: the canonical four-per packing is clean under this
+  // paradigm too, and the canonical per-hand surface is clean everywhere.
   assert.deepEqual(
-    report.violations.map((v) => [v.code, v.system + 1]),
-    [['stem-through-simultaneity', 22]],
-    'the railed engraving publishes the one m. 66 tie-head packing finding, nothing else'
+    report.violations.map((v) => [v.code, v.system + 1]).sort(),
+    [
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 23],
+      ['stem-through-simultaneity', 23],
+      ['stem-through-simultaneity', 24],
+    ],
+    'the railed engraving publishes only the m. 66/68/70 tie-head packing findings'
   );
   assert.ok(
-    report.violations.every((v) => (v.measure ?? 66) === 66),
-    'it is in the m. 66 written-tie window'
+    report.violations.every((v) => (v.measure ?? 66) >= 66),
+    'they are in the m. 66/68/70 written-tie windows'
   );
   assert.equal(report.warnings.length, 0, 'the rail adds no warning');
   // The same override under the sibling retired paradigm: one shared packing
@@ -1644,9 +1659,17 @@ test('Beamed clasp rail: contiguous clasps of one measure join at the spines, in
     BRAHMS_T
   );
   assert.deepEqual(
-    sibling.violations.map((v) => [v.code, v.system + 1]),
-    [['stem-through-simultaneity', 22]],
-    'the sibling retired paradigm publishes the same single finding'
+    sibling.violations.map((v) => [v.code, v.system + 1]).sort(),
+    [
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 22],
+      ['stem-through-simultaneity', 23],
+      ['stem-through-simultaneity', 23],
+      ['stem-through-simultaneity', 24],
+    ],
+    'the sibling retired paradigm publishes the same packing findings'
   );
 });
 

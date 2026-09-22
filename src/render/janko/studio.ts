@@ -849,7 +849,7 @@ function renderReferenceScore(
     `      <span class="badge"><b>noteheadRadius</b> = ${tokens.noteheadRadius.toFixed(1)}pt</span>`,
     `      <span class="badge"><b>haloRadius</b> = ${tokens.haloRadius.toFixed(1)}pt</span>`,
     '    </div>',
-    `    <p class="round-meta" data-lint-ok="${report.ok}">Live linter: ${lintChip(report)} — ${report.stats.violations} violations, ${report.stats.warnings} warnings across ${report.stats.checks} checks in ${report.stats.durationMs} ms.${knowns > 0 ? ` <em class="known-note">${knowns} known folding-geometry finding${knowns === 1 ? '' : 's'}, scheduled for a future round.</em>` : ''}</p>`,
+    `    <p class="round-meta" data-lint-ok="${report.ok}">Live linter: ${lintChip(report)} — ${report.stats.violations} violations, ${report.stats.warnings} warnings across ${report.stats.checks} checks.${knowns > 0 ? ` <em class="known-note">${knowns} known folding-geometry finding${knowns === 1 ? '' : 's'}, scheduled for a future round.</em>` : ''}</p>`,
     '  </div>',
     '  <h3 class="section-title">Full page spread</h3>',
     `  <div class="page-grid">${pageCards.join('\n')}</div>`,

@@ -175,9 +175,10 @@ test('Brahms canonical lint record: fixed-3 zero hard errors and zero warnings o
   const studio = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(studio.violations.length, 0, 'canonical fixed-3: zero violations');
   assert.equal(studio.warnings.length, 0, 'canonical fixed-3: zero warnings');
-  // Round 48: the record is not *empty* any more — it carries exactly the two
-  // published rest-provenance facts of this score (the withheld inferred rests,
-  // and every painted rest the source does not write as a rest). They are
+  // Round 48: the record is not *empty* any more — it carries exactly the
+  // published rest-provenance facts of this score (the withheld inferred rest,
+  // and every painted rest the source does not write as a rest — now including
+  // the truthful m. 70 quarter the §4 editorial authority unblocks). They are
   // `'info'`: published for review, gating nothing.
   const provenanceRecord = studio.diagnostics.reduce<Record<string, number>>((acc, d) => {
     assert.equal(d.severity, 'info', `${d.code}: published as a fact, never a defect`);
@@ -186,7 +187,7 @@ test('Brahms canonical lint record: fixed-3 zero hard errors and zero warnings o
   }, {});
   assert.deepEqual(
     provenanceRecord,
-    { 'rest-inference-withheld': 2, 'rest-inferred': 4 },
+    { 'rest-inference-withheld': 1, 'rest-inferred': 5 },
     'the diagnostic record carries exactly the published rest provenance'
   );
   assert.deepEqual(
@@ -202,7 +203,7 @@ test('Brahms canonical lint record: fixed-3 zero hard errors and zero warnings o
   assert.match(
     brahms,
     /Diagnostics \(6\)/,
-    'the diagnostics list states the published record (two withheld, four inferred rests)'
+    'the diagnostics list states the published record (one withheld, five inferred rests)'
   );
   assert.ok(!brahms.includes('⚠'), 'no warning chip on a clean surface');
   assert.ok(
@@ -345,6 +346,13 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
     'midpointBracketRingScale',
     'midpointSpacingFactor',
     'opticalClearanceAir',
+    // Round 49 §5: the adopted 48B detached-circle baseline and the
+    // family-wide rightward air (the detached mount paints only under
+    // `exceptionCarrier: 'symbol'`, so the Reference's bytes read the family
+    // air alone).
+    'detachedRingScale',
+    'detachedSymbolAir',
+    'horizontalMountAir',
   ]);
   for (const key of Object.keys(goldenT) as Array<keyof typeof goldenT>) {
     if (allowedT.has(key as string)) continue;
@@ -368,6 +376,17 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
       opticalClearanceAir: 0.3,
     },
     'the adopted Round 46 readability ratios, the bracket enlargement and optical air'
+  );
+  // The Round 49 §5 adoption: the preferred 48B circle (0.88) with 0.80pt of
+  // seat air, and the same 0.80pt family-wide for the arm and short carriers.
+  assert.deepEqual(
+    {
+      detachedRingScale: brahmsT.detachedRingScale,
+      detachedSymbolAir: brahmsT.detachedSymbolAir,
+      horizontalMountAir: brahmsT.horizontalMountAir,
+    },
+    { detachedRingScale: 0.88, detachedSymbolAir: 0.8, horizontalMountAir: 0.8 },
+    'the adopted 48B baseline and family air'
   );
   assert.ok(
     Math.abs(

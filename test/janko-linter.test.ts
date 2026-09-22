@@ -1290,17 +1290,20 @@ test('Round 48 defect: a detached symbol off its right seat, inside a tie, or in
   assert.equal(seatHits.length, 1);
   assert.match(seatHits[0]!.message, /stands to the right/);
 
-  // 2. A symbol moved into a tie arc's own ink (its own chain excepted).
+  // 2. A symbol moved into a tie arc's own ink (its own chain excepted). The
+  // injected symbol is foreign by construction: it names a note the arc does
+  // not touch, so the moved-mark mutation is well-defined on any tie system.
   const tieLayout = clean.find((l) => (l.tieArcs ?? []).length > 0)!;
   const arc = (tieLayout.tieArcs ?? []).find(
     (a) => !tieLayout.detachedSymbols.some((s) => s.noteId === a.fromHeadId || s.noteId === a.toHeadId)
-  );
-  assert.ok(arc, 'a system carries a tie arc and a foreign detached symbol');
+  ) ?? (tieLayout.tieArcs ?? [])[0]!;
+  assert.ok(arc, 'a system carries a tie arc');
+  const movedSymbol = { ...symbol, noteId: `foreign-${symbol.noteId}` };
   const moved: JankoSystemLayout = {
     ...tieLayout,
     detachedSymbols: [
       {
-        ...tieLayout.detachedSymbols[0],
+        ...movedSymbol,
         x: (arc!.x1 + arc!.x2) / 2,
         // Centre the moved mark **in** the arc's ink band (the filled contour's
         // own extent), not on its endpoint axis.
@@ -2107,18 +2110,23 @@ const BRAHMS_PREVIEW = resolveJankoOptions({
 const BRAHMS_PREVIEW_TOKENS = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 
 test('dot-collision names a fused single second dot (sibling air)', () => {
-  const layouts = layoutJankoScore(BRAHMS_SCORE, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS);
-  // Source correction eliminated all 21s (ID 336 now a standard 24 eighth);
-  // the double-dotted audit now uses a legitimate 168 (ID 15, hidden-8th +
-  // dotted-half tie, lines 268+269) which resolves two dots under preview.
-  const sys = layouts.find((s) => s.notes.some((p) => p.note.id === 'brahms-op118-no1-15'))!;
-  const victim = sys.notes.find((p) => p.note.id === 'brahms-op118-no1-15')!;
+  // The double-dotted specimen is synthetic since Round 49 §1: the corpus's
+  // former 168 composite (ID 15) is now stated by its written components
+  // (24 + 144), so the audit's double-dot reading is pinned on a genuine
+  // 168-tick head under the complete grammar (168 = the double-dotted half).
+  const specimen = fixtureScore(
+    [{ id: 'dd', pitch: { pitchClass: 0, octave: 4 }, startTick: 48, durationTicks: 168, hand: 'RH' }],
+    2
+  );
+  const preview = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, durationGrammar: 'complete' });
+  const sys = layoutJankoScore(specimen, preview, DEFAULT_JANKO_TOKENS)[0];
+  const victim = sys.notes.find((p) => p.note.id === 'dd')!;
   assert.ok(victim.rhythm.dot2X !== undefined, 'the 168 resolves a second dot');
   // Fuse the pair: park the second dot exactly on the first.
   victim.rhythm.dot2X = victim.rhythm.dotX;
   victim.rhythm.dot2Y = victim.rhythm.dotY;
   const out: LintViolation[] = [];
-  checkDotCollision(sys, BRAHMS_PREVIEW, BRAHMS_PREVIEW_TOKENS, out);
+  checkDotCollision(sys, preview, DEFAULT_JANKO_TOKENS, out);
   assert.ok(
     out.some((v) => v.code === 'dot-collision' && v.message.includes('two augmentation dots')),
     'the fused pair is named'

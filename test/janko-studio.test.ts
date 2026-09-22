@@ -72,8 +72,8 @@ const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
 assert.equal(
   CURRENT_CANDIDATES.length,
-  2,
-  'Round 48 open: the two real-engine detached-circle readings of one corrected surface'
+  3,
+  'Round 49 open: the three real-engine readings of the completed written-tie surface'
 );
 
 /** The studio HTML-escapes labels and rationales before printing them. */
@@ -136,23 +136,23 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 48/);
-  assert.match(html, /traced tie/i);
+  assert.match(html, /Round 49/);
+  assert.match(html, /reference tie/i);
 });
 
-test('Round 48 open: two circle readings, two axes, twelve windows', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 48);
-  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
+test('Round 49 open: three readings, three axes, twenty-one windows', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 49);
+  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['detachedRingScale', 'detachedSymbolAir'],
-    'the detached circle size and its air from the owning head'
+    ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
+    'the above-numeral mount, the family air and the tie contour'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
-    'the two detached-circle readings on one corrected Brahms surface'
+    ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
+    'the above-numeral reading, the air bound and the contour control'
   );
   // The golden context the Reference view engraves, unchanged.
   const golden = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
@@ -184,20 +184,20 @@ test('Round 48 open: two circle readings, two axes, twelve windows', () => {
   );
 });
 
-test('The open studio renders both circle readings on their twelve declared windows', () => {
+test('The open studio renders the three readings on their twenty-one declared windows', () => {
   const html = renderCandidatesView(CONFIG);
 
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
   assert.equal(
     (html.match(/data-window="/g) ?? []).length,
-    12,
-    'six windows on each card (the common literal set, m. 10 and m. 70 included)'
+    21,
+    'seven windows on each card (the literal set: mm. 1–3, 7–10, 13, 33, 61–66, 68 and 70)'
   );
-  assert.match(html, /data-candidate-count="2"/);
-  assert.match(html, /data-window-count="12"/);
+  assert.match(html, /data-candidate-count="3"/);
+  assert.match(html, /data-window-count="21"/);
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 48/);
-  assert.match(html, /traced tie/i, 'the round title headlines the view');
+  assert.match(html, /Round 49/);
+  assert.match(html, /reference tie/i, 'the round title headlines the view');
   // The round's axes are badged where each card claims them; the shared
   // corrections (the traced tie, the detached mount, the inheritance rule, the
   // flat face, the 95 % scale and the written ties) ride as deltas too.
@@ -205,8 +205,7 @@ test('The open studio renders both circle readings on their twelve declared wind
     CURRENT_CANDIDATES.flatMap((c) => candidateBadges(c).map((b) => b.key))
   );
   for (const key of [
-    'detachedRingScale',
-    'detachedSymbolAir',
+    'standaloneLongMount',
     'tieProfile',
     'tieOriginIndicator',
     'exceptionCarrier',
@@ -216,7 +215,7 @@ test('The open studio renders both circle readings on their twelve declared wind
   ]) {
     assert.ok(badgeKeys.has(key), `the round badges ${key} on at least one card`);
   }
-  for (const id of ['round48-circle-090-air-060', 'round48-circle-088-air-080']) {
+  for (const id of ['round49-above-080', 'round49-air-100', 'round49-uniform-080']) {
     const card = html.slice(html.indexOf(`data-candidate="${id}"`));
     const body = card.slice(0, card.indexOf('</article>'));
     assert.ok(body.includes('<b>tieProfile</b>'), `${id}: the shared traced tie is badged`);
@@ -429,7 +428,11 @@ test('janko.html provides two-view navigation, zoom controls and the HMR entry',
   assert.match(html, /id="janko-zoom-reset"/);
   assert.match(html, /id="janko-zoom-label"/);
   assert.match(html, /id="janko-status"/);
-  assert.match(html, /<script type="module" src="\/src\/render\/janko\/studio\.ts"><\/script>/);
+  // Round 49 §7: the shell boots the thin prepared viewer over content-
+  // addressed artifacts; the in-browser engraving studio stays importable but
+  // is no longer the page's boot module.
+  assert.match(html, /<script type="module" src="\/src\/render\/janko\/prepared\/viewer\.ts"><\/script>/);
+  assert.ok(!/src="\.?\/src\/render\/janko\/studio\.ts"/.test(html), 'the shell must not boot the live in-browser engraving');
   assert.ok(!/\.png/.test(html), 'the studio no longer depends on pre-rendered PNGs');
   assert.ok(!/localhost/i.test(html), 'no localhost references (remote Tailscale access only)');
 });
@@ -550,15 +553,15 @@ test('renderStatusLine reports live lint statistics', () => {
 });
 
 test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 48);
-  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
+  assert.equal(CURRENT_ROUND_METADATA.round, 49);
+  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
   assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['detachedRingScale', 'detachedSymbolAir'],
+    ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
     'the round axes'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'two cards in the open round');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.

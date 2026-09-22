@@ -119,6 +119,7 @@ import {
   getStemAttachmentRadii,
   getStemAttachmentRadius,
   getStemGeometry,
+  JANKO_STEM_STROKE_WIDTH,
   getSubdivisionGlyphBBox,
   partitionBeamGroups,
   renderBeamGroup,
@@ -235,6 +236,7 @@ export type JankoLintCode =
   | 'symbol-seat-inconsistent'
   | 'symbol-tie-conflict'
   | 'symbol-symbol-conflict'
+  | 'symbol-stem-conflict'
   | 'symbol-rest-conflict'
   | 'contour-thread-vertex'
   | 'contour-thread-pen-lift'
@@ -3461,7 +3463,12 @@ export function checkDurationInkOwnership(
         metrics: { ruleY: rule.y, y0: box.y0, y1: box.y1 },
       });
     }
-    if (symbol.seat !== 'right') {
+    // Round 49 §2: the above-numeral mount is a legal seat when the options
+    // select it — the vocabulary is the same circle/half-circle run, mounted
+    // in the vertical band above the owning head's numeral. Any other seat
+    // (and `above` under the incumbent option) stays a placement regression.
+    const aboveMountLegal = o.standaloneLongMount === 'above' && symbol.seat === 'above';
+    if (symbol.seat !== 'right' && !aboveMountLegal) {
       out.push({
         code: 'symbol-seat-inconsistent',
         severity: 'error',
@@ -3474,6 +3481,89 @@ export function checkDurationInkOwnership(
         noteIds: [symbol.noteId],
         metrics: { seat: -1 },
       });
+    }
+    // Round 49 §2: an above-seated symbol never covers a painted stem or a
+    // beam strip — the same actual-ink predicate the seat walk measures.
+    if (symbol.seat === 'above') {
+      const stemBands: Array<{ id: string; x0: number; x1: number; y0: number; y1: number }> = [];
+      for (const beam of layout.beams) {
+        beam.stems.forEach((stem, index) => {
+          const owner = beam.notes[index];
+          stemBands.push({
+            id: owner?.id ?? '',
+            x0: stem.stemX - JANKO_STEM_STROKE_WIDTH / 2,
+            x1: stem.stemX + JANKO_STEM_STROKE_WIDTH / 2,
+            y0: Math.min(stem.stemStartY, stem.stemEndY),
+            y1: Math.max(stem.stemStartY, stem.stemEndY),
+          });
+        });
+      }
+      const beamedIds = new Set(layout.beams.flatMap((b) => b.notes.map((n) => n.id)));
+      const bracketMemberIds = new Set(
+        (layout.clasps ?? []).flatMap((c) => c.notes.map((n) => n.id))
+      );
+      for (const q of layout.notes) {
+        if (beamedIds.has(q.note.id) || bracketMemberIds.has(q.note.id)) continue;
+        const s = getStemGeometry(q.rhythm, t);
+        stemBands.push({
+          id: q.note.id,
+          x0: s.stemX - JANKO_STEM_STROKE_WIDTH / 2,
+          x1: s.stemX + JANKO_STEM_STROKE_WIDTH / 2,
+          y0: Math.min(s.stemStartY, s.stemEndY),
+          y1: Math.max(s.stemStartY, s.stemEndY),
+        });
+      }
+      for (const stem of stemBands) {
+        if (
+          stem.x1 <= box.x0 ||
+          stem.x0 >= box.x1 ||
+          stem.y1 <= box.y0 ||
+          stem.y0 >= box.y1
+        ) {
+          continue;
+        }
+        out.push({
+          code: 'symbol-stem-conflict',
+          severity: 'error',
+          message:
+            `The above-mounted ${symbol.base}-tick symbol of ${symbol.noteId} shares ink with ` +
+            `the stem of ${stem.id}: the vertical mount never covers a painted stem.`,
+          system: layout.index,
+          measure: measureOfTick(symbol.tick, t),
+          noteIds: [symbol.noteId, stem.id].filter((id) => id.length > 0),
+          metrics: { x: symbol.x, y: symbol.y },
+        });
+      }
+      for (const beam of layout.beams) {
+        for (const level of beam.levels) {
+          const connector = level.connector;
+          const beamBox = {
+            x0: Math.min(connector.x1, connector.x2),
+            x1: Math.max(connector.x1, connector.x2),
+            y0: Math.min(connector.y1, connector.y2) - beam.thickness / 2,
+            y1: Math.max(connector.y1, connector.y2) + beam.thickness / 2,
+          };
+          if (
+            beamBox.x1 <= box.x0 ||
+            beamBox.x0 >= box.x1 ||
+            beamBox.y1 <= box.y0 ||
+            beamBox.y0 >= box.y1
+          ) {
+            continue;
+          }
+          out.push({
+            code: 'symbol-stem-conflict',
+            severity: 'error',
+            message:
+              `The above-mounted ${symbol.base}-tick symbol of ${symbol.noteId} shares ink with ` +
+              `a beam strip: the vertical mount never covers a beam.`,
+            system: layout.index,
+            measure: measureOfTick(symbol.tick, t),
+            noteIds: [symbol.noteId],
+            metrics: { x: symbol.x, y: symbol.y },
+          });
+        }
+      }
     }
     for (const arc of layout.tieArcs ?? []) {
       if (!tieArcEntersBoxes(arc, [{ id: symbol.noteId, ...box }], t)) continue;
@@ -5721,11 +5811,21 @@ export function checkTieIntegrity(
   out: LintViolation[]
 ): void {
   for (const blocked of layout.tieBlockedArcs ?? []) {
+    // Round 49 §1: the diagnostic names the arc's own measure, so a published
+    // crossing is located where it happens and never reads as a measure-less
+    // finding.
+    const blockedArc = layout.tieArcs?.find(
+      (a) => a.noteId === blocked.noteId && a.index === blocked.component - 1
+    );
+    const blockedMeasure = blockedArc ? measureOfTick(blockedArc.fromTick, t) : undefined;
     out.push({
       code: 'tie-endpoint-clearance',
       severity: 'error',
       message: `Tie chain ${blocked.noteId} component ${blocked.component}: ${blocked.reason}`,
       system: layout.index,
+      ...(blockedMeasure !== undefined && Number.isFinite(blockedMeasure)
+        ? { measure: blockedMeasure }
+        : {}),
       noteIds: [blocked.noteId, blocked.headId].filter((id) => id.length > 0),
     });
   }
@@ -5742,10 +5842,14 @@ export function checkTieIntegrity(
   const arcs = layout.tieArcs ?? [];
   if (chains.length === 0 && arcs.length === 0) return;
   const byId = new Map(layout.notes.map((p) => [p.note.id, p]));
+  // Round 49 §1: component heads whose glyphs are laid out in the neighbouring
+  // system (the tie is split at the break) are not this system's missing ink.
+  const splitHeadIds = new Set(layout.tieSplitHeadIds ?? []);
   for (const chain of chains) {
     for (const component of chain.components) {
       const head = byId.get(component.headId);
       if (!head) {
+        if (splitHeadIds.has(component.headId)) continue;
         out.push({
           code: 'tie-missing-head',
           severity: 'error',

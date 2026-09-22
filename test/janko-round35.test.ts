@@ -418,7 +418,10 @@ test('Spatial Echo (Treatment A): renders origin enclosure, connector, echo mark
   const echoDigits = (echoCrop.match(/class="janko-digit"/g) ?? []).length;
   assert.equal(literalDigits, 113, 'literal renders 113 notehead digits in mm. 8-9 crop');
   assert.ok(echoDigits < literalDigits, 'spatial echo suppresses copy noteheads');
-  assert.equal(echoDigits, 109, 'spatial echo suppresses copy noteheads down to 109 digits');
+  // Round 49 §1: the newly rendered written continuation heads join the
+  // window, and one of them is independent (not a copy of an origin in the
+  // group), so the echo keeps 110 of the 113 literal digits (was 109).
+  assert.equal(echoDigits, 110, 'spatial echo suppresses copy noteheads down to 110 digits');
 
   // 4. Independent note B3 ('B') remains rendered with full notehead
   assert.match(echoCrop, />B<\/text>/, 'independent note B3 notehead retained');

@@ -577,17 +577,17 @@ test('Parked Round 44 registry: one anchored 45-degree design on the full score 
     'the parked round keeps its eleven windows'
   );
 
-  // Round 48 is the live round now: two real-engine circle-size/spacing readings
-  // of one fully corrected Brahms surface (rest provenance, the traced tie, its
-  // measured routing, the detached right seats and the accepted flat face). The
-  // full Round 48 contract is pinned in test/janko-round48.test.ts; the Round 47
-  // quartet is parked in candidates.ts as ROUND_47_CANDIDATES and pinned in
-  // test/janko-round47.test.ts. Here the history only has to point at it.
-  assert.equal(CURRENT_ROUND_METADATA.round, 48, 'the open round');
+  // Round 49 is the live round now: three real-engine readings of the
+  // completed written-tie surface (every authenticated chain, the scoped
+  // omission, the above-numeral mount, the family air and the reference tie
+  // contour). The full Round 49 contract is pinned in test/janko-round49.test.ts;
+  // the Round 48 pair and the Round 47 quartet are parked in candidates.ts and
+  // pinned in their own suites. Here the history only has to point at it.
+  assert.equal(CURRENT_ROUND_METADATA.round, 49, 'the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
-    'the two Round 48 circle readings (the Round 47 quartet is parked on record)'
+    ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
+    'the three Round 49 readings (the Round 48 pair and Round 47 quartet are parked on record)'
   );
   for (const card of CURRENT_CANDIDATES) {
     for (const [key, value] of Object.entries({
@@ -1597,16 +1597,17 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
     perPage.push(digits);
   }
   // Round 46 — the card rides the working Brahms entry (the adopted 95 %
-  // treatment with the committed written ties), so the studio's full-score
-  // window paints 970 digits: 964 source notes − 7 merged source heads (five
-  // cross-hand unisons + the two m. 66 attack/carry groups) + 13 written
-  // continuation heads. The `heads` count this test's own Round 44 reserve
-  // surface lays out (959) is the historical control, not the served page.
-  assert.deepEqual(perPage, [211, 234, 236, 223, 66], 'the engine page census');
+  // treatment with the committed written ties). Round 49 §1 renders every
+  // authenticated written chain, so the served spread paints 986 digits:
+  // 964 source notes − 7 merged source heads (five cross-hand unisons + the
+  // two m. 66 attack/carry groups) + 29 written continuation heads. The
+  // `heads` count this test's own Round 44 reserve surface lays out (959) is
+  // the historical control, not the served page.
+  assert.deepEqual(perPage, [215, 235, 237, 224, 75], 'the engine page census');
   assert.equal(
     perPage.reduce((sum, n) => sum + n, 0),
-    970,
-    'every painted head of the served Round 46 engraving has its digit across the five pages'
+    986,
+    'every painted head of the served Round 49 engraving has its digit across the five pages'
   );
   assert.equal(heads.length, 959, 'the Round 44 reserve control layout');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(html), 'no raster artifact anywhere in the served view');
@@ -1682,12 +1683,19 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
   // Reference bytes below were regenerated with it. The tie *contour* remains
   // candidate-scoped (`options.tieProfile`), so the Reference keeps its Round 46
   // uniform-stroke arcs.
+  // Round 49 §4 note: the m70 editorial hands regroup the m. 70 beams, and
+  // the corrected §4 *authority* lets the engine paint the truthful m. 70 LH
+  // quarter at 13392 (the raw source label no longer vetoes the inference),
+  // so page 4 is re-pinned here.
+  // Round 49: the §1 written chains, the §4 m70 hands + authority, the §6
+  // reference tie laws and the §5 family air re-pin the BRONZE spread's
+  // m. 70-bearing page (Bach GOLD above stays frozen byte-for-byte).
   const brahmsPages = [
-    '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b',
-    '2a5611137a1cc0ba489c8da6fbc24c48d5c76e2131087506b1b117f8f400d063',
-    'f248763aabc00a94c903f73b063d7c75aa4edc68f49a230e84235cbfecbb843c',
-    '3d50b6312d752dac4c27d7f33bb1c20737f78b5b47b16c673fd7b5e324b951ce',
-    '4e459d38b42593051093e192ba8efd330d6500aa6ee8bb892931b7f6e91ebc97',
+    '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90',
+    'a84166821d569d8c080b1ff98f97664d0f1d6132b7002026ea6cd66e32b85cfa',
+    '78b3fd134d5f3b4bf4269619759149a34aa9c8c95f540fcc72fe12f9495a2897',
+    '40c43f6aed8a4b4554d2e0c8c7c9d62a468dccb3766f2da15ba66d7f7fa984fd',
+    'd2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
@@ -1698,7 +1706,7 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)),
-    '1c6600e0d3cfaee9098b35ea654feeab68915a443111a11d0792e09664313ab3',
-    'the Brahms Reference 1–71 crop is the adopted Round 46 engraving'
+    'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be83570f2a9059',
+    'the Brahms Reference 1–71 crop carries the §4 m70 hands, authority and truthful rest'
   );
 });

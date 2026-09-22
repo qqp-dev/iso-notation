@@ -192,6 +192,10 @@ test('literal whole note: rightHandLower line 114 / ID 5 / tick 48 is 192, not 1
 });
 
 test('staccato eighths: line 327 / IDs 953+954 / ticks 13392+13416 are 24, not 18 or 12', () => {
+  // The written-duration provenance is keyed by the ORIGINAL MIDI-track
+  // hands (the overlay runs before any hand correction): both events are
+  // leftHandLower/LH there, even though the Round 49 §4 editorial hands now
+  // display 953/954 as RH.
   for (const [id, tick] of [
     ['brahms-op118-no1-953', 13392],
     ['brahms-op118-no1-954', 13416],
@@ -199,7 +203,8 @@ test('staccato eighths: line 327 / IDs 953+954 / ticks 13392+13416 are 24, not 1
     const n = SCORE.notes.find((x) => x.id === id)!;
     assert.equal(n.startTick, tick);
     assert.equal(n.durationTicks, 24);
-    const prov = provByKey.get(brahmsEventKey(n.pitch.pitchClass, n.pitch.octave, n.startTick, n.hand))!;
+    assert.equal(n.hand, 'RH', `${id}: Round 49 §4 editorial display hand is RH`);
+    const prov = provByKey.get(brahmsEventKey(n.pitch.pitchClass, n.pitch.octave, n.startTick, 'LH'))!;
     assert.equal(prov.segments[0].line, 327);
     assert.equal(prov.segments[0].duration, '1/8');
   }
@@ -865,9 +870,13 @@ test('performance shortening cannot masquerade as a notated rest (real rest comp
   );
   const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'adaptive' });
   const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  // Source-grounded passage: LH staccato eighths (line 327) at 13392+13416.
-  // Corrected 24-tick notes abut exactly (no gap); artificial 18-tick
-  // shortening opens a 6-tick gap that the real engine notates as a rest.
+  // Source-grounded passage: staccato eighths (line 327) at 13392+13416.
+  // Under the Round 49 §4 editorial hands these display RH, so the rest
+  // walk reads them as RH onsets: corrected 24-tick notes abut exactly
+  // (no gap). Artificial 18-tick shortening opens a 6-tick RH gap — but a
+  // 6-tick silence is not a standard rest value, so the engine leaves it
+  // unwritten (a non-silence, never a refusal) exactly as before; the
+  // assertion pins that the shortening invents no *notated* rest.
   const corrected = layoutJankoScore(SCORE, o, t);
   const correctedHits = corrected.flatMap((l) => l.rests).filter((r) => r.tick === 13410);
   assert.equal(correctedHits.length, 0, 'corrected durations leave no notated rest at tick 13410');
@@ -880,9 +889,18 @@ test('performance shortening cannot masquerade as a notated rest (real rest comp
     ),
   };
   const shortLayouts = layoutJankoScore(shortened, o, t);
-  const shortHits = shortLayouts.flatMap((l) => l.rests).filter((r) => r.tick === 13410 && r.hand === 'LH');
-  assert.equal(shortHits.length, 1, 'artificial shortening produces exactly one false LH rest');
-  assert.equal(shortHits[0].durationTicks, 6);
+  const shortHits = shortLayouts.flatMap((l) => l.rests).filter((r) => r.tick === 13410);
+  assert.equal(shortHits.length, 0, 'a 6-tick gap is not a standard rest value: no notated rest is invented');
+  // …and the displayed-LH gap at 13392 stays **truthfully painted** even in
+  // the shortened fixture: the §4 editorial authority resolves 953/954 to RH,
+  // so the raw source label cannot veto the inference (the very failure mode
+  // the correction removed), and no withheld entry is published for it.
+  const shortPainted = shortLayouts.flatMap((l) => l.rests).filter((r) => r.tick === 13392 && r.hand === 'LH');
+  assert.equal(shortPainted.length, 1, 'the editorial authority governs: the LH quarter stays painted');
+  const shortWithheld = shortLayouts
+    .flatMap((l) => l.withheldRests)
+    .filter((w) => w.tick === 13392 && w.hand === 'LH');
+  assert.equal(shortWithheld.length, 0, 'no withheld entry: the resolved hand, not the raw label, decides');
 });
 
 test('pinned manifest matches vendored bytes (no network, ordinary validation)', () => {

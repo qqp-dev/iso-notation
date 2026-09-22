@@ -85,9 +85,12 @@ const LAYOUTS = layoutJankoScore(BRAHMS, OPTIONS, TOKENS);
 
 const sha = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
 
-/** The committed Round 46 Brahms Reference (page 0 and the whole-score crop). */
-const REFERENCE_PAGE0 = '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b';
-const REFERENCE_CROP = '1c6600e0d3cfaee9098b35ea654feeab68915a443111a11d0792e09664313ab3';
+/** The committed Brahms Reference (page 0 and the whole-score crop).
+ * Round 49 §4 re-pins the crop: the m70 editorial hands regroup the m. 70
+ * beams, and the corrected §4 authority paints the truthful m. 70 LH quarter
+ * at 13392 (the resolved hand decides; the raw label no longer vetoes). */
+const REFERENCE_PAGE0 = '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90';
+const REFERENCE_CROP = 'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be83570f2a9059';
 
 /** One synthetic note (the round's controlled tie-topology fixtures). */
 function note(
@@ -207,39 +210,34 @@ test('A. Declaring the new defaults explicitly changes nothing at all', () => {
 // B. The outgoing-tie simplification
 // ---------------------------------------------------------------------------
 
-test('B. The m. 61–63 chain: three non-terminal long marks omitted, the terminal kept', () => {
+test('B. The scoped omission: cluster members omit, the standalone E2 chain states its own components', () => {
   const run = cardRun('round47-mounted-control');
   const layouts = run.layouts;
   const suppressions = layouts.flatMap((l) => l.tieOriginSuppressions);
   const byId = new Map(suppressions.map((s) => [s.noteId, s]));
-  // The four written components of the 504-tick E2 chain (192 · 192 · 96 · 24),
-  // stated by the attack head and the three added continuation heads.
+  // Round 49 §2 scopes the omission to admitted clusters: only the bracket
+  // members whose value the bracket does not carry (m. 24's 448, m. 43's 734)
+  // omit their redundant mark. The standalone E2 chain (192 · 192 · 96 · 24,
+  // no bracket around it) states every non-terminal component's own mark.
   assert.deepEqual(
     [...byId.keys()].sort(),
-    [
-      'brahms-op118-no1-448',
-      'brahms-op118-no1-734',
-      'brahms-op118-no1-858',
-      'brahms-op118-no1-858~c1',
-      'brahms-op118-no1-858~c2',
-    ].sort(),
-    'exactly the five origins the shared rule omits'
+    ['brahms-op118-no1-448', 'brahms-op118-no1-734'].sort(),
+    'exactly the two cluster-member origins the scoped rule omits'
   );
-  const c0 = byId.get('brahms-op118-no1-858')!;
-  assert.equal(c0.tick, 11568);
-  assert.equal(c0.durationTicks, 192);
-  assert.equal(c0.run, 'ring');
-  assert.equal(c0.component, 0);
-  assert.equal(c0.toHeadId, 'brahms-op118-no1-858~c1');
-  assert.equal(c0.toTick, 11760);
-  const c2 = byId.get('brahms-op118-no1-858~c2')!;
-  assert.equal(c2.tick, 11952);
-  assert.equal(c2.run, 'half-ring');
-  assert.equal(c2.toHeadId, 'brahms-op118-no1-858~c3');
-  assert.equal(c2.toTick, 12048);
+  // The standalone E2 components state their own values: the origin 192 and
+  // the two non-terminal continuations paint their long marks — on this card's
+  // horizontal carrier mount (the detached-symbol card pins the same facts as
+  // symbol seats in test/janko-round49.test.ts).
+  const standalone = layouts
+    .flatMap((l) => l.exceptionCarriers)
+    .filter((s) => s.noteId.startsWith('brahms-op118-no1-858'));
+  assert.deepEqual(
+    standalone.map((s) => [s.noteId.replace('brahms-op118-no1-', ''), s.durationTicks]).sort(),
+    [['858', 192], ['858~c1', 192], ['858~c2', 96]],
+    'the three long components of the standalone chain state themselves'
+  );
   // The terminal component is never omitted and never gains a long mark: its
   // own 24-tick statement is the chain's end.
-  assert.ok(!byId.has('brahms-op118-no1-858~c3'), 'the terminal component is not omitted');
   assert.ok(
     !layouts.flatMap((l) => l.exceptionCarriers).some((c) => c.noteId === 'brahms-op118-no1-858~c3'),
     'and it carries no long exception mark'
@@ -281,9 +279,10 @@ test('B. The omission never touches pitches, onsets, sounding totals, ties or co
 
 test('B. Crop and system boundaries: the rule reads source topology, never the window', () => {
   // A chain whose continuation head lands in another **system** of a synthetic
-  // score: the origin is still omitted (the source chain declares the tie), the
-  // arc is published as a cross-system shortfall and nothing is invented at the
-  // window end.
+  // score: Round 49 §1 **splits** the written tie at the break — each system
+  // draws its own half arc carrying the real component head ids — and the
+  // standalone origin keeps its own long mark (the omission is scoped to
+  // clusters; nothing is invented at the window end).
   // System 0 covers ticks 0..816 (pickup + four 192-tick measures); the
   // continuation head at tick 960 therefore lives in the **next** system.
   const notes = [note('origin', 0, 4, 0, 192), note('tail', 0, 4, 960, 192)];
@@ -299,27 +298,28 @@ test('B. Crop and system boundaries: the rule reads source topology, never the w
     },
   ]);
   const layouts = layoutJankoScore(score, FIXTURE_OPTIONS, FIXTURE_TOKENS);
-  const suppressions = layouts.flatMap((l) => l.tieOriginSuppressions);
+  // The standalone origin is not a cluster member: its own mark stays stated.
   assert.deepEqual(
-    suppressions.map((s) => [s.noteId, s.component, s.toTick]),
-    [['origin', 0, 960]],
-    'the origin is omitted from the chain itself, not from the rendered system'
+    layouts.flatMap((l) => l.tieOriginSuppressions).map((s) => s.noteId),
+    [],
+    'a standalone origin is never globally suppressed'
   );
-  const shortfalls = layouts.flatMap((l) => l.tieAnchorShortfalls);
-  assert.equal(shortfalls.length, 2, 'both systems publish the split arc, never hiding it');
+  // The written tie is split, not abandoned: one outgoing half in system 0 and
+  // one incoming half in system 1, both carrying the real head ids, and no
+  // shortfall is published for a tie that IS drawn.
+  const halves = layouts.flatMap((l) => l.tieArcs ?? []).filter((a) => a.noteId === 'origin');
+  assert.equal(halves.length, 2, 'both halves of the split tie are drawn');
   assert.ok(
-    shortfalls.every((s) => /spans a system break/.test(s!.reason)),
-    'each mentions the system break it refuses to fake across'
+    halves.every((a) => a.fromHeadId === 'origin' && a.toHeadId === 'tail'),
+    'each half names the real written component pair (the anchored continuation reuses the existing head)'
   );
-  assert.ok(
-    shortfalls.every((s) => s!.noteId === 'origin'),
-    'and names the source chain, not a synthetic window-end note'
-  );
-  // A **crop** of the first system renders the same omission: no window-end
-  // synthesis can resurrect the mark.
+  assert.deepEqual(layouts.flatMap((l) => l.tieAnchorShortfalls ?? []), [], 'no shortfall for a drawn split');
+  assert.deepEqual(layouts.flatMap((l) => l.tieSplitHeadIds ?? []).sort(), ['origin', 'tail'], 'both heads are published as split across the break');
+  // A **crop** of the first system renders the outgoing half and the origin's
+  // own long mark: no window-end synthesis can resurrect or erase either.
   const crop = renderJankoCrop(score, 1, 4, FIXTURE_OPTIONS, FIXTURE_TOKENS);
-  assert.ok(!crop.includes('janko-exception-carrier'), 'no long exception arm in the crop');
-  assert.ok(!crop.includes('janko-detached-symbol'), 'and no detached seat either');
+  assert.ok(crop.includes('janko-tie'), 'the outgoing half arc is painted in the crop');
+  assert.ok(!crop.includes('janko-detached-symbol'), 'the horizontal carrier keeps the long statement (no detached seat under the incumbent mount)');
 });
 
 test('B. An untied shared partner keeps its statement with correct surviving ownership', () => {
@@ -364,7 +364,7 @@ test('B. An untied shared partner keeps its statement with correct surviving own
   assert.equal(marks[0].mount, 'carrier', 'stated on the round\u2019s own mount');
 });
 
-test('B. A terminal long component keeps its exact mark', () => {
+test('B. A standalone chain states every component; a cluster member omits the redundant origin', () => {
   const notes = [note('head', 0, 4, 0, 192), note('tail', 0, 4, 192, 192)];
   const score = tiedScore(notes, [
     {
@@ -378,14 +378,20 @@ test('B. A terminal long component keeps its exact mark', () => {
     },
   ]);
   const layouts = layoutJankoScore(score, FIXTURE_OPTIONS, FIXTURE_TOKENS);
+  // Round 49 §2: neither component is a cluster member, so neither mark is
+  // omitted — the written chain states 192 · 192 component by component.
   assert.deepEqual(
     layouts.flatMap((l) => l.tieOriginSuppressions).map((s) => s.noteId),
-    ['head'],
-    'the attack is omitted, the terminal is not'
+    [],
+    'a standalone origin keeps its own mark'
   );
   const marks = layouts.flatMap((l) => l.durationInkOwners).filter((o) => o.run === 'ring');
-  assert.equal(marks.length, 1, 'the terminal component still states its own value');
-  assert.deepEqual(marks[0].ownerIds, ['tail'], 'and it is that head that owns the mark');
+  assert.equal(marks.length, 2, 'both components state their own value');
+  assert.deepEqual(
+    marks.map((m) => m.ownerIds[0]).sort(),
+    ['head', 'tail'],
+    'the attack and the terminal each own their mark'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -480,7 +486,11 @@ test('D. Card 3 detaches every long statement and leaves every arm free', () => 
   const run = cardRun('round47-detached-symbols');
   const symbols = run.layouts.flatMap((l) => l.detachedSymbols);
   const carriers = run.layouts.flatMap((l) => l.exceptionCarriers);
-  assert.equal(symbols.length, 16, '16 long statements are seated');
+  // Round 49 §1 renders every authenticated written chain, so the standalone
+  // chain components state their own long values here too: 16 → 27 seated
+  // statements (the m. 67 breve is gone — the source ties two wholes — and the
+  // m. 68/70 continuations joined).
+  assert.equal(symbols.length, 27, '27 long statements are seated');
   assert.equal(
     carriers.filter((c) => longMarkKindForBase(c.base, c.longStyle) !== null).length,
     0,
@@ -491,7 +501,15 @@ test('D. Card 3 detaches every long statement and leaves every arm free', () => 
     carriers.every((c) => longMarkKindForBase(c.base, c.longStyle) === null),
     'and every remaining carrier is a cut statement'
   );
-  assert.equal(run.layouts.flatMap((l) => l.detachedSeatRefusals).length, 0, 'none refused');
+  // Round 49 §1 adds the m. 68 half-rings whose right seats a drawn staff rule
+  // refuses; the above-numeral mount (Round 49 §2) is their seat on the live
+  // cards, and this parked right-seat card publishes the refusal honestly.
+  const refusals = run.layouts.flatMap((l) => l.detachedSeatRefusals);
+  assert.deepEqual(
+    refusals.map((r) => r.noteId).sort(),
+    ['brahms-op118-no1-918~c1', 'brahms-op118-no1-920~c1'],
+    'exactly the two m. 68 half-ring right-seat refusals, published'
+  );
   // Every seat hugs its owner: the "nearest legal seat" is published, never a
   // distant arm endpoint.
   for (const symbol of symbols) {
@@ -597,7 +615,15 @@ test('E. Card 4: three distinguishable shapes, no three-mark stack, both mounts 
   const svg = run.layouts.map((l) => renderSystem(BRAHMS, l.geometry, l.index, run.options, run.tokens, l)).join('\n');
   assert.ok(svg.includes('data-open-oval="oval-narrow"'), 'the 96 shape paints on the bracket spine');
   assert.ok(/janko-clasp-compact-ring"[^>]*data-open-oval="oval-broad"/.test(svg), 'and on the bracket for 192');
-  assert.ok(svg.includes('data-open-oval="oval-breve"'), 'the breve paints too');
+  // Round 49 §1: the source writes the former "breve" as two tied wholes
+  // (919: 192 + 192), so no 384 statement exists any more — the components
+  // state themselves and the flank strokes are gone with them.
+  assert.ok(!svg.includes('data-open-oval="oval-breve"'), 'no breve statement exists (the source ties two wholes)');
+  assert.equal(
+    (svg.match(/data-open-oval="oval-broad"/g) ?? []).length >= 2,
+    true,
+    'the tied whole components state their own broad ovals'
+  );
   assert.ok(svg.includes('janko-detached-mark" data-open-oval='), 'and the same shapes on the detached seats');
   assert.equal(
     (svg.match(/data-open-oval-flank=/g) ?? []).length,
@@ -658,11 +684,40 @@ test('E. Every card lints clean on the whole Brahms score and renders every decl
     const run = cardRun(candidate.id);
     const report = lintJankoScore(BRAHMS, run.options, run.tokens);
     assert.deepEqual(report.violations, [], `${candidate.id}: zero violations`);
-    assert.deepEqual(report.warnings, [], `${candidate.id}: zero warnings (nothing suppressed)`);
+    // Round 49 §1 adds the m. 68 half-ring continuations whose right seats a
+    // drawn staff rule refuses; on the parked right-seat cards (the detached
+    // vocabulary without the above-numeral mount) the refusal is published —
+    // the member keeps its ordinary duration ink, so nothing is hidden. The
+    // live Round 49 cards seat those values above the numeral instead.
+    if (candidate.id === 'round47-detached-symbols') {
+      assert.deepEqual(
+        report.warnings.map((w) => `${w.code}:${(w.noteIds ?? []).join(',')}`).sort(),
+        [
+          'symbol-seat-refused:brahms-op118-no1-918~c1',
+          'symbol-seat-refused:brahms-op118-no1-920~c1',
+        ],
+        `${candidate.id}: exactly the two published m. 68 right-seat refusals`
+      );
+    } else {
+      assert.deepEqual(report.warnings, [], `${candidate.id}: zero warnings (nothing suppressed)`);
+    }
+    // Round 49 §1: on the parked right-seat detached cards the two m. 68
+    // refusals are the published seat findings; every other surface reports
+    // nothing.
+    const seatFindings = report.diagnostics.filter((d) => d.code.startsWith('symbol-seat'));
+    if (candidate.id === 'round47-detached-symbols') {
+      assert.deepEqual(
+        seatFindings.map((d) => d.code),
+        ['symbol-seat-refused', 'symbol-seat-refused'],
+        `${candidate.id}: the seat findings are exactly the two published refusals`
+      );
+    } else {
+      assert.deepEqual(seatFindings, [], `${candidate.id}: the seat checks report nothing`);
+    }
     assert.deepEqual(
-      report.diagnostics.filter((d) => d.code.startsWith('duration-mark') || d.code.startsWith('symbol-seat')),
+      report.diagnostics.filter((d) => d.code.startsWith('duration-mark')),
       [],
-      `${candidate.id}: the ownership and seat checks report nothing`
+      `${candidate.id}: the ownership checks report nothing`
     );
     for (const [start, count] of windows) {
       const svg = renderJankoCrop(BRAHMS, start, count, run.options, run.tokens);

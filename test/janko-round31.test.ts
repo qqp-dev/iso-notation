@@ -278,8 +278,9 @@ test('The BRONZE block displays honestly: zero hard errors, the six composites i
   const { bach, brahms } = referenceBlocks();
   assert.match(brahms, /data-lint-ok="true"/, 'the BRONZE chip stays honestly clean');
   assert.match(brahms, /0 violations, 0 warnings/, 'the ok line prints both counts');
-  // Round 48: the list holds exactly the published rest-provenance facts (two
-  // withheld inferred rests, four inferred rests), all `'info'` — nothing is
+  // Round 48: the list holds exactly the published rest-provenance facts (one
+  // withheld inferred rest, five inferred rests — the truthful m. 70 quarter
+  // the §4 editorial authority unblocked), all `'info'` — nothing is
   // folded away and nothing gating appears.
   assert.match(brahms, /Diagnostics \(6\)/, 'the published provenance facts are listed in full');
   assert.ok(

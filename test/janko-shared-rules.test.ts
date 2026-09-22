@@ -652,20 +652,49 @@ test('§D rule: m.2 LH seats on the preceding lower E3 — never interpolated', 
   assert.equal(absMeasure(432), 3, 'the resume onset is out (m.3)');
 });
 
-test('§D rule: an exact tick tie prefers the preceding onset', () => {
-  // Rest 360 RH sits 24 ticks from each neighbour; the tie-break takes the
-  // release side (336), whose level differs from the resume side's — so the
-  // pin proves the choice, not just a plausible row.
+test('§D rule: an exact tick tie prefers the preceding onset — and a foreign-voice release side offers no query', () => {
+  // Rest 360 RH sits 24 ticks from each neighbour. Round 49 §1 renders the
+  // written chains, and the release onset's only displayed-RH head (note 22,
+  // C6) is a foreign-voice continuation (source LH): under the §3 editorial
+  // query that side offers NO query, so the exact tie never arises here — the
+  // seat falls through to the resume side's genuine RH level.
   assert.equal(360 - 336, 24, 'release distance');
   assert.equal(384 - 360, 24, 'resume distance: an exact tie');
   const { seatY, geoIndex } = restSeat(360, 'RH');
   const layouts = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   const geo = layouts[geoIndex].geometry;
-  const before = onsetLevel(336, 'RH');
   const after = onsetLevel(384, 'RH');
-  assert.ok(Math.abs(before - after) > 1, 'the two sides offer different levels');
-  assert.equal(seatY, nearestLatticeRow(before, geo, T_BRAHMS, O_BRAHMS), 'the seat follows the release side');
-  assert.ok(Math.abs(seatY - after) > 1, 'not the resume side');
+  assert.equal(seatY, nearestLatticeRow(after, geo, T_BRAHMS, O_BRAHMS), 'the seat follows the resume side (the release side is foreign-voice)');
+  // The tie-break preference itself, on a clean synthetic specimen: two
+  // genuine same-hand onsets exactly 96 ticks from a 96-tick (half) rest,
+  // different levels — the seat follows the release side.
+  const mk = (id: string, pc: number, oct: number, tick: number, dur: number): QuantizedNote => ({
+    id,
+    pitch: { pitchClass: pc, octave: oct },
+    startTick: tick,
+    durationTicks: dur,
+    hand: 'RH',
+  });
+  const fixture: QuantizedGridScore = {
+    id: 'synthetic-tie-break',
+    title: 'synthetic',
+    composer: 'synthetic',
+    ticksPerBeat: 48,
+    totalTicks: 5 * 192,
+    timeSignatures: [],
+    barlines: [],
+    tempos: [],
+    dynamics: [],
+    pedals: [],
+    notes: [mk('a', 0, 4, 48, 96), mk('b', 7, 5, 240, 48)],
+  };
+  const flayouts = layoutJankoScore(fixture, O_BRAHMS, T_BRAHMS);
+  const frest = flayouts.flatMap((l) => l.rests).find((r) => r.tick === 144 && r.hand === 'RH');
+  assert.ok(frest, 'the synthetic rest is written (the 96-tick gap is a half value)');
+  const fa = flayouts.flatMap((l) => l.notes).find((p) => p.note.id === 'a')!;
+  const fb = flayouts.flatMap((l) => l.notes).find((p) => p.note.id === 'b')!;
+  assert.ok(Math.abs(fa.y - fb.y) > 1, 'the two sides offer different levels');
+  assert.ok(Math.abs(frest.y - fa.y) < 1e-9, 'the exact tie seats on the release side');
 });
 
 test('§D rule: a blocked release row falls through to the in-measure resume level', () => {
