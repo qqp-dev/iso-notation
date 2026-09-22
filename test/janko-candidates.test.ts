@@ -65,6 +65,7 @@ import {
   getCandidate,
   ROUND_47_CANDIDATES,
   ROUND_48_SHARED_TOKENS,
+  ROUND_49_SHARED_TOKENS,
 } from '../src/render/janko/candidates';
 import { createStudioConfig, renderCandidatesView, renderCompareStrip } from '../src/render/janko/studio';
 import {
@@ -267,18 +268,18 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 48 (two declared detached-circle axes)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 48);
-  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
+test('CURRENT_ROUND_METADATA is the open Round 49 (three declared axes)', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 49);
+  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['detachedRingScale', 'detachedSymbolAir'],
-    'the detached closed circle size and its air from the owning head are the round axes'
+    ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
+    'the above-numeral mount, the family air and the tie contour are the round axes'
   );
   assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.match(
     CURRENT_ROUND_METADATA.description,
-    /12528|leftHandUpper|LilyPond|0\.88|0\.90|0\.30/,
+    /LilyPond|0\.88|0\.80|above-numeral|29/,
     'the measured witnesses and the declared deltas are published'
   );
   assert.deepEqual(ROUND_46_CARDS, ['brahms-scale-95-air30', 'brahms-scale-95-air20'], 'R46 parked pair on record');
@@ -308,15 +309,15 @@ test('CURRENT_ROUND_METADATA is the open Round 48 (two declared detached-circle 
   }
 });
 
-test('CURRENT_CANDIDATES is the Round 48 pair: one corrected surface, two circle readings', () => {
+test('CURRENT_CANDIDATES is the Round 49 trio: one completed written-tie surface, three axes', () => {
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
-    'card A at 0.90/0.60pt and card B at 0.88/0.80pt'
+    ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
+    'card A above-numeral at the adopted air, card B the 1.00pt air bound, card C the contour control'
   );
   /** The landed treatment every card states as fixed context (the Round 46
-   * family plus the round's approved corrections). */
+   * family plus every approved correction through Round 49). */
   const family = {
     pitchPlacement: 'parity-columns',
     bracketDurationGrammar: 'midpoint',
@@ -327,21 +328,29 @@ test('CURRENT_CANDIDATES is the Round 48 pair: one corrected surface, two circle
     tieOriginIndicator: 'omit-outgoing',
     tieProfile: 'traced',
     exceptionCarrier: 'symbol',
+    standaloneLongMount: 'above',
   };
-  /** The round's own axes: only these token keys may leave the shared set. */
-  const roundKeys = new Set(['detachedRingScale', 'detachedSymbolAir']);
+  /** The round's own axes: only these keys may leave the shared set. */
+  const roundKeys = new Set(['horizontalMountAir', 'tieProfile']);
   for (const c of CURRENT_CANDIDATES) {
     assert.ok(
       (CURRENT_ROUND_METADATA.openAxes ?? []).includes(c.axis ?? ''),
       `${c.id}: it badges a declared round axis`
     );
     assert.notEqual(c.kind, 'abstract', `${c.id}: score candidate`);
-    assert.deepEqual({ ...c.options }, { ...family }, `${c.id}: the shared corrected option set`);
+    // The card's own axis key is the one deliberate delta; everything else is
+    // the shared corrected set (card C re-states the tieProfile axis).
+    const ownAxis = c.axis ?? '';
+    const sharedOptions = { ...family };
+    delete (sharedOptions as Record<string, unknown>)[ownAxis];
+    const cardOptions = { ...c.options };
+    delete (cardOptions as Record<string, unknown>)[ownAxis];
+    assert.deepEqual(cardOptions, sharedOptions, `${c.id}: the shared corrected option set`);
     for (const [key, value] of Object.entries(c.tokens ?? {})) {
       if (roundKeys.has(key)) continue;
       assert.deepEqual(
         value,
-        (ROUND_48_SHARED_TOKENS as Record<string, unknown>)[key],
+        (ROUND_49_SHARED_TOKENS as Record<string, unknown>)[key],
         `${c.id}: the shared ${key} token`
       );
     }
@@ -360,33 +369,31 @@ test('CURRENT_CANDIDATES is the Round 48 pair: one corrected surface, two circle
         ['brahms-op118-no1', 13, 1],
         ['brahms-op118-no1', 33, 1],
         ['brahms-op118-no1', 61, 6],
+        ['brahms-op118-no1', 68, 1],
         ['brahms-op118-no1', 70, 1],
       ],
-      `${c.id}: the common literal windows, m. 10 and m. 70 included`
+      `${c.id}: the common literal windows, m. 68 and m. 70 included`
     );
   }
-  const [a, b] = CURRENT_CANDIDATES;
-  assert.equal(a.tokens?.detachedRingScale, 0.9, 'card A states the 0.90 circle');
-  assert.equal(a.tokens?.detachedSymbolAir, 0.6, 'card A states 0.60pt of air');
-  assert.equal(b.tokens?.detachedRingScale, 0.88, 'card B states the 0.88 circle');
-  assert.equal(b.tokens?.detachedSymbolAir, 0.8, 'card B states 0.80pt of air');
+  const [a, b, c] = CURRENT_CANDIDATES;
+  assert.equal(b.tokens?.horizontalMountAir, 1.0, 'card B states the 1.00pt air bound');
+  assert.equal(c.options?.tieProfile, 'uniform', 'card C states the uniform contour control');
   assert.deepEqual(
-    { ...a.tokens, detachedRingScale: 0.88, detachedSymbolAir: 0.8 },
+    { ...a.tokens, horizontalMountAir: 1.0 },
     { ...b.tokens },
-    'the two cards differ in exactly the declared token pair'
+    'cards A and B differ in exactly the declared air token'
   );
-  assert.deepEqual({ ...a.options }, { ...b.options }, 'and in no option at all');
+  assert.deepEqual({ ...a.options, tieProfile: 'uniform' }, { ...c.options }, 'card C differs in the contour alone');
+  assert.deepEqual({ ...a.options }, { ...b.options }, 'cards A and B differ in no option at all');
   assert.deepEqual(
-    ROUND_48_SHARED_TOKENS,
+    ROUND_49_SHARED_TOKENS,
     {
-      midpointSlashLengthFactor: 1.1,
-      midpointRingScale: 1.1,
-      midpointBracketRingScale: 1.2,
-      midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
-      opticalClearanceAir: 0.3,
-      halfRingGap: 0.3,
+      ...ROUND_48_SHARED_TOKENS,
+      detachedRingScale: 0.88,
+      detachedSymbolAir: 0.8,
+      horizontalMountAir: 0.8,
     },
-    'the Round 46 readability ratios plus the accepted 0.30pt flat face'
+    'the Round 48 shared ratios plus the adopted 48B baseline and family air'
   );
   // No smuggling: every key a card declares is either the shared set or the
   // declared axis, so a card can never quietly re-open a settled decision. Four
@@ -401,6 +408,7 @@ test('CURRENT_CANDIDATES is the Round 48 pair: one corrected surface, two circle
     'tieProfile',
     'tieOriginIndicator',
     'halfRingGap',
+    'standaloneLongMount',
   ]);
   const adopted = BRAHMS_OP118_NO1_JANKO_OPTIONS as Record<string, unknown>;
   const adoptedTokens = BRAHMS_OP118_NO1_JANKO_TOKENS as Record<string, unknown>;
@@ -2183,20 +2191,20 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two variants, nine windows each, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open Round 48: two circle readings on 12 windows', () => {
+test('The live studio renders the open Round 49: three readings on 21 windows', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal((html.match(/data-candidate="/g) ?? []).length, 2, 'two cards');
-  assert.match(html, /data-candidate-count="2"/);
+  assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
+  assert.match(html, /data-candidate-count="3"/);
   assert.match(
     html,
-    /data-window-count="12"/,
-    'per card: the six literal Brahms windows (m. 10 and m. 70 included)'
+    /data-window-count="21"/,
+    'per card: the seven literal Brahms windows (m. 68 and m. 70 included)'
   );
   assert.ok(!html.includes('data-decided="true"'), 'the open round is not marked decided');
-  assert.match(html, /Round 48/);
-  assert.match(html, /traced tie/i, 'the traced-tie title headlines the view');
-  assert.match(html, /detachedRingScale/, 'one declared axis is badged');
-  assert.match(html, /detachedSymbolAir/, 'both declared axes are badged');
+  assert.match(html, /Round 49/);
+  assert.match(html, /reference tie/i, 'the reference-tie title headlines the view');
+  assert.match(html, /standaloneLongMount/, 'the mount axis is badged');
+  assert.match(html, /horizontalMountAir/, 'the air axis is badged');
   for (const id of [
     ...ROUND_41_CARDS,
     ...ROUND_42_CARDS,
@@ -2213,7 +2221,7 @@ test('The live studio renders the open Round 48: two circle readings on 12 windo
   // and window proofs live in test/janko-round48.test.ts.
   assert.equal(
     (html.match(/data-lint="clean"/g) ?? []).length,
-    2,
+    3,
     'every chip honestly reads clean'
   );
   assert.equal(
@@ -2222,10 +2230,10 @@ test('The live studio renders the open Round 48: two circle readings on 12 windo
     'no card publishes a refused seat, a withheld rest as a warning, or any warning'
   );
   // The six common literal Brahms windows per card, one each.
-  for (const span of ['1-3', '7-10', '13-13', '33-33', '61-66', '70-70']) {
+  for (const span of ['1-3', '7-10', '13-13', '33-33', '61-66', '68-68', '70-70']) {
     assert.equal(
       (html.match(new RegExp(`data-window="brahms-op118-no1:${span}"`, 'g')) ?? []).length,
-      2,
+      3,
       `Brahms window ${span} on every card`
     );
   }

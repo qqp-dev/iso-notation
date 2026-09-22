@@ -5,14 +5,15 @@
  * duration overlay (which matches ORIGINAL MIDI-track keys) and BEFORE
  * hand-crossing computation. Preserves the original matching boundary and
  * fixture bytes: the duration overlay stays bijective on track labels, and
- * this step only retargets the semantic performance hand of ten explicitly
+ * this step only retargets the semantic performance hand of explicitly
  * authorized events.
  *
  * Authority: ticket §4 plus the OPERATOR AMENDMENT (ten corrections, not
- * six). Source staff changes are NOT automatically hand changes; this table
- * is a LIMITED editorial assignment for the descending RH line in
- * mm. 23/43 and its phrase continuation in mm. 24/44, not a universal
- * hand/fingering system. Do not broaden without a new decision round.
+ * six), plus the approved m70 editorial hands (three flips, two
+ * confirmations — see the Round 49 table below). Source staff changes are
+ * NOT automatically hand changes; each table entry is a LIMITED editorial
+ * assignment, not a universal hand/fingering system. Do not broaden without
+ * a new decision round.
  *
  * Source witness (pinned, see data/sources/brahms-op118-no1/):
  * - includes/intermezzo-op118-no1-parts.ily:62–63 — rightHandUpper
@@ -28,7 +29,9 @@
  * m. 43 (ticks 8232/8256/8280) and m. 44 (ticks 8304/8400).
  */
 
-export const BRAHMS_HAND_CORRECTIONS_VERSION = 3;
+import type { EditorialHandResolution } from '../model/types';
+
+export const BRAHMS_HAND_CORRECTIONS_VERSION = 4;
 
 /** One authorized hand retargeting. All guards must match exactly. */
 export interface BrahmsHandCorrection {
@@ -67,6 +70,17 @@ const SOURCE_FILE = 'includes/intermezzo-op118-no1-parts.ily';
  *   events — the reported mistake this bounded correction repairs. The
  *   distinct sustained `leftHandLower` A2 (168t) / D3 (144t) tie-wait events at
  *   the same pitches are preserved exactly, and no new onset is invented.
+ * - Round 49 §4, the m70 editorial hands — three **flips** plus two
+ *   **confirm-only** records in performed m. 70 (ticks 13392–13464): 953/954
+ *   change LH → RH (the run's second half belongs to the right hand under the
+ *   operator's explicit authority, even though the source parts keep them in
+ *   `leftHandLower`), 955 changes RH → LH (the tick-13440 A1 bass is a
+ *   left-hand event), and 956/957 confirm RH (already on the performed upper
+ *   staff — guarded, no hand change). Raw source voice/staff/hand provenance
+ *   is retained on every record; the table retargets the displayed hand only.
+ *   Editorial authority governs display grouping, rest inference and conflict
+ *   diagnostics for these events (see the engine's rest layer and
+ *   `detectHandCrossings`, which both run after this table).
  */
 export const BRAHMS_HAND_CORRECTIONS: readonly BrahmsHandCorrection[] = [
   {
@@ -297,6 +311,95 @@ export const BRAHMS_HAND_CORRECTIONS: readonly BrahmsHandCorrection[] = [
       'column reads two-handed while D4/D5 stay right hand. The distinct sustained ' +
       'leftHandLower D3 (brahms-op118-no1-911, 144 ticks) is untouched.',
   },
+  // --- Round 49 §4: performed m. 70 (source bar 70), LH → RH run halves ---
+  {
+    expectedId: 'brahms-op118-no1-953',
+    pitchClass: 1,
+    octave: 3,
+    startTick: 13392,
+    durationTicks: 24,
+    expectedOriginalHand: 'LH',
+    correctedHand: 'RH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '327:22',
+    logicalPart: 'leftHandLower (run eighth, second half)',
+    performedOccurrence: 'performed m. 70, run tick 13392 (fifth of eight eighths)',
+    rationale:
+      'Operator §4 editorial authority: the run\'s second half (ticks 13392/13416) belongs to ' +
+      'the right hand. The source parts keep this event in leftHandLower on the lower staff ' +
+      '(parts.ily:327), so the source voice/staff/hand provenance stays LH — only the displayed ' +
+      'hand changes.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-954',
+    pitchClass: 9,
+    octave: 3,
+    startTick: 13416,
+    durationTicks: 24,
+    expectedOriginalHand: 'LH',
+    correctedHand: 'RH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '327:28',
+    logicalPart: 'leftHandLower (run eighth, second half)',
+    performedOccurrence: 'performed m. 70, run tick 13416 (sixth of eight eighths)',
+    rationale:
+      'Operator §4 editorial authority: the run\'s second half (ticks 13392/13416) belongs to ' +
+      'the right hand. The source parts keep this event in leftHandLower on the lower staff ' +
+      '(parts.ily:327), so the source voice/staff/hand provenance stays LH — only the displayed ' +
+      'hand changes.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-955',
+    pitchClass: 9,
+    octave: 1,
+    startTick: 13440,
+    durationTicks: 48,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'LH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '258:12',
+    logicalPart: 'leftHandUpper (low A1 bass, quarter)',
+    performedOccurrence: 'performed m. 70, low A1 bass tick 13440 (48 ticks)',
+    rationale:
+      'Operator §4 editorial authority: the separate low A1 at tick 13440 is a left-hand event. ' +
+      'The source already assigns it to leftHandUpper (parts.ily:258), so the source provenance ' +
+      'stays LH — the correction moves the displayed hand from the performed upper staff to LH. ' +
+      'No LH rest may be painted at 13440 while this bass sounds.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-956',
+    pitchClass: 1,
+    octave: 4,
+    startTick: 13440,
+    durationTicks: 24,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'RH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '327:58',
+    logicalPart: 'leftHandLower (run eighth, confirm RH)',
+    performedOccurrence: 'performed m. 70, run tick 13440 (seventh of eight eighths)',
+    rationale:
+      'Operator §4 confirm-only record: this event already displays RH (performed upper staff) ' +
+      'and stays RH. The guard pins the musical identity so a future track-label change fails ' +
+      'closed instead of silently reassigning the hand.',
+  },
+  {
+    expectedId: 'brahms-op118-no1-957',
+    pitchClass: 9,
+    octave: 4,
+    startTick: 13464,
+    durationTicks: 24,
+    expectedOriginalHand: 'RH',
+    correctedHand: 'RH',
+    sourceFile: SOURCE_FILE,
+    sourceLines: '327:63',
+    logicalPart: 'leftHandLower (run eighth, confirm RH)',
+    performedOccurrence: 'performed m. 70, run tick 13464 (eighth of eight eighths)',
+    rationale:
+      'Operator §4 confirm-only record: this event already displays RH (performed upper staff) ' +
+      'and stays RH. The guard pins the musical identity so a future track-label change fails ' +
+      'closed instead of silently reassigning the hand.',
+  },
 ];
 
 /**
@@ -392,8 +495,19 @@ export function applyBrahmsHandCorrections<
       );
     }
     correctedIds.add(target.id);
-    const mutable = byId.get(target.id)!;
+    const mutable = byId.get(target.id)! as T & { editorialHand?: EditorialHandResolution };
     mutable.hand = c.correctedHand;
+    // Round 49 §4: the flip alone is display-only — the authority must travel
+    // with the note so the engine's occupancy, rest-inference and conflict
+    // decisions read the *resolved* hand instead of re-vetoing through the
+    // raw source label. Confirm-only records carry the same resolution (kind
+    // 'confirm'), so a guarded confirmation is auditable and authoritative
+    // too. The raw sourceProvenance is never touched.
+    mutable.editorialHand = {
+      hand: c.correctedHand,
+      kind: c.expectedOriginalHand === c.correctedHand ? 'confirm' : 'flip',
+      authorityId: c.expectedId,
+    };
   }
   return out;
 }

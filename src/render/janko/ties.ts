@@ -107,6 +107,16 @@ export function isTieContinuationHead(id: string): boolean {
  *
  * `score.tieChains` is the committed provenance sidecar; a score without it
  * yields the empty plan, so every pre-Round-46 surface is untouched.
+ *
+ * Round 49 §1: every authenticated written chain is preserved — written
+ * segmentation, continuation heads/arcs and component durations — even when
+ * the sounding sum has one available duration symbol. Equal sounding duration
+ * is NOT equivalent notation, so the former in-grammar/unanchored
+ * consolidation filter is removed: an in-grammar chain whose continuations
+ * coincide with no existing head gains explicit continuation heads (`<id>~c<k>`)
+ * stating their own written values, exactly like a non-grammar chain. No
+ * reattack is invented (added heads carry `tieStart`) and no sounding event
+ * is altered; proven head reuse (anchored continuations) is unchanged.
  */
 export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplayPlan {
   const empty: JankoTieDisplayPlan = {
@@ -134,6 +144,12 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
   const rendered: JankoTieChainPlan[] = [];
   const heads: QuantizedNote[] = [];
   const headIds = new Set<string>();
+  // The chain's source voice, for the provenance of added continuation heads
+  // (see below): every component of one chain is written in one voice.
+  const voiceByNoteId = new Map(chains.map((c) => [c.noteId, c.voice] as const));
+  // Round 49 §1: no consolidation filter — every committed chain renders.
+  // (The former `!nonGrammar && !anchored` skip conflated equal sounding
+  // duration with equivalent notation.)
   for (const chain of [...chains].sort((a, b) => a.noteId.localeCompare(b.noteId))) {
     const note = byId.get(chain.noteId);
     if (!note) continue;
@@ -142,8 +158,6 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
     const anchors = continuations.map(
       (c) => headAt.get(anchorKey(c.startTick, note.pitch.pitchClass, note.pitch.octave)) ?? []
     );
-    const anchored = anchors.every((list) => list.length > 0);
-    if (!nonGrammar && !anchored) continue;
 
     const components: JankoTieComponentPlan[] = [];
     chain.components.forEach((component, index) => {
@@ -171,6 +185,21 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
         return;
       }
       const id = `${chain.noteId}${TIE_HEAD_SUFFIX}${index}`;
+      // Round 49 §3: the added head is a written component of the chain's
+      // own source voice, so voice-aware readers (the rest layer's
+      // editorial-hand query) see it as the voice that wrote it — a
+      // legitimate cross-hand continuation stays a valid tie anchor while
+      // never masquerading as the displayed hand's own voice. The chain's
+      // source hand is the voice's own part hand (see BRAHMS_VOICE_HAND),
+      // read from the sounding note's committed provenance when present.
+      const chainHands = (() => {
+        const fromNote = note.sourceProvenance?.hands;
+        if (fromNote !== undefined) return [...fromNote];
+        return voiceByNoteId.get(chain.noteId) !== undefined &&
+          /leftHand/.test(voiceByNoteId.get(chain.noteId) ?? '')
+          ? (['LH'] as Hand[])
+          : (['RH'] as Hand[]);
+      })();
       const head: QuantizedNote = {
         id,
         pitch: { ...note.pitch },
@@ -181,6 +210,12 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
         // The written tie also states the sounding link on the added head, so
         // every reader of the model sees a continuation rather than an attack.
         tieStart: true,
+        sourceProvenance: {
+          voices: [chain.voice],
+          staves: note.sourceProvenance ? [...note.sourceProvenance.staves] : [],
+          hands: chainHands,
+          unison: false,
+        },
       };
       heads.push(head);
       components.push({
@@ -325,6 +360,98 @@ export type JankoTieProfile = 'uniform' | 'traced';
  *   the *shape* is the measured one and the *span* adaptation is this
  *   notation's declared rule (recorded here rather than passed off as traced).
  */
+/**
+ * Round 49 §6 — **the reference tie construction** (independently authored,
+ * verified against LilyPond 2.26.0's own output).
+ * ======================================================================
+ *
+ * The Round 48 approximation traced the *shape* of LilyPond's tie but kept
+ * this engine's own span law (a fixed chord fraction clamped to
+ * `tieMinDepth..tieMaxDepth`) and a single fixed median control fraction
+ * (0.21), and painted the contour with `stroke: none`. That is not a precise
+ * trace of the reference across spans: LilyPond's own output states both a
+ * different height law and a control indent that varies with the height, and
+ * its stencil edges read round, not knife-sharp.
+ *
+ * The two span laws are the **reference's own functional forms**, re-derived
+ * from their published mathematical statement and expressed here in this
+ * notation's units — not fitted approximations, and no GPL source text is
+ * copied or translated (LilyPond is GPLv3+; this file is part of an
+ * MIT-licensed codebase and the Bravura OFL grant does not extend to
+ * LilyPond code). Primary evidence, all in LilyPond's native staff-space
+ * units (`sp`):
+ *
+ * - **height law** — a normalized saturation `F(x) = (2/π)·atan(π·x/2)`
+ *     (chosen so `F(0)=0`, `F'(0)=1`, `F(∞)=1`), applied as
+ *     `h(w) = h_inf · F(w · r_0 / h_inf)` where `w` is the attachment span,
+ *     `h_inf` the height limit and `r_0` the small-span slope ratio.
+ *     Constants: LilyPond's Tie grob defaults `height-limit = 1.0 sp`,
+ *     `ratio = 0.333` (`scm/define-grobs.scm`, v2.26.0).
+ * - **control-indent law** — `G(w) = 2·h_inf − q²·m/(w + q)` with
+ *     `q = 2·h_inf/m` and `m = 1/3.1` (so `G(0)=0`, `G'(0)=m`, `G(∞)=2·h_inf`:
+ *     the controls pull outward as the crown flattens, never past a third of
+ *     the span).
+ * - **units** — every LilyPond tie length is in staff spaces
+ *     (`tie-details.cc`: `staff_space_ = Staff_symbol_referencer::staff_space`);
+ *     this engine converts through `tokens.tieRefStaffSpace` (4.984pt, the
+ *     measured scale of the Round 48 specimens).
+ * - **verification (independent oracle, not this engine's output)** —
+ *     (a) LilyPond 2.26.0's *own computed* Tie control-points, dumped via an
+ *     `after-line-breaking` Scheme hook at five spans (1.5563, 3.0405, 3.6621,
+ *     4.5094, 6.2811 sp), reproduce under these laws to < 0.001 sp on both
+ *     height and indent (`test/janko-round49.test.ts` pins the dumped
+ *     numbers); (b) the four recorded output specimens of
+ *     `docs/round48-rest-provenance-and-tie-trace.md` §4.1 — apexes 3.39 /
+ *     2.87 / 2.45 / 1.96 pt at chords 38.56 / 19.34 / 12.96 / 8.47 pt —
+ *     reproduce within 0.006 pt once the two-cubic sandwich offset (half the
+ *     body's control separation, `0.5 · tieApexThickness`) is added to the
+ *     centre-curve apex, exactly as the reference's own stencil offsets its
+ *     two boundaries.
+ *
+ * `tieTracedDepth` returns the **printed outer-boundary apex** in pt (the
+ * convention every ink consumer already reads); `tieTracedIndent` returns the
+ * **absolute control indent** in pt (the reference law's native quantity —
+ * no fraction clamp: the law itself keeps the indent under a third of the
+ * span at every width).
+ *
+ * The contour itself stays the measured **two-cubic filled sandwich** with
+ * pointed tips (both boundaries share both endpoints), now edged by a **round
+ * edging stroke** of `tokens.tieEdgeStroke` (round joins and caps), so the
+ * tips read as the reference's softened points instead of knife-sharp corners.
+ * The musical placement — side, axis, routing — is untouched: this is contour
+ * reproduction only, scoped to `options.tieProfile: 'traced'`, so the frozen
+ * Bach profile (`'uniform'`) and its output stay byte-identical.
+ */
+export function tieTracedDepth(span: number, t: ResolvedJankoTokens): number {
+  const wSp = Math.abs(span) / t.tieRefStaffSpace;
+  const x = (wSp * t.tieRefRatio) / t.tieRefHeightLimit;
+  const hSp = t.tieRefHeightLimit * (2 / Math.PI) * Math.atan((Math.PI / 2) * x);
+  // The cubic boundary reads 0.75 of its control offset, and the outer
+  // boundary's control sits half the body's control separation
+  // (`0.5 · tieApexThickness` in apex terms) above the reference centre curve.
+  return 0.75 * hSp * t.tieRefStaffSpace + 0.5 * t.tieApexThickness;
+}
+
+/** Absolute control indent (pt) of one traced arc, from its own span. */
+export function tieTracedIndent(width: number, t: ResolvedJankoTokens): number {
+  const wSp = Math.abs(width) / t.tieRefStaffSpace;
+  const hInf = t.tieRefHeightLimit;
+  const q = (2 * hInf) / t.tieRefIndentMaxFraction;
+  const indentSp = 2 * hInf - (q * q * t.tieRefIndentMaxFraction) / (wSp + q);
+  return Math.max(0, indentSp) * t.tieRefStaffSpace;
+}
+
+/** Saturation ceiling (pt) of the traced apex: the law's asymptotic depth. */
+export function tieTracedMaxDepth(t: ResolvedJankoTokens): number {
+  return 0.75 * t.tieRefHeightLimit * t.tieRefStaffSpace + 0.5 * t.tieApexThickness;
+}
+
+/**
+ * One traced contour's control geometry: `indentAbs` is the **absolute**
+ * control indent in pt (the reference law's native quantity, see
+ * {@link tieTracedIndent}) — the law self-bounds it under a third of the
+ * span, so only the degenerate zero-chord case needs a guard.
+ */
 export function tieTracedGeometry(
   x1: number,
   y: number,
@@ -332,13 +459,14 @@ export function tieTracedGeometry(
   side: -1 | 1,
   depth: number,
   thickness: number,
-  controlFraction: number
+  indentAbs: number
 ): { ax: number; bx: number; outerControlY: number; innerControlY: number } {
   // The cubic's apex is 3/4 of its control offset, so the control offset is
   // `depth / 0.75` for an ink apex of exactly `depth` at the endpoint axis y.
   const outer = depth / 0.75;
   const inner = Math.max(0, outer - thickness / 0.75);
-  const f = Math.min(0.49, Math.max(0.05, controlFraction));
+  const chord = Math.max(1e-6, Math.abs(x2 - x1));
+  const f = Math.max(0, indentAbs) / chord;
   return {
     ax: x1 + f * (x2 - x1),
     bx: x2 - f * (x2 - x1),
@@ -371,10 +499,10 @@ export function tieArcPath(
   depth: number,
   profile: JankoTieProfile = 'uniform',
   thickness: number = 0.7,
-  controlFraction: number = 0.21
+  indentAbs: number = 0
 ): string {
   if (profile === 'traced') {
-    const g = tieTracedGeometry(x1, y, x2, side, depth, thickness, controlFraction);
+    const g = tieTracedGeometry(x1, y, x2, side, depth, thickness, indentAbs);
     return (
       `M ${f(x1)} ${f(y)} C ${f(g.ax)} ${f(g.outerControlY)} ${f(g.bx)} ${f(g.outerControlY)} ${f(x2)} ${f(y)} ` +
       `L ${f(x2)} ${f(y)} C ${f(g.bx)} ${f(g.innerControlY)} ${f(g.ax)} ${f(g.innerControlY)} ${f(x1)} ${f(y)} Z`
@@ -395,14 +523,16 @@ export function tieArcInkBox(
 ): { x0: number; y0: number; x1: number; y1: number } {
   const yApex = arc.y + arc.side * arc.depth;
   if (arc.profile === 'traced') {
-    // The contour's own bounds: the tips sit exactly on the axis, the outer
-    // boundary's apex exactly `depth` beyond it — the ink is the region
-    // between, so this is exact (no stroke padding).
+    // The contour's own bounds plus its round edging stroke (Round 49 §6):
+    // the tips sit exactly on the axis, the outer boundary's apex exactly
+    // `depth` beyond it — the filled region is exact, and the round-cap edge
+    // grows it by half the declared edge stroke on every face.
+    const edge = resolveJankoTokens(tokens).tieEdgeStroke / 2;
     return {
-      x0: Math.min(arc.x1, arc.x2),
-      x1: Math.max(arc.x1, arc.x2),
-      y0: Math.min(arc.y, yApex),
-      y1: Math.max(arc.y, yApex),
+      x0: Math.min(arc.x1, arc.x2) - edge,
+      x1: Math.max(arc.x1, arc.x2) + edge,
+      y0: Math.min(arc.y, yApex) - edge,
+      y1: Math.max(arc.y, yApex) + edge,
     };
   }
   const half = (arc.thickness ?? tieStrokeOf(tokens)) / 2;
@@ -430,7 +560,7 @@ export function tieArcSegments(
     thickness?: number;
   },
   samples: number = 16,
-  controlFraction: number = 0.21
+  indentAbs: number = 0
 ): Array<{ x1: number; y1: number; x2: number; y2: number }> {
   const out: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
   if (arc.profile === 'traced') {
@@ -443,7 +573,7 @@ export function tieArcSegments(
       arc.side,
       arc.depth,
       arc.thickness ?? 0.45,
-      controlFraction
+      indentAbs
     );
     const cubic = (controlY: number): Array<{ x: number; y: number }> => {
       const points: Array<{ x: number; y: number }> = [];
@@ -563,14 +693,15 @@ export function tieArcEntersBoxes(
   boxes: readonly JankoTieBox[],
   tokens?: Partial<JankoTokens> | null
 ): JankoTieBox | null {
-  // The traced ink is the contour itself (its boundary is sampled), so it needs
-  // no stroke padding; the uniform profile keeps its half-stroke air.
-  const half = arc.profile === 'traced' ? 0 : (arc.thickness ?? tieStrokeOf(tokens)) / 2;
-  const segments = tieArcSegments(
-    arc,
-    16,
-    resolveJankoTokens(tokens).tieControlFraction
-  );
+  // The traced ink is the contour plus its round edging stroke (Round 49 §6),
+  // so it keeps half the declared edge stroke as padding; the uniform profile
+  // keeps its half-stroke air. The sampled boundaries follow the reference
+  // control-indent law — the same absolute indent the paint uses, read from
+  // the arc's own span.
+  const resolved = resolveJankoTokens(tokens);
+  const half =
+    arc.profile === 'traced' ? resolved.tieEdgeStroke / 2 : (arc.thickness ?? tieStrokeOf(tokens)) / 2;
+  const segments = tieArcSegments(arc, 16, tieTracedIndent(Math.abs(arc.x2 - arc.x1), resolved));
   for (const box of boxes) {
     for (const segment of segments) {
       if (segmentTouchesBox(segment, box, half)) return box;
@@ -598,7 +729,7 @@ export function renderJankoTieArcs(
         `${arc.stemCrossings.length > 0 ? ` data-tie-stem-crossings="${arc.stemCrossings.map((c) => c.stemNoteId).join(',')}"` : ''} ` +
         `d="${arc.path}" ` +
         (traced
-          ? `fill="#111111" stroke="none"/>`
+          ? `fill="#111111" stroke="#111111" stroke-width="${t.tieEdgeStroke.toFixed(2)}" stroke-linejoin="round" stroke-linecap="round"/>`
           : `fill="none" stroke="#111111" stroke-width="${t.tieStroke.toFixed(2)}"/>`)
     );
   }

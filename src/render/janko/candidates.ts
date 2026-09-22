@@ -865,7 +865,8 @@ export interface CandidateOptionBadge {
  * - **one tie contour, faithfully traced**: the round's shared tie treatment is
  *   the two-cubic filled contour traced from LilyPond 2.26.0's own tie
  *   (`options.tieProfile: 'traced'`) — pointed tips, `tokens.tieApexThickness`
- *   (0.45pt) mid thickness, control points at `tokens.tieControlFraction` (0.21)
+ *   (0.45pt) mid thickness, control points at the reference indent law's
+ *   absolute indent (Round 49 §6)
  *   of the chord — with the engine's own span law kept as the recorded
  *   adaptation;
  * - **measured tie routing**: the side is chosen by measured ink (heads, stems,
@@ -1009,9 +1010,175 @@ export const ROUND_48_CANDIDATES: JankoCandidate[] = [
   }),
 ];
 
-export const CURRENT_ROUND_METADATA: JankoCandidateRound = ROUND_48_METADATA;
+/**
+ * Round 49 — source-faithful rhythm, the above-numeral mount, the family air
+ * and the reference tie contour.
+ *
+ * The round's shared surface carries **every** authenticated written tie chain
+ * (the in-grammar consolidation filter is gone: 29 written continuation heads
+ * state their own components, the m. 61–63 E2 chain reads 192 · 192 · 96 · 24
+ * component by component, and the m. 70 editorial hands are applied), the
+ * operator-preferred **48B** detached-circle baseline (0.88 / 0.80pt) and the
+ * **family-wide rightward air** (`horizontalMountAir` 0.80pt — every horizontal
+ * duration mount, half-rings and short carriers included, keeps 0.80pt from
+ * the ink it belongs to). The outgoing-tie omission is **scoped**: only a
+ * member of an admitted hand-specific cluster may omit its redundant mark;
+ * standalone tied origins state their own values again. On that surface the
+ * three cards decide the round's three axes:
+ *
+ * - **A · the above-numeral mount** (`standaloneLongMount: 'above'`) — an
+ *   ordinary standalone long value tries the vertical band above its owning
+ *   head's numeral first, at the nearest legal lane a bounded actual-ink walk
+ *   finds (own/foreign heads, stems, beams, rests, brackets, siblings, rules,
+ *   boundaries); the m. 68 half-ring that the right seat refuses on its drawn
+ *   staff line takes the above seat, and every other standalone long value
+ *   states itself above its numeral. Shared pairs and short cues untouched.
+ * - **B · the air bound** (`horizontalMountAir: 1.00`) — the family air one
+ *   notch wider than the adopted 0.80pt, on the incumbent right mount, to
+ *   bound the gap the operator preferred.
+ * - **C · the contour control** (`tieProfile: 'uniform'`) — the adopted
+ *   mount and air with the incumbent uniform contour, so the traced contour's
+ *   contribution is judged against it on identical geometry.
+ *
+ * Every card paints the **reference tie contour** except the control: the
+ * two-cubic filled sandwich with the round edging stroke, its height read by
+ * the reference's own arctangent height law and its control indent by the
+ * reference's rational indent law — both verified against LilyPond 2.26.0's
+ * own computed control-points (five dumped spans, < 0.001 sp) and the four
+ * recorded output specimens (< 0.006 pt), never against a fit of our own.
+ */
+export const ROUND_49_METADATA: JankoCandidateRound = {
+  round: 49,
+  title: 'Source-faithful rhythm, the above-numeral mount, the family air and the reference tie — Round 49',
+  description:
+    'Round 49 judges **three real-engine readings of one completed written-tie surface** — every authenticated chain rendered (29 written continuation heads state their own components; the E2 chain reads 192 · 192 · 96 · 24), the m. 70 editorial hands applied, the preferred 48B circle baseline (0.88 / 0.80pt) and the family-wide 0.80pt rightward air adopted, and the outgoing-tie omission scoped to admitted clusters so standalone tied origins state their own values again. **Card A** mounts every ordinary standalone long value **above its numeral** (the same circle/half-circle vocabulary, seated by a bounded actual-ink walk that measures heads, stems, beams, rests, brackets, siblings, rules and the staff boundary; the m. 68 half-ring that cannot take the right seat on its drawn line takes the above seat). **Card B** bounds the family air one notch wider (1.00pt) on the incumbent right mount. **Card C** is the contour control: the incumbent uniform tie on the adopted mount and air. The traced contour itself is the reference construction — the two-cubic filled sandwich with the round edging stroke, its height from the reference\'s own arctangent height law and its control indent from the reference\'s rational indent law (verified against LilyPond 2.26.0\'s own computed control-points and the recorded output specimens).',
+  openAxes: ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
+};
 
-export const CURRENT_CANDIDATES: JankoCandidate[] = ROUND_48_CANDIDATES;
+/** Round 49 — the shared surface every card states: the completed written-tie
+ * engraving at the adopted 48B baseline, the family air and the traced contour. */
+const ROUND_49_BASE: Partial<JankoLayoutOptions> = {
+  ...ROUND_48_BASE,
+  // Every card carries the above-numeral mount: it is the seat that keeps the
+  // m. 68 half-rings stated (their right seats are refused by the drawn staff
+  // lines they stand on), so the air and contour axes are judged on the mount
+  // that leaves the surface clean. The golden master keeps 'right'; the badge
+  // on card A names the axis.
+  standaloneLongMount: 'above',
+};
+
+/** Round 49 — the shared tokens: 48B plus the adopted family air. */
+export const ROUND_49_SHARED_TOKENS: Partial<JankoTokens> = {
+  ...ROUND_48_SHARED_TOKENS,
+  detachedRingScale: 0.88,
+  detachedSymbolAir: 0.8,
+  horizontalMountAir: 0.8,
+};
+
+/** Round 49 — the literal windows every card renders, never one fewer. */
+function round49Windows(): JankoCandidateWindow[] {
+  return [
+    brahmsWindow(
+      1,
+      3,
+      'Brahms mm. 1–3 · the written chains begin, the detached circles and the family air',
+      'The opening system now carries the first newly rendered written chains (the m. 2 E4 and the m. 4-boundary F3 state their components), the two 192-tick exceptions stand detached at the adopted 0.88 / 0.80pt baseline, and every horizontal duration mount in the window keeps the family-wide 0.80pt air. Card A seats the standalone long values above their numerals; cards B and C keep the right seat at the declared air.'
+    ),
+    brahmsWindow(
+      7,
+      4,
+      'Brahms mm. 7–10 · half-rings, short carriers and the family air',
+      'The dense clusters with their 96-tick half-note brackets, the 48-tick exceptions on their historical arms and m. 10\u2019s half-ring beside the B: every horizontal mount — half-ring, carrier arm, short carrier — keeps the declared family air from the ink it belongs to, and no time-column or augmentation-dot semantic moved.'
+    ),
+    brahmsWindow(
+      13,
+      1,
+      'Brahms m. 13 · the second staff-rule seat',
+      'The m. 13 192-tick exception on its own pitch line with the drawn rule cleaned out of the closed ring\u2019s hollow interior — at the adopted circle size and family air.'
+    ),
+    brahmsWindow(
+      33,
+      1,
+      'Brahms m. 33 · the scoped omission on a bracket member',
+      'The D6 figure: the member\u2019s own bracket context supplies the handedness, so the outgoing written tie still omits its individual long mark — the arc plus the continuation state the hold. Standalone origins elsewhere in the score keep their marks; this window shows the scoped rule where it applies.'
+    ),
+    brahmsWindow(
+      61,
+      6,
+      'Brahms mm. 61–66 · the E2 chain\u2019s own components, the source continuation and the RH rest',
+      'The four written components of the E2 chain (192 · 192 · 96 · 24) each state their own value again — the scoped omission no longer suppresses a standalone origin — joined by three tie arcs routed below their note. mm. 65–66: the nine-tick source continuation window and the authored RH quarter rest read as the source does, with every written continuation head seated clear of its neighbours.'
+    ),
+    brahmsWindow(
+      68,
+      1,
+      'Brahms m. 68 · the half-ring that takes the above seat',
+      'The 96-tick continuation whose right seat a drawn staff rule refuses (a half-ring\u2019s flat face is never crossed): card A seats it **above the numeral** in the clear vertical band; the right-mount cards publish the refusal honestly and the member keeps its ordinary duration ink.'
+    ),
+    brahmsWindow(
+      70,
+      1,
+      'Brahms m. 70 · the editorial hands and the horizontal indicators',
+      'The run\u2019s second half displayed RH (953/954), the low A1 bass LH (955), the confirmed RH pair (956/957), the truthful LH silence at 13392 published as withheld — and the horizontal duration mounts at the adopted family air around the regrouped beams.'
+    ),
+  ];
+}
+
+/** One Round 49 card: the shared surface, one declared axis delta. */
+function round49Card(spec: {
+  id: string;
+  label: string;
+  description: string;
+  axis: string;
+  options: Partial<JankoLayoutOptions>;
+  tokens?: Partial<JankoTokens>;
+  tags: string[];
+}): JankoCandidate {
+  return {
+    id: spec.id,
+    label: spec.label,
+    description: spec.description,
+    axis: spec.axis,
+    options: { ...ROUND_49_BASE, ...spec.options },
+    tokens: { ...ROUND_49_SHARED_TOKENS, ...spec.tokens },
+    windows: round49Windows(),
+    tags: spec.tags,
+  };
+}
+
+export const ROUND_49_CANDIDATES: JankoCandidate[] = [
+  round49Card({
+    id: 'round49-above-080',
+    label: 'Round 49 · A — Above-numeral mount · family air 0.80pt',
+    description:
+      'The above-numeral mount (the round\u2019s first axis, the value every card shares): every ordinary standalone long value tries the vertical band above its owning head\u2019s numeral first — centred, then one and two rail steps right, then left — seated by a bounded actual-ink walk that measures the owning head\u2019s own stem, every foreign stem, the beams, the rests, the heads, the brackets, the sibling symbols, the drawn rules and the staff boundary. A refused above seat falls back to the right seat (the value stays stated); the two m. 68 half-rings take the above seat their right seats can\u2019t. Shared 2-span pairs keep their pair channel and short cues are untouched. The tie is the reference contour: the two-cubic filled sandwich with the round edging stroke, the primary-source arctangent height law and the reference control indent — verified against LilyPond\'s own computed control-points.',
+    axis: 'standaloneLongMount',
+    options: {},
+    tags: ['brahms', 'duration', 'detached-symbols', 'ties', 'rests', 'experimental'],
+  }),
+  round49Card({
+    id: 'round49-air-100',
+    label: 'Round 49 · B — Right mount · family air 1.00pt',
+    description:
+      'The air bound: the family-wide rightward air one notch wider than the adopted 0.80pt — every horizontal duration mount (detached circle, half-ring, carrier arm, short carrier) keeps **1.00pt** of clear air. Same written-tie surface, same above-numeral mount, same reference tie contour: the token is the only difference from the adopted baseline.',
+    axis: 'horizontalMountAir',
+    options: {},
+    tokens: { horizontalMountAir: 1.0 },
+    tags: ['brahms', 'duration', 'detached-symbols', 'ties', 'rests', 'experimental'],
+  }),
+  round49Card({
+    id: 'round49-uniform-080',
+    label: 'Round 49 · C — Uniform contour control · family air 0.80pt',
+    description:
+      'The contour control: the adopted surface geometry — 48B circle, family air 0.80pt, above-numeral mount, scoped omission — with the incumbent **uniform** tie profile (the Round 46 single quadratic of constant stroke). Reading it beside card A isolates what the reference contour construction contributes on identical geometry.',
+    axis: 'tieProfile',
+    options: { tieProfile: 'uniform' },
+    tags: ['brahms', 'duration', 'detached-symbols', 'ties', 'rests', 'experimental'],
+  }),
+];
+
+export const CURRENT_ROUND_METADATA: JankoCandidateRound = ROUND_49_METADATA;
+
+export const CURRENT_CANDIDATES: JankoCandidate[] = ROUND_49_CANDIDATES;
 
 export function candidateBadges(
   candidate: JankoCandidate,
@@ -1060,11 +1227,13 @@ export function candidateBadges(
 
 /**
  * Look one candidate up by id — the live registry first, then the **parked**
- * Round 47 registry, so a historical card stays addressable (and re-renderable)
- * after the next round opens. Nothing else is registered.
+ * Round 48 and Round 47 registries, so a historical card stays addressable
+ * (and re-renderable) after the next round opens. Nothing else is registered.
  */
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
-    CURRENT_CANDIDATES.find((c) => c.id === id) ?? ROUND_47_CANDIDATES.find((c) => c.id === id)
+    CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_48_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_47_CANDIDATES.find((c) => c.id === id)
   );
 }

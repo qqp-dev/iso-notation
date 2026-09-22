@@ -378,10 +378,13 @@ test('D. The source bijection is untouched: 964 sounding notes, no invented soun
   }
 });
 
-test('D. Nineteen tie arcs, six carries that reuse an existing head, thirteen added continuation heads', () => {
+test('D. Thirty-five tie arcs, six carries that reuse an existing head, twenty-nine added continuation heads', () => {
   const arcs = LAYOUTS.flatMap((l) => l.tieArcs ?? []);
-  assert.equal(arcs.length, 19, 'one arc per consecutive written component pair of the mandatory set');
-  assert.equal(arcs.filter((a) => a.crossesBarline).length, 4, 'four barline crossings, no system break');
+  // Round 49 §1 renders every authenticated written chain, so the arcs number
+  // 35 (was 19) and 18 of them cross a barline (the newly rendered chains
+  // reach across measures); none spans a system break at the canonical packing.
+  assert.equal(arcs.length, 35, 'one arc per consecutive written component pair of every authenticated chain');
+  assert.equal(arcs.filter((a) => a.crossesBarline).length, 18, 'eighteen barline crossings, no system break');
   assert.equal(LAYOUTS.flatMap((l) => l.tieAnchorShortfalls ?? []).length, 0, 'every arc found its heads');
   assert.equal(LAYOUTS.flatMap((l) => l.tieBlockedArcs ?? []).length, 0, 'every arc clears the glyph masks');
   const added = LAYOUTS.flatMap((l) => l.notes)
@@ -390,21 +393,37 @@ test('D. Nineteen tie arcs, six carries that reuse an existing head, thirteen ad
   assert.deepEqual(
     [...new Set(added)].sort(),
     [
+      'brahms-op118-no1-150~c1',
+      'brahms-op118-no1-15~c1',
+      'brahms-op118-no1-172~c1',
       'brahms-op118-no1-295~c1',
       'brahms-op118-no1-351~c1',
+      'brahms-op118-no1-37~c1',
+      'brahms-op118-no1-434~c1',
       'brahms-op118-no1-448~c1',
       'brahms-op118-no1-544~c1',
+      'brahms-op118-no1-554~c1',
       'brahms-op118-no1-581~c1',
       'brahms-op118-no1-637~c1',
+      'brahms-op118-no1-720~c1',
       'brahms-op118-no1-734~c1',
       'brahms-op118-no1-858~c1',
       'brahms-op118-no1-858~c2',
       'brahms-op118-no1-858~c3',
+      'brahms-op118-no1-904~c1',
+      'brahms-op118-no1-904~c2',
       'brahms-op118-no1-905~c1',
       'brahms-op118-no1-906~c1',
+      'brahms-op118-no1-907~c1',
       'brahms-op118-no1-912~c1',
+      'brahms-op118-no1-918~c1',
+      'brahms-op118-no1-919~c1',
+      'brahms-op118-no1-920~c1',
+      'brahms-op118-no1-939~c1',
+      'brahms-op118-no1-940~c1',
+      'brahms-op118-no1-941~c1',
     ].sort(),
-    'exactly the thirteen written continuations no head stated'
+    'exactly the twenty-nine written continuations no head stated (Round 49 §1)'
   );
   // Every rendered component head states exactly its own written component —
   // the tie can never re-label a head with the composite total.
@@ -490,18 +509,25 @@ test('D. m. 66 reads 9 / 2 / 5 before the chord, with one visible attack head pe
   );
 });
 
-test('D. m. 65’s bracket carries its first component (96), and 907 keeps its own 144', () => {
+test('D. m. 65’s bracket carries its first component (96), and 907 states its written components', () => {
   const clasp = LAYOUTS[16].clasps.find((c) => c.tick === 12432);
   assert.ok(clasp, 'the m. 65 bracket is admitted');
   assert.equal(clasp.durationTicks, 96, 'the carried value is the first written component, not the 120 total');
   const ink = clasp.durationInk[0];
   assert.equal(ink.compactRings, 1, 'one ring mark');
   assert.equal(ink.compactHalfRing, true, 'and it is the half-ring (96 ticks)');
+  // Round 49 §1: 907's source writes a2~ + a4 (96 + 48) — equal sounding
+  // duration is not equivalent notation, so the former single 144 statement is
+  // gone. The bracket states the origin's own 96 (the member's value IS the
+  // bracket's carried value, so no individual mark is painted beside it), the
+  // arc states the hold, and the added continuation head states the 48.
   const carrier = LAYOUTS[16].exceptionCarriers.find((c) => c.noteId === 'brahms-op118-no1-907');
-  assert.ok(carrier, 'the in-grammar 144 exception keeps its own statement');
-  assert.equal(carrier.durationTicks, 144);
-  assert.equal(carrier.dots, 1, '144 = half-ring + dot');
-  assert.equal(carrier.halfRing, true);
+  assert.equal(carrier, undefined, 'no redundant individual 96 mark beside the bracket that carries it');
+  const continuation = LAYOUTS.flatMap((l) => l.notes).find(
+    (p) => p.note.id === 'brahms-op118-no1-907~c1'
+  );
+  assert.ok(continuation, 'the continuation head is laid out');
+  assert.equal(continuation.note.durationTicks, 48, 'and it states the source’s own a4 (48 ticks)');
 });
 
 test('D. The canonical Brahms report is clean: no violations, no warnings, the six refusals solved', () => {
@@ -632,11 +658,11 @@ test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family a
   // adopted family as fixed context, and the working Reference they are measured
   // against is untouched — the assertions below are the Round 46 contract,
   // checked through the live registry.
-  assert.equal(CURRENT_ROUND_METADATA.round, 48, 'Round 48 is the open round');
+  assert.equal(CURRENT_ROUND_METADATA.round, 49, 'Round 49 is the open round');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
-    'the Round 48 pair'
+    ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
+    'the Round 49 trio'
   );
   for (const candidate of CURRENT_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
@@ -658,8 +684,13 @@ test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family a
   assert.equal(reference.tieOriginIndicator, 'source', 'and states every originator mark itself');
   assert.equal(reference.tieProfile, 'uniform', 'and paints the Round 46 uniform tie contour');
   assert.equal(referenceTokens.halfRingGap, 0, 'and the unbroken half-ring mount');
-  assert.equal(referenceTokens.detachedRingScale, 1, 'and the full-size detached circle');
-  assert.equal(referenceTokens.detachedSymbolAir, 0.3, 'at the round\u2019s own 0.30pt air');
+  // Round 49 §5: the adopted 48B detached-circle baseline and the family-wide
+  // rightward air are the golden token values (the detached mount itself only
+  // paints under `exceptionCarrier: 'symbol'`, so the Reference's bytes read
+  // the family air alone).
+  assert.equal(referenceTokens.detachedRingScale, 0.88, 'at the adopted 48B circle size');
+  assert.equal(referenceTokens.detachedSymbolAir, 0.8, 'at the adopted 0.80pt seat air');
+  assert.equal(referenceTokens.horizontalMountAir, 0.8, 'at the adopted family-wide air');
   assert.equal(OPTIONS.chordSymbolScale, 0.95, 'the Reference is the 95 % engraving');
   assert.equal(TOKENS.midpointSpacingFactor, 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95));
   // The working Reference and the 0.30pt card engrave the same music: every

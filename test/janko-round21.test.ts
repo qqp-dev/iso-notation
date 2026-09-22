@@ -462,26 +462,25 @@ test('§E flag geometry: the measured taper is confirmed, so the R20 flag stands
 // §F — the registry
 // ---------------------------------------------------------------------------
 
-test('§F registry: round 48 open, two detached-circle axes, the two real-engine readings', () => {
-  // Ordered contract change: Rounds 40–47 are parked (historical consts in
-  // test/janko-round40.test.ts … test/janko-round47.test.ts plus the exported
-  // ROUND_47_* registry) and Round 48 opens the corrections round on the same
-  // working Brahms Reference: two otherwise identical cards — the same six
-  // literal windows, the same 95 % scale, the same 0.30pt air and flat face,
-  // the same written ties, the same traced tie contour, the same measured
-  // routing, the same rest provenance and the same suppressed redundant stems —
-  // differing only in the detached closed circle's size and air.
-  assert.equal(CURRENT_ROUND_METADATA.round, 48);
+test('§F registry: round 49 open, three declared axes, the three real-engine readings', () => {
+  // Ordered contract change: Rounds 40–48 are parked (historical consts in
+  // test/janko-round40.test.ts … test/janko-round48.test.ts plus the exported
+  // ROUND_47_*/ROUND_48_* registries) and Round 49 opens the written-tie round
+  // on the completed Brahms surface: three otherwise identical cards — the same
+  // seven literal windows, the same 95 % scale, the adopted 48B baseline and
+  // family air, the same written ties, the same scoped omission — differing in
+  // the above-numeral mount, the family air bound and the tie contour.
+  assert.equal(CURRENT_ROUND_METADATA.round, 49);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['detachedRingScale', 'detachedSymbolAir'],
-    'the detached circle size and its air from the owning head'
+    ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
+    'the above-numeral mount, the family air and the tie contour'
   );
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
-    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
-    'the two real-engine detached-circle readings'
+    ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
+    'the three real-engine readings'
   );
 });
 

@@ -58,7 +58,8 @@
  *    and the four-cut run individually countable.
  * 6. **m. 66** — the tick-12624 column reads two-handed (A2/D3 left, D4/D5
  *    right) with the written F3 tie and every sustained voice preserved; the
- *    correction is bounded to the fifteen authorized records.
+ *    correction is bounded to the twenty authorized records (fifteen
+ *    retargetings plus five m70 editorial records, two of them confirm-only).
  * 7. **Literal low pitches** — the nine unwarranted ↓10 folds of mm. 5/15/22/
  *    33/42/53/67/68/69 are gone and the literal positions are exact; system
  *    spacing / pagination are unchanged.
@@ -405,19 +406,19 @@ const PAIR_GAP = 5.46;
 // 1. Registry: three cards on one shared family, 0.85 / 0.90 / 0.95
 // ---------------------------------------------------------------------------
 
-test('Round 48 registry: two circle readings of one corrected shared family', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 48, 'the open round');
-  assert.match(CURRENT_ROUND_METADATA.title, /traced tie/i);
+test('Round 49 registry: three readings of one completed written-tie family', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 49, 'the open round');
+  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
   assert.deepEqual(
     CURRENT_ROUND_METADATA.openAxes,
-    ['detachedRingScale', 'detachedSymbolAir'],
-    'the Round 48 axes (every other family key is locked context)'
+    ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
+    'the Round 49 axes (every other family key is locked context)'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 2, 'the Round 48 pair, no more');
+  assert.equal(CURRENT_CANDIDATES.length, 3, 'the Round 49 trio, no more');
   assert.deepEqual(
     CURRENT_CANDIDATES.map((c) => c.id),
-    ['round48-circle-090-air-060', 'round48-circle-088-air-080'],
-    'both Round 45/46/47 variants are parked on record; the live cards are the Round 48 readings'
+    ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
+    'the Round 45–48 variants are parked on record; the live cards are the Round 49 readings'
   );
 
   // The parked Round 46 pair is pinned as this round's own historical fixtures
@@ -544,18 +545,18 @@ test('The landed Round 46 card IS the working Brahms Reference; the Reference vi
       `page card ${i + 1} states its real measure range`
     );
   }
-  // Every Round 47 card renders its six declared literal windows, each labelled.
-  for (const round47Card of CURRENT_CANDIDATES) {
-    const start = candidates.indexOf(`data-candidate="${round47Card.id}"`);
+  // Every Round 49 card renders its seven declared literal windows, each labelled.
+  for (const round49Card of CURRENT_CANDIDATES) {
+    const start = candidates.indexOf(`data-candidate="${round49Card.id}"`);
     const end = candidates.indexOf('data-candidate="', start + 1);
     const slice = candidates.slice(start, end < 0 ? undefined : end);
-    assert.ok(start >= 0, `${round47Card.id}: the card is served`);
+    assert.ok(start >= 0, `${round49Card.id}: the card is served`);
     assert.equal(
       (slice.match(/class="candidate-window"/g) ?? []).length,
-      6,
-      `${round47Card.id}: six literal windows, no page card`
+      7,
+      `${round49Card.id}: seven literal windows, no page card`
     );
-    assert.ok(!slice.includes('class="page-card"'), `${round47Card.id}: no invented page spread`);
+    assert.ok(!slice.includes('class="page-card"'), `${round49Card.id}: no invented page spread`);
   }
 });
 
@@ -716,10 +717,12 @@ test('Optical spacing is declared placement metadata: musical fields and columns
     assert.equal(p.y, q.y, `${p.note.id}: and its established pitch y`);
   }
   // Round 46: the spread paints the source heads once (964 − 7 merged) plus
-  // the 13 written continuation heads = 970; the control surface is the same
-  // spread (the optical pass is placement metadata only).
-  assert.equal(headsOf(on).length, 970, 'the surface is complete');
-  assert.equal(headsOf(off).length, 970, 'and the control surface is the same spread');
+  // the written continuation heads; Round 49 §1 renders every authenticated
+  // written chain, so the continuations number 29 (13 + the 16 the removed
+  // consolidation filter used to suppress) = 986; the control surface is the
+  // same spread (the optical pass is placement metadata only).
+  assert.equal(headsOf(on).length, 986, 'the surface is complete');
+  assert.equal(headsOf(off).length, 986, 'and the control surface is the same spread');
   assert.deepEqual(
     on.flatMap((l) => l.clasps.map((c) => c.tick)),
     off.flatMap((l) => l.clasps.map((c) => c.tick)),
@@ -942,10 +945,11 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
       .map((b) => b.notes.map((n) => n.id).sort().join('+'));
   // Round 46: with the written ties off, the canonical beam partition is
   // byte-identical to the Round 44 reserve (236 groups) — the tie treatment
-  // re-partitions nothing by itself. With ties on, the thirteen continuation
-  // heads beam under the ordinary rules: 245 groups, of which 7 carry a
-  // written-continuation id and exactly 2 more are the m. 66 groups whose
-  // merged-voice ids changed (898+901, 910+912).
+  // re-partitions nothing by itself. With ties on, the continuation heads
+  // beam under the ordinary rules: Round 49 §1 renders every authenticated
+  // written chain, so the 29 continuation heads beam into 252 groups, of
+  // which 7 carry a written-continuation id and exactly 2 more are the m. 66
+  // groups whose merged-voice ids changed (898+901, 910+912).
   const noTies = layoutJankoScore(
     BRAHMS,
     resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, writtenTies: 'none' }),
@@ -953,7 +957,7 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
   );
   assert.deepEqual(beamGroups(noTies), beamGroups(reserve), 'the real beams are the same groups, unchanged');
   assert.equal(beamGroups(reserve).length, 236, 'and there are 236 of them');
-  assert.equal(beamGroups(working).length, 245, 'the canonical spread adds the written continuations\u2019 groups');
+  assert.equal(beamGroups(working).length, 252, 'the canonical spread adds the written continuations\u2019 groups');
   assert.equal(
     beamGroups(working).filter((g) => g.includes('~c')).length,
     7,
@@ -997,7 +1001,10 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
   // both members of their pairs (`+2` vs 269's two carriers, each still with
   // its own suppressed partner), and the seven written tie components that
   // state their value on an added or reused head add their own suppression.
-  assert.equal(workingSuppressed.size, 282, 'the Round 46 suppression census (Round 45: 269)');
+  // Round 49 §1 renders every authenticated written chain: the 16 newly
+  // revealed continuation heads state their own values and join the same
+  // suppression accounting, so 282 → 298.
+  assert.equal(workingSuppressed.size, 298, 'the Round 49 §1 suppression census (Round 46: 282)');
   assert.equal(suppressedOf(reserve).size, 203, 'against the Round 44 reserve');
   assert.equal(
     suppressedOf(noOpticalLayouts()).size,
@@ -1187,9 +1194,11 @@ test('Every admitted owner is correct; the one specimen stress refusal is publis
   // Round 46: 37 carriers = 30 member statements (the two 192-tick pairs share
   // one indicator, so 32 member statements paint as 30 marks) + the 7 written
   // tie components whose 96/192-tick value the mark family states with a ring.
-  // The six former `carrier-duration-unsupported` composites are solved: their
-  // first 96 component is a half-ring and the remaining 24 is tied.
-  assert.equal(carriers.length, 37, '37 painted carriers across the working Reference (Round 45: 32)');
+  // Round 49 §1 renders every authenticated written chain: the 16 newly
+  // revealed components add 10 more standalone statements whose value the
+  // mark family states (96/192/144 readings), so 37 → 47. The six former
+  // `carrier-duration-unsupported` composites stay solved.
+  assert.equal(carriers.length, 47, '47 painted carriers across the working Reference (was 37 pre-Round 49)');
   assert.equal(layouts.flatMap((l) => l.exceptionCarrierRefusals).length, 0, 'no withheld carrier on Brahms');
   assert.equal(layouts.flatMap((l) => l.exceptionCarrierOcclusions).length, 0, 'no destroyed duration ink on Brahms');
   assert.deepEqual(
@@ -1303,7 +1312,7 @@ test('Every admitted owner is correct; the one specimen stress refusal is publis
 // ---------------------------------------------------------------------------
 
 test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the written F3 and the sustained voices preserved', () => {
-  assert.equal(BRAHMS_HAND_CORRECTIONS.length, 15, 'the bounded overlay: ten LH→RH + five RH→LH, no more');
+  assert.equal(BRAHMS_HAND_CORRECTIONS.length, 20, 'the bounded overlay: ten LH→RH + five RH→LH + five m70 editorial records, no more');
   const layouts = referenceLayouts();
   const onset = (tick: number) => headsOf(layouts).filter((p) => p.note.startTick === tick);
   const rows = (tick: number) =>
@@ -1375,21 +1384,37 @@ test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the written F3
       .map((p) => p.note.id)
       .sort(),
     [
+      'brahms-op118-no1-150~c1',
+      'brahms-op118-no1-15~c1',
+      'brahms-op118-no1-172~c1',
       'brahms-op118-no1-295~c1',
       'brahms-op118-no1-351~c1',
+      'brahms-op118-no1-37~c1',
+      'brahms-op118-no1-434~c1',
       'brahms-op118-no1-448~c1',
       'brahms-op118-no1-544~c1',
+      'brahms-op118-no1-554~c1',
       'brahms-op118-no1-581~c1',
       'brahms-op118-no1-637~c1',
+      'brahms-op118-no1-720~c1',
       'brahms-op118-no1-734~c1',
       'brahms-op118-no1-858~c1',
       'brahms-op118-no1-858~c2',
       'brahms-op118-no1-858~c3',
+      'brahms-op118-no1-904~c1',
+      'brahms-op118-no1-904~c2',
       'brahms-op118-no1-905~c1',
       'brahms-op118-no1-906~c1',
+      'brahms-op118-no1-907~c1',
       'brahms-op118-no1-912~c1',
+      'brahms-op118-no1-918~c1',
+      'brahms-op118-no1-919~c1',
+      'brahms-op118-no1-920~c1',
+      'brahms-op118-no1-939~c1',
+      'brahms-op118-no1-940~c1',
+      'brahms-op118-no1-941~c1',
     ],
-    'exactly the thirteen written continuation heads the ties state'
+    'exactly the twenty-nine written continuation heads the ties state (Round 49 §1 renders every authenticated chain)'
   );
   // The former 120-tick composite is now a rendered chain, so it is no longer
   // published as an unsupported duration.
@@ -1405,8 +1430,9 @@ test('m. 66 “9222” reads two-handed: A2/D3 left, D4/D5 right, the written F3
     1,
     'exactly one F3 onset exists (no invented duplicate)'
   );
-  // The written ties are painted as arcs, and none is blocked.
-  assert.equal(layouts.flatMap((l) => l.tieArcs ?? []).length, 19, 'nineteen tie arcs join the chains');
+  // The written ties are painted as arcs, and none is blocked. Round 49 §1
+  // renders every authenticated chain: 19 → 35 arcs.
+  assert.equal(layouts.flatMap((l) => l.tieArcs ?? []).length, 35, 'thirty-five tie arcs join the chains');
   assert.deepEqual(layouts.flatMap((l) => l.tieAnchorShortfalls ?? []), [], 'every arc found its heads');
   assert.deepEqual(layouts.flatMap((l) => l.tieBlockedArcs ?? []), [], 'every arc clears the glyph masks');
 });
@@ -1544,17 +1570,19 @@ test('System spacing and pagination are unchanged by the literal placement; the 
   assert.equal(BRAHMS.notes.length, 964, 'the source carries 964 notes');
   const paintedHeads = headsOf(literal);
   // Round 46 head accounting: 964 source notes − 7 merged source heads (five
-  // cross-hand unisons + the two m. 66 attack/carry groups) + 13 written
-  // continuation heads = 970 painted heads.
-  assert.equal(paintedHeads.length, 970, 'the spread paints every source head once plus the written continuations');
+  // cross-hand unisons + the two m. 66 attack/carry groups) + the written
+  // continuation heads. Round 49 §1 renders every authenticated written
+  // chain, so the continuations number 29 (13 + the 16 the removed
+  // consolidation filter used to suppress) = 986 painted heads.
+  assert.equal(paintedHeads.length, 986, 'the spread paints every source head once plus the written continuations');
   const merged = literal.flatMap((l) => l.unisonMerges).flatMap((m) => m.mergedIds);
   assert.equal(merged.length, 7, 'seven source heads merge');
   const addedTieHeads = paintedHeads.filter((p) => p.note.id.includes('~c')).length;
-  assert.equal(addedTieHeads, 13, 'thirteen written continuation heads are added');
+  assert.equal(addedTieHeads, 29, 'twenty-nine written continuation heads are added');
   assert.equal(
     paintedHeads.length + merged.length - addedTieHeads,
     BRAHMS.notes.length,
-    '964 = 970 painted − 13 continuations + 7 merged'
+    '964 = 986 painted − 29 continuations + 7 merged'
   );
   const perPage: number[] = [];
   const stemsPerPage: number[] = [];
@@ -1575,14 +1603,14 @@ test('System spacing and pagination are unchanged by the literal placement; the 
     stemsPerPage.push((svg.match(/class="janko-stem"/g) ?? []).length);
     flagsPerPage.push((svg.match(/class="janko-flag"/g) ?? []).length);
   }
-  assert.deepEqual(perPage, [211, 234, 236, 223, 66], 'the engine page census');
+  assert.deepEqual(perPage, [215, 235, 237, 224, 75], 'the engine page census (Round 49 §1: the written continuations join their pages)');
   assert.equal(perPage.reduce((a, b) => a + b, 0), paintedHeads.length, 'every laid-out head paints once');
   // No missing rhythm ink: every page paints its stems/flags, and the whole
-  // spread's stem census is the measured 692 (the 970 heads minus the 282
+  // spread's stem census is the measured 692 (the 986 heads minus the 298
   // suppressed standalone stems, plus the shared-stem/beam carriers).
   assert.deepEqual(stemsPerPage, [136, 172, 169, 169, 46], 'the page stem census');
   assert.equal(stemsPerPage.reduce((a, b) => a + b, 0), 692, '692 painted stems across the spread');
-  assert.deepEqual(flagsPerPage, [18, 24, 20, 12, 3], 'and the flag census is complete');
+  assert.deepEqual(flagsPerPage, [14, 23, 21, 11, 2], 'and the flag census is complete (Round 49 §1 recount)');
 });
 
 // ---------------------------------------------------------------------------
@@ -1604,7 +1632,7 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
       `brahms-op118-no1-${id}: the former refusal never reappears`
     );
   }
-  assert.equal(report.stats.notes, 970, 'the report walks the painted heads (964 − 7 merged + 13 continuations)');
+  assert.equal(report.stats.notes, 986, 'the report walks the painted heads (964 − 7 merged + 29 continuations)');
   assert.equal(report.stats.systems, 18, 'and the same systems');
   // Both candidate cards report the same clean Brahms surface (the round's own
   // spacing control differs by one declared number, never by diagnostics).
@@ -1659,12 +1687,19 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   // The Brahms Reference is the intentional golden change of this round: pin
   // the adopted artifact through the engine (the committed PDF is pinned by
   // `test/janko-pdf.test.ts`; the export is Bach-only, so it carries no churn).
+  // Round 49 §4: the m70 editorial hands regroup the m. 70 beams, and the
+  // corrected §4 *authority* lets the engine paint the truthful m. 70 LH
+  // quarter at 13392 (the raw source label no longer vetoes the inference),
+  // so page 5 is re-pinned here.
+  // Round 49: the §1 written chains, the §4 m70 hands + authority, the §6
+  // reference tie laws and the §5 family air re-pin the BRONZE spread's
+  // m. 70-bearing page (Bach GOLD above stays frozen).
   const brahmsPages = [
-    '205db94a3e9db316526cc24337b605815b50f57811110885ab482209839c2d5b',
-    '2a5611137a1cc0ba489c8da6fbc24c48d5c76e2131087506b1b117f8f400d063',
-    'f248763aabc00a94c903f73b063d7c75aa4edc68f49a230e84235cbfecbb843c',
-    '3d50b6312d752dac4c27d7f33bb1c20737f78b5b47b16c673fd7b5e324b951ce',
-    '4e459d38b42593051093e192ba8efd330d6500aa6ee8bb892931b7f6e91ebc97',
+    '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90',
+    'a84166821d569d8c080b1ff98f97664d0f1d6132b7002026ea6cd66e32b85cfa',
+    '78b3fd134d5f3b4bf4269619759149a34aa9c8c95f540fcc72fe12f9495a2897',
+    '40c43f6aed8a4b4554d2e0c8c7c9d62a468dccb3766f2da15ba66d7f7fa984fd',
+    'd2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5',
   ];
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
@@ -1675,8 +1710,8 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
-    '1c6600e0d3cfaee9098b35ea654feeab68915a443111a11d0792e09664313ab3',
-    'the whole-score crop is the adopted Round 46 engraving'
+    'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be83570f2a9059',
+    'the whole-score crop carries the §4 m70 hands, authority and truthful rest'
   );
 });
 
@@ -1684,23 +1719,23 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
 // 9. The served studio: labels, inventory and phone-session continuity
 // ---------------------------------------------------------------------------
 
-test('The served studio carries the two labelled cards and the honest inventory for both views', () => {
+test('The served studio carries the three labelled cards and the honest inventory for both views', () => {
   const candidates = candidatesView();
-  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 2, 'two candidate cards');
-  assert.match(candidates, /data-candidate-count="2"/);
-  assert.match(candidates, /data-window-count="12"/, 'six review surfaces per card');
+  assert.equal((candidates.match(/data-candidate="/g) ?? []).length, 3, 'three candidate cards');
+  assert.match(candidates, /data-candidate-count="3"/);
+  assert.match(candidates, /data-window-count="21"/, 'seven review surfaces per card');
   assert.equal(
     (candidates.match(/<figure class="page-card"/g) ?? []).length,
     0,
-    'the Round 48 cards declare literal crops only — no page cards'
+    'the Round 49 cards declare literal crops only — no page cards'
   );
-  for (const label of ['Circle 0.90', 'Circle 0.88']) {
+  for (const label of ['Above-numeral mount', 'family air 1.00pt', 'Uniform contour control']) {
     assert.ok(candidates.includes(label), `the served grid labels the ${label} card`);
   }
   // The honest chip inventory: the canonical Brahms is 0/0 for every card, and
   // the round publishes no withheld carrier, refused seat or withheld rest as a
   // warning (the rest facts are `'info'` notes, visible in the Reference record).
-  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 2, 'every card is free of hard errors');
+  assert.equal((candidates.match(/data-lint="clean"/g) ?? []).length, 3, 'every card is free of hard errors');
   assert.equal((candidates.match(/⚠ 1 warning/g) ?? []).length, 0, 'no card publishes a withheld seat');
   assert.equal((candidates.match(/⚠ 7 warnings/g) ?? []).length, 0, 'the former six-composite inventory is gone');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(candidates), 'no screenshots, no raster review artifacts');

@@ -212,8 +212,11 @@ test('Authentic lossless score contains 964 notes across 71 measures and upbeat'
   // source-verified m. 66 RH→LH correction (five notes: the A2/D3 reattacks
   // t12552/t12576, the tied-in 120-tick F3 at t12600 and the t12624 A2/D3),
   // so the split moves 5 for each hand (was 487/477 after the Round 44 set).
-  assert.equal(lh.length, 492, '492 LH notes');
-  assert.equal(rh.length, 472, '472 RH notes');
+  // Round 49 §4 adds the m70 editorial hands (three flips: 953/954 LH→RH,
+  // 955 RH→LH; two confirm-only records: 956/957 stay RH), so the split
+  // moves a net 1 toward RH.
+  assert.equal(lh.length, 491, '491 LH notes');
+  assert.equal(rh.length, 473, '473 RH notes');
 });
 
 // ---------------------------------------------------------------------------
@@ -377,7 +380,11 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   // hand merges); Round 46 adds the **source-proven same-hand attack/carry
   // groups** of m. 66 — one visible attack head per coincident attack/carry
   // group — so two more source heads merge (5 → 7), and it adds the 13
-  // written continuation heads the ties state. Net painted heads: 970.
+  // written continuation heads the ties state. Round 49 §1 renders **every**
+  // authenticated written chain (the in-grammar/unanchored consolidation
+  // filter is removed): the 15 formerly omitted chains state their 16 extra
+  // components (chain 904 states two), so 13 → 29 added heads. Net painted
+  // heads: 986.
   const merged = LAYOUTS.reduce(
     (sum, layout) => sum + layout.unisonMerges.reduce((n, m) => n + m.mergedIds.length, 0),
     0
@@ -387,13 +394,13 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
     (n, layout) => n + layout.notes.filter((p) => p.note.id.includes('~c')).length,
     0
   );
-  assert.equal(addedTieHeads, 13, 'the thirteen written continuation heads');
+  assert.equal(addedTieHeads, 29, 'the twenty-nine written continuation heads (13 + the 16 Round 49 §1 reveals)');
   assert.equal(
     notes.length,
     SCORE.notes.length - merged + addedTieHeads,
     'every sounding note is engraved (merged heads once) plus the written continuations'
   );
-  assert.equal(notes.length, 970, 'the Round 46 head census (was 959)');
+  assert.equal(notes.length, 986, 'the Round 49 §1 head census (964 − 7 merged + 29 continuations; was 970)');
   assert.equal(LAYOUTS.length, 18, 'the complete Intermezzo lays out as 18 systems, four measures each');
   // Every layout is engraved in its own system frame and later pages reuse the
   // four frames of page 1, so two notes are only comparable when their
@@ -443,7 +450,7 @@ test('Brahms Op. 118 No. 1 canonical fixed-3 is clean', () => {
   assert.equal(REPORT.ok, true, 'the canonical surface is honestly ok');
   assert.equal(REPORT.stats.systems, 18);
   assert.equal(REPORT.stats.measures, 71);
-  assert.equal(REPORT.stats.notes, 970, 'the Round 46 painted-head census (964 − 7 merged + 13 continuations)');
+  assert.equal(REPORT.stats.notes, 986, 'the Round 49 §1 painted-head census (964 − 7 merged + 29 continuations)');
   assert.ok(REPORT.stats.beams > 0, 'the eighths are beamed');
 });
 
@@ -451,17 +458,20 @@ test('Brahms linting stays a millisecond-scale operation', () => {
   // Wall-clock is not a valid measure inside this suite: the runner executes
   // the layout-heavy files concurrently, so the same call can take ~0.35s
   // alone and multiple seconds under contention — the pre-Round-46 baseline
-  // already exceeded the 2s budget under normal full-suite load, which makes a
+  // already exceeded a 2s budget under normal full-suite load, which makes a
   // wall-clock tripwire a false alarm generator rather than a regression
   // guard. The check therefore measures the call's own **CPU time**
-  // (`process.cpuUsage`), which is load-insensitive, against the same 2000ms
-  // budget: ~0.33s isolated on dev hardware, so a real 5–10x regression still
-  // trips it and contention cannot.
+  // (`process.cpuUsage`) against a budget sized to the census it audits:
+  // Round 49 §1 renders every authenticated written chain, so the lint walks
+  // 986 painted heads and 35 arcs (~0.66s isolated, roughly the pre-Round-49
+  // 0.33s doubled by the fuller surface) — the 3000ms budget still trips a
+  // real 5–10x regression while absorbing the suite's cache-pressure jitter
+  // (the same call measured 2.0–2.3s CPU at full concurrent load).
   const before = process.cpuUsage();
   lintJankoScore(SCORE, OPTIONS, TOKENS);
   const used = process.cpuUsage(before);
   const cpuMs = (used.user + used.system) / 1000;
-  assert.ok(cpuMs < 2000, `Brahms lint must stay fast (used ${cpuMs.toFixed(0)}ms CPU time)`);
+  assert.ok(cpuMs < 3000, `Brahms lint must stay fast (used ${cpuMs.toFixed(0)}ms CPU time)`);
 });
 
 test('The mm. 7–8 macro crop keeps the bass extension whole (canonical fixed-3)', () => {

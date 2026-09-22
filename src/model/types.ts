@@ -62,6 +62,35 @@ export interface QuantizedNote {
   tieEnd?: boolean;
   /** Round 48: committed source-voice provenance (absent when the score has none). */
   sourceProvenance?: NoteSourceProvenance;
+  /**
+   * Round 49 §4 — **explicit editorial hand authority** on this event, when an
+   * authorized correction record assigns its hand (absent on every uncorrected
+   * event). This is the *auditable resolution*: which record authorized it and
+   * whether the record flipped the hand or only confirmed it under guard. The
+   * engine reads it for authoritative occupancy, rest inference and conflict
+   * decisions; the raw `sourceProvenance` beside it is never mutated — the
+   * source's own voice/staff/hand facts stay exactly as imported.
+   */
+  editorialHand?: EditorialHandResolution;
+}
+
+/**
+ * Round 49 §4 — the audit record of one editorial hand assignment.
+ *
+ * `kind: 'flip'` — the authority *changed* the displayed hand (the source
+ * label is overruled for every downstream decision). `kind: 'confirm'` — the
+ * authority *confirmed* the already-displayed hand under the same musical-key
+ * guard, so a future source change fails closed instead of silently keeping
+ * the hand; confirmed events resolve their authoritative hand the same way
+ * flipped ones do. `authorityId` names the correction record for audit.
+ */
+export interface EditorialHandResolution {
+  /** The authoritative hand for occupancy, rest inference and conflict decisions. */
+  hand: Hand;
+  /** How the authority acts: a hand change, or a guarded confirmation. */
+  kind: 'flip' | 'confirm';
+  /** The authorized correction record id. */
+  authorityId: string;
 }
 
 /**

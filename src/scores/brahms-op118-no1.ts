@@ -118,6 +118,17 @@ export const BRAHMS_OP118_NO1_JANKO_TOKENS: Partial<JankoTokens> = {
   midpointBracketRingScale: 1.2,
   midpointSpacingFactor: 2.09658 / (Math.SQRT2 * (0.71 + 0.5) * 0.95),
   opticalClearanceAir: 0.3,
+  // Round 49 §5 — the operator-preferred 48B detached-circle baseline plus the
+  // family-wide rightward air: the closed circle reads at 0.88 of its Round 47
+  // size, and every horizontal duration mount — detached circle, half-ring,
+  // horizontal carrier arm, short carrier — keeps 0.80pt of clear air from the
+  // ink it belongs to (the incumbent air was the 0.30pt optical clearance).
+  // The values were bounded on the real engine by the Round 49 candidate
+  // cards; the detached mount itself only paints under `exceptionCarrier:
+  // 'symbol'`, so the working Reference receives the family air alone.
+  detachedRingScale: 0.88,
+  detachedSymbolAir: 0.8,
+  horizontalMountAir: 0.8,
 };
 
 /** Embedded base64 fallback for browser and headless execution without filesystem. */

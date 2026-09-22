@@ -1,18 +1,19 @@
 /**
- * Bounded source-informed hand corrections (ticket §4, operator amendment and
- * the Round 45 §D m. 66 correction).
+ * Bounded source-informed hand corrections (ticket §4, operator amendment,
+ * the Round 45 §D m. 66 correction and the Round 49 §4 m70 editorial hands).
  *
- * Fifteen authorized retargetings: the ten LH → RH corrections — the six
+ * Twenty authorized records: the ten LH → RH corrections — the six
  * descending-line eighths of mm. 23/43 plus the four phrase-continuation notes
  * of mm. 24/44 — and the five RH → LH corrections of performed m. 66, where
  * the printed (linear) reading of bar 37 / second ending puts the low A2/D3
  * reattacks and the tied F3 in the left hand, so the “9222” column reads
- * two-handed. All fifteen are applied as a declarative score-layer table AFTER
- * the validated written-duration overlay (original MIDI-track keys) and BEFORE
- * hand-crossing computation. Source cross-staff movement never forces a hand
- * change by itself; only this table retargets, with exact guards, and
- * whole-piece hand fidelity remains uncertified (notably the mm. 61–62
- * cross-voice unison).
+ * two-handed — plus the five m70 editorial records of performed m. 70
+ * (three flips, two confirm-only). All twenty are applied as a declarative
+ * score-layer table AFTER the validated written-duration overlay (original
+ * MIDI-track keys) and BEFORE hand-crossing computation. Source cross-staff
+ * movement never forces a hand change by itself; only this table retargets,
+ * with exact guards, and whole-piece hand fidelity remains uncertified
+ * (notably the mm. 61–62 cross-voice unison).
  */
 
 import { test } from 'node:test';
@@ -108,23 +109,52 @@ const M66: ReadonlyMap<string, readonly [number, number, number, number]> = new 
   ['brahms-op118-no1-914', [2, 3, 12624, 96]],
 ]);
 
-test('Table v3 carries exactly the fifteen authorized corrections, direction faithful', () => {
-  assert.equal(BRAHMS_HAND_CORRECTIONS_VERSION, 3, 'amendment version');
-  assert.equal(BRAHMS_HAND_CORRECTIONS.length, 15, 'fifteen records, no more');
+/**
+ * Round 49 §4 — the m70 editorial hands in performed m. 70: three flips
+ * (953/954 LH → RH, 955 RH → LH) plus two confirm-only records (956/957 stay
+ * RH). Same tuple-guard convention: [pitchClass, octave, startTick, duration].
+ * A confirm-only record pins the musical identity without changing the hand,
+ * so a future track-label change fails closed instead of silently moving it.
+ */
+const M70_FLIP: ReadonlyMap<string, readonly [number, number, number, number]> = new Map([
+  ['brahms-op118-no1-953', [1, 3, 13392, 24]],
+  ['brahms-op118-no1-954', [9, 3, 13416, 24]],
+  ['brahms-op118-no1-955', [9, 1, 13440, 48]],
+]);
+const M70_CONFIRM: ReadonlyMap<string, readonly [number, number, number, number]> = new Map([
+  ['brahms-op118-no1-956', [1, 4, 13440, 24]],
+  ['brahms-op118-no1-957', [9, 4, 13464, 24]],
+]);
+
+test('Table v4 carries exactly the twenty authorized corrections, direction faithful', () => {
+  assert.equal(BRAHMS_HAND_CORRECTIONS_VERSION, 4, 'amendment version');
+  assert.equal(BRAHMS_HAND_CORRECTIONS.length, 20, 'twenty records, no more');
   const ids = BRAHMS_HAND_CORRECTIONS.map((c) => c.expectedId);
   assert.deepEqual(
     [...ids].sort(),
-    [...TEN.keys(), ...M66.keys()].sort(),
-    'exactly the fifteen targets (ten mm. 23/43 + five m. 66)'
+    [...TEN.keys(), ...M66.keys(), ...M70_FLIP.keys(), ...M70_CONFIRM.keys()].sort(),
+    'exactly the twenty targets (ten mm. 23/43 + five m. 66 + five m. 70)'
   );
   for (const c of BRAHMS_HAND_CORRECTIONS) {
+    const flip = M70_FLIP.get(c.expectedId);
+    const confirm = M70_CONFIRM.get(c.expectedId);
     const m66 = M66.get(c.expectedId);
-    const [pc, oct, tick, dur] = m66 ?? TEN.get(c.expectedId)!;
+    const [pc, oct, tick, dur] = flip ?? confirm ?? m66 ?? TEN.get(c.expectedId)!;
     assert.equal(c.pitchClass, pc, `${c.expectedId}: pitch class`);
     assert.equal(c.octave, oct, `${c.expectedId}: octave`);
     assert.equal(c.startTick, tick, `${c.expectedId}: onset`);
     assert.equal(c.durationTicks, dur, `${c.expectedId}: written duration`);
-    if (m66) {
+    if (flip) {
+      // Round 49 §4 flips: 953/954 LH → RH, 955 RH → LH.
+      assert.equal(
+        `${c.expectedOriginalHand}->${c.correctedHand}`,
+        c.expectedId === 'brahms-op118-no1-955' ? 'RH->LH' : 'LH->RH',
+        `${c.expectedId}: flip direction`
+      );
+    } else if (confirm) {
+      assert.equal(c.expectedOriginalHand, 'RH', `${c.expectedId}: original RH (m. 70 confirm)`);
+      assert.equal(c.correctedHand, 'RH', `${c.expectedId}: confirmed RH (no change)`);
+    } else if (m66) {
       assert.equal(c.expectedOriginalHand, 'RH', `${c.expectedId}: original RH (m. 66)`);
       assert.equal(c.correctedHand, 'LH', `${c.expectedId}: corrected LH (m. 66)`);
       assert.ok(c.logicalPart.includes('leftHandUpper'), `${c.expectedId}: LH part`);
@@ -142,7 +172,7 @@ test('Table v3 carries exactly the fifteen authorized corrections, direction fai
   assert.deepEqual([...ticks].sort((a, b) => a - b), ticks, 'ordered by onset');
 });
 
-test('Fifteen and only fifteen hand changes; every other field of all 964 preserved', () => {
+test('Twenty and only twenty hand changes; every other field of all 964 preserved', () => {
   const pre = buildPreCorrectionNotes();
   assert.equal(pre.length, 964);
   assert.equal(SCORE.notes.length, 964);
@@ -160,16 +190,31 @@ test('Fifteen and only fifteen hand changes; every other field of all 964 preser
     if (a.hand !== b.hand) {
       changed.push(a.id);
       // Direction is guarded per record: the ten mm. 23/43 corrections are
-      // LH → RH, the five m. 66 corrections are RH → LH. Nothing else moves.
+      // LH → RH, the five m. 66 corrections are RH → LH, the three m. 70
+      // flips follow the operator's §4 prescription. Nothing else moves.
+      // Confirm-only records (956/957) change no hand and never appear here.
       const isM66 = M66.has(a.id);
-      assert.equal(a.hand, isM66 ? 'RH' : 'LH', `${a.id}: original hand`);
-      assert.equal(b.hand, isM66 ? 'LH' : 'RH', `${a.id}: corrected hand`);
-      (isM66 ? rhToLh : lhToRh).push(a.id);
+      const isM70Flip = M70_FLIP.has(a.id);
+      assert.ok(isM66 || isM70Flip || TEN.has(a.id), `${a.id}: a guarded correction target`);
+      if (isM66) {
+        assert.equal(a.hand, 'RH', `${a.id}: original hand`);
+        assert.equal(b.hand, 'LH', `${a.id}: corrected hand`);
+        rhToLh.push(a.id);
+      } else if (isM70Flip) {
+        const want = a.id === 'brahms-op118-no1-955' ? ['RH', 'LH'] : ['LH', 'RH'];
+        assert.equal(a.hand, want[0], `${a.id}: original hand`);
+        assert.equal(b.hand, want[1], `${a.id}: corrected hand`);
+        (want[1] === 'RH' ? lhToRh : rhToLh).push(a.id);
+      } else {
+        assert.equal(a.hand, 'LH', `${a.id}: original hand`);
+        assert.equal(b.hand, 'RH', `${a.id}: corrected hand`);
+        lhToRh.push(a.id);
+      }
     }
   }
-  assert.deepEqual(changed.sort(), [...TEN.keys(), ...M66.keys()].sort(), 'exactly the fifteen retargets');
-  assert.deepEqual(lhToRh.sort(), [...TEN.keys()].sort(), 'ten LH → RH (mm. 23/43)');
-  assert.deepEqual(rhToLh.sort(), [...M66.keys()].sort(), 'five RH → LH (m. 66)');
+  assert.deepEqual(changed.sort(), [...TEN.keys(), ...M66.keys(), ...M70_FLIP.keys()].sort(), 'exactly the eighteen retargets (confirms change nothing)');
+  assert.deepEqual(lhToRh.sort(), [...TEN.keys(), 'brahms-op118-no1-953', 'brahms-op118-no1-954'].sort(), 'twelve LH → RH (mm. 23/43 + m. 70 run)');
+  assert.deepEqual(rhToLh.sort(), [...M66.keys(), 'brahms-op118-no1-955'].sort(), 'six RH → LH (m. 66 + m. 70 bass)');
 });
 
 test('Cross-staff never forces a hand: the overlay preserves staff-track LH', () => {
@@ -251,16 +296,19 @@ test('Literal m.23/m.43: full RH run over LH bass; the four bridges dissolve', (
       assert.equal(n.hand, 'LH', `${id}: bass stays LH`);
     }
   }
-  // The four painted bridges (39 → 35) dissolve through the UNCHANGED
-  // same-hand grouping rule — no renderer exception, no threshold change —
-  // and no vertical chord touches a corrected note anymore.
+  // The painted bridges dissolve through the UNCHANGED same-hand grouping
+  // rule — no renderer exception, no threshold change — and no vertical chord
+  // touches a corrected note anymore. Round 49 §1 renders every authenticated
+  // written chain, so the newly revealed continuation heads join same-hand
+  // runs and re-group a few bridges back (13 → 29 heads): 38 → 33 net is the
+  // intentional recount of the same rule on the fuller written surface.
   let bridges = 0;
   for (let p = 0; p < 5; p++) {
     bridges += (renderJankoPage(SCORE, p, O, T).match(/class="janko-chord-bridge"/g) ?? []).length;
   }
   // Round 45 adds one more: the m. 66 hand correction removes a fifth bridge
   // (39 → 38), through the same unchanged same-hand grouping rule.
-  assert.equal(bridges, 38, 'five bridges gone (was 39)');
+  assert.equal(bridges, 33, 'the bridges regroup under the Round 49 §1 written chains (was 38)');
   const layouts = layoutJankoScore(SCORE, O, T);
   const touched = layouts
     .flatMap((l) => l.verticalChords ?? [])
@@ -309,8 +357,126 @@ test('Uncertified territory untouched: mm.61–62 unison and all other hands', (
   assert.deepEqual(at(11568), preAt(11568), 'tick-11568 unison hands byte-identical');
   assert.deepEqual(at(11568), ['brahms-op118-no1-858:LH'], 'the LH survivor stands');
   // Every untargeted hand on the whole score matches the track baseline.
+  // Confirm-only records are targets too: their hands must equal the baseline.
   for (const n of SCORE.notes) {
-    if (TEN.has(n.id) || M66.has(n.id)) continue;
+    if (TEN.has(n.id) || M66.has(n.id) || M70_FLIP.has(n.id) || M70_CONFIRM.has(n.id)) continue;
     assert.equal(n.hand, pre.find((x) => x.id === n.id)!.hand, `${n.id}: hand untouched`);
   }
+});
+
+test('m70 editorial hands: exact flips, confirms, raw provenance and occupancy', () => {
+  // §4 prescription, verbatim: first four of the run LH, next four RH,
+  // separate low bass LH; 953/954 flip, 956/957 confirm, 955 flips to LH.
+  const want: ReadonlyMap<string, 'LH' | 'RH'> = new Map([
+    ['brahms-op118-no1-949', 'LH'],
+    ['brahms-op118-no1-950', 'LH'],
+    ['brahms-op118-no1-951', 'LH'],
+    ['brahms-op118-no1-952', 'LH'],
+    ['brahms-op118-no1-953', 'RH'],
+    ['brahms-op118-no1-954', 'RH'],
+    ['brahms-op118-no1-955', 'LH'],
+    ['brahms-op118-no1-956', 'RH'],
+    ['brahms-op118-no1-957', 'RH'],
+  ]);
+  for (const [id, hand] of want) {
+    assert.equal(SCORE.notes.find((x) => x.id === id)!.hand, hand, `${id}: editorial display hand`);
+  }
+  // Raw source provenance is retained on every m70 record: the flipped run
+  // halves stay leftHandLower (lower staff), the bass stays leftHandUpper.
+  const src: ReadonlyMap<string, [string, string]> = new Map([
+    ['brahms-op118-no1-953', ['leftHandLower', 'lower']],
+    ['brahms-op118-no1-954', ['leftHandLower', 'lower']],
+    ['brahms-op118-no1-955', ['leftHandUpper', 'upper']],
+    ['brahms-op118-no1-956', ['leftHandLower', 'upper']],
+    ['brahms-op118-no1-957', ['leftHandLower', 'upper']],
+  ]);
+  for (const [id, [voice, staff]] of src) {
+    const n = SCORE.notes.find((x) => x.id === id)!;
+    assert.ok(n.sourceProvenance?.voices.includes(voice), `${id}: source voice ${voice} retained`);
+    assert.ok(n.sourceProvenance?.staves.includes(staff), `${id}: source staff ${staff} retained`);
+    assert.ok(n.sourceProvenance?.hands.includes('LH'), `${id}: source hand LH retained`);
+  }
+  // Authoritative occupancy including sustained voices: the displayed LH is
+  // silent across 13392–13440 (no LH ink), the LH bass 955 sounds through
+  // 13440–13488, and the RH upper chord sustains across the whole window.
+  const handOf = (id: string): 'LH' | 'RH' => SCORE.notes.find((x) => x.id === id)!.hand;
+  const sounds = (tick: number, dur: number, hand: 'LH' | 'RH'): string[] =>
+    SCORE.notes
+      .filter((n) => handOf(n.id) === hand && n.startTick < tick + dur - 1e-9 && n.startTick + n.durationTicks > tick + 1e-9)
+      .map((n) => n.id);
+  assert.deepEqual(sounds(13392, 24, 'LH'), [], 'displayed LH silent at 13392');
+  assert.deepEqual(sounds(13416, 24, 'LH'), [], 'displayed LH silent at 13416');
+  assert.ok(sounds(13440, 48, 'LH').includes('brahms-op118-no1-955'), 'LH bass 955 sounds at 13440');
+  assert.ok(sounds(13464, 24, 'LH').includes('brahms-op118-no1-955'), 'LH bass 955 sustains at 13464');
+  for (const id of ['brahms-op118-no1-939', 'brahms-op118-no1-940', 'brahms-op118-no1-941']) {
+    assert.ok(sounds(13392, 24, 'RH').includes(id), `${id}: RH upper chord sustains at 13392`);
+    assert.ok(sounds(13440, 48, 'RH').includes(id), `${id}: RH upper chord sustains at 13440`);
+  }
+  // The editorial hands regroup the beams: 953+954 beam RH, 956+957 stay RH.
+  const layouts = layoutJankoScore(SCORE, O, T);
+  const beamOf = (id: string): string[] => {
+    const beam = layouts.flatMap((l) => l.beams).find((b) => b.notes.some((n) => n.id === id))!;
+    assert.ok(beam, `${id}: beamed`);
+    return beam.notes.map((n) => `${n.id}:${n.hand}`);
+  };
+  assert.deepEqual(beamOf('brahms-op118-no1-953'), ['brahms-op118-no1-953:RH', 'brahms-op118-no1-954:RH'], '953+954 beam RH');
+  assert.deepEqual(beamOf('brahms-op118-no1-956'), ['brahms-op118-no1-956:RH', 'brahms-op118-no1-957:RH'], '956+957 beam RH');
+  // Guard failures stay fail-closed for the new records.
+  const pre = buildPreCorrectionNotes();
+  const badHand = BRAHMS_HAND_CORRECTIONS.map((c) =>
+    c.expectedId === 'brahms-op118-no1-953' ? { ...c, expectedOriginalHand: 'RH' as const } : c
+  );
+  assert.throws(() => applyBrahmsHandCorrections(pre, badHand), /no score note matches/);
+  const badDur = BRAHMS_HAND_CORRECTIONS.map((c) =>
+    c.expectedId === 'brahms-op118-no1-955' ? { ...c, durationTicks: c.durationTicks + 1 } : c
+  );
+  assert.throws(() => applyBrahmsHandCorrections(pre, badDur), /has duration/);
+});
+
+test('Round 49 §4 authority: every correction carries an auditable resolution, and the resolution governs inference', () => {
+  // The audit record: every corrected note states which record authorized it
+  // and whether the record flipped the hand or only confirmed it. The raw
+  // sourceProvenance beside it is never mutated.
+  const kinds: ReadonlyMap<string, 'flip' | 'confirm'> = new Map([
+    ['brahms-op118-no1-953', 'flip'],
+    ['brahms-op118-no1-954', 'flip'],
+    ['brahms-op118-no1-955', 'flip'],
+    ['brahms-op118-no1-956', 'confirm'],
+    ['brahms-op118-no1-957', 'confirm'],
+  ]);
+  for (const c of BRAHMS_HAND_CORRECTIONS) {
+    const n = SCORE.notes.find((x) => x.id === c.expectedId)!;
+    assert.ok(n.editorialHand, `${c.expectedId}: carries an editorial resolution`);
+    assert.equal(n.editorialHand!.hand, c.correctedHand, `${c.expectedId}: the resolved hand`);
+    assert.equal(n.editorialHand!.authorityId, c.expectedId, `${c.expectedId}: the audit trail names the record`);
+    assert.equal(
+      n.editorialHand!.kind,
+      kinds.get(c.expectedId) ?? 'flip',
+      `${c.expectedId}: flip vs confirm exactly as the table declares`
+    );
+  }
+  // Only corrected events carry authority; an uncorrected neighbour does not.
+  assert.equal(
+    SCORE.notes.filter((n) => n.editorialHand).length,
+    BRAHMS_HAND_CORRECTIONS.length,
+    'authority exists on exactly the authorized events'
+  );
+  // The resolution *governs the rest inference* — the assertion that fails
+  // under the display-only implementation, where the raw source label
+  // (leftHandLower) vetoed the inference through the withheld path:
+  const layouts = layoutJankoScore(SCORE, O, T);
+  const painted = layouts.flatMap((l) => l.rests).filter((r) => r.tick === 13392 && r.hand === 'LH');
+  assert.equal(painted.length, 1, 'the truthful LH quarter rest at 13392 is painted');
+  assert.equal(painted[0]!.authored, false, 'derived from occupancy, not from a source-written rest');
+  const withheldHere = layouts
+    .flatMap((l) => l.withheldRests)
+    .filter((w) => w.tick >= 13392 && w.hand === 'LH');
+  assert.deepEqual(
+    withheldHere.map((w) => w.tick),
+    [],
+    'no withheld veto at 13392 or later: the resolved hand decides, the raw label does not'
+  );
+  // Conservatism survives elsewhere: m. 66 (no authority) still withholds.
+  const withheld66 = layouts.flatMap((l) => l.withheldRests).filter((w) => w.tick === 12528);
+  assert.equal(withheld66.length, 1, 'the unresolved m. 66 case keeps the conservative source veto');
 });

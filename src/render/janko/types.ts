@@ -782,6 +782,30 @@ export interface JankoTokens {
    * `options.tieProfile: 'traced'`.
    */
   tieControlFraction?: number;
+  /**
+   * Round 49 §6 (corrected) — the **reference tie laws** of the traced tie
+   * (read only under `options.tieProfile: 'traced'`): the reference's own
+   * functional forms, re-derived from their published mathematical statement
+   * and expressed in staff-space units (see `ties.ts` for the citations and
+   * the verification). The height saturates by the normalized arctangent
+   * form `h(w) = h_inf · F(w · r_0 / h_inf)` with `F(x) = (2/π)·atan(π·x/2)`,
+   * and the control indent follows the reference rational law
+   * `G(w) = 2·h_inf − q²·m/(w + q)` with `q = 2·h_inf/m`. Converted to pt
+   * through `tieRefStaffSpace`; verified against LilyPond 2.26.0's own
+   * computed control-points (five spans, < 0.001 sp) and the four recorded
+   * output specimens of the Round 48 dossier (< 0.006 pt). The contour keeps
+   * its **round edging stroke** of `tieEdgeStroke` pt (round joins and caps)
+   * — the reference stencil's softened tips.
+   */
+  /** LilyPond staff-space size (pt) of this notation's tie scale. */
+  tieRefStaffSpace?: number;
+  /** Reference height limit `h_inf` (staff spaces; LilyPond Tie `height-limit` default). */
+  tieRefHeightLimit?: number;
+  /** Reference small-span slope ratio (LilyPond Tie `ratio` default). */
+  tieRefRatio?: number;
+  /** Reference indent law's max fraction `m` (the `G'(0)` slope of the source law). */
+  tieRefIndentMaxFraction?: number;
+  tieEdgeStroke?: number;
   // --- Round 42 (Phase 3 study): compact bracket-duration vocabulary ---
   /** Compact cut: transverse length (pt) of one subdivision cut. */
   compactCutLength?: number;
@@ -915,6 +939,19 @@ export interface JankoTokens {
    */
   detachedSymbolAir?: number;
   /**
+   * Round 49 §5: **family-wide rightward air (pt) of the horizontal duration
+   * mounts that have no air token of their own** — the horizontal carrier arm
+   * and every short carrier. The detached seats keep their own token
+   * (`detachedSymbolAir`, which governs both the closed circle and the
+   * half-ring), so each family's gap is governed by one declared number and
+   * the two adopted values together widen every horizontal indicator family.
+   * The effective air of a mount is the maximum of the cluster's own optical
+   * air and its family token, so a declared air can only widen a gap, never
+   * shrink one. No time-column, cluster-spacing or augmentation-dot semantic
+   * is touched. `0` (default) is inert: every mount keeps its incumbent air.
+   */
+  horizontalMountAir?: number;
+  /**
    * Round 48: **half-height (pt) of a detached ring's local staff-rule
    * knockout**. The band is the rule's own ink height plus this air on each
    * side (`rule ink + 2 × half`): the line is cleaned just inside the ring's
@@ -1047,6 +1084,18 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   // profile, so the canonical surface paints the Round 46 arc unchanged.
   tieApexThickness: 0.45,
   tieControlFraction: 0.21,
+  // Round 49 §6 (corrected) — the **reference tie laws** (see the token docs
+  // above): the reference's own functional forms in staff-space units — the
+  // measured 4.984pt staff space of the Round 48 specimen record, the Tie
+  // grob defaults `height-limit = 1.0 sp` and `ratio = 0.333`
+  // (`scm/define-grobs.scm`, v2.26.0), and the indent law's max fraction
+  // `m = 1/3.1`. Verified against LilyPond's own computed control-points and
+  // the recorded output specimens; see `ties.tieTracedDepth`.
+  tieRefStaffSpace: 4.984,
+  tieRefHeightLimit: 1.0,
+  tieRefRatio: 0.333,
+  tieRefIndentMaxFraction: 1 / 3.1,
+  tieEdgeStroke: 0.25,
   // Round 42 (Phase 3 study) — compact family; the refinement's dimensioned
   // recommendation (cut 2.4/0.42, ring centreline Ø1.60/0.38 → outer Ø1.98,
   // mark spacing 2.40, fixed horizontal carrier 9.0). Experimental, not adopted.
@@ -1086,6 +1135,11 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   // byte-identical; the round's two candidates set them explicitly.
   detachedRingScale: 1,
   detachedSymbolAir: 0.30,
+  // Round 49 §5 — inert by default: `horizontalMountAir: 0` keeps every
+  // horizontal duration mount at its incumbent air, so every canonical
+  // surface stays byte-identical; the family-wide gap is declared explicitly
+  // where it is adopted.
+  horizontalMountAir: 0,
   staffRuleKnockoutHalfHeight: 0.12,
   openOvalTiltDegrees: -30,
   openOvalNarrowFactor: 0.66,
@@ -1430,6 +1484,20 @@ export interface JankoLayoutOptions {
    */
   exceptionCarrier?: JankoExceptionCarrier;
   /**
+   * Round 49 §2: **where an ordinary standalone long value mounts**. `'right'`
+   * (default) is the incumbent detached mount — the circle/half-circle run on
+   * the head's own pitch line immediately to its right. `'above'` introduces
+   * the above-numeral mount: the same vocabulary seated in the vertical band
+   * above the owning head's numeral, at the nearest legal lane the bounded
+   * actual-ink seat walk finds (own/foreign heads, knockouts, the head's own
+   * stem, beams, rests, brackets, sibling symbols, drawn rules and the staff
+   * boundary are all measured). Shared 2-span pair statements and short-value
+   * cues are untouched — a shared pair keeps its pair channel, and a refused
+   * above seat falls back to the incumbent right seat (never a silent
+   * omission: the value stays stated, and a double refusal is published).
+   */
+  standaloneLongMount?: 'right' | 'above';
+  /**
    * Round 45: **declared, centred optical cluster spacing**.
    *
    * When `true`, every *actually admitted* bracket cluster (the exact
@@ -1760,6 +1828,9 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   chordSymbolScale: 1,
   bracketDurationGrammar: 'golden',
   exceptionCarrier: 'none',
+  // Round 49 §2 — the incumbent mount by default: the above-numeral seat is
+  // opt-in, so the canonical engraving is untouched.
+  standaloneLongMount: 'right',
   longDurationStyle: 'midpoint',
   tieOriginIndicator: 'source',
   tieProfile: 'uniform',
