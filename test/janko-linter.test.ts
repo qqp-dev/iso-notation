@@ -1412,8 +1412,10 @@ test('Round 47 defect: an orphaned, suppressed-only or unknown-owner duration ma
 
   // 4. A detached symbol moved onto a drawn staff rule (the seat contract).
   const withSymbols = layouts.find((l) => l.detachedSymbols.length > 0)!;
-  const rule = drawnStaffRuleYs(withSymbols.geometry, options, tokens)[0];
   const symbol = withSymbols.detachedSymbols[0];
+  // Choose ink that actually reaches this x; a remote need-based segment in
+  // another measure is not a collider of the moved symbol.
+  const rule = drawnStaffRuleYs(withSymbols.geometry, options, tokens, symbol.x)[0];
   const seated: JankoSystemLayout = {
     ...withSymbols,
     detachedSymbols: [{ ...symbol, y: rule }],

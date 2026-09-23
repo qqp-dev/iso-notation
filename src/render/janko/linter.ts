@@ -86,7 +86,7 @@ import {
   paintedFacingGap,
   renderSystem,
   suppressedStemIds,
-  systemPaintedInkBoxes,
+  systemPageBookingBoxes,
 } from './engine';
 import { getBarStaffSegments, getEquatorRuleYs, outlierLedgerSpans, pitchGridRules } from './elements/staff';
 import {
@@ -2161,7 +2161,8 @@ export function checkContentAwarePageFit(
     const ordered = [...systems].sort((a, b) => a.index - b.index);
     const contentTop = Math.min(...ordered.map((l) => l.geometry.slotTopY));
     const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
-    const boxes = ordered.map((l) => systemPaintedInkBoxes(l, o, t));
+    // Named page-slot booking constraint, NOT a claim of global physical ink.
+    const boxes = ordered.map((l) => systemPageBookingBoxes(l, o, t));
     const extents = boxes.map((bs) => ({
       top: Math.min(...bs.map((b) => b.y0)),
       bottom: Math.max(...bs.map((b) => b.y1)),
@@ -2404,12 +2405,14 @@ export function checkContourTicks(
       r: t.augmentationDotRadius,
     });
   }
-  const rules: number[] = [];
+  const rules: Array<{y:number;x1:number;x2:number}> = [];
   if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-    for (const rule of pitchGridRules(layout.geometry, o, t)) rules.push(rule.y);
+    for (const rule of pitchGridRules(layout.geometry, o, t)) rules.push(rule);
   } else {
+    // Unmigrated twin-row mapping: equators are full staff-width lines.
     for (let octave = 0; octave <= 8; octave++) {
-      rules.push(...getEquatorRuleYs(layout.geometry.equatorY('RH', octave), o, t));
+      rules.push(...getEquatorRuleYs(layout.geometry.equatorY('RH', octave), o, t)
+        .map(y=>({y,x1:layout.geometry.staffLeft,x2:layout.geometry.staffRight})));
     }
   }
   const painted: Array<{ x: number; air: number; label: string }> = [
@@ -2476,8 +2479,9 @@ export function checkContourTicks(
         });
         break;
       }
-      for (const y of rules) {
-        if (y < tb.y0 || y > tb.y1) continue;
+      for (const rule of rules) {
+        if (rule.x2 < tb.x0 || rule.x1 > tb.x1 || rule.y < tb.y0 || rule.y > tb.y1) continue;
+        const y=rule.y;
         out.push({
           code: 'contour-tick-clearance',
           severity: 'error',
@@ -3432,6 +3436,7 @@ export function checkDurationInkOwnership(
     const knockouts = symbol.ruleKnockouts ?? [];
     const bands = detachedRuleKnockoutBands(symbol, t);
     for (const rule of drawnStaffRuleBands(layout.geometry, o, t)) {
+      if (rule.x2 < box.x0 - 1e-9 || rule.x1 > box.x1 + 1e-9) continue;
       const crossing = rule.y > box.y0 - 1e-9 && rule.y < box.y1 + 1e-9;
       if (!crossing) continue;
       const recorded = knockouts.some(
@@ -5914,7 +5919,7 @@ export function checkTieIntegrity(
       }
     }
   }
-  const rules = drawnStaffRuleYs(layout.geometry, o, t);
+  const rules = drawnStaffRuleBands(layout.geometry, o, t);
   const ruleHalf = t.tieStroke / 2 + t.tieRuleAir;
   const boxes: JankoTieBox[] = layout.notes.map((p) => {
     const e = knockoutHalfExtents(o, t, p.note.startTick, p);
@@ -5938,21 +5943,22 @@ export function checkTieIntegrity(
       });
     }
     for (const rule of rules) {
+      if(rule.x2<arc.x1||rule.x1>arc.x2)continue;
       const band = [Math.min(arc.y, arc.y + arc.side * arc.depth), Math.max(arc.y, arc.y + arc.side * arc.depth)];
       for (const y of band.length === 2 ? [band[0], band[1]] : band) {
-        if (Math.abs(rule - y) > ruleHalf - 1e-9) continue;
+        if (Math.abs(rule.y - y) > ruleHalf - 1e-9) continue;
         out.push({
           code: 'tie-rule-fusion',
           severity: 'warning',
           message:
             `Tie ${arc.noteId} component ${arc.index + 1} runs ` +
-            `${Math.abs(rule - y).toFixed(2)}pt from a painted staff rule at y=${rule.toFixed(2)}: ` +
+            `${Math.abs(rule.y - y).toFixed(2)}pt from a painted staff rule at y=${rule.y.toFixed(2)}: ` +
             `the axis nudge could not clear it`,
           system: layout.index,
           noteIds: [arc.fromHeadId, arc.toHeadId],
           x: arc.x1,
           y: arc.y,
-          metrics: { ruleY: rule, axisY: y },
+          metrics: { ruleY: rule.y, axisY: y },
         });
       }
     }

@@ -121,15 +121,29 @@ function gridChannel(
  * selects the closing boundary: `'unified'` (the default) is the same
  * continuous rule, `'split-corridor'` restores the two hand halves.
  */
-export function renderBarlines(
+export interface VerticalGridStroke {
+  x: number;
+  y1: number;
+  y2: number;
+  width: number;
+  stroke: string;
+  cls: 'janko-grid-channel' | 'janko-barline' | 'janko-beat-line';
+  dash?: string;
+  /** The white air channel erases rhythm ink; it is not physical ink. */
+  erase: boolean;
+  tick?: number;
+}
+
+/** Authoritative placed vertical strokes, in their exact painter order. */
+export function barlineStrokes(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null,
   isFinalScoreMeasure: boolean = true
-): string {
+): VerticalGridStroke[] {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
-  const out: string[] = ['  <g class="janko-barlines">'];
+  const out: VerticalGridStroke[] = [];
   const channelled = channelsGridInk(o.gridWritingPolicy);
 
   const rhTop = gridTopY(geo, o, t);
@@ -170,21 +184,21 @@ export function renderBarlines(
 
   /** Push one internal measure barline: continuous across the corridor. */
   const pushMeasure = (x: number, strokeWidth: number = 0.60): void => {
-    if (channelled) out.push(gridChannel(x, measureTop, measureBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-    out.push(renderStaffBarline(x, measureTop, measureBot, strokeWidth));
+    if (channelled) out.push({ x, y1: measureTop, y2: measureBot, width: GRID_CHANNEL_BARLINE, stroke: '#FFFFFF', cls: 'janko-grid-channel', erase: true });
+    out.push({ x, y1: measureTop, y2: measureBot, width: strokeWidth, stroke: '#111111', cls: 'janko-barline', erase: false });
   };
 
   /** The authoritative final boundary of the score (stroke: 0.90pt). */
   const pushFinal = (x: number): void => {
     if (o.finalBarlineStyle === 'split-corridor') {
-      if (channelled) out.push(gridChannel(x, finalTop, rhBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-      out.push(renderStaffBarline(x, finalTop, rhBot, 0.90));
-      if (channelled) out.push(gridChannel(x, lhTop, finalBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-      out.push(renderStaffBarline(x, lhTop, finalBot, 0.90));
+      if (channelled) out.push({ x, y1: finalTop, y2: rhBot, width: GRID_CHANNEL_BARLINE, stroke: '#FFFFFF', cls: 'janko-grid-channel', erase: true });
+      out.push({ x, y1: finalTop, y2: rhBot, width: 0.90, stroke: '#111111', cls: 'janko-barline', erase: false });
+      if (channelled) out.push({ x, y1: lhTop, y2: finalBot, width: GRID_CHANNEL_BARLINE, stroke: '#FFFFFF', cls: 'janko-grid-channel', erase: true });
+      out.push({ x, y1: lhTop, y2: finalBot, width: 0.90, stroke: '#111111', cls: 'janko-barline', erase: false });
       return;
     }
-    if (channelled) out.push(gridChannel(x, finalTop, finalBot, GRID_CHANNEL_BARLINE, 'janko-grid-channel'));
-    out.push(renderStaffBarline(x, finalTop, finalBot, 0.90));
+    if (channelled) out.push({ x, y1: finalTop, y2: finalBot, width: GRID_CHANNEL_BARLINE, stroke: '#FFFFFF', cls: 'janko-grid-channel', erase: true });
+    out.push({ x, y1: finalTop, y2: finalBot, width: 0.90, stroke: '#111111', cls: 'janko-barline', erase: false });
   };
 
   const anacrusis = t.anacrusisTicks ?? 0;
@@ -219,8 +233,24 @@ export function renderBarlines(
     }
   }
 
-  out.push('  </g>');
-  return out.join('\n');
+  const anacrusisTicks = t.anacrusisTicks ?? 0;
+  const upbeatWidth = geo.index === 0 && anacrusisTicks > 0
+    ? anacrusisTicks / t.ticksPerMeasure * geo.measureWidth : 0;
+  return out.map(s => ({ ...s, tick: anacrusisTicks +
+    (geo.index * o.measuresPerSystem + Math.round((s.x - geo.staffLeft - upbeatWidth) / geo.measureWidth))
+    * t.ticksPerMeasure }));
+}
+
+/** Serialize the placed barline scene without deriving any geometry here. */
+export function renderBarlines(
+  geo: JankoSystemGeometry,
+  options?: Partial<JankoLayoutOptions> | null,
+  tokens?: Partial<JankoTokens> | null,
+  isFinalScoreMeasure: boolean = true
+): string {
+  return ['  <g class="janko-barlines">',
+    ...barlineStrokes(geo, options, tokens, isFinalScoreMeasure).map(serializeVerticalGridStroke),
+    '  </g>'].join('\n');
 }
 
 /** Vertical clearance (pt) a measure numeral keeps above the staff's top rule. */
@@ -389,23 +419,34 @@ export function renderBeatGrid(
   const t = resolveJankoTokens(tokens);
   if (!o.showBeatGrid) return '';
 
-  const pulses = resolveBeatPulseXs(geo, systemIndex, o, t, columns);
-  if (pulses.length === 0) return '';
+  const strokes = beatGridStrokes(geo, systemIndex, o, t, columns);
+  if (strokes.length === 0) return '';
+  return ['  <g class="janko-beat-grid">', ...strokes.map(serializeVerticalGridStroke), '  </g>'].join('\n');
+}
 
-  const out: string[] = ['  <g class="janko-beat-grid">'];
-  const rhTop = gridTopY(geo, o, t);
-  const lhBot = gridBotY(geo, o, t);
-  const channelled = channelsGridInk(o.gridWritingPolicy);
-
-  for (const x of pulses) {
-    if (channelled) {
-      out.push(gridChannel(x, rhTop, lhBot, GRID_CHANNEL_BEAT, 'janko-grid-channel', '2,3'));
+/** Beat pulses include the resolved tick, even for proportional empty beats. */
+export function beatGridStrokes(
+  geo: JankoSystemGeometry,
+  systemIndex: number,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens,
+  columns?: ReadonlyMap<number, number> | null
+): VerticalGridStroke[] {
+  const pulses = resolveBeatPulses(geo, systemIndex, o, t, columns);
+  const top = gridTopY(geo, o, t);
+  const bot = gridBotY(geo, o, t);
+  const out: VerticalGridStroke[] = [];
+  for (const { x, tick } of pulses) {
+    if (channelsGridInk(o.gridWritingPolicy)) {
+      out.push({ x, y1: top, y2: bot, width: GRID_CHANNEL_BEAT, stroke: '#FFFFFF', cls: 'janko-grid-channel', dash: '2,3', erase: true, tick });
     }
-    out.push(
-      `    <line class="janko-beat-line" x1="${f(x)}" y1="${f(rhTop)}" x2="${f(x)}" y2="${f(lhBot)}" stroke="#9CA3AF" stroke-width="0.70" stroke-dasharray="2,3"/>`
-    );
+    out.push({ x, y1: top, y2: bot, width: 0.70, stroke: '#9CA3AF', cls: 'janko-beat-line', dash: '2,3', erase: false, tick });
   }
+  return out;
+}
 
-  out.push('  </g>');
-  return out.join('\n');
+export function serializeVerticalGridStroke(s: VerticalGridStroke): string {
+  if (s.erase) return gridChannel(s.x, s.y1, s.y2, s.width, s.cls, s.dash);
+  if (s.cls === 'janko-barline') return renderStaffBarline(s.x, s.y1, s.y2, s.width, s.stroke);
+  return `    <line class="janko-beat-line" x1="${f(s.x)}" y1="${f(s.y1)}" x2="${f(s.x)}" y2="${f(s.y2)}" stroke="${s.stroke}" stroke-width="${s.width.toFixed(2)}" stroke-dasharray="${s.dash}"/>`;
 }
