@@ -138,11 +138,16 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
    * staleness, and the module never enters the config dependency graph.
    */
   const loadGenerator = async (): Promise<PreparedGeneration> => {
-    if (options.generate) return options.generate();
+    const started = performance.now();
+    if (options.generate) {
+      const generated = await options.generate();
+      return { ...generated, generationMs: +(performance.now() - started).toFixed(1) };
+    }
     const generatorPath = fileURLToPath(new URL('./generate.ts', import.meta.url));
     const { module } = await runnerImport(generatorPath);
-    const gen = (module as { generatePreparedStudio: () => PreparedGeneration }).generatePreparedStudio;
-    return gen();
+    const gen = (module as { generatePreparedStudio: (overrides?: object, candidateRoot?: string) => PreparedGeneration }).generatePreparedStudio;
+    const generated = gen({}, isBuild ? undefined : root);
+    return { ...generated, generationMs: +(performance.now() - started).toFixed(1) };
   };
 
   const generateCoherently = async (): Promise<
@@ -258,6 +263,13 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
       // Serve the content-addressed artifacts from memory.
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';
+        if (url === '/@janko-prepared/status') {
+          const current = queue?.current;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', candidateRevision: current?.generation.candidateRevision, candidateError: current?.generation.candidateError, generationMs: current?.generation.generationMs, stale: current?.stale ?? true, error: current?.error }));
+          return;
+        }
         if (!url.startsWith(PREPARED_DEV_ARTIFACT_PREFIX)) return next();
         const hash = url.slice(PREPARED_DEV_ARTIFACT_PREFIX.length).replace(/\.html$/, '');
         const current = queue?.current;
@@ -283,7 +295,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
       queue?.request();
       const onChange = (path: string): void => {
         if (!isWatchedInput(path, root)) return;
-        queue?.request();
+        queue?.request(resolve(path) === resolve(root, '.semantic-candidate.local'));
       };
       server.watcher.on('add', onChange);
       server.watcher.on('change', onChange);

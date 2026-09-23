@@ -214,6 +214,28 @@ describe('prepared studio HMR delivery (real vite server, real protocol)', () =>
     }
   });
 
+  it('candidate state is explicitly watched and publishes pending/stale before the next prepared generation', async () => {
+    const { ws, events } = await browserBoot();
+    try {
+      const state = join(root, '.semantic-candidate.local');
+      writeFileSync(state, JSON.stringify({ schema: 1, revision: 'fixture' }));
+      const pending = await waitForUpdate(events, u => u.type === 'js-update');
+      const ready = await waitForUpdate(events, u => u.type === 'js-update' && u.timestamp > pending.timestamp);
+      assert.equal(ready.path, '/src/viewer-fixture.ts');
+      const status = await fetch(`http://127.0.0.1:${port}/@janko-prepared/status`);
+      assert.equal(status.status, 200);
+      assert.equal(status.headers.get('cache-control'), 'no-store');
+      // The real generator carries candidateRevision from the saved state; this
+      // fixture tests watched delivery and queue publication without an engine.
+      const published = await status.json();
+      assert.equal(typeof published.generation, 'string');
+      assert.equal(typeof published.generationMs, 'number');
+      rmSync(state);
+      const removed = await waitForUpdate(events, u => u.type === 'js-update' && u.timestamp > ready.timestamp);
+      await waitForUpdate(events, u => u.type === 'js-update' && u.timestamp > removed.timestamp);
+    } finally { ws.close(); }
+  });
+
   it('unwatched files never trigger a generation (the watcher filter stays exact)', async () => {
     const { ws, events } = await browserBoot();
     try {

@@ -75,6 +75,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
@@ -1694,13 +1695,7 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   // Round 49: the §1 written chains, the §4 m70 hands + authority, the §6
   // reference tie laws and the §5 family air re-pin the BRONZE spread's
   // m. 70-bearing page (Bach GOLD above stays frozen).
-  const brahmsPages = [
-    '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90',
-    'a84166821d569d8c080b1ff98f97664d0f1d6132b7002026ea6cd66e32b85cfa',
-    '78b3fd134d5f3b4bf4269619759149a34aa9c8c95f540fcc72fe12f9495a2897',
-    '40c43f6aed8a4b4554d2e0c8c7c9d62a468dccb3766f2da15ba66d7f7fa984fd',
-    'd2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5',
-  ];
+  const brahmsPages = BRAHMS_CURRENT_PAGES;
   for (let page = 0; page < brahmsPages.length; page++) {
     assert.equal(
       sha(renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
@@ -1710,7 +1705,7 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   }
   assert.equal(
     sha(renderJankoCrop(BRAHMS, 1, 71, REFERENCE_OPTIONS, REFERENCE_TOKENS)),
-    'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be83570f2a9059',
+    BRAHMS_CURRENT_WHOLE_CROP,
     'the whole-score crop carries the §4 m70 hands, authority and truthful rest'
   );
 });

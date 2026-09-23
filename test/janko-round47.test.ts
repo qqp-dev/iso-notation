@@ -35,6 +35,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
 import { readFileSync } from 'node:fs';
 
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
@@ -89,8 +90,8 @@ const sha = (text: string): string => createHash('sha256').update(text, 'utf8').
  * Round 49 §4 re-pins the crop: the m70 editorial hands regroup the m. 70
  * beams, and the corrected §4 authority paints the truthful m. 70 LH quarter
  * at 13392 (the resolved hand decides; the raw label no longer vetoes). */
-const REFERENCE_PAGE0 = '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90';
-const REFERENCE_CROP = 'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be83570f2a9059';
+const REFERENCE_PAGE0 = BRAHMS_CURRENT_PAGES[0];
+const REFERENCE_CROP = BRAHMS_CURRENT_WHOLE_CROP;
 
 /** One synthetic note (the round's controlled tie-topology fixtures). */
 function note(

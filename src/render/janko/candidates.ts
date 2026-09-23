@@ -1180,6 +1180,21 @@ export const CURRENT_ROUND_METADATA: JankoCandidateRound = ROUND_49_METADATA;
 
 export const CURRENT_CANDIDATES: JankoCandidate[] = ROUND_49_CANDIDATES;
 
+/** Candidate-only semantic projection: an additional real-engine review card,
+ * not a change to the current exploratory round or Reference. */
+export function semanticHandCandidate(revision: string, windows: readonly { measureStart: number; measureCount: number; changed: boolean }[]): JankoCandidate {
+  if (!windows.length) throw new Error('semantic candidate has no review windows');
+  return {
+    id: 'semantic-hand', label: 'Semantic hand candidate',
+    description: `Guarded candidate revision ${revision.slice(0, 12)} · real-engine hand assignment (not Reference)`,
+    tags: ['brahms', 'editorial', 'candidate'],
+    windows: windows.map(({ measureStart, measureCount, changed }) => {
+      const last = measureStart + measureCount - 1;
+      return brahmsWindow(measureStart, measureCount, `mm. ${measureStart}–${last} · ${changed ? 'affected' : 'candidate state · unchanged in this revision'}`);
+    }),
+  };
+}
+
 export function candidateBadges(
   candidate: JankoCandidate,
   round: JankoCandidateRound = CURRENT_ROUND_METADATA

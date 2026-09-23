@@ -2,6 +2,7 @@ node_modules
 dist
 .vite
 *.local
+.semantic-candidate.local.archive-*
 archive/
 scratch/
 .venv/
