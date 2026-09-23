@@ -82,6 +82,7 @@ import {
   SYNTHETIC_M8_DIAGNOSTIC_SCORE_ID,
   candidateBadges,
   resolveCandidate,
+  semanticHandCandidate,
   isAbstractCandidateWindow,
   JankoAbstractCandidateWindow,
   JankoScoreCandidateWindow,
@@ -234,6 +235,10 @@ export interface JankoStudioConfig {
    * primary entry is always present under `DEFAULT_STUDIO_SCORE_ID`.
    */
   scores: Record<string, StudioScore>;
+  /** Candidate-only Brahms projection; Reference always uses the canonical score. */
+  semanticCandidate?: { score: QuantizedGridScore; revision: string; reviewWindows: import('./semantic-hand').ReviewWindow[] };
+  /** Stale saved candidate is refused; render an explicit diagnostic, never a projected card. */
+  semanticCandidateError?: string;
 }
 
 /** Build a studio configuration, defaulting to the golden master + current round. */
@@ -352,6 +357,8 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     brahmsCrops: overrides.brahmsCrops ?? BRAHMS_STUDIO_CROPS,
     brahmsPages: overrides.brahmsPages ?? Array.from({ length: brahmsPages }, (_, i) => i),
     scores,
+    ...(overrides.semanticCandidate ? { semanticCandidate: overrides.semanticCandidate } : {}),
+    ...(overrides.semanticCandidateError ? { semanticCandidateError: overrides.semanticCandidateError } : {}),
   };
 }
 
@@ -516,7 +523,9 @@ export function renderCompareStrip(
  * lint verdict **over every score the candidate is demonstrated on**.
  */
 export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig()): string {
-  const { candidates, round, scores } = config;
+  const { round, scores } = config;
+  const candidates: JankoCandidate[] = config.semanticCandidate
+    ? [...config.candidates, semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows)] : config.candidates;
 
   // Compute once per distinct score/options/tokens configuration per candidate per render.
   // Candidate configurations remain separate from each other and from the reference view.
@@ -614,7 +623,9 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const seen = new Set<string>();
     const panels = resolved.windows.map((w) => {
       const window = w as JankoScoreCandidateWindow;
-      const entry = scores[window.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
+      const original = scores[window.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
+      const entry = candidate.id === 'semantic-hand' && original.id === BRAHMS_STUDIO_SCORE_ID && config.semanticCandidate
+        ? { ...original, score: config.semanticCandidate.score } : original;
       const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
       const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
       if (!seen.has(entry.id)) {
@@ -676,8 +687,9 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .join('');
     const opts = resolved.options;
     const toks = resolved.tokens;
-    const facts =
-      `${opts.rhythmStyle} · chord grouping ${opts.chordGrouping} · spine ${opts.middleCSpine} · ` +
+    const facts = candidate.id === 'semantic-hand'
+      ? `Brahms canonical fixed-3 engraving · guarded score projection · no Reference promotion`
+      : `${opts.rhythmStyle} · chord grouping ${opts.chordGrouping} · spine ${opts.middleCSpine} · ` +
       `gap ${opts.interStaffGap.toFixed(1)}pt · ${describeChannelLayout(opts, toks)} · ` +
       `grid ${opts.gridWritingPolicy} · system start ${opts.systemStartStyle} · ` +
       `clasp ${toks.claspOffset.toFixed(1)}pt offset / ${toks.claspMinBarlineAir.toFixed(1)}pt barline air · ` +
@@ -729,6 +741,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
     renderCompareStrip(config, candidateLayouts),
+    config.semanticCandidateError ? `<article class="candidate-card" data-candidate="semantic-hand-stale" data-lint="error" role="alert"><h3>Saved semantic candidate STALE — not applied</h3><p class="rationale">${escapeHtml(config.semanticCandidateError)}</p><p>Reference remains canonical. Archive and start a new guarded candidate with <code>semantic-hand recover</code>; no automatic rebase.</p></article>` : '',
     `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}" data-decided="${decided}">`,
     cards.join('\n'),
     '  </div>',

@@ -34,6 +34,7 @@ import { createHash } from 'node:crypto';
 import { createStudioConfig, renderCandidatesView, renderReferenceView, JankoStudioConfig } from '../studio';
 import { lintJankoScore } from '../linter';
 import type { PreparedGeneration, PreparedStatus } from './seam';
+import { readCandidate, candidateScore, head, candidateHealth, SEMANTIC_STATE } from '../semantic-hand';
 
 export type { PreparedArtifactKey, PreparedGeneration, PreparedStatus } from './seam';
 
@@ -44,9 +45,15 @@ function sha256Of(text: string): string {
 
 /** Generate one coherent prepared studio (both views + the lint status). */
 export function generatePreparedStudio(
-  overrides: Partial<JankoStudioConfig> = {}
+  overrides: Partial<JankoStudioConfig> = {},
+  candidateRoot?: string,
+  candidatePath = SEMANTIC_STATE
 ): PreparedGeneration {
-  const config = createStudioConfig(overrides);
+  const health = candidateRoot ? candidateHealth(candidateRoot, candidatePath) : undefined;
+  const state = candidateRoot && health?.state === 'current' ? readCandidate(candidateRoot, candidatePath) : undefined;
+  const semanticCandidate = state?.records.length ? { score: candidateScore(state), revision: head(state, candidateRoot), reviewWindows: state.records.at(-1)!.effects.reviewWindows } : undefined;
+  const semanticCandidateError = health?.state === 'stale' ? health.diagnostic : undefined;
+  const config = createStudioConfig({ ...overrides, ...(semanticCandidate ? { semanticCandidate } : {}), ...(semanticCandidateError ? { semanticCandidateError } : {}) });
   const candidates = renderCandidatesView(config);
   const reference = renderReferenceView(config);
   // The status line of the primary score, computed by the real linter — the
@@ -75,5 +82,5 @@ export function generatePreparedStudio(
       status: { ok: status.ok, violations: status.violations, warnings: status.warnings, systems: status.systems, notes: status.notes },
     })
   );
-  return { generation, artifactHashes, artifacts: { candidates, reference }, status };
+  return { generation, artifactHashes, artifacts: { candidates, reference }, status, candidateRevision: semanticCandidate?.revision, ...(semanticCandidateError ? { candidateError: semanticCandidateError } : {}) };
 }

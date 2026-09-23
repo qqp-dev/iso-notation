@@ -46,6 +46,12 @@ export interface PreparedGeneration {
   artifacts: Record<PreparedArtifactKey, string>;
   /** The primary score's lint status, computed by the real linter. */
   status: PreparedStatus;
+  /** Exact saved semantic revision represented by the candidate artifact, if any. */
+  candidateRevision?: string;
+  /** A refused stale saved candidate; the Reference artifact remains canonical. */
+  candidateError?: string;
+  /** Server-only measurement; excluded from content-addressed generation identity. */
+  generationMs?: number;
 }
 
 /**
@@ -75,7 +81,7 @@ export function snapshotKey(snapshot: PreparedInputSnapshot): string {
 
 /** The watched input roots, relative to the project root. */
 const WATCH_ROOTS = ['src', 'data', 'public/midi'];
-const WATCH_FILES = ['package.json', 'package-lock.json'];
+const WATCH_FILES = ['package.json', 'package-lock.json', '.semantic-candidate.local'];
 const WATCH_EXTENSIONS = ['.ts', '.tsx', '.json', '.ily', '.mid', '.midi', '.ly'];
 
 /** Whether a watched-event path is an engraving input the prepared studio must regenerate on. */
@@ -160,6 +166,8 @@ export function manifestModuleSource(
     generation: generation.generation,
     artifactHashes: generation.artifactHashes,
     status: generation.status,
+    candidateRevision: generation.candidateRevision,
+    candidateError: generation.candidateError,
     stale,
     ...(error !== undefined ? { error } : {}),
   };
@@ -200,7 +208,13 @@ export class GenerationQueue {
     return this.published;
   }
 
-  request(): void {
+  request(markCandidatePending = false): void {
+    // Candidate writes must not advertise the previous saved revision as ready.
+    // Ordinary source HMR retains its existing single-update-per-generation contract.
+    if (markCandidatePending && this.published) {
+      this.published = { ...this.published, stale: true };
+      this.onPublished(this.published);
+    }
     this.queued = true;
     if (this.running) return;
     this.running = true;

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
+import { BRAHMS_CURRENT_PAGES } from './support/brahms-current';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -93,13 +94,7 @@ test('only the compiler-confirmed parts line 383 redundant stop becomes diagnost
 });
 
 test('all five Brahms pages remain byte-identical to pre-overlay real-engine SVG', () => {
-  const expected = [
-    '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90',
-    'a84166821d569d8c080b1ff98f97664d0f1d6132b7002026ea6cd66e32b85cfa',
-    '78b3fd134d5f3b4bf4269619759149a34aa9c8c95f540fcc72fe12f9495a2897',
-    '40c43f6aed8a4b4554d2e0c8c7c9d62a468dccb3766f2da15ba66d7f7fa984fd',
-    'd2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5',
-  ];
+  const expected = BRAHMS_CURRENT_PAGES;
   for (let p = 0; p < 5; p++)
     assert.equal(hash(renderJankoPage(score, p, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)), expected[p], `page ${p+1}`);
 });

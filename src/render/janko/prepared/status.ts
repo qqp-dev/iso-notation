@@ -22,6 +22,8 @@ export interface PreparedManifest {
     lintMs: number;
   };
   stale: boolean;
+  candidateRevision?: string;
+  candidateError?: string;
   error?: string;
 }
 
@@ -38,5 +40,5 @@ export function renderPreparedStatus(manifest: PreparedManifest): string {
         ? '✓'
         : '✗';
   const counts = `${manifest.status.violations} violations · ${manifest.status.warnings} warnings · ${manifest.status.systems} systems · ${manifest.status.notes} noteheads`;
-  return `${verdict} ${counts} · prepared ${manifest.generation.slice(0, 12)}`;
+  return `${verdict} ${counts} · prepared ${manifest.generation.slice(0, 12)}${manifest.candidateRevision ? ` · candidate ${manifest.candidateRevision.slice(0, 12)}` : ''}${manifest.candidateError ? ` · saved candidate STALE — not applied: ${manifest.candidateError}` : ''}`;
 }
