@@ -107,6 +107,8 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
+import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg } from './ink-scene';
+import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
   renderLedgerEquator,
@@ -1773,6 +1775,9 @@ export function outgoingTieByHeadId(
 }
 
 export interface JankoSystemLayout {
+  /** Immutable input identity for the placed scene: the COMPLETE source/editorial
+   * score, not just this system's visible note ids. No layout-cache inference. */
+  scoreRevision?: QuantizedGridScore;
   /** Zero-based global system index. */
   index: number;
   /**
@@ -2978,13 +2983,8 @@ export function drawnStaffRuleYs(
   // read the painter's own line set (every lane on the Klavar grid, the
   // scheme's lines on the grand grid), so the list cannot drift from the ink.
   if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-    const allRules = pitchGridRules(geo, o, t);
-    const rules =
-      x !== undefined
-        ? allRules.filter((r) => r.x1 <= x + 0.01 && x <= r.x2 + 0.01)
-        : allRules;
-    const pool = rules.length > 0 ? rules : allRules;
-    return pool
+    const rules = preliminaryStaffRules(geo, o, t, x);
+    return rules
       .map((rule) => rule.y)
       .sort((a, b) => a - b);
   }
@@ -3010,15 +3010,15 @@ export function drawnStaffRuleYs(
 export function drawnStaffRuleBands(
   geo: JankoSystemGeometry,
   o: ResolvedJankoLayoutOptions,
-  t: ResolvedJankoTokens
-): Array<{ y: number; half: number }> {
+  t: ResolvedJankoTokens,
+  x?: number
+): Array<{ y: number; half: number; x1: number; x2: number }> {
   if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-    return pitchGridRules(geo, o, t)
-      .map((rule) => ({ y: rule.y, half: rule.width / 2 }))
-      .sort((a, b) => a.y - b.y);
+    return preliminaryStaffRules(geo, o, t, x).sort((a, b) => a.y - b.y);
   }
+  // Legacy twin-row equator family: not covered by the fixed-core scene.
   const half = Math.max(...pitchGridRules(geo, o, t).map((rule) => rule.width), 0) / 2 || 0.5;
-  return drawnStaffRuleYs(geo, o, t).map((y) => ({ y, half }));
+  return drawnStaffRuleYs(geo, o, t, x).map((y) => ({ y, half, x1: geo.staffLeft, x2: geo.staffRight }));
 }
 
 /**
@@ -3033,6 +3033,7 @@ export function nearestDrawnStaffRule(
   x?: number
 ): number {
   const rules = drawnStaffRuleYs(geo, o, t, x);
+  if (rules.length === 0) throw new Error(`No drawn staff rule at x=${x}; cannot seat a bar rest on absent ink`);
   let best = rules[0];
   for (const rule of rules) {
     const d = Math.abs(rule - y);
@@ -6598,28 +6599,32 @@ export function systemPaintedInkBoxes(
 ): JankoPaintedInkBox[] {
   const g = layout.geometry;
   const out: JankoPaintedInkBox[] = [];
+  let legacy = false;
   const push = (x0: number, x1: number, y0: number, y1: number, what: string): void => {
     out.push({
       x0: Math.min(x0, x1),
       x1: Math.max(x0, x1),
       y0: Math.min(y0, y1),
       y1: Math.max(y0, y1),
-      what,
+      what: legacy ? `legacy broad ${what}` : what,
     });
   };
 
-  // 1. The painted pitch grid. The need-based rows, the barlines' tips and the
-  //    dashed beat pulses all live inside the grid's outer span
-  //    (`gridTopY … gridBotY` = the extreme rows ± the measure inset), which is
-  //    the honest bound of that furniture.
-  if (o.pitchMapping !== 'twin-rows' || o.core === 'fixed-3' || o.core === 'fixed-4') {
-    push(g.staffLeft, g.staffRight, gridTopY(g, o, t), gridBotY(g, o, t), 'pitch grid');
+  // PARTIAL PHYSICAL INVENTORY: only the scene families have real visible
+  // ink here. The other boxes below are explicitly legacy BROAD bounds; do
+  // not treat this aggregate as a global narrow-phase physical clearance.
+  if (o.core === 'fixed-3' || o.core === 'fixed-4') {
+    for (const b of buildInkScene(layout, o, t).physical) {
+      push(b.x0, b.x1, b.y0, b.y1, b.what);
+    }
   } else {
+    // Legacy twin-row mapping has not migrated; no false scene coverage.
     for (const rule of pitchGridRules(g, o, t)) {
-      push(rule.x1, rule.x2, rule.y - rule.width / 2, rule.y + rule.width / 2, 'grid rule');
+      push(rule.x1, rule.x2, rule.y - rule.width / 2, rule.y + rule.width / 2, 'legacy broad grid rule');
     }
   }
 
+  legacy = true;
   // 2. Ledger ink: the continuous outlier rules and the per-notehead equator
   //    dashes (a dash inside a continuous span is not painted twice).
   const spans = outlierLedgerSpans(layout.notes, g, layout.index, t);
@@ -6641,16 +6646,8 @@ export function systemPaintedInkBoxes(
     }
   }
 
-  // 3. Noteheads: the erasure mask (or the wider honour halo) at the painted
-  //    centre — the optical position, never the source pitch's nominal row.
-  for (const p of layout.notes) {
-    const { wx, hy } = knockoutHalfExtents(o, t, p.note.startTick, p);
-    push(p.x - wx, p.x + wx, p.y - hy, p.y + hy, `notehead ${p.note.id}`);
-    if (o.showHonorHalo && isPositionOfHonor(p.note.startTick)) {
-      const R = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
-      push(p.x - R, p.x + R, p.y - R, p.y + R, `halo of ${p.note.id}`);
-    }
-  }
+  // 3. Ordinary noteheads (including visible digits and halos) came from
+  //    scenePhysicalBoxes above. The white knockout is erasure, not ink.
 
   // 4. Stems (exactly the painted ones) and the beam strips.
   const hidden = suppressedStemIds(layout);
@@ -6730,6 +6727,33 @@ export function systemPaintedInkBoxes(
   push(numeral.x0, numeral.x1, numeral.y0, numeral.y1, 'measure numeral');
   if (accolade) push(accolade.x0, accolade.x1, accolade.y0, accolade.y1, 'system start');
   return out;
+}
+
+/** PAGE POLICY ONLY: grandfathered slot bookings preserve the judged page-fit
+ * diagnostic while the scene covers only four families. These large rectangles
+ * are NOT physical ink and must never be used for note/rest collision. Retire
+ * after ledger/rhythm/rest/furniture families and page policy migrate together.
+ */
+export function systemPageBookingBoxes(
+  layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions,
+  t: ResolvedJankoTokens
+): JankoPaintedInkBox[] {
+  const boxes = systemPaintedInkBoxes(layout, o, t)
+    .filter(b => b.what.startsWith('legacy broad '))
+    .map(b => ({...b, what: b.what.slice('legacy broad '.length)}));
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') return boxes;
+  const g=layout.geometry;
+  const booking: JankoPaintedInkBox[] = [{x0:g.staffLeft,x1:g.staffRight,y0:gridTopY(g,o,t),y1:gridBotY(g,o,t),what:'pitch grid'}];
+  for (const p of layout.notes) {
+    const {wx,hy}=knockoutHalfExtents(o,t,p.note.startTick,p);
+    booking.push({x0:p.x-wx,x1:p.x+wx,y0:p.y-hy,y1:p.y+hy,what:`notehead ${p.note.id}`});
+    if(o.showHonorHalo&&isPositionOfHonor(p.note.startTick)){
+      const R=t.haloRadius+JANKO_HALO_STROKE_WIDTH/2;
+      booking.push({x0:p.x-R,x1:p.x+R,y0:p.y-R,y1:p.y+R,what:`halo of ${p.note.id}`});
+    }
+  }
+  return [...booking,...boxes];
 }
 
 /** Round 45 — the painted-ink extents of one system (`min y0 … max y1`). */
@@ -8307,6 +8331,9 @@ export function layoutJankoSystemShifted(
         const interiors = detachedSymbolInteriors(placed, t);
         const knockouts: Array<{ y: number; half: number }> = [];
         for (const rule of staffRules) {
+          // A need-based segment that does not reach this seat is whitespace,
+          // even when another measure draws the same row.
+          if (rule.x2 < box.x0 - 1e-9 || rule.x1 > box.x1 + 1e-9) continue;
           const crossing = rule.y > box.y0 - 1e-9 && rule.y < box.y1 + 1e-9;
           // Round 48: a drawn rule is **not** an obstacle for a hollow mark. It
           // may cross the mark only through a hollow counter, with the whole
@@ -8842,7 +8869,7 @@ export function layoutJankoSystemShifted(
   const tieBlockedArcs: JankoTieAnchorShortfall[] = [];
   if (tiePlan) {
     const solvedById = new Map(notes.map((p) => [p.note.id, p]));
-    const rules = drawnStaffRuleYs(geometry, o, t);
+    const rules = drawnStaffRuleBands(geometry, o, t);
     const ruleHalf = t.tieStroke / 2 + t.tieRuleAir;
     // Painted stems of this system (beamed stems at their beam-extended
     // extents, standalone stems at their own), skipping every suppressed stem
@@ -9149,11 +9176,12 @@ export function layoutJankoSystemShifted(
      * help does the whole axis step outward past the rule — the tie never lies on
      * a staff line. Applied to every evaluated side, so a flipped tie is cleared
      * exactly like the conventional one. */
-    const clearRules = (input: { y: number; side: -1 | 1; depth: number }): void => {
+    const clearRules = (input: { y: number; side: -1 | 1; depth: number; x1: number; x2: number }): void => {
       for (let guard = 0; guard < 8; guard++) {
         const crownY = input.y + input.side * input.depth;
         const near = rules
-          .map((rule) => ({ rule, crown: Math.abs(rule - crownY), axis: Math.abs(rule - input.y) }))
+          .filter((rule) => rule.x2 >= input.x1 && rule.x1 <= input.x2)
+          .map((rule) => ({ rule: rule.y, crown: Math.abs(rule.y - crownY), axis: Math.abs(rule.y - input.y) }))
           .filter((d) => d.crown < ruleHalf || d.axis < ruleHalf)
           .sort((a, b) => Math.min(a.crown, a.axis) - Math.min(b.crown, b.axis))[0];
         if (!near) return;
@@ -9355,7 +9383,7 @@ export function layoutJankoSystemShifted(
 
       function evaluateAxis(wall: readonly PositionedJankoNote[], variant: number) {
         const resolved = walkAxisFor(job, candidate, wall);
-        const state = { y: resolved.y, side: candidate, depth };
+        const state = { y: resolved.y, side: candidate, depth, x1: job.x1, x2: job.x2 };
         clearRules(state);
         const probe = {
           x1: job.x1,
@@ -9644,6 +9672,7 @@ export function layoutJankoSystemShifted(
   );
 
   return {
+    scoreRevision: score,
     index: systemIndex,
     isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
     geometry,
@@ -9792,7 +9821,8 @@ function renderNotesLayer(
   t: ResolvedJankoTokens,
   gridInk: string = '',
   threadInk: string = '',
-  tickInk: string = ''
+  tickInk: string = '',
+  inkScene?: InkScene
 ): string {
   const out: string[] = ['  <g class="janko-notes">'];
 
@@ -9981,7 +10011,7 @@ function renderNotesLayer(
   for (const p of layout.notes) {
     if (layout.compressedCopyIds?.has(p.note.id) || layout.handprintNoteIds?.has(p.note.id)) continue;
     out.push(
-      renderNotehead(
+      inkScene ? sceneHeadSvg(inkScene, p.note.id) : renderNotehead(
         {
           x: p.x,
           y: p.y,
@@ -10043,24 +10073,29 @@ export function renderSystem(
     out.push(renderTimeSignature(sysGeo, o, t));
   }
   out.push(renderOctaveLabels(sysGeo, o, t));
-  out.push(renderStaffLines(sysGeo, o, t));
+  // The fixed-core placed scene is constructed AFTER any content-aware shift.
+  // Other staff mappings remain labelled legacy until their staff families migrate.
+  const inkScene = o.core === 'fixed-3' || o.core === 'fixed-4'
+    ? buildInkScene(resolved, o, t, score)
+    : undefined;
+  out.push(inkScene ? sceneGridSvg(inkScene.pitch, 'janko-pitch-grid', true) : renderStaffLines(sysGeo, o, t));
   // Round 12: the continuous vertical grid (measure barlines + dashed beat
   // pulses). Under `'strict-protected-grid'` it is handed to the notes layer and
   // painted above the rhythm ink on its own white air channels; every other
   // policy paints it first, as the transparent structural background it is.
   const gridInk = [
-    renderBeatGrid(sysGeo, systemIndex, o, t, resolved.columns),
-    renderBarlines(sysGeo, o, t, resolved.isFinalSystem),
+    inkScene ? sceneGridSvg(inkScene.beat, 'janko-beat-grid', false) : renderBeatGrid(sysGeo, systemIndex, o, t, resolved.columns),
+    inkScene ? sceneGridSvg(inkScene.barlines, 'janko-barlines', true) : renderBarlines(sysGeo, o, t, resolved.isFinalSystem),
   ].join('\n');
   // The contour round: all three paradigms are pure functions of
   // (score, layout) — every layer is '' when its option is off, so the
   // golden master never sees this code path.
   const contour = buildSystemContour(score, resolved, o, t);
   if (channelsGridInk(o.gridWritingPolicy)) {
-    out.push(renderNotesLayer(resolved, o, t, gridInk, contour.thread, contour.ticks));
+    out.push(renderNotesLayer(resolved, o, t, gridInk, contour.thread, contour.ticks, inkScene));
   } else {
     out.push(gridInk);
-    out.push(renderNotesLayer(resolved, o, t, '', contour.thread, contour.ticks));
+    out.push(renderNotesLayer(resolved, o, t, '', contour.thread, contour.ticks, inkScene));
   }
   const ottavaSvg = renderOttavaBrackets(resolved.ottavaBrackets, t);
   if (ottavaSvg.length > 0) out.push(ottavaSvg);
