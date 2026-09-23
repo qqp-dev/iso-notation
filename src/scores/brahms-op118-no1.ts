@@ -14,6 +14,8 @@ import { applyBrahmsHandCorrections } from "./brahms-hand-corrections";
 import writtenDurationsFixture from "./data/brahms-op118-no1-written-durations.json";
 import writtenDurationsProvenance from "./data/brahms-op118-no1-written-durations.provenance.json";
 import sourceSilences from "./data/brahms-op118-no1-source-silences.json";
+import expressions from "./data/brahms-op118-no1-expressions.json";
+import { scorePedalsFromExpressions, validateBrahmsExpressions, type ExpressionSidecar } from "./brahms-expressions";
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -283,6 +285,9 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
     type: "final",
   });
 
+  // Source-level expression data: time-anchored, never assigned to a nearest
+  // note. The engraving engine currently paints neither score overlay.
+  const expressionOverlay = validateBrahmsExpressions(expressions as ExpressionSidecar, totalTicks);
   const score: QuantizedGridScore = {
     ...parsed,
     id: "brahms-op118-no1",
@@ -295,8 +300,8 @@ export function buildBrahmsOp118No1Score(): QuantizedGridScore {
     timeSignatures: [{ tick: 0, numerator: 2, denominator: 2 }],
     barlines,
     tempos: [{ tick: 0, bpm: 88, description: "Allegro non assai, ma molto appassionato" }],
-    dynamics: [],
-    pedals: [],
+    dynamics: expressionOverlay.dynamics,
+    pedals: scorePedalsFromExpressions(expressionOverlay),
     notes,
     tieChains,
     // Round 48: the source's authored silences (written rests *and* spacers),
