@@ -1,0 +1,3172 @@
+{
+  "version": 1,
+  "totalTicks": 13632,
+  "dynamics": [
+    {
+      "tick": 1200,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 51,
+        "col": 17,
+        "bar": 7,
+        "context": "rightHandUpper",
+        "occurrence": 1,
+        "time": "25/4",
+        "order": 0
+      },
+      "durationTicks": 144
+    },
+    {
+      "tick": 1392,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 52,
+        "col": 17,
+        "bar": 8,
+        "context": "rightHandUpper",
+        "occurrence": 1,
+        "time": "29/4",
+        "order": 2
+      }
+    },
+    {
+      "tick": 1392,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 52,
+        "col": 21,
+        "bar": 8,
+        "context": "rightHandUpper",
+        "occurrence": 1,
+        "time": "29/4",
+        "order": 3
+      },
+      "durationTicks": 144
+    },
+    {
+      "tick": 3120,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 51,
+        "col": 17,
+        "bar": 17,
+        "context": "rightHandUpper",
+        "occurrence": 2,
+        "time": "65/4",
+        "order": 5
+      },
+      "durationTicks": 144
+    },
+    {
+      "tick": 3312,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 52,
+        "col": 17,
+        "bar": 18,
+        "context": "rightHandUpper",
+        "occurrence": 2,
+        "time": "69/4",
+        "order": 7
+      }
+    },
+    {
+      "tick": 3312,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 52,
+        "col": 21,
+        "bar": 18,
+        "context": "rightHandUpper",
+        "occurrence": 2,
+        "time": "69/4",
+        "order": 8
+      },
+      "durationTicks": 144
+    },
+    {
+      "tick": 0,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 349,
+        "col": 18,
+        "bar": 1,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "0/1",
+        "order": 10
+      }
+    },
+    {
+      "tick": 0,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 349,
+        "col": 20,
+        "bar": 1,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "0/1",
+        "order": 11
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 48,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 350,
+        "col": 6,
+        "bar": 1,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "1/4",
+        "order": 13
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 384,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 351,
+        "col": 11,
+        "bar": 2,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "2/1",
+        "order": 15
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 432,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 352,
+        "col": 6,
+        "bar": 3,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "9/4",
+        "order": 17
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 1584,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 357,
+        "col": 6,
+        "bar": 9,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "33/4",
+        "order": 19
+      }
+    },
+    {
+      "tick": 1584,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 357,
+        "col": 30,
+        "bar": 9,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "33/4",
+        "order": 20
+      },
+      "durationTicks": 288
+    },
+    {
+      "tick": 1920,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 349,
+        "col": 18,
+        "bar": 10,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "10/1",
+        "order": 22
+      }
+    },
+    {
+      "tick": 1920,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 349,
+        "col": 20,
+        "bar": 10,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "10/1",
+        "order": 23
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 1968,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 350,
+        "col": 6,
+        "bar": 11,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "41/4",
+        "order": 25
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 2304,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 351,
+        "col": 11,
+        "bar": 12,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "12/1",
+        "order": 27
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 2352,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 352,
+        "col": 6,
+        "bar": 13,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "49/4",
+        "order": 29
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 3504,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 357,
+        "col": 6,
+        "bar": 19,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "73/4",
+        "order": 31
+      }
+    },
+    {
+      "tick": 3504,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 357,
+        "col": 30,
+        "bar": 19,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "73/4",
+        "order": 32
+      },
+      "durationTicks": 288
+    },
+    {
+      "tick": 3840,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 361,
+        "col": 7,
+        "bar": 20,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "20/1",
+        "order": 34
+      }
+    },
+    {
+      "tick": 3840,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 361,
+        "col": 9,
+        "bar": 20,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "20/1",
+        "order": 35
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 3888,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 362,
+        "col": 6,
+        "bar": 21,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "81/4",
+        "order": 37
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 4080,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 363,
+        "col": 6,
+        "bar": 22,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "85/4",
+        "order": 39
+      }
+    },
+    {
+      "tick": 4608,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 365,
+        "col": 10,
+        "bar": 24,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "24/1",
+        "order": 40
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 4656,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 366,
+        "col": 6,
+        "bar": 25,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "97/4",
+        "order": 42
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 4848,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 367,
+        "col": 6,
+        "bar": 26,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "101/4",
+        "order": 44
+      }
+    },
+    {
+      "tick": 4968,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 367,
+        "col": 33,
+        "bar": 26,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "207/8",
+        "order": 45
+      },
+      "durationTicks": 144
+    },
+    {
+      "tick": 5160,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 370,
+        "col": 19,
+        "bar": 27,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "215/8",
+        "order": 47
+      },
+      "durationTicks": 120
+    },
+    {
+      "tick": 5328,
+      "mark": "crescendo",
+      "kind": "text-cresc",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 371,
+        "col": 12,
+        "bar": 28,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "111/4",
+        "order": 49
+      }
+    },
+    {
+      "tick": 5376,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 371,
+        "col": 20,
+        "bar": 28,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "28/1",
+        "order": 50
+      },
+      "durationTicks": 120
+    },
+    {
+      "tick": 5520,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 372,
+        "col": 16,
+        "bar": 29,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "115/4",
+        "order": 52
+      }
+    },
+    {
+      "tick": 5520,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 372,
+        "col": 19,
+        "bar": 29,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "115/4",
+        "order": 53
+      },
+      "durationTicks": 72
+    },
+    {
+      "tick": 5616,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 373,
+        "col": 8,
+        "bar": 30,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "117/4",
+        "order": 55
+      },
+      "durationTicks": 168
+    },
+    {
+      "tick": 5808,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 374,
+        "col": 6,
+        "bar": 31,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "121/4",
+        "order": 57
+      }
+    },
+    {
+      "tick": 5808,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 374,
+        "col": 9,
+        "bar": 31,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "121/4",
+        "order": 58
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 6144,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 376,
+        "col": 11,
+        "bar": 32,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "32/1",
+        "order": 60
+      }
+    },
+    {
+      "tick": 6144,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 376,
+        "col": 13,
+        "bar": 32,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "32/1",
+        "order": 61
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 6192,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 377,
+        "col": 6,
+        "bar": 33,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "129/4",
+        "order": 63
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 6528,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 378,
+        "col": 11,
+        "bar": 34,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "34/1",
+        "order": 65
+      }
+    },
+    {
+      "tick": 6528,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 378,
+        "col": 33,
+        "bar": 34,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "34/1",
+        "order": 66
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 6576,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 382,
+        "col": 6,
+        "bar": 35,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "137/4",
+        "order": 68
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 6696,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 382,
+        "col": 42,
+        "bar": 35,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "279/8",
+        "order": 70
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 6936,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 383,
+        "col": 17,
+        "bar": 36,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "289/8",
+        "order": 73
+      },
+      "durationTicks": 192
+    },
+    {
+      "tick": 7152,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 385,
+        "col": 8,
+        "bar": 38,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "149/4",
+        "order": 75
+      }
+    },
+    {
+      "tick": 7152,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 385,
+        "col": 32,
+        "bar": 38,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "149/4",
+        "order": 76
+      },
+      "durationTicks": 168
+    },
+    {
+      "tick": 7344,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 388,
+        "col": 10,
+        "bar": 39,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "153/4",
+        "order": 78
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 7680,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 361,
+        "col": 7,
+        "bar": 40,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "40/1",
+        "order": 80
+      }
+    },
+    {
+      "tick": 7680,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 361,
+        "col": 9,
+        "bar": 40,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "40/1",
+        "order": 81
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 7728,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 362,
+        "col": 6,
+        "bar": 41,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "161/4",
+        "order": 83
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 7920,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 363,
+        "col": 6,
+        "bar": 42,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "165/4",
+        "order": 85
+      }
+    },
+    {
+      "tick": 8448,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 365,
+        "col": 10,
+        "bar": 44,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "44/1",
+        "order": 86
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 8496,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 366,
+        "col": 6,
+        "bar": 45,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "177/4",
+        "order": 88
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 8688,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 367,
+        "col": 6,
+        "bar": 46,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "181/4",
+        "order": 90
+      }
+    },
+    {
+      "tick": 8808,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 367,
+        "col": 33,
+        "bar": 46,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "367/8",
+        "order": 91
+      },
+      "durationTicks": 144
+    },
+    {
+      "tick": 9000,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 370,
+        "col": 19,
+        "bar": 47,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "375/8",
+        "order": 93
+      },
+      "durationTicks": 120
+    },
+    {
+      "tick": 9168,
+      "mark": "crescendo",
+      "kind": "text-cresc",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 371,
+        "col": 12,
+        "bar": 48,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "191/4",
+        "order": 95
+      }
+    },
+    {
+      "tick": 9216,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 371,
+        "col": 20,
+        "bar": 48,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "48/1",
+        "order": 96
+      },
+      "durationTicks": 120
+    },
+    {
+      "tick": 9360,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 372,
+        "col": 16,
+        "bar": 49,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "195/4",
+        "order": 98
+      }
+    },
+    {
+      "tick": 9360,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 372,
+        "col": 19,
+        "bar": 49,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "195/4",
+        "order": 99
+      },
+      "durationTicks": 72
+    },
+    {
+      "tick": 9456,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 373,
+        "col": 8,
+        "bar": 50,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "197/4",
+        "order": 101
+      },
+      "durationTicks": 168
+    },
+    {
+      "tick": 9648,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 374,
+        "col": 6,
+        "bar": 51,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "201/4",
+        "order": 103
+      }
+    },
+    {
+      "tick": 9648,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 374,
+        "col": 9,
+        "bar": 51,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "201/4",
+        "order": 104
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 9984,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 376,
+        "col": 11,
+        "bar": 52,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "52/1",
+        "order": 106
+      }
+    },
+    {
+      "tick": 9984,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 376,
+        "col": 13,
+        "bar": 52,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "52/1",
+        "order": 107
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 10032,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 377,
+        "col": 6,
+        "bar": 53,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "209/4",
+        "order": 109
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 10368,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 378,
+        "col": 11,
+        "bar": 54,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "54/1",
+        "order": 111
+      }
+    },
+    {
+      "tick": 10368,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 378,
+        "col": 33,
+        "bar": 54,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "54/1",
+        "order": 112
+      },
+      "durationTicks": 36
+    },
+    {
+      "tick": 10416,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 382,
+        "col": 6,
+        "bar": 55,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "217/4",
+        "order": 114
+      },
+      "durationTicks": 24
+    },
+    {
+      "tick": 10536,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 382,
+        "col": 42,
+        "bar": 55,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "439/8",
+        "order": 116
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 10776,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 383,
+        "col": 17,
+        "bar": 56,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "449/8",
+        "order": 119
+      },
+      "durationTicks": 192
+    },
+    {
+      "tick": 10992,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 385,
+        "col": 8,
+        "bar": 58,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "229/4",
+        "order": 121
+      }
+    },
+    {
+      "tick": 10992,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 385,
+        "col": 32,
+        "bar": 58,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "229/4",
+        "order": 122
+      },
+      "durationTicks": 168
+    },
+    {
+      "tick": 11184,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 392,
+        "col": 10,
+        "bar": 59,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "233/4",
+        "order": 124
+      }
+    },
+    {
+      "tick": 11184,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 392,
+        "col": 13,
+        "bar": 59,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "233/4",
+        "order": 125
+      },
+      "durationTicks": 96
+    },
+    {
+      "tick": 11376,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 393,
+        "col": 10,
+        "bar": 60,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "237/4",
+        "order": 127
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 11472,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 393,
+        "col": 18,
+        "bar": 60,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "239/4",
+        "order": 129
+      },
+      "durationTicks": 48
+    },
+    {
+      "tick": 11568,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 394,
+        "col": 10,
+        "bar": 61,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "241/4",
+        "order": 131
+      }
+    },
+    {
+      "tick": 11568,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 394,
+        "col": 12,
+        "bar": 61,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "241/4",
+        "order": 132
+      },
+      "durationTicks": 96
+    },
+    {
+      "tick": 12000,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 398,
+        "col": 13,
+        "bar": 63,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "125/2",
+        "order": 134
+      },
+      "durationTicks": 120
+    },
+    {
+      "tick": 12144,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 399,
+        "col": 12,
+        "bar": 64,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "253/4",
+        "order": 136
+      },
+      "durationTicks": 168
+    },
+    {
+      "tick": 12336,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 400,
+        "col": 10,
+        "bar": 65,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "257/4",
+        "order": 138
+      }
+    },
+    {
+      "tick": 12432,
+      "mark": "f",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 400,
+        "col": 14,
+        "bar": 65,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "259/4",
+        "order": 139
+      }
+    },
+    {
+      "tick": 12432,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 400,
+        "col": 16,
+        "bar": 65,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "259/4",
+        "order": 140
+      },
+      "durationTicks": 96
+    },
+    {
+      "tick": 12624,
+      "mark": "crescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 401,
+        "col": 20,
+        "bar": 66,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "263/4",
+        "order": 142
+      },
+      "durationTicks": 72
+    },
+    {
+      "tick": 12720,
+      "mark": "sf",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 402,
+        "col": 10,
+        "bar": 67,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "265/4",
+        "order": 144
+      }
+    },
+    {
+      "tick": 12816,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 402,
+        "col": 15,
+        "bar": 67,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "267/4",
+        "order": 145
+      },
+      "durationTicks": 264
+    },
+    {
+      "tick": 13104,
+      "mark": "p",
+      "kind": "mark",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 404,
+        "col": 10,
+        "bar": 69,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "273/4",
+        "order": 147
+      }
+    },
+    {
+      "tick": 13488,
+      "mark": "decrescendo",
+      "kind": "hairpin",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 408,
+        "col": 10,
+        "bar": 71,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "281/4",
+        "order": 148
+      },
+      "durationTicks": 96
+    }
+  ],
+  "boundaries": [
+    {
+      "tick": 6792,
+      "kind": "redundant-stop",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 383,
+        "col": 10,
+        "bar": 36,
+        "context": "dynamics",
+        "occurrence": 1,
+        "time": "283/8",
+        "order": 72
+      }
+    },
+    {
+      "tick": 10632,
+      "kind": "redundant-stop",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 383,
+        "col": 10,
+        "bar": 56,
+        "context": "dynamics",
+        "occurrence": 2,
+        "time": "443/8",
+        "order": 118
+      }
+    }
+  ],
+  "pedals": [
+    {
+      "tick": 0,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 457,
+        "col": 17,
+        "bar": 1,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "0/1",
+        "order": 150
+      },
+      "order": 150
+    },
+    {
+      "tick": 192,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 458,
+        "col": 10,
+        "bar": 1,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "1/1",
+        "order": 151
+      },
+      "order": 151
+    },
+    {
+      "tick": 432,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 3,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "9/4",
+        "order": 152
+      },
+      "order": 152
+    },
+    {
+      "tick": 432,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 3,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "9/4",
+        "order": 153
+      },
+      "order": 153
+    },
+    {
+      "tick": 576,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 460,
+        "col": 35,
+        "bar": 3,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "3/1",
+        "order": 154
+      },
+      "order": 154
+    },
+    {
+      "tick": 816,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 5,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "17/4",
+        "order": 155
+      },
+      "order": 155
+    },
+    {
+      "tick": 816,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 5,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "17/4",
+        "order": 156
+      },
+      "order": 156
+    },
+    {
+      "tick": 960,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 462,
+        "col": 35,
+        "bar": 5,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "5/1",
+        "order": 157
+      },
+      "order": 157
+    },
+    {
+      "tick": 1008,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 463,
+        "col": 6,
+        "bar": 6,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "21/4",
+        "order": 158
+      },
+      "order": 158
+    },
+    {
+      "tick": 1104,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 463,
+        "col": 33,
+        "bar": 6,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "23/4",
+        "order": 159
+      },
+      "order": 159
+    },
+    {
+      "tick": 1152,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 463,
+        "col": 38,
+        "bar": 6,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "6/1",
+        "order": 160
+      },
+      "order": 160
+    },
+    {
+      "tick": 1200,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 464,
+        "col": 6,
+        "bar": 7,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "25/4",
+        "order": 161
+      },
+      "order": 161
+    },
+    {
+      "tick": 1296,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 464,
+        "col": 61,
+        "bar": 7,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "27/4",
+        "order": 162
+      },
+      "order": 162
+    },
+    {
+      "tick": 1392,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 465,
+        "col": 6,
+        "bar": 8,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "29/4",
+        "order": 163
+      },
+      "order": 163
+    },
+    {
+      "tick": 1488,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 465,
+        "col": 11,
+        "bar": 8,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "31/4",
+        "order": 164
+      },
+      "order": 164
+    },
+    {
+      "tick": 1584,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 468,
+        "col": 6,
+        "bar": 9,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "33/4",
+        "order": 165
+      },
+      "order": 165
+    },
+    {
+      "tick": 1776,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 469,
+        "col": 6,
+        "bar": 10,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "37/4",
+        "order": 166
+      },
+      "order": 166
+    },
+    {
+      "tick": 1872,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 469,
+        "col": 41,
+        "bar": 10,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "39/4",
+        "order": 167
+      },
+      "order": 167
+    },
+    {
+      "tick": 1920,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 457,
+        "col": 17,
+        "bar": 10,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "10/1",
+        "order": 168
+      },
+      "order": 168
+    },
+    {
+      "tick": 2112,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 458,
+        "col": 10,
+        "bar": 11,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "11/1",
+        "order": 169
+      },
+      "order": 169
+    },
+    {
+      "tick": 2352,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 13,
+        "context": "pedal",
+        "occurrence": 3,
+        "time": "49/4",
+        "order": 170
+      },
+      "order": 170
+    },
+    {
+      "tick": 2352,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 13,
+        "context": "pedal",
+        "occurrence": 3,
+        "time": "49/4",
+        "order": 171
+      },
+      "order": 171
+    },
+    {
+      "tick": 2496,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 460,
+        "col": 35,
+        "bar": 13,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "13/1",
+        "order": 172
+      },
+      "order": 172
+    },
+    {
+      "tick": 2736,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 15,
+        "context": "pedal",
+        "occurrence": 4,
+        "time": "57/4",
+        "order": 173
+      },
+      "order": 173
+    },
+    {
+      "tick": 2736,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 15,
+        "context": "pedal",
+        "occurrence": 4,
+        "time": "57/4",
+        "order": 174
+      },
+      "order": 174
+    },
+    {
+      "tick": 2880,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 462,
+        "col": 35,
+        "bar": 15,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "15/1",
+        "order": 175
+      },
+      "order": 175
+    },
+    {
+      "tick": 2928,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 463,
+        "col": 6,
+        "bar": 16,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "61/4",
+        "order": 176
+      },
+      "order": 176
+    },
+    {
+      "tick": 3024,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 463,
+        "col": 33,
+        "bar": 16,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "63/4",
+        "order": 177
+      },
+      "order": 177
+    },
+    {
+      "tick": 3072,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 463,
+        "col": 38,
+        "bar": 16,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "16/1",
+        "order": 178
+      },
+      "order": 178
+    },
+    {
+      "tick": 3120,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 464,
+        "col": 6,
+        "bar": 17,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "65/4",
+        "order": 179
+      },
+      "order": 179
+    },
+    {
+      "tick": 3216,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 464,
+        "col": 61,
+        "bar": 17,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "67/4",
+        "order": 180
+      },
+      "order": 180
+    },
+    {
+      "tick": 3312,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 465,
+        "col": 6,
+        "bar": 18,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "69/4",
+        "order": 181
+      },
+      "order": 181
+    },
+    {
+      "tick": 3408,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 465,
+        "col": 11,
+        "bar": 18,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "71/4",
+        "order": 182
+      },
+      "order": 182
+    },
+    {
+      "tick": 3504,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 468,
+        "col": 6,
+        "bar": 19,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "73/4",
+        "order": 183
+      },
+      "order": 183
+    },
+    {
+      "tick": 3696,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 469,
+        "col": 6,
+        "bar": 20,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "77/4",
+        "order": 184
+      },
+      "order": 184
+    },
+    {
+      "tick": 3792,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 469,
+        "col": 41,
+        "bar": 20,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "79/4",
+        "order": 185
+      },
+      "order": 185
+    },
+    {
+      "tick": 3888,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 21,
+        "context": "pedal",
+        "occurrence": 5,
+        "time": "81/4",
+        "order": 186
+      },
+      "order": 186
+    },
+    {
+      "tick": 3888,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 21,
+        "context": "pedal",
+        "occurrence": 5,
+        "time": "81/4",
+        "order": 187
+      },
+      "order": 187
+    },
+    {
+      "tick": 4032,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 473,
+        "col": 14,
+        "bar": 21,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "21/1",
+        "order": 188
+      },
+      "order": 188
+    },
+    {
+      "tick": 4080,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 474,
+        "col": 8,
+        "bar": 22,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "85/4",
+        "order": 189
+      },
+      "order": 189
+    },
+    {
+      "tick": 4248,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 474,
+        "col": 34,
+        "bar": 22,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "177/8",
+        "order": 190
+      },
+      "order": 190
+    },
+    {
+      "tick": 4272,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 475,
+        "col": 6,
+        "bar": 23,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "89/4",
+        "order": 191
+      },
+      "order": 191
+    },
+    {
+      "tick": 4368,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 475,
+        "col": 12,
+        "bar": 23,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "91/4",
+        "order": 192
+      },
+      "order": 192
+    },
+    {
+      "tick": 4392,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 475,
+        "col": 19,
+        "bar": 23,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "183/8",
+        "order": 193
+      },
+      "order": 193
+    },
+    {
+      "tick": 4560,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 476,
+        "col": 8,
+        "bar": 24,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "95/4",
+        "order": 194
+      },
+      "order": 194
+    },
+    {
+      "tick": 4656,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 477,
+        "col": 7,
+        "bar": 25,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "97/4",
+        "order": 195
+      },
+      "order": 195
+    },
+    {
+      "tick": 4800,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 477,
+        "col": 33,
+        "bar": 25,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "25/1",
+        "order": 196
+      },
+      "order": 196
+    },
+    {
+      "tick": 4848,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 478,
+        "col": 8,
+        "bar": 26,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "101/4",
+        "order": 197
+      },
+      "order": 197
+    },
+    {
+      "tick": 5016,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 478,
+        "col": 14,
+        "bar": 26,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "209/8",
+        "order": 198
+      },
+      "order": 198
+    },
+    {
+      "tick": 5040,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 481,
+        "col": 6,
+        "bar": 27,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "105/4",
+        "order": 199
+      },
+      "order": 199
+    },
+    {
+      "tick": 5136,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 481,
+        "col": 11,
+        "bar": 27,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "107/4",
+        "order": 200
+      },
+      "order": 200
+    },
+    {
+      "tick": 5232,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 482,
+        "col": 6,
+        "bar": 28,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "109/4",
+        "order": 201
+      },
+      "order": 201
+    },
+    {
+      "tick": 5328,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 482,
+        "col": 40,
+        "bar": 28,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "111/4",
+        "order": 202
+      },
+      "order": 202
+    },
+    {
+      "tick": 5424,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 483,
+        "col": 6,
+        "bar": 29,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "113/4",
+        "order": 203
+      },
+      "order": 203
+    },
+    {
+      "tick": 5520,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 483,
+        "col": 40,
+        "bar": 29,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "115/4",
+        "order": 204
+      },
+      "order": 204
+    },
+    {
+      "tick": 5616,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 484,
+        "col": 6,
+        "bar": 30,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "117/4",
+        "order": 205
+      },
+      "order": 205
+    },
+    {
+      "tick": 5712,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 484,
+        "col": 40,
+        "bar": 30,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "119/4",
+        "order": 206
+      },
+      "order": 206
+    },
+    {
+      "tick": 5952,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 485,
+        "col": 10,
+        "bar": 31,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "31/1",
+        "order": 207
+      },
+      "order": 207
+    },
+    {
+      "tick": 6192,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 487,
+        "col": 6,
+        "bar": 33,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "129/4",
+        "order": 208
+      },
+      "order": 208
+    },
+    {
+      "tick": 6504,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 488,
+        "col": 13,
+        "bar": 34,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "271/8",
+        "order": 209
+      },
+      "order": 209
+    },
+    {
+      "tick": 6576,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 491,
+        "col": 6,
+        "bar": 35,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "137/4",
+        "order": 210
+      },
+      "order": 210
+    },
+    {
+      "tick": 6672,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 491,
+        "col": 34,
+        "bar": 35,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "139/4",
+        "order": 211
+      },
+      "order": 211
+    },
+    {
+      "tick": 6744,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 491,
+        "col": 69,
+        "bar": 35,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "281/8",
+        "order": 212
+      },
+      "order": 212
+    },
+    {
+      "tick": 6768,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 492,
+        "col": 6,
+        "bar": 36,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "141/4",
+        "order": 213
+      },
+      "order": 213
+    },
+    {
+      "tick": 6864,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 492,
+        "col": 13,
+        "bar": 36,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "143/4",
+        "order": 214
+      },
+      "order": 214
+    },
+    {
+      "tick": 6936,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 492,
+        "col": 48,
+        "bar": 36,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "289/8",
+        "order": 215
+      },
+      "order": 215
+    },
+    {
+      "tick": 6960,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 493,
+        "col": 7,
+        "bar": 37,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "145/4",
+        "order": 216
+      },
+      "order": 216
+    },
+    {
+      "tick": 7032,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 493,
+        "col": 13,
+        "bar": 37,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "293/8",
+        "order": 217
+      },
+      "order": 217
+    },
+    {
+      "tick": 7056,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 493,
+        "col": 19,
+        "bar": 37,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "147/4",
+        "order": 218
+      },
+      "order": 218
+    },
+    {
+      "tick": 7152,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 494,
+        "col": 6,
+        "bar": 38,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "149/4",
+        "order": 219
+      },
+      "order": 219
+    },
+    {
+      "tick": 7248,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 495,
+        "col": 7,
+        "bar": 38,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "151/4",
+        "order": 220
+      },
+      "order": 220
+    },
+    {
+      "tick": 7344,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 498,
+        "col": 10,
+        "bar": 39,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "153/4",
+        "order": 221
+      },
+      "order": 221
+    },
+    {
+      "tick": 7536,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 499,
+        "col": 10,
+        "bar": 40,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "157/4",
+        "order": 222
+      },
+      "order": 222
+    },
+    {
+      "tick": 7632,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 499,
+        "col": 45,
+        "bar": 40,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "159/4",
+        "order": 223
+      },
+      "order": 223
+    },
+    {
+      "tick": 7728,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 41,
+        "context": "pedal",
+        "occurrence": 6,
+        "time": "161/4",
+        "order": 224
+      },
+      "order": 224
+    },
+    {
+      "tick": 7728,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 41,
+        "context": "pedal",
+        "occurrence": 6,
+        "time": "161/4",
+        "order": 225
+      },
+      "order": 225
+    },
+    {
+      "tick": 7872,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 473,
+        "col": 14,
+        "bar": 41,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "41/1",
+        "order": 226
+      },
+      "order": 226
+    },
+    {
+      "tick": 7920,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 474,
+        "col": 8,
+        "bar": 42,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "165/4",
+        "order": 227
+      },
+      "order": 227
+    },
+    {
+      "tick": 8088,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 474,
+        "col": 34,
+        "bar": 42,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "337/8",
+        "order": 228
+      },
+      "order": 228
+    },
+    {
+      "tick": 8112,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 475,
+        "col": 6,
+        "bar": 43,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "169/4",
+        "order": 229
+      },
+      "order": 229
+    },
+    {
+      "tick": 8208,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 475,
+        "col": 12,
+        "bar": 43,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "171/4",
+        "order": 230
+      },
+      "order": 230
+    },
+    {
+      "tick": 8232,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 475,
+        "col": 19,
+        "bar": 43,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "343/8",
+        "order": 231
+      },
+      "order": 231
+    },
+    {
+      "tick": 8400,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 476,
+        "col": 8,
+        "bar": 44,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "175/4",
+        "order": 232
+      },
+      "order": 232
+    },
+    {
+      "tick": 8496,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 477,
+        "col": 7,
+        "bar": 45,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "177/4",
+        "order": 233
+      },
+      "order": 233
+    },
+    {
+      "tick": 8640,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 477,
+        "col": 33,
+        "bar": 45,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "45/1",
+        "order": 234
+      },
+      "order": 234
+    },
+    {
+      "tick": 8688,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 478,
+        "col": 8,
+        "bar": 46,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "181/4",
+        "order": 235
+      },
+      "order": 235
+    },
+    {
+      "tick": 8856,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 478,
+        "col": 14,
+        "bar": 46,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "369/8",
+        "order": 236
+      },
+      "order": 236
+    },
+    {
+      "tick": 8880,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 481,
+        "col": 6,
+        "bar": 47,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "185/4",
+        "order": 237
+      },
+      "order": 237
+    },
+    {
+      "tick": 8976,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 481,
+        "col": 11,
+        "bar": 47,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "187/4",
+        "order": 238
+      },
+      "order": 238
+    },
+    {
+      "tick": 9072,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 482,
+        "col": 6,
+        "bar": 48,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "189/4",
+        "order": 239
+      },
+      "order": 239
+    },
+    {
+      "tick": 9168,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 482,
+        "col": 40,
+        "bar": 48,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "191/4",
+        "order": 240
+      },
+      "order": 240
+    },
+    {
+      "tick": 9264,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 483,
+        "col": 6,
+        "bar": 49,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "193/4",
+        "order": 241
+      },
+      "order": 241
+    },
+    {
+      "tick": 9360,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 483,
+        "col": 40,
+        "bar": 49,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "195/4",
+        "order": 242
+      },
+      "order": 242
+    },
+    {
+      "tick": 9456,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 484,
+        "col": 6,
+        "bar": 50,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "197/4",
+        "order": 243
+      },
+      "order": 243
+    },
+    {
+      "tick": 9552,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 484,
+        "col": 40,
+        "bar": 50,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "199/4",
+        "order": 244
+      },
+      "order": 244
+    },
+    {
+      "tick": 9792,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 485,
+        "col": 10,
+        "bar": 51,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "51/1",
+        "order": 245
+      },
+      "order": 245
+    },
+    {
+      "tick": 10032,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 487,
+        "col": 6,
+        "bar": 53,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "209/4",
+        "order": 246
+      },
+      "order": 246
+    },
+    {
+      "tick": 10344,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 488,
+        "col": 13,
+        "bar": 54,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "431/8",
+        "order": 247
+      },
+      "order": 247
+    },
+    {
+      "tick": 10416,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 491,
+        "col": 6,
+        "bar": 55,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "217/4",
+        "order": 248
+      },
+      "order": 248
+    },
+    {
+      "tick": 10512,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 491,
+        "col": 34,
+        "bar": 55,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "219/4",
+        "order": 249
+      },
+      "order": 249
+    },
+    {
+      "tick": 10584,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 491,
+        "col": 69,
+        "bar": 55,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "441/8",
+        "order": 250
+      },
+      "order": 250
+    },
+    {
+      "tick": 10608,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 492,
+        "col": 6,
+        "bar": 56,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "221/4",
+        "order": 251
+      },
+      "order": 251
+    },
+    {
+      "tick": 10704,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 492,
+        "col": 13,
+        "bar": 56,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "223/4",
+        "order": 252
+      },
+      "order": 252
+    },
+    {
+      "tick": 10776,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 492,
+        "col": 48,
+        "bar": 56,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "449/8",
+        "order": 253
+      },
+      "order": 253
+    },
+    {
+      "tick": 10800,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 493,
+        "col": 7,
+        "bar": 57,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "225/4",
+        "order": 254
+      },
+      "order": 254
+    },
+    {
+      "tick": 10872,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 493,
+        "col": 13,
+        "bar": 57,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "453/8",
+        "order": 255
+      },
+      "order": 255
+    },
+    {
+      "tick": 10896,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 493,
+        "col": 19,
+        "bar": 57,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "227/4",
+        "order": 256
+      },
+      "order": 256
+    },
+    {
+      "tick": 10992,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 494,
+        "col": 6,
+        "bar": 58,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "229/4",
+        "order": 257
+      },
+      "order": 257
+    },
+    {
+      "tick": 11088,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 495,
+        "col": 7,
+        "bar": 58,
+        "context": "pedal",
+        "occurrence": 2,
+        "time": "231/4",
+        "order": 258
+      },
+      "order": 258
+    },
+    {
+      "tick": 11184,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 502,
+        "col": 10,
+        "bar": 59,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "233/4",
+        "order": 259
+      },
+      "order": 259
+    },
+    {
+      "tick": 11280,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 502,
+        "col": 36,
+        "bar": 59,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "235/4",
+        "order": 260
+      },
+      "order": 260
+    },
+    {
+      "tick": 12720,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 507,
+        "col": 10,
+        "bar": 67,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "265/4",
+        "order": 261
+      },
+      "order": 261
+    },
+    {
+      "tick": 13008,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 508,
+        "col": 12,
+        "bar": 68,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "271/4",
+        "order": 262
+      },
+      "order": 262
+    },
+    {
+      "tick": 13104,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/intermezzo-op118-no1-parts.ily",
+        "line": 509,
+        "col": 10,
+        "bar": 69,
+        "context": "pedal",
+        "occurrence": 1,
+        "time": "273/4",
+        "order": 263
+      },
+      "order": 263
+    },
+    {
+      "tick": 13440,
+      "type": "sustain-up",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 6,
+        "bar": 70,
+        "context": "pedal",
+        "occurrence": 7,
+        "time": "70/1",
+        "order": 264
+      },
+      "order": 264
+    },
+    {
+      "tick": 13440,
+      "type": "sustain-down",
+      "origin": {
+        "file": "includes/global-variables.ily",
+        "line": 126,
+        "col": 17,
+        "bar": 70,
+        "context": "pedal",
+        "occurrence": 7,
+        "time": "70/1",
+        "order": 265
+      },
+      "order": 265
+    }
+  ]
+}

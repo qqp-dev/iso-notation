@@ -11,7 +11,8 @@
     "test": "node --import tsx --test test/**/*.test.ts",
     "lint:engraving": "tsx scripts/lint_engraving.ts",
     "pdf": "tsx scripts/export-pdf.ts",
-    "brahms:export-durations": "tsx scripts/brahms-export-written-durations.ts"
+    "brahms:export-durations": "tsx scripts/brahms-export-written-durations.ts",
+    "brahms:export-expressions": "tsx scripts/brahms-export-expressions.ts"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

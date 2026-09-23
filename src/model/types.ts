@@ -16,7 +16,7 @@ export type Hand = 'RH' | 'LH';
 
 export type ArticulationType = 'staccato' | 'tenuto' | 'accent' | 'fermata' | 'marcato';
 
-export type DynamicMark = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff' | 'sfz';
+export type DynamicMark = 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff' | 'sf' | 'sfz';
 
 /**
  * Round 48 — **source-voice provenance of one sounding event** (import layer).
@@ -146,10 +146,25 @@ export interface TempoOverlay {
   description?: string;
 }
 
+export interface ExpressionProvenance {
+  file: string;
+  line: number;
+  col: number;
+  bar: number;
+  context: string;
+  occurrence: number;
+  /** Exact whole-note rational from the LilyPond listener. */
+  time: string;
+  order: number;
+}
+
 export interface DynamicOverlay {
   tick: number;
   mark: DynamicMark | 'crescendo' | 'decrescendo';
   durationTicks?: number; // for hairpins
+  /** Source-only: independent of a note onset. */
+  kind?: 'mark' | 'hairpin' | 'text-cresc';
+  origin?: ExpressionProvenance;
 }
 
 export type PedalType = 'sustain-down' | 'sustain-up' | 'sustain-change' | 'una-corda';
@@ -157,6 +172,10 @@ export type PedalType = 'sustain-down' | 'sustain-up' | 'sustain-change' | 'una-
 export interface PedalOverlay {
   tick: number;
   type: PedalType;
+  origin?: ExpressionProvenance;
+  order?: number;
+  /** Compiler off/on origins of a genuine layout change, in that order. */
+  changeOrigins?: [ExpressionProvenance, ExpressionProvenance];
 }
 
 export interface HandCrossingEvent {
