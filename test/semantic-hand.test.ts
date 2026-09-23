@@ -146,7 +146,7 @@ test('source-linked resolver refuses macro/source identity collisions and duplic
   const score = buildBrahmsOp118No1Score();
   const second = provenance.events.find(e => e.startTick === 2160 && e.pitchClass === 0 && e.octave === 4)!;
   assert.deepEqual(resolveLinkedOccurrences(origin, score, [origin, second]).map(n => n.id), ['brahms-op118-no1-17','brahms-op118-no1-152']);
-  assert.throws(() => resolveLinkedOccurrences(origin, score, [origin, { ...second, segments: [{ ...second.segments[0], midi: 61 }] }]), /collision/);
+  assert.throws(() => resolveLinkedOccurrences(origin, score, [origin, { ...second, pitchClass: 1, segments: [{ ...second.segments[0], midi: 61 }] }]), /collision/);
   assert.throws(() => resolveLinkedOccurrences(origin, score, [origin, { ...second, segments: [{ ...second.segments[0], occurrence: 1 }] }]), /ambiguous/);
   assert.throws(() => resolveLinkedOccurrences(origin, score, []), /ambiguous/);
 });
@@ -173,6 +173,7 @@ test('stale default-path source/engine drift refuses replay, keeps Reference and
     'src/scores/data/brahms-op118-no1-source-silences.json',
     'src/scores/data/brahms-op118-no1-expressions.json',
     'src/scores/brahms-op118-no1.ts', 'src/scores/brahms-hand-corrections.ts', 'src/model/grid.ts',
+    'src/model/semantic-identity.ts', 'src/scores/brahms-semantic-index.ts',
   ];
   const cli = (action: string, input?: unknown) => {
     const run = spawnSync(process.execPath, ['--import', join(root, 'node_modules/tsx/dist/loader.mjs'), join(root, 'scripts/semantic-hand.ts'), action, '--wait-ms', '0'],
@@ -225,6 +226,23 @@ test('stale default-path source/engine drift refuses replay, keeps Reference and
     assert.equal(stale.artifactHashes.reference, plain.artifactHashes.reference);
     assert.equal(cli('recover', request('incorrect')).code, 1);
     assert.deepEqual(readFileSync(join(fixture, SEMANTIC_STATE)), archiveBytes);
+    const pinnedFile = join(fixture, inputs[2]);
+    const pinnedBytes = readFileSync(pinnedFile);
+    try {
+      writeFileSync(pinnedFile, Buffer.concat([pinnedBytes, Buffer.from('\n')]));
+      assert.equal(cli('recover', request(cli('status').result.baseline)).code, 1, 'source drift cannot be recovered by silently reusing old provenance');
+      assert.deepEqual(readFileSync(join(fixture, SEMANTIC_STATE)), archiveBytes);
+    } finally { writeFileSync(pinnedFile, pinnedBytes); }
+    const sourceBytes = readFileSync(sourceFile);
+    try {
+      const changedProvenance = JSON.parse(sourceBytes.toString());
+      const c4 = changedProvenance.events.find((e: { startTick: number; pitchClass: number; octave: number }) =>
+        e.startTick === 240 && e.pitchClass === 0 && e.octave === 4);
+      c4.segments[0].voice = 'rightHandUpper'; // event/score retain leftHandUpper
+      writeFileSync(sourceFile, JSON.stringify(changedProvenance));
+      assert.equal(cli('recover', request(cli('status').result.baseline)).code, 1);
+      assert.deepEqual(readFileSync(join(fixture, SEMANTIC_STATE)), archiveBytes, 'invalid source witness never archives/mutates candidate');
+    } finally { writeFileSync(sourceFile, sourceBytes); }
     const recovery = cli('recover', request(status.result.baseline));
     assert.equal(recovery.code, 0);
     assert.equal(recovery.result.publication.state, 'pending');

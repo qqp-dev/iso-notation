@@ -4,6 +4,9 @@ import { readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSyn
 import { resolve } from 'node:path';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../../scores/brahms-op118-no1';
 import provenance from '../../scores/data/brahms-op118-no1-written-durations.provenance.json' with { type: 'json' };
+import writtenFixture from '../../scores/data/brahms-op118-no1-written-durations.json' with { type: 'json' };
+import { buildBrahmsSemanticIndex, editableBrahmsSound, linkedBrahmsNotes } from '../../scores/brahms-semantic-index';
+import type { SoundingIdentity } from '../../model/semantic-identity';
 import { detectHandCrossings } from '../../model/grid';
 import type { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
 import { layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages } from './engine';
@@ -13,7 +16,8 @@ import { resolveJankoOptions, resolveJankoTokens } from './types';
 export const SEMANTIC_STATE = '.semantic-candidate.local';
 export const SEMANTIC_SCORE = 'brahms-op118-no1';
 const digest = (value: unknown) => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
-const engineFiles = ['src/scores/brahms-op118-no1.ts', 'src/scores/brahms-hand-corrections.ts', 'src/model/grid.ts'];
+const engineFiles = ['src/scores/brahms-op118-no1.ts', 'src/scores/brahms-hand-corrections.ts', 'src/model/grid.ts',
+  'src/model/semantic-identity.ts', 'src/scores/brahms-semantic-index.ts'];
 function renderingFiles(root: string) {
   return ['src/render/janko', 'src/render/janko/elements'].flatMap(dir =>
     readdirSync(resolve(root, dir)).filter(name => name.endsWith('.ts')).map(name => `${dir}/${name}`));
@@ -66,25 +70,11 @@ export function candidateHealth(root = process.cwd(), path = SEMANTIC_STATE): Ca
 }
 export interface ReviewWindow { measureStart: number; measureCount: number; changed: boolean }
 export interface Effects { selected: Assignment[]; reviewWindows: ReviewWindow[]; crossings: [number, number]; rests: [number, number]; beams: [number, number]; brackets: [number, number]; tieOwners: [number, number]; durationOwners: [number, number]; tieOwnerChanges: { added: string[]; removed: string[] }; durationOwnerChanges: { added: string[]; removed: string[] }; changedPages: number[]; unchangedPages: number[]; changedSystems: number[]; unchangedSystems: number[]; changedCrops: string[]; unchangedCrops: string[]; visible: 'CHANGED' | 'NO_VISIBLE_EFFECT'; lint: { violations: number; warnings: number } }
-const sourceEvents = provenance.events;
 const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
 const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-const keyOf = (n: { pitchClass: number; octave: number; startTick: number }) => `${n.pitchClass}|${n.octave}|${n.startTick}`;
-const noteKey = (n: QuantizedNote) => keyOf({ ...n.pitch, startTick: n.startTick });
-function evidence(note: QuantizedNote) {
-  const matches = sourceEvents.filter(e => keyOf(e) === noteKey(note));
-  if (matches.length !== 1 || matches[0].unison || matches[0].segments.length !== 1 || matches[0].voices.length !== 1)
-    throw new Error(`ambiguous/missing source statement for ${note.id} (${matches.length} matches); no edit applied`);
-  return matches[0];
-}
-function sourceKey(event: typeof sourceEvents[number]) {
-  const s = event.segments[0];
-  // Pinned source/fixture identity plus authored statement, never a pitch-pattern search.
-  return `${s.file}|${s.line}|${s.col}|${s.voice}|${s.midi}|${s.duration}|${s.tieForward}|${s.tieWait}`;
-}
-function citation(event: typeof sourceEvents[number]) {
-  const s = event.segments[0];
-  return `${s.file}:${s.line}:${s.col} ${s.voice}, bar ${s.bar}, occurrence ${s.occurrence}`;
+function citation(sound: SoundingIdentity) {
+  const c = sound.components[0];
+  return `${c.statement.file}:${c.statement.line}:${c.statement.col} ${c.statement.voice}, bar ${c.bar}, occurrence ${c.occurrence}`;
 }
 export function projectCandidate(score: QuantizedGridScore, assignments: readonly Assignment[]): QuantizedGridScore {
   const byId = new Map(assignments.map(a => [a.id, a]));
@@ -123,24 +113,20 @@ export const head = (state: CandidateState, root = process.cwd()) => state.recor
 export const activeAssignments = (state: CandidateState) => state.records.at(-1)?.assignments ?? [];
 export function candidateScore(state: CandidateState) { return projectCandidate(buildBrahmsOp118No1Score(), activeAssignments(state)); }
 export function resolveLinkedOccurrences(
-  origin: typeof sourceEvents[number], score: QuantizedGridScore,
-  events: readonly (typeof sourceEvents[number])[] = sourceEvents
+  origin: typeof provenance.events[number], score: QuantizedGridScore,
+  events: readonly (typeof provenance.events[number])[] = provenance.events
 ): QuantizedNote[] {
-  const s = origin.segments[0];
-  const sameLocation = events.filter(e => e.segments.some(p => p.file === s.file && p.line === s.line && p.col === s.col && p.voice === s.voice));
-  if (sameLocation.some(e => e.unison || e.segments.length !== 1 || e.voices.length !== 1 || sourceKey(e) !== sourceKey(origin)))
-    throw new Error('macro/source identity collision at selected statement; no edit applied');
-  if (!sameLocation.length || new Set(sameLocation.map(e => e.segments[0].occurrence)).size !== sameLocation.length)
-    throw new Error('ambiguous source-linked occurrences');
-  return sameLocation.map(e => {
-    const matches = score.notes.filter(n => noteKey(n) === keyOf(e));
-    if (matches.length !== 1 || (events === sourceEvents && evidence(matches[0]) !== e))
-      throw new Error(`ambiguous source-linked match at tick ${e.startTick}`);
-    return matches[0];
-  });
+  // Compatibility adapter for callers of the PR88 API; sunset when those callers
+  // use source statement keys directly. All matching lives in the index.
+  const index = buildBrahmsSemanticIndex(score, events as Parameters<typeof buildBrahmsSemanticIndex>[1]);
+  const witness = index.sounds.find(s => s.tick === origin.startTick && s.pitchClass === origin.pitchClass &&
+    s.octave === origin.octave && s.performedTrackHand === origin.hand);
+  if (!witness) throw new Error('ambiguous source-linked occurrences: missing origin');
+  return linkedBrahmsNotes(index, witness, score);
 }
 function resolveIntent(intent: HandIntent, score: QuantizedGridScore, current: readonly Assignment[]): Assignment[] {
   if (intent.schema !== 1 || intent.score !== SEMANTIC_SCORE || intent.intent !== 'assign-hand' || !['RH', 'LH'].includes(intent.target) || !['this','set','source-linked'].includes(intent.scope) || !Array.isArray(intent.selected) || intent.selected.length < 1 || (intent.scope !== 'set' && intent.selected.length !== 1)) throw new Error('invalid/unsupported hand intent or selection');
+  const index = buildBrahmsSemanticIndex(score);
   const currentMap = new Map(current.map(a => [a.id, a]));
   const byId = new Map(score.notes.map(n => [n.id, n]));
   const selected = intent.selected.map(g => {
@@ -152,12 +138,11 @@ function resolveIntent(intent: HandIntent, score: QuantizedGridScore, current: r
   if (new Set(selected.map(n => n.id)).size !== selected.length) throw new Error('duplicate selection');
   let targets = selected;
   if (intent.scope === 'source-linked') {
-    const origin = evidence(selected[0]);
-    targets = resolveLinkedOccurrences(origin, score);
+    targets = linkedBrahmsNotes(index, editableBrahmsSound(index, index.forNote(selected[0].id), selected[0].id), score);
     if (targets.some(n => n.hand !== selected[0].hand)) throw new Error('source-linked hand mismatch');
   }
   return targets.map(n => {
-    const e = evidence(n);
+    const e = editableBrahmsSound(index, index.forNote(n.id), n.id);
     const previous = currentMap.get(n.id);
     return { id: n.id, guard: previous?.guard ?? { id: n.id, pitchClass: n.pitch.pitchClass, octave: n.pitch.octave, tick: n.startTick, expectedHand: n.hand }, hand: intent.target, citation: citation(e) };
   });
@@ -216,6 +201,13 @@ function prepareChange(state: CandidateState, request: HandIntent, root: string)
   { replay: true; revision: string; effects: Effects } | { replay: false; assignments: Assignment[]; effects: Effects } {
   const old = candidateScore(state);
   if (request.base !== head(state, root)) throw new Error('stale candidate base');
+  const provenanceFile = 'src/scores/data/brahms-op118-no1-written-durations.provenance.json';
+  if (digest(JSON.parse(readFileSync(resolve(root, provenanceFile), 'utf8'))) !== digest(provenance))
+    throw new Error(`SOURCE_WITNESS: imported provenance drift at ${provenanceFile}; refuse edit until evidence is rebuilt`);
+  const pinnedFile = 'data/sources/brahms-op118-no1/includes/intermezzo-op118-no1-parts.ily';
+  const expected = writtenFixture.sources.find(s => s.path === 'includes/intermezzo-op118-no1-parts.ily')?.sha256;
+  if (!expected || digest(readFileSync(resolve(root, pinnedFile))) !== expected)
+    throw new Error(`SOURCE_WITNESS: pinned source drift at ${pinnedFile}; refuse edit until source evidence is regenerated`);
   const incoming = resolveIntent(request, old, activeAssignments(state));
   const byId = new Map(activeAssignments(state).map(a => [a.id, a]));
   for (const a of incoming) byId.set(a.id, a);
