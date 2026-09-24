@@ -62,7 +62,7 @@ const bl=layoutJankoScore(brahms,bo,bt);
 test('placed semantic rest owners and paint mutation do not consult source geometry', () => {
   for (const system of [bl[0],bl[5]]) {
     const scene=buildInkScene(system,bo,bt,brahms);
-    assert.deepEqual(scene.paintCoverage.stored,['rests']);
+    assert.deepEqual(scene.paintCoverage.stored,['rests','beamed-solo']);
     assert.ok(!scene.coverage.migrated.includes('rests' as never));
     assert.throws(()=>requireSceneCoverage(scene,'rests'),/does not cover rests/);
     assert.equal(scene.restPaint.length,system.rests.length);

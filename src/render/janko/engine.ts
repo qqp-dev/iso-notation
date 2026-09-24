@@ -107,7 +107,7 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
-import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg } from './ink-scene';
+import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg, sceneSoloSvg } from './ink-scene';
 import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
@@ -2380,6 +2380,9 @@ export function resolveDotFlagClearance(
     const dur = p.note.durationTicks;
     if (durationDotCount(dur, o.durationGrammar) < 1) return p;
     if (beamedIds && beamedIds.has(p.note.id)) return p;
+    // Preliminary conservative placement/readability policy, NOT a final
+    // physical scene query: dot seats precede final placed solo paint. Next
+    // targeted sunset shares projected primitives while preserving seats.
     // Round 30: the escape clears the TRUE flag ink — under the complete
     // grammar a double-dotted 16th's two-mark glyph, not the legacy one.
     const marks = subdivisionMarkCount(dur, o.durationGrammar);
@@ -6669,7 +6672,9 @@ export function systemPaintedInkBoxes(
     }
   }
   if (o.rhythmStyle === 'beamed') {
-    for (const n of layout.ungrouped) {
+    // Fixed-core solo stems, rings, flags and dots are inventoried from the
+    // stored placed scene above; boxes are broad, not physical occupancy.
+    if (!placedScene) for (const n of layout.ungrouped) {
       if (hidden.has(n.id)) continue;
       const s = getStemGeometry(n, t);
       stemBox(n.id, s, s.stemEndY);
@@ -9946,7 +9951,8 @@ function renderNotesLayer(
         clasp !== undefined &&
         n.durationTicks !== claspMemberCarriedTicks(clasp, n.id);
       const grammar = claspedIds.has(n.id) && !exception ? 'golden' : o.durationGrammar;
-      out.push(renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle, grammar));
+      out.push(inkScene ? sceneSoloSvg(inkScene,n.id) :
+        renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle, grammar));
     }
   } else {
     for (const p of layout.notes) {

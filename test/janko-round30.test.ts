@@ -78,9 +78,12 @@ import {
   layoutJankoScore,
   renderJankoCrop,
   renderJankoPage,
+  renderSystem,
   suppressedStemIds,
 } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
+import { buildInkScene, sceneSoloAt, sceneSoloSvg } from '../src/render/janko/ink-scene';
+import { soloPieceAt } from '../src/render/janko/solo-scene';
 import {
   StudioCrop,
   createStudioConfig,
@@ -660,18 +663,19 @@ test('Unchanged: option-off renders equal the current golden on both scores', ()
 // 4. Linter: the preview lints clean, the new audits are option-aware
 // ---------------------------------------------------------------------------
 
-test('The complete grammar adds no finding (Bach green, Brahms 2+0)', () => {
+test('Withdrawn complete preview reports previously missed Brahms ring contacts; Bach remains green', () => {
   const bach = lintJankoScore(BACH, O_BACH_PREVIEW, T_BACH);
   assert.equal(bach.violations.length, 0, 'Bach preview: zero violations');
   assert.equal(bach.warnings.length, 0, 'Bach preview: zero warnings');
-  // Canonical packing: the Brahms preview carries exactly the golden's 2
-  // slot findings. Note 5 (m.1 downbeat whole) used to stand bare, mounting
-  // two preview rings on its short chord stem with the upper ring colliding
-  // with its own mask; the admitted tick-48 bracket (§2 true-ink pre-step)
-  // carries it as the 192 exception (preview stays golden for clasp
-  // members), so the ring defect is gone with the bare stem.
+  // Canonical packing retains its two historical slot findings. The
+  // withdrawn complete preview has seventeen *additional* real painted
+  // clasp-exception ring/mask contacts the former golden re-render missed.
   const brahms = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
-  assert.equal(brahms.violations.length, 2, 'Brahms preview: the golden 2 slot findings, nothing new');
+  // Historical withheld preview only: its clasp exceptions already painted
+  // complete-grammar rings, but the old re-render audit used golden grammar
+  // and silently missed seventeen ring/mask contacts. The placed audit reports
+  // the real ink without shifting its seats or changing canonical Brahms.
+  assert.equal(brahms.violations.length, 19, '2 grandfathered slots + 17 previously missed preview ring contacts');
   assert.equal(brahms.warnings.length, 0, 'Brahms preview: zero warnings');
   assert.equal(brahms.ok, false, 'red by operator order, like its golden');
   const slots = brahms.violations.filter((v) => v.code === 'system-slot-overlap');
@@ -681,26 +685,53 @@ test('The complete grammar adds no finding (Bach green, Brahms 2+0)', () => {
     'the 2 slot findings are byte-identical to the golden report'
   );
   const rings = brahms.violations.filter((v) => v.code === 'ring-geometry');
-  assert.equal(rings.length, 0, 'no new-audit finding: the whole is bracketed');
+  assert.equal(rings.length, 17, 'all previously missed complete-preview clasp exception rings');
 });
 
-test('The new audits run under the preview and stay silent under golden', () => {
+test('withdrawn Round 30 mm. 1–2 ring witness is physically clipped by the later mask, not a conservative false positive',()=>{
+  const layouts=layoutJankoScore(BRAHMS,O_BRAHMS_PREVIEW,T_BRAHMS);
+  const layout=layouts.find(l=>l.notes.some(n=>n.note.id==='brahms-op118-no1-5'))!;
+  const scene=buildInkScene(layout,O_BRAHMS_PREVIEW,T_BRAHMS,BRAHMS);
+  const id='brahms-op118-no1-5',group=scene.solos.get(id)!;
+  assert.ok(group&&group.some(p=>p.shape.kind==='ring'));
+  assert.ok(layout.notes.find(p=>p.note.id===id)!.note.startTick<384,
+    'contact is in historical Round 30 rings card mm. 1–2, not the current studio registry');
+  // Adaptive is a direct-call adapter to the same constructor, not fixed-core
+  // stored paint. Both paths retain literal output bytes at this historical seat.
+  const svg=renderSystem(BRAHMS,layout.geometry,layout.index,O_BRAHMS_PREVIEW,T_BRAHMS,layout);
+  assert.ok(svg.includes(sceneSoloSvg(scene,id)));
+  const mask=scene.heads.get(id)!.find(p=>p.primitive.kind==='erase')!.primitive;
+  if(mask.kind!=='erase')throw Error('missing later head mask');
+  const rings=group.filter(p=>p.shape.kind==='ring');
+  let contact:[number,number]|undefined;
+  for(const ring of rings){
+    const shape=ring.shape;if(shape.kind!=='ring')continue;
+    for(let x=mask.box.x0+.02;x<mask.box.x1-.02&&!contact;x+=.04)
+      for(let y=mask.box.y0+.02;y<mask.box.y1-.02;y+=.04)
+        if(soloPieceAt(ring,x,y).status==='ink'){contact=[x,y];break;}
+  }
+  assert.ok(contact,'literal ring rim lies inside actual mask: genuine later white clipping');
+  assert.equal(sceneSoloAt(scene,id,...contact!).status,'clear','mask erases the earlier ring rim');
+});
+
+test('Placed audits expose withdrawn preview rings while canonical golden stays silent', () => {
   // Golden: the two new checks are no-ops (the golden grammar predates the
   // notated counts), so the gate reports exactly the accepted 2.
   const golden = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
   assert.equal(golden.violations.length, 2, 'golden: exactly the accepted 2 slot findings');
   assert.equal(golden.warnings.length, 0);
-  // Preview: the checks run over real new ink and stay silent — the one
-  // genuine corpus firing (note 5's self-colliding whole ring) is gone with
-  // the bare stem (5 is the admitted tick-48 bracket's 192 exception now).
+  // Preview: the checks now see real clasp-exception paint, not the former
+  // golden re-render. The canonical golden remains silent; the unjudged
+  // historical preview's seventeen contacts are not silently dismissed.
   // Non-vacuousness rests on the synthetic fixtures in
   // test/janko-linter.test.ts.
   const preview = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
-  assert.equal(preview.violations.length, 2, 'preview: the accepted 2, nothing new');
+  assert.equal(preview.violations.length, 19, 'preview: 2 accepted slots + 17 newly visible historical ring contacts');
   assert.equal(preview.warnings.length, 0);
   const auditCodes = (codes: string[]): string[] =>
     codes.filter((c) => c === 'ring-geometry' || c === 'dot-count-agreement');
-  assert.deepEqual(auditCodes(preview.violations.map((v) => v.code)), [], 'the preview path is silent too');
+  assert.deepEqual(auditCodes(preview.violations.map((v) => v.code)), Array(17).fill('ring-geometry'),
+    'the historical preview now reports its painted exception ring contacts');
   assert.deepEqual(auditCodes(golden.violations.map((v) => v.code)), [], 'the golden path is silent');
 });
 
