@@ -59,6 +59,7 @@ import {
   subdivisionMarkCount,
 } from '../src/render/janko/elements/rhythm';
 import { JankoSystemLayout, layoutJankoScore, renderSystem } from '../src/render/janko/engine';
+import { dotFlagPolicyBox } from '../src/render/janko/solo-scene';
 
 const T = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
 const BACH = buildBachGoldbergVar1Score();
@@ -608,6 +609,7 @@ test('Note-dot no-move guard: the augmentation dots are byte-identical', () => {
   const dotted = layout.ungrouped.filter((n) => n.durationTicks > 26 && n.durationTicks <= 38);
   assert.deepEqual(dotted.map((n) => n.startTick), [24, 168, 312], 'the system’s solitary dotted 8ths');
   const svg = renderSystem(BACH, layout.geometry, 0, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, layout);
+  let subpixelShifts = 0;
   for (const note of dotted) {
     const dotX = (note.dotX ?? -1).toFixed(2);
     const dotY = (note.dotY ?? note.y).toFixed(2);
@@ -618,17 +620,11 @@ test('Note-dot no-move guard: the augmentation dots are byte-identical', () => {
       `t${note.startTick}: the note dot is painted at its judged lane (${dotX}, ${dotY})`
     );
     // The judged relation: the dot escapes RIGHT off its mask hug onto exactly
-    // the house gap of true verbatim flag air, keeping the hug lane height.
-    const s = getStemGeometry(note, T);
-    const bbox = getSubdivisionGlyphBBox(
-      DEFAULT_JANKO_OPTIONS.subdivisionStyle,
-      s.direction,
-      subdivisionMarkCount(note.durationTicks),
-      T
-    );
+    // the house gap of the emitted-curve policy envelope, keeping the hug lane height.
+    const bbox = dotFlagPolicyBox(note, subdivisionMarkCount(note.durationTicks), resolveJankoOptions(DEFAULT_JANKO_OPTIONS), T);
     assert.equal(
       note.dotX,
-      s.stemX + bbox.x1 + T.augmentationDotRadius + T.augmentationDotGap,
+      bbox.x1 + T.augmentationDotRadius + T.augmentationDotGap,
       `t${note.startTick}: the dot escapes right onto 1.2pt of flag air`
     );
     assert.equal(
@@ -636,5 +632,15 @@ test('Note-dot no-move guard: the augmentation dots are byte-identical', () => {
       note.y - T.augmentationDotRowOffset,
       `t${note.startTick}: the dot keeps the hug lane height`
     );
+    // The old baked policy predicted a subtly different unrounded seat. Its
+    // disappearance is real; two-decimal SVG and the pinned page remain equal.
+    const stem = getStemGeometry(note, T);
+    const legacy = getSubdivisionGlyphBBox('classical-urtext', stem.direction, 1, T);
+    const oldSeat = stem.stemX + legacy.x1 + T.augmentationDotRadius + T.augmentationDotGap;
+    const delta = note.dotX! - oldSeat;
+    assert.ok(Math.abs(delta) <= 0.005, `t${note.startTick}: only millipoint internal solver change (${delta})`);
+    if (Math.abs(delta) > 0.0001) subpixelShifts++;
+    assert.equal(note.dotX!.toFixed(2), oldSeat.toFixed(2), 'the actual emitted coordinate is unchanged');
   }
+  assert.ok(subpixelShifts > 0, 'at least one first-system dot uses the new numerical bound');
 });

@@ -58,6 +58,7 @@ import {
   renderBarlines,
   renderBeatGrid,
 } from '../src/render/janko/elements/barlines';
+import { dotFlagPolicyBox } from '../src/render/janko/solo-scene';
 import {
   getStemGeometry,
   getSubdivisionGlyphBBox,
@@ -228,15 +229,8 @@ test('Dots golden: m.1 tick-24 dot clears true flag ink by >= 1.2pt AND clears t
   assert.ok(n5, 'bach-var1-5 found');
   assert.ok(n7, 'bach-var1-7 follower found');
 
-  // Flag bbox under verbatim SMuFL glyph
-  const s = getStemGeometry(n5.rhythm, t);
-  const bbox = getSubdivisionGlyphBBox('classical-urtext', s.direction, 1, t);
-  const fBox = {
-    x0: s.stemX + bbox.x0,
-    y0: s.stemEndY + bbox.y0,
-    x1: s.stemX + bbox.x1,
-    y1: s.stemEndY + bbox.y1,
-  };
+  // Projected emitted-curve envelope; a readability seat, not physical fill.
+  const fBox = dotFlagPolicyBox(n5.rhythm, 1, o, t);
 
   const dotX = n5.rhythm.dotX!;
   const dotY = n5.rhythm.dotY!;
@@ -289,14 +283,7 @@ test('Dots golden pin: Bach ships 0 dot-flag collisions (19 dotted flagged singl
       const marks = subdivisionMarkCount(p.note.durationTicks);
       if (marks < 1) continue;
       scanned++;
-      const s = getStemGeometry(p.rhythm, t);
-      const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
-      const fBox = {
-        x0: s.stemX + bbox.x0,
-        y0: s.stemEndY + bbox.y0,
-        x1: s.stemX + bbox.x1,
-        y1: s.stemEndY + bbox.y1,
-      };
+      const fBox = dotFlagPolicyBox(p.rhythm, marks, o, t);
       const dotX = p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + t.augmentationDotGap;
       const dotY = p.rhythm.dotY ?? p.y;
       const dx = Math.max(fBox.x0 - dotX, 0, dotX - fBox.x1);

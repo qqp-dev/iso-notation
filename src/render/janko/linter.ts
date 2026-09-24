@@ -124,7 +124,6 @@ import {
   getStemAttachmentRadius,
   getStemGeometry,
   JANKO_STEM_STROKE_WIDTH,
-  getSubdivisionGlyphBBox,
   partitionBeamGroups,
   renderBeamGroup,
   resolveClaspInk,
@@ -178,6 +177,7 @@ import {
 import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
+import { dotFlagPolicyBox } from './solo-scene';
 import { beamPieceAt } from './beam-scene';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
@@ -1558,21 +1558,11 @@ export function checkDotCollision(
         break;
       }
       if (!beamedIds || !beamedIds.has(p.note.id)) {
-        // Conservative pre-final dot/flag seat readability policy; the
-        // final solo scene is not yet available to the escape solver. Next
-        // targeted replacement shares projected paint without moving seats.
-        // Round 30: the escape clears the TRUE flag ink — the complete
-        // grammar's mark count, not the legacy one.
+        // Same pre-final policy envelope as both escape stages; not positive
+        // ink, and complete grammar uses its engraved mark count.
         const marks = subdivisionMarkCount(dur, o.durationGrammar);
         if (marks >= 1) {
-          const s = getStemGeometry(p.rhythm, t);
-          const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
-          const fBox = {
-            x0: s.stemX + bbox.x0,
-            y0: s.stemEndY + bbox.y0,
-            x1: s.stemX + bbox.x1,
-            y1: s.stemEndY + bbox.y1,
-          };
+          const fBox = dotFlagPolicyBox(p.rhythm, marks, o, t);
           const fdx = Math.max(fBox.x0 - dx, 0, dx - fBox.x1);
           const fdy = Math.max(fBox.y0 - dy, 0, dy - fBox.y1);
           const distance = Math.hypot(fdx, fdy) - dotR;
@@ -1581,7 +1571,7 @@ export function checkDotCollision(
               code: 'dot-collision',
               severity: 'error',
               message:
-                `The ${which} of ${p.note.id} sits ${distance.toFixed(2)}pt from its flag ink box ` +
+                `The ${which} of ${p.note.id} sits ${distance.toFixed(2)}pt from its flag readability envelope ` +
                 `(${t.augmentationDotGap.toFixed(2)}pt required).`,
               ...base,
               metrics: { distance, required: t.augmentationDotGap, cx: dx, cy: dy },

@@ -108,6 +108,7 @@ import {
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
 import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg, sceneSoloSvg } from './ink-scene';
+import { dotFlagPolicyBox } from './solo-scene';
 import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
@@ -2380,22 +2381,12 @@ export function resolveDotFlagClearance(
     const dur = p.note.durationTicks;
     if (durationDotCount(dur, o.durationGrammar) < 1) return p;
     if (beamedIds && beamedIds.has(p.note.id)) return p;
-    // Preliminary conservative placement/readability policy, NOT a final
-    // physical scene query: dot seats precede final placed solo paint. Next
-    // targeted sunset shares projected primitives while preserving seats.
-    // Round 30: the escape clears the TRUE flag ink — under the complete
-    // grammar a double-dotted 16th's two-mark glyph, not the legacy one.
+    // Pre-final readability envelope, not physical ink: the scene does not yet
+    // exist. Complete grammar uses its actual two-mark flag for dotted 16ths.
     const marks = subdivisionMarkCount(dur, o.durationGrammar);
     if (marks < 1) return p;
 
-    const s = getStemGeometry(p.rhythm, t);
-    const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
-    const fBox = {
-      x0: s.stemX + bbox.x0,
-      y0: s.stemEndY + bbox.y0,
-      x1: s.stemX + bbox.x1,
-      y1: s.stemEndY + bbox.y1,
-    };
+    const fBox = dotFlagPolicyBox(p.rhythm, marks, o, t);
 
     const curX =
       p.rhythm.dotX ?? p.x + getClusterSpacingPreset(o.clusterSpacing).wx + gap;
@@ -2535,14 +2526,7 @@ export function resolveSecondDots(
     if (!beamedIds || !beamedIds.has(p.note.id)) {
       const marks = subdivisionMarkCount(dur, o.durationGrammar);
       if (marks >= 1) {
-        const s = getStemGeometry(p.rhythm, t);
-        const bbox = getSubdivisionGlyphBBox(o.subdivisionStyle, s.direction, marks, t);
-        flagBox = {
-          x0: s.stemX + bbox.x0,
-          y0: s.stemEndY + bbox.y0,
-          x1: s.stemX + bbox.x1,
-          y1: s.stemEndY + bbox.y1,
-        };
+        flagBox = dotFlagPolicyBox(p.rhythm, marks, o, t);
       }
     }
 

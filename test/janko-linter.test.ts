@@ -1978,7 +1978,7 @@ test('checkDotCollision: the golden dot standard clears every flag (no option)',
   checkDotCollision(sys, o, t, vClean);
   assert.equal(vClean.length, 0, 'golden dot standard with engine resolution reports 0 dot-collisions');
 
-  // If a note has its dot forced into its own flag ink box, the audit catches it:
+  // If a note has its dot forced into its own flag readability envelope, the audit catches it:
   const victim = sys.notes.find((q) => q.note.id === 'bach-var1-5')!;
   const stem = getStemGeometry(victim.rhythm, t);
   const collidingNotes = sys.notes.map((n) => {
@@ -2001,7 +2001,7 @@ test('checkDotCollision: the golden dot standard clears every flag (no option)',
   const vColliding: LintViolation[] = [];
   checkDotCollision(collidingLayout, o, t, vColliding);
   const flagViolations = vColliding.filter(
-    (v) => v.code === 'dot-collision' && v.message.includes('flag ink box')
+    (v) => v.code === 'dot-collision' && v.message.includes('flag readability envelope')
   );
   assert.equal(flagViolations.length, 1, 'flag clearance audit catches a colliding dot');
   assert.equal(flagViolations[0].noteIds?.[0], 'bach-var1-5');

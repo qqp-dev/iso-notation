@@ -3,14 +3,70 @@
 import type { QuantizedNote } from '../../model/types';
 import type { JankoRhythmNote } from './elements/rhythm';
 import { getStemGeometry, JANKO_STEM_STROKE_WIDTH, CLASP_RING_RADIUS, CLASP_RING_STROKE,
-  stemRingCenters, subdivisionMarkCount, renderSubdivisionMark, verbatimFlagPath } from './elements/rhythm';
+  stemRingCenters, subdivisionMarkCount, renderSubdivisionMark, verbatimFlagPath,
+  getSubdivisionGlyphBBox } from './elements/rhythm';
 import { durationDotCount } from './elements/duration';
-import type { JankoDurationGrammar, JankoSubdivisionStyle, ResolvedJankoTokens } from './types';
+import type { JankoDurationGrammar, JankoSubdivisionStyle, ResolvedJankoTokens, ResolvedJankoLayoutOptions } from './types';
 import { getClusterSpacingPreset } from './types';
 import { f } from './elements/style';
 import type { InkBox } from './ink-scene';
 
 const n=(v:number)=>Number(f(v));
+
+/** The path constructor used by both final solo paint and pre-final dot policy. */
+export function soloClassicalFlagPath(stemX:number,tipY:number,direction:-1|1,marks:number):string {
+  const d=verbatimFlagPath(stemX,tipY,direction,marks).match(/\bd="([^"]+)"/)?.[1];
+  if(!d)throw new Error('Unsupported solo flag path');
+  return d;
+}
+
+/** Conservative SVG-effective *envelope*, not filled ink: closed cubic extrema
+ * after the actual path's two-decimal coordinate projection. The AABB corners
+ * and evenodd counters cannot establish physical occupancy. */
+export function projectedSoloFlagEnvelope(d:string):InkBox {
+  const parts=d.match(/[MCZ]|-?\d+(?:\.\d+)?/g)??[];
+  if(parts.join('').length!==d.replace(/[\s,]/g,'').length)throw new Error('Unsupported projected flag path');
+  let i=0, start:[number,number]|null=null, current:[number,number]|null=null;
+  const xs:number[]=[],ys:number[]=[];
+  const point=():[number,number]=>{
+    const x=Number(parts[i++]),y=Number(parts[i++]);
+    if(!Number.isFinite(x)||!Number.isFinite(y))throw new Error('Invalid projected flag coordinate');
+    return [x,y];
+  };
+  const extrema=(a:number,b:number,c:number,e:number):number[]=>{
+    const values=[a,e], A=-a+3*b-3*c+e, B=2*(a-2*b+c), C=b-a;
+    const roots:number[]=[];
+    if(Math.abs(A)<1e-14){if(Math.abs(B)>1e-14)roots.push(-C/B);}
+    else {const disc=B*B-4*A*C;if(disc>=0){roots.push((-B-Math.sqrt(disc))/(2*A),(-B+Math.sqrt(disc))/(2*A));}}
+    for(const t of roots)if(t>0&&t<1){const u=1-t;values.push(u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*e);}
+    return values;
+  };
+  while(i<parts.length){
+    const command=parts[i++];
+    if(command==='M'){current=point();start=current;xs.push(current[0]);ys.push(current[1]);}
+    else if(command==='C'&&current){const a=point(),b=point(),end=point();
+      xs.push(...extrema(current[0],a[0],b[0],end[0]));
+      ys.push(...extrema(current[1],a[1],b[1],end[1]));current=end;
+    }else if(command==='Z'&&start){current=start;}
+    else throw new Error('Unsupported projected flag command');
+  }
+  if(!xs.length)throw new Error('Empty projected flag path');
+  const margin=1e-9; // outward near derivative tangencies / floating-point equality
+  return {x0:Math.min(...xs)-margin,x1:Math.max(...xs)+margin,y0:Math.min(...ys)-margin,y1:Math.max(...ys)+margin};
+}
+
+/** One named pre-final dot admission dispatch; sunset the retained kinetic and
+ * nonfixed branches after real-engine Candidate seat judgments. Never a final
+ * scene physical query: placement happens before the scene can be built. */
+export function dotFlagPolicyBox(note:JankoRhythmNote,marks:number,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens):InkBox {
+  const s=getStemGeometry(note,t);
+  if(o.rhythmStyle==='beamed'&&o.subdivisionStyle==='classical-urtext'&&
+      (o.core==='fixed-3'||o.core==='fixed-4'))
+    return projectedSoloFlagEnvelope(soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks));
+  // Legacy baked admission only; kinetic candidates differ by up to ~0.985pt.
+  const b=getSubdivisionGlyphBBox(o.subdivisionStyle,s.direction,marks,t);
+  return {x0:s.stemX+b.x0,x1:s.stemX+b.x1,y0:s.stemEndY+b.y0,y1:s.stemEndY+b.y1};
+}
 export type SoloShape =
   | {kind:'stem';x:number;y1:number;y2:number;width:number}
   | {kind:'ring';cx:number;cy:number;r:number;width:number}
@@ -45,9 +101,7 @@ export function soloRhythmPaint(note:JankoRhythmNote,t:ResolvedJankoTokens,style
   const marks=subdivisionMarkCount(note.durationTicks,grammar);
   if(style==='classical-urtext') {
     if(marks>=1){
-      const svg=verbatimFlagPath(s.stemX,s.stemEndY,s.direction,marks);
-      const d=svg.match(/\bd="([^"]+)"/)?.[1];
-      if(!d)throw new Error('Unsupported solo flag path');
+      const d=soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks);
       add({kind:'flag',d,stemX:n(s.stemX),index:1,count:marks,style});
     }
   } else for(let i=1;i<=marks;i++){
