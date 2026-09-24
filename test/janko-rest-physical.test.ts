@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { placedRestPaint, serializeRestPaint, type JankoRestInk } from '../src/render/janko/elements/rests';
-import { restInkAt, restInkInBox, restDiscClearance } from '../src/render/janko/rest-physical';
+import { prepareRestPaint, restInkAt, restInkInBox, restDiscClearance } from '../src/render/janko/rest-physical';
 import { buildInkScene } from '../src/render/janko/ink-scene';
 import { checkRestClearance, lintJankoScore, DEFAULT_JANKO_LINT_OPTIONS, systemBarlines } from '../src/render/janko/linter';
 import { layoutJankoScore } from '../src/render/janko/engine';
@@ -36,6 +36,77 @@ test('literal SVG rectangle and the certified queries share effective two-decima
     assert.equal(q.kind,'clear');
     if(q.kind==='clear') assert.ok(Math.abs(q.certificate.distance-expected)<1e-8);
   }
+});
+
+test('literal emitted cubic controls bound paint; hull is never mistaken for painted ink', () => {
+  const base=placedRestPaint({...rest,value:'eighth'},0,0,0,t)[0];
+  const shape: JankoRestInk={kind:'path',cls:'janko-rest-verbatim',
+    start:{x:0,y:0},segments:[[{x:0,y:10},{x:10,y:10},{x:10,y:0}]],
+    close:true,fill:'#1A1A1A',stroke:null,attrs:' data-verbatim-rest="eighth"'};
+  const group=[{...base,primitive:shape}];
+  const svg=serializeRestPaint(group);
+  assert.match(svg, /<path class="janko-rest-verbatim" d="M 0\.00 0\.00 C 0\.00 10\.00 10\.00 10\.00 10\.00 0\.00 Z" fill="#1A1A1A" stroke="none" stroke-linecap="butt" stroke-linejoin="miter" data-verbatim-rest="eighth"\/>/);
+  // Independent Bézier oracle: nonnegative Bernstein weights sum to one;
+  // every sampled curve point and the closing edge lie in the rectangle hull
+  // [0,10]² of the *literal emitted* control coordinates.
+  for(let i=0;i<=100;i++) {
+    const u=i/100, bx=30*u*u-20*u*u*u, by=30*u*(1-u);
+    assert.ok(bx>=-1e-10 && bx<=10+1e-10 && by>=-1e-10 && by<=10+1e-10);
+    assert.ok(i/10>=0 && i/10<=10,'closing edge in hull');
+  }
+  const prepared=prepareRestPaint(group);
+  assert.equal(prepared.kind,'cubic');
+  assert.equal(restInkAt(prepared,15,5).kind,'clear');
+  assert.equal(restInkInBox(prepared,{x0:15,y0:4,x1:16,y1:5}).kind,'clear');
+  assert.equal(restDiscClearance(prepared,15,5,2,1).kind,'clear');
+  assert.equal(restInkAt(prepared,5,9).kind,'unknown','unpainted hull area is not ink or certified clear');
+  assert.equal(restInkAt(prepared,5,5).kind,'unknown','actual cubic interior is not a positive claim');
+  assert.equal(restInkInBox(prepared,{x0:5,y0:8,x1:6,y1:9}).kind,'unknown');
+  assert.equal(restDiscClearance(prepared,13,5,2,1).kind,'unknown','tangent refuses');
+  assert.equal(restDiscClearance(prepared,13.000001,5,2,1).kind,'unknown','rounding refuses');
+  for (const primitive of [
+    {...shape,attrs:' data-verbatim-rest="quarter"'},
+    {...shape,stroke:0.1}, {...shape,fill:'#FFFFFF'}, {...shape,close:false},
+    {...shape,segments:[]}, {...shape,dash:'2,3'},
+  ]) assert.equal(restInkAt([{...base,primitive} as typeof group[0]],15,5).kind,'unknown');
+  assert.equal(restInkAt([...group,{...base,id:'extra',primitive:{kind:'rect',cls:'erase',x:15,y:0,w:1,h:1,fill:'#FFFFFF',stroke:null}}],15,5).kind,'unknown');
+  // Frozen layout/identity, stored primitive alone moves: SVG and query agree.
+  const moved=[{...base,primitive:{...shape,segments:[[{x:0,y:10},{x:20,y:10},{x:20,y:0}] as const]}}];
+  assert.notEqual(serializeRestPaint(moved),svg);
+  assert.equal(restInkAt(moved,15,5).kind,'unknown');
+});
+
+test('real Bach verbatim rest is the same stored SVG path consumed by the certified linter', () => {
+  const score=buildBachGoldbergVar1Score(),o=resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const layout=layoutJankoScore(score,o,t).find(s=>s.rests.some(r=>r.value==='eighth'))!;
+  const index=layout.rests.findIndex(r=>r.value==='eighth');
+  const scene=buildInkScene(layout,o,t,score),group=scene.restPaint[index];
+  const item=group[0].primitive;
+  assert.equal(group.length,1);
+  assert.equal(item.kind,'path');
+  if(item.kind!=='path') return;
+  const literal=serializeRestPaint(group);
+  assert.match(literal, /<g class="janko-rest-group" data-rest-tick="\d+" data-rest-value="eighth" data-rest-hand="(?:RH|LH)" data-rest-style="classical-urtext">/);
+  assert.match(literal, /<path class="janko-rest-verbatim" d="M -?\d+\.\d{2} -?\d+\.\d{2} C /);
+  assert.match(literal, / Z" fill="#1A1A1A" stroke="none" stroke-linecap="butt" stroke-linejoin="miter" data-verbatim-rest="eighth"\/>/);
+  assert.equal(prepareRestPaint(group).kind,'cubic');
+  const p=layout.notes[0];
+  const nearby={...layout,rests:[{...layout.rests[index],x:p.x,y:p.y}]};
+  const far=buildInkScene(nearby,o,t,score);
+  const farGroup=far.restPaint[0];
+  const old=farGroup[0].primitive;
+  assert.equal(old.kind,'path');
+  if(old.kind!=='path') return;
+  // Keep placement/admission frozen. Only the stored SVG control points move.
+  const shift=500;
+  farGroup[0].primitive={...old,start:{...old.start,x:old.start.x+shift},
+    segments:old.segments.map(([a,b,c])=>[{...a,x:a.x+shift},{...b,x:b.x+shift},{...c,x:c.x+shift}] as const)};
+  const out: Parameters<typeof checkRestClearance>[4]=[];
+  const counts={certified:0,fallback:{} as Record<string,number>};
+  checkRestClearance(nearby,o,t,DEFAULT_JANKO_LINT_OPTIONS,out,far,counts);
+  assert.ok(counts.certified>0);
+  assert.ok(!out.some(d=>d.noteIds?.includes(p.note.id)),'certified cubic does not run stale admission distance');
+  assert.notEqual(serializeRestPaint(farGroup),serializeRestPaint([{...farGroup[0],primitive:old}]));
 });
 
 test('unsupported shape/paint refuses whole rest including narrow dashed ellipse grazing', () => {
@@ -101,13 +172,14 @@ test('live linter retires certified box distance, counts unsupported fallback, k
 
 test('real corpus and literal seven-value specimen have certified decisions and counted fallbacks', () => {
   for(const [score,opts,tokens,expectedCertified] of [
-    [buildBachGoldbergVar1Score(),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,0],
-    [buildBrahmsOp118No1Score(),BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS,0],
-    [buildRestDurationSpecimenScore(),REST_DURATION_SPECIMEN_JANKO_OPTIONS,REST_DURATION_SPECIMEN_JANKO_TOKENS,30],
+    [buildBachGoldbergVar1Score(),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,579],
+    [buildBrahmsOp118No1Score(),BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS,1233],
+    [buildRestDurationSpecimenScore(),REST_DURATION_SPECIMEN_JANKO_OPTIONS,REST_DURATION_SPECIMEN_JANKO_TOKENS,111],
   ] as const) {
     const report=lintJankoScore(score,opts,tokens);
     assert.equal(report.stats.restPhysical.certified,expectedCertified);
-    assert.ok(report.stats.restPhysical.fallback['shape not certified']>0);
+    assert.equal(report.stats.restPhysical.fallback['shape not certified'] ?? 0,0);
+    if (expectedCertified !== 111) assert.deepEqual(report.stats.restPhysical.fallback,{},'canonical cubic pairs need no legacy fallback');
     assert.equal(report.violations.length,0);
   }
 });
