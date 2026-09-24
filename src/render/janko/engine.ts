@@ -107,7 +107,7 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
-import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg } from './ink-scene';
+import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg } from './ink-scene';
 import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
@@ -9974,9 +9974,14 @@ function renderNotesLayer(
   // 2c. Round 12 voice rests: the written silences of an inactive hand span,
   //     painted above the rhythm layer they interrupt and beneath the noteheads,
   //     so a glyph mask always erases whatever a rest should never have touched.
-  // Written rests retain one legacy painter until every rest contour has a
-  // deterministic physical point/box contract; this scene cannot cover them.
-  for (const rest of layout.rests) out.push(renderRest(rest, t));
+  // Fixed-core SVG consumes stored final-placement primitives, not the seat
+  // or conservative admission reservation. Physical rest coverage is absent.
+  if (inkScene) {
+    for (let i = 0; i < inkScene.restPaint.length; i++) out.push(sceneRestSvg(inkScene, i));
+  } else {
+    // Non-fixed dialect compatibility, using the same primitive constructor/serializer.
+    for (const rest of layout.rests) out.push(renderRest(rest, t));
+  }
 
   // 2d. Round 12 `'strict-protected-grid'`: the continuous vertical grid is
   //     painted here, on its dedicated white air channels, *above* the rhythm
@@ -10047,7 +10052,9 @@ export function renderSystem(
   systemIndex: number,
   options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null,
-  layout?: JankoSystemLayout
+  layout?: JankoSystemLayout,
+  /** Optional placed-scene handoff for emission; production builds this once below. */
+  placedInkScene?: InkScene
 ): string {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -10075,7 +10082,7 @@ export function renderSystem(
   // The fixed-core placed scene is constructed AFTER any content-aware shift.
   // Other staff mappings remain labelled legacy until their staff families migrate.
   const inkScene = o.core === 'fixed-3' || o.core === 'fixed-4'
-    ? buildInkScene(resolved, o, t, score)
+    ? placedInkScene ?? buildInkScene(resolved, o, t, score)
     : undefined;
   out.push(inkScene ? sceneGridSvg(inkScene.pitch, 'janko-pitch-grid', true) : renderStaffLines(sysGeo, o, t));
   // Round 12: the continuous vertical grid (measure barlines + dashed beat
