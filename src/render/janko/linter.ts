@@ -88,7 +88,7 @@ import {
   suppressedStemIds,
   systemPageBookingBoxes,
 } from './engine';
-import { getBarStaffSegments, getEquatorRuleYs, outlierLedgerSpans, pitchGridRules } from './elements/staff';
+import { getBarStaffSegments, getEquatorRuleYs, placedLedgerRules, pitchGridRules } from './elements/staff';
 import {
   continuousPitchY,
   getMeasureIndexOfTick,
@@ -147,7 +147,7 @@ import {
   JankoRestGeometry,
   isBarRestValue,
   restInkCentroidOffset,
-  restInkBox,
+  restAdmissionBox,
   restSeatOffsetY,
 } from './elements/rests';
 import {
@@ -1124,7 +1124,7 @@ export function checkBeamRestClearance(
 
     for (const { label, connector } of connectors) {
       for (const rest of layout.rests) {
-        const ink = restInkBox(rest, t);
+        const ink = restAdmissionBox(rest, t); // conservative beam-air admission
         const gap = segmentToBoxDistance(
           connector.x1,
           connector.y1,
@@ -2018,6 +2018,8 @@ export function checkSystemSlotFit(
     const { numeral } = marginFurniture(layout, t, lint, 1, o.systemStartStyle);
     inkTop = Math.min(inkTop, numeral.y0);
   }
+  // Legacy page-slot reservation, not physical ledger occupancy. Matched to
+  // engine.systemFurnitureBounds until the complete page solver migrates.
   for (const p of layout.notes) {
     for (const ledgerY of p.coord.ledgerYs) {
       inkTop = Math.min(inkTop, g.middleCY + ledgerY - 0.38);
@@ -2696,6 +2698,8 @@ export function systemInkExtents(
       : r;
     top = Math.min(top, p.y - glyph);
     bottom = Math.max(bottom, p.y + glyph);
+    // Conservative page booking retained beside engine.systemCompleteInkBounds;
+    // neither centre ±0.38pt term claims physical ledger occupancy.
     for (const ledgerY of p.coord.ledgerYs) {
       top = Math.min(top, g.middleCY + ledgerY - 0.38);
       bottom = Math.max(bottom, g.middleCY + ledgerY + 0.38);
@@ -2717,7 +2721,7 @@ export function systemInkExtents(
     bottom = Math.max(bottom, clasp.botY);
   }
   for (const rest of layout.rests) {
-    const box = restInkBox(rest, t);
+    const box = restAdmissionBox(rest, t); // page-slot reservation, not filled ink
     top = Math.min(top, box.y0);
     bottom = Math.max(bottom, box.y1);
   }
@@ -3604,7 +3608,7 @@ export function checkDurationInkOwnership(
       });
     }
     for (const rest of layout.rests) {
-      const restBox = restInkBox(rest, t);
+      const restBox = restAdmissionBox(rest, t); // conservative detached-seat admission
       if (
         restBox.x1 <= box.x0 ||
         restBox.x0 >= box.x1 ||
@@ -4190,7 +4194,7 @@ export function checkRestClearance(
   };
 
   for (const rest of layout.rests) {
-    const box = restInkBox(rest, t);
+    const box = restAdmissionBox(rest, t); // conservative rest-clearance contract
     for (const p of layout.notes) {
       const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
       const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
@@ -5233,7 +5237,7 @@ export function checkOttavaClearance(
   // (noteheads only) on the legacy 6pt path.
   if (!layout.geometry) return;
   const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
-  const ledgerHalf = t.ledgerHalfWidth;
+  const ledgerRules = placedLedgerRules(layout.notes, layout.geometry, layout.index, t, o);
   const contextInk = collectOttavaContextInk(
     {
       beams: layout.beams ?? [],
@@ -5246,7 +5250,7 @@ export function checkOttavaClearance(
       ]),
       clasps: layout.clasps ?? [],
       rests: layout.rests ?? [],
-      outlierRules: outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t),
+      ledgerRules,
       options: o,
     },
     t
@@ -5272,21 +5276,15 @@ export function checkOttavaClearance(
       if (inSpan(p.x - glyph, p.x + glyph)) {
         ink.push({ x0: p.x - glyph, y0: p.y - glyph, x1: p.x + glyph, y1: p.y + glyph, what: `notehead ${p.note.id}` });
       }
-      if (inSpan(p.x - ledgerHalf, p.x + ledgerHalf)) {
-        for (const ledgerY of p.coord.ledgerYs) {
-          for (const ruleY of getEquatorRuleYs(layout.geometry.middleCY + ledgerY, o, t)) {
-            ink.push({ x0: p.x - ledgerHalf, y0: ruleY - 0.375, x1: p.x + ledgerHalf, y1: ruleY + 0.375, what: `ledger of ${p.note.id}` });
-          }
-        }
-      }
     }
     for (const rule of pitchGridRules(layout.geometry, o, t)) {
       if (!inSpan(rule.x1, rule.x2)) continue;
       ink.push({ x0: rule.x1, y0: rule.y - rule.width / 2, x1: rule.x2, y1: rule.y + rule.width / 2, what: 'staff rule' });
     }
-    for (const span of outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t)) {
-      if (!inSpan(span.x1, span.x2)) continue;
-      ink.push({ x0: span.x1, y0: span.y - 0.375, x1: span.x2, y1: span.y + 0.375, what: 'outlier rule' });
+    for (const rule of ledgerRules) {
+      if (!inSpan(rule.x1, rule.x2)) continue;
+      ink.push({ x0: rule.x1, y0: rule.y - 0.375, x1: rule.x2, y1: rule.y + 0.375,
+        what: rule.cls === 'janko-ledger' ? `ledger of ${rule.ownerIds[0]}` : 'outlier rule' });
     }
     for (const box of contextInk) {
       if (!inSpan(box.x0, box.x1)) continue;

@@ -1574,9 +1574,18 @@ export function restSeatOffsetY(
 /**
  * Axis-aligned ink box of one rest, in the active dialect, at the glyph's
  * optical origin. The engine's fit rule measures foreign notehead discs
- * against this same box, so a painted rest can never be a surprise collision —
- * the box and the ink are defined together.
+ * against this same conservative box, so a painted rest cannot surprise its
+ * clearance policy. It is NOT an occupied-ink or free-space query.
  */
+/** Conservative admission/page reservation, NOT occupied ink. */
+export function restAdmissionBox(
+  rest: JankoRestGeometry,
+  tokens?: Partial<JankoTokens> | null
+): { x0: number; y0: number; x1: number; y1: number } {
+  return restInkBox(rest, tokens);
+}
+
+/** Legacy conservative box; admission callers use the explicit policy alias. */
 export function restInkBox(
   rest: JankoRestGeometry,
   tokens?: Partial<JankoTokens> | null

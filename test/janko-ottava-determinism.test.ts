@@ -218,7 +218,7 @@ test('§5 m.69: the spanner drops exactly 1.60 and the label clears beam ink by 
       ]),
       clasps: l.clasps ?? [],
       rests: l.rests ?? [],
-      outlierRules: [],
+      ledgerRules: [],
       options: BRAHMS_O,
     },
     BRAHMS_T

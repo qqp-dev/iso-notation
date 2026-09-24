@@ -175,6 +175,29 @@ export function outlierLedgerSpans(
   return out;
 }
 
+/** Fixed-core ledger geometry shared by paint, ottava admission and lint.
+ * Long spans suppress short rules at their equator; the short rule itself
+ * expands to both channel boundaries when that writing policy is active. */
+export function placedLedgerRules(
+  notes: readonly {note:QuantizedNote; x:number; coord:{octave:number;ledgerYs:readonly number[]}}[],
+  geo:JankoSystemGeometry, systemIndex:number, t:ResolvedJankoTokens,
+  options:Partial<JankoLayoutOptions>
+):Array<{x1:number;x2:number;y:number;cls:'janko-outlier-rule'|'janko-ledger';ownerIds:string[];tick?:number;key:number}> {
+  const spans=outlierLedgerSpans(notes,geo,systemIndex,t);
+  const continuous=new Set(spans.map(s=>s.key));
+  return [
+    ...spans.map(s=>({x1:s.x1,x2:s.x2,y:s.y,cls:'janko-outlier-rule' as const,
+      ownerIds:notes.filter(p=>p.coord.octave>5&&p.coord.ledgerYs.some(y=>Math.round(y*100)===s.key)).map(p=>p.note.id),key:s.key})),
+    ...notes.flatMap(p=>p.coord.ledgerYs.flatMap(ledgerY=>{
+      const key=Math.round(ledgerY*100);
+      return continuous.has(key)?[]:getEquatorRuleYs(geo.middleCY+ledgerY,options,t).map(y=>({
+        x1:p.x-t.ledgerHalfWidth,x2:p.x+t.ledgerHalfWidth,y,cls:'janko-ledger' as const,
+        ownerIds:[p.note.id],tick:p.note.startTick,key,
+      }));
+    })),
+  ];
+}
+
 /** Ink of the Middle C divider (the landscape benchmark's dark spine). */
 export const PITCH_GRID_DIVIDER_INK = '#0F172A';
 /** Weight of the Middle C divider: firm, not bold (2x the faint C-lines). */
