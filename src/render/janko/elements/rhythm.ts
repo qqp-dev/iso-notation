@@ -4143,6 +4143,9 @@ export function beamRailPathD(
  * are onset-alone by construction (Round 11), hence never clasped, so no
  * member ink is ever suppressed here.
  */
+import { placedBeamGroup, beamGroupSvg } from '../beam-scene';
+
+/** Sunset adapter for standalone/non-fixed callers; fixed-core uses stored scene. */
 export function renderBeamGroup(
   group: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
@@ -4159,54 +4162,7 @@ export function renderBeamGroup(
 
   const beam = geometry ?? computeBeamGroupGeometry(group, t, null, null, null, grammar);
   if (!beam) return '';
-  const { notes: sorted, stems, primary, direction } = beam;
-
-  const parts: string[] = ['  <g class="janko-beam-group">'];
-
-  // Every stem grows from its notehead to the (clamped) beam centerline.
-  for (const s of stems) {
-    parts.push(`    <line class="janko-stem" x1="${f(s.stemX)}" y1="${f(s.stemStartY)}" x2="${f(s.stemX)}" y2="${f(beam.beamY(s.stemX))}" stroke="#111111" stroke-width="${JANKO_STEM_STROKE_WIDTH.toFixed(2)}"/>`);
-  }
-
-  // Primary beam: clamped straight connector across the stem tips, painted as
-  // a stem-flush filled rail (beamRailPathD) rather than a stroked line.
-  parts.push(
-    `    <path class="janko-beam" d="${beamRailPathD(primary.x1, primary.y1, primary.x2, primary.y2, t.beamThickness)}" fill="#111111"/>`
-  );
-
-  // Every higher beam level, closer to the noteheads: the 16th secondary, the
-  // 32nd tertiary and the 64th quaternary all come from the same generic run
-  // rule, and a single-note run paints a Gould partial beam. Level 2 keeps its
-  // historical `janko-beam-secondary` class; the deeper levels name themselves.
-  const LEVEL_CLASS: Readonly<Record<number, string>> = {
-    2: 'janko-beam-secondary',
-    3: 'janko-beam-tertiary',
-    4: 'janko-beam-quaternary',
-  };
-  for (const strip of beam.levels) {
-    if (strip.level < 2) continue;
-    const cls = strip.stub
-      ? `${LEVEL_CLASS[strip.level] ?? 'janko-beam-secondary'} janko-beam-stub`
-      : (LEVEL_CLASS[strip.level] ?? 'janko-beam-secondary');
-    const c = strip.connector;
-    parts.push(
-      `    <path class="${cls}" data-beam-level="${strip.level}"${strip.stub ? ' data-beam-stub="1"' : ''} d="${beamRailPathD(c.x1, c.y1, c.x2, c.y2, t.beamThickness)}" fill="#111111"/>`
-    );
-  }
-
-  void direction;
-  for (const n of sorted) {
-    const dots = durationDotCount(n.durationTicks, grammar);
-    if (dots >= 1) {
-      parts.push(renderAugmentationDot(n, t));
-    }
-    if (dots >= 2) {
-      parts.push(renderSecondAugmentationDot(n, t));
-    }
-  }
-
-  parts.push('  </g>');
-  return parts.join('\n');
+  return beamGroupSvg(placedBeamGroup(beam, t, grammar, 0, 0));
 }
 
 /**
