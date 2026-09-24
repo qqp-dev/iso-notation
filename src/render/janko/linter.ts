@@ -36,8 +36,10 @@
  * 5. **Accolade & measure numeral clearances** — the left-margin furniture
  *    never collides with the music or with itself.
  * 6. **Rest clearance** (Round 12, hung from its phrase row by Round 17B) —
- *    a voice rest's own dialect ink box keeps real air from every foreign
- *    notehead disc and from any protected barline; a silence the fit rule
+ *    a certified filled rectangular rest keeps real air from foreign notehead
+ *    discs by its stored SVG-effective paint; unsupported cuts use conservative
+ *    admission, and protected barlines retain their separate booking box. A
+ *    silence the fit rule
  *    refused is republished as the named `rest-unwritable` diagnostic. A
  *    bridged beam clears every printed rest's ink (`beam-rest-clearance`).
  * 7. **Simultaneity integrity** (Round 14) — no painted stem or beam connector
@@ -175,6 +177,8 @@ import {
 } from './compression';
 import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
+import { buildInkScene, type InkScene } from './ink-scene';
+import { restDiscClearance } from './rest-physical';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -316,6 +320,8 @@ export interface LintReport {
     violations: number;
     warnings: number;
     durationMs: number;
+    /** Pre-head-knockout rest/head decisions; unsupported paint retains named admission policy. */
+    restPhysical: { certified: number; fallback: Record<string, number> };
   };
 }
 
@@ -4155,14 +4161,15 @@ export function checkClaspDotFusion(
 }
 
 /**
- * A voice rest is **real musical ink**: its dialect's ink box must keep
+ * A voice rest is **real musical ink**: its certified painted shape (or the
+ * named conservative admission policy for unsupported cuts) must keep
  * `minClearance` from every foreign notehead disc (of either hand — the other
  * hand is exactly what plays while this one is silent) and, whenever the active
  * grid writing policy protects the barlines, from the barline column it may
  * never straddle. The engine's `resolveRestX` (hung from the phrase row and
  * seated along it with the guaranteed `REST_SEAT_AIR`) fits the hang with the
- * same box and **more** air — plus the float-safety solver margin — so a rest
- * the engine admits is guaranteed to pass this audit; the check exists to
+ * conservative admission box and **more** air — plus the float-safety solver
+ * margin — so a rest the engine admits passes this audit; the check exists to
  * catch a regression that paints a rest where the fit rule never placed one.
  * A rest-notehead clearance failure is a hard **violation**: a rest may never
  * touch, let alone overlap, a head disc.
@@ -4172,7 +4179,9 @@ export function checkRestClearance(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
   lint: JankoLintOptions,
-  out: LintViolation[]
+  out: LintViolation[],
+  scene?: InkScene,
+  coverage: { certified: number; fallback: Record<string, number> } = { certified: 0, fallback: {} }
 ): void {
   if (layout.rests.length === 0) return;
   const r = t.noteheadRadius;
@@ -4193,13 +4202,27 @@ export function checkRestClearance(
     });
   };
 
-  for (const rest of layout.rests) {
-    const box = restAdmissionBox(rest, t); // conservative rest-clearance contract
+  for (const [index, rest] of layout.rests.entries()) {
+    // The barline remains a distinct protected admission rule, not a physical
+    // rest occupancy query. Do not let a later white head mask erase a collision.
+    const box = restAdmissionBox(rest, t);
     for (const p of layout.notes) {
       const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
-      const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
-      const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
-      const gap = Math.hypot(dx, dy) - radius;
+      const result = scene?.restPaint[index]
+        ? restDiscClearance(scene.restPaint[index], p.x, p.y, radius)
+        : undefined;
+      let gap: number;
+      if (result && result.kind !== 'unknown') {
+        coverage.certified++;
+        gap = (result.kind === 'ink' ? result.witness.distance : result.certificate.distance) - radius;
+      } else {
+        const reason = result?.reason ?? 'stored paint unavailable';
+        coverage.fallback[reason] = (coverage.fallback[reason] ?? 0) + 1;
+        // Unsupported paint retains the named conservative admission policy.
+        const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
+        const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
+        gap = Math.hypot(dx, dy) - radius;
+      }
       if (gap >= lint.minClearance - EPS) continue;
       report(
         rest,
@@ -5981,6 +6004,7 @@ export function lintJankoScore(
   const page = computePageGeometry(o, t, score);
   const diagnostics: LintViolation[] = [];
   const extents: Array<{ top: number; bottom: number }> = [];
+  const restPhysical = { certified: 0, fallback: {} as Record<string, number> };
 
   for (const layout of layouts) {
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
@@ -6003,7 +6027,8 @@ export function lintJankoScore(
     checkClaspClearance(layout, o, t, thresholds, diagnostics);
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
-    checkRestClearance(layout, o, t, thresholds, diagnostics);
+    checkRestClearance(layout, o, t, thresholds, diagnostics,
+      layout.rests.length ? buildInkScene(layout, o, t, score) : undefined, restPhysical);
     checkRestProvenance(layout, o, t, diagnostics);
     checkUnwrittenRests(layout, t, diagnostics);
     checkRestSeat(layout, o, t, diagnostics);
@@ -6106,6 +6131,7 @@ export function lintJankoScore(
       violations: violations.length,
       warnings: warnings.length,
       durationMs: Date.now() - startedAt,
+      restPhysical,
     },
   };
 }
