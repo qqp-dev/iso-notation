@@ -4,10 +4,10 @@ import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../src/scores/brahms-op118-no1';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
 import { computePageGeometry, layoutJankoScore, layoutJankoSystem, renderSystem, systemPaintedInkBoxes, systemPageBookingBoxes } from '../src/render/janko/engine';
-import { buildInkScene, preliminaryStaffRules, requireSceneCoverage, sceneGridSvg, sceneHeadSvg, sceneInkAt, scenePhysicalBoxes, sceneStaffRules, SCENE_FONT, serializeInkPiece, type InkPiece, type InkScene } from '../src/render/janko/ink-scene';
+import { buildInkScene, preliminaryStaffRules, requireSceneCoverage, sceneGridSvg, sceneHeadSvg, sceneLedgerAt, sceneLedgerBoxes, sceneLedgerSvg, sceneInkAt, scenePhysicalBoxes, sceneStaffRules, SCENE_FONT, serializeInkPiece, type InkPiece, type InkScene } from '../src/render/janko/ink-scene';
 import { GOTHIC_DEMI_GLYPHS } from '../src/render/janko/gothic-glyphs';
 import { renderBarlines, renderBeatGrid } from '../src/render/janko/elements/barlines';
-import { renderPitchGrid } from '../src/render/janko/elements/staff';
+import { renderLedgerEquator, renderOutlierRule, renderPitchGrid, outlierLedgerSpans } from '../src/render/janko/elements/staff';
 import { renderNotehead } from '../src/render/janko/elements/notehead';
 
 const score = buildBachGoldbergVar1Score();
@@ -35,6 +35,76 @@ test('placed scene emits literal pre-cutover grid, pulses, and head SVG in real 
   assert.ok(svg.indexOf(pitch)<svg.indexOf(beat)&&svg.indexOf(beat)<svg.indexOf(bars));
   assert.ok(svg.indexOf(bars)<svg.indexOf('class="janko-knockout"'));
   assert.match(beat,/stroke-dasharray="2,3"/);
+});
+
+test('fixed-core ledger paint and measured rules share placed primitives, not centre-line reservations', () => {
+  const first=layout.notes.find(p=>p.note.startTick<t.ticksPerMeasure)!;
+  const second=layout.notes.find(p=>p.note.startTick>=t.ticksPerMeasure)!;
+  assert.ok(first&&second);
+  const continuous={...layout,notes:layout.notes.map(p=>p===first||p===second
+    ?{...p,coord:{...p.coord,octave:6,ledgerYs:[-90]}}:p)};
+  assert.ok(outlierLedgerSpans(continuous.notes,continuous.geometry,continuous.index,t).length,'two distinct measures create a span');
+  const shortLayout={...layout,notes:layout.notes.map(p=>p===first
+    ?{...p,coord:{...p.coord,octave:1,ledgerYs:[90]}}:p)};
+  for (const placed of [shortLayout,continuous]) {
+    const s=buildInkScene(placed,o,t,score), rendered=renderSystem(score,placed.geometry,placed.index,o,t,placed);
+    const spans=outlierLedgerSpans(placed.notes,placed.geometry,placed.index,t);
+    const expected=[...spans.map(r=>renderOutlierRule(r.x1,r.x2,r.y)),
+      ...placed.notes.flatMap(p=>p.coord.ledgerYs.filter(y=>!spans.some(r=>r.key===Math.round(y*100)))
+        .map(y=>renderLedgerEquator(p.x,placed.geometry.middleCY+y,t,o)))].filter(Boolean).join('\n');
+    assert.equal(s.ledger.map(p=>p.svg).join('\n'),expected);
+    assert.ok(rendered.includes(sceneLedgerSvg(s)));
+    for(const span of spans){
+      const rule=s.ledger.find(p=>p.primitive.kind==='stroke'&&p.primitive.x1===span.x1&&p.primitive.y1===span.y)!;
+      assert.ok(rule&&rule.ownerIds.length>1);
+      assert.equal(rule.structuralOwner,`system:${placed.index}:outlier:${span.key}`);
+      assert.deepEqual(rule.span,[span.x1,span.x2]);
+      assert.equal(sceneLedgerAt(s,span.x1-0.1,span.y).includes(rule),false,'butt cap ends at the emitted SVG x1');
+      assert.ok(placed.notes.filter(p=>p.coord.octave>5&&p.coord.ledgerYs.some(y=>Math.round(y*100)===span.key))
+        .every(p=>rule.ownerIds.includes(p.note.id)));
+      assert.ok(sceneInkAt(s,(span.x1+span.x2)/2,span.y).includes(rule));
+      assert.equal(s.ledger.filter(p=>p.primitive.kind==='stroke'&&p.primitive.y1===span.y&&p.paint.cls==='janko-ledger').length,0);
+    }
+    const short=s.ledger.find(p=>p.paint.cls==='janko-ledger');
+    if(short){
+      assert.equal(short.ownerIds[0],short.structuralOwner?.slice(5));
+      assert.ok(sceneLedgerBoxes(s).some(b=>b.what.includes(short.id)));
+      if(short.primitive.kind!=='stroke')throw new Error('ledger not stroke');
+      const old=short.svg,x=short.primitive.x1,y=short.primitive.y1;
+      short.primitive={...short.primitive,x1:x+0.12};
+      assert.notEqual(short.svg,old);
+      assert.equal(sceneInkAt(s,x+0.03,y).includes(short),false);
+      assert.ok(sceneInkAt(s,x+0.15,y).includes(short));
+    }
+  }
+  const bounded=resolveJankoOptions({...o,channelLayout:'bounded-channel'});
+  const boundedLayout=layoutJankoSystem(score,computePageGeometry(bounded,t,score),0,bounded,t);
+  const boundedShort={...boundedLayout,notes:boundedLayout.notes.map(p=>p.note.id===first.note.id
+    ?{...p,coord:{...p.coord,octave:1,ledgerYs:[90]}}:p)};
+  const b=buildInkScene(boundedShort,bounded,t,score);
+  const pair=b.ledger.filter(p=>p.paint.cls==='janko-ledger').slice(0,2);
+  assert.equal(pair.length,2);
+  if(pair[0].primitive.kind!=='stroke'||pair[1].primitive.kind!=='stroke')throw new Error('missing bounded strokes');
+  const x=(pair[0].primitive.x1+pair[0].primitive.x2)/2;
+  const mid=(pair[0].primitive.y1+pair[1].primitive.y1)/2;
+  assert.equal(sceneInkAt(b,x,mid).some(p=>p.family==='ledger'),false);
+  assert.ok(sceneLedgerAt(b,x,pair[0].primitive.y1).includes(pair[0]));
+  assert.equal(sceneLedgerAt(b,x,pair[0].primitive.y1+0.4).includes(pair[0]),false,'outside 0.75pt painted stroke');
+  const merged={...shortLayout,unisonMerges:[...shortLayout.unisonMerges,{
+    tick:first.note.startTick,pitchClass:first.coord.pitchClass,octave:first.coord.octave,
+    survivorId:first.note.id,mergedIds:['authored-other-voice'],exact:true,
+  }]};
+  assert.ok(buildInkScene(merged,o,t,score).ledger.some(p=>p.ownerIds.includes('authored-other-voice')));
+  const headNote=layout.notes[0];
+  const line=sceneLedgerAt(buildInkScene(shortLayout,o,t,score),first.x,shortLayout.geometry.middleCY+90)[0];
+  assert.ok(line&&line.primitive.kind==='stroke');
+  const cross={...line,primitive:{kind:'stroke' as const,x1:headNote.x-12,y1:headNote.y,
+    x2:headNote.x+12,y2:headNote.y,width:0.75,cap:'butt' as const}};
+  const witness={...scene,pitch:[],ledger:[cross],beat:[],barlines:[],heads:new Map([[headNote.note.id,scene.heads.get(headNote.note.id)!]])};
+  assert.equal(sceneLedgerAt(witness,headNote.x,headNote.y).length,0,'head knockout removes ledger from physical query');
+  assert.ok(sceneLedgerAt(witness,headNote.x+10,headNote.y).includes(cross));
+  assert.equal(sceneLedgerBoxes(witness).some(box=>box.x0<headNote.x&&headNote.x<box.x1&&box.y0<headNote.y&&headNote.y<box.y1),false);
+  assert.ok(sceneLedgerBoxes(witness).some(box=>box.x0<headNote.x+10&&headNote.x+10<box.x1));
 });
 
 test('finite actual ink leaves old grid envelope whitespace free; drawn segment blocks', () => {
@@ -322,6 +392,7 @@ test('pre-layout and final structural rules share geometry but scene refuses abs
   const x=layout.geometry.staffLeft+0.5;
   assert.deepEqual(preliminaryStaffRules(layout.geometry,o,t,x).map(p=>p.y),sceneStaffRules(scene,x).map(p=>(p.primitive as {y1:number}).y1));
   assert.throws(()=>requireSceneCoverage(scene,'rests'),/does not cover rests/);
+  assert.throws(()=>requireSceneCoverage(scene,'beams'),/does not cover beams/);
   assert.throws(()=>buildInkScene(layout,o,{...t,fontFamily:'Other Sans'},score),/custom digit face/);
   assert.notEqual(buildInkScene({...layout,geometry:{...layout.geometry,middleCY:layout.geometry.middleCY+0.5}},o,t,score).key,scene.key);
   const placed=buildInkScene(layout,o,t,score);

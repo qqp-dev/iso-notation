@@ -1,5 +1,5 @@
 /* Ordered, deliberately PARTIAL placed ink scene. Never use this as global occupancy:
- * ledger/rhythm/holds/rests/ottava/furniture/contour/compression are not covered.
+ * written rests/rhythm/holds/ottava/furniture/contour/compression are not covered.
  * No cache: key contains the full source and placed layout, not system count.
  */
 import type { QuantizedGridScore } from '../../model/types';
@@ -7,7 +7,7 @@ import { getDuodecimalDigit } from '../types';
 import type { JankoSystemLayout } from './engine';
 import { DEFAULT_JANKO_TOKENS } from './types';
 import type { ResolvedJankoLayoutOptions, ResolvedJankoTokens } from './types';
-import { pitchGridRules } from './elements/staff';
+import { placedLedgerRules, pitchGridRules } from './elements/staff';
 import { barlineStrokes, beatGridStrokes } from './elements/barlines';
 import { f } from './elements/style';
 import type { VerticalGridStroke } from './elements/barlines';
@@ -15,11 +15,11 @@ import { getScaledKnockoutMetrics, digitBaselineOffset, JANKO_USER_UNITS_PER_PT,
 import type { JankoNoteheadSpec } from './elements/notehead';
 import { GOTHIC_DEMI_GLYPHS } from './gothic-glyphs';
 
-export const SCENE_VERSION = 1;
+export const SCENE_VERSION = 2;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
-  migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads'] as const,
-  legacyBroadBounds: ['ledger', 'stems', 'beams', 'rests', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
+  migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads', 'ledger'] as const,
+  legacyBroadBounds: ['rests', 'stems', 'beams', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
 } as const;
 export type InkBox = { x0: number; y0: number; x1: number; y1: number };
 export type InkPrimitive =
@@ -36,7 +36,7 @@ export interface InkPiece {
   span?: readonly [number, number];
   system: number;
   pagePiece: number;
-  layer: 'pitch' | 'ordinary-grid' | 'strict-grid' | 'head';
+  layer: 'pitch' | 'ordinary-grid' | 'ledger' | 'strict-grid' | 'head';
   primitive: InkPrimitive;
   /** Broad phase ONLY; mask is never occupied ink. */
   box: InkBox;
@@ -77,10 +77,11 @@ export interface InkScene {
   key: string;
   coverage: typeof SCENE_COVERAGE;
   pitch: readonly InkPiece[];
+  ledger: readonly InkPiece[];
   beat: readonly InkPiece[];
   barlines: readonly InkPiece[];
   heads: ReadonlyMap<string, readonly InkPiece[]>;
-  /** Finite physical broad-phase boxes after earlier strokes are clipped. */
+  /** Partial finite physical boxes; rest booking is a separate legacy policy. */
   physical: readonly (InkBox & {what:string})[];
 }
 const revisionString=(value:unknown):string=>JSON.stringify(value,(_key,entry:unknown)=>
@@ -112,6 +113,38 @@ function glyphBox(p: Extract<InkPrimitive,{kind:'glyph'}>): InkBox {
     p.baseline-Math.max(...points.map(pt=>pt[1]))*p.em/1000,
     p.x+(Math.max(...points.map(pt=>pt[0]))-g.advance/2)*p.em/1000,
     p.baseline-Math.min(...points.map(pt=>pt[1]))*p.em/1000);
+}
+function ledgerPieces(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,pagePiece:number):InkPiece[] {
+  const system=layout.index, g=layout.geometry, out:InkPiece[]=[];
+  const contributors=(id:string)=>[id,...layout.unisonMerges.filter(m=>m.survivorId===id).flatMap(m=>m.mergedIds)];
+  const add=(x1:number,x2:number,y:number,cls:string,owners:readonly string[],owner:string,tick?:number)=>{
+    const primitive:InkPrimitive={kind:'stroke',x1,y1:y,x2,y2:y,width:0.75,cap:'butt'};
+    out.push(inkPiece({id:`s${system}:ledger:${out.length}`,family:'ledger',ownerIds:owners,structuralOwner:owner,tick,
+      ...(cls==='janko-outlier-rule'?{span:[x1,x2] as const}:{}),system,pagePiece,layer:'ledger',primitive,box:primitiveBox(primitive),paint:{cls,color:'#334155'}}));
+  };
+  for(const rule of placedLedgerRules(layout.notes,g,system,t,o)){
+    const owners=rule.ownerIds.flatMap(contributors);
+    add(rule.x1,rule.x2,rule.y,rule.cls,owners,rule.cls==='janko-ledger'
+      ?`note:${rule.ownerIds[0]}`:`system:${system}:outlier:${rule.key}`,rule.tick);
+  }
+  return out;
+}
+/** Ledger uses the same stroke primitives as its paint; no equator-centre surrogate. */
+export function sceneLedgerSvg(scene:InkScene):string {
+  return scene.ledger.length?['    <g class="janko-ledger-layer">',...scene.ledger.map(p=>p.svg),'    </g>'].join('\n'):'';
+}
+/** Measured ledger intervals after ordered masks; never page-slot reservations. */
+export function sceneLedgerBoxes(scene:InkScene):Array<InkBox & {what:string}> {
+  return scenePhysicalBoxes(scene).filter(b=>b.what.includes(':ledger:'));
+}
+/** Narrow-phase ledger occupants at a point after ordered erasures. */
+export function sceneLedgerAt(scene:InkScene,x:number,y:number):readonly InkPiece[] {
+  return sceneInkAt(scene,x,y).filter(p=>p.family==='ledger');
+}
+function orderedPieces(scene:InkScene):InkPiece[] {
+  const strict=scene.beat.some(p=>p.layer==='strict-grid')||scene.barlines.some(p=>p.layer==='strict-grid');
+  return [...scene.pitch,...(strict?[]:[...scene.beat,...scene.barlines]),...scene.ledger,
+    ...(strict?[...scene.beat,...scene.barlines]:[]),...[...scene.heads.values()].flat()];
 }
 function headPieces(spec: JankoNoteheadSpec, id: string, tick: number, system: number, pagePiece: number, o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, owners: readonly string[]): InkPiece[] {
   const scale=spec.symbolScale??1;
@@ -149,6 +182,7 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     const primitive:InkPrimitive={kind:'stroke',x1:r.x1,y1:r.y,x2:r.x2,y2:r.y,width:r.width,cap:'butt'};
     return inkPiece({id:`s${system}:pitch:${i}`,family:'pitch-grid',structuralOwner:'staff-rule',ownerIds:[],span:[r.x1,r.x2] as const,system,pagePiece,layer:'pitch',primitive,box:strokeBox(primitive),paint:{cls:r.cls,color:r.ink}});
   });
+  const ledger=ledgerPieces(layout,o,t,pagePiece);
   const gridLayer=o.gridWritingPolicy==='strict-protected-grid'?'strict-grid':'ordinary-grid';
   const beat=beatGridStrokes(g,system,o,t,layout.columns).map((s,i)=>strokePiece(s,'beat-pulses',i,system,pagePiece,gridLayer));
   const barlines=barlineStrokes(g,o,t,layout.isFinalSystem).map((s,i)=>strokePiece(s,'measure-barlines',i,system,pagePiece,gridLayer));
@@ -161,14 +195,16 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     heads.set(p.note.id,headPieces({x:p.x,y:p.y,pitchClass:p.coord.pitchClass,hand:p.coord.hand,isPositionOfHonor:p.note.startTick===0&&o.showHonorHalo,tallKnockout:p.tallKnockout===true,symbolScale:p.symbolScale,chordMember:p.symbolChord},p.note.id,p.note.startTick,system,pagePiece,o,t,contributors));
   }
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,pitch,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {
   // An inventory of visible stroke intervals, not a grid envelope and not
-  // knockout rectangles. Broad glyph/ring boxes still require sceneInkAt for
+  // knockout rectangles. Rests are unsupported: their conservative page
+  // reservations belong to the legacy admission/page-policy layer. Broad
+  // glyph/ring boxes still require sceneInkAt for
   // narrow phase: the hollow regions of these boxes are not obstacles.
-  const ordered=[...scene.pitch,...scene.beat,...scene.barlines,...scene.heads.values()].flat() as InkPiece[];
+  const ordered=orderedPieces(scene);
   const result:Array<InkBox & {what:string}>=[];
   for(let i=0;i<ordered.length;i++){
     const piece=ordered[i],p=piece.primitive;
@@ -232,7 +268,7 @@ export function preliminaryStaffRules(geo:JankoSystemLayout['geometry'],o:Resolv
  * Clipping and detailed mark intersection are performed by sceneInkAt below. */
 export function sceneInkAt(scene:InkScene,x:number,y:number):readonly InkPiece[] {
   const painted:InkPiece[]=[];
-  const ordered=[...scene.pitch,...scene.beat,...scene.barlines,...scene.heads.values()].flat() as InkPiece[];
+  const ordered=orderedPieces(scene);
   for(const p of ordered){
     if(p.primitive.kind==='erase'){
       if(inBox(primitiveBox(p.primitive),x,y)&&(!p.primitive.stroke||primitiveInkAt(p.primitive.stroke,x,y)))painted.length=0;

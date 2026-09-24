@@ -45,9 +45,9 @@ import {
   subdivisionMarkCount,
 } from './rhythm';
 import { durationDotCount, durationRingCount } from './duration';
-import { JankoRestGeometry, restInkBox } from './rests';
+import { JankoRestGeometry, restAdmissionBox } from './rests';
 import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor } from './notehead';
-import { OutlierRuleSpan, getEquatorRuleYs, pitchGridRules } from './staff';
+import { placedLedgerRules, pitchGridRules } from './staff';
 
 /**
  * Zero-based duodecimal interval spans in semitones: b = 11, 10 (one dozen)
@@ -272,8 +272,8 @@ export interface OttavaInkContext {
   clasps: readonly JankoClaspGroupGeometry[];
   /** Printed rests. */
   rests: readonly JankoRestGeometry[];
-  /** Continuous outlier-rule spans (shared helper, render-exact). */
-  outlierRules: readonly OutlierRuleSpan[];
+  /** Ledger admission rules from the shared placed constructor (not filled-box collision claims). */
+  ledgerRules: readonly ReturnType<typeof placedLedgerRules>[number][];
   /** Active layout options (grammar, subdivision style, rhythm style). */
   options: ResolvedJankoLayoutOptions;
 }
@@ -387,7 +387,7 @@ export function collectOttavaContextInk(
     boxes.push({ x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1 });
   }
   for (const rest of context.rests) {
-    const box = restInkBox(rest, tokens);
+    const box = restAdmissionBox(rest, tokens); // conservative ottava clearance admission
     boxes.push({ x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1 });
   }
   return boxes;
@@ -470,7 +470,7 @@ export function buildSystemOttavaBrackets(
   // resolver reads noteheads and staff floors only.
   const contextInk = context ? collectOttavaContextInk(context, tokens) : [];
   const haloOuter = tokens.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
-  const ledgerHalf = tokens.ledgerHalfWidth;
+  const ledgerRules = context?.ledgerRules ?? placedLedgerRules(notes,geo,0,tokens,options);
 
   const mergeMap = new Map<string, string[]>();
   if (unisonMerges) {
@@ -540,24 +540,16 @@ export function buildSystemOttavaBrackets(
           inkTop = Math.min(inkTop, p.y - glyph);
           inkBottom = Math.max(inkBottom, p.y + glyph);
         }
-        if (overlaps(p.x - ledgerHalf, p.x + ledgerHalf)) {
-          for (const ledgerY of p.coord.ledgerYs) {
-            for (const ruleY of getEquatorRuleYs(geo.middleCY + ledgerY, options, tokens)) {
-              inkTop = Math.min(inkTop, ruleY - 0.375);
-              inkBottom = Math.max(inkBottom, ruleY + 0.375);
-            }
-          }
-        }
       }
       for (const rule of pitchGridRules(geo, options, tokens)) {
         if (!overlaps(rule.x1, rule.x2)) continue;
         inkTop = Math.min(inkTop, rule.y - rule.width / 2);
         inkBottom = Math.max(inkBottom, rule.y + rule.width / 2);
       }
-      for (const span of context?.outlierRules ?? []) {
-        if (!overlaps(span.x1, span.x2)) continue;
-        inkTop = Math.min(inkTop, span.y - 0.375);
-        inkBottom = Math.max(inkBottom, span.y + 0.375);
+      for (const rule of ledgerRules) {
+        if (!overlaps(rule.x1, rule.x2)) continue;
+        inkTop = Math.min(inkTop, rule.y - 0.375);
+        inkBottom = Math.max(inkBottom, rule.y + 0.375);
       }
       for (const box of contextInk) {
         if (!overlaps(box.x0, box.x1)) continue;

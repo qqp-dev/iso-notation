@@ -107,7 +107,7 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
-import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg } from './ink-scene';
+import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg } from './ink-scene';
 import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
@@ -118,6 +118,7 @@ import {
   renderTimeSignature,
   getEquatorRuleYs,
   outlierLedgerSpans,
+  placedLedgerRules,
   pitchGridRules,
   computeBarStaffRows,
   computeSystemStaffSegments,
@@ -249,7 +250,7 @@ import {
   isBarRestValue,
   isStandardRestValue,
   renderRest,
-  restInkBox,
+  restAdmissionBox,
   restSeatOffsetY,
   restValueForTicks,
 } from './elements/rests';
@@ -1563,7 +1564,7 @@ export function holdClearanceInk(
     return { x0: p.x - wx, x1: p.x + wx, y0: p.y - hy, y1: p.y + hy };
   });
   for (const rest of rests) {
-    const box = restInkBox(rest, t);
+    const box = restAdmissionBox(rest, t);
     corridor.push({ x0: box.x0, x1: box.x1, y0: box.y0, y1: box.y1 });
   }
   const brackets: JankoHoldBlocker[] = clasps.map((clasp) => {
@@ -2668,7 +2669,7 @@ function measureIndexOfTick(
  *
  * The rest layer is painted beneath the noteheads, so an overlap would be
  * silently half-erased rather than reported; the engine therefore admits a rest
- * only where its own {@link restInkBox} keeps {@link REST_NOTEHEAD_AIR} from
+ * only where its own {@link restAdmissionBox} keeps {@link REST_NOTEHEAD_AIR} from
  * every notehead disc — of **both** hands, because the other hand is exactly
  * what is playing while this one is silent.
  */
@@ -2677,7 +2678,7 @@ export function restClearsLayout(
   notes: readonly PositionedJankoNote[],
   t: ResolvedJankoTokens
 ): boolean {
-  const box = restInkBox(rest, t);
+  const box = restAdmissionBox(rest, t);
   for (const p of notes) {
     const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
     const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
@@ -3139,7 +3140,7 @@ export function resolveRestX(
   t: ResolvedJankoTokens
 ): number | null {
   const target = rest.x;
-  const probe = restInkBox(rest, t);
+  const probe = restAdmissionBox(rest, t);
   const relX0 = probe.x0 - rest.x;
   const relX1 = probe.x1 - rest.x;
 
@@ -3571,7 +3572,7 @@ export function computeJankoRestLayer(
       // and never slide past a neighboring onset's column.
       const colPrev = getTickColumnX(ticks[i], geo, systemIndex, o, t);
       const colNext = getTickColumnX(ticks[i + 1], geo, systemIndex, o, t);
-      const probe = restInkBox(candidate, t);
+      const probe = restAdmissionBox(candidate, t);
       const leftW = candidate.x - probe.x0;
       const rightW = probe.x1 - candidate.x;
       const gapLeft = Math.max(cell.left, colPrev + leftW);
@@ -6435,10 +6436,10 @@ export function detectStemDigitCrossings(
 export const SYSTEM_SLOT_CORRECTION_AIR = 1.0;
 
 /**
- * Staff furniture bounds of a laid-out system (page pt): the staff extents,
- * the measure numeral and every ledger equator — the exact span the linter's
- * slot-fit gate measures. The furniture triggers the correction; the complete
- * ink sizes it.
+ * Legacy PAGE-POLICY reservation of a laid-out system (page pt): the staff,
+ * numeral and ledger equator centre ±0.38pt. This deliberately conservative
+ * slot booking is not physical ledger ink (use sceneLedgerBoxes for that).
+ * Keep it until page placement and its linter migrate together.
  */
 export function systemFurnitureBounds(
   layout: JankoSystemLayout,
@@ -6469,9 +6470,10 @@ export function systemFurnitureBounds(
 }
 
 /**
- * Complete painted bounds of a laid-out system (page pt): every glyph, rule,
- * beam and bracket — the exact span the linter's adjacent-system scan
- * measures. Mirrors `linter.systemInkExtents` term for term (same boxes from
+ * Legacy complete page-booking bounds of a laid-out system (page pt): every
+ * glyph, rule, beam and bracket, including centre ±0.38pt ledger reservations,
+ * not a composed physical ink query. The linter's adjacent-system scan
+ * measures these same page-policy terms. Mirrors `linter.systemInkExtents` term for term (same boxes from
  * the same builders); the slot-correction suite asserts equality on the
  * corpus, so the two can never drift apart silently.
  */
@@ -6539,7 +6541,8 @@ export function systemCompleteInkBounds(
     bottom = Math.max(bottom, clasp.botY);
   }
   for (const rest of layout.rests) {
-    const box = restInkBox(rest, t);
+    // Conservative page-slot booking, not measured filled rest ink.
+    const box = restAdmissionBox(rest, t);
     top = Math.min(top, box.y0);
     bottom = Math.max(bottom, box.y1);
   }
@@ -6576,9 +6579,9 @@ export interface JankoPaintedInkBox {
 }
 
 /**
- * Round 45 — every **painted** ink box of one laid-out system: the real
- * geometry the page-fit audits measure, so a *reserved envelope* crossing a
- * limit can never masquerade as a visible collision.
+ * Round 45 painted-ink inventory with explicitly labelled legacy page-policy
+ * reservations. This aggregate is NOT a global physical collision oracle:
+ * rest envelopes are page bookings; rest physical ink is unsupported.
  *
  * The model names the same ink as {@link systemCompleteInkBounds} — the pitch
  * grid, the noteheads (their masks and honour halos), the dynamic ledger
@@ -6610,11 +6613,12 @@ export function systemPaintedInkBoxes(
     });
   };
 
-  // PARTIAL PHYSICAL INVENTORY: only the scene families have real visible
-  // ink here. The other boxes below are explicitly legacy BROAD bounds; do
-  // not treat this aggregate as a global narrow-phase physical clearance.
-  if (o.core === 'fixed-3' || o.core === 'fixed-4') {
-    for (const b of buildInkScene(layout, o, t).physical) {
+  // PARTIAL PHYSICAL INVENTORY: only scene grid/ledger/head strokes are
+  // physically inventoried here. Rest indexes and remaining legacy boxes are
+  // labelled reservations, not global narrow-phase physical clearance.
+  const placedScene = o.core === 'fixed-3' || o.core === 'fixed-4' ? buildInkScene(layout, o, t) : null;
+  if (placedScene) {
+    for (const b of placedScene.physical) {
       push(b.x0, b.x1, b.y0, b.y1, b.what);
     }
   } else {
@@ -6625,24 +6629,16 @@ export function systemPaintedInkBoxes(
   }
 
   legacy = true;
-  // 2. Ledger ink: the continuous outlier rules and the per-notehead equator
-  //    dashes (a dash inside a continuous span is not painted twice).
-  const spans = outlierLedgerSpans(layout.notes, g, layout.index, t);
-  const continuous = new Set(spans.map((s) => s.key));
-  for (const span of spans) {
-    push(span.x1, span.x2, span.y - 0.375, span.y + 0.375, 'outlier rule');
-  }
-  for (const p of layout.notes) {
-    for (const ledgerY of p.coord.ledgerYs) {
+  // 2. Ledger physical ink is inventoried by the placed scene for fixed cores.
+  // Non-fixed mappings retain an explicitly legacy broad page reservation.
+  if (o.core !== 'fixed-3' && o.core !== 'fixed-4') {
+    const spans = outlierLedgerSpans(layout.notes, g, layout.index, t);
+    const continuous = new Set(spans.map((s) => s.key));
+    for (const span of spans) push(span.x1, span.x2, span.y - 0.375, span.y + 0.375, 'outlier rule');
+    for (const p of layout.notes) for (const ledgerY of p.coord.ledgerYs) {
       if (continuous.has(Math.round(ledgerY * 100))) continue;
       const y = g.middleCY + ledgerY;
-      push(
-        p.x - t.ledgerHalfWidth,
-        p.x + t.ledgerHalfWidth,
-        y - 0.375,
-        y + 0.375,
-        `ledger of ${p.note.id}`
-      );
+      push(p.x - t.ledgerHalfWidth, p.x + t.ledgerHalfWidth, y - 0.375, y + 0.375, `ledger of ${p.note.id}`);
     }
   }
 
@@ -6692,14 +6688,18 @@ export function systemPaintedInkBoxes(
     }
   }
 
-  // 5. Brackets, rests, ottava ink, handprint clusters and margin furniture.
+  // 5. Brackets, conservative rest page reservations, ottava, clusters and furniture.
   for (const clasp of layout.clasps) {
     const box = claspInkBox(clasp, t);
     push(box.x0, box.x1, box.y0, box.y1, 'bracket');
   }
+  // This aggregate also serves old page limits. Rest bounding envelopes are
+  // conservative PAGE reservations, not physical collision assertions; the
+  // no rest physical scene oracle exists in this ledger-only stage.
   for (const rest of layout.rests) {
-    const box = restInkBox(rest, t);
-    push(box.x0, box.x1, box.y0, box.y1, 'rest');
+    const box = restAdmissionBox(rest, t);
+    push(box.x0, box.x1, box.y0, box.y1,
+      placedScene ? 'rest page-policy reservation (legacy rest paint)' : 'rest page-policy reservation (twin-row)' );
   }
   for (const b of layout.ottavaBrackets ?? []) {
     const label = ottavaLabelBox(b, t);
@@ -7320,7 +7320,8 @@ export function layoutJankoSystemShifted(
       restLayer.rests,
       t
     );
-    const restInk = restLayer.rests.map((r) => restInkBox(r, t));
+    // Pre-layout beam exclusion uses conservative admission, never final placed ink.
+    const restInk = restLayer.rests.map((r) => restAdmissionBox(r, t));
     beams = partition.groups
       .map((group) =>
         computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY, restInk, o.durationGrammar)
@@ -8174,7 +8175,7 @@ export function layoutJankoSystemShifted(
               });
             }
             for (const rest of restLayer.rests) {
-              out.push({ id: `rest:${rest.tick}:${rest.hand}`, ...restInkBox(rest, t) });
+              out.push({ id: `rest:${rest.tick}:${rest.hand}`, ...restAdmissionBox(rest, t) });
             }
             return out;
           })()
@@ -8928,7 +8929,7 @@ export function layoutJankoSystemShifted(
       tieObstacles.push({ id: `clasp:${clasp.tick}`, ...claspInkBox(clasp, t) });
     }
     for (const rest of restLayer.rests) {
-      const box = restInkBox(rest, t);
+      const box = restAdmissionBox(rest, t);
       tieObstacles.push({ id: `rest:${rest.tick}:${rest.hand}`, ...box });
     }
     for (const hold of holds) {
@@ -9659,7 +9660,7 @@ export function layoutJankoSystemShifted(
     suppressedStemIds: suppressed,
     clasps,
     rests: restLayer.rests,
-    outlierRules: outlierLedgerSpans(flaggedNotes, geometry, systemIndex, t),
+    ledgerRules: placedLedgerRules(flaggedNotes, geometry, systemIndex, t, o),
     options: o,
   };
   const ottavaBrackets = buildSystemOttavaBrackets(
@@ -9840,25 +9841,21 @@ function renderNotesLayer(
   //    equator (Bach Var. 1 climbs into Octave 6 across mm. 29–30), the choppy
   //    notehead-centred dashes are suppressed in favour of one continuous
   //    outlier rule spanning those measures edge to edge.
-  const ledgers: string[] = [];
-  // Round 11 outlier spans via the shared helper (also read by the §5
-  // ottava ink model, so audited ledger ink matches the paint exactly).
-  const continuous = new Map<number, { x1: number; x2: number }>();
-  for (const span of outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t)) {
-    continuous.set(span.key, { x1: span.x1, x2: span.x2 });
-    ledgers.push(renderOutlierRule(span.x1, span.x2, span.y));
-  }
-  for (const p of layout.notes) {
-    for (const ledgerY of p.coord.ledgerYs) {
-      const key = Math.round(ledgerY * 100);
-      if (continuous.has(key)) continue;
-      ledgers.push(renderLedgerEquator(p.x, layout.geometry.middleCY + ledgerY, t, o));
+  if (inkScene) {
+    const ledgerInk = sceneLedgerSvg(inkScene);
+    if (ledgerInk) out.push(ledgerInk);
+  } else {
+    // Legacy twin-row rendering is outside fixed-core scene coverage.
+    const ledgers: string[] = [];
+    const continuous = new Set(outlierLedgerSpans(layout.notes, layout.geometry, layout.index, t).map(span => {
+      ledgers.push(renderOutlierRule(span.x1, span.x2, span.y));
+      return span.key;
+    }));
+    for (const p of layout.notes) for (const ledgerY of p.coord.ledgerYs) {
+      if (!continuous.has(Math.round(ledgerY * 100)))
+        ledgers.push(renderLedgerEquator(p.x, layout.geometry.middleCY + ledgerY, t, o));
     }
-  }
-  if (ledgers.length > 0) {
-    out.push('    <g class="janko-ledger-layer">');
-    out.push(...ledgers);
-    out.push('    </g>');
+    if (ledgers.length) out.push('    <g class="janko-ledger-layer">', ...ledgers, '    </g>');
   }
 
   // 1b. Round 41 hold-to-release layer: the white underlays that replace the
@@ -9977,6 +9974,8 @@ function renderNotesLayer(
   // 2c. Round 12 voice rests: the written silences of an inactive hand span,
   //     painted above the rhythm layer they interrupt and beneath the noteheads,
   //     so a glyph mask always erases whatever a rest should never have touched.
+  // Written rests retain one legacy painter until every rest contour has a
+  // deterministic physical point/box contract; this scene cannot cover them.
   for (const rest of layout.rests) out.push(renderRest(rest, t));
 
   // 2d. Round 12 `'strict-protected-grid'`: the continuous vertical grid is
