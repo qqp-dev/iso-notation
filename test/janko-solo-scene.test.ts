@@ -6,8 +6,9 @@ import { buildDurationSpecimenScore } from '../src/scores/duration-specimen';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
 import { computePageGeometry, layoutJankoScore, renderSystem, systemPaintedInkBoxes, suppressedStemIds, claspMemberCarriedTicks } from '../src/render/janko/engine';
 import { buildInkScene, sceneSoloSvg, sceneSoloAt, sceneSoloBoxAt, requireSceneCoverage } from '../src/render/janko/ink-scene';
-import { soloRhythmPaint, soloBox, soloPieceAt, soloPieceBoxAt } from '../src/render/janko/solo-scene';
-import { renderFlags } from '../src/render/janko/elements/rhythm';
+import { soloRhythmPaint, soloBox, soloPieceAt, soloPieceBoxAt, soloClassicalFlagPath, projectedSoloFlagEnvelope, dotFlagPolicyBox } from '../src/render/janko/solo-scene';
+import { renderFlags, getStemGeometry, getSubdivisionGlyphBBox, partitionBeamGroups, subdivisionMarkCount, verbatimFlagPath } from '../src/render/janko/elements/rhythm';
+import { URTEXT_FLAGS_UP, type UrtextGlyph } from '../src/render/janko/elements/urtext-paths';
 import { checkDotCountAgreement, checkStemRingGeometry } from '../src/render/janko/linter';
 
 const t=resolveJankoTokens(DEFAULT_JANKO_TOKENS);
@@ -37,6 +38,123 @@ test('five real dialect keys: independent literal SVG path controls, metadata, 1
       assert.equal(soloPieceBoxAt(flag,box((hull.x0+hull.x1)/2,(hull.y0+hull.y1)/2)).status,'unknown');
     }
   }
+});
+
+test('Bach both spacing presets preserve 19 dotted solos and 12 judged right escapes',()=>{
+  for(const spacing of ['tight','snug'] as const){
+    const o=resolveJankoOptions({...DEFAULT_JANKO_OPTIONS,clusterSpacing:spacing});
+    const systems=layoutJankoScore(buildBachGoldbergVar1Score(),o,t);
+    const ids:string[]=[],all:string[]=[];
+    for(const sys of systems){
+      const beamed=new Set(partitionBeamGroups(sys.notes.map(p=>p.rhythm),t,sys.geometry.middleCY).groups.flatMap(g=>g.map(n=>n.id)));
+      for(const p of sys.notes){
+        if(p.note.durationTicks!==36||beamed.has(p.note.id))continue;
+        const marks=subdivisionMarkCount(p.note.durationTicks,o.durationGrammar);
+        if(!marks)continue;
+        all.push(p.note.id);
+        const b=dotFlagPolicyBox(p.rhythm,marks,o,t);
+        if(Math.abs((p.rhythm.dotX??0)-(b.x1+t.augmentationDotRadius+t.augmentationDotGap))<1e-6){
+          ids.push(p.note.id);
+        }
+      }
+    }
+    assert.equal(all.length,19);
+    assert.deepEqual(ids,['bach-var1-5','bach-var1-22','bach-var1-39','bach-var1-287',
+      'bach-var1-304','bach-var1-351','bach-var1-353','bach-var1-355',
+      'bach-var1-357','bach-var1-365','bach-var1-367','bach-var1-369']);
+  }
+});
+
+test('literal emitted projected cubics: independent dense extrema, interior vs control hull, conservative tangency and named legacy dispatch',()=>{
+  const o=resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  let strictInterior=0;
+  for(const grammar of ['golden','complete'] as const)for(const hand of ['RH','LH'] as const)for(const marks of [1,2,3,4]){
+    const n={...note,hand,durationTicks:[24,12,6,3][marks-1],x:80.004,y:100.006};
+    const s=getStemGeometry(n,t),d=soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks);
+    const actual=soloRhythmPaint(n,t,'classical-urtext',grammar).find(p=>p.shape.kind==='flag');
+    assert.equal(actual?.shape.kind,'flag');if(actual?.shape.kind!=='flag')continue;
+    assert.equal(actual.shape.d,d,'preliminary and emitted path use the same constructor');
+    const b=dotFlagPolicyBox(n,marks,o,t),projected=projectedSoloFlagEnvelope(d);
+    assert.deepEqual(b,projected);
+    const tokens=d.match(/[MCZ]|-?\d+(?:\.\d+)?/g)??[];
+    let i=0,current:[number,number]=[0,0];let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    const sample=(x:number,y:number)=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);};
+    const hullX:number[]=[],hullY:number[]=[];
+    while(i<tokens.length){const cmd=tokens[i++];
+      if(cmd==='M'){current=[Number(tokens[i++]),Number(tokens[i++])];sample(...current);hullX.push(current[0]);hullY.push(current[1]);}
+      else if(cmd==='C'){
+        const a:[number,number]=[Number(tokens[i++]),Number(tokens[i++])],c:[number,number]=[Number(tokens[i++]),Number(tokens[i++])],end:[number,number]=[Number(tokens[i++]),Number(tokens[i++])];
+        hullX.push(a[0],c[0],end[0]);hullY.push(a[1],c[1],end[1]);
+        for(let step=0;step<=10000;step++){const v=step/10000,u=1-v;
+          sample(u*u*u*current[0]+3*u*u*v*a[0]+3*u*v*v*c[0]+v*v*v*end[0],
+            u*u*u*current[1]+3*u*u*v*a[1]+3*u*v*v*c[1]+v*v*v*end[1]);
+        }current=end;
+      }else assert.equal(cmd,'Z');
+    }
+    assert.ok(minX>=b.x0&&maxX<=b.x1&&minY>=b.y0&&maxY<=b.y1);
+    assert.ok(Math.abs(minX-b.x0)<.001&&Math.abs(maxX-b.x1)<.001);
+    assert.ok(Math.abs(minY-b.y0)<.001&&Math.abs(maxY-b.y1)<.001);
+    if(b.x1<Math.max(...hullX)-.01||b.x0>Math.min(...hullX)+.01||b.y0>Math.min(...hullY)+.01||b.y1<Math.max(...hullY)-.01)strictInterior++;
+    const legacy=getSubdivisionGlyphBBox('classical-urtext',s.direction,marks,t);
+    for(const style of ['kinetic-tab-30','kinetic-tab-45','kinetic-tab-tapered','kinetic-tab-beam'] as const){
+      const kinetic=resolveJankoOptions({...o,subdivisionStyle:style});
+      const old=getSubdivisionGlyphBBox(style,s.direction,marks,t);
+      assert.deepEqual(dotFlagPolicyBox(n,marks,kinetic,t),{
+        x0:s.stemX+old.x0,x1:s.stemX+old.x1,y0:s.stemEndY+old.y0,y1:s.stemEndY+old.y1,
+      });
+    }
+    assert.deepEqual(dotFlagPolicyBox(n,marks,resolveJankoOptions({...o,core:'adaptive'}),t),{
+      x0:s.stemX+legacy.x0,x1:s.stemX+legacy.x1,y0:s.stemEndY+legacy.y0,y1:s.stemEndY+legacy.y1});
+  }
+  assert.ok(strictInterior>0,'at least one emitted curve extreme lies strictly inside its control hull');
+  const tangent=projectedSoloFlagEnvelope('M 0.00 0.00 C 100.00 0.00 100.00 0.00 0.00 0.00 Z');
+  assert.ok(tangent.x1>=75&&tangent.x1<76&&tangent.y0<0&&tangent.y1>0,'interior x-extremum and outward tangent rounding');
+  assert.throws(()=>projectedSoloFlagEnvelope('M 0 0 L 10 10 Z'),/Unsupported/);
+  const shifted={...note,x:80.111,y:100.231};
+  const before=soloRhythmPaint({...note,durationTicks:24},t,'classical-urtext','complete').find(p=>p.shape.kind==='flag')!;
+  const after=soloRhythmPaint({...shifted,durationTicks:24},t,'classical-urtext','complete').find(p=>p.shape.kind==='flag')!;
+  assert.notEqual(before.svg,after.svg,'path-construction input perturbation moves final emitted paint');
+  assert.notDeepEqual(dotFlagPolicyBox(shifted,1,o,t),dotFlagPolicyBox(note,1,o,t),'same perturbation moves preliminary projected envelope');
+});
+
+test('mutating the shared flag path constructor input moves emitted SVG and pre-final clearance, not the baked box',()=>{
+  const options=resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
+  const n={...note,hand:'RH' as const,durationTicks:24};
+  const s=getStemGeometry(n,t);
+  assert.equal(s.direction,-1);
+  const table=URTEXT_FLAGS_UP as unknown as UrtextGlyph[];
+  const original=table[0];
+  const before=verbatimFlagPath(s.stemX,s.stemEndY,s.direction,1);
+  const paintBefore=soloRhythmPaint(n,t,'classical-urtext','complete');
+  const flagBefore=paintBefore.find(p=>p.shape.kind==='flag')!;
+  const boxBefore=dotFlagPolicyBox(n,1,options,t);
+  const legacyBefore=getSubdivisionGlyphBBox('classical-urtext',s.direction,1,t);
+  try {
+    // Alter the actual input contours consumed by verbatimFlagPath, keeping
+    // note/stem/tokens fixed. This is not a translation of the placed note.
+    // The legacy glyph bbox is intentionally NOT patched: it cannot prove the
+    // SVG-effective pre-final seat tracks the same construction as final paint.
+    table[0]={...original,contours:original.contours.map(c=>({
+      start:[c.start[0]+0.4,c.start[1]],
+      segments:c.segments.map(([a,b,e])=>[
+        [a[0]+0.4,a[1]],[b[0]+0.4,b[1]],[e[0]+0.4,e[1]],
+      ] as const),
+    }))};
+    const changed=verbatimFlagPath(s.stemX,s.stemEndY,s.direction,1);
+    const paintAfter=soloRhythmPaint(n,t,'classical-urtext','complete');
+    const flagAfter=paintAfter.find(p=>p.shape.kind==='flag')!;
+    const boxAfter=dotFlagPolicyBox(n,1,options,t);
+    assert.notEqual(changed,before,'actual emitted-path primitive consumes changed glyph contours');
+    assert.notEqual(flagAfter.svg,flagBefore.svg,'final paint tracks the altered path');
+    assert.equal(paintAfter[0].svg,paintBefore[0].svg,'stem parameters have not moved');
+    assert.equal(flagAfter.shape.kind,'flag');
+    if(flagAfter.shape.kind==='flag')assert.equal(flagAfter.shape.d,changed.match(/\bd="([^"]+)"/)?.[1]);
+    assert.ok(Math.abs(boxAfter.x0-boxBefore.x0-0.4)<1e-8);
+    assert.ok(Math.abs(boxAfter.x1-boxBefore.x1-0.4)<1e-8);
+    assert.ok(Math.abs(boxAfter.y0-boxBefore.y0)<1e-8);
+    assert.deepEqual(getSubdivisionGlyphBBox('classical-urtext',s.direction,1,t),legacyBefore,'baked box did not change');
+  } finally { table[0]=original; }
+  assert.equal(verbatimFlagPath(s.stemX,s.stemEndY,s.direction,1),before,'restore the shared factory input');
 });
 
 // Independent SVG path pixel oracle for test witnesses only: cubic flattening

@@ -62,6 +62,9 @@ import {
   renderStudioMarkup,
 } from '../src/render/janko/studio';
 import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './janko-round39.test';
+// PR96 Candidate SVG byte baseline shares this studio worker: no extra
+// full-score renderer competes with the independent lint CPU timing gate.
+import './janko-candidate-pr96-parity';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
