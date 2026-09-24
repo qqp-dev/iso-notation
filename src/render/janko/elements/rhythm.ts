@@ -46,6 +46,8 @@ import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, getKnockoutMetrics } from '
 import { f } from './style';
 import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
 import { soloRhythmPaint } from '../solo-scene';
+import { chordBridgesSvg, placedChordBridges, placedClaspShell, claspShellSvg } from '../connective-scene';
+import type { PlacedClaspShell } from '../connective-scene';
 
 /** One note as seen by the rhythm renderers (already positioned in page pt). */
 export interface JankoRhythmNote {
@@ -3413,14 +3415,19 @@ export function renderChordClasp(
   tokens?: Partial<JankoTokens> | null
 ): string {
   const t = resolveJankoTokens(tokens);
-  const ids = group.notes.map((n) => n.id).join(',');
-  const parts: string[] = [
+  return serializeClaspGroup(group, placedClaspShell(group), t);
+}
+
+/** A single shell authority for fixed-core stored paint and direct adapters.
+ * Duration marks remain the legacy painter and never repaint the shell. */
+export function serializeClaspGroup(
+  group:JankoClaspGroupGeometry, shell:ReturnType<typeof placedClaspShell>, t:ResolvedJankoTokens
+):string {
+  const ids=group.notes.map(n=>n.id).join(',');
+  return [
     `  <g class="janko-clasp-group" data-clasp-tick="${group.tick}" data-clasp-duration="${group.duration}" data-clasp-duration-style="${group.durationStyle}" data-clasp-notes="${ids}">`,
-    `    <path class="janko-clasp" d="${group.path}" fill="none" stroke="#111111" stroke-width="${group.strokeWidth.toFixed(2)}" stroke-linejoin="miter" stroke-linecap="butt"/>`,
-  ];
-  parts.push(...renderClaspDurationInk(group, t));
-  parts.push('  </g>');
-  return parts.join('\n');
+    claspShellSvg(shell),...renderClaspDurationInk(group,t),'  </g>'
+  ].join('\n');
 }
 
 /** One horizontal rail joining the extended spine tops of contiguous clasps. */
@@ -3458,12 +3465,15 @@ export function renderClaspRail(
 export function renderClaspGroup(
   groups: readonly JankoClaspGroupGeometry[],
   rails: readonly JankoClaspRailGeometry[] = [],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  shells?: readonly PlacedClaspShell[]
 ): string {
   if (groups.length === 0 && rails.length === 0) return '';
+  if(shells && shells.length!==groups.length)throw new Error('Placed clasp shell/group mismatch');
   const t = resolveJankoTokens(tokens);
   const parts: string[] = ['  <g class="janko-clasp-layer">'];
-  for (const group of groups) parts.push(renderChordClasp(group, t));
+  for (const [i,group] of groups.entries()) parts.push(shells
+    ? serializeClaspGroup(group,shells[i],t) : renderChordClasp(group,t));
   for (const rail of rails) parts.push(renderClaspRail(rail, t));
   parts.push('  </g>');
   return parts.join('\n');
@@ -3594,15 +3604,8 @@ export function renderChordBridges(
   bridges: readonly JankoChordBridge[],
   strokeWidth: number = 0.90
 ): string {
-  if (bridges.length === 0) return '';
-  const parts: string[] = ['    <g class="janko-chord-bridges">'];
-  for (const b of bridges) {
-    parts.push(
-      `      <line class="janko-chord-bridge" data-bridge-notes="${b.noteIds.join(',')}" x1="${f(b.x)}" y1="${f(b.y1)}" x2="${f(b.x)}" y2="${f(b.y2)}" stroke="#111111" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="butt"/>`
-    );
-  }
-  parts.push('    </g>');
-  return parts.join('\n');
+  // Direct/nonfixed compatibility; fixed cores emit stored final-layout strokes.
+  return chordBridgesSvg(placedChordBridges(bridges, -1, -1, new Map(), strokeWidth));
 }
 
 /**

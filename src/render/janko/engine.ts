@@ -107,8 +107,9 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
-import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg, sceneSoloSvg } from './ink-scene';
+import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg, sceneSoloSvg, sceneChordBridgesSvg } from './ink-scene';
 import { dotFlagPolicyBox } from './solo-scene';
+import { claspShellBox } from './connective-scene';
 import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
@@ -6672,9 +6673,14 @@ export function systemPaintedInkBoxes(
   }
 
   // 5. Brackets, conservative rest page reservations, ottava, clusters and furniture.
-  for (const clasp of layout.clasps) {
-    const box = claspInkBox(clasp, t);
-    push(box.x0, box.x1, box.y0, box.y1, 'bracket');
+  for (const [index,clasp] of layout.clasps.entries()) {
+    // Only a bare fixed-core shell replaces the historical whole-group box.
+    // Marked groups retain exactly one legacy booking for arc/ring/dot ink.
+    const shell=placedScene?.claspShells[index];
+    const box=shell&&!shell.marked?claspShellBox(shell):claspInkBox(clasp,t);
+    if(shell&&!shell.marked)legacy=false;
+    push(box.x0, box.x1, box.y0, box.y1, shell&&!shell.marked?'clasp-shell':'bracket');
+    legacy=true;
   }
   // This aggregate also serves old page limits. Rest bounding envelopes are
   // conservative PAGE reservations, not physical collision assertions; the
@@ -9947,13 +9953,13 @@ function renderNotesLayer(
 
   // 2a. Option 3 bridge lines: the intentional vertical ink across a hand's
   //     wide leaps, painted with the rhythm layer and beneath the noteheads.
-  if (layout.chordBridges.length > 0) out.push(renderChordBridges(layout.chordBridges));
+  if (layout.chordBridges.length > 0) out.push(inkScene ? sceneChordBridgesSvg(inkScene) : renderChordBridges(layout.chordBridges));
 
   // 2b. External left clasps + their rails (Round 5), painted above the stems
   //     they replace and beneath the noteheads they must never touch. Round 8
   //     carries each bracket's symmetrical duration paradigm on its geometry.
   if (layout.clasps.length > 0 || layout.claspRails.length > 0) {
-    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t));
+    out.push(renderClaspGroup(layout.clasps, layout.claspRails, t, inkScene?.claspShells));
   }
 
   // 2c. Round 12 voice rests: the written silences of an inactive hand span,

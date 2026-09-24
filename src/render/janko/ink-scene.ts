@@ -22,8 +22,10 @@ import type { BeamPiece } from './beam-scene';
 import { soloRhythmPaint, soloBox, soloPieceAt, soloPieceBoxAt, soloSvg } from './solo-scene';
 import type { SoloPiece, SoloPhysicalResult } from './solo-scene';
 import { suppressedStemIds, claspMemberCarriedTicks } from './engine';
+import { placedChordBridges, chordBridgesSvg, chordBridgeBox, chordBridgeAt, chordBridgeBoxAt, placedClaspShell, claspGroupAt, claspShellBoxAt } from './connective-scene';
+import type { PlacedChordBridge, PlacedClaspShell } from './connective-scene';
 
-export const SCENE_VERSION = 5;
+export const SCENE_VERSION = 6;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
   migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads', 'ledger', 'grouped-beam'] as const,
@@ -96,6 +98,8 @@ export interface InkScene {
   beams: readonly (readonly BeamPiece[])[];
   /** Final eligible solo members; non-beamed dialects remain legacy. */
   solos: ReadonlyMap<string,readonly SoloPiece[]>;
+  chordBridges: readonly PlacedChordBridge[];
+  claspShells: readonly PlacedClaspShell[];
   pitch: readonly InkPiece[];
   ledger: readonly InkPiece[];
   beat: readonly InkPiece[];
@@ -243,8 +247,10 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
       solos.set(note.id,soloRhythmPaint(engraved,t,o.subdivisionStyle,grammar,system,pagePiece,owners,soloSources));
     }
   }
+  const chordBridges=placedChordBridges(layout.chordBridges,system,pagePiece,soloSources);
+  const claspShells=layout.clasps.map(group=>placedClaspShell(group,system,pagePiece,soloSources));
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,pitch,ledger,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,chordBridges,claspShells,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {
@@ -259,6 +265,10 @@ export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}>
     const b=soloBox(piece);
     result.push({...b,what:`beamed-solo nonphysical enclosure ${piece.id}`});
   }
+  // Additive bridge inventory only: there was no prior bridge booking to retire.
+  for(const bridge of scene.chordBridges)result.push({...chordBridgeBox(bridge),what:`chord-bridge ${bridge.ownerIds.join(',')}`});
+  // Clasp shells are booked by systemPaintedInkBoxes: bare shells replace its
+  // legacy branch, while marked groups retain ONE whole-group booking there.
   for(let i=0;i<ordered.length;i++){
     const piece=ordered[i],p=piece.primitive;
     if(p.kind==='erase')continue;
@@ -329,6 +339,49 @@ export function sceneBeamIntersectsBox(scene:InkScene,b:InkBox):boolean {
         candidates=candidates.flatMap(v=>subtractBox(v,cut));
     return candidates.some(v=>beamPieceIntersectsBox(p,v));
   });
+}
+export function sceneChordBridgesSvg(scene:InkScene):string {
+  return chordBridgesSvg(scene.chordBridges);
+}
+/** Family-scoped query; a later white grid channel or head mask refuses an
+ * earlier stroke's positive ink. Not a query for global visible ink. */
+function laterConnectiveErasureAt(scene:InkScene,x:number,y:number):boolean {
+  return [...scene.beat,...scene.barlines].some(p=>p.layer==='strict-grid'&&p.primitive.kind==='erase'&&
+    inBox(primitiveBox(p.primitive),x,y)&&(!p.primitive.stroke||primitiveInkAt(p.primitive.stroke,x,y))) ||
+    [...scene.heads.values()].flat().some(p=>p.primitive.kind==='erase'&&inBox(p.primitive.box,x,y));
+}
+export function sceneChordBridgeAt(scene:InkScene,index:number,x:number,y:number):'ink'|'clear'|'unknown' {
+  const bridge=scene.chordBridges[index];
+  if(!bridge)return 'unknown';
+  const result=chordBridgeAt(bridge,x,y);
+  return result==='ink'&&laterConnectiveErasureAt(scene,x,y)?'unknown':result;
+}
+export function sceneClaspShellAt(scene:InkScene,index:number,x:number,y:number):'ink'|'clear'|'unknown' {
+  const shell=scene.claspShells[index];
+  if(!shell)return 'unknown';
+  const result=claspGroupAt(shell,x,y);
+  return result==='ink'&&laterConnectiveErasureAt(scene,x,y)?'unknown':result;
+}
+/** A finite positive-area enquiry can certify local ink only when no later
+ * white mask intersects its candidate region. Partial mask overlap refuses;
+ * never extrapolate this family result into a global-clear answer. */
+function connectiveBoxErasure(scene:InkScene,b:InkBox):boolean {
+  const overlaps=(cut:InkBox)=>b.x0<cut.x1&&b.x1>cut.x0&&b.y0<cut.y1&&b.y1>cut.y0;
+  return [...scene.beat,...scene.barlines].some(p=>p.layer==='strict-grid'&&p.primitive.kind==='erase'&&
+    eraseBoxes(p.primitive).some(overlaps)) ||
+    [...scene.heads.values()].flat().some(p=>p.primitive.kind==='erase'&&overlaps(p.primitive.box));
+}
+export function sceneChordBridgeBoxAt(scene:InkScene,index:number,b:InkBox):'ink'|'clear'|'unknown' {
+  const bridge=scene.chordBridges[index];
+  if(!bridge)return 'unknown';
+  const result=chordBridgeBoxAt(bridge,b);
+  return result==='ink'&&connectiveBoxErasure(scene,b)?'unknown':result;
+}
+export function sceneClaspShellBoxAt(scene:InkScene,index:number,b:InkBox):'ink'|'clear'|'unknown' {
+  const shell=scene.claspShells[index];
+  if(!shell)return 'unknown';
+  const result=shell.marked?'unknown':claspShellBoxAt(shell,b);
+  return result==='ink'&&connectiveBoxErasure(scene,b)?'unknown':result;
 }
 export function sceneSoloSvg(scene:InkScene,id:string):string {
   const group=scene.solos.get(id);
