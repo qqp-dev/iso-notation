@@ -45,6 +45,7 @@ import { analyzeNotatedDuration, durationDotCount, durationFlagCount, durationRi
 import { JANKO_HALO_STROKE_WIDTH, isPositionOfHonor, getKnockoutMetrics } from './notehead';
 import { f } from './style';
 import { URTEXT_FLAGS_DOWN, URTEXT_FLAGS_UP } from './urtext-paths';
+import { soloRhythmPaint } from '../solo-scene';
 
 /** One note as seen by the rhythm renderers (already positioned in page pt). */
 export interface JankoRhythmNote {
@@ -221,28 +222,6 @@ function renderAugmentationDot(note: JankoRhythmNote, tokens: ResolvedJankoToken
   const cx = note.dotX ?? note.x + getClusterSpacingPreset().wx + tokens.augmentationDotGap;
   const cy = note.dotY ?? note.y;
   return `    <circle class="janko-augmentation-dot" cx="${f(cx)}" cy="${f(cy)}" r="${f(tokens.augmentationDotRadius)}" fill="#111111"/>`;
-}
-
-/**
- * Round 30: the SECOND augmentation dot of a double-dotted value (complete
- * grammar only). Painted from the engine's resolved `dot2X`/`dot2Y` — further
- * along the escape than the first dot — with the canonical horizontal pair
- * (`dotX + 2r + gap`, same height) as the hand-built fallback. The
- * `data-dot="2"` tag distinguishes it from its sibling; first dots keep their
- * exact golden markup.
- */
-function renderSecondAugmentationDot(
-  note: JankoRhythmNote,
-  tokens: ResolvedJankoTokens
-): string {
-  const r = tokens.augmentationDotRadius;
-  const cx =
-    note.dot2X ??
-    (note.dotX ?? note.x + getClusterSpacingPreset().wx + tokens.augmentationDotGap) +
-      2 * r +
-      tokens.augmentationDotGap;
-  const cy = note.dot2Y ?? note.dotY ?? note.y;
-  return `    <circle class="janko-augmentation-dot" data-dot="2" cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#111111"/>`;
 }
 
 /**
@@ -498,7 +477,7 @@ export function getSubdivisionGlyphBBox(
  * origin is the SMuFL stem-tip attach point, placed exactly on
  * (`stemX`, `tipY`); all contours share one path with `evenodd` counters.
  */
-function verbatimFlagPath(stemX: number, tipY: number, direction: -1 | 1, marks: number): string {
+export function verbatimFlagPath(stemX: number, tipY: number, direction: -1 | 1, marks: number): string {
   const table = direction === -1 ? URTEXT_FLAGS_UP : URTEXT_FLAGS_DOWN;
   const g = table[Math.min(Math.max(marks, 1), 4) - 1];
   const p = (q: readonly [number, number]): string => `${f(stemX + q[0])} ${f(tipY + q[1])}`;
@@ -543,23 +522,6 @@ export function stemRingCenters(
 }
 
 /**
- * Round 30: the open stem rings of a lone half/whole (complete grammar
- * only). Each ring's 100% white interior knocks the stem out with zero
- * crosshairs — the same knockout the bracket rings use — so the rings paint
- * immediately after the stem and before every flag and dot.
- */
-function renderStemRings(
-  note: JankoRhythmNote,
-  tokens: ResolvedJankoTokens,
-  grammar: JankoDurationGrammar
-): string[] {
-  return stemRingCenters(note, tokens, grammar).map(
-    (c) =>
-      `    <circle class="janko-stem-ring" cx="${f(c.x)}" cy="${f(c.y)}" r="${f(CLASP_RING_RADIUS)}" fill="#FFFFFF" stroke="#111111" stroke-width="${CLASP_RING_STROKE.toFixed(2)}"/>`
-  );
-}
-
-/**
  * Solitary / unbeamed short note: bare stem plus duration ink plus the
  * augmentation dot for dotted values. Crescent dialects stack one mark per
  * subdivision at the stem tip within the tokenised reach; `'classical-urtext'`
@@ -580,27 +542,8 @@ export function renderFlags(
   style: JankoSubdivisionStyle = 'classical-urtext',
   grammar: JankoDurationGrammar = 'golden'
 ): string {
-  const t = resolveJankoTokens(tokens);
-  const s = getStemGeometry(note, t);
-  const parts: string[] = [renderStem(note, t)];
-  parts.push(...renderStemRings(note, t, grammar));
-
-  const marks = subdivisionMarkCount(note.durationTicks, grammar);
-  if (style === 'classical-urtext') {
-    if (marks >= 1) parts.push(verbatimFlagPath(s.stemX, s.stemEndY, s.direction, marks));
-  } else {
-    for (let i = 1; i <= marks; i++) {
-      parts.push(renderSubdivisionMark(s.stemX, s.stemEndY, s.direction, i, style, t));
-    }
-  }
-  const dots = durationDotCount(note.durationTicks, grammar);
-  if (dots >= 1) {
-    parts.push(renderAugmentationDot(note, t));
-  }
-  if (dots >= 2) {
-    parts.push(renderSecondAugmentationDot(note, t));
-  }
-  return parts.join('\n');
+  // Standalone/non-fixed adapter; fixed-core paint uses the stored scene.
+  return soloRhythmPaint(note, resolveJankoTokens(tokens), style, grammar).map(p => p.svg).join('\n');
 }
 
 // ---------------------------------------------------------------------------

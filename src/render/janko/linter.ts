@@ -76,6 +76,7 @@ import {
   JankoSystemLayout,
   PositionedJankoNote,
   computePageGeometry,
+  claspMemberCarriedTicks,
   detectStemDigitCrossings,
   drawnStaffRuleBands,
   drawnStaffRuleYs,
@@ -107,6 +108,7 @@ import {
 } from './elements/ottava';
 import {
   CLASP_RING_RADIUS,
+  CLASP_MARK_STACK_GAP,
   CLASP_RING_STROKE,
   JankoBeamConnector,
   JankoRhythmNote,
@@ -125,9 +127,7 @@ import {
   getSubdivisionGlyphBBox,
   partitionBeamGroups,
   renderBeamGroup,
-  renderFlags,
   resolveClaspInk,
-  stemRingCenters,
   subdivisionMarkCount,
 } from './elements/rhythm';
 import { durationDotCount, durationRingCount } from './elements/duration';
@@ -1558,6 +1558,9 @@ export function checkDotCollision(
         break;
       }
       if (!beamedIds || !beamedIds.has(p.note.id)) {
+        // Conservative pre-final dot/flag seat readability policy; the
+        // final solo scene is not yet available to the escape solver. Next
+        // targeted replacement shares projected paint without moving seats.
         // Round 30: the escape clears the TRUE flag ink — the complete
         // grammar's mark count, not the legacy one.
         const marks = subdivisionMarkCount(dur, o.durationGrammar);
@@ -1620,9 +1623,8 @@ export function checkDotCollision(
  * Round 30 — **painted dots agree with the notated value** (preview only).
  *
  * The audit the lost-dot defect class deserved: for every note whose stem
- * paints, the dots the renderer PAINTS (counted from `renderFlags` /
- * `renderBeamGroup`, called exactly as the engine calls them) must equal
- * the dots its engraved duration READS under the active grammar. A clasp
+ * paints, the dots in its stored placed scene pieces must equal the dots its
+ * engraved duration READS under the active grammar. A clasp
  * member's kept stem renders golden — the bracket owns its duration — so a
  * member expects the legacy count. Any threading regression (a forgotten
  * grammar argument, a gate that drifts from the grammar) is named per note.
@@ -1630,6 +1632,10 @@ export function checkDotCollision(
  * unless the preview is on — and it only runs on the beamed dialect, the
  * only dialect the preview threads through.
  */
+function soloClaspOwns(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,n:JankoRhythmNote):boolean {
+  const clasp=layout.clasps.find(c=>c.notes.some(member=>member.id===n.id));
+  return clasp!==undefined && !(o.chordGrouping==='per-hand-clasp'&&n.durationTicks!==claspMemberCarriedTicks(clasp,n.id));
+}
 export function checkDotCountAgreement(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
@@ -1653,8 +1659,6 @@ export function checkDotCountAgreement(
   };
   const legacyDots = (durationTicks: number): number =>
     durationTicks > 26 && durationTicks <= 38 ? 1 : 0;
-  const paintedDots = (svg: string): number =>
-    (svg.match(/janko-augmentation-dot/g) ?? []).length;
 
   const placed = scene ?? buildInkScene(layout,o,t);
   for (const [beamOrder,beam] of layout.beams.entries()) {
@@ -1702,13 +1706,12 @@ export function checkDotCountAgreement(
   }
 
   for (const n of layout.ungrouped) {
-    if (hidden.has(n.id)) continue;
+    if (hidden.has(n.id)||layout.handprintNoteIds?.has(n.id)) continue;
     const engraved = asEngraved(n);
-    const grammar = clasped.has(n.id) ? 'golden' : o.durationGrammar;
-    const expected = clasped.has(n.id)
+    const expected = soloClaspOwns(layout,o,n)
       ? legacyDots(engraved.durationTicks)
       : durationDotCount(engraved.durationTicks, o.durationGrammar);
-    const painted = paintedDots(renderFlags(engraved, t, o.subdivisionStyle, grammar));
+    const painted = (placed.solos.get(n.id)??[]).filter(p=>p.shape.kind==='dot').length;
     if (painted !== expected) {
       out.push({
         code: 'dot-count-agreement',
@@ -1734,8 +1737,7 @@ export function checkDotCountAgreement(
  * A lone half/whole's stem-mounted rings share the bracket's ring constants
  * and its knockout contract: each ring's white interior knocks the stem out,
  * and nothing painted after the ring may cut it. The audit holds every
- * painted single to both halves — the painted ring count (counted from
- * `renderFlags`, called exactly as the engine calls it) equals the notated
+ * painted single to both halves — the placed ring count equals the notated
  * ring count, and every ring's stroke clears every notehead mask (its own
  * head's and every foreign glyph's, halo rings included), so no later
  * knockout or digit can chop the ring. Only the beamed dialect paints
@@ -1745,12 +1747,13 @@ export function checkStemRingGeometry(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
-  out: LintViolation[]
+  out: LintViolation[],
+  scene?: InkScene
 ): void {
   if (o.durationGrammar !== 'complete') return;
   if (o.rhythmStyle !== 'beamed') return;
+  const placed=scene??buildInkScene(layout,o,t);
   const hidden = suppressedStemIds(layout);
-  const clasped = new Set(layout.clasps.flatMap((c) => c.notes.map((n) => n.id)));
   const carrierDurations = new Map(
     layout.verticalChords.map((chord) => [chord.carrier.id, chord.durationTicks])
   );
@@ -1766,11 +1769,11 @@ export function checkStemRingGeometry(
   const haloOuter = t.haloRadius + JANKO_HALO_STROKE_WIDTH / 2;
 
   for (const n of layout.ungrouped) {
-    if (hidden.has(n.id)) continue;
+    if (hidden.has(n.id)||layout.handprintNoteIds?.has(n.id)) continue;
     const engraved = asEngraved(n);
-    const grammar = clasped.has(n.id) ? 'golden' : o.durationGrammar;
-    const expected = clasped.has(n.id) ? 0 : durationRingCount(engraved.durationTicks, grammar);
-    const painted = (renderFlags(engraved, t, o.subdivisionStyle, grammar).match(/janko-stem-ring/g) ?? []).length;
+    const expected = soloClaspOwns(layout,o,n) ? 0 : durationRingCount(engraved.durationTicks, o.durationGrammar);
+    const rings=(placed.solos.get(n.id)??[]).filter(p=>p.shape.kind==='ring');
+    const painted = rings.length;
     if (painted !== expected) {
       out.push({
         code: 'ring-geometry',
@@ -1787,7 +1790,17 @@ export function checkStemRingGeometry(
       });
       continue;
     }
-    for (const center of stemRingCenters(engraved, t, grammar)) {
+    for (const [ringIndex,ring] of rings.entries()) {
+      if(ring.shape.kind!=='ring')continue;
+      const center={x:ring.shape.cx,y:ring.shape.cy};
+      const stem=getStemGeometry(engraved,t);
+      const mid=(stem.stemStartY+stem.stemEndY)/2;
+      const intended=expected===1?[mid]:[mid-(CLASP_RING_RADIUS+CLASP_MARK_STACK_GAP),mid+(CLASP_RING_RADIUS+CLASP_MARK_STACK_GAP)];
+      if(Math.abs(center.x-stem.stemX)>0.011||Math.abs(center.y-intended[ringIndex])>0.011||
+        Math.abs(ring.shape.r-CLASP_RING_RADIUS)>0.011||Math.abs(ring.shape.width-CLASP_RING_STROKE)>0.011){
+        out.push({code:'ring-geometry',severity:'error',message:`The painted stem ring of ${n.id} is disconnected from its notated stem.`,
+          system:layout.index,measure:measureOfTick(n.startTick,t),noteIds:[n.id],x:center.x,y:center.y});
+      }
       for (const q of layout.notes) {
         const air = isPositionOfHonor(q.note.startTick)
           ? Math.hypot(center.x - q.x, center.y - q.y) - haloOuter - ringOuter
@@ -6026,6 +6039,8 @@ export function lintJankoScore(
   const restPhysical = { certified: 0, fallback: {} as Record<string, number> };
 
   for (const layout of layouts) {
+    const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'
+      ?buildInkScene(layout,o,t,score):undefined;
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, o, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);
@@ -6047,15 +6062,14 @@ export function lintJankoScore(
     checkMeasureNumeralClearance(layout, o, t, thresholds, diagnostics);
     checkAccoladeClearance(layout, o, t, thresholds, diagnostics);
     checkRestClearance(layout, o, t, thresholds, diagnostics,
-      layout.rests.length ? buildInkScene(layout, o, t, score) : undefined, restPhysical);
+      layout.rests.length ? placedScene : undefined, restPhysical);
     checkRestProvenance(layout, o, t, diagnostics);
     checkUnwrittenRests(layout, t, diagnostics);
     checkRestSeat(layout, o, t, diagnostics);
     checkUnisonDigits(score, layout, t, diagnostics);
     checkClaspDotFusion(layout, t, thresholds, diagnostics, o);
-    checkDotCountAgreement(layout, o, t, diagnostics,
-      o.durationGrammar==='complete' && o.rhythmStyle==='beamed' ? buildInkScene(layout,o,t,score) : undefined);
-    checkStemRingGeometry(layout, o, t, diagnostics);
+    checkDotCountAgreement(layout, o, t, diagnostics, placedScene);
+    checkStemRingGeometry(layout, o, t, diagnostics, placedScene);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     // The contour round: each paradigm audits itself, gated by its option —
     // with every contour option off these are no-ops and the golden master

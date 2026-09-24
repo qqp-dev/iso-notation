@@ -334,6 +334,9 @@ export function collectOttavaContextInk(
       }
     }
   }
+  // Preliminary conservative ottava placement/readability envelopes, NOT
+  // final placed-solo physical occupancy. Retire with projected primitives
+  // at the next targeted placement-envelope stage without shifting seats.
   // Standalone voices: stems that paint, solo flags, dots and rings.
   for (const n of context.ungrouped) {
     if (context.suppressedStemIds.has(n.id)) continue;

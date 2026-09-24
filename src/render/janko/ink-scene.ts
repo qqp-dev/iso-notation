@@ -1,6 +1,6 @@
 /* Ordered, deliberately PARTIAL placed ink scene. Never use this as global occupancy:
- * rests have stored SVG paint, NOT physical occupancy; only grouped-beam rhythm
- * is covered, not solo rhythm/holds/ottava/furniture/contour/compression.
+ * rests and beamed-solo flags have stored SVG paint, NOT complete physical
+ * occupancy; solo shape-local queries are bounded, not a global free-space proof.
  * No cache: key contains the full source and placed layout, not system count.
  */
 import type { QuantizedGridScore } from '../../model/types';
@@ -19,15 +19,18 @@ import { placedRestPaint, serializeRestPaint } from './elements/rests';
 import type { PlacedRestPaint } from './elements/rests';
 import { placedBeamGroup, beamGroupSvg, beamPieceAt, beamPieceBox, beamPieceIntersectsBox } from './beam-scene';
 import type { BeamPiece } from './beam-scene';
+import { soloRhythmPaint, soloBox, soloPieceAt, soloPieceBoxAt, soloSvg } from './solo-scene';
+import type { SoloPiece, SoloPhysicalResult } from './solo-scene';
+import { suppressedStemIds, claspMemberCarriedTicks } from './engine';
 
-export const SCENE_VERSION = 4;
+export const SCENE_VERSION = 5;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
   migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads', 'ledger', 'grouped-beam'] as const,
-  legacyBroadBounds: ['rests', 'solo-stems', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
+  legacyBroadBounds: ['rests', 'other-solo-dialects', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
 } as const;
 /** Stored emission authority is distinct from certified physical coverage. */
-export const SCENE_PAINT_COVERAGE = { stored: ['rests'] as const } as const;
+export const SCENE_PAINT_COVERAGE = { stored: ['rests', 'beamed-solo'] as const, physical: 'partial stem/dot/ring exact; flag clearance-only/unknown near' as const } as const;
 export type InkBox = { x0: number; y0: number; x1: number; y1: number };
 export type InkPrimitive =
   | { kind: 'stroke'; x1: number; y1: number; x2: number; y2: number; width: number; cap: 'butt'; dash?: string }
@@ -91,6 +94,8 @@ export interface InkScene {
   restPaint: readonly (readonly PlacedRestPaint[])[];
   /** Each group preserves the original rhythm-layer SVG order. */
   beams: readonly (readonly BeamPiece[])[];
+  /** Final eligible solo members; non-beamed dialects remain legacy. */
+  solos: ReadonlyMap<string,readonly SoloPiece[]>;
   pitch: readonly InkPiece[];
   ledger: readonly InkPiece[];
   beat: readonly InkPiece[];
@@ -219,8 +224,27 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
   const sourceNotes=new Map(source.notes.map(note=>[note.id,note] as const));
   const beams=o.rhythmStyle==='beamed'?layout.beams.map(beam=>placedBeamGroup(beam,t,o.durationGrammar,system,pagePiece,
     id=>[id,...layout.unisonMerges.filter(m=>m.survivorId===id).flatMap(m=>m.mergedIds)],sourceNotes)):[];
+  const solos=new Map<string,readonly SoloPiece[]>();
+  // Layout may contain performed tie-continuation occurrences absent from
+  // the authored score.notes array. Preserve their own carried source fields
+  // rather than attributing them to a neighbouring authored event.
+  const soloSources=new Map([...source.notes,...layout.notes.map(p=>p.note)].map(note=>[note.id,note] as const));
+  if(o.rhythmStyle==='beamed'){
+    const hidden=suppressedStemIds(layout);
+    const carriers=new Map(layout.verticalChords.map(chord=>[chord.carrier.id,chord.durationTicks]));
+    const clasps=new Map(layout.clasps.flatMap(c=>c.notes.map(note=>[note.id,c] as const)));
+    for(const note of layout.ungrouped){
+      if(hidden.has(note.id)||layout.handprintNoteIds?.has(note.id))continue;
+      const clasp=clasps.get(note.id);
+      const exception=o.chordGrouping==='per-hand-clasp'&&clasp!==undefined&&note.durationTicks!==claspMemberCarriedTicks(clasp,note.id);
+      const grammar=clasp&&!exception?'golden':o.durationGrammar;
+      const engraved={...note,durationTicks:carriers.get(note.id)??note.durationTicks};
+      const owners=[note.id,...layout.unisonMerges.filter(m=>m.survivorId===note.id).flatMap(m=>m.mergedIds)];
+      solos.set(note.id,soloRhythmPaint(engraved,t,o.subdivisionStyle,grammar,system,pagePiece,owners,soloSources));
+    }
+  }
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,pitch,ledger,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {
@@ -231,6 +255,10 @@ export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}>
   // narrow phase: the hollow regions of these boxes are not obstacles.
   const ordered=orderedPieces(scene);
   const result:Array<InkBox & {what:string}>=[];
+  for(const group of scene.solos.values())for(const piece of group){
+    const b=soloBox(piece);
+    result.push({...b,what:`beamed-solo nonphysical enclosure ${piece.id}`});
+  }
   for(let i=0;i<ordered.length;i++){
     const piece=ordered[i],p=piece.primitive;
     if(p.kind==='erase')continue;
@@ -301,6 +329,76 @@ export function sceneBeamIntersectsBox(scene:InkScene,b:InkBox):boolean {
         candidates=candidates.flatMap(v=>subtractBox(v,cut));
     return candidates.some(v=>beamPieceIntersectsBox(p,v));
   });
+}
+export function sceneSoloSvg(scene:InkScene,id:string):string {
+  const group=scene.solos.get(id);
+  if(!group)throw new Error(`Missing placed beamed solo ${id}`);
+  return soloSvg(group);
+}
+/** This is NOT global sceneInkAt: unsupported later paint and other dialects
+ * cannot certify free paper. Ordered white ring, strict-grid and head erasures
+ * apply only to this beamed-solo slice. */
+export function sceneSoloAt(scene:InkScene,id:string,x:number,y:number):SoloPhysicalResult {
+  if(!Number.isFinite(x)||!Number.isFinite(y))return {status:'unknown',reason:'nonfinite point'};
+  const group=scene.solos.get(id);
+  if(!group)return {status:'unknown',reason:'uncovered solo member'};
+  let ink:SoloPhysicalResult={status:'clear'};
+  for(const p of group){
+    const s=p.shape;
+    if(s.kind==='ring'&&Math.hypot(x-s.cx,y-s.cy)<s.r-s.width/2)ink={status:'clear'};
+    const result=soloPieceAt(p,x,y);
+    if(result.status!=='clear')ink=result;
+  }
+  // Strict grid channels repaint over rhythm: they are not white erasers.
+  // Only explicit white grid air (dashed, start-phased) erases earlier rhythm.
+  for(const p of [...scene.beat,...scene.barlines])if(p.layer==='strict-grid'&&p.primitive.kind==='erase'&&
+    inBox(primitiveBox(p.primitive),x,y)&&(!p.primitive.stroke||primitiveInkAt(p.primitive.stroke,x,y)))ink={status:'clear'};
+  for(const pieces of scene.heads.values())for(const p of pieces)if(p.primitive.kind==='erase'&&
+    inBox(p.primitive.box,x,y))ink={status:'clear'};
+  return ink;
+}
+/** Positive-area bounded query. Partial erasure and cubic proximity refuse
+ * instead of treating broad enclosures as positive ink. */
+export function sceneSoloBoxAt(scene:InkScene,id:string,b:InkBox):SoloPhysicalResult {
+  if(![b.x0,b.x1,b.y0,b.y1].every(Number.isFinite)||b.x0>=b.x1||b.y0>=b.y1)
+    return {status:'unknown',reason:'box requires finite positive area'};
+  const group=scene.solos.get(id);
+  if(!group)return {status:'unknown',reason:'uncovered solo member'};
+  let candidates=[b];
+  for(const pieces of scene.heads.values())for(const p of pieces)if(p.primitive.kind==='erase'){
+    const cut=p.primitive.box;
+    candidates=candidates.flatMap(v=>subtractBox(v,cut));
+  }
+  for(const p of [...scene.beat,...scene.barlines])if(p.layer==='strict-grid'&&p.primitive.kind==='erase')
+    for(const cut of eraseBoxes(p.primitive))candidates=candidates.flatMap(v=>subtractBox(v,cut));
+  let uncertain:SoloPhysicalResult|undefined;
+  // A later disc/rim repaints an earlier uncertainty; a cubic within the box
+  // may be ink OR counter, so do not certify an apparently empty box clear.
+  for(const p of group)for(const v of candidates){
+    const r=soloPieceBoxAt(p,v);
+    if(r.status==='unknown'){uncertain=r;continue;}
+    if(r.status!=='ink')continue;
+    if(p.shape.kind==='stem'){
+      const stem=p.shape;
+      const clipped={x0:Math.max(v.x0,stem.x-stem.width/2),x1:Math.min(v.x1,stem.x+stem.width/2),
+        y0:Math.max(v.y0,Math.min(stem.y1,stem.y2)),y1:Math.min(v.y1,Math.max(stem.y1,stem.y2))};
+      const whiteRings=group.filter(q=>q.shape.kind==='ring'&&group.indexOf(q)>group.indexOf(p));
+      if(whiteRings.some(q=>{
+        if(q.shape.kind!=='ring')return false;
+        const dx=Math.max(clipped.x0-q.shape.cx,0,q.shape.cx-clipped.x1);
+        const dy=Math.max(clipped.y0-q.shape.cy,0,q.shape.cy-clipped.y1);
+        return Math.hypot(dx,dy)<q.shape.r-q.shape.width/2;
+      })){
+        // A disc may partly erase the stem; only certify when a surviving
+        // positive-area corner lies outside every white centre.
+        const corners=[[clipped.x0,clipped.y0],[clipped.x0,clipped.y1],[clipped.x1,clipped.y0],[clipped.x1,clipped.y1]];
+        if(!corners.some(([x,y])=>whiteRings.every(q=>q.shape.kind!=='ring'||
+          Math.hypot(x-q.shape.cx,y-q.shape.cy)>q.shape.r-q.shape.width/2)))continue;
+      }
+    }
+    return r;
+  }
+  return uncertain??{status:'clear'};
 }
 export function sceneRestSvg(scene:InkScene,order:number):string {
   const records=scene.restPaint[order];
