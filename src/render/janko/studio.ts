@@ -382,6 +382,14 @@ export function combineLintReports(reports: readonly LintReport[]): LintReport {
       violations: violations.length,
       warnings: warnings.length,
       durationMs: sum((s) => s.durationMs),
+      restPhysical: {
+        certified: sum((s) => s.restPhysical.certified),
+        fallback: reports.reduce<Record<string, number>>((counts, report) => {
+          for (const [reason, count] of Object.entries(report.stats.restPhysical.fallback))
+            counts[reason] = (counts[reason] ?? 0) + count;
+          return counts;
+        }, {}),
+      },
     },
   };
 }
