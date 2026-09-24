@@ -178,6 +178,7 @@ import {
 import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
+import { beamPieceAt } from './beam-scene';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
 // ---------------------------------------------------------------------------
@@ -208,6 +209,7 @@ export type JankoLintCode =
   | 'stem-foreign-digit-collision'
   | 'halo-piercing'
   | 'beam-slope'
+  | 'beam-connection'
   | 'beam-stem-gap'
   | 'beam-notehead-collision'
   | 'beam-rest-clearance'
@@ -1632,7 +1634,8 @@ export function checkDotCountAgreement(
   layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
-  out: LintViolation[]
+  out: LintViolation[],
+  scene?: InkScene
 ): void {
   if (o.durationGrammar !== 'complete') return;
   if (o.rhythmStyle !== 'beamed') return;
@@ -1653,7 +1656,8 @@ export function checkDotCountAgreement(
   const paintedDots = (svg: string): number =>
     (svg.match(/janko-augmentation-dot/g) ?? []).length;
 
-  for (const beam of layout.beams) {
+  const placed = scene ?? buildInkScene(layout,o,t);
+  for (const [beamOrder,beam] of layout.beams.entries()) {
     // Beamed members are onset-alone (Round 11), hence unclasped — but a
     // future score that clasps one must not double-dot it: a member expects
     // the legacy count there, and the painter is held to it.
@@ -1665,9 +1669,21 @@ export function checkDotCountAgreement(
           : durationDotCount(n.durationTicks, o.durationGrammar)),
       0
     );
-    const painted = paintedDots(
-      renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle, o.durationGrammar)
-    );
+    const pieces=placed.beams[beamOrder] ?? [];
+    const painted=pieces.filter(p=>p.shape.kind==='dot').length;
+    // Independent musical/connection oracle: shared scene SVG and queries
+    // cannot validate themselves if a stem or a rail was omitted together.
+    const stems=pieces.filter(p=>p.shape.kind==='stem');
+    const rails=pieces.filter(p=>p.shape.kind==='rail');
+    if(stems.length!==beam.notes.length||rails.length!==beam.levels.length||
+      stems.some((p,i)=>p.shape.kind!=='stem'||Math.abs(p.shape.x-beam.stems[i].stemX)>0.011||
+        Math.abs(p.shape.y1-beam.stems[i].stemStartY)>0.011||
+        Math.abs(p.shape.y2-beam.beamY(beam.stems[i].stemX))>0.011)||
+      rails.some((p,i)=>p.shape.kind!=='rail'||
+        !beamPieceAt(p,beam.levels[i].connector.x1,beam.levels[i].connector.y1)||
+        !beamPieceAt(p,beam.levels[i].connector.x2,beam.levels[i].connector.y2))){
+      out.push({code:'beam-connection',severity:'error',message:`Beam group at tick ${beam.notes[0].startTick} has missing or disconnected painted stem/rail.`,system:layout.index,measure:measureOfTick(beam.notes[0].startTick,t),noteIds:beam.notes.map(n=>n.id),x:beam.primary.x1,y:beam.primary.y1});
+    }
     if (painted !== expected) {
       out.push({
         code: 'dot-count-agreement',
@@ -6037,7 +6053,8 @@ export function lintJankoScore(
     checkRestSeat(layout, o, t, diagnostics);
     checkUnisonDigits(score, layout, t, diagnostics);
     checkClaspDotFusion(layout, t, thresholds, diagnostics, o);
-    checkDotCountAgreement(layout, o, t, diagnostics);
+    checkDotCountAgreement(layout, o, t, diagnostics,
+      o.durationGrammar==='complete' && o.rhythmStyle==='beamed' ? buildInkScene(layout,o,t,score) : undefined);
     checkStemRingGeometry(layout, o, t, diagnostics);
     checkMiddleCCorridor(layout, o, t, thresholds, diagnostics);
     // The contour round: each paradigm audits itself, gated by its option —

@@ -1,5 +1,6 @@
 /* Ordered, deliberately PARTIAL placed ink scene. Never use this as global occupancy:
- * rests have stored SVG paint, NOT physical occupancy; rhythm/holds/ottava/furniture/contour/compression are not covered.
+ * rests have stored SVG paint, NOT physical occupancy; only grouped-beam rhythm
+ * is covered, not solo rhythm/holds/ottava/furniture/contour/compression.
  * No cache: key contains the full source and placed layout, not system count.
  */
 import type { QuantizedGridScore } from '../../model/types';
@@ -16,18 +17,21 @@ import type { JankoNoteheadSpec } from './elements/notehead';
 import { GOTHIC_DEMI_GLYPHS } from './gothic-glyphs';
 import { placedRestPaint, serializeRestPaint } from './elements/rests';
 import type { PlacedRestPaint } from './elements/rests';
+import { placedBeamGroup, beamGroupSvg, beamPieceAt, beamPieceBox, beamPieceIntersectsBox } from './beam-scene';
+import type { BeamPiece } from './beam-scene';
 
-export const SCENE_VERSION = 3;
+export const SCENE_VERSION = 4;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
-  migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads', 'ledger'] as const,
-  legacyBroadBounds: ['rests', 'stems', 'beams', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
+  migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads', 'ledger', 'grouped-beam'] as const,
+  legacyBroadBounds: ['rests', 'solo-stems', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
 } as const;
 /** Stored emission authority is distinct from certified physical coverage. */
 export const SCENE_PAINT_COVERAGE = { stored: ['rests'] as const } as const;
 export type InkBox = { x0: number; y0: number; x1: number; y1: number };
 export type InkPrimitive =
   | { kind: 'stroke'; x1: number; y1: number; x2: number; y2: number; width: number; cap: 'butt'; dash?: string }
+  | { kind: 'beam'; beam: BeamPiece }
   | { kind: 'ring'; cx: number; cy: number; radius: number; width: number }
   | { kind: 'glyph'; digit: string; x: number; baseline: number; em: number; face: typeof SCENE_FONT }
   | { kind: 'erase'; box: InkBox; protects: 'own-digit' | 'strict-grid-air'; stroke?: Extract<InkPrimitive,{kind:'stroke'}> };
@@ -40,7 +44,7 @@ export interface InkPiece {
   span?: readonly [number, number];
   system: number;
   pagePiece: number;
-  layer: 'pitch' | 'ordinary-grid' | 'ledger' | 'strict-grid' | 'head';
+  layer: 'pitch' | 'ordinary-grid' | 'ledger' | 'strict-grid' | 'rhythm' | 'head';
   primitive: InkPrimitive;
   /** Broad phase ONLY; mask is never occupied ink. */
   box: InkBox;
@@ -51,6 +55,7 @@ export interface InkPiece {
 /** Serialize the stored primitive, never the constructor input or a cached SVG. */
 export function serializeInkPiece(piece: InkPiece): string {
   const p=piece.primitive,{cls,color}=piece.paint;
+  if(p.kind==='beam')return p.beam.svg;
   if(p.kind==='ring')return `    <circle class="${cls}" cx="${f(p.cx)}" cy="${f(p.cy)}" r="${f(p.radius)}" fill="none" stroke="${color}" stroke-width="${p.width.toFixed(2)}"/>`;
   if(p.kind==='glyph'){
     requirePinnedFace(p);
@@ -73,6 +78,7 @@ function primitiveBox(p:InkPrimitive):InkBox {
   if(p.kind==='erase')return p.stroke?strokeBox(p.stroke):p.box;
   if(p.kind==='stroke')return strokeBox(p);
   if(p.kind==='glyph')return glyphBox(p);
+  if(p.kind==='beam')return beamPieceBox(p.beam);
   return box(p.cx-p.radius-p.width/2,p.cy-p.radius-p.width/2,p.cx+p.radius+p.width/2,p.cy+p.radius+p.width/2);
 }
 export interface InkScene {
@@ -83,6 +89,8 @@ export interface InkScene {
   paintCoverage: typeof SCENE_PAINT_COVERAGE;
   /** One normalized primitive per record, grouped in original layout rest order. No physical queries. */
   restPaint: readonly (readonly PlacedRestPaint[])[];
+  /** Each group preserves the original rhythm-layer SVG order. */
+  beams: readonly (readonly BeamPiece[])[];
   pitch: readonly InkPiece[];
   ledger: readonly InkPiece[];
   beat: readonly InkPiece[];
@@ -148,9 +156,15 @@ export function sceneLedgerBoxes(scene:InkScene):Array<InkBox & {what:string}> {
 export function sceneLedgerAt(scene:InkScene,x:number,y:number):readonly InkPiece[] {
   return sceneInkAt(scene,x,y).filter(p=>p.family==='ledger');
 }
+function beamAsInkPiece(beam:BeamPiece):InkPiece {
+  const primitive:InkPrimitive={kind:'beam',beam};
+  return inkPiece({id:beam.id,family:'grouped-beam',ownerIds:beam.ownerIds,tick:beam.tick,span:beam.span,
+    system:beam.system,pagePiece:beam.pagePiece,layer:'rhythm',primitive,box:beamPieceBox(beam),paint:{cls:beam.cls}});
+}
 function orderedPieces(scene:InkScene):InkPiece[] {
   const strict=scene.beat.some(p=>p.layer==='strict-grid')||scene.barlines.some(p=>p.layer==='strict-grid');
   return [...scene.pitch,...(strict?[]:[...scene.beat,...scene.barlines]),...scene.ledger,
+    ...scene.beams.flat().map(beamAsInkPiece),
     ...(strict?[...scene.beat,...scene.barlines]:[]),...[...scene.heads.values()].flat()];
 }
 function headPieces(spec: JankoNoteheadSpec, id: string, tick: number, system: number, pagePiece: number, o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, owners: readonly string[]): InkPiece[] {
@@ -202,8 +216,11 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     heads.set(p.note.id,headPieces({x:p.x,y:p.y,pitchClass:p.coord.pitchClass,hand:p.coord.hand,isPositionOfHonor:p.note.startTick===0&&o.showHonorHalo,tallKnockout:p.tallKnockout===true,symbolScale:p.symbolScale,chordMember:p.symbolChord},p.note.id,p.note.startTick,system,pagePiece,o,t,contributors));
   }
   const restPaint=layout.rests.map((rest,i)=>placedRestPaint(rest,system,pagePiece,i,t));
+  const sourceNotes=new Map(source.notes.map(note=>[note.id,note] as const));
+  const beams=o.rhythmStyle==='beamed'?layout.beams.map(beam=>placedBeamGroup(beam,t,o.durationGrammar,system,pagePiece,
+    id=>[id,...layout.unisonMerges.filter(m=>m.survivorId===id).flatMap(m=>m.mergedIds)],sourceNotes)):[];
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,pitch,ledger,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {
@@ -217,6 +234,15 @@ export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}>
   for(let i=0;i<ordered.length;i++){
     const piece=ordered[i],p=piece.primitive;
     if(p.kind==='erase')continue;
+    if(p.kind==='beam'){
+      // Filled rail bounds are broad-phase only; beamPieceIntersectsBox and
+      // sceneInkAt certify the polygon rather than its empty sloped corners.
+      let visible=[beamPieceBox(p.beam)];
+      for(const later of ordered.slice(i+1))if(later.primitive.kind==='erase')
+        for(const cut of eraseBoxes(later.primitive))visible=visible.flatMap(b=>subtractBox(b,cut));
+      for(const b of visible)result.push({...b,what:`visible grouped-beam ${piece.id}`});
+      continue;
+    }
     if(p.kind==='glyph'||p.kind==='ring'){
       result.push({...primitiveBox(p),what:`visible ${p.kind} ${piece.id}`});
       continue;
@@ -255,6 +281,27 @@ export function sceneGridSvg(pieces:readonly InkPiece[],cls:string,emptyGroup:bo
   return [`  <g class="${cls}">`,...pieces.map(p=>p.svg),'  </g>'].join('\n');
 }
 /** Stored paint only; this does not imply rest sceneInkAt or scenePhysicalBoxes. */
+export function sceneBeamSvg(scene:InkScene,order:number):string {
+  const group=scene.beams[order];
+  if(!group)throw new Error(`Missing placed grouped beam at order ${order}`);
+  return beamGroupSvg(group);
+}
+/** Positive-area box query for the migrated grouped family only. Other scene
+ * families must not be inferred absent from this restricted physical query. */
+export function sceneBeamIntersectsBox(scene:InkScene,b:InkBox):boolean {
+  if(![b.x0,b.x1,b.y0,b.y1].every(Number.isFinite)||!(b.x1>b.x0&&b.y1>b.y0))
+    throw new Error('Grouped-beam box query requires finite positive area');
+  return scene.beams.flat().some(p=>{
+    // Only later erasures cut this owner; strict-grid air is dashed and
+    // bounded, while head masks remove just their own painted rectangles.
+    const ordered=orderedPieces(scene),index=ordered.findIndex(q=>q.id===p.id);
+    let candidates=[b];
+    for(const later of ordered.slice(index+1))if(later.primitive.kind==='erase')
+      for(const cut of eraseBoxes(later.primitive))
+        candidates=candidates.flatMap(v=>subtractBox(v,cut));
+    return candidates.some(v=>beamPieceIntersectsBox(p,v));
+  });
+}
 export function sceneRestSvg(scene:InkScene,order:number):string {
   const records=scene.restPaint[order];
   if(!records)throw new Error(`Missing scene rest paint at order ${order}`);
@@ -281,6 +328,7 @@ export function preliminaryStaffRules(geo:JankoSystemLayout['geometry'],o:Resolv
 /** The physical inventory is incomplete; broad boxes are NOT collision queries.
  * Clipping and detailed mark intersection are performed by sceneInkAt below. */
 export function sceneInkAt(scene:InkScene,x:number,y:number):readonly InkPiece[] {
+  if(!Number.isFinite(x)||!Number.isFinite(y))throw new Error('Scene point query requires finite coordinates');
   const painted:InkPiece[]=[];
   const ordered=orderedPieces(scene);
   for(const p of ordered){
@@ -319,6 +367,7 @@ function eraseBoxes(p:Extract<InkPrimitive,{kind:'erase'}>):InkBox[] {
   return strokeDashBoxes(s);
 }
 function primitiveInkAt(p:Exclude<InkPrimitive,{kind:'erase'}>,x:number,y:number):boolean {
+  if(p.kind==='beam')return beamPieceAt(p.beam,x,y);
   if(p.kind==='ring'){
     const d=Math.hypot(x-p.cx,y-p.cy);return Math.abs(d-p.radius)<=p.width/2;
   }

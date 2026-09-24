@@ -107,7 +107,7 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
-import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg } from './ink-scene';
+import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg } from './ink-scene';
 import type { InkScene } from './ink-scene';
 import {
   renderHandLabels,
@@ -6656,22 +6656,16 @@ export function systemPaintedInkBoxes(
       `stem ${id}`
     );
   };
-  for (const beam of layout.beams) {
-    for (let i = 0; i < beam.stems.length; i++) {
-      // A beam stem runs from the head's mask edge to the beam centerline.
-      const s = beam.stems[i];
-      stemBox(beam.notes[i]?.id ?? 'beam', s, beam.beamY(s.stemX));
+  // Grouped ink is already inventoried by the placed scene. For unmigrated
+  // twin-row dialects only, preserve the original page-slot booking separately.
+  if (!placedScene) for (const beam of layout.beams) {
+    for (let i=0;i<beam.stems.length;i++) {
+      const s=beam.stems[i];stemBox(beam.notes[i]?.id??'beam',s,beam.beamY(s.stemX));
     }
-    for (const connector of [beam.primary, ...beam.levels.map((l) => l.connector)]) {
-      if (!connector) continue;
-      const half = beam.thickness / 2;
-      push(
-        connector.x1,
-        connector.x2,
-        Math.min(connector.y1, connector.y2) - half,
-        Math.max(connector.y1, connector.y2) + half,
-        'beam'
-      );
+    for (const connector of [beam.primary,...beam.levels.map(l=>l.connector)]) {
+      const half=beam.thickness/2;
+      push(connector.x1,connector.x2,Math.min(connector.y1,connector.y2)-half,
+        Math.max(connector.y1,connector.y2)+half,'beam page-slot booking');
     }
   }
   if (o.rhythmStyle === 'beamed') {
@@ -9931,8 +9925,9 @@ function renderNotesLayer(
       : { ...n, durationTicks };
   };
   if (o.rhythmStyle === 'beamed') {
-    for (const beam of layout.beams) {
-      out.push(renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle, o.durationGrammar));
+    for (const [order,beam] of layout.beams.entries()) {
+      out.push(inkScene ? sceneBeamSvg(inkScene,order) :
+        renderBeamGroup(beam.notes, t, beam, o.subdivisionStyle, o.durationGrammar));
     }
     // Round 30: a clasp member's kept stem renders with the golden grammar —
     // the bracket owns the member's duration, so the stem carries no
