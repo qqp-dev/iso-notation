@@ -1,5 +1,5 @@
 /* Ordered, deliberately PARTIAL placed ink scene. Never use this as global occupancy:
- * written rests/rhythm/holds/ottava/furniture/contour/compression are not covered.
+ * rests have stored SVG paint, NOT physical occupancy; rhythm/holds/ottava/furniture/contour/compression are not covered.
  * No cache: key contains the full source and placed layout, not system count.
  */
 import type { QuantizedGridScore } from '../../model/types';
@@ -14,13 +14,17 @@ import type { VerticalGridStroke } from './elements/barlines';
 import { getScaledKnockoutMetrics, digitBaselineOffset, JANKO_USER_UNITS_PER_PT, JANKO_HALO_STROKE_WIDTH } from './elements/notehead';
 import type { JankoNoteheadSpec } from './elements/notehead';
 import { GOTHIC_DEMI_GLYPHS } from './gothic-glyphs';
+import { placedRestPaint, serializeRestPaint } from './elements/rests';
+import type { PlacedRestPaint } from './elements/rests';
 
-export const SCENE_VERSION = 2;
+export const SCENE_VERSION = 3;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
   migrated: ['pitch-grid', 'measure-barlines', 'beat-pulses', 'ordinary-noteheads', 'ledger'] as const,
   legacyBroadBounds: ['rests', 'stems', 'beams', 'brackets', 'ties', 'holds', 'duration', 'ottava', 'measure-furniture', 'handprint', 'compressed-cluster', 'contour', 'guidelines', 'middle-c-spine', 'page-policy'] as const,
 } as const;
+/** Stored emission authority is distinct from certified physical coverage. */
+export const SCENE_PAINT_COVERAGE = { stored: ['rests'] as const } as const;
 export type InkBox = { x0: number; y0: number; x1: number; y1: number };
 export type InkPrimitive =
   | { kind: 'stroke'; x1: number; y1: number; x2: number; y2: number; width: number; cap: 'butt'; dash?: string }
@@ -76,6 +80,9 @@ export interface InkScene {
   /** Complete content and final placed geometry. Not a layout-cache key. */
   key: string;
   coverage: typeof SCENE_COVERAGE;
+  paintCoverage: typeof SCENE_PAINT_COVERAGE;
+  /** One normalized primitive per record, grouped in original layout rest order. No physical queries. */
+  restPaint: readonly (readonly PlacedRestPaint[])[];
   pitch: readonly InkPiece[];
   ledger: readonly InkPiece[];
   beat: readonly InkPiece[];
@@ -194,8 +201,9 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     const contributors=[p.note.id,...layout.unisonMerges.filter(m=>m.survivorId===p.note.id).flatMap(m=>m.mergedIds)];
     heads.set(p.note.id,headPieces({x:p.x,y:p.y,pitchClass:p.coord.pitchClass,hand:p.coord.hand,isPositionOfHonor:p.note.startTick===0&&o.showHonorHalo,tallKnockout:p.tallKnockout===true,symbolScale:p.symbolScale,chordMember:p.symbolChord},p.note.id,p.note.startTick,system,pagePiece,o,t,contributors));
   }
+  const restPaint=layout.rests.map((rest,i)=>placedRestPaint(rest,system,pagePiece,i,t));
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,pitch,ledger,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {
@@ -245,6 +253,12 @@ function subtractBox(b:InkBox,c:InkBox):InkBox[] {
 export function sceneGridSvg(pieces:readonly InkPiece[],cls:string,emptyGroup:boolean):string {
   if(!emptyGroup&&pieces.length===0)return '';
   return [`  <g class="${cls}">`,...pieces.map(p=>p.svg),'  </g>'].join('\n');
+}
+/** Stored paint only; this does not imply rest sceneInkAt or scenePhysicalBoxes. */
+export function sceneRestSvg(scene:InkScene,order:number):string {
+  const records=scene.restPaint[order];
+  if(!records)throw new Error(`Missing scene rest paint at order ${order}`);
+  return serializeRestPaint(records);
 }
 export function sceneHeadSvg(scene:InkScene,id:string):string {
   const pieces=scene.heads.get(id);

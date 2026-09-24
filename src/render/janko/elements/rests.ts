@@ -727,7 +727,7 @@ export function extentsOfInk(items: readonly JankoRestInk[]): {
 }
 
 /** Serialize one primitive as SVG. */
-function inkToSvg(item: JankoRestInk): string {
+export function serializeRestPrimitive(item: JankoRestInk): string {
   const attrs = item.attrs ?? '';
   switch (item.kind) {
     case 'line':
@@ -804,7 +804,7 @@ function inkToSvg(item: JankoRestInk): string {
 
 /** Paint one primitive list. */
 export function renderInk(items: readonly JankoRestInk[]): string[] {
-  return items.map(inkToSvg);
+  return items.map(serializeRestPrimitive);
 }
 
 // ---------------------------------------------------------------------------
@@ -1602,16 +1602,68 @@ export function restInkBox(
  * `-hand`, `-style`), so the studio, the tests and a future audition pass can
  * address it without parsing coordinates.
  */
+export interface PlacedRestPaint {
+  /** Stable identity for this system and occurrence; never a neighbouring note owner. */
+  id: string;
+  system: number;
+  pagePiece: number;
+  order: number;
+  layer: 'rest';
+  groupClass: 'janko-rest-group';
+  tick: number;
+  durationTicks: number;
+  span: readonly [number, number];
+  hand: Hand;
+  value: JankoRestValue;
+  style: JankoRestStyle;
+  /** Absent when source silence provenance was unavailable. */
+  authored?: boolean;
+  /** The source silence's own origin, never a nearby note's origin. */
+  sourceOrigin?: string;
+  /** Only SVG paint; this is NOT a certified physical occupancy primitive. */
+  primitive: JankoRestInk;
+}
+
+/** Construct exactly once from final placed geometry, in original paint order. */
+export function placedRestPaint(
+  rest: JankoRestGeometry,
+  system: number,
+  pagePiece: number,
+  order: number,
+  tokens: ResolvedJankoTokens
+): PlacedRestPaint[] {
+  const origin = restGlyphOrigin(rest, tokens);
+  return restInk(origin, rest.value, rest.style, tokens).map((primitive, index) => ({
+    id: `s${system}:rest:${rest.tick}:${rest.hand}:${order}:${index}`,
+    system, pagePiece, order, layer: 'rest' as const, groupClass: 'janko-rest-group' as const,
+    tick: rest.tick, durationTicks: rest.durationTicks,
+    span: [rest.tick, rest.tick + rest.durationTicks] as const,
+    hand: rest.hand, value: rest.value, style: rest.style,
+    ...(rest.authored !== undefined ? { authored: rest.authored } : {}),
+    ...(rest.authored && rest.sourceOrigin ? { sourceOrigin: rest.sourceOrigin } : {}),
+    primitive,
+  }));
+}
+
+/** Emit a group directly from its stored primitives. No geometry or cut is rebuilt. */
+export function serializeRestPaint(records: readonly PlacedRestPaint[]): string {
+  if (!records.length) throw new Error('A painted rest requires at least one primitive');
+  const first = records[0];
+  if (records.some(p => p.order !== first.order || p.system !== first.system || p.tick !== first.tick || p.hand !== first.hand))
+    throw new Error('Mixed rest paint group');
+  return [
+    `    <g class="${first.groupClass}" data-rest-tick="${first.tick}" data-rest-value="${first.value}" data-rest-hand="${first.hand}" data-rest-style="${first.style}">`,
+    ...records.map(p => serializeRestPrimitive(p.primitive)),
+    '    </g>',
+  ].join('\n');
+}
+
+/** Sunset: compatibility adapter for non-fixed-core callers and standalone specimens.
+ * Fixed-core production consumes the placed scene instead; remove this adapter
+ * when all other dialects consume placed paint records. */
 export function renderRest(
   rest: JankoRestGeometry,
   tokens?: Partial<JankoTokens> | null
 ): string {
-  const t = resolveJankoTokens(tokens);
-  const o = restGlyphOrigin(rest, t);
-  const ink = renderInk(restInk(o, rest.value, rest.style, t));
-  return [
-    `    <g class="janko-rest-group" data-rest-tick="${rest.tick}" data-rest-value="${rest.value}" data-rest-hand="${rest.hand}" data-rest-style="${rest.style}">`,
-    ...ink,
-    '    </g>',
-  ].join('\n');
+  return serializeRestPaint(placedRestPaint(rest, 0, 0, 0, resolveJankoTokens(tokens)));
 }
