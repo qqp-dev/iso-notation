@@ -382,6 +382,8 @@ export function combineLintReports(reports: readonly LintReport[]): LintReport {
       violations: violations.length,
       warnings: warnings.length,
       durationMs: sum((s) => s.durationMs),
+      // Decision-level rest/head certificates only (rectangles or cubic CLEAR);
+      // never rest-family global physical scene coverage.
       restPhysical: {
         certified: sum((s) => s.restPhysical.certified),
         fallback: reports.reduce<Record<string, number>>((counts, report) => {

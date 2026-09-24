@@ -178,7 +178,7 @@ import {
 import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
-import { restDiscClearance } from './rest-physical';
+import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
 // ---------------------------------------------------------------------------
 // Report model
@@ -4205,11 +4205,12 @@ export function checkRestClearance(
   for (const [index, rest] of layout.rests.entries()) {
     // The barline remains a distinct protected admission rule, not a physical
     // rest occupancy query. Do not let a later white head mask erase a collision.
-    const box = restAdmissionBox(rest, t);
+    const paint = scene?.restPaint[index] ? prepareRestPaint(scene.restPaint[index]) : undefined;
+    let box: ReturnType<typeof restAdmissionBox> | undefined;
     for (const p of layout.notes) {
       const radius = isPositionOfHonor(p.note.startTick) ? Math.max(r, haloEdge) : r;
-      const result = scene?.restPaint[index]
-        ? restDiscClearance(scene.restPaint[index], p.x, p.y, radius)
+      const result = paint
+        ? restDiscClearance(paint, p.x, p.y, radius, lint.minClearance)
         : undefined;
       let gap: number;
       if (result && result.kind !== 'unknown') {
@@ -4219,6 +4220,7 @@ export function checkRestClearance(
         const reason = result?.reason ?? 'stored paint unavailable';
         coverage.fallback[reason] = (coverage.fallback[reason] ?? 0) + 1;
         // Unsupported paint retains the named conservative admission policy.
+        box ??= restAdmissionBox(rest, t);
         const dx = Math.max(box.x0 - p.x, 0, p.x - box.x1);
         const dy = Math.max(box.y0 - p.y, 0, p.y - box.y1);
         gap = Math.hypot(dx, dy) - radius;
@@ -4235,6 +4237,7 @@ export function checkRestClearance(
       );
     }
     for (const b of barlines) {
+      box ??= restAdmissionBox(rest, t); // separate protected-barline admission policy
       const horizontal = Math.max(box.x0 - b.x, 0, b.x - box.x1);
       const vertical = Math.max(box.y0 - b.bottom, 0, b.top - box.y1);
       const gap = Math.max(0, Math.hypot(horizontal, vertical));
