@@ -532,7 +532,9 @@ export function renderCompareStrip(
  * registry, engraved on the same windows, with option-delta badges and a live
  * lint verdict **over every score the candidate is demonstrated on**.
  */
-export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig()): string {
+/** Reusable only when every non-semantic studio input is identical. */
+export interface StaticCandidateMarkup { cards: string[]; compareStrip: string }
+export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig(), reuse?: StaticCandidateMarkup, capture?: (markup: StaticCandidateMarkup) => void): string {
   const { round, scores } = config;
   const candidates: JankoCandidate[] = config.semanticCandidate
     ? [...config.candidates, semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows)] : config.candidates;
@@ -556,7 +558,8 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     return layouts;
   };
 
-  const cards = candidates.map((candidate) => {
+  const cards = candidates.map((candidate, index) => {
+    if (candidate.id !== 'semantic-hand' && reuse?.cards[index] !== undefined) return reuse.cards[index];
     const resolved = resolveCandidate(candidate);
     const isAbstract =
       candidate.kind === 'abstract' ||
@@ -722,6 +725,9 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .join('\n');
   });
 
+  const compareStrip = reuse?.compareStrip ?? renderCompareStrip(config, candidateLayouts);
+  capture?.({ cards: cards.slice(0, config.candidates.length), compareStrip });
+
   // Round 20: a **verification round** (no open axis) states every card's own
   // window set instead of one shared candidate window count, so the header
   // counts the round's whole evidence.
@@ -750,7 +756,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
           : `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} × ${windowCount} engraving window${windowCount === 1 ? '' : 's'}`
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
-    renderCompareStrip(config, candidateLayouts),
+    compareStrip,
     config.semanticCandidateError ? `<article class="candidate-card" data-candidate="semantic-hand-stale" data-lint="error" role="alert"><h3>Saved semantic candidate STALE — not applied</h3><p class="rationale">${escapeHtml(config.semanticCandidateError)}</p><p>Reference remains canonical. Archive and start a new guarded candidate with <code>semantic-hand recover</code>; no automatic rebase.</p></article>` : '',
     `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}" data-decided="${decided}">`,
     cards.join('\n'),

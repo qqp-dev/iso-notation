@@ -30,32 +30,62 @@
  */
 
 import { createHash } from 'node:crypto';
+import { resolve } from 'node:path';
 
-import { createStudioConfig, renderCandidatesView, renderReferenceView, JankoStudioConfig } from '../studio';
+import { createStudioConfig, renderCandidatesView, renderReferenceView, type StaticCandidateMarkup, JankoStudioConfig } from '../studio';
 import { lintJankoScore } from '../linter';
-import type { PreparedGeneration, PreparedStatus } from './seam';
+import { fingerprintInputs, snapshotKey, type PreparedGeneration, type PreparedInputSnapshot, type PreparedStatus } from './seam';
 import { readCandidate, candidateScore, head, candidateHealth, SEMANTIC_STATE } from '../semantic-hand';
 
 export type { PreparedArtifactKey, PreparedGeneration, PreparedStatus } from './seam';
+export function staticInputKey(snapshot: PreparedInputSnapshot, stateFile: string): string {
+  return snapshotKey({ entries: new Map([...snapshot.entries].filter(([file]) => file !== stateFile)) });
+}
 
 /** sha256 hex digest of a UTF-8 string. */
 function sha256Of(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+/** Process-local, read-only reuse of canonical view bytes. The semantic card is never cached. */
+export interface PreparedStaticCache {
+  key?: string;
+  cards?: StaticCandidateMarkup;
+  reference?: string;
+}
+
 /** Generate one coherent prepared studio (both views + the lint status). */
 export function generatePreparedStudio(
   overrides: Partial<JankoStudioConfig> = {},
   candidateRoot?: string,
-  candidatePath = SEMANTIC_STATE
+  candidatePath = SEMANTIC_STATE,
+  cache?: PreparedStaticCache
 ): PreparedGeneration {
+  const started = performance.now();
   const health = candidateRoot ? candidateHealth(candidateRoot, candidatePath) : undefined;
   const state = candidateRoot && health?.state === 'current' ? readCandidate(candidateRoot, candidatePath) : undefined;
   const semanticCandidate = state?.records.length ? { score: candidateScore(state), revision: head(state, candidateRoot), reviewWindows: state.records.at(-1)!.effects.reviewWindows } : undefined;
   const semanticCandidateError = health?.state === 'stale' ? health.diagnostic : undefined;
   const config = createStudioConfig({ ...overrides, ...(semanticCandidate ? { semanticCandidate } : {}), ...(semanticCandidateError ? { semanticCandidateError } : {}) });
-  const candidates = renderCandidatesView(config);
-  const reference = renderReferenceView(config);
+  // The full watched content snapshot (including font binaries) is the
+  // dependency identity. Exclude ONLY the ignored semantic state: its output
+  // lives in the independently rendered semantic card. Coherence is still
+  // checked around the entire generation by the plugin, including that state.
+  const eligible = !!cache && !!candidateRoot && Object.keys(overrides).length === 0;
+  const snapshot = eligible ? fingerprintInputs(candidateRoot!) : undefined;
+  const staticKey = snapshot && staticInputKey(snapshot, resolve(candidateRoot!, candidatePath));
+  const hit = !!staticKey && cache?.key === staticKey && !!cache.cards && !!cache.reference;
+  const configMs = performance.now() - started;
+  let cards: StaticCandidateMarkup | undefined;
+  const candidates = renderCandidatesView(config, hit ? cache!.cards : undefined, value => { cards = value; });
+  const candidatesMs = performance.now() - started - configMs;
+  const reference = hit ? cache!.reference! : renderReferenceView(config);
+  if (eligible && staticKey && cards && !hit) {
+    cache!.key = staticKey;
+    cache!.cards = cards;
+    cache!.reference = reference;
+  }
+  const referenceMs = performance.now() - started - configMs - candidatesMs;
   // The status line of the primary score, computed by the real linter — the
   // same call the live studio's footer makes, here resolved once at generation
   // time so the browser never runs the linter.
@@ -68,6 +98,8 @@ export function generatePreparedStudio(
     notes: report.stats.notes,
     lintMs: Math.round(report.stats.durationMs),
   };
+  const lintMs = performance.now() - started - configMs - candidatesMs - referenceMs;
+  const phaseMs = { config: +configMs.toFixed(1), candidates: +candidatesMs.toFixed(1), reference: +referenceMs.toFixed(1), lint: +lintMs.toFixed(1) };
   const artifactHashes = {
     candidates: sha256Of(candidates),
     reference: sha256Of(reference),
@@ -82,5 +114,5 @@ export function generatePreparedStudio(
       status: { ok: status.ok, violations: status.violations, warnings: status.warnings, systems: status.systems, notes: status.notes },
     })
   );
-  return { generation, artifactHashes, artifacts: { candidates, reference }, status, candidateRevision: semanticCandidate?.revision, ...(semanticCandidateError ? { candidateError: semanticCandidateError } : {}) };
+  return { generation, artifactHashes, artifacts: { candidates, reference }, status, phaseMs, candidateRevision: semanticCandidate?.revision, ...(semanticCandidateError ? { candidateError: semanticCandidateError } : {}) };
 }

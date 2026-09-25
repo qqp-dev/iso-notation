@@ -38,6 +38,8 @@
  */
 
 import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
 import { runnerImport, type Plugin, type ViteDevServer } from 'vite';
@@ -50,6 +52,7 @@ import {
   generateWithCoherenceCheck,
   isWatchedInput,
   manifestModuleSource,
+  snapshotKey,
   type PreparedGeneration,
   type PreparedInputSnapshot,
 } from './seam';
@@ -121,16 +124,33 @@ export interface JankoPreparedPluginOptions {
   generate?: () => Promise<PreparedGeneration>;
   /** Test seam for HMR publication identity; does not alter Vite's clock. */
   publicationClock?: () => number;
+  /** Isolated test server only: the path it watches and engraves (default stays operator-owned). */
+  candidatePath?: string;
 }
 
 export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = {}): Plugin {
   const root = resolve(options.root ?? process.cwd());
+  const candidatePath = resolve(root, options.candidatePath ?? '.semantic-candidate.local');
+  const snapshot = (): PreparedInputSnapshot => {
+    const entries = new Map(fingerprintInputs(root).entries);
+    if (options.candidatePath && existsSync(candidatePath)) {
+      entries.set(candidatePath, createHash('sha256').update(readFileSync(candidatePath)).digest('hex'));
+    }
+    return { entries };
+  };
   let devServer: ViteDevServer | null = null;
   let isBuild = false;
   let emittedReferenceIds: Record<'candidates' | 'reference', string> | null = null;
   let buildGeneration: PreparedGeneration | null = null;
   let queue: GenerationQueue | null = null;
   let lastPublicationTimestamp = 0;
+  let watchedAt: number | undefined;
+  let publishedAt: number | undefined;
+  // Only canonical fragments are reused, under the generator's complete
+  // non-semantic input fingerprint. Vite runnerImport still loads fresh code.
+  const staticCache: import('./generate').PreparedStaticCache = {};
+  let cachedGenerator: ((overrides?: object, candidateRoot?: string, candidatePath?: string, cache?: typeof staticCache) => PreparedGeneration) | undefined;
+  let cachedGeneratorKey: string | undefined;
 
   /**
    * The lazy generator: loads `./generate.ts` through Vite's own pipeline at
@@ -146,10 +166,18 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
       const generated = await options.generate();
       return { ...generated, generationMs: +(performance.now() - started).toFixed(1) };
     }
-    const generatorPath = fileURLToPath(new URL('./generate.ts', import.meta.url));
-    const { module } = await runnerImport(generatorPath);
-    const gen = (module as { generatePreparedStudio: (overrides?: object, candidateRoot?: string) => PreparedGeneration }).generatePreparedStudio;
-    const generated = gen({}, isBuild ? undefined : root);
+    // Reuse the imported code only while *every* non-semantic source, score,
+    // editorial, options, tokens and font input has identical bytes. A state
+    // change cannot change that code; source/HMR drift forces runnerImport.
+    // The outer coherence snapshots still include the state on both sides.
+    const key = !isBuild ? snapshotKey({ entries: new Map([...fingerprintInputs(root).entries].filter(([file]) => file !== candidatePath)) }) : undefined;
+    if (!cachedGenerator || isBuild || cachedGeneratorKey !== key) {
+      const generatorPath = fileURLToPath(new URL('./generate.ts', import.meta.url));
+      const { module } = await runnerImport(generatorPath);
+      cachedGenerator = (module as { generatePreparedStudio: typeof cachedGenerator }).generatePreparedStudio;
+      cachedGeneratorKey = key;
+    }
+    const generated = cachedGenerator!({}, isBuild ? undefined : root, candidatePath, isBuild ? undefined : staticCache);
     return { ...generated, generationMs: +(performance.now() - started).toFixed(1) };
   };
 
@@ -159,8 +187,8 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
     try {
       return await generateWithCoherenceCheck(
         loadGenerator,
-        () => fingerprintInputs(root),
-        () => fingerprintInputs(root)
+        snapshot,
+        snapshot
       );
     } catch (error) {
       return { failure: error instanceof Error ? error.message : String(error) };
@@ -169,6 +197,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
 
   const publishToServer = (): void => {
     if (!devServer || !queue) return;
+    publishedAt = Date.now();
     const clientGraph = devServer.environments.client.moduleGraph;
     const targets = preparedHmrTargets(clientGraph, `\0${PREPARED_MANIFEST_ID}`);
     if (targets.length === 0) return;
@@ -274,7 +303,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
           const current = queue?.current;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
-          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', candidateRevision: current?.generation.candidateRevision, candidateError: current?.generation.candidateError, generationMs: current?.generation.generationMs, stale: current?.stale ?? true, error: current?.error }));
+          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', candidateRevision: current?.generation.candidateRevision, candidateError: current?.generation.candidateError, artifactHashes: current?.generation.artifactHashes, generationMs: current?.generation.generationMs, phaseMs: current?.generation.phaseMs, watchedAt, publishedAt, stale: current?.stale ?? true, error: current?.error }));
           return;
         }
         if (!url.startsWith(PREPARED_DEV_ARTIFACT_PREFIX)) return next();
@@ -300,9 +329,11 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
       // coalesced (the queue folds overlapping requests) and serialized (one
       // generation at a time), and each settled generation is published.
       queue?.request();
+      if (options.candidatePath) server.watcher.add(candidatePath);
       const onChange = (path: string): void => {
-        if (!isWatchedInput(path, root)) return;
-        queue?.request(resolve(path) === resolve(root, '.semantic-candidate.local'));
+        if (!isWatchedInput(path, root) && resolve(path) !== candidatePath) return;
+        watchedAt = Date.now();
+        queue?.request(resolve(path) === candidatePath);
       };
       server.watcher.on('add', onChange);
       server.watcher.on('change', onChange);

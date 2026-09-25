@@ -52,6 +52,8 @@ export interface PreparedGeneration {
   candidateError?: string;
   /** Server-only measurement; excluded from content-addressed generation identity. */
   generationMs?: number;
+  /** Server diagnostics, not part of content identity or the browser manifest. */
+  phaseMs?: { config: number; candidates: number; reference: number; lint: number };
 }
 
 /**
@@ -65,9 +67,9 @@ export interface PreparedInputSnapshot {
   entries: ReadonlyMap<string, string>;
 }
 
-/** sha256 hex digest of a UTF-8 string. */
-export function sha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
+/** sha256 hex digest of UTF-8 text or exact binary bytes. */
+export function sha256(input: string | Uint8Array): string {
+  return createHash('sha256').update(input).digest('hex');
 }
 
 export function snapshotKey(snapshot: PreparedInputSnapshot): string {
@@ -80,9 +82,9 @@ export function snapshotKey(snapshot: PreparedInputSnapshot): string {
 }
 
 /** The watched input roots, relative to the project root. */
-const WATCH_ROOTS = ['src', 'data', 'public/midi'];
+const WATCH_ROOTS = ['src', 'data', 'public/midi', 'public/fonts'];
 const WATCH_FILES = ['package.json', 'package-lock.json', '.semantic-candidate.local'];
-const WATCH_EXTENSIONS = ['.ts', '.tsx', '.json', '.ily', '.mid', '.midi', '.ly'];
+const WATCH_EXTENSIONS = ['.ts', '.tsx', '.json', '.ily', '.mid', '.midi', '.ly', '.woff', '.woff2', '.ttf', '.otf'];
 
 /** Whether a watched-event path is an engraving input the prepared studio must regenerate on. */
 export function isWatchedInput(path: string, root: string): boolean {
@@ -121,7 +123,8 @@ export function fingerprintInputs(root: string): PreparedInputSnapshot {
       if (stat.isDirectory()) visit(abs);
       else if (WATCH_EXTENSIONS.some((ext) => abs.endsWith(ext))) {
         try {
-          entries.set(abs, sha256(readFileSync(abs, 'utf8')));
+          // Hash original bytes: UTF-8 replacement characters alias distinct font/MIDI inputs.
+          entries.set(abs, sha256(readFileSync(abs)));
         } catch {
           /* a file that vanished mid-walk is simply absent from the snapshot */
         }
@@ -133,7 +136,7 @@ export function fingerprintInputs(root: string): PreparedInputSnapshot {
     const abs = resolve(root, file);
     if (existsSync(abs)) {
       try {
-        entries.set(abs, sha256(readFileSync(abs, 'utf8')));
+        entries.set(abs, sha256(readFileSync(abs)));
       } catch {
         /* unreadable → absent */
       }
