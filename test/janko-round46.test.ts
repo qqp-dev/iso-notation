@@ -58,10 +58,11 @@ import {
 } from '../src/render/janko/elements/rhythm';
 import { lintJankoScore } from '../src/render/janko/linter';
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  ROUND_49_CANDIDATES,
+  ROUND_49_METADATA,
   resolveCandidate,
 } from '../src/render/janko/candidates';
+import { bachBeforeM5 } from './support/bach-before-m5';
 
 const SCORE = buildBrahmsOp118No1Score();
 const OPTIONS = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
@@ -643,8 +644,9 @@ test('D. Ties clear every glyph mask and never erase ink (paint order and stem c
 test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family as its shared base', () => {
   const bach = buildBachGoldbergVar1Score();
   let svg = '';
-  for (let i = 0; i < countJankoPages(bach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); i++) {
-    svg += renderJankoPage(bach, i, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const archivalBach = bachBeforeM5(bach);
+  for (let i = 0; i < countJankoPages(archivalBach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); i++) {
+    svg += renderJankoPage(archivalBach, i, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   }
   assert.equal(
     createHash('sha256').update(svg).digest('hex'),
@@ -658,13 +660,13 @@ test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family a
   // adopted family as fixed context, and the working Reference they are measured
   // against is untouched — the assertions below are the Round 46 contract,
   // checked through the live registry.
-  assert.equal(CURRENT_ROUND_METADATA.round, 49, 'Round 49 is the open round');
+  assert.equal(ROUND_49_METADATA.round, 49, 'Round 49 is parked');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_49_CANDIDATES.map((c) => c.id),
     ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
     'the Round 49 trio'
   );
-  for (const candidate of CURRENT_CANDIDATES) {
+  for (const candidate of ROUND_49_CANDIDATES) {
     const resolved = resolveCandidate(candidate);
     assert.equal(resolved.options.chordSymbolScale, 0.95, `${candidate.id}: 95 %`);
     assert.equal(resolved.options.writtenTies, 'source', `${candidate.id}: ties are rendered`);

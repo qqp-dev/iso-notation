@@ -49,7 +49,7 @@ import { subdivisionMarkCount } from '../src/render/janko/elements/rhythm';
 import { layoutJankoScore, drawnStaffRuleYs, nearestDrawnStaffRule } from '../src/render/janko/engine';
 import { checkRestSeat, lintJankoScore } from '../src/render/janko/linter';
 import type { LintViolation } from '../src/render/janko/linter';
-import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA } from '../src/render/janko/candidates';
+import { ROUND_49_CANDIDATES, ROUND_49_METADATA } from '../src/render/janko/candidates';
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
@@ -470,13 +470,13 @@ test('§F registry: round 49 open, three declared axes, the three real-engine re
   // seven literal windows, the same 95 % scale, the adopted 48B baseline and
   // family air, the same written ties, the same scoped omission — differing in
   // the above-numeral mount, the family air bound and the tie contour.
-  assert.equal(CURRENT_ROUND_METADATA.round, 49);
+  assert.equal(ROUND_49_METADATA.round, 49);
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
+    ROUND_49_METADATA.openAxes,
     ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
     'the above-numeral mount, the family air and the tie contour'
   );
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+  const ids = ROUND_49_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
     ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],

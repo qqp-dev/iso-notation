@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks';
 import { readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../../scores/brahms-op118-no1';
+import { buildBachGoldbergVar1Score } from '../../scores/bach-goldberg-var1';
 import provenance from '../../scores/data/brahms-op118-no1-written-durations.provenance.json' with { type: 'json' };
 import writtenFixture from '../../scores/data/brahms-op118-no1-written-durations.json' with { type: 'json' };
 import { buildBrahmsSemanticIndex, editableBrahmsSound, linkedBrahmsNotes } from '../../scores/brahms-semantic-index';
@@ -12,10 +13,19 @@ import { detectHandCrossings } from '../../model/grid';
 import type { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
 import { layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages } from './engine';
 import { lintJankoScore } from './linter';
-import { resolveJankoOptions, resolveJankoTokens } from './types';
+import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from './types';
 
 export const SEMANTIC_STATE = '.semantic-candidate.local';
 export const SEMANTIC_SCORE = 'brahms-op118-no1';
+export const BACH_SCORE = 'bach-goldberg-var1';
+export type EditableScore = typeof SEMANTIC_SCORE | typeof BACH_SCORE;
+export function selectScore(score: string): EditableScore {
+  if (score !== SEMANTIC_SCORE && score !== BACH_SCORE) throw new Error(`unknown semantic score: ${score}`);
+  return score;
+}
+const provider = (score: EditableScore) => score === BACH_SCORE
+  ? { build: buildBachGoldbergVar1Score, options: resolveJankoOptions(DEFAULT_JANKO_OPTIONS), tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS) }
+  : { build: buildBrahmsOp118No1Score, options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS), tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS) };
 const digest = (value: unknown) => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
 const engineFiles = ['src/scores/brahms-op118-no1.ts', 'src/scores/brahms-hand-corrections.ts', 'src/model/grid.ts',
   'src/model/semantic-identity.ts', 'src/scores/brahms-semantic-index.ts'];
@@ -23,7 +33,13 @@ function renderingFiles(root: string) {
   return ['src/render/janko', 'src/render/janko/elements'].flatMap(dir =>
     readdirSync(resolve(root, dir)).filter(name => name.endsWith('.ts')).map(name => `${dir}/${name}`));
 }
-export function identityParts(root = process.cwd()) {
+export function identityParts(root = process.cwd(), score: EditableScore = SEMANTIC_SCORE) {
+  if (score === BACH_SCORE) {
+    const source = { builder: digest(readFileSync(resolve(root, 'src/scores/bach-goldberg-var1.ts'))),
+      corpus: digest(readFileSync(resolve(root, 'public/midi/bach-goldberg-var1.mid'))) };
+    const engine = ['src/model/grid.ts', ...renderingFiles(root)].map(file => [file, digest(readFileSync(resolve(root, file)))]);
+    return { source: digest(source), engine: digest(engine) };
+  }
   const source = { source: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-written-durations.provenance.json'))),
     fixture: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-written-durations.json'))),
     pinnedSource: digest(readFileSync(resolve(root, 'data/sources/brahms-op118-no1/includes/intermezzo-op118-no1-parts.ily'))),
@@ -34,7 +50,8 @@ export function identityParts(root = process.cwd()) {
   return { source: digest(source), engine: digest(engine) };
 }
 // Retain the original fingerprint representation so existing saved histories remain readable.
-export function modelIdentity(root = process.cwd()) {
+export function modelIdentity(root = process.cwd(), score: EditableScore = SEMANTIC_SCORE) {
+  if (score === BACH_SCORE) return digest({ score, ...identityParts(root, score) });
   const files = { source: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-written-durations.provenance.json'))),
     fixture: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-written-durations.json'))),
     pinnedSource: digest(readFileSync(resolve(root, 'data/sources/brahms-op118-no1/includes/intermezzo-op118-no1-parts.ily'))),
@@ -45,25 +62,25 @@ export function modelIdentity(root = process.cwd()) {
   return digest(files);
 }
 export interface Guard { id: string; pitchClass: number; octave: number; tick: number; expectedHand: Hand }
-export interface HandIntent { schema: 1; score: typeof SEMANTIC_SCORE; base: string; intent: 'assign-hand'; target: Hand; scope: 'this' | 'set' | 'source-linked'; selected: Guard[]; reason?: string }
+export interface HandIntent { schema: 1; score: EditableScore; base: string; intent: 'assign-hand'; target: Hand; scope: 'this' | 'set' | 'source-linked'; selected: Guard[]; reason?: string }
 export interface Assignment { id: string; guard: Guard; hand: Hand; citation: string }
 export interface CandidateRecord { revision: string; parent: string; operation: 'change' | 'undo'; assignments: Assignment[]; effects: Effects; reason?: string }
-export interface CandidateState { schema: 1; identity: string; identityParts?: { source: string; engine: string }; records: CandidateRecord[] }
+export interface CandidateState { schema: 1; score?: EditableScore; identity: string; identityParts?: { source: string; engine: string }; records: CandidateRecord[] }
 export interface CandidateHealth { state: 'current' | 'stale'; revision?: string; diagnostic?: string; recovery: string }
 /** Read status without ever replaying a stale or corrupted saved candidate. */
-export function candidateHealth(root = process.cwd(), path = SEMANTIC_STATE): CandidateHealth {
+export function candidateHealth(root = process.cwd(), path = SEMANTIC_STATE, score: EditableScore = SEMANTIC_SCORE): CandidateHealth {
   const file = resolve(root, path);
-  if (!existsSync(file)) return { state: 'current', revision: baseline(root), recovery: 'No saved candidate; use change with this revision.' };
+  if (!existsSync(file)) return { state: 'current', revision: baseline(root, score), recovery: 'No saved candidate; use change with this revision.' };
   try {
-    const state = readCandidate(root, path);
-    return { state: 'current', revision: head(state, root), recovery: 'Use change or guarded undo.' };
+    const state = readCandidate(root, path, score);
+    return { state: 'current', revision: head(state, root, score), recovery: 'Use change or guarded undo.' };
   } catch (error) {
     let detail = 'saved candidate cannot be parsed or verified';
     try {
       const saved = JSON.parse(readFileSync(file, 'utf8')) as CandidateState;
-      const current = identityParts(root);
+      const current = identityParts(root, score);
       const differences = (['source','engine'] as const).filter(key => saved.identityParts?.[key] !== current[key]);
-      detail = `saved identity ${saved.identity ?? 'missing'}; current identity ${modelIdentity(root)}; ` +
+      detail = `saved identity ${saved.identity ?? 'missing'}; current identity ${modelIdentity(root, score)}; ` +
         (saved.identityParts ? `${differences.join(' and ') || 'history/base'} mismatch` : 'source/base/engine mismatch (legacy state has no component fingerprints)');
     } catch { /* keep parse error */ }
     return { state: 'stale', diagnostic: `${detail}; ${String(error)}`, recovery: 'Archive and create a new candidate with recover --json <guarded-request.json> (base from status); old history is retained verbatim.' };
@@ -71,8 +88,6 @@ export function candidateHealth(root = process.cwd(), path = SEMANTIC_STATE): Ca
 }
 export interface ReviewWindow { measureStart: number; measureCount: number; changed: boolean }
 export interface Effects { selected: Assignment[]; reviewWindows: ReviewWindow[]; crossings: [number, number]; rests: [number, number]; beams: [number, number]; brackets: [number, number]; tieOwners: [number, number]; durationOwners: [number, number]; tieOwnerChanges: { added: string[]; removed: string[] }; durationOwnerChanges: { added: string[]; removed: string[] }; changedPages: number[]; unchangedPages: number[]; changedSystems: number[]; unchangedSystems: number[]; changedCrops: string[]; unchangedCrops: string[]; visible: 'CHANGED' | 'NO_VISIBLE_EFFECT'; lint: { violations: number; warnings: number } }
-const options = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-const tokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
 function citation(sound: SoundingIdentity) {
   const c = sound.components[0];
   return `${c.statement.file}:${c.statement.line}:${c.statement.col} ${c.statement.voice}, bar ${c.bar}, occurrence ${c.occurrence}`;
@@ -94,15 +109,15 @@ export function projectCandidate(score: QuantizedGridScore, assignments: readonl
   next.handCrossings = detectHandCrossings(next);
   return next;
 }
-export function baseline(root = process.cwd()) { return digest({ identity: modelIdentity(root), score: SEMANTIC_SCORE, schema: 1 }); }
-export function readCandidate(root = process.cwd(), path = SEMANTIC_STATE): CandidateState {
-  const identity = modelIdentity(root);
-  if (!existsSync(resolve(root, path))) return { schema: 1, identity, identityParts: identityParts(root), records: [] };
+export function baseline(root = process.cwd(), score: EditableScore = SEMANTIC_SCORE) { return digest({ identity: modelIdentity(root, score), score, schema: 1 }); }
+export function readCandidate(root = process.cwd(), path = SEMANTIC_STATE, score: EditableScore = SEMANTIC_SCORE): CandidateState {
+  const identity = modelIdentity(root, score);
+  if (!existsSync(resolve(root, path))) return { schema: 1, ...(score === BACH_SCORE ? { score } : {}), identity, identityParts: identityParts(root, score), records: [] };
   const state = JSON.parse(readFileSync(resolve(root, path), 'utf8')) as CandidateState;
-  if (state.schema !== 1 || state.identity !== identity || !Array.isArray(state.records) ||
-    (state.identityParts && JSON.stringify(state.identityParts) !== JSON.stringify(identityParts(root))))
+  if (state.schema !== 1 || (state.score ?? SEMANTIC_SCORE) !== score || state.identity !== identity || !Array.isArray(state.records) ||
+    (state.identityParts && JSON.stringify(state.identityParts) !== JSON.stringify(identityParts(root, score))))
     throw new Error('candidate source/model/engine revision drift; refusing stale state');
-  let parent = baseline(root);
+  let parent = baseline(root, score);
   for (const record of state.records) {
     if (record.parent !== parent || record.revision !== digest({ identity, parent, operation: record.operation, assignments: record.assignments, effects: record.effects, reason: record.reason }))
       throw new Error('candidate history fingerprint mismatch');
@@ -110,9 +125,9 @@ export function readCandidate(root = process.cwd(), path = SEMANTIC_STATE): Cand
   }
   return state;
 }
-export const head = (state: CandidateState, root = process.cwd()) => state.records.at(-1)?.revision ?? baseline(root);
+export const head = (state: CandidateState, root = process.cwd(), score: EditableScore = state.score ?? SEMANTIC_SCORE) => state.records.at(-1)?.revision ?? baseline(root, score);
 export const activeAssignments = (state: CandidateState) => state.records.at(-1)?.assignments ?? [];
-export function candidateScore(state: CandidateState) { return projectCandidate(buildBrahmsOp118No1Score(), activeAssignments(state)); }
+export function candidateScore(state: CandidateState) { return projectCandidate(provider(state.score ?? SEMANTIC_SCORE).build(), activeAssignments(state)); }
 export function resolveLinkedOccurrences(
   origin: typeof provenance.events[number], score: QuantizedGridScore,
   events: readonly (typeof provenance.events[number])[] = provenance.events
@@ -125,9 +140,10 @@ export function resolveLinkedOccurrences(
   if (!witness) throw new Error('ambiguous source-linked occurrences: missing origin');
   return linkedBrahmsNotes(index, witness, score);
 }
-function resolveIntent(intent: HandIntent, score: QuantizedGridScore, current: readonly Assignment[]): Assignment[] {
-  if (intent.schema !== 1 || intent.score !== SEMANTIC_SCORE || intent.intent !== 'assign-hand' || !['RH', 'LH'].includes(intent.target) || !['this','set','source-linked'].includes(intent.scope) || !Array.isArray(intent.selected) || intent.selected.length < 1 || (intent.scope !== 'set' && intent.selected.length !== 1)) throw new Error('invalid/unsupported hand intent or selection');
-  const index = buildBrahmsSemanticIndex(score);
+function resolveIntent(intent: HandIntent, score: QuantizedGridScore, current: readonly Assignment[], selectedScore: EditableScore): Assignment[] {
+  if (intent.schema !== 1 || intent.score !== selectedScore || intent.intent !== 'assign-hand' || !['RH', 'LH'].includes(intent.target) || !['this','set','source-linked'].includes(intent.scope) || !Array.isArray(intent.selected) || intent.selected.length < 1 || (intent.scope !== 'set' && intent.selected.length !== 1)) throw new Error('invalid/unsupported hand intent or selection');
+  if (selectedScore === BACH_SCORE && intent.scope === 'source-linked') throw new Error('unsupported Bach source-linked scope: no authored provenance index');
+  const index = selectedScore === SEMANTIC_SCORE ? buildBrahmsSemanticIndex(score) : undefined;
   const currentMap = new Map(current.map(a => [a.id, a]));
   const byId = new Map(score.notes.map(n => [n.id, n]));
   const selected = intent.selected.map(g => {
@@ -139,16 +155,18 @@ function resolveIntent(intent: HandIntent, score: QuantizedGridScore, current: r
   if (new Set(selected.map(n => n.id)).size !== selected.length) throw new Error('duplicate selection');
   let targets = selected;
   if (intent.scope === 'source-linked') {
-    targets = linkedBrahmsNotes(index, editableBrahmsSound(index, index.forNote(selected[0].id), selected[0].id), score);
+    targets = linkedBrahmsNotes(index!, editableBrahmsSound(index!, index!.forNote(selected[0].id), selected[0].id), score);
     if (targets.some(n => n.hand !== selected[0].hand)) throw new Error('source-linked hand mismatch');
   }
   return targets.map(n => {
-    const e = editableBrahmsSound(index, index.forNote(n.id), n.id);
+    const citationText = index ? citation(editableBrahmsSound(index, index.forNote(n.id), n.id))
+      : `src/scores/bach-goldberg-var1.ts builder; public/midi/bach-goldberg-var1.mid corpus; note ${n.id} tick ${n.startTick} (no authored hand provenance)`;
     const previous = currentMap.get(n.id);
-    return { id: n.id, guard: previous?.guard ?? { id: n.id, pitchClass: n.pitch.pitchClass, octave: n.pitch.octave, tick: n.startTick, expectedHand: n.hand }, hand: intent.target, citation: citation(e) };
+    return { id: n.id, guard: previous?.guard ?? { id: n.id, pitchClass: n.pitch.pitchClass, octave: n.pitch.octave, tick: n.startTick, expectedHand: n.hand }, hand: intent.target, citation: citationText };
   });
 }
 function geometry(score: QuantizedGridScore) {
+  const { options, tokens } = provider(selectScore(score.id));
   const layouts = layoutJankoScore(score, options, tokens);
   const pages = Array.from({ length: countJankoPages(score, options, tokens) }, (_, i) => digest(renderJankoPage(score, i, options, tokens, layouts)));
   const systems = layouts.map((_, i) => digest(renderJankoCrop(score, i * options.measuresPerSystem + 1, options.measuresPerSystem, options, tokens, undefined, layouts)));
@@ -159,6 +177,8 @@ function geometry(score: QuantizedGridScore) {
     tieOwners, durationOwners };
 }
 export function compareCandidate(before: QuantizedGridScore, after: QuantizedGridScore, selected: Assignment[], active: readonly Assignment[] = selected): Effects {
+  if (before.id !== after.id) throw new Error('cross-score candidate comparison');
+  const { options, tokens } = provider(selectScore(before.id));
   const a = geometry(before), b = geometry(after);
   const changedPages = b.pages.flatMap((h,i) => h !== a.pages[i] ? [i+1] : []);
   const changedSystems = b.systems.flatMap((h,i) => h !== a.systems[i] ? [i+1] : []);
@@ -201,7 +221,22 @@ function persist(root: string, path: string, state: CandidateState, operation: C
 function prepareChange(state: CandidateState, request: HandIntent, root: string, timing?: HandPhaseTiming):
   { replay: true; revision: string; effects: Effects } | { replay: false; assignments: Assignment[]; effects: Effects } {
   const old = candidateScore(state);
-  if (request.base !== head(state, root)) throw new Error('stale candidate base');
+  const score = state.score ?? SEMANTIC_SCORE;
+  if (request.score !== score) throw new Error('cross-score intent');
+  if (request.base !== head(state, root, score)) throw new Error('stale candidate base');
+  if (score === SEMANTIC_SCORE) verifyBrahmsWitness(root);
+  const incoming = resolveIntent(request, old, activeAssignments(state), score);
+  if (timing) timing.resolveMs = performance.now() - timing.started;
+  const byId = new Map(activeAssignments(state).map(a => [a.id, a]));
+  for (const a of incoming) byId.set(a.id, a);
+  const assignments = [...byId.values()].sort((a,b) => a.id.localeCompare(b.id));
+  if (JSON.stringify(assignments) === JSON.stringify(activeAssignments(state)))
+    return { replay: true, revision: head(state, root, score), effects: compareCandidate(old, old, incoming, assignments) };
+  const effects = compareCandidate(old, projectCandidate(provider(score).build(), assignments), incoming, assignments);
+  if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
+  return { replay: false, assignments, effects };
+}
+function verifyBrahmsWitness(root: string) {
   const provenanceFile = 'src/scores/data/brahms-op118-no1-written-durations.provenance.json';
   if (digest(JSON.parse(readFileSync(resolve(root, provenanceFile), 'utf8'))) !== digest(provenance))
     throw new Error(`SOURCE_WITNESS: imported provenance drift at ${provenanceFile}; refuse edit until evidence is rebuilt`);
@@ -209,28 +244,21 @@ function prepareChange(state: CandidateState, request: HandIntent, root: string,
   const expected = writtenFixture.sources.find(s => s.path === 'includes/intermezzo-op118-no1-parts.ily')?.sha256;
   if (!expected || digest(readFileSync(resolve(root, pinnedFile))) !== expected)
     throw new Error(`SOURCE_WITNESS: pinned source drift at ${pinnedFile}; refuse edit until source evidence is regenerated`);
-  const incoming = resolveIntent(request, old, activeAssignments(state));
-  if (timing) timing.resolveMs = performance.now() - timing.started;
-  const byId = new Map(activeAssignments(state).map(a => [a.id, a]));
-  for (const a of incoming) byId.set(a.id, a);
-  const assignments = [...byId.values()].sort((a,b) => a.id.localeCompare(b.id));
-  if (JSON.stringify(assignments) === JSON.stringify(activeAssignments(state)))
-    return { replay: true, revision: head(state, root), effects: compareCandidate(old, old, incoming, assignments) };
-  const effects = compareCandidate(old, projectCandidate(buildBrahmsOp118No1Score(), assignments), incoming, assignments);
-  if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
-  return { replay: false, assignments, effects };
 }
 /** Explicit stale-history rollover. Preflight the guarded change before moving any bytes. */
-export function recoverHandCandidate(request: HandIntent, root = process.cwd(), path = SEMANTIC_STATE) {
+export function recoverHandCandidate(request: HandIntent, root = process.cwd(), path = SEMANTIC_STATE, score: EditableScore = SEMANTIC_SCORE) {
   const lock = resolve(root, `${path}.lock`);
   let fd: number;
   try { fd = openSync(lock, 'wx', 0o600); } catch { throw new Error('candidate writer busy; retry'); }
   try {
     const file = resolve(root, path);
-    if (!existsSync(file) || candidateHealth(root, path).state !== 'stale')
+    if (!existsSync(file) || candidateHealth(root, path, score).state !== 'stale')
       throw new Error('recover requires a stale saved candidate; no history moved');
     const original = readFileSync(file);
-    const state: CandidateState = { schema: 1, identity: modelIdentity(root), identityParts: identityParts(root), records: [] };
+    // Recovery may roll over a stale identity, never convert another score's history.
+    const savedScore = selectScore(JSON.parse(original.toString('utf8')).score ?? SEMANTIC_SCORE);
+    if (savedScore !== score) throw new Error('cross-score recovery refused; archive this score separately');
+    const state: CandidateState = { schema: 1, ...(score === BACH_SCORE ? { score } : {}), identity: modelIdentity(root, score), identityParts: identityParts(root, score), records: [] };
     const prepared = prepareChange(state, request, root);
     if (prepared.replay) throw new Error('recover requires a new candidate with changed assignments');
     const archive = `${file}.archive-${Date.now()}-${digest(original).slice(0, 16)}`;
@@ -249,12 +277,12 @@ export function recoverHandCandidate(request: HandIntent, root = process.cwd(), 
   } finally { closeSync(fd); unlinkSync(lock); }
 }
 export interface HandPhaseTiming { started: number; resolveMs: number; layoutEffectsMs: number; saveMs: number }
-export function executeHandCommand(command: { action: 'change'; request: HandIntent } | { action: 'undo'; base: string; revision: string }, root = process.cwd(), path = SEMANTIC_STATE, timing?: HandPhaseTiming) {
+export function executeHandCommand(command: { action: 'change'; request: HandIntent } | { action: 'undo'; base: string; revision: string }, root = process.cwd(), path = SEMANTIC_STATE, timing?: HandPhaseTiming, score: EditableScore = SEMANTIC_SCORE) {
   const lock = resolve(root, `${path}.lock`);
   let fd: number;
   try { fd = openSync(lock, 'wx', 0o600); } catch { throw new Error('candidate writer busy; retry'); }
   try {
-    const state = readCandidate(root, path), old = candidateScore(state);
+    const state = readCandidate(root, path, score), old = candidateScore(state);
     if (command.action === 'change') {
       const result = prepareChange(state, command.request, root, timing);
       if (result.replay) return result;
@@ -262,10 +290,10 @@ export function executeHandCommand(command: { action: 'change'; request: HandInt
       if (timing) timing.saveMs = performance.now() - timing.started - timing.resolveMs - timing.layoutEffectsMs;
       return { ...saved, replay: false };
     }
-    if (command.base !== head(state, root) || state.records.at(-1)?.revision !== command.revision) throw new Error('stale/unknown undo revision');
+    if (command.base !== head(state, root, score) || state.records.at(-1)?.revision !== command.revision) throw new Error('stale/unknown undo revision');
     const previous = state.records.length > 1 ? state.records.at(-2)!.assignments : [];
     if (timing) timing.resolveMs = performance.now() - timing.started;
-    const effects = compareCandidate(old, projectCandidate(buildBrahmsOp118No1Score(), previous), activeAssignments(state), previous);
+    const effects = compareCandidate(old, projectCandidate(provider(score).build(), previous), activeAssignments(state), previous);
     if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
     const saved = persist(root, path, state, 'undo', previous, effects);
     if (timing) timing.saveMs = performance.now() - timing.started - timing.resolveMs - timing.layoutEffectsMs;

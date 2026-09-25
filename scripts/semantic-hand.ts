@@ -2,7 +2,7 @@
 /** JSON CLI for the candidate-only hand service. No TS editing required. */
 import { performance } from 'node:perf_hooks';
 import { readFileSync } from 'node:fs';
-import { baseline, head, readCandidate, candidateHealth, executeHandCommand, recoverHandCandidate, SEMANTIC_STATE, type HandPhaseTiming } from '../src/render/janko/semantic-hand';
+import { baseline, head, readCandidate, candidateHealth, executeHandCommand, recoverHandCandidate, SEMANTIC_STATE, SEMANTIC_SCORE, selectScore, type HandPhaseTiming } from '../src/render/janko/semantic-hand';
 const [action, ...argv] = process.argv.slice(2);
 const option = (name: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : undefined; };
 const root = process.cwd();
@@ -11,21 +11,22 @@ const started = performance.now();
 async function main() {
   if (action === 'promote') throw new Error('promotion requires separate exact-candidate operator judgment and release authorization; not implemented');
   if (!['status', 'change', 'explain', 'undo', 'recover'].includes(action)) throw new Error(`unsupported command ${action}`);
-  const health = candidateHealth(root, path);
-  if (action === 'status') return { ...health, baseline: baseline(root), ...(health.state === 'current' ? { saved: readCandidate(root, path).records.length > 0, records: readCandidate(root, path).records.length } : {}) };
+  const score = selectScore(option('score') ?? SEMANTIC_SCORE);
+  const health = candidateHealth(root, path, score);
+  if (action === 'status') return { ...health, baseline: baseline(root, score), ...(health.state === 'current' ? { saved: readCandidate(root, path, score).records.length > 0, records: readCandidate(root, path, score).records.length } : {}) };
   if (health.state === 'stale' && action !== 'recover') throw new Error(`stale candidate: ${health.diagnostic}; ${health.recovery}`);
-  const state = action === 'recover' ? undefined : readCandidate(root, path);
+  const state = action === 'recover' ? undefined : readCandidate(root, path, score);
   const resolveMs = performance.now() - started;
   if (action === 'explain') {
     const record = state!.records.at(-1);
-    if (!record) return { revision: head(state!, root), saved: false, effect: 'NO_VISIBLE_EFFECT' };
+    if (!record) return { revision: head(state!, root, score), saved: false, effect: 'NO_VISIBLE_EFFECT' };
     if (option('revision') && option('revision') !== record.revision) throw new Error('stale/unknown explanation revision');
     return { revision: record.revision, operation: record.operation, ...record.effects };
   }
   const input = option('json') ? JSON.parse(readFileSync(option('json')!, 'utf8')) : JSON.parse(readFileSync(0, 'utf8'));
   const phases: HandPhaseTiming = { started: performance.now(), resolveMs: 0, layoutEffectsMs: 0, saveMs: 0 };
-  const result = action === 'recover' ? recoverHandCandidate(input, root, path) :
-    executeHandCommand(action === 'change' ? { action, request: input } : { action: 'undo', base: input.base, revision: input.revision }, root, path, phases);
+  const result = action === 'recover' ? recoverHandCandidate(input, root, path, score) :
+    executeHandCommand(action === 'change' ? { action, request: input } : { action: 'undo', base: input.base, revision: input.revision }, root, path, phases, score);
   const deriveLayoutLintMs = performance.now() - started - resolveMs;
   // Dev Vite's watcher owns publication. Poll its authoritative status endpoint;
   // a file save is never reported as a prepared, browser-ready generation.

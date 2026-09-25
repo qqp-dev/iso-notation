@@ -66,6 +66,8 @@ import {
   ROUND_47_CANDIDATES,
   ROUND_48_SHARED_TOKENS,
   ROUND_49_SHARED_TOKENS,
+  ROUND_49_METADATA,
+  ROUND_49_CANDIDATES,
 } from '../src/render/janko/candidates';
 import { createStudioConfig, renderCandidatesView, renderCompareStrip } from '../src/render/janko/studio';
 import {
@@ -268,17 +270,17 @@ function restInkOf(
 // 1. Registry discipline (one judged axis, per-candidate purity)
 // ---------------------------------------------------------------------------
 
-test('CURRENT_ROUND_METADATA is the open Round 49 (three declared axes)', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 49);
-  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
+test('parked Round 49 metadata retains its three declared axes', () => {
+  assert.equal(ROUND_49_METADATA.round, 49);
+  assert.match(ROUND_49_METADATA.title, /reference tie/i);
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
+    ROUND_49_METADATA.openAxes,
     ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
     'the above-numeral mount, the family air and the tie contour are the round axes'
   );
-  assert.equal(CURRENT_ROUND_METADATA.compareStrip, undefined, 'no shared compare strip');
+  assert.equal(ROUND_49_METADATA.compareStrip, undefined, 'no shared compare strip');
   assert.match(
-    CURRENT_ROUND_METADATA.description,
+    ROUND_49_METADATA.description,
     /LilyPond|0\.88|0\.80|above-numeral|29/,
     'the measured witnesses and the declared deltas are published'
   );
@@ -309,8 +311,8 @@ test('CURRENT_ROUND_METADATA is the open Round 49 (three declared axes)', () => 
   }
 });
 
-test('CURRENT_CANDIDATES is the Round 49 trio: one completed written-tie surface, three axes', () => {
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+test('parked Round 49 trio retains one completed written-tie surface and three axes', () => {
+  const ids = ROUND_49_CANDIDATES.map((c) => c.id);
   assert.deepEqual(
     ids,
     ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
@@ -332,9 +334,9 @@ test('CURRENT_CANDIDATES is the Round 49 trio: one completed written-tie surface
   };
   /** The round's own axes: only these keys may leave the shared set. */
   const roundKeys = new Set(['horizontalMountAir', 'tieProfile']);
-  for (const c of CURRENT_CANDIDATES) {
+  for (const c of ROUND_49_CANDIDATES) {
     assert.ok(
-      (CURRENT_ROUND_METADATA.openAxes ?? []).includes(c.axis ?? ''),
+      (ROUND_49_METADATA.openAxes ?? []).includes(c.axis ?? ''),
       `${c.id}: it badges a declared round axis`
     );
     assert.notEqual(c.kind, 'abstract', `${c.id}: score candidate`);
@@ -375,7 +377,7 @@ test('CURRENT_CANDIDATES is the Round 49 trio: one completed written-tie surface
       `${c.id}: the common literal windows, m. 68 and m. 70 included`
     );
   }
-  const [a, b, c] = CURRENT_CANDIDATES;
+  const [a, b, c] = ROUND_49_CANDIDATES;
   assert.equal(b.tokens?.horizontalMountAir, 1.0, 'card B states the 1.00pt air bound');
   assert.equal(c.options?.tieProfile, 'uniform', 'card C states the uniform contour control');
   assert.deepEqual(
@@ -412,7 +414,7 @@ test('CURRENT_CANDIDATES is the Round 49 trio: one completed written-tie surface
   ]);
   const adopted = BRAHMS_OP118_NO1_JANKO_OPTIONS as Record<string, unknown>;
   const adoptedTokens = BRAHMS_OP118_NO1_JANKO_TOKENS as Record<string, unknown>;
-  for (const c of CURRENT_CANDIDATES) {
+  for (const c of ROUND_49_CANDIDATES) {
     for (const [key, value] of Object.entries(c.options ?? {})) {
       if (candidateOnly.has(key)) continue;
       assert.ok(key in adopted, `${c.id}: the ${key} is part of the adopted treatment`);
@@ -2191,8 +2193,10 @@ test('The dialect material contains no same-column collision (the independence p
 // 17. Studio: two variants, nine windows each, no strip
 // ---------------------------------------------------------------------------
 
-test('The live studio renders the open Round 49: three readings on 21 windows', () => {
-  const html = renderCandidatesView(CONFIG);
+test('the parked Round 49 studio still renders three readings on 21 windows', () => {
+  const html = renderCandidatesView(createStudioConfig({
+    score: SCORE, candidates: ROUND_49_CANDIDATES, round: ROUND_49_METADATA,
+  }));
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
   assert.match(html, /data-candidate-count="3"/);
   assert.match(
@@ -2261,6 +2265,18 @@ test('The live studio renders the open Round 49: three readings on 21 windows', 
   );
 });
 
+
+test('the current studio renders the settled Bach m. 5–8 context without reopening the hand vote', () => {
+  const html = renderCandidatesView(CONFIG);
+  assert.equal(CURRENT_ROUND_METADATA.round, 50);
+  assert.equal(CURRENT_ROUND_METADATA.openAxes, undefined);
+  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.id), ['bach-m5-settled']);
+  assert.match(html, /data-candidate-count="1"/);
+  assert.match(html, /data-window-count="1"/);
+  assert.match(html, /data-window="primary:5-8"/);
+  assert.match(html, /operator-judged GOLD hand correction/i);
+  assert.doesNotMatch(html, /data-candidate="round49-/);
+});
 
 test('The closer-comparison strip is absent without a declared strip', () => {
   const html = renderCompareStrip(CONFIG);

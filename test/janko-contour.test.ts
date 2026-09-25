@@ -18,6 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { bachBeforeM5 } from './support/bach-before-m5';
 import {
   computeCropExtents,
   computePageGeometry,
@@ -76,10 +77,44 @@ test('linearPitch addresses middle C the note at 48, the anchor with it', () => 
 });
 
 test('Global sequences: one attack per tick per hand, top pitch, time order', () => {
+  const before = bachBeforeM5(SCORE);
+  const oldRh = contourGlobalSequence(before, 'RH');
+  const oldLh = contourGlobalSequence(before, 'LH');
+  assert.equal(oldRh.length, 303, 'historical RH corpus count');
+  assert.equal(oldLh.length, 248, 'historical LH corpus count');
+  assert.equal(oldRh.length + oldLh.length, 551, 'historical attack total');
+
+  // Operator-judged GOLD revision: exactly these two distinct m. 5 attacks move
+  // from RH to LH; MIDI track assignment does not establish performing hand.
+  const moved = [
+    { id: 'bach-var1-70', tick: 576, lin: 35 }, // B2
+    { id: 'bach-var1-71', tick: 588, lin: 33 }, // A2
+  ];
+  for (const { id, tick, lin } of moved) {
+    const oldNote = before.notes.find(n => n.id === id)!;
+    const note = SCORE.notes.find(n => n.id === id)!;
+    assert.equal(oldNote.hand, 'RH', `${id} historically RH`);
+    assert.equal(note.hand, 'LH', `${id} now LH`);
+    assert.equal(note.startTick, tick, `${id} onset`);
+    assert.equal(linearPitch(note.pitch), lin, `${id} pitch`);
+    assert.equal(note.durationTicks, 12, `${id} duration`);
+    assert.deepEqual({ ...note, hand: 'RH' }, oldNote, `${id} changes hand only`);
+    assert.deepEqual(oldRh.find(a => a.tick === tick), { tick, lin, durationTicks: 12 });
+    assert.ok(!oldLh.some(a => a.tick === tick), `${id} adds a new LH onset`);
+  }
+  const movedIds = new Set(moved.map(n => n.id));
+  assert.deepEqual(SCORE.notes.filter(n => !movedIds.has(n.id)),
+    before.notes.filter(n => !movedIds.has(n.id)), 'every other note and hand stays fixed');
+
   const rh = contourGlobalSequence(SCORE, 'RH');
   const lh = contourGlobalSequence(SCORE, 'LH');
-  assert.equal(rh.length, 303);
-  assert.equal(lh.length, 248);
+  const movedTicks = new Set(moved.map(n => n.tick));
+  assert.deepEqual(rh, oldRh.filter(a => !movedTicks.has(a.tick)), 'all other RH attacks unchanged');
+  assert.deepEqual(lh, [...oldLh, ...oldRh.filter(a => movedTicks.has(a.tick))].sort((a, b) => a.tick - b.tick),
+    'all other LH attacks unchanged');
+  assert.equal(rh.length, 301, '303 historical RH attacks minus exactly two');
+  assert.equal(lh.length, 250, '248 historical LH attacks plus exactly two');
+  assert.equal(rh.length + lh.length, 551, 'global attack total is preserved');
   for (const seq of [rh, lh]) {
     for (let i = 1; i < seq.length; i++) {
       assert.ok(seq[i].tick > seq[i - 1].tick, 'strictly time-ordered');

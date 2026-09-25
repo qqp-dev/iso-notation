@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_49_CANDIDATES, ROUND_49_METADATA } from '../src/render/janko/candidates';
+import { bachBeforeM5 } from './support/bach-before-m5';
 import { createStudioConfig, DEFAULT_STUDIO_CROPS, BRAHMS_STUDIO_CROPS } from '../src/render/janko/studio';
 import { countJankoPages, layoutJankoScore, renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
 import { resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
@@ -77,20 +78,30 @@ test('PR96 pinned-archive Reference full pages and real-engine macro windows rem
   assert.deepEqual(config.brahmsCrops,BRAHMS_STUDIO_CROPS);
   for(const id of ['primary','brahms-op118-no1'] as const){
     const entry=config.scores[id],baseline=REFERENCE[id];
-    const layouts=layoutJankoScore(entry.score,entry.options,entry.tokens);
+    // PR96 predates the operator-judged Bach GOLD correction. Restore only
+    // those two historical hands for the independent archival byte witness.
+    const score = id === 'primary' ? bachBeforeM5(entry.score) : entry.score;
+    const layouts=layoutJankoScore(score,entry.options,entry.tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    assert.deepEqual(pages.map(page=>sha(renderJankoPage(entry.score,page,entry.options,entry.tokens,layouts))),baseline.pages);
-    assert.equal(sha(renderJankoCrop(entry.score,1,4,entry.options,entry.tokens,undefined,layouts)),baseline.whole);
+    assert.deepEqual(pages.map(page=>sha(renderJankoPage(score,page,entry.options,entry.tokens,layouts))),baseline.pages);
+    assert.equal(sha(renderJankoCrop(score,1,4,entry.options,entry.tokens,undefined,layouts)),baseline.whole);
     const crops=id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS;
-    assert.deepEqual(crops.map(c=>sha(renderJankoCrop(entry.score,c.start,c.count,entry.options,entry.tokens,undefined,layouts))),baseline.crops);
+    assert.deepEqual(crops.map(c=>sha(renderJankoCrop(score,c.start,c.count,entry.options,entry.tokens,undefined,layouts))),baseline.crops);
+    if (id === 'primary') {
+      const currentLayouts = layoutJankoScore(entry.score,entry.options,entry.tokens);
+      assert.notEqual(sha(renderJankoPage(entry.score,0,entry.options,entry.tokens,currentLayouts)),baseline.pages[0],
+        'the judged m. 5 hands change the Bach first page');
+      assert.equal(sha(renderJankoPage(entry.score,1,entry.options,entry.tokens,currentLayouts)),baseline.pages[1],
+        'the unaffected Bach second page remains byte-identical');
+    }
   }
 });
 
-test('all current real-engine Candidate windows retain PR96 serialized SVG bytes', () => {
-  const config = createStudioConfig();
-  assert.equal(config.round.round, 49, 'new round requires fresh independent baseline');
-  assert.deepEqual(CURRENT_CANDIDATES.map(c=>c.id), Object.keys(BASELINE));
-  for (const candidate of CURRENT_CANDIDATES) {
+test('parked Round 49 real-engine Candidate windows retain PR96 serialized SVG bytes', () => {
+  const config = createStudioConfig({ round: ROUND_49_METADATA, candidates: ROUND_49_CANDIDATES });
+  assert.equal(config.round.round, 49);
+  assert.deepEqual(ROUND_49_CANDIDATES.map(c=>c.id), Object.keys(BASELINE));
+  for (const candidate of ROUND_49_CANDIDATES) {
     const expected = BASELINE[candidate.id as keyof typeof BASELINE];
     const windows = candidate.windows ?? [];
     assert.deepEqual(windows.map(w=>[('measureStart' in w ? w.measureStart : null),('measureCount' in w ? w.measureCount : null)]), WINDOWS);

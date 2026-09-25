@@ -122,14 +122,15 @@ import {
   renderReferenceView,
 } from '../src/render/janko/studio';
 import {
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  ROUND_49_CANDIDATES,
+  ROUND_49_METADATA,
   type JankoScoreCandidateWindow,
 } from '../src/render/janko/candidates';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
 } from './brahms-round44-reserve';
+import { bachBeforeM5 } from './support/bach-before-m5';
 
 // ---------------------------------------------------------------------------
 // Fixtures and caches
@@ -283,7 +284,9 @@ let studioConfigCache: ReturnType<typeof createStudioConfig> | undefined;
 const studioConfig = (): ReturnType<typeof createStudioConfig> =>
   (studioConfigCache ??= createStudioConfig());
 let candidatesViewCache: string | undefined;
-const candidatesView = (): string => (candidatesViewCache ??= renderCandidatesView(studioConfig()));
+const candidatesView = (): string => (candidatesViewCache ??= renderCandidatesView(createStudioConfig({
+  round: ROUND_49_METADATA, candidates: ROUND_49_CANDIDATES,
+})));
 let referenceViewCache: string | undefined;
 const referenceView = (): string => (referenceViewCache ??= renderReferenceView(studioConfig()));
 
@@ -408,16 +411,16 @@ const PAIR_GAP = 5.46;
 // ---------------------------------------------------------------------------
 
 test('Round 49 registry: three readings of one completed written-tie family', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 49, 'the open round');
-  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
+  assert.equal(ROUND_49_METADATA.round, 49, 'the parked round');
+  assert.match(ROUND_49_METADATA.title, /reference tie/i);
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
+    ROUND_49_METADATA.openAxes,
     ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
     'the Round 49 axes (every other family key is locked context)'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'the Round 49 trio, no more');
+  assert.equal(ROUND_49_CANDIDATES.length, 3, 'the Round 49 trio, no more');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_49_CANDIDATES.map((c) => c.id),
     ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
     'the Round 45–48 variants are parked on record; the live cards are the Round 49 readings'
   );
@@ -547,7 +550,7 @@ test('The landed Round 46 card IS the working Brahms Reference; the Reference vi
     );
   }
   // Every Round 49 card renders its seven declared literal windows, each labelled.
-  for (const round49Card of CURRENT_CANDIDATES) {
+  for (const round49Card of ROUND_49_CANDIDATES) {
     const start = candidates.indexOf(`data-candidate="${round49Card.id}"`);
     const end = candidates.indexOf('data-candidate="', start + 1);
     const slice = candidates.slice(start, end < 0 ? undefined : end);
@@ -1637,7 +1640,7 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   assert.equal(report.stats.systems, 18, 'and the same systems');
   // Both candidate cards report the same clean Brahms surface (the round's own
   // spacing control differs by one declared number, never by diagnostics).
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_49_CANDIDATES) {
     const brahmsReport = lintJankoScore(
       BRAHMS,
       resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, ...(card.options ?? {}) }),
@@ -1662,8 +1665,8 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
     'and its token set'
   );
 
-  // Frozen canonicals: Bach GOLD is byte-identical to the landed Round 44
-  // engine, and this round's machinery never touches it.
+  // The archival pre-correction Bach score remains byte-identical to Round 44.
+  // Current GOLD differs by the operator-judged two m. 5 hands.
   const sha = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
   const bachPages = [
     '2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f',
@@ -1671,9 +1674,9 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   ];
   for (let page = 0; page < bachPages.length; page++) {
     assert.equal(
-      sha(renderJankoPage(BACH, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
+      sha(renderJankoPage(bachBeforeM5(BACH), page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
       bachPages[page],
-      `Bach GOLD page ${page} is byte-identical to 081e5cdf0459`
+      `archival Bach page ${page} is byte-identical to 081e5cdf0459`
     );
   }
   const bach = lintJankoScore(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
