@@ -119,6 +119,8 @@ export interface JankoPreparedPluginOptions {
    * (fast fixtures). Production leaves it unset.
    */
   generate?: () => Promise<PreparedGeneration>;
+  /** Test seam for HMR publication identity; does not alter Vite's clock. */
+  publicationClock?: () => number;
 }
 
 export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = {}): Plugin {
@@ -128,6 +130,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
   let emittedReferenceIds: Record<'candidates' | 'reference', string> | null = null;
   let buildGeneration: PreparedGeneration | null = null;
   let queue: GenerationQueue | null = null;
+  let lastPublicationTimestamp = 0;
 
   /**
    * The lazy generator: loads `./generate.ts` through Vite's own pipeline at
@@ -169,6 +172,10 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
     const clientGraph = devServer.environments.client.moduleGraph;
     const targets = preparedHmrTargets(clientGraph, `\0${PREPARED_MANIFEST_ID}`);
     if (targets.length === 0) return;
+    // The browser imports accepted modules with ?t=<timestamp>. Allocate once
+    // per publication, not per owner, even if the clock stalls or rolls back.
+    const timestamp = Math.max(options.publicationClock?.() ?? Date.now(), lastPublicationTimestamp + 1);
+    lastPublicationTimestamp = timestamp;
     for (const target of targets) {
       // The actual HMR protocol: invalidate the virtual module (its transform
       // cache drops) and deliver a js-update addressed to the accept-owner —
@@ -184,7 +191,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
             type: 'js-update',
             path: target.path,
             acceptedPath: target.acceptedPath,
-            timestamp: Date.now(),
+            timestamp,
           },
         ],
       });
