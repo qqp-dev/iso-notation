@@ -31,6 +31,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
+import { bachBeforeM5 } from './support/bach-before-m5';
 
 import { wholeToneParity } from '../src/model/pitch';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
@@ -87,8 +88,8 @@ import {
 import { createStudioConfig, renderCandidatesView, renderStudioMarkup } from '../src/render/janko/studio';
 import {
   BRAHMS_STUDIO_SCORE_ID,
-  CURRENT_CANDIDATES,
-  CURRENT_ROUND_METADATA,
+  ROUND_49_CANDIDATES,
+  ROUND_49_METADATA,
   DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
   PITCH_PARITY_SPECIMEN_STUDIO_SCORE_ID,
   brahmsWindow,
@@ -584,13 +585,13 @@ test('Parked Round 44 registry: one anchored 45-degree design on the full score 
   // contour). The full Round 49 contract is pinned in test/janko-round49.test.ts;
   // the Round 48 pair and the Round 47 quartet are parked in candidates.ts and
   // pinned in their own suites. Here the history only has to point at it.
-  assert.equal(CURRENT_ROUND_METADATA.round, 49, 'the open round');
+  assert.equal(ROUND_49_METADATA.round, 49, 'the parked round');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_49_CANDIDATES.map((c) => c.id),
     ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
     'the three Round 49 readings (the Round 48 pair and Round 47 quartet are parked on record)'
   );
-  for (const card of CURRENT_CANDIDATES) {
+  for (const card of ROUND_49_CANDIDATES) {
     for (const [key, value] of Object.entries({
       pitchPlacement: 'parity-columns',
       bracketDurationGrammar: 'midpoint',
@@ -1660,7 +1661,7 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
     );
   }
 
-  // Full-page byte pins (SHA-256). Bach GOLD is pinned to the pristine
+  // Historical full-page byte pins (SHA-256). Pre-correction Bach is pinned to the pristine
   // pre-Round-44 worktree (PR #80 / d796043): untouched, byte for byte, by any
   // candidate-only or Brahms treatment work. The Brahms Reference pages are
   // re-pinned to the adopted Round 46 treatment — the operator-chosen change,
@@ -1673,7 +1674,7 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
   ];
   for (let page = 0; page < bachPages.length; page++) {
     assert.equal(
-      sha(renderJankoPage(BACH, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
+      sha(renderJankoPage(bachBeforeM5(BACH), page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
       bachPages[page],
       `Bach GOLD page ${page} is byte-identical`
     );

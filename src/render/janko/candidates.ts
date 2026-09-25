@@ -1176,21 +1176,32 @@ export const ROUND_49_CANDIDATES: JankoCandidate[] = [
   }),
 ];
 
-export const CURRENT_ROUND_METADATA: JankoCandidateRound = ROUND_49_METADATA;
+export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
+  round: 50,
+  title: 'Bach Goldberg m. 5 · operator-judged GOLD hand correction',
+  description: 'The opening m. 5 B2 and A2 at ticks 576 and 588 are settled LH by operator judgment, not by MIDI track provenance. Canonical Reference carries that reading; the real-engine Bach mm. 5–8 context shows it beside the unchanged Brahms Reference. No hand vote remains open.',
+};
 
-export const CURRENT_CANDIDATES: JankoCandidate[] = ROUND_49_CANDIDATES;
+export const CURRENT_CANDIDATES: JankoCandidate[] = [{
+  id: 'bach-m5-settled', label: 'Bach GOLD · settled LH reading',
+  description: 'Canonical Bach builder, without an option delta or an invented source-hand witness.',
+  windows: [{ scoreId: 'primary', measureStart: 5, measureCount: 4,
+    title: 'Bach mm. 5–8 · B2/A2 LH at m. 5 opening',
+    caption: 'Operator-judged GOLD correction at ticks 576/588; the surrounding measures remain canonical.' }],
+  tags: ['Bach', 'GOLD', 'settled'],
+}];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
  * not a change to the current exploratory round or Reference. */
-export function semanticHandCandidate(revision: string, windows: readonly { measureStart: number; measureCount: number; changed: boolean }[]): JankoCandidate {
+export function semanticHandCandidate(revision: string, windows: readonly { measureStart: number; measureCount: number; changed: boolean }[], scoreId = BRAHMS_STUDIO_SCORE_ID): JankoCandidate {
   if (!windows.length) throw new Error('semantic candidate has no review windows');
   return {
     id: 'semantic-hand', label: 'Semantic hand candidate',
     description: `Guarded candidate revision ${revision.slice(0, 12)} · real-engine hand assignment (not Reference)`,
-    tags: ['brahms', 'editorial', 'candidate'],
+    tags: [scoreId, 'editorial', 'candidate'],
     windows: windows.map(({ measureStart, measureCount, changed }) => {
       const last = measureStart + measureCount - 1;
-      return brahmsWindow(measureStart, measureCount, `mm. ${measureStart}–${last} · ${changed ? 'affected' : 'candidate state · unchanged in this revision'}`);
+      return { scoreId, measureStart, measureCount, title: `mm. ${measureStart}–${last} · ${changed ? 'affected' : 'candidate state · unchanged in this revision'}` };
     }),
   };
 }
@@ -1248,6 +1259,7 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_49_CANDIDATES.find((c) => c.id === id) ??
     ROUND_48_CANDIDATES.find((c) => c.id === id) ??
     ROUND_47_CANDIDATES.find((c) => c.id === id)
   );

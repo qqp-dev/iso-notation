@@ -4,30 +4,32 @@ import assert from 'node:assert/strict';
 import { placedChordBridges, chordBridgesSvg, chordBridgeAt, chordBridgeBoxAt, chordBridgeBox,
   placedClaspShell, claspShellSvg, claspShellAt, claspShellBox, claspShellBoxAt, claspGroupAt } from '../src/render/janko/connective-scene';
 import { renderChordBridges, renderChordClasp, renderClaspGroup, claspInkBox } from '../src/render/janko/elements/rhythm';
-import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA } from '../src/render/janko/candidates';
+import { ROUND_49_CANDIDATES, ROUND_49_METADATA } from '../src/render/janko/candidates';
+import { bachBeforeM5 } from './support/bach-before-m5';
 import { DEFAULT_STUDIO_CROPS, BRAHMS_STUDIO_CROPS } from '../src/render/janko/studio';
 import { resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { countJankoPages, layoutJankoScore, renderJankoCrop, renderJankoPage, renderSystem, systemPaintedInkBoxes } from '../src/render/janko/engine';
 import { buildInkScene, sceneChordBridgesSvg, sceneChordBridgeAt, sceneClaspShellAt, sceneChordBridgeBoxAt, sceneClaspShellBoxAt, requireSceneCoverage } from '../src/render/janko/ink-scene';
 
-test('current real-engine Reference, optional macros and Round 49 Candidate windows match pinned PR97 39-record manifest', () => {
+test('historical Bach Reference and parked Round 49 Candidate windows match pinned PR97 39-record manifest', () => {
   const sha=(s:string)=>createHash('sha256').update(s,'utf8').digest('hex');
-  const config=createStudioConfig();
+  const config=createStudioConfig({round: ROUND_49_METADATA, candidates: ROUND_49_CANDIDATES});
   const records:unknown[]=[];
-  records.push({kind:'metadata',pinned:'57cf8ba0fff1fa3b77877df9d83cf2ae664f0d52',round:CURRENT_ROUND_METADATA.round,
+  records.push({kind:'metadata',pinned:'57cf8ba0fff1fa3b77877df9d83cf2ae664f0d52',round:ROUND_49_METADATA.round,
     reference:{bachPages:config.pages,brahmsPages:config.brahmsPages,bachLiveCrops:config.crops,brahmsLiveCrops:config.brahmsCrops},
-    candidateOrder:CURRENT_CANDIDATES.map(c=>c.id)});
+    candidateOrder:ROUND_49_CANDIDATES.map(c=>c.id)});
   for(const id of ['primary','brahms-op118-no1'] as const){
-    const e=config.scores[id],layouts=layoutJankoScore(e.score,e.options,e.tokens);
+    const e=config.scores[id],score=id==='primary'?bachBeforeM5(e.score):e.score;
+    const layouts=layoutJankoScore(score,e.options,e.tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    for(const page of pages)records.push({kind:'reference-page',score:id,page,sha256:sha(renderJankoPage(e.score,page,e.options,e.tokens,layouts))});
-    records.push({kind:'legacy-whole-system-crop',score:id,start:1,count:4,sha256:sha(renderJankoCrop(e.score,1,4,e.options,e.tokens,undefined,layouts))});
+    for(const page of pages)records.push({kind:'reference-page',score:id,page,sha256:sha(renderJankoPage(score,page,e.options,e.tokens,layouts))});
+    records.push({kind:'legacy-whole-system-crop',score:id,start:1,count:4,sha256:sha(renderJankoCrop(score,1,4,e.options,e.tokens,undefined,layouts))});
     for(const crop of id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS)
       records.push({kind:id==='primary'?'reference-optional-crop':'reference-live-crop',score:id,start:crop.start,count:crop.count,title:crop.title,
-        sha256:sha(renderJankoCrop(e.score,crop.start,crop.count,e.options,e.tokens,undefined,layouts))});
+        sha256:sha(renderJankoCrop(score,crop.start,crop.count,e.options,e.tokens,undefined,layouts))});
   }
-  for(const c of CURRENT_CANDIDATES){
+  for(const c of ROUND_49_CANDIDATES){
     const byScore=new Map<string,ReturnType<typeof layoutJankoScore>>();
     for(const [order,w] of (c.windows??[]).entries()){
       if(!('measureStart' in w))throw Error('unexpected abstract window');

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { verifyLosslessGrid, computeOptimalGridResolution } from '../src/model/grid';
 import { parseMidiToScore } from '../src/model/midi';
@@ -117,12 +118,29 @@ test('Bach pitch regression: 0 onset-slot mismatches against the vendored Bach-G
   );
 });
 
-test('Authentic Hand Attribution Invariants: BWV 988 mm. 4 & 24 and playable hand spans', () => {
+test('Operator-judged Bach GOLD hand revision: only opening m. 5 B2/A2 change, all other score data stays fixed', () => {
+  const score = buildBachGoldbergVar1Score();
+  // An operator judgment, NOT a performing-hand inference from the MIDI lower track.
+  const changed = new Set(['bach-var1-70', 'bach-var1-71']);
+  assert.deepEqual(score.notes.filter(n => changed.has(n.id)), [
+    { id: 'bach-var1-70', pitch: { pitchClass: 11, octave: 2 }, startTick: 576, durationTicks: 12, hand: 'LH', velocity: 90 },
+    { id: 'bach-var1-71', pitch: { pitchClass: 9, octave: 2 }, startTick: 588, durationTicks: 12, hand: 'LH', velocity: 90 },
+  ]);
+  const hash = (data: unknown) => createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  assert.equal(hash(score.notes.filter(n => !changed.has(n.id))),
+    'a7298cf878ba033c882d794af321deca2b822911f88f3701024c6af8bf3a7d61',
+    'all other notes, including every other hand/voice/onset/duration/pitch, retain the pre-revision canonical data');
+  assert.equal(hash(Object.fromEntries(Object.entries(score).filter(([key]) => key !== 'notes' && key !== 'handCrossings'))),
+    '96cb01a53b011f7623a0e92a2b9a685baf83f5ec1a546aa1b17392583d907115',
+    'unrelated score metadata remains unchanged (handCrossings is derived from hands)');
+});
+
+test('Hand Attribution Invariants: BWV 988 mm. 4 & 24 and playable hand spans', () => {
   const score = buildBachGoldbergVar1Score();
 
-  // In Measure 4:
-  // Ticks 504, 516, 528, 540, 564, 576, 588 (the 7 sixteenth notes: A3, G3, F#3, A3, C3, B2, A2) must have hand === 'RH'.
-  const m4RhSixteenthTicks = [504, 516, 528, 540, 564, 576, 588];
+  // In Measure 4 (ticks 432–575), the A3, G3, F#3, A3, C3 sixteenths remain RH.
+  // Ticks 576 and 588 start Measure 5 and are pinned separately as LH above.
+  const m4RhSixteenthTicks = [504, 516, 528, 540, 564];
   for (const tick of m4RhSixteenthTicks) {
     const rhNotes = score.notes.filter((n) => n.startTick === tick && n.durationTicks === 12);
     assert.equal(rhNotes.length, 1, `Expected 1 sixteenth note at tick ${tick}`);

@@ -35,7 +35,8 @@ import { resolve } from 'node:path';
 import { createStudioConfig, renderCandidatesView, renderReferenceView, type StaticCandidateMarkup, JankoStudioConfig } from '../studio';
 import { lintJankoScore } from '../linter';
 import { fingerprintInputs, snapshotKey, type PreparedGeneration, type PreparedInputSnapshot, type PreparedStatus } from './seam';
-import { readCandidate, candidateScore, head, candidateHealth, SEMANTIC_STATE } from '../semantic-hand';
+import { readCandidate, candidateScore, head, candidateHealth, selectScore, SEMANTIC_STATE, SEMANTIC_SCORE, type EditableScore } from '../semantic-hand';
+import { existsSync, readFileSync } from 'node:fs';
 
 export type { PreparedArtifactKey, PreparedGeneration, PreparedStatus } from './seam';
 export function staticInputKey(snapshot: PreparedInputSnapshot, stateFile: string): string {
@@ -62,10 +63,18 @@ export function generatePreparedStudio(
   cache?: PreparedStaticCache
 ): PreparedGeneration {
   const started = performance.now();
-  const health = candidateRoot ? candidateHealth(candidateRoot, candidatePath) : undefined;
-  const state = candidateRoot && health?.state === 'current' ? readCandidate(candidateRoot, candidatePath) : undefined;
+  // Legacy untagged state belongs to Brahms. A tagged state selects its own provider;
+  // unknown tags fail closed as stale diagnostics rather than being retargeted.
+  let selected: EditableScore = SEMANTIC_SCORE;
+  let selectionError: string | undefined;
+  if (candidateRoot && existsSync(resolve(candidateRoot, candidatePath))) {
+    try { selected = selectScore(JSON.parse(readFileSync(resolve(candidateRoot, candidatePath), 'utf8')).score ?? SEMANTIC_SCORE); }
+    catch (error) { selectionError = String(error); }
+  }
+  const health = candidateRoot && !selectionError ? candidateHealth(candidateRoot, candidatePath, selected) : undefined;
+  const state = candidateRoot && health?.state === 'current' ? readCandidate(candidateRoot, candidatePath, selected) : undefined;
   const semanticCandidate = state?.records.length ? { score: candidateScore(state), revision: head(state, candidateRoot), reviewWindows: state.records.at(-1)!.effects.reviewWindows } : undefined;
-  const semanticCandidateError = health?.state === 'stale' ? health.diagnostic : undefined;
+  const semanticCandidateError = selectionError ?? (health?.state === 'stale' ? health.diagnostic : undefined);
   const config = createStudioConfig({ ...overrides, ...(semanticCandidate ? { semanticCandidate } : {}), ...(semanticCandidateError ? { semanticCandidateError } : {}) });
   // The full watched content snapshot (including font binaries) is the
   // dependency identity. Exclude ONLY the ignored semantic state: its output

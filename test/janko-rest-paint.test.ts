@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { bachBeforeM5 } from './support/bach-before-m5';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../src/scores/brahms-op118-no1';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, JANKO_REST_STYLES, resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
 import { countJankoPages, layoutJankoScore, renderJankoCrop, renderJankoPage, renderSystem, systemPaintedInkBoxes } from '../src/render/janko/engine';
@@ -109,9 +110,9 @@ const originalPages = {
   bach: ['2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f','dbfb83dcf008782d34e5260548c706d0cb980689eac58b24c7d0e7ae1e828757'],
   brahms: ['7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90','a84166821d569d8c080b1ff98f97664d0f1d6132b7002026ea6cd66e32b85cfa','78b3fd134d5f3b4bf4269619759149a34aa9c8c95f540fcc72fe12f9495a2897','40c43f6aed8a4b4554d2e0c8c7c9d62a468dccb3766f2da15ba66d7f7fa984fd','d2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5'],
 };
-test('Bach GOLD and Brahms BRONZE pages and cropped system remain byte-identical to PR91', () => {
+test('archival Bach hands and Brahms BRONZE pages and cropped system remain byte-identical to PR91', () => {
   for(const [name,score,options,tokens,crop] of [
-    ['bach',buildBachGoldbergVar1Score(),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,'c97fef4cea414bec819a96e1be9c0245f9230dec5fba0738dcfcb7cd5e021d61'],
+    ['bach',bachBeforeM5(buildBachGoldbergVar1Score()),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,'c97fef4cea414bec819a96e1be9c0245f9230dec5fba0738dcfcb7cd5e021d61'],
     ['brahms',brahms,BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS,'9e5d4d45e52bb7e834b7b55ec23041914f8a02a5cf844304a654c78d95d82076'],
   ] as const) {
     assert.equal(countJankoPages(score,options,tokens),originalPages[name].length);

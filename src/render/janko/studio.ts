@@ -235,7 +235,7 @@ export interface JankoStudioConfig {
    * primary entry is always present under `DEFAULT_STUDIO_SCORE_ID`.
    */
   scores: Record<string, StudioScore>;
-  /** Candidate-only Brahms projection; Reference always uses the canonical score. */
+  /** Candidate-only registered-score projection; Reference always uses the canonical score. */
   semanticCandidate?: { score: QuantizedGridScore; revision: string; reviewWindows: import('./semantic-hand').ReviewWindow[] };
   /** Stale saved candidate is refused; render an explicit diagnostic, never a projected card. */
   semanticCandidateError?: string;
@@ -255,6 +255,7 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
   );
   const scores: Record<string, StudioScore> = {
     [DEFAULT_STUDIO_SCORE_ID]: { id: DEFAULT_STUDIO_SCORE_ID, score, options, tokens },
+    [score.id]: { id: score.id, score, options, tokens },
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: buildBrahmsOp118No1Score(),
@@ -537,7 +538,7 @@ export interface StaticCandidateMarkup { cards: string[]; compareStrip: string }
 export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig(), reuse?: StaticCandidateMarkup, capture?: (markup: StaticCandidateMarkup) => void): string {
   const { round, scores } = config;
   const candidates: JankoCandidate[] = config.semanticCandidate
-    ? [...config.candidates, semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows)] : config.candidates;
+    ? [...config.candidates, semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows, config.semanticCandidate.score.id)] : config.candidates;
 
   // Compute once per distinct score/options/tokens configuration per candidate per render.
   // Candidate configurations remain separate from each other and from the reference view.
@@ -637,7 +638,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const panels = resolved.windows.map((w) => {
       const window = w as JankoScoreCandidateWindow;
       const original = scores[window.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
-      const entry = candidate.id === 'semantic-hand' && original.id === BRAHMS_STUDIO_SCORE_ID && config.semanticCandidate
+      const entry = candidate.id === 'semantic-hand' && original.score.id === config.semanticCandidate?.score.id && config.semanticCandidate
         ? { ...original, score: config.semanticCandidate.score } : original;
       const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
       const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });

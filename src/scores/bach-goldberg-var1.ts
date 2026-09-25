@@ -106,8 +106,9 @@ export function buildBachGoldbergVar1Score(): QuantizedGridScore {
     createNote(9, 3, 540, 12, 'RH', 90),
     createNote(2, 3, 552, 24, 'LH', 90),
     createNote(0, 3, 564, 12, 'RH', 90),
-    createNote(11, 2, 576, 12, 'RH', 90),
-    createNote(9, 2, 588, 12, 'RH', 90),
+    // Operator-judged GOLD hand revision; MIDI track is not performing-hand evidence.
+    createNote(11, 2, 576, 12, 'LH', 90),
+    createNote(9, 2, 588, 12, 'LH', 90),
     createNote(11, 2, 600, 36, 'LH', 90),
     createNote(2, 5, 600, 12, 'RH', 90),
     createNote(0, 5, 612, 12, 'RH', 90),

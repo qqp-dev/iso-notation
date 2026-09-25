@@ -36,6 +36,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
+import { bachBeforeM5 } from './support/bach-before-m5';
 import { readFileSync } from 'node:fs';
 
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
@@ -178,13 +179,14 @@ test('A. The three new keys default to the incumbent behaviour', () => {
 
 test('A. Bach GOLD and the Brahms Reference are byte-identical', () => {
   let bach = '';
-  for (let page = 0; page < countJankoPages(BACH, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); page++) {
-    bach += renderJankoPage(BACH, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const archivalBach = bachBeforeM5(BACH);
+  for (let page = 0; page < countJankoPages(archivalBach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); page++) {
+    bach += renderJankoPage(archivalBach, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
   }
   assert.equal(
     sha(bach),
     'ccfcaecca058aa1ed7d37291d765a8ef58ed79e428c732f338f298fb5b7a104f',
-    'Bach GOLD is unchanged'
+    'the historical Bach witness is unchanged before the judged m. 5 correction'
   );
   assert.equal(sha(renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS)), REFERENCE_PAGE0, 'Brahms page 0');
   assert.equal(sha(renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS)), REFERENCE_CROP, 'the whole-score crop');

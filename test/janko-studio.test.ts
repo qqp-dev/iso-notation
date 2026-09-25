@@ -42,6 +42,8 @@ import { lintJankoScore } from '../src/render/janko/linter';
 import {
   CURRENT_CANDIDATES,
   CURRENT_ROUND_METADATA,
+  ROUND_49_CANDIDATES,
+  ROUND_49_METADATA,
   candidateBadges,
   resolveCandidate,
 } from '../src/render/janko/candidates';
@@ -73,11 +75,6 @@ const SCORE = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
 const SPECIMEN = buildChordDurationSpecimenScore();
 const CONFIG = createStudioConfig({ score: SCORE });
-assert.equal(
-  CURRENT_CANDIDATES.length,
-  3,
-  'Round 49 open: the three real-engine readings of the completed written-tie surface'
-);
 
 /** The studio HTML-escapes labels and rationales before printing them. */
 function esc(text: string): string {
@@ -139,21 +136,21 @@ test('renderCandidatesView renders every scheme card on every declared window', 
       `${candidate.id} renders all its declared windows and no others`
     );
   }
-  assert.match(html, /Round 49/);
-  assert.match(html, /reference tie/i);
+  assert.match(html, new RegExp(`Round ${CURRENT_ROUND_METADATA.round}`));
+  assert.ok(html.includes(esc(CURRENT_ROUND_METADATA.title)));
 });
 
-test('Round 49 open: three readings, three axes, twenty-one windows', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 49);
-  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
+test('parked Round 49 retains three readings, three axes, twenty-one windows', () => {
+  assert.equal(ROUND_49_METADATA.round, 49);
+  assert.match(ROUND_49_METADATA.title, /reference tie/i);
   assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
+    ROUND_49_METADATA.openAxes,
     ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
     'the above-numeral mount, the family air and the tie contour'
   );
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards');
+  assert.equal(ROUND_49_CANDIDATES.length, 3, 'three parked cards');
   assert.deepEqual(
-    CURRENT_CANDIDATES.map((c) => c.id),
+    ROUND_49_CANDIDATES.map((c) => c.id),
     ['round49-above-080', 'round49-air-100', 'round49-uniform-080'],
     'the above-numeral reading, the air bound and the contour control'
   );
@@ -187,8 +184,10 @@ test('Round 49 open: three readings, three axes, twenty-one windows', () => {
   );
 });
 
-test('The open studio renders the three readings on their twenty-one declared windows', () => {
-  const html = renderCandidatesView(CONFIG);
+test('parked Round 49 studio renders its three readings on twenty-one declared windows', () => {
+  const html = renderCandidatesView(createStudioConfig({
+    score: SCORE, round: ROUND_49_METADATA, candidates: ROUND_49_CANDIDATES,
+  }));
 
   assert.equal((html.match(/data-candidate="/g) ?? []).length, 3, 'three cards');
   assert.equal(
@@ -205,7 +204,7 @@ test('The open studio renders the three readings on their twenty-one declared wi
   // corrections (the traced tie, the detached mount, the inheritance rule, the
   // flat face, the 95 % scale and the written ties) ride as deltas too.
   const badgeKeys = new Set(
-    CURRENT_CANDIDATES.flatMap((c) => candidateBadges(c).map((b) => b.key))
+    ROUND_49_CANDIDATES.flatMap((c) => candidateBadges(c, ROUND_49_METADATA).map((b) => b.key))
   );
   for (const key of [
     'standaloneLongMount',
@@ -221,10 +220,13 @@ test('The open studio renders the three readings on their twenty-one declared wi
   for (const id of ['round49-above-080', 'round49-air-100', 'round49-uniform-080']) {
     const card = html.slice(html.indexOf(`data-candidate="${id}"`));
     const body = card.slice(0, card.indexOf('</article>'));
-    assert.ok(body.includes('<b>tieProfile</b>'), `${id}: the shared traced tie is badged`);
     assert.ok(body.includes('<b>exceptionCarrier</b>'), `${id}: the detached mount is badged`);
-    const axis = CURRENT_CANDIDATES.find((c) => c.id === id)!.axis!;
-    assert.ok(body.includes(`<b>${axis}</b>`), `${id}: its own axis is badged`);
+    const candidate = ROUND_49_CANDIDATES.find((c) => c.id === id)!;
+    const declared = candidateBadges(candidate, ROUND_49_METADATA).map(b => b.key);
+    assert.ok(declared.includes(candidate.axis!), `${id}: its declared axis remains in the parked registry`);
+    if (candidate.options?.tieProfile !== 'uniform') {
+      assert.ok(body.includes('<b>tieProfile</b>'), `${id}: traced contour is badged`);
+    }
   }
 });
 
@@ -555,16 +557,14 @@ test('renderStatusLine reports live lint statistics', () => {
   assert.match(line, /rendered live at 12:34:56Z/);
 });
 
-test('Round metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 49);
-  assert.match(CURRENT_ROUND_METADATA.title, /reference tie/i);
-  assert.ok(CURRENT_ROUND_METADATA.description.length > 0);
-  assert.deepEqual(
-    CURRENT_ROUND_METADATA.openAxes,
-    ['standaloneLongMount', 'horizontalMountAir', 'tieProfile'],
-    'the round axes'
-  );
-  assert.equal(CURRENT_CANDIDATES.length, 3, 'three cards in the open round');
+test('settled Bach metadata is exported and drives the view headline', () => {
+  assert.equal(CURRENT_ROUND_METADATA.round, 50);
+  assert.match(CURRENT_ROUND_METADATA.title, /Bach|Goldberg/i);
+  assert.match(CURRENT_ROUND_METADATA.description, /LH|left hand/i);
+  assert.equal(CURRENT_ROUND_METADATA.openAxes, undefined, 'no unsettled hand vote');
+  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.id), ['bach-m5-settled']);
+  assert.deepEqual(CURRENT_CANDIDATES[0].windows?.map(w => 'measureStart' in w &&
+    [w.scoreId, w.measureStart, w.measureCount]), [['primary', 5, 4]]);
   const ids = CURRENT_CANDIDATES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
   // The registry drives the rendered headline, never a hardcoded template string.
