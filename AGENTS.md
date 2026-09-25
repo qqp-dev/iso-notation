@@ -93,12 +93,13 @@ Headless implementers must not render images to see a defect. Run the mathematic
 - Checks: knockout protection (glyph fits the mask; nothing painted after a knockout may cut through it), notehead-disc clearance (2r), barline clearance, stem attachment and beam-stem connection, beam slope ≤ 0.25, measure-numeral and accolade clearances, Middle C corridor integrity.
 - CLI: `npm run lint:engraving` (add `--json`, `--strict`, `--quiet`). Exit code 1 on violations; `--strict` also fails on warnings.
 - The canonical Bach score with `DEFAULT_JANKO_OPTIONS` must report **zero violations**. Any new defect class gets a matching assertion in `test/janko-linter.test.ts`.
-- `npm test` covers unit tests, engraving invariants, the visual linter and the studio architecture in **under 1 second**; run it before every hand-off. `npm run build` must stay clean.
+- `npm test` covers unit tests, engraving invariants, the visual linter and the studio architecture in **under 1 second**. `npm run build` must stay clean. Full regression, genuine strict engraving lint and build are mandatory pre-landing engineering gates, not requirements after every candidate engraving edit.
 - **Canonical Validation Commands ONLY (No Unconfigured Linters / No Scope Creep)**:
-  - Implementers MUST validate code using ONLY the official test commands:
-    - `npm test`
-    - `npm run lint:engraving --strict`
-    - `npm run build`
+  - Implementers MUST validate code using ONLY these commands:
+    - `npm test` (full pre-landing regression)
+    - `npm run lint:engraving -- --strict` (full pre-landing strict lint)
+    - `npm run build` (full pre-landing build)
+    - Workflow-managed selected-file `node --import tsx --test <validated test/*.test.ts>` under the committed `.architect/test-runner.json` profile (focused development only; the workflow validates the file, not an agent-supplied command or a substitute for pre-landing gates)
   - **NEVER** run ad-hoc or unconfigured compiler flags (e.g. `tsc --noEmit --noUnusedLocals --noUnusedParameters`) that are not enabled in `tsconfig.json` or `package.json`.
   - **NEVER** embark on rabbit holes attempting to fix pre-existing unused parameters, dead code, or refactor functions outside the ticket's explicit scope. Keep diffs strictly minimal and bounded to the ticket requirements.
 
