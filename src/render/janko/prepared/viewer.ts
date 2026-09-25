@@ -37,6 +37,7 @@ import {
 } from '../studio-session';
 
 import prepared from 'virtual:janko-prepared-manifest';
+import { observeCandidateFrame } from './observation';
 import type { PreparedManifest } from './status';
 import {
   applyZoom,
@@ -166,6 +167,7 @@ function mountOnce(manifest: PreparedManifest): void {
   });
   activeApplier = applier;
   const currentView = (): string => session.state.view;
+  const observe = (): void => observeCandidateFrame(root, document, window);
 
   // Every handler this mount installs is tracked for detach — including the
   // long-lived shell elements (tabs, zoom buttons): a re-mount must never
@@ -186,6 +188,7 @@ function mountOnce(manifest: PreparedManifest): void {
           if (typeof window !== 'undefined') window.location.hash = view;
         },
       });
+      observe();
     });
   }
   showView(root, session.state.view);
@@ -246,6 +249,7 @@ function mountOnce(manifest: PreparedManifest): void {
   };
   const visibilitychange = (): void => {
     if (document.visibilityState === 'hidden') pagehide();
+    observe();
   };
   const gesture = (): void => {
     session.cancelRestore();
@@ -260,6 +264,7 @@ function mountOnce(manifest: PreparedManifest): void {
         view: viewFromHash(session.state.view),
         afterLayout: afterLayoutReady,
       });
+      observe();
     });
     window.addEventListener('pointerdown', gesture, { passive: true });
     window.addEventListener('touchstart', gesture, { passive: true });
@@ -291,9 +296,12 @@ function mountOnce(manifest: PreparedManifest): void {
   // Apply the manifest generation; the applier re-shows the session view on
   // the fresh panels before resolving, so the place restore below always runs
   // against laid-out content (never a blank, collapsed studio).
-  void applier.apply(manifest, currentView).then(() => {
+  void applier.apply(manifest, currentView).then((outcome) => {
+    if (activeApplier !== applier || outcome === 'dropped') return;
     applyZoom(dom, session.state.zoom);
     session.restorePlace(afterLayoutReady);
+    if (outcome === 'applied') afterLayoutReady(observe);
+    else observe();
   });
 }
 
@@ -316,10 +324,14 @@ function bootstrap(): void {
       if (!mod) return;
       const root = document.getElementById(ROOT_ID);
       if (!root || !activeApplier) return;
+      root.dataset.preparedHmrEpochMs = String(Date.now());
       void activeApplier
         .apply((mod as unknown as { default: PreparedManifest }).default, () => activeSession?.state.view ?? 'candidates')
-        .then(() => {
+        .then((outcome) => {
+          if (outcome === 'dropped') return;
           activeSession?.restorePlace(afterLayoutReady);
+          if (outcome === 'applied') afterLayoutReady(() => observeCandidateFrame(root, document, window));
+          else observeCandidateFrame(root, document, window);
         });
     });
   }

@@ -401,6 +401,54 @@ test('out-of-order artifact responses are dropped; the latest generation stays a
   assert.equal(root.dataset.preparedApply, '1', 'a dropped response is not an applied generation');
 });
 
+test('candidate observation identity follows the applied artifact, not the latest requested manifest', async () => {
+  const studio = makeStudio();
+  let releaseSlow!: () => void;
+  const slow = new Promise<void>((resolve) => { releaseSlow = resolve; });
+  const applier = createPreparedApplier({
+    root: studio.asRoot(), status: studio.asStatus(),
+    fetchText: fetchTextFor({ hold: (url) => url.includes(':slow:') ? slow : Promise.resolve() }),
+  });
+  const view = () => 'candidates';
+  const first = manifest('one', { candidateRevision: 'saved-one' });
+  assert.equal(await applier.apply(first, view), 'applied');
+  // These DOM facts are inspectable by an isolated browser observer. An
+  // applied generation alone is not evidence that its candidate is visible.
+  assert.equal(studio.root.dataset.preparedGeneration, first.generation);
+  assert.equal(studio.root.dataset.preparedCandidateRevision, 'saved-one');
+  assert.equal(studio.root.dataset.preparedCandidatesHash, first.artifactHashes.candidates);
+
+  const pending = manifest('slow', { candidateRevision: 'saved-slow' });
+  const obsolete = applier.apply(pending, view);
+  assert.notEqual(studio.root.dataset.preparedState, 'ready');
+  const latest = manifest('two', { candidateRevision: 'saved-two' });
+  assert.equal(await applier.apply(latest, view), 'applied');
+  releaseSlow();
+  assert.equal(await obsolete, 'dropped');
+  assert.equal(studio.root.dataset.preparedGeneration, latest.generation);
+  assert.equal(studio.root.dataset.preparedCandidateRevision, 'saved-two');
+  assert.equal(studio.root.dataset.preparedCandidatesHash, latest.artifactHashes.candidates);
+  assert.match(studio.root.innerHTML, /two:candidates/);
+});
+
+test('failed, stale and candidate-free generations cannot masquerade as a new candidate observation', async () => {
+  const studio = makeStudio();
+  const applier = createPreparedApplier({ root: studio.asRoot(), status: studio.asStatus(), fetchText: fetchTextFor() });
+  const view = () => 'candidates';
+  const good = manifest('good', { candidateRevision: 'saved-good' });
+  assert.equal(await applier.apply(good, view), 'applied');
+  assert.equal(studio.root.dataset.preparedCandidateRevision, 'saved-good');
+  assert.equal(await applier.apply(manifest('bad', { error: 'broken', candidateRevision: 'saved-bad' }), view), 'stale-kept');
+  assert.notEqual(studio.root.dataset.preparedState, 'ready');
+  assert.notEqual(studio.root.dataset.preparedCandidateRevision, 'saved-bad');
+  assert.equal(await applier.apply(manifest('stale', { stale: true, candidateRevision: 'saved-stale' }), view), 'applied');
+  assert.notEqual(studio.root.dataset.preparedState, 'ready');
+  // The identity of stale bytes may be recorded, but is not a current preview.
+  assert.equal(await applier.apply(manifest('plain'), view), 'applied');
+  assert.equal(studio.root.dataset.preparedState, 'ready');
+  assert.ok(!studio.root.dataset.preparedCandidateRevision, 'no prior candidate revision survives a candidate-free apply');
+});
+
 test('a re-apply preserves the selected tab and the zoom', async () => {
   const studio = makeStudio();
   const root = studio.root;

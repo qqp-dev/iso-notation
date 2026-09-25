@@ -1,5 +1,6 @@
 /** Guarded, candidate-only semantic hand editing. No canonical score or source writes. */
 import { createHash } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../../scores/brahms-op118-no1';
@@ -197,7 +198,7 @@ function persist(root: string, path: string, state: CandidateState, operation: C
   finally { if (existsSync(temp)) unlinkSync(temp); }
   return { revision, effects };
 }
-function prepareChange(state: CandidateState, request: HandIntent, root: string):
+function prepareChange(state: CandidateState, request: HandIntent, root: string, timing?: HandPhaseTiming):
   { replay: true; revision: string; effects: Effects } | { replay: false; assignments: Assignment[]; effects: Effects } {
   const old = candidateScore(state);
   if (request.base !== head(state, root)) throw new Error('stale candidate base');
@@ -209,12 +210,14 @@ function prepareChange(state: CandidateState, request: HandIntent, root: string)
   if (!expected || digest(readFileSync(resolve(root, pinnedFile))) !== expected)
     throw new Error(`SOURCE_WITNESS: pinned source drift at ${pinnedFile}; refuse edit until source evidence is regenerated`);
   const incoming = resolveIntent(request, old, activeAssignments(state));
+  if (timing) timing.resolveMs = performance.now() - timing.started;
   const byId = new Map(activeAssignments(state).map(a => [a.id, a]));
   for (const a of incoming) byId.set(a.id, a);
   const assignments = [...byId.values()].sort((a,b) => a.id.localeCompare(b.id));
   if (JSON.stringify(assignments) === JSON.stringify(activeAssignments(state)))
     return { replay: true, revision: head(state, root), effects: compareCandidate(old, old, incoming, assignments) };
   const effects = compareCandidate(old, projectCandidate(buildBrahmsOp118No1Score(), assignments), incoming, assignments);
+  if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
   return { replay: false, assignments, effects };
 }
 /** Explicit stale-history rollover. Preflight the guarded change before moving any bytes. */
@@ -245,20 +248,27 @@ export function recoverHandCandidate(request: HandIntent, root = process.cwd(), 
     }
   } finally { closeSync(fd); unlinkSync(lock); }
 }
-export function executeHandCommand(command: { action: 'change'; request: HandIntent } | { action: 'undo'; base: string; revision: string }, root = process.cwd(), path = SEMANTIC_STATE) {
+export interface HandPhaseTiming { started: number; resolveMs: number; layoutEffectsMs: number; saveMs: number }
+export function executeHandCommand(command: { action: 'change'; request: HandIntent } | { action: 'undo'; base: string; revision: string }, root = process.cwd(), path = SEMANTIC_STATE, timing?: HandPhaseTiming) {
   const lock = resolve(root, `${path}.lock`);
   let fd: number;
   try { fd = openSync(lock, 'wx', 0o600); } catch { throw new Error('candidate writer busy; retry'); }
   try {
     const state = readCandidate(root, path), old = candidateScore(state);
     if (command.action === 'change') {
-      const result = prepareChange(state, command.request, root);
+      const result = prepareChange(state, command.request, root, timing);
       if (result.replay) return result;
-      return { ...persist(root, path, state, 'change', result.assignments, result.effects, command.request.reason), replay: false };
+      const saved = persist(root, path, state, 'change', result.assignments, result.effects, command.request.reason);
+      if (timing) timing.saveMs = performance.now() - timing.started - timing.resolveMs - timing.layoutEffectsMs;
+      return { ...saved, replay: false };
     }
     if (command.base !== head(state, root) || state.records.at(-1)?.revision !== command.revision) throw new Error('stale/unknown undo revision');
     const previous = state.records.length > 1 ? state.records.at(-2)!.assignments : [];
+    if (timing) timing.resolveMs = performance.now() - timing.started;
     const effects = compareCandidate(old, projectCandidate(buildBrahmsOp118No1Score(), previous), activeAssignments(state), previous);
-    return { ...persist(root, path, state, 'undo', previous, effects), replay: false };
+    if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
+    const saved = persist(root, path, state, 'undo', previous, effects);
+    if (timing) timing.saveMs = performance.now() - timing.started - timing.resolveMs - timing.layoutEffectsMs;
+    return { ...saved, replay: false };
   } finally { closeSync(fd); unlinkSync(lock); }
 }

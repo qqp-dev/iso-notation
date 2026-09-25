@@ -150,7 +150,7 @@ export function createPreparedApplier(args: {
   // generation and the apply counter live on the root element, so the
   // stale/error semantics and the browser harness's cycle marker stay honest.
   let applied: string | null = root.dataset.preparedGeneration ?? null;
-  let latest: string | null = null;
+  let serial = 0;
   let count = Number(root.dataset.preparedApply ?? '0') || 0;
 
   return {
@@ -158,7 +158,10 @@ export function createPreparedApplier(args: {
     appliedCount: () => count,
 
     async apply(manifest, view): Promise<ApplyOutcome> {
-      latest = manifest.generation;
+      const token = ++serial;
+      // Any pending/failing generation invalidates a prior frame marker, even
+      // while the last coherent panels are still displayed.
+      root.dataset.preparedObservation = JSON.stringify({ state: 'unobserved', reason: 'manifest-requested' });
       if (status) {
         status.textContent = renderPreparedStatus(manifest);
         status.dataset.live = 'false';
@@ -181,6 +184,7 @@ export function createPreparedApplier(args: {
         return 'error-shown';
       }
       root.dataset.preparedState = manifest.stale && applied !== null ? 'refreshing' : 'loading';
+      const fetchStart = performance.now();
       const generationToken = manifest.generation;
       let candidates: string;
       let reference: string;
@@ -190,6 +194,7 @@ export function createPreparedApplier(args: {
           fetchText('reference', manifest.artifacts.reference),
         ]);
       } catch (error) {
+        if (token !== serial) return 'dropped';
         // A malformed or missing artifact is explicit, never a blank panel —
         // and the last-good output stays if one was applied.
         const message = error instanceof Error ? error.message : String(error);
@@ -205,9 +210,16 @@ export function createPreparedApplier(args: {
         return applied !== null ? 'artifact-failed-kept' : 'artifact-failed-shown';
       }
       // Out-of-order guard: a response for a superseded generation is dropped.
-      if (generationToken !== latest) return 'dropped';
+      if (token !== serial) return 'dropped';
+      root.dataset.preparedFetchMs = (performance.now() - fetchStart).toFixed(1);
+      root.dataset.preparedAppliedEpochMs = String(Date.now());
       applied = generationToken;
       root.dataset.preparedGeneration = generationToken;
+      // Identities describe the bytes actually swapped, never an in-flight or
+      // failed manifest. A candidate-free apply must clear an older identity.
+      if (manifest.candidateRevision) root.dataset.preparedCandidateRevision = manifest.candidateRevision;
+      else delete root.dataset.preparedCandidateRevision;
+      root.dataset.preparedCandidatesHash = manifest.artifactHashes.candidates;
       count += 1;
       root.dataset.preparedApply = String(count);
       root.innerHTML = `${candidates}\n${reference}`;

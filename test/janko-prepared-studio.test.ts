@@ -269,12 +269,12 @@ test('the fingerprint changes when an input changes and its key is stable', () =
   assert.notEqual(snapshotKey({ entries: mutatedEntries }), key, 'a changed input moves the snapshot key');
 });
 
-test('the viewer imports no engraving module — only the session logic, the DOM layer and the manifest', async () => {
+test('the thin viewer and its observer import no engraving module', async () => {
   const source = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer.ts`, 'utf8');
   const imports = [...source.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
   assert.deepEqual(
     [...imports].sort(),
-    ['../studio-session', './status', './viewer-dom', 'virtual:janko-prepared-manifest'],
+    ['../studio-session', './observation', './status', './viewer-dom', 'virtual:janko-prepared-manifest'],
     'the browser bundle carries no engine, linter or score builder'
   );
   const domSource = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer-dom.ts`, 'utf8');
@@ -284,9 +284,13 @@ test('the viewer imports no engraving module — only the session logic, the DOM
     ['../studio-session', './status'],
     'the DOM application layer is pure: session types and the status line only'
   );
+  const observerSource = readFileSync(`${projectRoot}/src/render/janko/prepared/observation.ts`, 'utf8');
+  const observerImports = [...observerSource.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
+  assert.deepEqual(observerImports, ['./viewer-dom'], 'the observer uses only the prepared DOM layer');
   for (const forbidden of ['../engine', '../linter', '../../scores', 'buildBachGoldberg', 'lintJankoScore', 'renderReferenceView', 'renderCandidatesView']) {
     assert.ok(!source.includes(forbidden), `the viewer must not reference ${forbidden}`);
     assert.ok(!domSource.includes(forbidden), `the DOM layer must not reference ${forbidden}`);
+    assert.ok(!observerSource.includes(forbidden), `the observer must not reference ${forbidden}`);
   }
   assert.ok(!domSource.includes('virtual:janko-prepared-manifest'), 'the DOM layer stays free of the virtual seam (testable without a dev server)');
   // The actual HMR contract: the viewer accepts the manifest module by id —
