@@ -69,6 +69,26 @@ export function applyZoom(dom: StudioDom, zoom: number): void {
  * stale collection would toggle dead markup while both live panels stay
  * hidden.
  */
+export function foldPreparedDetails(root: HTMLElement): void {
+  // Prepared artifacts are immutable/fingerprinted. Decorate only the freshly
+  // injected DOM, so the same rules apply after every HMR swap without changing
+  // the engraving or losing any of its provenance and diagnostic text.
+  for (const diagnostic of root.querySelectorAll<HTMLDetailsElement>('details.diagnostics')) diagnostic.open = false;
+  for (const card of root.querySelectorAll<HTMLElement>('.round-card, .golden-card, .candidate-card')) {
+    if (card.matches('[role="alert"]') || card.querySelector(':scope > details.studio-extra')) continue;
+    const extras = Array.from(card.children).filter((node) => card.matches('.golden-card')
+      ? node.matches('p:not(.round-meta), .badges')
+      : node.matches('.round-meta, .badges, .rationale'));
+    if (!extras.length) continue;
+    const details = card.ownerDocument.createElement('details');
+    details.className = 'studio-extra';
+    const summary = card.ownerDocument.createElement('summary');
+    summary.textContent = 'Context & options';
+    card.insertBefore(details, extras[0]);
+    details.append(summary, ...extras);
+  }
+}
+
 export function showView(root: HTMLElement, view: string): void {
   const doc = root.ownerDocument;
   for (const panel of Array.from(root.querySelectorAll<HTMLElement>('.view-panel'))) {
@@ -225,6 +245,7 @@ export function createPreparedApplier(args: {
       count += 1;
       root.dataset.preparedApply = String(count);
       root.innerHTML = `${candidates}\n${reference}`;
+      foldPreparedDetails(root);
       root.dataset.preparedState = manifest.stale ? 'stale' : 'ready';
       if (status) status.textContent = renderPreparedStatus(manifest);
       // The fresh markup redefines the panels and arrives with no active one;

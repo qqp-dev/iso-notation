@@ -22,6 +22,25 @@ if (!import.meta.env.DEV) {
   if (sourceButton) { sourceButton.disabled = true; sourceButton.title = 'Local source PDFs are available only in the development studio'; sourceButton.textContent = 'Source PDFs (local dev only)'; }
 }
 const persist = () => { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* private session */ } };
+// A page's reading place is independent of the A/B choice. Store its vertical
+// anchor relative to the fitted pane width, so a reload or orientation refit
+// returns to approximately the same portion of the document.
+const SCROLL_KEY = 'janko-source-scroll-v1';
+const scrollPlaces: Record<string, number> = {};
+try {
+  const saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? '{}');
+  if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+    for (const [key, value] of Object.entries(saved)) {
+      const separator = key.lastIndexOf(':');
+      const id = key.slice(0, separator) as SourceDocumentId;
+      const page = Number(key.slice(separator + 1));
+      if (Object.hasOwn(SOURCE_DOCUMENTS, id) && Number.isInteger(page) && page >= 1 && page <= SOURCE_DOCUMENTS[id].pages &&
+          typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1000) scrollPlaces[key] = value;
+    }
+  }
+} catch { /* corrupt or blocked session storage */ }
+const placeKey = (id: SourceDocumentId, page: number) => `${id}:${page}`;
+const persistPlaces = () => { try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify(scrollPlaces)); } catch { /* private session */ } };
 const loaded = new Map<SourceDocumentId, Promise<pdfjs.PDFDocumentProxy>>();
 function load(id: SourceDocumentId): Promise<pdfjs.PDFDocumentProxy> {
   let task = loaded.get(id);
@@ -66,18 +85,18 @@ async function checkScanDecoder(wasmUrl: string): Promise<void> {
 }
 
 type Role = 'reference' | 'candidate';
-interface Pane { container: HTMLElement; info: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; serial: number; render?: pdfjs.RenderTask }
+interface Pane { container: HTMLElement; info: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number } }
 const panes = {} as Record<Role, Pane>;
 for (const role of ['reference', 'candidate'] as const) {
   const container = document.createElement('section'); container.className = `source-pane source-${role}`;
   container.setAttribute('aria-label', role === 'reference' ? 'Original scan' : 'Published transcription');
-  container.innerHTML = `<h3>${role === 'reference' ? 'LEFT · original scan · provisional reference' : 'RIGHT · published PDF A/B'}</h3>
-    <label>Document <select class="source-select"></select></label><div class="source-info"></div>
+  container.innerHTML = `<h3>${role === 'reference' ? 'Original scan · provisional reference' : 'Published PDF A/B'}</h3>
+    <label>Document <select class="source-select"></select></label>
     <div class="source-controls"><button data-action="previous" aria-label="Previous PDF page">◀</button>
     <span class="source-page"></span><button data-action="next" aria-label="Next PDF page">▶</button>
     <button data-action="out" aria-label="Zoom out">−</button><span class="source-zoom"></span>
     <button data-action="in" aria-label="Zoom in">+</button><button data-action="reset">Fit</button></div>
-    <p class="source-status" role="status"></p><div class="source-canvas"></div>`;
+    <div class="source-canvas"></div><p class="source-status" role="status"></p><details class="source-provenance"><summary>Publication, rights &amp; uncertainty</summary><div class="source-info"></div></details>`;
   root.querySelector('.source-grid')!.append(container);
   const select = container.querySelector('select')!;
   for (const id of role === 'reference' ? REFERENCE_IDS : CANDIDATE_IDS) {
@@ -86,8 +105,9 @@ for (const role of ['reference', 'candidate'] as const) {
     select.append(opt);
   }
   panes[role] = { container, select, info: container.querySelector('.source-info')!, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
-  select.addEventListener('change', () => { selectDocument(state, role, select.value as SourceDocumentId); persist(); void render(role); });
+  select.addEventListener('change', () => { rememberPlace(role); selectDocument(state, role, select.value as SourceDocumentId); persist(); void render(role); });
   container.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => button.addEventListener('click', () => {
+    rememberPlace(role);
     const id = state[role], choice = state.pages[id];
     switch (button.dataset.action) {
       case 'previous': setPage(state, id, choice.page - 1); break;
@@ -100,12 +120,34 @@ for (const role of ['reference', 'candidate'] as const) {
   }));
 }
 
+let scrollTimer: number | undefined;
+function rememberPlace(role: Role): void {
+  const pane = panes[role];
+  if (pane.container.dataset.renderState !== 'ready' || !pane.pixels || pane.canvasHost.clientWidth <= 0) return;
+  scrollPlaces[placeKey(pane.pixels.id, pane.pixels.page)] = pane.canvasHost.scrollTop / pane.pixels.width;
+  window.clearTimeout(scrollTimer);
+  scrollTimer = window.setTimeout(persistPlaces, 200);
+}
+for (const role of ['reference', 'candidate'] as const) panes[role].canvasHost.addEventListener('scroll', () => rememberPlace(role));
+window.addEventListener('pagehide', () => { rememberPlace('reference'); rememberPlace('candidate'); persistPlaces(); });
+
 async function render(role: Role): Promise<void> {
   const pane = panes[role];
-  const serial = ++pane.serial;
-  pane.render?.cancel(); pane.render = undefined;
-  pane.canvasHost.replaceChildren(); // No stale pixels under a newly selected label, even during a race.
+  // A hidden pane has no measurable fit. Its last valid canvas is retained and
+  // checked against its actual width when made visible again.
+  if (root.hidden || pane.canvasHost.clientWidth <= 0) return;
   const id = state[role], doc = SOURCE_DOCUMENTS[id], { page, zoom } = state.pages[id];
+  const width = pane.canvasHost.clientWidth;
+  const key = `${id}:${page}:${zoom}:${width}`;
+  if (key === pane.key && pane.container.dataset.renderState !== 'error') return;
+  const serial = ++pane.serial;
+  pane.key = key;
+  pane.render?.cancel(); pane.render = undefined;
+  // Only a same-document/page fit change may retain old pixels while work is
+  // pending. A new label or a failed attempt must never inherit prior ink.
+  const oldPixels = pane.pixels;
+  const retain = oldPixels?.id === id && oldPixels.page === page && pane.container.dataset.renderState !== 'error';
+  if (!retain) { pane.canvasHost.replaceChildren(); pane.pixels = undefined; }
   pane.select.value = id;
   pane.info.replaceChildren();
   const heading = document.createElement('strong'); heading.textContent = doc.title;
@@ -130,7 +172,7 @@ async function render(role: Role): Promise<void> {
     }
     // 100% fits one full page to the pane's width; each pane then zooms independently.
     const natural = pdfPage.getViewport({ scale: 1 });
-    const fit = (pane.canvasHost.clientWidth || 600) / natural.width;
+    const fit = width / natural.width;
     const viewport = pdfPage.getViewport({ scale: zoom * fit });
     const canvas = document.createElement('canvas');
     const scale = Math.min(window.devicePixelRatio || 1, 2);
@@ -143,11 +185,19 @@ async function render(role: Role): Promise<void> {
     pane.render = renderTask;
     await renderTask.promise;
     if (serial !== pane.serial) return;
+    // Keep the reader near the same point on the page after a real refit.
+    const anchor = retain && oldPixels ? pane.canvasHost.scrollTop / oldPixels.width : scrollPlaces[placeKey(id, page)] ?? 0;
     pane.canvasHost.replaceChildren(canvas);
+    pane.canvasHost.scrollTop = anchor * width;
+    pane.pixels = { id, page, width };
+    pane.render = undefined;
     pane.container.dataset.renderState = 'ready';
     pane.status.textContent = `${id}: PDF page ${page} of ${pdf.numPages} drawn (${role === 'reference' ? 'local JBIG2 decoder path checked; ' : ''}image fidelity not certified). Printed page and measures are not aligned across documents.`;
   } catch (error) {
     if (serial !== pane.serial) return;
+    pane.render = undefined;
+    pane.pixels = undefined;
+    pane.canvasHost.replaceChildren();
     pane.container.dataset.renderState = 'error';
     pane.status.textContent = `${id}: could not render PDF page ${page}: ${error instanceof Error ? error.message : String(error)}. Check the approved local cache and retry by selecting this document again.`;
   }
@@ -163,12 +213,14 @@ function updateSurface(): void {
   if (sourceActive) { void render('reference'); void render('candidate'); }
 }
 modeButtons.forEach((button) => button.addEventListener('click', () => {
+  rememberPlace('reference'); rememberPlace('candidate');
   mode = !import.meta.env.DEV || button.dataset.candidatesMode === 'engraving' ? 'engraving' : 'source';
   try { sessionStorage.setItem('janko-candidates-mode', mode); } catch { /* private session */ }
   if (location.hash === '#reference') location.hash = '#candidates';
   updateSurface();
 }));
 root.querySelectorAll<HTMLButtonElement>('[data-mobile-pane]').forEach((button) => button.addEventListener('click', () => {
+  rememberPlace(state.mobilePane);
   state.mobilePane = button.dataset.mobilePane as Role; persist(); updateMobile(); void render(state.mobilePane);
 }));
 function updateMobile(): void {

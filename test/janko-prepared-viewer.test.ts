@@ -35,6 +35,7 @@ import {
   applyZoom,
   collectStudioDom,
   createPreparedApplier,
+  foldPreparedDetails,
   selectStudioView,
   showView,
   type ApplyOutcome,
@@ -473,6 +474,65 @@ test('a re-apply preserves the selected tab and the zoom', async () => {
   assert.ok(studio.tabs[1].classList.contains('is-active'));
   assert.equal(root.dataset.zoom, '1.75', 'the zoom survives the swap');
   assert.equal(studio.zoomLabel.textContent, '175%');
+});
+
+test('prepared metadata and findings fold without losing content or nesting on re-apply', () => {
+  // A small DOM tree for the disclosure decorator: append moves existing nodes
+  // and a second application must leave the first details structure intact.
+  class Node {
+    children: Node[] = [];
+    parent: Node | null = null;
+    className = '';
+    textContent = '';
+    open = false;
+    ownerDocument = { createElement: (tag: string) => new Node(tag) };
+    constructor(readonly tag: string, classes = '', text = '') { this.className = classes; this.textContent = text; }
+    matches(selector: string): boolean {
+      return selector.split(',').some((part) => part.trim().split(':')[0].split('.').some((name) => name && this.className.split(' ').includes(name)));
+    }
+    querySelector(selector: string): Node | null {
+      if (selector === ':scope > details.studio-extra') return this.children.find((child) => child.tag === 'details' && child.className === 'studio-extra') ?? null;
+      return null;
+    }
+    insertBefore(child: Node, before: Node): void {
+      const index = this.children.indexOf(before);
+      assert.ok(index >= 0);
+      child.parent = this;
+      this.children.splice(index, 0, child);
+    }
+    append(...children: Node[]): void {
+      for (const child of children) {
+        if (child.parent) child.parent.children.splice(child.parent.children.indexOf(child), 1);
+        child.parent = this;
+        this.children.push(child);
+      }
+    }
+  }
+  const candidate = new Node('article', 'candidate-card');
+  const rationale = new Node('p', 'rationale', 'Option rationale');
+  const title = new Node('h3', '', 'Candidate');
+  candidate.append(title, rationale);
+  const golden = new Node('article', 'golden-card');
+  const designation = new Node('span', 'badges', 'GOLD');
+  golden.append(new Node('h2', '', 'Reference'), designation);
+  const diagnostic = new Node('details', 'diagnostics', 'Brahms findings');
+  diagnostic.open = true; // Previously expanded findings must default closed after a fresh swap.
+  const root = { querySelectorAll: (selector: string) => selector === 'details.diagnostics'
+    ? [diagnostic] : selector === '.round-card, .golden-card, .candidate-card' ? [candidate, golden] : [] };
+  foldPreparedDetails(root as unknown as HTMLElement);
+  assert.equal(diagnostic.open, false, 'the complete findings stay present but default closed');
+  for (const [card, item] of [[candidate, rationale], [golden, designation]] as const) {
+    const details = card.querySelector(':scope > details.studio-extra');
+    assert.ok(details, 'context is reachable through a native disclosure');
+    assert.equal(details.open, false, 'new context disclosures default closed');
+    assert.equal(details.children[0].tag, 'summary');
+    assert.equal(details.children[1], item, 'existing metadata moves intact, rather than being deleted');
+    assert.equal(details.children[1].textContent, item.textContent);
+  }
+  foldPreparedDetails(root as unknown as HTMLElement);
+  assert.equal(candidate.children.filter((child) => child.tag === 'details').length, 1);
+  assert.equal(golden.children.filter((child) => child.tag === 'details').length, 1);
+  assert.equal(diagnostic.open, false);
 });
 
 // ---------------------------------------------------------------------------
