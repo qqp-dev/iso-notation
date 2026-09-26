@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ViteDevServer } from 'vite';
 import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS } from '../src/source-review/documents';
 import { initialChoices, restoreChoices, selectDocument, setPage, setZoom, STORAGE_KEY } from '../src/source-review/session';
-import { SOURCE_PDF_PREFIX, sourcePdfPlugin, validatePdfBytes } from '../src/source-review/vite-plugin';
+import { PDFJS_DECODER_PREFIX, SOURCE_PDF_PREFIX, sourcePdfPlugin, validatePdfBytes } from '../src/source-review/vite-plugin';
 
 const scan = REFERENCE_IDS[0], alternate = REFERENCE_IDS[1];
 const a = CANDIDATE_IDS[0], b = CANDIDATE_IDS[1];
@@ -104,14 +104,15 @@ function middleware(cache: string, root: string): Middleware {
   assert.ok(handler, 'development server installs the PDF endpoint');
   return handler;
 }
-async function request(handler: Middleware, url: string): Promise<{ status: number; body: string; mime?: string; next: boolean }> {
+async function request(handler: Middleware, url: string): Promise<{ status: number; body: string; bytes: Buffer; mime?: string; next: boolean }> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`PDF middleware did not finish: ${url}`)), 3000);
     const headers = new Map<string, string>();
     let statusCode = 200;
     const finish = (body: Uint8Array | string, next = false) => {
       clearTimeout(timeout);
-      resolve({ status: statusCode, body: Buffer.from(body).toString(), mime: headers.get('content-type'), next });
+      const bytes = Buffer.from(body);
+      resolve({ status: statusCode, body: bytes.toString(), bytes, mime: headers.get('content-type'), next });
     };
     const res = { get statusCode() { return statusCode; }, set statusCode(v: number) { statusCode = v; },
       setHeader: (key: string, value: string) => { headers.set(key.toLowerCase(), value); },
@@ -119,6 +120,26 @@ async function request(handler: Middleware, url: string): Promise<{ status: numb
     handler({ url } as IncomingMessage, res as unknown as ServerResponse, () => finish('', true));
   });
 }
+
+test('dev decoder route serves only pinned local PDF.js assets with exact bytes and MIME', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'janko-decoder-test-'));
+  try {
+    const root = join(base, 'checkout'), cache = join(base, 'cache');
+    await mkdir(root); await mkdir(cache);
+    const handle = middleware(cache, root);
+    for (const name of ['jbig2.wasm', 'jbig2_nowasm_fallback.js']) {
+      const response = await request(handle, `${PDFJS_DECODER_PREFIX}${name}`);
+      assert.equal(response.status, 200, name);
+      assert.match(response.mime ?? '', name.endsWith('.wasm') ? /^application\/wasm/ : /^text\/javascript/);
+      assert.deepEqual(response.bytes, await readFile(join('node_modules/pdfjs-dist/wasm', name)));
+    }
+    const imported = await request(handle, `${PDFJS_DECODER_PREFIX}jbig2_nowasm_fallback.js?import`);
+    assert.equal(imported.status, 200, 'Vite fallback module request remains available');
+    for (const suffix of ['../jbig2.wasm', '%2e%2e/jbig2.wasm', 'other.wasm', 'jbig2.wasm?path=/etc/passwd', 'jbig2_nowasm_fallback.js?url']) {
+      assert.equal((await request(handle, `${PDFJS_DECODER_PREFIX}${suffix}`)).status, 404, suffix);
+    }
+  } finally { await rm(base, { recursive: true, force: true }); }
+});
 
 test('dev endpoint accepts only pinned IDs: no URL/path/traversal proxy; missing and altered cache files fail closed', async () => {
   const base = await mkdtemp(join(tmpdir(), 'janko-source-test-'));
