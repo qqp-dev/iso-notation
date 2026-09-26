@@ -303,7 +303,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
           const current = queue?.current;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
-          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', candidateRevision: current?.generation.candidateRevision, candidateError: current?.generation.candidateError, artifactHashes: current?.generation.artifactHashes, generationMs: current?.generation.generationMs, phaseMs: current?.generation.phaseMs, watchedAt, publishedAt, stale: current?.stale ?? true, error: current?.error }));
+          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', candidateRevision: current?.generation.candidateRevision, variantId: current?.generation.variantId, candidateError: current?.generation.candidateError, artifactHashes: current?.generation.artifactHashes, generationMs: current?.generation.generationMs, phaseMs: current?.generation.phaseMs, watchedAt, publishedAt, stale: current?.stale ?? true, error: current?.error }));
           return;
         }
         if (!url.startsWith(PREPARED_DEV_ARTIFACT_PREFIX)) return next();

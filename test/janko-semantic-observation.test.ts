@@ -38,6 +38,22 @@ test('two frame opportunities acknowledge only the exact applied visible candida
   assert.equal(candidateObservation(root, doc).reason, 'disconnected');
 });
 
+test('frame evidence includes the active comparison variant, not just a shared state revision', () => {
+  const h = harness();
+  const data = h.root.dataset as Record<string, string>;
+  data.preparedVariantId = 'gap-positive';
+  const root = h.root as unknown as HTMLElement, doc = h.doc as unknown as Document, win = h.win as unknown as Window;
+  observeCandidateFrame(root, doc, win);
+  h.frames();
+  assert.equal(h.observed().state, 'frame-opportunity');
+  assert.ok(Object.entries(h.observed()).some(([key, value]) => /variant/i.test(key) && value === 'gap-positive'),
+    'an observer must identify which active variant had a frame opportunity');
+  observeCandidateFrame(root, doc, win);
+  data.preparedVariantId = 'beside';
+  h.frames();
+  assert.notEqual(h.observed().state, 'frame-opportunity', 'a superseded variant must not inherit the earlier frame');
+});
+
 test('superseded frames, pending fetches and stale/error generations never acknowledge a candidate', () => {
   const h = harness();
   const root = h.root as unknown as HTMLElement, doc = h.doc as unknown as Document, win = h.win as unknown as Window;

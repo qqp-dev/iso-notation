@@ -557,21 +557,13 @@ test('renderStatusLine reports live lint statistics', () => {
   assert.match(line, /rendered live at 12:34:56Z/);
 });
 
-test('settled Bach metadata is exported and drives the view headline', () => {
-  assert.equal(CURRENT_ROUND_METADATA.round, 50);
-  assert.match(CURRENT_ROUND_METADATA.title, /Bach|Goldberg/i);
-  assert.match(CURRENT_ROUND_METADATA.description, /LH|left hand/i);
-  assert.equal(CURRENT_ROUND_METADATA.openAxes, undefined, 'no unsettled hand vote');
-  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.id), ['bach-m5-settled']);
-  assert.deepEqual(CURRENT_CANDIDATES[0].windows?.map(w => 'measureStart' in w &&
-    [w.scoreId, w.measureStart, w.measureCount]), [['primary', 5, 4]]);
-  const ids = CURRENT_CANDIDATES.map((c) => c.id);
+test('the current round registry drives the view headline without pinning a future decision round', () => {
+  assert.ok(Number.isInteger(CURRENT_ROUND_METADATA.round));
+  assert.ok(CURRENT_ROUND_METADATA.title.length > 0);
+  const ids = CURRENT_CANDIDATES.map(c => c.id);
   assert.equal(new Set(ids).size, ids.length, 'candidate ids are unique');
-  // The registry drives the rendered headline, never a hardcoded template string.
+  // Runtime edits may add comparison cards, but cannot rewrite formal round metadata.
   const headline = renderCandidatesView(CONFIG);
   assert.match(headline, new RegExp(`Round ${CURRENT_ROUND_METADATA.round}`));
-  assert.ok(
-    headline.includes(esc(CURRENT_ROUND_METADATA.title)),
-    'the view headline is the round title from the registry'
-  );
+  assert.ok(headline.includes(esc(CURRENT_ROUND_METADATA.title)), 'the view headline is the round title from the registry');
 });

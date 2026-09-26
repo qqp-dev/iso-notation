@@ -1483,6 +1483,8 @@ export interface JankoLayoutOptions {
  *   unchanged, so the round only ever touches the long-value family.
    */
   exceptionCarrier?: JankoExceptionCarrier;
+  /** Candidate-only, guarded complete-owner shared long-mark seat requests. Not a canonical default. */
+  durationSeatPreferences?: Array<{ tick: number; ownerIds: string[]; family: 'ring' | 'half-ring'; seat: 'above' | 'beside' }>;
   /**
    * Round 49 §2: **where an ordinary standalone long value mounts**. `'right'`
    * (default) is the incumbent detached mount — the circle/half-circle run on
@@ -1768,7 +1770,7 @@ export type JankoClusterPresentation = 'literal' | 'mirrored-handprint' | 'index
 export type JankoVerticalPlacement = 'slot' | 'content-aware';
 
 /** Fully resolved layout options (every optional option filled in). */
-export type ResolvedJankoLayoutOptions = Required<JankoLayoutOptions>;
+export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'durationSeatPreferences'>> & Pick<JankoLayoutOptions, 'durationSeatPreferences'>;
 
 /** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {

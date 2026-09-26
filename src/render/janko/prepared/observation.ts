@@ -7,6 +7,7 @@ export interface CandidateObservation {
   generation?: string;
   candidateRevision?: string;
   candidatesHash?: string;
+  variantId?: string;
   apply?: string;
   observedAt?: number;
   observedEpochMs?: number;
@@ -19,6 +20,7 @@ export function candidateObservation(root: HTMLElement, doc: Document): Candidat
     generation: data.preparedGeneration,
     candidateRevision: data.preparedCandidateRevision,
     candidatesHash: data.preparedCandidatesHash,
+    variantId: data.preparedVariantId,
     apply: data.preparedApply,
   };
   const reason = !root.isConnected ? 'disconnected' : doc.visibilityState !== 'visible' ? 'hidden' :
@@ -52,7 +54,8 @@ export function observeCandidateFrame(root: HTMLElement, doc: Document, win: Win
     if (serials.get(root) !== serial) return;
     const same = current.state === 'frame-opportunity' &&
       current.apply === initial.apply && current.generation === initial.generation &&
-      current.candidateRevision === initial.candidateRevision && current.candidatesHash === initial.candidatesHash;
+      current.candidateRevision === initial.candidateRevision && current.candidatesHash === initial.candidatesHash &&
+      current.variantId === initial.variantId;
     root.dataset.preparedObservation = JSON.stringify(same
       ? { ...current, observedAt: performance.now(), observedEpochMs: Date.now() }
       : { ...current, state: 'unobserved', reason: 'superseded-or-not-visible' });

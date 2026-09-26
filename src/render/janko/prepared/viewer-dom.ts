@@ -220,6 +220,8 @@ export function createPreparedApplier(args: {
       if (manifest.candidateRevision) root.dataset.preparedCandidateRevision = manifest.candidateRevision;
       else delete root.dataset.preparedCandidateRevision;
       root.dataset.preparedCandidatesHash = manifest.artifactHashes.candidates;
+      if (manifest.variantId) root.dataset.preparedVariantId = manifest.variantId;
+      else delete root.dataset.preparedVariantId;
       count += 1;
       root.dataset.preparedApply = String(count);
       root.innerHTML = `${candidates}\n${reference}`;

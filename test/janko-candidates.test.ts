@@ -2266,19 +2266,18 @@ test('the parked Round 49 studio still renders three readings on 21 windows', ()
 });
 
 
-test('the current studio renders the settled Bach m. 5–8 context without reopening the hand vote', () => {
+test('the current studio follows its formal registry without pinning the next round or card count', () => {
   const html = renderCandidatesView(CONFIG);
-  assert.equal(CURRENT_ROUND_METADATA.round, 50);
-  assert.equal(CURRENT_ROUND_METADATA.openAxes, undefined);
-  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.id), ['bach-m5-settled']);
-  assert.match(html, /data-candidate-count="1"/);
-  assert.match(html, /data-window-count="1"/);
-  assert.match(html, /data-window="primary:5-8"/);
-  assert.match(html, /operator-judged GOLD hand correction/i);
+  assert.match(html, new RegExp(`Round ${CURRENT_ROUND_METADATA.round}`));
+  assert.match(html, /data-candidate-count="\d+"/);
+  for (const candidate of CURRENT_CANDIDATES) {
+    assert.ok(html.includes(`data-candidate="${candidate.id}"`), `${candidate.id} is in the real Candidates view`);
+  }
   assert.doesNotMatch(html, /data-candidate="round49-/);
 });
 
-test('The closer-comparison strip is absent without a declared strip', () => {
+test('the closer-comparison strip follows only the formal round declaration', () => {
   const html = renderCompareStrip(CONFIG);
-  assert.equal(html, '', 'no declared strip — no strip to compare');
+  if (!CURRENT_ROUND_METADATA.compareStrip) assert.equal(html, '', 'no declared strip — no strip to compare');
+  else assert.ok(html.length > 0, 'a declared strip is rendered');
 });

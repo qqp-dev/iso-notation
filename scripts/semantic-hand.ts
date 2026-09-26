@@ -2,7 +2,7 @@
 /** JSON CLI for the candidate-only hand service. No TS editing required. */
 import { performance } from 'node:perf_hooks';
 import { readFileSync } from 'node:fs';
-import { baseline, head, readCandidate, candidateHealth, executeHandCommand, recoverHandCandidate, SEMANTIC_STATE, SEMANTIC_SCORE, selectScore, type HandPhaseTiming } from '../src/render/janko/semantic-hand';
+import { baseline, head, readCandidate, candidateHealth, executeHandCommand, recoverHandCandidate, inspectDurationCandidate, activeDurationVariants, SEMANTIC_STATE, SEMANTIC_SCORE, selectScore, type HandPhaseTiming } from '../src/render/janko/semantic-hand';
 const [action, ...argv] = process.argv.slice(2);
 const option = (name: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : undefined; };
 const root = process.cwd();
@@ -10,10 +10,17 @@ const path = option('state') ?? SEMANTIC_STATE;
 const started = performance.now();
 async function main() {
   if (action === 'promote') throw new Error('promotion requires separate exact-candidate operator judgment and release authorization; not implemented');
-  if (!['status', 'change', 'explain', 'undo', 'recover'].includes(action)) throw new Error(`unsupported command ${action}`);
+  if (!['status', 'change', 'explain', 'undo', 'recover', 'inspect-duration'].includes(action)) throw new Error(`unsupported command ${action}`);
   const score = selectScore(option('score') ?? SEMANTIC_SCORE);
   const health = candidateHealth(root, path, score);
-  if (action === 'status') return { ...health, baseline: baseline(root, score), ...(health.state === 'current' ? { saved: readCandidate(root, path, score).records.length > 0, records: readCandidate(root, path, score).records.length } : {}) };
+  if (action === 'inspect-duration') {
+    if (health.state !== 'current') throw new Error(`stale candidate: ${health.diagnostic}`);
+    return { score, revision: health.revision, marks: inspectDurationCandidate(score, Number(option('measure')), option('tick') === undefined ? undefined : Number(option('tick')), readCandidate(root, path, score)) };
+  }
+  if (action === 'status') return { ...health, baseline: baseline(root, score), ...(health.state === 'current' ? {
+    saved: readCandidate(root, path, score).records.length > 0, records: readCandidate(root, path, score).records.length,
+    variants: activeDurationVariants(readCandidate(root, path, score)).map(v => ({ id: v.id, score: v.score, revision: v.revision, lint: v.lint, refusals: v.refusals, windows: v.windows })),
+  } : {}) };
   if (health.state === 'stale' && action !== 'recover') throw new Error(`stale candidate: ${health.diagnostic}; ${health.recovery}`);
   const state = action === 'recover' ? undefined : readCandidate(root, path, score);
   const resolveMs = performance.now() - started;

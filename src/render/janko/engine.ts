@@ -1876,6 +1876,8 @@ export interface JankoSystemLayout {
    * that seat keeps from its owning head.
    */
   detachedSymbols: JankoDetachedSymbolGeometry[];
+  /** Candidate-only preference refusals: original horizontal mark remains painted. */
+  durationSeatRefusals: Array<{ tick: number; ownerIds: string[]; reason: string }>;
   /**
    * Round 47: detached long-value symbols that found **no legal seat** — the
    * member then keeps its own ordinary duration ink, exactly like a refused
@@ -7943,6 +7945,7 @@ export function layoutJankoSystemShifted(
   // Round 47: the detached long-value mount, its refusals, the outgoing-tie
   // omissions and the duration-ink census (published on the layout).
   const detachedSymbols: JankoDetachedSymbolGeometry[] = [];
+  const durationSeatRefusals: Array<{ tick: number; ownerIds: string[]; reason: string }> = [];
   const detachedSeatRefusals: JankoDetachedSeatRefusal[] = [];
   const tieOriginSuppressions: JankoTieOriginSuppression[] = [];
   const durationInkOwners: JankoDurationInkOwner[] = [];
@@ -8582,6 +8585,16 @@ export function layoutJankoSystemShifted(
         // pure symbol run (no arm); every short value (the 1–4 cut family, a
         // bare quarter) keeps the horizontal carrier unchanged, so only the
         // long-value family ever moves.
+        const owners = [request.id, ...(request.partnerId ? [request.partnerId] : [])].sort();
+        const preference = o.durationSeatPreferences?.find(seat => seat.seat === 'beside' && seat.tick === request.startTick &&
+          seat.family === longRunName(marks.base, longStyle) &&
+          JSON.stringify(seat.ownerIds) === JSON.stringify(owners));
+        if (preference && request.partner && longMarkKindForBase(marks.base, longStyle) !== null) {
+          const verdict = seatDetachedSymbol(request, marks, durationScale);
+          if (verdict.ok) continue;
+          durationSeatRefusals.push({ tick: request.startTick, ownerIds: owners, reason: verdict.refusal.reason });
+          // Keep the horizontal statement when the requested seat does not fit.
+        }
         if (o.exceptionCarrier === 'symbol' && longMarkKindForBase(marks.base, longStyle) !== null) {
           if (request.partner) {
             // One shared statement for the 2-span pair when it can be seated;
@@ -9680,6 +9693,7 @@ export function layoutJankoSystemShifted(
     exceptionCarriers,
     exceptionCarrierRefusals,
     detachedSymbols,
+    durationSeatRefusals,
     detachedSeatRefusals,
     tieOriginSuppressions,
     durationInkOwners,

@@ -23,6 +23,7 @@ export interface PreparedManifest {
   };
   stale: boolean;
   candidateRevision?: string;
+  variantId?: string;
   candidateError?: string;
   error?: string;
 }
