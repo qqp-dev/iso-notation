@@ -10,7 +10,6 @@ import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
 import { generatePreparedStudio } from '../src/render/janko/prepared/generate';
 import { createStudioConfig, renderCandidatesView, renderReferenceView } from '../src/render/janko/studio';
 import { renderJankoCrop } from '../src/render/janko/engine';
-import { CURRENT_ROUND_METADATA, CURRENT_CANDIDATES } from '../src/render/janko/candidates';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { lintJankoScore } from '../src/render/janko/linter';
 
@@ -119,17 +118,14 @@ test('legacy default Brahms remains usable, while selecting Bach never silently 
   assert.equal(command('status', file, brahms, undefined, false).result.revision, saved.result.revision);
 }));
 
-test('current real-engine registry records the settled Bach hand decision with an accurate mm. 5–8 context', () => {
-  const round = CURRENT_ROUND_METADATA;
-  const description = `${round.title} ${round.description}`;
-  assert.ok(/Bach|Goldberg/i.test(description), 'current round names Bach');
-  assert.ok(/(?:m\.\s*5|measure\s*5|mm\.\s*5)/i.test(description), 'current round names m. 5');
-  assert.ok(/LH|left hand/i.test(description), 'current round records LH as settled');
-  assert.ok(!/vote (?:for|on) (?:RH|LH)|unresolved (?:RH|LH)/i.test(description), 'no reopened hand vote');
-  const windows = CURRENT_CANDIDATES.flatMap(c => (c.windows ?? []).filter(w =>
-    'measureStart' in w && (w.scoreId === bach || w.scoreId === 'primary')));
-  assert.ok(windows.some(w => 'measureStart' in w && w.measureStart === 5 && w.measureCount === 4),
-    'real score window mm. 5–8, not a mockup');
+test('the settled Bach m. 5 hand judgment remains in the real canonical score when a new round opens', () => {
+  const score = buildBachGoldbergVar1Score();
+  for (const [id, tick] of [['bach-var1-70', 576], ['bach-var1-71', 588]] as const) {
+    const note = score.notes.find(n => n.id === id);
+    assert.equal(note?.startTick, tick);
+    assert.equal(note?.hand, 'LH', `${id} retains the judged LH reading`);
+  }
+  assert.match(renderJankoCrop(score, 5, 4, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS), /<svg/);
 });
 
 test('real-engine Bach Candidate identifies exact saved revision and m. 5 crop; both References stay canonical', () => isolated(file => {

@@ -48,6 +48,8 @@ export interface PreparedGeneration {
   status: PreparedStatus;
   /** Exact saved semantic revision represented by the candidate artifact, if any. */
   candidateRevision?: string;
+  /** Latest active comparison variant represented in this generation. */
+  variantId?: string;
   /** A refused stale saved candidate; the Reference artifact remains canonical. */
   candidateError?: string;
   /** Server-only measurement; excluded from content-addressed generation identity. */
@@ -170,6 +172,7 @@ export function manifestModuleSource(
     artifactHashes: generation.artifactHashes,
     status: generation.status,
     candidateRevision: generation.candidateRevision,
+    variantId: generation.variantId,
     candidateError: generation.candidateError,
     stale,
     ...(error !== undefined ? { error } : {}),

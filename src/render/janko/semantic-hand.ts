@@ -14,6 +14,7 @@ import type { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types'
 import { layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages } from './engine';
 import { lintJankoScore } from './linter';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from './types';
+import { inspectDuration, validateDurationIntent, evaluateDurationVariant, type DurationIntent, type DurationVariant } from './duration-rig';
 
 export const SEMANTIC_STATE = '.semantic-candidate.local';
 export const SEMANTIC_SCORE = 'brahms-op118-no1';
@@ -64,7 +65,11 @@ export function modelIdentity(root = process.cwd(), score: EditableScore = SEMAN
 export interface Guard { id: string; pitchClass: number; octave: number; tick: number; expectedHand: Hand }
 export interface HandIntent { schema: 1; score: EditableScore; base: string; intent: 'assign-hand'; target: Hand; scope: 'this' | 'set' | 'source-linked'; selected: Guard[]; reason?: string }
 export interface Assignment { id: string; guard: Guard; hand: Hand; citation: string }
-export interface CandidateRecord { revision: string; parent: string; operation: 'change' | 'undo'; assignments: Assignment[]; effects: Effects; reason?: string }
+export interface DurationEffects { scope: 'rule-wide / targeted duration preference'; variants: string[];
+  changedVariant?: string; ruleWide?: { options: DurationVariant['options']; tokens: DurationVariant['tokens'] };
+  targeted?: DurationVariant['placements']; reviewWindows?: DurationVariant['windows'];
+  lint?: DurationVariant['lint']; refusals?: DurationVariant['refusals'] }
+export interface CandidateRecord { revision: string; parent: string; operation: 'change' | 'undo'; assignments: Assignment[]; effects: Effects | DurationEffects; reason?: string; variants?: DurationVariant[] }
 export interface CandidateState { schema: 1; score?: EditableScore; identity: string; identityParts?: { source: string; engine: string }; records: CandidateRecord[] }
 export interface CandidateHealth { state: 'current' | 'stale'; revision?: string; diagnostic?: string; recovery: string }
 /** Read status without ever replaying a stale or corrupted saved candidate. */
@@ -119,7 +124,7 @@ export function readCandidate(root = process.cwd(), path = SEMANTIC_STATE, score
     throw new Error('candidate source/model/engine revision drift; refusing stale state');
   let parent = baseline(root, score);
   for (const record of state.records) {
-    if (record.parent !== parent || record.revision !== digest({ identity, parent, operation: record.operation, assignments: record.assignments, effects: record.effects, reason: record.reason }))
+    if (record.parent !== parent || record.revision !== digest({ identity, parent, operation: record.operation, assignments: record.assignments, effects: record.effects, reason: record.reason, ...(record.variants ? { variants: record.variants } : {}) }))
       throw new Error('candidate history fingerprint mismatch');
     parent = record.revision;
   }
@@ -127,6 +132,12 @@ export function readCandidate(root = process.cwd(), path = SEMANTIC_STATE, score
 }
 export const head = (state: CandidateState, root = process.cwd(), score: EditableScore = state.score ?? SEMANTIC_SCORE) => state.records.at(-1)?.revision ?? baseline(root, score);
 export const activeAssignments = (state: CandidateState) => state.records.at(-1)?.assignments ?? [];
+export const activeDurationVariants = (state: CandidateState) => state.records.at(-1)?.variants ?? [];
+export function inspectDurationCandidate(score: EditableScore, measure: number, tick?: number, state?: CandidateState) {
+  const { build, options, tokens } = provider(score);
+  if (state && (state.score ?? SEMANTIC_SCORE) !== score) throw new Error('cross-score duration inspect');
+  return inspectDuration(state ? projectCandidate(build(), activeAssignments(state)) : build(), options, tokens, measure, tick);
+}
 export function candidateScore(state: CandidateState) { return projectCandidate(provider(state.score ?? SEMANTIC_SCORE).build(), activeAssignments(state)); }
 export function resolveLinkedOccurrences(
   origin: typeof provenance.events[number], score: QuantizedGridScore,
@@ -209,10 +220,11 @@ export function compareCandidate(before: QuantizedGridScore, after: QuantizedGri
   if (lint.violations.length) throw new Error(`candidate engraving validation failed: ${lint.violations.map(v => v.message).slice(0,3).join('; ')}`);
   return { selected, reviewWindows, crossings: [a.crossings,b.crossings], rests: [a.rests,b.rests], beams: [a.beams,b.beams], brackets: [a.brackets,b.brackets], tieOwners: [a.tieOwners.length,b.tieOwners.length], durationOwners: [a.durationOwners.length,b.durationOwners.length], tieOwnerChanges: ownerDiff(a.tieOwners, b.tieOwners), durationOwnerChanges: ownerDiff(a.durationOwners, b.durationOwners), changedPages, unchangedPages: b.pages.flatMap((_,i) => changedPages.includes(i+1) ? [] : [i+1]), changedSystems, unchangedSystems: b.systems.flatMap((_,i) => changedSystems.includes(i+1) ? [] : [i+1]), changedCrops, unchangedCrops, visible: changedPages.length ? 'CHANGED' : 'NO_VISIBLE_EFFECT', lint: { violations: lint.violations.length, warnings: lint.warnings.length } };
 }
-function persist(root: string, path: string, state: CandidateState, operation: CandidateRecord['operation'], assignments: Assignment[], effects: Effects, reason?: string) {
+function persist(root: string, path: string, state: CandidateState, operation: CandidateRecord['operation'], assignments: Assignment[], effects: CandidateRecord['effects'], reason?: string, variants: DurationVariant[] = activeDurationVariants(state)) {
   const parent = head(state, root);
-  const revision = digest({ identity: state.identity, parent, operation, assignments, effects, reason });
-  const next = { ...state, records: [...state.records, { parent, revision, operation, assignments, effects, ...(reason ? { reason } : {}) }] };
+  const variantField = variants.length ? { variants } : {};
+  const revision = digest({ identity: state.identity, parent, operation, assignments, effects, reason, ...variantField });
+  const next = { ...state, records: [...state.records, { parent, revision, operation, assignments, effects, ...(reason ? { reason } : {}), ...variantField }] };
   const dest = resolve(root, path), temp = `${dest}.${process.pid}.tmp`;
   try { writeFileSync(temp, JSON.stringify(next, null, 2) + '\n', { flag: 'wx', mode: 0o600 }); renameSync(temp, dest); }
   finally { if (existsSync(temp)) unlinkSync(temp); }
@@ -277,25 +289,64 @@ export function recoverHandCandidate(request: HandIntent, root = process.cwd(), 
   } finally { closeSync(fd); unlinkSync(lock); }
 }
 export interface HandPhaseTiming { started: number; resolveMs: number; layoutEffectsMs: number; saveMs: number }
-export function executeHandCommand(command: { action: 'change'; request: HandIntent } | { action: 'undo'; base: string; revision: string }, root = process.cwd(), path = SEMANTIC_STATE, timing?: HandPhaseTiming, score: EditableScore = SEMANTIC_SCORE) {
+function revalidateVariants(state: CandidateState, assignments: Assignment[], score: EditableScore): DurationVariant[] {
+  if (!activeDurationVariants(state).length) return [];
+  const { build, options, tokens } = provider(score);
+  const projected = projectCandidate(build(), assignments);
+  return activeDurationVariants(state).map(v => {
+    const controls = validateDurationIntent({ schema: 1, intent: 'engrave-duration', score, base: '', variantId: v.id,
+      options: v.options, tokens: v.tokens, placements: v.placements, windows: v.windows }, projected, options, tokens);
+    return { ...v, ...evaluateDurationVariant(projected, options, tokens, controls),
+      revision: digest({ score, id: v.id, controls, assignments, identity: state.identity }) };
+  });
+}
+export function executeHandCommand(command: { action: 'change'; request: HandIntent } | { action: 'undo'; base: string; revision: string }, root?: string, path?: string, timing?: HandPhaseTiming, score?: EditableScore): { revision: string; effects: Effects; replay: boolean };
+export function executeHandCommand(command: { action: 'change'; request: DurationIntent }, root?: string, path?: string, timing?: HandPhaseTiming, score?: EditableScore): { revision: string; effects: CandidateRecord['effects']; replay: boolean };
+export function executeHandCommand(command: { action: 'change'; request: HandIntent | DurationIntent } | { action: 'undo'; base: string; revision: string }, root?: string, path?: string, timing?: HandPhaseTiming, score?: EditableScore): { revision: string; effects: CandidateRecord['effects']; replay: boolean };
+export function executeHandCommand(command: { action: 'change'; request: HandIntent | DurationIntent } | { action: 'undo'; base: string; revision: string }, root = process.cwd(), path = SEMANTIC_STATE, timing?: HandPhaseTiming, score: EditableScore = SEMANTIC_SCORE): { revision: string; effects: CandidateRecord['effects']; replay: boolean } {
   const lock = resolve(root, `${path}.lock`);
   let fd: number;
   try { fd = openSync(lock, 'wx', 0o600); } catch { throw new Error('candidate writer busy; retry'); }
   try {
     const state = readCandidate(root, path, score), old = candidateScore(state);
     if (command.action === 'change') {
+      if (command.request.intent === 'engrave-duration') {
+        const request = command.request;
+        if (request.base !== head(state, root, score)) throw new Error('stale candidate base');
+        if (request.score !== score) throw new Error('cross-score duration intent');
+        if (score === SEMANTIC_SCORE) verifyBrahmsWitness(root);
+        const { build, options, tokens } = provider(score);
+        const controls = validateDurationIntent(request, old, options, tokens);
+        const previous = activeDurationVariants(state);
+        if (!previous.some(v => v.id === request.variantId) && previous.length >= 4) throw new Error('at most four runtime comparison variants');
+        const verdict = evaluateDurationVariant(old, options, tokens, controls);
+        const revision = digest({ score, id: request.variantId, controls, assignments: activeAssignments(state), identity: state.identity });
+        const variant: DurationVariant = { id: request.variantId, score, ...controls, revision, ...verdict };
+        const variants = [...previous.filter(v => v.id !== variant.id), variant];
+        if (JSON.stringify(variants) === JSON.stringify(previous)) return { revision: head(state, root, score), replay: true, effects: state.records.at(-1)!.effects };
+        const effects: DurationEffects = { scope: 'rule-wide / targeted duration preference', variants: variants.map(v => v.id),
+          changedVariant: variant.id, ruleWide: { options: variant.options, tokens: variant.tokens },
+          targeted: variant.placements, reviewWindows: variant.windows, lint: variant.lint, refusals: variant.refusals };
+        return { ...persist(root, path, state, 'change', activeAssignments(state), effects, request.reason, variants), replay: false };
+      }
       const result = prepareChange(state, command.request, root, timing);
       if (result.replay) return result;
-      const saved = persist(root, path, state, 'change', result.assignments, result.effects, command.request.reason);
+      const variants = revalidateVariants(state, result.assignments, score);
+      const saved = persist(root, path, state, 'change', result.assignments, result.effects, command.request.reason, variants);
       if (timing) timing.saveMs = performance.now() - timing.started - timing.resolveMs - timing.layoutEffectsMs;
       return { ...saved, replay: false };
     }
     if (command.base !== head(state, root, score) || state.records.at(-1)?.revision !== command.revision) throw new Error('stale/unknown undo revision');
     const previous = state.records.length > 1 ? state.records.at(-2)!.assignments : [];
+    const previousVariants = state.records.length > 1 ? activeDurationVariants({ ...state, records: state.records.slice(0, -1) }) : [];
     if (timing) timing.resolveMs = performance.now() - timing.started;
-    const effects = compareCandidate(old, projectCandidate(provider(score).build(), previous), activeAssignments(state), previous);
+    const effects = JSON.stringify(previous) === JSON.stringify(activeAssignments(state))
+      ? { scope: 'rule-wide / targeted duration preference' as const, variants: previousVariants.map(v => v.id) }
+      : compareCandidate(old, projectCandidate(provider(score).build(), previous), activeAssignments(state), previous);
     if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
-    const saved = persist(root, path, state, 'undo', previous, effects);
+    const restoredVariants = JSON.stringify(previous) === JSON.stringify(activeAssignments(state)) ? previousVariants :
+      revalidateVariants({ ...state, records: [{ ...state.records.at(-1)!, variants: previousVariants }] }, previous, score);
+    const saved = persist(root, path, state, 'undo', previous, effects, undefined, restoredVariants);
     if (timing) timing.saveMs = performance.now() - timing.started - timing.resolveMs - timing.layoutEffectsMs;
     return { ...saved, replay: false };
   } finally { closeSync(fd); unlinkSync(lock); }

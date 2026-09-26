@@ -237,6 +237,7 @@ export interface JankoStudioConfig {
   scores: Record<string, StudioScore>;
   /** Candidate-only registered-score projection; Reference always uses the canonical score. */
   semanticCandidate?: { score: QuantizedGridScore; revision: string; reviewWindows: import('./semantic-hand').ReviewWindow[] };
+  durationVariants?: Array<{ variant: import('./duration-rig').DurationVariant; score: QuantizedGridScore }>;
   /** Stale saved candidate is refused; render an explicit diagnostic, never a projected card. */
   semanticCandidateError?: string;
 }
@@ -359,6 +360,7 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     brahmsPages: overrides.brahmsPages ?? Array.from({ length: brahmsPages }, (_, i) => i),
     scores,
     ...(overrides.semanticCandidate ? { semanticCandidate: overrides.semanticCandidate } : {}),
+    ...(overrides.durationVariants ? { durationVariants: overrides.durationVariants } : {}),
     ...(overrides.semanticCandidateError ? { semanticCandidateError: overrides.semanticCandidateError } : {}),
   };
 }
@@ -534,11 +536,23 @@ export function renderCompareStrip(
  * lint verdict **over every score the candidate is demonstrated on**.
  */
 /** Reusable only when every non-semantic studio input is identical. */
-export interface StaticCandidateMarkup { cards: string[]; compareStrip: string }
+export interface StaticCandidateMarkup { cards: string[]; compareStrip: string; variantCards?: Record<string, string> }
 export function renderCandidatesView(config: JankoStudioConfig = createStudioConfig(), reuse?: StaticCandidateMarkup, capture?: (markup: StaticCandidateMarkup) => void): string {
   const { round, scores } = config;
-  const candidates: JankoCandidate[] = config.semanticCandidate
-    ? [...config.candidates, semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows, config.semanticCandidate.score.id)] : config.candidates;
+  const runtime = config.durationVariants ?? [];
+  const candidates: JankoCandidate[] = [
+    ...config.candidates,
+    ...(config.semanticCandidate ? [semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows, config.semanticCandidate.score.id)] : []),
+    ...runtime.map(({ variant }) => ({
+      ...semanticHandCandidate(variant.revision, variant.windows.map(w => ({ ...w, changed: true })), variant.score === 'bach-goldberg-var1' ? 'primary' : variant.score),
+      id: `duration-${variant.id}`, label: `Duration · ${variant.id}`,
+      description: `Guarded ${variant.revision.slice(0,12)} · rule-wide controls / targeted placements · ${variant.refusals.length ? `beside refused: ${variant.refusals.map(r => r.reason).join('; ')}` : 'seat requests fitted or absent'} · not Reference`,
+      options: { ...variant.options, durationSeatPreferences: variant.placements.map(p => ({ tick: p.target.tick, ownerIds: p.target.ownerIds, family: p.target.family, seat: p.preference })) },
+      tokens: variant.tokens,
+    })),
+  ];
+  const runtimeById = new Map(runtime.map(value => [`duration-${value.variant.id}`, value]));
+  const variantCards: Record<string, string> = {};
 
   // Compute once per distinct score/options/tokens configuration per candidate per render.
   // Candidate configurations remain separate from each other and from the reference view.
@@ -560,7 +574,10 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
   };
 
   const cards = candidates.map((candidate, index) => {
-    if (candidate.id !== 'semantic-hand' && reuse?.cards[index] !== undefined) return reuse.cards[index];
+    const dynamic = runtimeById.get(candidate.id);
+    const variantKey = dynamic ? `${dynamic.variant.score}:${dynamic.variant.id}:${dynamic.variant.revision}` : '';
+    if (dynamic && reuse?.variantCards?.[variantKey]) return variantCards[variantKey] = reuse.variantCards[variantKey];
+    if (!dynamic && candidate.id !== 'semantic-hand' && reuse?.cards[index] !== undefined) return reuse.cards[index];
     const resolved = resolveCandidate(candidate);
     const isAbstract =
       candidate.kind === 'abstract' ||
@@ -638,7 +655,8 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const panels = resolved.windows.map((w) => {
       const window = w as JankoScoreCandidateWindow;
       const original = scores[window.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
-      const entry = candidate.id === 'semantic-hand' && original.score.id === config.semanticCandidate?.score.id && config.semanticCandidate
+      const entry = dynamic && original.score.id === dynamic.score.id ? { ...original, score: dynamic.score } :
+        candidate.id === 'semantic-hand' && original.score.id === config.semanticCandidate?.score.id && config.semanticCandidate
         ? { ...original, score: config.semanticCandidate.score } : original;
       const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
       const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
@@ -708,7 +726,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       `grid ${opts.gridWritingPolicy} · system start ${opts.systemStartStyle} · ` +
       `clasp ${toks.claspOffset.toFixed(1)}pt offset / ${toks.claspMinBarlineAir.toFixed(1)}pt barline air · ` +
       `beat grid ${opts.showBeatGrid ? 'on' : 'off'}`;
-    return [
+    const markup = [
       `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="${report.ok ? 'clean' : 'violations'}">`,
       '  <header class="candidate-head">',
       `    <h3>${escapeHtml(candidate.label)}</h3>`,
@@ -724,10 +742,12 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     ]
       .filter(Boolean)
       .join('\n');
+    if (dynamic) variantCards[variantKey] = markup;
+    return markup;
   });
 
   const compareStrip = reuse?.compareStrip ?? renderCompareStrip(config, candidateLayouts);
-  capture?.({ cards: cards.slice(0, config.candidates.length), compareStrip });
+  capture?.({ cards: cards.slice(0, config.candidates.length), compareStrip, variantCards: { ...reuse?.variantCards, ...variantCards } });
 
   // Round 20: a **verification round** (no open axis) states every card's own
   // window set instead of one shared candidate window count, so the header

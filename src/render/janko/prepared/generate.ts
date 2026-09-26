@@ -35,7 +35,7 @@ import { resolve } from 'node:path';
 import { createStudioConfig, renderCandidatesView, renderReferenceView, type StaticCandidateMarkup, JankoStudioConfig } from '../studio';
 import { lintJankoScore } from '../linter';
 import { fingerprintInputs, snapshotKey, type PreparedGeneration, type PreparedInputSnapshot, type PreparedStatus } from './seam';
-import { readCandidate, candidateScore, head, candidateHealth, selectScore, SEMANTIC_STATE, SEMANTIC_SCORE, type EditableScore } from '../semantic-hand';
+import { readCandidate, candidateScore, activeDurationVariants, activeAssignments, head, candidateHealth, selectScore, SEMANTIC_STATE, SEMANTIC_SCORE, type EditableScore } from '../semantic-hand';
 import { existsSync, readFileSync } from 'node:fs';
 
 export type { PreparedArtifactKey, PreparedGeneration, PreparedStatus } from './seam';
@@ -73,9 +73,13 @@ export function generatePreparedStudio(
   }
   const health = candidateRoot && !selectionError ? candidateHealth(candidateRoot, candidatePath, selected) : undefined;
   const state = candidateRoot && health?.state === 'current' ? readCandidate(candidateRoot, candidatePath, selected) : undefined;
-  const semanticCandidate = state?.records.length ? { score: candidateScore(state), revision: head(state, candidateRoot), reviewWindows: state.records.at(-1)!.effects.reviewWindows } : undefined;
+  const scoreProjection = state ? candidateScore(state) : undefined;
+  const handRecord = state?.records.findLast(record => 'selected' in record.effects);
+  const semanticCandidate = scoreProjection && activeAssignments(state!).length && handRecord && 'selected' in handRecord.effects
+    ? { score: scoreProjection, revision: head(state!, candidateRoot), reviewWindows: handRecord.effects.reviewWindows } : undefined;
+  const durationVariants = state && scoreProjection ? activeDurationVariants(state).map(variant => ({ variant, score: scoreProjection })) : [];
   const semanticCandidateError = selectionError ?? (health?.state === 'stale' ? health.diagnostic : undefined);
-  const config = createStudioConfig({ ...overrides, ...(semanticCandidate ? { semanticCandidate } : {}), ...(semanticCandidateError ? { semanticCandidateError } : {}) });
+  const config = createStudioConfig({ ...overrides, ...(semanticCandidate ? { semanticCandidate } : {}), ...(durationVariants.length ? { durationVariants } : {}), ...(semanticCandidateError ? { semanticCandidateError } : {}) });
   // The full watched content snapshot (including font binaries) is the
   // dependency identity. Exclude ONLY the ignored semantic state: its output
   // lives in the independently rendered semantic card. Coherence is still
@@ -89,7 +93,9 @@ export function generatePreparedStudio(
   const candidates = renderCandidatesView(config, hit ? cache!.cards : undefined, value => { cards = value; });
   const candidatesMs = performance.now() - started - configMs;
   const reference = hit ? cache!.reference! : renderReferenceView(config);
-  if (eligible && staticKey && cards && !hit) {
+  // The static input key may hit while a runtime variant changes. Publish its
+  // newly rendered card back to the cache without changing canonical bytes.
+  if (eligible && staticKey && cards) {
     cache!.key = staticKey;
     cache!.cards = cards;
     cache!.reference = reference;
@@ -123,5 +129,8 @@ export function generatePreparedStudio(
       status: { ok: status.ok, violations: status.violations, warnings: status.warnings, systems: status.systems, notes: status.notes },
     })
   );
-  return { generation, artifactHashes, artifacts: { candidates, reference }, status, phaseMs, candidateRevision: semanticCandidate?.revision, ...(semanticCandidateError ? { candidateError: semanticCandidateError } : {}) };
+  return { generation, artifactHashes, artifacts: { candidates, reference }, status, phaseMs,
+    candidateRevision: state?.records.length ? head(state!, candidateRoot) : undefined,
+    variantId: durationVariants.at(-1)?.variant.id,
+    ...(semanticCandidateError ? { candidateError: semanticCandidateError } : {}) };
 }
