@@ -34,10 +34,12 @@ export function renderPreparedStatus(manifest: PreparedManifest): string {
     return 'preparing the engraving… (the real engine is generating the views)';
   }
   const verdict = manifest.error
-    ? '✗ generation failed — showing the last coherent output'
+    ? `✗ generation failed: ${manifest.error} — last coherent output retained if available`
     : manifest.stale
       ? '⏳ stale — inputs changed; regenerating'
-      : manifest.status.ok
+      : manifest.candidateError
+        ? '⚠ saved candidate error'
+        : manifest.status.ok
         ? '✓'
         : '✗';
   const counts = `${manifest.status.violations} violations · ${manifest.status.warnings} warnings · ${manifest.status.systems} systems · ${manifest.status.notes} noteheads`;

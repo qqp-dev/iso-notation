@@ -18,6 +18,8 @@ class Element {
   title = '';
   value = '';
   textContent = '';
+  markup = '';
+  attributes = new Map<string, string>();
   href = ''; target = ''; rel = '';
   clientWidth = 600;
   scrollTop = 0;
@@ -30,7 +32,10 @@ class Element {
   constructor(public tag = 'div') {}
   set innerHTML(html: string) {
     // Model the fixed pane template's controls as DOM children, not its PDF content.
+    this.markup = html;
     if (!html.includes('source-controls')) return;
+    // Keep the legacy info node in the fake until the implementation stops
+    // reading it; markup checks below assert it is absent from the reader.
     for (const name of ['source-select', 'source-info', 'source-page', 'source-zoom', 'source-status', 'source-canvas']) {
       this.entries.set(`.${name}`, new Element(name === 'source-select' ? 'select' : 'div'));
     }
@@ -45,13 +50,13 @@ class Element {
   setChild(selector: string, child: Element): void { this.entries.set(selector, child); }
   append(...nodes: Element[]): void { this.children.push(...nodes); }
   replaceChildren(...nodes: Element[]): void { this.children = nodes; }
-  setAttribute(_name: string, _value: string): void {}
+  setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   addEventListener(type: string, callback: () => void): void { this.events.set(type, [...(this.events.get(type) ?? []), callback]); }
   fire(type: string): void { for (const callback of this.events.get(type) ?? []) callback(); }
   getContext(_kind: string): object { return {}; }
 }
 
-async function launch() {
+async function launch(seed?: Map<string, string>) {
   // Bundle the actual Vite-only viewer and actual session. Replace only pdf.js and its
   // worker asset; the renderer and transport can be deterministically held/rejected.
   const bundle = await build({
@@ -89,7 +94,7 @@ async function launch() {
   const modeButtons = ['source', 'engraving'].map((mode) => {
     const button = new Element('button'); button.dataset.candidatesMode = mode; return button;
   });
-  const storage = new Map<string, string>();
+  const storage = new Map<string, string>(seed);
   const windowEvents = new Map<string, Array<() => void>>();
   let resizeCallback: (() => void) | undefined;
   const pending = new Map<string, Array<ReturnType<typeof deferred<object>>>>();
@@ -184,6 +189,7 @@ async function launch() {
     for (const callback of windowEvents.get('resize') ?? []) callback();
     resizeCallback?.(); await flush();
   };
+  const pagehide = () => { for (const callback of windowEvents.get('pagehide') ?? []) callback(); };
   const switchMobile = async (role: 'reference' | 'candidate') => {
     mobileButtons.find((button) => button.dataset.mobilePane === role)!.fire('click'); await flush();
   };
@@ -196,7 +202,7 @@ async function launch() {
     const button = pane(index).querySelectorAll('[data-action]').find((entry) => entry.dataset.action === name);
     assert.ok(button); button.fire('click');
   };
-  return { root, prepared, grid, storage, fetches, decoder, pageGates, renderGates, renderCalls, documentOptions, pane, action, resolveFetch, rejectFetch, flush, settled, until, resize, switchMobile, switchView, mobileButtons };
+  return { root, prepared, grid, storage, fetches, decoder, pageGates, renderGates, renderCalls, documentOptions, pane, action, resolveFetch, rejectFetch, flush, settled, until, resize, pagehide, switchMobile, switchView, mobileButtons, modeButtons };
 }
 
 test('source viewer enables supported PDF.js strict handling and local decoder resources for each loaded PDF', async () => {
@@ -283,8 +289,8 @@ test('source viewer drops obsolete pages/errors across an actual A/B switch and 
   h.action(0, 'next'); h.action(0, 'in');
   h.action(1, 'next'); h.action(1, 'in');
   await h.flush();
-  assert.match(left.querySelector('.source-page')!.textContent, /page 2 of 37/);
-  assert.match(right.querySelector('.source-page')!.textContent, /page 2 of 2/);
+  assert.match(left.querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/);
+  assert.match(right.querySelector('.source-page')!.textContent, /\b2\s*\/\s*2\b/);
 
   const lateA = deferred<object>();
   h.pageGates.set(`${a}:2`, lateA);
@@ -301,15 +307,15 @@ test('source viewer drops obsolete pages/errors across an actual A/B switch and 
   right.querySelector('select')!.fire('change'); // retry after failed load
   await h.resolveFetch(b);
   assert.equal(right.dataset.renderState, 'ready');
-  assert.match(right.querySelector('.source-page')!.textContent, /page 1 of 1/);
+  assert.match(right.querySelector('.source-page')!.textContent, /\b1\s*\/\s*1\b/);
   lateA.resolve({ getViewport: ({ scale }: { scale: number }) => ({ width: 600 * scale, height: 800 * scale }), render: () => ({ promise: Promise.resolve(), cancel: () => undefined }) });
   await h.flush();
   assert.equal(right.dataset.documentId, b);
   assert.equal(right.querySelector('.source-canvas')!.children.length, 1, 'obsolete A completion cannot replace B pixels');
-  assert.match(left.querySelector('.source-page')!.textContent, /page 2 of 37/, 'right switches do not change left');
+  assert.match(left.querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/, 'right switches do not change left');
   right.querySelector('select')!.value = a; right.querySelector('select')!.fire('change');
   await h.flush();
-  assert.match(right.querySelector('.source-page')!.textContent, /page 2 of 2/);
+  assert.match(right.querySelector('.source-page')!.textContent, /\b2\s*\/\s*2\b/);
   assert.match(right.querySelector('.source-zoom')!.textContent, /150%/);
 });
 
@@ -394,10 +400,55 @@ test('phone pane switch keeps both selected pages, zooms and valid canvases when
   assert.equal(right.querySelector('.source-canvas')!.children[0], candidate);
   assert.equal([...h.renderCalls.values()].reduce((sum, n) => sum + n, 0), renders);
   assert.equal(h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length, scans);
-  assert.match(left.querySelector('.source-page')!.textContent, /page 2 of 37/);
-  assert.match(right.querySelector('.source-page')!.textContent, /page 2 of 2/);
+  assert.match(left.querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/);
+  assert.match(right.querySelector('.source-page')!.textContent, /\b2\s*\/\s*2\b/);
   assert.match(right.querySelector('.source-zoom')!.textContent, /125%/);
   assert.equal(JSON.parse(h.storage.get('janko-source-review-v1')!).mobilePane, 'reference');
+});
+
+test('Candidates Source/Engraving mode preserves each PDF document, zoom, page, ink and place', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  const reference = h.pane(0), candidate = h.pane(1);
+  h.action(0, 'next'); h.action(0, 'in');
+  h.action(1, 'next'); h.action(1, 'in');
+  await h.settled(reference); await h.settled(candidate);
+  const one = reference.querySelector('.source-canvas')!, two = candidate.querySelector('.source-canvas')!;
+  one.scrollTop = 140; two.scrollTop = 75;
+  one.fire('scroll'); two.fire('scroll');
+  const original = one.children[0], other = two.children[0];
+  const calls = [...h.renderCalls.values()].reduce((sum, n) => sum + n, 0);
+  h.modeButtons.find((button) => button.dataset.candidatesMode === 'engraving')!.fire('click');
+  assert.equal(h.root.hidden, true);
+  h.modeButtons.find((button) => button.dataset.candidatesMode === 'source')!.fire('click');
+  await h.flush();
+  assert.equal(h.root.hidden, false);
+  assert.equal(one.children[0], original); assert.equal(two.children[0], other);
+  assert.equal(one.scrollTop, 140); assert.equal(two.scrollTop, 75);
+  assert.equal([...h.renderCalls.values()].reduce((sum, n) => sum + n, 0), calls, 'no extra decode on unchanged pane width');
+  assert.match(reference.querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/);
+  assert.match(candidate.querySelector('.source-page')!.textContent, /\b2\s*\/\s*2\b/);
+  assert.match(candidate.querySelector('.source-zoom')!.textContent, /125%/);
+});
+
+test('Source reload restores each document/page place independently without transferring another PDF’s ink', async () => {
+  const first = await launch();
+  await first.resolveFetch('imslp-936721'); await first.resolveFetch('snortum-v0.4-no01');
+  const scan = first.pane(0).querySelector('.source-canvas')!, candidate = first.pane(1).querySelector('.source-canvas')!;
+  first.action(0, 'next'); first.action(1, 'next');
+  await first.settled(first.pane(0)); await first.settled(first.pane(1));
+  scan.scrollTop = 150; candidate.scrollTop = 85;
+  first.pagehide();
+  const second = await launch(first.storage);
+  await second.resolveFetch('imslp-936721'); await second.resolveFetch('snortum-v0.4-no01');
+  assert.match(second.pane(0).querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/);
+  assert.match(second.pane(1).querySelector('.source-page')!.textContent, /\b2\s*\/\s*2\b/);
+  assert.equal(second.pane(0).querySelector('.source-canvas')!.scrollTop, 150);
+  assert.equal(second.pane(1).querySelector('.source-canvas')!.scrollTop, 85);
+  assert.equal(second.pane(0).querySelector('.source-canvas')!.children.length, 1);
+  assert.equal(second.pane(1).querySelector('.source-canvas')!.children.length, 1);
+  assert.equal(second.pane(0).dataset.documentId, 'imslp-936721');
+  assert.equal(second.pane(1).dataset.documentId, 'snortum-v0.4-no01');
 });
 
 test('a temporarily unmeasurable phone layout keeps both documents and does not advertise stale ink on return', async () => {
@@ -427,7 +478,7 @@ test('a temporarily unmeasurable phone layout keeps both documents and does not 
   assert.equal(candidateHost.scrollTop, 75);
   assert.equal([...h.renderCalls.values()].reduce((sum, count) => sum + count, 0), renders);
   assert.equal(h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length, preflights);
-  assert.match(original.querySelector('.source-page')!.textContent, /page 2 of 37/);
+  assert.match(original.querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/);
   assert.match(candidate.querySelector('.source-zoom')!.textContent, /125%/);
 
   // A hidden pane may retain old pixels, but a newly selected document must
@@ -458,7 +509,7 @@ test('real pane width change refits the same page; pending old pixels are allowe
   await h.resize();
   await h.until(() => (h.renderCalls.get('imslp-936721:1') ?? 0) > before);
   assert.equal(left.dataset.documentId, 'imslp-936721');
-  assert.match(left.querySelector('.source-page')!.textContent, /page 1 of 37/);
+  assert.match(left.querySelector('.source-page')!.textContent, /\b1\s*\/\s*37\b/);
   if (host.children.length) assert.equal(host.children[0], original, 'pending pixels must belong to the same document/page');
   gate.resolve(); await h.settled(left);
   assert.notEqual(host.children[0], original);
@@ -467,23 +518,47 @@ test('real pane width change refits the same page; pending old pixels are allowe
   assert.equal(host.children.length, 0, 'a new page must never inherit the old image while its label changes');
 });
 
-test('source provenance and uncertainty survive A/B changes without concealing page or errors', async () => {
+test('source panes give a compact, accessible reading UI without success or provenance narration, even after rerender', async () => {
   const h = await launch();
-  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
   const left = h.pane(0), right = h.pane(1);
-  const inspect = (pane: Element, id: keyof typeof SOURCE_DOCUMENTS) => {
-    const info = pane.querySelector('.source-info')!;
-    const parts = info.children;
-    assert.ok(parts.some((part) => part.textContent.includes(SOURCE_DOCUMENTS[id].title)));
-    assert.ok(parts.some((part) => part.href === SOURCE_DOCUMENTS[id].url && part.rel.includes('noopener')));
-    assert.ok(parts.some((part) => part.textContent.includes(SOURCE_DOCUMENTS[id].rights)));
-    assert.ok(parts.some((part) => part.textContent.includes(SOURCE_DOCUMENTS[id].differences)));
-    assert.match(pane.querySelector('.source-page')!.textContent, /PDF page 1/);
-  };
-  inspect(left, 'imslp-936721'); inspect(right, 'snortum-v0.4-no01');
+  for (const pane of [left, right]) {
+    assert.match(pane.markup, /<label[^>]*>[^<]*Document\s*<select/i, 'document selector has a real label');
+    const choices = pane.querySelector('select')!.children;
+    assert.ok(choices.length >= 2, 'document A/B choice remains usable');
+    for (const option of choices) {
+      assert.ok(option.textContent.trim().length > 0 && option.textContent.length < 90, 'short human-readable option');
+      assert.notEqual(option.textContent, option.value, 'the reader sees a title, not an internal ID');
+    }
+    assert.doesNotMatch(pane.markup, /source-provenance|source-info|rights|uncertainty|source-context/i);
+    assert.match(pane.markup, /<[^>]*(?=[^>]*class="source-status")(?=[^>]*role="(?:status|alert)")[^>]*>/,
+      'loading and failure have an assistive status outlet');
+    assert.match(pane.markup, /data-action="reset"[^>]*>Fit</);
+    for (const action of ['previous', 'next', 'out', 'in', 'reset']) {
+      const button = pane.markup.match(new RegExp(`<button\\b(?=[^>]*data-action="${action}")[^>]*>[^<]*<\\/button>`, 'i'))?.[0];
+      assert.ok(button && (/aria-label=/.test(button) || /title=/.test(button) || />\s*[A-Za-z]{2,}/.test(button)),
+        `${action} has an accessible name, not just a symbol`);
+    }
+    assert.match(pane.querySelector('.source-status')!.textContent, /load/i, 'only pending work announces progress');
+  }
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  for (const pane of [left, right]) {
+    assert.equal(pane.querySelector('.source-status')!.textContent.trim(), '', 'successful render needs no fidelity or telemetry paragraph');
+    assert.match(pane.querySelector('.source-page')!.textContent, /\b1\s*\/\s*\d+\b/);
+    assert.ok(pane.querySelector('.source-canvas')!.children.length, 'actual page ink remains');
+  }
+  assert.ok(SOURCE_DOCUMENTS['imslp-936721'].rights && SOURCE_DOCUMENTS['imslp-936721'].differences,
+    'the underlying catalog still retains its source facts');
+  h.action(0, 'next'); await h.settled(left);
+  h.action(0, 'in'); await h.settled(left);
+  assert.equal(left.querySelector('.source-status')!.textContent.trim(), '', 'page and zoom rerenders stay quiet on success');
   right.querySelector('select')!.value = 'mutopia-1779-no01'; right.querySelector('select')!.fire('change');
+  assert.match(right.querySelector('.source-status')!.textContent, /load/i);
   await h.rejectFetch('mutopia-1779-no01');
-  inspect(right, 'mutopia-1779-no01');
   assert.equal(right.dataset.renderState, 'error');
-  assert.match(right.querySelector('.source-status')!.textContent, /could not render.*cache unavailable/);
+  assert.match(right.querySelector('.source-status')!.textContent, /mutopia-1779-no01.*cache unavailable.*retry/i);
+  assert.equal(left.querySelector('.source-status')!.textContent.trim(), '', 'an unrelated healthy pane stays quiet');
+  right.querySelector('select')!.fire('change');
+  await h.resolveFetch('mutopia-1779-no01');
+  assert.equal(right.querySelector('.source-status')!.textContent.trim(), '', 'retry removes the old error and healthy narration');
+  assert.doesNotMatch(right.markup, /source-provenance|source-info/i);
 });

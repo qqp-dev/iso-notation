@@ -38,6 +38,7 @@ import {
 
 import prepared from 'virtual:janko-prepared-manifest';
 import { observeCandidateFrame } from './observation';
+import { decorateReferenceReader, readReferenceReader, writeReferenceReader, type ReferenceScore } from './reference-reader';
 import type { PreparedManifest } from './status';
 import {
   applyZoom,
@@ -160,10 +161,42 @@ function mountOnce(manifest: PreparedManifest): void {
     else session.captureScroll();
   }
 
+  const storage = studioSessionStorage();
+  // Independent Reference anchors and zooms; Candidates keeps the original
+  // session slot. This record lives on the document across a viewer remount.
+  const readerHost = host as StudioSessionHost & { __jankoReferenceReader?: ReturnType<typeof readReferenceReader> };
+  const reader = readerHost.__jankoReferenceReader ?? readReferenceReader(storage);
+  readerHost.__jankoReferenceReader = reader;
+  if (!remount) {
+    if (session.state.view === 'candidates') reader.candidatesZoom = session.state.zoom;
+    session.state.scroll.reference = reader.places[reader.selected];
+    if (session.state.view === 'reference') session.state.zoom = reader.zooms[reader.selected];
+  }
+  const saveReference = (): void => {
+    if (session.state.view !== 'reference' || root.hidden || session.restorePending()) return;
+    const top = port.get();
+    if (Number.isFinite(top) && top >= 0) reader.places[reader.selected] = top;
+    reader.zooms[reader.selected] = session.state.zoom;
+    writeReferenceReader(storage, reader);
+  };
+  const picker = document.getElementById('janko-reference-picker') as HTMLSelectElement | null;
+  if (picker) picker.value = reader.selected;
   const applier: PreparedApplier = createPreparedApplier({
     root,
     status: dom.status,
     fetchText: fetchArtifact,
+    beforeSwap: () => {
+      // Artifact replacement can collapse the document before the 150 ms
+      // scroll debounce runs. Save the *visible* pane's live place while its
+      // original layout is still present; never sample an empty first load,
+      // hidden Source surface or a pending programmatic restore.
+      if (root.hidden || session.restorePending() ||
+          !Array.from(root.querySelectorAll<HTMLElement>('.view-panel')).some((panel) => panel.classList.contains('is-active'))) return;
+      clearScrollTimer();
+      session.capture();
+      saveReference();
+    },
+    afterSwap: () => decorateReferenceReader(root, reader.selected),
   });
   activeApplier = applier;
   const currentView = (): string => session.state.view;
@@ -177,20 +210,54 @@ function mountOnce(manifest: PreparedManifest): void {
     removers.push(() => target.removeEventListener(type, handler));
   };
 
+  let viewEpoch = 0;
+  const switchView = (next: string, setHash?: (view: string) => void): void => {
+    if (next === session.state.view) { setHash?.(next); showView(root, next); return; }
+    clearScrollTimer();
+    saveReference();
+    // Capture the outgoing pane while it still has its original zoom and
+    // height. Shrinking it first can clamp window.scrollY irreversibly.
+    if (!root.hidden && !session.restorePending()) session.capture();
+    if (next === 'reference') session.state.scroll.reference = reader.places[reader.selected];
+    const incomingZoom = next === 'reference' ? reader.zooms[reader.selected] : candidatesZoom;
+    const epoch = ++viewEpoch;
+    if (root.hidden) {
+      session.state.view = next;
+      showView(root, next);
+      setHash?.(next);
+    } else {
+      selectStudioView({ session, root, view: next, afterLayout: afterLayoutReady, setHash });
+    }
+    session.setZoom(incomingZoom);
+    zoom = incomingZoom;
+    applyZoom(dom, zoom);
+    session.persist();
+    if (!root.hidden && session.place() === 0) afterLayoutReady(() => { if (epoch === viewEpoch && session.state.view === next) port.set(0); });
+  };
+  let candidatesZoom = session.state.view === 'candidates' ? session.state.zoom : reader.candidatesZoom;
   for (const tab of dom.tabs) {
     on(tab, 'click', () => {
-      selectStudioView({
-        session,
-        root,
-        view: tab.dataset.viewTarget ?? 'candidates',
-        afterLayout: afterLayoutReady,
-        setHash: (view) => {
-          if (typeof window !== 'undefined') window.location.hash = view;
-        },
-      });
+      switchView(tab.dataset.viewTarget ?? 'candidates', (view) => { window.location.hash = view; });
       observe();
     });
   }
+  if (picker) on(picker, 'change', () => {
+    const next = picker.value;
+    if (next !== 'primary' && next !== 'brahms-op118-no1') return;
+    clearScrollTimer();
+    saveReference();
+    session.cancelRestore();
+    const epoch = ++viewEpoch;
+    reader.selected = next as ReferenceScore;
+    writeReferenceReader(storage, reader);
+    decorateReferenceReader(root, reader.selected);
+    session.state.scroll.reference = reader.places[reader.selected];
+    zoom = reader.zooms[reader.selected];
+    session.setZoom(zoom);
+    applyZoom(dom, zoom);
+    if (reader.places[reader.selected] === 0) afterLayoutReady(() => { if (epoch === viewEpoch && reader.selected === next && session.state.view === 'reference') port.set(0); });
+    else session.restorePlace(afterLayoutReady);
+  });
   showView(root, session.state.view);
 
   let zoom = session.state.zoom;
@@ -199,6 +266,8 @@ function mountOnce(manifest: PreparedManifest): void {
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
     applyZoom(dom, zoom);
     session.setZoom(zoom);
+    if (session.state.view === 'reference') { reader.zooms[reader.selected] = zoom; writeReferenceReader(storage, reader); }
+    else { candidatesZoom = zoom; reader.candidatesZoom = zoom; writeReferenceReader(storage, reader); }
     session.capture();
   };
   const step = (delta: number): void => setZoom(zoom + delta);
@@ -231,21 +300,20 @@ function mountOnce(manifest: PreparedManifest): void {
     scrollTimer = undefined;
   };
   const scroll = (): void => {
-    if (session.restorePending()) {
-      const top = port.get();
-      const target = session.place();
-      if (target !== top && top > 0) session.cancelRestore();
-    }
+    // A score swap can itself move the viewport before the two-frame restore.
+    // Pointer, touch, wheel and keyboard gestures cancel it; layout scrolls
+    // must not overwrite the incoming score's saved anchor.
+    if (session.restorePending() || root.hidden) return;
     if (typeof window === 'undefined') return;
     clearScrollTimer();
     scrollTimer = window.setTimeout(() => {
       scrollTimer = undefined;
-      session.capture();
+      if (!root.hidden) { session.capture(); saveReference(); }
     }, STUDIO_SCROLL_CAPTURE_DELAY_MS);
   };
   const pagehide = (): void => {
     clearScrollTimer();
-    session.capture();
+    if (!root.hidden && !session.restorePending()) { session.capture(); saveReference(); }
   };
   const visibilitychange = (): void => {
     if (document.visibilityState === 'hidden') pagehide();
@@ -258,22 +326,27 @@ function mountOnce(manifest: PreparedManifest): void {
     window.addEventListener('scroll', scroll, { passive: true });
     window.addEventListener('pagehide', pagehide);
     on(window, 'hashchange', () => {
-      selectStudioView({
-        session,
-        root,
-        view: viewFromHash(session.state.view),
-        afterLayout: afterLayoutReady,
-      });
+      switchView(viewFromHash(session.state.view));
       observe();
     });
     window.addEventListener('pointerdown', gesture, { passive: true });
     window.addEventListener('touchstart', gesture, { passive: true });
   }
   document.addEventListener('visibilitychange', visibilitychange);
+  on(window, 'janko-before-surface-hide', () => {
+    // On a Source-mode reload no prepared paper has arrived yet. Sampling the
+    // empty page would destroy the saved anchor before it could be restored.
+    if (!root.hidden && root.dataset.preparedGeneration && !session.restorePending()) {
+      session.capture(); saveReference();
+    }
+  });
+  on(window, 'janko-surface-show', () => {
+    decorateReferenceReader(root, reader.selected);
+    if (root.dataset.preparedGeneration) session.restorePlace(afterLayoutReady);
+  });
 
   claimScrollRestoration();
-  session.restorePlace(afterLayoutReady);
-  afterLayoutReady(() => session.capture());
+  if (root.dataset.preparedGeneration && !root.hidden) session.restorePlace(afterLayoutReady);
 
   activeSession = session;
   GLOBAL_SCOPE.__jankoStudioListeners = {
@@ -299,7 +372,7 @@ function mountOnce(manifest: PreparedManifest): void {
   void applier.apply(manifest, currentView).then((outcome) => {
     if (activeApplier !== applier || outcome === 'dropped') return;
     applyZoom(dom, session.state.zoom);
-    session.restorePlace(afterLayoutReady);
+    if (!root.hidden && root.dataset.preparedGeneration) session.restorePlace(afterLayoutReady);
     if (outcome === 'applied') afterLayoutReady(observe);
     else observe();
   });
@@ -329,7 +402,7 @@ function bootstrap(): void {
         .apply((mod as unknown as { default: PreparedManifest }).default, () => activeSession?.state.view ?? 'candidates')
         .then((outcome) => {
           if (outcome === 'dropped') return;
-          activeSession?.restorePlace(afterLayoutReady);
+          if (!root.hidden) activeSession?.restorePlace(afterLayoutReady);
           if (outcome === 'applied') afterLayoutReady(() => observeCandidateFrame(root, document, window));
           else observeCandidateFrame(root, document, window);
         });

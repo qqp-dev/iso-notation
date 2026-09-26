@@ -115,10 +115,11 @@ export function selectStudioView(args: {
   /** Address-bar update (the tab path passes it; the hash path is already there). */
   setHash?: (view: string) => void;
 }): void {
+  if (!args.session.restorePending()) args.session.capture();
   args.session.setView(args.view);
   showView(args.root, args.view);
   args.setHash?.(args.view);
-  args.session.capture();
+  args.session.persist();
   args.session.restorePlace(args.afterLayout);
 }
 
@@ -164,6 +165,8 @@ export function createPreparedApplier(args: {
   root: HTMLElement;
   status: HTMLElement | null;
   fetchText: (key: PreparedArtifactKey, url: string) => Promise<string>;
+  beforeSwap?: () => void;
+  afterSwap?: () => void;
 }): PreparedApplier {
   const { root, status, fetchText } = args;
   // Survive a viewer re-mount (HMR of the viewer module itself): the applied
@@ -184,6 +187,7 @@ export function createPreparedApplier(args: {
       root.dataset.preparedObservation = JSON.stringify({ state: 'unobserved', reason: 'manifest-requested' });
       if (status) {
         status.textContent = renderPreparedStatus(manifest);
+        status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && !manifest.candidateError && manifest.status.ok);
         status.dataset.live = 'false';
       }
       if (manifest.generation === 'pending') {
@@ -204,6 +208,7 @@ export function createPreparedApplier(args: {
         return 'error-shown';
       }
       root.dataset.preparedState = manifest.stale && applied !== null ? 'refreshing' : 'loading';
+      if (status) { status.textContent = manifest.stale ? renderPreparedStatus(manifest) : 'Loading prepared engraving…'; status.dataset.healthy = 'false'; }
       const fetchStart = performance.now();
       const generationToken = manifest.generation;
       let candidates: string;
@@ -226,7 +231,7 @@ export function createPreparedApplier(args: {
             `<p style="color:#f87171;font-size:13px">The prepared artifact could not be loaded: ` +
             `${message}</p>`;
         }
-        if (status) status.textContent = renderPreparedStatus({ ...manifest, error: message });
+        if (status) { status.textContent = renderPreparedStatus({ ...manifest, error: message }); status.dataset.healthy = 'false'; }
         return applied !== null ? 'artifact-failed-kept' : 'artifact-failed-shown';
       }
       // Out-of-order guard: a response for a superseded generation is dropped.
@@ -244,10 +249,12 @@ export function createPreparedApplier(args: {
       else delete root.dataset.preparedVariantId;
       count += 1;
       root.dataset.preparedApply = String(count);
+      args.beforeSwap?.();
       root.innerHTML = `${candidates}\n${reference}`;
       foldPreparedDetails(root);
+      args.afterSwap?.();
       root.dataset.preparedState = manifest.stale ? 'stale' : 'ready';
-      if (status) status.textContent = renderPreparedStatus(manifest);
+      if (status) { status.textContent = renderPreparedStatus(manifest); status.dataset.healthy = String(!manifest.stale && !manifest.candidateError && manifest.status.ok); }
       // The fresh markup redefines the panels and arrives with no active one;
       // re-show the session's view NOW, before the caller restores the scroll
       // place — a hidden panel collapses the document and clamps the reader
