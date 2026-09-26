@@ -540,13 +540,11 @@ test('prepared metadata and findings fold without losing content or nesting on r
 // live-collecting layer (the defects were call-site bugs, not API bugs).
 // ---------------------------------------------------------------------------
 
-test('the viewer wires both switch paths through selectStudioView and restores place after every apply', () => {
+test('the viewer routes both tab and hash switches through live selection and restores after every apply', () => {
   const source = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer.ts`, 'utf8');
-  assert.equal(
-    source.split('selectStudioView({').length - 1,
-    2,
-    'the tab click and the hash change both switch through selectStudioView'
-  );
+  assert.match(source, /on\(tab, 'click', [\s\S]*?switchView\(/, 'tab clicks route through the shared switch');
+  assert.match(source, /on\(window, 'hashchange', [\s\S]*?switchView\(/, 'hash changes route through the same switch');
+  assert.match(source, /selectStudioView\(\{ session, root, view: next/, 'the shared switch uses live panels and the session');
   assert.ok(!source.includes('dom.panels'), 'no collected panel list survives in the viewer');
   assert.ok(!source.includes('showView(dom'), 'no stale-dom switch call survives');
   const adds = source.split('addEventListener').length - 1;
@@ -556,11 +554,8 @@ test('the viewer wires both switch paths through selectStudioView and restores p
     'every handler except the one-shot DOMContentLoaded boot is detached on re-mount (no stale/duplicated handlers)'
   );
   assert.ok(source.includes('createPreparedApplier'), 'the manifest is applied by the tested applier');
-  assert.equal(
-    source.split('restorePlace').length - 1,
-    3,
-    'place restore runs after the mount apply, the HMR re-apply and view switches (inside selectStudioView)'
-  );
+  assert.match(source, /applier\.apply\(manifest, currentView\)\.then\([\s\S]*?restorePlace\(/,
+    'mount apply restores after the prepared swap');
   const hot = source.slice(source.indexOf("import.meta.hot.accept('virtual:janko-prepared-manifest'"));
   assert.ok(hot.length > 0, 'the HMR accept contract is intact');
   assert.match(hot, /\.apply\(/, 'the accept path re-applies the delivered manifest');

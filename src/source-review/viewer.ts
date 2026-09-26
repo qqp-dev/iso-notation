@@ -85,18 +85,18 @@ async function checkScanDecoder(wasmUrl: string): Promise<void> {
 }
 
 type Role = 'reference' | 'candidate';
-interface Pane { container: HTMLElement; info: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number } }
+interface Pane { container: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number } }
 const panes = {} as Record<Role, Pane>;
 for (const role of ['reference', 'candidate'] as const) {
   const container = document.createElement('section'); container.className = `source-pane source-${role}`;
   container.setAttribute('aria-label', role === 'reference' ? 'Original scan' : 'Published transcription');
-  container.innerHTML = `<h3>${role === 'reference' ? 'Original scan · provisional reference' : 'Published PDF A/B'}</h3>
+  container.innerHTML = `<h3>${role === 'reference' ? 'Original scan' : 'Published PDF'}</h3>
     <label>Document <select class="source-select"></select></label>
     <div class="source-controls"><button data-action="previous" aria-label="Previous PDF page">◀</button>
     <span class="source-page"></span><button data-action="next" aria-label="Next PDF page">▶</button>
     <button data-action="out" aria-label="Zoom out">−</button><span class="source-zoom"></span>
     <button data-action="in" aria-label="Zoom in">+</button><button data-action="reset">Fit</button></div>
-    <div class="source-canvas"></div><p class="source-status" role="status"></p><details class="source-provenance"><summary>Publication, rights &amp; uncertainty</summary><div class="source-info"></div></details>`;
+    <div class="source-canvas"></div><p class="source-status" role="status"></p>`;
   root.querySelector('.source-grid')!.append(container);
   const select = container.querySelector('select')!;
   for (const id of role === 'reference' ? REFERENCE_IDS : CANDIDATE_IDS) {
@@ -104,7 +104,7 @@ for (const role of ['reference', 'candidate'] as const) {
     opt.textContent = role === 'reference' ? SOURCE_DOCUMENTS[id].version : SOURCE_DOCUMENTS[id].edition;
     select.append(opt);
   }
-  panes[role] = { container, select, info: container.querySelector('.source-info')!, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
+  panes[role] = { container, select, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
   select.addEventListener('change', () => { rememberPlace(role); selectDocument(state, role, select.value as SourceDocumentId); persist(); void render(role); });
   container.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => button.addEventListener('click', () => {
     rememberPlace(role);
@@ -149,18 +149,11 @@ async function render(role: Role): Promise<void> {
   const retain = oldPixels?.id === id && oldPixels.page === page && pane.container.dataset.renderState !== 'error';
   if (!retain) { pane.canvasHost.replaceChildren(); pane.pixels = undefined; }
   pane.select.value = id;
-  pane.info.replaceChildren();
-  const heading = document.createElement('strong'); heading.textContent = doc.title;
-  const edition = document.createElement('p'); edition.textContent = `${doc.edition} · ${doc.version}`;
-  const link = document.createElement('a'); link.href = doc.url; link.textContent = 'Direct published PDF / source URL'; link.target = '_blank'; link.rel = 'noopener noreferrer';
-  const rights = document.createElement('p'); rights.textContent = `Access/rights claim: ${doc.rights}`;
-  const differences = document.createElement('p'); differences.textContent = `Known differences/uncertainty: ${doc.differences}`;
-  pane.info.append(heading, edition, link, rights, differences);
-  pane.page.textContent = `PDF page ${page} of ${doc.pages}`;
+  pane.page.textContent = `${page}/${doc.pages}`;
   pane.zoom.textContent = `${Math.round(zoom * 100)}%`;
   pane.container.dataset.documentId = id;
   pane.container.dataset.renderState = 'loading';
-  pane.status.textContent = `Loading ${id}, PDF page ${page}…`;
+  pane.status.textContent = `Loading ${doc.title}, page ${page}…`;
   try {
     const pdf = await load(id);
     if (serial !== pane.serial) return;
@@ -192,7 +185,7 @@ async function render(role: Role): Promise<void> {
     pane.pixels = { id, page, width };
     pane.render = undefined;
     pane.container.dataset.renderState = 'ready';
-    pane.status.textContent = `${id}: PDF page ${page} of ${pdf.numPages} drawn (${role === 'reference' ? 'local JBIG2 decoder path checked; ' : ''}image fidelity not certified). Printed page and measures are not aligned across documents.`;
+    pane.status.textContent = '';
   } catch (error) {
     if (serial !== pane.serial) return;
     pane.render = undefined;
@@ -204,8 +197,10 @@ async function render(role: Role): Promise<void> {
 }
 function updateSurface(): void {
   const sourceActive = location.hash !== '#reference' && mode === 'source';
+  if (sourceActive && !prepared.hidden) window.dispatchEvent?.(new Event('janko-before-surface-hide'));
   root.hidden = !sourceActive;
   prepared.hidden = sourceActive;
+  if (!sourceActive) window.dispatchEvent?.(new Event('janko-surface-show'));
   const switcher = document.querySelector<HTMLElement>('.source-mode-switch');
   if (switcher) switcher.hidden = location.hash === '#reference';
   document.body.classList.toggle('source-mode', sourceActive);

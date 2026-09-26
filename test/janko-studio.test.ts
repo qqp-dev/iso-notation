@@ -8,7 +8,7 @@
  *     Brahms seats and unisons, and the nib case), with labels, the golden
  *     baseline badge, lint chips and SVG previews.
  *  2. `renderReferenceView()` renders the Golden Master: the full page spread
- *     (every page carries glyphs) plus the macro focus crops, based on
+ *     (every page carries glyphs) plus engine artifact macro data, based on
  *     `DEFAULT_JANKO_OPTIONS`.
  *  3. The candidate registry is the single source of truth — adding an entry
  *     needs five lines and zero template edits.
@@ -312,7 +312,7 @@ test('STOP tripwire (unlanded): GOLD Bach block lints clean in the Reference vie
 // 2. Golden Reference Object
 // ---------------------------------------------------------------------------
 
-test('renderReferenceView renders the golden page spread and macro crops', () => {
+test('renderReferenceView retains both complete page sets and macro data in the engine artifact', () => {
   const html = renderReferenceView(CONFIG);
   // Two golden scores since Round 30, each in its own scored block.
   const blocks = html.match(/data-score="/g) ?? [];
@@ -330,7 +330,7 @@ test('renderReferenceView renders the golden page spread and macro crops', () =>
   const bachCrops = bach.match(/data-crop="/g) ?? [];
   const brahmsCrops = brahms.match(/data-crop="/g) ?? [];
   assert.equal(bachCrops.length, 0, 'Bach focus crops dropped by operator order (spread stays)');
-  assert.equal(brahmsCrops.length, BRAHMS_STUDIO_CROPS.length);
+  assert.equal(brahmsCrops.length, BRAHMS_STUDIO_CROPS.length, 'macro data remains in the engine artifact; the reader hides it without changing engraving');
   assert.equal(
     (html.match(/<svg/g) ?? []).length,
     bachPages.length + brahmsPages.length + bachCrops.length + brahmsCrops.length

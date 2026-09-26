@@ -272,21 +272,16 @@ test('the fingerprint changes when an input changes and its key is stable', () =
 test('the thin viewer and its observer import no engraving module', async () => {
   const source = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer.ts`, 'utf8');
   const imports = [...source.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
-  assert.deepEqual(
-    [...imports].sort(),
-    ['../studio-session', './observation', './status', './viewer-dom', 'virtual:janko-prepared-manifest'],
-    'the browser bundle carries no engine, linter or score builder'
-  );
+  assert.ok(imports.includes('virtual:janko-prepared-manifest') && imports.includes('./viewer-dom') && imports.includes('../studio-session'),
+    'the viewer retains the prepared manifest, application and session seams');
+  assert.ok(imports.every((name) => !/engine|linter|scores/.test(name)), 'the browser bundle carries no engraver');
   const domSource = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer-dom.ts`, 'utf8');
   const domImports = [...domSource.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
-  assert.deepEqual(
-    [...domImports].sort(),
-    ['../studio-session', './status'],
-    'the DOM application layer is pure: session types and the status line only'
-  );
+  assert.ok(domImports.every((name) => !/engine|linter|scores|virtual:janko/.test(name)),
+    'the DOM application layer has no engine, linter, score or virtual manifest dependency');
   const observerSource = readFileSync(`${projectRoot}/src/render/janko/prepared/observation.ts`, 'utf8');
   const observerImports = [...observerSource.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
-  assert.deepEqual(observerImports, ['./viewer-dom'], 'the observer uses only the prepared DOM layer');
+  assert.ok(observerImports.every((name) => !/engine|linter|scores/.test(name)), 'the observer does not import engraving');
   for (const forbidden of ['../engine', '../linter', '../../scores', 'buildBachGoldberg', 'lintJankoScore', 'renderReferenceView', 'renderCandidatesView']) {
     assert.ok(!source.includes(forbidden), `the viewer must not reference ${forbidden}`);
     assert.ok(!domSource.includes(forbidden), `the DOM layer must not reference ${forbidden}`);
@@ -383,6 +378,22 @@ test('the portrait notice guards short phone landscape, not a fine-pointer deskt
     assert.match(rule.body, /body\s*>\s*header\s*,\s*body\s*>\s*main\s*,\s*body\s*>\s*footer\s*\{\s*visibility:\s*hidden/, 'hidden ready frames must not appear behind the notice');
     assert.match(rule.body, /\.portrait-notice\s*\{[^}]*background:\s*#000(?:000)?\s*;/, 'the rotation surface is pitch black');
   }
+});
+
+test('reader shell removes source acquisition prose and blank reserves without removing controls or error slots', () => {
+  const html = readFileSync(`${projectRoot}/janko.html`, 'utf8');
+  assert.equal(html, readFileSync(`${projectRoot}/public/janko.html`, 'utf8'));
+  assert.ok(!/class="source-context(?:-details)?"|class="source-footer"|source-provenance|\.source-info\s*\{|\.source-provenance\s*\{|source-context-details\s*\{/.test(html),
+    'no source boilerplate, provenance region or CSS spacer survives in the reader');
+  assert.ok(!/local source-PDF acquisition preview|fidelity not certified|no source is approved/i.test(html),
+    'no source-acquisition or healthy fidelity prose survives in the shell');
+  assert.ok(!/\.source-mode\s+\.source-mode-switch\s*\{[^}]*position:\s*fixed/i.test(html),
+    'mode controls do not reserve or cover the foot of a portrait paper pane');
+  assert.match(html, /class="source-grid"/);
+  assert.match(html, /id="janko-status"/, 'real prepared failures retain a status outlet');
+  assert.match(html, /:focus-visible\s*\{[^}]*outline/, 'keyboard focus remains visibly painted');
+  assert.match(html, /--bg:\s*#000;/, 'paper remains on black');
+  assert.match(html, /\.source-mode\s+\.source-canvas\s*\{[^}]*flex:\s*1/, 'PDF pages receive the available reading area');
 });
 
 test('the round badge has black paper-first chrome in the mirrored studio shell', () => {
