@@ -5,6 +5,9 @@ import { initialChoices, restoreChoices, selectDocument, setPage, setZoom, STORA
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const endpoint = (id: SourceDocumentId) => `/@janko-source-pdf/${id}`;
+const decoderUrl = () => import.meta.env.DEV
+  ? '/@janko-pdfjs-wasm/'
+  : new URL('./assets/source-pdf-decoder/', document.baseURI).href;
 const root = document.getElementById('source-review')!;
 const prepared = document.getElementById('janko-studio')!;
 const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-candidates-mode]'));
@@ -28,7 +31,10 @@ function load(id: SourceDocumentId): Promise<pdfjs.PDFDocumentProxy> {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
       if (!response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error('not a PDF response');
       const bytes = new Uint8Array(await response.arrayBuffer());
-      const doc = await pdfjs.getDocument({ data: bytes }).promise;
+      // PDF.js resolves JBIG2/OpenJPEG/QCMS resources against this directory in
+      // its worker. Strict parsing rejects parse failures where PDF.js supports
+      // them; asynchronous image errors additionally need the resource check below.
+      const doc = await pdfjs.getDocument({ data: bytes, wasmUrl: decoderUrl(), stopAtErrors: true }).promise;
       if (doc.numPages !== SOURCE_DOCUMENTS[id].pages) { await doc.destroy(); throw new Error('PDF page count mismatch'); }
       return doc;
     })();
@@ -36,6 +42,27 @@ function load(id: SourceDocumentId): Promise<pdfjs.PDFDocumentProxy> {
     void task.catch(() => { if (loaded.get(id) === task) loaded.delete(id); }); // allow a retry after a missing/failed PDF
   }
   return task;
+}
+
+// PDF.js 5.7 catches asynchronous image decoder failures even with
+// stopAtErrors and resolves RenderTask with an empty image. For the approved
+// scanned references, verify that at least one local JBIG2 decoder path is
+// viable before reporting the page ready. A failed check is retried on the
+// next render (no poisoned resource cache); the JS fallback is legitimate when
+// WebAssembly is unavailable. This is NOT a blank-page/ink-density check.
+async function checkScanDecoder(wasmUrl: string): Promise<void> {
+  try {
+    const response = await fetch(`${wasmUrl}jbig2.wasm`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`JBIG2 wasm HTTP ${response.status}`);
+    await WebAssembly.compile(await response.arrayBuffer());
+    return;
+  } catch {
+    try {
+      const fallback = await import(/* @vite-ignore */ `${wasmUrl}jbig2_nowasm_fallback.js`);
+      if (typeof fallback.default === 'function') return;
+    } catch { /* neither local decoder path is usable */ }
+    throw new Error('local JBIG2 decoder unavailable (wasm and fallback); retry after restoring decoder resources');
+  }
 }
 
 type Role = 'reference' | 'candidate';
@@ -97,6 +124,10 @@ async function render(role: Role): Promise<void> {
     if (serial !== pane.serial) return;
     const pdfPage = await pdf.getPage(page);
     if (serial !== pane.serial) return;
+    if (role === 'reference') {
+      await checkScanDecoder(decoderUrl());
+      if (serial !== pane.serial) return;
+    }
     // 100% fits one full page to the pane's width; each pane then zooms independently.
     const natural = pdfPage.getViewport({ scale: 1 });
     const fit = (pane.canvasHost.clientWidth || 600) / natural.width;
@@ -114,7 +145,7 @@ async function render(role: Role): Promise<void> {
     if (serial !== pane.serial) return;
     pane.canvasHost.replaceChildren(canvas);
     pane.container.dataset.renderState = 'ready';
-    pane.status.textContent = `${id}: PDF page ${page} of ${pdf.numPages} rendered. Printed page and measures are not aligned across documents.`;
+    pane.status.textContent = `${id}: PDF page ${page} of ${pdf.numPages} drawn (${role === 'reference' ? 'local JBIG2 decoder path checked; ' : ''}image fidelity not certified). Printed page and measures are not aligned across documents.`;
   } catch (error) {
     if (serial !== pane.serial) return;
     pane.container.dataset.renderState = 'error';
