@@ -101,6 +101,7 @@
 
     /* ----------------------------------------------------------------- views */
     main { flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+    [hidden] { display: none !important; }
     .view-panel { display: none; }
     .view-panel.is-active { display: block; }
 
@@ -236,6 +237,33 @@
     .diag-ok { color: var(--ok) !important; }
     .diagnostics code { color: var(--accent); }
 
+    .source-mode .zoom-group, .source-mode .engraving-context, .source-mode .engraving-footer { display: none; }
+    body:not(.source-mode) .source-context, body:not(.source-mode) .source-footer { display: none; }
+    .source-review { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .source-review h2 { font-size: 19px; margin: 10px 0; }
+    .source-review > p { color: #cbd5e1; line-height: 1.5; font-size: 13px; margin: 8px 0; }
+    .source-mode-switch, .source-mobile-switch { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+    .source-pane { min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .source-pane h3 { font-size: 15px; margin-bottom: 10px; }
+    .source-pane select { max-width: 100%; margin: 0 0 10px 8px; }
+    .source-info { font-size: 12px; line-height: 1.5; color: #cbd5e1; min-height: 170px; overflow-wrap: anywhere; }
+    .source-info p { margin: 4px 0; }
+    .source-info a { color: var(--accent); }
+    .source-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
+    .source-controls button, .source-mobile-switch button { background: #263449; color: white; border: 1px solid #4a607b; border-radius: 5px; min-height: 36px; padding: 5px 10px; cursor: pointer; }
+    .source-controls button:focus-visible, .source-mode-switch button:focus-visible { outline: 2px solid var(--accent); }
+    .source-page { font-weight: 700; font-size: 12px; margin-right: 10px; }
+    .source-status { font-size: 12px; color: var(--muted); min-height: 32px; }
+    .source-canvas { background: white; max-height: 72vh; min-height: 100px; overflow: auto; }
+    .source-canvas canvas { display: block; max-width: none; }
+    .source-mobile-switch { display: none; }
+    @media (max-width: 700px) {
+      .source-grid { display: block; }
+      .source-mobile-switch { display: flex; margin-top: 12px; }
+      .source-review[data-mobile-pane="reference"] .source-candidate,
+      .source-review[data-mobile-pane="candidate"] .source-reference { display: none; }
+    }
     footer {
       border-top: 1px solid var(--border);
       padding: 10px 18px;
@@ -262,7 +290,8 @@
   <header>
     <div class="brand">
       <h1>Jánko Engraving Studio</h1>
-      <p>Live two-view rig · <code>http://100.102.70.49:5175/janko.html</code> · Bach Goldberg Var. 1</p>
+      <p class="engraving-context">Live two-view rig · <code>http://100.102.70.49:5175/janko.html</code> · Bach Goldberg Var. 1</p>
+      <p class="source-context">Candidates · Scriabin Op. 11 No. 1 · local source-PDF acquisition preview (not a design round)</p>
     </div>
     <div class="controls">
       <nav class="tabs" aria-label="Studio views">
@@ -279,6 +308,18 @@
   </header>
 
   <main>
+    <div class="source-mode-switch" aria-label="Candidates mode">
+      <span>Candidates:</span>
+      <button class="tab" data-candidates-mode="source" aria-pressed="true">Source PDF comparison</button>
+      <button class="tab" data-candidates-mode="engraving" aria-pressed="false">Engraving design round</button>
+    </div>
+    <div id="source-review" class="source-review" hidden>
+      <h2>Scriabin Op. 11 No. 1 · source-fidelity acquisition session</h2>
+      <p>Compare an original scan on the left (1897 first edition selected <strong>provisionally</strong>) with one published transcription PDF on the right. Each pane has its own PDF page and zoom. PDF page numbers are not printed pages or matching measures. Scan pages for No. 1 and their legibility still need human inspection.</p>
+      <p>Viewing and switching do not certify equivalence, exact build, whole-note accuracy or a canonical starter; no source or notation choice is approved or automatically imported. Published PDFs are not independently rebuilt.</p>
+      <div class="source-mobile-switch" aria-label="Mobile comparison pane"><button data-mobile-pane="reference">Original scan</button><button data-mobile-pane="candidate">Published PDF</button></div>
+      <div class="source-grid"></div>
+    </div>
     <!-- Rendered live by src/render/janko/studio.ts (Vite HMR). -->
     <div id="janko-studio" data-initial-view="candidates">
       <p style="color:#94a3b8;font-size:13px">Loading the prepared engraving…</p>
@@ -286,10 +327,13 @@
   </main>
 
   <footer>
-    <div id="janko-status">awaiting first render…</div>
-    <div class="hint">Ctrl/⌘ + wheel or +/− keys to zoom · prepared by the real engine, refreshed in place on change</div>
+    <div id="janko-status" class="engraving-footer">awaiting first render…</div>
+    <div class="hint engraving-footer">Ctrl/⌘ + wheel or +/− keys to zoom · prepared by the real engine, refreshed in place on change</div>
+    <div class="source-footer">Local PDF preview · each document reports its own loading or error state above; no source is approved.</div>
+    <div class="source-footer">Use each pane’s page and zoom controls; page numbers do not align measures.</div>
   </footer>
 
   <script type="module" src="/src/render/janko/prepared/viewer.ts"></script>
+  <script type="module" src="/src/source-review/viewer.ts"></script>
 </body>
 </html>

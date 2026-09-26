@@ -4,12 +4,13 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
 import { jankoPreparedStudioPlugin } from './src/render/janko/prepared/vite-plugin';
+import { sourcePdfPlugin } from './src/source-review/vite-plugin';
 
 // The static config (exported so tests can pin the prepared seam); Vite is
 // handed the same object as the default.
 export const viteConfig = {
   base: './',
-  plugins: [react(), tailwindcss(), jankoPreparedStudioPlugin()],
+  plugins: [react(), tailwindcss(), jankoPreparedStudioPlugin(), sourcePdfPlugin()],
   build: {
     rollupOptions: {
       input: {

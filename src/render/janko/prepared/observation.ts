@@ -26,6 +26,8 @@ export function candidateObservation(root: HTMLElement, doc: Document): Candidat
   const reason = !root.isConnected ? 'disconnected' : doc.visibilityState !== 'visible' ? 'hidden' :
     data.preparedState !== 'ready' ? `prepared-${data.preparedState ?? 'unknown'}` :
     activePanelViews(root).join(',') !== 'candidates' ? 'wrong-view' :
+    !Array.from(root.querySelectorAll<HTMLElement>('.view-panel')).some((panel) =>
+      panel.dataset.view === 'candidates' && panel.getClientRects().length > 0) ? 'hidden-candidate-panel' :
     !identity.generation || !identity.candidateRevision || !identity.candidatesHash ? 'no-candidate' : undefined;
   return reason ? { state: 'unobserved', reason, ...identity } : { state: 'frame-opportunity', ...identity };
 }

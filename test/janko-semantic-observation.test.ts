@@ -4,7 +4,14 @@ import { candidateObservation, observeCandidateFrame } from '../src/render/janko
 
 function harness() {
   const pending: Array<() => void> = [];
-  const panel = { dataset: { view: 'candidates' }, classList: { contains: () => true } };
+  let visible = true;
+  const panel = {
+    dataset: { view: 'candidates' },
+    classList: { contains: () => true },
+    // A source-review mode can leave an engraving tab logically active while
+    // CSS hides its entire panel. Browser layout rectangles expose that fact.
+    getClientRects: () => visible ? [{ width: 1, height: 1 }] : [],
+  };
   const root = {
     isConnected: true,
     dataset: { preparedState: 'ready', preparedGeneration: 'g1', preparedCandidateRevision: 'r1', preparedCandidatesHash: 'h1', preparedApply: '1', preparedObservation: '' },
@@ -14,7 +21,7 @@ function harness() {
   const win = { requestAnimationFrame: (cb: () => void) => { pending.push(cb); return pending.length; } };
   const frames = () => { while (pending.length) pending.shift()!(); };
   const observed = () => JSON.parse(root.dataset.preparedObservation);
-  return { root, doc, win, frames, observed, panel };
+  return { root, doc, win, frames, observed, panel, setEngravingVisible: (value: boolean) => { visible = value; } };
 }
 
 test('two frame opportunities acknowledge only the exact applied visible candidate, not server readiness', () => {
@@ -36,6 +43,22 @@ test('two frame opportunities acknowledge only the exact applied visible candida
   h.panel.dataset.view = 'candidates';
   h.root.isConnected = false;
   assert.equal(candidateObservation(root, doc).reason, 'disconnected');
+});
+
+test('source mode cannot acknowledge an engraving frame while its panel is hidden', () => {
+  const h = harness();
+  const root = h.root as unknown as HTMLElement, doc = h.doc as unknown as Document, win = h.win as unknown as Window;
+  h.setEngravingVisible(false); // e.g. an ancestor hidden by the source/engraving mode switch
+  assert.equal(candidateObservation(root, doc).state, 'unobserved');
+  observeCandidateFrame(root, doc, win);
+  h.frames();
+  assert.equal(h.observed().state, 'unobserved');
+
+  h.setEngravingVisible(true);
+  observeCandidateFrame(root, doc, win);
+  h.setEngravingVisible(false); // switch modes between scheduling and the frame
+  h.frames();
+  assert.equal(h.observed().state, 'unobserved', 'a queued old engraving frame cannot cross a source-mode switch');
 });
 
 test('frame evidence includes the active comparison variant, not just a shared state revision', () => {
