@@ -20,6 +20,7 @@ class Element {
   textContent = '';
   href = ''; target = ''; rel = '';
   clientWidth = 600;
+  scrollTop = 0;
   width = 0; height = 0;
   style: Record<string, string> = {};
   children: Element[] = [];
@@ -79,12 +80,18 @@ async function launch() {
   });
   const root = new Element();
   const grid = new Element(); root.setChild('.source-grid', grid);
+  const mobileButtons = ['reference', 'candidate'].map((role) => {
+    const button = new Element('button'); button.dataset.mobilePane = role; return button;
+  });
+  root.setChild('[data-mobile-pane]', Object.assign(new Element(), { children: mobileButtons }));
   const prepared = new Element();
   const switcher = new Element();
   const modeButtons = ['source', 'engraving'].map((mode) => {
     const button = new Element('button'); button.dataset.candidatesMode = mode; return button;
   });
   const storage = new Map<string, string>();
+  const windowEvents = new Map<string, Array<() => void>>();
+  let resizeCallback: (() => void) | undefined;
   const pending = new Map<string, Array<ReturnType<typeof deferred<object>>>>();
   const pageGates = new Map<string, ReturnType<typeof deferred<object>>>();
   const renderGates = new Map<string, ReturnType<typeof deferred<void>>>();
@@ -111,7 +118,9 @@ async function launch() {
     },
     location: { hash: '#candidates' },
     sessionStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => { storage.set(key, value); } },
-    window: { devicePixelRatio: 1, addEventListener: () => undefined, clearTimeout, setTimeout },
+    window: { devicePixelRatio: 1, addEventListener: (name: string, callback: () => void) => {
+      windowEvents.set(name, [...(windowEvents.get(name) ?? []), callback]);
+    }, clearTimeout, setTimeout: (callback: () => void) => { resizeCallback = callback; return 1; } },
     fetch: (url: string) => {
       if (url.endsWith('/jbig2.wasm')) {
         fetches.push(url);
@@ -171,11 +180,23 @@ async function launch() {
     await flush();
   };
   const pane = (index: number) => grid.children[index];
+  const resize = async () => {
+    for (const callback of windowEvents.get('resize') ?? []) callback();
+    resizeCallback?.(); await flush();
+  };
+  const switchMobile = async (role: 'reference' | 'candidate') => {
+    mobileButtons.find((button) => button.dataset.mobilePane === role)!.fire('click'); await flush();
+  };
+  const switchView = async (hash: string) => {
+    context.location.hash = hash;
+    for (const callback of windowEvents.get('hashchange') ?? []) callback();
+    await flush();
+  };
   const action = (index: number, name: string) => {
     const button = pane(index).querySelectorAll('[data-action]').find((entry) => entry.dataset.action === name);
     assert.ok(button); button.fire('click');
   };
-  return { root, prepared, grid, storage, fetches, decoder, pageGates, renderGates, renderCalls, documentOptions, pane, action, resolveFetch, rejectFetch, flush, settled, until };
+  return { root, prepared, grid, storage, fetches, decoder, pageGates, renderGates, renderCalls, documentOptions, pane, action, resolveFetch, rejectFetch, flush, settled, until, resize, switchMobile, switchView, mobileButtons };
 }
 
 test('source viewer enables supported PDF.js strict handling and local decoder resources for each loaded PDF', async () => {
@@ -231,9 +252,12 @@ test('stale decoder preflight rejection cannot overwrite a switched scan or leav
   const left = h.pane(0);
   await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
   h.decoder.wasm = 'pending';
+  const oldCanvas = left.querySelector('.source-canvas')!.children[0];
   h.action(0, 'in'); await h.flush();
   assert.equal(left.dataset.renderState, 'loading');
-  assert.equal(left.querySelector('.source-canvas')!.children.length, 0);
+  const pendingPixels = left.querySelector('.source-canvas')!.children;
+  assert.ok(pendingPixels.length <= 1);
+  if (pendingPixels.length) assert.equal(pendingPixels[0], oldCanvas, 'only valid pixels from the same document/page may remain while zoom is pending');
   assert.equal(h.decoder.pending.length, 1, 'real scanned-page preflight must be in flight');
   left.querySelector('select')!.value = 'imslp-10496'; left.querySelector('select')!.fire('change');
   assert.equal(left.dataset.documentId, 'imslp-10496');
@@ -301,7 +325,7 @@ test('a rejected page decode never becomes ready or retains pixels; same-documen
   h.action(0, 'in');
   await h.until(() => (h.renderCalls.get(key) ?? 0) > before);
   assert.equal(left.dataset.renderState, 'loading');
-  assert.equal(left.querySelector('.source-canvas')!.children.length, 0, 'old canvas removed before attempting a new render');
+  assert.ok(left.querySelector('.source-canvas')!.children.length <= 1, 'same-document pending work may keep valid old pixels until replacement');
   broken.reject(new Error('JBIG2 decoder unavailable'));
   await h.flush();
   assert.equal(left.dataset.renderState, 'error');
@@ -329,4 +353,137 @@ test('a rejected page decode never becomes ready or retains pixels; same-documen
   assert.equal(left.dataset.renderState, 'ready');
   assert.equal(left.querySelector('.source-canvas')!.children.length, 1);
   assert.doesNotMatch(left.querySelector('.source-status')!.textContent, /late decode failure/);
+});
+
+test('same-width resize and return from Reference preserve decoded canvas, scan preflight and scroll place', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  const left = h.pane(0), right = h.pane(1);
+  const canvas = (pane: Element) => pane.querySelector('.source-canvas')!.children[0];
+  const first = canvas(left), second = canvas(right);
+  const scans = h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length;
+  const renders = [...h.renderCalls.values()].reduce((sum, n) => sum + n, 0);
+  left.querySelector('.source-canvas')!.scrollTop = 120;
+  right.querySelector('.source-canvas')!.scrollTop = 70;
+  await h.resize(); // height-only: effective pane width has not moved
+  await h.settled(left); await h.settled(right);
+  assert.equal(canvas(left), first);
+  assert.equal(canvas(right), second);
+  assert.equal(left.querySelector('.source-canvas')!.scrollTop, 120);
+  assert.equal(right.querySelector('.source-canvas')!.scrollTop, 70);
+  await h.switchView('#reference'); await h.switchView('#candidates');
+  assert.equal(canvas(left), first, 'returning to Source at the same fit reuses the decoded page');
+  assert.equal(canvas(right), second);
+  assert.equal(h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length, scans);
+  assert.equal([...h.renderCalls.values()].reduce((sum, n) => sum + n, 0), renders);
+});
+
+test('phone pane switch keeps both selected pages, zooms and valid canvases when fit is unchanged', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  const left = h.pane(0), right = h.pane(1);
+  h.action(0, 'next'); h.action(1, 'next'); h.action(1, 'in'); await h.flush();
+  await h.settled(left); await h.settled(right);
+  const original = left.querySelector('.source-canvas')!.children[0];
+  const candidate = right.querySelector('.source-canvas')!.children[0];
+  const renders = [...h.renderCalls.values()].reduce((sum, n) => sum + n, 0);
+  const scans = h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length;
+  await h.switchMobile('candidate'); await h.switchMobile('reference');
+  await h.settled(left); await h.settled(right);
+  assert.equal(left.querySelector('.source-canvas')!.children[0], original);
+  assert.equal(right.querySelector('.source-canvas')!.children[0], candidate);
+  assert.equal([...h.renderCalls.values()].reduce((sum, n) => sum + n, 0), renders);
+  assert.equal(h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length, scans);
+  assert.match(left.querySelector('.source-page')!.textContent, /page 2 of 37/);
+  assert.match(right.querySelector('.source-page')!.textContent, /page 2 of 2/);
+  assert.match(right.querySelector('.source-zoom')!.textContent, /125%/);
+  assert.equal(JSON.parse(h.storage.get('janko-source-review-v1')!).mobilePane, 'reference');
+});
+
+test('a temporarily unmeasurable phone layout keeps both documents and does not advertise stale ink on return', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  const original = h.pane(0), candidate = h.pane(1);
+  h.action(0, 'next'); h.action(0, 'in');
+  h.action(1, 'next'); h.action(1, 'in');
+  await h.settled(original); await h.settled(candidate);
+  const originalHost = original.querySelector('.source-canvas')!, candidateHost = candidate.querySelector('.source-canvas')!;
+  originalHost.scrollTop = 110; candidateHost.scrollTop = 75;
+  const originalCanvas = originalHost.children[0], candidateCanvas = candidateHost.children[0];
+  const renders = [...h.renderCalls.values()].reduce((sum, count) => sum + count, 0);
+  const preflights = h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length;
+
+  // A rotation guard or transient hidden layout can leave panes unmeasurable.
+  // Returning to the same effective fit must keep valid canvases and anchors.
+  originalHost.clientWidth = 0; candidateHost.clientWidth = 0;
+  await h.resize();
+  await h.switchMobile('candidate'); await h.switchView('#reference');
+  await h.switchView('#candidates'); await h.switchMobile('reference');
+  originalHost.clientWidth = 600; candidateHost.clientWidth = 600;
+  await h.resize();
+  assert.equal(originalHost.children[0], originalCanvas);
+  assert.equal(candidateHost.children[0], candidateCanvas);
+  assert.equal(originalHost.scrollTop, 110);
+  assert.equal(candidateHost.scrollTop, 75);
+  assert.equal([...h.renderCalls.values()].reduce((sum, count) => sum + count, 0), renders);
+  assert.equal(h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length, preflights);
+  assert.match(original.querySelector('.source-page')!.textContent, /page 2 of 37/);
+  assert.match(candidate.querySelector('.source-zoom')!.textContent, /125%/);
+
+  // A hidden pane may retain old pixels, but a newly selected document must
+  // clear them synchronously before the new label becomes visible again.
+  candidateHost.clientWidth = 0;
+  candidate.querySelector('select')!.value = 'mutopia-1779-no01';
+  candidate.querySelector('select')!.fire('change');
+  await h.flush();
+  candidateHost.clientWidth = 600;
+  await h.resize();
+  assert.equal(candidate.dataset.documentId, 'mutopia-1779-no01');
+  assert.equal(candidate.dataset.renderState, 'loading');
+  assert.equal(candidateHost.children.length, 0, 'no previous candidate pixels beneath the new document label');
+  await h.resolveFetch('mutopia-1779-no01');
+  assert.equal(candidate.dataset.renderState, 'ready');
+  assert.equal(candidateHost.children.length, 1);
+  assert.notEqual(candidateHost.children[0], candidateCanvas);
+});
+
+test('real pane width change refits the same page; pending old pixels are allowed only under matching identity', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  const left = h.pane(0), host = left.querySelector('.source-canvas')!;
+  const original = host.children[0];
+  const before = h.renderCalls.get('imslp-936721:1') ?? 0;
+  const gate = deferred<void>(); h.renderGates.set('imslp-936721:1', gate);
+  host.clientWidth = 430;
+  await h.resize();
+  await h.until(() => (h.renderCalls.get('imslp-936721:1') ?? 0) > before);
+  assert.equal(left.dataset.documentId, 'imslp-936721');
+  assert.match(left.querySelector('.source-page')!.textContent, /page 1 of 37/);
+  if (host.children.length) assert.equal(host.children[0], original, 'pending pixels must belong to the same document/page');
+  gate.resolve(); await h.settled(left);
+  assert.notEqual(host.children[0], original);
+  assert.equal(host.children[0].style.width, '430px', 'the new width is fitted to the available pane');
+  h.action(0, 'next');
+  assert.equal(host.children.length, 0, 'a new page must never inherit the old image while its label changes');
+});
+
+test('source provenance and uncertainty survive A/B changes without concealing page or errors', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  const left = h.pane(0), right = h.pane(1);
+  const inspect = (pane: Element, id: keyof typeof SOURCE_DOCUMENTS) => {
+    const info = pane.querySelector('.source-info')!;
+    const parts = info.children;
+    assert.ok(parts.some((part) => part.textContent.includes(SOURCE_DOCUMENTS[id].title)));
+    assert.ok(parts.some((part) => part.href === SOURCE_DOCUMENTS[id].url && part.rel.includes('noopener')));
+    assert.ok(parts.some((part) => part.textContent.includes(SOURCE_DOCUMENTS[id].rights)));
+    assert.ok(parts.some((part) => part.textContent.includes(SOURCE_DOCUMENTS[id].differences)));
+    assert.match(pane.querySelector('.source-page')!.textContent, /PDF page 1/);
+  };
+  inspect(left, 'imslp-936721'); inspect(right, 'snortum-v0.4-no01');
+  right.querySelector('select')!.value = 'mutopia-1779-no01'; right.querySelector('select')!.fire('change');
+  await h.rejectFetch('mutopia-1779-no01');
+  inspect(right, 'mutopia-1779-no01');
+  assert.equal(right.dataset.renderState, 'error');
+  assert.match(right.querySelector('.source-status')!.textContent, /could not render.*cache unavailable/);
 });

@@ -326,6 +326,76 @@ test('janko.html loads the thin viewer; the public mirror stays byte-identical',
   assert.ok(root.includes('<script type="module" src="/src/render/janko/prepared/viewer.ts"></script>'));
   assert.ok(!root.includes('/src/render/janko/studio.ts'), 'the shell must not boot the in-browser engraving');
   assert.equal(root.indexOf('src/render/janko/prepared/viewer.ts'), root.lastIndexOf('src/render/janko/prepared/viewer.ts'), 'exactly one boot module');
+  assert.match(root, /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/, 'native browser zoom is not disabled');
+  assert.deepEqual([...root.matchAll(/data-view-target="([^"]+)"/g)].map((match) => match[1]), ['candidates', 'reference'], 'exactly the approved two studio surfaces');
+  assert.ok(root.includes('data-candidates-mode="source"') && root.includes('data-candidates-mode="engraving"'), 'the source comparison and prepared engraving remain available');
+  assert.ok(root.includes('data-mobile-pane="reference"') && root.includes('data-mobile-pane="candidate"'), 'phone comparison keeps both Original and Candidate controls');
+  assert.ok(root.includes('class="source-grid"'), 'the existing pair of source panes remains in the real studio');
+  assert.match(root, />\s*Rotate to portrait\s*</i, 'the phone-landscape guard needs a readable rotation instruction, not inaccessible paper');
+});
+
+test('the portrait notice guards short phone landscape, not a fine-pointer desktop window', () => {
+  const html = readFileSync(`${projectRoot}/janko.html`, 'utf8');
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
+  assert.ok(css, 'the studio shell must include its responsive styles');
+  assert.match(css, /\.portrait-notice\s*\{\s*display:\s*none\s*;/,
+    'the notice is not shown over normal studio content');
+
+  // Inspect the actual media rules controlling the notice, not a single
+  // breakpoint or a copy of the message. This covers comma-separated arms:
+  // one unguarded narrow arm would still blank a desktop browser window.
+  const rules: { query: string; body: string }[] = [];
+  for (const match of css.matchAll(/@media\s+([^{}]+)\{/g)) {
+    let depth = 1;
+    let end = match.index! + match[0].length;
+    for (; end < css.length && depth; end++) {
+      if (css[end] === '{') depth++;
+      if (css[end] === '}') depth--;
+    }
+    rules.push({ query: match[1], body: css.slice(match.index! + match[0].length, end - 1) });
+  }
+  const noticeRules = rules.filter(({ body }) => /\.portrait-notice\s*\{[^}]*display:\s*flex\s*;/.test(body));
+  assert.ok(noticeRules.length, 'phone landscape must expose a readable notice');
+  const matches = (query: string, width: number, height: number, pointer: 'coarse' | 'fine') =>
+    query.split(',').some((arm) => arm.split(/\s+and\s+/i).every((condition) => {
+      const feature = condition.trim().match(/^\(\s*(orientation|max-width|min-width|max-height|min-height|max-device-width|pointer|hover)\s*:\s*([\w-]+)\s*\)$/i);
+      assert.ok(feature, `unsupported guard condition needs an explicit test case: ${condition}`);
+      const [, name, value] = feature;
+      if (name === 'orientation') return value === (width > height ? 'landscape' : 'portrait');
+      if (name === 'pointer') return value === pointer;
+      if (name === 'hover') return value === (pointer === 'fine' ? 'hover' : 'none');
+      const size = name.includes('height') ? height : width;
+      // A regular desktop's physical device width exceeds these narrow viewport
+      // probes; a max-device-width condition cannot activate solely on resize.
+      const actual = name === 'max-device-width' && pointer === 'fine' ? 1440 : size;
+      const threshold = Number.parseInt(value, 10);
+      return name.startsWith('min-') ? actual >= threshold : actual <= threshold;
+    }));
+  const visible = (width: number, height: number, pointer: 'coarse' | 'fine') =>
+    noticeRules.some(({ query }) => matches(query, width, height, pointer));
+  for (const height of [320, 450]) {
+    assert.equal(visible(700, height, 'coarse'), true, 'short phone landscape needs the rotation notice');
+    assert.equal(visible(700, height, 'fine'), false, 'resizing a desktop window must not hide the studio');
+  }
+  assert.equal(visible(390, 844, 'coarse'), false, 'portrait must keep the existing view and paper usable');
+  assert.equal(visible(1440, 900, 'fine'), false, 'desktop landscape must remain usable');
+  for (const rule of noticeRules) {
+    assert.match(rule.body, /body\s*>\s*header\s*,\s*body\s*>\s*main\s*,\s*body\s*>\s*footer\s*\{\s*visibility:\s*hidden/, 'hidden ready frames must not appear behind the notice');
+    assert.match(rule.body, /\.portrait-notice\s*\{[^}]*background:\s*#000(?:000)?\s*;/, 'the rotation surface is pitch black');
+  }
+});
+
+test('the round badge has black paper-first chrome in the mirrored studio shell', () => {
+  const root = readFileSync(`${projectRoot}/janko.html`, 'utf8');
+  // Check the final matching declaration, not the presence of a black token
+  // elsewhere: earlier badge rules used to leave a tinted background visible.
+  const declarations = [...root.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, selectors]) => selectors.split(',').some((selector) => selector.trim() === '.round-badge'))
+    .flatMap(([, , body]) => [...body.matchAll(/(?:^|;)\s*background\s*:\s*([^;]+)/g)].map((match) => match[1].trim()));
+  assert.ok(declarations.length > 0, 'badge background should be explicitly painted black');
+  const last = declarations.at(-1)!;
+  assert.ok(last === '#000' || last === '#000000' || (last === 'var(--bg)' && /--bg\s*:\s*#000(?:000)?\s*;/.test(root)),
+    `round badge must finish on pure black, got ${last}`);
 });
 
 test('the vite config carries the prepared seam and the shell inputs', async () => {
