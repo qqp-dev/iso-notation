@@ -646,7 +646,7 @@ test('E. Bach GOLD is byte-frozen, and Round 47 keeps this round\u2019s family a
   let svg = '';
   const archivalBach = bachBeforeM5(bach);
   for (let i = 0; i < countJankoPages(archivalBach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); i++) {
-    svg += renderJankoPage(archivalBach, i, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+    svg += renderJankoPage(archivalBach, i, { ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false }, DEFAULT_JANKO_TOKENS);
   }
   assert.equal(
     createHash('sha256').update(svg).digest('hex'),

@@ -81,18 +81,19 @@ test('PR96 pinned-archive Reference full pages and real-engine macro windows rem
     // PR96 predates the operator-judged Bach GOLD correction. Restore only
     // those two historical hands for the independent archival byte witness.
     const score = id === 'primary' ? bachBeforeM5(entry.score) : entry.score;
-    const layouts=layoutJankoScore(score,entry.options,entry.tokens);
+    const options = id === 'primary' ? { ...entry.options, inferBoundaryRests: false } : entry.options;
+    const layouts=layoutJankoScore(score,options,entry.tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    assert.deepEqual(pages.map(page=>sha(renderJankoPage(score,page,entry.options,entry.tokens,layouts))),baseline.pages);
-    assert.equal(sha(renderJankoCrop(score,1,4,entry.options,entry.tokens,undefined,layouts)),baseline.whole);
+    assert.deepEqual(pages.map(page=>sha(renderJankoPage(score,page,options,entry.tokens,layouts))),baseline.pages);
+    assert.equal(sha(renderJankoCrop(score,1,4,options,entry.tokens,undefined,layouts)),baseline.whole);
     const crops=id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS;
-    assert.deepEqual(crops.map(c=>sha(renderJankoCrop(score,c.start,c.count,entry.options,entry.tokens,undefined,layouts))),baseline.crops);
+    assert.deepEqual(crops.map(c=>sha(renderJankoCrop(score,c.start,c.count,options,entry.tokens,undefined,layouts))),baseline.crops);
     if (id === 'primary') {
       const currentLayouts = layoutJankoScore(entry.score,entry.options,entry.tokens);
       assert.notEqual(sha(renderJankoPage(entry.score,0,entry.options,entry.tokens,currentLayouts)),baseline.pages[0],
         'the judged m. 5 hands change the Bach first page');
-      assert.equal(sha(renderJankoPage(entry.score,1,entry.options,entry.tokens,currentLayouts)),baseline.pages[1],
-        'the unaffected Bach second page remains byte-identical');
+      assert.notEqual(sha(renderJankoPage(entry.score,1,entry.options,entry.tokens,currentLayouts)),baseline.pages[1],
+        'the second page also contains the approved m. 25 boundary rest');
     }
   }
 });

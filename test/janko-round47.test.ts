@@ -181,7 +181,7 @@ test('A. Bach GOLD and the Brahms Reference are byte-identical', () => {
   let bach = '';
   const archivalBach = bachBeforeM5(BACH);
   for (let page = 0; page < countJankoPages(archivalBach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); page++) {
-    bach += renderJankoPage(archivalBach, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+    bach += renderJankoPage(archivalBach, page, { ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false }, DEFAULT_JANKO_TOKENS);
   }
   assert.equal(
     sha(bach),

@@ -1230,6 +1230,9 @@ export interface JankoLayoutOptions {
    * {@link JankoRestStyle}).
    */
   restStyle?: JankoRestStyle;
+  /** Infer an active hand's opening silence from its preceding-system onset and
+   * maximum still-sounding release. Disable only for a legacy comparison. */
+  inferBoundaryRests?: boolean;
   /**
    * Horizontal cluster spacing (Round 17): the rectangular mask margin and the
    * breathing air between same-row heads of one onset. Defaults to the golden
@@ -1783,6 +1786,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   subdivisionStyle: 'classical-urtext',
   claspDurationStyle: 'kinetic-cross-slashes',
   restStyle: 'classical-urtext',
+  inferBoundaryRests: true,
   clusterSpacing: 'tight',
   gridWritingPolicy: 'overlaid-beat-grid',
   systemStartStyle: 'architectural-bracket',

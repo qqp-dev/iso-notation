@@ -553,19 +553,39 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   assert.equal(Number(rest552.y.toFixed(1)), 179.5, 'Rest y pinned at 179.5');
   assert.ok(Math.abs(rest552.y - 179.48625) < 0.01, 'Rest seats at exactly 179.48625');
 
-  // Hanging rest counts: Bach 9 (frozen), Brahms 21 (was 20 before Round 45).
+  // Hanging rest counts: Bach 11 (nine prior seats plus two approved RH eighths).
   // The m. 66 RH → LH hand correction (§D) re-hands the tick-12552/12576
   // reattacks, which opens exactly one further genuine hanging rest
   // (t12576, quarter, RH); the source correction's 74 false hanging rests
-  // stay gone and the engine's rest rules are untouched.
-  // Source correction filled 74 false hanging rests opened by playback
-  // shortenings (e.g. the m.68 t13092 12-tick gap from 96→84 halves, now full
-  // 96; staccato 24→18 gaps, now abutting). Engine rules unchanged.
+  // stay gone. That source correction filled 74 false hanging rests opened by
+  // playback shortenings (e.g. the m.68 t13092 12-tick gap from 96→84 halves,
+  // now full 96; staccato 24→18 gaps, now abutting). The current boundary
+  // policy adds only the two approved Bach system-opening silences.
   const bachHanging = bachLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
-  assert.equal(bachHanging.length, 9, 'Bach hanging-rest count holds at exactly 9');
+  assert.equal(bachHanging.length, 11, 'canonical Bach has nine prior rests plus two RH boundary eighths');
+  // The PR111 rest policy is an archival witness, not the current GOLD policy.
+  // Compare complete old rest records (including geometry) against that witness;
+  // the page-SVG strip-two comparison in janko-rest-paint.test.ts independently
+  // protects all other emitted ink.
+  const priorLayouts = layoutJankoScore(BACH, resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false }), t);
+  const priorHanging = priorLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
+  const approvedBoundary = (r: (typeof bachHanging)[number]) => r.hand === 'RH' && (r.tick === 576 || r.tick === 3456);
+  assert.equal(priorHanging.length, 9, 'PR111 policy has nine hanging rests');
+  assert.deepEqual(bachHanging.filter((r) => !approvedBoundary(r)), priorHanging, 'the original nine rest records and seats are unchanged');
+  const added = bachHanging.filter(approvedBoundary);
+  assert.deepEqual(added.map((r) => [r.hand, r.tick, r.value, r.x]), [
+    ['RH', 576, 'eighth', 37.8],
+    ['RH', 3456, 'eighth', 37.8],
+  ], 'the two and only two new seats belong to approved RH eighth rests');
+  for (const [r, y] of added.map((r, i) => [r, [320.95875, 499.93125][i]] as const)) {
+    assert.ok(Math.abs(r.y - y) < 1e-6, `RH t${r.tick} vertical seat is ${y}`);
+  }
 
-  const brahmsOpts = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
-  const brahmsTokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  // Use Brahms' canonical cut-time measure and upbeat, not Bach's 144-tick
+  // defaults: the PR111 baseline and current engine both place 23 rests under
+  // these score-specific settings. The mixed-meter diagnostic placed 20/21.
+  const brahmsOpts = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
+  const brahmsTokens = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
   const brahmsLayouts = layoutJankoScore(BRAHMS, brahmsOpts, brahmsTokens);
   const brahmsHanging = brahmsLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
   // Round 48: two of the three former false silences are gone — the m. 66 LH
@@ -575,7 +595,7 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   // authority (the authority resolves the run's hand, so the raw label no
   // longer vetoes), while the m. 66 RH quarter — which the source writes as
   // an `r` — stays and is classified **authored**.
-  assert.equal(brahmsHanging.length, 20, 'Brahms hanging-rest count holds at exactly 20');
+  assert.equal(brahmsHanging.length, 23, 'canonical Brahms hanging-rest count holds at the PR111 baseline of 23');
   assert.equal(
     brahmsLayouts.flatMap((s) => s.withheldRests).length,
     1,
@@ -599,12 +619,9 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   assert.equal(bachMaxDisp, 0, 'Bach rest horizontal displacement max is exactly 0.000');
   assert.equal(bachMeanDisp, 0, 'Bach rest horizontal displacement mean is exactly 0.000');
 
-  // Vertical displacement stats vs pre-change seats (pre-change snapped to drawn lines {36, 48, 60}):
-  let bachMovedCount = 0;
-  let bachDySum = 0;
-  let bachDyMax = 0;
-  for (const r of bachHanging) {
-    const sys = bachLayouts.find((s) => s.rests.includes(r))!;
+  // Vertical displacement stats vs pre-change seats (snapped to drawn lines {36, 48, 60}).
+  const bachDy = (r: (typeof bachHanging)[number], layouts: typeof bachLayouts) => {
+    const sys = layouts.find((s) => s.rests.includes(r))!;
     const currentLin = 48 + (sys.geometry.middleCY - r.y) / t.semitoneScale;
     let nearestLine = 48;
     let bestDist = Math.abs(currentLin - 48);
@@ -615,12 +632,22 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
         nearestLine = d;
       }
     }
-    const oldY = sys.geometry.middleCY - (nearestLine - 48) * t.semitoneScale;
-    const dy = Math.abs(r.y - oldY);
-    if (dy > 0.01) bachMovedCount++;
-    bachDySum += dy;
-    if (dy > bachDyMax) bachDyMax = dy;
-  }
+    return Math.abs(r.y - (sys.geometry.middleCY - (nearestLine - 48) * t.semitoneScale));
+  };
+  const priorDy = priorHanging.map((r) => bachDy(r, priorLayouts));
+  const addedDy = added.map((r) => bachDy(r, bachLayouts));
+  const bachDys = bachHanging.map((r) => bachDy(r, bachLayouts));
+  assert.deepEqual(bachHanging.filter((r) => !approvedBoundary(r)).map((r) => bachDy(r, bachLayouts)), priorDy,
+    'the original nine retain their displacement geometry');
+  const priorMovedCount = priorDy.filter((dy) => dy > 0.01).length;
+  const addedMovedCount = addedDy.filter((dy) => dy > 0.01).length;
+  const bachMovedCount = bachDys.filter((dy) => dy > 0.01).length;
+  const bachDySum = bachDys.reduce((sum, dy) => sum + dy, 0);
+  const bachDyMax = Math.max(0, ...bachDys);
+  assert.ok(priorMovedCount <= 8, `original nine moved ${priorMovedCount} <= 8`);
+  assert.equal(addedMovedCount, 2, 'each approved RH boundary eighth adds exactly one vertical move');
+  assert.equal(bachMovedCount, priorMovedCount + addedMovedCount, 'no other move is introduced');
+  assert.equal(bachMovedCount, 10, 'canonical Bach eleven-rest move total');
 
   let brahmsMovedCount = 0;
   let brahmsDySum = 0;
@@ -646,10 +673,10 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
 
   console.log(
     `[Voice-Height Rest Displacement Stats]\n` +
-    `  Bach: ${bachHanging.length} hanging rests, ${bachMovedCount} vertical moves (expected <= 8), max dy = ${bachDyMax.toFixed(2)}pt, mean dy = ${(bachDySum / bachHanging.length).toFixed(2)}pt, max dx = 0.000\n` +
-    `  Brahms: ${brahmsHanging.length} hanging rests, ${brahmsMovedCount} vertical moves (expected ~18; was ~90 pre-correction with 94 hanging), max dy = ${brahmsDyMax.toFixed(2)}pt, mean dy = ${(brahmsDySum / brahmsHanging.length).toFixed(2)}pt, max dx = 0.000`
+    `  Bach: ${bachHanging.length} hanging rests, ${bachMovedCount} vertical moves (prior nine ${priorMovedCount} <= 8 + two RH boundary moves), max dy = ${bachDyMax.toFixed(2)}pt, mean dy = ${(bachDySum / bachHanging.length).toFixed(2)}pt, max dx = 0.000\n` +
+    `  Brahms: ${brahmsHanging.length} hanging rests, ${brahmsMovedCount} vertical moves (canonical baseline 20), max dy = ${brahmsDyMax.toFixed(2)}pt, mean dy = ${(brahmsDySum / brahmsHanging.length).toFixed(2)}pt, max dx = 0.000`
   );
-  assert.ok(bachMovedCount <= 8, `Bach vertical moves ${bachMovedCount} <= 8`);
-  assert.ok(brahmsMovedCount >= 15 && brahmsMovedCount <= 20, `Brahms vertical moves ${brahmsMovedCount} ~18`);
+  assert.ok(brahmsMovedCount >= 15 && brahmsMovedCount <= 20, `Brahms vertical moves ${brahmsMovedCount} within the retained 15..20 bound`);
+  assert.equal(brahmsMovedCount, 20, 'canonical Brahms vertical moves match the PR111 baseline');
 });
 
