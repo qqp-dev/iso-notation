@@ -803,6 +803,25 @@ test('Defect: a rest driven into a foreign notehead is caught', () => {
   assert.deepEqual(clean, []);
 });
 
+test('Defect: restored GOLD boundary rests are audited against foreign notehead ink', () => {
+  const layouts=systems(DEFAULT_JANKO_OPTIONS);
+  for(const tick of [576,3456]) {
+    const layout=layouts.find(s=>s.rests.some(r=>r.tick===tick&&r.hand==='RH'));
+    assert.ok(layout,`rest t${tick} exists in the actual score`);
+    const rest=layout.rests.find(r=>r.tick===tick&&r.hand==='RH')!;
+    assert.equal(rest.value,'eighth');
+    const clean: LintViolation[]=[];
+    checkRestClearance(layout,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,LINT,clean);
+    assert.deepEqual(clean,[],`rest t${tick} clears its system`);
+    const victim=layout.notes.find(p=>p.note.startTick===tick&&p.note.hand==='LH')!;
+    assert.ok(victim,`foreign LH attack exists at t${tick}`);
+    const broken={...layout,rests:[{...rest,x:victim.x,y:victim.y}]};
+    const hits: LintViolation[]=[];
+    checkRestClearance(broken,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,LINT,hits);
+    assert.ok(hits.some(v=>v.code==='rest-collision'&&v.noteIds?.includes(victim.note.id)),`rest t${tick} moved onto LH head is caught`);
+  }
+});
+
 test('Defect: a beam driven into a printed rest is caught', () => {
   const out: LintViolation[] = [];
   const layout = systems(DEFAULT_JANKO_OPTIONS)[0];

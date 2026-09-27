@@ -21,13 +21,15 @@ test('historical Bach Reference and parked Round 49 Candidate windows match pinn
     candidateOrder:ROUND_49_CANDIDATES.map(c=>c.id)});
   for(const id of ['primary','brahms-op118-no1'] as const){
     const e=config.scores[id],score=id==='primary'?bachBeforeM5(e.score):e.score;
-    const layouts=layoutJankoScore(score,e.options,e.tokens);
+    // PR97's Bach witness predates the new rest policy; Brahms stays canonical.
+    const options=id==='primary'?{...e.options,inferBoundaryRests:false}:e.options;
+    const layouts=layoutJankoScore(score,options,e.tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    for(const page of pages)records.push({kind:'reference-page',score:id,page,sha256:sha(renderJankoPage(score,page,e.options,e.tokens,layouts))});
-    records.push({kind:'legacy-whole-system-crop',score:id,start:1,count:4,sha256:sha(renderJankoCrop(score,1,4,e.options,e.tokens,undefined,layouts))});
+    for(const page of pages)records.push({kind:'reference-page',score:id,page,sha256:sha(renderJankoPage(score,page,options,e.tokens,layouts))});
+    records.push({kind:'legacy-whole-system-crop',score:id,start:1,count:4,sha256:sha(renderJankoCrop(score,1,4,options,e.tokens,undefined,layouts))});
     for(const crop of id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS)
       records.push({kind:id==='primary'?'reference-optional-crop':'reference-live-crop',score:id,start:crop.start,count:crop.count,title:crop.title,
-        sha256:sha(renderJankoCrop(score,crop.start,crop.count,e.options,e.tokens,undefined,layouts))});
+        sha256:sha(renderJankoCrop(score,crop.start,crop.count,options,e.tokens,undefined,layouts))});
   }
   for(const c of ROUND_49_CANDIDATES){
     const byScore=new Map<string,ReturnType<typeof layoutJankoScore>>();

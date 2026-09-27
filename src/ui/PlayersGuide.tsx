@@ -1,10 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   DUODECIMAL_SOLFEGE,
-  DuodecimalSolfegeDefinition,
-  getDuodecimalSyllable,
 } from '../model/phonetics';
-import { DUODECIMAL_DIGITS, getDuodecimalDigit } from '../render/types';
+import { DUODECIMAL_DIGITS } from '../render/types';
 import { BENCHMARK_SCORES } from '../scores';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -27,7 +25,6 @@ import {
   threadDigitString,
   threadSyllableString,
 } from './guide-specimens';
-import { synth } from '../audio/synth';
 
 /** Chromatic note names for the twelve pitch classes (0 = C). */
 const NOTE_NAMES = [
@@ -89,8 +86,6 @@ const Section: React.FC<{
 );
 
 export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
-  const [activePc, setActivePc] = useState<number | null>(null);
-
   const engraving = useMemo(() => {
     const bach = BENCHMARK_SCORES['bach-goldberg-var1']();
     const pitch = buildGuidePitchSpecimen();
@@ -99,10 +94,6 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
     const rests = buildGuideRestSpecimen();
     const m1RH = handThread(bach, 0, 'RH', GUIDE_TICKS_PER_MEASURE);
     const m1LH = handThread(bach, 0, 'LH', GUIDE_TICKS_PER_MEASURE);
-    const openingThread = [
-      ...m1RH,
-      ...handThread(bach, 1, 'RH', GUIDE_TICKS_PER_MEASURE).slice(0, 3),
-    ];
     return {
       pitchSvg: renderJankoCrop(
         pitch,
@@ -157,9 +148,7 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
       m1RHSyllables: threadSyllableString(m1RH),
       m1LHDigits: threadDigitString(m1LH),
       m1LHSyllables: threadSyllableString(m1LH),
-      openingThread,
-      openingDigits: threadDigitString(openingThread),
-      openingSyllables: threadSyllableString(openingThread),
+
     };
   }, []);
 
@@ -190,34 +179,6 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
     []
   );
 
-  const playPitch = (pc: number, octave = 4) => {
-    setActivePc(pc);
-    synth.playPitch({ pitchClass: pc, octave }, 0.6, 85);
-    setTimeout(() => setActivePc(null), 600);
-  };
-
-  const playSequence = async (
-    pcs: ReadonlyArray<{ pitchClass: number; octave: number }>,
-    intervalMs = 350
-  ) => {
-    for (const { pitchClass, octave } of pcs) {
-      setActivePc(pitchClass);
-      synth.playPitch({ pitchClass, octave }, 0.4, 85);
-      await new Promise((r) => setTimeout(r, intervalMs));
-    }
-    setActivePc(null);
-  };
-
-  const phrase = (pcs: readonly number[], octave = 4) =>
-    pcs.map((pitchClass) => ({ pitchClass, octave }));
-  const phraseDigits = (pcs: readonly number[]) =>
-    pcs.map((pc) => getDuodecimalDigit(pc)).join(' ');
-  const phraseSyllables = (pcs: readonly number[]) =>
-    pcs.map((pc) => getDuodecimalSyllable(pc)).join(' ');
-
-  const triad = [0, 4, 7];
-  const fifth = [0, 7];
-  const tritone = [0, 6];
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
@@ -487,139 +448,6 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
           </p>
         </Section>
 
-        {/* 7 · Syllables */}
-        <section className="overflow-hidden rounded-2xl bg-neutral-950 text-neutral-100">
-          <div className="space-y-6 p-4 sm:p-8">
-            <div>
-              <div className="font-mono text-xs font-bold tracking-wide text-neutral-500">
-                07 · REFERENCE
-              </div>
-              <h2 className="mt-1 font-serif text-xl font-bold tracking-tight text-white">
-                Syllables
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                Every pitch class has a one-syllable name — each a shortening
-                of its spoken digit — for singing the lines. Tap any card to
-                hear it.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {DUODECIMAL_SOLFEGE.map(
-                (entry: DuodecimalSolfegeDefinition) => {
-                  const isSelected = activePc === entry.pitchClass;
-                  return (
-                    <button
-                      key={entry.pitchClass}
-                      onClick={() => playPitch(entry.pitchClass)}
-                      className={`flex min-h-[7rem] cursor-pointer select-none flex-col justify-between rounded-xl border p-3.5 text-left transition ${
-                        isSelected
-                          ? 'border-amber-400 bg-amber-500/20 ring-2 ring-amber-400/50'
-                          : 'border-neutral-800 bg-neutral-900/60 hover:border-neutral-700 hover:bg-neutral-900'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className="text-2xl font-bold leading-none"
-                          style={{
-                            fontFamily:
-                              "'URW Gothic', 'Century Gothic', 'ITC Avant Garde Gothic', sans-serif",
-                            color: isSelected ? '#FACC15' : '#F8FAFC',
-                          }}
-                        >
-                          {entry.digit}
-                        </span>
-                        <span className="font-mono text-[10px] font-bold text-neutral-500">
-                          {NOTE_NAMES[entry.pitchClass]}
-                        </span>
-                      </div>
-                      <div>
-                        <div
-                          className="font-mono text-xl font-bold tracking-tight"
-                          style={{ color: isSelected ? '#FACC15' : '#38BDF8' }}
-                        >
-                          {entry.syllable}
-                        </div>
-                        <div className="mt-0.5 font-mono text-[11px] text-neutral-400">
-                          {entry.derivation}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                }
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-neutral-400">
-                  Audition phrases
-                </h3>
-                <span className="font-mono text-[11px] text-neutral-500">
-                  Tap a phrase to hear it
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <button
-                  onClick={() => playSequence(phrase(triad))}
-                  className="rounded-lg border border-neutral-700/60 bg-neutral-900/90 p-3 text-left transition hover:bg-neutral-800/90"
-                >
-                  <div className="font-mono text-xs font-bold text-neutral-200">
-                    Major triad
-                  </div>
-                  <div className="mt-1 font-mono text-sm font-bold text-amber-400">
-                    {phraseSyllables(triad).split(' ').join(' → ')}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-neutral-500">
-                    Digits: {phraseDigits(triad).split(' ').join(' - ')}
-                  </div>
-                </button>
-                <button
-                  onClick={() => playSequence(phrase(fifth))}
-                  className="rounded-lg border border-neutral-700/60 bg-neutral-900/90 p-3 text-left transition hover:bg-neutral-800/90"
-                >
-                  <div className="font-mono text-xs font-bold text-neutral-200">
-                    Perfect 5th
-                  </div>
-                  <div className="mt-1 font-mono text-sm font-bold text-amber-400">
-                    {phraseSyllables(fifth).split(' ').join(' → ')}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-neutral-500">
-                    Digits: {phraseDigits(fifth).split(' ').join(' - ')}
-                  </div>
-                </button>
-                <button
-                  onClick={() => playSequence(phrase(tritone))}
-                  className="rounded-lg border border-neutral-700/60 bg-neutral-900/90 p-3 text-left transition hover:bg-neutral-800/90"
-                >
-                  <div className="font-mono text-xs font-bold text-neutral-200">
-                    Tritone
-                  </div>
-                  <div className="mt-1 font-mono text-sm font-bold text-amber-400">
-                    {phraseSyllables(tritone).split(' ').join(' → ')}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-neutral-500">
-                    Digits: {phraseDigits(tritone).split(' ').join(' - ')}
-                  </div>
-                </button>
-              </div>
-              <button
-                onClick={() => playSequence(engraving.openingThread)}
-                className="w-full rounded-lg border border-neutral-700/60 bg-neutral-900/90 p-3 text-left transition hover:bg-neutral-800/90"
-              >
-                <div className="font-mono text-xs font-bold text-neutral-200">
-                  Bach, Goldberg Variation 1 — opening thread
-                </div>
-                <div className="mt-1 font-mono text-sm font-bold leading-relaxed text-amber-400">
-                  {engraving.openingSyllables.split(' ').join(' → ')}
-                </div>
-                <div className="mt-0.5 font-mono text-[10px] text-neutral-500">
-                  Digits: {engraving.openingDigits.split(' ').join(' → ')}
-                </div>
-              </button>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );

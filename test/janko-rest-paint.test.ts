@@ -10,6 +10,8 @@ import { buildInkScene, requireSceneCoverage, sceneInkAt, scenePhysicalBoxes, sc
 import { JANKO_REST_VALUES, placedRestPaint, renderRest, restAdmissionBox, serializeRestPaint, serializeRestPrimitive, type JankoRestInk } from '../src/render/janko/elements/rests';
 
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
+// PR91's frozen Bach witness predates the approved system-opening rest correction.
+const legacyBachOptions = { ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false };
 const point = (x: number, y: number) => ({ x, y });
 
 // Independent literal XML witnesses: each of the six real primitive tags and
@@ -55,6 +57,67 @@ test('all five styles and seven values are byte-identical to pre-cutover XML', (
     assert.equal(serializeRestPaint(placed),renderRest(rest,tokens));
     assert.deepEqual(placed.map(p=>p.order),placed.map(()=>i));
   }
+});
+
+test('Bach GOLD boundary silences use one real eighth-rest glyph at each approved RH opening', () => {
+  const score=buildBachGoldbergVar1Score();
+  const layouts=layoutJankoScore(score,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS);
+  // Seat pins are independent of serialization: page SVG must also emit the same glyph.
+  for(const [tick,next,x,y] of [[576,600,37.8,320.95875],[3456,3480,37.8,499.93125]] as const) {
+    const owners=layouts.filter(s=>s.rests.some(r=>r.tick===tick&&r.hand==='RH'));
+    assert.equal(owners.length,1,`RH t${tick} belongs to one system`);
+    const system=owners[0];
+    const rests=system.rests.filter(r=>r.tick===tick&&r.hand==='RH');
+    assert.equal(rests.length,1,`RH t${tick} has one rest, not doubled glyphs`);
+    const r=rests[0];
+    assert.equal(r.durationTicks,next-tick);
+    assert.equal(r.value,'eighth');
+    assert.equal(r.style,'classical-urtext');
+    assert.equal(r.x,x,`RH t${tick} absolute rest x`);
+    assert.ok(Math.abs(r.y-y)<1e-6,`RH t${tick} absolute rest y: ${r.y}`);
+    assert.equal(r.authored,undefined,'Bach carries no source silence classification');
+    const scene=buildInkScene(system,resolveJankoOptions(DEFAULT_JANKO_OPTIONS),resolveJankoTokens(DEFAULT_JANKO_TOKENS),score);
+    const index=system.rests.indexOf(r);
+    const glyph=sceneRestSvg(scene,index);
+    assert.match(glyph,new RegExp(`data-rest-tick="${tick}" data-rest-value="eighth" data-rest-hand="RH"`));
+    assert.match(glyph,/data-verbatim-rest="eighth"/);
+    assert.equal(scene.restPaint[index].length,1,'one stored physical glyph');
+    const page=renderJankoPage(score,Math.floor(system.index/DEFAULT_JANKO_OPTIONS.systemsPerPage),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS);
+    assert.ok(page.includes(glyph),`actual page SVG paints the stored RH glyph at t${tick}`);
+    assert.equal((page.match(new RegExp(`data-rest-tick="${tick}" data-rest-value="eighth" data-rest-hand="RH"`,'g'))??[]).length,1);
+  }
+  assert.deepEqual(layouts.flatMap(s=>s.rests).filter(r=>[720,864,3600].includes(r.tick)).map(r=>[r.tick,r.value]),[[720,'eighth'],[864,'eighth'],[3600,'eighth']], 'm. 6/7/26 approved rests remain');
+});
+
+test('current GOLD differs from the same score under the prior rest policy only by the two restored glyphs', () => {
+  const score=buildBachGoldbergVar1Score();
+  const restored=layoutJankoScore(score,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS);
+  const prior=layoutJankoScore(score,legacyBachOptions,DEFAULT_JANKO_TOKENS);
+  assert.deepEqual(restored.flatMap(s=>s.notes),prior.flatMap(s=>s.notes),'all placed Bach note identities and geometry remain');
+  assert.deepEqual(restored.flatMap(s=>s.rests).filter(r=>r.tick!==576&&r.tick!==3456),prior.flatMap(s=>s.rests),'the original nine rests do not move');
+  for(const [page,tick] of [[0,576],[1,3456]] as const) {
+    const s=restored.find(system=>system.rests.some(r=>r.hand==='RH'&&r.tick===tick))!;
+    const index=s.rests.findIndex(r=>r.hand==='RH'&&r.tick===tick);
+    const glyph=sceneRestSvg(buildInkScene(s,resolveJankoOptions(DEFAULT_JANKO_OPTIONS),resolveJankoTokens(DEFAULT_JANKO_TOKENS),score),index);
+    const svg=renderJankoPage(score,page,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS);
+    assert.equal(svg.replace('\n'+glyph,''),renderJankoPage(score,page,legacyBachOptions,DEFAULT_JANKO_TOKENS),`page ${page+1} has no other ink changes`);
+  }
+});
+
+test('system-opening RH silence requires a valid prior release, not an older sustained chord member', () => {
+  const base=buildBachGoldbergVar1Score();
+  const rests=(score:typeof base)=>layoutJankoScore(score,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS).flatMap(s=>s.rests).filter(r=>r.hand==='RH'&&r.tick===576);
+  const prior=base.notes.find(n=>n.id==='bach-var1-69')!;
+  assert.equal(prior.startTick,564);
+  assert.equal(prior.durationTicks,12);
+  const sustained={...base,notes:base.notes.map(n=>n.id===prior.id?{...n,durationTicks:48}:n)};
+  assert.equal(rests(sustained).length,0,'prior RH note still sounding through the proposed rest');
+  const older={...base,notes:[...base.notes,{...prior,id:'boundary-older-chord-tone',startTick:552,durationTicks:60}]};
+  assert.equal(rests(older).length,0,'older long RH onset outlives the latest short RH note');
+  const chord={...base,notes:[...base.notes,{...prior,id:'boundary-long-chord-tone',durationTicks:48}]};
+  assert.equal(rests(chord).length,0,'maximum release across one chord prevents false silence');
+  const noPrior={...base,notes:base.notes.filter(n=>n.hand!=='RH'||n.startTick>=576)};
+  assert.equal(rests(noPrior).length,0,'first system RH onset at 600 cannot create a rest without a preceding source onset');
 });
 
 const brahms=buildBrahmsOp118No1Score();
@@ -110,13 +173,15 @@ const originalPages = {
   bach: ['2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f','dbfb83dcf008782d34e5260548c706d0cb980689eac58b24c7d0e7ae1e828757'],
   brahms: ['7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90','a84166821d569d8c080b1ff98f97664d0f1d6132b7002026ea6cd66e32b85cfa','78b3fd134d5f3b4bf4269619759149a34aa9c8c95f540fcc72fe12f9495a2897','40c43f6aed8a4b4554d2e0c8c7c9d62a468dccb3766f2da15ba66d7f7fa984fd','d2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5'],
 };
-test('archival Bach hands and Brahms BRONZE pages and cropped system remain byte-identical to PR91', () => {
-  for(const [name,score,options,tokens,crop] of [
-    ['bach',bachBeforeM5(buildBachGoldbergVar1Score()),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,'c97fef4cea414bec819a96e1be9c0245f9230dec5fba0738dcfcb7cd5e021d61'],
-    ['brahms',brahms,BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS,'9e5d4d45e52bb7e834b7b55ec23041914f8a02a5cf844304a654c78d95d82076'],
-  ] as const) {
-    assert.equal(countJankoPages(score,options,tokens),originalPages[name].length);
-    originalPages[name].forEach((expected,i)=>assert.equal(sha(renderJankoPage(score,i,options,tokens)),expected,`${name} page ${i}`));
-    assert.equal(sha(renderJankoCrop(score,1,4,options,tokens)),crop,`${name} crop`);
-  }
+test('archival Bach hands remain byte-identical to PR91 with the historical rest policy', () => {
+  const score=bachBeforeM5(buildBachGoldbergVar1Score());
+  assert.equal(countJankoPages(score,legacyBachOptions,DEFAULT_JANKO_TOKENS),originalPages.bach.length);
+  originalPages.bach.forEach((expected,i)=>assert.equal(sha(renderJankoPage(score,i,legacyBachOptions,DEFAULT_JANKO_TOKENS)),expected,`bach page ${i}`));
+  assert.equal(sha(renderJankoCrop(score,1,4,legacyBachOptions,DEFAULT_JANKO_TOKENS)),'c97fef4cea414bec819a96e1be9c0245f9230dec5fba0738dcfcb7cd5e021d61');
+});
+
+test('Brahms BRONZE pages and cropped system remain byte-identical to PR91 under canonical policy', () => {
+  assert.equal(countJankoPages(brahms,bo,bt),originalPages.brahms.length);
+  originalPages.brahms.forEach((expected,i)=>assert.equal(sha(renderJankoPage(brahms,i,bo,bt)),expected,`brahms page ${i}`));
+  assert.equal(sha(renderJankoCrop(brahms,1,4,bo,bt)),'9e5d4d45e52bb7e834b7b55ec23041914f8a02a5cf844304a654c78d95d82076');
 });

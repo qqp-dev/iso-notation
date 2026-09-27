@@ -1177,19 +1177,35 @@ export const ROUND_49_CANDIDATES: JankoCandidate[] = [
 ];
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 50,
-  title: 'Bach Goldberg m. 5 · operator-judged GOLD hand correction',
-  description: 'The opening m. 5 B2 and A2 at ticks 576 and 588 are settled LH by operator judgment, not by MIDI track provenance. Canonical Reference carries that reading; the real-engine Bach mm. 5–8 context shows it beside the unchanged Brahms Reference. No hand vote remains open.',
+  round: 51,
+  title: 'Bach GOLD · system-opening RH silence correction',
+  description: 'The approved LH assignments at ticks 576/588 remain fixed. Compare the old current-system-only rest walk with the restored preceding-release walk on the real Bach score at mm. 4–5 and 24–25. Reference uses the corrected GOLD engraving; Brahms BRONZE remains unchanged.',
+  openAxes: ['inferBoundaryRests'],
 };
 
-export const CURRENT_CANDIDATES: JankoCandidate[] = [{
-  id: 'bach-m5-settled', label: 'Bach GOLD · settled LH reading',
-  description: 'Canonical Bach builder, without an option delta or an invented source-hand witness.',
-  windows: [{ scoreId: 'primary', measureStart: 5, measureCount: 4,
-    title: 'Bach mm. 5–8 · B2/A2 LH at m. 5 opening',
-    caption: 'Operator-judged GOLD correction at ticks 576/588; the surrounding measures remain canonical.' }],
-  tags: ['Bach', 'GOLD', 'settled'],
-}];
+const BACH_BOUNDARY_WINDOWS: JankoScoreCandidateWindow[] = [
+  { scoreId: 'primary', measureStart: 4, measureCount: 2,
+    title: 'Bach mm. 4–5 · RH release at 576, LH attacks at 576/588',
+    caption: 'The prior RH onset at 564 releases at 576; the next RH onset at 600 leaves a genuine 24-tick eighth-rest silence.' },
+  { scoreId: 'primary', measureStart: 24, measureCount: 2,
+    title: 'Bach mm. 24–25 · RH release at 3456, LH attacks at 3456/3468',
+    caption: 'The prior RH onset at 3444 releases at 3456; the next RH onset at 3480 leaves a genuine 24-tick eighth-rest silence.' },
+];
+
+export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  {
+    id: 'bach-boundary-baseline', label: 'A · prior system-only rest walk',
+    description: 'Real-engine baseline: preceding-system onset is not carried into the rest walk. Hands and all score data stay fixed.',
+    options: { inferBoundaryRests: false }, windows: BACH_BOUNDARY_WINDOWS,
+    tags: ['Bach', 'GOLD', 'baseline'],
+  },
+  {
+    id: 'bach-boundary-restored', label: 'B · restored whole-hand silence',
+    description: 'Canonical real-engine GOLD: preceding onset and maximum still-sounding release admit the two RH eighth rests.',
+    options: { inferBoundaryRests: true }, windows: BACH_BOUNDARY_WINDOWS,
+    tags: ['Bach', 'GOLD', 'correction'],
+  },
+];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
  * not a change to the current exploratory round or Reference. */

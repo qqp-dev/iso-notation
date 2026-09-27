@@ -578,7 +578,7 @@ test('Rests golden: verbatim constants stay byte-identical (license provenance)'
   );
 });
 
-test('Rests golden: all nine Bach seats pinned (§4 nearby-level rule)', () => {
+test('Rests golden: the nine previously approved Bach seats stay fixed (§4 nearby-level rule)', () => {
   // Provenance: pre-§4 seats were 720/318.45875, 864/313.45875,
   // 1056/333.45875, 2988/325.95875, 3060/370.95875, 3132/345.95875,
   // 3600/512.43125 (552/179.48625 and 3432/358.45875 never moved). The §4
@@ -602,7 +602,8 @@ test('Rests golden: all nine Bach seats pinned (§4 nearby-level rule)', () => {
     [3432, 'sixteenth', 548.635, 358.45875],
     [3600, 'eighth', 173.67, 504.93125],
   ];
-  assert.equal(seats.length, expected.length, 'Bach writes nine rests');
+  assert.equal(seats.length, expected.length + 2, 'only the two approved RH system-opening rests join the nine original rests');
+  assert.deepEqual(seats.filter(r=>!expected.some(([tick])=>tick===r.tick)).map(r=>[r.tick,r.hand,r.value]).sort((a,b)=>Number(a[0])-Number(b[0])),[[576,'RH','eighth'],[3456,'RH','eighth']]);
 
   for (const [tick, value, x, y] of expected) {
     const rest = seats.find((r) => r.tick === tick)!;

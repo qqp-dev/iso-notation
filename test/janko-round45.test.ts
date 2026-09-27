@@ -1674,7 +1674,7 @@ test('Honest whole-score report: zero hard errors, zero warnings, Reference ≡ 
   ];
   for (let page = 0; page < bachPages.length; page++) {
     assert.equal(
-      sha(renderJankoPage(bachBeforeM5(BACH), page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
+      sha(renderJankoPage(bachBeforeM5(BACH), page, {...DEFAULT_JANKO_OPTIONS, inferBoundaryRests:false}, DEFAULT_JANKO_TOKENS)),
       bachPages[page],
       `archival Bach page ${page} is byte-identical to 081e5cdf0459`
     );

@@ -21,6 +21,7 @@ import { lintJankoScore } from '../src/render/janko/linter';
 const BASELINE_REVISION = '8890d42003676f181525298e472e0eb93e622e7e';
 const BASELINE_PAGES = 2;
 const BASELINE_SYSTEMS = 8;
+const HISTORICAL_OPTIONS = { ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false }; // pre-boundary-rest engraving
 // Provenance: pre-PR66 page hashes were
 // 5331f5966b18b764d398554800d8d579ee6614a7327123ff4d8bb766b289141d and
 // f75e80b2916ca9835829553630699067e59e6948a77d44b7931f647d7c2c6a97.
@@ -37,11 +38,11 @@ const BASELINE_PAGE_SHA = [
 
 test('archival pre-m. 5 hand reading retains both historical Goldberg page hashes', () => {
   const score = bachBeforeM5(buildBachGoldbergVar1Score());
-  assert.equal(countJankoSystems(score, DEFAULT_JANKO_OPTIONS), BASELINE_SYSTEMS);
+  assert.equal(countJankoSystems(score, HISTORICAL_OPTIONS), BASELINE_SYSTEMS);
   const pages = Math.ceil(BASELINE_SYSTEMS / DEFAULT_JANKO_OPTIONS.systemsPerPage);
   assert.equal(pages, BASELINE_PAGES);
   for (let p = 0; p < pages; p++) {
-    const svg = renderJankoPage(score, p, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+    const svg = renderJankoPage(score, p, HISTORICAL_OPTIONS, DEFAULT_JANKO_TOKENS);
     const sha = crypto.createHash('sha256').update(svg, 'utf8').digest('hex');
     assert.equal(
       sha,

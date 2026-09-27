@@ -3434,6 +3434,20 @@ export function computeJankoRestLayer(
       if (handForNote(n) !== hand) continue;
       release.set(n.startTick, Math.max(release.get(n.startTick) ?? 0, n.startTick + n.durationTicks));
     }
+    // The first onset of a system can follow a release in the previous one.
+    // Carry the latest preceding onset as the phrase anchor, but its release
+    // must include *all* earlier still-sounding members of this hand. Never
+    // invent a rest before a hand has actually stated an onset.
+    if (o.inferBoundaryRests && release.size > 0) {
+      const preceding = score.notes.filter(
+        (n) => handForNote(n) === hand && n.startTick < startTick
+      );
+      if (preceding.length > 0) {
+        const latest = Math.max(...preceding.map((n) => n.startTick));
+        const soundingTo = Math.max(...preceding.map((n) => n.startTick + n.durationTicks));
+        release.set(latest, soundingTo);
+      }
+    }
     const ticks = [...release.keys()].sort((a, b) => a - b);
     if (ticks.length === 0) continue;
     const activeMeasures = new Set(ticks.map((tick) => measureIndexOfTick(tick, geo, systemIndex, t)));

@@ -1674,7 +1674,7 @@ test('Frozen canonicals: Bach GOLD is byte-identical, the Brahms Reference is th
   ];
   for (let page = 0; page < bachPages.length; page++) {
     assert.equal(
-      sha(renderJankoPage(bachBeforeM5(BACH), page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)),
+      sha(renderJankoPage(bachBeforeM5(BACH), page, {...DEFAULT_JANKO_OPTIONS, inferBoundaryRests:false}, DEFAULT_JANKO_TOKENS)),
       bachPages[page],
       `Bach GOLD page ${page} is byte-identical`
     );
