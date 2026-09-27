@@ -226,7 +226,7 @@ test('scanned-page preflight fails closed for missing and corrupt JBIG2 wasm wit
   for (const failure of ['missing', 'corrupt'] as const) {
     h.decoder.wasm = failure;
     h.decoder.fallback = false;
-    h.action(0, 'in'); await h.flush();
+    h.action(0, 'in'); await h.settled(left);
     assert.equal(left.dataset.renderState, 'error', `${failure} required decoder must not become ready`);
     assert.match(left.querySelector('.source-status')!.textContent, /imslp-936721.*JBIG2 decoder unavailable/);
     assert.equal(left.querySelector('.source-canvas')!.children.length, 0, 'neither stale nor partial pixels may be committed');
