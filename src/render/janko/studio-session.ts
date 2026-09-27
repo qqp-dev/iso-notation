@@ -170,8 +170,6 @@ export interface StudioReviewSession {
   captureScroll(): void;
   /** Capture and persist the session (never throws). */
   capture(): boolean;
-  /** Persist the record without sampling a newly switched/hidden layout. */
-  persist(): boolean;
   /** Switch the active view, capturing the outgoing view's place first. */
   setView(view: string): void;
   /** Set the active zoom (already clamped by the caller's zoom policy). */
@@ -262,19 +260,15 @@ export function openStudioReviewSession(init: StudioReviewSessionInit): StudioRe
       captureScroll();
       return writeStudioState(init.storage, state);
     },
-    persist() {
-      return writeStudioState(init.storage, state);
-    },
     setView(view) {
       if (!views.includes(view)) return;
-      if (!pending) captureScroll();
+      captureScroll();
       state.view = view;
     },
     setZoom(zoom) {
       state.zoom = clampStudioZoom(zoom, init.zoomBounds.min, init.zoomBounds.max);
     },
     restorePlace(afterLayout) {
-      this.cancelRestore();
       const port = init.scroll;
       const target = this.place();
       if (!port || target <= 0) return;

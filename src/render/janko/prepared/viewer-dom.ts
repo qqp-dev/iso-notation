@@ -23,7 +23,7 @@
  *   laid-out content.
  */
 
-import type { StudioReviewSession } from '../studio-session';
+import { writeStudioState, type StudioReviewSession, type StudioStorageLike } from '../studio-session';
 import { renderPreparedStatus, type PreparedManifest } from './status';
 
 /** The studio zoom bounds (shared by the zoom policy and the label). */
@@ -112,15 +112,29 @@ export function selectStudioView(args: {
   root: HTMLElement;
   view: string;
   afterLayout: (apply: () => void) => void;
+  storage?: StudioStorageLike;
+  /** The viewer restores after applying the incoming zoom; standalone switches restore here. */
+  deferRestore?: boolean;
   /** Address-bar update (the tab path passes it; the hash path is already there). */
   setHash?: (view: string) => void;
 }): void {
-  if (!args.session.restorePending()) args.session.capture();
-  args.session.setView(args.view);
+  if (args.view !== 'candidates' && args.view !== 'reference') return;
+  // The legacy root setView always samples the viewport. In the prepared UI
+  // that can be a pending restore (or a collapsed outgoing panel), so capture
+  // once, before changing the layout, and switch the validated record directly.
+  if (!args.root.hidden && !args.session.restorePending() &&
+      Array.from(args.root.querySelectorAll<HTMLElement>('.view-panel')).some((panel) => panel.classList.contains('is-active'))) args.session.capture();
+  args.session.cancelRestore();
+  args.session.state.view = args.view;
   showView(args.root, args.view);
   args.setHash?.(args.view);
-  args.session.persist();
-  args.session.restorePlace(args.afterLayout);
+  writeStudioState(args.storage, args.session.state);
+  if (!args.deferRestore) {
+    const view = args.view;
+    args.session.restorePlace((apply) => args.afterLayout(() => {
+      if (!args.root.hidden && args.session.state.view === view) apply();
+    }));
+  }
 }
 
 /** What one {@link PreparedApplier.apply} pass did — explicit, never silent. */

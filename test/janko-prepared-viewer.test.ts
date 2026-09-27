@@ -536,11 +536,11 @@ test('prepared metadata and findings fold without losing content or nesting on r
 });
 
 // ---------------------------------------------------------------------------
-// Source pins: the viewer routes both switch paths and every apply through the
-// live-collecting layer (the defects were call-site bugs, not API bugs).
+// The viewer routes both switch paths through live collection; post-apply
+// restoration is covered behaviorally by janko-reference-reader.test.ts.
 // ---------------------------------------------------------------------------
 
-test('the viewer routes both tab and hash switches through live selection and restores after every apply', () => {
+test('the viewer routes both tab and hash switches through live selection', () => {
   const source = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer.ts`, 'utf8');
   assert.match(source, /on\(tab, 'click', [\s\S]*?switchView\(/, 'tab clicks route through the shared switch');
   assert.match(source, /on\(window, 'hashchange', [\s\S]*?switchView\(/, 'hash changes route through the same switch');
@@ -554,12 +554,9 @@ test('the viewer routes both tab and hash switches through live selection and re
     'every handler except the one-shot DOMContentLoaded boot is detached on re-mount (no stale/duplicated handlers)'
   );
   assert.ok(source.includes('createPreparedApplier'), 'the manifest is applied by the tested applier');
-  assert.match(source, /applier\.apply\(manifest, currentView\)\.then\([\s\S]*?restorePlace\(/,
-    'mount apply restores after the prepared swap');
   const hot = source.slice(source.indexOf("import.meta.hot.accept('virtual:janko-prepared-manifest'"));
   assert.ok(hot.length > 0, 'the HMR accept contract is intact');
   assert.match(hot, /\.apply\(/, 'the accept path re-applies the delivered manifest');
-  assert.match(hot, /restorePlace/, 'and restores the scroll place afterwards');
   // The applier re-shows the session view on the fresh panels before it resolves.
   const domSource = readFileSync(`${projectRoot}/src/render/janko/prepared/viewer-dom.ts`, 'utf8');
   const applyBody = domSource.slice(domSource.indexOf('async apply(manifest, view)'));

@@ -31,6 +31,7 @@
 import {
   openStudioReviewSession,
   STUDIO_SCROLL_CAPTURE_DELAY_MS,
+  writeStudioState,
   type StudioScrollPort,
   type StudioSessionHost,
   type StudioStorageLike,
@@ -156,10 +157,9 @@ function mountOnce(manifest: PreparedManifest): void {
     scroll: port,
     zoomBounds: { min: ZOOM_MIN, max: ZOOM_MAX },
   });
-  if (remount) {
-    if (liveView && Number.isFinite(livePlace) && livePlace > 0) session.recordPlace(livePlace, liveView);
-    else session.captureScroll();
-  }
+  if (remount && !root.hidden && root.dataset.preparedGeneration &&
+      Array.from(root.querySelectorAll<HTMLElement>('.view-panel')).some((panel) => panel.classList.contains('is-active')) &&
+      liveView && Number.isFinite(livePlace) && livePlace > 0) session.recordPlace(livePlace, liveView);
 
   const storage = studioSessionStorage();
   // Independent Reference anchors and zooms; Candidates keeps the original
@@ -172,8 +172,10 @@ function mountOnce(manifest: PreparedManifest): void {
     session.state.scroll.reference = reader.places[reader.selected];
     if (session.state.view === 'reference') session.state.zoom = reader.zooms[reader.selected];
   }
+  const hasVisiblePaper = (): boolean => !root.hidden && !!root.dataset.preparedGeneration &&
+    Array.from(root.querySelectorAll<HTMLElement>('.view-panel')).some((panel) => panel.classList.contains('is-active'));
   const saveReference = (): void => {
-    if (session.state.view !== 'reference' || root.hidden || session.restorePending()) return;
+    if (session.state.view !== 'reference' || !hasVisiblePaper() || session.restorePending()) return;
     const top = port.get();
     if (Number.isFinite(top) && top >= 0) reader.places[reader.selected] = top;
     reader.zooms[reader.selected] = session.state.zoom;
@@ -190,11 +192,13 @@ function mountOnce(manifest: PreparedManifest): void {
       // scroll debounce runs. Save the *visible* pane's live place while its
       // original layout is still present; never sample an empty first load,
       // hidden Source surface or a pending programmatic restore.
-      if (root.hidden || session.restorePending() ||
-          !Array.from(root.querySelectorAll<HTMLElement>('.view-panel')).some((panel) => panel.classList.contains('is-active'))) return;
       clearScrollTimer();
-      session.capture();
-      saveReference();
+      if (hasVisiblePaper() && !session.restorePending()) {
+        session.capture();
+        saveReference();
+      }
+      ++viewEpoch;
+      session.cancelRestore();
     },
     afterSwap: () => decorateReferenceReader(root, reader.selected),
   });
@@ -211,28 +215,33 @@ function mountOnce(manifest: PreparedManifest): void {
   };
 
   let viewEpoch = 0;
+  const restore = (): void => {
+    session.cancelRestore();
+    if (root.hidden || !root.dataset.preparedGeneration) return;
+    const epoch = ++viewEpoch;
+    const view = session.state.view;
+    const score = reader.selected;
+    const generation = root.dataset.preparedGeneration;
+    session.restorePlace((apply) => afterLayoutReady(() => {
+      if (epoch === viewEpoch && !root.hidden && session.state.view === view &&
+          reader.selected === score && root.dataset.preparedGeneration === generation) apply();
+    }));
+  };
   const switchView = (next: string, setHash?: (view: string) => void): void => {
     if (next === session.state.view) { setHash?.(next); showView(root, next); return; }
     clearScrollTimer();
     saveReference();
-    // Capture the outgoing pane while it still has its original zoom and
-    // height. Shrinking it first can clamp window.scrollY irreversibly.
-    if (!root.hidden && !session.restorePending()) session.capture();
+    if (next !== 'reference' && next !== 'candidates') return;
     if (next === 'reference') session.state.scroll.reference = reader.places[reader.selected];
     const incomingZoom = next === 'reference' ? reader.zooms[reader.selected] : candidatesZoom;
-    const epoch = ++viewEpoch;
-    if (root.hidden) {
-      session.state.view = next;
-      showView(root, next);
-      setHash?.(next);
-    } else {
-      selectStudioView({ session, root, view: next, afterLayout: afterLayoutReady, setHash });
-    }
+    selectStudioView({ session, root, view: next, afterLayout: afterLayoutReady, storage, setHash, deferRestore: true });
     session.setZoom(incomingZoom);
     zoom = incomingZoom;
     applyZoom(dom, zoom);
-    session.persist();
-    if (!root.hidden && session.place() === 0) afterLayoutReady(() => { if (epoch === viewEpoch && session.state.view === next) port.set(0); });
+    writeStudioState(storage, session.state);
+    restore();
+    const epoch = viewEpoch;
+    if (!root.hidden && session.place() === 0) afterLayoutReady(() => { if (epoch === viewEpoch && session.state.view === next && !root.hidden) port.set(0); });
   };
   let candidatesZoom = session.state.view === 'candidates' ? session.state.zoom : reader.candidatesZoom;
   for (const tab of dom.tabs) {
@@ -247,7 +256,7 @@ function mountOnce(manifest: PreparedManifest): void {
     clearScrollTimer();
     saveReference();
     session.cancelRestore();
-    const epoch = ++viewEpoch;
+    ++viewEpoch;
     reader.selected = next as ReferenceScore;
     writeReferenceReader(storage, reader);
     decorateReferenceReader(root, reader.selected);
@@ -255,8 +264,10 @@ function mountOnce(manifest: PreparedManifest): void {
     zoom = reader.zooms[reader.selected];
     session.setZoom(zoom);
     applyZoom(dom, zoom);
-    if (reader.places[reader.selected] === 0) afterLayoutReady(() => { if (epoch === viewEpoch && reader.selected === next && session.state.view === 'reference') port.set(0); });
-    else session.restorePlace(afterLayoutReady);
+    writeStudioState(storage, session.state);
+    restore();
+    const epoch = viewEpoch;
+    if (reader.places[reader.selected] === 0) afterLayoutReady(() => { if (epoch === viewEpoch && reader.selected === next && session.state.view === 'reference' && !root.hidden) port.set(0); });
   });
   showView(root, session.state.view);
 
@@ -264,11 +275,14 @@ function mountOnce(manifest: PreparedManifest): void {
   applyZoom(dom, zoom);
   const setZoom = (next: number): void => {
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
+    if (hasVisiblePaper() && !session.restorePending()) { session.capture(); saveReference(); }
+    session.cancelRestore();
+    ++viewEpoch;
     applyZoom(dom, zoom);
     session.setZoom(zoom);
     if (session.state.view === 'reference') { reader.zooms[reader.selected] = zoom; writeReferenceReader(storage, reader); }
     else { candidatesZoom = zoom; reader.candidatesZoom = zoom; writeReferenceReader(storage, reader); }
-    session.capture();
+    writeStudioState(storage, session.state);
   };
   const step = (delta: number): void => setZoom(zoom + delta);
   const zoomIn = document.getElementById('janko-zoom-in');
@@ -303,23 +317,24 @@ function mountOnce(manifest: PreparedManifest): void {
     // A score swap can itself move the viewport before the two-frame restore.
     // Pointer, touch, wheel and keyboard gestures cancel it; layout scrolls
     // must not overwrite the incoming score's saved anchor.
-    if (session.restorePending() || root.hidden) return;
+    if (session.restorePending() || !hasVisiblePaper()) return;
     if (typeof window === 'undefined') return;
     clearScrollTimer();
     scrollTimer = window.setTimeout(() => {
       scrollTimer = undefined;
-      if (!root.hidden) { session.capture(); saveReference(); }
+      if (hasVisiblePaper() && !session.restorePending()) { session.capture(); saveReference(); }
     }, STUDIO_SCROLL_CAPTURE_DELAY_MS);
   };
   const pagehide = (): void => {
     clearScrollTimer();
-    if (!root.hidden && !session.restorePending()) { session.capture(); saveReference(); }
+    if (hasVisiblePaper() && !session.restorePending()) { session.capture(); saveReference(); }
   };
   const visibilitychange = (): void => {
     if (document.visibilityState === 'hidden') pagehide();
     observe();
   };
   const gesture = (): void => {
+    ++viewEpoch;
     session.cancelRestore();
   };
   if (typeof window !== 'undefined') {
@@ -336,19 +351,20 @@ function mountOnce(manifest: PreparedManifest): void {
   on(window, 'janko-before-surface-hide', () => {
     // On a Source-mode reload no prepared paper has arrived yet. Sampling the
     // empty page would destroy the saved anchor before it could be restored.
-    if (!root.hidden && root.dataset.preparedGeneration && !session.restorePending()) {
+    if (hasVisiblePaper() && !session.restorePending()) {
       session.capture(); saveReference();
     }
   });
   on(window, 'janko-surface-show', () => {
     decorateReferenceReader(root, reader.selected);
-    if (root.dataset.preparedGeneration) session.restorePlace(afterLayoutReady);
+    if (root.dataset.preparedGeneration) restore();
   });
 
   claimScrollRestoration();
-  if (root.dataset.preparedGeneration && !root.hidden) session.restorePlace(afterLayoutReady);
+  if (root.dataset.preparedGeneration && !root.hidden) restore();
 
   activeSession = session;
+  activeRestore = restore;
   GLOBAL_SCOPE.__jankoStudioListeners = {
     detach: () => {
       clearScrollTimer();
@@ -372,7 +388,7 @@ function mountOnce(manifest: PreparedManifest): void {
   void applier.apply(manifest, currentView).then((outcome) => {
     if (activeApplier !== applier || outcome === 'dropped') return;
     applyZoom(dom, session.state.zoom);
-    if (!root.hidden && root.dataset.preparedGeneration) session.restorePlace(afterLayoutReady);
+    if (!root.hidden && root.dataset.preparedGeneration) restore();
     if (outcome === 'applied') afterLayoutReady(observe);
     else observe();
   });
@@ -381,6 +397,7 @@ function mountOnce(manifest: PreparedManifest): void {
 let mounted = false;
 /** The live session — HMR re-applies must restore its scroll place (the innerHTML swap collapses the document height momentarily). */
 let activeSession: ReturnType<typeof openStudioReviewSession> | null = null;
+let activeRestore: (() => void) | null = null;
 /** The live applier — the HMR accept path reuses it (shared generation bookkeeping). */
 let activeApplier: PreparedApplier | null = null;
 
@@ -402,7 +419,7 @@ function bootstrap(): void {
         .apply((mod as unknown as { default: PreparedManifest }).default, () => activeSession?.state.view ?? 'candidates')
         .then((outcome) => {
           if (outcome === 'dropped') return;
-          if (!root.hidden) activeSession?.restorePlace(afterLayoutReady);
+          if (!root.hidden) activeRestore?.();
           if (outcome === 'applied') afterLayoutReady(() => observeCandidateFrame(root, document, window));
           else observeCandidateFrame(root, document, window);
         });
