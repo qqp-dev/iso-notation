@@ -138,12 +138,16 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
   // Model the browser's immediate clamp when a zoom change shortens the document.
   // Before the prepared artifact is injected there is no laid-out paper.
   const layout = (zoom: number) => {
-    const visible = root.querySelectorAll('.view-panel').some((panel) => panel.classList.contains('is-active'));
+    const visible = !root.hidden && root.querySelectorAll('.view-panel').some((panel) => panel.classList.contains('is-active'));
     const height = visible ? 1100 + zoom * 1900 : window.innerHeight;
     doc.body.scrollHeight = doc.documentElement.scrollHeight = height;
     top = Math.min(top, Math.max(0, height - window.innerHeight));
   };
   root.onZoom = layout;
+  // CSS display:none collapses the paper; showing it lays out the prepared
+  // artifact again before the queued two-frame scroll restore runs.
+  let hidden = false;
+  Object.defineProperty(root, 'hidden', { get: () => hidden, set: (value: boolean) => { hidden = value; layout(root.zoom); } });
   window.setTimeout = (fn: () => void) => { const id = ++timerId; timers.set(id, fn); return id; };
   window.clearTimeout = (id: number) => timers.delete(id);
   window.requestAnimationFrame = (fn: (time: number) => void) => window.setTimeout(() => fn(0));
@@ -174,7 +178,7 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
     else doc.tabs.find((tab) => tab.dataset.viewTarget === next)!.fire('click');
     await flush(); layout(root.zoom);
   };
-  const swap = async (generation: string) => { accepts[0]({ default: manifest(generation) }); await Promise.resolve(); };
+  const swap = async (generation: string) => { assert.equal(accepts.length, 1, 'one manifest HMR accept handler'); accepts[0]({ default: manifest(generation) }); await Promise.resolve(); };
   return { root, doc, picker, storage, pending, answer, select, score, view, swap, flush, window, location,
     scroll: (y: number) => { window.scrollTo(0, y); window.fire('scroll'); }, getTop: () => top,
     zoom: () => root.zoom, zoomIn: async () => { doc.ids.get('janko-zoom-in')!.fire('click'); await flush(); } };
@@ -286,6 +290,54 @@ test('switching from enlarged Candidates captures its original anchor before Ref
   await h.view('candidates');
   assert.equal(h.zoom(), 2.5);
   assert.equal(h.getTop(), 3500, 'the hidden, shortened layout must not overwrite the outgoing Candidates anchor');
+});
+
+test('pending restores and rapid view/piece changes cannot replay a stale callback into another pane', async () => {
+  const seed = new Map([
+    [STUDIO_STATE_STORAGE_KEY, JSON.stringify({ version: 1, view: 'candidates', zoom: 2.5, scroll: { candidates: 3500, reference: 680 } })],
+    [REFERENCE_READER_KEY, JSON.stringify({ selected: 'primary', candidatesZoom: 2.5, places: { primary: 680, 'brahms-op118-no1': 930 }, zooms: { primary: 1, 'brahms-op118-no1': 1.5 } })],
+  ]);
+  const h = await mount(await bundleViewer(), seed, '#candidates');
+  await h.answer('one');
+  assert.equal(h.getTop(), 3500);
+  h.doc.tabs.find((tab) => tab.dataset.viewTarget === 'reference')!.fire('click');
+  h.doc.tabs.find((tab) => tab.dataset.viewTarget === 'candidates')!.fire('click');
+  await h.flush();
+  assert.equal(h.getTop(), 3500, 'earlier Reference restore must not land in Candidates');
+  assert.equal(h.zoom(), 2.5);
+  await h.view('reference');
+  h.picker.value = 'brahms-op118-no1'; h.picker.fire('change');
+  h.picker.value = 'primary'; h.picker.fire('change');
+  await h.flush();
+  assertPaper(h, 'primary', 'one');
+  assert.equal(h.getTop(), 680, 'superseded Brahms callback must not land on Bach');
+  await h.select('brahms-op118-no1');
+  assert.equal(h.getTop(), 930, 'the other saved anchor survives rapid switching');
+  await h.view('candidates');
+  assert.equal(h.getTop(), 3500, 'neither pending restore nor smaller Reference layout clamps Candidates');
+});
+
+test('a hidden Source initial load retains a Reference anchor until its first visible paper and subsequent HMR', async () => {
+  const seed = new Map([
+    [STUDIO_STATE_STORAGE_KEY, JSON.stringify({ version: 1, view: 'reference', zoom: 1.5, scroll: { reference: 920, candidates: 1250 } })],
+    [REFERENCE_READER_KEY, JSON.stringify({ selected: 'brahms-op118-no1', candidatesZoom: 2, places: { primary: 300, 'brahms-op118-no1': 920 }, zooms: { primary: 1, 'brahms-op118-no1': 1.5 } })],
+  ]);
+  const h = await mount(await bundleViewer(), seed, '#reference');
+  h.root.hidden = true;
+  h.window.fire('janko-before-surface-hide');
+  await h.answer('one');
+  assert.equal(h.getTop(), 0, 'hidden paper is not a valid viewport');
+  h.root.hidden = false;
+  h.window.fire('janko-surface-show');
+  await h.flush();
+  assertPaper(h, 'brahms-op118-no1', 'one');
+  assert.equal(h.getTop(), 920);
+  assert.equal(h.zoom(), 1.5);
+  await h.swap('two'); await h.answer('two');
+  assertPaper(h, 'brahms-op118-no1', 'two');
+  assert.equal(h.getTop(), 920, 'the real HMR accept path keeps the visible anchor');
+  await h.zoomIn();
+  assert.equal(h.zoom(), 1.75, 'HMR does not duplicate zoom handlers');
 });
 
 test('Source-mode reload cannot overwrite a pending prepared place before paper arrives', async () => {

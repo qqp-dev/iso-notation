@@ -24,6 +24,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { buildRestDurationSpecimenScore } from '../src/scores/rest-duration-specimen';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
@@ -47,6 +49,14 @@ import {
 // ---------------------------------------------------------------------------
 
 const VIEWS = ['candidates', 'reference'] as const;
+
+test('the fingerprinted root session retains its approved PR108 bytes', () => {
+  // This file participates in the guarded semantic engine identity. UI
+  // compatibility policy belongs under prepared/, not in this root module.
+  const bytes = readFileSync(new URL('../src/render/janko/studio-session.ts', import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    '295cad233ddccb9f6a8cb462028e4329ca849d652a0f71541a20f0a023ecb42b');
+});
 
 function memoryStorage(seed?: string) {
   const store = new Map<string, string>();
