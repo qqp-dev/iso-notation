@@ -206,8 +206,10 @@ function assertPaper(h: Awaited<ReturnType<typeof mount>>, id: ScoreId, generati
 test('the mirrored shell offers a labeled keyboard picker and hides the second score before JS layout', async () => {
   const html = await readFile('janko.html', 'utf8');
   assert.equal(html, await readFile('public/janko.html', 'utf8'));
-  assert.match(html, /<label[^>]*>\s*Piece\s*<select\b[^>]*id="janko-reference-picker"[^>]*>/);
-  for (const id of ids) assert.match(html, new RegExp(`<option value="${id}"[^>]*>[^<]*${badges[id]}`));
+  const picker = html.match(/<select\b[^>]*id="janko-reference-picker"[^>]*>[\s\S]*?<\/select>/)?.[0];
+  assert.ok(picker, 'the keyboard-operable Reference piece picker is present');
+  assert.match(picker, /aria-label="Reference piece"/, 'a compact visible label must not shorten its accessible identity');
+  for (const id of ids) assert.match(picker, new RegExp(`<option value="${id}"[^>]*>[^<]*${names[id]}`), 'both works remain identifiable');
   assert.match(html, /\.reference-score\[data-score="brahms-op118-no1"\]:not\(\[data-reader-selected="true"\]\)\s*\{\s*display:\s*none/);
   assert.match(html, /\.reference-score\[hidden\]\s*\{\s*display:\s*none/);
   assert.match(html, /:focus-visible\s*\{[^}]*outline/);
@@ -276,6 +278,26 @@ test('prepared replacement preserves a just-scrolled anchor before debounce in b
   await h.view('reference');
   assertPaper(h, 'primary', 'fast');
   assert.equal(h.getTop(), 1200, 'the other view’s replacement does not overwrite Reference place');
+});
+
+test('a tab switch before the scroll debounce preserves the latest place of each prepared view', async () => {
+  const h = await mount(await bundleViewer(), undefined, '#candidates');
+  await h.answer('one');
+  h.scroll(430); await h.flush();
+  h.scroll(1320); // No scroll timer has fired yet.
+  await h.view('reference');
+  assertPaper(h, 'primary', 'one');
+  h.scroll(760); // Switch back before Reference's scroll debounce fires.
+  await h.view('candidates');
+  assert.equal(h.getTop(), 1320, 'the latest Candidates place wins over the older debounced value');
+  await h.view('reference');
+  assert.equal(h.getTop(), 760, 'Reference retains its own latest place');
+  h.window.fire('pagehide');
+  const reload = await mount(await bundleViewer(), h.storage, '#candidates');
+  await reload.answer('one');
+  assert.equal(reload.getTop(), 1320, 'the latest place survives reload as well');
+  await reload.view('reference');
+  assert.equal(reload.getTop(), 760);
 });
 
 test('switching from enlarged Candidates captures its original anchor before Reference shrinks the document', async () => {

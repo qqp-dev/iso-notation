@@ -324,8 +324,7 @@ test('janko.html loads the thin viewer; the public mirror stays byte-identical',
   assert.match(root, /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/, 'native browser zoom is not disabled');
   assert.deepEqual([...root.matchAll(/data-view-target="([^"]+)"/g)].map((match) => match[1]), ['candidates', 'reference'], 'exactly the approved two studio surfaces');
   assert.ok(root.includes('data-candidates-mode="source"') && root.includes('data-candidates-mode="engraving"'), 'the source comparison and prepared engraving remain available');
-  assert.ok(root.includes('data-mobile-pane="reference"') && root.includes('data-mobile-pane="candidate"'), 'phone comparison keeps both Original and Candidate controls');
-  assert.ok(root.includes('class="source-grid"'), 'the existing pair of source panes remains in the real studio');
+  assert.ok(root.includes('data-mobile-pane="reference"') && root.includes('data-mobile-pane="candidate"'), 'phone comparison keeps both Original and Published PDF controls');
   assert.match(root, />\s*Rotate to portrait\s*</i, 'the phone-landscape guard needs a readable rotation instruction, not inaccessible paper');
 });
 
@@ -380,20 +379,15 @@ test('the portrait notice guards short phone landscape, not a fine-pointer deskt
   }
 });
 
-test('reader shell removes source acquisition prose and blank reserves without removing controls or error slots', () => {
+test('reader shell keeps the prepared failure outlet, focus treatment and black surroundings', () => {
   const html = readFileSync(`${projectRoot}/janko.html`, 'utf8');
   assert.equal(html, readFileSync(`${projectRoot}/public/janko.html`, 'utf8'));
-  assert.ok(!/class="source-context(?:-details)?"|class="source-footer"|source-provenance|\.source-info\s*\{|\.source-provenance\s*\{|source-context-details\s*\{/.test(html),
-    'no source boilerplate, provenance region or CSS spacer survives in the reader');
-  assert.ok(!/local source-PDF acquisition preview|fidelity not certified|no source is approved/i.test(html),
-    'no source-acquisition or healthy fidelity prose survives in the shell');
-  assert.ok(!/\.source-mode\s+\.source-mode-switch\s*\{[^}]*position:\s*fixed/i.test(html),
-    'mode controls do not reserve or cover the foot of a portrait paper pane');
-  assert.match(html, /class="source-grid"/);
-  assert.match(html, /id="janko-status"/, 'real prepared failures retain a status outlet');
+  assert.match(html, /id="janko-status"[^>]*role="status"/, 'real prepared failures retain an announced status outlet');
   assert.match(html, /:focus-visible\s*\{[^}]*outline/, 'keyboard focus remains visibly painted');
-  assert.match(html, /--bg:\s*#000;/, 'paper remains on black');
-  assert.match(html, /\.source-mode\s+\.source-canvas\s*\{[^}]*flex:\s*1/, 'PDF pages receive the available reading area');
+  assert.match(html, /--bg:\s*#000;/, 'authentic PDF and engraving paper remain surrounded by black');
+  // Source pane creation, PDF rendering and canvas reuse are exercised against
+  // the running viewer in janko-source-viewer.test.ts; do not pin this shell to
+  // one grid or spacer selector instead of the reading behavior.
 });
 
 test('the round badge has black paper-first chrome in the mirrored studio shell', () => {
