@@ -88,7 +88,6 @@ async function launch(seed?: Map<string, string>) {
   const mobileButtons = ['reference', 'candidate'].map((role) => {
     const button = new Element('button'); button.dataset.mobilePane = role; return button;
   });
-  root.setChild('[data-mobile-pane]', Object.assign(new Element(), { children: mobileButtons }));
   const prepared = new Element();
   const switcher = new Element();
   const modeButtons = ['source', 'engraving'].map((mode) => {
@@ -118,7 +117,7 @@ async function launch(seed?: Map<string, string>) {
       getElementById: (id: string) => id === 'source-review' ? root : prepared,
       createElement: (tag: string) => new Element(tag),
       querySelector: (selector: string) => selector === '.source-mode-switch' ? switcher : null,
-      querySelectorAll: (selector: string) => selector === '[data-candidates-mode]' ? modeButtons : [],
+      querySelectorAll: (selector: string) => selector === '[data-candidates-mode]' ? modeButtons : selector === '[data-mobile-pane]' ? mobileButtons : [],
       body: { classList: { toggle: () => undefined } },
     },
     location: { hash: '#candidates' },
@@ -377,7 +376,10 @@ test('same-width resize and return from Reference preserve decoded canvas, scan 
   assert.equal(canvas(right), second);
   assert.equal(left.querySelector('.source-canvas')!.scrollTop, 120);
   assert.equal(right.querySelector('.source-canvas')!.scrollTop, 70);
-  await h.switchView('#reference'); await h.switchView('#candidates');
+  await h.switchView('#reference');
+  assert.equal(h.root.hidden, true, 'Reference hides the Source reading surface');
+  await h.switchView('#candidates');
+  assert.equal(h.root.hidden, false, 'Candidates restores the Source reading surface');
   assert.equal(canvas(left), first, 'returning to Source at the same fit reuses the decoded page');
   assert.equal(canvas(right), second);
   assert.equal(h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length, scans);
@@ -394,8 +396,21 @@ test('phone pane switch keeps both selected pages, zooms and valid canvases when
   const candidate = right.querySelector('.source-canvas')!.children[0];
   const renders = [...h.renderCalls.values()].reduce((sum, n) => sum + n, 0);
   const scans = h.fetches.filter((url) => url.endsWith('/jbig2.wasm')).length;
-  await h.switchMobile('candidate'); await h.switchMobile('reference');
+  const leftHost = left.querySelector('.source-canvas')!, rightHost = right.querySelector('.source-canvas')!;
+  leftHost.scrollTop = 125; rightHost.scrollTop = 75;
+  assert.equal(h.root.dataset.mobilePane, 'reference');
+  await h.switchMobile('candidate');
+  assert.equal(h.root.dataset.mobilePane, 'candidate', 'the candidate pane is actually selected');
+  assert.equal(h.mobileButtons[0].attributes.get('aria-pressed'), 'false');
+  assert.equal(h.mobileButtons[1].attributes.get('aria-pressed'), 'true');
+  assert.equal(JSON.parse(h.storage.get('janko-source-review-v1')!).mobilePane, 'candidate');
+  assert.equal(leftHost.scrollTop, 125); assert.equal(rightHost.scrollTop, 75);
+  await h.switchMobile('reference');
+  assert.equal(h.root.dataset.mobilePane, 'reference', 'the original scan is selected again');
+  assert.equal(h.mobileButtons[0].attributes.get('aria-pressed'), 'true');
+  assert.equal(h.mobileButtons[1].attributes.get('aria-pressed'), 'false');
   await h.settled(left); await h.settled(right);
+  assert.equal(leftHost.scrollTop, 125); assert.equal(rightHost.scrollTop, 75);
   assert.equal(left.querySelector('.source-canvas')!.children[0], original);
   assert.equal(right.querySelector('.source-canvas')!.children[0], candidate);
   assert.equal([...h.renderCalls.values()].reduce((sum, n) => sum + n, 0), renders);
@@ -429,6 +444,14 @@ test('Candidates Source/Engraving mode preserves each PDF document, zoom, page, 
   assert.match(reference.querySelector('.source-page')!.textContent, /\b2\s*\/\s*37\b/);
   assert.match(candidate.querySelector('.source-page')!.textContent, /\b2\s*\/\s*2\b/);
   assert.match(candidate.querySelector('.source-zoom')!.textContent, /125%/);
+  await h.switchView('#reference');
+  assert.equal(h.root.hidden, true);
+  await h.switchView('#candidates');
+  assert.equal(h.root.hidden, false);
+  assert.equal(one.children[0], original); assert.equal(two.children[0], other);
+  assert.equal(one.scrollTop, 140); assert.equal(two.scrollTop, 75);
+  assert.equal([...h.renderCalls.values()].reduce((sum, n) => sum + n, 0), calls,
+    'Reference navigation does not refit unchanged PDF panes');
 });
 
 test('Source reload restores each document/page place independently without transferring another PDF’s ink', async () => {

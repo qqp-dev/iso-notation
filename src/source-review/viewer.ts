@@ -214,13 +214,13 @@ modeButtons.forEach((button) => button.addEventListener('click', () => {
   if (location.hash === '#reference') location.hash = '#candidates';
   updateSurface();
 }));
-root.querySelectorAll<HTMLButtonElement>('[data-mobile-pane]').forEach((button) => button.addEventListener('click', () => {
+document.querySelectorAll<HTMLButtonElement>('[data-mobile-pane]').forEach((button) => button.addEventListener('click', () => {
   rememberPlace(state.mobilePane);
   state.mobilePane = button.dataset.mobilePane as Role; persist(); updateMobile(); void render(state.mobilePane);
 }));
 function updateMobile(): void {
   root.dataset.mobilePane = state.mobilePane;
-  root.querySelectorAll<HTMLButtonElement>('[data-mobile-pane]').forEach((button) => {
+  document.querySelectorAll<HTMLButtonElement>('[data-mobile-pane]').forEach((button) => {
     button.setAttribute('aria-pressed', String(button.dataset.mobilePane === state.mobilePane));
   });
 }
