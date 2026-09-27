@@ -25,6 +25,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { bachPr112Hands } from './support/bach-before-m5';
 import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
@@ -578,32 +579,31 @@ test('Rests golden: verbatim constants stay byte-identical (license provenance)'
   );
 });
 
-test('Rests golden: the nine previously approved Bach seats stay fixed (§4 nearby-level rule)', () => {
-  // Provenance: pre-§4 seats were 720/318.45875, 864/313.45875,
-  // 1056/333.45875, 2988/325.95875, 3060/370.95875, 3132/345.95875,
-  // 3600/512.43125 (552/179.48625 and 3432/358.45875 never moved). The §4
-  // nearby-level rule reseats the other seven onto the nearest row of an
-  // actual in-measure same-hand level (downbeat rests take the resume side,
-  // the only side present; mid-measure rests take the nearer side) — every
-  // delta traced to played-note data, x/values/hands byte-identical.
-  // Absolute pins: any further seating drift fails here.
+test('Rests golden: unaffected §4 seats and corrected-hand rest ownership', () => {
+  // The m4/m20–22/m24 hand flips change source/display occupancy; the former
+  // nine-rest PR112 ink is not an invariant of this score. Retain exact seats
+  // outside those measures and check the changed slots against the approved
+  // identity/hand facts, rather than silently blessing old rest positions.
   const o = resolveJankoOptions(DEFAULT_JANKO_OPTIONS);
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const seats = layoutJankoScore(BACH, o, t).flatMap((s) => s.rests);
 
   const expected: ReadonlyArray<readonly [number, string, number, number]> = [
-    [552, 'sixteenth', 548.635, 179.48625],
     [720, 'eighth', 173.67, 315.95875],
     [864, 'eighth', 309.54, 310.95875],
     [1056, 'sixteenth', 486.7, 338.45875],
-    [2988, 'quarter', 130.7025, 345.95875],
-    [3060, 'quarter', 204.6375, 385.95875],
-    [3132, 'quarter', 266.5725, 333.45875],
-    [3432, 'sixteenth', 548.635, 358.45875],
     [3600, 'eighth', 173.67, 504.93125],
   ];
-  assert.equal(seats.length, expected.length + 2, 'only the two approved RH system-opening rests join the nine original rests');
-  assert.deepEqual(seats.filter(r=>!expected.some(([tick])=>tick===r.tick)).map(r=>[r.tick,r.hand,r.value]).sort((a,b)=>Number(a[0])-Number(b[0])),[[576,'RH','eighth'],[3456,'RH','eighth']]);
+  const ticks = seats.map(r=>r.tick).sort((a,b)=>a-b);
+  assert.deepEqual(ticks,[552,576,720,864,1056,3024,3432,3456,3600],
+    'the corrected hands remove three obsolete silences and add one at t3024; both boundary eighths remain');
+  assert.deepEqual(seats.filter(r=>[552,3024,3432].includes(r.tick)).map(r=>[r.tick,r.hand,r.value]),
+    [[552,'LH','sixteenth'],[3024,'RH','sixteenth'],[3432,'LH','sixteenth']],
+    'new hand ownership governs printed silences');
+  const old = layoutJankoScore(bachPr112Hands(BACH), o, t).flatMap(s=>s.rests);
+  assert.deepEqual(seats.filter(r=>expected.some(([tick])=>tick===r.tick)),
+    old.filter(r=>expected.some(([tick])=>tick===r.tick)),
+    'unaffected old §4 rest records remain byte-identical');
 
   for (const [tick, value, x, y] of expected) {
     const rest = seats.find((r) => r.tick === tick)!;

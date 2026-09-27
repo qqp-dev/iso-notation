@@ -22,6 +22,7 @@
  */
 
 import { QuantizedGridScore } from '../../model/types';
+import { detectHandCrossings } from '../../model/grid';
 import { buildBachGoldbergVar1Score } from '../../scores/bach-goldberg-var1';
 import {
   DURATION_SPECIMEN_JANKO_OPTIONS,
@@ -67,6 +68,8 @@ import {
 } from './studio-session';
 import {
   BRAHMS_STUDIO_SCORE_ID,
+  BACH_PR112_SCORE_ID,
+  PR112_EVENTS,
   DURATION_SPECIMEN_STUDIO_SCORE_ID,
   HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
   DURATION_VOCABULARY_SPECIMEN_STUDIO_SCORE_ID,
@@ -242,6 +245,27 @@ export interface JankoStudioConfig {
   semanticCandidateError?: string;
 }
 
+/** Reconstruct the registry's readonly PR112 witness without mutating GOLD. */
+function bachPr112HandScore(gold: QuantizedGridScore): QuantizedGridScore {
+  if (gold.id !== 'bach-goldberg-var1' || gold.notes.length !== 551) throw new Error('PR112 hand witness requires the canonical 551-event Bach score');
+  const seen = new Set<number>();
+  const notes = gold.notes.map((note, index) => {
+    const id = index + 1;
+    if (note.id !== `bach-var1-${id}`) throw new Error(`Unexpected Bach event identity at ${id}`);
+    const event = PR112_EVENTS[id];
+    if (!event) return { ...note, pitch: { ...note.pitch } };
+    seen.add(id);
+    const [prior, tick, pitchClass, octave] = event;
+    if (note.startTick !== tick || note.pitch.pitchClass !== pitchClass || note.pitch.octave !== octave || note.hand === prior)
+      throw new Error(`PR112 hand witness mismatch at ${note.id}`);
+    return { ...note, pitch: { ...note.pitch }, hand: prior };
+  });
+  if (seen.size !== 16 || notes.filter(n => n.hand === 'RH').length !== 301) throw new Error('PR112 hand witness has wrong census');
+  const baseline: QuantizedGridScore = { ...gold, notes };
+  baseline.handCrossings = detectHandCrossings(baseline);
+  return baseline;
+}
+
 /** Build a studio configuration, defaulting to the golden master + current round. */
 export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): JankoStudioConfig {
   const options = resolveJankoOptions({
@@ -257,6 +281,11 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
   const scores: Record<string, StudioScore> = {
     [DEFAULT_STUDIO_SCORE_ID]: { id: DEFAULT_STUDIO_SCORE_ID, score, options, tokens },
     [score.id]: { id: score.id, score, options, tokens },
+    // The score-selected PR112 card uses the existing score-entry seam; the
+    // primary/Reference and Brahms entries are never projected or replaced.
+    ...(score.id === 'bach-goldberg-var1' ? {
+      [BACH_PR112_SCORE_ID]: { id: BACH_PR112_SCORE_ID, score: bachPr112HandScore(score), options, tokens },
+    } : {}),
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: buildBrahmsOp118No1Score(),
@@ -654,6 +683,8 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const seen = new Set<string>();
     const panels = resolved.windows.map((w) => {
       const window = w as JankoScoreCandidateWindow;
+      if (window.scoreId === BACH_PR112_SCORE_ID && !scores[BACH_PR112_SCORE_ID])
+        throw new Error('PR112 hand witness missing: cannot substitute the GOLD score');
       const original = scores[window.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
       const entry = dynamic && original.score.id === dynamic.score.id ? { ...original, score: dynamic.score } :
         candidate.id === 'semantic-hand' && original.score.id === config.semanticCandidate?.score.id && config.semanticCandidate

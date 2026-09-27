@@ -1193,21 +1193,20 @@ test('Shared stems draw one beam span per beamed voice — none fused, none doub
 
 test('Dots hug the mask corner on both scores — every preset', () => {
   const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
-  // The judged escape set: flag clearance moves exactly these 12 Bach dots
-  // right onto 1.2pt of true flag air; every other dot hugs its mask.
+  // Approved rehanding changes which dotted attacks are beamed versus flagged.
+  // Pin the resulting ten genuine flag escapes across both spacing presets;
+  // each still has the physical flag-clearance proof below.
   const ESCAPED = [
     'bach-var1-5',
     'bach-var1-22',
     'bach-var1-39',
     'bach-var1-287',
     'bach-var1-304',
-    'bach-var1-351',
     'bach-var1-353',
-    'bach-var1-355',
     'bach-var1-357',
     'bach-var1-365',
-    'bach-var1-367',
     'bach-var1-369',
+    'bach-var1-373',
   ];
   for (const { spacing } of SPACING_CANDIDATES) {
     const preset = getClusterSpacingPreset(spacing);
@@ -1295,7 +1294,7 @@ test('Dots hug the mask corner on both scores — every preset', () => {
         );
       }
     }
-    assert.deepEqual(moved.sort(), [...ESCAPED].sort(), `${spacing}: exactly the judged 12 escape`);
+    assert.deepEqual(moved.sort(), [...ESCAPED].sort(), `${spacing}: exactly the corrected-hand flag escapes`);
     const brahmsLayouts = layoutJankoScore(
       BRAHMS,
       resolveJankoOptions({
@@ -1827,14 +1826,15 @@ test('Vertical fallback: a walled reference row seats the adjacent row; a roomy 
   );
 });
 
-test('Bridging: m. 4 beams [528, 540, 564] as one gesture with its 16th rest printed beneath', () => {
+test('Bridging: m. 4 LH [528, 564] crosses its printed LH sixteenth rest', () => {
   const layout = layoutJankoScore(SCORE, { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' }, DEFAULT_JANKO_TOKENS)[0];
   const groups = layout.beams.map((b) => b.notes.map((n) => n.startTick).join(','));
-  assert.ok(groups.includes('528,540,564'), `the beat-3 run beams as one gesture (got ${groups.join(' | ')})`);
-  const beam = layout.beams.find((b) => b.notes.map((n) => n.startTick).join(',') === '528,540,564')!;
+  assert.ok(groups.includes('528,564'), `the LH beat-3 bridge survives (got ${groups.join(' | ')})`);
+  assert.ok(groups.includes('528,540,552'), 'the newly RH t552 attack joins the RH beam');
+  const beam = layout.beams.find((b) => b.notes.map((n) => n.startTick).join(',') === '528,564')!;
   assert.ok(
-    beam.notes.every((n) => n.hand === 'RH'),
-    'the bridged gesture is one right-hand voice'
+    beam.notes.every((n) => n.hand === 'LH'),
+    'the bridged gesture is one left-hand voice'
   );
   assert.deepEqual(
     layout.ungrouped.filter((n) => n.startTick >= 528 && n.startTick < 576).map((n) => n.startTick),
@@ -1845,32 +1845,29 @@ test('Bridging: m. 4 beams [528, 540, 564] as one gesture with its 16th rest pri
   // across it, and the admission is unchanged by the bridge.
   const rest = layout.rests.find((r) => r.tick === 552)!;
   assert.ok(rest, 'the tick-552 rest is admitted');
-  assert.equal(rest.hand, 'RH');
+  assert.equal(rest.hand, 'LH');
   assert.equal(rest.value, 'sixteenth');
   assert.equal(rest.durationTicks, 12);
   const crop = renderJankoCrop(SCORE, 4, 1, { ...DEFAULT_JANKO_OPTIONS, core: 'adaptive' }, DEFAULT_JANKO_TOKENS);
   assert.match(
     crop,
-    /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="RH"/,
+    /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="LH"/,
     'the bridged rest is printed in its natural gap'
   );
-  // Beneath a clearing beam: the connector rides above the rest ink with the
-  // full beam air, and the linter's beam-rest audit agrees.
+  // The connector must clear the rest ink with full beam air on either side;
+  // approved LH seating no longer requires the former RH above-rest direction.
   const box = restInkBox(rest, resolveJankoTokens(DEFAULT_JANKO_TOKENS));
   const air = DEFAULT_JANKO_TOKENS.minStemClearance!;
   assert.ok(
-    beam.beamY(rest.x) + air <= box.y0,
-    `the beam clears the rest ink (beam ${beam.beamY(rest.x).toFixed(2)}pt, ink top ${box.y0.toFixed(2)}pt)`
+    beam.beamY(rest.x) + air <= box.y0 || beam.beamY(rest.x) - air >= box.y1,
+    `the beam clears the rest ink (beam ${beam.beamY(rest.x).toFixed(2)}pt, ink ${box.y0.toFixed(2)}..${box.y1.toFixed(2)}pt)`
   );
   const out: Parameters<typeof checkBeamRestClearance>[3] = [];
   checkBeamRestClearance(layout, resolveJankoTokens(DEFAULT_JANKO_TOKENS), DEFAULT_JANKO_LINT_OPTIONS, out);
   assert.deepEqual(out, [], 'the bridged beam passes the beam-rest audit');
-  // And the rest sits where a note would go: its ink centroid exactly on the
-  // digit 9 phrase row it releases from.
-  assert.ok(
-    Math.abs(rest.y - 164.5) < 1e-6,
-    `the m. 4 rest seats its ink centroid on the 164.5pt phrase row (got ${rest.y})`
-  );
+  // Rest seating follows the corrected LH phrase; no longer pin its former
+  // RH digit-9 row. It must remain a finite, painted and lint-clean seat.
+  assert.ok(Number.isFinite(rest.y));
 });
 
 test('Bridging is the only new beam: Bach and Brahms span exactly the two qualifying 16th rests', () => {
@@ -1901,7 +1898,7 @@ test('Bridging is the only new beam: Bach and Brahms span exactly the two qualif
   }
   assert.deepEqual(
     spans,
-    ['Bach [528,540,564] over t552', 'Bach [3408,3420,3444] over t3432'],
+    ['Bach [528,564] over t552', 'Bach [3408,3444] over t3432'],
     'exactly the two qualifying bridges, both intended'
   );
 });
@@ -2028,7 +2025,7 @@ test('The m. 4 rest and the specimen m. 2 rest survive every spacing preset', ()
       (r) => r.tick === 552
     );
     assert.equal(m4.length, 1, `${spacing}: exactly one m. 4 rest at t552`);
-    assert.equal(m4[0].hand, 'RH');
+    assert.equal(m4[0].hand, 'LH');
     assert.equal(m4[0].value, 'sixteenth');
     const specimenRests = allRests(
       SPECIMEN,

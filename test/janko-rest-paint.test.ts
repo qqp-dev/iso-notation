@@ -89,12 +89,12 @@ test('Bach GOLD boundary silences use one real eighth-rest glyph at each approve
   assert.deepEqual(layouts.flatMap(s=>s.rests).filter(r=>[720,864,3600].includes(r.tick)).map(r=>[r.tick,r.value]),[[720,'eighth'],[864,'eighth'],[3600,'eighth']], 'm. 6/7/26 approved rests remain');
 });
 
-test('current GOLD differs from the same score under the prior rest policy only by the two restored glyphs', () => {
+test('current GOLD boundary-rest inference adds only two source-supported RH eighth rests to the same corrected hands', () => {
   const score=buildBachGoldbergVar1Score();
   const restored=layoutJankoScore(score,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS);
   const prior=layoutJankoScore(score,legacyBachOptions,DEFAULT_JANKO_TOKENS);
   assert.deepEqual(restored.flatMap(s=>s.notes),prior.flatMap(s=>s.notes),'all placed Bach note identities and geometry remain');
-  assert.deepEqual(restored.flatMap(s=>s.rests).filter(r=>r.tick!==576&&r.tick!==3456),prior.flatMap(s=>s.rests),'the original nine rests do not move');
+  assert.deepEqual(restored.flatMap(s=>s.rests).filter(r=>r.tick!==576&&r.tick!==3456),prior.flatMap(s=>s.rests),'same corrected score under either policy: no unrelated rest differences');
   for(const [page,tick] of [[0,576],[1,3456]] as const) {
     const s=restored.find(system=>system.rests.some(r=>r.hand==='RH'&&r.tick===tick))!;
     const index=s.rests.findIndex(r=>r.hand==='RH'&&r.tick===tick);
@@ -107,13 +107,14 @@ test('current GOLD differs from the same score under the prior rest policy only 
 test('system-opening RH silence requires a valid prior release, not an older sustained chord member', () => {
   const base=buildBachGoldbergVar1Score();
   const rests=(score:typeof base)=>layoutJankoScore(score,DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS).flatMap(s=>s.rests).filter(r=>r.hand==='RH'&&r.tick===576);
-  const prior=base.notes.find(n=>n.id==='bach-var1-69')!;
-  assert.equal(prior.startTick,564);
-  assert.equal(prior.durationTicks,12);
+  const prior=base.notes.find(n=>n.id==='bach-var1-68')!;
+  assert.equal(prior.startTick,552);
+  assert.equal(prior.durationTicks,24);
+  assert.equal(prior.hand,'RH','approved m4 source-part assignment releases at the m5 boundary');
   const sustained={...base,notes:base.notes.map(n=>n.id===prior.id?{...n,durationTicks:48}:n)};
   assert.equal(rests(sustained).length,0,'prior RH note still sounding through the proposed rest');
-  const older={...base,notes:[...base.notes,{...prior,id:'boundary-older-chord-tone',startTick:552,durationTicks:60}]};
-  assert.equal(rests(older).length,0,'older long RH onset outlives the latest short RH note');
+  const older={...base,notes:[...base.notes,{...prior,id:'boundary-older-chord-tone',startTick:528,durationTicks:60}]};
+  assert.equal(rests(older).length,0,'older long RH onset outlives the latest RH release');
   const chord={...base,notes:[...base.notes,{...prior,id:'boundary-long-chord-tone',durationTicks:48}]};
   assert.equal(rests(chord).length,0,'maximum release across one chord prevents false silence');
   const noPrior={...base,notes:base.notes.filter(n=>n.hand!=='RH'||n.startTick>=576)};

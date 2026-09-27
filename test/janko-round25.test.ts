@@ -339,16 +339,21 @@ test('Slab honesty: grand bar rests touch drawn lines exactly', () => {
   }
 });
 
-test('Bar-4 regression: the tick-552 rest seats on the Middle C line between the 9 and the 0, not mid-air', () => {
+test('Bar-4 regression: the corrected LH tick-552 rest seats on the drawn C3 line', () => {
   const o = continuousOptions('grand-divider');
   const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
   const page = computePageGeometry(o, t, SCORE);
   const layout = layoutJankoSystem(SCORE, page, 0, o, t);
-  const rest = layout.rests.find((r) => r.tick === 552)!;
+  const rests = layout.rests.filter((r) => r.tick === 552);
+  assert.equal(rests.length, 1, 'exactly one printed silence between the LH D2 and C3');
+  const rest = rests[0];
+  assert.equal(rest.hand, 'LH');
+  assert.equal(rest.value, 'sixteenth');
   const geo = getSystemGeometry(page, 0);
   const rules = drawnStaffRuleYs(geo, o, t);
-  assert.ok(rules.includes(rest.y), 'the seat is a drawn line');
-  const c4 = geo.middleCY + continuousPitchY(48, t.semitoneScale);
-  assert.ok(Math.abs(rest.y - c4) < 1e-9, `the seat is the Middle C line (y=${rest.y.toFixed(2)})`);
+  assert.ok(rules.includes(rest.y), 'the seat is a drawn line, not mid-air');
+  const c3 = geo.middleCY + continuousPitchY(36, t.semitoneScale);
+  assert.equal(rest.y, c3, 'the LH phrase resumes on C3, not the former RH Middle C');
+  assert.match(renderSystem(SCORE, geo, 0, o, t, layout), /<g class="janko-rest-group" data-rest-tick="552" data-rest-value="sixteenth" data-rest-hand="LH"/, 'the physical rest is painted');
 });
 
