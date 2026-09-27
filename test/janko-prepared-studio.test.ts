@@ -49,6 +49,10 @@ import {
   PREPARED_MANIFEST_ID,
 } from '../src/render/janko/prepared/vite-plugin';
 import { createStudioConfig, renderCandidatesView, renderReferenceView } from '../src/render/janko/studio';
+import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
+import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
+import { bachPr112Hands } from './support/bach-before-m5';
 import { renderPreparedStatus } from '../src/render/janko/prepared/status';
 
 const projectRoot = process.cwd();
@@ -83,6 +87,71 @@ test('each prepared artifact is byte-equal to the direct real renderer', () => {
   const generation = preparedOnce();
   assert.equal(generation.artifacts.candidates, renderCandidatesView(config));
   assert.equal(generation.artifacts.reference, renderReferenceView(config));
+});
+
+test('served direct and prepared A/B panels bind real PR112/GOLD ink; Reference stays GOLD', () => {
+  // Independent PR112 hand fixture: its 551 source tuples and unchanged-field
+  // hashes are pinned against landed PR112 in scores.test.ts, not projected
+  // from the candidate registry. Compare the actual SVG inside each served
+  // card rather than trusting its label, data-window or clean lint chip.
+  const gold = buildBachGoldbergVar1Score();
+  const prior = bachPr112Hands(gold);
+  const expectedSvg = (svg: string) => svg.replace('<svg ', '<svg class="janko-svg" ');
+  const panelSvg = (markup: string, cardId: string, scoreId: string, start: number, count: number): string => {
+    const cardStart = markup.indexOf(`data-candidate="${cardId}"`);
+    assert.ok(cardStart >= 0, `${cardId}: served card exists`);
+    const card = markup.slice(cardStart, markup.indexOf('</article>', cardStart));
+    const marker = `data-window="${scoreId}:${start}-${start + count - 1}"`;
+    const at = card.indexOf(marker);
+    assert.ok(at >= 0, `${cardId}: served window ${marker}`);
+    const panel = card.slice(at, card.indexOf('</figure>', at));
+    const svg = panel.match(/<svg\b[\s\S]*?<\/svg>/)?.[0];
+    assert.ok(svg, `${cardId} mm. ${start}–${start + count - 1}: painted SVG`);
+    return svg;
+  };
+  const referencePages = (markup: string): string[] => {
+    const bachStart = markup.indexOf('data-score="primary"');
+    assert.ok(bachStart >= 0, 'served GOLD Reference block');
+    const bach = markup.slice(bachStart);
+    return [1, 2].map(page => {
+      const at = bach.indexOf(`data-page="${page}"`);
+      assert.ok(at >= 0, `GOLD Reference page ${page}`);
+      const svg = bach.slice(at, bach.indexOf('</figure>', at)).match(/<svg\b[\s\S]*?<\/svg>/)?.[0];
+      assert.ok(svg, `GOLD Reference page ${page} has painted SVG`);
+      return svg;
+    });
+  };
+  const direct = createStudioConfig();
+  const generation = preparedOnce();
+  const expectedGoldPages = [0, 1].map(page => expectedSvg(renderJankoPage(gold, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS)));
+  for (const [route, candidates, reference] of [
+    ['direct', renderCandidatesView(direct), renderReferenceView(direct)],
+    ['prepared', generation.artifacts.candidates, generation.artifacts.reference],
+  ] as const) {
+    for (const [start, count] of [[4, 2], [20, 4], [24, 2]] as const) {
+      const before = panelSvg(candidates, 'bach-hands-pr112', 'bach-pr112-hands', start, count);
+      const after = panelSvg(candidates, 'bach-hands-approved', 'primary', start, count);
+      const oldInk = expectedSvg(renderJankoCrop(prior, start, count, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
+      const goldInk = expectedSvg(renderJankoCrop(gold, start, count, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
+      assert.notEqual(oldInk, goldInk, `${route} mm. ${start}–${start + count - 1}: A/B witnesses differ`);
+      for (const [name, svg, expected] of [['PR112', before, oldInk], ['GOLD', after, goldInk]] as const) {
+        assert.match(svg, /class="janko-beam"/, `${route} ${name}: printed beams`);
+        assert.match(svg, /class="janko-rest-group"/, `${route} ${name}: printed rests`);
+        assert.match(svg, /class="janko-stem"/, `${route} ${name}: printed stems`);
+        assert.equal(svg, expected, `${route} ${name} mm. ${start}–${start + count - 1}: served ink binds the correct hand score`);
+      }
+    }
+    assert.deepEqual(referencePages(reference), expectedGoldPages, `${route}: both GOLD Reference pages are canonical, not PR112`);
+  }
+
+  // Even a candidate-library override under the primary id cannot promote
+  // PR112 into Reference; the prepared generator must honor the same isolation.
+  const baselineEntry = { ...direct.scores.primary, score: prior };
+  const override = { scores: { primary: baselineEntry } };
+  assert.deepEqual(referencePages(renderReferenceView(createStudioConfig(override))), expectedGoldPages,
+    'direct Reference ignores the candidate score-library override');
+  assert.deepEqual(referencePages(generatePreparedStudio(override).artifacts.reference), expectedGoldPages,
+    'prepared Reference ignores the candidate score-library override');
 });
 
 test('the lint facts come from the real linter: the primary score engraves clean', () => {

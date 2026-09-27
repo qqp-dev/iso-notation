@@ -826,15 +826,13 @@ test('Defect: a beam driven into a printed rest is caught', () => {
   const out: LintViolation[] = [];
   const layout = systems(DEFAULT_JANKO_OPTIONS)[0];
   assert.ok(layout.beams.length > 0, 'the canonical score beams');
-  // The Round 17B bridged beam: m. 4 beat 3 continues across the printed RH
-  // 16th rest at tick 552.
-  const beam = layout.beams.find((b) => b.notes.some((n) => n.startTick === 528 && n.hand === 'RH'))!;
-  const rest = layout.rests.find((r) => r.tick === 552)!;
-  assert.deepEqual(
-    beam.notes.map((n) => n.startTick),
-    [528, 540, 564],
-    'the m. 4 run beams as one gesture across its rest'
-  );
+  // The approved m4 swap puts the t552 sixteenth rest in LH. The LH
+  // [528,564] bridge still spans that printed rest; the RH [528,540,552]
+  // beam is a different, sounding voice and is not a beam/rest collision.
+  const beam = layout.beams.find((b) => b.notes.map(n=>n.startTick).join(',') === '528,564' && b.notes[0].hand === 'LH')!;
+  const rest = layout.rests.find((r) => r.tick === 552 && r.hand === 'LH')!;
+  assert.ok(beam && rest, 'the corrected LH rest has a real bridging beam');
+  assert.deepEqual(beam.notes.map(n=>n.startTick),[528,564]);
   // Drive the primary connector onto the rest ink: collapse it to a
   // horizontal segment through the rest centre.
   const broken: JankoSystemLayout = {
@@ -1016,14 +1014,14 @@ test('Handled tuck: an unpainted or too-deep tuck still violates', () => {
 
 test('Round 14: an unwritable rest is a named diagnostic, never a silent drop', () => {
   // A disc wide enough to wall the m. 4 beat cell shut: no slot along the row
-  // keeps the guaranteed seating air from the LH D3 head that shares the column.
+  // keeps the guaranteed seating air from the RH D3 head that shares the column.
   const fat = { ...DEFAULT_JANKO_TOKENS, noteheadRadius: 60.0 };
   const layout = layoutJankoScore(SCORE, DEFAULT_JANKO_OPTIONS, fat)[0];
   assert.ok(!layout.rests.some((r) => r.tick === 552), 'the refused rest is not painted');
   const refusal = layout.unwrittenRests.find((r) => r.tick === 552);
   assert.ok(refusal, 'the refusal is recorded instead of being dropped silently');
   assert.equal(refusal!.reason, 'no-slot');
-  assert.equal(refusal!.hand, 'RH');
+  assert.equal(refusal!.hand, 'LH');
   assert.equal(refusal!.value, 'sixteenth');
   // −4 staffLeft + 3·2 measure slots + ⅚·2 grid growth under golden margins.
   assert.ok(

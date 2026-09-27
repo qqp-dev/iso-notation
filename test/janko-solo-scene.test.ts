@@ -40,7 +40,7 @@ test('five real dialect keys: independent literal SVG path controls, metadata, 1
   }
 });
 
-test('Bach both spacing presets preserve 19 dotted solos and 12 judged right escapes',()=>{
+test('Bach both spacing presets preserve 19 dotted solos and corrected-hand right escapes',()=>{
   for(const spacing of ['tight','snug'] as const){
     const o=resolveJankoOptions({...DEFAULT_JANKO_OPTIONS,clusterSpacing:spacing});
     const systems=layoutJankoScore(buildBachGoldbergVar1Score(),o,t);
@@ -59,9 +59,12 @@ test('Bach both spacing presets preserve 19 dotted solos and 12 judged right esc
       }
     }
     assert.equal(all.length,19);
+    // The hand-only GOLD revision moves #351/#355/#367 into LH beams and
+    // makes #373 an RH dotted solo; the other nine right-escape identities
+    // retain their previously judged seat under both spacing presets.
     assert.deepEqual(ids,['bach-var1-5','bach-var1-22','bach-var1-39','bach-var1-287',
-      'bach-var1-304','bach-var1-351','bach-var1-353','bach-var1-355',
-      'bach-var1-357','bach-var1-365','bach-var1-367','bach-var1-369']);
+      'bach-var1-304','bach-var1-353','bach-var1-357','bach-var1-365',
+      'bach-var1-369','bach-var1-373']);
   }
 });
 

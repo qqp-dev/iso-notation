@@ -1176,34 +1176,53 @@ export const ROUND_49_CANDIDATES: JankoCandidate[] = [
   }),
 ];
 
-export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 51,
-  title: 'Bach GOLD · system-opening RH silence correction',
-  description: 'The approved LH assignments at ticks 576/588 remain fixed. Compare the old current-system-only rest walk with the restored preceding-release walk on the real Bach score at mm. 4–5 and 24–25. Reference uses the corrected GOLD engraving; Brahms BRONZE remains unchanged.',
-  openAxes: ['inferBoundaryRests'],
+// The previous PR112 score is reconstructed from the corrected canonical notes
+// for this review card only. The map records exactly the approved sixteen
+// previous hands; no engine rule infers hand from staff, pitch or MIDI track.
+export const BACH_PR112_SCORE_ID = 'bach-pr112-hands';
+export const PR112_EVENTS: Readonly<Record<number, readonly ['LH' | 'RH', number, number, number]>> = {
+  68: ['LH', 552, 2, 3], 69: ['RH', 564, 0, 3],
+  348: ['RH', 2844, 3, 4], 349: ['RH', 2856, 6, 4], 350: ['RH', 2868, 9, 4],
+  351: ['RH', 2880, 7, 4], 354: ['RH', 2916, 6, 4], 355: ['RH', 2928, 7, 4],
+  360: ['LH', 2988, 3, 3], 361: ['LH', 3000, 4, 3],
+  366: ['RH', 3060, 11, 4], 367: ['RH', 3072, 0, 5],
+  372: ['LH', 3132, 8, 3], 373: ['LH', 3144, 9, 3],
+  408: ['LH', 3432, 4, 3], 409: ['RH', 3444, 2, 3],
 };
 
-const BACH_BOUNDARY_WINDOWS: JankoScoreCandidateWindow[] = [
-  { scoreId: 'primary', measureStart: 4, measureCount: 2,
-    title: 'Bach mm. 4–5 · RH release at 576, LH attacks at 576/588',
-    caption: 'The prior RH onset at 564 releases at 576; the next RH onset at 600 leaves a genuine 24-tick eighth-rest silence.' },
-  { scoreId: 'primary', measureStart: 24, measureCount: 2,
-    title: 'Bach mm. 24–25 · RH release at 3456, LH attacks at 3456/3468',
-    caption: 'The prior RH onset at 3444 releases at 3456; the next RH onset at 3480 leaves a genuine 24-tick eighth-rest silence.' },
-];
+export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
+  round: 52,
+  title: 'Bach GOLD · sixteen approved hand corrections',
+  description: 'PR112 hand assignments versus the operator-approved sixteen corrections on the same literal Bach measures, using the real engraving engine and unchanged boundary-rest policy. Only hands change; Reference is the corrected GOLD. Brahms BRONZE remains unchanged.',
+  openAxes: ['hand assignment'],
+};
+
+function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
+  return [
+    { scoreId, measureStart: 4, measureCount: 2,
+      title: 'Bach mm. 4–5 · crossing exit and RH eighth rest',
+      caption: 'm. 4 #68 D3 moves LH→RH and #69 C3 RH→LH; m. 5 #70/#71 stay LH. The RH eighth rest at 576 remains source-supported; the preceding release changes hand.' },
+    { scoreId, measureStart: 20, measureCount: 4,
+      title: 'Bach mm. 20–23 · alternating parts through m. 22',
+      caption: 'Twelve assignments follow the separate bass/LH and soprano/RH parts across mm. 20–22; #343 B4 stays a RH hold into m. 21, #373 A3 stays tied into m. 23, where the alternating texture ends.' },
+    { scoreId, measureStart: 24, measureCount: 2,
+      title: 'Bach mm. 24–25 · crossing exit and RH eighth rest',
+      caption: 'm. 24 #408 E3 moves LH→RH and #409 D3 RH→LH; m. 25 is not copied from m. 5. The RH eighth rest at 3456 remains source-supported.' },
+  ];
+}
 
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
-    id: 'bach-boundary-baseline', label: 'A · prior system-only rest walk',
-    description: 'Real-engine baseline: preceding-system onset is not carried into the rest walk. Hands and all score data stay fixed.',
-    options: { inferBoundaryRests: false }, windows: BACH_BOUNDARY_WINDOWS,
-    tags: ['Bach', 'GOLD', 'baseline'],
+    id: 'bach-hands-pr112', label: 'A · PR112 before the sixteen hand corrections',
+    description: 'Readonly reconstruction of landed PR112: the same 551 events, durations, pitches, rest policy and engraving options; exactly sixteen hands differ from GOLD.',
+    windows: bachHandWindows(BACH_PR112_SCORE_ID),
+    tags: ['Bach', 'PR112', 'previous hands'],
   },
   {
-    id: 'bach-boundary-restored', label: 'B · restored whole-hand silence',
-    description: 'Canonical real-engine GOLD: preceding onset and maximum still-sounding release admit the two RH eighth rests.',
-    options: { inferBoundaryRests: true }, windows: BACH_BOUNDARY_WINDOWS,
-    tags: ['Bach', 'GOLD', 'correction'],
+    id: 'bach-hands-approved', label: 'B · operator-approved GOLD hands',
+    description: 'Canonical GOLD builder after the sixteen judged hand changes. Beams, stems and rest seating derive from these hands in the same real engine; crossing metadata is recomputed.',
+    windows: bachHandWindows(DEFAULT_STUDIO_SCORE_ID),
+    tags: ['Bach', 'GOLD', 'approved hands'],
   },
 ];
 

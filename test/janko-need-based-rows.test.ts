@@ -528,17 +528,16 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   const bachLayouts = layoutJankoScore(BACH, o, t);
   const sys0 = bachLayouts[0];
 
-  // Notes around tick 552:
-  // RH 9 at tick 540 (x = 538.3125)
-  // LH 2 at tick 552 (x = 548.635)
-  // RH 0 at tick 564 (x = 558.9575)
+  // Notes around tick 552: RH 9 at 540, RH 2 at 552, LH 0 at 564.
+  // The approved swap leaves a LH sixteenth rest at the central column.
   const rh9 = sys0.notes.find((n) => n.note.startTick === 540 && n.note.pitch.pitchClass === 9);
   const rh0 = sys0.notes.find((n) => n.note.startTick === 564 && n.note.pitch.pitchClass === 0);
   const rest552 = sys0.rests.find((r) => r.tick === 552);
 
   assert.ok(rh9, 'RH 9 note found');
   assert.ok(rh0, 'RH 0 note found');
-  assert.ok(rest552, 'RH tick 552 rest found');
+  assert.ok(rest552, 'LH tick 552 rest found');
+  assert.equal(rest552.hand,'LH');
 
   // Rest x strictly between the 9 head x and the 0 head x, inside its inter-onset gap
   assert.ok(rest552.x > rh9.x, `Rest x (${rest552.x}) must be to the right of RH 9 (${rh9.x})`);
@@ -549,11 +548,11 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   assert.equal(rest552.x, canonicalColX, 'Rest x aligns with canonical column x');
   assert.equal(Number(rest552.x.toFixed(2)), 548.63, 'Rest x pinned at 548.63');
 
-  // Voice-height rest seating: seats at the 9 note's own height (semitone lin 46)
-  assert.equal(Number(rest552.y.toFixed(1)), 179.5, 'Rest y pinned at 179.5');
-  assert.ok(Math.abs(rest552.y - 179.48625) < 0.01, 'Rest seats at exactly 179.48625');
+  // The corrected LH phrase seats on its own row, not the former RH 9 row.
+  assert.equal(Number(rest552.y.toFixed(1)), 227, 'corrected LH rest seat');
 
-  // Hanging rest counts: Bach 11 (nine prior seats plus two approved RH eighths).
+  // Hand flips remove three former source silences and add one new one;
+  // this count is derived from actual canonical occupancy, not PR112 ink.
   // The m. 66 RH → LH hand correction (§D) re-hands the tick-12552/12576
   // reattacks, which opens exactly one further genuine hanging rest
   // (t12576, quarter, RH); the source correction's 74 false hanging rests
@@ -562,16 +561,17 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   // now full 96; staccato 24→18 gaps, now abutting). The current boundary
   // policy adds only the two approved Bach system-opening silences.
   const bachHanging = bachLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
-  assert.equal(bachHanging.length, 11, 'canonical Bach has nine prior rests plus two RH boundary eighths');
+  assert.deepEqual(bachHanging.map(r=>r.tick).sort((a,b)=>a-b),[552,576,720,864,1056,3024,3432,3456,3600],
+    'all current GOLD rests, including two source-supported RH boundary eighths');
   // The PR111 rest policy is an archival witness, not the current GOLD policy.
-  // Compare complete old rest records (including geometry) against that witness;
+  // Compare complete same-hand-policy rest records (including geometry);
   // the page-SVG strip-two comparison in janko-rest-paint.test.ts independently
   // protects all other emitted ink.
   const priorLayouts = layoutJankoScore(BACH, resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false }), t);
   const priorHanging = priorLayouts.flatMap((s) => s.rests).filter((r) => r.value !== 'whole' && r.value !== 'half');
   const approvedBoundary = (r: (typeof bachHanging)[number]) => r.hand === 'RH' && (r.tick === 576 || r.tick === 3456);
-  assert.equal(priorHanging.length, 9, 'PR111 policy has nine hanging rests');
-  assert.deepEqual(bachHanging.filter((r) => !approvedBoundary(r)), priorHanging, 'the original nine rest records and seats are unchanged');
+  assert.equal(priorHanging.length, 7, 'without boundary inference the corrected hands have seven hanging rests');
+  assert.deepEqual(bachHanging.filter((r) => !approvedBoundary(r)), priorHanging, 'only the boundary-rest policy adds ink to the same corrected hands');
   const added = bachHanging.filter(approvedBoundary);
   assert.deepEqual(added.map((r) => [r.hand, r.tick, r.value, r.x]), [
     ['RH', 576, 'eighth', 37.8],
@@ -638,16 +638,16 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
   const addedDy = added.map((r) => bachDy(r, bachLayouts));
   const bachDys = bachHanging.map((r) => bachDy(r, bachLayouts));
   assert.deepEqual(bachHanging.filter((r) => !approvedBoundary(r)).map((r) => bachDy(r, bachLayouts)), priorDy,
-    'the original nine retain their displacement geometry');
+    'the seven corrected-hand non-boundary rests retain their displacement geometry');
   const priorMovedCount = priorDy.filter((dy) => dy > 0.01).length;
   const addedMovedCount = addedDy.filter((dy) => dy > 0.01).length;
   const bachMovedCount = bachDys.filter((dy) => dy > 0.01).length;
   const bachDySum = bachDys.reduce((sum, dy) => sum + dy, 0);
   const bachDyMax = Math.max(0, ...bachDys);
-  assert.ok(priorMovedCount <= 8, `original nine moved ${priorMovedCount} <= 8`);
+  assert.equal(priorMovedCount, 7, 'all seven corrected-hand non-boundary rests are displaced');
   assert.equal(addedMovedCount, 2, 'each approved RH boundary eighth adds exactly one vertical move');
   assert.equal(bachMovedCount, priorMovedCount + addedMovedCount, 'no other move is introduced');
-  assert.equal(bachMovedCount, 10, 'canonical Bach eleven-rest move total');
+  assert.equal(bachMovedCount, 9, 'canonical Bach nine-rest move total');
 
   let brahmsMovedCount = 0;
   let brahmsDySum = 0;
@@ -673,7 +673,7 @@ test('Bach m.4 Rest: placed strictly between RH 9 and RH 0, zero unwritten acros
 
   console.log(
     `[Voice-Height Rest Displacement Stats]\n` +
-    `  Bach: ${bachHanging.length} hanging rests, ${bachMovedCount} vertical moves (prior nine ${priorMovedCount} <= 8 + two RH boundary moves), max dy = ${bachDyMax.toFixed(2)}pt, mean dy = ${(bachDySum / bachHanging.length).toFixed(2)}pt, max dx = 0.000\n` +
+    `  Bach: ${bachHanging.length} hanging rests, ${bachMovedCount} vertical moves (seven corrected-hand non-boundary ${priorMovedCount} + two RH boundary moves), max dy = ${bachDyMax.toFixed(2)}pt, mean dy = ${(bachDySum / bachHanging.length).toFixed(2)}pt, max dx = 0.000\n` +
     `  Brahms: ${brahmsHanging.length} hanging rests, ${brahmsMovedCount} vertical moves (canonical baseline 20), max dy = ${brahmsDyMax.toFixed(2)}pt, mean dy = ${(brahmsDySum / brahmsHanging.length).toFixed(2)}pt, max dx = 0.000`
   );
   assert.ok(brahmsMovedCount >= 15 && brahmsMovedCount <= 20, `Brahms vertical moves ${brahmsMovedCount} within the retained 15..20 bound`);

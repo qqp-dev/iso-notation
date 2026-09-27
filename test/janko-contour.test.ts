@@ -84,15 +84,18 @@ test('Global sequences: one attack per tick per hand, top pitch, time order', ()
   assert.equal(oldLh.length, 248, 'historical LH corpus count');
   assert.equal(oldRh.length + oldLh.length, 551, 'historical attack total');
 
-  // Operator-judged GOLD revision: exactly these two distinct m. 5 attacks move
-  // from RH to LH; MIDI track assignment does not establish performing hand.
+  // First isolate the earlier m5 judgment on the archival score. The sixteen
+  // later edits are audited separately in scores.test.ts; they must not be
+  // mistaken for a change to m5 or the historical PR91/96 witness.
+  const pr112 = { ...before, notes: before.notes.map(n =>
+    n.id === 'bach-var1-70' || n.id === 'bach-var1-71' ? {...n,hand:'LH' as const} : n) };
   const moved = [
     { id: 'bach-var1-70', tick: 576, lin: 35 }, // B2
     { id: 'bach-var1-71', tick: 588, lin: 33 }, // A2
   ];
   for (const { id, tick, lin } of moved) {
     const oldNote = before.notes.find(n => n.id === id)!;
-    const note = SCORE.notes.find(n => n.id === id)!;
+    const note = pr112.notes.find(n => n.id === id)!;
     assert.equal(oldNote.hand, 'RH', `${id} historically RH`);
     assert.equal(note.hand, 'LH', `${id} now LH`);
     assert.equal(note.startTick, tick, `${id} onset`);
@@ -103,17 +106,21 @@ test('Global sequences: one attack per tick per hand, top pitch, time order', ()
     assert.ok(!oldLh.some(a => a.tick === tick), `${id} adds a new LH onset`);
   }
   const movedIds = new Set(moved.map(n => n.id));
-  assert.deepEqual(SCORE.notes.filter(n => !movedIds.has(n.id)),
-    before.notes.filter(n => !movedIds.has(n.id)), 'every other note and hand stays fixed');
+  assert.deepEqual(pr112.notes.filter(n => !movedIds.has(n.id)),
+    before.notes.filter(n => !movedIds.has(n.id)), 'm5-only revision leaves all other notes fixed');
 
+  const pr112Rh = contourGlobalSequence(pr112, 'RH');
+  const pr112Lh = contourGlobalSequence(pr112, 'LH');
+  const movedTicks = new Set(moved.map(n => n.tick));
+  assert.deepEqual(pr112Rh, oldRh.filter(a => !movedTicks.has(a.tick)), 'PR112 RH differs by exactly m5');
+  assert.deepEqual(pr112Lh, [...oldLh, ...oldRh.filter(a => movedTicks.has(a.tick))].sort((a, b) => a.tick - b.tick),
+    'PR112 LH differs by exactly m5');
+  assert.equal(pr112Rh.length, 301);
+  assert.equal(pr112Lh.length, 250);
   const rh = contourGlobalSequence(SCORE, 'RH');
   const lh = contourGlobalSequence(SCORE, 'LH');
-  const movedTicks = new Set(moved.map(n => n.tick));
-  assert.deepEqual(rh, oldRh.filter(a => !movedTicks.has(a.tick)), 'all other RH attacks unchanged');
-  assert.deepEqual(lh, [...oldLh, ...oldRh.filter(a => movedTicks.has(a.tick))].sort((a, b) => a.tick - b.tick),
-    'all other LH attacks unchanged');
-  assert.equal(rh.length, 301, '303 historical RH attacks minus exactly two');
-  assert.equal(lh.length, 250, '248 historical LH attacks plus exactly two');
+  assert.equal(rh.length, 297, 'current GOLD RH attacks after sixteen approved flips');
+  assert.equal(lh.length, 254, 'current GOLD LH attacks after sixteen approved flips');
   assert.equal(rh.length + lh.length, 551, 'global attack total is preserved');
   for (const seq of [rh, lh]) {
     for (let i = 1; i < seq.length; i++) {
@@ -125,7 +132,7 @@ test('Global sequences: one attack per tick per hand, top pitch, time order', ()
   assert.deepEqual(contourPieceRange(SCORE), { min: 26, max: 74 });
 });
 
-test('Pen lifts exactly at the five corpus silences of a beat or more', () => {
+test('Pen lifts reflect the corrected hand phrases without changing the silence threshold', () => {
   const lifts = (hand: 'RH' | 'LH'): string[] => {
     const seq = contourGlobalSequence(SCORE, hand);
     const out: string[] = [];
@@ -135,8 +142,8 @@ test('Pen lifts exactly at the five corpus silences of a beat or more', () => {
     }
     return out;
   };
-  assert.deepEqual(lifts('RH'), ['2244->2304', '2952->3036', '3096->3180']);
-  assert.deepEqual(lifts('LH'), ['2832->2964', '3024->3108']);
+  assert.deepEqual(lifts('RH'), ['2244->2304'], 'RH now connects across mm20–22');
+  assert.deepEqual(lifts('LH'), [], 'new LH attacks close both former PR112 pen lifts');
   // Sounding durations never lift: a legato quarter bridges its full value.
   assert.equal(contourPenLifts(0, T), false);
   assert.equal(contourPenLifts(47, T), false);
@@ -211,7 +218,8 @@ test('Thread runs break exactly at pen-lifting silences, never elsewhere', () =>
       }
     }
   }
-  // The corpus breaks, pinned: sys6 carries the RH 2952→3036 and LH 2832→2964 lifts.
+  // Corrected GOLD RH on sys6 remains connected through the newly rehanded
+  // mm21–22 attacks; the former PR112 RH rests are not current pen lifts.
   const sys6 = LAYOUTS[5];
   const rhTicks = buildContourThreads(
     contourSystemAttacks(SCORE, sys6, 'RH', T),
@@ -220,8 +228,8 @@ test('Thread runs break exactly at pen-lifting silences, never elsewhere', () =>
     'RH',
     T
   ).map((r) => r.ticks);
-  assert.ok(rhTicks.length >= 2, 'the RH thread lifts on sys6');
-  assert.ok(!rhTicks.some((ticks) => ticks.includes(2952) && ticks.includes(3036)));
+  assert.equal(rhTicks.length, 1, 'the corrected RH thread does not lift on sys6');
+  assert.ok(rhTicks[0].includes(2952) && rhTicks[0].includes(3036));
 });
 
 test("contourThread 'rh' voices the right hand only", () => {
@@ -275,7 +283,7 @@ test('Tick legend: direction, weight, breath — the opening ascent reads up', (
       T
     ).map((tk) => [tk.tick, tk])
   );
-  assert.equal(rh6.get(2952)!.kind, 'breathe', 'the 48t silence breathes');
+  assert.equal(rh6.get(2952)!.kind, 'down-leap', 'new RH attacks bridge the former silence');
   // The score's final attack of each hand carries no tick.
   const sys8 = LAYOUTS[7];
   const rh8 = buildContourTicks(
