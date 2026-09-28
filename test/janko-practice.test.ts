@@ -17,6 +17,8 @@ test('versioned consumer fixtures match rendered data and stable selection ident
     assert.equal(view.isoVersion, fixture.isoVersion);
     assert.equal(view.selectionId, entry.selectionId);
     assert.equal(view.systemCount, entry.systemCount);
+    assert.deepEqual(view.attacks.map(a => a.tick), fixture.onsetTicks);
+    assert.equal((view.svg.match(/class="janko-beam-group"/g) ?? []).length, fixture.beamGroupSizes.length);
     assert.deepEqual(view.attacks.map(a => a.pitchLinear), entry.pitchesLinear);
     assert.equal(view.attacks.map(a => a.hands.RH.finger).join(''), entry.rightFingers);
     assert.equal(view.attacks.map(a => a.hands.LH.finger).join(''), entry.leftFingers);
@@ -29,7 +31,9 @@ test('Practice major scale: exact data, both parity placements, provisional reve
   for (const tonic of [48, 49]) {
     const { score, fingers } = resolvePracticeScale(tonic);
     assert.equal(score.notes.length, 15);
-    assert.equal(score.totalTicks, 720);
+    assert.equal(score.totalTicks, 360);
+    assert.deepEqual(score.notes.map(n => n.startTick), Array.from({length: 15}, (_, i) => i * 24));
+    assert.ok(score.notes.every(n => n.durationTicks === 24));
     assert.deepEqual(score.notes.map(n => n.pitch.octave * 12 + n.pitch.pitchClass), contour.map(step => tonic + step));
     assert.deepEqual(fingers.map(f => f.RH).join(''), '234123121321432');
     assert.deepEqual(fingers.map(f => f.LH).join(''), '432132141231234');
@@ -56,22 +60,31 @@ test('portable complete SVG has real engine note columns, independent aligned ra
   assert.match(a.svg, /<svg[^>]*width="760px" height="380px" viewBox="0 0 760 380"/);
   assert.deepEqual(a.attacks, b.attacks, 'only guides differ');
   const laid = layoutJankoScore(resolvePracticeScale(48).score, {
-    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 5, systemsPerPage: 1,
-    pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 0, pageMarginBottom: 0,
-    headerHeight: 0, footerHeight: 0, ticksPerMeasure: 144, ticksPerBeat: 48,
+    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 4, systemsPerPage: 1,
+    pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 90, pageMarginBottom: 0,
+    headerHeight: 0, footerHeight: 0, ticksPerMeasure: 96, ticksPerBeat: 48,
+    beamGroupTicks: 96, rhythmStyle: 'beamed',
     showMeasureNumbers: false, showTimeSignature: false, showHandLabels: false,
     showOctaveLabels: false, showBeatGrid: false, showHonorHalo: false,
     systemStartStyle: 'none', inferBoundaryRests: false, lowPitchFolding: 'literal',
-  });
+  }, { ticksPerMeasure: 96 });
   assert.equal(laid.length, 1);
+  assert.deepEqual(laid[0].beams.map(b => b.notes.length), [4, 4, 4, 3]);
+  for (const [i, beam] of laid[0].beams.entries()) {
+    assert.ok(beam.notes.every(n => Math.floor(n.startTick / 96) === i));
+    assert.deepEqual(beam.levels.map(l => l.level), [1], 'eighths have exactly one beam');
+    assert.ok(beam.primary.x2 > beam.primary.x1);
+  }
   for (const attack of a.attacks) {
     assert.equal(attack.x, laid[0].notes.find(n => n.note.id === `practice-${attack.index}`)?.x);
     assert.ok(attack.hands.RH.y < attack.hands.LH.y);
     assert.ok(attack.hands.LH.y + 4 < laid[0].geometry.staffTopY - 20);
     const closestInk = Math.min(laid[0].geometry.staffTopY - 1,
-      ...laid[0].notes.map(n => Math.min(n.y - 16 - 1, n.y - 4.8 - 1)));
+      ...laid[0].notes.map(n => n.y - 4.8 - 1),
+      ...laid[0].beams.flatMap(b => [...b.stems.map(s => Math.min(s.stemStartY, s.stemEndY) - 1),
+        b.primary.y1 - b.thickness / 2 - 1, b.primary.y2 - b.thickness / 2 - 1]));
     assert.ok(a.railClearance <= closestInk - (Math.max(...a.attacks.map(n => n.hands.LH.y)) + 4),
-      'conservative bound includes an unoccupied row-1 seat');
+      'conservative bound includes an unoccupied row-1 seat and real beam ink');
     assert.equal((a.svg.match(new RegExp(`data-attack="${attack.index}"`, 'g')) ?? []).length, 2);
   }
   assert.equal((a.svg.match(/<g id="system-/g) ?? []).length, 1);
@@ -83,7 +96,7 @@ test('portable complete SVG has real engine note columns, independent aligned ra
   const guideYs = [...a.svg.matchAll(/<line x1="[^"]+" x2="[^"]+" y1="([^"]+)" y2="[^"]+" stroke="#384455" stroke-width="0.55"\/>/g)].map(m => Number(m[1]));
   for (const y of guideYs) {
     const hand = y < Math.min(...a.attacks.map(n => n.hands.LH.y)) - 4 ? 'RH' : 'LH';
-    assert.ok(a.attacks.every(n => Math.abs(n.hands[hand].y - y) >= 4));
+    assert.ok(a.attacks.every(n => Math.abs(n.hands[hand].y - y) >= 7.5));
   }
   assert.equal((b.svg.match(/stroke="#384455" stroke-width="0.55"/g) ?? []).length, 0);
   assert.ok(a.svg.includes('fill="#000000"'), 'black ground / true opaque knockout');

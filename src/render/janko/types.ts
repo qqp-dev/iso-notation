@@ -1266,6 +1266,9 @@ export interface JankoLayoutOptions {
   anacrusisTicks?: number;
   /** Ticks per beat. */
   ticksPerBeat?: number;
+  /** Optional beam grouping window in ticks; Practice uses a four-eighth measure.
+   * Omitted for the canonical beat-bounded grouping. */
+  beamGroupTicks?: number | null;
   /** Horizontal inset of the first/last note of a measure. */
   measureInset?: number;
   /** Extra clearance reserved for the opening time signature. */
@@ -1795,6 +1798,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   ticksPerMeasure: 144,
   anacrusisTicks: 0,
   ticksPerBeat: 48,
+  beamGroupTicks: null,
   measureInset: 6.0,
   timeSignatureWidth: 0,
   pageWidth: 595.28,

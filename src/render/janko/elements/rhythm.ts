@@ -4186,10 +4186,17 @@ export interface JankoBeamPartition {
 export function partitionBeamGroups(
   notes: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
-  middleCY?: number | null
+  middleCY?: number | null,
+  groupTicks?: number | null
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
   void middleCY;
+  // Explicit grouping is Practice-only: four eighths share a measure window
+  // without changing the eighth's duration grammar (or canonical beat groups).
+  const windowTicks = groupTicks ?? t.ticksPerBeat;
+  if (!Number.isInteger(windowTicks) || windowTicks < t.ticksPerBeat ||
+      windowTicks > t.ticksPerMeasure || t.ticksPerMeasure % windowTicks !== 0)
+    throw new RangeError('Invalid beam grouping window');
 
   const buckets = new Map<string, JankoRhythmNote[]>();
   const unbeamable = new Map<Hand, JankoRhythmNote[]>();
@@ -4201,8 +4208,8 @@ export function partitionBeamGroups(
       continue;
     }
     const measure = Math.floor(n.startTick / t.ticksPerMeasure);
-    const beat = Math.floor((n.startTick % t.ticksPerMeasure) / t.ticksPerBeat);
-    const key = `${n.hand}|${measure}|${beat}`;
+    const window = Math.floor((n.startTick % t.ticksPerMeasure) / windowTicks);
+    const key = `${n.hand}|${measure}|${window}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.push(n);
     else buckets.set(key, [n]);
