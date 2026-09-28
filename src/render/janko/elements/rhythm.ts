@@ -4191,8 +4191,8 @@ export function partitionBeamGroups(
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
   void middleCY;
-  // Explicit grouping is Practice-only: four eighths share a measure window
-  // without changing the eighth's duration grammar (or canonical beat groups).
+  // Explicit grouping is Practice-only: four sixteenths share a half-measure
+  // window without changing the duration grammar (or canonical beat groups).
   const windowTicks = groupTicks ?? t.ticksPerBeat;
   if (!Number.isInteger(windowTicks) || windowTicks < t.ticksPerBeat ||
       windowTicks > t.ticksPerMeasure || t.ticksPerMeasure % windowTicks !== 0)

@@ -60,6 +60,8 @@ test('actual offline IIFE package: deterministic build, complete local materials
     assert.deepEqual(JSON.parse(JSON.stringify(actual)), renderPracticeView(entry.request));
     assert.equal(actual.selectionId, entry.selectionId);
     assert.deepEqual(Array.from(actual.attacks, (attack: any) => attack.pitchLinear), entry.pitchesLinear);
+    assert.deepEqual(Array.from(actual.attacks, (attack: any) => attack.hands.RH.pitchLinear), entry.pitchesLinear);
+    assert.deepEqual(Array.from(actual.attacks, (attack: any) => attack.hands.LH.pitchLinear), entry.pitchesLinear.map((p: number) => p - 12));
     assert.equal(actual.attacks.map((a: any) => a.hands.RH.finger).join(''), entry.rightFingers);
     assert.equal(actual.attacks.map((a: any) => a.hands.LH.finger).join(''), entry.leftFingers);
     assert.equal(actual.attacks.map((a: any) => a.hands.RH.row).join(''), entry.physicalRows);

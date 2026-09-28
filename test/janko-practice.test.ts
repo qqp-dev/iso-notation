@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderPracticeView, resolvePracticeScale } from '../src/render/janko/practice';
 import { layoutJankoScore } from '../src/render/janko/engine';
+import { placedBeamGroup } from '../src/render/janko/beam-scene';
+import { DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
 import { createStudioConfig, renderCandidatesView, renderReferenceView } from '../src/render/janko/studio';
 
@@ -18,8 +20,11 @@ test('versioned consumer fixtures match rendered data and stable selection ident
     assert.equal(view.selectionId, entry.selectionId);
     assert.equal(view.systemCount, entry.systemCount);
     assert.deepEqual(view.attacks.map(a => a.tick), fixture.onsetTicks);
-    assert.equal((view.svg.match(/class="janko-beam-group"/g) ?? []).length, fixture.beamGroupSizes.length);
+    assert.equal((view.svg.match(/class="janko-beam-group"/g) ?? []).length, 2 * fixture.beamGroupSizes.length);
     assert.deepEqual(view.attacks.map(a => a.pitchLinear), entry.pitchesLinear);
+    assert.deepEqual(view.attacks.map(a => a.hands.RH.pitchLinear), entry.pitchesLinear);
+    assert.deepEqual(view.attacks.map(a => a.hands.LH.pitchLinear), entry.pitchesLinear.map((p: number) => p - 12));
+    assert.deepEqual([view.attacks.filter(a => a.tick < 96).length, view.attacks.filter(a => a.tick >= 96).length], fixture.measureAttackCounts);
     assert.equal(view.attacks.map(a => a.hands.RH.finger).join(''), entry.rightFingers);
     assert.equal(view.attacks.map(a => a.hands.LH.finger).join(''), entry.leftFingers);
     assert.equal(view.attacks.map(a => a.hands.RH.row).join(''), entry.physicalRows);
@@ -30,11 +35,17 @@ test('versioned consumer fixtures match rendered data and stable selection ident
 test('Practice major scale: exact data, both parity placements, provisional reverse and 1-span transposition', () => {
   for (const tonic of [48, 49]) {
     const { score, fingers } = resolvePracticeScale(tonic);
-    assert.equal(score.notes.length, 15);
-    assert.equal(score.totalTicks, 360);
-    assert.deepEqual(score.notes.map(n => n.startTick), Array.from({length: 15}, (_, i) => i * 24));
-    assert.ok(score.notes.every(n => n.durationTicks === 24));
-    assert.deepEqual(score.notes.map(n => n.pitch.octave * 12 + n.pitch.pitchClass), contour.map(step => tonic + step));
+    assert.equal(score.notes.length, 30);
+    assert.equal(score.totalTicks, 180);
+    for (const hand of ['RH', 'LH']) {
+      const notes = score.notes.filter(n => n.hand === hand);
+      assert.deepEqual(notes.map(n => n.startTick), Array.from({length: 15}, (_, i) => i * 12));
+      assert.ok(notes.every(n => n.durationTicks === 12));
+      assert.deepEqual(notes.map(n => n.pitch.octave * 12 + n.pitch.pitchClass),
+        contour.map(step => tonic + step - (hand === 'LH' ? 12 : 0)));
+      assert.deepEqual([notes.filter(n => n.startTick < 96).length, notes.filter(n => n.startTick >= 96).length], [8, 7]);
+    }
+    assert.deepEqual(score.barlines, [], 'no fabricated terminal bar or rest');
     assert.deepEqual(fingers.map(f => f.RH).join(''), '234123121321432');
     assert.deepEqual(fingers.map(f => f.LH).join(''), '432132141231234');
     assert.equal(fingers.map(f => f.row).join(''), tonic === 48 ? '333244232442333' : '222133121331222');
@@ -60,23 +71,47 @@ test('portable complete SVG has real engine note columns, independent aligned ra
   assert.match(a.svg, /<svg[^>]*width="760px" height="380px" viewBox="0 0 760 380"/);
   assert.deepEqual(a.attacks, b.attacks, 'only guides differ');
   const laid = layoutJankoScore(resolvePracticeScale(48).score, {
-    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 4, systemsPerPage: 1,
+    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 2, systemsPerPage: 1,
     pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 90, pageMarginBottom: 0,
     headerHeight: 0, footerHeight: 0, ticksPerMeasure: 96, ticksPerBeat: 48,
-    beamGroupTicks: 96, rhythmStyle: 'beamed',
+    beamGroupTicks: 48, rhythmStyle: 'beamed',
     showMeasureNumbers: false, showTimeSignature: false, showHandLabels: false,
     showOctaveLabels: false, showBeatGrid: false, showHonorHalo: false,
     systemStartStyle: 'none', inferBoundaryRests: false, lowPitchFolding: 'literal',
   }, { ticksPerMeasure: 96 });
   assert.equal(laid.length, 1);
-  assert.deepEqual(laid[0].beams.map(b => b.notes.length), [4, 4, 4, 3]);
-  for (const [i, beam] of laid[0].beams.entries()) {
-    assert.ok(beam.notes.every(n => Math.floor(n.startTick / 96) === i));
-    assert.deepEqual(beam.levels.map(l => l.level), [1], 'eighths have exactly one beam');
-    assert.ok(beam.primary.x2 > beam.primary.x1);
+  assert.equal(laid[0].notes.length, 30);
+  for (const hand of ['RH', 'LH']) {
+    const beams = laid[0].beams.filter(b => b.notes[0].hand === hand);
+    assert.deepEqual(beams.map(b => b.notes.length), [4, 4, 4, 3]);
+    for (const [i, beam] of beams.entries()) {
+      assert.ok(beam.notes.every(n => n.hand === hand && Math.floor(n.startTick / 48) === i));
+      assert.deepEqual(beam.notes.map(n => n.startTick),
+        Array.from({length: i === 3 ? 3 : 4}, (_, k) => i * 48 + k * 12));
+      assert.deepEqual(beam.levels.map(l => l.level), [1, 2], 'sixteenths have two full beams');
+      assert.ok(beam.levels.every(l => !l.stub && l.connector.x2 > l.connector.x1));
+      const painted = placedBeamGroup(beam, DEFAULT_JANKO_TOKENS, 'golden', 0, 0);
+      assert.equal(painted.filter(p => p.cls === 'janko-beam-secondary').length, 1);
+      for (const stem of beam.stems) {
+        const ink = painted.find(p => p.cls === 'janko-stem' && p.shape.kind === 'stem' && p.shape.x === Math.round(stem.stemX * 100) / 100);
+        assert.ok(ink?.shape.kind === 'stem' && Math.abs(beam.beamY(stem.stemX) - ink.shape.y2) <= 0.011,
+          'painted stem joins primary beam');
+        assert.ok(beam.levels.every(l => stem.stemX >= l.connector.x1 - 1e-6 && stem.stemX <= l.connector.x2 + 1e-6),
+          'both beam strips span each stem');
+      }
+    }
   }
   for (const attack of a.attacks) {
-    assert.equal(attack.x, laid[0].notes.find(n => n.note.id === `practice-${attack.index}`)?.x);
+    for (const hand of ['RH', 'LH'] as const) {
+      const note = laid[0].notes.find(n => n.note.id === `practice-${hand}-${attack.index}`);
+      assert.equal(attack.x, note?.x);
+      assert.equal(attack.hands[hand].pitchLinear, note!.note.pitch.octave * 12 + note!.note.pitch.pitchClass);
+    }
+    const rh = laid[0].notes.find(n => n.note.id === `practice-RH-${attack.index}`)!;
+    const lh = laid[0].notes.find(n => n.note.id === `practice-LH-${attack.index}`)!;
+    assert.equal(lh.y - rh.y, 30, 'literal one 10-span LH drop, no octave folding');
+    assert.ok(rh.y > 0 && lh.y < input.height, 'both hands fit within viewport');
+    assert.equal(attack.hands.RH.pitchLinear - attack.hands.LH.pitchLinear, 12);
     assert.ok(attack.hands.RH.y < attack.hands.LH.y);
     assert.ok(attack.hands.LH.y + 4 < laid[0].geometry.staffTopY - 20);
     const closestInk = Math.min(laid[0].geometry.staffTopY - 1,
@@ -88,7 +123,7 @@ test('portable complete SVG has real engine note columns, independent aligned ra
     assert.equal((a.svg.match(new RegExp(`data-attack="${attack.index}"`, 'g')) ?? []).length, 2);
   }
   assert.equal((a.svg.match(/<g id="system-/g) ?? []).length, 1);
-  assert.equal((a.svg.match(/class="janko-digit"/g) ?? []).length, 15);
+  assert.equal((a.svg.match(/class="janko-digit"/g) ?? []).length, 30);
   assert.equal((a.svg.match(/class="practice-RH"/g) ?? []).length, 1);
   assert.equal((a.svg.match(/class="practice-LH"/g) ?? []).length, 1);
   assert.equal((a.svg.match(/stroke="#384455" stroke-width="0.55"/g) ?? []).length, 4);
@@ -121,8 +156,8 @@ test('studio two candidate cards use portable renderer and leave Reference uncha
   const html = renderCandidatesView(config);
   for (const candidate of CURRENT_CANDIDATES) {
     assert.ok(html.includes(`data-candidate="${candidate.id}"`));
-    assert.ok(html.includes('data-window="practice:major:48:1-1"'));
-    assert.ok(html.includes('data-window="practice:major:49:1-1"'));
+    assert.ok(html.includes('data-window="practice:major:48:1-2"'));
+    assert.ok(html.includes('data-window="practice:major:49:1-2"'));
     assert.ok(html.includes(renderPracticeView({ ...input, guide: candidate.practiceGuide }).svg.replace('<svg ', '<svg class="janko-svg" ')));
   }
   assert.equal(renderReferenceView(config), renderReferenceView(createStudioConfig({ candidates: [] })));
