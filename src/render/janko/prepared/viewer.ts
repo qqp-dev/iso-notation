@@ -38,7 +38,8 @@ import {
 } from '../studio-session';
 
 import prepared from 'virtual:janko-prepared-manifest';
-import { observeCandidateFrame } from './observation';
+import { observeCandidateFrame, observeReferenceFrame } from './observation';
+import { watchDeployedRelease } from './deployed';
 import { decorateReferenceReader, readReferenceReader, writeReferenceReader, type ReferenceScore } from './reference-reader';
 import type { PreparedManifest } from './status';
 import {
@@ -183,10 +184,11 @@ function mountOnce(manifest: PreparedManifest): void {
   };
   const picker = document.getElementById('janko-reference-picker') as HTMLSelectElement | null;
   if (picker) picker.value = reader.selected;
+  const verifiedArtifacts = new Map<string, string>();
   const applier: PreparedApplier = createPreparedApplier({
     root,
     status: dom.status,
-    fetchText: fetchArtifact,
+    fetchText: (key, url) => verifiedArtifacts.has(url) ? Promise.resolve(verifiedArtifacts.get(url)!) : fetchArtifact(key, url),
     beforeSwap: () => {
       // Artifact replacement can collapse the document before the 150 ms
       // scroll debounce runs. Save the *visible* pane's live place while its
@@ -203,8 +205,31 @@ function mountOnce(manifest: PreparedManifest): void {
     afterSwap: () => decorateReferenceReader(root, reader.selected),
   });
   activeApplier = applier;
+  if (typeof import.meta.env !== 'undefined' && import.meta.env.PROD) {
+    const url = new URL(`${import.meta.env.BASE_URL}active-release.json`, window.location.href).href;
+    const stop = watchDeployedRelease(url, async release => {
+      const candidatesUrl = new URL(release.manifest.artifacts.candidates.url, url).href;
+      const referenceUrl = new URL(release.manifest.artifacts.reference.url, url).href;
+      verifiedArtifacts.set(candidatesUrl, release.candidates);
+      verifiedArtifacts.set(referenceUrl, release.reference);
+      const outcome = await applier.apply({
+        generation: release.manifest.generation,
+        engineIdentity: release.manifest.engineIdentity,
+        canonicalRevisions: release.manifest.canonicalRevisions,
+        artifactHashes: { candidates: release.manifest.artifacts.candidates.sha256, reference: release.manifest.artifacts.reference.sha256 },
+        artifacts: { candidates: candidatesUrl, reference: referenceUrl }, status: release.manifest.status, stale: false,
+      }, () => session.state.view);
+      if (outcome !== 'applied') throw new Error(`deployed release was not applied: ${outcome}`);
+      if (!root.hidden) activeRestore?.();
+      afterLayoutReady(() => { observeCandidateFrame(root, document, window); observeReferenceFrame(root, document, window); });
+    }, error => {
+      root.dataset.preparedState = 'stale';
+      if (dom.status) { dom.status.textContent = `Stale deployed release · ${error.message}`; dom.status.dataset.healthy = 'false'; }
+    }, manifest.engineIdentity ?? 'unknown');
+    removers.push(stop);
+  }
   const currentView = (): string => session.state.view;
-  const observe = (): void => observeCandidateFrame(root, document, window);
+  const observe = (): void => { observeCandidateFrame(root, document, window); observeReferenceFrame(root, document, window); };
 
   // Every handler this mount installs is tracked for detach — including the
   // long-lived shell elements (tabs, zoom buttons): a re-mount must never
@@ -268,6 +293,7 @@ function mountOnce(manifest: PreparedManifest): void {
     restore();
     const epoch = viewEpoch;
     if (reader.places[reader.selected] === 0) afterLayoutReady(() => { if (epoch === viewEpoch && reader.selected === next && session.state.view === 'reference' && !root.hidden) port.set(0); });
+    observe();
   });
   showView(root, session.state.view);
 
@@ -420,8 +446,8 @@ function bootstrap(): void {
         .then((outcome) => {
           if (outcome === 'dropped') return;
           if (!root.hidden) activeRestore?.();
-          if (outcome === 'applied') afterLayoutReady(() => observeCandidateFrame(root, document, window));
-          else observeCandidateFrame(root, document, window);
+          if (outcome === 'applied') afterLayoutReady(() => { observeCandidateFrame(root, document, window); observeReferenceFrame(root, document, window); });
+          else { observeCandidateFrame(root, document, window); observeReferenceFrame(root, document, window); }
         });
     });
   }

@@ -46,6 +46,7 @@ import {
   resolveJankoTokens,
 } from '../src/render/janko/types';
 import { countJankoPages, renderJankoPage } from '../src/render/janko/engine';
+import { resolveActiveScore } from '../src/scores/active';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -59,18 +60,18 @@ function read(file: string): string {
 
 test('Print resolves the canonical studio/CLI entries', () => {
   const bach = resolvePrintScore('bach-goldberg-var1');
-  assert.deepEqual(bach.options, resolveJankoOptions(DEFAULT_JANKO_OPTIONS), 'Bach golden options');
-  assert.deepEqual(bach.tokens, resolveJankoTokens(DEFAULT_JANKO_TOKENS), 'Bach golden tokens');
+  assert.deepEqual(bach.options, resolveActiveScore('bach-goldberg-var1').options, 'Bach active options');
+  assert.deepEqual(bach.tokens, resolveActiveScore('bach-goldberg-var1').tokens, 'Bach active tokens');
   const brahms = resolvePrintScore('brahms-op118-no1');
   assert.deepEqual(
     brahms.options,
-    resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
-    'Brahms fixed-3 golden options'
+    resolveActiveScore('brahms-op118-no1').options,
+    'Brahms active fixed-3 options'
   );
   assert.deepEqual(
     brahms.tokens,
-    resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
-    'Brahms golden tokens'
+    resolveActiveScore('brahms-op118-no1').tokens,
+    'Brahms active tokens'
   );
   assert.equal(countJankoPages(bach.score, bach.options, bach.tokens), 2, 'Bach paginates to 2');
   assert.equal(countJankoPages(brahms.score, brahms.options, brahms.tokens), 5, 'Brahms paginates to 5');

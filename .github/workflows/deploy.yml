@@ -23,6 +23,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The independent data classifier checks HEAD^ and authenticates
+          # undo against earlier score revisions in first-parent history.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,8 +45,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify data-only release provenance and matching PDF
+        # Non-data commits retain the reviewed software lane; this gate only
+        # adds checks, and cannot replace the mandatory regression/build below.
+        run: node --import tsx scripts/verify-data-release.ts
+
       - name: Run tests
         run: npm test
+
+      - name: Strict canonical engraving lint
+        run: npm run lint:engraving -- --strict
 
       - name: Build production bundle
         run: npm run build

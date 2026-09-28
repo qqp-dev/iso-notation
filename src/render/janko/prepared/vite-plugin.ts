@@ -48,11 +48,13 @@ import {
   EMPTY_GENERATION,
   GenerationQueue,
   buildPreparedEmission,
+  buildIdentity,
   fingerprintInputs,
   generateWithCoherenceCheck,
   isWatchedInput,
   manifestModuleSource,
   snapshotKey,
+  sha256,
   type PreparedGeneration,
   type PreparedInputSnapshot,
 } from './seam';
@@ -178,7 +180,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
       cachedGeneratorKey = key;
     }
     const generated = cachedGenerator!({}, isBuild ? undefined : root, candidatePath, isBuild ? undefined : staticCache);
-    return { ...generated, generationMs: +(performance.now() - started).toFixed(1) };
+    return { ...generated, engineIdentity: buildIdentity(root), generationMs: +(performance.now() - started).toFixed(1) };
   };
 
   const generateCoherently = async (): Promise<
@@ -249,6 +251,24 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
         this.error(`janko-prepared-studio: ${outcome.failure}`);
       }
       buildGeneration = outcome.generation;
+      // One revalidated static release pointer: content-addressed score data,
+      // both prepared surfaces, and the exact PDF travel together. Browsers
+      // never infer deployment success from a local editor's pending status.
+      const activeBytes = readFileSync(resolve(root, 'src/scores/data/active-scores.json'));
+      const activeData = JSON.parse(activeBytes.toString('utf8')) as { scores: Record<string, { revision: string }> };
+      for (const [id, revision] of Object.entries(outcome.generation.canonicalRevisions ?? {}))
+        if (activeData.scores[id]?.revision !== revision) this.error(`release active revision drift: ${id}`);
+      const pdfBytes = readFileSync(resolve(root, 'public/goldberg-variation-1.pdf'));
+      const dataHash = sha256(activeBytes), pdfHash = sha256(pdfBytes);
+      this.emitFile({ type: 'asset', fileName: `janko-release/${dataHash}.json`, source: activeBytes });
+      this.emitFile({ type: 'asset', fileName: `janko-release/${pdfHash}.pdf`, source: pdfBytes });
+      this.emitFile({ type: 'asset', fileName: 'active-release.json', source: JSON.stringify({ schema: 1,
+        generation: outcome.generation.generation, engineIdentity: outcome.generation.engineIdentity,
+        canonicalRevisions: outcome.generation.canonicalRevisions, status: outcome.generation.status, data: { url: `janko-release/${dataHash}.json`, sha256: dataHash },
+        pdf: { url: `janko-release/${pdfHash}.pdf`, sha256: pdfHash },
+        artifacts: { candidates: { url: `janko-prepared/${outcome.generation.artifactHashes.candidates}.html`, sha256: outcome.generation.artifactHashes.candidates },
+          reference: { url: `janko-prepared/${outcome.generation.artifactHashes.reference}.html`, sha256: outcome.generation.artifactHashes.reference } },
+      }) + '\n' });
       emittedReferenceIds = {
         candidates: this.emitFile({
           type: 'asset',
@@ -303,7 +323,7 @@ export function jankoPreparedStudioPlugin(options: JankoPreparedPluginOptions = 
           const current = queue?.current;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
-          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', candidateRevision: current?.generation.candidateRevision, variantId: current?.generation.variantId, candidateError: current?.generation.candidateError, artifactHashes: current?.generation.artifactHashes, generationMs: current?.generation.generationMs, phaseMs: current?.generation.phaseMs, watchedAt, publishedAt, stale: current?.stale ?? true, error: current?.error }));
+          res.end(JSON.stringify({ generation: current?.generation.generation ?? 'pending', canonicalRevisions: current?.generation.canonicalRevisions, candidateRevision: current?.generation.candidateRevision, variantId: current?.generation.variantId, candidateError: current?.generation.candidateError, artifactHashes: current?.generation.artifactHashes, generationMs: current?.generation.generationMs, phaseMs: current?.generation.phaseMs, watchedAt, publishedAt, stale: current?.stale ?? true, error: current?.error }));
           return;
         }
         if (!url.startsWith(PREPARED_DEV_ARTIFACT_PREFIX)) return next();

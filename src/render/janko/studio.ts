@@ -23,6 +23,7 @@
 
 import { QuantizedGridScore } from '../../model/types';
 import { detectHandCrossings } from '../../model/grid';
+import { resolveActiveScore } from '../../scores/active';
 import { buildBachGoldbergVar1Score } from '../../scores/bach-goldberg-var1';
 import {
   DURATION_SPECIMEN_JANKO_OPTIONS,
@@ -32,7 +33,6 @@ import {
 import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
 } from '../../scores/brahms-op118-no1';
 import { buildChordDurationSpecimenScore } from '../../scores/chord-duration-specimen';
 import {
@@ -69,6 +69,7 @@ import {
 import {
   BRAHMS_STUDIO_SCORE_ID,
   BACH_PR112_SCORE_ID,
+  BACH_PR114_SCORE_ID,
   PR112_EVENTS,
   DURATION_SPECIMEN_STUDIO_SCORE_ID,
   HOLD_ENDPOINT_SPECIMEN_STUDIO_SCORE_ID,
@@ -268,12 +269,11 @@ function bachPr112HandScore(gold: QuantizedGridScore): QuantizedGridScore {
 
 /** Build a studio configuration, defaulting to the golden master + current round. */
 export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): JankoStudioConfig {
-  const options = resolveJankoOptions({
-    ...DEFAULT_JANKO_OPTIONS,
-    ...(overrides.options ?? {}),
-  });
-  const tokens = resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ...(overrides.tokens ?? {}) });
-  const score = overrides.score ?? buildBachGoldbergVar1Score();
+  const bach = resolveActiveScore('bach-goldberg-var1');
+  const brahmsCanonical = resolveActiveScore('brahms-op118-no1');
+  const options = resolveJankoOptions({ ...bach.options, ...(overrides.options ?? {}) });
+  const tokens = resolveJankoTokens({ ...bach.tokens, ...(overrides.tokens ?? {}) });
+  const score = overrides.score ?? bach.score;
   const totalPages = Math.max(
     1,
     Math.ceil(countJankoSystems(score, options, tokens) / Math.max(1, options.systemsPerPage))
@@ -281,20 +281,24 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
   const scores: Record<string, StudioScore> = {
     [DEFAULT_STUDIO_SCORE_ID]: { id: DEFAULT_STUDIO_SCORE_ID, score, options, tokens },
     [score.id]: { id: score.id, score, options, tokens },
-    // The score-selected PR112 card uses the existing score-entry seam; the
-    // primary/Reference and Brahms entries are never projected or replaced.
-    ...(score.id === 'bach-goldberg-var1' ? {
-      [BACH_PR112_SCORE_ID]: { id: BACH_PR112_SCORE_ID, score: bachPr112HandScore(score), options, tokens },
+    // Archived PR112 evidence may be requested explicitly; always derive it
+    // from the immutable historical builder, never reverse today's active score.
+    ...(overrides.candidates?.some(candidate => candidate.windows?.some(window =>
+      !isAbstractCandidateWindow(window) && (window.scoreId === BACH_PR112_SCORE_ID || window.scoreId === BACH_PR114_SCORE_ID))) ? {
+      [BACH_PR112_SCORE_ID]: { id: BACH_PR112_SCORE_ID,
+        score: bachPr112HandScore(buildBachGoldbergVar1Score()), options, tokens },
+      [BACH_PR114_SCORE_ID]: { id: BACH_PR114_SCORE_ID,
+        score: buildBachGoldbergVar1Score(), options, tokens },
     } : {}),
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
-      score: buildBrahmsOp118No1Score(),
+      score: brahmsCanonical.score,
       // Canonical Brahms: the fixed-3 golden at four measures/system with
       // the page-top correction and the full grid — 18 systems over 5 pages.
       // Fixed-3 is project-wide canonical: studio, production commands and
       // acceptance tests agree; the CLI lints this same entry.
-      options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
-      tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
+      options: brahmsCanonical.options,
+      tokens: brahmsCanonical.tokens,
     },
     // Round 9: the curated multi-duration specimen. Two measures across the
     // staff width, so the five chords and their midpoint marks stay large
@@ -571,10 +575,21 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
   const runtime = config.durationVariants ?? [];
   const candidates: JankoCandidate[] = [
     ...config.candidates,
-    ...(config.semanticCandidate ? [semanticHandCandidate(config.semanticCandidate.revision, config.semanticCandidate.reviewWindows, config.semanticCandidate.score.id)] : []),
-    ...runtime.map(({ variant }) => ({
-      ...semanticHandCandidate(variant.revision, variant.windows.map(w => ({ ...w, changed: true })), variant.score === 'bach-goldberg-var1' ? 'primary' : variant.score),
+    ...(config.semanticCandidate ? [(() => {
+      const hand = semanticHandCandidate(config.semanticCandidate!.revision, config.semanticCandidate!.reviewWindows,
+        config.semanticCandidate!.score.id);
+      const source = config.semanticCandidate!.score;
+      const entry = scores[source.id];
+      return { ...hand, windows: [{ scoreId: source.id === 'bach-goldberg-var1' ? 'primary' : source.id,
+        measureStart: 1, measureCount: Math.ceil(source.totalTicks / entry.tokens.ticksPerMeasure),
+        title: 'Complete guarded score', fullScore: true }, ...(hand.windows ?? [])] };
+    })()] : []),
+    ...runtime.map(({ variant, score }) => ({
+      ...semanticHandCandidate(variant.revision, [{ measureStart: 1, measureCount: Math.ceil(score.totalTicks / config.scores[variant.score].tokens.ticksPerMeasure), changed: true }], variant.score === 'bach-goldberg-var1' ? 'primary' : variant.score),
       id: `duration-${variant.id}`, label: `Duration · ${variant.id}`,
+      windows: [{ scoreId: variant.score === 'bach-goldberg-var1' ? 'primary' : variant.score,
+        measureStart: 1, measureCount: Math.ceil(score.totalTicks / config.scores[variant.score].tokens.ticksPerMeasure),
+        title: `Complete score · ${variant.id}`, fullScore: true }],
       description: `Guarded ${variant.revision.slice(0,12)} · rule-wide controls / targeted placements · ${variant.refusals.length ? `beside refused: ${variant.refusals.map(r => r.reason).join('; ')}` : 'seat requests fitted or absent'} · not Reference`,
       options: { ...variant.options, durationSeatPreferences: variant.placements.map(p => ({ tick: p.target.tick, ownerIds: p.target.ownerIds, family: p.target.family, seat: p.preference })) },
       tokens: variant.tokens,
@@ -910,7 +925,7 @@ function renderReferenceScore(
           `  <div class="crop-grid">${cropCards.join('\n')}</div>`,
         ].join('\n');
   return [
-    `<div class="reference-score" data-score="${scoreId}">`,
+    `<div class="reference-score" data-score="${scoreId}" data-revision="${escapeHtml(resolveActiveScore(scoreId === 'primary' ? 'bach-goldberg-var1' : scoreId).revision)}">`,
     '  <div class="golden-card">',
     `    <span class="round-badge">Golden Master</span>${badge}`,
     `    <h2>${escapeHtml(score.title ?? 'J.S. Bach — Goldberg Variations, BWV 988')}</h2>`,

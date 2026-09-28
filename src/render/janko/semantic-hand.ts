@@ -1,10 +1,10 @@
 /** Guarded, candidate-only semantic hand editing. No canonical score or source writes. */
 import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
+import { fileURLToPath } from 'node:url';
 import { readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../../scores/brahms-op118-no1';
-import { buildBachGoldbergVar1Score } from '../../scores/bach-goldberg-var1';
+import { resolveActiveScore } from '../../scores/active';
 import provenance from '../../scores/data/brahms-op118-no1-written-durations.provenance.json' with { type: 'json' };
 import writtenFixture from '../../scores/data/brahms-op118-no1-written-durations.json' with { type: 'json' };
 import { buildBrahmsSemanticIndex, editableBrahmsSound, linkedBrahmsNotes } from '../../scores/brahms-semantic-index';
@@ -24,12 +24,29 @@ export function selectScore(score: string): EditableScore {
   if (score !== SEMANTIC_SCORE && score !== BACH_SCORE) throw new Error(`unknown semantic score: ${score}`);
   return score;
 }
-const provider = (score: EditableScore) => score === BACH_SCORE
-  ? { build: buildBachGoldbergVar1Score, options: resolveJankoOptions(DEFAULT_JANKO_OPTIONS), tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS) }
-  : { build: buildBrahmsOp118No1Score, options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS), tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS) };
+const provider = (score: EditableScore) => {
+  const active = resolveActiveScore(score);
+  return { build: () => resolveActiveScore(score).score, options: active.options, tokens: active.tokens };
+};
 const digest = (value: unknown) => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
-const engineFiles = ['src/scores/brahms-op118-no1.ts', 'src/scores/brahms-hand-corrections.ts', 'src/model/grid.ts',
+const engineFiles = ['src/scores/active.ts', 'src/scores/data/active-scores.json', 'src/scores/brahms-op118-no1.ts', 'src/scores/brahms-hand-corrections.ts', 'src/model/grid.ts',
   'src/model/semantic-identity.ts', 'src/scores/brahms-semantic-index.ts'];
+function fingerprintFile(root: string, file: string, score: EditableScore) {
+  const abs = resolve(root, file);
+  if (file === 'src/scores/data/active-scores.json' && existsSync(abs)) {
+    const active = JSON.parse(readFileSync(abs, 'utf8')) as { scores: Record<string, unknown> };
+    return digest(active.scores[score]); // unrelated score DATA edits cannot stale this score's variants
+  }
+  if (existsSync(abs)) return digest(readFileSync(abs));
+  // Historic isolated source-drift fixtures copy the original finite source
+  // graph and the entire render directory, not newly introduced active data.
+  // The actual checkout must NEVER silently omit one of its own inputs.
+  if (resolve(root) === resolve(fileURLToPath(new URL('../../..', import.meta.url))) ||
+      !['src/scores/active.ts','src/scores/data/active-scores.json'].includes(file))
+    throw new Error(`model identity input missing: ${file}`);
+  const bytes = readFileSync(new URL(file === 'src/scores/active.ts' ? '../../scores/active.ts' : '../../scores/data/active-scores.json', import.meta.url));
+  return file.endsWith('active-scores.json') ? digest((JSON.parse(bytes.toString('utf8')) as { scores: Record<string, unknown> }).scores[score]) : digest(bytes);
+}
 function renderingFiles(root: string) {
   return ['src/render/janko', 'src/render/janko/elements'].flatMap(dir =>
     readdirSync(resolve(root, dir)).filter(name => name.endsWith('.ts')).map(name => `${dir}/${name}`));
@@ -38,7 +55,7 @@ export function identityParts(root = process.cwd(), score: EditableScore = SEMAN
   if (score === BACH_SCORE) {
     const source = { builder: digest(readFileSync(resolve(root, 'src/scores/bach-goldberg-var1.ts'))),
       corpus: digest(readFileSync(resolve(root, 'public/midi/bach-goldberg-var1.mid'))) };
-    const engine = ['src/model/grid.ts', ...renderingFiles(root)].map(file => [file, digest(readFileSync(resolve(root, file)))]);
+    const engine = ['src/scores/active.ts', 'src/scores/data/active-scores.json', 'src/model/grid.ts', ...renderingFiles(root)].map(file => [file, fingerprintFile(root, file, score)]);
     return { source: digest(source), engine: digest(engine) };
   }
   const source = { source: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-written-durations.provenance.json'))),
@@ -47,7 +64,7 @@ export function identityParts(root = process.cwd(), score: EditableScore = SEMAN
     midi: digest(readFileSync(resolve(root, 'public/midi/brahms-op118-no1.mid'))),
     silences: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-source-silences.json'))),
     expressions: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-expressions.json'))) };
-  const engine = [...engineFiles, ...renderingFiles(root)].map(file => [file, digest(readFileSync(resolve(root, file)))]);
+  const engine = [...engineFiles, ...renderingFiles(root)].map(file => [file, fingerprintFile(root, file, score)]);
   return { source: digest(source), engine: digest(engine) };
 }
 // Retain the original fingerprint representation so existing saved histories remain readable.
@@ -59,7 +76,7 @@ export function modelIdentity(root = process.cwd(), score: EditableScore = SEMAN
     midi: digest(readFileSync(resolve(root, 'public/midi/brahms-op118-no1.mid'))),
     silences: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-source-silences.json'))),
     expressions: digest(readFileSync(resolve(root, 'src/scores/data/brahms-op118-no1-expressions.json'))),
-    engine: [...engineFiles, ...renderingFiles(root)].map(file => [file, digest(readFileSync(resolve(root, file)))]) };
+    engine: [...engineFiles, ...renderingFiles(root)].map(file => [file, fingerprintFile(root, file, score)]) };
   return digest(files);
 }
 export interface Guard { id: string; pitchClass: number; octave: number; tick: number; expectedHand: Hand }
@@ -248,7 +265,7 @@ function prepareChange(state: CandidateState, request: HandIntent, root: string,
   if (timing) timing.layoutEffectsMs = performance.now() - timing.started - timing.resolveMs;
   return { replay: false, assignments, effects };
 }
-function verifyBrahmsWitness(root: string) {
+export function verifyBrahmsWitness(root: string) {
   const provenanceFile = 'src/scores/data/brahms-op118-no1-written-durations.provenance.json';
   if (digest(JSON.parse(readFileSync(resolve(root, provenanceFile), 'utf8'))) !== digest(provenance))
     throw new Error(`SOURCE_WITNESS: imported provenance drift at ${provenanceFile}; refuse edit until evidence is rebuilt`);

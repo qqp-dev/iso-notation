@@ -309,9 +309,12 @@ test('CLI canonical: fixed-3 Brahms entry is clean (deploy green)', () => {
     !read('scripts/lint_engraving.ts').includes("core: 'adaptive'"),
     'the script carries no adaptive production override'
   );
-  // Deploy stays green: `.github/workflows/deploy.yml` gates on `npm test` +
-  // `npm run build` only — the CLI is an operator readout, not a gate.
-  assert.ok(!read('.github/workflows/deploy.yml').includes('lint:engraving'), 'deploy never gates on the CLI');
+  // The active-score software lane now explicitly requires strict lint in
+  // addition to the unchanged mandatory full test and build gates.
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /npm run build/);
+  assert.match(workflow, /npm run lint:engraving -- --strict/);
 });
 
 test('Bach engraved-identity by construction: 0 clasps, so the nudge is inert', () => {

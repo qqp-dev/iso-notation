@@ -1,15 +1,41 @@
 #!/usr/bin/env node
 /** JSON CLI for the candidate-only hand service. No TS editing required. */
 import { performance } from 'node:perf_hooks';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { baseline, head, readCandidate, candidateHealth, executeHandCommand, recoverHandCandidate, inspectDurationCandidate, activeDurationVariants, SEMANTIC_STATE, SEMANTIC_SCORE, selectScore, type HandPhaseTiming } from '../src/render/janko/semantic-hand';
+import { executeCanonicalCommand, type CanonicalIntent } from '../src/render/janko/active-transaction';
 const [action, ...argv] = process.argv.slice(2);
 const option = (name: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : undefined; };
 const root = process.cwd();
 const path = option('state') ?? SEMANTIC_STATE;
 const started = performance.now();
 async function main() {
-  if (action === 'promote') throw new Error('promotion requires separate exact-candidate operator judgment and release authorization; not implemented');
+  if (action === 'promote') throw new Error('No candidate promotion: an approved canonical data edit uses active-change directly.');
+  if (action === 'active-status' || action === 'active-change' || action === 'active-undo') {
+    const selected = option('score');
+    if (!selected) throw new Error('active transactions require an explicit --score');
+    const input = action === 'active-status' ? undefined : option('json') ? JSON.parse(readFileSync(option('json')!, 'utf8')) : JSON.parse(readFileSync(0, 'utf8'));
+    const result = executeCanonicalCommand(action.slice('active-'.length) as 'status' | 'change' | 'undo', selected,
+      input as CanonicalIntent | { base: string; revision: string } | undefined, root,
+      option('active-file') ?? 'src/scores/data/active-scores.json', option('history-file') ?? '.canonical-history.local');
+    if (action === 'active-status' || option('active-file')) return result;
+    // A guarded no-op against the initial revision has no history to publish.
+    // Retried submitted requests may still require the publisher to finish
+    // verifying Pages propagation, so only skip a replay without a record.
+    if ('replay' in result && result.replay) {
+      const status = executeCanonicalCommand('status', selected, undefined, root,
+        'src/scores/data/active-scores.json', option('history-file') ?? '.canonical-history.local');
+      if (status.records === 0) return { ...result, publication: status.publication };
+    }
+    // Only the explicitly designated persistent service/deployment checkout
+    // can submit an automatic release. Isolated state files never publish.
+    if (!process.env.JANKO_DEPLOY_CHECKOUT) return { ...result, publication: 'pending', reason: 'persistent publisher not configured' };
+    const published = JSON.parse(execFileSync(process.execPath, ['--import', 'tsx', 'scripts/publish-active.ts'],
+      { cwd: root, encoding: 'utf8', timeout: 720000 })) as { state: string; revision: string };
+    if (published.revision !== result.revision) throw new Error('publisher returned a different active revision');
+    return { ...result, publication: published.state };
+  }
   if (!['status', 'change', 'explain', 'undo', 'recover', 'inspect-duration'].includes(action)) throw new Error(`unsupported command ${action}`);
   const score = selectScore(option('score') ?? SEMANTIC_SCORE);
   const health = candidateHealth(root, path, score);

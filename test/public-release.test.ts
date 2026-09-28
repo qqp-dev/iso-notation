@@ -20,6 +20,24 @@ test('public Guide removes only the dark section 07; Reading pitch cards and oth
   assert.match(guide, /<Section index="03" title="Reading rhythm">/);
 });
 
+test('root Play/Sheet and PDF consume one verified active release; Pages keeps full software gates', () => {
+  const root = read('src/ui/Landing.tsx');
+  const sheet = read('src/ui/JankoPages.tsx');
+  const viewer = read('src/render/janko/prepared/viewer.ts');
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(root, /watchDeployedRelease\(/);
+  assert.match(root, /resolveActiveScore\(BACH_ID, parsed\)/);
+  assert.match(root, /setScore\(next\.score\)/);
+  assert.match(root, /setActiveData\(parsed\)/);
+  assert.match(root, /setPdfUrl\(release\.pdfUrl\)/);
+  assert.match(root, /useJankoPages\(score, activeData\)/);
+  assert.match(sheet, /resolveActiveScore\(/);
+  assert.match(viewer, /watchDeployedRelease\(/);
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /npm run build/);
+  assert.match(workflow, /verify-data-release/);
+});
+
 test('Pages provisions the actual LilyPond compiler before mandatory expression tests', () => {
   const workflow = read('.github/workflows/deploy.yml');
   const install = workflow.indexOf('Install system dependencies');

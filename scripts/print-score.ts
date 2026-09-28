@@ -16,18 +16,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execSync, spawn } from 'node:child_process';
-import { BENCHMARK_SCORES } from '../src/scores';
-import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { resolveActiveScore } from '../src/scores/active';
 import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
-import {
-  DEFAULT_JANKO_OPTIONS,
-  DEFAULT_JANKO_TOKENS,
-  resolveJankoOptions,
-  resolveJankoTokens,
   type ResolvedJankoLayoutOptions,
   type ResolvedJankoTokens,
 } from '../src/render/janko/types';
@@ -60,30 +50,11 @@ export interface PrintScoreResolution {
  * entries the studio Reference and the lint CLI engrave.
  */
 export function resolvePrintScore(scoreId: string): PrintScoreResolution {
-  if (scoreId === 'bach-goldberg-var1') {
-    return {
-      score: buildBachGoldbergVar1Score(),
-      options: resolveJankoOptions(DEFAULT_JANKO_OPTIONS),
-      tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
-      title: 'Goldberg Variations, BWV 988: Var. 1',
-    };
-  }
-  if (scoreId === 'brahms-op118-no1') {
-    return {
-      score: buildBrahmsOp118No1Score(),
-      options: resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
-      tokens: resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS),
-      title: 'Intermezzo in A minor, Op. 118 No. 1',
-    };
-  }
-  const builder = BENCHMARK_SCORES[scoreId];
-  if (!builder) throw new Error(`Score '${scoreId}' not found in BENCHMARK_SCORES.`);
-  return {
-    score: builder(),
-    options: resolveJankoOptions(DEFAULT_JANKO_OPTIONS),
-    tokens: resolveJankoTokens(DEFAULT_JANKO_TOKENS),
-    title: scoreId,
-  };
+  if (scoreId !== 'bach-goldberg-var1' && scoreId !== 'brahms-op118-no1')
+    throw new Error(`Score '${scoreId}' not found in BENCHMARK_SCORES.`);
+  const { score, options, tokens } = resolveActiveScore(scoreId);
+  return { score, options, tokens, title: scoreId === 'bach-goldberg-var1' ?
+    'Goldberg Variations, BWV 988: Var. 1' : 'Intermezzo in A minor, Op. 118 No. 1' };
 }
 
 export interface LetterFit {

@@ -8,7 +8,7 @@ import { baseline, activeDurationVariants, executeHandCommand, inspectDurationCa
 import { generatePreparedStudio, type PreparedStaticCache } from '../src/render/janko/prepared/generate';
 import type { DurationIntent } from '../src/render/janko/duration-rig';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../src/scores/brahms-op118-no1';
-import { layoutJankoScore } from '../src/render/janko/engine';
+import { layoutJankoScore, renderJankoPage, countJankoPages } from '../src/render/janko/engine';
 
 const root = process.cwd();
 function request(score: typeof SEMANTIC_SCORE | typeof BACH_SCORE, base: string, id: string): DurationIntent {
@@ -146,6 +146,24 @@ test('full-owner shared placement fits or explicitly refuses; changed owner set 
     const cache: PreparedStaticCache = {};
     const prepared = generatePreparedStudio({}, root, path, cache);
     assert.match(prepared.artifacts.candidates, /data-candidate="duration-beside"/);
+    // A requested parallel variant is an entire score, not a hand-picked pair
+    // of diagnostic crops. Compare every served page to the real engine.
+    const card = prepared.artifacts.candidates.split('data-candidate="duration-beside"')[1]?.split('</article>')[0];
+    assert.ok(card, 'the optional variant has its own isolated card');
+    const projected = buildBrahmsOp118No1Score();
+    const variantOptions = { ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+      durationSeatPreferences: variant.placements.map(p => ({ tick: p.target.tick, ownerIds: p.target.ownerIds,
+        family: p.target.family, seat: p.preference })) , ...variant.options };
+    const variantTokens = { ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...variant.tokens };
+    const pageCount = countJankoPages(projected, variantOptions, variantTokens);
+    assert.equal(pageCount, 5, 'Brahms complete spread is five pages');
+    const servedPages = [...card.matchAll(/<figure class="page-card" data-page="(\d+)">[\s\S]*?<svg\b[\s\S]*?<\/svg>/g)];
+    assert.equal(servedPages.length, pageCount, 'variant card contains every full real page');
+    for (let page = 0; page < pageCount; page++) {
+      assert.equal(Number(servedPages[page][1]), page + 1);
+      assert.ok(servedPages[page][0].includes(renderJankoPage(projected, page, variantOptions, variantTokens)
+        .replace('<svg ', '<svg class="janko-svg" ')), `page ${page + 1} uses real variant ink`);
+    }
     assert.equal(prepared.variantId, 'beside');
     assert.equal(prepared.candidateRevision, result.revision);
     const reference = prepared.artifacts.reference;

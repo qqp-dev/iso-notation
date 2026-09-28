@@ -48,6 +48,10 @@ export interface PreparedGeneration {
   status: PreparedStatus;
   /** Exact saved semantic revision represented by the candidate artifact, if any. */
   candidateRevision?: string;
+  /** Exact revisions whose Reference pages are on screen. */
+  canonicalRevisions?: Record<string, string>;
+  /** Hash of the complete reviewed software/source/build inputs (not the active data). */
+  engineIdentity?: string;
   /** Latest active comparison variant represented in this generation. */
   variantId?: string;
   /** A refused stale saved candidate; the Reference artifact remains canonical. */
@@ -147,6 +151,31 @@ export function fingerprintInputs(root: string): PreparedInputSnapshot {
   return { entries };
 }
 
+/** Software/source/build identity; active data and private candidate state are deliberately separate revisions. */
+export function buildIdentity(root: string): string {
+  const entries = new Map(fingerprintInputs(root).entries);
+  entries.delete(resolve(root, 'src/scores/data/active-scores.json'));
+  entries.delete(resolve(root, 'data/active-release.json'));
+  entries.delete(resolve(root, '.semantic-candidate.local'));
+  // Include every trusted script, not a hand-maintained list: the PDF recipe,
+  // fingerprint verifier and future imported helpers are all software inputs.
+  const visitScripts = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const name of readdirSync(dir)) {
+      const file = join(dir, name), stat = statSync(file);
+      if (stat.isDirectory()) visitScripts(file);
+      else if (stat.isFile()) entries.set(file, sha256(readFileSync(file)));
+    }
+  };
+  visitScripts(resolve(root, 'scripts'));
+  visitScripts(resolve(root, '.github/workflows'));
+  for (const name of ['vite.config.ts', 'tsconfig.json', 'janko.html', 'index.html', 'public/janko.html']) {
+    const file = resolve(root, name);
+    if (existsSync(file)) entries.set(file, sha256(readFileSync(file)));
+  }
+  return snapshotKey({ entries });
+}
+
 /** A manifest published before the first successful generation. */
 export const EMPTY_GENERATION: PreparedGeneration = {
   generation: 'pending',
@@ -172,6 +201,8 @@ export function manifestModuleSource(
     artifactHashes: generation.artifactHashes,
     status: generation.status,
     candidateRevision: generation.candidateRevision,
+    canonicalRevisions: generation.canonicalRevisions,
+    engineIdentity: generation.engineIdentity,
     variantId: generation.variantId,
     candidateError: generation.candidateError,
     stale,

@@ -4,10 +4,7 @@ import {
   countJankoPages,
   renderJankoPage,
 } from '../render/janko/engine';
-import {
-  DEFAULT_JANKO_OPTIONS,
-  DEFAULT_JANKO_TOKENS,
-} from '../render/janko/types';
+import { resolveActiveScore, type ActiveData } from '../scores/active';
 
 /** One engraved page: the SVG document plus its viewBox in pt. */
 export interface JankoPageDoc {
@@ -24,20 +21,17 @@ export interface JankoPageDoc {
  * Shared by the Player and Sheet views so both show byte-identical pages
  * from the real engine — never a cached export.
  */
-export function useJankoPages(score: QuantizedGridScore): JankoPageDoc[] {
+export function useJankoPages(score: QuantizedGridScore, active?: ActiveData): JankoPageDoc[] {
   return useMemo(() => {
-    const count = countJankoPages(
-      score,
-      DEFAULT_JANKO_OPTIONS,
-      DEFAULT_JANKO_TOKENS
-    );
+    const { options, tokens } = resolveActiveScore(score.id, active);
+    const count = countJankoPages(score, options, tokens);
     const docs: JankoPageDoc[] = [];
     for (let i = 0; i < count; i++) {
       const svg = renderJankoPage(
         score,
         i,
-        DEFAULT_JANKO_OPTIONS,
-        DEFAULT_JANKO_TOKENS
+        options,
+        tokens
       );
       const m = svg.match(/viewBox="([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)"/);
       docs.push({
@@ -49,7 +43,7 @@ export function useJankoPages(score: QuantizedGridScore): JankoPageDoc[] {
       });
     }
     return docs;
-  }, [score]);
+  }, [score, active]);
 }
 
 interface JankoPagesProps {

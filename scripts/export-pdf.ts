@@ -38,7 +38,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BENCHMARK_SCORES } from '../src/scores';
+import { resolveActiveScore } from '../src/scores/active';
 import { countJankoPages, renderJankoPage } from '../src/render/janko/engine';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 
@@ -105,8 +105,8 @@ function main(): void {
   const rsvg = requireTool('rsvg-convert', 'librsvg2-bin');
   const pdfunite = requireTool('pdfunite', 'poppler-utils');
 
-  const score = BENCHMARK_SCORES[SCORE_ID]();
-  const totalPages = countJankoPages(score, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+  const { score, options, tokens } = resolveActiveScore(SCORE_ID);
+  const totalPages = countJankoPages(score, options, tokens);
   if (totalPages < 1) {
     console.error('npm run pdf: the golden score renders zero pages; refusing to export.');
     process.exit(1);
@@ -116,7 +116,7 @@ function main(): void {
   try {
     const pagePdfs: string[] = [];
     for (let i = 0; i < totalPages; i++) {
-      const svg = renderJankoPage(score, i, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+      const svg = renderJankoPage(score, i, options, tokens);
       const svgPath = path.join(tmpDir, `page-${i}.svg`);
       const pdfPath = path.join(tmpDir, `page-${i}.pdf`);
       fs.writeFileSync(svgPath, svg, 'utf-8');
