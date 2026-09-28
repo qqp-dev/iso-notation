@@ -7,7 +7,7 @@ import { renderJankoStyleDefs } from './elements/style';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from './types';
 import { PRACTICE_GOTHIC_DATA } from './practice-font';
 
-export const ISO_PRACTICE_VERSION = '0.1.0';
+export const ISO_PRACTICE_VERSION = '0.1.1';
 export const PRACTICE_CONTRACT_VERSION = 1;
 export type PracticeGuide = 'two-guides' | 'none';
 export interface PracticeRequest {
@@ -35,8 +35,8 @@ export interface PracticeView {
   guide: PracticeGuide;
   attacks: PracticeAttack[];
   systemCount: number;
-  /** Conservative gap from the lowest possible rail digit seat to the engine's staff top,
-   * notehead boxes and quarter-stem tips (SVG user units); not a general linter certificate. */
+  /** Conservative gap from the lowest possible rail digit ink to the engine's
+   * staff, notehead, stem and beam envelope (SVG user units). */
   railClearance: number;
 }
 
@@ -45,7 +45,11 @@ const RH = '23412312';
 const LH = '43213214';
 const EVEN_ROWS = '33324423';
 const ODD_ROWS = '22213312';
-const ROW_STEP = 8;
+// The 7pt sans-serif fingers occupy ~9.33 SVG px; seat and guide intervals
+// need to be measured against CSS px, not mistaken for 7 viewBox units.
+const ROW_STEP = 15;
+const FINGER_ASCENT = 7;
+const FINGER_DESCENT = 6;
 const fmt = (n: number) => n.toFixed(2);
 
 /** Palette only on this isolated rendered fragment, AFTER engine composition.
@@ -95,10 +99,10 @@ export function resolvePracticeScale(tonicLinear: number): { score: QuantizedGri
   });
   const score: QuantizedGridScore = {
     id: `practice-major-${tonicLinear}`, title: '', composer: '', ticksPerBeat: 48,
-    totalTicks: 15 * 48, timeSignatures: [], barlines: [], tempos: [], dynamics: [], pedals: [],
+    totalTicks: 15 * 24, timeSignatures: [], barlines: [], tempos: [], dynamics: [], pedals: [],
     notes: order.map((i, index) => ({
       id: `practice-${index}`, pitch: fromLinearIndex(tonicLinear + STEPS[i]),
-      startTick: index * 48, durationTicks: 48, hand: 'RH' as const,
+      startTick: index * 24, durationTicks: 24, hand: 'RH' as const,
     })),
   };
   return { score, fingers };
@@ -110,23 +114,26 @@ export function renderPracticeView(input: PracticeRequest): PracticeView {
   const guide = input.guide ?? 'two-guides';
   const { score, fingers } = resolvePracticeScale(input.tonicLinear);
   const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS,
-    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 5, systemsPerPage: 1,
-    pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 0, pageMarginBottom: 0,
-    headerHeight: 0, footerHeight: 0, ticksPerMeasure: 144, ticksPerBeat: 48,
+    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 4, systemsPerPage: 1,
+    pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 90, pageMarginBottom: 0,
+    headerHeight: 0, footerHeight: 0, ticksPerMeasure: 96, ticksPerBeat: 48,
+    beamGroupTicks: 96, rhythmStyle: 'beamed',
     showMeasureNumbers: false, showTimeSignature: false, showHandLabels: false,
     showOctaveLabels: false, showBeatGrid: false, showHonorHalo: false,
     systemStartStyle: 'none', inferBoundaryRests: false,
     // Literal full-scale pitch positions, no folding when transposed.
     lowPitchFolding: 'literal',
   });
-  const tokens = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const tokens = resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 96 });
   const layouts = layoutJankoScore(score, options, tokens);
   if (layouts.length !== 1 || layouts[0].notes.length !== 15) throw new Error('Practice scale does not fit one system');
   const layout = layouts[0];
-  const bottomLH = layout.geometry.staffTopY - 42;
-  const bottomRH = bottomLH - 47;
+  const bottomLH = layout.geometry.staffTopY - 50;
+  const bottomRH = bottomLH - 54;
   const topRH = bottomRH - 3 * ROW_STEP;
-  if (topRH - 7 < 0) throw new RangeError('Practice rails cannot fit above pitch staff');
+  if (topRH - FINGER_ASCENT < 0) throw new RangeError('Practice rails cannot fit above pitch staff');
+  if (layout.beams.length !== 4 || layout.beams.some((b, i) => b.notes.length !== (i === 3 ? 3 : 4)))
+    throw new Error(`Practice eighths must form real four-note engine beams (last group: three): ${layout.beams.map(b => b.notes.map(n => n.startTick).join(',')).join(';')}`);
   const positioned = new Map(layout.notes.map(n => [n.note.id, n]));
   const attacks: PracticeAttack[] = score.notes.map((note, index) => {
     const placed = positioned.get(note.id);
@@ -137,25 +144,28 @@ export function renderPracticeView(input: PracticeRequest): PracticeView {
       tick: note.startTick, x: placed.x,
       hands: { RH: { finger: RH, row, y: y(bottomRH) }, LH: { finger: LH, row, y: y(bottomLH) } } };
   });
-  // One-note-per-quarter RH score: upper stem ends y - stemLength; the
-  // 1-unit pad bounds stroke and the head/line ink. This does not certify
-  // arbitrary engine scores, flags, beams, ottavas or future overlays.
+  // Bound actual painted beams and solved stems, not a quarter-note estimate.
+  // This fixture has no foreign hands, ottavas or flags.
   const pitchInkTop = Math.min(layout.geometry.staffTopY - 1,
-    ...layout.notes.map(n => Math.min(n.y - tokens.stemLength - 1, n.y - tokens.noteheadRadius - 1)));
-  const railClearance = pitchInkTop - (bottomLH + 4);
+    ...layout.notes.map(n => n.y - tokens.noteheadRadius - 1),
+    ...layout.beams.flatMap(b => [
+      ...b.stems.map(s => Math.min(s.stemStartY, s.stemEndY) - 1),
+      ...[b.primary, ...b.levels.map(l => l.connector)].map(c => Math.min(c.y1, c.y2) - b.thickness / 2 - 1),
+    ]));
+  const railClearance = pitchInkTop - (bottomLH + FINGER_DESCENT);
   if (railClearance < 20) throw new RangeError('Practice rail/score clearance failed');
   const left = layout.geometry.staffLeft;
   const right = layout.geometry.staffRight;
   // Each rail has TWO faint boundaries, each midway between adjacent digit
-  // seats. Nearest digit centre is 4 units away; the glyph's 3-unit half-height
-  // leaves a full unit of air. No guide crosses a numbered finger.
+  // seats. Each is 7.5 units from its neighbouring row centres, leaving
+  // breathing room for 7pt (~9.33 CSS px) sans-serif ink. No guide crosses a digit.
   const guides = guide === 'two-guides'
     ? [bottomRH, bottomLH].flatMap(bottom => [bottom - ROW_STEP / 2, bottom - 2.5 * ROW_STEP]).map(y =>
       `<line x1="${fmt(left)}" x2="${fmt(right)}" y1="${fmt(y)}" y2="${fmt(y)}" stroke="#384455" stroke-width="0.55"/>`).join('') : '';
   const rail = (hand: 'RH' | 'LH', bottom: number) =>
     `<g class="practice-${hand}" data-hand="${hand}">` +
     `<text x="7" y="${fmt(bottom - 1.5 * ROW_STEP + 2)}" fill="#91A5BE" font-family="sans-serif" font-size="8pt" font-weight="bold">${hand}</text>` +
-    attacks.map(attack => `<text data-attack="${attack.index}" data-row="${attack.hands[hand].row}" x="${fmt(attack.x)}" y="${fmt(attack.hands[hand].y + 2.4)}" text-anchor="middle" fill="#F4C88D" font-family="sans-serif" font-size="7pt" font-weight="600">${attack.hands[hand].finger}</text>`).join('') + '</g>';
+    attacks.map(attack => `<text data-attack="${attack.index}" data-row="${attack.hands[hand].row}" x="${fmt(attack.x)}" y="${fmt(attack.hands[hand].y + 3)}" text-anchor="middle" fill="#F4C88D" font-family="sans-serif" font-size="7pt" font-weight="600">${attack.hands[hand].finger}</text>`).join('') + '</g>';
   const engine = nightInk(renderSystem(score, layout.geometry, 0, options, tokens, layout));
   const styles = nightInk(renderJankoStyleDefs(tokens));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${input.width}px" height="${input.height}px" viewBox="0 0 ${input.width} ${input.height}" data-practice-version="${PRACTICE_CONTRACT_VERSION}" data-selection="scale:major:${input.tonicLinear}">` +

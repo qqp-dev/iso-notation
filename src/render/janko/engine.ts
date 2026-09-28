@@ -2375,7 +2375,7 @@ export function resolveDotFlagClearance(
   // Standalone/unbeamable notes with marks carry flags.
   const rhythmNotes = notes.map((p) => p.rhythm);
   const partition =
-    o.rhythmStyle === 'beamed' ? partitionBeamGroups(rhythmNotes, t, geo.middleCY) : null;
+    o.rhythmStyle === 'beamed' ? partitionBeamGroups(rhythmNotes, t, geo.middleCY, o.beamGroupTicks) : null;
   const beamedIds = partition
     ? new Set(partition.groups.flatMap((g) => g.map((n) => n.id)))
     : null;
@@ -2501,7 +2501,7 @@ export function resolveSecondDots(
 
   const rhythmNotes = notes.map((p) => p.rhythm);
   const partition =
-    o.rhythmStyle === 'beamed' ? partitionBeamGroups(rhythmNotes, t, geo.middleCY) : null;
+    o.rhythmStyle === 'beamed' ? partitionBeamGroups(rhythmNotes, t, geo.middleCY, o.beamGroupTicks) : null;
   const beamedIds = partition
     ? new Set(partition.groups.flatMap((g) => g.map((n) => n.id)))
     : null;
@@ -7321,7 +7321,7 @@ export function layoutJankoSystemShifted(
     // belongs to a beam keeps its beam.
     const rhythmNotes = [...notes, ...unisonVoices].map((p) => p.rhythm);
     const partition = bridgeBeamGroupsAcrossRests(
-      partitionBeamGroups(rhythmNotes, t, geometry.middleCY),
+      partitionBeamGroups(rhythmNotes, t, geometry.middleCY, o.beamGroupTicks),
       restLayer.rests,
       t
     );

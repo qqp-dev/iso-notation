@@ -1,6 +1,11 @@
 {
   "contractVersion": 1,
-  "isoVersion": "0.1.0",
+  "isoVersion": "0.1.1",
+  "durationTicks": 24,
+  "ticksPerBeat": 48,
+  "ticksPerMeasure": 96,
+  "onsetTicks": [0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336],
+  "beamGroupSizes": [4, 4, 4, 3],
   "cases": [
     {
       "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 380, "guide": "two-guides" },
@@ -19,6 +24,37 @@
       "leftFingers": "432132141231234",
       "physicalRows": "222133121331222",
       "systemCount": 1
+    },
+    {
+      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 36, "width": 760, "height": 900 },
+      "selectionId": "scale:major:36",
+      "pitchesLinear": [36, 38, 40, 41, 43, 45, 47, 48, 47, 45, 43, 41, 40, 38, 36],
+      "rightFingers": "234123121321432",
+      "leftFingers": "432132141231234",
+      "physicalRows": "333244232442333",
+      "guide": "two-guides",
+      "systemCount": 1
+    },
+    {
+      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 60, "width": 760, "height": 900 },
+      "selectionId": "scale:major:60",
+      "pitchesLinear": [60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60],
+      "rightFingers": "234123121321432",
+      "leftFingers": "432132141231234",
+      "physicalRows": "333244232442333",
+      "guide": "two-guides",
+      "systemCount": 1
     }
-  ]
+  ],
+  "invalidRequests": [
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 35, "width": 760, "height": 380 },
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 61, "width": 760, "height": 380 },
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 559, "height": 380 },
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 359 },
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 1601, "height": 380 },
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 901 },
+    { "rudiment": "scale", "scaleType": "minor", "tonicLinear": 48, "width": 760, "height": 380 },
+    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 380, "guide": "unknown" }
+  ],
+  "invalidError": "RangeError"
 }

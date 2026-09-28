@@ -1439,7 +1439,8 @@ export function checkDotCollision(
           partitionBeamGroups(
             layout.notes.map((n) => n.rhythm),
             t,
-            layout.geometry.middleCY
+            layout.geometry.middleCY,
+            o.beamGroupTicks
           ).groups.flatMap((g) => g.map((n) => n.id))
         )
       : null;
