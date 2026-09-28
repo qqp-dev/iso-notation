@@ -1,6 +1,6 @@
-# Guarded duration-mark comparisons (candidate-only)
+# Guarded duration-mark comparisons (optional variants; historical comparison notes)
 
-The existing `scripts/semantic-hand.ts` CLI and `.semantic-candidate.local` transaction/history are reused; no authored score, canonical option, formal round metadata, MIDI, PDF, or Reference view is edited. The only formal round-opening authority remains `src/render/janko/candidates.ts` (Round 50 GOLD remains unchanged). Runtime cards in Candidates are guarded comparison data, not promotion.
+The `scripts/semantic-hand.ts` CLI still supports isolated private comparison histories. **Current active-score engraving edits** use `active-change` as documented in [active-score-releases.md](active-score-releases.md); neither route edits musical `durationTicks`, source, or MIDI. Variants are optional complete score readings, never a promotion gate. The examples below concern the private variant route only.
 
 Use an isolated `--state /path/to/private-candidate.json` with an isolated server configured to watch **that same state** for demonstrations. Never aim an alternative state at the operator's server. On the live service, activation of a new candidate state belongs to the architect after preservation of prior history and conflict review.
 

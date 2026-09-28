@@ -42,6 +42,7 @@ import {
   buildBrahmsOp118No1Score,
 } from '../src/scores/brahms-op118-no1';
 import { BENCHMARK_METADATA, BENCHMARK_SCORES } from '../src/scores';
+import { resolveActiveScore } from '../src/scores/active';
 import { QuantizedNote } from '../src/model/types';
 import { verifyLosslessGrid } from '../src/model/grid';
 import {
@@ -170,8 +171,13 @@ test('The authentic score opens with a quarter-note upbeat and downbeat chord ov
   );
 });
 
-test('The score is registered as a first-class benchmark', () => {
-  assert.equal(BENCHMARK_SCORES['brahms-op118-no1'], buildBrahmsOp118No1Score);
+test('The score is registered as a first-class active benchmark', () => {
+  // The immutable builder remains the historic corpus; the public registry
+  // deliberately resolves its score-keyed active revision instead of exposing
+  // the raw builder function (which would bypass a future approved DATA edit).
+  const registered = BENCHMARK_SCORES['brahms-op118-no1']();
+  assert.equal(registered.id, buildBrahmsOp118No1Score().id);
+  assert.deepEqual(registered, resolveActiveScore('brahms-op118-no1').score);
   const meta = BENCHMARK_METADATA.find((m) => m.id === 'brahms-op118-no1');
   assert.ok(meta, 'Brahms metadata is exported to the UI');
   assert.match(meta!.title, /Op\. 118 No\. 1/);

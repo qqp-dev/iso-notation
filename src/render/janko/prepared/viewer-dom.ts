@@ -199,6 +199,7 @@ export function createPreparedApplier(args: {
       // Any pending/failing generation invalidates a prior frame marker, even
       // while the last coherent panels are still displayed.
       root.dataset.preparedObservation = JSON.stringify({ state: 'unobserved', reason: 'manifest-requested' });
+      root.dataset.preparedReferenceObservation = JSON.stringify({ state: 'unobserved', reason: 'manifest-requested' });
       if (status) {
         status.textContent = renderPreparedStatus(manifest);
         status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && !manifest.candidateError && manifest.status.ok);
@@ -259,6 +260,11 @@ export function createPreparedApplier(args: {
       if (manifest.candidateRevision) root.dataset.preparedCandidateRevision = manifest.candidateRevision;
       else delete root.dataset.preparedCandidateRevision;
       root.dataset.preparedCandidatesHash = manifest.artifactHashes.candidates;
+      root.dataset.preparedReferenceHash = manifest.artifactHashes.reference;
+      if (manifest.canonicalRevisions?.['bach-goldberg-var1']) root.dataset.preparedCanonicalRevision = manifest.canonicalRevisions['bach-goldberg-var1'];
+      else delete root.dataset.preparedCanonicalRevision;
+      if (manifest.canonicalRevisions) root.dataset.preparedCanonicalRevisions = JSON.stringify(manifest.canonicalRevisions);
+      else delete root.dataset.preparedCanonicalRevisions;
       if (manifest.variantId) root.dataset.preparedVariantId = manifest.variantId;
       else delete root.dataset.preparedVariantId;
       count += 1;

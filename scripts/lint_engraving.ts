@@ -16,7 +16,7 @@
  * Exit codes: 0 = clean, 1 = violations (or warnings with `--strict`).
  */
 
-import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { resolveActiveScore } from '../src/scores/active';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import {
   REST_DURATION_SPECIMEN_JANKO_OPTIONS,
@@ -28,11 +28,6 @@ import {
   DURATION_SPECIMEN_JANKO_TOKENS,
   buildDurationSpecimenScore,
 } from '../src/scores/duration-specimen';
-import {
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS,
-  buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
 import { formatLintReport, lintJankoScore } from '../src/render/janko/linter';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 
@@ -41,15 +36,11 @@ const asJson = args.has('--json');
 const strict = args.has('--strict');
 const quiet = args.has('--quiet');
 
-const bachScore = buildBachGoldbergVar1Score();
-const bachReport = lintJankoScore(bachScore, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS);
+const bach = resolveActiveScore('bach-goldberg-var1');
+const bachReport = lintJankoScore(bach.score, bach.options, bach.tokens);
 
-const brahmsScore = buildBrahmsOp118No1Score();
-const brahmsReport = lintJankoScore(
-  brahmsScore,
-  BRAHMS_OP118_NO1_JANKO_OPTIONS,
-  BRAHMS_OP118_NO1_JANKO_TOKENS
-);
+const brahms = resolveActiveScore('brahms-op118-no1');
+const brahmsReport = lintJankoScore(brahms.score, brahms.options, brahms.tokens);
 
 // Round 20: the two curated specimens are part of the golden gate — the rest
 // specimen states every rest value (the whole bar included) and the chord

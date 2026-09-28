@@ -32,6 +32,7 @@ export function writeReferenceReader(storage: StudioStorageLike | undefined, sta
 
 /** Decorate only the reader DOM, never the content-addressed artifact bytes. */
 export function decorateReferenceReader(root: HTMLElement, selected: ReferenceScore): void {
+  root.dataset.preparedReferenceScore = selected;
   const panel = root.querySelector<HTMLElement>('#view-reference');
   if (!panel) return;
   for (const score of panel.querySelectorAll<HTMLElement>('.reference-score')) {

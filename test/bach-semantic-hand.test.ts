@@ -118,6 +118,31 @@ test('legacy default Brahms remains usable, while selecting Bach never silently 
   assert.equal(command('status', file, brahms, undefined, false).result.revision, saved.result.revision);
 }));
 
+test('the two coincident m.32 events are independently guarded, while m.16 #282 stays one unresolved event', () => isolated(file => {
+  const score = buildBachGoldbergVar1Score();
+  const a = score.notes.find(n => n.id === 'bach-var1-550')!;
+  const b = score.notes.find(n => n.id === 'bach-var1-551')!;
+  assert.equal(a.startTick, b.startTick);
+  assert.deepEqual(a.pitch, b.pitch);
+  assert.notEqual(a.hand, b.hand);
+  const status = command('status', file, bach);
+  assert.equal(status.code, 0);
+  const changed = command('change', file, bach, {
+    ...intent(status.result.revision, 'this'), target: b.hand,
+    selected: [{ id: a.id, pitchClass: a.pitch.pitchClass, octave: a.pitch.octave, tick: a.startTick, expectedHand: a.hand }],
+  });
+  assert.equal(changed.code, 0, JSON.stringify(changed.result));
+  assert.deepEqual(changed.result.effects.selected.map((entry: { id: string }) => entry.id), [a.id],
+    'same tick and solf must not cause an implicit second assignment');
+  assert.equal(command('change', file, bach, {
+    ...intent(changed.result.revision, 'this'), target: a.hand,
+    selected: [{ id: b.id, pitchClass: b.pitch.pitchClass, octave: b.pitch.octave, tick: b.startTick, expectedHand: a.hand }],
+  }).code, 1, 'a false hand guard on the other identity is rejected');
+  assert.equal(command('status', file, bach).result.revision, changed.result.revision);
+  const unresolved = score.notes.filter(n => n.id === 'bach-var1-282');
+  assert.equal(unresolved.length, 1, 'coincident m.16 source parts do not justify cloning an event');
+}));
+
 test('the settled Bach m. 5 hand judgment remains in the real canonical score when a new round opens', () => {
   const score = buildBachGoldbergVar1Score();
   for (const [id, tick] of [['bach-var1-70', 576], ['bach-var1-71', 588]] as const) {

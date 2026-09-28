@@ -1,6 +1,5 @@
 import { QuantizedGridScore } from '../model/types';
-import { buildBachGoldbergVar1Score } from './bach-goldberg-var1';
-import { buildBrahmsOp118No1Score } from './brahms-op118-no1';
+import { resolveActiveScore } from './active';
 
 export { buildBachGoldbergVar1Score } from './bach-goldberg-var1';
 export {
@@ -30,8 +29,8 @@ export {
 } from './brahms-op118-no1';
 
 export const BENCHMARK_SCORES: Record<string, () => QuantizedGridScore> = {
-  'bach-goldberg-var1': buildBachGoldbergVar1Score,
-  'brahms-op118-no1': buildBrahmsOp118No1Score,
+  'bach-goldberg-var1': () => resolveActiveScore('bach-goldberg-var1').score,
+  'brahms-op118-no1': () => resolveActiveScore('brahms-op118-no1').score,
 };
 
 export const BENCHMARK_METADATA = [

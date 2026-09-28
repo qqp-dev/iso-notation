@@ -233,14 +233,12 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
   assert.equal(studioBrahms.systemsPerPage, O_BRAHMS.systemsPerPage, 'studio reads the score options');
   assert.equal(studioBrahms.measuresPerSystem, O_BRAHMS.measuresPerSystem);
   assert.equal(studioBrahms.ticksPerMeasure, O_BRAHMS.ticksPerMeasure);
-  // The lint CLI spreads the same const; reconstruct its spread exactly.
+  // The CLI now resolves the active per-score options, not a frozen local
+  // spread; the historical fixed-3 baseline remains pinned independently.
   const cliBrahms = resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS);
-  assert.equal(cliBrahms.systemsPerPage, 4, 'the CLI spread carries the 4-up flip');
-  assert.match(
-    read('scripts/lint_engraving.ts'),
-    /BRAHMS_OP118_NO1_JANKO_OPTIONS,\n\s*BRAHMS_OP118_NO1_JANKO_TOKENS/,
-    'the CLI spreads the const — no private pagination, no adaptive override'
-  );
+  assert.equal(cliBrahms.systemsPerPage, 4, 'the original 4-up baseline');
+  assert.match(read('scripts/lint_engraving.ts'), /resolveActiveScore\('brahms-op118-no1'\)/,
+    'the CLI consumes the active score and its own pagination');
   assert.ok(
     !read('scripts/lint_engraving.ts').includes("core: 'adaptive'"),
     'the CLI carries no adaptive production override'
@@ -252,18 +250,17 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
     'engine and studio page counts agree (5)'
   );
   assert.equal(O_BRAHMS.systemsPerPage, 4);
-  // Sheet views hardcode the golden defaults over Bach-only scores, so there
-  // is nothing to disagree; print engraves the canonical Jánko pages
-  // (Bach + Brahms entries) with Letter fit, the PDF stays Bach-only.
-  assert.ok(!read('src/ui/JankoPages.tsx').includes('BRAHMS'), 'sheet hardcodes the golden defaults');
+  // The Sheet and print surfaces share the score-keyed active resolver;
+  // print engraves canonical pages with Letter fit, PDF remains Bach-only.
+  assert.ok(read('src/ui/JankoPages.tsx').includes('resolveActiveScore'), 'sheet resolves the active score');
   assert.ok(!read('src/ui/Landing.tsx').includes('brahms'), 'the app never loads Brahms (Bach + uploads)');
   assert.ok(
     read('scripts/print-score.ts').includes('renderJankoPage'),
     'print runs the canonical Jánko engine'
   );
   assert.ok(
-    read('scripts/print-score.ts').includes('BRAHMS_OP118_NO1_JANKO_OPTIONS'),
-    'print engraves the Brahms golden entry'
+    read('scripts/print-score.ts').includes('resolveActiveScore'),
+    'print engraves the active Brahms entry, not the raw builder'
   );
   assert.ok(
     !read('scripts/print-score.ts').includes('computeColumnarLayout'),

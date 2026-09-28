@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "scores": {
+    "bach-goldberg-var1": {
+      "revision": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+      "parent": null,
+      "assignments": [],
+      "duration": { "options": {}, "tokens": {}, "placements": [] }
+    },
+    "brahms-op118-no1": {
+      "revision": "baseline-pr114-brahms",
+      "parent": null,
+      "assignments": [],
+      "duration": { "options": {}, "tokens": {}, "placements": [] }
+    }
+  }
+}

@@ -5,7 +5,9 @@ import React, {
   useRef,
 } from 'react';
 import { QuantizedGridScore } from '../model/types';
-import { BENCHMARK_SCORES } from '../scores';
+import { initialActiveData, resolveActiveScore, type ActiveData } from '../scores/active';
+import prepared from 'virtual:janko-prepared-manifest';
+import { watchDeployedRelease } from '../render/janko/prepared/deployed';
 import { tickToMeasureBeat } from '../model/grid';
 import { synth } from '../audio/synth';
 import { JankoPages, useJankoPages } from './JankoPages';
@@ -13,7 +15,6 @@ import { PlayersGuide } from './PlayersGuide';
 import { locateTick, tickAtPoint } from './playhead';
 
 const BACH_ID = 'bach-goldberg-var1';
-const PDF_URL = `${import.meta.env.BASE_URL}goldberg-variation-1.pdf`;
 
 type View = 'play' | 'sheet' | 'guide';
 
@@ -21,16 +22,32 @@ const VIEW_LABELS = { play: 'Play', sheet: 'Sheet', guide: 'Guide' } as const;
 
 export const Landing: React.FC = () => {
   const [view, setView] = useState<View>('play');
-  const [score] = useState<QuantizedGridScore>(
-    () => BENCHMARK_SCORES[BACH_ID]()
-  );
+  const [activeData, setActiveData] = useState<ActiveData>(initialActiveData);
+  const [score, setScore] = useState<QuantizedGridScore>(() => resolveActiveScore(BACH_ID).score);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(import.meta.env.PROD ? null : `${import.meta.env.BASE_URL}goldberg-variation-1.pdf`);
+  const [releaseStatus, setReleaseStatus] = useState('Verifying deployed score and PDF…');
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    return watchDeployedRelease(new URL(`${import.meta.env.BASE_URL}active-release.json`, window.location.href).href,
+      release => {
+        const parsed = JSON.parse(release.data) as ActiveData;
+        const next = resolveActiveScore(BACH_ID, parsed);
+        if (next.revision !== release.manifest.canonicalRevisions[BACH_ID]) throw new Error('root score revision mismatch');
+        synth.stopAll();
+        setIsPlaying(false);
+        setActiveData(parsed);
+        setScore(next.score);
+        setPdfUrl(release.pdfUrl);
+        setReleaseStatus(`Deployed · ${next.revision.slice(0, 12)}`);
+      }, error => setReleaseStatus(`Stale · ${error.message}`), prepared.engineIdentity ?? 'unknown');
+  }, []);
   const [currentTick, setCurrentTick] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [tempoMultiplier, setTempoMultiplier] = useState<number>(1.0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const pages = useJankoPages(score);
+  const pages = useJankoPages(score, activeData);
   const playhead = useMemo(
     () => locateTick(score, currentTick),
     [score, currentTick]
@@ -145,7 +162,7 @@ export const Landing: React.FC = () => {
               Iso-Notation
             </div>
             <div className="text-[11px] text-neutral-500">
-              Jánko isomorphic engraving
+              Jánko isomorphic engraving{import.meta.env.PROD ? ` · ${releaseStatus}` : ''}
             </div>
           </div>
 
@@ -176,7 +193,9 @@ export const Landing: React.FC = () => {
         </div>
       </header>
 
-      {view === 'play' ? (
+      {import.meta.env.PROD && !pdfUrl && view !== 'guide' ? (
+        <div className="landing-scroll min-h-0 flex-1 overflow-y-auto p-6" role="status">{releaseStatus}</div>
+      ) : view === 'play' ? (
         <>
           {/* Transport */}
           <div className="landing-chrome border-b border-neutral-200 bg-neutral-50">
@@ -258,13 +277,11 @@ export const Landing: React.FC = () => {
               >
                 Print
               </button>
-              <a
-                href={PDF_URL}
+              {pdfUrl ? <a
+                href={pdfUrl}
                 download="goldberg-variation-1.pdf"
                 className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100"
-              >
-                Download PDF
-              </a>
+              >Download PDF</a> : <span role="status">Verifying matching PDF…</span>}
               <span className="ml-auto hidden text-sm text-neutral-400 sm:inline">
                 {pages.length} {pages.length === 1 ? 'page' : 'pages'} · A4
               </span>

@@ -30,6 +30,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { resolveActiveScore } from '../../../scores/active';
 import { resolve } from 'node:path';
 
 import { createStudioConfig, renderCandidatesView, renderReferenceView, type StaticCandidateMarkup, JankoStudioConfig } from '../studio';
@@ -130,6 +131,8 @@ export function generatePreparedStudio(
     })
   );
   return { generation, artifactHashes, artifacts: { candidates, reference }, status, phaseMs,
+    canonicalRevisions: { 'bach-goldberg-var1': resolveActiveScore('bach-goldberg-var1').revision,
+      'brahms-op118-no1': resolveActiveScore('brahms-op118-no1').revision },
     candidateRevision: state?.records.length ? head(state!, candidateRoot) : undefined,
     variantId: durationVariants.at(-1)?.variant.id,
     ...(semanticCandidateError ? { candidateError: semanticCandidateError } : {}) };

@@ -63,3 +63,41 @@ export function observeCandidateFrame(root: HTMLElement, doc: Document, win: Win
       : { ...current, state: 'unobserved', reason: 'superseded-or-not-visible' });
   }));
 }
+
+/** A distinct applied-Reference frame opportunity; not a paint or operator acceptance. */
+export function referenceObservation(root: HTMLElement, doc: Document) {
+  const data = root.dataset;
+  const score = data.preparedReferenceScore === 'brahms-op118-no1' ? 'brahms-op118-no1' : 'bach-goldberg-var1';
+  let revisions: Record<string, string> = {};
+  try { revisions = JSON.parse(data.preparedCanonicalRevisions ?? '{}') as Record<string, string>; } catch { /* invalid applied metadata is unobserved */ }
+  const identity = { generation: data.preparedGeneration, score,
+    canonicalRevision: revisions[score] ?? (score === 'bach-goldberg-var1' ? data.preparedCanonicalRevision : undefined),
+    referenceHash: data.preparedReferenceHash, apply: data.preparedApply };
+  const reason = !root.isConnected ? 'disconnected' : doc.visibilityState !== 'visible' ? 'hidden' :
+    data.preparedState !== 'ready' ? `prepared-${data.preparedState ?? 'unknown'}` :
+    activePanelViews(root).join(',') !== 'reference' ? 'wrong-view' :
+    !Array.from(root.querySelectorAll<HTMLElement>('.view-panel')).some(panel => panel.dataset.view === 'reference' && panel.getClientRects().length > 0) ? 'hidden-reference-panel' :
+    !identity.generation || !identity.canonicalRevision || !identity.referenceHash ? 'no-reference' : undefined;
+  return reason ? { state: 'unobserved', reason, ...identity } : { state: 'frame-opportunity', ...identity };
+}
+const referenceSerials = new WeakMap<HTMLElement, number>();
+export function observeReferenceFrame(root: HTMLElement, doc: Document, win: Window): void {
+  const serial = (referenceSerials.get(root) ?? 0) + 1;
+  referenceSerials.set(root, serial);
+  const initial = referenceObservation(root, doc);
+  root.dataset.preparedReferenceObservation = JSON.stringify({ ...initial, state: 'unobserved', reason: 'awaiting-frame' });
+  if (initial.state !== 'frame-opportunity') {
+    root.dataset.preparedReferenceObservation = JSON.stringify(initial);
+    return;
+  }
+  win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
+    if (referenceSerials.get(root) !== serial) return;
+    const current = referenceObservation(root, doc);
+    const same = current.state === 'frame-opportunity' && current.generation === initial.generation &&
+      current.canonicalRevision === initial.canonicalRevision && current.score === initial.score &&
+      current.referenceHash === initial.referenceHash && current.apply === initial.apply;
+    root.dataset.preparedReferenceObservation = JSON.stringify(same
+      ? { ...current, observedAt: performance.now(), observedEpochMs: Date.now() }
+      : { ...current, state: 'unobserved', reason: 'superseded-or-not-visible' });
+  }));
+}

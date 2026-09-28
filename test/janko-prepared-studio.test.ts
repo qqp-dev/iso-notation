@@ -89,7 +89,7 @@ test('each prepared artifact is byte-equal to the direct real renderer', () => {
   assert.equal(generation.artifacts.reference, renderReferenceView(config));
 });
 
-test('served direct and prepared A/B panels bind real PR112/GOLD ink; Reference stays GOLD', () => {
+test('archived PR112 ink remains distinct from GOLD; served References remain canonical', () => {
   // Independent PR112 hand fixture: its 551 source tuples and unchanged-field
   // hashes are pinned against landed PR112 in scores.test.ts, not projected
   // from the candidate registry. Compare the actual SVG inside each served
@@ -97,18 +97,6 @@ test('served direct and prepared A/B panels bind real PR112/GOLD ink; Reference 
   const gold = buildBachGoldbergVar1Score();
   const prior = bachPr112Hands(gold);
   const expectedSvg = (svg: string) => svg.replace('<svg ', '<svg class="janko-svg" ');
-  const panelSvg = (markup: string, cardId: string, scoreId: string, start: number, count: number): string => {
-    const cardStart = markup.indexOf(`data-candidate="${cardId}"`);
-    assert.ok(cardStart >= 0, `${cardId}: served card exists`);
-    const card = markup.slice(cardStart, markup.indexOf('</article>', cardStart));
-    const marker = `data-window="${scoreId}:${start}-${start + count - 1}"`;
-    const at = card.indexOf(marker);
-    assert.ok(at >= 0, `${cardId}: served window ${marker}`);
-    const panel = card.slice(at, card.indexOf('</figure>', at));
-    const svg = panel.match(/<svg\b[\s\S]*?<\/svg>/)?.[0];
-    assert.ok(svg, `${cardId} mm. ${start}–${start + count - 1}: painted SVG`);
-    return svg;
-  };
   const referencePages = (markup: string): string[] => {
     const bachStart = markup.indexOf('data-score="primary"');
     assert.ok(bachStart >= 0, 'served GOLD Reference block');
@@ -129,18 +117,16 @@ test('served direct and prepared A/B panels bind real PR112/GOLD ink; Reference 
     ['prepared', generation.artifacts.candidates, generation.artifacts.reference],
   ] as const) {
     for (const [start, count] of [[4, 2], [20, 4], [24, 2]] as const) {
-      const before = panelSvg(candidates, 'bach-hands-pr112', 'bach-pr112-hands', start, count);
-      const after = panelSvg(candidates, 'bach-hands-approved', 'primary', start, count);
       const oldInk = expectedSvg(renderJankoCrop(prior, start, count, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
       const goldInk = expectedSvg(renderJankoCrop(gold, start, count, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
-      assert.notEqual(oldInk, goldInk, `${route} mm. ${start}–${start + count - 1}: A/B witnesses differ`);
-      for (const [name, svg, expected] of [['PR112', before, oldInk], ['GOLD', after, goldInk]] as const) {
-        assert.match(svg, /class="janko-beam"/, `${route} ${name}: printed beams`);
-        assert.match(svg, /class="janko-rest-group"/, `${route} ${name}: printed rests`);
-        assert.match(svg, /class="janko-stem"/, `${route} ${name}: printed stems`);
-        assert.equal(svg, expected, `${route} ${name} mm. ${start}–${start + count - 1}: served ink binds the correct hand score`);
+      assert.notEqual(oldInk, goldInk, `${route} mm. ${start}–${start + count - 1}: immutable PR112/GOLD witness differs`);
+      for (const ink of [oldInk, goldInk]) {
+        assert.match(ink, /class="janko-beam"/);
+        assert.match(ink, /class="janko-rest-group"/);
+        assert.match(ink, /class="janko-stem"/);
       }
     }
+    assert.doesNotMatch(candidates, /data-candidate="bach-hands-pr112"/, 'historical reading is not a mandatory live candidate');
     assert.deepEqual(referencePages(reference), expectedGoldPages, `${route}: both GOLD Reference pages are canonical, not PR112`);
   }
 
@@ -152,6 +138,21 @@ test('served direct and prepared A/B panels bind real PR112/GOLD ink; Reference 
     'direct Reference ignores the candidate score-library override');
   assert.deepEqual(referencePages(generatePreparedStudio(override).artifacts.reference), expectedGoldPages,
     'prepared Reference ignores the candidate score-library override');
+});
+
+test('prepared Reference and manifest identify both active canonical score revisions, independently of candidate history', () => {
+  const generation = preparedOnce();
+  const revisions = (generation as PreparedGeneration & { canonicalRevisions?: Record<string, string> }).canonicalRevisions;
+  assert.ok(revisions, 'prepared output carries the active canonical revisions, not just candidateRevision');
+  for (const score of ['bach-goldberg-var1', 'brahms-op118-no1']) {
+    assert.ok(typeof revisions[score] === 'string' && revisions[score].length > 0,
+      `${score} exposes an exact active revision identity`);
+  }
+  const manifest = manifestModuleSource(generation, false, undefined, () => '"asset"');
+  assert.match(manifest, /canonicalRevisions/, 'the versioned identity reaches the browser manifest');
+  assert.ok(manifest.includes(revisions['bach-goldberg-var1']));
+  assert.ok(manifest.includes(revisions['brahms-op118-no1']));
+  assert.equal(generation.candidateRevision, undefined, 'no variant is needed for a live Reference revision');
 });
 
 test('the lint facts come from the real linter: the primary score engraves clean', () => {

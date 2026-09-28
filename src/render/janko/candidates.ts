@@ -1190,11 +1190,18 @@ export const PR112_EVENTS: Readonly<Record<number, readonly ['LH' | 'RH', number
   408: ['LH', 3432, 4, 3], 409: ['RH', 3444, 2, 3],
 };
 
-export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
+export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
   round: 52,
   title: 'Bach GOLD · sixteen approved hand corrections',
-  description: 'PR112 hand assignments versus the operator-approved sixteen corrections on the same literal Bach measures, using the real engraving engine and unchanged boundary-rest policy. Only hands change; Reference is the corrected GOLD. Brahms BRONZE remains unchanged.',
+  description: 'Historical PR112/PR114 evidence, not an active comparison or approval gate.',
   openAxes: ['hand assignment'],
+};
+
+export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
+  round: 53,
+  title: 'Direct active SCORE · optional whole-score variants',
+  description: 'There is no pending before/after promotion. Approved guarded edits update the score directly; open Candidates only when a parallel full-score reading is deliberately requested.',
+  openAxes: [],
 };
 
 function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
@@ -1211,7 +1218,8 @@ function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
   ];
 }
 
-export const CURRENT_CANDIDATES: JankoCandidate[] = [
+export const BACH_PR114_SCORE_ID = 'bach-pr114-hands';
+export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
   {
     id: 'bach-hands-pr112', label: 'A · PR112 before the sixteen hand corrections',
     description: 'Readonly reconstruction of landed PR112: the same 551 events, durations, pitches, rest policy and engraving options; exactly sixteen hands differ from GOLD.',
@@ -1221,10 +1229,13 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
   {
     id: 'bach-hands-approved', label: 'B · operator-approved GOLD hands',
     description: 'Canonical GOLD builder after the sixteen judged hand changes. Beams, stems and rest seating derive from these hands in the same real engine; crossing metadata is recomputed.',
-    windows: bachHandWindows(DEFAULT_STUDIO_SCORE_ID),
-    tags: ['Bach', 'GOLD', 'approved hands'],
+    windows: bachHandWindows(BACH_PR114_SCORE_ID),
+    tags: ['Bach', 'PR114', 'approved hands'],
   },
 ];
+
+/** No mandatory comparison round after the PR114 judgment. */
+export const CURRENT_CANDIDATES: JankoCandidate[] = [];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
  * not a change to the current exploratory round or Reference. */

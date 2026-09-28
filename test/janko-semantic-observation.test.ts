@@ -6,7 +6,7 @@ function harness() {
   const pending: Array<() => void> = [];
   let visible = true;
   const panel = {
-    dataset: { view: 'candidates' },
+    dataset: { view: 'candidates' } as Record<string, string>,
     classList: { contains: () => true },
     // A source-review mode can leave an engraving tab logically active while
     // CSS hides its entire panel. Browser layout rectangles expose that fact.
@@ -14,7 +14,7 @@ function harness() {
   };
   const root = {
     isConnected: true,
-    dataset: { preparedState: 'ready', preparedGeneration: 'g1', preparedCandidateRevision: 'r1', preparedCandidatesHash: 'h1', preparedApply: '1', preparedObservation: '' },
+    dataset: { preparedState: 'ready', preparedGeneration: 'g1', preparedCandidateRevision: 'r1', preparedCandidatesHash: 'h1', preparedApply: '1', preparedObservation: '' } as Record<string, string>,
     querySelectorAll: () => [panel],
   };
   const doc = { visibilityState: 'visible' };
@@ -23,6 +23,35 @@ function harness() {
   const observed = () => JSON.parse(root.dataset.preparedObservation);
   return { root, doc, win, frames, observed, panel, setEngravingVisible: (value: boolean) => { visible = value; } };
 }
+
+test('Reference observation is tied to visible applied DOM, not a candidate or server-ready revision', async () => {
+  const module = await import('../src/render/janko/prepared/observation');
+  const observe = (module as typeof module & {
+    observeReferenceFrame?: (root: HTMLElement, doc: Document, win: Window) => void;
+  }).observeReferenceFrame;
+  assert.equal(typeof observe, 'function', 'Reference has its own applied frame-opportunity observer');
+  const h = harness();
+  h.panel.dataset.view = 'reference';
+  h.root.dataset.preparedCanonicalRevision = 'bach-r1';
+  h.root.dataset.preparedReferenceHash = 'reference-h1';
+  const root = h.root as unknown as HTMLElement, doc = h.doc as unknown as Document, win = h.win as unknown as Window;
+  observe!(root, doc, win);
+  h.frames();
+  const first = JSON.parse(h.root.dataset.preparedReferenceObservation ?? '{}');
+  assert.equal(first.state, 'frame-opportunity');
+  assert.equal(first.canonicalRevision, 'bach-r1');
+  assert.equal(first.referenceHash, 'reference-h1');
+  observe!(root, doc, win);
+  h.root.dataset.preparedState = 'loading';
+  h.root.dataset.preparedCanonicalRevision = 'bach-r2'; // announced, not applied
+  h.frames();
+  assert.notEqual(JSON.parse(h.root.dataset.preparedReferenceObservation ?? '{}').state, 'frame-opportunity');
+  h.root.dataset.preparedState = 'ready';
+  observe!(root, doc, win);
+  h.root.dataset.preparedApply = '2'; // a later DOM swap invalidates a queued frame
+  h.frames();
+  assert.notEqual(JSON.parse(h.root.dataset.preparedReferenceObservation ?? '{}').state, 'frame-opportunity');
+});
 
 test('two frame opportunities acknowledge only the exact applied visible candidate, not server readiness', () => {
   const h = harness();
