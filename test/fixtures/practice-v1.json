@@ -1,0 +1,24 @@
+{
+  "contractVersion": 1,
+  "isoVersion": "0.1.0",
+  "cases": [
+    {
+      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 380, "guide": "two-guides" },
+      "selectionId": "scale:major:48",
+      "pitchesLinear": [48, 50, 52, 53, 55, 57, 59, 60, 59, 57, 55, 53, 52, 50, 48],
+      "rightFingers": "234123121321432",
+      "leftFingers": "432132141231234",
+      "physicalRows": "333244232442333",
+      "systemCount": 1
+    },
+    {
+      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 49, "width": 760, "height": 380, "guide": "none" },
+      "selectionId": "scale:major:49",
+      "pitchesLinear": [49, 51, 53, 54, 56, 58, 60, 61, 60, 58, 56, 54, 53, 51, 49],
+      "rightFingers": "234123121321432",
+      "leftFingers": "432132141231234",
+      "physicalRows": "222133121331222",
+      "systemCount": 1
+    }
+  ]
+}
