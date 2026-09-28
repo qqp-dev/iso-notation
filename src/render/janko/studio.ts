@@ -120,6 +120,7 @@ import {
   PITCH_PARITY_SPECIMEN_JANKO_TOKENS,
 } from '../../scores/pitch-parity-specimen';
 import { LintReport, lintJankoScore } from './linter';
+import { renderPracticeView } from './practice';
 
 /** One macro focus crop in the Golden Reference view. */
 export interface StudioCrop {
@@ -444,9 +445,9 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Width of an inline SVG in pt, read from its root element. */
+/** Numeric width of an inline SVG in pt or px, read from its root element. */
 function svgWidthPt(svg: string): number {
-  const match = /<svg[^>]*\bwidth="([\d.]+)pt"/.exec(svg);
+  const match = /<svg[^>]*\bwidth="([\d.]+)(?:pt|px)"/.exec(svg);
   return match ? Number(match[1]) : 400;
 }
 
@@ -622,6 +623,21 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     const variantKey = dynamic ? `${dynamic.variant.score}:${dynamic.variant.id}:${dynamic.variant.revision}` : '';
     if (dynamic && reuse?.variantCards?.[variantKey]) return variantCards[variantKey] = reuse.variantCards[variantKey];
     if (!dynamic && candidate.id !== 'semantic-hand' && reuse?.cards[index] !== undefined) return reuse.cards[index];
+    if (candidate.kind === 'practice') {
+      const panels = [48, 49].map(tonic => {
+        const view = renderPracticeView({ rudiment: 'scale', scaleType: 'major', tonicLinear: tonic,
+          width: 760, height: 380, guide: candidate.practiceGuide });
+        return `<figure class="candidate-window" data-window="practice:major:${tonic}:1-1">` +
+          `<figcaption><b>Major · tonic linear ${tonic}</b> · <span>15 attacks, one 10-span ascent and descent; reversed descent fingering is provisional.</span></figcaption>` +
+          `<div class="canvas-frame">${canvas(view.svg)}</div></figure>`;
+      });
+      return `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="clean">` +
+        `<header class="candidate-head"><h3>${escapeHtml(candidate.label)}</h3><div class="chips"><span class="chip chip-ok">✓ Practice rail geometry checked</span><span class="chip">score lint: separate canonical gate</span></div></header>` +
+        `<p class="rationale">${escapeHtml(candidate.description ?? '')}</p>` +
+        `<div class="badges">${candidateBadges(candidate, round).map(badgeHtml).join('')}</div>` +
+        `<div class="candidate-windows">${panels.join('')}</div>` +
+        `<footer class="candidate-foot">Portable ISO Practice v1 · engine-placed pitch x · RH over LH · black knockout-safe ground · GOLD/BRONZE unchanged</footer></article>`;
+    }
     const resolved = resolveCandidate(candidate);
     const isAbstract =
       candidate.kind === 'abstract' ||

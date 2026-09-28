@@ -276,7 +276,9 @@ export interface JankoCandidate {
   /** One-line designer rationale. */
   description?: string;
   /** Candidate kind: score candidate (default) or abstract geometry candidate. */
-  kind?: 'score' | 'abstract';
+  kind?: 'score' | 'abstract' | 'practice';
+  /** Only the guide treatment changes in a Practice candidate. */
+  practiceGuide?: 'two-guides' | 'none';
   /** Abstract geometry arrangement (for abstract candidates). */
   abstractGeometry?: AbstractGeometryId;
   /**
@@ -1198,10 +1200,10 @@ export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
 };
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 53,
-  title: 'Direct active SCORE · optional whole-score variants',
-  description: 'There is no pending before/after promotion. Approved guarded edits update the score directly; open Candidates only when a parallel full-score reading is deliberately requested.',
-  openAxes: [],
+  round: 54,
+  title: 'Practice · two independent hand rails above one pitch staff',
+  description: 'Compare two faint mid-row guides per hand against no continuous guides on identical major-scale data. RH above LH; row 1 nearest, row 4 farthest. Descent reverses the supplied finger and row arrays without repeating the apex: provisional for visual judgment, not an approved fingering.',
+  openAxes: ['practiceGuide'],
 };
 
 function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
@@ -1234,8 +1236,17 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
   },
 ];
 
-/** No mandatory comparison round after the PR114 judgment. */
-export const CURRENT_CANDIDATES: JankoCandidate[] = [];
+/** Practice candidates render the portable renderer itself; score References remain canonical. */
+export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  { id: 'practice-two-guides', kind: 'practice', practiceGuide: 'two-guides',
+    label: 'A · Two faint guides per hand', description: 'Two quiet mid-row rules in each rail, with four discrete physical-row heights per hand.',
+    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 1, title: `Tonic ${tonic}` })),
+    tags: ['Practice', 'major', 'provisional descent'] },
+  { id: 'practice-no-guides', kind: 'practice', practiceGuide: 'none',
+    label: 'B · No continuous guides', description: 'The same finger digits at the same heights, without the continuous rules.',
+    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 1, title: `Tonic ${tonic}` })),
+    tags: ['Practice', 'major', 'provisional descent'] },
+];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
  * not a change to the current exploratory round or Reference. */
@@ -1256,6 +1267,7 @@ export function candidateBadges(
   candidate: JankoCandidate,
   round: JankoCandidateRound = CURRENT_ROUND_METADATA
 ): CandidateOptionBadge[] {
+  if (candidate.kind === 'practice') return [{ key: 'practiceGuide', value: candidate.practiceGuide ?? 'two-guides', golden: 'n/a', axis: true }];
   if (candidate.kind === 'abstract' || candidate.abstractGeometry) {
     const geomId = candidate.abstractGeometry!;
     const spec = ABSTRACT_GEOMETRY_SPECS[geomId];
