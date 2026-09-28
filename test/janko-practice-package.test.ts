@@ -26,7 +26,7 @@ function packageBuild() {
 }
 
 test('actual offline IIFE package: deterministic build, complete local materials and source-equivalent output', () => {
-  assert.ok(!existsSync(join(root, 'dist/practice-v1')), 'personal bundle must not enter Pages dist');
+  assert.ok(!existsSync(join(root, 'dist/practice-v1')), 'Practice build must not enter Pages dist');
   const first = packageBuild();
   const firstManifest = readFileSync(join(dir, 'manifest.json'));
   const second = packageBuild();
@@ -38,8 +38,12 @@ test('actual offline IIFE package: deterministic build, complete local materials
     'iso-practice.js', 'notices/URW-COPYING', 'notices/URW-LICENSE', 'notices/URW-provenance.md',
   ].sort());
   assert.deepEqual(readFileSync(join(dir, 'fixtures/practice-v1.json')), readFileSync(join(root, 'test/fixtures/practice-v1.json')));
-  assert.match(second.intendedUse, /personal\/offline/);
-  assert.match(second.externalRedistribution, /not cleared/);
+  assert.ok(!('intendedUse' in second) && !('externalRedistribution' in second), 'no invented use gate');
+  for (const file of ['contract.md', 'handoff.md', 'notices/URW-provenance.md']) {
+    const text = readFileSync(join(dir, file), 'utf8');
+    assert.doesNotMatch(text, /personal.use only|external redistribution (?:is )?not cleared|licensing review is required/i, file);
+  }
+  assert.match(readFileSync(join(dir, 'notices/URW-provenance.md'), 'utf8'), /c15105598aa7eb256b1ebfcecd3d078801521e73\.tar\.gz/);
   assert.equal(second.contractVersion, fixture.contractVersion);
   assert.equal(second.isoVersion, fixture.isoVersion);
   assert.equal(second.files['fonts/URWGothic-Demi.otf'], '5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae');

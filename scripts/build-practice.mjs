@@ -35,11 +35,9 @@ const fixture = JSON.parse(await readFile(join(out, 'fixtures/practice-v1.json')
 const buildId = hash(Buffer.from(JSON.stringify({ entries, sources })));
 const manifest = { package: 'iso-practice', contractVersion: fixture.contractVersion,
   isoVersion: fixture.isoVersion, buildId: `sha256:${buildId}`,
-  entrypoint: 'iso-practice.js', global: 'IsoPractice', files: entries, sources,
-  intendedUse: 'operator personal/offline integration only',
-  externalRedistribution: 'not cleared; see notices/URW-provenance.md' };
+  entrypoint: 'iso-practice.js', global: 'IsoPractice', files: entries, sources };
 await writeFile(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 const actual = (await readdir(out)).sort();
 if (actual.join(',') !== ['contract.md', 'fixtures', 'fonts', 'handoff.md', 'iso-practice.js', 'manifest.json', 'notices'].sort().join(','))
   throw new Error(`Unexpected Practice output: ${actual}`);
-console.log(`Practice package ${out} ${manifest.buildId} (personal use; external distribution not cleared)`);
+console.log(`Practice package ${out} ${manifest.buildId}`);
