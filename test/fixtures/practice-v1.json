@@ -1,36 +1,131 @@
 {
   "contractVersion": 1,
-  "isoVersion": "0.1.2",
+  "isoVersion": "0.1.3",
   "durationTicks": 12,
   "ticksPerBeat": 48,
   "ticksPerMeasure": 96,
-  "onsetTicks": [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144, 156, 168],
-  "beamGroupSizes": [4, 4, 4, 3],
-  "beamLevels": [1, 2],
-  "measureAttackCounts": [8, 7],
+  "onsetTicks": [
+    0,
+    12,
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+    156,
+    168
+  ],
+  "beamGroupSizes": [
+    4,
+    4,
+    4,
+    3
+  ],
+  "beamLevels": [
+    1,
+    2
+  ],
+  "measureAttackCounts": [
+    8,
+    7
+  ],
   "cases": [
     {
-      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 380, "guide": "two-guides" },
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "major",
+        "tonicLinear": 48,
+        "width": 760,
+        "height": 380,
+        "guide": "two-guides"
+      },
       "selectionId": "scale:major:48",
-      "pitchesLinear": [48, 50, 52, 53, 55, 57, 59, 60, 59, 57, 55, 53, 52, 50, 48],
+      "pitchesLinear": [
+        48,
+        50,
+        52,
+        53,
+        55,
+        57,
+        59,
+        60,
+        59,
+        57,
+        55,
+        53,
+        52,
+        50,
+        48
+      ],
       "rightFingers": "234123121321432",
       "leftFingers": "432132141231234",
       "physicalRows": "333244232442333",
       "systemCount": 1
     },
     {
-      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 49, "width": 760, "height": 380, "guide": "none" },
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "major",
+        "tonicLinear": 49,
+        "width": 760,
+        "height": 380,
+        "guide": "none"
+      },
       "selectionId": "scale:major:49",
-      "pitchesLinear": [49, 51, 53, 54, 56, 58, 60, 61, 60, 58, 56, 54, 53, 51, 49],
+      "pitchesLinear": [
+        49,
+        51,
+        53,
+        54,
+        56,
+        58,
+        60,
+        61,
+        60,
+        58,
+        56,
+        54,
+        53,
+        51,
+        49
+      ],
       "rightFingers": "234123121321432",
       "leftFingers": "432132141231234",
       "physicalRows": "222133121331222",
       "systemCount": 1
     },
     {
-      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 36, "width": 760, "height": 900 },
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "major",
+        "tonicLinear": 36,
+        "width": 760,
+        "height": 900
+      },
       "selectionId": "scale:major:36",
-      "pitchesLinear": [36, 38, 40, 41, 43, 45, 47, 48, 47, 45, 43, 41, 40, 38, 36],
+      "pitchesLinear": [
+        36,
+        38,
+        40,
+        41,
+        43,
+        45,
+        47,
+        48,
+        47,
+        45,
+        43,
+        41,
+        40,
+        38,
+        36
+      ],
       "rightFingers": "234123121321432",
       "leftFingers": "432132141231234",
       "physicalRows": "333244232442333",
@@ -38,25 +133,255 @@
       "systemCount": 1
     },
     {
-      "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 60, "width": 760, "height": 900 },
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "major",
+        "tonicLinear": 60,
+        "width": 760,
+        "height": 900
+      },
       "selectionId": "scale:major:60",
-      "pitchesLinear": [60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60],
+      "pitchesLinear": [
+        60,
+        62,
+        64,
+        65,
+        67,
+        69,
+        71,
+        72,
+        71,
+        69,
+        67,
+        65,
+        64,
+        62,
+        60
+      ],
       "rightFingers": "234123121321432",
       "leftFingers": "432132141231234",
       "physicalRows": "333244232442333",
       "guide": "two-guides",
       "systemCount": 1
+    },
+    {
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "natural-minor",
+        "tonicLinear": 48,
+        "width": 760,
+        "height": 380,
+        "guide": "two-guides"
+      },
+      "selectionId": "scale:natural-minor:48",
+      "pitchesLinear": [
+        48,
+        50,
+        51,
+        53,
+        55,
+        56,
+        58,
+        60,
+        58,
+        56,
+        55,
+        53,
+        51,
+        50,
+        48
+      ],
+      "rightFingers": "312341232143213",
+      "leftFingers": "214321323123412",
+      "physicalRows": "312221333122213",
+      "systemCount": 1
+    },
+    {
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "natural-minor",
+        "tonicLinear": 49,
+        "width": 760,
+        "height": 380,
+        "guide": "two-guides"
+      },
+      "selectionId": "scale:natural-minor:49",
+      "pitchesLinear": [
+        49,
+        51,
+        52,
+        54,
+        56,
+        57,
+        59,
+        61,
+        59,
+        57,
+        56,
+        54,
+        52,
+        51,
+        49
+      ],
+      "rightFingers": "312341232143213",
+      "leftFingers": "214321323123412",
+      "physicalRows": "423332444233324",
+      "systemCount": 1
+    },
+    {
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "natural-minor",
+        "tonicLinear": 36,
+        "width": 760,
+        "height": 900,
+        "guide": "two-guides"
+      },
+      "selectionId": "scale:natural-minor:36",
+      "pitchesLinear": [
+        36,
+        38,
+        39,
+        41,
+        43,
+        44,
+        46,
+        48,
+        46,
+        44,
+        43,
+        41,
+        39,
+        38,
+        36
+      ],
+      "rightFingers": "312341232143213",
+      "leftFingers": "214321323123412",
+      "physicalRows": "312221333122213",
+      "systemCount": 1
+    },
+    {
+      "request": {
+        "rudiment": "scale",
+        "scaleType": "natural-minor",
+        "tonicLinear": 60,
+        "width": 760,
+        "height": 900,
+        "guide": "two-guides"
+      },
+      "selectionId": "scale:natural-minor:60",
+      "pitchesLinear": [
+        60,
+        62,
+        63,
+        65,
+        67,
+        68,
+        70,
+        72,
+        70,
+        68,
+        67,
+        65,
+        63,
+        62,
+        60
+      ],
+      "rightFingers": "312341232143213",
+      "leftFingers": "214321323123412",
+      "physicalRows": "312221333122213",
+      "systemCount": 1
     }
   ],
   "invalidRequests": [
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 35, "width": 760, "height": 380 },
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 61, "width": 760, "height": 380 },
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 559, "height": 380 },
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 359 },
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 1601, "height": 380 },
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 901 },
-    { "rudiment": "scale", "scaleType": "minor", "tonicLinear": 48, "width": 760, "height": 380 },
-    { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 380, "guide": "unknown" }
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 35,
+      "width": 760,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 61,
+      "width": 760,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 48,
+      "width": 559,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 359
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 48,
+      "width": 1601,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 901
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "minor",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "major",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 380,
+      "guide": "unknown"
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "harmonic-minor",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "melodic-minor",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 380
+    },
+    {
+      "rudiment": "scale",
+      "scaleType": "jazz-minor",
+      "tonicLinear": 48,
+      "width": 760,
+      "height": 380
+    }
   ],
-  "invalidError": "RangeError"
+  "invalidError": "RangeError",
+  "supportedScales": [
+    {
+      "id": "major",
+      "label": "Major"
+    },
+    {
+      "id": "natural-minor",
+      "label": "Natural minor (N26)"
+    }
+  ]
 }
