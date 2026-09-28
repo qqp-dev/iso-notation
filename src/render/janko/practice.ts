@@ -1,4 +1,4 @@
-/** ISO Practice v1: display-only major scale, engraved by the score engine.
+/** ISO Practice v1: display-only major and natural-minor scales, engraved by the score engine.
  * No studio, DOM, filesystem, or desktop dependency. */
 import { fromLinearIndex, wholeToneParity } from '../../model/pitch';
 import { QuantizedGridScore } from '../../model/types';
@@ -7,12 +7,18 @@ import { renderJankoStyleDefs } from './elements/style';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from './types';
 import { PRACTICE_GOTHIC_DATA } from './practice-font';
 
-export const ISO_PRACTICE_VERSION = '0.1.2';
+export const ISO_PRACTICE_VERSION = '0.1.3';
 export const PRACTICE_CONTRACT_VERSION = 1;
+/** Stable ids for the two supported techniques; other minor variants are deferred. */
+export const SUPPORTED_PRACTICE_SCALES = [
+  { id: 'major', label: 'Major' },
+  { id: 'natural-minor', label: 'Natural minor (N26)' },
+] as const;
+export type PracticeScaleType = typeof SUPPORTED_PRACTICE_SCALES[number]['id'];
 export type PracticeGuide = 'two-guides' | 'none';
 export interface PracticeRequest {
   rudiment: 'scale';
-  scaleType: 'major';
+  scaleType: PracticeScaleType;
   /** C4 = 48; one unit = one 1-span. Supported tonic interval: 36..60. */
   tonicLinear: number;
   /** Available viewport in CSS px; output uses these numbers as SVG user coordinates. */
@@ -41,11 +47,16 @@ export interface PracticeView {
   railClearance: number;
 }
 
-const STEPS = [0, 2, 4, 5, 7, 9, 11, 12] as const;
-const RH = '23412312';
-const LH = '43213214';
-const EVEN_ROWS = '33324423';
-const ODD_ROWS = '22213312';
+const SCALES = {
+  major: { steps: [0, 2, 4, 5, 7, 9, 11, 12], RH: '23412312', LH: '43213214',
+    evenRows: '33324423', oddRows: '22213312' },
+  'natural-minor': {
+    // N26: 2,1,2,2,1,2,2 in 1-spans. R0/R1/R2 contour 2,0,1,1,1,0,2,2.
+    // Rows are physical 1..4, not R0..R2: +1 for even tonic, +2 for odd.
+    steps: [0, 2, 3, 5, 7, 8, 10, 12], RH: '31234123', LH: '21432132',
+    relativeRows: [2, 0, 1, 1, 1, 0, 2, 2],
+  },
+} as const;
 // The 7pt sans-serif fingers occupy ~9.33 SVG px; seat and guide intervals
 // need to be measured against CSS px, not mistaken for 7 viewBox units.
 const ROW_STEP = 15;
@@ -74,7 +85,8 @@ function nightInk(svg: string): string {
 }
 
 function requestValid(input: PracticeRequest): void {
-  if (input?.rudiment !== 'scale' || input.scaleType !== 'major') throw new RangeError('Practice v1 supports only scale / major');
+  if (input?.rudiment !== 'scale' || !Object.prototype.hasOwnProperty.call(SCALES, input.scaleType))
+    throw new RangeError('Unsupported Practice scale');
   if (!Number.isInteger(input.tonicLinear) || input.tonicLinear < 36 || input.tonicLinear > 60)
     throw new RangeError('tonicLinear must be an integer from 36 to 60');
   if (!Number.isFinite(input.width) || input.width < 560 || input.width > 1600 ||
@@ -84,25 +96,32 @@ function requestValid(input: PracticeRequest): void {
     throw new RangeError('Unknown Practice guide treatment');
 }
 
-/** The same two-hand score feeds both candidates. Descent omits a repeated apex;
- * the supplied fingers/rows for ascent indices 6..0 are reversed provisionally. */
-export function resolvePracticeScale(tonicLinear: number): { score: QuantizedGridScore; fingers: { RH: number; LH: number; row: number }[] } {
+/** Descent reverses ascent degrees 7..1 exactly, with one apex (15 attacks).
+ * Omitting scaleType preserves existing default-major callers. */
+export function resolvePracticeScale(tonicLinear: number, scaleType: PracticeScaleType = 'major'): { score: QuantizedGridScore; fingers: { RH: number; LH: number; row: number }[] } {
   if (!Number.isInteger(tonicLinear) || tonicLinear < 36 || tonicLinear > 60) throw new RangeError('Unsupported tonic');
-  const rows = wholeToneParity(tonicLinear) === 0 ? EVEN_ROWS : ODD_ROWS;
-  const order = [...STEPS.keys(), ...[6, 5, 4, 3, 2, 1, 0]];
+  if (!Object.prototype.hasOwnProperty.call(SCALES, scaleType)) throw new RangeError('Unsupported Practice scale');
+  const definition = SCALES[scaleType];
+  const rows = scaleType === 'major'
+    ? (wholeToneParity(tonicLinear) === 0 ? SCALES.major.evenRows : SCALES.major.oddRows).split('').map(Number)
+    : SCALES['natural-minor'].relativeRows.map(row => row + (wholeToneParity(tonicLinear) === 0 ? 1 : 2));
+  const order = [...definition.steps.keys(), ...[6, 5, 4, 3, 2, 1, 0]];
   const fingers = order.map(i => {
-    const row = Number(rows[i]);
-    const pitch = tonicLinear + STEPS[i];
+    const row = rows[i];
+    const pitch = tonicLinear + definition.steps[i];
     // Physical four-row keyboard: odd pitches occupy rows 2/4; evens 1/3.
-    if (row < 1 || row > 4 || (row % 2 !== 1 - wholeToneParity(pitch)))
-      throw new Error(`Illegal physical row ${row} at ${pitch}`);
-    return { RH: Number(RH[i]), LH: Number(LH[i]), row };
+    // Check both hands, even though the octave drop preserves their parity.
+    for (const handPitch of [pitch, pitch - 12]) {
+      if (row < 1 || row > 4 || (row % 2 !== 1 - wholeToneParity(handPitch)))
+        throw new Error(`Illegal physical row ${row} at ${handPitch}`);
+    }
+    return { RH: Number(definition.RH[i]), LH: Number(definition.LH[i]), row };
   });
   const score: QuantizedGridScore = {
-    id: `practice-major-${tonicLinear}`, title: '', composer: '', ticksPerBeat: 48,
+    id: `practice-${scaleType}-${tonicLinear}`, title: '', composer: '', ticksPerBeat: 48,
     totalTicks: 15 * 12, timeSignatures: [], barlines: [], tempos: [], dynamics: [], pedals: [],
     notes: order.flatMap((i, index) => (['RH', 'LH'] as const).map(hand => ({
-      id: `practice-${hand}-${index}`, pitch: fromLinearIndex(tonicLinear + STEPS[i] - (hand === 'LH' ? 12 : 0)),
+      id: `practice-${hand}-${index}`, pitch: fromLinearIndex(tonicLinear + definition.steps[i] - (hand === 'LH' ? 12 : 0)),
       startTick: index * 12, durationTicks: 12, hand,
     }))),
   };
@@ -113,7 +132,8 @@ export function resolvePracticeScale(tonicLinear: number): { score: QuantizedGri
 export function renderPracticeView(input: PracticeRequest): PracticeView {
   requestValid(input);
   const guide = input.guide ?? 'two-guides';
-  const { score, fingers } = resolvePracticeScale(input.tonicLinear);
+  const { score, fingers } = resolvePracticeScale(input.tonicLinear, input.scaleType);
+  const steps = SCALES[input.scaleType].steps;
   const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS,
     pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 2, systemsPerPage: 1,
     pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 90, pageMarginBottom: 0,
@@ -142,7 +162,7 @@ export function renderPracticeView(input: PracticeRequest): PracticeView {
     const rh = positioned.get(`practice-RH-${index}`);
     const lh = positioned.get(`practice-LH-${index}`);
     if (!rh || !lh || Math.abs(rh.x - lh.x) > 1e-6) throw new Error(`Unaligned engine hand notes ${index}`);
-    const pitchLinear = input.tonicLinear + STEPS[index <= 7 ? index : 14 - index];
+    const pitchLinear = input.tonicLinear + steps[index <= 7 ? index : 14 - index];
     const y = (bottom: number) => bottom - (row - 1) * ROW_STEP;
     return { index, pitchLinear, tick: index * 12, x: rh.x,
       hands: { RH: { finger: RH, row, y: y(bottomRH), pitchLinear },
@@ -172,10 +192,10 @@ export function renderPracticeView(input: PracticeRequest): PracticeView {
     attacks.map(attack => `<text data-attack="${attack.index}" data-row="${attack.hands[hand].row}" x="${fmt(attack.x)}" y="${fmt(attack.hands[hand].y + 3)}" text-anchor="middle" fill="#F4C88D" font-family="sans-serif" font-size="7pt" font-weight="600">${attack.hands[hand].finger}</text>`).join('') + '</g>';
   const engine = nightInk(renderSystem(score, layout.geometry, 0, options, tokens, layout));
   const styles = nightInk(renderJankoStyleDefs(tokens));
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${input.width}px" height="${input.height}px" viewBox="0 0 ${input.width} ${input.height}" data-practice-version="${PRACTICE_CONTRACT_VERSION}" data-selection="scale:major:${input.tonicLinear}">` +
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${input.width}px" height="${input.height}px" viewBox="0 0 ${input.width} ${input.height}" data-practice-version="${PRACTICE_CONTRACT_VERSION}" data-selection="scale:${input.scaleType}:${input.tonicLinear}">` +
     `<defs><style>@font-face{font-family:"URW Gothic";src:url(data:font/otf;base64,${PRACTICE_GOTHIC_DATA}) format("opentype");font-weight:700}</style></defs>` +
     styles + `<rect width="100%" height="100%" fill="#000000"/>` + engine +
     `<g class="practice-rails">${guides}${rail('RH', bottomRH)}${rail('LH', bottomLH)}</g></svg>`;
-  return { svg, selectionId: `scale:major:${input.tonicLinear}`, isoVersion: ISO_PRACTICE_VERSION,
+  return { svg, selectionId: `scale:${input.scaleType}:${input.tonicLinear}`, isoVersion: ISO_PRACTICE_VERSION,
     contractVersion: PRACTICE_CONTRACT_VERSION, guide, attacks, systemCount: 1, railClearance };
 }

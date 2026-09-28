@@ -277,7 +277,8 @@ export interface JankoCandidate {
   description?: string;
   /** Candidate kind: score candidate (default) or abstract geometry candidate. */
   kind?: 'score' | 'abstract' | 'practice';
-  /** Only the guide treatment changes in a Practice candidate. */
+  /** Practice scale selection and guide treatment (same portable renderer). */
+  practiceScaleType?: 'major' | 'natural-minor';
   practiceGuide?: 'two-guides' | 'none';
   /** Abstract geometry arrangement (for abstract candidates). */
   abstractGeometry?: AbstractGeometryId;
@@ -1201,9 +1202,9 @@ export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 54,
-  title: 'Practice · two-measure sixteenths above independent hand rails',
-  description: 'Fifteen simultaneous sixteenth attacks per hand across two measures, LH one 10-span below RH, beamed four at a time per hand (4/4/4/3). The selected two faint mid-row guides per hand remain beside the existing no-guide comparison. RH above LH; row 1 nearest, row 4 farthest. Descent reverses the supplied finger and row arrays without repeating the apex: provisional for visual judgment, not an approved fingering.',
-  openAxes: ['practiceGuide'],
+  title: 'Practice · major and natural minor N26',
+  description: 'Two real-engine scales with the selected two faint guides per hand: major and the operator-supplied natural minor N26. Fifteen simultaneous sixteenths per hand across two measures; LH one 10-span below RH, double-beamed 4/4/4/3. RH above LH, nearest physical row lowest. N26 descent exactly reverses its ascending cues without repeating the apex. Other minor candidates remain deferred.',
+  openAxes: ['practiceScaleType'],
 };
 
 function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
@@ -1238,14 +1239,14 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
 
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
-  { id: 'practice-two-guides', kind: 'practice', practiceGuide: 'two-guides',
-    label: 'A · Two faint guides per hand', description: 'Two quiet mid-row rules in each rail, with four discrete physical-row heights per hand.',
+  { id: 'practice-major', kind: 'practice', practiceScaleType: 'major', practiceGuide: 'two-guides',
+    label: 'A · Major', description: 'Existing major scale, two selected faint mid-row guides in each rail.',
     windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 2, title: `Tonic ${tonic} · mm. 1–2` })),
-    tags: ['Practice', 'major', 'provisional descent'] },
-  { id: 'practice-no-guides', kind: 'practice', practiceGuide: 'none',
-    label: 'B · No continuous guides', description: 'The same finger digits at the same heights, without the continuous rules.',
-    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 2, title: `Tonic ${tonic} · mm. 1–2` })),
-    tags: ['Practice', 'major', 'provisional descent'] },
+    tags: ['Practice', 'major'] },
+  { id: 'practice-natural-minor', kind: 'practice', practiceScaleType: 'natural-minor', practiceGuide: 'two-guides',
+    label: 'B · Natural minor N26', description: 'Operator-supplied N26 contour and both hands’ fingerings; exact reverse descent.',
+    windows: [48, 49].map(tonic => ({ scoreId: `practice:natural-minor:${tonic}`, measureStart: 1, measureCount: 2, title: `Tonic ${tonic} · mm. 1–2` })),
+    tags: ['Practice', 'natural minor', 'N26'] },
 ];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
@@ -1267,7 +1268,7 @@ export function candidateBadges(
   candidate: JankoCandidate,
   round: JankoCandidateRound = CURRENT_ROUND_METADATA
 ): CandidateOptionBadge[] {
-  if (candidate.kind === 'practice') return [{ key: 'practiceGuide', value: candidate.practiceGuide ?? 'two-guides', golden: 'n/a', axis: true }];
+  if (candidate.kind === 'practice') return [{ key: 'practiceScaleType', value: candidate.practiceScaleType ?? 'major', golden: 'n/a', axis: true }];
   if (candidate.kind === 'abstract' || candidate.abstractGeometry) {
     const geomId = candidate.abstractGeometry!;
     const spec = ABSTRACT_GEOMETRY_SPECS[geomId];

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { renderPracticeView, resolvePracticeScale } from '../src/render/janko/practice';
+import { renderPracticeView, resolvePracticeScale, SUPPORTED_PRACTICE_SCALES } from '../src/render/janko/practice';
+import { lintJankoScore } from '../src/render/janko/linter';
 import { layoutJankoScore } from '../src/render/janko/engine';
 import { placedBeamGroup } from '../src/render/janko/beam-scene';
 import { DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
@@ -33,6 +34,7 @@ test('versioned consumer fixtures match rendered data and stable selection ident
 });
 
 test('Practice major scale: exact data, both parity placements, provisional reverse and 1-span transposition', () => {
+  assert.deepEqual(resolvePracticeScale(48), resolvePracticeScale(48, 'major'), 'default-major caller remains compatible');
   for (const tonic of [48, 49]) {
     const { score, fingers } = resolvePracticeScale(tonic);
     assert.equal(score.notes.length, 30);
@@ -56,6 +58,81 @@ test('Practice major scale: exact data, both parity placements, provisional reve
     }
   }
 });
+
+test('N26 exact ascending source data, reverse descent, parity rows and both-hand real-engine layout', () => {
+  assert.deepEqual(SUPPORTED_PRACTICE_SCALES, [
+    { id: 'major', label: 'Major' }, { id: 'natural-minor', label: 'Natural minor (N26)' },
+  ]);
+  const offsets = [0, 2, 3, 5, 7, 8, 10, 12];
+  assert.deepEqual(offsets.slice(1).map((n, i) => n - offsets[i]), [2, 1, 2, 2, 1, 2, 2]);
+  const relative = [2, 0, 1, 1, 1, 0, 2, 2];
+  for (const tonic of [36, 48, 49, 60]) {
+    const { score, fingers } = resolvePracticeScale(tonic, 'natural-minor');
+    assert.equal(score.id, `practice-natural-minor-${tonic}`);
+    assert.equal(score.notes.length, 30);
+    assert.equal(score.totalTicks, 180);
+    assert.deepEqual(fingers.slice(0, 8).map(f => f.RH), [3, 1, 2, 3, 4, 1, 2, 3]);
+    assert.deepEqual(fingers.slice(0, 8).map(f => f.LH), [2, 1, 4, 3, 2, 1, 3, 2]);
+    assert.deepEqual(fingers.slice(0, 8).map(f => f.row), relative.map(n => n + (tonic % 2 ? 2 : 1)));
+    assert.equal(fingers.slice(0, 8).map(f => f.row).join(''), tonic % 2 ? '42333244' : '31222133');
+    assert.deepEqual(fingers.slice(8), fingers.slice(0, 7).reverse(), 'descending path exactly reverses');
+    assert.deepEqual([1, 5].map(i => fingers[i].RH), [1, 1]);
+    assert.deepEqual([1, 5].map(i => fingers[i].LH), [1, 1]);
+    assert.deepEqual([1, 5].map(i => fingers[i].row - (tonic % 2 ? 2 : 1)), [0, 0]);
+    for (const hand of ['RH', 'LH'] as const) {
+      const notes = score.notes.filter(n => n.hand === hand);
+      assert.deepEqual(notes.map(n => n.startTick), Array.from({ length: 15 }, (_, i) => 12 * i));
+      assert.ok(notes.every(n => n.durationTicks === 12));
+      assert.deepEqual(notes.map(n => n.pitch.octave * 12 + n.pitch.pitchClass),
+        [...offsets, ...offsets.slice(0, 7).reverse()].map(n => tonic + n - (hand === 'LH' ? 12 : 0)));
+      for (const [i, n] of notes.entries()) assert.equal(fingers[i].row % 2, 1 - (n.pitch.pitchClass % 2));
+    }
+  }
+  for (const tonic of [48, 49]) {
+    const request = { ...input, scaleType: 'natural-minor' as const, tonicLinear: tonic };
+    const view = renderPracticeView(request);
+    const { score } = resolvePracticeScale(tonic, 'natural-minor');
+    assert.equal(view.selectionId, `scale:natural-minor:${tonic}`);
+    assert.ok(view.svg.includes(`data-selection="scale:natural-minor:${tonic}"`));
+    assert.equal(view.systemCount, 1);
+    assert.equal(view.attacks.length, 15);
+    assert.ok(view.railClearance >= 20);
+    assert.equal((view.svg.match(/class="janko-digit"/g) ?? []).length, 30);
+    assert.equal((view.svg.match(/stroke="#384455" stroke-width="0.55"/g) ?? []).length, 4);
+    const laid = layoutJankoScore(score, practiceLayoutOptions(request), { ticksPerMeasure: 96 });
+    assert.equal(laid.length, 1);
+    assert.equal(laid[0].notes.length, 30);
+    for (const hand of ['RH', 'LH'] as const) {
+      const beams = laid[0].beams.filter(b => b.notes[0].hand === hand);
+      assert.deepEqual(beams.map(b => b.notes.length), [4, 4, 4, 3]);
+      assert.ok(beams.every(b => b.levels.map(l => l.level).join(',') === '1,2' && b.levels.every(l => !l.stub)));
+    }
+    for (const attack of view.attacks) {
+      const rh = laid[0].notes.find(n => n.note.id === `practice-RH-${attack.index}`)!;
+      const lh = laid[0].notes.find(n => n.note.id === `practice-LH-${attack.index}`)!;
+      assert.equal(attack.x, rh.x, `RH tonic ${tonic} attack ${attack.index}`);
+      assert.equal(attack.x, lh.x, `LH tonic ${tonic} attack ${attack.index}`);
+      assert.equal(lh.y - rh.y, 30);
+      assert.equal(attack.hands.RH.pitchLinear, rh.note.pitch.octave * 12 + rh.note.pitch.pitchClass);
+      assert.equal(attack.hands.LH.pitchLinear, lh.note.pitch.octave * 12 + lh.note.pitch.pitchClass);
+      assert.ok(attack.hands.RH.y < attack.hands.LH.y);
+    }
+    const report = lintJankoScore(score, practiceLayoutOptions(request), { ticksPerMeasure: 96 });
+    assert.equal(report.violations.length, 0, JSON.stringify(report.violations.slice(0, 3)));
+  }
+});
+
+function practiceLayoutOptions(request: { width: number; height: number }) {
+  return {
+    pageWidth: request.width, pageHeight: request.height, measuresPerSystem: 2, systemsPerPage: 1,
+    pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 90, pageMarginBottom: 0,
+    headerHeight: 0, footerHeight: 0, ticksPerMeasure: 96, ticksPerBeat: 48,
+    beamGroupTicks: 48, rhythmStyle: 'beamed' as const,
+    showMeasureNumbers: false, showTimeSignature: false, showHandLabels: false,
+    showOctaveLabels: false, showBeatGrid: false, showHonorHalo: false,
+    systemStartStyle: 'none' as const, inferBoundaryRests: false, lowPitchFolding: 'literal' as const,
+  };
+}
 
 test('portable complete SVG has real engine note columns, independent aligned rails and measured clearance', () => {
   const a = renderPracticeView(input);
@@ -148,17 +225,21 @@ test('invalid and unsupported requests are refused instead of silently clipped',
     { rudiment: 'chord' }, { scaleType: 'minor' }, { guide: 'unknown' },
   ]) assert.throws(() => renderPracticeView({ ...input, ...patch } as typeof input));
   assert.equal(renderPracticeView({ ...input, width: 560, height: 360 }).systemCount, 1);
+  assert.throws(() => resolvePracticeScale(48, 'harmonic-minor' as 'major'), RangeError);
+  for (const scaleType of ['major', 'natural-minor'] as const)
+    for (const tonicLinear of [36, 49, 60])
+      assert.equal(renderPracticeView({ ...input, scaleType, tonicLinear, width: 1600, height: 900 }).systemCount, 1);
 });
 
-test('studio two candidate cards use portable renderer and leave Reference unchanged', () => {
+test('studio major and N26 cards use portable renderer and leave Reference unchanged', () => {
   const config = createStudioConfig();
-  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.practiceGuide), ['two-guides', 'none']);
+  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.practiceScaleType), ['major', 'natural-minor']);
+  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.practiceGuide), ['two-guides', 'two-guides']);
   const html = renderCandidatesView(config);
   for (const candidate of CURRENT_CANDIDATES) {
     assert.ok(html.includes(`data-candidate="${candidate.id}"`));
-    assert.ok(html.includes('data-window="practice:major:48:1-2"'));
-    assert.ok(html.includes('data-window="practice:major:49:1-2"'));
-    assert.ok(html.includes(renderPracticeView({ ...input, guide: candidate.practiceGuide }).svg.replace('<svg ', '<svg class="janko-svg" ')));
+    for (const tonic of [48, 49]) assert.ok(html.includes(`data-window="practice:${candidate.practiceScaleType}:${tonic}:1-2"`));
+    assert.ok(html.includes(renderPracticeView({ ...input, scaleType: candidate.practiceScaleType!, guide: candidate.practiceGuide }).svg.replace('<svg ', '<svg class="janko-svg" ')));
   }
   assert.equal(renderReferenceView(config), renderReferenceView(createStudioConfig({ candidates: [] })));
 });

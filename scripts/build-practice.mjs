@@ -34,7 +34,7 @@ const sources = Object.fromEntries(await Promise.all([
 const fixture = JSON.parse(await readFile(join(out, 'fixtures/practice-v1.json'), 'utf8'));
 const buildId = hash(Buffer.from(JSON.stringify({ entries, sources })));
 const manifest = { package: 'iso-practice', contractVersion: fixture.contractVersion,
-  isoVersion: fixture.isoVersion, buildId: `sha256:${buildId}`,
+  isoVersion: fixture.isoVersion, supportedScales: fixture.supportedScales, buildId: `sha256:${buildId}`,
   entrypoint: 'iso-practice.js', global: 'IsoPractice', files: entries, sources };
 await writeFile(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 const actual = (await readdir(out)).sort();

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { renderPracticeView } from '../src/render/janko/practice';
+import { renderPracticeView, resolvePracticeScale } from '../src/render/janko/practice';
 
 const root = resolve(import.meta.dirname, '..');
 const dir = join(root, 'build/practice-v1');
@@ -46,6 +46,7 @@ test('actual offline IIFE package: deterministic build, complete local materials
   assert.match(readFileSync(join(dir, 'notices/URW-provenance.md'), 'utf8'), /c15105598aa7eb256b1ebfcecd3d078801521e73\.tar\.gz/);
   assert.equal(second.contractVersion, fixture.contractVersion);
   assert.equal(second.isoVersion, fixture.isoVersion);
+  assert.deepEqual(second.supportedScales, fixture.supportedScales);
   assert.equal(second.files['fonts/URWGothic-Demi.otf'], '5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae');
   const js = readFileSync(join(dir, second.entrypoint), 'utf8');
   assert.doesNotMatch(js, /\b(?:require\s*\(|import\s*\(|fetch\s*\()/);
@@ -55,6 +56,8 @@ test('actual offline IIFE package: deterministic build, complete local materials
   const api = context[second.global];
   assert.equal(api.PRACTICE_CONTRACT_VERSION, fixture.contractVersion);
   assert.equal(api.ISO_PRACTICE_VERSION, fixture.isoVersion);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.SUPPORTED_PRACTICE_SCALES)), fixture.supportedScales);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.resolvePracticeScale(48))), resolvePracticeScale(48));
   for (const entry of fixture.cases) {
     const actual = api.renderPracticeView(entry.request);
     assert.deepEqual(JSON.parse(JSON.stringify(actual)), renderPracticeView(entry.request));
@@ -73,6 +76,7 @@ test('actual offline IIFE package: deterministic build, complete local materials
     assert.ok(font);
     assert.equal(sha(Buffer.from(font[1], 'base64')), second.files['fonts/URWGothic-Demi.otf']);
   }
+  assert.throws(() => api.resolvePracticeScale(48, 'harmonic-minor'), (error: any) => error.name === 'RangeError');
   for (const input of fixture.invalidRequests) {
     assert.throws(() => api.renderPracticeView(input), (error: any) => error.name === fixture.invalidError);
   }
