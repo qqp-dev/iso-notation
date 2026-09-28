@@ -627,8 +627,8 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       const panels = [48, 49].map(tonic => {
         const view = renderPracticeView({ rudiment: 'scale', scaleType: 'major', tonicLinear: tonic,
           width: 760, height: 380, guide: candidate.practiceGuide });
-        return `<figure class="candidate-window" data-window="practice:major:${tonic}:1-1">` +
-          `<figcaption><b>Major · tonic linear ${tonic}</b> · <span>15 attacks, one 10-span ascent and descent; reversed descent fingering is provisional.</span></figcaption>` +
+        return `<figure class="candidate-window" data-window="practice:major:${tonic}:1-2">` +
+          `<figcaption><b>Major · tonic linear ${tonic}</b> · <span>15 simultaneous sixteenths per hand across mm. 1–2 (8 + 7), four-note double beams; LH one 10-span below RH, provisional reverse fingering.</span></figcaption>` +
           `<div class="canvas-frame">${canvas(view.svg)}</div></figure>`;
       });
       return `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="clean">` +

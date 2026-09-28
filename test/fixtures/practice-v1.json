@@ -1,11 +1,13 @@
 {
   "contractVersion": 1,
-  "isoVersion": "0.1.1",
-  "durationTicks": 24,
+  "isoVersion": "0.1.2",
+  "durationTicks": 12,
   "ticksPerBeat": 48,
   "ticksPerMeasure": 96,
-  "onsetTicks": [0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336],
+  "onsetTicks": [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144, 156, 168],
   "beamGroupSizes": [4, 4, 4, 3],
+  "beamLevels": [1, 2],
+  "measureAttackCounts": [8, 7],
   "cases": [
     {
       "request": { "rudiment": "scale", "scaleType": "major", "tonicLinear": 48, "width": 760, "height": 380, "guide": "two-guides" },

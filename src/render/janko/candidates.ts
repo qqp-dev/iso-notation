@@ -1201,8 +1201,8 @@ export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 54,
-  title: 'Practice · two independent hand rails above one pitch staff',
-  description: 'Compare two faint mid-row guides per hand against no continuous guides on identical major-scale data. RH above LH; row 1 nearest, row 4 farthest. Descent reverses the supplied finger and row arrays without repeating the apex: provisional for visual judgment, not an approved fingering.',
+  title: 'Practice · two-measure sixteenths above independent hand rails',
+  description: 'Fifteen simultaneous sixteenth attacks per hand across two measures, LH one 10-span below RH, beamed four at a time per hand (4/4/4/3). The selected two faint mid-row guides per hand remain beside the existing no-guide comparison. RH above LH; row 1 nearest, row 4 farthest. Descent reverses the supplied finger and row arrays without repeating the apex: provisional for visual judgment, not an approved fingering.',
   openAxes: ['practiceGuide'],
 };
 
@@ -1240,11 +1240,11 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   { id: 'practice-two-guides', kind: 'practice', practiceGuide: 'two-guides',
     label: 'A · Two faint guides per hand', description: 'Two quiet mid-row rules in each rail, with four discrete physical-row heights per hand.',
-    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 1, title: `Tonic ${tonic}` })),
+    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 2, title: `Tonic ${tonic} · mm. 1–2` })),
     tags: ['Practice', 'major', 'provisional descent'] },
   { id: 'practice-no-guides', kind: 'practice', practiceGuide: 'none',
     label: 'B · No continuous guides', description: 'The same finger digits at the same heights, without the continuous rules.',
-    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 1, title: `Tonic ${tonic}` })),
+    windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 2, title: `Tonic ${tonic} · mm. 1–2` })),
     tags: ['Practice', 'major', 'provisional descent'] },
 ];
 

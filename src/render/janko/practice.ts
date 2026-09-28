@@ -7,7 +7,7 @@ import { renderJankoStyleDefs } from './elements/style';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from './types';
 import { PRACTICE_GOTHIC_DATA } from './practice-font';
 
-export const ISO_PRACTICE_VERSION = '0.1.1';
+export const ISO_PRACTICE_VERSION = '0.1.2';
 export const PRACTICE_CONTRACT_VERSION = 1;
 export type PracticeGuide = 'two-guides' | 'none';
 export interface PracticeRequest {
@@ -22,10 +22,11 @@ export interface PracticeRequest {
 }
 export interface PracticeAttack {
   index: number;
+  /** RH pitch retained for contract-1 consumers. */
   pitchLinear: number;
   tick: number;
   x: number;
-  hands: { RH: { finger: number; row: number; y: number }; LH: { finger: number; row: number; y: number } };
+  hands: { RH: { finger: number; row: number; y: number; pitchLinear: number }; LH: { finger: number; row: number; y: number; pitchLinear: number } };
 }
 export interface PracticeView {
   svg: string;
@@ -83,7 +84,7 @@ function requestValid(input: PracticeRequest): void {
     throw new RangeError('Unknown Practice guide treatment');
 }
 
-/** The same one-note score feeds both candidates. Descent omits a repeated apex;
+/** The same two-hand score feeds both candidates. Descent omits a repeated apex;
  * the supplied fingers/rows for ascent indices 6..0 are reversed provisionally. */
 export function resolvePracticeScale(tonicLinear: number): { score: QuantizedGridScore; fingers: { RH: number; LH: number; row: number }[] } {
   if (!Number.isInteger(tonicLinear) || tonicLinear < 36 || tonicLinear > 60) throw new RangeError('Unsupported tonic');
@@ -99,11 +100,11 @@ export function resolvePracticeScale(tonicLinear: number): { score: QuantizedGri
   });
   const score: QuantizedGridScore = {
     id: `practice-major-${tonicLinear}`, title: '', composer: '', ticksPerBeat: 48,
-    totalTicks: 15 * 24, timeSignatures: [], barlines: [], tempos: [], dynamics: [], pedals: [],
-    notes: order.map((i, index) => ({
-      id: `practice-${index}`, pitch: fromLinearIndex(tonicLinear + STEPS[i]),
-      startTick: index * 24, durationTicks: 24, hand: 'RH' as const,
-    })),
+    totalTicks: 15 * 12, timeSignatures: [], barlines: [], tempos: [], dynamics: [], pedals: [],
+    notes: order.flatMap((i, index) => (['RH', 'LH'] as const).map(hand => ({
+      id: `practice-${hand}-${index}`, pitch: fromLinearIndex(tonicLinear + STEPS[i] - (hand === 'LH' ? 12 : 0)),
+      startTick: index * 12, durationTicks: 12, hand,
+    }))),
   };
   return { score, fingers };
 }
@@ -114,10 +115,10 @@ export function renderPracticeView(input: PracticeRequest): PracticeView {
   const guide = input.guide ?? 'two-guides';
   const { score, fingers } = resolvePracticeScale(input.tonicLinear);
   const options = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS,
-    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 4, systemsPerPage: 1,
+    pageWidth: input.width, pageHeight: input.height, measuresPerSystem: 2, systemsPerPage: 1,
     pageMargin: 24, pageMarginLeft: 28, pageMarginRight: 24, pageMarginTop: 90, pageMarginBottom: 0,
     headerHeight: 0, footerHeight: 0, ticksPerMeasure: 96, ticksPerBeat: 48,
-    beamGroupTicks: 96, rhythmStyle: 'beamed',
+    beamGroupTicks: 48, rhythmStyle: 'beamed',
     showMeasureNumbers: false, showTimeSignature: false, showHandLabels: false,
     showOctaveLabels: false, showBeatGrid: false, showHonorHalo: false,
     systemStartStyle: 'none', inferBoundaryRests: false,
@@ -126,26 +127,29 @@ export function renderPracticeView(input: PracticeRequest): PracticeView {
   });
   const tokens = resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 96 });
   const layouts = layoutJankoScore(score, options, tokens);
-  if (layouts.length !== 1 || layouts[0].notes.length !== 15) throw new Error('Practice scale does not fit one system');
+  if (layouts.length !== 1 || layouts[0].notes.length !== 30) throw new Error('Practice scale does not fit one system');
   const layout = layouts[0];
   const bottomLH = layout.geometry.staffTopY - 50;
   const bottomRH = bottomLH - 54;
   const topRH = bottomRH - 3 * ROW_STEP;
   if (topRH - FINGER_ASCENT < 0) throw new RangeError('Practice rails cannot fit above pitch staff');
-  if (layout.beams.length !== 4 || layout.beams.some((b, i) => b.notes.length !== (i === 3 ? 3 : 4)))
-    throw new Error(`Practice eighths must form real four-note engine beams (last group: three): ${layout.beams.map(b => b.notes.map(n => n.startTick).join(',')).join(';')}`);
+  if (layout.beams.length !== 8 || layout.beams.some(b =>
+    b.notes.length !== (b.notes[0].startTick === 144 ? 3 : 4) || b.levels.length !== 2 ||
+    b.levels[0].level !== 1 || b.levels[1].level !== 2 || b.levels[1].stub))
+    throw new Error(`Practice sixteenths must form two-level four-note engine beams (last group: three): ${layout.beams.map(b => b.notes.map(n => n.startTick).join(',')).join(';')}`);
   const positioned = new Map(layout.notes.map(n => [n.note.id, n]));
-  const attacks: PracticeAttack[] = score.notes.map((note, index) => {
-    const placed = positioned.get(note.id);
-    if (!placed) throw new Error(`Missing engine note ${note.id}`);
-    const { row, RH, LH } = fingers[index];
+  const attacks: PracticeAttack[] = fingers.map(({ row, RH, LH }, index) => {
+    const rh = positioned.get(`practice-RH-${index}`);
+    const lh = positioned.get(`practice-LH-${index}`);
+    if (!rh || !lh || Math.abs(rh.x - lh.x) > 1e-6) throw new Error(`Unaligned engine hand notes ${index}`);
+    const pitchLinear = input.tonicLinear + STEPS[index <= 7 ? index : 14 - index];
     const y = (bottom: number) => bottom - (row - 1) * ROW_STEP;
-    return { index, pitchLinear: note.pitch.octave * 12 + note.pitch.pitchClass,
-      tick: note.startTick, x: placed.x,
-      hands: { RH: { finger: RH, row, y: y(bottomRH) }, LH: { finger: LH, row, y: y(bottomLH) } } };
+    return { index, pitchLinear, tick: index * 12, x: rh.x,
+      hands: { RH: { finger: RH, row, y: y(bottomRH), pitchLinear },
+        LH: { finger: LH, row, y: y(bottomLH), pitchLinear: pitchLinear - 12 } } };
   });
   // Bound actual painted beams and solved stems, not a quarter-note estimate.
-  // This fixture has no foreign hands, ottavas or flags.
+  // This fixture has no ottavas or flags; both hands' beams are included.
   const pitchInkTop = Math.min(layout.geometry.staffTopY - 1,
     ...layout.notes.map(n => n.y - tokens.noteheadRadius - 1),
     ...layout.beams.flatMap(b => [
