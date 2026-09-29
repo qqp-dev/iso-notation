@@ -32,6 +32,7 @@ import { test } from 'node:test';
 
 import {
   activePanelViews,
+  updateStudioNavigation,
   applyZoom,
   collectStudioDom,
   createPreparedApplier,
@@ -104,6 +105,8 @@ class FakeElement {
   }
 
   replaceChildren(): void { this.innerHTML = ''; }
+  querySelector(_selector: string): FakeElement | null { return null; }
+  setAttribute(name: string, value: string): void { if (name === 'aria-current') this.dataset.ariaCurrent = value; }
   append(child: FakeElement): void { this.children.push(child); this.markup += `<p>${child.textContent}</p>`; }
 
   querySelectorAll(selector: string): FakeElement[] {
@@ -115,6 +118,7 @@ class FakeElement {
 class FakeDocument {
   byId = new Map<string, FakeElement>();
   tabs: FakeElement[] = [];
+  body = { classList: new FakeClassList() };
 
   getElementById(id: string): FakeElement | null {
     return this.byId.get(id) ?? null;
@@ -122,7 +126,7 @@ class FakeDocument {
   createElement(_tag: string): FakeElement { return new FakeElement(this); }
 
   querySelectorAll(selector: string): FakeElement[] {
-    if (selector === '[data-view-target]') return [...this.tabs];
+    if (selector === '[data-view-target]' || selector === '[data-studio-mode], #janko-tab-reference') return [...this.tabs];
     return [];
   }
 }
@@ -148,6 +152,7 @@ function makeStudio(): {
   for (const view of ['candidates', 'reference']) {
     const tab = new FakeElement(doc);
     tab.dataset.viewTarget = view;
+    tab.dataset.studioMode = view === 'candidates' ? 'engraving' : 'reference';
     tabs.push(tab);
     doc.tabs.push(tab);
   }
@@ -353,6 +358,7 @@ test('the manifest states are explicit: preparing, loadingâ†’ready, refreshingâ†
   releaseSecond();
   assert.equal(await second, 'applied');
   assert.equal(root.dataset.preparedState, 'stale', 'a stale generation is labelled, never current');
+  assert.equal(studio.status.dataset.problem, 'true');
 
   // A failed regeneration keeps the last coherent output, labelled stale.
   const failing = createPreparedApplier({
@@ -364,6 +370,7 @@ test('the manifest states are explicit: preparing, loadingâ†’ready, refreshingâ†
   assert.equal(root.dataset.preparedState, 'stale');
   assert.match(root.innerHTML, /two:/, 'the last coherent output stays on screen');
   assert.match(studio.status.textContent, /failed/);
+  assert.equal(studio.status.dataset.problem, 'true', 'visible artifact failure remains actionable');
   assert.equal(
     await failing.apply(manifest('four', { error: 'the linter exploded' }), view),
     'stale-kept'
@@ -481,6 +488,21 @@ test('a re-apply preserves the selected tab and the zoom', async () => {
   assert.equal(studio.zoomLabel.textContent, '175%');
 });
 
+test('one navigation row describes the actually visible mode without decorative underlines', () => {
+  const doc = new FakeDocument();
+  const source = new FakeElement(doc), engraving = new FakeElement(doc), reference = new FakeElement(doc);
+  source.dataset.studioMode = 'source'; engraving.dataset.studioMode = 'engraving'; reference.dataset.studioMode = 'reference';
+  doc.tabs.push(source, engraving, reference);
+  doc.body.classList.toggle('source-mode', true);
+  updateStudioNavigation(doc as unknown as Document, 'candidates');
+  assert.deepEqual(doc.tabs.map(tab => tab.dataset.ariaCurrent), ['page', 'false', 'false']);
+  doc.body.classList.toggle('source-mode', false);
+  updateStudioNavigation(doc as unknown as Document, 'candidates');
+  assert.deepEqual(doc.tabs.map(tab => tab.dataset.ariaCurrent), ['false', 'page', 'false']);
+  updateStudioNavigation(doc as unknown as Document, 'reference');
+  assert.deepEqual(doc.tabs.map(tab => tab.dataset.ariaCurrent), ['false', 'false', 'page']);
+});
+
 test('prepared metadata and findings fold without losing content or nesting on re-apply', () => {
   // A small DOM tree for the disclosure decorator: append moves existing nodes
   // and a second application must leave the first details structure intact.
@@ -488,11 +510,13 @@ test('prepared metadata and findings fold without losing content or nesting on r
     children: Node[] = [];
     parent: Node | null = null;
     className = '';
+    dataset: Record<string, string> = {};
     textContent = '';
     open = false;
     ownerDocument = { createElement: (tag: string) => new Node(tag) };
     constructor(readonly tag: string, classes = '', text = '') { this.className = classes; this.textContent = text; }
     matches(selector: string): boolean {
+      if (selector === '[data-candidate="semantic-hand-stale"]') return this.dataset.candidate === 'semantic-hand-stale';
       return selector.split(',').some((part) => part.trim().split(':')[0].split('.').some((name) => name && this.className.split(' ').includes(name)));
     }
     querySelector(selector: string): Node | null {
@@ -520,12 +544,19 @@ test('prepared metadata and findings fold without losing content or nesting on r
   const golden = new Node('article', 'golden-card');
   const designation = new Node('span', 'badges', 'GOLD');
   golden.append(new Node('h2', '', 'Reference'), designation);
+  const round = new Node('article', 'round-card');
+  const refused = new Node('article', 'candidate-card', 'Full guarded refusal');
+  refused.dataset.candidate = 'semantic-hand-stale';
   const diagnostic = new Node('details', 'diagnostics', 'Brahms findings');
   diagnostic.open = true; // Previously expanded findings must default closed after a fresh swap.
-  const root = { querySelectorAll: (selector: string) => selector === 'details.diagnostics'
+  const root = { ownerDocument: { createElement: (tag: string) => new Node(tag) },
+    querySelector: (selector: string) => selector === '[data-candidate="semantic-hand-stale"]' && !refused.parent ? refused : selector === '.round-card' ? round : null,
+    querySelectorAll: (selector: string) => selector === 'details.diagnostics'
     ? [diagnostic] : selector === '.round-card, .golden-card, .candidate-card' ? [candidate, golden] : [] };
   foldPreparedDetails(root as unknown as HTMLElement);
   assert.equal(diagnostic.open, false, 'the complete findings stay present but default closed');
+  assert.equal(round.children[0].className, 'studio-recovery', 'saved draft stays in closed Engraving context');
+  assert.equal(round.children[0].children[1], refused, 'complete refusal is retained without a pre-score card');
   for (const [card, item] of [[candidate, rationale], [golden, designation]] as const) {
     const details = card.querySelector(':scope > details.studio-extra');
     assert.ok(details, 'context is reachable through a native disclosure');
@@ -538,6 +569,7 @@ test('prepared metadata and findings fold without losing content or nesting on r
   assert.equal(candidate.children.filter((child) => child.tag === 'details').length, 1);
   assert.equal(golden.children.filter((child) => child.tag === 'details').length, 1);
   assert.equal(diagnostic.open, false);
+  assert.equal(round.children.length, 1, 're-apply does not nest duplicate recovery controls');
 });
 
 // ---------------------------------------------------------------------------
@@ -580,15 +612,17 @@ test('the status line renders every state from manifest facts (no live claim)', 
   assert.ok(!renderPreparedStatus(base).includes('live'));
   const hash = 'a'.repeat(64);
   const outdated = manifest('old', { candidateError: `engine ${hash} refused`, engineIdentity: hash, candidateRevision: hash });
-  assert.equal(renderPreparedStatus(outdated), 'Saved engraving candidate is outdated â€” not applied.');
+  assert.equal(renderPreparedStatus(outdated), 'Engraving prepared; saved draft was not applied.');
   assert.ok(!renderPreparedStatus(outdated).includes(hash));
   assert.match(renderPreparedDiagnostics(outdated), new RegExp(hash));
+  assert.doesNotMatch(renderPreparedStatus(outdated), /outdated|stale/i, 'draft refusal is not global staleness');
   assert.match(renderPreparedDiagnostics({ ...outdated, error: 'the linter exploded' }), /generation error: the linter exploded/);
   const studio = makeStudio();
   const applier = createPreparedApplier({ root: studio.asRoot(), status: studio.asStatus(), fetchText: fetchTextFor() });
   return applier.apply(outdated, () => 'candidates').then(() => {
     assert.equal(studio.status.textContent, renderPreparedStatus(outdated));
-    assert.equal(studio.status.dataset.healthy, 'false');
+    assert.equal(studio.status.dataset.healthy, 'true');
+    assert.equal(studio.status.dataset.problem, 'false');
     assert.match(studio.status.ownerDocument.getElementById('janko-status-diagnostics')!.textContent, new RegExp(hash));
   });
 });

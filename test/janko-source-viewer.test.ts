@@ -58,7 +58,7 @@ class Element {
   getContext(_kind: string): object { return {}; }
 }
 
-async function launch(seed?: Map<string, string>) {
+async function launch(seed?: Map<string, string>, initialHash = '#candidates') {
   // Bundle the actual Vite-only viewer and actual session. Replace only pdf.js and its
   // worker asset; the renderer and transport can be deterministically held/rejected.
   const bundle = await build({
@@ -91,9 +91,9 @@ async function launch(seed?: Map<string, string>) {
     const button = new Element('button'); button.dataset.mobilePane = role; return button;
   });
   const prepared = new Element();
-  const switcher = new Element();
+  const workSelect = new Element('select');
   const modeButtons = ['source', 'engraving'].map((mode) => {
-    const button = new Element('button'); button.dataset.candidatesMode = mode; return button;
+    const button = new Element('button'); button.dataset.studioMode = mode; return button;
   });
   const storage = new Map<string, string>(seed);
   const windowEvents = new Map<string, Array<() => void>>();
@@ -119,11 +119,11 @@ async function launch(seed?: Map<string, string>) {
     document: {
       getElementById: (id: string) => id === 'source-review' ? root : prepared,
       createElement: (tag: string) => { const element = new Element(tag); if (tag === 'img') images.push(element); return element; },
-      querySelector: (selector: string) => selector === '.source-mode-switch' ? switcher : null,
-      querySelectorAll: (selector: string) => selector === '[data-candidates-mode]' ? modeButtons : selector === '[data-mobile-pane]' ? mobileButtons : [],
-      body: { classList: { toggle: () => undefined } },
+      querySelector: (selector: string) => selector === '.work-picker .source-work' ? workSelect : null,
+      querySelectorAll: (selector: string) => selector === '[data-studio-mode]' ? modeButtons : selector === '[data-mobile-pane]' ? mobileButtons : [],
+      body: { classList: { toggle: () => undefined, contains: () => true } },
     },
-    location: { hash: '#candidates' },
+    location: { hash: initialHash },
     sessionStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => { storage.set(key, value); } },
     window: { devicePixelRatio: 1, addEventListener: (name: string, callback: () => void) => {
       windowEvents.set(name, [...(windowEvents.get(name) ?? []), callback]);
@@ -187,7 +187,6 @@ async function launch(seed?: Map<string, string>) {
     await flush();
   };
   const pane = (index: number) => grid.children[index];
-  const workSelect = root.children[0].children[0];
   const switchWork = async (work: string) => { workSelect.value = work; workSelect.fire('change'); await flush(); };
   const resize = async () => {
     for (const callback of windowEvents.get('resize') ?? []) callback();
@@ -426,6 +425,15 @@ test('phone pane switch keeps both selected pages, zooms and valid canvases when
   assert.equal(JSON.parse(h.storage.get('janko-source-review-v1')!).mobilePane, 'reference');
 });
 
+test('a hashless restored Reference opens Source through the shared Candidates route', async () => {
+  const h = await launch(new Map([
+    ['janko-studio-session-v1', JSON.stringify({ version: 1, view: 'reference', zoom: 1, scroll: {} })],
+  ]), '');
+  assert.equal(h.root.hidden, true, 'the stored Reference view wins over default Source');
+  h.modeButtons.find(button => button.dataset.studioMode === 'source')!.fire('click');
+  assert.equal(h.root.hidden, false, 'Source becomes visible without a reload');
+});
+
 test('Candidates Source/Engraving mode preserves each PDF document, zoom, page, ink and place', async () => {
   const h = await launch();
   await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
@@ -438,9 +446,9 @@ test('Candidates Source/Engraving mode preserves each PDF document, zoom, page, 
   one.fire('scroll'); two.fire('scroll');
   const original = one.children[0], other = two.children[0];
   const calls = [...h.renderCalls.values()].reduce((sum, n) => sum + n, 0);
-  h.modeButtons.find((button) => button.dataset.candidatesMode === 'engraving')!.fire('click');
+  h.modeButtons.find((button) => button.dataset.studioMode === 'engraving')!.fire('click');
   assert.equal(h.root.hidden, true);
-  h.modeButtons.find((button) => button.dataset.candidatesMode === 'source')!.fire('click');
+  h.modeButtons.find((button) => button.dataset.studioMode === 'source')!.fire('click');
   await h.flush();
   assert.equal(h.root.hidden, false);
   assert.equal(one.children[0], original); assert.equal(two.children[0], other);
