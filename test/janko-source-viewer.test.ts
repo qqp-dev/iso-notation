@@ -20,7 +20,8 @@ class Element {
   textContent = '';
   markup = '';
   attributes = new Map<string, string>();
-  href = ''; target = ''; rel = '';
+  href = ''; target = ''; rel = ''; src = ''; alt = '';
+  onload?: () => void; onerror?: () => void;
   clientWidth = 600;
   scrollTop = 0;
   width = 0; height = 0;
@@ -36,7 +37,7 @@ class Element {
     if (!html.includes('source-controls')) return;
     // Keep the legacy info node in the fake until the implementation stops
     // reading it; markup checks below assert it is absent from the reader.
-    for (const name of ['source-select', 'source-info', 'source-page', 'source-zoom', 'source-status', 'source-canvas']) {
+    for (const name of ['source-select', 'source-info', 'source-edition', 'source-link', 'source-catalogue', 'source-page', 'source-zoom', 'source-status', 'source-canvas']) {
       this.entries.set(`.${name}`, new Element(name === 'source-select' ? 'select' : 'div'));
     }
     this.entries.set('select', this.entries.get('.source-select')!);
@@ -49,6 +50,7 @@ class Element {
   querySelectorAll(selector: string): Element[] { return this.entries.get(selector)?.children ?? []; }
   setChild(selector: string, child: Element): void { this.entries.set(selector, child); }
   append(...nodes: Element[]): void { this.children.push(...nodes); }
+  insertBefore(node: Element, _other: Element | null): void { this.children.unshift(node); }
   replaceChildren(...nodes: Element[]): void { this.children = nodes; }
   setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   addEventListener(type: string, callback: () => void): void { this.events.set(type, [...(this.events.get(type) ?? []), callback]); }
@@ -102,6 +104,7 @@ async function launch(seed?: Map<string, string>) {
   const renderCalls = new Map<string, number>();
   const documentOptions: Array<Record<string, unknown>> = [];
   const fetches: string[] = [];
+  const images: Element[] = [];
   const validWasm = await readFile('node_modules/pdfjs-dist/wasm/jbig2.wasm');
   const decoder = {
     wasm: 'valid' as 'valid' | 'missing' | 'corrupt' | 'pending',
@@ -115,7 +118,7 @@ async function launch(seed?: Map<string, string>) {
   const context = {
     document: {
       getElementById: (id: string) => id === 'source-review' ? root : prepared,
-      createElement: (tag: string) => new Element(tag),
+      createElement: (tag: string) => { const element = new Element(tag); if (tag === 'img') images.push(element); return element; },
       querySelector: (selector: string) => selector === '.source-mode-switch' ? switcher : null,
       querySelectorAll: (selector: string) => selector === '[data-candidates-mode]' ? modeButtons : selector === '[data-mobile-pane]' ? mobileButtons : [],
       body: { classList: { toggle: () => undefined } },
@@ -184,6 +187,8 @@ async function launch(seed?: Map<string, string>) {
     await flush();
   };
   const pane = (index: number) => grid.children[index];
+  const workSelect = root.children[0].children[0];
+  const switchWork = async (work: string) => { workSelect.value = work; workSelect.fire('change'); await flush(); };
   const resize = async () => {
     for (const callback of windowEvents.get('resize') ?? []) callback();
     resizeCallback?.(); await flush();
@@ -201,7 +206,7 @@ async function launch(seed?: Map<string, string>) {
     const button = pane(index).querySelectorAll('[data-action]').find((entry) => entry.dataset.action === name);
     assert.ok(button); button.fire('click');
   };
-  return { root, prepared, grid, storage, fetches, decoder, pageGates, renderGates, renderCalls, documentOptions, pane, action, resolveFetch, rejectFetch, flush, settled, until, resize, pagehide, switchMobile, switchView, mobileButtons, modeButtons };
+  return { root, prepared, grid, storage, workSelect, switchWork, images, fetches, decoder, pageGates, renderGates, renderCalls, documentOptions, pane, action, resolveFetch, rejectFetch, flush, settled, until, resize, pagehide, switchMobile, switchView, mobileButtons, modeButtons };
 }
 
 test('source viewer enables supported PDF.js strict handling and local decoder resources for each loaded PDF', async () => {
@@ -539,6 +544,54 @@ test('real pane width change refits the same page; pending old pixels are allowe
   assert.equal(host.children[0].style.width, '430px', 'the new width is fitted to the available pane');
   h.action(0, 'next');
   assert.equal(host.children.length, 0, 'a new page must never inherit the old image while its label changes');
+});
+
+test('mixed Schumann originals load only fixed URLs, recover from error and discard obsolete images', async () => {
+  const h = await launch();
+  await h.resolveFetch('imslp-936721'); await h.resolveFetch('snortum-v0.4-no01');
+  await h.switchWork('schumann-14');
+  const left = h.pane(0), right = h.pane(1);
+  assert.equal(left.dataset.documentId, 'schuberth-14');
+  assert.equal(left.querySelector('.source-canvas')!.children.length, 0);
+  assert.equal(h.images[0].src, 'https://brahmsinstitut.de/Archiv/web/bihl_digital/schumann_drucke/abh_005_002_187_s_016.jpg');
+  assert.match(left.querySelector('.source-edition')!.textContent, /Schuberth.*Henle fallback/);
+  assert.match(left.querySelector('.source-page')!.textContent, /Printed p\. 16.*1\/2/);
+  assert.match(right.querySelector('.source-page')!.textContent, /22\/92/);
+  await h.resolveFetch('schumann-starter');
+  h.images[0].onerror?.(); await h.flush();
+  assert.equal(left.dataset.renderState, 'error');
+  assert.equal(left.querySelector('.source-canvas')!.children.length, 0);
+  assert.match(left.querySelector('.source-status')!.textContent, /original image unavailable.*original source link/);
+  assert.match(left.querySelector('.source-link')!.href, /_016\.jpg$/);
+  assert.match(left.querySelector('.source-catalogue')!.href, /schum_op_068/);
+  left.querySelector('select')!.fire('change');
+  h.images[1].onload?.(); await h.flush();
+  assert.equal(left.dataset.renderState, 'ready');
+  h.action(0, 'next');
+  assert.match(left.querySelector('.source-page')!.textContent, /Printed p\. 17.*2\/2/);
+  assert.equal(left.querySelector('.source-canvas')!.children.length, 0);
+  await h.switchWork('schumann-30');
+  h.images[2].onload?.(); await h.flush(); // obsolete p17 event
+  assert.equal(left.dataset.documentId, 'schuberth-30');
+  assert.equal(left.querySelector('.source-canvas')!.children.length, 0);
+  assert.match(h.images[3].src, /_038\.jpg$/);
+  h.images[3].onload?.(); await h.flush();
+  assert.match(left.querySelector('.source-page')!.textContent, /Printed p\. 38/);
+  assert.equal(left.querySelector('.source-canvas')!.children.length, 1);
+  h.action(0, 'next'); assert.match(h.images[4].src, /_039\.jpg$/);
+  h.images[4].onload?.(); await h.flush();
+  await h.switchWork('schumann-13');
+  assert.match(h.images[5].src, /0045_0028/);
+  h.images[5].onload?.(); await h.flush();
+  h.action(0, 'next'); assert.match(h.images[6].src, /0045_0029/);
+  h.images[6].onload?.(); await h.flush();
+  await h.switchWork('schumann-43');
+  assert.match(h.images[7].src, /0045_0073/);
+  assert.match(right.querySelector('.source-page')!.textContent, /86\/92/);
+  h.images[7].onload?.(); await h.flush();
+  await h.switchWork('schumann-14');
+  assert.match(left.querySelector('.source-page')!.textContent, /Printed p\. 17/);
+  assert.match(right.querySelector('.source-page')!.textContent, /22\/92/);
 });
 
 test('source panes give a compact, accessible reading UI without success or provenance narration, even after rerender', async () => {

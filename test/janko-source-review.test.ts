@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ViteDevServer } from 'vite';
-import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS } from '../src/source-review/documents';
-import { initialChoices, restoreChoices, selectDocument, setPage, setZoom, STORAGE_KEY } from '../src/source-review/session';
+import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS, SOURCE_IMAGES, WORKS } from '../src/source-review/documents';
+import { currentChoice, initialChoices, restoreChoices, selectDocument, selectWork, setPage, setZoom, STORAGE_KEY } from '../src/source-review/session';
 import { PDFJS_DECODER_PREFIX, SOURCE_PDF_PREFIX, sourcePdfPlugin, validatePdfBytes } from '../src/source-review/vite-plugin';
 
 const scan = REFERENCE_IDS[0], alternate = REFERENCE_IDS[1];
@@ -40,7 +40,7 @@ test('source review clamps page and zoom independently and rejects corrupt or fo
   const state = initialChoices();
   setPage(state, a, -20); setPage(state, scan, 1000); setZoom(state, a, 100); setZoom(state, scan, -2);
   assert.equal(state.pages[a].page, 1);
-  assert.equal(state.pages[scan].page, SOURCE_DOCUMENTS[scan].pages);
+  assert.equal(state.pages[scan].page, SOURCE_DOCUMENTS[scan as keyof typeof SOURCE_DOCUMENTS].pages);
   assert.equal(state.pages[a].zoom, 3);
   assert.equal(state.pages[scan].zoom, 0.5);
   setZoom(state, a, NaN);
@@ -62,6 +62,33 @@ test('source review clamps page and zoom independently and rejects corrupt or fo
   assert.deepEqual(restored.pages[a], { page: 2, zoom: 2 });
   assert.deepEqual(restored.pages[b], { page: 1, zoom: 1 });
   assert.equal(Object.hasOwn(restored.pages, 'injected'), false);
+});
+
+test('Schumann work selection keeps separate starter anchors, image folios and role restrictions', () => {
+  const state = initialChoices();
+  for (const [work, expected, reference] of [
+    ['schumann-13', 20, 'henle-13'], ['schumann-14', 22, 'schuberth-14'],
+    ['schumann-30', 56, 'schuberth-30'], ['schumann-43', 86, 'henle-43'],
+  ] as const) {
+    selectWork(state, work);
+    assert.equal(state.reference, reference);
+    assert.equal(state.candidate, 'schumann-starter');
+    assert.equal(currentChoice(state, 'schumann-starter').page, expected);
+    assert.equal(SOURCE_IMAGES[reference].pages.length, work === 'schumann-43' ? 1 : 2);
+    assert.throws(() => selectDocument(state, 'reference', 'imslp-936721'), /role/);
+    setZoom(state, reference, 1.5);
+    setPage(state, 'schumann-starter', expected + 1);
+  }
+  assert.equal(WORKS['schumann-14'].starterPage, 22);
+  selectWork(state, 'scriabin');
+  assert.equal(state.reference, scan);
+  assert.equal(state.candidate, a);
+  const restored = restoreChoices(JSON.stringify(state));
+  selectWork(restored, 'schumann-14');
+  assert.equal(currentChoice(restored, 'schumann-starter').page, 23);
+  assert.equal(currentChoice(restored, 'schuberth-14').zoom, 1.5);
+  selectWork(restored, 'schumann-30');
+  assert.equal(currentChoice(restored, 'schumann-starter').page, 57);
 });
 
 // A self-contained PDF fixture: no download, approved cache, or source asset is needed to

@@ -1,10 +1,10 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS, type SourceDocumentId } from './documents';
-import { initialChoices, restoreChoices, selectDocument, setPage, setZoom, STORAGE_KEY, type SourceChoices } from './session';
+import { SOURCE_DOCUMENTS, SOURCE_IMAGES, WORKS, isImage, pageCount, type PdfId, type SourceDocumentId, type WorkId } from './documents';
+import { choiceKey, currentChoice, initialChoices, restoreChoices, selectDocument, selectWork, setPage, setZoom, STORAGE_KEY, type SourceChoices } from './session';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-const endpoint = (id: SourceDocumentId) => `/@janko-source-pdf/${id}`;
+const endpoint = (id: PdfId) => `/@janko-source-pdf/${id}`;
 const decoderUrl = () => import.meta.env.DEV
   ? '/@janko-pdfjs-wasm/'
   : new URL('./assets/source-pdf-decoder/', document.baseURI).href;
@@ -32,17 +32,18 @@ try {
   if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
     for (const [key, value] of Object.entries(saved)) {
       const separator = key.lastIndexOf(':');
-      const id = key.slice(0, separator) as SourceDocumentId;
+      const choice = key.slice(0, separator);
+      const id = choice.split(':').at(-1) as SourceDocumentId;
       const page = Number(key.slice(separator + 1));
-      if (Object.hasOwn(SOURCE_DOCUMENTS, id) && Number.isInteger(page) && page >= 1 && page <= SOURCE_DOCUMENTS[id].pages &&
+      if (Object.hasOwn(initialChoices().pages, choice) && Number.isInteger(page) && page >= 1 && page <= pageCount(id) &&
           typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1000) scrollPlaces[key] = value;
     }
   }
 } catch { /* corrupt or blocked session storage */ }
-const placeKey = (id: SourceDocumentId, page: number) => `${id}:${page}`;
+const placeKey = (id: string, page: number) => `${id}:${page}`;
 const persistPlaces = () => { try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify(scrollPlaces)); } catch { /* private session */ } };
-const loaded = new Map<SourceDocumentId, Promise<pdfjs.PDFDocumentProxy>>();
-function load(id: SourceDocumentId): Promise<pdfjs.PDFDocumentProxy> {
+const loaded = new Map<PdfId, Promise<pdfjs.PDFDocumentProxy>>();
+function load(id: PdfId): Promise<pdfjs.PDFDocumentProxy> {
   let task = loaded.get(id);
   if (!task) {
     task = (async () => {
@@ -85,8 +86,20 @@ async function checkScanDecoder(wasmUrl: string): Promise<void> {
 }
 
 type Role = 'reference' | 'candidate';
-interface Pane { container: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number } }
+interface Pane { container: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; edition: HTMLElement; link: HTMLAnchorElement; catalogue: HTMLAnchorElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number; work: WorkId } }
 const panes = {} as Record<Role, Pane>;
+const workLabel = document.createElement('label');
+workLabel.textContent = 'Work ';
+const workSelect = document.createElement('select'); workSelect.className = 'source-work';
+for (const [id, work] of Object.entries(WORKS)) { const option = document.createElement('option'); option.value = id; option.textContent = work.label; workSelect.append(option); }
+workSelect.value = state.work;
+workLabel.append(workSelect);
+root.insertBefore(workLabel, root.querySelector('.source-grid'));
+workSelect.addEventListener('change', () => {
+  rememberPlace('reference'); rememberPlace('candidate');
+  selectWork(state, workSelect.value as WorkId); persist();
+  void render('reference'); void render('candidate');
+});
 for (const role of ['reference', 'candidate'] as const) {
   const container = document.createElement('section'); container.className = `source-pane source-${role}`;
   container.setAttribute('aria-label', role === 'reference' ? 'Original scan' : 'Published transcription');
@@ -96,19 +109,16 @@ for (const role of ['reference', 'candidate'] as const) {
     <span class="source-page"></span><button data-action="next" aria-label="Next PDF page">▶</button>
     <button data-action="out" aria-label="Zoom out">−</button><span class="source-zoom"></span>
     <button data-action="in" aria-label="Zoom in">+</button><button data-action="reset">Fit</button></div>
+    <p class="source-edition"></p><a class="source-link" target="_blank" rel="noopener noreferrer">Original page ↗</a>
+    <a class="source-catalogue" target="_blank" rel="noopener noreferrer">Publisher / archive catalogue ↗</a>
     <div class="source-canvas"></div><p class="source-status" role="status"></p>`;
   root.querySelector('.source-grid')!.append(container);
   const select = container.querySelector('select')!;
-  for (const id of role === 'reference' ? REFERENCE_IDS : CANDIDATE_IDS) {
-    const opt = document.createElement('option'); opt.value = id;
-    opt.textContent = role === 'reference' ? SOURCE_DOCUMENTS[id].version : SOURCE_DOCUMENTS[id].edition;
-    select.append(opt);
-  }
-  panes[role] = { container, select, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
+  panes[role] = { container, select, edition: container.querySelector('.source-edition')!, link: container.querySelector('.source-link')!, catalogue: container.querySelector('.source-catalogue')!, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
   select.addEventListener('change', () => { rememberPlace(role); selectDocument(state, role, select.value as SourceDocumentId); persist(); void render(role); });
   container.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => button.addEventListener('click', () => {
     rememberPlace(role);
-    const id = state[role], choice = state.pages[id];
+    const id = state[role], choice = currentChoice(state, id);
     switch (button.dataset.action) {
       case 'previous': setPage(state, id, choice.page - 1); break;
       case 'next': setPage(state, id, choice.page + 1); break;
@@ -124,7 +134,7 @@ let scrollTimer: number | undefined;
 function rememberPlace(role: Role): void {
   const pane = panes[role];
   if (pane.container.dataset.renderState !== 'ready' || !pane.pixels || pane.canvasHost.clientWidth <= 0) return;
-  scrollPlaces[placeKey(pane.pixels.id, pane.pixels.page)] = pane.canvasHost.scrollTop / pane.pixels.width;
+  scrollPlaces[placeKey(choiceKey(pane.pixels.work, pane.pixels.id), pane.pixels.page)] = pane.canvasHost.scrollTop / pane.pixels.width;
   window.clearTimeout(scrollTimer);
   scrollTimer = window.setTimeout(persistPlaces, 200);
 }
@@ -135,10 +145,19 @@ async function render(role: Role): Promise<void> {
   const pane = panes[role];
   // A hidden pane has no measurable fit. Its last valid canvas is retained and
   // checked against its actual width when made visible again.
-  if (root.hidden || pane.canvasHost.clientWidth <= 0) return;
-  const id = state[role], doc = SOURCE_DOCUMENTS[id], { page, zoom } = state.pages[id];
+  if (root.hidden || pane.canvasHost.clientWidth <= 0) {
+    const current = `${state.work}:${state[role]}:${currentChoice(state, state[role]).page}:`;
+    if (pane.key && !pane.key.startsWith(current)) {
+      pane.serial++; pane.render?.cancel(); pane.render = undefined;
+      pane.key = undefined; pane.pixels = undefined; pane.canvasHost.replaceChildren();
+      pane.container.dataset.renderState = 'loading';
+    }
+    return;
+  }
+  const id = state[role], work = state.work, doc = isImage(id) ? SOURCE_IMAGES[id] : SOURCE_DOCUMENTS[id];
+  const { page, zoom } = currentChoice(state, id);
   const width = pane.canvasHost.clientWidth;
-  const key = `${id}:${page}:${zoom}:${width}`;
+  const key = `${work}:${id}:${page}:${zoom}:${width}`;
   if (key === pane.key && pane.container.dataset.renderState !== 'error') return;
   const serial = ++pane.serial;
   pane.key = key;
@@ -146,15 +165,48 @@ async function render(role: Role): Promise<void> {
   // Only a same-document/page fit change may retain old pixels while work is
   // pending. A new label or a failed attempt must never inherit prior ink.
   const oldPixels = pane.pixels;
-  const retain = oldPixels?.id === id && oldPixels.page === page && pane.container.dataset.renderState !== 'error';
+  const retain = oldPixels?.id === id && oldPixels.page === page && oldPixels.work === work && pane.container.dataset.renderState !== 'error';
   if (!retain) { pane.canvasHost.replaceChildren(); pane.pixels = undefined; }
+  pane.select.replaceChildren();
+  for (const allowed of WORKS[work][role]) {
+    const opt = document.createElement('option'); opt.value = allowed;
+    opt.textContent = isImage(allowed) ? SOURCE_IMAGES[allowed].edition : role === 'reference' ? SOURCE_DOCUMENTS[allowed].version : SOURCE_DOCUMENTS[allowed].edition;
+    pane.select.append(opt);
+  }
   pane.select.value = id;
-  pane.page.textContent = `${page}/${doc.pages}`;
+  pane.edition.textContent = `${WORKS[work].label} · ${doc.edition}${isImage(id) ? ' · Original host preview; availability does not grant reproduction rights.' : id === 'schumann-starter' ? ' · Philippe Hardy / Phil Hézaine attribution relationship unverified; 2012 Free Art License announcement. Not certified against Henle or the first issue.' : ''}`;
+  pane.link.href = isImage(id) ? SOURCE_IMAGES[id].pages[page - 1].url : SOURCE_DOCUMENTS[id].url;
+  pane.link.textContent = isImage(id) ? 'Original page ↗' : 'Published PDF ↗';
+  pane.catalogue.hidden = !isImage(id);
+  if (isImage(id)) pane.catalogue.href = SOURCE_IMAGES[id].source;
+  pane.page.textContent = isImage(id) ? `Printed p. ${SOURCE_IMAGES[id].pages[page - 1].folio} · ${page}/${pageCount(id)}` : `${page}/${pageCount(id)}`;
   pane.zoom.textContent = `${Math.round(zoom * 100)}%`;
   pane.container.dataset.documentId = id;
   pane.container.dataset.renderState = 'loading';
   pane.status.textContent = `Loading ${doc.title}, page ${page}…`;
   try {
+    if (isImage(id)) {
+      const image = document.createElement('img');
+      const source = SOURCE_IMAGES[id].pages[page - 1];
+      image.alt = `${doc.title}, original printed page ${source.folio}`;
+      // Load privately before committing ink; obsolete events cannot replace a newer selection.
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('original image unavailable'));
+        image.src = source.url;
+      });
+      if (serial !== pane.serial) return;
+      const anchor = retain && oldPixels ? pane.canvasHost.scrollTop / oldPixels.width : scrollPlaces[placeKey(choiceKey(work, id), page)] ?? 0;
+      image.style.width = `${width * zoom}px`;
+      image.style.height = 'auto';
+      image.style.display = 'block';
+      pane.canvasHost.replaceChildren(image);
+      pane.canvasHost.scrollTop = anchor * width;
+      pane.pixels = { id, page, width, work };
+      pane.container.dataset.renderState = 'ready';
+      pane.status.textContent = '';
+      return;
+    }
     const pdf = await load(id);
     if (serial !== pane.serial) return;
     const pdfPage = await pdf.getPage(page);
@@ -179,10 +231,10 @@ async function render(role: Role): Promise<void> {
     await renderTask.promise;
     if (serial !== pane.serial) return;
     // Keep the reader near the same point on the page after a real refit.
-    const anchor = retain && oldPixels ? pane.canvasHost.scrollTop / oldPixels.width : scrollPlaces[placeKey(id, page)] ?? 0;
+    const anchor = retain && oldPixels ? pane.canvasHost.scrollTop / oldPixels.width : scrollPlaces[placeKey(choiceKey(work, id), page)] ?? 0;
     pane.canvasHost.replaceChildren(canvas);
     pane.canvasHost.scrollTop = anchor * width;
-    pane.pixels = { id, page, width };
+    pane.pixels = { id, page, width, work };
     pane.render = undefined;
     pane.container.dataset.renderState = 'ready';
     pane.status.textContent = '';
@@ -192,7 +244,7 @@ async function render(role: Role): Promise<void> {
     pane.pixels = undefined;
     pane.canvasHost.replaceChildren();
     pane.container.dataset.renderState = 'error';
-    pane.status.textContent = `${id}: could not render PDF page ${page}: ${error instanceof Error ? error.message : String(error)}. Check the approved local cache and retry by selecting this document again.`;
+    pane.status.textContent = `${id}: could not load ${isImage(id) ? 'original image' : 'PDF page'} ${page}: ${error instanceof Error ? error.message : String(error)}. Open the original source link or retry by selecting this document again${isImage(id) ? '' : ' after checking the approved local cache'}.`;
   }
 }
 function updateSurface(): void {
