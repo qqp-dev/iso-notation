@@ -1237,8 +1237,21 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
   },
 ];
 
+/** No. 43 is a source-derived draft, NOT a change to either canonical Reference. */
+export const SCHUMANN_NO43_STUDIO_SCORE_ID = 'schumann-op68-no43';
+
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  { id: 'schumann-no43-written-draft', label: 'Schumann Op. 68 No. 43 · Draft / unfolded repeats',
+    description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Hands are provisional upper/lower-part hints; ornament, expression, slurs, fingering and laissez-vibrer are deferred (see the source-linked ledger). Not GOLD or BRONZE.',
+    tags: ['Draft / unfolded repeats', 'provisional hands', 'expression deferred'],
+    windows: [
+      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 1, measureCount: 3, title: 'Opening · pickup + first three bars', caption: 'Draft / unfolded repeats · eighth pickup, both logical voices, authored rests and spacers.' },
+      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 12, measureCount: 3, title: 'Dense chords · written partial ties', caption: 'Draft / unfolded repeats · chord members can release or reattack independently; fingering and slurs are deferred.' },
+      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 16, measureCount: 2, title: 'Repeat body · dense cross-hand onset', caption: 'Draft / unfolded repeats · includes the m. 16 displaced-head lint findings; no passages are removed.' },
+      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 20, measureCount: 3, title: 'First ending and second pass', caption: 'Draft / unfolded repeats · written bar 20 ends first pass; the volta body restarts at bar 11.' },
+      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 29, measureCount: 3, title: 'Second ending · Fine', caption: 'Draft / unfolded repeats · second ending at source bar 21; fermata and text remain deferred facts.' },
+    ] },
   { id: 'practice-major', kind: 'practice', practiceScaleType: 'major', practiceGuide: 'two-guides',
     label: 'A · Major', description: 'Existing major scale, two selected faint mid-row guides in each rail.',
     windows: [48, 49].map(tonic => ({ scoreId: `practice:major:${tonic}`, measureStart: 1, measureCount: 2, title: `Tonic ${tonic} · mm. 1–2` })),

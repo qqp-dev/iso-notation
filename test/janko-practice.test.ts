@@ -233,10 +233,11 @@ test('invalid and unsupported requests are refused instead of silently clipped',
 
 test('studio major and N26 cards use portable renderer and leave Reference unchanged', () => {
   const config = createStudioConfig();
-  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.practiceScaleType), ['major', 'natural-minor']);
-  assert.deepEqual(CURRENT_CANDIDATES.map(c => c.practiceGuide), ['two-guides', 'two-guides']);
+  const practiceCandidates = CURRENT_CANDIDATES.filter(c => c.kind === 'practice');
+  assert.deepEqual(practiceCandidates.map(c => c.practiceScaleType), ['major', 'natural-minor']);
+  assert.deepEqual(practiceCandidates.map(c => c.practiceGuide), ['two-guides', 'two-guides']);
   const html = renderCandidatesView(config);
-  for (const candidate of CURRENT_CANDIDATES) {
+  for (const candidate of practiceCandidates) {
     assert.ok(html.includes(`data-candidate="${candidate.id}"`));
     for (const tonic of [48, 49]) assert.ok(html.includes(`data-window="practice:${candidate.practiceScaleType}:${tonic}:1-2"`));
     assert.ok(html.includes(renderPracticeView({ ...input, scaleType: candidate.practiceScaleType!, guide: candidate.practiceGuide }).svg.replace('<svg ', '<svg class="janko-svg" ')));
