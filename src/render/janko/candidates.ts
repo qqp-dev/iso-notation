@@ -1240,9 +1240,20 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
 /** No. 43 is a source-derived draft, NOT a change to either canonical Reference. */
 export const SCHUMANN_NO43_STUDIO_SCORE_ID = 'schumann-op68-no43';
 export const SCHUMANN_NO14_STUDIO_SCORE_ID = 'schumann-op68-no14';
+export const SCHUMANN_NO30_STUDIO_SCORE_ID = 'schumann-op68-no30';
 
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  { id: 'schumann-no30-written-draft', label: 'Schumann Op. 68 No. 30 · Draft / unfolded repeats',
+    description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Printed cross-staff destinations, literal tie and laissez-vibrer marks, expressive/fingering/slur/arpeggio layout and omissions remain source-linked in the ledger. Not GOLD or BRONZE.',
+    tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked ties', 'deferred notation'],
+    windows: [
+      { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 1, measureCount: 49, fullScore: true, title: 'Complete unfolded score · mm. 1–49', caption: 'All real-engine pages · 34 written bars, first ending at unfolded m. 33, second ending at m. 49.' },
+      { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 17, measureCount: 3, title: 'First entry · unfolded mm. 17–19 (written bars 16–18)', caption: 'The upper Ab chord member from written bar 16 continues at the first repeat entry (m. 18). A hidden sounding Ab in independent upper Voice Two remains a separate voice/attack.' },
+      { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 32, measureCount: 4, title: 'First ending → second entry · unfolded mm. 32–35', caption: 'Written first ending bar 32 returns to written bar 17 on pass 2 (m. 34): the explicit incoming Ab tie continues from the ending chord without new attack.' },
+      { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Second ending · unfolded mm. 48–49', caption: 'Written bars 31 and 33, shortened second ending (three quarters); no first-ending Ab chord.' },
+      { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 29, measureCount: 2, title: 'Hidden phantom · unfolded mm. 29–30', caption: 'Written bar 29 lower Voice One hidden A3 is a source-commented layout clock carrier; audible notes and authored rests remain.' },
+    ] },
   { id: 'schumann-no14-written-draft', label: 'Schumann Op. 68 No. 14 · Draft / unfolded repeats',
     description: 'Complete 64 written / 96 unfolded 6/8 bars from approved source. Logical upper/lower-part hands are provisional, NOT performance instructions; printed cross-staff destinations are recorded separately. Phrasing, fingerings, expression, pedals and source staff layout remain deferred; real-engine lint findings are shown below. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked printed staff', 'deferred notation'],
