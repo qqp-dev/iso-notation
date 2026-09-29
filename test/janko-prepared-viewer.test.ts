@@ -41,7 +41,7 @@ import {
   type ApplyOutcome,
   type PreparedArtifactKey,
 } from '../src/render/janko/prepared/viewer-dom';
-import { renderPreparedStatus, type PreparedManifest } from '../src/render/janko/prepared/status';
+import { renderPreparedDiagnostics, renderPreparedStatus, type PreparedManifest } from '../src/render/janko/prepared/status';
 import {
   openStudioReviewSession,
   type StudioScrollPort,
@@ -103,6 +103,9 @@ class FakeElement {
     this.children = parsed;
   }
 
+  replaceChildren(): void { this.innerHTML = ''; }
+  append(child: FakeElement): void { this.children.push(child); this.markup += `<p>${child.textContent}</p>`; }
+
   querySelectorAll(selector: string): FakeElement[] {
     if (selector === '.view-panel') return [...this.children];
     return [];
@@ -116,6 +119,7 @@ class FakeDocument {
   getElementById(id: string): FakeElement | null {
     return this.byId.get(id) ?? null;
   }
+  createElement(_tag: string): FakeElement { return new FakeElement(this); }
 
   querySelectorAll(selector: string): FakeElement[] {
     if (selector === '[data-view-target]') return [...this.tabs];
@@ -138,6 +142,7 @@ function makeStudio(): {
   const zoomLabel = new FakeElement(doc);
   doc.byId.set('janko-studio', root);
   doc.byId.set('janko-status', status);
+  doc.byId.set('janko-status-diagnostics', new FakeElement(doc));
   doc.byId.set('janko-zoom-label', zoomLabel);
   const tabs: FakeElement[] = [];
   for (const view of ['candidates', 'reference']) {
@@ -573,6 +578,19 @@ test('the status line renders every state from manifest facts (no live claim)', 
   assert.match(renderPreparedStatus({ ...base, stale: true }), /stale/);
   assert.match(renderPreparedStatus({ ...base, error: 'x' }), /failed/);
   assert.ok(!renderPreparedStatus(base).includes('live'));
+  const hash = 'a'.repeat(64);
+  const outdated = manifest('old', { candidateError: `engine ${hash} refused`, engineIdentity: hash, candidateRevision: hash });
+  assert.equal(renderPreparedStatus(outdated), 'Saved engraving candidate is outdated — not applied.');
+  assert.ok(!renderPreparedStatus(outdated).includes(hash));
+  assert.match(renderPreparedDiagnostics(outdated), new RegExp(hash));
+  assert.match(renderPreparedDiagnostics({ ...outdated, error: 'the linter exploded' }), /generation error: the linter exploded/);
+  const studio = makeStudio();
+  const applier = createPreparedApplier({ root: studio.asRoot(), status: studio.asStatus(), fetchText: fetchTextFor() });
+  return applier.apply(outdated, () => 'candidates').then(() => {
+    assert.equal(studio.status.textContent, renderPreparedStatus(outdated));
+    assert.equal(studio.status.dataset.healthy, 'false');
+    assert.match(studio.status.ownerDocument.getElementById('janko-status-diagnostics')!.textContent, new RegExp(hash));
+  });
 });
 
 // Keep the outcome type exercised end to end (exhaustiveness aid).

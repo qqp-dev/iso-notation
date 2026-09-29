@@ -37,7 +37,7 @@ class Element {
     if (!html.includes('source-controls')) return;
     // Keep the legacy info node in the fake until the implementation stops
     // reading it; markup checks below assert it is absent from the reader.
-    for (const name of ['source-select', 'source-info', 'source-edition', 'source-link', 'source-catalogue', 'source-page', 'source-zoom', 'source-status', 'source-canvas']) {
+    for (const name of ['source-select', 'source-info', 'source-identity-label', 'source-edition', 'source-link', 'source-catalogue', 'source-page', 'source-zoom', 'source-status', 'source-canvas']) {
       this.entries.set(`.${name}`, new Element(name === 'source-select' ? 'select' : 'div'));
     }
     this.entries.set('select', this.entries.get('.source-select')!);

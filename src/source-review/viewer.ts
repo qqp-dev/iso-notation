@@ -86,7 +86,7 @@ async function checkScanDecoder(wasmUrl: string): Promise<void> {
 }
 
 type Role = 'reference' | 'candidate';
-interface Pane { container: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; edition: HTMLElement; link: HTMLAnchorElement; catalogue: HTMLAnchorElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number; work: WorkId } }
+interface Pane { container: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; identity: HTMLElement; edition: HTMLElement; link: HTMLAnchorElement; catalogue: HTMLAnchorElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number; work: WorkId } }
 const panes = {} as Record<Role, Pane>;
 const workLabel = document.createElement('label');
 workLabel.textContent = 'Work ';
@@ -102,19 +102,20 @@ workSelect.addEventListener('change', () => {
 });
 for (const role of ['reference', 'candidate'] as const) {
   const container = document.createElement('section'); container.className = `source-pane source-${role}`;
-  container.setAttribute('aria-label', role === 'reference' ? 'Original scan' : 'Published transcription');
-  container.innerHTML = `<h3>${role === 'reference' ? 'Original scan' : 'Published PDF'}</h3>
-    <label>Document <select class="source-select"></select></label>
-    <div class="source-controls"><button data-action="previous" aria-label="Previous PDF page">◀</button>
-    <span class="source-page"></span><button data-action="next" aria-label="Next PDF page">▶</button>
+  container.setAttribute('aria-label', role === 'reference' ? 'Original' : 'Transcription');
+  container.innerHTML = `<div class="source-identity"><strong class="source-identity-label"></strong><span class="source-page"></span></div>
+    <div class="source-controls"><button data-action="previous" aria-label="Previous page">◀</button>
+    <button data-action="next" aria-label="Next page">▶</button>
     <button data-action="out" aria-label="Zoom out">−</button><span class="source-zoom"></span>
-    <button data-action="in" aria-label="Zoom in">+</button><button data-action="reset">Fit</button></div>
+    <button data-action="in" aria-label="Zoom in">+</button><button data-action="reset" aria-label="Fit page">Fit</button></div>
+    <details class="source-details"><summary>Edition &amp; source details</summary>
+    <label>Document <select class="source-select"></select></label>
     <p class="source-edition"></p><a class="source-link" target="_blank" rel="noopener noreferrer">Original page ↗</a>
-    <a class="source-catalogue" target="_blank" rel="noopener noreferrer">Publisher / archive catalogue ↗</a>
+    <a class="source-catalogue" target="_blank" rel="noopener noreferrer">Publisher / archive catalogue ↗</a></details>
     <div class="source-canvas"></div><p class="source-status" role="status"></p>`;
   root.querySelector('.source-grid')!.append(container);
   const select = container.querySelector('select')!;
-  panes[role] = { container, select, edition: container.querySelector('.source-edition')!, link: container.querySelector('.source-link')!, catalogue: container.querySelector('.source-catalogue')!, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
+  panes[role] = { container, select, identity: container.querySelector('.source-identity-label')!, edition: container.querySelector('.source-edition')!, link: container.querySelector('.source-link')!, catalogue: container.querySelector('.source-catalogue')!, page: container.querySelector('.source-page')!, zoom: container.querySelector('.source-zoom')!, status: container.querySelector('.source-status')!, canvasHost: container.querySelector('.source-canvas')!, serial: 0 };
   select.addEventListener('change', () => { rememberPlace(role); selectDocument(state, role, select.value as SourceDocumentId); persist(); void render(role); });
   container.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => button.addEventListener('click', () => {
     rememberPlace(role);
@@ -174,13 +175,15 @@ async function render(role: Role): Promise<void> {
     pane.select.append(opt);
   }
   pane.select.value = id;
-  pane.edition.textContent = `${WORKS[work].label} · ${doc.edition}${isImage(id) ? ' · Original host preview; availability does not grant reproduction rights.' : id === 'schumann-starter' ? ' · Philippe Hardy / Phil Hézaine attribution relationship unverified; 2012 Free Art License announcement. Not certified against Henle or the first issue.' : id === 'kinderszenen-v70' ? ' · CC BY-NC-SA 4.0 claimed; rights not independently cleared. Not certified against Henle HN 44.' : ''}`;
+  const imagePage = isImage(id) ? SOURCE_IMAGES[id].pages[page - 1] : undefined;
+  pane.identity.textContent = `${role === 'reference' ? 'Original' : 'Transcription'} · ${id === 'schumann-starter' ? 'Schumann starter' : isImage(id) ? doc.edition.split(' · ')[0] + ' preview' : doc.edition.split(' · ')[0]}`;
+  pane.edition.textContent = `${WORKS[work].label} · ${doc.edition}${imagePage && 'frame' in imagePage ? ` · preview frame ${imagePage.frame}; printed page ${imagePage.folio}` : ''}${isImage(id) ? ' · Original host preview; availability does not grant reproduction rights.' : id === 'schumann-starter' ? ' · Philippe Hardy / Phil Hézaine attribution relationship unverified; 2012 Free Art License announcement. Not certified against Henle or the first issue.' : id === 'kinderszenen-v70' ? ' · CC BY-NC-SA 4.0 claimed; rights not independently cleared. Not certified against Henle HN 44.' : ''}`;
   pane.link.href = isImage(id) ? SOURCE_IMAGES[id].pages[page - 1].url : SOURCE_DOCUMENTS[id].url;
   pane.link.textContent = isImage(id) ? 'Original page ↗' : 'Published PDF ↗';
   pane.catalogue.hidden = !isImage(id);
   if (isImage(id)) pane.catalogue.href = SOURCE_IMAGES[id].source;
-  const imagePage = isImage(id) ? SOURCE_IMAGES[id].pages[page - 1] : undefined;
-  pane.page.textContent = imagePage ? `Printed p. ${imagePage.folio}${'frame' in imagePage ? ` · preview frame ${imagePage.frame}` : ''} · ${page}/${pageCount(id)}` : `${page}/${pageCount(id)}`;
+  pane.page.textContent = imagePage ? `Printed p. ${imagePage.folio} · ${page}/${pageCount(id)} image${pageCount(id) === 1 ? '' : 's'}` : `PDF p. ${page}/${pageCount(id)}`;
+  pane.page.title = imagePage && 'frame' in imagePage ? `Printed page ${imagePage.folio}, preview frame ${imagePage.frame}, image ${page} of ${pageCount(id)}` : `PDF page ${page} of ${pageCount(id)}`;
   pane.zoom.textContent = `${Math.round(zoom * 100)}%`;
   pane.container.dataset.documentId = id;
   pane.container.dataset.renderState = 'loading';

@@ -30,20 +30,18 @@ export interface PreparedManifest {
   error?: string;
 }
 
-/** The status line the viewer renders from the manifest's published facts. */
+/** Short live announcement only; identities and errors belong in the closed diagnostics. */
 export function renderPreparedStatus(manifest: PreparedManifest): string {
-  if (manifest.generation === 'pending') {
-    return 'preparing the engraving… (the real engine is generating the views)';
-  }
-  const verdict = manifest.error
-    ? `✗ generation failed: ${manifest.error} — last coherent output retained if available`
-    : manifest.stale
-      ? '⏳ stale — inputs changed; regenerating'
-      : manifest.candidateError
-        ? '⚠ saved candidate error'
-        : manifest.status.ok
-        ? '✓'
-        : '✗';
+  if (manifest.generation === 'pending') return 'preparing engraving…';
+  if (manifest.error) return 'Engraving generation failed — last coherent output retained if available.';
+  if (manifest.stale) return 'Engraving output is stale — inputs changed; regenerating.';
+  if (manifest.candidateError) return 'Saved engraving candidate is outdated — not applied.';
+  if (!manifest.status.ok) return 'Engraving lint failed — see diagnostics.';
+  return 'Engraving prepared.';
+}
+
+/** Full published facts, never placed in the live region. */
+export function renderPreparedDiagnostics(manifest: PreparedManifest): string {
   const counts = `${manifest.status.violations} violations · ${manifest.status.warnings} warnings · ${manifest.status.systems} systems · ${manifest.status.notes} noteheads`;
-  return `${verdict} ${counts} · prepared ${manifest.generation.slice(0, 12)}${manifest.candidateRevision ? ` · candidate ${manifest.candidateRevision.slice(0, 12)}` : ''}${manifest.candidateError ? ` · saved candidate STALE — not applied: ${manifest.candidateError}` : ''}`;
+  return `${renderPreparedStatus(manifest)} ${counts} · prepared ${manifest.generation}${manifest.candidateRevision ? ` · candidate revision ${manifest.candidateRevision}` : ''}${manifest.engineIdentity ? ` · engine ${manifest.engineIdentity}` : ''}${manifest.canonicalRevisions ? ` · canonical revisions ${JSON.stringify(manifest.canonicalRevisions)}` : ''}${manifest.error ? ` · generation error: ${manifest.error}` : ''}${manifest.candidateError ? ` · saved candidate diagnostic: ${manifest.candidateError}` : ''}`;
 }
