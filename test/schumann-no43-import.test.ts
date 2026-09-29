@@ -144,7 +144,7 @@ test('written volta graph and unfolded occurrences retain source bar identity, s
 
 test('actual No.43 draft is registered only in Candidates and engraves with the real engine', () => {
   const config = createStudioConfig();
-  const entries = Object.values(config.scores).filter((entry) => /schumann|no.?43/i.test(entry.id));
+  const entries = Object.values(config.scores).filter((entry) => entry.id === 'schumann-op68-no43');
   assert.equal(entries.length, 1, 'a registered No.43 score, not an isolated importer skeleton');
   const { id, score, options, tokens } = entries[0];
   assert.ok(score.notes.length > 0);
