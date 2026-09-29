@@ -369,7 +369,7 @@ test('the manifest states are explicit: preparing, loadingâ†’ready, refreshingâ†
   assert.equal(await failing.apply(manifest('three'), view), 'artifact-failed-kept');
   assert.equal(root.dataset.preparedState, 'stale');
   assert.match(root.innerHTML, /two:/, 'the last coherent output stays on screen');
-  assert.match(studio.status.textContent, /failed/);
+  assert.match(studio.status.textContent, /artifact could not be loaded/);
   assert.equal(studio.status.dataset.problem, 'true', 'visible artifact failure remains actionable');
   assert.equal(
     await failing.apply(manifest('four', { error: 'the linter exploded' }), view),
@@ -601,6 +601,91 @@ test('the viewer routes both tab and hash switches through live selection', () =
     applyBody.indexOf('showView(root, view())') > applyBody.indexOf('root.innerHTML ='),
     'the session view is re-shown on the fresh panels right after the swap'
   );
+});
+
+// Evaluate the shipped shell's display selectors against the same DOM state
+// produced by the real applier. This tiny selector subset is intentionally
+// strict: a new selector shape must be accounted for, not silently ignored.
+function statusChromeDisplay(studio: ReturnType<typeof makeStudio>, view: string, sourceMode: boolean, target: 'status' | 'details'): string {
+  const css = readFileSync(`${projectRoot}/janko.html`, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const subject = target === 'status' ? '#janko-status' : '.engraving-details';
+  const rules = Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
+    .flatMap(([, selectors, declarations]) => selectors.split(',').map(selector => ({ selector: selector.trim(), declarations })));
+  const matching = rules.filter(({ selector }) => target === 'status'
+    ? /#janko-status(?::empty|\[data-(?:healthy|problem)="true"\])?$/.test(selector)
+    : selector.endsWith(subject));
+  let display = '';
+  for (const { selector, declarations } of matching) {
+    const declaration = declarations.match(/(?:^|;)\s*display:\s*(none|block)\s*(?:;|$)/)?.[1];
+    if (!declaration) continue;
+    const matched = selector.match(/^(?:(body:not\(\.source-mode\)((?::has\(#[^)]*\))*) )?)(#janko-status(?::empty|\[data-(?:healthy|problem)="true"\])?|\.engraving-details)$/);
+    assert.ok(matched, `unmodelled status chrome selector: ${selector}`);
+    const [, body, has, element] = matched;
+    if (body && sourceMode) continue;
+    if ([...(has ?? '').matchAll(/:has\(#([^)]*)\)/g)].some(([, condition]) => {
+      if (condition === 'view-candidates.is-active') return view !== 'candidates';
+      if (condition === 'view-reference.is-active') return view !== 'reference';
+      if (condition === 'janko-status[data-problem="true"]') return studio.status.dataset.problem !== 'true';
+      assert.fail(`unmodelled :has condition: ${condition}`);
+    })) continue;
+    if (element.startsWith('#janko-status') && target !== 'status') continue;
+    if (element === '.engraving-details' && target !== 'details') continue;
+    if (element.endsWith(':empty') && studio.status.textContent !== '') continue;
+    if (element.includes('data-healthy=') && studio.status.dataset.healthy !== 'true') continue;
+    if (element.includes('data-problem=') && studio.status.dataset.problem !== 'true') continue;
+    display = declaration;
+  }
+  return display;
+}
+
+test('Reference status distinguishes stale last-good output from a ready saved-draft refusal; Source remains unchanged', async () => {
+  const studio = makeStudio();
+  const session = makeSession(scrollPort(studio.root).port);
+  const applier = createPreparedApplier({ root: studio.asRoot(), status: studio.asStatus(), fetchText: fetchTextFor() });
+  const view = () => session.state.view;
+  const ready = manifest('ready', { candidateError: 'saved draft rejected' });
+  assert.equal(await applier.apply(ready, view), 'applied');
+  selectStudioView({ session, root: studio.asRoot(), view: 'reference', afterLayout: runNow });
+  assert.deepEqual(activePanelViews(studio.asRoot()), ['reference']);
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'status'), 'none');
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'details'), 'none');
+  assert.equal(statusChromeDisplay(studio, 'reference', true, 'status'), 'none');
+
+  const previous = studio.root.innerHTML;
+  assert.equal(await applier.apply(manifest('broken', { error: 'regeneration exploded' }), view), 'stale-kept');
+  assert.equal(studio.root.dataset.preparedState, 'stale');
+  assert.equal(studio.root.innerHTML, previous, 'Reference retains the previous actual bytes, not a new current frame');
+  assert.match(studio.status.textContent, /failed.*last coherent output retained/);
+  assert.match(studio.status.ownerDocument.getElementById('janko-status-diagnostics')!.textContent, /regeneration exploded/);
+  for (const active of ['reference', 'candidates']) {
+    assert.equal(statusChromeDisplay(studio, active, false, 'status'), 'block', `${active} shows the failure`);
+    assert.equal(statusChromeDisplay(studio, active, false, 'details'), 'block', `${active} exposes the diagnostic`);
+  }
+  assert.equal(statusChromeDisplay(studio, 'reference', true, 'status'), 'none', 'Source has no engraving warning');
+  assert.equal(statusChromeDisplay(studio, 'reference', true, 'details'), 'none');
+
+  assert.equal(await applier.apply(manifest('recovered', { candidateError: 'saved draft rejected' }), view), 'applied');
+  assert.equal(studio.root.dataset.preparedState, 'ready');
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'status'), 'none');
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'details'), 'none');
+  assert.equal(await applier.apply(manifest('changed', { stale: true }), view), 'applied');
+  assert.equal(studio.root.dataset.preparedState, 'stale');
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'status'), 'block', 'stale artifact bytes are distinguished');
+});
+
+test('Reference keeps last good panels and shows a contextual warning when artifact fetch fails', async () => {
+  const studio = makeStudio();
+  const ready = createPreparedApplier({ root: studio.asRoot(), status: studio.asStatus(), fetchText: fetchTextFor() });
+  assert.equal(await ready.apply(manifest('good'), () => 'reference'), 'applied');
+  const previous = studio.root.innerHTML;
+  const broken = createPreparedApplier({ root: studio.asRoot(), status: studio.asStatus(), fetchText: fetchTextFor({ failOn: () => true }) });
+  assert.equal(await broken.apply(manifest('unavailable'), () => 'reference'), 'artifact-failed-kept');
+  assert.equal(studio.root.innerHTML, previous);
+  assert.equal(studio.root.dataset.preparedState, 'stale');
+  assert.match(studio.status.textContent, /artifact could not be loaded.*last coherent output retained/);
+  assert.match(studio.status.ownerDocument.getElementById('janko-status-diagnostics')!.textContent, /artifact fetch error: artifact (reference|candidates) exploded/);
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'status'), 'block');
+  assert.equal(statusChromeDisplay(studio, 'reference', false, 'details'), 'block');
 });
 
 test('the status line renders every state from manifest facts (no live claim)', () => {

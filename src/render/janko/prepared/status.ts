@@ -28,12 +28,15 @@ export interface PreparedManifest {
   variantId?: string;
   candidateError?: string;
   error?: string;
+  /** Viewer-only fetch failure, distinct from a prepared generation error. */
+  artifactError?: string;
 }
 
 /** Short live announcement only; identities and errors belong in the closed diagnostics. */
 export function renderPreparedStatus(manifest: PreparedManifest): string {
   if (manifest.generation === 'pending') return 'preparing engraving…';
   if (manifest.error) return 'Engraving generation failed — last coherent output retained if available.';
+  if (manifest.artifactError) return 'Engraving artifact could not be loaded — last coherent output retained if available.';
   if (manifest.stale) return 'Engraving output is stale — inputs changed; regenerating.';
   if (manifest.candidateError) return 'Engraving prepared; saved draft was not applied.';
   if (!manifest.status.ok) return 'Engraving lint failed — see diagnostics.';
@@ -43,5 +46,5 @@ export function renderPreparedStatus(manifest: PreparedManifest): string {
 /** Full published facts, never placed in the live region. */
 export function renderPreparedDiagnostics(manifest: PreparedManifest): string {
   const counts = `${manifest.status.violations} violations · ${manifest.status.warnings} warnings · ${manifest.status.systems} systems · ${manifest.status.notes} noteheads`;
-  return `${renderPreparedStatus(manifest)} ${counts} · prepared ${manifest.generation}${manifest.candidateRevision ? ` · candidate revision ${manifest.candidateRevision}` : ''}${manifest.engineIdentity ? ` · engine ${manifest.engineIdentity}` : ''}${manifest.canonicalRevisions ? ` · canonical revisions ${JSON.stringify(manifest.canonicalRevisions)}` : ''}${manifest.error ? ` · generation error: ${manifest.error}` : ''}${manifest.candidateError ? ` · saved candidate diagnostic: ${manifest.candidateError}` : ''}`;
+  return `${renderPreparedStatus(manifest)} ${counts} · prepared ${manifest.generation}${manifest.candidateRevision ? ` · candidate revision ${manifest.candidateRevision}` : ''}${manifest.engineIdentity ? ` · engine ${manifest.engineIdentity}` : ''}${manifest.canonicalRevisions ? ` · canonical revisions ${JSON.stringify(manifest.canonicalRevisions)}` : ''}${manifest.error ? ` · generation error: ${manifest.error}` : ''}${manifest.artifactError ? ` · artifact fetch error: ${manifest.artifactError}` : ''}${manifest.candidateError ? ` · saved candidate diagnostic: ${manifest.candidateError}` : ''}`;
 }
