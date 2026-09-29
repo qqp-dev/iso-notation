@@ -53,7 +53,7 @@ import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { bachPr112Hands } from './support/bach-before-m5';
-import { renderPreparedStatus } from '../src/render/janko/prepared/status';
+import { renderPreparedDiagnostics, renderPreparedStatus } from '../src/render/janko/prepared/status';
 
 const projectRoot = process.cwd();
 
@@ -373,8 +373,9 @@ test('the viewer renders every manifest state explicitly, never blank, never liv
     stale: false,
   };
   const preparedLine = renderPreparedStatus(ready);
-  assert.ok(preparedLine.includes('0 violations'), 'the counts come from the manifest');
-  assert.ok(preparedLine.includes('prepared'), 'the line names the prepared identity, not a live run');
+  assert.ok(!preparedLine.includes('0 violations'), 'counts do not fill the live status');
+  assert.ok(renderPreparedDiagnostics(ready).includes('0 violations'), 'published counts remain in diagnostics');
+  assert.ok(preparedLine.includes('prepared'), 'the line names the prepared state, not a live run');
   assert.equal(renderPreparedStatus({ ...ready, generation: 'pending' }).includes('preparing'), true);
   const stale = renderPreparedStatus({ ...ready, stale: true });
   assert.ok(stale.includes('stale'), 'a stale generation is labelled, never presented as current');

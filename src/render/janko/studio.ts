@@ -841,7 +841,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     } · registry <code>src/render/janko/candidates.ts</code> · add a candidate with five lines, zero template edits.</p>`,
     '  </div>',
     compareStrip,
-    config.semanticCandidateError ? `<article class="candidate-card" data-candidate="semantic-hand-stale" data-lint="error" role="alert"><h3>Saved semantic candidate STALE — not applied</h3><p class="rationale">${escapeHtml(config.semanticCandidateError)}</p><p>Reference remains canonical. Archive and start a new guarded candidate with <code>semantic-hand recover</code>; no automatic rebase.</p></article>` : '',
+    config.semanticCandidateError ? `<article class="candidate-card" data-candidate="semantic-hand-stale" data-lint="error"><h3 role="alert">Saved engraving candidate is outdated — not applied.</h3><details class="candidate-recovery"><summary>Diagnostics &amp; recovery</summary><p class="rationale">${escapeHtml(config.semanticCandidateError)}</p><p>Reference remains canonical. Archive and start a new guarded candidate with <code>semantic-hand recover</code>; no automatic rebase.</p></details></article>` : '',
     `  <div class="candidate-grid" data-candidate-count="${candidates.length}" data-window-count="${windowCount}" data-verification="${verification}" data-decided="${decided}">`,
     cards.join('\n'),
     '  </div>',

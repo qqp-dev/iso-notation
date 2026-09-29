@@ -220,7 +220,11 @@ test('stale default-path source/engine drift refuses replay, keeps Reference and
     assert.equal(stale.candidateRevision, undefined);
     assert.match(stale.candidateError!, /source mismatch/);
     assert.match(stale.artifacts.candidates, /data-candidate="semantic-hand-stale"/);
-    assert.match(stale.artifacts.candidates, /not applied/);
+    assert.match(stale.artifacts.candidates, /<h3 role="alert">Saved engraving candidate is outdated — not applied\.<\/h3>/);
+    assert.match(stale.artifacts.candidates, /<details class="candidate-recovery"><summary>Diagnostics &amp; recovery<\/summary>/);
+    assert.match(stale.artifacts.candidates, /semantic-hand recover/);
+    assert.match(stale.artifacts.candidates, /source mismatch/);
+    assert.doesNotMatch(stale.artifacts.candidates, /<details class="candidate-recovery" open/);
     assert.doesNotMatch(stale.artifacts.candidates, /data-candidate="semantic-hand"/);
     assert.equal(stale.artifacts.reference, plain.artifacts.reference);
     assert.equal(stale.artifactHashes.reference, plain.artifactHashes.reference);

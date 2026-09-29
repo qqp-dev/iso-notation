@@ -24,7 +24,15 @@
  */
 
 import { writeStudioState, type StudioReviewSession, type StudioStorageLike } from '../studio-session';
-import { renderPreparedStatus, type PreparedManifest } from './status';
+import { renderPreparedStatus, renderPreparedDiagnostics, type PreparedManifest } from './status';
+
+function publishStatus(status: HTMLElement | null, manifest: PreparedManifest): void {
+  if (!status) return;
+  status.textContent = renderPreparedStatus(manifest);
+  status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && !manifest.candidateError && manifest.status.ok);
+  const diagnostics = status.ownerDocument.getElementById('janko-status-diagnostics');
+  if (diagnostics) diagnostics.textContent = renderPreparedDiagnostics(manifest);
+}
 
 /** The studio zoom bounds (shared by the zoom policy and the label). */
 export const ZOOM_MIN = 0.5;
@@ -78,7 +86,9 @@ export function foldPreparedDetails(root: HTMLElement): void {
     if (card.matches('[role="alert"]') || card.querySelector(':scope > details.studio-extra')) continue;
     const extras = Array.from(card.children).filter((node) => card.matches('.golden-card')
       ? node.matches('p:not(.round-meta), .badges')
-      : node.matches('.round-meta, .badges, .rationale'));
+      : card.matches('.round-card')
+        ? node.matches('p')
+        : node.matches('.rationale'));
     if (!extras.length) continue;
     const details = card.ownerDocument.createElement('details');
     details.className = 'studio-extra';
@@ -201,8 +211,7 @@ export function createPreparedApplier(args: {
       root.dataset.preparedObservation = JSON.stringify({ state: 'unobserved', reason: 'manifest-requested' });
       root.dataset.preparedReferenceObservation = JSON.stringify({ state: 'unobserved', reason: 'manifest-requested' });
       if (status) {
-        status.textContent = renderPreparedStatus(manifest);
-        status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && !manifest.candidateError && manifest.status.ok);
+        publishStatus(status, manifest);
         status.dataset.live = 'false';
       }
       if (manifest.generation === 'pending') {
@@ -217,9 +226,11 @@ export function createPreparedApplier(args: {
       }
       if (manifest.error) {
         root.dataset.preparedState = 'error';
-        root.innerHTML =
-          `<p style="color:#f87171;font-size:13px">The prepared studio failed to generate: ` +
-          `${manifest.error}</p>`;
+        root.replaceChildren();
+        const message = root.ownerDocument.createElement('p');
+        message.className = 'prepared-error';
+        message.textContent = `The prepared studio failed to generate: ${manifest.error}`;
+        root.append(message);
         return 'error-shown';
       }
       root.dataset.preparedState = manifest.stale && applied !== null ? 'refreshing' : 'loading';
@@ -242,11 +253,13 @@ export function createPreparedApplier(args: {
           root.dataset.preparedState = 'stale';
         } else {
           root.dataset.preparedState = 'error';
-          root.innerHTML =
-            `<p style="color:#f87171;font-size:13px">The prepared artifact could not be loaded: ` +
-            `${message}</p>`;
+          root.replaceChildren();
+          const failure = root.ownerDocument.createElement('p');
+          failure.className = 'prepared-error';
+          failure.textContent = `The prepared artifact could not be loaded: ${message}`;
+          root.append(failure);
         }
-        if (status) { status.textContent = renderPreparedStatus({ ...manifest, error: message }); status.dataset.healthy = 'false'; }
+        publishStatus(status, { ...manifest, error: message });
         return applied !== null ? 'artifact-failed-kept' : 'artifact-failed-shown';
       }
       // Out-of-order guard: a response for a superseded generation is dropped.
@@ -274,7 +287,7 @@ export function createPreparedApplier(args: {
       foldPreparedDetails(root);
       args.afterSwap?.();
       root.dataset.preparedState = manifest.stale ? 'stale' : 'ready';
-      if (status) { status.textContent = renderPreparedStatus(manifest); status.dataset.healthy = String(!manifest.stale && !manifest.candidateError && manifest.status.ok); }
+      publishStatus(status, manifest);
       // The fresh markup redefines the panels and arrives with no active one;
       // re-show the session's view NOW, before the caller restores the scroll
       // place — a hidden panel collapses the document and clamps the reader
