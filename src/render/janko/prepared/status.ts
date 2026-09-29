@@ -35,7 +35,7 @@ export function renderPreparedStatus(manifest: PreparedManifest): string {
   if (manifest.generation === 'pending') return 'preparing engraving…';
   if (manifest.error) return 'Engraving generation failed — last coherent output retained if available.';
   if (manifest.stale) return 'Engraving output is stale — inputs changed; regenerating.';
-  if (manifest.candidateError) return 'Saved engraving candidate is outdated — not applied.';
+  if (manifest.candidateError) return 'Engraving prepared; saved draft was not applied.';
   if (!manifest.status.ok) return 'Engraving lint failed — see diagnostics.';
   return 'Engraving prepared.';
 }

@@ -1,4 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
+import { updateStudioNavigation } from '../render/janko/prepared/viewer-dom';
+import { readStudioState, type StudioSessionHost } from '../render/janko/studio-session';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { SOURCE_DOCUMENTS, SOURCE_IMAGES, WORKS, isImage, pageCount, type PdfId, type SourceDocumentId, type WorkId } from './documents';
 import { choiceKey, currentChoice, initialChoices, restoreChoices, selectDocument, selectWork, setPage, setZoom, STORAGE_KEY, type SourceChoices } from './session';
@@ -10,7 +12,7 @@ const decoderUrl = () => import.meta.env.DEV
   : new URL('./assets/source-pdf-decoder/', document.baseURI).href;
 const root = document.getElementById('source-review')!;
 const prepared = document.getElementById('janko-studio')!;
-const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-candidates-mode]'));
+const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-studio-mode]'));
 let state: SourceChoices;
 try { state = restoreChoices(sessionStorage.getItem(STORAGE_KEY)); }
 catch { state = initialChoices(); }
@@ -18,7 +20,7 @@ let mode: 'source' | 'engraving' = 'source';
 try { if (sessionStorage.getItem('janko-candidates-mode') === 'engraving') mode = 'engraving'; } catch { /* private session */ }
 if (!import.meta.env.DEV) {
   mode = 'engraving';
-  const sourceButton = modeButtons.find((button) => button.dataset.candidatesMode === 'source');
+  const sourceButton = modeButtons.find((button) => button.dataset.studioMode === 'source');
   if (sourceButton) { sourceButton.disabled = true; sourceButton.title = 'Local source PDFs are available only in the development studio'; sourceButton.textContent = 'Source PDFs (local dev only)'; }
 }
 const persist = () => { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* private session */ } };
@@ -88,13 +90,9 @@ async function checkScanDecoder(wasmUrl: string): Promise<void> {
 type Role = 'reference' | 'candidate';
 interface Pane { container: HTMLElement; page: HTMLElement; zoom: HTMLElement; status: HTMLElement; canvasHost: HTMLElement; select: HTMLSelectElement; identity: HTMLElement; edition: HTMLElement; link: HTMLAnchorElement; catalogue: HTMLAnchorElement; serial: number; render?: pdfjs.RenderTask; key?: string; pixels?: { id: SourceDocumentId; page: number; width: number; work: WorkId } }
 const panes = {} as Record<Role, Pane>;
-const workLabel = document.createElement('label');
-workLabel.textContent = 'Work ';
-const workSelect = document.createElement('select'); workSelect.className = 'source-work';
+const workSelect = document.querySelector<HTMLSelectElement>('.work-picker .source-work')!;
 for (const [id, work] of Object.entries(WORKS)) { const option = document.createElement('option'); option.value = id; option.textContent = work.label; workSelect.append(option); }
 workSelect.value = state.work;
-workLabel.append(workSelect);
-root.insertBefore(workLabel, root.querySelector('.source-grid'));
 workSelect.addEventListener('change', () => {
   rememberPlace('reference'); rememberPlace('candidate');
   selectWork(state, workSelect.value as WorkId); persist();
@@ -103,15 +101,15 @@ workSelect.addEventListener('change', () => {
 for (const role of ['reference', 'candidate'] as const) {
   const container = document.createElement('section'); container.className = `source-pane source-${role}`;
   container.setAttribute('aria-label', role === 'reference' ? 'Original' : 'Transcription');
-  container.innerHTML = `<div class="source-identity"><strong class="source-identity-label"></strong><span class="source-page"></span></div>
+  container.innerHTML = `<div class="source-identity"><strong class="source-identity-label"></strong><span class="source-page"></span>
+    <details class="source-details"><summary aria-label="Edition and source details">Details</summary><div class="source-details-content">
+    <label>Document <select class="source-select"></select></label>
+    <p class="source-edition"></p><a class="source-link" target="_blank" rel="noopener noreferrer">Original page ↗</a>
+    <a class="source-catalogue" target="_blank" rel="noopener noreferrer">Publisher / archive catalogue ↗</a></div></details></div>` + `
     <div class="source-controls"><button data-action="previous" aria-label="Previous page">◀</button>
     <button data-action="next" aria-label="Next page">▶</button>
     <button data-action="out" aria-label="Zoom out">−</button><span class="source-zoom"></span>
     <button data-action="in" aria-label="Zoom in">+</button><button data-action="reset" aria-label="Fit page">Fit</button></div>
-    <details class="source-details"><summary>Edition &amp; source details</summary>
-    <label>Document <select class="source-select"></select></label>
-    <p class="source-edition"></p><a class="source-link" target="_blank" rel="noopener noreferrer">Original page ↗</a>
-    <a class="source-catalogue" target="_blank" rel="noopener noreferrer">Publisher / archive catalogue ↗</a></details>
     <div class="source-canvas"></div><p class="source-status" role="status"></p>`;
   root.querySelector('.source-grid')!.append(container);
   const select = container.querySelector('select')!;
@@ -252,22 +250,23 @@ async function render(role: Role): Promise<void> {
   }
 }
 function updateSurface(): void {
-  const sourceActive = location.hash !== '#reference' && mode === 'source';
+  const live = (document as unknown as StudioSessionHost).__jankoStudioSession?.view;
+  const stored = !live ? readStudioState(sessionStorage, ['candidates', 'reference'])?.view : undefined;
+  const referenceActive = location.hash === '#reference' || (!location.hash && (live ?? stored) === 'reference');
+  const sourceActive = !referenceActive && mode === 'source';
   if (sourceActive && !prepared.hidden) window.dispatchEvent?.(new Event('janko-before-surface-hide'));
   root.hidden = !sourceActive;
   prepared.hidden = sourceActive;
   if (!sourceActive) window.dispatchEvent?.(new Event('janko-surface-show'));
-  const switcher = document.querySelector<HTMLElement>('.source-mode-switch');
-  if (switcher) switcher.hidden = location.hash === '#reference';
   document.body.classList.toggle('source-mode', sourceActive);
-  modeButtons.forEach((button) => { button.classList.toggle('is-active', button.dataset.candidatesMode === mode); button.setAttribute('aria-pressed', String(button.dataset.candidatesMode === mode)); });
+  updateStudioNavigation(document, referenceActive ? 'reference' : 'candidates');
   if (sourceActive) { void render('reference'); void render('candidate'); }
 }
 modeButtons.forEach((button) => button.addEventListener('click', () => {
   rememberPlace('reference'); rememberPlace('candidate');
-  mode = !import.meta.env.DEV || button.dataset.candidatesMode === 'engraving' ? 'engraving' : 'source';
+  mode = !import.meta.env.DEV || button.dataset.studioMode === 'engraving' ? 'engraving' : 'source';
   try { sessionStorage.setItem('janko-candidates-mode', mode); } catch { /* private session */ }
-  if (location.hash === '#reference') location.hash = '#candidates';
+  if (location.hash !== '#candidates') location.hash = '#candidates';
   updateSurface();
 }));
 document.querySelectorAll<HTMLButtonElement>('[data-mobile-pane]').forEach((button) => button.addEventListener('click', () => {
@@ -290,3 +289,7 @@ window.addEventListener('resize', () => {
   }, 150);
 });
 updateMobile(); updateSurface();
+// The prepared viewer establishes the authoritative session on DOMContentLoaded.
+// Reconcile once it has mounted as well as on hash changes (notably a hashless
+// reload of a saved Reference session).
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', updateSurface);

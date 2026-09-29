@@ -91,11 +91,11 @@ class Doc extends Node {
   readyState = 'complete';
   visibilityState = 'visible';
   documentElement = { scrollHeight: 7000 };
-  body = { scrollHeight: 7000 };
+  body = { scrollHeight: 7000, classList: new Classes() };
   fonts = { ready: Promise.resolve() };
   constructor() { super('document'); this.ownerDocument = this; }
   getElementById(id: string) { return this.ids.get(id) ?? null; }
-  querySelectorAll(selector: string) { return selector === '[data-view-target]' ? this.tabs : []; }
+  querySelectorAll(selector: string) { return selector === '[data-view-target]' || selector === '[data-studio-mode], #janko-tab-reference' ? this.tabs : []; }
 }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((yes) => { resolve = yes; }); return { promise, resolve }; }
 
@@ -122,7 +122,7 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
   for (const id of ['janko-status', 'janko-zoom-label', 'janko-zoom-in', 'janko-zoom-out', 'janko-zoom-reset']) {
     const element = new Node('div'); element.ownerDocument = doc; doc.ids.set(id, element);
   }
-  for (const view of ['candidates', 'reference']) { const tab = new Node('button'); tab.dataset.viewTarget = view; doc.tabs.push(tab); }
+  for (const view of ['candidates', 'reference']) { const tab = new Node('button'); tab.dataset.viewTarget = view; tab.dataset.studioMode = view === 'candidates' ? 'engraving' : 'reference'; doc.tabs.push(tab); }
   const location = { hash };
   const storage = new Map(seed);
   const pending = new Map<string, ReturnType<typeof deferred<any>>>();

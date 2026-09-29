@@ -29,7 +29,8 @@ import { renderPreparedStatus, renderPreparedDiagnostics, type PreparedManifest 
 function publishStatus(status: HTMLElement | null, manifest: PreparedManifest): void {
   if (!status) return;
   status.textContent = renderPreparedStatus(manifest);
-  status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && !manifest.candidateError && manifest.status.ok);
+  status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && manifest.status.ok);
+  status.dataset.problem = String(manifest.stale || !!manifest.error || !manifest.status.ok);
   const diagnostics = status.ownerDocument.getElementById('janko-status-diagnostics');
   if (diagnostics) diagnostics.textContent = renderPreparedDiagnostics(manifest);
 }
@@ -85,10 +86,10 @@ export function foldPreparedDetails(root: HTMLElement): void {
   for (const card of root.querySelectorAll<HTMLElement>('.round-card, .golden-card, .candidate-card')) {
     if (card.matches('[role="alert"]') || card.querySelector(':scope > details.studio-extra')) continue;
     const extras = Array.from(card.children).filter((node) => card.matches('.golden-card')
-      ? node.matches('p:not(.round-meta), .badges')
+      ? node.matches('p:not(.round-meta), .badges, .round-meta')
       : card.matches('.round-card')
-        ? node.matches('p')
-        : node.matches('.rationale'));
+        ? node.matches('p, .round-badge')
+        : node.matches('.rationale, .badges, .candidate-foot'));
     if (!extras.length) continue;
     const details = card.ownerDocument.createElement('details');
     details.className = 'studio-extra';
@@ -97,6 +98,28 @@ export function foldPreparedDetails(root: HTMLElement): void {
     card.insertBefore(details, extras[0]);
     details.append(summary, ...extras);
   }
+  // A refused saved draft is recoverable context, not an alert about the
+  // canonical score. Keep its complete text, but never reserve a pre-score card.
+  const refused = root.querySelector<HTMLElement>('[data-candidate="semantic-hand-stale"]');
+  const round = root.querySelector<HTMLElement>('.round-card');
+  if (refused && round && !refused.parentElement?.classList.contains('studio-recovery')) {
+    const recovery = root.ownerDocument.createElement('details');
+    recovery.className = 'studio-recovery';
+    const summary = root.ownerDocument.createElement('summary');
+    summary.textContent = 'Saved draft & recovery';
+    refused.querySelector('[role="alert"]')?.removeAttribute('role');
+    recovery.append(summary, refused);
+    round.append(recovery);
+  }
+}
+
+export function updateStudioNavigation(doc: Document, view: string): void {
+  const selected = view === 'reference' ? 'reference' : doc.body.classList.contains('source-mode') ? 'source' : 'engraving';
+  for (const tab of doc.querySelectorAll<HTMLElement>('[data-studio-mode], #janko-tab-reference')) {
+    const active = (tab.dataset.studioMode ?? 'reference') === selected;
+    tab.classList.toggle('is-active', active);
+    tab.setAttribute('aria-current', active ? 'page' : 'false');
+  }
 }
 
 export function showView(root: HTMLElement, view: string): void {
@@ -104,9 +127,7 @@ export function showView(root: HTMLElement, view: string): void {
   for (const panel of Array.from(root.querySelectorAll<HTMLElement>('.view-panel'))) {
     panel.classList.toggle('is-active', panel.dataset.view === view);
   }
-  for (const tab of Array.from(doc.querySelectorAll<HTMLElement>('[data-view-target]'))) {
-    tab.classList.toggle('is-active', tab.dataset.viewTarget === view);
-  }
+  updateStudioNavigation(doc, view);
 }
 
 /** The panel ids currently visible (live query — for tests and diagnostics). */

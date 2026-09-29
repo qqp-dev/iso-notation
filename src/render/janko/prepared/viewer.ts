@@ -224,7 +224,7 @@ function mountOnce(manifest: PreparedManifest): void {
       afterLayoutReady(() => { observeCandidateFrame(root, document, window); observeReferenceFrame(root, document, window); });
     }, error => {
       root.dataset.preparedState = 'stale';
-      if (dom.status) { dom.status.textContent = `Stale deployed release · ${error.message}`; dom.status.dataset.healthy = 'false'; }
+      if (dom.status) { dom.status.textContent = `Stale deployed release · ${error.message}`; dom.status.dataset.healthy = 'false'; dom.status.dataset.problem = 'true'; }
     }, manifest.engineIdentity ?? 'unknown');
     removers.push(stop);
   }

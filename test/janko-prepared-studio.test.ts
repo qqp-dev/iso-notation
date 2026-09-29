@@ -394,7 +394,10 @@ test('janko.html loads the thin viewer; the public mirror stays byte-identical',
   assert.equal(root.indexOf('src/render/janko/prepared/viewer.ts'), root.lastIndexOf('src/render/janko/prepared/viewer.ts'), 'exactly one boot module');
   assert.match(root, /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/, 'native browser zoom is not disabled');
   assert.deepEqual([...root.matchAll(/data-view-target="([^"]+)"/g)].map((match) => match[1]), ['candidates', 'reference'], 'exactly the approved two studio surfaces');
-  assert.ok(root.includes('data-candidates-mode="source"') && root.includes('data-candidates-mode="engraving"'), 'the source comparison and prepared engraving remain available');
+  assert.ok(root.includes('data-studio-mode="source"') && root.includes('data-studio-mode="engraving"'), 'source comparison and prepared engraving share one reading navigation');
+  assert.match(root, /class="work-picker"/, 'the active source work has a full-width picker');
+  assert.doesNotMatch(root, /<footer>\s*<div id="janko-status"/, 'no diagnostic footer is reserved in normal reading');
+  assert.match(root, /body > header\s*\{[^}]*background:\s*#000;/, 'the header itself is black, not a tinted override');
   assert.ok(root.includes('data-mobile-pane="reference"') && root.includes('data-mobile-pane="candidate"'), 'phone comparison keeps both Original and Published PDF controls');
   assert.match(root, />\s*Rotate to portrait\s*</i, 'the phone-landscape guard needs a readable rotation instruction, not inaccessible paper');
 });
