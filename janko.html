@@ -262,7 +262,11 @@
     .source-status { font-size: 12px; color: var(--muted); }
     .source-status:empty { display: none; }
     .source-canvas { background: white; max-height: 72vh; min-height: 100px; overflow: auto; }
-    .source-canvas canvas { display: block; max-width: none; }
+    .source-canvas canvas, .source-canvas img { display: block; max-width: none; }
+    .source-work { max-width: min(85vw, 350px); }
+    .source-edition { font-size: 12px; line-height: 1.35; margin: 3px 0; }
+    .source-link, .source-catalogue { display: inline-block; font-size: 12px; margin-right: 10px; }
+    .source-catalogue[hidden] { display: none; }
     .source-mobile-switch { display: none; }
     @media (max-width: 700px) {
       .source-grid { display: block; }

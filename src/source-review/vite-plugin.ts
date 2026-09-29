@@ -4,7 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { SOURCE_DOCUMENTS, type SourceDocumentId } from './documents';
+import { SOURCE_DOCUMENTS, type PdfId } from './documents';
 
 export const SOURCE_PDF_PREFIX = '/@janko-source-pdf/';
 export const PDFJS_DECODER_PREFIX = '/@janko-pdfjs-wasm/';
@@ -38,7 +38,7 @@ export function sourcePdfPlugin(options: { cache?: string; root?: string } = {})
     const rel = relative(parent, child);
     return rel !== '' && rel !== '..' && !rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) && !isAbsolute(rel);
   };
-  async function documentBytes(id: SourceDocumentId): Promise<Uint8Array> {
+  async function documentBytes(id: PdfId): Promise<Uint8Array> {
     const dir = await realpath(cache);
     const project = await realpath(root);
     if (dir === project || inside(project, dir) || inside(dir, project)) throw new Error('cache must be outside checkout');
@@ -79,7 +79,7 @@ export function sourcePdfPlugin(options: { cache?: string; root?: string } = {})
         if (!Object.hasOwn(SOURCE_DOCUMENTS, id)) {
           res.statusCode = 404; res.end('unknown source document'); return;
         }
-        void documentBytes(id as SourceDocumentId).then((data) => {
+        void documentBytes(id as PdfId).then((data) => {
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/pdf');
           res.setHeader('Cache-Control', 'no-store');
