@@ -35,6 +35,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
 } from '../../scores/brahms-op118-no1';
 import { buildChordDurationSpecimenScore } from '../../scores/chord-duration-specimen';
+import { buildSchumannNo43Draft } from '../../scores/schumann-no43-draft';
 import {
   REST_DURATION_SPECIMEN_JANKO_OPTIONS,
   REST_DURATION_SPECIMEN_JANKO_TOKENS,
@@ -68,6 +69,7 @@ import {
 } from './studio-session';
 import {
   BRAHMS_STUDIO_SCORE_ID,
+  SCHUMANN_NO43_STUDIO_SCORE_ID,
   BACH_PR112_SCORE_ID,
   BACH_PR114_SCORE_ID,
   PR112_EVENTS,
@@ -291,6 +293,16 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       [BACH_PR114_SCORE_ID]: { id: BACH_PR114_SCORE_ID,
         score: buildBachGoldbergVar1Score(), options, tokens },
     } : {}),
+    [SCHUMANN_NO43_STUDIO_SCORE_ID]: {
+      id: SCHUMANN_NO43_STUDIO_SCORE_ID,
+      score: buildSchumannNo43Draft(),
+      // A wider two-measure draft uses the existing transparent grid treatment:
+      // barline-crossing beams in the denser three-measure default are not
+      // falsely certified by clipping notes or modifying source timing.
+      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2,
+        gridWritingPolicy: 'unified-transparent-grid', writtenTies: 'source' }),
+      tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 192, anacrusisTicks: 24 }),
+    },
     [BRAHMS_STUDIO_SCORE_ID]: {
       id: BRAHMS_STUDIO_SCORE_ID,
       score: brahmsCanonical.score,
