@@ -64,6 +64,36 @@ test('source review clamps page and zoom independently and rejects corrupt or fo
   assert.equal(Object.hasOwn(restored.pages, 'injected'), false);
 });
 
+test('Op. 15 proposed Henle pages and published starter keep independent per-work anchors', () => {
+  const state = initialChoices();
+  for (const [work, ref, folio, frame, anchor] of [
+    ['kinderszenen-1', 'henle-op15-1', 2, 10, 3],
+    ['kinderszenen-6', 'henle-op15-6', 7, 15, 8],
+    ['kinderszenen-8', 'henle-op15-8', 9, 17, 10],
+  ] as const) {
+    selectWork(state, work);
+    assert.equal(state.reference, ref);
+    assert.equal(state.candidate, 'kinderszenen-v70');
+    assert.equal(currentChoice(state, state.candidate).page, anchor);
+    const image = SOURCE_IMAGES[ref];
+    assert.deepEqual(image.pages.map(({ folio, frame }) => [folio, frame]), [[folio, frame]]);
+    assert.match(image.pages[0].url, new RegExp(`0044_00${frame}-`));
+    assert.equal(image.source, 'https://www.henle.de/Scenes-from-Childhood-op.-15/HN-44');
+    assert.throws(() => selectDocument(state, 'reference', 'henle-13'), /role/);
+    setPage(state, state.candidate, anchor + 1);
+  }
+  const pdf = SOURCE_DOCUMENTS['kinderszenen-v70'];
+  assert.equal(pdf.pages, 16); assert.equal(pdf.bytes, 2496446);
+  assert.equal(pdf.sha256, '30ded702114332842e87aecd63cc672d32ac32ea7a779a70939055fbff6013af');
+  const restored = restoreChoices(JSON.stringify(state));
+  for (const [work, anchor] of [['kinderszenen-1', 4], ['kinderszenen-6', 9], ['kinderszenen-8', 11]] as const) {
+    selectWork(restored, work);
+    assert.equal(currentChoice(restored, 'kinderszenen-v70').page, anchor);
+  }
+  selectWork(restored, 'scriabin'); assert.equal(restored.reference, scan);
+  selectWork(restored, 'schumann-13'); assert.equal(currentChoice(restored, 'schumann-starter').page, 20);
+});
+
 test('Schumann work selection keeps separate starter anchors, image folios and role restrictions', () => {
   const state = initialChoices();
   for (const [work, expected, reference] of [

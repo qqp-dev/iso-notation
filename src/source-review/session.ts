@@ -11,13 +11,13 @@ export interface SourceChoices {
 }
 export const STORAGE_KEY = 'janko-source-review-v1';
 export const ZOOM_MIN = 0.5, ZOOM_MAX = 3;
-export const choiceKey = (work: WorkId, id: SourceDocumentId) => id === 'schumann-starter' ? `${work}:${id}` : id;
+export const choiceKey = (work: WorkId, id: SourceDocumentId) => id === 'schumann-starter' || id === 'kinderszenen-v70' ? `${work}:${id}` : id;
 const pageChoice = (page = 1): PageChoice => ({ page, zoom: 1 });
 export function initialChoices(): SourceChoices {
   const selections = Object.fromEntries(Object.entries(WORKS).map(([id, work]) => [id, { reference: work.reference[0], candidate: work.candidate[0] }])) as SourceChoices['selections'];
   const pages: Record<string, PageChoice> = Object.fromEntries([...Object.keys(SOURCE_DOCUMENTS), ...Object.keys(SOURCE_IMAGES)].map((id) => [id, pageChoice()]));
   for (const [id, work] of Object.entries(WORKS) as [WorkId, typeof WORKS[WorkId]][]) {
-    if (id !== 'scriabin') pages[choiceKey(id, 'schumann-starter')] = pageChoice(work.starterPage);
+    if (id !== 'scriabin') pages[choiceKey(id, work.candidate[0])] = pageChoice(work.starterPage);
   }
   return { work: 'scriabin', ...selections.scriabin, mobilePane: 'reference', pages, selections };
 }

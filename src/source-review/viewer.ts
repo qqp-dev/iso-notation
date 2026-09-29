@@ -174,12 +174,13 @@ async function render(role: Role): Promise<void> {
     pane.select.append(opt);
   }
   pane.select.value = id;
-  pane.edition.textContent = `${WORKS[work].label} · ${doc.edition}${isImage(id) ? ' · Original host preview; availability does not grant reproduction rights.' : id === 'schumann-starter' ? ' · Philippe Hardy / Phil Hézaine attribution relationship unverified; 2012 Free Art License announcement. Not certified against Henle or the first issue.' : ''}`;
+  pane.edition.textContent = `${WORKS[work].label} · ${doc.edition}${isImage(id) ? ' · Original host preview; availability does not grant reproduction rights.' : id === 'schumann-starter' ? ' · Philippe Hardy / Phil Hézaine attribution relationship unverified; 2012 Free Art License announcement. Not certified against Henle or the first issue.' : id === 'kinderszenen-v70' ? ' · CC BY-NC-SA 4.0 claimed; rights not independently cleared. Not certified against Henle HN 44.' : ''}`;
   pane.link.href = isImage(id) ? SOURCE_IMAGES[id].pages[page - 1].url : SOURCE_DOCUMENTS[id].url;
   pane.link.textContent = isImage(id) ? 'Original page ↗' : 'Published PDF ↗';
   pane.catalogue.hidden = !isImage(id);
   if (isImage(id)) pane.catalogue.href = SOURCE_IMAGES[id].source;
-  pane.page.textContent = isImage(id) ? `Printed p. ${SOURCE_IMAGES[id].pages[page - 1].folio} · ${page}/${pageCount(id)}` : `${page}/${pageCount(id)}`;
+  const imagePage = isImage(id) ? SOURCE_IMAGES[id].pages[page - 1] : undefined;
+  pane.page.textContent = imagePage ? `Printed p. ${imagePage.folio}${'frame' in imagePage ? ` · preview frame ${imagePage.frame}` : ''} · ${page}/${pageCount(id)}` : `${page}/${pageCount(id)}`;
   pane.zoom.textContent = `${Math.round(zoom * 100)}%`;
   pane.container.dataset.documentId = id;
   pane.container.dataset.renderState = 'loading';
