@@ -29,8 +29,8 @@ import { renderPreparedStatus, renderPreparedDiagnostics, type PreparedManifest 
 function publishStatus(status: HTMLElement | null, manifest: PreparedManifest): void {
   if (!status) return;
   status.textContent = renderPreparedStatus(manifest);
-  status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && manifest.status.ok);
-  status.dataset.problem = String(manifest.stale || !!manifest.error || !manifest.status.ok);
+  status.dataset.healthy = String(manifest.generation !== 'pending' && !manifest.stale && !manifest.error && !manifest.artifactError && manifest.status.ok);
+  status.dataset.problem = String(manifest.stale || !!manifest.error || !!manifest.artifactError || !manifest.status.ok);
   const diagnostics = status.ownerDocument.getElementById('janko-status-diagnostics');
   if (diagnostics) diagnostics.textContent = renderPreparedDiagnostics(manifest);
 }
@@ -280,7 +280,7 @@ export function createPreparedApplier(args: {
           failure.textContent = `The prepared artifact could not be loaded: ${message}`;
           root.append(failure);
         }
-        publishStatus(status, { ...manifest, error: message });
+        publishStatus(status, { ...manifest, artifactError: message });
         return applied !== null ? 'artifact-failed-kept' : 'artifact-failed-shown';
       }
       // Out-of-order guard: a response for a superseded generation is dropped.

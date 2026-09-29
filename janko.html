@@ -398,12 +398,13 @@
     }
     /* Diagnostics live with Engraving, not in a persistent reading footer. */
     .engraving-details { display: none; position: relative; color: var(--muted); font-size: 12px; flex: none; }
-    body:not(.source-mode):has(#view-candidates.is-active) .engraving-details { display: block; }
+    body:not(.source-mode):has(#view-candidates.is-active) .engraving-details,
+    body:not(.source-mode):has(#view-reference.is-active):has(#janko-status[data-problem="true"]) .engraving-details { display: block; }
     body.source-mode .context-toolbar .zoom-group { display: none; }
     .engraving-details summary { min-height: 44px; display: flex; align-items: center; }
     #janko-status-diagnostics { position: absolute; right: 0; top: 100%; z-index: 60; width: min(90vw, 420px); max-height: 35dvh; overflow: auto; overflow-wrap: anywhere; padding: 10px; background: #000; border: 1px solid #777; }
     #janko-status { display: none; font-size: 13px; color: var(--warn); overflow-wrap: anywhere; }
-    body:not(.source-mode):has(#view-candidates.is-active) #janko-status[data-problem="true"] { display: block; }
+    body:not(.source-mode) #janko-status[data-problem="true"] { display: block; }
     .studio-recovery { font-size: 12px; color: var(--muted); }
     .studio-recovery summary { min-height: 44px; }
     .round-badge, .section-title { display: none; }
