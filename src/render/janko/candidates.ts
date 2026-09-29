@@ -1239,9 +1239,20 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
 
 /** No. 43 is a source-derived draft, NOT a change to either canonical Reference. */
 export const SCHUMANN_NO43_STUDIO_SCORE_ID = 'schumann-op68-no43';
+export const SCHUMANN_NO14_STUDIO_SCORE_ID = 'schumann-op68-no14';
 
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  { id: 'schumann-no14-written-draft', label: 'Schumann Op. 68 No. 14 · Draft / unfolded repeats',
+    description: 'Complete 64 written / 96 unfolded 6/8 bars from approved source. Logical upper/lower-part hands are provisional, NOT performance instructions; printed cross-staff destinations are recorded separately. Phrasing, fingerings, expression, pedals and source staff layout remain deferred; real-engine lint findings are shown below. Not GOLD or BRONZE.',
+    tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked printed staff', 'deferred notation'],
+    windows: [
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 96, fullScore: true, title: 'Complete unfolded score · mm. 1–96', caption: 'Draft / unfolded repeats · all real-engine pages, both passes of the second half; source printed staff and logical part are distinct.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 2, title: 'Opening · mm. 1–2', caption: 'Lower logical part moves onto printed upper staff after three eighths; upper part has authored skips.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 41, measureCount: 3, title: 'Concurrent voices · mm. 41–43', caption: 'Half-bar branches and parent continuation; small lower-staff voice remains sounding.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Three branches · mm. 48–49', caption: 'Three independent written voices, including a lower printed destination.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 95, measureCount: 2, title: 'Second pass · mm. 95–96', caption: 'End of repeated second half; same written bar IDs, separate unfolded occurrences.' },
+    ] },
   { id: 'schumann-no43-written-draft', label: 'Schumann Op. 68 No. 43 · Draft / unfolded repeats',
     description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Hands are provisional upper/lower-part hints; ornament, expression, slurs, fingering and laissez-vibrer are deferred (see the source-linked ledger). Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'expression deferred'],
