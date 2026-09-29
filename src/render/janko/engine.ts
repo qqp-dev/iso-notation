@@ -127,6 +127,7 @@ import {
   getBarStaffSegments,
   getBarStaffRows,
 } from './elements/staff';
+import { graceVerticalInkBounds, placeGraceGroups, renderPlacedGrace, type PlacedGrace } from './grace';
 import {
   JANKO_HALO_STROKE_WIDTH,
   isPositionOfHonor,
@@ -328,8 +329,8 @@ export function computePageGeometry(
       const middleCY = o.core === 'fixed-3' ? slotCenterY + 2.0 : slotCenterY - 0.5 * scale;
 
       const anacrusis = t.anacrusisTicks ?? 0;
-      const startTick = s === 0 ? 0 : anacrusis + s * measuresPerSystem * t.ticksPerMeasure;
-      const endTick = anacrusis + (s + 1) * measuresPerSystem * t.ticksPerMeasure;
+      const startTick = score?.sourceBarTicks?.[s * measuresPerSystem] ?? (s === 0 ? 0 : anacrusis + s * measuresPerSystem * t.ticksPerMeasure);
+      const endTick = score?.sourceBarTicks?.[(s + 1) * measuresPerSystem] ?? (anacrusis + (s + 1) * measuresPerSystem * t.ticksPerMeasure);
       const sysNotes = score
         ? score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick)
         : [];
@@ -454,6 +455,7 @@ export function computePageGeometry(
   }
 
   return {
+    ...(score?.sourceBarTicks ? { sourceBarTicks: score.sourceBarTicks } : {}),
     options: o,
     tokens: t,
     pageWidth: o.pageWidth,
@@ -559,6 +561,7 @@ export function getSystemGeometry(
   const perPage = Math.max(1, geo.systemsPerPage);
   const slot = ((systemIndex % perPage) + perPage) % perPage;
   const base = geo.systems[slot];
+  if (geo.sourceBarTicks) return { ...base, sourceBarTicks: geo.sourceBarTicks };
   const correction =
     options?.correctPageTopAnacrusisMeasureWidth ??
     geo.options.correctPageTopAnacrusisMeasureWidth ??
@@ -578,6 +581,7 @@ export function countJankoSystems(
   tokens?: Partial<JankoTokens> | null
 ): number {
   const o = resolveJankoOptions(options);
+  if (score.sourceBarTicks) return Math.max(1, Math.ceil((score.sourceBarTicks.length - 1) / Math.max(1, o.measuresPerSystem)));
   const t = resolveJankoTokens(tokens);
   const anacrusis = t.anacrusisTicks ?? 0;
   const totalTicks = score.totalTicks || 0;
@@ -1793,6 +1797,8 @@ export interface JankoSystemLayout {
   geometry: JankoSystemGeometry;
   /** Notes of this system, in engraving order (tick, then pitch class). */
   notes: PositionedJankoNote[];
+  /** Optional source-ordered, nonmetrical ink; never added to notes/beams. */
+  grace?: PlacedGrace[];
   /** Beamed groups with fully resolved beam/stem geometry ([] when unbeamed). */
   beams: JankoBeamGroupGeometry[];
   /** Short notes engraved with a standalone tick instead of a beam. */
@@ -2122,6 +2128,17 @@ function getNominalNoteX(
  * Round 12 voice rests share this one function, so a rest stands on exactly the
  * proportional grid the surrounding writing uses — never on an ad-hoc offset.
  */
+export function systemTickRange(geo: JankoSystemGeometry, systemIndex: number, t: ResolvedJankoTokens): [number, number] {
+  if (geo.sourceBarTicks) {
+    const i = systemIndex * geo.measuresPerSystem;
+    return [geo.sourceBarTicks[i] ?? geo.sourceBarTicks.at(-1)!,
+      geo.sourceBarTicks[Math.min(i + geo.measuresPerSystem, geo.sourceBarTicks.length - 1)]];
+  }
+  const upbeat = t.anacrusisTicks ?? 0;
+  return [systemIndex === 0 ? 0 : upbeat + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure,
+    upbeat + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure];
+}
+
 export function getTickColumnX(
   tick: number,
   geo: JankoSystemGeometry,
@@ -2131,6 +2148,15 @@ export function getTickColumnX(
   claspInsets?: JankoClaspInsetMap | null
 ): number {
   const claspInset = (measureIdx: number): number => claspInsets?.get(measureIdx) ?? 0;
+  if (geo.sourceBarTicks) {
+    const index = getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geo, systemIndex, t);
+    const first = geo.sourceBarTicks[systemIndex * geo.measuresPerSystem + index];
+    const last = geo.sourceBarTicks[systemIndex * geo.measuresPerSystem + index + 1];
+    if (first === undefined || last === undefined || last <= first) throw Error(`Source bar grid cannot place tick ${tick} in system ${systemIndex}`);
+    const insets = getMeasureInsets(systemIndex,index,o,t,claspInset(index));
+    const left = insets.left ?? t.measureInset, right = insets.right ?? t.measureInset;
+    return geo.staffLeft + index * geo.measureWidth + left + (tick-first)/(last-first) * Math.max(0,geo.measureWidth-left-right);
+  }
   const anacrusis = t.anacrusisTicks ?? 0;
   if (systemIndex === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
@@ -2646,6 +2672,7 @@ function measureIndexOfTick(
   systemIndex: number,
   t: ResolvedJankoTokens
 ): number {
+  if (geo.sourceBarTicks) return getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geo, systemIndex, t);
   const anacrusis = t.anacrusisTicks ?? 0;
   if (anacrusis > 0) {
     if (tick < anacrusis) return systemIndex === 0 ? 0 : -1;
@@ -3347,10 +3374,7 @@ export function computeJankoRestLayer(
   t: ResolvedJankoTokens,
   notes: readonly PositionedJankoNote[]
 ): JankoRestLayer {
-  const anacrusis = t.anacrusisTicks ?? 0;
-  const startTick =
-    systemIndex === 0 ? 0 : anacrusis + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure;
-  const endTick = anacrusis + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure;
+  const [startTick, endTick] = systemTickRange(geo, systemIndex, t);
   const sysNotes = score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick);
   const out: JankoRestGeometry[] = [];
   const unwritten: JankoUnwrittenRest[] = [];
@@ -4507,10 +4531,7 @@ export function computeClaspInsetMap(
 ): JankoClaspInsetMap {
   const map = new Map<number, number>();
   if (!usesChordClasps(o.chordGrouping)) return map;
-  const anacrusis = t.anacrusisTicks ?? 0;
-  const startTick =
-    systemIndex === 0 ? 0 : anacrusis + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure;
-  const endTick = anacrusis + (systemIndex + 1) * geo.measuresPerSystem * t.ticksPerMeasure;
+  const [startTick, endTick] = systemTickRange(geo, systemIndex, t);
   const perHand = o.chordGrouping === 'per-hand-clasp';
 
   // Every onset of the system, bucketed by its system-local measure index.
@@ -6487,8 +6508,9 @@ export function systemCompleteInkBounds(
   t: ResolvedJankoTokens
 ): { top: number; bottom: number } {
   const g = layout.geometry;
-  let top = g.staffTopY;
-  let bottom = g.staffBotY;
+  const graceInk = graceVerticalInkBounds(layout.grace ?? [],o,t);
+  let top = Math.min(g.staffTopY, graceInk.top);
+  let bottom = Math.max(g.staffBotY, graceInk.bottom);
   if (o.showMeasureNumbers) {
     const { numeral } = getMarginFurniture(
       g,
@@ -6962,9 +6984,7 @@ export function layoutJankoSystemShifted(
         };
   const mps = geometryRaw.measuresPerSystem;
   const anacrusis = t.anacrusisTicks ?? 0;
-  const startTick =
-    systemIndex === 0 ? 0 : anacrusis + systemIndex * mps * t.ticksPerMeasure;
-  const endTick = anacrusis + (systemIndex + 1) * mps * t.ticksPerMeasure;
+  const [startTick, endTick] = systemTickRange(geometryBase, systemIndex, t);
   // -------------------------------------------------------------------------
   // Round 46 — written ties.
   //
@@ -9688,8 +9708,14 @@ export function layoutJankoSystemShifted(
     ottavaContext
   );
 
+  const grace = score.graceGroups?.length ? placeGraceGroups(score.graceGroups, startTick, endTick,
+    flaggedNotes, geometry, o, t,
+    note => positionJankoNote(note, geometry, systemIndex, o, t, null, claspInsets),
+    tick => getMeasureOpeningBarlineX(
+      getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geometry, systemIndex, t), geometry, systemIndex, t) ?? geometry.staffLeft) : undefined;
   return {
     scoreRevision: score,
+    ...(grace ? { grace } : {}),
     index: systemIndex,
     isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
     geometry,
@@ -10030,6 +10056,10 @@ function renderNotesLayer(
     }
   }
 
+  // Nonmetrical ink has its own source-order geometry and real scaled heads;
+  // paint before ordinary heads so the host knockout protects its own digit.
+  if (layout.grace) for (const grace of layout.grace) out.push(renderPlacedGrace(grace, o, t));
+
   // 3. Position of Honor halo + white knockout + duodecimal digit, last.
   for (const p of layout.notes) {
     if (layout.compressedCopyIds?.has(p.note.id) || layout.handprintNoteIds?.has(p.note.id)) continue;
@@ -10168,6 +10198,7 @@ export function countJankoPages(
   tokens?: Partial<JankoTokens> | null
 ): number {
   const o = resolveJankoOptions(options);
+  if (score.sourceBarTicks) return Math.ceil(countJankoSystems(score,o,tokens) / Math.max(1,o.systemsPerPage));
   const t = resolveJankoTokens(tokens);
   const totalTicks = score.totalTicks || 0;
   const measuresTotal = Math.max(1, Math.ceil(totalTicks / t.ticksPerMeasure));
@@ -10254,8 +10285,9 @@ export function computeCropExtents(
   const startIdx = Math.max(0, Math.floor(measureStart) - 1);
   const count = Math.max(1, Math.floor(measureCount));
   const anacrusis = t.anacrusisTicks ?? 0;
-  const startTick = startIdx === 0 ? 0 : anacrusis + startIdx * t.ticksPerMeasure;
-  const endTick = anacrusis + (startIdx + count) * t.ticksPerMeasure;
+  const startTick = score.sourceBarTicks?.[startIdx] ?? (startIdx === 0 ? 0 : anacrusis + startIdx * t.ticksPerMeasure);
+  const endTick = score.sourceBarTicks?.[Math.min(startIdx + count,score.sourceBarTicks.length - 1)] ??
+    (anacrusis + (startIdx + count) * t.ticksPerMeasure);
   const reference = geo.systems[0];
   const staffTop = reference.staffTopY - reference.middleCY;
   const staffBottom = reference.staffBotY - reference.middleCY;
@@ -10330,6 +10362,17 @@ export function computeCropExtents(
         top = Math.max(top, staffTop - CROP_PAD_TOP - cTop);
         bottom = Math.max(bottom, cBot - (staffBottom + CROP_PAD_BOTTOM));
       }
+    }
+  }
+  if (score.graceGroups?.length) {
+    const placed = precomputedLayouts ?? layoutJankoScore(score,o,t);
+    const first = Math.floor(startIdx/o.measuresPerSystem);
+    const last = Math.floor((startIdx+count-1)/o.measuresPerSystem);
+    for (let s=first;s<=last;s++) {
+      const l = placed[s]; if (!l?.grace?.length) continue;
+      const ink = graceVerticalInkBounds(l.grace,o,t);
+      top = Math.max(top,l.geometry.staffTopY-CROP_PAD_TOP-ink.top);
+      bottom = Math.max(bottom,ink.bottom-(l.geometry.staffBotY+CROP_PAD_BOTTOM));
     }
   }
   return { top: Math.max(0, top), bottom: Math.max(0, bottom) };

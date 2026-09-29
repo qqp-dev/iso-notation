@@ -179,6 +179,7 @@ import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox } from './solo-scene';
 import { beamPieceAt } from './beam-scene';
+import { GRACE_SCALE, GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
 // ---------------------------------------------------------------------------
@@ -282,7 +283,8 @@ export type JankoLintCode =
   | 'tie-endpoint-clearance'
   | 'tie-component-value'
   | 'tie-gap-unpublished'
-  | 'tie-rule-fusion';
+  | 'tie-rule-fusion'
+  | 'grace-missing' | 'grace-value' | 'grace-host' | 'grace-geometry' | 'grace-paint';
 
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
@@ -1851,6 +1853,16 @@ export function checkGridCrossingOffset(
     return;
   }
   const geo = layout.geometry;
+  if (geo.sourceBarTicks) {
+    // Literal repeated pickups and shortened endings have independent bar
+    // cells. The nominal full-measure split is not an ink boundary for them.
+    for (const p of layout.notes) {
+      const index = getMeasureIndexOfTick(p.note,geo,layout.index,t);
+      const left = geo.staffLeft + index * geo.measureWidth;
+      checkHeadInCell(layout,p,left,left+geo.measureWidth,p.nominalX ?? p.x,t,out);
+    }
+    return;
+  }
   const columns = layout.columns;
   const pulseByTick = new Map(
     resolveBeatPulses(geo, layout.index, o, t, columns).map((p) => [p.tick, p.x] as const)
@@ -2711,8 +2723,9 @@ export function systemInkExtents(
   o: ResolvedJankoLayoutOptions
 ): { top: number; bottom: number } {
   const g = layout.geometry;
-  let top = g.staffTopY;
-  let bottom = g.staffBotY;
+  const graceInk = graceVerticalInkBounds(layout.grace ?? [],o,t);
+  let top = Math.min(g.staffTopY, graceInk.top);
+  let bottom = Math.max(g.staffBotY, graceInk.bottom);
   if (o.showMeasureNumbers) {
     const { numeral } = marginFurniture(layout, t, lint, 1, o.systemStartStyle);
     top = Math.min(top, numeral.y0);
@@ -6009,6 +6022,87 @@ export function checkTieIntegrity(
   }
 }
 
+/** Opt-in nonmetrical audit: source identities, full chord host, values, beams,
+ * scaled head/mask paint, and physical separation all have separate witnesses. */
+export function checkGraceIntegrity(score: QuantizedGridScore, layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, out: LintViolation[]): void {
+  if (!score.graceGroups?.length) return;
+  const placed = layout.grace ?? [];
+  const mask = getScaledKnockoutMetrics(o, t, GRACE_SCALE, false);
+  const problem = (code: JankoLintCode, id: string, reason: string) => out.push({ code, severity: 'error', system: layout.index,
+    message: `Grace ${id}: ${reason}` });
+  for (const g of placed) {
+    const source = score.graceGroups.find(q => q.id === g.group.id);
+    const occurrence = source?.occurrences.find(q => q.id === g.occurrence.id);
+    if (!source || !occurrence || source.members.length !== g.heads.length) {
+      problem('grace-missing', g.occurrence.id, 'unknown written group, occurrence or member count'); continue;
+    }
+    const hostIds = new Set(occurrence.hostNoteIds);
+    if (source.hostEventId !== g.group.hostEventId || occurrence.tick !== g.occurrence.tick ||
+        !occurrence.hostNoteIds.length || occurrence.hostNoteIds.join('|') !== g.occurrence.hostNoteIds.join('|') ||
+        occurrence.hostNoteIds.some(id => !score.notes.some(n => n.id === id)))
+      problem('grace-host', g.occurrence.id, 'written event / whole chord occurrence differs from source');
+    const host = layout.notes.find(n => hostIds.has(n.note.id) && n.note.startTick === occurrence.tick);
+    if (!host || Math.abs(g.heads.at(-1)!.x - (host.x - GRACE_HOST_GAP)) > 0.01)
+      problem('grace-host', g.occurrence.id, 'placed ink not aligned before its exact host event');
+    g.heads.forEach((h, i) => {
+      const m = source.members[i];
+      if (h.id !== m.id || h.duration !== m.duration || h.pitchClass !== m.pitch?.pitchClass ||
+          h.beamStart !== m.beamStart || h.beamEnd !== m.beamEnd)
+        problem('grace-value', g.occurrence.id, `member ${i} pitch/value/source bracket differs`);
+      if (i && !(h.x > g.heads[i - 1].x + 2 * mask.wx))
+        problem('grace-geometry', g.occurrence.id, `member ${i} overlaps preceding mask`);
+      if (host && Math.abs(h.x - host.x) < mask.wx + t.noteheadRadius + 1 &&
+          Math.abs(h.y - host.y) < mask.hy + t.noteheadRadius + 1)
+        problem('grace-geometry', g.occurrence.id, `member ${i} touches host disc`);
+      for (const n of layout.notes) {
+        if (hostIds.has(n.note.id)) continue;
+        if (Math.abs(h.x - n.x) < mask.wx + t.noteheadRadius && Math.abs(h.y - n.y) < mask.hy + t.noteheadRadius)
+          problem('grace-geometry', g.occurrence.id, `member ${i} collides with independent note ${n.note.id}`);
+      }
+    });
+    if (g.heads.length > 1 && (g.beamY === undefined || !g.heads[0].beamStart || !g.heads.at(-1)!.beamEnd ||
+        g.heads.some(h => h.duration !== '1/16') || Math.abs(g.beamY - (Math.min(...g.heads.map(h=>h.y)) - GRACE_STEM)) > 0.01))
+      problem('grace-geometry', g.occurrence.id, 'two-level connected beam missing or detached');
+    if (g.heads.length === 1 && (g.beamY !== undefined || g.heads[0].duration !== '1/8'))
+      problem('grace-geometry', g.occurrence.id, 'lone eighth flag replaced by a beam or wrong value');
+  }
+  // The source sidecar, not the rendered list, decides what must be present.
+  for (const group of score.graceGroups.filter(g => g.members.some(m=>m.pitch))) for (const occ of group.occurrences) {
+    const inSystem = layout.notes.some(n => n.note.startTick === occ.tick && occ.hostNoteIds.includes(n.note.id));
+    if (inSystem && !placed.some(g => g.occurrence.id === occ.id)) problem('grace-missing', occ.id, 'pitched source occurrence has no geometry');
+  }
+  const svg = placed.length ? renderSystem(score, layout.geometry, layout.index, o, t, layout) : '';
+  for (const g of placed) {
+    const tag = `data-grace-id="${g.occurrence.id}"`;
+    const begin = svg.indexOf(tag);
+    const end = svg.indexOf('\n    </g>', begin);
+    const paint = begin >= 0 && end > begin ? svg.slice(begin, end) : '';
+    const count = (re: RegExp) => (paint.match(re) ?? []).length;
+    for (const h of g.heads) {
+      const at = paint.indexOf(`data-member="${h.id}" data-written="${h.duration}"`);
+      const segment = at < 0 ? '' : paint.slice(at,paint.indexOf('</g>',at));
+      const rect = /class="janko-knockout" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/.exec(segment);
+      const font = /class="janko-digit"[^>]*font-size="([\d.-]+)pt"/.exec(segment);
+      if (!rect || !font ||
+          Math.abs(Number(rect[1])-(h.x-mask.wx)) > 0.03 ||
+          Math.abs(Number(rect[2])-(h.y-mask.hy)) > 0.03 ||
+          Math.abs(Number(rect[3])-2*mask.wx) > 0.03 ||
+          Math.abs(Number(rect[4])-2*mask.hy) > 0.03 ||
+          Math.abs(Number(font[1])-t.digitFontSize*GRACE_SCALE) > 0.005)
+        problem('grace-paint',g.occurrence.id,`scaled glyph or opaque mask is missing/wrong for ${h.id}`);
+    }
+    if (!paint || count(/class="janko-grace-head"/g) !== g.heads.length ||
+        count(/class="janko-knockout"/g) !== g.heads.length || count(/class="janko-digit"/g) !== g.heads.length ||
+        count(/class="janko-grace-beam"/g) !== (g.heads.length > 1 ? 2 : 0) ||
+        count(/class="janko-grace-flag"/g) !== (g.heads.length === 1 ? 1 : 0) ||
+        count(/class="janko-grace-stem"/g) !== g.heads.length ||
+        g.heads.some(h => !paint.includes(`data-member="${h.id}" data-written="${h.duration}"`)) ||
+        (paint.indexOf('janko-grace-beam') > paint.indexOf('janko-knockout') && g.heads.length > 1))
+      problem('grace-paint', g.occurrence.id, 'source values, mask/head count, stem, flag, beam or paint order absent');
+  }
+}
+
 export function lintJankoScore(
   score: QuantizedGridScore,
   options?: Partial<JankoLayoutOptions> | null,
@@ -6032,6 +6126,7 @@ export function lintJankoScore(
   for (const layout of layouts) {
     const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'
       ?buildInkScene(layout,o,t,score):undefined;
+    checkGraceIntegrity(score, layout, o, t, diagnostics);
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, o, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);

@@ -1927,6 +1927,8 @@ export const JANKO_RHYTHM_STYLE_LABELS: Record<JankoRhythmStyle, string> = {
  * (y grows downward, matching SVG).
  */
 export interface JankoSystemGeometry {
+  /** Opt-in unfolded literal bar boundaries, final end included. */
+  sourceBarTicks?: readonly number[];
   /** Zero-based system index on the page. */
   index: number;
   /** Measures engraved in this system. */
@@ -1982,6 +1984,7 @@ export interface StaffLineSegment {
 
 /** Absolute page geometry for a Jánko Two-Row page. */
 export interface JankoPageGeometry {
+  sourceBarTicks?: readonly number[];
   options: ResolvedJankoLayoutOptions;
   tokens: ResolvedJankoTokens;
   pageWidth: number;
