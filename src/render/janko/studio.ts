@@ -37,6 +37,7 @@ import {
 import { buildChordDurationSpecimenScore } from '../../scores/chord-duration-specimen';
 import { buildSchumannNo43Draft } from '../../scores/schumann-no43-draft';
 import { buildSchumannNo14Draft } from '../../scores/schumann-no14-draft';
+import { buildSchumannNo30Draft } from '../../scores/schumann-no30-draft';
 import {
   REST_DURATION_SPECIMEN_JANKO_OPTIONS,
   REST_DURATION_SPECIMEN_JANKO_TOKENS,
@@ -72,6 +73,7 @@ import {
   BRAHMS_STUDIO_SCORE_ID,
   SCHUMANN_NO43_STUDIO_SCORE_ID,
   SCHUMANN_NO14_STUDIO_SCORE_ID,
+  SCHUMANN_NO30_STUDIO_SCORE_ID,
   BACH_PR112_SCORE_ID,
   BACH_PR114_SCORE_ID,
   PR112_EVENTS,
@@ -295,6 +297,13 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       [BACH_PR114_SCORE_ID]: { id: BACH_PR114_SCORE_ID,
         score: buildBachGoldbergVar1Score(), options, tokens },
     } : {}),
+    [SCHUMANN_NO30_STUDIO_SCORE_ID]: {
+      id: SCHUMANN_NO30_STUDIO_SCORE_ID,
+      score: buildSchumannNo30Draft(),
+      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2, systemsPerPage: 3,
+        gridWritingPolicy: 'unified-transparent-grid', writtenTies: 'source' }),
+      tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 192, anacrusisTicks: 48 }),
+    },
     [SCHUMANN_NO14_STUDIO_SCORE_ID]: {
       id: SCHUMANN_NO14_STUDIO_SCORE_ID,
       score: buildSchumannNo14Draft(),
