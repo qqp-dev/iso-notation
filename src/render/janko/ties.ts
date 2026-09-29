@@ -11,10 +11,11 @@
  *    ink reads the first written component, never the composite total;
  * 2. **each further component gets a conventional tie arc** from the previous
  *    component's head to its own, anchored on the written onsets;
- * 3. **a continuation that coincides with an existing same-pitch head reuses
- *    that head** (the six hidden `tieWaitForNote` carries of mm. 39/40/65/66);
- *    a continuation no head states becomes an explicit continuation head whose
- *    own ink states its component value — never an unvalued tie-only head;
+ * 3. **a continuation reuses an existing same-pitch head only when that
+ *    head's engraved value states the component** (including the six hidden
+ *    `tieWaitForNote` carries of mm. 39/40/65/66); otherwise an explicit
+ *    continuation head states its component value — never an unvalued
+ *    tie-only head;
  * 4. **a coincident same-hand attack/carry group merges to one visible attack
  *    head** — the chain owns it, a shorter simultaneous voice stays a mixed
  *    duration voice (its own stem/flag), and a voice whose written value equals
@@ -116,7 +117,8 @@ export function isTieContinuationHead(id: string): boolean {
  * coincide with no existing head gains explicit continuation heads (`<id>~c<k>`)
  * stating their own written values, exactly like a non-grammar chain. No
  * reattack is invented (added heads carry `tieStart`) and no sounding event
- * is altered; proven head reuse (anchored continuations) is unchanged.
+ * is altered. Reuse requires the anchor's engraved written value to match the
+ * component; an unrelated attack of a different value cannot state it.
  */
 export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplayPlan {
   const empty: JankoTieDisplayPlan = {
@@ -140,7 +142,16 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
     else headAt.set(k, [n]);
   }
 
+  // An anchor may itself be a chain attack: its *engraved* value is its first
+  // component, not its sounding total. Resolve all such values before choosing
+  // any anchors so the choice does not depend on chain iteration order.
   const displayTicks = new Map<string, number>();
+  const orderedChains = [...chains].sort((a, b) => a.noteId.localeCompare(b.noteId));
+  for (const chain of orderedChains) {
+    if (byId.has(chain.noteId) && chain.components[0]) {
+      displayTicks.set(chain.noteId, chain.components[0].durationTicks);
+    }
+  }
   const rendered: JankoTieChainPlan[] = [];
   const heads: QuantizedNote[] = [];
   const headIds = new Set<string>();
@@ -150,7 +161,7 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
   // Round 49 §1: no consolidation filter — every committed chain renders.
   // (The former `!nonGrammar && !anchored` skip conflated equal sounding
   // duration with equivalent notation.)
-  for (const chain of [...chains].sort((a, b) => a.noteId.localeCompare(b.noteId))) {
+  for (const chain of orderedChains) {
     const note = byId.get(chain.noteId);
     if (!note) continue;
     const nonGrammar = !tieValueInGrammar(chain.soundingTicks);
@@ -172,7 +183,9 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
         });
         return;
       }
-      const anchor = anchors[index - 1][0];
+      const anchor = anchors[index - 1].find(
+        (candidate) => (displayTicks.get(candidate.id) ?? candidate.durationTicks) === component.durationTicks
+      );
       if (anchor) {
         components.push({
           index,
@@ -227,8 +240,6 @@ export function deriveTieDisplayPlan(score: QuantizedGridScore): JankoTieDisplay
         tieWait: component.tieWait,
       });
     });
-    const first = chain.components[0];
-    if (first) displayTicks.set(chain.noteId, first.durationTicks);
     for (const c of components) headIds.add(c.headId);
     rendered.push({
       noteId: chain.noteId,
