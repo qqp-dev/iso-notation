@@ -28,6 +28,15 @@ export const SOURCE_DOCUMENTS = {
     differences: 'Header cites IMSLP #10496 and #03773, not Henle. Published PDF — not independently rebuilt.',
     pages: 2, bytes: 110919, sha256: 'ccf50b7878ba0dd231a5f43a3c60a5e4a33c187a4fec5849983d635c8eb6440e',
   },
+  'kinderszenen-v70': {
+    role: 'candidate', title: 'Schumann · Kinderszenen Op. 15 · Nos. 1/6/8 (within complete Op. 15)',
+    edition: 'Madrisan open-scores · published transcription · Breitkopf & Härtel 1880, plate R.S. 53 source parent',
+    version: 'Published v70 PDF · commit 1add902dee06d3a94ebedf6cc6405dfedf4a11f4',
+    url: 'https://github.com/madrisan/open-scores/releases/download/v70/Robert-Schumann-Kinderscenen-op.15.pdf',
+    rights: 'Repository claims CC BY-NC-SA 4.0; underlying edition and reuse rights not independently cleared.',
+    differences: 'Not certified against Henle HN 44 or adopted as a canonical score. PDF page anchors are independently checked as text boundaries; inspect actual rendered pages.',
+    pages: 16, bytes: 2496446, sha256: '30ded702114332842e87aecd63cc672d32ac32ea7a779a70939055fbff6013af',
+  },
   'schumann-starter': {
     role: 'candidate', title: 'Schumann · Album für die Jugend Op. 68',
     edition: 'Published transcription · starter (Peters parent unspecified)',
@@ -49,9 +58,16 @@ export const SOURCE_DOCUMENTS = {
 } as const;
 // Page numbers in image records are printed folio numbers, not PDF indexes.
 const henle = 'https://www.henle.de/en/Album-for-the-Young-op.-68/HN-45';
+const hn44 = 'https://www.henle.de/Scenes-from-Childhood-op.-15/HN-44';
 const institute = 'https://brahmsinstitut.de/Archiv/web/bihl_digital/schumann_drucke_units/schum_op_068.html';
 const archive = 'https://brahmsinstitut.de/Archiv/web/bihl_digital/schumann_drucke/';
 export const SOURCE_IMAGES = {
+  'henle-op15-1': { role: 'reference', title: 'Schumann Op. 15 No. 1 · Von fremden Ländern und Menschen', edition: 'Henle HN 44 · Ernst Herttrich · proposed comparison · original public preview', source: hn44,
+    pages: [{ folio: 2, frame: 10, url: 'https://www.henle.de/media/8e/b8/e2/1740990328/0044_0010-1740990328-sync.jpg' }] },
+  'henle-op15-6': { role: 'reference', title: 'Schumann Op. 15 No. 6 · Wichtige Begebenheit', edition: 'Henle HN 44 · Ernst Herttrich · proposed comparison · original public preview', source: hn44,
+    pages: [{ folio: 7, frame: 15, url: 'https://www.henle.de/media/e2/02/d2/1740990328/0044_0015-1740990328-sync.jpg' }] },
+  'henle-op15-8': { role: 'reference', title: 'Schumann Op. 15 No. 8 · Am Camin', edition: 'Henle HN 44 · Ernst Herttrich · proposed comparison · original public preview', source: hn44,
+    pages: [{ folio: 9, frame: 17, url: 'https://www.henle.de/media/80/79/29/1740990327/0044_0017-1740990327-sync.jpg' }] },
   'henle-13': { role: 'reference', title: 'Schumann Op. 68 No. 13', edition: 'Henle HN 45 · Ernst Herttrich · original public preview', source: henle,
     pages: [{ folio: 14, url: 'https://www.henle.de/media/1c/1b/ab/1692635407/0045_0028-1692635407-sync.jpg' },
       { folio: 15, url: 'https://www.henle.de/media/76/45/42/1692635391/0045_0029-1692635391-sync.jpg' }] },
@@ -66,13 +82,16 @@ export type SourceDocumentId = keyof typeof SOURCE_DOCUMENTS | keyof typeof SOUR
 export type PdfId = keyof typeof SOURCE_DOCUMENTS;
 export const isImage = (id: SourceDocumentId): id is keyof typeof SOURCE_IMAGES => Object.hasOwn(SOURCE_IMAGES, id);
 export const pageCount = (id: SourceDocumentId): number => isImage(id) ? SOURCE_IMAGES[id].pages.length : SOURCE_DOCUMENTS[id].pages;
-export const REFERENCE_IDS: SourceDocumentId[] = ['imslp-936721', 'imslp-10496', 'henle-13', 'schuberth-14', 'schuberth-30', 'henle-43'];
-export const CANDIDATE_IDS: SourceDocumentId[] = ['snortum-v0.4-no01', 'mutopia-1779-no01', 'schumann-starter'];
+export const REFERENCE_IDS: SourceDocumentId[] = ['imslp-936721', 'imslp-10496', 'henle-13', 'schuberth-14', 'schuberth-30', 'henle-43', 'henle-op15-1', 'henle-op15-6', 'henle-op15-8'];
+export const CANDIDATE_IDS: SourceDocumentId[] = ['snortum-v0.4-no01', 'mutopia-1779-no01', 'schumann-starter', 'kinderszenen-v70'];
 export const WORKS = {
   scriabin: { label: 'Scriabin · Op. 11 No. 1', reference: ['imslp-936721', 'imslp-10496'], candidate: ['snortum-v0.4-no01', 'mutopia-1779-no01'], starterPage: 1 },
   'schumann-13': { label: 'Schumann · Op. 68 No. 13', reference: ['henle-13'], candidate: ['schumann-starter'], starterPage: 20 },
   'schumann-14': { label: 'Schumann · Op. 68 No. 14', reference: ['schuberth-14'], candidate: ['schumann-starter'], starterPage: 22 },
   'schumann-30': { label: 'Schumann · Op. 68 No. 30', reference: ['schuberth-30'], candidate: ['schumann-starter'], starterPage: 56 },
   'schumann-43': { label: 'Schumann · Op. 68 No. 43', reference: ['henle-43'], candidate: ['schumann-starter'], starterPage: 86 },
+  'kinderszenen-1': { label: 'Schumann · Op. 15 No. 1', reference: ['henle-op15-1'], candidate: ['kinderszenen-v70'], starterPage: 3 },
+  'kinderszenen-6': { label: 'Schumann · Op. 15 No. 6', reference: ['henle-op15-6'], candidate: ['kinderszenen-v70'], starterPage: 8 },
+  'kinderszenen-8': { label: 'Schumann · Op. 15 No. 8', reference: ['henle-op15-8'], candidate: ['kinderszenen-v70'], starterPage: 10 },
 } as const satisfies Record<string, { label: string; reference: readonly SourceDocumentId[]; candidate: readonly SourceDocumentId[]; starterPage: number }>;
 export type WorkId = keyof typeof WORKS;

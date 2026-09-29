@@ -44,7 +44,11 @@ export const pinnedRequest: Transport = (url, ip, timeout, cap, signal) => new P
   const countedError = (error: Error) => Object.assign(error, { receivedBytes: received });
   const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(url, {
     method: 'GET', agent: false, signal, headers: { Accept: 'text/html,application/pdf,image/*,*/*;q=0.5', 'Accept-Encoding': 'identity', 'User-Agent': 'iso-notation-source-inventory/1' },
-    lookup: (_hostname, _options, callback) => callback(null, ip, 4),
+    // Node's autoSelectFamily asks lookup({ all: true }) for an array even when
+    // only one vetted address is pinned. A scalar breaks Node 26's default path.
+    lookup: (_hostname, options, callback) => options.all
+      ? callback(null, [{ address: ip, family: 4 }])
+      : callback(null, ip, 4),
   }, (response) => {
     const chunks: Buffer[] = []; let size = 0;
     response.on('data', (chunk: Buffer) => {
@@ -78,24 +82,29 @@ function typeFor(url: string): string | null {
   const p = new URL(url).pathname.toLowerCase();
   if (p.endsWith('.pdf')) return 'pdf';
   if (/\.(png|jpe?g|tiff?|webp|gif|jp2)$/.test(p)) return 'image';
-  if (/\.(musicxml|mxl|xml|ly|ily|krn|mei|mid|midi)$/.test(p)) return 'encoding';
+  if (/\.(musicxml|mxl|xml|ly|ily|krn|mei|mid|midi|mscx|mscz)$/.test(p)) return 'encoding';
   return null;
 }
 export function linkedAssets(html: string, base: string): { url: string; type: string }[] {
+  return htmlAssetLeads(html, base).links;
+}
+function htmlAssetLeads(html: string, base: string): { links: { url: string; type: string }[]; truncated: boolean } {
   const out: { url: string; type: string }[] = [], seen = new Set<string>();
   // Tag attributes are leads only; never fetched automatically. Script/text literals are not links.
   const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>|<style\b[^>]*>[\s\S]*?<\/style\s*>|<!--[\s\S]*?-->/gi, '');
   for (const tag of markup.matchAll(/<(?:a|link|img|source|object|embed)\b[^>]*>/gi)) {
     const match = /\b(?:href|src|data)\s*=\s*(["'])(.*?)\1/i.exec(tag[0]);
     if (!match) continue;
-    if (out.length >= MAX_LINKS) break;
     try {
       const url = safeURL(new URL(match[2].replaceAll('&amp;', '&'), base).href).href;
       const type = typeFor(url);
-      if (type && !seen.has(url)) { out.push({ url, type }); seen.add(url); }
+      if (type && !seen.has(url)) {
+        if (out.length >= MAX_LINKS) return { links: out, truncated: true };
+        out.push({ url, type }); seen.add(url);
+      }
     } catch { /* nonpublic or malformed link: not a fetch candidate */ }
   }
-  return out;
+  return { links: out, truncated: false };
 }
 async function pdfFacts(bytes: Uint8Array): Promise<object> {
   const worker = new Worker(new URL('./source-pdf-facts-worker.mjs', import.meta.url), {
@@ -117,7 +126,7 @@ export async function inventory(inputs: string[], deps: { transport?: Transport;
   const now = deps.now ?? Date.now, transport = deps.transport ?? pinnedRequest, resolve = deps.resolve ?? resolvePublic;
   const started = now(), results = [], totals = { attempted: 0, completed: 0, failed: 0, httpErrors: 0, redirects: 0, responseBytes: 0 }; 
   for (const input of inputs) {
-    const item: { input: string; finalURL?: string; status?: number; contentType?: string; bytes?: number; sha256?: string; kind?: string; facts?: object; links?: object[]; error?: string; requests: number; humanCoverage: string } =
+    const item: { input: string; finalURL?: string; status?: number; contentType?: string; bytes?: number; sha256?: string; kind?: string; facts?: object; links?: object[]; linksTruncated?: boolean; error?: string; requests: number; humanCoverage: string } =
       { input, requests: 0, humanCoverage: 'unverified; inspect each requested-piece page independently' };
     results.push(item);
     try {
@@ -158,7 +167,9 @@ export async function inventory(inputs: string[], deps: { transport?: Transport;
           item.kind = 'pdf'; item.sha256 = sha(bytes);
           try { item.facts = await pdfFacts(bytes); } catch (error) { item.facts = { parserError: String(error) }; }
         } else if (/^\s*(?:<!doctype html|<html|<head|<body)/i.test(prefix) || (item.contentType ?? '').includes('text/html')) {
-          item.kind = 'html'; item.links = linkedAssets(Buffer.from(bytes).toString('utf8'), url.href);
+          item.kind = 'html';
+          const leads = htmlAssetLeads(Buffer.from(bytes).toString('utf8'), url.href);
+          item.links = leads.links; item.linksTruncated = leads.truncated;
         } else if (/^(?:\x89PNG|GIF8|\xff\xd8\xff|II\x2a\x00|MM\x00\x2a)/.test(prefix)) {
           item.kind = 'image'; item.sha256 = sha(bytes);
         } else if (typeFor(url.href) === 'encoding') {

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 import { createHash } from 'node:crypto';
-import { inventory, linkedAssets, type Reply, type Transport } from '../scripts/inventory-source-routes';
+import { inventory, linkedAssets, pinnedRequest, type Reply, type Transport } from '../scripts/inventory-source-routes';
 
 function pdfWithAttachment(): Uint8Array {
   const objects = [
@@ -78,6 +80,30 @@ test('failed, oversized, timed-out and incomplete responses cannot produce ident
   for (const item of result.results.slice(0, 3)) { assert.equal(item.sha256, undefined); assert.equal(item.facts, undefined); }
   assert.match(result.results[3].facts ? JSON.stringify(result.results[3].facts) : '', /parserError/);
   assert.equal(result.requests.failed, 3);
+});
+
+test('Node default socket family selection accepts pinned lookup without disabling protection', async () => {
+  const server = createServer((_req, res) => res.end('pinned transport'));
+  server.listen(0, '127.0.0.1');
+  try {
+    await once(server, 'listening');
+    const port = (server.address() as { port: number }).port;
+    // Direct transport test only: inventory itself still rejects IP literals/private DNS.
+    const result = await pinnedRequest(new URL(`http://example.org:${port}/`), '127.0.0.1', 1000, 1024);
+    assert.equal(Buffer.from(result.bytes).toString(), 'pinned transport');
+    assert.equal(result.status, 200);
+  } finally { server.close(); await once(server, 'close'); }
+});
+
+test('MuseScore extensions remain unparsed leads and bounded HTML links report truncation', async () => {
+  const html = `<html>${Array.from({ length: 41 }, (_, i) => `<a href="/score${i}.mscx">score</a>`).join('')}</html>`;
+  const report = await inventory(['https://example.org/item', 'https://example.org/score.mscz'], {
+    resolve: resolver, transport: async (url) => reply(Buffer.from(url.pathname === '/item' ? html : 'unparsed archive')),
+  });
+  assert.equal(report.results[0].links?.length, 40);
+  assert.equal(report.results[0].linksTruncated, true);
+  assert.equal(report.results[1].kind, 'encoding candidate (extension only; format unverified)');
+  assert.equal((await inventory(['https://example.org/short'], { resolve: resolver, transport: async () => reply(Buffer.from('<html><a href="/one.mscz">x</a></html>')) })).results[0].linksTruncated, false);
 });
 
 test('non-success is accounted separately, encoding links are candidates not verified scores', async () => {
