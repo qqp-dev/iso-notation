@@ -224,6 +224,22 @@ export interface WrittenTieChain {
   voice: string;
 }
 
+/** Nonmetrical written ornament or synchronization fact. Its host tick is alignment, not playback time. */
+export interface GraceGroup {
+  id: string;
+  source: { file: string; line: number; column: number; endLine: number; endColumn: number; bar: number };
+  voice: string;
+  staff: string;
+  printedStaff: string;
+  hand: Hand | null; // null on the non-performing Dynamics synchronization channel
+  kind: 'grace' | 'appoggiatura';
+  members: { id: string; spelling?: string; pitch?: PitchCoordinate; duration: string; beamStart: boolean; beamEnd: boolean;
+    line: number; column: number; endLine: number; endColumn: number }[];
+  hostEventId: string;
+  hostKind: 'note' | 'rest' | 'spacer';
+  occurrences: { id: string; sourceBar: number; pass: number; tick: number; hostNoteIds: string[] }[];
+}
+
 export interface QuantizedGridScore {
   id: string;
   title: string;
@@ -245,6 +261,10 @@ export interface QuantizedGridScore {
    * score has no such provenance.
    */
   tieChains?: WrittenTieChain[];
+  /** Absent for scores without nonmetrical source facts; never sounding notes. */
+  graceGroups?: GraceGroup[];
+  /** Opt-in literal unfolded bar starts plus final end (ticks); for scores with repeated pickups/short endings. */
+  sourceBarTicks?: number[];
   /**
    * Round 48: the source's **authored silences** (written rests and spacers),
    * in source order. Omitted entirely when the score has no such provenance, so

@@ -1241,9 +1241,20 @@ export const ROUND52_HAND_PROOF_CANDIDATES: JankoCandidate[] = [
 export const SCHUMANN_NO43_STUDIO_SCORE_ID = 'schumann-op68-no43';
 export const SCHUMANN_NO14_STUDIO_SCORE_ID = 'schumann-op68-no14';
 export const SCHUMANN_NO30_STUDIO_SCORE_ID = 'schumann-op68-no30';
+export const SCHUMANN_NO13_STUDIO_SCORE_ID = 'schumann-op68-no13';
 
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
+  { id: 'schumann-no13-written-draft', label: 'Schumann Op. 68 No. 13 · Draft / unfolded repeats',
+    description: 'Complete source-derived 28-bar / 56-occurrence draft. Eight pitched pre-host grace groups (13 written members) keep their own eighth flags or connected sixteenth beams, with zero metrical time; 12 further spacer-only synchronization groups are retained without ink. Hands are provisional; slurs, fingerings, expressions and source staff layout remain deferred. Not GOLD or BRONZE.',
+    tags: ['Draft / unfolded repeats', 'nonmetrical grace', 'provisional hands', 'deferred expression'],
+    windows: [
+      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 1, measureCount: 56, fullScore: true, title: 'Complete unfolded score · mm. 1–56', caption: 'All real-engine pages · 28 written bars, two passes of both halves; source grace groups occupy pre-host ink, never clock time.' },
+      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 3, measureCount: 5, title: 'First part · written lines 84–87', caption: 'Opening pre-host sixteenth pairs and eighth-to-chord; lower synchronized spacer grace before a rest has no pitched ink.' },
+      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 9, measureCount: 2, title: 'Written line 90 · beamed pair and chord', caption: 'Two distinct sixteenth heads joined by two source-ordered beams before the whole chord host.' },
+      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 23, measureCount: 3, title: 'Second half · written line 96', caption: 'One eighth flag before a chord host; lower appoggiatura is a spacer-only synchronization fact.' },
+      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 29, measureCount: 5, title: 'Second-half continuation · written lines 105–108', caption: 'Braced pairs and lone eighth grace on the second repeated section; identical written facts unfold with separate occurrence IDs.' },
+    ] },
   { id: 'schumann-no30-written-draft', label: 'Schumann Op. 68 No. 30 · Draft / unfolded repeats',
     description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Printed cross-staff destinations, literal tie and laissez-vibrer marks, expressive/fingering/slur/arpeggio layout and omissions remain source-linked in the ledger. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked ties', 'deferred notation'],

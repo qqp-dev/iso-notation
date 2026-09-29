@@ -369,12 +369,16 @@ export function resolveBeatPulses(
     // The absolute tick of this loop cell's first beat. The anacrusis system's
     // opening cell is the first *full* measure (measure index 1, starting at
     // the anacrusis); every other cell follows the ordinary measure grid.
-    const measureStartTick = isSys0Anacrusis
+    const sourceBar = systemIndex * o.measuresPerSystem + m;
+    const measureStartTick = geo.sourceBarTicks?.[sourceBar] ?? (isSys0Anacrusis
       ? anacrusis + m * t.ticksPerMeasure
-      : anacrusis + (systemIndex * o.measuresPerSystem + m) * t.ticksPerMeasure;
+      : anacrusis + sourceBar * t.ticksPerMeasure);
+    const beatCount = geo.sourceBarTicks
+      ? Math.ceil((geo.sourceBarTicks[sourceBar + 1] - measureStartTick) / t.ticksPerBeat)
+      : beatsPerMeasure;
     // Round 33 `none`: no interior pulse paints at all (barlines always do).
     if (o.gridPulseFilter === 'none') continue;
-    for (let b = 1; b < beatsPerMeasure; b++) {
+    for (let b = 1; b < beatCount; b++) {
       // Round 32 `midpoint-only`: a filter over the existing candidates —
       // retain the pulse iff its tick offset is exactly half a measure.
       // Odd subdivisions with no existing midpoint retain nothing here.
@@ -385,7 +389,7 @@ export function resolveBeatPulses(
         continue;
       }
       const tick = measureStartTick + b * t.ticksPerBeat;
-      out.push({ tick, x: columns?.get(tick) ?? measureLeft + left + (b / beatsPerMeasure) * available });
+      out.push({ tick, x: columns?.get(tick) ?? measureLeft + left + (b * t.ticksPerBeat / (geo.sourceBarTicks ? geo.sourceBarTicks[sourceBar + 1] - measureStartTick : t.ticksPerMeasure)) * available });
     }
   }
   return out;

@@ -1,10 +1,10 @@
-/** Read-only, deliberately bounded LilyPond music visitor for approved No. 43 and No. 14 encodings.
+/** Read-only, deliberately bounded LilyPond music visitor for approved Nos. 43/14/30/13.
  * No Scheme evaluation or LilyPond process is involved. Unsupported musical syntax fails closed.
  * Derived encodings retain the source's Free Art License / Copyleft attribution to Philippe Hardy.
  */
 import { createHash } from 'node:crypto';
 import { fromLinearIndex } from '../model/pitch';
-import type { QuantizedGridScore, QuantizedNote, VoiceSilence, WrittenTieChain } from '../model/types';
+import type { QuantizedGridScore, QuantizedNote, VoiceSilence, WrittenTieChain, GraceGroup } from '../model/types';
 
 export interface WrittenMark { eventId: string; mark: 'outgoing-tie' | 'incoming-repeat-tie' | 'laissez-vibrer'; line: number; column: number; voice: string }
 export interface OccurrenceTie { fromId: string; toId: string; pitch: number; fromOccurrence: number; toOccurrence: number; fromTick: number; toTick: number }
@@ -22,7 +22,7 @@ export interface DeferredFact {
   construct: string; reason: string; effect: string; blocking: boolean; voice: string;
 }
 interface Token { text: string; line: number; column: number; offset: number; endOffset: number }
-interface Part { events: WrittenEvent[]; bars: { number: number; duration: string }[];
+interface Part { events: WrittenEvent[]; graces: GraceGroup[]; bars: { number: number; duration: string }[];
   repeats: { start: number; end: number; alternatives: number[][] }[]; anchor?: number; anchorD?: number; previous?: Fraction; }
 const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
 class Fraction {
@@ -76,15 +76,24 @@ function dur(digit: string | undefined, dots: string | undefined, mult: string |
   return mult ? value.mul(new Fraction(Number(mult), Number(div ?? '1'))) : value;
 }
 function exactTicks(value: string, quarter: number): number {
-  const f = Fraction.parse(value); const n = f.n * quarter * 4 / f.d;
-  if (!Number.isSafeInteger(n)) throw Error(`Non-integral tick for ${value} at ${quarter} ticks/quarter`);
-  return n;
+  const f = Fraction.parse(value);
+  const numerator = BigInt(f.n) * BigInt(quarter) * 4n, denominator = BigInt(f.d);
+  if (numerator % denominator !== 0n || numerator / denominator > BigInt(Number.MAX_SAFE_INTEGER) ||
+      numerator / denominator < BigInt(Number.MIN_SAFE_INTEGER))
+    throw Error(`Non-integral or unsafe tick for ${value} at ${quarter} ticks/quarter`);
+  return Number(numerator / denominator);
 }
 
-export interface SchumannImportIdentity { file: string; hash: string; number: 43 | 14 | 30 }
+export interface SchumannImportIdentity { file: string; hash: string; number: 43 | 14 | 30 | 13 }
 const NO43: SchumannImportIdentity = { file: '43-Chant-du-Nouvel-An.ly', hash: '150e13d9723743fea780168fd9776525a856a99506522072185b619d3815797f', number: 43 };
 const NO14: SchumannImportIdentity = { file: '14-Petite-etude.ly', hash: '42aa471662af4d919f696b03e6b7b5b634a8e1f1310303aa6a92075c9b511533', number: 14 };
 const NO30: SchumannImportIdentity = { file: '30-sans-titre.ly', hash: '2dbde2fc08b9204df98a6b2f93a4c67a87b9fe8ca74bcab39a6cec0e42b518d0', number: 30 };
+const NO13: SchumannImportIdentity = { file: '13-Mai-cher-Mai.ly', hash: 'c9345d758fb6bb2bd88425d810e1578e4db497e7393f23bbda6504644fc3e15e', number: 13 };
+export function importSchumannNo13(source: string) {
+  const hash = createHash('sha256').update(source).digest('hex');
+  if (hash !== NO13.hash) throw Error(`Unapproved Schumann No. 13 source hash ${hash}; expected ${NO13.hash}`);
+  return importSchumann(source, NO13);
+}
 export function importSchumannNo30(source: string) {
   const hash = createHash('sha256').update(source).digest('hex');
   if (hash !== NO30.hash) throw Error(`Unapproved Schumann No. 30 source hash ${hash}; expected ${NO30.hash}`);
@@ -100,7 +109,7 @@ export function importSchumannNo14(source: string) {
 export function importSchumann(source: string, identity: SchumannImportIdentity):
   { facts: { sourceHash: string; sourceFile: string; pickup: string; events: WrittenEvent[];
     ties: { fromId: string; toId: string; fromPitch: number; toPitch: number }[];
-    writtenMarks?: WrittenMark[]; occurrenceTies?: OccurrenceTie[];
+    writtenMarks?: WrittenMark[]; occurrenceTies?: OccurrenceTie[]; graceGroups?: GraceGroup[];
     bars: { number: number; duration: string }[]; expressionSpacers?: ExpressionSpacer[];
     repeats: Part['repeats']; occurrences: { sourceBar: number; pass: number; onset: string }[];
     handPolicy: string; provenance: { author: string; maintainer: string; sourceHeader: string; licenseNotice: string;
@@ -109,7 +118,8 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
   const { file } = identity;
   const approvedSource = identity.number === 43 && sourceHash === NO43.hash;
   const no30 = identity.number === 30;
-  const no14 = identity.number === 14 || no30;
+  const no13 = identity.number === 13;
+  const no14 = identity.number === 14 || no30 || no13;
   const approvedNo30 = no30 && sourceHash === NO30.hash;
 
   const t = tokenize(source); let i = 0;
@@ -138,6 +148,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
   if (scoreAt < 0) throw Error(`${file}: no score music tree`);
   i = scoreAt + 1; expect('{', 'score');
   const parts: Part[] = []; const expressionSpacers: ExpressionSpacer[] = [];
+  const dynamicGraces: GraceGroup[] = [];
   const writtenMarksAll: WrittenMark[] = [];
   let pickup = ''; let meter = '1';
   function music(staff: string, voice: string, relative: number, relativeD = 0, inheritedDuration = new Fraction(1, 4), destination = staff): Part {
@@ -146,7 +157,8 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     let once: Token | undefined;
     let lastEvent: WrittenEvent | undefined;
     const localMarks: WrittenMark[] = [];
-    const events: WrittenEvent[] = [], bars: Part['bars'] = [], repeats: Part['repeats'] = [];
+    const events: WrittenEvent[] = [], graces: GraceGroup[] = [], bars: Part['bars'] = [], repeats: Part['repeats'] = [];
+    let pendingGrace: GraceGroup | undefined;
     const pitch = (token: Token, prior: { n: number; d: number }) => {
       const m = pitchRe.exec(token.text); if (!m) error(token, voice, 'Invalid pitch');
       const [, name, accidental = '', marks = ''] = m!;
@@ -162,17 +174,18 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
       expect('{', voice);
       while (i < t.length && t[i].text !== '}') {
         const tk = pop(), x = tk.text;
-        if (x === '|') { const length = time.add(new Fraction(-barStart.n, barStart.d));
-          if (no14 && length.n * Fraction.parse(meter).d > Fraction.parse(meter).n * length.d)
-            error(tk, voice, 'Written bar overrun');
+        if (x === '|') { if (pendingGrace) error(tk, voice, 'Grace has no host before barline'); const length = time.add(new Fraction(-barStart.n, barStart.d));
+          if (no14 && !no13 && length.n * Fraction.parse(meter).d > Fraction.parse(meter).n * length.d)
+            error(tk, voice, `Written bar overrun ${length} at ${time} bar ${bar}`);
           if (length.n === 0) { // A barline after a multiplied whole-bar spacer does not create a new bar.
             if (bars.length === 0) error(tk, voice, 'Empty written bar');
             continue;
           }
           bars.push({ number: bar, duration: length.toString() }); barStart = time; bar++; continue; }
         if (x === '\\repeat') {
+          if (pendingGrace) error(tk, voice, 'Ambiguous grace host across repeat');
           expect('volta', voice); const times = pop(); if (times.text !== '2') error(times, voice, 'Only two-pass volta supported');
-          const start = bar; sequence(); const end = bar - 1;
+          const start = bar; sequence(no13); const end = bar - 1;
           const alternatives: number[][] = [];
           if (t[i]?.text === '\\alternative') {
             pop(); expect('{', voice);
@@ -183,6 +196,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           repeats.push({ start, end, alternatives }); continue;
         }
         if (x === '<<') {
+          if (pendingGrace) error(tk, voice, 'Ambiguous grace host across simultaneous voices');
           // Independent simultaneous voices share the same bar clock, not sequential time.
           const base = time, baseBar = bar, baseBarStart = barStart;
           const branchParts: Part[] = [];
@@ -198,26 +212,37 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           expect('>>', voice);
           // Branches were independently measured from zero; align them to parent position.
           for (const child of branchParts) {
-            for (const e of child.events) { e.onset = Fraction.parse(e.onset).add(base).toString(); e.bar += baseBar; events.push(e); }
+            for (const e of child.events) {
+              const local = Fraction.parse(e.onset);
+              e.onset = local.add(base).toString();
+              const boundaries = branchParts[0].bars.slice(0, -1).map((_, k) =>
+                branchParts[0].bars.slice(0, k + 1).reduce((v, b) => v.add(Fraction.parse(b.duration)), Z));
+              e.bar = no13 ? baseBar + boundaries.filter(boundary => local.n * boundary.d >= boundary.n * local.d).length : e.bar + baseBar;
+              events.push(e);
+            }
+            for (const g of child.graces) { g.source.bar += baseBar; graces.push(g); }
           }
           for (const r of branchParts[0]?.repeats ?? []) repeats.push({ start: r.start + baseBar, end: r.end + baseBar,
             alternatives: r.alternatives.map(a => a.map(b => b + baseBar)) });
           const lengths = branchParts.map(p => p.bars.reduce((sum, b) => sum.add(Fraction.parse(b.duration)), Z));
           if (!lengths.length || lengths.some(l => l.toString() !== lengths[0].toString()) ||
-              branchParts.slice(1).some(p => p.bars.length !== branchParts[0].bars.length ||
-                p.bars.some((b, j) => b.duration !== branchParts[0].bars[j].duration)))
-            error(tk, voice, 'Simultaneous voices disagree on bar accounting');
+              (!no13 && branchParts.slice(1).some(p => p.bars.length !== branchParts[0].bars.length ||
+                p.bars.some((b, j) => b.duration !== branchParts[0].bars[j].duration))))
+            error(tk, voice, `Simultaneous voices disagree on bar accounting ${JSON.stringify(branchParts.map(p => p.bars))}`);
           if (!no14 || no30) {
             for (const childBar of branchParts[0].bars) bars.push({ number: childBar.number + baseBar, duration: childBar.duration });
             time = base.add(lengths[0]); bar = baseBar + branchParts[0].bars.length; barStart = time;
           } else {
-            if (branchParts[0].bars.length > 1) error(tk, voice, 'Unsupported simultaneous bar structure');
-            time = base.add(lengths[0]);
+            if (!no13 && branchParts[0].bars.length > 1) error(tk, voice, 'Unsupported simultaneous bar structure');
+            time = base;
             anchor = branchParts[0].anchor!; anchorD = branchParts[0].anchorD!; previous = branchParts[0].previous!;
-            const elapsed = time.add(new Fraction(-baseBarStart.n, baseBarStart.d));
-            if (elapsed.toString() === Fraction.parse(meter).toString()) { bars.push({ number: bar++, duration: Fraction.parse(meter).toString() }); barStart = time; }
-            else if (elapsed.n * Fraction.parse(meter).d > Fraction.parse(meter).n * elapsed.d)
-              error(tk, voice, 'Simultaneous voices overrun bar');
+            for (const childBar of branchParts[0].bars) {
+              time = time.add(Fraction.parse(childBar.duration));
+              const elapsed = time.add(new Fraction(-barStart.n, barStart.d));
+              if (elapsed.toString() === Fraction.parse(meter).toString()) { bars.push({ number: bar++, duration: Fraction.parse(meter).toString() }); barStart = time; }
+              else if (elapsed.n * Fraction.parse(meter).d > Fraction.parse(meter).n * elapsed.d)
+                error(tk, voice, 'Simultaneous voices overrun bar');
+            }
           }
           continue;
         }
@@ -229,9 +254,54 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
         if (x === '\\relative') { const ref = pop(); const match = pitchRe.exec(ref.text); if (!match) error(ref, voice); const marks = match![3];
           anchorD = diatonic[match![1]] + ((marks.match(/'/g) ?? []).length - (marks.match(/,/g) ?? []).length) * 7;
           anchor = (3 + Math.floor(anchorD / 7)) * 12 + letters[match![1]]; sequence(); continue; }
+        if (no13 && (x === '\\grace' || x === '\\appoggiatura')) {
+          if (pendingGrace) error(tk, voice, 'Grace without unique following host');
+          const group: GraceGroup = { id: `${file}:${tk.line}:${tk.column}:${voice}`, source: { file, line: tk.line, column: tk.column, endLine: tk.line, endColumn: tk.column + tk.text.length, bar },
+            voice, staff, printedStaff, hand: staff === 'upper' ? 'RH' : 'LH', kind: x === '\\grace' ? 'grace' : 'appoggiatura',
+            members: [], hostEventId: '', hostKind: 'note', occurrences: [] };
+          const braced = t[i]?.text === '{'; if (braced) pop();
+          let open = false;
+          do {
+            if (no13 && t[i]?.text === '\\once') {
+              const first = pop(); expect('\\override', voice); const property = pop();
+              if (property.text !== 'Slur') error(property, voice, 'Only source Slur stencil layout in appoggiatura');
+              const field = pop(); if (field.text !== "#'stencil") error(field, voice);
+              expect('=', voice); const value = pop(); if (value.text !== '##f') error(value, voice);
+              deferSpan(first, value, voice, 'Synchronization slur stencil deferred');
+            }
+            const p = pop();
+            const rest = restRe.exec(p.text), match = pitchRe.exec(p.text);
+            if (!rest && !match) error(p, voice, 'Unsupported grace member');
+            if (rest && rest[1] !== 's') error(p, voice, 'Grace rest is not a synchronization spacer');
+            const item = match ? pitch(p, { n: anchor, d: anchorD }) : undefined;
+            const value = rest ? dur(rest[2], rest[3], rest[4], rest[5], previous) : dur(match![4], match![5], match![6], match![7], previous);
+            if (match?.[4] || rest?.[2]) previous = dur(match?.[4] ?? rest![2], match?.[5] ?? rest![3], undefined, undefined, previous);
+            if (item) { anchor = item.absolutePitch; anchorD = item.d; }
+            const member = { id: `${group.id}:${group.members.length}`, ...(item ? { spelling: item.spelling, pitch: fromLinearIndex(item.absolutePitch) } : {}),
+              duration: value.toString(), beamStart: false, beamEnd: false, line: p.line, column: p.column,
+              endLine: p.line, endColumn: p.column + p.text.length };
+            group.members.push(member);
+            while (['^', '_', '(', ')', '[', ']'].includes(t[i]?.text ?? '')) {
+              const attachment = pop();
+              if (attachment.text === '[') { if (open) error(attachment, voice, 'Nested grace beam'); open = true; member.beamStart = true; }
+              else if (attachment.text === ']') { if (!open) error(attachment, voice, 'Unopened grace beam'); open = false; member.beamEnd = true; }
+              else if (attachment.text === '^' || attachment.text === '_') {
+                if (/^\d+$/.test(t[i]?.text ?? '') || ['(', ')'].includes(t[i]?.text ?? '')) deferSpan(attachment, pop(), voice, 'Grace fingering or phrasing deferred');
+                else error(t[i] ?? attachment, voice, 'Unsupported grace attachment');
+              } else defer(attachment, voice, 'Grace slur deferred');
+            }
+            member.endLine = t[i - 1].line; member.endColumn = t[i - 1].column + t[i - 1].text.length;
+          } while (braced && t[i]?.text !== '}');
+          if (braced) expect('}', voice);
+          group.source.endLine = t[i - 1].line; group.source.endColumn = t[i - 1].column + t[i - 1].text.length;
+          if (open || !group.members.length || group.members.some(m => !!m.pitch !== !!group.members[0].pitch))
+            error(tk, voice, 'Incomplete or mixed grace beam/contents');
+          if (x === '\\appoggiatura' && group.members.some(m => m.pitch)) error(tk, voice, 'Pitched appoggiatura not supported');
+          pendingGrace = group; graces.push(group); continue;
+        }
         if (x === '\\hideNotes') { hidden = true; defer(tk, voice, 'Following written notes remain sounding but are not hidden by this draft'); continue; }
         if (x === '\\unHideNotes') { hidden = false; defer(tk, voice, 'End of hidden source layout span'); continue; }
-        if (no30 && (x === '~' || x === '\\repeatTie' || x === '\\laissezVibrer')) {
+        if ((no30 || no13) && (x === '~' || x === '\\repeatTie' || x === '\\laissezVibrer')) {
           if (!lastEvent || lastEvent.kind !== 'note') error(tk, voice, 'Mark has no preceding note');
           localMarks.push({ eventId: lastEvent!.id, mark: x === '~' ? 'outgoing-tie' : x === '\\repeatTie' ? 'incoming-repeat-tie' : 'laissez-vibrer', line: tk.line, column: tk.column, voice });
           if (x !== '~') defer(tk, voice, 'Source tie or laissez-vibrer glyph deferred; written mark retained');
@@ -248,17 +318,19 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
             } else error(t[i], voice, 'Unbounded markup'); }
           else if (next.startsWith('\\')) { defer(pop(), voice); }
           else if (/^\d+$/.test(next)) { defer(pop(), voice, 'Fingering deferred'); }
-          else if (next === '(' || next === ')' || next === '[' || next === ']') defer(pop(), voice, 'Articulation or phrasing deferred');
+          else if (next === '(' || next === ')' || next === '[' || next === ']' || (no13 && ['.', '>'].includes(next))) defer(pop(), voice, 'Articulation or phrasing deferred');
           else error(t[i], voice, 'Unhandled note attachment');
           continue;
         }
         if ('()[]'.includes(x) && x.length === 1) { defer(tk, voice, 'Slur or beam presentation deferred'); continue; }
         if (x === '\\once') { if (t[i]?.text !== '\\override') error(tk, voice, 'Only once override is classified as layout'); once = tk; continue; }
+        if (no13 && x === '\\unset') { const property = pop(); if (property.text !== 'doubleSlurs') error(property, voice); deferSpan(tk, property, voice, 'Slur layout reset deferred'); continue; }
         if (x === '\\override' || x === '\\set') {
           // Scoped property assignment: stop before the following music atom. No Scheme is evaluated.
           const property = pop();
           if (!/^(?:Score\.(?:Fingering|MetronomeMark|VoltaBracketSpanner|fingeringOrientations)|Staff\.(?:fingeringOrientations|Rest|Fingering)|Voice\.(?:Arpeggio|Rest|TieColumn)|NoteColumn|TextScript|Tie|Slur|LaissezVibrerTie|DynamicText)$/.test(property.text) &&
-              !(no14 && /^(?:Staff\.NoteCollision|PhrasingSlur|fontSize|Rest|Fingering)$/.test(property.text)))
+              !(no14 && /^(?:Staff\.NoteCollision|PhrasingSlur|fontSize|Rest|Fingering)$/.test(property.text)) &&
+              !(no13 && /^(?:PianoStaff\.connectArpeggios|doubleSlurs|Voice\.Rest)$/.test(property.text)))
             error(property, voice, 'Unclassified property may affect music');
           if (t[i]?.text.startsWith("#'")) pop();
           expect('=', voice); const value = pop();
@@ -274,15 +346,15 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
         if (x === '\\clef' || x === '\\key' || x === '\\tempo') {
           let last: Token;
           if (x === '\\clef') last = pop(); else if (x === '\\key') { pop(); last = pop(); if (last.text !== '\\major') error(last, voice); }
-          else last = pop();
+          else { last = pop(); if (no13 && /^\d+$/.test(last.text) && t[i]?.text === '=') { pop(); last = pop(); if (!/^\d+$/.test(last.text)) error(last, voice, 'Invalid tempo'); } }
           if (no30) deferSpan(tk, last, voice, x === '\\key' ? 'Source key signature deferred; absolute pitches retained' : 'Source clef or tempo presentation deferred');
           else defer(tk, voice); continue;
         }
         if (['\\voiceOne','\\voiceTwo','\\oneVoice','\\noBeam','\\stemDown','\\stemUp','\\stemNeutral',
-          '\\mergeDifferentlyDottedOn','\\arpeggio','\\arpeggioBracket','\\break','\\pageBreak'].includes(x) || (no14 && x === '\\phrasingSlurUp') || (no30 && ['\\arpeggioNormal','\\shiftOnnn','\\showStaffSwitch','\\hideStaffSwitch','\\noPageBreak'].includes(x))) { defer(tk, voice); continue; }
+          '\\mergeDifferentlyDottedOn','\\arpeggio','\\arpeggioBracket','\\break','\\pageBreak', ...(no13 ? ['\\stemNeutral','\\tieDown'] : [])].includes(x) || (no14 && x === '\\phrasingSlurUp') || (no30 && ['\\arpeggioNormal','\\shiftOnnn','\\showStaffSwitch','\\hideStaffSwitch','\\noPageBreak'].includes(x))) { defer(tk, voice); continue; }
         if (x === '\\new') error(tk, voice, 'Nested new context not supported in voice');
         if (x.startsWith('\\')) {
-          if (['\\fermata','\\laissezVibrer','\\mf','\\fp','\\cresc','\\!','\\<','\\>','\\(','\\)'].includes(x) || (no30 && ['\\repeatTie','\\espressivo','\\turn','\\p','\\pp','\\sf'].includes(x))) { defer(tk, voice); continue; }
+          if (['\\fermata','\\laissezVibrer','\\mf','\\fp','\\cresc','\\!','\\<','\\>','\\(','\\)'].includes(x) || (no30 && ['\\repeatTie','\\espressivo','\\turn','\\p','\\pp','\\sf'].includes(x)) || (no13 && ['\\p','\\f','\\fp'].includes(x))) { defer(tk, voice); continue; }
           error(tk, voice);
         }
         let raw: { spelling: string; absolutePitch: number; d: number }[] = [];
@@ -353,8 +425,14 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           voice, staff, ...(no14 ? { printedStaff } : {}), handPolicy: staff === 'upper' ? 'provisional-upper' : 'provisional-lower', bar, hidden,
           line: tk.line, column: tk.column };
         events.push(e); lastEvent = e;
+        if (pendingGrace) {
+          if (pendingGrace.members[0]?.pitch && e.kind !== 'note') error(tk, voice, 'Pitched grace has no note/chord host');
+          pendingGrace.hostEventId = e.id; pendingGrace.hostKind = e.kind === 'layout-note' ? 'note' : e.kind;
+          pendingGrace = undefined;
+        }
         time = time.add(length);
       }
+      if (pendingGrace) error(t[i] ?? t[i - 1], voice, 'Grace has no following written host in the same voice');
       expect('}', voice);
       if (ending && time.toString() !== barStart.toString()) {
         bars.push({ number: bar++, duration: time.add(new Fraction(-barStart.n, barStart.d)).toString() }); barStart = time;
@@ -363,18 +441,41 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     sequence();
     writtenMarksAll.push(...localMarks);
     if (time.toString() !== barStart.toString()) bars.push({ number: bar, duration: time.add(new Fraction(-barStart.n, barStart.d)).toString() });
-    return { events, bars, repeats, anchor, anchorD, previous };
+    return { events, graces, bars, repeats, anchor, anchorD, previous };
   }
   // Dynamics contexts are music (not paper/layout). No. 14 retains exact
   // expression-channel spacer clocks separately from playable-part silences.
   const dynamics = (channel: string) => {
     expect('{', 'Dynamics'); let depth = 1;
     let clock = Z, barStart = Z, bar = 0, previous = new Fraction(1, 4);
+    let pending: GraceGroup | undefined;
     const expressions = new Set(['\\mf', '\\fp', '\\cresc', '\\<', '\\>', '\\!']);
     while (depth && i < t.length) {
       const token = pop();
+      if (no13 && token.text === '\\repeat') { expect('volta', channel); expect('2', channel); continue; }
       if (token.text === '{') { depth++; continue; }
-      if (token.text === '}') { depth--; continue; }
+      if (token.text === '}') {
+        depth--;
+        if (no13 && depth === 1 && clock.toString() !== barStart.toString()) {
+          const length = clock.add(new Fraction(-barStart.n, barStart.d));
+          if (length.toString() !== '3/8') error(token, channel, `Unexpected repeat ending duration ${length}`);
+          bar++; barStart = clock;
+        }
+        continue;
+      }
+      if (no13 && (token.text === '\\grace' || token.text === '\\appoggiatura')) {
+        if (pending) error(token, channel, 'Grace without host');
+        expect('{', channel); const spacer = pop(); const m = restRe.exec(spacer.text);
+        if (!m || m[1] !== 's') error(spacer, channel, 'Only spacer dynamics grace supported');
+        const value = dur(m![2], m![3], m![4], m![5], previous);
+        if (m![2]) previous = dur(m![2], m![3], undefined, undefined, previous);
+        expect('}', channel);
+        pending = { id: `${file}:${token.line}:${token.column}:${channel}`, source: { file, line: token.line, column: token.column, endLine: t[i - 1].line, endColumn: t[i - 1].column + t[i - 1].text.length, bar },
+          voice: channel, staff: 'Dynamics', printedStaff: 'Dynamics', hand: null, kind: token.text === '\\grace' ? 'grace' : 'appoggiatura',
+          members: [{ id: `${file}:${spacer.line}:${spacer.column}:${channel}`, duration: value.toString(), beamStart: false, beamEnd: false, line: spacer.line, column: spacer.column,
+            endLine: spacer.line, endColumn: spacer.column + spacer.text.length }],
+          hostEventId: '', hostKind: 'spacer', occurrences: [] }; dynamicGraces.push(pending); continue;
+      }
       if (expressions.has(token.text)) { defer(token, 'Dynamics', 'Expressive mark/hairpin omitted from draft; source order retained'); continue; }
       if (['\\break','\\pageBreak', '\\bar'].includes(token.text)) {
         defer(token, 'Dynamics', 'Dynamics-staff layout omitted'); if (token.text === '\\bar') pop(); continue;
@@ -391,7 +492,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
       if (token.text === '|') {
         if (no14) {
           const length = clock.add(new Fraction(-barStart.n, barStart.d));
-          if (length.n && length.toString() !== (no30 && bar === 0 ? pickup : Fraction.parse(meter).toString())) error(token, channel, 'Expression-staff bar duration mismatch');
+          if (length.n && !(no13 && length.toString() === '1/4') && length.toString() !== ((no30 || no13) && (bar === 0 || no13 && bar === 11) ? pickup : Fraction.parse(meter).toString())) error(token, channel, 'Expression-staff bar duration mismatch');
           if (length.n) { bar++; barStart = clock; }
         }
         continue;
@@ -407,8 +508,10 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
             Number.isInteger(length.n * barLength.d / (length.d * barLength.n)) ? length.n * barLength.d / (length.d * barLength.n) : 1;
           for (let k = 0; k < count; k++) {
             const slice = count > 1 ? barLength : length;
-            expressionSpacers.push({ id: `${file}:${token.line}:${token.column}:${channel}:${k}`, channel,
-              onset: clock.toString(), duration: slice.toString(), bar, line: token.line, column: token.column });
+            const spacer = { id: `${file}:${token.line}:${token.column}:${channel}:${k}`, channel,
+              onset: clock.toString(), duration: slice.toString(), bar, line: token.line, column: token.column };
+            expressionSpacers.push(spacer);
+            if (pending) { pending.hostEventId = spacer.id; pending = undefined; }
             clock = clock.add(slice);
             if (count > 1) { bar++; barStart = clock; }
           }
@@ -419,7 +522,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
         }
         continue;
       }
-      if (no14 && ['\\sustainOn','\\sustainOff','\\p','\\parenpiano', ...(no30 ? ['\\pp','\\sf','\\noPageBreak','\\fp','\\<','\\>','\\!'] : [])].includes(token.text)) {
+      if (no14 && ['\\sustainOn','\\sustainOff','\\p','\\parenpiano', ...(no30 || no13 ? ['\\pp','\\sf','\\noPageBreak','\\fp','\\<','\\>','\\!','\\f'] : [])].includes(token.text)) {
         defer(token, 'Dynamics', 'Source expression/pedal deferred; not painted'); continue;
       }
       // The reviewed source has a fused s8s4 spelling in the dynamics staff.
@@ -435,7 +538,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     if (depth) throw Error(`${file}: unterminated Dynamics context`);
     if (no30 && (bar !== 33 || clock.toString() !== '33'))
       throw Error(`${file}: ${channel} expression-staff clock mismatch (${bar} bars, ${clock})`);
-    if (no14 && !no30 && (bar !== 64 || clock.toString() !== '48'))
+    if (no14 && !no30 && !no13 && (bar !== 64 || clock.toString() !== '48'))
       throw Error(`${file}: ${channel} expression-staff clock mismatch (${bar} bars, ${clock})`);
   };
   // Traverse only positively identified score containers and inert layout trees.
@@ -449,7 +552,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     } else if (tk.text === '>>' && pianoStaffOpen) pianoStaffOpen = false;
     else if (tk.text === '\\set') {
       const property = pop();
-      if (no30 && property.text === 'PianoStaff.connectArpeggios') {
+      if ((no30 || no13) && property.text === 'PianoStaff.connectArpeggios') {
         expect('=', 'score'); const value = pop(); if (value.text !== '##t') error(value, 'score');
         deferSpan(tk, value, 'score', 'PianoStaff arpeggio connection presentation deferred');
       } else {
@@ -485,8 +588,9 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
   }
   const meterLength = Fraction.parse(meter);
   for (const b of bars) {
-    if (b.number === 0 && pickup) { if (b.duration !== pickup) throw Error(`${file}: pickup mismatch`); }
-    else if ((no14 && !(no30 && b.number === bars.length - 1) || !no14 && b.number !== bars.length - 1) && b.duration !== meterLength.toString())
+    if (pickup && (b.number === 0 || no13 && sourceHash === NO13.hash && b.number === 11)) { if (b.duration !== pickup) throw Error(`${file}: pickup mismatch at source bar ${b.number}`); }
+    else if (no13 && sourceHash === NO13.hash && (b.number === 10 || b.number === bars.length - 1)) { if (b.duration !== '3/8') throw Error(`${file}: shortened repeat ending ${b.number} has ${b.duration}`); }
+    else if ((no14 && !((no30 || no13) && b.number === bars.length - 1) || !no14 && b.number !== bars.length - 1) && b.duration !== meterLength.toString())
       throw Error(`${file}: source bar ${b.number} has ${b.duration}, expected ${meter}`);
   }
   const occurrences: { sourceBar: number; pass: number; onset: string }[] = [];
@@ -503,18 +607,19 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
   }
   while (b < bars.length) append(b++, 1);
   const events = parts.flatMap(p => p.events);
+  const graceGroups = [...parts.flatMap(p => p.graces), ...dynamicGraces];
   const ties: { fromId: string; toId: string; fromPitch: number; toPitch: number }[] = [];
   // A written ~ belongs to its SOURCE origin, even when the next performed
   // component is back at the repeat body's opening rather than its textual neighbour.
   const outgoing = new Set<string>();
   const incoming = new Set<string>();
   const writtenMarks: WrittenMark[] = [];
-  if (no30) for (const mark of writtenMarksAll) {
+  if (no30 || no13) for (const mark of writtenMarksAll) {
     writtenMarks.push(mark);
     if (mark.mark === 'outgoing-tie') outgoing.add(mark.eventId);
     if (mark.mark === 'incoming-repeat-tie') incoming.add(mark.eventId);
   }
-  for (const voice of no30 ? [] : new Set(events.map(e => e.voice))) {
+  for (const voice of no30 || no13 ? [] : new Set(events.map(e => e.voice))) {
     const voiceEvents = events.filter(e => e.voice === voice);
     for (let k = 0; k < voiceEvents.length; k++) {
       const e = voiceEvents[k]; if (e.kind !== 'note') continue;
@@ -548,19 +653,19 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           throw Error(`${file}:${pending.event.line}:${pending.event.column} [${e.voice}] Written tie has no matching continuation`);
         pendingTie.delete(e.voice);
       }
-      if (outgoing.has(e.id) && !no30) pendingTie.set(e.voice, { event: e, endTick: tick + durationTicks });
+      if (outgoing.has(e.id) && !no30 && !no13) pendingTie.set(e.voice, { event: e, endTick: tick + durationTicks });
       if (e.kind !== 'note') { sourceSilences.push({ voice: e.voice, staff: e.printedStaff ?? e.staff, hand: e.staff === 'upper' ? 'RH' : 'LH',
         file, line: e.line, col: e.column, bar: e.bar, occurrence: ordinal, kind: e.kind === 'rest' ? 'rest' : 'skip', startTick: tick, durationTicks }); continue; }
       for (const p of e.pitches) {
         const key = `${e.voice}:${p.absolutePitch}`;
         const previous = active.get(key);
         const continuous = previous && previous.note.startTick + previous.note.durationTicks === tick;
-        const tied = no30 ? incoming.has(e.id) || (continuous && outgoing.has(previous.eventId)) : continuous && outgoing.has(previous!.eventId);
+        const tied = no30 || no13 ? incoming.has(e.id) || (continuous && outgoing.has(previous.eventId)) : continuous && outgoing.has(previous!.eventId);
         if (no30 && incoming.has(e.id) && (!continuous || !previous || previous.eventId === e.id ||
             previous.note.sourceProvenance?.voices[0] !== e.voice))
           throw Error(`${file}:${e.line}:${e.column} [${e.voice}] Incoming repeat tie has no adjacent same-voice pitch ${p.absolutePitch} at tick ${tick} (previous ${previous?.eventId ?? 'none'})`);
         if (previous && continuous && tied) {
-          if (no30) occurrenceTies.push({ fromId: previous.eventId, toId: e.id, pitch: p.absolutePitch,
+          if (no30 || no13) occurrenceTies.push({ fromId: previous.eventId, toId: e.id, pitch: p.absolutePitch,
             fromOccurrence: previous.occurrence, toOccurrence: ordinal, fromTick: previous.componentTick, toTick: tick });
           const edge = { fromId: previous.eventId, toId: e.id, fromPitch: p.absolutePitch, toPitch: p.absolutePitch };
           if (!ties.some(t => t.fromId === edge.fromId && t.toId === edge.toId && t.fromPitch === edge.fromPitch)) ties.push(edge);
@@ -581,7 +686,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
       }
     }
   }
-  if (no30) for (const e of events.filter(e => outgoing.has(e.id))) {
+  if (no30 || no13) for (const e of events.filter(e => outgoing.has(e.id))) {
     for (const o of occurrences.filter(o => o.sourceBar === e.bar)) {
       const offset = Fraction.parse(o.onset).add(new Fraction(-sourceStarts[e.bar].n, sourceStarts[e.bar].d));
       const fromTick = exactTicks(Fraction.parse(e.onset).add(offset).toString(), ticksPerBeat);
@@ -589,7 +694,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
         throw Error(`${file}:${e.line}:${e.column} [${e.voice}] Outgoing written tie lacks adjacent same-voice continuation`);
     }
   }
-  if (no30) for (const e of events.filter(e => incoming.has(e.id))) {
+  if (no30 || no13) for (const e of events.filter(e => incoming.has(e.id))) {
     for (const o of occurrences.filter(o => o.sourceBar === e.bar)) {
       const offset = Fraction.parse(o.onset).add(new Fraction(-sourceStarts[e.bar].n, sourceStarts[e.bar].d));
       const toTick = exactTicks(Fraction.parse(e.onset).add(offset).toString(), ticksPerBeat);
@@ -601,15 +706,42 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     const { event } = pendingTie.values().next().value!;
     throw Error(`${file}:${event.line}:${event.column} [${event.voice}] Written tie has no matching continuation`);
   }
+  // Project ornaments by their written host event, never by a coincident tick.
+  // Tie continuations can reuse a sounding note id: the active voice/pitch map
+  // above resolves every host member to that note's actual occurrence id.
+  for (const group of graceGroups) {
+    const host = events.find(e => e.id === group.hostEventId) ?? expressionSpacers.find(e => e.id === group.hostEventId);
+    if (!host) throw Error(`${file}:${group.source.line}:${group.source.column} [${group.voice}] Grace host missing`);
+    for (const o of occurrences.filter(o => o.sourceBar === group.source.bar)) {
+      const ordinal = occurrences.filter(q => q.sourceBar === o.sourceBar).indexOf(o) + 1;
+      const offset = Fraction.parse(o.onset).add(new Fraction(-sourceStarts[o.sourceBar].n, sourceStarts[o.sourceBar].d));
+      const onset = Fraction.parse(host.onset).add(offset).toString();
+      const tick = exactTicks(onset, ticksPerBeat);
+      const hostNoteIds = 'pitches' in host ? host.pitches.map(p => {
+        const id = `${host.id}:${p.absolutePitch}:${ordinal}`;
+        const direct = notes.find(n => n.id === id);
+        if (direct) return id;
+        const chain = occurrenceTies.find(edge => edge.toId === host.id && edge.toTick === tick && edge.pitch === p.absolutePitch);
+        if (chain) {
+          const continuation = notes.find(n => n.pitch.octave * 12 + n.pitch.pitchClass === p.absolutePitch &&
+            n.sourceProvenance?.voices.includes(host.voice) && n.startTick <= tick && n.startTick + n.durationTicks > tick);
+          if (continuation) return continuation.id;
+        }
+        throw Error(`${file}:${group.source.line}:${group.source.column} [${group.voice}] Grace host member ${id} not projected`);
+      }) : [];
+      group.occurrences.push({ id: `${group.id}:pass${ordinal}`, sourceBar: o.sourceBar, pass: o.pass, tick, hostNoteIds });
+    }
+  }
   const totalTicks = exactTicks(cursor.toString(), ticksPerBeat);
-  const score: QuantizedGridScore = { id: `schumann-op68-no${identity.number}`, title: `${no30 ? 'Sans titre' : no14 ? 'Petite Etude' : 'Chant du Nouvel An'} — Draft / unfolded repeats`,
+  const score: QuantizedGridScore = { id: `schumann-op68-no${identity.number}`, title: `${no13 ? 'Mai, cher Mai' : no30 ? 'Sans titre' : identity.number === 14 ? 'Petite Etude' : 'Chant du Nouvel An'} — Draft / unfolded repeats`,
     composer: 'Robert Schumann', opus: `Op. 68 No. ${identity.number}`, ticksPerBeat, totalTicks,
     timeSignatures: [{ tick: 0, numerator: Number(meter.split('/')[0]), denominator: Number(meter.split('/')[1]) }],
     barlines: occurrences.map((o, j) => ({ barNumber: j, tick: exactTicks(o.onset, ticksPerBeat), type: 'regular' as const })),
-    tempos: [], dynamics: [], pedals: [], notes, sourceSilences, tieChains };
+    tempos: [], dynamics: [], pedals: [], notes, sourceSilences, tieChains,
+    ...(no13 ? { graceGroups, sourceBarTicks: [...occurrences.map(o => exactTicks(o.onset, ticksPerBeat)), totalTicks] } : {}) };
   return { facts: { sourceHash, sourceFile: file, pickup, events, ...(no14 ? { expressionSpacers } : {}),
-    ties, ...(no30 ? { writtenMarks, occurrenceTies } : {}), bars, repeats: main.repeats, occurrences, handPolicy: no14 ? 'PROVISIONAL: logical upper RH/lower LH only; printed staff is not a performing-hand instruction' : 'PROVISIONAL: upper part RH, lower part LH; no inferred crossings',
-    provenance: { author: 'Robert Schumann', maintainer: 'Philippe Hardy', sourceHeader: no30 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "* * *" (Peters edition unspecified)' : 'Peters (edition unspecified)',
+    ties, ...(no30 || no13 ? { writtenMarks, occurrenceTies } : {}), ...(no13 ? { graceGroups } : {}), bars, repeats: main.repeats, occurrences, handPolicy: no14 ? 'PROVISIONAL: logical upper RH/lower LH only; printed staff is not a performing-hand instruction' : 'PROVISIONAL: upper part RH, lower part LH; no inferred crossings',
+    provenance: { author: 'Robert Schumann', maintainer: 'Philippe Hardy', sourceHeader: no30 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "* * *" (Peters edition unspecified)' : no13 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "Mai, cher Mai, Te voilà bientôt de retour!" (Peters edition unspecified)' : 'Peters (edition unspecified)',
       licenseNotice: 'Source header: Copyleft - Licence Art Libre / Free Art License; retain attribution and applicable copyleft for derived encodings',
       approval: 'Operator reviewed recovered LilyPond against a reference edition; source hash pins approved encoding, not machine certification of Henle' } }, score, ledger };
 }

@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { createStudioConfig } from '../src/render/janko/studio';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { continuousPitchY } from '../src/render/janko/geometry';
@@ -62,6 +63,7 @@ import {
   checkBeamNoteheadClearance,
   checkBeamRestClearance,
   checkClaspClearance,
+  checkGraceIntegrity,
   checkClaspDotFusion,
   checkDotCollision,
   checkDotCountAgreement,
@@ -2258,4 +2260,27 @@ test('the Round 30 audits are silent under golden and listed in the registry', (
   checkDotCountAgreement(sys, golden, BRAHMS_PREVIEW_TOKENS, out);
   checkStemRingGeometry(sys, golden, BRAHMS_PREVIEW_TOKENS, out);
   assert.equal(out.length, 0, 'golden silence');
+});
+
+test('nonmetrical grace linter refuses missing ink, wrong value, wrong whole-chord host and severed beams', () => {
+  const entry = createStudioConfig().scores['schumann-op68-no13'];
+  const layouts = layoutJankoScore(entry.score, entry.options, entry.tokens);
+  const system = layouts.find(l => l.grace?.some(g => g.group.source.line === 87))!;
+  const audit = (layout: JankoSystemLayout) => {
+    const out: LintViolation[] = [];
+    checkGraceIntegrity(entry.score, layout, entry.options, entry.tokens, out);
+    return out.map(d => d.code);
+  };
+  assert.deepEqual(audit(system), []);
+  assert.ok(audit({ ...system, grace: [] }).includes('grace-missing'));
+  const badValue = { ...system, grace: structuredClone(system.grace) };
+  badValue.grace!.find(g=>g.group.source.line===87)!.heads[0].duration = '1/16';
+  assert.ok(audit(badValue).includes('grace-value'));
+  const badHost = { ...system, grace: structuredClone(system.grace) };
+  badHost.grace!.find(g=>g.group.source.line===87)!.occurrence.hostNoteIds.pop();
+  assert.ok(audit(badHost).includes('grace-host'));
+  const pairSystem = layouts.find(l=>l.grace?.some(g=>g.group.source.line===84))!;
+  const severed = { ...pairSystem, grace: structuredClone(pairSystem.grace) };
+  severed.grace!.find(g=>g.group.source.line===84)!.beamY = undefined;
+  assert.ok(audit(severed).includes('grace-geometry'));
 });
