@@ -240,7 +240,7 @@ test('Whole-spread completeness: 5 Brahms pages tile mm. 1–71 exactly once', (
   }
 });
 
-test('GOLD/BRONZE badges on the two Reference blocks + AGENTS.md convention', () => {
+test('GOLD/BRONZE live badges + AGENTS.md source/pianist priorities and honest legacy references', () => {
   const { bach, brahms } = referenceBlocks();
   assert.ok(bach.includes('<span class="tag tag-gold">GOLD · frozen standard</span>'), 'Bach wears GOLD');
   assert.ok(
@@ -250,8 +250,16 @@ test('GOLD/BRONZE badges on the two Reference blocks + AGENTS.md convention', ()
   assert.ok(!bach.includes('tag-bronze'), 'no BRONZE on the GOLD block');
   assert.ok(!brahms.includes('tag-gold'), 'no GOLD on the BRONZE block');
   const agents = read('AGENTS.md');
-  assert.match(agents, /GOLD = the frozen perfection standard/, 'the GOLD convention is written');
-  assert.match(agents, /BRONZE = the active iteration surface/, 'the BRONZE convention is written');
+  assert.match(
+    agents,
+    /1\. \*\*Composer\/source fidelity and honest uncertainty\.\*\*\s+2\. \*\*Immediate actionability and legibility for the pianist\.\*\*\s+3\. \*\*Coherent musical-gesture geometry and page hierarchy\.\*\*\s+4\. \*\*Engineering checks, collaboration and release workflow that support those outcomes\.\*\*/,
+    'source fidelity and pianist readability lead geometry and supporting engineering'
+  );
+  assert.match(agents, /GOLD\/BRONZE badges are legacy reference designations/, 'badges are honestly historical');
+  assert.match(agents, /Shared correctness fixes may change both Bach and Brahms within the approved scope/, 'neither score is frozen against correctness fixes');
+  assert.match(agents, /Inspect and report those changes; do not preserve errors through exemptions/, 'changes are inspected, not defects exempted');
+  assert.match(agents, /The operator is not the required QA system/, 'agents own routine readability checks');
+  assert.doesNotMatch(agents, /GOLD = the frozen perfection standard/, 'the superseded freeze is not retained');
 });
 
 test('The BRONZE block displays honestly: zero hard errors, the six composites itemized, ungated', () => {
