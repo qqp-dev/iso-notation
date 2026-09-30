@@ -6,6 +6,8 @@ import { bachBeforeM5 } from './support/bach-before-m5';
 import { createStudioConfig, DEFAULT_STUDIO_CROPS, BRAHMS_STUDIO_CROPS } from '../src/render/janko/studio';
 import { countJankoPages, layoutJankoScore, renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
 import { resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
+import { FIXED_3_ROW_DEFS, getBarStaffRows } from '../src/render/janko/elements/staff';
+import { computeFoldShift, getMeasureIndexOfTick } from '../src/render/janko/geometry';
 
 // SHA-256 of the real SVG bytes from PR96 merge ada6ec5, captured in an
 // isolated PR96 archive with its own engine and unchanged Round 49 registry.
@@ -42,6 +44,26 @@ const BASELINE = {
 } as const;
 const WINDOWS = [[1,3],[7,4],[13,1],[33,1],[61,6],[68,1],[70,1]] as const;
 const sha = (svg:string) => createHash('sha256').update(svg,'utf8').digest('hex');
+
+// Replay just the former inclusive extension predicate against the *same*
+// real engine, then restore it before asserting current output. The archive
+// hashes below independently attest that the replay really is PR96 ink.
+function withInclusiveUpperRow<T>(render: () => T): T {
+  const row = FIXED_3_ROW_DEFS.find(def => def.lin === 72)!;
+  const original = row.fires;
+  (row as { fires: typeof original }).fires = lins => lins.some(lin => lin >= 72);
+  try { return render(); }
+  finally { (row as { fires: typeof original }).fires = original; }
+}
+
+function assertOnlyUpperExtensionChanged(before: string, after: string, layouts: ReturnType<typeof layoutJankoScore>, scale: number, label: string) {
+  const extensionYs = new Set(layouts.map(layout =>
+    (layout.geometry.middleCY - 24 * scale).toFixed(2)));
+  const strip = (svg: string) => svg.split('\n').filter(line =>
+    !(/<line class="janko-pitch-lane janko-pitch-clane"/.test(line) &&
+      [...extensionYs].some(y => line.includes(` y1="${y}"`) && line.includes(` y2="${y}"`)))).join('\n');
+  assert.equal(strip(after), strip(before), `${label}: only upper extension-row segments may change`);
+}
 
 // PR96 pinned-archive witness manifest: all 7 Reference pages, 3 live Brahms
 // macros, 5 optional historic Bach macros and 2 explicitly historic systems.
@@ -84,10 +106,46 @@ test('PR96 pinned-archive Reference full pages and real-engine macro windows rem
     const options = id === 'primary' ? { ...entry.options, inferBoundaryRests: false } : entry.options;
     const layouts=layoutJankoScore(score,options,entry.tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    assert.deepEqual(pages.map(page=>sha(renderJankoPage(score,page,options,entry.tokens,layouts))),baseline.pages);
-    assert.equal(sha(renderJankoCrop(score,1,4,options,entry.tokens,undefined,layouts)),baseline.whole);
+    const currentPages = pages.map(page=>renderJankoPage(score,page,options,entry.tokens,layouts));
+    const currentWhole = renderJankoCrop(score,1,4,options,entry.tokens,undefined,layouts);
     const crops=id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS;
-    assert.deepEqual(crops.map(c=>sha(renderJankoCrop(score,c.start,c.count,options,entry.tokens,undefined,layouts))),baseline.crops);
+    const currentCrops = crops.map(c=>renderJankoCrop(score,c.start,c.count,options,entry.tokens,undefined,layouts));
+    if (id === 'primary') {
+      assert.deepEqual(currentPages.map(sha),baseline.pages);
+      assert.equal(sha(currentWhole),baseline.whole);
+      assert.deepEqual(currentCrops.map(sha),baseline.crops);
+    } else {
+      const previous = withInclusiveUpperRow(() => {
+        const oldLayouts = layoutJankoScore(score,options,entry.tokens);
+        return {
+          layouts: oldLayouts,
+          pages: pages.map(page=>renderJankoPage(score,page,options,entry.tokens,oldLayouts)),
+          whole: renderJankoCrop(score,1,4,options,entry.tokens,undefined,oldLayouts),
+          crops: crops.map(c=>renderJankoCrop(score,c.start,c.count,options,entry.tokens,undefined,oldLayouts)),
+        };
+      });
+      const affectedBars: number[] = [];
+      for (const [system,layout] of layouts.entries()) for (let m = 0; m < layout.geometry.measuresPerSystem; m++) {
+        const old = getBarStaffRows(previous.layouts[system].geometry,m).includes(4);
+        const now = getBarStaffRows(layout.geometry,m).includes(4);
+        const pitches = layout.notes.filter(n => getMeasureIndexOfTick(n.note,layout.geometry,system,entry.tokens) === m)
+          .map(n => n.note.pitch.octave * 12 + n.note.pitch.pitchClass)
+          .map(lin => lin + computeFoldShift(lin,'fixed-3'));
+        if (old !== now) affectedBars.push(system * layout.geometry.measuresPerSystem + m + 1);
+        assert.equal(now,pitches.some(lin => lin > 72),`Brahms source m.${system * layout.geometry.measuresPerSystem + m + 1}: shared above-zero rule`);
+        assert.equal(old,pitches.some(lin => lin >= 72),`Brahms source m.${system * layout.geometry.measuresPerSystem + m + 1}: archived inclusive rule`);
+      }
+      assert.ok(affectedBars.length > 0, 'literal Brahms has 0-alone bars affected by the shared correction');
+      assert.deepEqual(previous.pages.map(sha),baseline.pages,'former rule reproduces archived Brahms pages');
+      assert.equal(sha(previous.whole),baseline.whole);
+      assert.deepEqual(previous.crops.map(sha),baseline.crops);
+      for (const [i,svg] of currentPages.entries())
+        assertOnlyUpperExtensionChanged(previous.pages[i],svg,layouts,entry.tokens.semitoneScale,`Brahms page ${i+1}`);
+      assertOnlyUpperExtensionChanged(previous.whole,currentWhole,layouts,entry.tokens.semitoneScale,'Brahms opening crop');
+      for (const [i,svg] of currentCrops.entries())
+        assertOnlyUpperExtensionChanged(previous.crops[i],svg,layouts,entry.tokens.semitoneScale,`Brahms macro ${i+1}`);
+      assert.equal(sha(currentPages[4]),baseline.pages[4],'unaffected final page retains old bytes');
+    }
     if (id === 'primary') {
       const currentLayouts = layoutJankoScore(entry.score,entry.options,entry.tokens);
       assert.notEqual(sha(renderJankoPage(entry.score,0,entry.options,entry.tokens,currentLayouts)),baseline.pages[0],
@@ -123,10 +181,26 @@ test('parked Round 49 real-engine Candidate windows retain PR96 serialized SVG b
         layouts = layoutJankoScore(entry.score, options, tokens);
         layoutsByScore.set(entry.id, layouts);
       }
-      const actual = window.fullScore
-        ? Array.from({length:countJankoPages(entry.score,options,tokens)},(_,page)=>sha(renderJankoPage(entry.score,page,options,tokens,layouts)))
-        : [sha(renderJankoCrop(entry.score,window.measureStart,window.measureCount,options,tokens,undefined,layouts))];
-      assert.deepEqual(actual,[expected[i]],`${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} vs PR96`);
+      const render = (activeLayouts: typeof layouts) => window.fullScore
+        ? Array.from({length:countJankoPages(entry.score,options,tokens)},(_,page)=>renderJankoPage(entry.score,page,options,tokens,activeLayouts))
+        : [renderJankoCrop(entry.score,window.measureStart,window.measureCount,options,tokens,undefined,activeLayouts)];
+      const current = render(layouts);
+      const previous = withInclusiveUpperRow(() => render(layoutJankoScore(entry.score,options,tokens)));
+      for (const [page,svg] of current.entries())
+        assertOnlyUpperExtensionChanged(previous[page],svg,layouts,tokens.semitoneScale,
+          `${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} page ${page+1}`);
+      const firstSystem = Math.floor((window.measureStart - 1) / options.measuresPerSystem);
+      const lastSystem = Math.floor((window.measureStart + window.measureCount - 2) / options.measuresPerSystem);
+      const crossesPage = Math.floor(firstSystem / options.systemsPerPage) !== Math.floor(lastSystem / options.systemsPerPage);
+      if (crossesPage) {
+        // The shared crop repair now stacks real systems across pages instead
+        // of overlaying their old PR96 coordinates. Keep the archive manifest
+        // but do not mislabel this independently authorized correction as row ink.
+        assert.notDeepEqual(previous.map(sha),[expected[i]],'cross-page crop is no longer the archived overlapping view');
+        assert.match(previous[0], /transform="translate\(0 [1-9]/,'second page receives a nonzero vertical translation');
+      } else {
+        assert.deepEqual(previous.map(sha),[expected[i]],`${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} archived PR96`);
+      }
     }
   }
 });

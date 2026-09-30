@@ -81,7 +81,33 @@ test('No30 both repeat entries retain separate 96/24 statements across full-page
   const laid = layouts.flatMap(l => l.notes);
   const pages = Array.from({ length: countJankoPages(entry.score, entry.options, entry.tokens) }, (_, i) =>
     renderJankoPage(entry.score, i, entry.options, entry.tokens, layouts));
-  assert.equal(pages.length, 8);
+  // Adaptive packing determines the page count; certify the entire written
+  // bar sequence is covered exactly once, then certify every planned system
+  // is painted on its appointed page (not just that some pages exist).
+  const barTicks = entry.score.sourceBarTicks;
+  assert.ok(barTicks && barTicks.length > 1, 'imported written bar boundaries are retained');
+  let nextBar = 0;
+  for (const layout of layouts) {
+    const geo = layout.geometry;
+    assert.equal(geo.firstBar, nextBar, `system ${layout.index + 1}: contiguous first written bar`);
+    assert.ok(geo.measuresPerSystem > 0, 'no empty system');
+    assert.equal(geo.sourceBarTicks, barTicks, 'system uses the source bar clock');
+    nextBar += geo.measuresPerSystem;
+    assert.ok(nextBar < barTicks.length, 'no system extends beyond the source ending');
+  }
+  assert.equal(nextBar, barTicks.length - 1, 'every written bar, including repeated entries and ending, is packed once');
+  assert.equal(pages.length, Math.ceil(layouts.length / entry.options.systemsPerPage),
+    'page booking agrees with the adaptive system plan');
+  assert.ok(layouts.length < barTicks.length - 1, 'ordinary passages share systems rather than one bar per system');
+  const renderedSystems = pages.flatMap((svg, page) => {
+    const ids = [...svg.matchAll(/<g id="system-(\d+)">/g)].map(m => Number(m[1]));
+    assert.deepEqual(ids, layouts.slice(page * entry.options.systemsPerPage,
+      (page + 1) * entry.options.systemsPerPage).map(l => l.index + 1),
+      `page ${page + 1}: exactly its planned systems in order`);
+    return ids;
+  });
+  assert.deepEqual(renderedSystems, layouts.map(l => l.index + 1),
+    'full-page SVG paints each system exactly once, without gaps or duplicates');
   for (const [start, count] of [[17, 3], [32, 4]]) {
     assert.match(renderJankoCrop(entry.score, start, count, entry.options, entry.tokens), /class="janko-tie/);
   }

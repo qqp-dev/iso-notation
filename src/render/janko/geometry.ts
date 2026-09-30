@@ -781,7 +781,7 @@ export function splitTick(
 /** Measure index (inside its system) of a note's onset. */
 export function getMeasureIndexOfTick(
   note: QuantizedNote,
-  geo: { measuresPerSystem: number; sourceBarTicks?: readonly number[] },
+  geo: { measuresPerSystem: number; sourceBarTicks?: readonly number[]; firstBar?: number },
   systemIndex: number,
   t: ResolvedJankoTokens
 ): number {
@@ -789,7 +789,7 @@ export function getMeasureIndexOfTick(
     const bars = geo.sourceBarTicks;
     let lo = 0, hi = bars.length - 1;
     while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (bars[mid] <= note.startTick) lo = mid; else hi = mid - 1; }
-    return lo - systemIndex * geo.measuresPerSystem;
+    return lo - (geo.firstBar ?? systemIndex * geo.measuresPerSystem);
   }
   const anacrusis = t.anacrusisTicks ?? 0;
   if (anacrusis > 0) {

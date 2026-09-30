@@ -513,6 +513,16 @@ export function buildSystemOttavaBrackets(
       } else {
         labelX = Math.max(geo.staffLeft, firstNote.x - advance / 2);
       }
+      if (options.ottavaSingletonSeat === 'ink-aware' && currentRun.length === 1) {
+        // Centre the label over an isolated folded head only when the nearest
+        // preceding head leaves enough real ink air. The dash/hook still use
+        // the ordinary shared span and vertical clearance resolver.
+        const centered = Math.max(geo.staffLeft, firstNote.x - advance / 2);
+        const preceding = notes.filter(p => p.note.id !== firstNote.note.id && p.x < firstNote.x)
+          .reduce((right, p) => Math.max(right, p.x + r), geo.staffLeft);
+        if (centered >= preceding + dashGap && centered + advance + dashGap < geo.staffRight)
+          labelX = centered;
+      }
       const dashX0 = labelX + advance + dashGap;
       const lastNoteRight = lastNote.x + r + 2.0;
       const dashX1 = Math.min(

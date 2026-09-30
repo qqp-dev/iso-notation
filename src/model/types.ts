@@ -72,6 +72,8 @@ export interface QuantizedNote {
    * source's own voice/staff/hand facts stay exactly as imported.
    */
   editorialHand?: EditorialHandResolution;
+  /** Provisional performance reading, with its source-grounded rationale. */
+  handInference?: { evidence: string; confidence: 'high' | 'contextual' | 'unresolved' };
 }
 
 /**
@@ -245,6 +247,8 @@ export interface QuantizedGridScore {
   title: string;
   composer: string;
   opus?: string;
+  /** Source-resolved publication identity; distinct from an imported filename or draft label. */
+  printIdentity?: { scoreId: string; work: string; piece: string; composer: string; sourceAlias?: string };
   ticksPerBeat: number; // e.g. 48 ticks per quarter note
   totalTicks: number;
   timeSignatures: TimeSignatureOverlay[];
@@ -265,6 +269,8 @@ export interface QuantizedGridScore {
   graceGroups?: GraceGroup[];
   /** Opt-in literal unfolded bar starts plus final end (ticks); for scores with repeated pickups/short endings. */
   sourceBarTicks?: number[];
+  /** Admit this source-linked draft to shared content-aware production packing. */
+  productionLayout?: boolean;
   /**
    * Round 48: the source's **authored silences** (written rests and spacers),
    * in source order. Omitted entirely when the score has no such provenance, so

@@ -93,7 +93,7 @@ test('only the compiler-confirmed parts line 383 redundant stop becomes diagnost
   assert.throws(() => normalizeBrahmsExpressions([start, close, { ...redundant, col: 11 }], 13632), /383:11.*unmatched span stop/);
 });
 
-test('all five Brahms pages remain byte-identical to pre-overlay real-engine SVG', () => {
+test('all five Brahms pages match the current BRONZE real-engine SVG', () => {
   const expected = BRAHMS_CURRENT_PAGES;
   for (let p = 0; p < 5; p++)
     assert.equal(hash(renderJankoPage(score, p, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)), expected[p], `page ${p+1}`);

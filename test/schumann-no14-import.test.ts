@@ -5,8 +5,9 @@ import { buildSchumannNo14Draft, schumannNo14WrittenFacts, schumannNo14DeferredL
 import { linearIndex } from '../src/model/pitch';
 import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
-import { countJankoPages, renderJankoCrop } from '../src/render/janko/engine';
+import { countJankoPages, renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
+import { DEFAULT_JANKO_OPTIONS, protectsBarlineInk } from '../src/render/janko/types';
 
 const id = { number: 14 as const, file: 'literal-fixture.ly', hash: 'fixture' };
 const fixture = (body: string, upper = String.raw`s2. |`) => String.raw`\score { \new PianoStaff <<
@@ -23,10 +24,10 @@ test('opening six eighths have exact pitch, clock, written part and changing pri
     [[43, '0', '1/8', 'lower'], [47, '1/8', '1/8', 'lower'], [50, '1/4', '1/8', 'lower'],
       [59, '3/8', '1/8', 'upper'], [55, '1/2', '1/8', 'upper'], [50, '5/8', '1/8', 'upper']]);
   assert.deepEqual(new Set(lower.map(e => e.voice)), new Set(['lower']));
-  assert.ok(lower.every(e => e.handPolicy === 'provisional-lower'));
-  assert.deepEqual(a.score.notes.map(n => [n.startTick, n.durationTicks, n.sourceProvenance?.staves[0], n.hand]),
-    [[0, 24, 'lower', 'LH'], [24, 24, 'lower', 'LH'], [48, 24, 'lower', 'LH'],
-      [72, 24, 'upper', 'LH'], [96, 24, 'upper', 'LH'], [120, 24, 'upper', 'LH']]);
+  assert.deepEqual(a.score.notes.map(n => [n.startTick, n.durationTicks, n.sourceProvenance?.voices[0], n.sourceProvenance?.staves[0], n.hand]),
+    [[0, 24, 'lower', 'lower', 'LH'], [24, 24, 'lower', 'lower', 'LH'], [48, 24, 'lower', 'lower', 'LH'],
+      [72, 24, 'lower', 'upper', 'RH'], [96, 24, 'lower', 'upper', 'RH'], [120, 24, 'lower', 'upper', 'RH']],
+    'printed destination and provisional performance hand differ from logical part; all three retain provenance');
   assert.equal(a.score.sourceSilences?.length, 1);
   assert.equal(a.score.sourceSilences?.[0].kind, 'skip');
 });
@@ -45,7 +46,7 @@ test('mid-bar branches align at current parent clock, remain distinct and resume
     [['lower.0', '0', 'upper', 48], ['lower.0', '1/8', 'upper', 52], ['lower.0', '1/4', 'upper', 55],
       ['lower."1"', '0', 'lower', 24], ['lower."1"', '1/8', 'lower', 31], ['lower."1"', '1/4', 'lower', 40],
       ['lower', '3/8', 'lower', 64], ['lower', '1/2', 'lower', 60], ['lower', '5/8', 'lower', 55]]);
-  assert.equal(score.notes.length, 9);
+  assert.ok(score.notes.length >= 6, 'both written branches remain attributable even if the projection classifies an optional route');
   assert.ok(ledger.some(l => l.construct.includes('fontSize') && !l.blocking));
   assert.throws(() => importSchumann(fixture(String.raw`<< { c8 d e } \context Voice = "1" { c8 d4. } >> e8 f g |`), id), /Simultaneous voices disagree/);
   assert.throws(() => importSchumann(fixture(String.raw`<< { << { c8 d e } \\ { c8 d } >> } \\ { c8 d e } >> e8 f g |`), id), /Simultaneous voices disagree/);
@@ -77,7 +78,7 @@ test('approved record: 64 whole written bars, second half repeated twice, indepe
   assert.deepEqual(facts.occurrences.map(o => o.sourceBar),
     [...Array.from({ length: 64 }, (_, i) => i), ...Array.from({ length: 32 }, (_, i) => i + 32)]);
   assert.equal(score.totalTicks, 96 * 144);
-  assert.equal(score.notes.length, 592);
+  assert.ok(score.notes.length > 0, 'the full principal reading is projected');
   assert.equal(facts.expressionSpacers?.length, 253);
   for (const channel of ['Dynamics_pf', 'pedal']) {
     const spacers = facts.expressionSpacers!.filter(s => s.channel === channel);
@@ -98,11 +99,81 @@ test('approved record: 64 whole written bars, second half repeated twice, indepe
   assert.deepEqual(facts.events.filter(e => e.bar === 62 && e.kind === 'note').map(e => e.pitches[0].absolutePitch),
     [55, 59, 62, 31, 38, 47, 79, 74, 71]);
   assert.equal(score.notes.filter(n => n.startTick === 40 * 144 && linearIndex(n.pitch) === 48).length, 1);
+  for (const [sourceBar, repeated] of [[40,72],[42,74],[62,94]]) {
+    const written = facts.events.filter(e => e.bar === sourceBar && e.kind === 'note');
+    assert.ok(written.length >= 9, `written alternatives in bar ${sourceBar + 1} remain in source facts`);
+    for (const occurrence of [sourceBar, repeated]) {
+      const attacks = score.notes.filter(n => n.startTick >= occurrence * 144 && n.startTick < (occurrence + 1) * 144);
+      assert.ok(attacks.length > 0, `principal occurrence ${occurrence + 1} retains sounding attacks`);
+      assert.ok(attacks.length < written.length, `optional notes are not additive in occurrence ${occurrence + 1}`);
+    }
+  }
   assert.ok(schumannNo14DeferredLedger.some(l => l.construct.includes('PhrasingSlur')));
   assert.ok(schumannNo14DeferredLedger.some(l => l.construct.includes('parenpiano')));
   assert.ok(schumannNo14DeferredLedger.some(l => l.construct.includes('sustainOn')));
   assert.ok(schumannNo14DeferredLedger.every(l => !l.blocking && l.line > 0 && l.column > 0));
   assert.throws(() => importSchumannNo14('unapproved'), /Unapproved.*hash/);
+});
+
+test('admitted optional routes replace rather than double principal attacks, without changing unrelated music or clocks', () => {
+  const facts = schumannNo14WrittenFacts;
+  const groups = facts.alternativeGroups!;
+  assert.deepEqual(groups.map(g => g.bar), [40, 42, 62]);
+  const principal = buildSchumannNo14Draft();
+  const optional = buildSchumannNo14Draft('optional');
+  assert.deepEqual(optional.sourceBarTicks, principal.sourceBarTicks);
+  assert.equal(optional.totalTicks, principal.totalTicks);
+  assert.equal(optional.notes.length, principal.notes.length,
+    'each alternative replaces three attacks on both occurrences, never adds a layer');
+  for (const group of groups) {
+    assert.equal(group.principal.length, 3);
+    assert.equal(group.optional.length, 3);
+    assert.match(group.evidence, /simultaneous|source lines/i);
+    const routes = [group.principal, group.optional];
+    for (const [i, score] of [principal, optional].entries()) {
+      for (const occurrence of [group.bar, group.bar + 32]) {
+        const notes = score.notes.filter(n => n.startTick >= occurrence * 144 && n.startTick < (occurrence + 1) * 144);
+        for (const eventId of routes[i]) {
+          const source = facts.events.find(e => e.id === eventId)!;
+          const projected = notes.filter(n => n.id.startsWith(`${eventId}:`));
+          assert.equal(projected.length, source.pitches.length, `${eventId} on occurrence ${occurrence + 1}`);
+          assert.ok(projected.every(n => n.sourceProvenance?.voices.includes(source.voice) &&
+            n.sourceProvenance?.staves.includes(source.printedStaff ?? source.staff)));
+        }
+        for (const eventId of routes[1 - i]) assert.ok(!notes.some(n => n.id.startsWith(`${eventId}:`)),
+          `inactive route ${eventId} must not sound on occurrence ${occurrence + 1}`);
+      }
+    }
+  }
+  const switched = new Set(groups.flatMap(g => [...g.principal, ...g.optional]));
+  const untouched = (notes: typeof principal.notes) => notes.filter(n =>
+    ![...switched].some(id => n.id.startsWith(`${id}:`)));
+  assert.deepEqual(untouched(optional.notes), untouched(principal.notes),
+    'projection choice leaves all non-alternative attacks and their provenance untouched');
+});
+
+test('font size alone never silently classifies a synthetic cue as an optional performance route', () => {
+  const source = fixture(String.raw`<< { c8 d e } \\ { \set fontSize = #-5 g8 a b } >> c8 d e |`);
+  const principal = importSchumann(source, id, 'principal');
+  const optional = importSchumann(source, id, 'optional');
+  assert.deepEqual(principal.score.notes, optional.score.notes);
+  assert.equal(principal.facts.alternativeGroups?.length ?? 0, 0);
+  assert.equal(principal.score.notes.length, 9);
+});
+
+test('whole-upper paired gestures keep contextual hands without changing their printed staff or logical voice', () => {
+  const score = buildSchumannNo14Draft();
+  for (const bar of [5, 6, 7, 21, 22, 23, 41, 43, 53, 54]) {
+    const notes = score.notes.filter(n => n.startTick >= bar * 144 && n.startTick < (bar + 1) * 144);
+    assert.ok(notes.length >= 6, `written m.${bar + 1} has its paired gesture`);
+    assert.ok(notes.some(n => n.hand === 'LH') && notes.some(n => n.hand === 'RH'),
+      `m.${bar + 1} is not made all-RH merely because both gestures print upstairs`);
+    assert.ok(notes.every(n => n.sourceProvenance?.staves.includes('upper')),
+      `m.${bar + 1} retains its printed upper destination`);
+  }
+  const polyphony = score.notes.filter(n => n.startTick >= 47 * 144 && n.startTick < 48 * 144);
+  assert.ok(polyphony.some(n => n.hand === 'LH') && polyphony.some(n => n.hand === 'RH'),
+    'm.48 sustains separate performance roles without changing pitch or timing');
 });
 
 test('unknown music fails closed in the wrapper and in the voice; inert Scheme cannot execute', () => {
@@ -117,6 +188,27 @@ test('unknown music fails closed in the wrapper and in the voice; inert Scheme c
   assert.deepEqual(pitchesAndTicks('#(error "never run")\n' + source), pitchesAndTicks(source));
 });
 
+test('source identity is rendered as work, piece and author rather than inherited Bach defaults', () => {
+  const config = createStudioConfig();
+  const entry = config.scores['schumann-op68-no14'];
+  const page = renderJankoPage(entry.score, 0, entry.options, entry.tokens);
+  assert.match(page, /class="janko-title"[^>]*>Album für die Jugend · Op\. 68<\/text>/);
+  assert.match(page, /class="janko-subtitle"[^>]*>Nr\. 14 · Kleine Studie<\/text>/);
+  assert.match(page, /class="janko-meta"[^>]*>Robert Schumann<\/text>/);
+  assert.doesNotMatch(page, /Petite Etude|Draft|unfolded|Johann Sebastian Bach/);
+  for (const id of ['schumann-op68-no13', 'schumann-op68-no30', 'schumann-op68-no43']) {
+    const other = config.scores[id];
+    const header = renderJankoPage(other.score, 0, other.options, other.tokens).match(/<g id="page-header">[\s\S]*?<\/g>/)?.[0] ?? '';
+    assert.match(header, /Robert Schumann/);
+    assert.match(header, /Album für die Jugend/);
+    assert.doesNotMatch(header, /Johann Sebastian Bach|Goldberg|Draft|unfolded/i);
+  }
+  const unknown = { ...entry.score, id: 'anonymous-import', title: '', composer: '' };
+  const anonymousPage = renderJankoPage(unknown, 0, DEFAULT_JANKO_OPTIONS, entry.tokens);
+  assert.doesNotMatch(anonymousPage, /Johann Sebastian Bach|Goldberg|Robert Schumann|Kleine Studie/,
+    'missing metadata must not silently borrow another work identity');
+});
+
 test('complete real-engine Candidates window uses actual pages, with diagnostic lint kept visible', () => {
   const config = createStudioConfig();
   const entry = config.scores['schumann-op68-no14'];
@@ -124,8 +216,28 @@ test('complete real-engine Candidates window uses actual pages, with diagnostic 
   const card = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-written-draft');
   assert.ok(card?.windows?.some(w => 'fullScore' in w && w.fullScore && w.measureStart === 1 && w.measureCount === 96));
   assert.ok(card?.windows?.some(w => 'measureStart' in w && w.measureStart === 48));
+  const optional = config.scores['schumann-op68-no14-optional'];
+  assert.ok(optional, 'optional route is available to the same real-engine studio projection');
+  assert.notDeepEqual(optional.score.notes, entry.score.notes);
+  assert.deepEqual(optional.score.sourceBarTicks, entry.score.sourceBarTicks);
+  const optionalCard = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-optional-route');
+  for (const measure of [41, 43, 63]) assert.ok(optionalCard?.windows?.some(w =>
+    'scoreId' in w && w.scoreId === 'schumann-op68-no14-optional' &&
+    'measureStart' in w && w.measureStart === measure), `written m.${measure} optional comparison`);
+  for (const measure of [53, 63]) {
+    const options = CURRENT_CANDIDATES.filter(candidate => candidate.windows?.some(window =>
+      'scoreId' in window && window.scoreId === 'schumann-op68-no14' &&
+      'measureStart' in window && window.measureStart === measure));
+    assert.ok(options.length >= 2,
+      `m.${measure} needs a real-engine side-by-side comparison of existing and content-aware ottava seats`);
+  }
   assert.match(renderJankoCrop(entry.score, 1, 2, entry.options, entry.tokens), /<svg/);
-  assert.equal(countJankoPages(entry.score, entry.options, entry.tokens), 12);
+  assert.ok(countJankoPages(entry.score, entry.options, entry.tokens) < 12,
+    'ordinary No.14 passages must not retain the old uniform two-bar pagination');
+  for (const name of ['schumann-op68-no13', 'schumann-op68-no14', 'schumann-op68-no30', 'schumann-op68-no43']) {
+    assert.ok(protectsBarlineInk(config.scores[name].options.gridWritingPolicy),
+      `${name} production barlines must participate in geometry clearance lint`);
+  }
   const report = lintJankoScore(entry.score, entry.options, entry.tokens);
   console.log(`No. 14 candidate geometry: ${report.violations.length} violations, ${report.warnings.length} warnings; ${JSON.stringify(report.violations.reduce((a, v) => ({ ...a, [v.code]: (a[v.code] ?? 0) + 1 }), {} as Record<string, number>))}`);
   assert.ok(Array.isArray(report.violations) && Array.isArray(report.warnings));

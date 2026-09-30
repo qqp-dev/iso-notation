@@ -287,6 +287,11 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     1,
     Math.ceil(countJankoSystems(score, options, tokens) / Math.max(1, options.systemsPerPage))
   );
+  // Source-derived drafts share one production admission; actual bar widths
+  // and spans come from the literal score's content, never a score-ID table.
+  const importedOptions = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS,
+    measuresPerSystem: 4, systemsPerPage: 4, gridWritingPolicy: 'overlaid-beat-grid',
+    writtenTies: 'source', verticalPlacement: 'content-aware' });
   const scores: Record<string, StudioScore> = {
     [DEFAULT_STUDIO_SCORE_ID]: { id: DEFAULT_STUDIO_SCORE_ID, score, options, tokens },
     [score.id]: { id: score.id, score, options, tokens },
@@ -302,32 +307,30 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     [SCHUMANN_NO13_STUDIO_SCORE_ID]: {
       id: SCHUMANN_NO13_STUDIO_SCORE_ID,
       score: buildSchumannNo13Draft(),
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 1, systemsPerPage: 3,
-        gridWritingPolicy: 'overlaid-beat-grid', writtenTies: 'source' }),
-      tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 96, anacrusisTicks: 0, measureInset: 42 }),
+      options: importedOptions,
+      tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 96, anacrusisTicks: 0 }),
     },
     [SCHUMANN_NO30_STUDIO_SCORE_ID]: {
       id: SCHUMANN_NO30_STUDIO_SCORE_ID,
       score: buildSchumannNo30Draft(),
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2, systemsPerPage: 3,
-        gridWritingPolicy: 'unified-transparent-grid', writtenTies: 'source' }),
+      options: importedOptions,
       tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 192, anacrusisTicks: 48 }),
+    },
+    ['schumann-op68-no14-optional']: {
+      id: 'schumann-op68-no14-optional', score: buildSchumannNo14Draft('optional'),
+      options: importedOptions,
+      tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 144, anacrusisTicks: 0 }),
     },
     [SCHUMANN_NO14_STUDIO_SCORE_ID]: {
       id: SCHUMANN_NO14_STUDIO_SCORE_ID,
       score: buildSchumannNo14Draft(),
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2,
-        gridWritingPolicy: 'unified-transparent-grid', writtenTies: 'source' }),
+      options: importedOptions,
       tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 144, anacrusisTicks: 0 }),
     },
     [SCHUMANN_NO43_STUDIO_SCORE_ID]: {
       id: SCHUMANN_NO43_STUDIO_SCORE_ID,
       score: buildSchumannNo43Draft(),
-      // A wider two-measure draft uses the existing transparent grid treatment:
-      // barline-crossing beams in the denser three-measure default are not
-      // falsely certified by clipping notes or modifying source timing.
-      options: resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, measuresPerSystem: 2,
-        gridWritingPolicy: 'unified-transparent-grid', writtenTies: 'source' }),
+      options: importedOptions,
       tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 192, anacrusisTicks: 24 }),
     },
     [BRAHMS_STUDIO_SCORE_ID]: {
@@ -774,12 +777,14 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       // the whole score. Every other window stays the established macro crop.
       if (window.fullScore) {
         const pages = countJankoPages(entry.score, options, tokens);
-        const perPage = Math.max(1, options.measuresPerSystem * options.systemsPerPage);
         const pageCards: string[] = [];
         for (let page = 0; page < pages; page++) {
           const svg = renderJankoPage(entry.score, page, options, tokens, layouts);
-          const firstMeasure = page * perPage + 1;
-          const last = Math.min((page + 1) * perPage, lastMeasure);
+          const plan = layouts[0]?.geometry.systemBarStarts;
+          const firstMeasure = plan?.[page * options.systemsPerPage] !== undefined ? plan[page * options.systemsPerPage] + 1 :
+            page * options.measuresPerSystem * options.systemsPerPage + 1;
+          const last = Math.min(plan?.[(page + 1) * options.systemsPerPage] ??
+            (page + 1) * options.measuresPerSystem * options.systemsPerPage, lastMeasure);
           pageCards.push(
             [
               `<figure class="page-card" data-page="${page + 1}">`,

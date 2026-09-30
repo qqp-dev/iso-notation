@@ -662,15 +662,21 @@ test('All three endpoint shapes and the shared connector paint in the emitted SV
 });
 
 test('The rule-coincident connector replaces exactly the local rule segment', () => {
-  // Brahms m. 22: the C6 exception runs along the C6 octave-line rule (pitch 72).
+  // In the literal bar C6 alone does not earn the upper row. Keep the C6
+  // exception ON its rule and earn that rule with a later, separate upper note.
+  const earned = { ...BRAHMS, notes: BRAHMS.notes.map(n => n.id === 'brahms-op118-no1-303'
+    ? { ...n, pitch: { octave: 6, pitchClass: 1 } } : n) };
   for (const id of CARD_IDS) {
     const ctx = cardOptions(id);
-    const hold = holdsOf(id, 'brahms').find((h) => h.noteId === 'brahms-op118-no1-295')!;
+    const hold = layoutJankoScore(earned, ctx.brahms, ctx.brahmsTokens)
+      .flatMap(l => l.holds).find(h => h.noteId === 'brahms-op118-no1-295')!;
+    assert.equal(holdsOf(id, 'brahms').find(h => h.noteId === hold.noteId)!.underlays.length, 0,
+      'literal C6 alone does not earn a rule');
     assert.equal(hold.underlays.length, 1, `${id}: one coincident rule segment is replaced`);
     const u = hold.underlays[0];
     assert.ok(Math.abs(u.y - hold.y) < 1e-9, `${id}: the band sits on the member's own row`);
     assert.ok(u.x1 >= hold.x1 - 1e-9 && u.x2 <= hold.x2 + 1e-9, `${id}: the band stays inside the connector`);
-    const svg = renderJankoCrop(BRAHMS, 22, 2, ctx.brahms, ctx.brahmsTokens);
+    const svg = renderJankoCrop(earned, 22, 2, ctx.brahms, ctx.brahmsTokens);
     assert.ok(svg.includes('class="janko-hold-underlay"'), `${id}: the white band paints`);
     assert.ok(
       svg.includes(`height="${Number(DEFAULT_JANKO_TOKENS.holdUnderlayWidth).toFixed(2)}"`),

@@ -7,9 +7,10 @@ export const SCHUMANN_NO14_DRAFT_ID = 'schumann-op68-no14';
 export const schumannNo14WrittenFacts = derived.facts;
 export const schumannNo14DeferredLedger = derived.ledger;
 
-export function buildSchumannNo14Draft(): QuantizedGridScore {
+export function buildSchumannNo14Draft(choice: 'principal' | 'optional' = 'principal'): QuantizedGridScore {
   if (derived.facts.sourceHash !== SCHUMANN_NO14_APPROVED_SHA256 || derived.score.id !== SCHUMANN_NO14_DRAFT_ID ||
       derived.facts.bars.length !== 64 || derived.facts.occurrences.length !== 96)
     throw Error('Schumann No. 14 derived record does not match the approved complete source identity');
-  return structuredClone(derived.score) as QuantizedGridScore;
+  if (choice === 'optional' && !derived.optionalScore) throw Error('Optional route projection unavailable');
+  return structuredClone(choice === 'optional' ? derived.optionalScore : derived.score) as QuantizedGridScore;
 }

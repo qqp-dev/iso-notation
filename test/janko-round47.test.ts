@@ -8,14 +8,14 @@
  * report. Nothing in this file claims operator acceptance — the flat face, the
  * detached seats and the open-oval family are the operator's judgement at
  * normal size; this file certifies that the round's *contract* is implemented,
- * that the new axes are inert by default, and that the Reference surfaces are
- * byte-frozen.
+ * that the new axes are inert by default, and that Reference ink changes only
+ * where the shared above-0 extension rule requires it.
  *
  * The six sections mirror the ticket:
  *
- * - **A** the new knobs are inert: the golden defaults are unchanged, the
- *   Reference is byte-identical to the committed Round 46 engraving, and
- *   declaring the defaults explicitly changes nothing;
+ * - **A** the new knobs are inert: Bach remains byte-identical, Brahms loses
+ *   only the authorized upper extension segments, and declaring the defaults
+ *   explicitly changes nothing else;
  * - **B** the outgoing-tie simplification: the exact source chain, the shared
  *   partner, the terminal component and the crop/system boundary, with the
  *   published `tieOriginSuppressions` and the untouched ties/pitches;
@@ -78,6 +78,7 @@ import {
   openOvalShape,
 } from '../src/render/janko/elements/rhythm';
 import { lintJankoScore } from '../src/render/janko/linter';
+import { FIXED_3_ROW_DEFS } from '../src/render/janko/elements/staff';
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
@@ -91,8 +92,35 @@ const sha = (text: string): string => createHash('sha256').update(text, 'utf8').
  * Round 49 §4 re-pins the crop: the m70 editorial hands regroup the m. 70
  * beams, and the corrected §4 authority paints the truthful m. 70 LH quarter
  * at 13392 (the resolved hand decides; the raw label no longer vetoes). */
-const REFERENCE_PAGE0 = BRAHMS_CURRENT_PAGES[0];
-const REFERENCE_CROP = BRAHMS_CURRENT_WHOLE_CROP;
+// Distinct archived inclusive-rule witness: the shared current BRONZE pins
+// intentionally changed, so never use them to authenticate the old replay.
+const INCLUSIVE_PAGE0 = '7676bf9059982aac2a0a2b96b32711b32ad6b15b12016419da19d3afb29d0c90';
+const INCLUSIVE_CROP = 'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be83570f2a9059';
+
+// Replay the historical inclusive rule through the *same real renderer* to
+// authenticate archival hashes. Restore the shared rule even on assertion
+// failure; the other tests in this file must see today's above-0 policy.
+function withInclusiveUpperRow<T>(render: () => T): T {
+  const row = FIXED_3_ROW_DEFS.find(def => def.lin === 72)!;
+  const original = row.fires;
+  (row as { fires: typeof original }).fires = lins => lins.some(lin => lin >= 72);
+  try { return render(); }
+  finally { (row as { fires: typeof original }).fires = original; }
+}
+
+function assertScopedRowRemoval(previous: string, current: string, label: string): void {
+  const ys = new Set(LAYOUTS.map(l => (l.geometry.middleCY - 24 * TOKENS.semitoneScale).toFixed(2)));
+  const rows = (svg: string) => svg.split('\n');
+  const extension = (line: string) =>
+    /<line class="janko-pitch-lane janko-pitch-clane"/.test(line) &&
+    [...ys].some(y => line.includes(` y1="${y}"`) && line.includes(` y2="${y}"`));
+  const before = rows(previous), after = rows(current);
+  assert.deepEqual(after.filter(line => !extension(line)), before.filter(line => !extension(line)),
+    `${label}: every non-extension SVG line remains byte-identical`);
+  const oldRows = before.filter(extension), newRows = after.filter(extension);
+  assert.ok(oldRows.length > newRows.length, `${label}: at least one old 0-alone segment is removed`);
+  for (const row of newRows) assert.ok(oldRows.includes(row), `${label}: no added or moved upper extension`);
+}
 
 /** One synthetic note (the round's controlled tie-topology fixtures). */
 function note(
@@ -177,7 +205,7 @@ test('A. The three new keys default to the incumbent behaviour', () => {
   assert.equal(longMarkKindForBase(24, 'open-oval'), null, 'and no cut value is re-shaped');
 });
 
-test('A. Bach GOLD and the Brahms Reference are byte-identical', () => {
+test('A. Bach GOLD is byte-identical; Brahms differs only in above-0 extension ink', () => {
   let bach = '';
   const archivalBach = bachBeforeM5(BACH);
   for (let page = 0; page < countJankoPages(archivalBach, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS); page++) {
@@ -188,8 +216,20 @@ test('A. Bach GOLD and the Brahms Reference are byte-identical', () => {
     'ccfcaecca058aa1ed7d37291d765a8ef58ed79e428c732f338f298fb5b7a104f',
     'the historical Bach witness is unchanged before the judged m. 5 correction'
   );
-  assert.equal(sha(renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS)), REFERENCE_PAGE0, 'Brahms page 0');
-  assert.equal(sha(renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS)), REFERENCE_CROP, 'the whole-score crop');
+  const historic = withInclusiveUpperRow(() => ({
+    page: renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS),
+    crop: renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS),
+  }));
+  assert.equal(sha(historic.page), INCLUSIVE_PAGE0, 'inclusive-rule archive: Brahms page 0');
+  // This whole-score crop crosses pages. Its previously archived bytes used
+  // overlapping page coordinates; the shared crop repair stacks real systems.
+  // The inclusive replay is the valid same-engine row-only comparison here.
+  assert.notEqual(sha(historic.crop), INCLUSIVE_CROP, 'the historical cross-page crop predates corrected stacking');
+  assert.equal(sha(renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS)), BRAHMS_CURRENT_PAGES[0]);
+  assert.equal(sha(renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS)), BRAHMS_CURRENT_WHOLE_CROP);
+  assert.match(historic.crop, /transform="translate\(0 [1-9]/, 'the cross-page crop translates later systems');
+  assertScopedRowRemoval(historic.page, renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS), 'Brahms page 0');
+  assertScopedRowRemoval(historic.crop, renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS), 'Brahms crop');
 });
 
 test('A. Declaring the new defaults explicitly changes nothing at all', () => {
@@ -199,8 +239,19 @@ test('A. Declaring the new defaults explicitly changes nothing at all', () => {
     tieOriginIndicator: 'source',
   });
   const explicitTokens = resolveJankoTokens({ ...BRAHMS_OP118_NO1_JANKO_TOKENS, halfRingGap: 0 });
-  assert.equal(sha(renderJankoPage(BRAHMS, 0, explicit, explicitTokens)), REFERENCE_PAGE0);
-  assert.equal(sha(renderJankoCrop(BRAHMS, 1, 71, explicit, explicitTokens)), REFERENCE_CROP);
+  const historic = withInclusiveUpperRow(() => ({
+    page: renderJankoPage(BRAHMS, 0, explicit, explicitTokens),
+    crop: renderJankoCrop(BRAHMS, 1, 71, explicit, explicitTokens),
+  }));
+  assert.equal(sha(historic.page), INCLUSIVE_PAGE0, 'explicit defaults reproduce the archived inclusive page');
+  assert.notEqual(sha(historic.crop), INCLUSIVE_CROP, 'the archived cross-page crop predates corrected stacking');
+  assert.match(historic.crop, /transform="translate\(0 [1-9]/, 'explicit crop stacks later-page systems');
+  assertScopedRowRemoval(historic.page, renderJankoPage(BRAHMS, 0, explicit, explicitTokens), 'explicit page 0');
+  assertScopedRowRemoval(historic.crop, renderJankoCrop(BRAHMS, 1, 71, explicit, explicitTokens), 'explicit crop');
+  assert.equal(sha(renderJankoPage(BRAHMS, 0, explicit, explicitTokens)),
+    sha(renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS)), 'explicit and implicit page output match');
+  assert.equal(sha(renderJankoCrop(BRAHMS, 1, 71, explicit, explicitTokens)),
+    sha(renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS)), 'explicit and implicit crop output match');
   // And the new layout metadata is empty wherever its axis is off.
   const layouts = layoutJankoScore(BRAHMS, explicit, explicitTokens);
   assert.equal(layouts.flatMap((l) => l.tieOriginSuppressions).length, 0, 'no omission without the option');

@@ -11,7 +11,8 @@ import { schumannNo43DeferredLedger } from '../src/scores/schumann-no43-draft';
 import { linearIndex } from '../src/model/pitch';
 import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
-import { renderJankoCrop } from '../src/render/janko/engine';
+import { computePageGeometry, layoutJankoScore, renderJankoCrop } from '../src/render/janko/engine';
+import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 
 const file = 'hand-authored-no43-fixture.ly';
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -117,6 +118,8 @@ test('simultaneous unison voices, authored silence, spacer, hidden music and ine
   const projectedUnison = score.notes.filter((n) => n.startTick === 0 && linearIndex(n.pitch) === 48);
   assert.equal(projectedUnison.length, 2);
   assert.equal(new Set(projectedUnison.map((n) => n.voice)).size, 2, 'independent source voices stay independent in the grid score');
+  assert.deepEqual(new Set(score.notes.map(n => n.hand)), new Set(['RH']),
+    'unrelated upper-staff polyphony is not automatically split into alternating hands');
   assert.deepEqual(new Set(projectedUnison.flatMap((n) => n.sourceProvenance?.voices ?? [])), new Set(atStart.map((e) => e.voice)));
   assert.deepEqual(facts.events.filter((e) => e.kind === 'spacer').map((e) => [e.onset, e.duration]), [['1/4', '1/4']]);
   assert.deepEqual(facts.events.filter((e) => e.kind === 'rest').map((e) => [e.onset, e.duration]), [['3/4', '1/4']]);
@@ -137,6 +140,26 @@ test('written volta graph and unfolded occurrences retain source bar identity, s
   assert.equal(score.totalTicks, score.ticksPerBeat * (0.5 + 4 * 4 + 3), 'unfolded duration, with no padded final bar');
   assert.deepEqual(score.notes.map((n) => linearIndex(n.pitch)), [52, 48, 50, 52, 50, 53]);
   assert.equal(new Set(score.notes.map((n) => n.id)).size, score.notes.length, 'repeat occurrences cannot share projected note IDs');
+  // This hand-authored source has a different hash from every shipped draft.
+  // Its pickup, repeated body and short ending must still enter the shared
+  // production plan, rather than inheriting fixed-meter arithmetic.
+  const boundaries = [0, 1, 9, 17, 25, 33, 39].map(eighths => eighths * score.ticksPerBeat / 2);
+  assert.deepEqual(score.sourceBarTicks, boundaries);
+  assert.equal(score.productionLayout, true);
+  const options = { ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3' as const };
+  const plan = computePageGeometry(options, DEFAULT_JANKO_TOKENS, score);
+  const layouts = layoutJankoScore(score, options, DEFAULT_JANKO_TOKENS);
+  assert.equal(plan.productionSystems?.length, layouts.length);
+  assert.deepEqual(plan.systemBarStarts, [0, ...plan.productionSystems!.map(s => s.lastBar)]);
+  assert.equal(plan.productionSystems!.at(-1)!.lastBar, boundaries.length - 1);
+  for (const [index, system] of plan.productionSystems!.entries()) {
+    assert.equal(layouts[index].geometry.sourceBarTicks?.[system.firstBar], boundaries[system.firstBar]);
+    assert.equal(layouts[index].geometry.measureEdges?.length, system.lastBar - system.firstBar + 1);
+  }
+  for (const bar of [1, 3, 5, 6]) {
+    assert.match(renderJankoCrop(score, bar, 1, options, DEFAULT_JANKO_TOKENS, layouts),
+      new RegExp(`m\\. ${bar}(?![0-9])`));
+  }
   for (const note of score.notes) {
     assert.ok(Number.isSafeInteger(note.startTick) && Number.isSafeInteger(note.durationTicks));
   }

@@ -1617,6 +1617,9 @@ export interface JankoLayoutOptions {
    */
   tieProfile?: JankoTieProfile;
 
+  /** Horizontal seat for a single folded note; only an option candidate, not a new canonical default. */
+  ottavaSingletonSeat?: 'incumbent' | 'ink-aware';
+
   /** Page title (full-page renders only). */
   title?: string;
   /** Page subtitle (full-page renders only). */
@@ -1847,6 +1850,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   opticalSpacing: false,
   lowPitchFolding: 'core',
   writtenTies: 'none',
+  ottavaSingletonSeat: 'incumbent',
   title: 'Goldberg-Variationen',
   subtitle: 'Variatio 1. a 1 Clav.',
   composer: 'Johann Sebastian Bach',
@@ -1929,6 +1933,13 @@ export const JANKO_RHYTHM_STYLE_LABELS: Record<JankoRhythmStyle, string> = {
 export interface JankoSystemGeometry {
   /** Opt-in unfolded literal bar boundaries, final end included. */
   sourceBarTicks?: readonly number[];
+  /** First global bar in this system and each bar's horizontal edge, for production packing. */
+  firstBar?: number;
+  measureEdges?: readonly number[];
+  measureLeftInsets?: readonly number[];
+  systemBarStarts?: readonly number[];
+  /** Admitted page for source-derived production systems; fixed layouts use quotient booking. */
+  pageIndex?: number;
   /** Zero-based system index on the page. */
   index: number;
   /** Measures engraved in this system. */
@@ -1985,6 +1996,9 @@ export interface StaffLineSegment {
 /** Absolute page geometry for a Jánko Two-Row page. */
 export interface JankoPageGeometry {
   sourceBarTicks?: readonly number[];
+  systemBarStarts?: readonly number[];
+  productionSystems?: readonly { firstBar: number; lastBar: number; widths: readonly number[]; minimums: readonly number[]; leftInsets: readonly number[] }[];
+  productionGeometries?: readonly JankoSystemGeometry[];
   options: ResolvedJankoLayoutOptions;
   tokens: ResolvedJankoTokens;
   pageWidth: number;

@@ -1858,8 +1858,9 @@ export function checkGridCrossingOffset(
     // cells. The nominal full-measure split is not an ink boundary for them.
     for (const p of layout.notes) {
       const index = getMeasureIndexOfTick(p.note,geo,layout.index,t);
-      const left = geo.staffLeft + index * geo.measureWidth;
-      checkHeadInCell(layout,p,left,left+geo.measureWidth,p.nominalX ?? p.x,t,out);
+      const left = geo.measureEdges?.[index] ?? geo.staffLeft + index * geo.measureWidth;
+      const right = geo.measureEdges?.[index + 1] ?? left + geo.measureWidth;
+      checkHeadInCell(layout,p,left,right,p.nominalX ?? p.x,t,out);
     }
     return;
   }
@@ -2123,7 +2124,7 @@ export function resolveAllocatedPageSlots(
   const out: AllocatedSystemSlot[] = [];
   const byPage = new Map<number, JankoSystemLayout[]>();
   for (const layout of layouts) {
-    const pageIndex = Math.floor(layout.index / page.systemsPerPage);
+    const pageIndex = layout.geometry.pageIndex ?? Math.floor(layout.index / page.systemsPerPage);
     const bucket = byPage.get(pageIndex);
     if (bucket) bucket.push(layout);
     else byPage.set(pageIndex, [layout]);
@@ -2192,14 +2193,15 @@ export function checkContentAwarePageFit(
   if (!isContentAwarePlacement(o)) return;
   const byPage = new Map<number, JankoSystemLayout[]>();
   for (const layout of layouts) {
-    const pageIndex = Math.floor(layout.index / page.systemsPerPage);
+    const pageIndex = layout.geometry.pageIndex ?? Math.floor(layout.index / page.systemsPerPage);
     const bucket = byPage.get(pageIndex);
     if (bucket) bucket.push(layout);
     else byPage.set(pageIndex, [layout]);
   }
   for (const [pageIndex, systems] of byPage) {
     const ordered = [...systems].sort((a, b) => a.index - b.index);
-    const contentTop = Math.min(...ordered.map((l) => l.geometry.slotTopY));
+    const contentTop = page.productionSystems ? page.marginTop + page.headerHeight :
+      Math.min(...ordered.map((l) => l.geometry.slotTopY));
     const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
     // Named page-slot booking constraint, NOT a claim of global physical ink.
     const boxes = ordered.map((l) => systemPageBookingBoxes(l, o, t));
@@ -2275,7 +2277,7 @@ export function checkSystemAllocatedSlotFit(
   const slots = new Map(resolveAllocatedPageSlots(layouts, page, t, lint, o).map((s) => [s.index, s] as const));
   const byPage = new Map<number, JankoSystemLayout[]>();
   for (const layout of layouts) {
-    const pageIndex = Math.floor(layout.index / page.systemsPerPage);
+    const pageIndex = layout.geometry.pageIndex ?? Math.floor(layout.index / page.systemsPerPage);
     const bucket = byPage.get(pageIndex);
     if (bucket) bucket.push(layout);
     else byPage.set(pageIndex, [layout]);
@@ -2684,7 +2686,8 @@ export function checkContourStrip(
     }
   }
   const bottom = strip.top + strip.height;
-  const lastOnPage = layout.index % page.systemsPerPage === page.systemsPerPage - 1;
+  const lastOnPage = (layout.geometry.pageIndex !== undefined && layouts[layout.index + 1]?.geometry.pageIndex !== layout.geometry.pageIndex) ||
+    (layout.geometry.pageIndex === undefined && layout.index % page.systemsPerPage === page.systemsPerPage - 1);
   if (!lastOnPage && layout.index + 1 < layouts.length) {
     const nextTop = systemInkExtents(layouts[layout.index + 1], t, thresholds, o).top;
     if (bottom > nextTop - 2.5) {
@@ -3015,7 +3018,13 @@ export function systemBarlines(
     }
     barlines.push({ x, top: measureTop, bottom: measureBot });
   };
-  if (layout.index === 0 && anacrusis > 0) {
+  if (g.measureEdges) {
+    for (let m = 1; m < g.measureEdges.length; m++) {
+      const isSystemEnd = m === g.measureEdges.length - 1;
+      if (isSystemEnd && !layout.isFinalSystem) continue;
+      push(g.measureEdges[m], isSystemEnd);
+    }
+  } else if (layout.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * g.measureWidth;
     push(g.staffLeft + upbeatWidth);
     for (let m = 1; m <= o.measuresPerSystem; m++) {
@@ -3851,7 +3860,7 @@ export function checkClaspClearance(
     layout,
     t,
     lint,
-    layout.index * o.measuresPerSystem + 1,
+    (layout.geometry.firstBar ?? layout.index * o.measuresPerSystem) + 1,
     o.systemStartStyle
   );
 
@@ -4569,7 +4578,7 @@ export function checkMeasureNumeralClearance(
     layout,
     t,
     lint,
-    layout.index * o.measuresPerSystem + 1,
+    (layout.geometry.firstBar ?? layout.index * o.measuresPerSystem) + 1,
     o.systemStartStyle
   );
   // The numeral is right-aligned into the true left margin, so it may share the
@@ -4638,7 +4647,7 @@ export function checkAccoladeClearance(
     layout,
     t,
     lint,
-    layout.index * o.measuresPerSystem + 1,
+    (layout.geometry.firstBar ?? layout.index * o.measuresPerSystem) + 1,
     o.systemStartStyle
   );
   if (accolade === null) return;
@@ -5553,10 +5562,11 @@ export function checkStaffSegments(
   const g = layout.geometry;
   const segments = g.staffSegments ?? [];
   const anacrusis = t.anacrusisTicks ?? 0;
-  const isSys0Anacrusis = layout.index === 0 && anacrusis > 0;
+  const isSys0Anacrusis = !g.measureEdges && layout.index === 0 && anacrusis > 0;
   const numBars = isSys0Anacrusis ? g.measuresPerSystem + 1 : g.measuresPerSystem;
 
   const measureNum = (m: number): number => {
+    if (g.firstBar !== undefined) return g.firstBar + m + 1;
     if (anacrusis > 0) {
       if (layout.index === 0) {
         return m === 0 ? 0 : m;
@@ -6210,7 +6220,8 @@ export function lintJankoScore(
   // carry page-relative slot geometry, so two neighbours on the same page are
   // directly comparable; a page break starts a fresh page and is exempt.
   for (let i = 1; i < layouts.length; i++) {
-    if (i % page.systemsPerPage === 0) continue;
+    if ((layouts[i].geometry.pageIndex ?? Math.floor(i / page.systemsPerPage)) !==
+      (layouts[i - 1].geometry.pageIndex ?? Math.floor((i - 1) / page.systemsPerPage))) continue;
     const above = extents[i - 1];
     const below = extents[i];
     if (below.top >= above.bottom - thresholds.minClearance) continue;
@@ -6232,6 +6243,28 @@ export function lintJankoScore(
   // Content-aware placement: page-block fit and facing-gap minimums.
   checkContentAwarePageFit(layouts, page, t, thresholds, o, diagnostics);
 
+  // The same admitted source-boundary map controls diagnostics as columns,
+  // page captions and crops. Never report a repeated pickup's nominal
+  // fixed-meter quotient as its written occurrence number.
+  if (score.sourceBarTicks) {
+    for (const d of diagnostics) {
+      if (d.measure === undefined) continue;
+      const g = layouts[d.system]?.geometry;
+      if (!g?.measureEdges || g.firstBar === undefined) continue;
+      const note = layouts[d.system].notes.find(n => d.noteIds?.includes(n.note.id));
+      const tick = note?.note.startTick;
+      if (tick !== undefined) {
+        let low = 0, high = score.sourceBarTicks.length - 2;
+        while (low < high) { const mid = Math.ceil((low + high) / 2);
+          if (score.sourceBarTicks[mid] <= tick) low = mid; else high = mid - 1; }
+        d.measure = low + 1;
+      } else if (d.x !== undefined) {
+        let index = 0;
+        while (index + 1 < g.measureEdges.length - 1 && d.x >= g.measureEdges[index + 1]) index++;
+        d.measure = g.firstBar + index + 1;
+      }
+    }
+  }
   const violations = diagnostics.filter((d) => d.severity === 'error');
   const warnings = diagnostics.filter((d) => d.severity === 'warning');
   const notes = layouts.reduce((sum, l) => sum + l.notes.length, 0);
@@ -6258,6 +6291,7 @@ export function lintJankoScore(
 
 /** Total measures engraved for a score. */
 export function countMeasures(score: QuantizedGridScore, t: ResolvedJankoTokens): number {
+  if (score.sourceBarTicks) return score.sourceBarTicks.length - 1;
   const anacrusis = t.anacrusisTicks ?? 0;
   const ticks = Math.max(0, (score.totalTicks || 0) - anacrusis);
   return Math.max(1, Math.ceil(ticks / t.ticksPerMeasure));
