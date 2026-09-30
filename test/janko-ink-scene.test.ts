@@ -320,11 +320,16 @@ test('placed merged head retains every collapsed semantic owner, not just rhythm
   for(const piece of painted)assert.deepEqual(piece.ownerIds,[merge.survivorId,...merge.mergedIds]);
   const brahms=buildBrahmsOp118No1Score();
   const bo=resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),bt=resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const mixed=layoutJankoScore(brahms,bo,bt).find(l=>l.unisonMerges.some(m=>!m.exact))!;
-  const mixedMerge=mixed.unisonMerges.find(m=>!m.exact)!;
-  assert.ok(mixed.unisonVoices.some(v=>v.unisonSurvivorId===mixedMerge.survivorId));
-  const mixedHead=buildInkScene(mixed,bo,bt,brahms).heads.get(mixedMerge.survivorId)!;
-  for(const piece of mixedHead)assert.deepEqual(piece.ownerIds,[mixedMerge.survivorId,...mixedMerge.mergedIds]);
+  const layouts=layoutJankoScore(brahms,bo,bt);
+  assert.ok(layouts.flatMap(l=>l.unisonMerges).every(m=>m.exact),'unequal written values are not hidden in a shared head');
+  const samePitch=(a:typeof final.notes[number],b:typeof final.notes[number])=>a!==b &&
+    a.note.startTick===b.note.startTick && a.note.pitch.octave===b.note.pitch.octave &&
+    a.note.pitch.pitchClass===b.note.pitch.pitchClass && a.rhythm.durationTicks!==b.rhythm.durationTicks;
+  const mixed=layouts.find(l=>l.notes.some(a=>l.notes.some(b=>samePitch(a,b))))!;
+  const a=mixed.notes.find(a=>mixed.notes.some(b=>samePitch(a,b)))!,b=mixed.notes.find(b=>samePitch(a,b))!;
+  const actual=buildInkScene(mixed,bo,bt,brahms);
+  for(const owner of [a,b])for(const piece of actual.heads.get(owner.note.id)!)
+    assert.deepEqual(piece.ownerIds,[owner.note.id],'each incompatible statement keeps its own painted owner');
 });
 
 test('a head mask removes earlier rule ink only, never later digit ink', () => {

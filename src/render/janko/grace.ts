@@ -6,10 +6,15 @@ import { getScaledKnockoutMetrics, renderNotehead } from './elements/notehead';
 import { getSubdivisionGlyphBBox, verbatimFlagPath } from './elements/rhythm';
 import { f } from './elements/style';
 
-export const GRACE_SCALE = 0.68;
+export const GRACE_SCALE = 0.80;
 export const GRACE_GAP = 12.5;
 export const GRACE_HOST_GAP = 15;
 export const GRACE_STEM = 15;
+// Normalize the existing 0.68 ornament's real ink, so the comparison is exact
+// and every new scale grows flags, beams and stem weight coherently.
+const GRACE_BEAM_WEIGHT = 1.3 / 0.68;
+const GRACE_BEAM_SPACING = 2.3 / 0.68;
+const GRACE_STEM_WEIGHT = 0.65 / 0.68;
 export interface PlacedGrace {
   group: GraceGroup;
   occurrence: GraceGroup['occurrences'][number];
@@ -26,7 +31,7 @@ export function placeGraceGroups(
   openingX: (tick: number) => number,
 ): PlacedGrace[] {
   const placed: PlacedGrace[] = [];
-  const mask = getScaledKnockoutMetrics(o, t, GRACE_SCALE, false);
+  const mask = getScaledKnockoutMetrics(o, t, t.graceScale, false);
   for (const group of groups) {
     if (!group.members.some(m => m.pitch)) continue;
     const hand = group.hand;
@@ -66,18 +71,19 @@ export function placeGraceGroups(
 export function graceVerticalInkBounds(graces: readonly PlacedGrace[], o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens): { top: number; bottom: number } {
   let top = Infinity, bottom = -Infinity;
-  const mask = getScaledKnockoutMetrics(o, t, GRACE_SCALE, false);
+  const mask = getScaledKnockoutMetrics(o, t, t.graceScale, false);
   for (const grace of graces) {
     for (const h of grace.heads) {
-      top = Math.min(top, h.y - mask.hy, grace.beamY ?? h.y - GRACE_STEM);
+      top = Math.min(top, h.y - mask.hy, grace.beamY !== undefined
+        ? grace.beamY - GRACE_BEAM_WEIGHT * t.graceScale / 2 : h.y - GRACE_STEM - GRACE_STEM_WEIGHT * t.graceScale / 2);
       bottom = Math.max(bottom, h.y + mask.hy);
       if (grace.heads.length === 1) {
         const box = getSubdivisionGlyphBBox('classical-urtext', -1, 1, t);
-        top = Math.min(top, h.y - GRACE_STEM + GRACE_SCALE * box.y0);
-        bottom = Math.max(bottom, h.y - GRACE_STEM + GRACE_SCALE * box.y1);
+        top = Math.min(top, h.y - GRACE_STEM + t.graceScale * box.y0);
+        bottom = Math.max(bottom, h.y - GRACE_STEM + t.graceScale * box.y1);
       }
     }
-    if (grace.beamY !== undefined) bottom = Math.max(bottom, grace.beamY + 3.6);
+    if (grace.beamY !== undefined) bottom = Math.max(bottom, grace.beamY + 5.3 * t.graceScale);
   }
   return { top, bottom };
 }
@@ -85,21 +91,21 @@ export function graceVerticalInkBounds(graces: readonly PlacedGrace[], o: Resolv
 /** Paint rhythm before masks, with true two-level connected beams or one eighth flag. */
 export function renderPlacedGrace(grace: PlacedGrace, o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens): string {
   const parts = [`    <g class="janko-grace" data-grace-id="${grace.occurrence.id}" data-host="${grace.group.hostEventId}">`];
-  const mask = getScaledKnockoutMetrics(o, t, GRACE_SCALE, false);
+  const mask = getScaledKnockoutMetrics(o, t, t.graceScale, false);
   for (const head of grace.heads) {
     const top = grace.beamY ?? head.y - GRACE_STEM;
-    parts.push(`      <path class="janko-grace-stem" data-member="${head.id}" d="M ${f(head.x)} ${f(head.y - mask.hy - 0.2)} L ${f(head.x)} ${f(top)}" fill="none" stroke="#111111" stroke-width="0.65"/>`);
+    parts.push(`      <path class="janko-grace-stem" data-member="${head.id}" d="M ${f(head.x)} ${f(head.y - mask.hy - 0.2)} L ${f(head.x)} ${f(top)}" fill="none" stroke="#111111" stroke-width="${f(GRACE_STEM_WEIGHT * t.graceScale)}"/>`);
     if (grace.heads.length === 1) {
       const flag = verbatimFlagPath(head.x, top, -1, 1);
-      parts.push(`      <g class="janko-grace-flag" transform="translate(${f(head.x)} ${f(top)}) scale(${GRACE_SCALE}) translate(${f(-head.x)} ${f(-top)})">${flag}</g>`);
+      parts.push(`      <g class="janko-grace-flag" transform="translate(${f(head.x)} ${f(top)}) scale(${t.graceScale}) translate(${f(-head.x)} ${f(-top)})">${flag}</g>`);
     }
   }
   if (grace.beamY !== undefined) {
     const a = grace.heads[0].x, b = grace.heads.at(-1)!.x;
-    for (let level = 0; level < 2; level++) parts.push(`      <path class="janko-grace-beam" data-level="${level + 1}" d="M ${f(a)} ${f(grace.beamY + level * 2.3)} L ${f(b)} ${f(grace.beamY + level * 2.3)}" fill="none" stroke="#111111" stroke-width="1.3"/>`);
+    for (let level = 0; level < 2; level++) parts.push(`      <path class="janko-grace-beam" data-level="${level + 1}" d="M ${f(a)} ${f(grace.beamY + level * GRACE_BEAM_SPACING * t.graceScale)} L ${f(b)} ${f(grace.beamY + level * GRACE_BEAM_SPACING * t.graceScale)}" fill="none" stroke="#111111" stroke-width="${f(GRACE_BEAM_WEIGHT * t.graceScale)}"/>`);
   }
   for (const h of grace.heads) parts.push(`      <g class="janko-grace-head" data-member="${h.id}" data-written="${h.duration}">` +
-    renderNotehead({ x: h.x, y: h.y, pitchClass: h.pitchClass, hand: grace.group.hand ?? undefined, symbolScale: GRACE_SCALE }, t, o) + '</g>');
+    renderNotehead({ x: h.x, y: h.y, pitchClass: h.pitchClass, hand: grace.group.hand ?? undefined, symbolScale: t.graceScale }, t, o) + '</g>');
   parts.push('    </g>');
   return parts.join('\n');
 }

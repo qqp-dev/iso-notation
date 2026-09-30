@@ -21,7 +21,7 @@ import {
   buildBrahmsOp118No1Score,
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   JankoCandidate,
   JankoCandidateRound,
@@ -29,13 +29,13 @@ import {
   resolveCandidate,
   candidateBadges,
   BRAHMS_STUDIO_SCORE_ID,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import { layoutJankoScore } from '../src/render/janko/engine';
 import { checkOttavaCoverage } from '../src/render/janko/linter';
 

@@ -1,4 +1,4 @@
-import { pedalIntervals } from './elements/expressions';
+import { expressionsOverlap, expressionIntersectsBox, pedalIntervals } from './elements/expressions';
 import { systemTickRange, systemPaintedInkBoxes } from './engine';
 /**
  * Jánko Implementer Visual Linter
@@ -180,8 +180,8 @@ import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox } from './solo-scene';
-import { beamPieceAt } from './beam-scene';
-import { GRACE_SCALE, GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
+import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes } from './beam-scene';
+import { GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
 // ---------------------------------------------------------------------------
@@ -228,6 +228,7 @@ export type JankoLintCode =
   | 'rest-inferred'
   | 'rest-centroid-off-row'
   | 'rest-slab-off-line'
+  | 'beam-voice-crossing'
   | 'unison-double-digit'
   | 'clasp-dot-fusion'
   | 'stem-through-simultaneity'
@@ -411,6 +412,7 @@ export const JANKO_LINT_CHECKS = [
   'compression-collision',
   'hold-integrity',
   'expression-integrity',
+  'voice-beam-corridors',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -1679,7 +1681,8 @@ export function checkDotCountAgreement(
     if(stems.length!==beam.notes.length||rails.length!==beam.levels.length||
       stems.some((p,i)=>p.shape.kind!=='stem'||Math.abs(p.shape.x-beam.stems[i].stemX)>0.011||
         Math.abs(p.shape.y1-beam.stems[i].stemStartY)>0.011||
-        Math.abs(p.shape.y2-beam.beamY(beam.stems[i].stemX))>0.011)||
+        Math.abs(p.shape.y2-beam.beamY(beam.stems[i].stemX))>0.011||
+        !beamPieceAt(p,p.shape.x,p.shape.y1)||!beamPieceAt(p,p.shape.x,p.shape.y2))||
       rails.some((p,i)=>p.shape.kind!=='rail'||
         !beamPieceAt(p,beam.levels[i].connector.x1,beam.levels[i].connector.y1)||
         !beamPieceAt(p,beam.levels[i].connector.x2,beam.levels[i].connector.y2))){
@@ -4502,7 +4505,8 @@ export function checkUnisonDigits(
   score: QuantizedGridScore,
   layout: JankoSystemLayout,
   t: ResolvedJankoTokens,
-  out: LintViolation[]
+  out: LintViolation[],
+  clarity = true
 ): void {
   const painted = new Set(layout.notes.map((p) => p.note.id));
   const systemTicks = new Set(layout.notes.map((p) => p.note.startTick));
@@ -4510,7 +4514,9 @@ export function checkUnisonDigits(
   const groups = new Map<string, typeof score.notes>();
   for (const note of score.notes) {
     if (!systemTicks.has(note.startTick)) continue;
-    const key = `${note.startTick}|${note.pitch.pitchClass}|${note.pitch.octave}`;
+    const written = layout.notes.find(p=>p.note.id===note.id)?.rhythm.durationTicks ??
+      layout.unisonVoices.find(p=>p.note.id===note.id)?.rhythm.durationTicks ?? note.durationTicks;
+    const key = `${note.startTick}|${note.pitch.pitchClass}|${note.pitch.octave}${clarity?`|${written}`:''}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(note);
     else groups.set(key, [note]);
@@ -4518,7 +4524,7 @@ export function checkUnisonDigits(
   for (const [key, group] of groups) {
     if (group.length < 2) continue;
     const hands = new Set(group.map((n) => n.hand));
-    if (hands.size < 2) continue;
+    if (hands.size < 2 && !clarity) continue;
     const drawn = group.filter((n) => painted.has(n.id));
     if (drawn.length <= 1) continue;
     const [tick, pitchClass, octave] = key.split('|');
@@ -6043,7 +6049,7 @@ export function checkGraceIntegrity(score: QuantizedGridScore, layout: JankoSyst
   o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, out: LintViolation[]): void {
   if (!score.graceGroups?.length) return;
   const placed = layout.grace ?? [];
-  const mask = getScaledKnockoutMetrics(o, t, GRACE_SCALE, false);
+  const mask = getScaledKnockoutMetrics(o, t, t.graceScale, false);
   const problem = (code: JankoLintCode, id: string, reason: string) => out.push({ code, severity: 'error', system: layout.index,
     message: `Grace ${id}: ${reason}` });
   for (const g of placed) {
@@ -6104,7 +6110,7 @@ export function checkGraceIntegrity(score: QuantizedGridScore, layout: JankoSyst
           Math.abs(Number(rect[2])-(h.y-mask.hy)) > 0.03 ||
           Math.abs(Number(rect[3])-2*mask.wx) > 0.03 ||
           Math.abs(Number(rect[4])-2*mask.hy) > 0.03 ||
-          Math.abs(Number(font[1])-t.digitFontSize*GRACE_SCALE) > 0.005)
+          Math.abs(Number(font[1])-t.digitFontSize*t.graceScale) > 0.005)
         problem('grace-paint',g.occurrence.id,`scaled glyph or opaque mask is missing/wrong for ${h.id}`);
     }
     if (!paint || count(/class="janko-grace-head"/g) !== g.heads.length ||
@@ -6115,6 +6121,62 @@ export function checkGraceIntegrity(score: QuantizedGridScore, layout: JankoSyst
         g.heads.some(h => !paint.includes(`data-member="${h.id}" data-written="${h.duration}"`)) ||
         (paint.indexOf('janko-grace-beam') > paint.indexOf('janko-knockout') && g.heads.length > 1))
       problem('grace-paint', g.occurrence.id, 'source values, mask/head count, stem, flag, beam or paint order absent');
+  }
+}
+
+/** Independent same-hand voices must not cross/fuse their actual filled rails.
+ * Secondary levels matter just as much as the primary; all endpoints here
+ * are the final connectors painted by placedBeamGroup. */
+export function checkVoiceBeamCorridors(layout:JankoSystemLayout,t:ResolvedJankoTokens,out:LintViolation[],
+  o:ResolvedJankoLayoutOptions=resolveJankoOptions(),placed?:InkScene):void {
+  for(let i=0;i<layout.beams.length;i++)for(let j=i+1;j<layout.beams.length;j++){
+    const a=layout.beams[i],b=layout.beams[j];
+    if(!o.clarityPass && a.notes[0].hand!==b.notes[0].hand ||
+      a.notes[0].hand===b.notes[0].hand && a.notes[0].sourceVoice===b.notes[0].sourceVoice)continue;
+    for(const aa of a.levels)for(const bb of b.levels){
+      const p=aa.connector,q=bb.connector,left=Math.max(Math.min(p.x1,p.x2),Math.min(q.x1,q.x2)),
+        right=Math.min(Math.max(p.x1,p.x2),Math.max(q.x1,q.x2));
+      if(right<=left)continue;
+      const at=(c:typeof p,x:number)=>c.y1+(c.y2-c.y1)*(x-c.x1)/(c.x2-c.x1);
+      const d0=at(p,left)-at(q,left),d1=at(p,right)-at(q,right);
+      if(d0*d1>0 && Math.min(Math.abs(d0),Math.abs(d1))>=t.beamThickness)continue;
+      out.push({code:'beam-voice-crossing',severity:'error',system:layout.index,
+        noteIds:[...a.notes,...b.notes].map(n=>n.id),
+        message:`Independent ${a.notes[0].hand} voices ${a.notes[0].sourceVoice} / ${b.notes[0].sourceVoice} have intersecting painted rails (levels ${aa.level}/${bb.level}).`});
+    }
+  }
+  if(!o.clarityPass||layout.beams.length===0)return;
+  const scene=placed??buildInkScene(layout,o,t), groups=scene.beams;
+  for(const group of groups)for(const stem of group){
+    if(stem.shape.kind!=='stem')continue;
+    const s=stem.shape,boxes=beamStemBoxes(stem);
+    if(![s.y1,s.y2].every(y=>boxes.some(b=>y>=b.y0&&y<=b.y1)))
+      out.push({code:'beam-connection',severity:'error',system:layout.index,noteIds:[...stem.ownerIds],message:`Voice underpass must keep ${stem.id}'s own attachment and beam endpoint.`});
+  }
+  for(let i=0;i<groups.length;i++)for(let j=0;j<groups.length;j++){
+    if(i===j||layout.beams[i].notes[0].hand===layout.beams[j].notes[0].hand &&
+      layout.beams[i].notes[0].sourceVoice===layout.beams[j].notes[0].sourceVoice)continue;
+    for(const stem of groups[i].filter(p=>p.shape.kind==='stem'))for(const rail of groups[j].filter(p=>p.shape.kind==='rail')){
+      if(rail.ownerIds.some(id=>stem.ownerIds.includes(id)) || !beamStemBoxes(stem).some(box=>beamPieceIntersectsBox(rail,box)))continue;
+      out.push({code:'beam-voice-crossing',severity:'error',system:layout.index,
+        noteIds:[...stem.ownerIds,...rail.ownerIds],message:`Independent voice stem ${stem.id} fuses with foreign painted rail ${rail.id}; a true crossing needs a non-fusing underpass.`});
+    }
+  }
+  for(const [id,pieces] of scene.solos){
+    const note=layout.ungrouped.find(n=>n.id===id);if(!note)continue;
+    for(const stem of pieces){
+      if(stem.shape.kind!=='stem')continue;
+      const s=stem.shape,boxes=beamStemBoxes({shape:s});
+      if(![s.y1,s.y2].every(y=>boxes.some(b=>y>=b.y0&&y<=b.y1)))
+        out.push({code:'beam-connection',severity:'error',system:layout.index,noteIds:[id],message:`Voice underpass must not remove solo ${id}'s attachment or duration tip.`});
+      for(const [j,group] of groups.entries()){
+        const foreign=layout.beams[j].notes[0];
+        if(note.hand===foreign.hand && note.sourceVoice===foreign.sourceVoice)continue;
+        for(const rail of group.filter(p=>p.shape.kind==='rail'))if(!rail.ownerIds.some(id=>stem.ownerIds.includes(id)) && boxes.some(b=>beamPieceIntersectsBox(rail,b)))
+          out.push({code:'beam-voice-crossing',severity:'error',system:layout.index,noteIds:[...stem.ownerIds,...rail.ownerIds],
+            message:`Independent solo ${id} fuses with foreign painted rail ${rail.id}.`});
+      }
+    }
   }
 }
 
@@ -6152,12 +6214,18 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
   for(const q of ink) {
     const cls=q.kind==='dynamic'?/janko-(?:dynamic|expression-text)/:new RegExp(`janko-${q.kind}`);
     if(!q.svg||!cls.test(q.svg))problem('expression-paint',q.id,'stored ink has no matching glyph/curve/bracket');
-    for(const b of music)if(q.x0<b.x1&&q.x1>b.x0&&q.y0<b.y1&&q.y1>b.y0)
+    const protectedBox=(b:{x0:number;x1:number;y0:number;y1:number})=>q.gridKnockout
+      ? {x0:b.x0-.6,x1:b.x1+.6,y0:b.y0-.6,y1:b.y1+.6} : b;
+    for(const b of music)if(!(q.kind==='phrase' && q.gridKnockout && /janko-phrase-grid-knockout/.test(q.svg) &&
+        /:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what)) && expressionIntersectsBox(q,protectedBox(b)))
       problem('expression-clearance',q.id,`overlaps ${b.what}`);
     if(![q.x0,q.x1,q.y0,q.y1].every(Number.isFinite)||q.x0>=q.x1||q.y0>=q.y1)problem('expression-geometry',q.id,'invalid ink bounds');
-    for(const n of layout.notes) if(q.x0<n.x+t.noteheadRadius&&q.x1>n.x-t.noteheadRadius&&q.y0<n.y+t.noteheadRadius&&q.y1>n.y-t.noteheadRadius)
-      problem('expression-clearance',q.id,`overlaps note ${n.note.id}`);
-    for(const other of ink) if(other.id>q.id&&q.x0<other.x1&&q.x1>other.x0&&q.y0<other.y1&&q.y1>other.y0)
+    for(const n of layout.notes) {
+      const {wx,hy}=knockoutHalfExtents(o,t,n.note.startTick,n);
+      if(expressionIntersectsBox(q,protectedBox({x0:n.x-wx,x1:n.x+wx,y0:n.y-hy,y1:n.y+hy})))
+        problem('expression-clearance',q.id,`overlaps note ${n.note.id}`);
+    }
+    for(const other of ink) if(other.id>q.id && expressionsOverlap(q,other))
       problem('expression-clearance',q.id,`overlaps ${other.id}`);
   }
 }
@@ -6183,10 +6251,11 @@ export function lintJankoScore(
   const restPhysical = { certified: 0, fallback: {} as Record<string, number> };
 
   for (const layout of layouts) {
-    const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'
+    const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'||o.clarityPass&&layout.beams.length>1
       ?buildInkScene(layout,o,t,score):undefined;
     checkGraceIntegrity(score, layout, o, t, diagnostics);
     checkExpressionIntegrity(score,layout,o,t,diagnostics);
+    checkVoiceBeamCorridors(layout,t,diagnostics,o,placedScene);
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, o, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);
@@ -6212,7 +6281,7 @@ export function lintJankoScore(
     checkRestProvenance(layout, o, t, diagnostics);
     checkUnwrittenRests(layout, t, diagnostics);
     checkRestSeat(layout, o, t, diagnostics);
-    checkUnisonDigits(score, layout, t, diagnostics);
+    checkUnisonDigits(score, layout, t, diagnostics, o.clarityPass);
     checkClaspDotFusion(layout, t, thresholds, diagnostics, o);
     checkDotCountAgreement(layout, o, t, diagnostics, placedScene);
     checkStemRingGeometry(layout, o, t, diagnostics, placedScene);

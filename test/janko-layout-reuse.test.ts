@@ -374,7 +374,7 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
   // The studio engraves a candidate window as **entry options + candidate
   // delta** (the Brahms goldens are that entry: mps 4, cut time, anacrusis).
   const optFor = (c: (typeof ROUND_41_CANDIDATES)[number]) =>
-    resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, ...(c.options ?? {}) });
+    resolveJankoOptions({ ...BRAHMS_ROUND44_RESERVE_OPTIONS, ...(c.options ?? {}),clarityPass:false });
   const tokFor = (c: (typeof ROUND_41_CANDIDATES)[number]) =>
     resolveJankoTokens({ ...BRAHMS_ROUND44_RESERVE_TOKENS, ...(c.tokens ?? {}) });
   const svg0 = renderJankoCrop(BRAHMS, 8, 1, optFor(ROUND_41_CANDIDATES[0]), tokFor(ROUND_41_CANDIDATES[0]));

@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 
 import { QuantizedGridScore, QuantizedNote, Hand } from '../src/model/types';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
+import { buildBrahmsOp118No1Score } from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -39,7 +39,7 @@ import {
   getGridNoteInset,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   claspMemberCarriedTicks,
   layoutJankoScore,

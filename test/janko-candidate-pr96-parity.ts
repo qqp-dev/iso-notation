@@ -5,7 +5,7 @@ import { ROUND_49_CANDIDATES, ROUND_49_METADATA } from '../src/render/janko/cand
 import { bachBeforeM5 } from './support/bach-before-m5';
 import { createStudioConfig, DEFAULT_STUDIO_CROPS, BRAHMS_STUDIO_CROPS } from '../src/render/janko/studio';
 import { countJankoPages, layoutJankoScore, renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
-import { resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
+import { resolveJankoOptions, resolveJankoTokens } from './pre-clarity-rules';
 import { FIXED_3_ROW_DEFS, getBarStaffRows } from '../src/render/janko/elements/staff';
 import { computeFoldShift, getMeasureIndexOfTick } from '../src/render/janko/geometry';
 
@@ -48,12 +48,11 @@ const sha = (svg:string) => createHash('sha256').update(svg,'utf8').digest('hex'
 // Replay just the former inclusive extension predicate against the *same*
 // real engine, then restore it before asserting current output. The archive
 // hashes below independently attest that the replay really is PR96 ink.
-function withInclusiveUpperRow<T>(render: () => T): T {
-  const row = FIXED_3_ROW_DEFS.find(def => def.lin === 72)!;
-  const original = row.fires;
-  (row as { fires: typeof original }).fires = lins => lins.some(lin => lin >= 72);
+function withInclusiveUpperRow<T>(render: () => T,tokens:ReturnType<typeof resolveJankoTokens>): T {
+  const original = tokens.upperExtensionThreshold;
+  tokens.upperExtensionThreshold = 72;
   try { return render(); }
-  finally { (row as { fires: typeof original }).fires = original; }
+  finally { tokens.upperExtensionThreshold = original; }
 }
 
 function assertOnlyUpperExtensionChanged(before: string, after: string, layouts: ReturnType<typeof layoutJankoScore>, scale: number, label: string) {
@@ -103,27 +102,28 @@ test('PR96 pinned-archive Reference full pages and real-engine macro windows rem
     // PR96 predates the operator-judged Bach GOLD correction. Restore only
     // those two historical hands for the independent archival byte witness.
     const score = id === 'primary' ? bachBeforeM5(entry.score) : entry.score;
-    const options = id === 'primary' ? { ...entry.options, inferBoundaryRests: false } : entry.options;
-    const layouts=layoutJankoScore(score,options,entry.tokens);
+    const options = resolveJankoOptions({...entry.options,tieProfile:'uniform',...(id==='primary'?{inferBoundaryRests:false}:{})});
+    const tokens=resolveJankoTokens(entry.tokens);
+    const layouts=layoutJankoScore(score,options,tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    const currentPages = pages.map(page=>renderJankoPage(score,page,options,entry.tokens,layouts));
-    const currentWhole = renderJankoCrop(score,1,4,options,entry.tokens,undefined,layouts);
+    const currentPages = pages.map(page=>renderJankoPage(score,page,options,tokens,layouts));
+    const currentWhole = renderJankoCrop(score,1,4,options,tokens,undefined,layouts);
     const crops=id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS;
-    const currentCrops = crops.map(c=>renderJankoCrop(score,c.start,c.count,options,entry.tokens,undefined,layouts));
+    const currentCrops = crops.map(c=>renderJankoCrop(score,c.start,c.count,options,tokens,undefined,layouts));
     if (id === 'primary') {
       assert.deepEqual(currentPages.map(sha),baseline.pages);
       assert.equal(sha(currentWhole),baseline.whole);
       assert.deepEqual(currentCrops.map(sha),baseline.crops);
     } else {
       const previous = withInclusiveUpperRow(() => {
-        const oldLayouts = layoutJankoScore(score,options,entry.tokens);
+        const oldLayouts = layoutJankoScore(score,options,tokens);
         return {
           layouts: oldLayouts,
-          pages: pages.map(page=>renderJankoPage(score,page,options,entry.tokens,oldLayouts)),
-          whole: renderJankoCrop(score,1,4,options,entry.tokens,undefined,oldLayouts),
-          crops: crops.map(c=>renderJankoCrop(score,c.start,c.count,options,entry.tokens,undefined,oldLayouts)),
+          pages: pages.map(page=>renderJankoPage(score,page,options,tokens,oldLayouts)),
+          whole: renderJankoCrop(score,1,4,options,tokens,undefined,oldLayouts),
+          crops: crops.map(c=>renderJankoCrop(score,c.start,c.count,options,tokens,undefined,oldLayouts)),
         };
-      });
+      },tokens);
       const affectedBars: number[] = [];
       for (const [system,layout] of layouts.entries()) for (let m = 0; m < layout.geometry.measuresPerSystem; m++) {
         const old = getBarStaffRows(previous.layouts[system].geometry,m).includes(4);
@@ -185,7 +185,7 @@ test('parked Round 49 real-engine Candidate windows retain PR96 serialized SVG b
         ? Array.from({length:countJankoPages(entry.score,options,tokens)},(_,page)=>renderJankoPage(entry.score,page,options,tokens,activeLayouts))
         : [renderJankoCrop(entry.score,window.measureStart,window.measureCount,options,tokens,undefined,activeLayouts)];
       const current = render(layouts);
-      const previous = withInclusiveUpperRow(() => render(layoutJankoScore(entry.score,options,tokens)));
+      const previous = withInclusiveUpperRow(() => render(layoutJankoScore(entry.score,options,tokens)),tokens);
       for (const [page,svg] of current.entries())
         assertOnlyUpperExtensionChanged(previous[page],svg,layouts,tokens.semitoneScale,
           `${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} page ${page+1}`);

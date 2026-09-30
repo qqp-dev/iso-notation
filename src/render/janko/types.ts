@@ -589,6 +589,18 @@ export const JANKO_OCTAVE_LINE_SCHEMES: readonly JankoOctaveLineScheme[] = [
 
 /** Engraving token set: geometric and styling constants (all in pt). */
 export interface JankoTokens {
+  /** Shared nonmetrical grace scale, applied to masks, digits and rhythm ink. */
+  graceScale?: number;
+  /** Folded/displayed earning threshold; the upper rule remains at linear 72. */
+  upperExtensionThreshold?: number;
+  /** Uniform optical scale of authentic filled dynamic outlines. */
+  dynamicScale?: number;
+  /** Local duration-cut rake; independent of the genuine beam slope limit. */
+  claspSlashSlope?: number;
+  claspSlashLength?: number;
+  claspSlashStroke?: number;
+  /** Clear air at a true independent-voice stem/foreign-rail underpass. */
+  voiceCrossingAir?: number;
   /** Vertical distance between the two whole-tone rows. */
   rowHeight: number;
   /**
@@ -1057,6 +1069,13 @@ export const DEFAULT_JANKO_TOKENS: ResolvedJankoTokens = {
   ottavaDashLength: 3.5,
   ottavaDashGap: 2.0,
   ottavaHookLength: 4.0,
+  graceScale: 0.80,
+  upperExtensionThreshold: 78,
+  dynamicScale: 0.016,
+  claspSlashSlope: 0.5,
+  claspSlashLength: 5.0,
+  claspSlashStroke: 0.65,
+  voiceCrossingAir: 0.6,
   ottavaClearance: 6.0,
   ottavaLineWidth: 0.35,
   // Round 41 — provisional starting values (the ticket's dimensions; bounded
@@ -1185,6 +1204,8 @@ export type JankoWrittenTies = 'none' | 'source';
 export const OPTICAL_DISPLACEMENT_CAP = 2.5;
 
 export interface JankoLayoutOptions {
+  /** Shared clarity rules. False is the real-engine pre-pass comparison only. */
+  clarityPass?: boolean;
   /** Measures engraved per horizontal system. */
   measuresPerSystem: number;
   /** Pluggable rhythm renderer style. */
@@ -1783,6 +1804,7 @@ export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'dura
 
 /** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
+  clarityPass: true,
   measuresPerSystem: 4,
   rhythmStyle: 'beamed',
   interStaffGap: 30.0,
@@ -1846,7 +1868,7 @@ export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
   standaloneLongMount: 'right',
   longDurationStyle: 'midpoint',
   tieOriginIndicator: 'source',
-  tieProfile: 'uniform',
+  tieProfile: 'traced',
   opticalSpacing: false,
   lowPitchFolding: 'core',
   writtenTies: 'none',

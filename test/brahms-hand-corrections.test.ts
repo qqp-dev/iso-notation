@@ -308,7 +308,7 @@ test('Literal m.23/m.43: full RH run over LH bass; the four bridges dissolve', (
   }
   // Round 45 adds one more: the m. 66 hand correction removes a fifth bridge
   // (39 → 38), through the same unchanged same-hand grouping rule.
-  assert.equal(bridges, 33, 'the bridges regroup under the Round 49 §1 written chains (was 38)');
+  assert.equal(bridges, 50, 'shared clarity partitions source-voice chords before routing (previous cross-voice grouping had 33); source hands and durations below remain unchanged');
   const layouts = layoutJankoScore(SCORE, O, T);
   const touched = layouts
     .flatMap((l) => l.verticalChords ?? [])

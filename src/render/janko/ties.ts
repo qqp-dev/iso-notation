@@ -486,6 +486,15 @@ export function tieTracedGeometry(
   };
 }
 
+/** Shared two-cubic tapered contour; phrasing may have unequal endpoint heights.
+ * Placement and musical semantics remain the caller's responsibility. */
+export function taperedSpanPath(x1: number, y1: number, x2: number, y2: number,
+  side: -1 | 1, depth: number, thickness: number, indent: number): string {
+  const g = tieTracedGeometry(x1,0,x2,side,depth,thickness,indent);
+  return `M ${f(x1)} ${f(y1)} C ${f(g.ax)} ${f(y1+g.outerControlY)} ${f(g.bx)} ${f(y2+g.outerControlY)} ${f(x2)} ${f(y2)} ` +
+    `L ${f(x2)} ${f(y2)} C ${f(g.bx)} ${f(y2+g.innerControlY)} ${f(g.ax)} ${f(y1+g.innerControlY)} ${f(x1)} ${f(y1)} Z`;
+}
+
 /**
  * Bulge (pt) of one tie arc: a shallow constant fraction of the chord, capped
  * at both ends so a two-column tie still curves and a system-wide tie never
@@ -513,11 +522,7 @@ export function tieArcPath(
   indentAbs: number = 0
 ): string {
   if (profile === 'traced') {
-    const g = tieTracedGeometry(x1, y, x2, side, depth, thickness, indentAbs);
-    return (
-      `M ${f(x1)} ${f(y)} C ${f(g.ax)} ${f(g.outerControlY)} ${f(g.bx)} ${f(g.outerControlY)} ${f(x2)} ${f(y)} ` +
-      `L ${f(x2)} ${f(y)} C ${f(g.bx)} ${f(g.innerControlY)} ${f(g.ax)} ${f(g.innerControlY)} ${f(x1)} ${f(y)} Z`
-    );
+    return taperedSpanPath(x1,y,x2,y,side,depth,thickness,indentAbs);
   }
   const cx = (x1 + x2) / 2;
   const cy = y + side * 2 * depth;

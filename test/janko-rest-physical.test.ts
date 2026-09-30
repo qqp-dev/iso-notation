@@ -173,7 +173,7 @@ test('live linter retires certified box distance, counts unsupported fallback, k
 test('real corpus and literal seven-value specimen have certified decisions and counted fallbacks', () => {
   for(const [score,opts,tokens,expectedCertified] of [
     [buildBachGoldbergVar1Score(),DEFAULT_JANKO_OPTIONS,DEFAULT_JANKO_TOKENS,579],
-    [buildBrahmsOp118No1Score(),BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS,1233],
+    [buildBrahmsOp118No1Score(),BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS,1235],
     [buildRestDurationSpecimenScore(),REST_DURATION_SPECIMEN_JANKO_OPTIONS,REST_DURATION_SPECIMEN_JANKO_TOKENS,111],
   ] as const) {
     const report=lintJankoScore(score,opts,tokens);

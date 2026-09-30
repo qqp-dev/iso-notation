@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import {  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -43,7 +43,7 @@ import {
   candidateBadges,
   type JankoCandidate,
   type JankoCandidateRound,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   createStudioConfig,
   renderCandidatesView,
@@ -55,7 +55,7 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
   type JankoClusterPresentation,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   computeCropExtents,
   layoutJankoScore,

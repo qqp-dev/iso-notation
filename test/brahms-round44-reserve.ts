@@ -32,6 +32,10 @@ import { JankoLayoutOptions, JankoTokens } from '../src/render/janko/types';
  */
 export const BRAHMS_ROUND44_RESERVE_OPTIONS: Partial<JankoLayoutOptions> = {
   ...BRAHMS_OP118_NO1_JANKO_OPTIONS,
+  // Historical mechanism fixture only; current shared rules are certified in
+  // janko-clarity*.test.ts, not frozen to these old coordinates.
+  clarityPass: false,
+  tieProfile: 'uniform',
   pitchPlacement: 'standard',
   chordSymbolScale: 1,
   bracketDurationGrammar: 'golden',
@@ -51,6 +55,12 @@ export const BRAHMS_ROUND44_RESERVE_OPTIONS: Partial<JankoLayoutOptions> = {
  */
 export const BRAHMS_ROUND44_RESERVE_TOKENS: Partial<JankoTokens> = {
   ...BRAHMS_OP118_NO1_JANKO_TOKENS,
+  graceScale: .68,
+  dynamicScale: .018,
+  claspSlashLength: 7.5,
+  claspSlashStroke: 1,
+  claspSlashSlope: .22,
+  upperExtensionThreshold: 73,
   midpointSlashLengthFactor: 1,
   midpointRingScale: 1,
   // Round 46: the bracket ring's extra enlargement is a mount policy of the

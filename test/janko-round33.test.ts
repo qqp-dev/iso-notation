@@ -32,7 +32,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
+import { buildBrahmsOp118No1Score } from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -45,12 +45,12 @@ import {
   type JankoCandidate,
   type JankoCandidateRound,
   type JankoScoreCandidateWindow,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   countJankoSystems,
   getSystemGeometry,

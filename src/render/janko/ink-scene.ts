@@ -17,7 +17,7 @@ import type { JankoNoteheadSpec } from './elements/notehead';
 import { GOTHIC_DEMI_GLYPHS } from './gothic-glyphs';
 import { placedRestPaint, serializeRestPaint } from './elements/rests';
 import type { PlacedRestPaint } from './elements/rests';
-import { placedBeamGroup, beamGroupSvg, beamPieceAt, beamPieceBox, beamPieceIntersectsBox } from './beam-scene';
+import { placedBeamGroup, routeVoiceUnderpasses, beamStemBoxes, beamGroupSvg, beamPieceAt, beamPieceBox, beamPieceIntersectsBox } from './beam-scene';
 import type { BeamPiece } from './beam-scene';
 import { soloRhythmPaint, soloBox, soloPieceAt, soloPieceBoxAt, soloSvg } from './solo-scene';
 import type { SoloPiece, SoloPhysicalResult } from './solo-scene';
@@ -225,7 +225,7 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     heads.set(p.note.id,headPieces({x:p.x,y:p.y,pitchClass:p.coord.pitchClass,hand:p.coord.hand,isPositionOfHonor:p.note.startTick===0&&o.showHonorHalo,tallKnockout:p.tallKnockout===true,symbolScale:p.symbolScale,chordMember:p.symbolChord},p.note.id,p.note.startTick,system,pagePiece,o,t,contributors));
   }
   const restPaint=layout.rests.map((rest,i)=>placedRestPaint(rest,system,pagePiece,i,t));
-  const sourceNotes=new Map(source.notes.map(note=>[note.id,note] as const));
+  const sourceNotes=new Map([...source.notes,...layout.notes.map(p=>p.note),...layout.unisonVoices.map(p=>p.note)].map(note=>[note.id,note] as const));
   const beams=o.rhythmStyle==='beamed'?layout.beams.map(beam=>placedBeamGroup(beam,t,o.durationGrammar,system,pagePiece,
     id=>[id,...layout.unisonMerges.filter(m=>m.survivorId===id).flatMap(m=>m.mergedIds)],sourceNotes)):[];
   const solos=new Map<string,readonly SoloPiece[]>();
@@ -246,6 +246,13 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
       const owners=[note.id,...layout.unisonMerges.filter(m=>m.survivorId===note.id).flatMap(m=>m.mergedIds)];
       solos.set(note.id,soloRhythmPaint(engraved,t,o.subdivisionStyle,grammar,system,pagePiece,owners,soloSources));
     }
+  }
+  if(o.clarityPass) {
+    const stems=[...solos.entries()].flatMap(([id,pieces])=>{
+      const note=layout.ungrouped.find(n=>n.id===id)!;
+      return pieces.flatMap(p=>p.shape.kind==='stem'?[{shape:p.shape,ownerIds:p.ownerIds,hand:note.hand,sourceVoice:note.sourceVoice}]:[]);
+    });
+    routeVoiceUnderpasses(beams,layout.beams,t,stems);
   }
   const chordBridges=placedChordBridges(layout.chordBridges,system,pagePiece,soloSources);
   const claspShells=layout.clasps.map(group=>placedClaspShell(group,system,pagePiece,soloSources));
@@ -275,7 +282,7 @@ export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}>
     if(p.kind==='beam'){
       // Filled rail bounds are broad-phase only; beamPieceIntersectsBox and
       // sceneInkAt certify the polygon rather than its empty sloped corners.
-      let visible=[beamPieceBox(p.beam)];
+      let visible=p.beam.shape.kind==='stem'?beamStemBoxes(p.beam):[beamPieceBox(p.beam)];
       for(const later of ordered.slice(i+1))if(later.primitive.kind==='erase')
         for(const cut of eraseBoxes(later.primitive))visible=visible.flatMap(b=>subtractBox(b,cut));
       for(const b of visible)result.push({...b,what:`visible grouped-beam ${piece.id}`});

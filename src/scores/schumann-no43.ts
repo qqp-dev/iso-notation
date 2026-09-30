@@ -703,15 +703,15 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
   }
   // Stem direction is meaningful only once a nearby same-voice printed lower/upstairs
   // gesture has anchored its role. It is NOT a universal stem-to-hand rule.
-  const anchored = sourceHash === NO14.hash && identity.number === 14 &&
-    events.some(e => e.kind === 'note' && e.printedStaff === 'lower' && e.stemDirection === 'down') &&
-    events.some(e => e.kind === 'note' && e.printedStaff === 'upper' && e.stemDirection === 'up');
-  const lowerAnchors = events.filter(e => e.kind === 'note' && e.voice === 'lower' &&
-    e.printedStaff === 'lower' && e.stemDirection === 'down').map(e => e.bar);
+  const lowerAnchors = events.filter(e => e.kind === 'note' && e.staff === 'lower' &&
+    (e.printedStaff ?? e.staff) === 'lower');
   const inferredHand = (e: WrittenEvent): { hand: 'RH' | 'LH'; evidence: string; confidence: 'high' | 'contextual' | 'unresolved' } => {
     const destination = e.printedStaff ?? e.staff;
-    if (anchored && lowerAnchors.some(bar => bar <= e.bar && e.bar - bar <= 4) &&
-        e.stemDirection === 'down' && (e.voice === 'lower' || e.voice === 'lower.0') && destination === 'upper')
+    if (e.staff === 'lower' && lowerAnchors.some(a =>
+        (a.voice === e.voice || a.voice === e.voice.split('.')[0]) &&
+        a.bar <= e.bar && e.bar - a.bar <= 4 &&
+        Fraction.parse(a.onset).n * Fraction.parse(e.onset).d <= Fraction.parse(e.onset).n * Fraction.parse(a.onset).d) &&
+        e.stemDirection === 'down' && destination === 'upper')
       return { hand: 'LH', evidence: 'Same logical gesture: lower/down anchor continued on upper staff', confidence: 'contextual' };
     return { hand: destination === 'upper' ? 'RH' : 'LH', evidence: `Printed ${destination} destination${e.stemDirection ? `; source stem ${e.stemDirection}` : ''}`, confidence: 'high' };
   };

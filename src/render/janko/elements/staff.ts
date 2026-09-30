@@ -264,7 +264,7 @@ export interface PitchGridRule {
  *   Row 1 center (0/4, Middle C, lin 48, always drawn — constitutional anchor)
  *   Row 2 above (0/5, lin 60, always drawn — locked core)
  *   Row 3 below (0/3, lin 36, always drawn — locked core)
- *   Row 4 outer-above (0/6, lin 72, fires iff bar max > 72)
+ *   Row 4 outer-above (0/6, lin 72, fires iff displayed bar max >= 78)
  *   Row 5 outer-below (0/2, lin 24, fires iff bar min <= 24)
  *
  * Fixed-4 analogue at its middles (shared grammar):
@@ -294,7 +294,7 @@ export const FIXED_3_ROW_DEFS: readonly NeedBasedRowDef[] = [
   { lin: 48, rowId: 1, name: 'center (0/4)', isAnchor: true, fires: () => true },
   { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: () => true },
   { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: () => true },
-  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l > 72) },
+  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 78) },
   { lin: 24, rowId: 5, name: 'outer-below (0/2)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 24) },
 ];
 
@@ -312,10 +312,12 @@ export const FIXED_4_ROW_DEFS: readonly NeedBasedRowDef[] = [
  */
 export function computeBarStaffRows(
   barLins: readonly number[],
-  core?: JankoCore
+  core?: JankoCore,
+  upperThreshold = 78
 ): { rowIds: number[]; lins: number[] } {
   const defs = core === 'fixed-3' ? FIXED_3_ROW_DEFS : core === 'fixed-4' ? FIXED_4_ROW_DEFS : [];
-  const firing = defs.filter((d) => d.fires(barLins));
+  const firing = defs.filter((d) => core==='fixed-3' && d.lin===72
+    ? barLins.some(l=>l>=upperThreshold) : d.fires(barLins));
   return {
     rowIds: firing.map((d) => d.rowId).sort((a, b) => a - b),
     lins: firing.map((d) => d.lin).sort((a, b) => a - b),
@@ -391,7 +393,8 @@ export function computeSystemStaffSegments(
         : t.measureInset;
 
   for (const def of defs) {
-    const earnsBar = barLins.map((lins) => def.fires(lins));
+    const earnsBar = barLins.map((lins) => isFixed3 && def.lin === 72
+      ? lins.some(l => l >= t.upperExtensionThreshold) : def.fires(lins));
     const isExtension = isFixed3
       ? def.lin === 24 || def.lin === 72
       : def.lin === 17.5 || def.lin === 77.5;

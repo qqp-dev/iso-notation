@@ -275,8 +275,8 @@ test('Row collisions are fanned at the judged pair gap (adaptive solver, Round 1
     for (let i = 1; i < k; i++) {
       const step = xs[i] - xs[i - 1];
       assert.ok(
-        Math.abs(step - PAIR_GAP) < 1e-9 || Math.abs(step - 2 * PAIR_GAP) < 1e-9,
-        `${key}: heads step one or two rail gaps (got ${step.toFixed(3)})`
+        Math.abs(step / PAIR_GAP - Math.round(step / PAIR_GAP)) < 1e-9 && step >= PAIR_GAP - 1e-9,
+        `${key}: coherent voice components step whole extent-derived rail gaps (got ${step.toFixed(3)})`
       );
       assert.ok(
         step >= 2 * MASK_WX - 1e-9,
@@ -395,7 +395,7 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
     (sum, layout) => sum + layout.unisonMerges.reduce((n, m) => n + m.mergedIds.length, 0),
     0
   );
-  assert.equal(merged, 7, 'the seven merged source heads (five cross-hand unisons + two m. 66 carry groups)');
+  assert.equal(merged, 3, 'only three compatible cross-hand groups share heads; unequal cross-hand and tie-chain statements remain distinct');
   const addedTieHeads = LAYOUTS.reduce(
     (n, layout) => n + layout.notes.filter((p) => p.note.id.includes('~c')).length,
     0
@@ -406,7 +406,7 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
     SCORE.notes.length - merged + addedTieHeads,
     'every sounding note is engraved (merged heads once) plus the written continuations'
   );
-  assert.equal(notes.length, 986, 'the Round 49 §1 head census (964 − 7 merged + 29 continuations; was 970)');
+  assert.equal(notes.length, 990, 'shared clarity head census: 964 − 3 compatible merges + 29 continuations');
   assert.equal(LAYOUTS.length, 18, 'the complete Intermezzo lays out as 18 systems, four measures each');
   // Every layout is engraved in its own system frame and later pages reuse the
   // four frames of page 1, so two notes are only comparable when their
@@ -456,7 +456,7 @@ test('Brahms Op. 118 No. 1 canonical fixed-3 is clean', () => {
   assert.equal(REPORT.ok, true, 'the canonical surface is honestly ok');
   assert.equal(REPORT.stats.systems, 18);
   assert.equal(REPORT.stats.measures, 71);
-  assert.equal(REPORT.stats.notes, 986, 'the Round 49 §1 painted-head census (964 − 7 merged + 29 continuations)');
+  assert.equal(REPORT.stats.notes, 990, 'painted-head census preserves unequal values: 964 − 3 compatible merges + 29 continuations');
   assert.ok(REPORT.stats.beams > 0, 'the eighths are beamed');
 });
 

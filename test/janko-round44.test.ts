@@ -30,7 +30,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
+import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-pre-clarity';
 import { bachBeforeM5 } from './support/bach-before-m5';
 
 import { wholeToneParity } from '../src/model/pitch';
@@ -39,7 +39,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -63,7 +63,7 @@ import {
   getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   countJankoPages,
   fitParityColumns,
@@ -98,7 +98,7 @@ import {
   type JankoCandidateRound,
   type JankoCandidateWindow,
   type JankoScoreCandidateWindow,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();
@@ -1605,11 +1605,11 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
   // two m. 66 attack/carry groups) + 29 written continuation heads. The
   // `heads` count this test's own Round 44 reserve surface lays out (959) is
   // the historical control, not the served page.
-  assert.deepEqual(perPage, [162, 174, 176, 175, 182, 117], 'the engine page census');
+  assert.deepEqual(perPage, [162, 174, 176, 175, 184, 119], 'current engine page census keeps both unequal-value cross-hand and tied statements');
   assert.equal(
     perPage.reduce((sum, n) => sum + n, 0),
-    986,
-    'every painted head of the served Round 49 engraving has its digit across the six pages'
+    990,
+    'every compatible or unequal-value head of the served current engraving has its digit across the six pages'
   );
   assert.equal(heads.length, 959, 'the Round 44 reserve control layout');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(html), 'no raster artifact anywhere in the served view');

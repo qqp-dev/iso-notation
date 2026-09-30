@@ -1202,9 +1202,9 @@ export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 55,
-  title: 'Source-faithful pitch, gestures and expression',
-  description: 'Approved shared correction round: lower/wider No.14 reference and explicit principal alternative, with corrected pitches, compound-meter beams and first-time source expression engraving. Shared Brahms and other repertoire effects are shown honestly.',
-  openAxes: [],
+  title: 'No. 13-led shared engraving clarity',
+  description: 'The same literal No. 13 windows before and after shared hand/voice, unison, grace, local duration-cut and contour rules. Printed Henle folio 14 shows one head at the two encoded LH E-sharp eighths (written 1 / unfolded 2, final eighth). Hands remain provisional. Shared repertoire consequences are measured, not frozen.',
+  openAxes: ['clarityPass'],
 };
 
 function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
@@ -1243,18 +1243,27 @@ export const SCHUMANN_NO14_STUDIO_SCORE_ID = 'schumann-op68-no14';
 export const SCHUMANN_NO30_STUDIO_SCORE_ID = 'schumann-op68-no30';
 export const SCHUMANN_NO13_STUDIO_SCORE_ID = 'schumann-op68-no13';
 
+/** Same literal windows for both real-engine surfaces; no per-measure geometry. */
+const NO13_CLARITY_WINDOWS: JankoScoreCandidateWindow[] = [
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:1,measureCount:56,fullScore:true,title:'Complete No. 13 · unfolded 1–56'},
+  ...[[2,2],[6,5],[27,1],[30,4],[37,3],[43,1]].map(([measureStart,measureCount])=>({
+    scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart,measureCount,
+    title:`No. 13 · unfolded ${measureStart}–${measureStart+measureCount-1}`,
+    caption:'Pickup is unfolded 1; written 1 is unfolded 2. Equal-value unisons share one head, not one voice. At written 25 / unfolded 37, the lower/down cross-staff continuation is provisional LH, not authoritative fingering. “3 to33” and “144” remain ambiguous spoken numbering.',
+  })),
+];
+
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
-  { id: 'schumann-no13-written-draft', label: 'Schumann Op. 68 No. 13 · Draft / unfolded repeats',
-    description: 'Complete source-derived 28-bar / 56-occurrence draft. Eight pitched pre-host grace groups (13 written members) keep their own eighth flags or connected sixteenth beams, with zero metrical time; 12 further spacer-only synchronization groups are retained without ink. Textual relative traversal corrects the second-half pitches and grace hosts. Source dynamics and explicit phrasing now engrave through shared paths; hands remain provisional, and ordinary slurs, fingerings and source staff layout remain deferred. Not GOLD or BRONZE.',
+  { id: 'schumann-no13-written-draft', label: 'No. 13 · proposed shared clarity', options:{clarityPass:true},
+    description: 'Shared clarity: LH-anchored / coherent RH clearance, independent source-voice corridors with non-fusing underpasses at true crossings, one head for compatible-value unisons with both owners, 0.80 nonmetrical grace, 5pt / 0.65pt local cuts at their own steeper rake, locally anchored tapered phrases and 0.016 Bravura dynamics. The upper rule stays at linear 72 but earns at displayed 78. Complete 28-bar / 56-occurrence source; all 16 pitched grace occurrences / 26 heads keep their hosts, flags and beams. Performing hands remain provisional; ordinary slurs, fingerings and source staff layout remain deferred.',
     tags: ['Draft / unfolded repeats', 'nonmetrical grace', 'provisional hands', 'source expression'],
-    windows: [
-      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 1, measureCount: 56, fullScore: true, title: 'Complete unfolded score · mm. 1–56', caption: 'All real-engine pages · 28 written bars, two passes of both halves; source grace groups occupy pre-host ink, never clock time.' },
-      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 3, measureCount: 5, title: 'First part · written lines 84–87', caption: 'Opening pre-host sixteenth pairs and eighth-to-chord; lower synchronized spacer grace before a rest has no pitched ink.' },
-      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 9, measureCount: 2, title: 'Written line 90 · beamed pair and chord', caption: 'Two distinct sixteenth heads joined by two source-ordered beams before the whole chord host.' },
-      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 23, measureCount: 3, title: 'Second half · written line 96', caption: 'One eighth flag before a chord host; lower appoggiatura is a spacer-only synchronization fact.' },
-      { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 29, measureCount: 5, title: 'Second-half continuation · written lines 105–108', caption: 'Braced pairs and lone eighth grace on the second repeated section; identical written facts unfold with separate occurrence IDs.' },
-    ] },
+    windows: NO13_CLARITY_WINDOWS },
+  { id:'schumann-no13-before-clarity',label:'No. 13 · pre-pass engraving rules',
+    description:'The same approved source, clocks and literal windows through the real engine, with pre-pass head/hand placement, 0.68 grace, 7.5pt/1pt cuts at beam rake, system-air phrases, 0.018 dynamics and the old upper-rule threshold. Contextual hand evidence is shared; this is not a reconstructed source edition.',
+    options:{clarityPass:false,tieProfile:'uniform'},
+    tokens:{graceScale:.68,dynamicScale:.018,claspSlashLength:7.5,claspSlashStroke:1,claspSlashSlope:.22,upperExtensionThreshold:73},
+    windows:NO13_CLARITY_WINDOWS,tags:['pre-pass rules','same source','real engine'] },
   { id: 'schumann-no30-written-draft', label: 'Schumann Op. 68 No. 30 · Draft / unfolded repeats',
     description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Corrected relative pitches preserve independent voices and repeat ties. Source dynamics and explicit phrasing now engrave through shared paths; printed cross-staff destinations, literal tie and laissez-vibrer marks, fingering, ordinary slurs, arpeggio layout and omissions remain source-linked in the ledger. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked ties', 'deferred notation'],

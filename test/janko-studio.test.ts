@@ -224,8 +224,8 @@ test('parked Round 49 studio renders its three readings on twenty-one declared w
     const candidate = ROUND_49_CANDIDATES.find((c) => c.id === id)!;
     const declared = candidateBadges(candidate, ROUND_49_METADATA).map(b => b.key);
     assert.ok(declared.includes(candidate.axis!), `${id}: its declared axis remains in the parked registry`);
-    if (candidate.options?.tieProfile !== 'uniform') {
-      assert.ok(body.includes('<b>tieProfile</b>'), `${id}: traced contour is badged`);
+    if (candidate.options?.tieProfile !== DEFAULT_JANKO_OPTIONS.tieProfile) {
+      assert.ok(body.includes('<b>tieProfile</b>'), `${id}: the real contour delta is badged`);
     }
   }
 });

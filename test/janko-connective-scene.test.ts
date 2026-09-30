@@ -1,4 +1,5 @@
 import { BRAHMS_CURRENT_PAGES } from './support/brahms-current';
+import { DEFAULT_JANKO_OPTIONS as archiveOptions,DEFAULT_JANKO_TOKENS as archiveTokens } from './pre-clarity-rules';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -23,14 +24,15 @@ test('historical Bach Reference and parked Round 49 Candidate windows match 39-r
   for(const id of ['primary','brahms-op118-no1'] as const){
     const e=config.scores[id],score=id==='primary'?bachBeforeM5(e.score):e.score;
     // PR97's Bach witness predates the new rest policy; Brahms stays canonical.
-    const options=id==='primary'?{...e.options,inferBoundaryRests:false}:e.options;
-    const layouts=layoutJankoScore(score,options,e.tokens);
+    const options=id==='primary'?{...archiveOptions,inferBoundaryRests:false}:e.options;
+    const tokens=id==='primary'?archiveTokens:e.tokens;
+    const layouts=layoutJankoScore(score,options,tokens);
     const pages=id==='primary'?config.pages:config.brahmsPages;
-    for(const page of pages)records.push({kind:'reference-page',score:id,page,sha256:sha(renderJankoPage(score,page,options,e.tokens,layouts))});
-    records.push({kind:'legacy-whole-system-crop',score:id,start:1,count:4,sha256:sha(renderJankoCrop(score,1,4,options,e.tokens,undefined,layouts))});
+    for(const page of pages)records.push({kind:'reference-page',score:id,page,sha256:sha(renderJankoPage(score,page,options,tokens,layouts))});
+    records.push({kind:'legacy-whole-system-crop',score:id,start:1,count:4,sha256:sha(renderJankoCrop(score,1,4,options,tokens,undefined,layouts))});
     for(const crop of id==='primary'?DEFAULT_STUDIO_CROPS:BRAHMS_STUDIO_CROPS)
       records.push({kind:id==='primary'?'reference-optional-crop':'reference-live-crop',score:id,start:crop.start,count:crop.count,title:crop.title,
-        sha256:sha(renderJankoCrop(score,crop.start,crop.count,options,e.tokens,undefined,layouts))});
+        sha256:sha(renderJankoCrop(score,crop.start,crop.count,options,tokens,undefined,layouts))});
   }
   for(const c of ROUND_49_CANDIDATES){
     const byScore=new Map<string,ReturnType<typeof layoutJankoScore>>();
@@ -137,11 +139,11 @@ test('clasp shell literal former path, miter, gaps, hollow interior and stored m
     '  </g>');
 });
 
-test('canonical final Brahms layout has 72 clasps, 33 bridges; placed paint and final booking are distinct', () => {
+test('canonical final Brahms layout has 52 voice-aware clasps, 50 bridges; placed paint and final booking are distinct', () => {
   const {scores}=createStudioConfig(),e=scores['brahms-op118-no1'];
   const layouts=layoutJankoScore(e.score,e.options,e.tokens);
-  assert.equal(layouts.reduce((n,l)=>n+l.clasps.length,0),72);
-  assert.equal(layouts.reduce((n,l)=>n+l.chordBridges.length,0),33);
+  assert.equal(layouts.reduce((n,l)=>n+l.clasps.length,0),52);
+  assert.equal(layouts.reduce((n,l)=>n+l.chordBridges.length,0),50);
   let bare=0,marked=0,dots=0;
   const dottedSpires:number[]=[];
   for(const l of layouts){
@@ -160,6 +162,8 @@ test('canonical final Brahms layout has 72 clasps, 33 bridges; placed paint and 
     }
     assert.equal(renderClaspGroup(l.clasps,l.claspRails,e.tokens,s.claspShells),renderClaspGroup(l.clasps,l.claspRails,e.tokens));
     for(const [index,g] of l.clasps.entries()){
+      assert.equal(new Set(g.notes.map(n=>`${n.hand}:${n.sourceVoice}`)).size,1,
+        'a shared clasp never fuses independent source voices or two performing hands');
       // Independent pre-cutover geometry and musical identity; no SVG parser or self-comparison.
       assert.equal(claspShellSvg(s.claspShells[index]).includes(`d="${g.path}"`),true);
       assert.equal(s.claspShells[index].tick,g.tick);
@@ -176,11 +180,13 @@ test('canonical final Brahms layout has 72 clasps, 33 bridges; placed paint and 
     assert.deepEqual(bareBoxes,s.claspShells.filter(sh=>!sh.marked).map(sh=>({...claspShellBox(sh),what:'clasp-shell'})));
     assert.deepEqual(markedBoxes,l.clasps.filter((_,i)=>s.claspShells[i].marked).map(g=>({...claspInkBox(g,e.tokens),what:'legacy broad bracket'})));
   }
-  // Two of the 16 spire-duration groups actually paint augmentation dots.
-  assert.equal(bare,14);
-  assert.equal(marked,58);
+  console.log('CURRENT-CONNECTIVES',JSON.stringify({bare,marked,dots,dottedSpires}));
+  // Source-voice / performing-hand partition replaces cross-voice shared
+  // brackets: 52 real groups, of which 49 carry a duration mark.
+  assert.equal(bare,3);
+  assert.equal(marked,49);
   assert.deepEqual(dottedSpires,[5520,9360]);
-  assert.equal(dots,21);
+  assert.equal(dots,17);
 });
 
 test('frozen placed scene mutations, not stale layout, govern connective emission', () => {

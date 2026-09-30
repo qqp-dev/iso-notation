@@ -93,7 +93,7 @@ test('Bracket span pin: vertical extent equals C3–C5 pitch extent identically 
 
   const brahmsOpts = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3', measuresPerSystem: 1 });
   const fiveLine = { ...BRAHMS, notes: BRAHMS.notes.map(n => n.id === 'brahms-op118-no1-2'
-    ? { ...n, pitch: { octave: 6, pitchClass: 1 } } : n) };
+    ? { ...n, pitch: { octave: 6, pitchClass: 6 } } : n) };
   const brahmsPage = computePageGeometry(brahmsOpts, TOKENS, BRAHMS);
   const fiveLinePage = computePageGeometry(brahmsOpts, TOKENS, fiveLine);
 
@@ -101,7 +101,7 @@ test('Bracket span pin: vertical extent equals C3–C5 pitch extent identically 
     { score: BACH, page: bachPage, sysIndex: 3, opts: bachOpts, expectedRows: [1, 2, 3], expectedLins: [36, 48, 60], label: '3-line (m.7)' },
     { score: BACH, page: bachPage, sysIndex: 0, opts: bachOpts, expectedRows: [1, 2, 3], expectedLins: [36, 48, 60], label: '3-line (m.1)' },
     { score: BRAHMS, page: brahmsPage, sysIndex: 3, opts: brahmsOpts, expectedRows: [1, 2, 3, 5], expectedLins: [24, 36, 48, 60], label: '4-line' },
-    { score: fiveLine, page: fiveLinePage, sysIndex: 0, opts: brahmsOpts, expectedRows: [1, 2, 3, 4, 5], expectedLins: [24, 36, 48, 60, 72], label: '5-line (earned above 0)' },
+    { score: fiveLine, page: fiveLinePage, sysIndex: 0, opts: brahmsOpts, expectedRows: [1, 2, 3, 4, 5], expectedLins: [24, 36, 48, 60, 72], label: '5-line (earned at linear 78)' },
   ];
 
   const expectedPitchExtent = 24 * TOKENS.semitoneScale; // 60.0pt (C3 lin 36 to C5 lin 60)

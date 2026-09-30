@@ -38,19 +38,19 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
   BRAHMS_VOICE_HAND,
   normalizeSourceSilences,
 } from '../src/scores/brahms-source-fidelity';
-import { getCandidate, ROUND_48_CANDIDATES, ROUND_48_METADATA } from '../src/render/janko/candidates';
+import { getCandidate, ROUND_48_CANDIDATES, ROUND_48_METADATA } from './pre-clarity-candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   claspMemberCarriedTicks,
   knockoutHalfExtents,

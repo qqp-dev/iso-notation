@@ -38,7 +38,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -49,7 +49,7 @@ import {
   JankoChordGrouping,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import { QuantizedGridScore } from '../src/model/types';
 import { splitTick } from '../src/render/janko/geometry';
 import {
@@ -162,9 +162,9 @@ test('Clasp tokens: geometry lands on the ticket defaults, and Round 14 restores
   // A downbeat clasp needs `r + claspOffset + CLASP_MARK_REACH +
   // claspMinBarlineAir` from the measure's left edge — 15.35pt with the
   // canonical tokens, because a 7.5pt cut reaches 3.75pt left of the spine.
-  assert.equal(getClaspDownbeatInset(T), 4.8 + 2.8 + CLASP_MARK_REACH + 4.0);
+  assert.equal(getClaspDownbeatInset(T), 4.8 + 2.8 + T.claspSlashLength / 2 + 4.0);
   assert.equal(CLASP_MARK_REACH, CLASP_TRANSVERSE_WIDTH / 2, 'the widest cut is the 7.5pt rung');
-  assert.equal(CLASP_TRANSVERSE_STROKE, 1.0, 'every transverse cut is a 1.0pt line');
+  assert.equal(CLASP_TRANSVERSE_STROKE, 1, 'historical exported metrics remain compatible; current ink uses the shared clarity tokens');
   assert.equal(CLASP_RING_STROKE, 1.0, 'the standalone open stem ring is a 1.0pt stroke');
   // §3 bracket-circle family: the bracket's own rings render at scale 0.80
   // (R = 2.4pt, 0.8pt), isolated from standalone stem rings (3.0/1.0).

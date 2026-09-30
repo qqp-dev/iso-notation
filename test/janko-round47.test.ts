@@ -35,7 +35,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
+import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-pre-clarity';
 import { bachBeforeM5 } from './support/bach-before-m5';
 import { readFileSync } from 'node:fs';
 
@@ -45,18 +45,18 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   ROUND_47_CANDIDATES,
   ROUND_47_METADATA,
   getCandidate,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   countJankoPages,
   drawnStaffRuleYs,
@@ -100,12 +100,11 @@ const INCLUSIVE_CROP = 'cb30a7d9c18dfe2391e073e91e5686a619c8684b8e79d9adf2be8357
 // Replay the historical inclusive rule through the *same real renderer* to
 // authenticate archival hashes. Restore the shared rule even on assertion
 // failure; the other tests in this file must see today's above-0 policy.
-function withInclusiveUpperRow<T>(render: () => T): T {
-  const row = FIXED_3_ROW_DEFS.find(def => def.lin === 72)!;
-  const original = row.fires;
-  (row as { fires: typeof original }).fires = lins => lins.some(lin => lin >= 72);
+function withInclusiveUpperRow<T>(render: () => T, tokens = TOKENS): T {
+  const original = tokens.upperExtensionThreshold;
+  tokens.upperExtensionThreshold = 72;
   try { return render(); }
-  finally { (row as { fires: typeof original }).fires = original; }
+  finally { tokens.upperExtensionThreshold = original; }
 }
 
 function assertScopedRowRemoval(previous: string, current: string, label: string): void {
@@ -242,7 +241,7 @@ test('A. Declaring the new defaults explicitly changes nothing at all', () => {
   const historic = withInclusiveUpperRow(() => ({
     page: renderJankoPage(BRAHMS, 0, explicit, explicitTokens),
     crop: renderJankoCrop(BRAHMS, 1, 71, explicit, explicitTokens),
-  }));
+  }),explicitTokens);
   assert.notEqual(sha(historic.page), INCLUSIVE_PAGE0, 'explicit defaults reproduce the archived inclusive page');
   assert.notEqual(sha(historic.crop), INCLUSIVE_CROP, 'the archived cross-page crop predates corrected stacking');
   assert.match(historic.crop, /transform="translate\(0 [1-9]/, 'explicit crop stacks later-page systems');

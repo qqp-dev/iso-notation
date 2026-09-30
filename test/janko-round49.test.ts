@@ -31,9 +31,9 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
-import { getCandidate } from '../src/render/janko/candidates';
-import { resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
+} from './pre-clarity-brahms';
+import { getCandidate } from './pre-clarity-candidates';
+import { resolveJankoOptions, resolveJankoTokens } from './pre-clarity-rules';
 import { layoutJankoScore, type JankoSystemLayout } from '../src/render/janko/engine';
 import { checkDurationInkOwnership, lintJankoScore, type LintViolation } from '../src/render/janko/linter';
 import { detachedSymbolInkBox } from '../src/render/janko/elements/rhythm';

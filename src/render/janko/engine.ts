@@ -159,7 +159,6 @@ import {
   JankoStemGeometry,
   JankoVerticalChordGroup,
   BRACKET_RING_OUTER,
-  CLASP_MARK_REACH,
   CLASP_MIN_VERTICAL_CHORD,
   CLASP_TRANSVERSE_WIDTH,
   HONOR_STEM_ATTACHMENT_AIR,
@@ -202,7 +201,9 @@ import {
   detachedSymbolInteriors,
   renderDetachedRuleKnockout,
 } from './elements/rhythm';
-import { durationDotCount } from './elements/duration';
+import { durationDotCount, durationFlagCount } from './elements/duration';
+import { placedBeamGroup, routeVoiceUnderpasses } from './beam-scene';
+import { soloRhythmPaint } from './solo-scene';
 import {
   ThreeRailDiagnostic,
   ThreeRailFixed,
@@ -818,8 +819,15 @@ function rewriteFoldShift(
 export function resolveOnsetClaspGroups(
   onset: readonly PositionedJankoNote[],
   t: ResolvedJankoTokens,
-  spreadX: (p: PositionedJankoNote) => number
+  spreadX: (p: PositionedJankoNote) => number,
+  separateVoices = false
 ): PositionedJankoNote[][] {
+  if (separateVoices) {
+    const parts=new Map<string,PositionedJankoNote[]>();
+    for(const p of onset){const key=`${p.rhythm.hand}:${p.rhythm.sourceVoice ?? ''}`;
+      const group=parts.get(key) ?? [];group.push(p);parts.set(key,group);}
+    return [...parts.values()].flatMap(group=>resolveOnsetClaspGroups(group,t,spreadX));
+  }
   const byHand = new Map<Hand, PositionedJankoNote[]>();
   for (const p of onset) {
     const bucket = byHand.get(p.rhythm.hand);
@@ -893,7 +901,7 @@ export function collectClaspClusters(
       // Round 6/8 scope per hand (a spread cluster or a 3+ head vertical
       // chord), unified into one cross-hand bracket by Round 19 when the two
       // hands' spans overlap or touch.
-      const handGroups = resolveOnsetClaspGroups(onset, t, (p) => p.rhythm.x);
+      const handGroups = resolveOnsetClaspGroups(onset, t, (p) => p.rhythm.x, o.clarityPass);
       const unified = handGroups.length === 1 && handGroups[0].length === onset.length;
       for (const members of handGroups) {
         groups.push({
@@ -2082,7 +2090,7 @@ function handForNote(note: QuantizedNote): Hand {
  */
 export function getClaspDownbeatInset(tokens?: Partial<JankoTokens> | null): number {
   const t = resolveJankoTokens(tokens);
-  return t.noteheadRadius + t.claspOffset + CLASP_MARK_REACH + t.claspMinBarlineAir;
+  return t.noteheadRadius + t.claspOffset + t.claspSlashLength / 2 + t.claspMinBarlineAir;
 }
 
 /**
@@ -4740,7 +4748,7 @@ export function perHandDownbeatGroups(
     const fit = fitClusterSlots(members, air, 'column');
     for (const [id, slot] of fit.slots) offsets.set(id, slot * fit.gap);
   }
-  return resolveOnsetClaspGroups(positioned, t, (p) => offsets.get(p.note.id) ?? 0);
+  return resolveOnsetClaspGroups(positioned, t, (p) => offsets.get(p.note.id) ?? 0, o.clarityPass);
 }
 
 /**
@@ -5058,6 +5066,7 @@ export function resolveChordColumns(
   //     monotonically, so each pass terminates.
   // -------------------------------------------------------------------------
   const offsetsById = new Map<string, number>();
+  const componentShiftById = new Map<string,number>();
   /** Round 45: every optical cluster actually applied in this solve. */
   const opticalClusters: JankoOpticalCluster[] = [];
   const byX = [...units].sort((a, b) => a.nominalX - b.nominalX || a.tick - b.tick);
@@ -5077,6 +5086,7 @@ export function resolveChordColumns(
         fitGroup(cluster.notes.map((p) => p.note.id));
       }
     }
+    if (o.clarityPass) return; // coherent hand/voice envelope solve below
     for (const unit of units) {
       const memberCount = unit.rows.reduce((n, c) => n + c.notes.length, 0);
       for (let pass = 0; pass < memberCount; pass++) {
@@ -5183,7 +5193,7 @@ export function resolveChordColumns(
     const onset = unit.rows
       .flatMap((cluster) => cluster.notes)
       .sort((a, b) => a.y - b.y || a.x - b.x);
-    return resolveOnsetClaspGroups(onset, t, (p) => offsets.get(p.note.id) ?? 0);
+    return resolveOnsetClaspGroups(onset, t, (p) => offsets.get(p.note.id) ?? 0, o.clarityPass);
   };
   const bracketedIds = new Set<string>();
   /** Lowest-source-pitch member of one fit group (stable id tie-break). */
@@ -5343,6 +5353,62 @@ export function resolveChordColumns(
     // stays lowest-pitch-first under either anchor. Residuals re-resolve
     // under the final anchors.
     fitPass(anchorFit((ids) => (bracketedIds.has(lowestIdOf(ids)) ? 'inward' : 'column')));
+  }
+  if (o.clarityPass) {
+    // Solve performing-hand / source-voice components BEFORE any dependent ink
+    // or width admission. The obstacle includes each actual grouped stem end,
+    // not merely the head mask or its preliminary minimum-length stem.
+    const sourceOf = (p: PositionedJankoNote) => p.rhythm.sourceVoice ?? p.rhythm.hand;
+    for (let pass = 0; pass < 4; pass++) {
+      const projected = notes.map(p => ({ ...p.rhythm, x: p.x + (offsetsById.get(p.note.id) ?? 0) }));
+      const ends = new Map(projected.map(n => [n.id, getStemGeometry(n, t).stemEndY]));
+      if (o.rhythmStyle === 'beamed') {
+        const groups = partitionBeamGroups(projected, t, geo.middleCY, o.beamGroupTicks, geo.sourceBarTicks).groups;
+        for (const beam of computeVoiceBeams(groups,t,projected,geo.middleCY,[],o.durationGrammar,true)) {
+          beam.stems.forEach((s, i) => ends.set(beam.notes[i].id, beam.beamY(s.stemX)));
+        }
+      }
+      let changed = false;
+      for (const unit of units) {
+        const onset = unit.rows.flatMap(c => c.notes);
+        const components = new Map<string, PositionedJankoNote[]>();
+        for (const p of onset) {
+          const key = `${p.rhythm.hand}:${sourceOf(p)}`;
+          const group = components.get(key) ?? []; group.push(p); components.set(key, group);
+        }
+        // LH is the invariant bass anchor. Independent voices within a hand
+        // retain their whole chord; only a conflicting component travels.
+        const groups = [...components.values()].sort((a,b) =>
+          (a[0].rhythm.hand === 'LH' ? 0 : 1) - (b[0].rhythm.hand === 'LH' ? 0 : 1) ||
+          Math.min(...a.map(sourceLin)) - Math.min(...b.map(sourceLin)) ||
+          sourceOf(a[0]).localeCompare(sourceOf(b[0])));
+        const envelope = (g: PositionedJankoNote[]) => ({
+          left: Math.min(...g.map(p=>xOf(unit,p.note.id)-fitById.get(p.note.id)!.wx)),
+          right: Math.max(...g.map(p=>xOf(unit,p.note.id)+fitById.get(p.note.id)!.wx)),
+          top: Math.min(...g.map(p=>Math.min(fitById.get(p.note.id)!.lower,ends.get(p.note.id)!))),
+          bottom: Math.max(...g.map(p=>Math.max(fitById.get(p.note.id)!.upper,ends.get(p.note.id)!))),
+        });
+        for (let i=1;i<groups.length;i++) {
+          const moving = groups[i];
+          for (let j=0;j<i;j++) {
+            const a=envelope(groups[j]), b=envelope(moving);
+            if (Math.min(a.bottom,b.bottom) <= Math.max(a.top,b.top)+EPS ||
+                Math.min(a.right,b.right) <= Math.max(a.left,b.left)+EPS) continue;
+            const shift = Math.ceil((a.right + presetAir - b.left) / pairGap) * pairGap;
+            // In a cross-hand conflict all RH members move coherently, even
+            // those outside this voice's head-mask overlap component.
+            const members = moving[0].rhythm.hand !== groups[j][0].rhythm.hand
+              ? onset.filter(p=>p.rhythm.hand==='RH') : moving;
+            for (const p of members) {
+              offsetsById.set(p.note.id,(offsetsById.get(p.note.id) ?? 0)+shift);
+              componentShiftById.set(p.note.id,(componentShiftById.get(p.note.id) ?? 0)+shift);
+            }
+            changed = true;
+          }
+        }
+      }
+      if (!changed) break;
+    }
   }
   for (const unit of units) {
     for (const cluster of unit.rows) {
@@ -5765,8 +5831,10 @@ export function resolveChordColumns(
         const carriedOf = new Map(
           memberTicks.map((m) => [m.id, claspCarriedDuration(memberTicks, m.id)] as const)
         );
+        const componentShift = o.clarityPass ? (componentShiftById.get(members[0].note.id) ?? 0) : 0;
+        const componentX = unit.nominalX + componentShift;
         const threeMembers: ThreeRailMember[] = members.map((p) =>
-          buildThreeRailMember(p, unit.nominalX, o, t, carriedOf.get(p.note.id)!)
+          buildThreeRailMember(p, componentX, o, t, carriedOf.get(p.note.id)!)
         );
         const memberIds = new Set(members.map((p) => p.note.id));
         const fixed: ThreeRailFixed[] = unit.rows
@@ -5782,7 +5850,7 @@ export function resolveChordColumns(
               hy: e.hy,
             };
           });
-        const assignment = assignThreeRails(threeMembers, unit.nominalX, pairGap, fixed);
+        const assignment = assignThreeRails(threeMembers, componentX, pairGap, fixed);
         if (assignment.diagnostics.length > 0) {
           railDiagnostics.push(...assignment.diagnostics);
           continue;
@@ -5790,7 +5858,7 @@ export function resolveChordColumns(
         for (const m of threeMembers) {
           const rail = assignment.rails.get(m.id)!;
           const prev = offsetsById.get(m.id) ?? 0;
-          const next = rail * pairGap;
+          const next = componentShift + rail * pairGap;
           if (Math.abs(next - prev) > EPS) {
             offsetsById.set(m.id, next);
             moved = true;
@@ -6314,9 +6382,34 @@ export function resolveChordColumns(
   };
 }
 
+/** Independent source rhythms reserve distinct rail corridors. Obstacles are
+ * final rail ink (including secondary levels), and painted stems use beamY. */
+function computeVoiceBeams(groups: JankoRhythmNote[][], t: ResolvedJankoTokens,
+  notes: JankoRhythmNote[], spine: number, restInk: {x0:number;x1:number;y0:number;y1:number}[],
+  grammar: ResolvedJankoLayoutOptions['durationGrammar'], clarity: boolean): JankoBeamGroupGeometry[] {
+  const beams: JankoBeamGroupGeometry[] = [];
+  for (const group of groups) {
+    const foreignRails = clarity ? beams.filter(b => b.notes[0].hand !== group[0].hand ||
+      b.notes[0].sourceVoice !== group[0].sourceVoice).flatMap(b=>b.levels.map(l=>({
+        x0:Math.min(l.connector.x1,l.connector.x2)-JANKO_STEM_STROKE_WIDTH/2,
+        x1:Math.max(l.connector.x1,l.connector.x2)+JANKO_STEM_STROKE_WIDTH/2,
+        y0:Math.min(l.connector.y1,l.connector.y2)-t.beamThickness/2,
+        y1:Math.max(l.connector.y1,l.connector.y2)+t.beamThickness/2,
+      }))) : [];
+    const beam = computeBeamGroupGeometry(group,t,notes,spine,[...restInk,...foreignRails],grammar);
+    if (beam) beams.push(beam);
+  }
+  return beams;
+}
+
 /** Position every note of one system, in engraving order. */
 /**
  * Round 20 — **one sound, one digit**; Round 21 — the **lower head** keeps it.
+ *
+ * Compatible engraved values at one absolute pitch/onset share a visible head
+ * (same-hand independent source voices included). Owners remain in the score
+ * and in the merged contributor list; incompatible statements stay distinct.
+ * The legacy comparison below retains its old cross-hand policy.
  *
  * Two hands sounding the same pitch at the same onset produce one sound event
  * (a piano can only strike it once; no notation draws it twice), so the two
@@ -6344,15 +6437,19 @@ function mergeUnisonHeads(
    * attack/carry group); every other same-hand group keeps its heads, exactly
    * as before. `null` (or an empty plan) is the canonical, pre-Round-46 path.
    */
-  tiePlan: JankoTieDisplayPlan | null = null
+  tiePlan: JankoTieDisplayPlan | null = null,
+  clarity = true,
+  grammar: ResolvedJankoLayoutOptions['durationGrammar'] = 'golden'
 ): {
   notes: PositionedJankoNote[];
   voices: PositionedJankoNote[];
   merges: JankoUnisonMerge[];
 } {
   const groups = new Map<string, PositionedJankoNote[]>();
+  const pitchKey = (p: PositionedJankoNote) => `${p.note.startTick}|${p.note.pitch.pitchClass}|${p.note.pitch.octave}`;
   for (const p of positioned) {
-    const key = `${p.note.startTick}|${p.note.pitch.pitchClass}|${p.note.pitch.octave}`;
+    const value = clarity ? `|${p.rhythm.durationTicks}` : '';
+    const key = pitchKey(p) + value;
     const bucket = groups.get(key);
     if (bucket) bucket.push(p);
     else groups.set(key, [p]);
@@ -6374,7 +6471,7 @@ function mergeUnisonHeads(
       ? group.filter((p) => tiePlan.chains.some((c) => c.noteId === p.note.id))
       : [];
     const sameHandChainGroup = hands.size < 2 && chainMembers.length > 0;
-    if (hands.size < 2 && !sameHandChainGroup) {
+    if (hands.size < 2 && !sameHandChainGroup && !clarity) {
       notes.push(...group);
       continue;
     }
@@ -6397,7 +6494,10 @@ function mergeUnisonHeads(
     const exact = others.every((p) => p.rhythm.durationTicks === survivor.rhythm.durationTicks);
     notes.push(survivor);
     for (const p of others) {
-      if (!exact) voices.push({ ...p, unisonSurvivorId: survivor.note.id });
+      const independent = p.rhythm.hand!==survivor.rhythm.hand || p.rhythm.sourceVoice!==survivor.rhythm.sourceVoice;
+      const differentBeam = p.rhythm.sourceBeam?.group !== survivor.rhythm.sourceBeam?.group;
+      if (!exact || clarity && independent && (differentBeam || durationFlagCount(p.rhythm.durationTicks,grammar)>0))
+        voices.push({ ...p, unisonSurvivorId: survivor.note.id });
     }
     merges.push({
       tick: survivor.note.startTick,
@@ -7103,9 +7203,9 @@ export function layoutJankoSystemShifted(
    * The system's own notes with every rendered chain head stating its **first
    * written component** instead of the composite total. Sounding data is never
    * touched: this is the engraving value of the head, and the tie chain (arcs +
-   * continuation heads) states the rest. The continuation heads themselves are
-   * injected *after* the column solve — a written continuation never moves a
-   * column, changes a downbeat inset or re-decides a bracket.
+   * continuation heads) states the rest. Shared clarity includes continuations
+   * in the same hand/voice solve and width admission as attacks. The historical
+   * comparison retains its post-solve injection below.
    */
   const sysNotes = score.notes
     .filter((n) => n.startTick >= startTick && n.startTick < endTick)
@@ -7205,11 +7305,12 @@ export function layoutJankoSystemShifted(
   // over the co-onset candidate set reads the admitted ownership, and the real
   // solve then scales exactly those members. Canonical (`chordSymbolScale: 1`)
   // takes the untouched path — `chordSymbolIds` stays null.
+  const columnNotes = o.clarityPass ? [...sysNotes,...tieHeads] : sysNotes;
   const coOnsetIds = o.chordSymbolScale === 1 ? null : chordSymbolMemberIds(score);
   let chordSymbolIds: ReadonlySet<string> | null = coOnsetIds;
   if (coOnsetIds) {
     const preRaw = applyFoldPairPresentation(
-      sysNotes.map((n) => {
+      columnNotes.map((n) => {
         const p = positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets);
         if (!coOnsetIds.has(n.id)) return p;
         return { ...p, symbolScale: o.chordSymbolScale, symbolChord: true };
@@ -7219,7 +7320,7 @@ export function layoutJankoSystemShifted(
       t
     );
     const pre = resolveChordColumns(
-      mergeUnisonHeads(preRaw, tiePlan).notes,
+      mergeUnisonHeads(preRaw, tiePlan, o.clarityPass, o.durationGrammar).notes,
       geometry,
       systemIndex,
       o,
@@ -7230,7 +7331,7 @@ export function layoutJankoSystemShifted(
   }
   for (let attempt = 0; ; attempt++) {
     const raw = applyFoldPairPresentation(
-      sysNotes.map((n) => {
+      columnNotes.map((n) => {
         const p = positionJankoNote(n, geometry, systemIndex, o, t, flanks?.get(n.id) ?? null, claspInsets);
         if (!chordSymbolIds || !chordSymbolIds.has(n.id)) return p;
         return { ...p, symbolScale: o.chordSymbolScale, symbolChord: true };
@@ -7242,7 +7343,7 @@ export function layoutJankoSystemShifted(
     // Round 20: one sound, one digit — cross-hand unisons merge before the
     // column solve, so the survivor keeps its column with no fan. Round 46 adds
     // the source-proven same-hand attack/carry groups (see `mergeUnisonHeads`).
-    const merged = mergeUnisonHeads(raw, tiePlan);
+    const merged = mergeUnisonHeads(raw, tiePlan, o.clarityPass, o.durationGrammar);
     positioned = merged.notes;
     mergedVoices = merged.voices;
     unisonMerges = merged.merges;
@@ -7286,7 +7387,7 @@ export function layoutJankoSystemShifted(
   // that head's admitted symbol scale and optical displacement, so a continued
   // chord tone is engraved like its chord.
   // -------------------------------------------------------------------------
-  const injectedBase = tieHeads.map((head) => {
+  const injectedBase = (o.clarityPass ? [] : tieHeads).map((head) => {
     const p = positionJankoNote(head, geometry, systemIndex, o, t, flanks?.get(head.id) ?? null, claspInsets);
     const column = chordColumns.columns.get(head.startTick);
     const x = column ?? getTickColumnX(head.startTick, geometry, systemIndex, o, t, claspInsets);
@@ -7438,12 +7539,23 @@ export function layoutJankoSystemShifted(
     );
     // Pre-layout beam exclusion uses conservative admission, never final placed ink.
     const restInk = restLayer.rests.map((r) => restAdmissionBox(r, t));
-    beams = partition.groups
-      .map((group) =>
-        computeBeamGroupGeometry(group, t, rhythmNotes, geometry.middleCY, restInk, o.durationGrammar)
-      )
-      .filter((g): g is JankoBeamGroupGeometry => g !== null);
+    beams = computeVoiceBeams(partition.groups,t,rhythmNotes,geometry.middleCY,restInk,o.durationGrammar,o.clarityPass);
     ungrouped = partition.ungrouped;
+    if(o.clarityPass && beams.length){
+      // Earn independent solo tip length BEFORE dependent duration/curve ink.
+      // Use the very same f-rounded polygons and routing as final paint; no
+      // score IDs, shifted onsets or hypothetical minimum-length beam ends.
+      const contributors=(id:string)=>[id,...unisonMerges.filter(m=>m.survivorId===id).flatMap(m=>m.mergedIds)];
+      const groups=beams.map(b=>placedBeamGroup(b,t,o.durationGrammar,systemIndex,0,contributors));
+      const tips=ungrouped.flatMap(note=>{
+        const pieces=soloRhythmPaint(note,t,o.subdivisionStyle,o.durationGrammar);
+        return pieces.flatMap(p=>p.shape.kind==='stem'?[{note,shape:p.shape,original:p.shape.y2,
+          ownerIds:contributors(note.id),hand:note.hand,sourceVoice:note.sourceVoice,extendTip:true}]:[]);
+      });
+      routeVoiceUnderpasses(groups,beams,t,tips);
+      for(const tip of tips)if(Math.abs(tip.shape.y2-tip.original)>1e-9)
+        tip.note.stemLength=Math.abs(tip.shape.y2-tip.note.y);
+    }
   }
 
   // Round 5: external left clasps group every vertical simultaneity and carry
@@ -7738,14 +7850,14 @@ export function layoutJankoSystemShifted(
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
       if (compressedCopyIds?.has(p.note.id) || handprintNoteIds?.has(p.note.id)) continue;
-      const key = `${p.note.startTick}|${p.rhythm.hand}`;
+      const key = `${p.note.startTick}|${p.rhythm.hand}${o.clarityPass?`|${p.rhythm.sourceVoice ?? ''}`:''}`;
       const bucket = byHandOnset.get(key);
       if (bucket) bucket.push(p);
       else byHandOnset.set(key, [p]);
     }
     for (const [key, group] of byHandOnset.entries()) {
       if (group.length < 2) continue;
-      if (bracketedHandOnsets.has(key)) continue;
+      if (bracketedHandOnsets.has(key.split('|').slice(0,2).join('|'))) continue;
       const standalone = group.filter((p) => !beamedIds.has(p.note.id));
       if (standalone.length < 2) continue;
       const resolved = computeVerticalChordGroup(
@@ -7778,7 +7890,7 @@ export function layoutJankoSystemShifted(
     const byHandOnset = new Map<string, PositionedJankoNote[]>();
     for (const p of notes) {
       if (compressedCopyIds?.has(p.note.id) || handprintNoteIds?.has(p.note.id)) continue;
-      const key = `${p.note.startTick}|${p.rhythm.hand}`;
+      const key = `${p.note.startTick}|${p.rhythm.hand}${o.clarityPass?`|${p.rhythm.sourceVoice ?? ''}`:''}`;
       const bucket = byHandOnset.get(key);
       if (bucket) bucket.push(p);
       else byHandOnset.set(key, [p]);
@@ -9873,9 +9985,38 @@ export function layoutJankoSystemShifted(
     const ink = { top: Math.min(booking.top,...painted.map(b=>b.y0)),
       bottom: Math.max(booking.bottom,...painted.map(b=>b.y1)) };
     const tickX = (tick: number) => layout.columns.get(tick) ?? getTickColumnX(tick,geometry,systemIndex,o,t,claspInsets);
+    const endpointHeads=(ids:string[],tick:number):PositionedJankoNote[]=>{
+      const owners=new Set(ids);
+      if(o.clarityPass)for(const chain of tiePlan?.chains??[])if(owners.has(chain.noteId))
+        for(const component of chain.components)if(component.startTick===tick)owners.add(component.headId);
+      for(const merge of unisonMerges)if(merge.mergedIds.some(id=>owners.has(id)))owners.add(merge.survivorId);
+      const exact=flaggedNotes.filter(n=>owners.has(n.note.id)&&n.note.startTick===tick);
+      if(exact.length || tick>=startTick && tick<endTick)return exact;
+      // A continuation fragment earns an endpoint from its OWN logical voice
+      // at this system edge, not from the highest unrelated ink in the system.
+      const voices=new Set(score.notes.filter(n=>ids.includes(n.id)).flatMap(n=>n.sourceProvenance?.voices??[]));
+      const local=flaggedNotes.filter(n=>n.rhythm.sourceVoice && voices.has(n.rhythm.sourceVoice));
+      const nearest=Math.min(...local.map(n=>Math.abs(n.note.startTick-tick)));
+      return local.filter(n=>Math.abs(n.note.startTick-tick)===nearest);
+    };
     layout.expressions = placeExpressions(score,{ start:startTick,end:endTick,left:geometry.staffLeft,right:geometry.staffRight,
       top:ink.top,bottom:ink.bottom,x:tickX,
-      endpointX: (ids,tick) => flaggedNotes.find(n => ids.includes(n.note.id) && n.note.startTick === tick)?.x ?? tickX(tick) });
+      clarity:o.clarityPass, dynamicScale:t.dynamicScale,contourThickness:t.tieApexThickness,
+      obstacles:[...painted.filter(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what)),
+        ...flaggedNotes.map(n=>{const {wx,hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return {x0:n.x-wx,x1:n.x+wx,y0:n.y-hy,y1:n.y+hy};})],
+      endpointEnvelope: (ids,tick) => {
+        const heads=endpointHeads(ids,tick);
+        if (!heads.length) return undefined;
+        const rhythmEnds=heads.map(n=>{
+          if(suppressed.has(n.note.id))return n.y;
+          const beam=beams.find(b=>b.notes.some(p=>p.id===n.note.id));
+          const stem=beam?.stems[beam.notes.findIndex(p=>p.id===n.note.id)];
+          return stem&&beam ? beam.beamY(stem.stemX) : getStemGeometry(n.rhythm,t).stemEndY;
+        });
+        return {top:Math.min(...heads.map(n=>n.y-knockoutHalfExtents(o,t,n.note.startTick,n).hy),...rhythmEnds),
+          bottom:Math.max(...heads.map(n=>n.y+knockoutHalfExtents(o,t,n.note.startTick,n).hy),...rhythmEnds),hand:heads[0].rhythm.hand};
+      },
+      endpointX: (ids,tick) => endpointHeads(ids,tick)[0]?.x ?? tickX(tick) });
   }
   return layout;
 }

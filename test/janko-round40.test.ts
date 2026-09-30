@@ -6,14 +6,14 @@ import {
   resolveCandidate,
   type JankoCandidate,
   type JankoCandidateRound,
-} from '../src/render/janko/candidates.js';
+} from './pre-clarity-candidates.js';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types.js';
+} from './pre-clarity-rules.js';
 import {
   layoutJankoScore,
   renderJankoCrop,

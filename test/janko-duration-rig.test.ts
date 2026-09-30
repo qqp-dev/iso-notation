@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../src/scores/brahms-op118-no1';
+import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from './pre-clarity-brahms';
 import { layoutJankoScore } from '../src/render/janko/engine';
 
 // Literal ownership fixtures for guarded inspection/target resolution. Coordinates and
 // transient layout IDs deliberately do not participate in a persistent target.
-test('literal Brahms long marks retain their complete owner sets and distinct duration grammar', () => {
+// Current independent-voice rules retire these fused owner sets; current guard
+// refusal and full-page delivery are covered in janko-duration-controls.test.ts.
+test('explicit pre-clarity Brahms duration targets remain reproducible, not current eligibility', () => {
   const score = buildBrahmsOp118No1Score();
   const layouts = layoutJankoScore(score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS);
   const marks = layouts.flatMap(layout => layout.durationInkOwners);

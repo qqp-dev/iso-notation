@@ -27,20 +27,20 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   DEFAULT_STUDIO_SCORE_ID,
   JankoCandidate,
   JankoCandidateRound,
   getCandidate,
   resolveCandidate,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   computePageGeometry,
   getSystemGeometry,

@@ -12,6 +12,7 @@ import { prepareCanonicalChange, executeCanonicalCommand, validateCanonicalTrans
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { renderJankoPage, countJankoPages } from '../src/render/janko/engine';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
+import { DEFAULT_JANKO_OPTIONS as PRE_CLARITY_OPTIONS, DEFAULT_JANKO_TOKENS as PRE_CLARITY_TOKENS } from './pre-clarity-rules';
 import { fetchVerifiedRelease, watchDeployedRelease, type DeployedRelease } from '../src/render/janko/prepared/deployed';
 import { buildIdentity } from '../src/render/janko/prepared/seam';
 import { fingerprintPdf } from './support/pdf-fingerprint';
@@ -32,7 +33,7 @@ function intent(data: ActiveData): CanonicalHandIntent {
 // Guard the independently delivered PR114 git-object PDF bytes, then compare
 // semantic fingerprints: pdfunite regenerates random /ID bytes without any
 // changed geometry, fonts, text, page count/size or raster content.
-test('PR114 source-commit GOLD baseline pins 551 note identities, hands and real page/PDF-source ink', () => {
+test('PR114 immutable source/hand witness and explicit pre-clarity engraving remain reproducible', () => {
   const builder = buildBachGoldbergVar1Score();
   assert.equal(builder.notes.length, 551);
   assert.equal(sha(JSON.stringify(builder.notes.map(({ hand, ...note }) => note))),
@@ -59,7 +60,7 @@ test('PR114 source-commit GOLD baseline pins 551 note identities, hands and real
   assert.deepEqual([a.startTick, a.pitch], [b.startTick, b.pitch]);
   assert.notEqual(a.hand, b.hand);
   const active = resolveActiveScore(bach);
-  const pages = Array.from({ length: 2 }, (_, page) => renderJankoPage(builder, page, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS));
+  const pages = Array.from({ length: 2 }, (_, page) => renderJankoPage(builder, page, PRE_CLARITY_OPTIONS, PRE_CLARITY_TOKENS));
   assert.equal(sha(pages[0]), '01a555eb2cc892d30f32905b01bfc3a4550ae68562ffd49584f03c1fdb1c55a6');
   assert.equal(sha(pages[1]), '47c7f22994296b6fd4968a2e806f87e6a75ae7eeec0428e5f6a09daff3a908f4');
   assert.equal(sha(pages.join('\n')), '78cf5cac97b63387a74f9230d205f9ed083c20d57aad9a4ecdb50df3a073c250',
@@ -73,8 +74,8 @@ test('PR114 source-commit GOLD baseline pins 551 note identities, hands and real
     const dir = mkdtempSync(join(tmpdir(),'pr114-pdf-witness-'));
     try {
       const original = join(dir,'original.pdf'); writeFileSync(original,witness);
-      assert.deepEqual(fingerprintPdf('public/goldberg-variation-1.pdf'),fingerprintPdf(original),
-        'PR114 PDF musical ink is unchanged, ignoring random document IDs');
+      assert.notDeepEqual(fingerprintPdf('public/goldberg-variation-1.pdf'),fingerprintPdf(original),
+        'approved shared clarity changes painted geometry, not PR114 source/hand identity; current semantic freshness is gated by janko-pdf.test.ts');
     } finally { rmSync(dir,{recursive:true,force:true}); }
   }
   assert.equal(countJankoPages(builder, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS), 2);
