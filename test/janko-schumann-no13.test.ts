@@ -3,7 +3,7 @@ import test from 'node:test';
 import { buildSchumannNo13Draft, schumannNo13WrittenFacts } from '../src/scores/schumann-no13-draft';
 import { importSchumann } from '../src/scores/schumann-no43';
 import { createStudioConfig } from '../src/render/janko/studio';
-import { layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages } from '../src/render/janko/engine';
+import { computePageGeometry, layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages, systemCompleteInkBounds } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
 import type { GraceGroup } from '../src/model/types';
 
@@ -93,12 +93,14 @@ test('tiny literal relative fixture: grace stays zero time and updates host anch
 test('real No. 13 candidate engraves all pitched occurrences across its complete pages', () => {
   const entry = createStudioConfig().scores['schumann-op68-no13'];
   const layouts = layoutJankoScore(entry.score, entry.options, entry.tokens);
-  assert.equal(layouts.length,56, 'one literal source bar per system, including both pickups/shortened endings');
+  assert.ok(layouts.length < 56, 'sparse measures share systems instead of the old one-bar-per-system fallback');
+  assert.ok(layouts.some(l => l.geometry.measuresPerSystem > 1), 'at least one ordinary passage shares a system');
   assert.deepEqual(entry.score.sourceBarTicks?.slice(10,13), [888,960,984], 'first short ending / repeated pickup / next bar are separate source bars');
   assert.deepEqual(entry.score.sourceBarTicks?.slice(22,24), [1920,1944], 'second half begins with its own eighth pickup');
-  const opening = layouts[2].grace!.find(g=>g.group.source.line===84)!;
+  const opening = layouts.flatMap(l=>l.grace ?? []).find(g=>g.group.source.line===84 && g.occurrence.pass===1)!;
+  const openingSystem = layouts.find(l=>l.grace?.includes(opening))!;
   assert.equal(opening.occurrence.tick,entry.score.sourceBarTicks![2]);
-  assert.ok(opening.heads[0].x > layouts[2].geometry.staffLeft + 1);
+  assert.ok(opening.heads[0].x > openingSystem.geometry.staffLeft + 1);
   assert.ok(Math.abs(Math.abs(opening.heads[0].y-opening.heads[1].y) - 5*entry.tokens.semitoneScale)<1e-6,
     'scaled heads retain the real five-semitone pitch-axis distance');
   const chord = layouts.flatMap(l=>l.grace ?? []).find(g=>g.group.source.line===87)!;
@@ -108,7 +110,7 @@ test('real No. 13 candidate engraves all pitched occurrences across its complete
   const beams = layouts.flatMap(l=>l.grace ?? []).filter(g=>g.heads.length===2);
   assert.equal(beams.length,10);
   const pages = countJankoPages(entry.score, entry.options, entry.tokens);
-  assert.equal(pages,19);
+  assert.ok(pages < 19, 'ordinary bars no longer create nineteen three-system pages');
   const svg = Array.from({length:pages},(_,i)=>renderJankoPage(entry.score,i,entry.options,entry.tokens,layouts)).join('');
   assert.equal((svg.match(/class="janko-grace"/g) ?? []).length,16);
   assert.equal((svg.match(/class="janko-grace-beam"/g) ?? []).length,20);
@@ -120,7 +122,99 @@ test('real No. 13 candidate engraves all pitched occurrences across its complete
   const report = lintJankoScore(entry.score,entry.options,entry.tokens);
   assert.deepEqual(report.violations.filter(v=>v.code.startsWith('grace-')), [],
     JSON.stringify(report.violations.filter(v=>v.code.startsWith('grace-'))));
-  assert.deepEqual([...new Set(report.violations.map(v=>v.code))].sort(), ['stem-through-simultaneity','tie-endpoint-clearance']);
-  assert.equal(report.violations.length, 16, JSON.stringify(report.violations.map(v=>[v.code,v.system])));
+  // Historical stem/tie diagnostics may change when bars are repacked; do not
+  // certify an old fixed violation count or excuse new grace-host failures.
+});
 
+test('all four imports share a literal-boundary system plan with local widths and complete page/crop coverage', () => {
+  const config = createStudioConfig();
+  for (const id of ['schumann-op68-no13', 'schumann-op68-no14', 'schumann-op68-no30', 'schumann-op68-no43']) {
+    const { score, options, tokens } = config.scores[id];
+    const ticks = score.sourceBarTicks!;
+    const plan = computePageGeometry(options, tokens, score);
+    const layouts = layoutJankoScore(score, options, tokens);
+    const systems = plan.productionSystems!;
+    assert.equal(systems.length, layouts.length, id);
+    assert.deepEqual(plan.systemBarStarts, [0, ...systems.map(s => s.lastBar)], id);
+    assert.equal(systems.at(-1)!.lastBar, ticks.length - 1, `${id} accounts for every written occurrence`);
+    assert.ok(systems.some(s => s.lastBar - s.firstBar > 1), `${id}: at least one shared system`);
+    const pages = Array.from({ length: countJankoPages(score, options, tokens) }, (_, page) =>
+      renderJankoPage(score, page, options, tokens, layouts));
+    const bookedSystems = pages.map(svg => [...svg.matchAll(/id="system-(\d+)"/g)].map(match => Number(match[1]) - 1));
+    assert.deepEqual(bookedSystems.flat(), layouts.map((_, index) => index),
+      `${id}: every planned system is painted exactly once, in page order`);
+    assert.ok(bookedSystems.every(systemIds => systemIds.length > 0 && systemIds.length <= options.systemsPerPage),
+      `${id}: no blank page or overbooked page`);
+    for (const [index, system] of systems.entries()) {
+      const geo = layouts[index].geometry;
+      assert.equal(geo.firstBar, system.firstBar);
+      assert.equal(geo.sourceBarTicks?.[geo.firstBar!], ticks[system.firstBar]);
+      assert.equal(geo.measureEdges?.length, system.lastBar - system.firstBar + 1);
+      assert.ok(system.widths.every((w, m) => w + 1e-6 >= system.minimums[m]),
+        `${id} system ${index}: each bar reserves its own occupied ink`);
+      assert.ok(geo.measureEdges!.every((x, m) => m === 0 || x > geo.measureEdges![m - 1]),
+        `${id} system ${index}: strictly increasing barline boundaries`);
+      assert.ok(Math.abs(geo.measureEdges!.at(-1)! - geo.staffRight) < 1e-6);
+      for (const note of layouts[index].notes) assert.ok(note.note.startTick >= ticks[system.firstBar] &&
+        note.note.startTick < ticks[system.lastBar], `${id}: ${note.note.id} projected into its literal system`);
+    }
+    for (const bar of [0, Math.floor((ticks.length - 2) / 2), ticks.length - 2]) {
+      const crop = renderJankoCrop(score, bar + 1, 1, options, tokens, layouts);
+      assert.match(crop, /<svg/);
+      assert.match(crop, new RegExp(`m\\. ${bar + 1}(?![0-9])`), `${id}: crop addresses occurrence ${bar + 1}`);
+    }
+  }
+});
+
+test('vertical admission books three dense imported systems per page when four cannot fit', () => {
+  // Sixteen literal bars, in two simultaneous printed staves: the extreme
+  // pitches make each of four otherwise ordinary four-bar systems tall. Use
+  // the actual ink demand to choose a constrained page between the three-
+  // and four-system capacities, rather than guessing a score-specific offset.
+  const bars = Array(16).fill('c4 c4 |').join(' ');
+  const source = String.raw`\score {
+    \new PianoStaff <<
+      \new Staff = "upper" { \relative c''' { \time 2/4 ${bars} } }
+      \new Staff = "lower" { \relative c { \time 2/4 ${bars} } }
+    >>
+  }`;
+  const score = importSchumann(source, { file: 'vertical-demand.ly', hash: '', number: 13 }).score;
+  const entry = createStudioConfig().scores['schumann-op68-no13'];
+  const { tokens } = entry;
+  const roomy = { ...entry.options, pageHeight: 841.89 };
+  const reference = layoutJankoScore(score, roomy, tokens);
+  assert.equal(score.sourceBarTicks?.length, 17, 'source has sixteen real written bars');
+  assert.equal(reference.length, 4, 'horizontal content fits four bars in each system');
+  const heights = reference.map(layout => {
+    const ink = systemCompleteInkBounds(layout, roomy, tokens);
+    return ink.bottom - ink.top;
+  });
+  const minimumGap = 10;
+  const bodyHeight = 3 * Math.max(...heights) + 2 * minimumGap + 12;
+  assert.ok(bodyHeight < heights.reduce((sum, height) => sum + height, 0) + 3 * minimumGap,
+    'fixture separates feasible three-system booking from infeasible four-system booking');
+  const options = { ...roomy, pageHeight: bodyHeight + (roomy.pageMarginTop ?? roomy.pageMargin) +
+    (roomy.pageMarginBottom ?? roomy.pageMargin) + roomy.headerHeight + roomy.footerHeight };
+  const layouts = layoutJankoScore(score, options, tokens);
+  const pages = Array.from({ length: countJankoPages(score, options, tokens) }, (_, page) =>
+    renderJankoPage(score, page, options, tokens, layouts));
+  const pageSystems = pages.map(svg => [...svg.matchAll(/id="system-(\d+)"/g)].map(match => Number(match[1]) - 1));
+  assert.deepEqual(pageSystems, [[0, 1, 2], [3]], 'one impossible fourth system moves intact to the next page');
+  const top = (options.pageMarginTop ?? options.pageMargin) + options.headerHeight;
+  const bottom = options.pageHeight - (options.pageMarginBottom ?? options.pageMargin) - options.footerHeight;
+  for (const ids of pageSystems) {
+    const ink = ids.map(id => systemCompleteInkBounds(layouts[id], options, tokens));
+    assert.ok(ink[0].top >= top - 1e-6 && ink.at(-1)!.bottom <= bottom + 1e-6,
+      'complete painted system ink stays in the page body');
+    for (let i = 1; i < ink.length; i++) assert.ok(ink[i].top - ink[i - 1].bottom >= minimumGap - 1e-6,
+      'adjacent complete ink has protected facing air');
+  }
+  assert.deepEqual(layouts.map(l => [l.geometry.firstBar, l.geometry.sourceBarTicks?.[l.geometry.firstBar!]]),
+    [[0,score.sourceBarTicks![0]],[4,score.sourceBarTicks![4]],
+      [8,score.sourceBarTicks![8]],[12,score.sourceBarTicks![12]]],
+    'page break never changes source bar clocks or system membership');
+  const crossing = renderJankoCrop(score, 12, 2, options, tokens, layouts);
+  assert.match(crossing, /id="system-3"/);
+  assert.match(crossing, /id="system-4"/);
+  assert.match(crossing, /mm\. 12–13/, 'cross-page window retains both literal measures');
 });

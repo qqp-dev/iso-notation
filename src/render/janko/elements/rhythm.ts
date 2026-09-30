@@ -4187,7 +4187,8 @@ export function partitionBeamGroups(
   notes: JankoRhythmNote[],
   tokens?: Partial<JankoTokens> | null,
   middleCY?: number | null,
-  groupTicks?: number | null
+  groupTicks?: number | null,
+  sourceBarTicks?: readonly number[] | null
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
   void middleCY;
@@ -4207,8 +4208,14 @@ export function partitionBeamGroups(
       else unbeamable.set(n.hand, [n]);
       continue;
     }
-    const measure = Math.floor(n.startTick / t.ticksPerMeasure);
-    const window = Math.floor((n.startTick % t.ticksPerMeasure) / windowTicks);
+    let measure = Math.floor(n.startTick / t.ticksPerMeasure);
+    let window = Math.floor((n.startTick % t.ticksPerMeasure) / windowTicks);
+    if (sourceBarTicks) {
+      let low = 0, high = sourceBarTicks.length - 2;
+      while (low < high) { const mid = Math.ceil((low + high) / 2); if (sourceBarTicks[mid] <= n.startTick) low = mid; else high = mid - 1; }
+      measure = low;
+      window = Math.floor((n.startTick - sourceBarTicks[measure]) / windowTicks);
+    }
     const key = `${n.hand}|${measure}|${window}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.push(n);
@@ -4300,15 +4307,22 @@ export interface JankoBeamBridgeRest {
 export function bridgeBeamGroupsAcrossRests(
   partition: JankoBeamPartition,
   rests: readonly JankoBeamBridgeRest[],
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  sourceBarTicks?: readonly number[] | null
 ): JankoBeamPartition {
   const t = resolveJankoTokens(tokens);
   const beat = t.ticksPerBeat;
   const measure = t.ticksPerMeasure;
   const restMax = beat / 4;
   // The partition's own bucket math, matched exactly (no anacrusis shift).
-  const bucketOf = (startTick: number, hand: Hand): string =>
-    `${hand}|${Math.floor(startTick / measure)}|${Math.floor((startTick % measure) / beat)}`;
+  const bucketOf = (startTick: number, hand: Hand): string => {
+    if (sourceBarTicks) {
+      let low = 0, high = sourceBarTicks.length - 2;
+      while (low < high) { const mid = Math.ceil((low + high) / 2); if (sourceBarTicks[mid] <= startTick) low = mid; else high = mid - 1; }
+      return `${hand}|${low}|${Math.floor((startTick - sourceBarTicks[low]) / beat)}`;
+    }
+    return `${hand}|${Math.floor(startTick / measure)}|${Math.floor((startTick % measure) / beat)}`;
+  };
 
   const all = [...partition.groups.flat(), ...partition.ungrouped];
   const onsetCount = new Map<string, number>();
@@ -4370,7 +4384,7 @@ export function bridgeBeamGroupsAcrossRests(
   const bridges = (a: JankoRhythmNote, b: JankoRhythmNote, key: string): boolean => {
     const release = a.startTick + a.durationTicks;
     const [, m, beatIdx] = key.split('|').map(Number);
-    const beatStart = m * measure + beatIdx * beat;
+    const beatStart = (sourceBarTicks?.[m] ?? m * measure) + beatIdx * beat;
     const beatEnd = beatStart + beat;
     const spanned = rests.some(
       (r) =>

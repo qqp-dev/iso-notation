@@ -1201,10 +1201,10 @@ export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
 };
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
-  round: 54,
-  title: 'Practice · major and natural minor N26',
-  description: 'Two real-engine scales with the selected two faint guides per hand: major and the operator-supplied natural minor N26. Fifteen simultaneous sixteenths per hand across two measures; LH one 10-span below RH, double-beamed 4/4/4/3. RH above LH, nearest physical row lowest. N26 descent exactly reverses its ascending cues without repeating the apex. Other minor candidates remain deferred.',
-  openAxes: ['practiceScaleType'],
+  round: 55,
+  title: 'Schumann No. 14 · printed alternatives and ↑10 seat',
+  description: 'Principal reading is the full draft. Compare the hash-pinned smaller optional route separately, then judge incumbent versus ink-aware horizontal ottava seats on literal mm. 53 and 63. The candidate does not change pitch, fold, duration or the canonical reference.',
+  openAxes: ['ottavaSingletonSeat'],
 };
 
 function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
@@ -1265,16 +1265,30 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
       { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Second ending · unfolded mm. 48–49', caption: 'Written bars 31 and 33, shortened second ending (three quarters); no first-ending Ab chord.' },
       { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 29, measureCount: 2, title: 'Hidden phantom · unfolded mm. 29–30', caption: 'Written bar 29 lower Voice One hidden A3 is a source-commented layout clock carrier; audible notes and authored rests remain.' },
     ] },
-  { id: 'schumann-no14-written-draft', label: 'Schumann Op. 68 No. 14 · Draft / unfolded repeats',
-    description: 'Complete 64 written / 96 unfolded 6/8 bars from approved source. Logical upper/lower-part hands are provisional, NOT performance instructions; printed cross-staff destinations are recorded separately. Phrasing, fingerings, expression, pedals and source staff layout remain deferred; real-engine lint findings are shown below. Not GOLD or BRONZE.',
+  { id: 'schumann-no14-written-draft', label: 'Schumann Op. 68 No. 14 · principal reading',
+    description: 'Complete 64 written / 96 unfolded 6/8 bars from approved source. Printed-staff anchors and locally continuous gesture stems support provisional hands; source voices and printed destinations remain distinct. Smaller simultaneous routes in written bars 41, 43 and 63 remain facts, not additive attacks. Phrasing, fingerings, expression, pedals and source staff layout remain deferred; real-engine lint findings are shown below. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked printed staff', 'deferred notation'],
     windows: [
       { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 96, fullScore: true, title: 'Complete unfolded score · mm. 1–96', caption: 'Draft / unfolded repeats · all real-engine pages, both passes of the second half; source printed staff and logical part are distinct.' },
       { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 2, title: 'Opening · mm. 1–2', caption: 'Lower logical part moves onto printed upper staff after three eighths; upper part has authored skips.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 41, measureCount: 3, title: 'Concurrent voices · mm. 41–43', caption: 'Half-bar branches and parent continuation; small lower-staff voice remains sounding.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Three branches · mm. 48–49', caption: 'Three independent written voices, including a lower printed destination.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 41, measureCount: 3, title: 'Concurrent voices · mm. 41–43', caption: 'Principal half-bar route; the smaller alternative is reserved for the comparison card.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 53, measureCount: 1, title: 'Written m. 53 · singleton ↑10', caption: 'Incumbent octave-fold seat for comparison; sounding pitch and fold unchanged.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 63, measureCount: 1, title: 'Written m. 63 · principal route', caption: 'Principal route at the second optional passage.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Three branches · mm. 48–49', caption: 'Three source voices, distinct provisional hands. The rejected m. 48 dotted 72-tick clasp vanishes with corrected grouping; a bare dot without readable base in the shared compact-base grammar remains an unresolved vocabulary question, not a new adopted sign.' },
       { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 95, measureCount: 2, title: 'Second pass · mm. 95–96', caption: 'End of repeated second half; same written bar IDs, separate unfolded occurrences.' },
     ] },
+  { id: 'schumann-no14-ottava-seat', label: 'No. 14 · content-aware singleton ↑10 seat',
+    description: 'Candidate only: when preceding head ink leaves room, centre the ottava label above the folded note; dash and hook follow the same real-engine clearance solver. Compare with incumbent principal windows; no automatic adoption.',
+    options: { ottavaSingletonSeat: 'ink-aware' }, tags: ['No. 14', 'ottava candidate', 'not canonical'],
+    windows: [SCHUMANN_NO14_STUDIO_SCORE_ID, 'schumann-op68-no14-optional'].flatMap(scoreId =>
+      [53, 63].map(measureStart => ({ scoreId, measureStart, measureCount: 1,
+        title: `m. ${measureStart} · ink-aware label`,
+        caption: `Literal ${scoreId === SCHUMANN_NO14_STUDIO_SCORE_ID ? 'principal' : 'optional'} source route; pitch, fold and duration preserved.` }))) },
+  { id: 'schumann-no14-optional-route', label: 'No. 14 · smaller optional route',
+    description: 'Source-admitted simultaneous small-note alternative replaces, never doubles, the principal branch. Both projections use the same real engraving engine; optional passage remains a candidate, not the default full-score reading.',
+    tags: ['No. 14', 'optional route', 'not canonical'],
+    windows: [41, 43, 63, 53].map(measureStart => ({ scoreId: 'schumann-op68-no14-optional', measureStart, measureCount: 1,
+      title: `m. ${measureStart} · optional projection`, caption: 'Compare literal source routes; m. 53 controls singleton ↑10 seat.' })) },
   { id: 'schumann-no43-written-draft', label: 'Schumann Op. 68 No. 43 · Draft / unfolded repeats',
     description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Hands are provisional upper/lower-part hints; ornament, expression, slurs, fingering and laissez-vibrer are deferred (see the source-linked ledger). Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'expression deferred'],

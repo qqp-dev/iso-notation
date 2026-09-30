@@ -145,7 +145,7 @@ test('Bar-9 System Spread Pin: System 2 (mm. 9–12) is byte-identical (already 
 // 2. Strict Row Boundary Pins (Locked Core + Outer Conditional Rows)
 // ---------------------------------------------------------------------------
 
-test('Strict Row Boundary Pins: inclusive fire at 72, 24 under fixed-3; 77.5, 17.5 under fixed-4; locked core always fires', () => {
+test('Strict Row Boundary Pins: fixed-3 upper extension requires a digit above 0; lower and fixed-4 boundaries remain pinned', () => {
   // Fixed-3:
   // Core rows {1, 2, 3} (lin 48, 60, 36) always fire unconditionally:
   assert.deepEqual(computeBarStaffRows([59], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
@@ -153,9 +153,11 @@ test('Strict Row Boundary Pins: inclusive fire at 72, 24 under fixed-3; 77.5, 17
   assert.deepEqual(computeBarStaffRows([37], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
   assert.deepEqual(computeBarStaffRows([36], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
 
-  // Row 4 (72, 0/6) fires iff max >= 72:
+  // 0 alone does not earn the extra upper line; a pitch above it does.
   assert.deepEqual(computeBarStaffRows([71], 'fixed-3').rowIds, [1, 2, 3], 'lin 71 does NOT fire row 4');
-  assert.deepEqual(computeBarStaffRows([72], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 72 fires row 4');
+  assert.deepEqual(computeBarStaffRows([72], 'fixed-3').rowIds, [1, 2, 3], 'lin 72 alone does NOT fire row 4');
+  assert.deepEqual(computeBarStaffRows([73], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 73 fires row 4');
+  assert.deepEqual(computeBarStaffRows([74], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 74 fires row 4');
 
   // Row 5 (24, 0/2) fires iff min <= 24:
   assert.deepEqual(computeBarStaffRows([25], 'fixed-3').rowIds, [1, 2, 3], 'lin 25 does NOT fire row 5');
@@ -294,14 +296,14 @@ test('Rest-Bar Pin: Rest-only bar renders locked core {1, 2, 3} with whole rest 
 
 test('Segments Pin: Non-consecutive earning bars render disjoint unbroken segments on extension row', () => {
   // Synthetic 4-bar score:
-  // Bar 0: high note lin 72 (earns extension Row 4)
+  // Bar 0: high note lin 74 (earns extension Row 4)
   // Bar 1: middle note lin 48 (silent for Row 4)
-  // Bar 2: high note lin 72 (earns extension Row 4)
+  // Bar 2: high note lin 74 (earns extension Row 4)
   // Bar 3: middle note lin 48 (silent for Row 4)
   const score = makeScore('disjoint-segments', [
-    makeNote('n0', 0, 6, 0),     // lin 72 in bar 0
+    makeNote('n0', 2, 6, 0),     // lin 74 in bar 0
     makeNote('n1', 0, 4, 144),   // lin 48 in bar 1
-    makeNote('n2', 0, 6, 288),   // lin 72 in bar 2
+    makeNote('n2', 2, 6, 288),   // lin 74 in bar 2
     makeNote('n3', 0, 4, 432),   // lin 48 in bar 3
   ]);
 
@@ -415,15 +417,18 @@ test('janko.html <-> public/janko.html byte-identical', () => {
 // ---------------------------------------------------------------------------
 
 test('Guest Gaps: extension rows (0/6, 0/2) stand off 6.0pt at interior barlines; system edges and inner rows flush', () => {
-  // Use Brahms fixed-3, which has extension rows in middle measures.
-  // In system 2 (mm. 9–12) at canonical 4-per packing:
-  // Row 5 (lin 24) runs bars 0–2, flush at the system left edge, ending at
-  // barline 3; row 4 (lin 72) spans bar 1, starting at barline 1 and ending
-  // at barline 2.
-  const t = resolveJankoTokens(BRAHMS_OP118_NO1_JANKO_TOKENS);
-  const o = resolveJankoOptions({ ...BRAHMS_OP118_NO1_JANKO_OPTIONS, core: 'fixed-3' });
-  const layouts = layoutJankoScore(BRAHMS, o, t);
-  const sys = layouts[2];
+  // An independent synthetic passage earns its upper row with a digit above
+  // 0; a literal 0 alone is not enough. Lower extension spans bars 0–2.
+  const score = makeScore('guest-gap-extension', [
+    makeNote('lo0', 0, 2, 0, 48, 'LH'),
+    makeNote('lo1', 0, 2, 144, 48, 'LH'),
+    makeNote('hi1', 2, 6, 144),
+    makeNote('lo2', 0, 2, 288, 48, 'LH'),
+    makeNote('mid3', 0, 4, 432),
+  ]);
+  const t = resolveJankoTokens(DEFAULT_JANKO_TOKENS);
+  const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3' });
+  const sys = layoutJankoScore(score, o, t)[0];
   const geo = sys.geometry;
   const segs = geo.staffSegments ?? [];
 
@@ -469,7 +474,7 @@ test('Finale Conjoin: final barline extends to outermost extension rows; flush c
     tempos: [], dynamics: [], pedals: [],
     notes: [
       makeNote('n0', 0, 4, 0, 96),     // C4 in bar 0
-      makeNote('n1', 0, 6, 192, 96),   // C6 (lin 72) in final bar 1
+      makeNote('n1', 2, 6, 192, 96),   // D6 (lin 74) earns upper extension in final bar 1
       makeNote('n2', 0, 2, 192, 96, 'LH'), // C2 (lin 24) in final bar 1
     ],
   };

@@ -264,7 +264,7 @@ export interface PitchGridRule {
  *   Row 1 center (0/4, Middle C, lin 48, always drawn — constitutional anchor)
  *   Row 2 above (0/5, lin 60, always drawn — locked core)
  *   Row 3 below (0/3, lin 36, always drawn — locked core)
- *   Row 4 outer-above (0/6, lin 72, fires iff bar max >= 72)
+ *   Row 4 outer-above (0/6, lin 72, fires iff bar max > 72)
  *   Row 5 outer-below (0/2, lin 24, fires iff bar min <= 24)
  *
  * Fixed-4 analogue at its middles (shared grammar):
@@ -294,7 +294,7 @@ export const FIXED_3_ROW_DEFS: readonly NeedBasedRowDef[] = [
   { lin: 48, rowId: 1, name: 'center (0/4)', isAnchor: true, fires: () => true },
   { lin: 60, rowId: 2, name: 'above (0/5)', isAnchor: false, fires: () => true },
   { lin: 36, rowId: 3, name: 'below (0/3)', isAnchor: false, fires: () => true },
-  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l >= 72) },
+  { lin: 72, rowId: 4, name: 'outer-above (0/6)', isAnchor: false, fires: (lins) => lins.some((l) => l > 72) },
   { lin: 24, rowId: 5, name: 'outer-below (0/2)', isAnchor: false, fires: (lins) => lins.some((l) => l <= 24) },
 ];
 
@@ -334,7 +334,8 @@ export function computeSystemStaffSegments(
   measureWidth: number,
   core: JankoCore,
   t: ResolvedJankoTokens,
-  extensionJunction: ExtensionJunctionStyle = 'default'
+  extensionJunction: ExtensionJunctionStyle = 'default',
+  production?: { firstBar: number; barTicks: readonly number[]; edges: readonly number[] }
 ): {
   segments: StaffLineSegment[];
   staffLines: number[];
@@ -342,12 +343,12 @@ export function computeSystemStaffSegments(
   extensionLines: number[];
 } {
   const anacrusis = t.anacrusisTicks ?? 0;
-  const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
-  const numBars = isSys0Anacrusis ? measuresPerSystem + 1 : measuresPerSystem;
+  const isSys0Anacrusis = !production && systemIndex === 0 && anacrusis > 0;
+  const numBars = production ? production.edges.length - 1 : isSys0Anacrusis ? measuresPerSystem + 1 : measuresPerSystem;
 
   // Bucket notes into measure slots inside this system
   const barLins: number[][] = Array.from({ length: numBars }, () => []);
-  const mockGeo = { measuresPerSystem };
+  const mockGeo = production ? { measuresPerSystem, sourceBarTicks: production.barTicks, firstBar: production.firstBar } : { measuresPerSystem };
   for (const n of sysNotes) {
     const pc = ((n.pitch.pitchClass % 12) + 12) % 12;
     const lin = n.pitch.octave * 12 + pc;
@@ -365,6 +366,7 @@ export function computeSystemStaffSegments(
   }
 
   const getBarSpanX = (m: number): { x1: number; x2: number } => {
+    if (production) return { x1: production.edges[m], x2: production.edges[m + 1] };
     if (isSys0Anacrusis) {
       const upbeatWidth = (anacrusis / t.ticksPerMeasure) * measureWidth;
       if (m === 0) {

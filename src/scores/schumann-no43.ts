@@ -13,6 +13,10 @@ export interface WrittenEvent {
   pitches: { spelling: string; absolutePitch: number }[]; voice: string; staff: string; printedStaff?: string;
   handPolicy: 'provisional-upper' | 'provisional-lower'; bar: number; hidden: boolean;
   line: number; column: number;
+  stemDirection?: 'up' | 'down' | 'neutral';
+  smallRoute?: boolean;
+  /** An admitted branch of a positively identified optional route. */
+  alternative?: { group: string; route: 'principal' | 'optional'; evidence: string };
 }
 export interface ExpressionSpacer {
   id: string; channel: string; onset: string; duration: string; bar: number; line: number; column: number;
@@ -106,13 +110,13 @@ export function importSchumannNo14(source: string) {
   return importSchumann(source, NO14);
 }
 /** Test seam for bounded literal fixtures; production No. 14 is hash guarded. */
-export function importSchumann(source: string, identity: SchumannImportIdentity):
+export function importSchumann(source: string, identity: SchumannImportIdentity, choice: 'principal' | 'optional' = 'principal'):
   { facts: { sourceHash: string; sourceFile: string; pickup: string; events: WrittenEvent[];
     ties: { fromId: string; toId: string; fromPitch: number; toPitch: number }[];
     writtenMarks?: WrittenMark[]; occurrenceTies?: OccurrenceTie[]; graceGroups?: GraceGroup[];
     bars: { number: number; duration: string }[]; expressionSpacers?: ExpressionSpacer[];
     repeats: Part['repeats']; occurrences: { sourceBar: number; pass: number; onset: string }[];
-    handPolicy: string; provenance: { author: string; maintainer: string; sourceHeader: string; licenseNotice: string;
+    handPolicy: string; alternativeGroups?: { id: string; bar: number; principal: string[]; optional: string[]; evidence: string }[]; provenance: { author: string; maintainer: string; sourceHeader: string; licenseNotice: string;
       approval: string } }; score: QuantizedGridScore; ledger: DeferredFact[] } {
   const sourceHash = createHash('sha256').update(source).digest('hex');
   const { file } = identity;
@@ -154,6 +158,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
   function music(staff: string, voice: string, relative: number, relativeD = 0, inheritedDuration = new Fraction(1, 4), destination = staff): Part {
     let time = Z, previous = inheritedDuration, anchor = relative, anchorD = relativeD;
     let bar = 0, barStart = Z, hidden = false, printedStaff = destination;
+    let stemDirection: WrittenEvent['stemDirection']; let smallRoute = false;
     let once: Token | undefined;
     let lastEvent: WrittenEvent | undefined;
     const localMarks: WrittenMark[] = [];
@@ -336,7 +341,8 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           expect('=', voice); const value = pop();
           if (value.text === '#') { if (t[i]) pop(); }
           else if (!value.text.startsWith('#') && !/^"/.test(value.text)) error(value, voice, 'Unsafe property value');
-          if (no14) deferSpan(once ?? tk, value, voice, 'Layout property ignored; adjacent musical events remain');
+          if (property.text === 'fontSize' && value.text === '#-5') smallRoute = true;
+          if (no14) deferSpan(once ?? tk, value, voice, 'Layout property retained for source-context interpretation');
           else defer(tk, voice, 'Layout property ignored; adjacent musical events remain');
           once = undefined;
           continue;
@@ -350,7 +356,11 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           if (no30) deferSpan(tk, last, voice, x === '\\key' ? 'Source key signature deferred; absolute pitches retained' : 'Source clef or tempo presentation deferred');
           else defer(tk, voice); continue;
         }
-        if (['\\voiceOne','\\voiceTwo','\\oneVoice','\\noBeam','\\stemDown','\\stemUp','\\stemNeutral',
+        if (x === '\\stemDown' || x === '\\stemUp' || x === '\\stemNeutral') {
+          stemDirection = x === '\\stemDown' ? 'down' : x === '\\stemUp' ? 'up' : 'neutral';
+          defer(tk, voice, 'Stem direction retained as contextual gesture evidence'); continue;
+        }
+        if (['\\voiceOne','\\voiceTwo','\\oneVoice','\\noBeam',
           '\\mergeDifferentlyDottedOn','\\arpeggio','\\arpeggioBracket','\\break','\\pageBreak', ...(no13 ? ['\\stemNeutral','\\tieDown'] : [])].includes(x) || (no14 && x === '\\phrasingSlurUp') || (no30 && ['\\arpeggioNormal','\\shiftOnnn','\\showStaffSwitch','\\hideStaffSwitch','\\noPageBreak'].includes(x))) { defer(tk, voice); continue; }
         if (x === '\\new') error(tk, voice, 'Nested new context not supported in voice');
         if (x.startsWith('\\')) {
@@ -398,7 +408,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           for (let k = 0; k < count; k++) {
             events.push({ id: `${file}:${tk.line}:${tk.column}:${voice}:${k}`, kind, onset: time.toString(),
               duration: Fraction.parse(meter).toString(), pitches: [], voice, staff, ...(no14 ? { printedStaff } : {}), handPolicy: staff === 'upper' ? 'provisional-upper' : 'provisional-lower',
-              bar, hidden, line: tk.line, column: tk.column });
+              bar, hidden, line: tk.line, column: tk.column, ...(stemDirection ? { stemDirection } : {}) });
             time = time.add(Fraction.parse(meter)); bars.push({ number: bar++, duration: Fraction.parse(meter).toString() }); barStart = time;
           }
           continue;
@@ -423,7 +433,8 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
         const e: WrittenEvent = { id: `${file}:${tk.line}:${tk.column}:${voice}`, kind,
           onset: time.toString(), duration: length.toString(), pitches: raw.map(({ spelling, absolutePitch }) => ({ spelling, absolutePitch })),
           voice, staff, ...(no14 ? { printedStaff } : {}), handPolicy: staff === 'upper' ? 'provisional-upper' : 'provisional-lower', bar, hidden,
-          line: tk.line, column: tk.column };
+          line: tk.line, column: tk.column, ...(stemDirection ? { stemDirection } : {}),
+          ...(smallRoute ? { smallRoute: true } : {}) } as WrittenEvent;
         events.push(e); lastEvent = e;
         if (pendingGrace) {
           if (pendingGrace.members[0]?.pitch && e.kind !== 'note') error(tk, voice, 'Pitched grace has no note/chord host');
@@ -607,6 +618,40 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
   }
   while (b < bars.length) append(b++, 1);
   const events = parts.flatMap(p => p.events);
+  // Admit only the hash-pinned source's explicitly smaller simultaneous route.
+  // A size override on its own (in any other source) never means optional music.
+  const alternativeGroups: { id: string; bar: number; principal: string[]; optional: string[]; evidence: string }[] = [];
+  if (sourceHash === NO14.hash && identity.number === 14) {
+    const small = events.filter(e => e.kind === 'note' && e.smallRoute && e.voice.endsWith('."1"'));
+    for (const first of small.filter((e, index) => index === 0 || small[index - 1].bar !== e.bar)) {
+      const optional = small.filter(e => e.bar === first.bar);
+      const principal = events.filter(e => e.bar === first.bar && e.kind === 'note' &&
+        e.voice.endsWith('.0') && optional.some(a => a.onset === e.onset && a.duration === e.duration));
+      if (principal.length !== optional.length || principal.length !== 3 ||
+          new Set(optional.map(e => e.onset)).size !== 3)
+        throw Error(`${file}: ambiguous small route in written bar ${first.bar + 1}`);
+      const group = `${file}:bar${first.bar + 1}:route`;
+      const evidence = `Approved ${sourceHash}; simultaneous Voice 1, three coincident eighths, fontSize -5; source lines ${first.line}–${optional.at(-1)!.line}`;
+      for (const e of principal) e.alternative = { group, route: 'principal', evidence };
+      for (const e of optional) e.alternative = { group, route: 'optional', evidence };
+      alternativeGroups.push({ id: group, bar: first.bar, principal: principal.map(e => e.id), optional: optional.map(e => e.id), evidence });
+    }
+    if (alternativeGroups.length !== 3) throw Error(`${file}: expected three admitted source alternatives`);
+  }
+  // Stem direction is meaningful only once a nearby same-voice printed lower/upstairs
+  // gesture has anchored its role. It is NOT a universal stem-to-hand rule.
+  const anchored = sourceHash === NO14.hash && identity.number === 14 &&
+    events.some(e => e.kind === 'note' && e.printedStaff === 'lower' && e.stemDirection === 'down') &&
+    events.some(e => e.kind === 'note' && e.printedStaff === 'upper' && e.stemDirection === 'up');
+  const lowerAnchors = events.filter(e => e.kind === 'note' && e.voice === 'lower' &&
+    e.printedStaff === 'lower' && e.stemDirection === 'down').map(e => e.bar);
+  const inferredHand = (e: WrittenEvent): { hand: 'RH' | 'LH'; evidence: string; confidence: 'high' | 'contextual' | 'unresolved' } => {
+    const destination = e.printedStaff ?? e.staff;
+    if (anchored && lowerAnchors.some(bar => bar <= e.bar && e.bar - bar <= 4) &&
+        e.stemDirection === 'down' && (e.voice === 'lower' || e.voice === 'lower.0') && destination === 'upper')
+      return { hand: 'LH', evidence: 'Same logical gesture: lower/down anchor continued on upper staff', confidence: 'contextual' };
+    return { hand: destination === 'upper' ? 'RH' : 'LH', evidence: `Printed ${destination} destination${e.stemDirection ? `; source stem ${e.stemDirection}` : ''}`, confidence: 'high' };
+  };
   const graceGroups = [...parts.flatMap(p => p.graces), ...dynamicGraces];
   const ties: { fromId: string; toId: string; fromPitch: number; toPitch: number }[] = [];
   // A written ~ belongs to its SOURCE origin, even when the next performed
@@ -643,7 +688,8 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     const offset = Fraction.parse(occurrence.onset).add(new Fraction(-sourceStarts[occurrence.sourceBar].n, sourceStarts[occurrence.sourceBar].d));
     const passOccurrences = occurrences.filter(o => o.sourceBar === occurrence.sourceBar);
     const ordinal = passOccurrences.indexOf(occurrence) + 1;
-    for (const e of events.filter(e => e.bar === occurrence.sourceBar)) {
+    for (const e of events.filter(e => e.bar === occurrence.sourceBar &&
+      (!e.alternative || e.alternative.route === choice))) {
       const onset = Fraction.parse(e.onset).add(offset).toString(), tick = exactTicks(onset, ticksPerBeat), durationTicks = exactTicks(e.duration, ticksPerBeat);
       if (e.kind === 'layout-note') continue;
       const pending = pendingTie.get(e.voice);
@@ -679,9 +725,10 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
           chain.components.push({ startTick: tick, durationTicks, tieForward: false, tieWait: false, voice: e.voice });
           chain.soundingTicks = origin.durationTicks; active.set(key, { eventId: e.id, note: origin, occurrence: ordinal, componentTick: tick }); continue;
         }
+        const inference = inferredHand(e);
         const note: QuantizedNote = { id: `${e.id}:${p.absolutePitch}:${ordinal}`, pitch: fromLinearIndex(p.absolutePitch), startTick: tick, durationTicks,
-          hand: e.staff === 'upper' ? 'RH' : 'LH', voice: voiceNumbers.get(e.voice)!,
-          sourceProvenance: { voices: [e.voice], staves: [e.printedStaff ?? e.staff], hands: [e.staff === 'upper' ? 'RH' : 'LH'], unison: false } };
+          hand: inference.hand, handInference: { evidence: inference.evidence, confidence: inference.confidence }, voice: voiceNumbers.get(e.voice)!,
+          sourceProvenance: { voices: [e.voice], staves: [e.printedStaff ?? e.staff], hands: [inference.hand], unison: false } };
         notes.push(note); active.set(key, { eventId: e.id, note, occurrence: ordinal, componentTick: tick });
       }
     }
@@ -733,14 +780,21 @@ export function importSchumann(source: string, identity: SchumannImportIdentity)
     }
   }
   const totalTicks = exactTicks(cursor.toString(), ticksPerBeat);
-  const score: QuantizedGridScore = { id: `schumann-op68-no${identity.number}`, title: `${no13 ? 'Mai, cher Mai' : no30 ? 'Sans titre' : identity.number === 14 ? 'Petite Etude' : 'Chant du Nouvel An'} — Draft / unfolded repeats`,
-    composer: 'Robert Schumann', opus: `Op. 68 No. ${identity.number}`, ticksPerBeat, totalTicks,
+  const piece = identity.number === 14 ? 'Nr. 14 · Kleine Studie' : identity.number === 13 ? 'Nr. 13 · Mai, lieber Mai, bald bist du wieder da!' :
+    identity.number === 30 ? 'Nr. 30' : 'Nr. 43 · Sylvesterlied';
+  const score: QuantizedGridScore = { id: `schumann-op68-no${identity.number}`, title: piece,
+    composer: 'Robert Schumann', printIdentity: { scoreId: `schumann-op68-no${identity.number}`, work: 'Album für die Jugend · Op. 68', piece,
+      composer: 'Robert Schumann', sourceAlias: identity.file }, opus: `Op. 68 No. ${identity.number}`, ticksPerBeat, totalTicks,
     timeSignatures: [{ tick: 0, numerator: Number(meter.split('/')[0]), denominator: Number(meter.split('/')[1]) }],
     barlines: occurrences.map((o, j) => ({ barNumber: j, tick: exactTicks(o.onset, ticksPerBeat), type: 'regular' as const })),
     tempos: [], dynamics: [], pedals: [], notes, sourceSilences, tieChains,
-    ...(no13 ? { graceGroups, sourceBarTicks: [...occurrences.map(o => exactTicks(o.onset, ticksPerBeat)), totalTicks] } : {}) };
+    ...(no13 ? { graceGroups } : {}),
+    // Every successfully parsed source has literal unfolded boundaries, including
+    // unfamiliar sources with pickups/repeats/short endings. Hashes guard source
+    // semantics above, not admission to the shared production planner.
+    sourceBarTicks: [...occurrences.map(o => exactTicks(o.onset, ticksPerBeat)), totalTicks], productionLayout: true };
   return { facts: { sourceHash, sourceFile: file, pickup, events, ...(no14 ? { expressionSpacers } : {}),
-    ties, ...(no30 || no13 ? { writtenMarks, occurrenceTies } : {}), ...(no13 ? { graceGroups } : {}), bars, repeats: main.repeats, occurrences, handPolicy: no14 ? 'PROVISIONAL: logical upper RH/lower LH only; printed staff is not a performing-hand instruction' : 'PROVISIONAL: upper part RH, lower part LH; no inferred crossings',
+    ties, ...(no30 || no13 ? { writtenMarks, occurrenceTies } : {}), ...(no13 ? { graceGroups } : {}), bars, repeats: main.repeats, occurrences, ...(alternativeGroups.length ? { alternativeGroups } : {}), handPolicy: 'PROVISIONAL: printed destination anchored with local gesture context; source voice/staff and confidence retained separately',
     provenance: { author: 'Robert Schumann', maintainer: 'Philippe Hardy', sourceHeader: no30 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "* * *" (Peters edition unspecified)' : no13 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "Mai, cher Mai, Te voilà bientôt de retour!" (Peters edition unspecified)' : 'Peters (edition unspecified)',
       licenseNotice: 'Source header: Copyleft - Licence Art Libre / Free Art License; retain attribution and applicable copyleft for derived encodings',
       approval: 'Operator reviewed recovered LilyPond against a reference edition; source hash pins approved encoding, not machine certification of Henle' } }, score, ledger };

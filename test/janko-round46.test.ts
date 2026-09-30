@@ -57,6 +57,8 @@ import {
   midpointMetrics,
 } from '../src/render/janko/elements/rhythm';
 import { lintJankoScore } from '../src/render/janko/linter';
+import { getMeasureIndexOfTick } from '../src/render/janko/geometry';
+import { FIXED_3_ROW_DEFS, getBarStaffRows } from '../src/render/janko/elements/staff';
 import {
   ROUND_49_CANDIDATES,
   ROUND_49_METADATA,
@@ -118,12 +120,50 @@ function pagesOf(options = OPTIONS, tokens = TOKENS): string {
 // A. The literal-mode extra ink is gone; nothing else moved.
 // ---------------------------------------------------------------------------
 
-test('A. The unwanted literal-mode ink is gone: no outlier rules, no ledger dashes, the Round 44 row census', () => {
+test('A. Literal-mode ink stays clean; only above-0 digits earn the upper extension', () => {
   const svg = pagesOf();
   assert.equal((svg.match(/class="janko-outlier-rule"/g) ?? []).length, 0, 'no continuous outlier rule');
   assert.equal((svg.match(/class="janko-ledger"/g) ?? []).length, 0, 'no per-note ledger dash');
   const segments = LAYOUTS.reduce((n, l) => n + (l.geometry.staffSegments ?? []).length, 0);
-  assert.equal(segments, 85, 'the Round 44 need-based row census is back exactly');
+  assert.equal(segments, 77, 'the former 85-segment census loses only eight 0-alone upper segments');
+  const row = FIXED_3_ROW_DEFS.find(def => def.lin === 72)!;
+  const original = row.fires;
+  const previous = (() => {
+    (row as { fires: typeof original }).fires = lins => lins.some(lin => lin >= 72);
+    try { return layoutJankoScore(SCORE, OPTIONS, TOKENS); }
+    finally { (row as { fires: typeof original }).fires = original; }
+  })();
+  const census = (layouts: typeof LAYOUTS, lin: number) => layouts.flatMap(l =>
+    (l.geometry.staffSegments ?? []).filter(s => s.lin === lin).map(s =>
+      [l.index, s.rowId, s.mStart, s.mEnd, s.x1, s.x2]));
+  assert.equal(previous.reduce((n, l) => n + (l.geometry.staffSegments ?? []).length, 0), 85,
+    'the old inclusive rule reconstructs the archived complete census');
+  for (const lin of [24, 36, 48, 60])
+    assert.deepEqual(census(LAYOUTS, lin), census(previous, lin), `lin ${lin}: every non-upper segment remains`);
+  assert.equal(census(previous, 72).length - census(LAYOUTS, 72).length, 8,
+    'exactly eight upper extension segments disappear, with no unrelated row compensating');
+  // Independent source-pitch oracle: do not derive the expected row from the
+  // engine's row-earning predicate. Covers every bar, including unchanged
+  // upper-row positives, the lower extension and the pickup.
+  let zeroOnly = 0;
+  let earned = 0;
+  for (const layout of LAYOUTS) {
+    for (let m = 0; m < layout.geometry.measuresPerSystem; m++) {
+      const bar = layout.index * OPTIONS.measuresPerSystem + m;
+      const lins = layout.notes
+        .filter(p => getMeasureIndexOfTick(p.note, layout.geometry, layout.index, TOKENS) === m)
+        .map(p => p.note.pitch.octave * 12 + p.note.pitch.pitchClass);
+      const rows = getBarStaffRows(layout.geometry, m);
+      assert.equal(rows.includes(4), lins.some(lin => lin > 72), `written bar ${bar}: only above-0 earns row 4`);
+      if (lins.includes(72) && !lins.some(lin => lin > 72)) {
+        assert.ok(!rows.includes(4), `bar index ${bar}: 0 alone has no extension`);
+        zeroOnly++;
+      }
+      if (lins.some(lin => lin > 72)) earned++;
+    }
+  }
+  assert.ok(zeroOnly >= 8, 'all eight removed upper segments have 0-alone source witnesses');
+  assert.ok(earned > 0, 'independent above-0 positive controls retain extension ink');
   // System 1 (mm. 5–8) is the reported case: the bottom row was m6..m8 in Round
   // 44 and had grown to m5..m8 under the literal treatment.
   const exts = (LAYOUTS[1].geometry.staffSegments ?? [])

@@ -37,6 +37,7 @@
  */
 
 import { Hand, QuantizedGridScore, QuantizedNote } from '../../model/types';
+import { planProductionLayout } from './production-layout';
 import { wholeToneParity } from '../../model/pitch';
 import {
   CONTINUOUS_PITCH_ANCHOR_LIN,
@@ -80,6 +81,7 @@ import {
 import {
   JANKO_RHYTHM_STYLE_LABELS,
   OPTICAL_DISPLACEMENT_CAP,
+  DEFAULT_JANKO_OPTIONS,
   JankoChordGrouping,
   JankoFoldPairPresentation,
   JankoLayoutOptions,
@@ -303,6 +305,7 @@ export function computePageGeometry(
   const bodyHeight = printableHeight - o.headerHeight - o.footerHeight;
   const systemsPerPage = Math.max(1, Math.round(o.systemsPerPage));
   const measuresPerSystem = Math.max(1, Math.round(o.measuresPerSystem));
+  const production = score ? planProductionLayout(score, o, t) : undefined;
   const slotHeight = bodyHeight / systemsPerPage;
 
   const staffLeft = marginLeft + t.accoladeWidth + t.accoladeGap;
@@ -321,16 +324,20 @@ export function computePageGeometry(
     : null;
 
   const systems: JankoSystemGeometry[] = [];
-  for (let s = 0; s < systemsPerPage; s++) {
-    const slotTopY = marginTop + o.headerHeight + s * slotHeight;
+  for (let s = 0; s < (production?.systems.length ?? systemsPerPage); s++) {
+    const admitted = production?.systems[s];
+    const barCount = admitted ? admitted.lastBar - admitted.firstBar : measuresPerSystem;
+    const edges = admitted ? [staffLeft, ...admitted.widths.map((_, k) =>
+      staffLeft + admitted.widths.slice(0, k + 1).reduce((sum, width) => sum + width, 0))] : undefined;
+    const slotTopY = marginTop + o.headerHeight + (s % systemsPerPage) * slotHeight;
     if (isFixedCore) {
       const scale = t.semitoneScale;
       const slotCenterY = slotTopY + slotHeight / 2;
       const middleCY = o.core === 'fixed-3' ? slotCenterY + 2.0 : slotCenterY - 0.5 * scale;
 
       const anacrusis = t.anacrusisTicks ?? 0;
-      const startTick = score?.sourceBarTicks?.[s * measuresPerSystem] ?? (s === 0 ? 0 : anacrusis + s * measuresPerSystem * t.ticksPerMeasure);
-      const endTick = score?.sourceBarTicks?.[(s + 1) * measuresPerSystem] ?? (anacrusis + (s + 1) * measuresPerSystem * t.ticksPerMeasure);
+      const startTick = score?.sourceBarTicks?.[admitted?.firstBar ?? s * measuresPerSystem] ?? (s === 0 ? 0 : anacrusis + s * measuresPerSystem * t.ticksPerMeasure);
+      const endTick = score?.sourceBarTicks?.[admitted?.lastBar ?? (s + 1) * measuresPerSystem] ?? (anacrusis + (s + 1) * measuresPerSystem * t.ticksPerMeasure);
       const sysNotes = score
         ? score.notes.filter((n) => n.startTick >= startTick && n.startTick < endTick)
         : [];
@@ -349,13 +356,14 @@ export function computePageGeometry(
       } = computeSystemStaffSegments(
         sysNotes,
         s,
-        measuresPerSystem,
+        barCount,
         staffLeft,
         staffRight,
         measureWidth,
         o.core,
         t,
-        o.extensionJunction
+        o.extensionJunction,
+        admitted && score?.sourceBarTicks && edges ? { firstBar: admitted.firstBar, barTicks: score.sourceBarTicks, edges } : undefined
       );
 
       const writtenLins: number[] = [];
@@ -392,6 +400,9 @@ export function computePageGeometry(
         extensionLines,
         staffLines,
         staffSegments,
+        ...(admitted && edges ? { firstBar: admitted.firstBar, measureEdges: edges, measureLeftInsets: admitted.leftInsets,
+          systemBarStarts: production!.starts, sourceBarTicks: score!.sourceBarTicks,
+          measuresPerSystem: barCount } : {}),
       });
       continue;
     }
@@ -456,6 +467,8 @@ export function computePageGeometry(
 
   return {
     ...(score?.sourceBarTicks ? { sourceBarTicks: score.sourceBarTicks } : {}),
+    ...(production ? { systemBarStarts: production.starts, productionSystems: production.systems,
+      productionGeometries: systems } : {}),
     options: o,
     tokens: t,
     pageWidth: o.pageWidth,
@@ -558,6 +571,7 @@ export function getSystemGeometry(
   systemIndex: number,
   options?: Partial<JankoLayoutOptions> | null
 ): JankoSystemGeometry {
+  if (geo.productionGeometries) return geo.productionGeometries[systemIndex];
   const perPage = Math.max(1, geo.systemsPerPage);
   const slot = ((systemIndex % perPage) + perPage) % perPage;
   const base = geo.systems[slot];
@@ -581,6 +595,8 @@ export function countJankoSystems(
   tokens?: Partial<JankoTokens> | null
 ): number {
   const o = resolveJankoOptions(options);
+  const production = planProductionLayout(score, o, resolveJankoTokens(tokens));
+  if (production) return production.systems.length;
   if (score.sourceBarTicks) return Math.max(1, Math.ceil((score.sourceBarTicks.length - 1) / Math.max(1, o.measuresPerSystem)));
   const t = resolveJankoTokens(tokens);
   const anacrusis = t.anacrusisTicks ?? 0;
@@ -933,6 +949,7 @@ export function getMeasureOpeningBarlineX(
   t: ResolvedJankoTokens
 ): number | null {
   if (measureIdx <= 0) return null;
+  if (geo.measureEdges) return geo.measureEdges[measureIdx];
   const anacrusis = t.anacrusisTicks ?? 0;
   const upbeatSystem0 = systemIndex === 0 && anacrusis > 0;
   const firstMeasureLeft = upbeatSystem0
@@ -1150,6 +1167,7 @@ export function getMeasureClosingBarlineX(
   systemIndex: number,
   t: ResolvedJankoTokens
 ): number {
+  if (geo.measureEdges) return geo.measureEdges[measureIdx + 1];
   const anacrusis = t.anacrusisTicks ?? 0;
   const upbeatSystem0 = systemIndex === 0 && anacrusis > 0;
   const upbeatWidth = upbeatSystem0 ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth : 0;
@@ -2130,9 +2148,9 @@ function getNominalNoteX(
  */
 export function systemTickRange(geo: JankoSystemGeometry, systemIndex: number, t: ResolvedJankoTokens): [number, number] {
   if (geo.sourceBarTicks) {
-    const i = systemIndex * geo.measuresPerSystem;
+    const i = geo.firstBar ?? systemIndex * geo.measuresPerSystem;
     return [geo.sourceBarTicks[i] ?? geo.sourceBarTicks.at(-1)!,
-      geo.sourceBarTicks[Math.min(i + geo.measuresPerSystem, geo.sourceBarTicks.length - 1)]];
+      geo.sourceBarTicks[Math.min(geo.systemBarStarts?.[systemIndex + 1] ?? i + geo.measuresPerSystem, geo.sourceBarTicks.length - 1)]];
   }
   const upbeat = t.anacrusisTicks ?? 0;
   return [systemIndex === 0 ? 0 : upbeat + systemIndex * geo.measuresPerSystem * t.ticksPerMeasure,
@@ -2150,12 +2168,15 @@ export function getTickColumnX(
   const claspInset = (measureIdx: number): number => claspInsets?.get(measureIdx) ?? 0;
   if (geo.sourceBarTicks) {
     const index = getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geo, systemIndex, t);
-    const first = geo.sourceBarTicks[systemIndex * geo.measuresPerSystem + index];
-    const last = geo.sourceBarTicks[systemIndex * geo.measuresPerSystem + index + 1];
+    const first = geo.sourceBarTicks[(geo.firstBar ?? systemIndex * geo.measuresPerSystem) + index];
+    const last = geo.sourceBarTicks[(geo.firstBar ?? systemIndex * geo.measuresPerSystem) + index + 1];
     if (first === undefined || last === undefined || last <= first) throw Error(`Source bar grid cannot place tick ${tick} in system ${systemIndex}`);
     const insets = getMeasureInsets(systemIndex,index,o,t,claspInset(index));
-    const left = insets.left ?? t.measureInset, right = insets.right ?? t.measureInset;
-    return geo.staffLeft + index * geo.measureWidth + left + (tick-first)/(last-first) * Math.max(0,geo.measureWidth-left-right);
+    const left = Math.max(insets.left ?? t.measureInset, geo.measureLeftInsets?.[index] ?? 0);
+    const right = insets.right ?? t.measureInset;
+    const edge = geo.measureEdges?.[index] ?? geo.staffLeft + index * geo.measureWidth;
+    const width = geo.measureEdges ? geo.measureEdges[index + 1] - edge : geo.measureWidth;
+    return edge + left + (tick-first)/(last-first) * Math.max(0,width-left-right);
   }
   const anacrusis = t.anacrusisTicks ?? 0;
   if (systemIndex === 0 && anacrusis > 0) {
@@ -2264,6 +2285,16 @@ function tickBeatCell(
   measureWidth: number,
   claspInsets?: JankoClaspInsetMap | null
 ): { left: number; right: number } {
+  if (geo.measureEdges && geo.sourceBarTicks && geo.firstBar !== undefined) {
+    const m = getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geo, systemIndex, t);
+    const first = geo.sourceBarTicks[geo.firstBar + m];
+    const last = geo.sourceBarTicks[geo.firstBar + m + 1];
+    const beat = Math.max(1, Math.round(t.ticksPerBeat));
+    const leftTick = first + Math.floor((tick - first) / beat) * beat;
+    return { left: leftTick === first ? measureLeft : getTickColumnX(leftTick, geo, systemIndex, o, t, claspInsets),
+      right: Math.min(leftTick + beat, last) === last ? measureLeft + measureWidth :
+        getTickColumnX(leftTick + beat, geo, systemIndex, o, t, claspInsets) };
+  }
   const anacrusis = t.anacrusisTicks ?? 0;
   if (systemIndex === 0 && anacrusis > 0 && tick < anacrusis) {
     return { left: measureLeft, right: measureLeft + measureWidth };
@@ -3231,9 +3262,9 @@ function restBeatCell(
   t: ResolvedJankoTokens
 ): { left: number; right: number } {
   const anacrusis = t.anacrusisTicks ?? 0;
-  let measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
-  let mWidth = geo.measureWidth;
-  if (systemIndex === 0 && anacrusis > 0) {
+  let measureLeft = geo.measureEdges?.[measureIdx] ?? geo.staffLeft + measureIdx * geo.measureWidth;
+  let mWidth = geo.measureEdges ? geo.measureEdges[measureIdx + 1] - measureLeft : geo.measureWidth;
+  if (!geo.measureEdges && systemIndex === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
     if (tick < anacrusis) {
       measureLeft = geo.staffLeft;
@@ -4841,17 +4872,19 @@ export function resolveChordColumns(
     let unit = unitByTick.get(p.note.startTick);
     if (!unit) {
       const measureIdx = getMeasureIndexOfTick(p.note, geo, systemIndex, t);
-      const insets = getMeasureInsets(
+      const rawInsets = getMeasureInsets(
         systemIndex,
         measureIdx,
         o,
         t,
         claspInsets?.get(measureIdx) ?? 0
       );
+      const insets = geo.measureLeftInsets ? { ...rawInsets,
+        left: Math.max(rawInsets.left ?? t.measureInset, geo.measureLeftInsets[measureIdx] ?? 0) } : rawInsets;
       const anacrusis = t.anacrusisTicks ?? 0;
-      let measureLeft = geo.staffLeft + measureIdx * geo.measureWidth;
-      let mWidth = geo.measureWidth;
-      if (systemIndex === 0 && anacrusis > 0) {
+      let measureLeft = geo.measureEdges?.[measureIdx] ?? geo.staffLeft + measureIdx * geo.measureWidth;
+      let mWidth = geo.measureEdges ? geo.measureEdges[measureIdx + 1] - measureLeft : geo.measureWidth;
+      if (!geo.measureEdges && systemIndex === 0 && anacrusis > 0) {
         const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
         if (p.note.startTick < anacrusis) {
           measureLeft = geo.staffLeft;
@@ -6899,6 +6932,46 @@ export function computeContentAwarePageShifts(
   return out;
 }
 
+/** Greedy vertical admission of complete painted systems into the printable body.
+ * The page break is an independent production decision: a wide/low bar cannot
+ * impose a uniform three-system count on all the following pages. */
+function placeProductionPages(
+  score: QuantizedGridScore, geo: JankoPageGeometry, layouts: JankoSystemLayout[],
+  o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens
+): void {
+  const bodyTop = geo.marginTop + geo.headerHeight;
+  const limit = Math.max(1, geo.systemsPerPage);
+  for (let first = 0, pageIndex = 0; first < layouts.length; pageIndex++) {
+    let last = first, occupied = 0;
+    const bounds: ReturnType<typeof systemCompleteInkBounds>[] = [];
+    while (last < layouts.length && last - first < limit) {
+      const ink = systemCompleteInkBounds(layouts[last], o, t);
+      const height = ink.bottom - ink.top;
+      const need = occupied + height + (last > first ? CONTENT_AWARE_MIN_FACING_GAP : 0);
+      if (need > geo.bodyHeight + 1e-6) {
+        if (last === first) throw Error(`Unmet production height: system ${last + 1} (written bars ${layouts[last].geometry.firstBar! + 1}–${geo.systemBarStarts![last + 1]}) needs ${height.toFixed(2)}pt; available ${geo.bodyHeight.toFixed(2)}pt`);
+        break;
+      }
+      bounds.push(ink);
+      occupied = need;
+      last++;
+    }
+    const unit = (geo.bodyHeight - occupied) / (bounds.length + 1);
+    let cursor = bodyTop + unit;
+    for (let s = first; s < last; s++) {
+      const ink = bounds[s - first];
+      const height = ink.bottom - ink.top;
+      const template = getSystemGeometry(geo, s, o);
+      const applied = layouts[s].geometry.middleCY - template.middleCY;
+      const dy = cursor - ink.top;
+      if (Math.abs(dy) > 1e-9) layouts[s] = layoutJankoSystemShifted(score, geo, s, o, t, applied + dy);
+      layouts[s].geometry = { ...layouts[s].geometry, pageIndex };
+      cursor += height + CONTENT_AWARE_MIN_FACING_GAP + unit;
+    }
+    first = last;
+  }
+}
+
 /**
  * Rigid whole-system slot correction (page pt, +down): the minimal translation
  * that seats the system's complete ink inside its page slot with
@@ -7053,7 +7126,9 @@ export function layoutJankoSystemShifted(
       geometry.measureWidth,
       o.core,
       t,
-      o.extensionJunction
+      o.extensionJunction,
+      geometry.measureEdges && geometry.sourceBarTicks && geometry.firstBar !== undefined ?
+        { firstBar: geometry.firstBar, barTicks: geometry.sourceBarTicks, edges: geometry.measureEdges } : undefined
     );
 
     const writtenLins: number[] = [];
@@ -7341,9 +7416,10 @@ export function layoutJankoSystemShifted(
     // belongs to a beam keeps its beam.
     const rhythmNotes = [...notes, ...unisonVoices].map((p) => p.rhythm);
     const partition = bridgeBeamGroupsAcrossRests(
-      partitionBeamGroups(rhythmNotes, t, geometry.middleCY, o.beamGroupTicks),
+      partitionBeamGroups(rhythmNotes, t, geometry.middleCY, o.beamGroupTicks, geometry.sourceBarTicks),
       restLayer.rests,
-      t
+      t,
+      geometry.sourceBarTicks
     );
     // Pre-layout beam exclusion uses conservative admission, never final placed ink.
     const restInk = restLayer.rests.map((r) => restAdmissionBox(r, t));
@@ -9841,7 +9917,9 @@ export function layoutJankoScore(
   const total = countJankoSystems(score, o, t);
   const out: JankoSystemLayout[] = [];
   for (let s = 0; s < total; s++) out.push(layoutJankoSystem(score, geo, s, o, t));
-  if (isContentAwarePlacement(o)) {
+  if (geo.productionSystems && isContentAwarePlacement(o)) {
+    placeProductionPages(score, geo, out, o, t);
+  } else if (isContentAwarePlacement(o)) {
     // Content-aware page pass: re-lay-out moved systems on their resolved
     // centres (layout is a pure function of the centre, so every derived y
     // rides rigidly — render, crops, PDF and the linter share the geometry).
@@ -10110,7 +10188,7 @@ export function renderSystem(
   const resolved =
     layout ?? layoutJankoSystem(score, computePageGeometry(o, t, score), systemIndex, o, t);
   const sysGeo = resolved.geometry;
-  const startMeasureOffset = systemIndex * sysGeo.measuresPerSystem;
+  const startMeasureOffset = sysGeo.firstBar ?? systemIndex * sysGeo.measuresPerSystem;
 
   const out: string[] = [];
   out.push(`  <g id="system-${systemIndex + 1}">`);
@@ -10178,7 +10256,7 @@ export function renderSystemsBody(
   // Full-score layout: systems render at their placed (slot- or
   // content-aware) centres, so pages, crops, print, PDF and the linter
   // share one geometry.
-  const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, total, o.measuresPerSystem)
+  const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, total, geo.productionSystems ? undefined : o.measuresPerSystem)
     ? precomputedLayouts
     : layoutJankoScore(score, o, t);
   for (let s = Math.max(0, firstSystem); s <= last; s++) {
@@ -10198,6 +10276,10 @@ export function countJankoPages(
   tokens?: Partial<JankoTokens> | null
 ): number {
   const o = resolveJankoOptions(options);
+  if (score.productionLayout && score.sourceBarTicks && isContentAwarePlacement(o)) {
+    const layouts = layoutJankoScore(score, o, tokens);
+    return (layouts.at(-1)?.geometry.pageIndex ?? 0) + 1;
+  }
   if (score.sourceBarTicks) return Math.ceil(countJankoSystems(score,o,tokens) / Math.max(1,o.systemsPerPage));
   const t = resolveJankoTokens(tokens);
   const totalTicks = score.totalTicks || 0;
@@ -10217,17 +10299,30 @@ export function renderJankoPage(
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const geo = computePageGeometry(o, t, score);
-  const totalPages = countJankoPages(score, o, t);
-  const firstSystem = pageIndex * geo.systemsPerPage;
-
+  // Only source-resolved identity may override the caller's engraving header.
+  // An unrelated score using default layout options must never inherit Bach.
+  if (score.printIdentity?.scoreId === score.id) {
+    geo.options = { ...geo.options, title: score.printIdentity.work,
+      subtitle: score.printIdentity.piece, composer: score.printIdentity.composer };
+  } else if (!(score.title === 'Goldberg Variations, BWV 988: Variatio 1. a 1 Clav.' &&
+    score.composer === DEFAULT_JANKO_OPTIONS.composer)) {
+    // A caller can customize any header field independently; unchanged Bach
+    // defaults are placeholders, never evidence about an unrelated score.
+    geo.options = { ...geo.options,
+      title: o.title === DEFAULT_JANKO_OPTIONS.title ? score.title || '' : o.title,
+      subtitle: o.subtitle === DEFAULT_JANKO_OPTIONS.subtitle ? '' : o.subtitle,
+      composer: o.composer === DEFAULT_JANKO_OPTIONS.composer ? score.composer || '' : o.composer };
+  }
   const body: string[] = [];
   const totalSystems = countJankoSystems(score, o, t);
   // Full-score layout: systems render at their placed centres (see above).
-  const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, totalSystems, o.measuresPerSystem)
+  const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, totalSystems, geo.productionSystems ? undefined : o.measuresPerSystem)
     ? precomputedLayouts
     : layoutJankoScore(score, o, t);
-  for (let s = firstSystem; s < firstSystem + geo.systemsPerPage; s++) {
-    if (s >= totalSystems) break;
+  const productionPages = !!geo.productionSystems && isContentAwarePlacement(o);
+  const totalPages = productionPages ? (layouts.at(-1)?.geometry.pageIndex ?? 0) + 1 : countJankoPages(score, o, t);
+  for (let s = 0; s < totalSystems; s++) {
+    if ((productionPages ? layouts[s].geometry.pageIndex : Math.floor(s / geo.systemsPerPage)) !== pageIndex) continue;
     body.push(renderSystem(score, layouts[s].geometry, s, o, t, layouts[s]));
   }
 
@@ -10271,6 +10366,17 @@ export interface JankoCropExtents {
  * The result is `0 / 0` for any music inside the staff, so existing crops are
  * bit-for-bit unchanged.
  */
+function systemForBar(geo: JankoPageGeometry, bar: number): number {
+  const starts = geo.systemBarStarts;
+  if (!starts) return Math.floor(bar / geo.measuresPerSystem);
+  let low = 0, high = starts.length - 2;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (starts[mid] <= bar) low = mid; else high = mid - 1;
+  }
+  return low;
+}
+
 export function computeCropExtents(
   score: QuantizedGridScore,
   geo: JankoPageGeometry,
@@ -10323,8 +10429,8 @@ export function computeCropExtents(
   // so a crop never slices contour ink. Untouched when the options are off.
   if (o.contourThread !== 'none' || o.contourTicks || o.contourStrip) {
     const mps = geo.measuresPerSystem;
-    const firstSystem = Math.floor(startIdx / mps);
-    const lastSystem = Math.floor((startIdx + count - 1) / mps);
+    const firstSystem = systemForBar(geo, startIdx);
+    const lastSystem = systemForBar(geo, startIdx + count - 1);
     const total = countJankoSystems(score, o, t);
     for (let s = firstSystem; s <= Math.min(lastSystem, total - 1); s++) {
       const layout = precomputedLayouts?.[s] ?? layoutJankoSystem(score, geo, s, o, t);
@@ -10336,8 +10442,8 @@ export function computeCropExtents(
     }
   }
   const mps = geo.measuresPerSystem;
-  const firstSystem = Math.floor(startIdx / mps);
-  const lastSystem = Math.floor((startIdx + count - 1) / mps);
+  const firstSystem = systemForBar(geo, startIdx);
+  const lastSystem = systemForBar(geo, startIdx + count - 1);
   const total = countJankoSystems(score, o, t);
   for (let s = firstSystem; s <= Math.min(lastSystem, total - 1); s++) {
     const layout = precomputedLayouts?.[s] ?? layoutJankoSystem(score, geo, s, o, t);
@@ -10366,8 +10472,8 @@ export function computeCropExtents(
   }
   if (score.graceGroups?.length) {
     const placed = precomputedLayouts ?? layoutJankoScore(score,o,t);
-    const first = Math.floor(startIdx/o.measuresPerSystem);
-    const last = Math.floor((startIdx+count-1)/o.measuresPerSystem);
+    const first = systemForBar(geo, startIdx);
+    const last = systemForBar(geo, startIdx + count - 1);
     for (let s=first;s<=last;s++) {
       const l = placed[s]; if (!l?.grace?.length) continue;
       const ink = graceVerticalInkBounds(l.grace,o,t);
@@ -10399,16 +10505,17 @@ export function computeCropBox(
   measureStart: number,
   measureCount: number,
   includeCaptionBand: boolean = true,
-  extents?: Partial<JankoCropExtents> | null
+  extents?: Partial<JankoCropExtents> | null,
+  pageIndices?: readonly number[]
 ): JankoCropBox {
   const mps = geo.measuresPerSystem;
   const startIdx = Math.max(0, Math.floor(measureStart) - 1);
   const count = Math.max(1, Math.floor(measureCount));
   const endIdx = startIdx + count;
-  const firstSystem = Math.floor(startIdx / mps);
-  const lastSystem = Math.floor((endIdx - 1) / mps);
-  const startMIdx = startIdx % mps;
-  const endMIdx = (endIdx - 1) % mps;
+  const firstSystem = systemForBar(geo, startIdx);
+  const lastSystem = systemForBar(geo, endIdx - 1);
+  const startMIdx = startIdx - (geo.systemBarStarts?.[firstSystem] ?? firstSystem * mps);
+  const endMIdx = endIdx - 1 - (geo.systemBarStarts?.[lastSystem] ?? lastSystem * mps);
   const spansSystems = firstSystem !== lastSystem;
 
   const anacrusis = geo.tokens.anacrusisTicks ?? 0;
@@ -10421,17 +10528,19 @@ export function computeCropBox(
   const x0 =
     spansSystems || startMIdx === 0
       ? geo.marginLeft - CROP_PAD_X
-      : geo.staffLeft + upbeatWidth + startMIdx * sysGeo.measureWidth - CROP_PAD_X;
+      : (sysGeo.measureEdges?.[startMIdx] ?? geo.staffLeft + upbeatWidth + startMIdx * sysGeo.measureWidth) - CROP_PAD_X;
   const x1 = spansSystems
     ? geo.staffRight + CROP_PAD_X
-    : geo.staffLeft + upbeatWidth + (endMIdx + 1) * sysGeo.measureWidth + CROP_PAD_X;
+    : (sysGeo.measureEdges?.[endMIdx + 1] ?? geo.staffLeft + upbeatWidth + (endMIdx + 1) * sysGeo.measureWidth) + CROP_PAD_X;
 
   let staffTop = Infinity;
   let staffBottom = -Infinity;
   for (let s = firstSystem; s <= lastSystem; s++) {
     const sys = getSystemGeometry(geo, s);
-    staffTop = Math.min(staffTop, sys.staffTopY);
-    staffBottom = Math.max(staffBottom, sys.staffBotY);
+    const pageOffset = ((pageIndices?.[s] ?? Math.floor(s / geo.systemsPerPage)) -
+      (pageIndices?.[firstSystem] ?? Math.floor(firstSystem / geo.systemsPerPage))) * geo.bodyHeight;
+    staffTop = Math.min(staffTop, sys.staffTopY + pageOffset);
+    staffBottom = Math.max(staffBottom, sys.staffBotY + pageOffset);
   }
   if (!Number.isFinite(staffTop)) {
     staffTop = geo.systems[0].staffTopY;
@@ -10480,17 +10589,21 @@ export function renderJankoCrop(
   let layouts: readonly JankoSystemLayout[] | undefined = isMatchingPrecomputedLayouts(
     rawPrecomputed,
     total,
-    o.measuresPerSystem
+    geo.productionSystems ? undefined : o.measuresPerSystem
   )
     ? rawPrecomputed
     : undefined;
 
+  if (geo.productionSystems && isContentAwarePlacement(o)) layouts ??= layoutJankoScore(score, o, t);
+  const pageIndices = layouts && geo.productionSystems ? layouts.map(l => l.geometry.pageIndex ??
+    Math.floor(l.index / geo.systemsPerPage)) : undefined;
   const box = computeCropBox(
     geo,
     measureStart,
     measureCount,
     true,
-    computeCropExtents(score, geo, measureStart, measureCount, o, t, layouts)
+    computeCropExtents(score, geo, measureStart, measureCount, o, t, layouts),
+    pageIndices
   );
   // Placed-system framing: the box derives from slot-template staff lines,
   // but systems render at their placed centres — shift the frame to cover
@@ -10537,7 +10650,16 @@ export function renderJankoCrop(
     box.h += extra;
   }
 
-  const systems = renderSystemsBody(score, geo, box.firstSystem, box.lastSystem, o, t, layouts);
+  const pageOf = (s: number) => pageIndices?.[s] ?? Math.floor(s / geo.systemsPerPage);
+  const crossesPage = pageOf(box.firstSystem) !== pageOf(box.lastSystem);
+  const systems = crossesPage
+    ? Array.from({ length: box.lastSystem - box.firstSystem + 1 }, (_, index) => {
+      const system = box.firstSystem + index;
+      const dy = (pageOf(system) - pageOf(box.firstSystem)) * geo.bodyHeight;
+      const placed = layouts?.[system] ?? layoutJankoSystem(score, geo, system, o, t);
+      return `<g transform="translate(0 ${f(dy)})">${renderSystem(score, placed.geometry, system, o, t, placed)}</g>`;
+    }).join('\n')
+    : renderSystemsBody(score, geo, box.firstSystem, box.lastSystem, o, t, layouts);
 
   return [
     svgOpen(box),

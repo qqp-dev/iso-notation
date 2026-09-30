@@ -201,6 +201,17 @@ export function barlineStrokes(
     out.push({ x, y1: finalTop, y2: finalBot, width: 0.90, stroke: '#111111', cls: 'janko-barline', erase: false });
   };
 
+  if (geo.measureEdges && geo.sourceBarTicks && geo.firstBar !== undefined) {
+    for (let m = 1; m < geo.measureEdges.length; m++) {
+      if (m === geo.measureEdges.length - 1 && !isFinalScoreMeasure) continue;
+      const x = geo.measureEdges[m];
+      if (m === geo.measureEdges.length - 1) pushFinal(x); else pushMeasure(x);
+    }
+    return out.map(s => {
+      const boundary = geo.measureEdges!.findIndex(x => Math.abs(x - s.x) < 1e-6);
+      return { ...s, tick: geo.sourceBarTicks![geo.firstBar! + boundary] };
+    });
+  }
   const anacrusis = t.anacrusisTicks ?? 0;
   if (geo.index === 0 && anacrusis > 0) {
     const upbeatWidth = (anacrusis / t.ticksPerMeasure) * geo.measureWidth;
@@ -350,26 +361,27 @@ export function resolveBeatPulses(
 
   const baseInset = getGridNoteInset(o, t);
   const anacrusis = t.anacrusisTicks ?? 0;
-  const isSys0Anacrusis = systemIndex === 0 && anacrusis > 0;
+  const isSys0Anacrusis = !geo.measureEdges && systemIndex === 0 && anacrusis > 0;
   const upbeatWidth = isSys0Anacrusis ? (anacrusis / t.ticksPerMeasure) * geo.measureWidth : 0;
   const out: Array<{ tick: number; x: number }> = [];
 
-  for (let m = 0; m < o.measuresPerSystem; m++) {
+  for (let m = 0; m < (geo.measureEdges ? geo.measuresPerSystem : o.measuresPerSystem); m++) {
     const isOpeningMeasure = systemIndex === 0 && m === 0;
     const insets =
       isOpeningMeasure && o.showTimeSignature && o.timeSignatureWidth > 0
         ? { left: baseInset + o.timeSignatureWidth, right: baseInset }
         : undefined;
-    const measureLeft = isSys0Anacrusis
+    const measureLeft = geo.measureEdges?.[m] ?? (isSys0Anacrusis
       ? geo.staffLeft + upbeatWidth + m * geo.measureWidth
-      : geo.staffLeft + m * geo.measureWidth;
-    const left = insets?.left ?? baseInset;
+      : geo.staffLeft + m * geo.measureWidth);
+    const width = geo.measureEdges ? geo.measureEdges[m + 1] - measureLeft : geo.measureWidth;
+    const left = Math.max(insets?.left ?? baseInset, geo.measureLeftInsets?.[m] ?? 0);
     const right = insets?.right ?? baseInset;
-    const available = Math.max(0, geo.measureWidth - left - right);
+    const available = Math.max(0, width - left - right);
     // The absolute tick of this loop cell's first beat. The anacrusis system's
     // opening cell is the first *full* measure (measure index 1, starting at
     // the anacrusis); every other cell follows the ordinary measure grid.
-    const sourceBar = systemIndex * o.measuresPerSystem + m;
+    const sourceBar = (geo.firstBar ?? systemIndex * o.measuresPerSystem) + m;
     const measureStartTick = geo.sourceBarTicks?.[sourceBar] ?? (isSys0Anacrusis
       ? anacrusis + m * t.ticksPerMeasure
       : anacrusis + sourceBar * t.ticksPerMeasure);
