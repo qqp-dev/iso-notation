@@ -41,6 +41,8 @@
  */
 
 import test from 'node:test';
+import { BRAHMS_OP118_NO1_JANKO_OPTIONS as currentBrahmsOptions } from '../src/scores/brahms-op118-no1';
+import { resolveJankoOptions as currentResolveOptions } from '../src/render/janko/types';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -51,7 +53,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -66,14 +68,14 @@ import {
   brahmsWindow,
   candidateBadges,
   resolveCandidate,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import { claspMarkDaylight } from '../src/render/janko/elements/rhythm';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   countJankoSystems,
   layoutJankoScore,
@@ -199,7 +201,7 @@ test('Studio Brahms is the fixed-3 working Reference (display-only, no default c
   // (asserted in brahms-studio-ergonomics.test.ts and janko-round44.test.ts).
   assert.deepEqual(
     entry.options,
-    resolveJankoOptions(BRAHMS_OP118_NO1_JANKO_OPTIONS),
+    currentResolveOptions(currentBrahmsOptions),
     'the studio adds no override — the 0.90 treatment is the score’s own options'
   );
   assert.equal(DEFAULT_JANKO_OPTIONS.pitchPlacement, 'standard', 'the defaults stay literal');

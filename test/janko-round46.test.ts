@@ -36,13 +36,13 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   countJankoPages,
   getTieDisplayPlan,
@@ -63,7 +63,7 @@ import {
   ROUND_49_CANDIDATES,
   ROUND_49_METADATA,
   resolveCandidate,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import { bachBeforeM5 } from './support/bach-before-m5';
 
 const SCORE = buildBrahmsOp118No1Score();
@@ -126,13 +126,7 @@ test('A. Literal-mode ink stays clean; only above-0 digits earn the upper extens
   assert.equal((svg.match(/class="janko-ledger"/g) ?? []).length, 0, 'no per-note ledger dash');
   const segments = LAYOUTS.reduce((n, l) => n + (l.geometry.staffSegments ?? []).length, 0);
   assert.equal(segments, 77, 'the former 85-segment census loses only eight 0-alone upper segments');
-  const row = FIXED_3_ROW_DEFS.find(def => def.lin === 72)!;
-  const original = row.fires;
-  const previous = (() => {
-    (row as { fires: typeof original }).fires = lins => lins.some(lin => lin >= 72);
-    try { return layoutJankoScore(SCORE, OPTIONS, TOKENS); }
-    finally { (row as { fires: typeof original }).fires = original; }
-  })();
+  const previous = layoutJankoScore(SCORE, OPTIONS, {...TOKENS,upperExtensionThreshold:72});
   const census = (layouts: typeof LAYOUTS, lin: number) => layouts.flatMap(l =>
     (l.geometry.staffSegments ?? []).filter(s => s.lin === lin).map(s =>
       [l.index, s.rowId, s.mStart, s.mEnd, s.x1, s.x2]));

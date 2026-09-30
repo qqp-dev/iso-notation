@@ -19,7 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
+import { buildBrahmsOp118No1Score } from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -36,7 +36,7 @@ import {
   JANKO_REST_STYLES,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   JankoRestGeometry,
   JANKO_REST_VALUES,

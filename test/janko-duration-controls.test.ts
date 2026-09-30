@@ -42,9 +42,12 @@ test('duration intent is distinct, guarded on both registered scores and undo re
 // shared-mark ownership. Both orders must be independently exercised even while red.
 const score = SEMANTIC_SCORE;
 const note = buildBrahmsOp118No1Score().notes.find(n => n.id === 'brahms-op118-no1-118')!;
-const inspectedTarget = inspectDurationCandidate(score, 9, 1584).find(m => m.target.ownerIds.includes(note.id))!.target;
-assert.equal(inspectedTarget.family, 'ring', 'm. 9 fixture is the shared full ring');
-const target = { ...inspectedTarget, family: 'ring' as const };
+// The pre-clarity m.9 target fused two independent logical voices. It is
+// deliberately retained as a stale fixture: current rules must refuse it,
+// never silently retarget the operator's saved ownership.
+const target = {score,measure:9,tick:1584,family:'ring' as const,
+  ownerIds:['brahms-op118-no1-117','brahms-op118-no1-118']};
+assert.ok(!inspectDurationCandidate(score,9,1584).some(m=>JSON.stringify(m.target.ownerIds)===JSON.stringify(target.ownerIds)));
 const hand = (base: string): HandIntent => ({ schema: 1, intent: 'assign-hand', score, base,
   scope: 'this' as const, target: note.hand === 'RH' ? 'LH' as const : 'RH' as const,
   selected: [{ id: note.id, pitchClass: note.pitch.pitchClass, octave: note.pitch.octave,
@@ -79,23 +82,23 @@ test('hand-first placement rejects the canonical shared target atomically after 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('duration-first hand change revalidates existing placement against projected ownership atomically', () => {
+test('duration-first retired shared placement refuses before writing, including after a hand projection', () => {
   const dir = mkdtempSync(join(tmpdir(), 'duration-duration-first-'));
   try {
     const path = join(dir, 'candidate.json');
-    const saved = executeHandCommand({ action: 'change', request: beside(baseline(root, score)) }, root, path, undefined, score);
-    const before = readFileSync(path);
-    assert.throws(() => executeHandCommand({ action: 'change', request: hand(saved.revision) }, root, path, undefined, score), /owner|seat|changed/i);
-    assert.deepEqual(readFileSync(path), before, 'a hand change must not leave a saved carrier preference on a projected bracket');
+    assert.throws(()=>executeHandCommand({action:'change',request:beside(baseline(root,score))},root,path,undefined,score),/owner|seat|changed/i);
+    assert.equal(readCandidate(root,path,score).records.length,0,'retired ownership never becomes saved state');
+    const saved=executeHandCommand({action:'change',request:hand(baseline(root,score))},root,path,undefined,score);
+    const before=readFileSync(path);
+    assert.throws(()=>executeHandCommand({action:'change',request:beside(saved.revision)},root,path,undefined,score),/owner|seat|changed/i);
+    assert.deepEqual(readFileSync(path),before,'a stale carrier preference never silently follows the projected hand');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('refused beside seat with detached rule-wide mount does not silently split a shared statement', () => {
   const score = buildBrahmsOp118No1Score();
-  const inspectedTarget = inspectDurationCandidate(SEMANTIC_SCORE, 9, 1584).find(m =>
-    m.target.ownerIds.includes('brahms-op118-no1-117'))!.target;
-  assert.equal(inspectedTarget.family, 'ring', 'm. 9 fixture is the shared full ring');
-  const target = { ...inspectedTarget, family: 'ring' as const };
+  const target = {score:SEMANTIC_SCORE,measure:9,tick:1584,family:'ring' as const,
+    ownerIds:['brahms-op118-no1-117','brahms-op118-no1-118']};
   const dir = mkdtempSync(join(tmpdir(), 'duration-combined-'));
   try {
     const path = join(dir, 'candidate.json');
@@ -127,21 +130,23 @@ test('refused beside seat with detached rule-wide mount does not silently split 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('full-owner shared placement fits or explicitly refuses; changed owner set never writes', () => {
+test('retired/full-owner shared targets refuse; a guarded generic variant still serves every real engine page', () => {
   const dir = mkdtempSync(join(tmpdir(), 'duration-shared-'));
   try {
     const path = join(dir, 'candidate.json'), score: typeof SEMANTIC_SCORE = SEMANTIC_SCORE;
-    const mark = inspectDurationCandidate(score, 9, 1584).find(m => m.target.ownerIds.includes('brahms-op118-no1-117'))!;
-    assert.deepEqual(mark.target.ownerIds, ['brahms-op118-no1-117', 'brahms-op118-no1-118']);
-    assert.equal(mark.target.family, 'ring');
-    const target = { ...mark.target, family: 'ring' as const };
+    const target = {score,measure:9,tick:1584,family:'ring' as const,
+      ownerIds:['brahms-op118-no1-117','brahms-op118-no1-118']};
+    assert.ok(!inspectDurationCandidate(score,9,1584).some(m=>JSON.stringify(m.target.ownerIds)===JSON.stringify(target.ownerIds)),
+      'independent voice duration statements are not fused into a shared UI target');
     const requested = { ...request(score, baseline(root, score), 'beside'), placements: [{ target, preference: 'beside' as const }], windows: [{ measureStart: 9, measureCount: 4 }] };
     const wrong = { ...requested, placements: [{ target: { ...target, ownerIds: [target.ownerIds[0]] }, preference: 'beside' as const }] };
     assert.throws(() => executeHandCommand({ action: 'change', request: wrong }, root, path, undefined, score), /owner/);
-    const result = executeHandCommand({ action: 'change', request: requested }, root, path, undefined, score);
+    assert.throws(()=>executeHandCommand({action:'change',request:requested},root,path,undefined,score),/owner|seat|changed/i);
+    assert.equal(readCandidate(root,path,score).records.length,0);
+    const result = executeHandCommand({ action: 'change', request: {...requested,placements:[]} }, root, path, undefined, score);
     const variant = activeDurationVariants(readCandidate(root, path, score))[0];
     assert.equal(result.revision.length, 64);
-    assert.equal(variant.refusals.length, 0, 'literal m. 9 has a legal fitted shared seat');
+    assert.equal(variant.refusals.length, 0, 'the admitted generic variant contains no obsolete shared-seat request');
     assert.equal(variant.lint.newViolations.length, 0);
     const cache: PreparedStaticCache = {};
     const prepared = generatePreparedStudio({}, root, path, cache);

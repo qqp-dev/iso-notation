@@ -48,7 +48,7 @@ import {
   JankoOctaveLineScheme,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 
 const SCORE = buildBachGoldbergVar1Score();
 

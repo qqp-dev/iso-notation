@@ -24801,10 +24801,10 @@
         },
         "startTick": 3228,
         "durationTicks": 12,
-        "hand": "RH",
+        "hand": "LH",
         "handInference": {
-          "evidence": "Printed upper destination; source stem down",
-          "confidence": "high"
+          "evidence": "Same logical gesture: lower/down anchor continued on upper staff",
+          "confidence": "contextual"
         },
         "voice": 5,
         "sourceProvenance": {
@@ -24815,7 +24815,7 @@
             "upper"
           ],
           "hands": [
-            "RH"
+            "LH"
           ],
           "unison": false
         }
@@ -24828,13 +24828,13 @@
         },
         "startTick": 3240,
         "durationTicks": 12,
-        "hand": "RH",
+        "hand": "LH",
         "sourceBeam": {
           "group": "13-Mai-cher-Mai.ly:239:247:lower.0:pass1"
         },
         "handInference": {
-          "evidence": "Printed upper destination; source stem down",
-          "confidence": "high"
+          "evidence": "Same logical gesture: lower/down anchor continued on upper staff",
+          "confidence": "contextual"
         },
         "voice": 5,
         "sourceProvenance": {
@@ -24845,7 +24845,7 @@
             "upper"
           ],
           "hands": [
-            "RH"
+            "LH"
           ],
           "unison": false
         }
@@ -24858,13 +24858,13 @@
         },
         "startTick": 3252,
         "durationTicks": 12,
-        "hand": "RH",
+        "hand": "LH",
         "sourceBeam": {
           "group": "13-Mai-cher-Mai.ly:239:247:lower.0:pass1"
         },
         "handInference": {
-          "evidence": "Printed upper destination; source stem down",
-          "confidence": "high"
+          "evidence": "Same logical gesture: lower/down anchor continued on upper staff",
+          "confidence": "contextual"
         },
         "voice": 5,
         "sourceProvenance": {
@@ -24875,7 +24875,7 @@
             "upper"
           ],
           "hands": [
-            "RH"
+            "LH"
           ],
           "unison": false
         }
@@ -31509,10 +31509,10 @@
         },
         "startTick": 4764,
         "durationTicks": 12,
-        "hand": "RH",
+        "hand": "LH",
         "handInference": {
-          "evidence": "Printed upper destination; source stem down",
-          "confidence": "high"
+          "evidence": "Same logical gesture: lower/down anchor continued on upper staff",
+          "confidence": "contextual"
         },
         "voice": 5,
         "sourceProvenance": {
@@ -31523,7 +31523,7 @@
             "upper"
           ],
           "hands": [
-            "RH"
+            "LH"
           ],
           "unison": false
         }
@@ -31536,13 +31536,13 @@
         },
         "startTick": 4776,
         "durationTicks": 12,
-        "hand": "RH",
+        "hand": "LH",
         "sourceBeam": {
           "group": "13-Mai-cher-Mai.ly:239:247:lower.0:pass2"
         },
         "handInference": {
-          "evidence": "Printed upper destination; source stem down",
-          "confidence": "high"
+          "evidence": "Same logical gesture: lower/down anchor continued on upper staff",
+          "confidence": "contextual"
         },
         "voice": 5,
         "sourceProvenance": {
@@ -31553,7 +31553,7 @@
             "upper"
           ],
           "hands": [
-            "RH"
+            "LH"
           ],
           "unison": false
         }
@@ -31566,13 +31566,13 @@
         },
         "startTick": 4788,
         "durationTicks": 12,
-        "hand": "RH",
+        "hand": "LH",
         "sourceBeam": {
           "group": "13-Mai-cher-Mai.ly:239:247:lower.0:pass2"
         },
         "handInference": {
-          "evidence": "Printed upper destination; source stem down",
-          "confidence": "high"
+          "evidence": "Same logical gesture: lower/down anchor continued on upper staff",
+          "confidence": "contextual"
         },
         "voice": 5,
         "sourceProvenance": {
@@ -31583,7 +31583,7 @@
             "upper"
           ],
           "hands": [
-            "RH"
+            "LH"
           ],
           "unison": false
         }

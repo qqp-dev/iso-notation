@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import {  BRAHMS_OP118_NO1_ANACRUSIS_TICKS,
   BRAHMS_OP118_NO1_TICKS_PER_MEASURE,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -46,7 +46,7 @@ import {
   type JankoCandidate,
   type JankoCandidateRound,
   type JankoScoreCandidateWindow,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   createStudioConfig,
   renderCandidatesView,
@@ -58,7 +58,7 @@ import {
   resolveJankoOptions,
   resolveJankoTokens,
   type JankoClusterCompression,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   layoutJankoScore,
   renderJankoPage,
@@ -468,7 +468,8 @@ test('Linter registry: compression-collision and source-expression checks remain
   // underlays), so the catalog now carries 36 checks.
   // Round 48 registers `rest-provenance` (the published rest-source facts), so
   // the registry holds one more check than the compression-collision round left.
-  assert.equal(JANKO_LINT_CHECKS.length, 38, 'source-expression integrity adds one shared check');
+  assert.equal(JANKO_LINT_CHECKS.length, 39, 'shared clarity adds the final painted voice-corridor audit');
+  assert.ok(JANKO_LINT_CHECKS.includes('voice-beam-corridors'));
   assert.ok(JANKO_LINT_CHECKS.includes('expression-integrity'), 'source-expression integrity in lint catalog');
   assert.ok(JANKO_LINT_CHECKS.includes('rest-provenance'), 'the rest-provenance check is registered');
   assert.ok(JANKO_LINT_CHECKS.includes('hold-integrity'), 'hold-integrity in lint catalog');

@@ -47,7 +47,7 @@ import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -68,7 +68,7 @@ import {
   ROUND_49_SHARED_TOKENS,
   ROUND_49_METADATA,
   ROUND_49_CANDIDATES,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import { createStudioConfig, renderCandidatesView, renderCompareStrip } from '../src/render/janko/studio';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -81,7 +81,7 @@ import {
   getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   computePageGeometry,
   countJankoPages,

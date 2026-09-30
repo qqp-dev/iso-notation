@@ -26,7 +26,7 @@ import {
   getClusterSpacingPreset,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   continuousPitchY,
   getChannelLayoutSpec,

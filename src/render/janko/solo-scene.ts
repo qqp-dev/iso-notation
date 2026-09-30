@@ -10,6 +10,7 @@ import type { JankoDurationGrammar, JankoSubdivisionStyle, ResolvedJankoTokens, 
 import { getClusterSpacingPreset } from './types';
 import { f } from './elements/style';
 import type { InkBox } from './ink-scene';
+import { beamStemBoxes } from './beam-scene';
 
 const n=(v:number)=>Number(f(v));
 
@@ -68,7 +69,7 @@ export function dotFlagPolicyBox(note:JankoRhythmNote,marks:number,o:ResolvedJan
   return {x0:s.stemX+b.x0,x1:s.stemX+b.x1,y0:s.stemEndY+b.y0,y1:s.stemEndY+b.y1};
 }
 export type SoloShape =
-  | {kind:'stem';x:number;y1:number;y2:number;width:number}
+  | {kind:'stem';x:number;y1:number;y2:number;width:number;gaps?:readonly {y0:number;y1:number}[]}
   | {kind:'ring';cx:number;cy:number;r:number;width:number}
   | {kind:'flag';d:string;stemX:number;index:number;count?:number;style:JankoSubdivisionStyle}
   | {kind:'dot';cx:number;cy:number;r:number;index:1|2};
@@ -80,7 +81,11 @@ export interface SoloPiece {
 }
 export function serializeSoloPiece(p:SoloPiece):string {
   const s=p.shape;
-  if(s.kind==='stem')return `    <line class="janko-stem" x1="${f(s.x)}" y1="${f(s.y1)}" x2="${f(s.x)}" y2="${f(s.y2)}" stroke="#111111" stroke-width="${s.width.toFixed(2)}"/>`;
+  if(s.kind==='stem'){
+    if(s.gaps?.length){const d=beamStemBoxes({shape:s}).map(b=>`M ${f(s.x)} ${f(b.y0)} L ${f(s.x)} ${f(b.y1)}`).join(' ');
+      return `    <path class="janko-stem janko-voice-underpass" d="${d}" fill="none" stroke="#111111" stroke-width="${s.width.toFixed(2)}" stroke-linecap="butt"/>`;}
+    return `    <line class="janko-stem" x1="${f(s.x)}" y1="${f(s.y1)}" x2="${f(s.x)}" y2="${f(s.y2)}" stroke="#111111" stroke-width="${s.width.toFixed(2)}"/>`;
+  }
   if(s.kind==='ring')return `    <circle class="janko-stem-ring" cx="${f(s.cx)}" cy="${f(s.cy)}" r="${f(s.r)}" fill="#FFFFFF" stroke="#111111" stroke-width="${s.width.toFixed(2)}"/>`;
   if(s.kind==='dot')return `    <circle class="janko-augmentation-dot"${s.index===2?' data-dot="2"':''} cx="${f(s.cx)}" cy="${f(s.cy)}" r="${f(s.r)}" fill="#111111"/>`;
   if(s.count!==undefined)return `    <path class="janko-flag" data-stem-x="${f(s.stemX)}" data-flag-count="${s.count}" d="${s.d}" fill="#111111" stroke="none" fill-rule="evenodd" data-subdivision-style="classical-urtext"/>`;
@@ -143,7 +148,8 @@ export function soloPieceAt(p:SoloPiece,x:number,y:number):SoloPhysicalResult {
   if(s.kind==='stem'){
     if(Math.abs(Math.abs(x-s.x)-s.width/2)<1e-9||Math.abs(y-s.y1)<1e-9||Math.abs(y-s.y2)<1e-9)
       return {status:'unknown',piece:p,reason:'emitted boundary/tangent'};
-    return {status:x>s.x-s.width/2&&x<s.x+s.width/2&&y>Math.min(s.y1,s.y2)&&y<Math.max(s.y1,s.y2)?'ink':'clear',piece:p};
+    if(s.gaps?.some(g=>Math.abs(y-g.y0)<1e-9||Math.abs(y-g.y1)<1e-9))return {status:'unknown',piece:p,reason:'underpass boundary/tangent'};
+    return {status:beamStemBoxes({shape:s}).some(b=>x>b.x0&&x<b.x1&&y>b.y0&&y<b.y1)?'ink':'clear',piece:p};
   }
   const d=Math.hypot(x-s.cx,y-s.cy);
   if(s.kind==='ring'){
@@ -162,7 +168,12 @@ export function soloPieceBoxAt(p:SoloPiece,b:InkBox):SoloPhysicalResult {
   if(b.x1<h.x0||b.x0>h.x1||b.y1<h.y0||b.y0>h.y1)return {status:'clear'};
   if(s.kind==='flag')return {status:'unknown',piece:p,reason:'filled cubic/evenodd unresolved'};
   if(b.x1<=h.x0||b.x0>=h.x1||b.y1<=h.y0||b.y0>=h.y1)return {status:'unknown',piece:p,reason:'box boundary tangent'};
-  if(s.kind==='stem')return {status:'ink',piece:p};
+  if(s.kind==='stem'){
+    const boxes=beamStemBoxes({shape:s});
+    if(boxes.some(v=>Math.min(b.x1,v.x1)>Math.max(b.x0,v.x0)&&Math.min(b.y1,v.y1)>Math.max(b.y0,v.y0)))return {status:'ink',piece:p};
+    if(boxes.some(v=>Math.min(b.x1,v.x1)>=Math.max(b.x0,v.x0)&&Math.min(b.y1,v.y1)>=Math.max(b.y0,v.y0)))return {status:'unknown',piece:p,reason:'underpass boundary tangent'};
+    return {status:'clear',piece:p};
+  }
   const near=Math.hypot(Math.max(b.x0-s.cx,0,s.cx-b.x1),Math.max(b.y0-s.cy,0,s.cy-b.y1));
   const far=Math.hypot(Math.max(Math.abs(b.x0-s.cx),Math.abs(b.x1-s.cx)),Math.max(Math.abs(b.y0-s.cy),Math.abs(b.y1-s.cy)));
   const inner=s.kind==='ring'?s.r-s.width/2:0,outer=s.kind==='ring'?s.r+s.width/2:s.r;

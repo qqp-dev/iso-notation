@@ -17,7 +17,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
+import { buildBrahmsOp118No1Score } from './pre-clarity-brahms';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -33,7 +33,7 @@ import {
   REST_DURATION_SPECIMEN_JANKO_TOKENS,
   buildRestDurationSpecimenScore,
 } from '../src/scores/rest-duration-specimen';
-import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
+import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from './pre-clarity-rules';
 import { getEquatorRuleYs } from '../src/render/janko/elements/staff';
 import {
   JANKO_REST_VALUES,
@@ -49,7 +49,7 @@ import { subdivisionMarkCount } from '../src/render/janko/elements/rhythm';
 import { layoutJankoScore, drawnStaffRuleYs, nearestDrawnStaffRule } from '../src/render/janko/engine';
 import { checkRestSeat, lintJankoScore } from '../src/render/janko/linter';
 import type { LintViolation } from '../src/render/janko/linter';
-import { ROUND_49_CANDIDATES, ROUND_49_METADATA } from '../src/render/janko/candidates';
+import { ROUND_49_CANDIDATES, ROUND_49_METADATA } from './pre-clarity-candidates';
 
 const BACH = buildBachGoldbergVar1Score();
 const BRAHMS = buildBrahmsOp118No1Score();

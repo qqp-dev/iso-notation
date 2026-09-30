@@ -34,7 +34,7 @@ import {
   type JankoCandidate,
   type JankoCandidateRound,
   type JankoAbstractCandidateWindow,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   createStudioConfig,
   renderCandidatesView,
@@ -67,7 +67,7 @@ import {
   setLayoutJankoScoreObserver,
 } from '../src/render/janko/engine';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
-import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
+import { buildBrahmsOp118No1Score } from './pre-clarity-brahms';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');

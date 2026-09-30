@@ -75,14 +75,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-current';
+import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-pre-clarity';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import {
   BRAHMS_OP118_NO1_JANKO_OPTIONS,
   BRAHMS_OP118_NO1_JANKO_TOKENS,
   buildBrahmsOp118No1Score,
-} from '../src/scores/brahms-op118-no1';
+} from './pre-clarity-brahms';
 import { BRAHMS_HAND_CORRECTIONS } from '../src/scores/brahms-hand-corrections';
 import {
   DURATION_VOCABULARY_SPECIMEN_JANKO_OPTIONS,
@@ -96,7 +96,7 @@ import {
   OPTICAL_DISPLACEMENT_CAP,
   resolveJankoOptions,
   resolveJankoTokens,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import {
   claspMemberCarriedTicks,
   countJankoPages,
@@ -125,7 +125,7 @@ import {
   ROUND_49_CANDIDATES,
   ROUND_49_METADATA,
   type JankoScoreCandidateWindow,
-} from '../src/render/janko/candidates';
+} from './pre-clarity-candidates';
 import {
   BRAHMS_ROUND44_RESERVE_OPTIONS,
   BRAHMS_ROUND44_RESERVE_TOKENS,
@@ -503,7 +503,7 @@ test('Round 49 registry: three readings of one completed written-tie family', ()
   }
 });
 
-test('The landed Round 46 card IS the working Brahms Reference; the Reference view serves the engine pages', () => {
+test('historical Round 46 card retains its explicit rules; current Reference serves the real engine pages', () => {
   // Round 47 opens its own candidate set, so the card that the working
   // Reference *is* is kept here as the round's own historical fixture (the
   // Round 46 pair is on record in test/janko-round46.test.ts).
@@ -533,10 +533,11 @@ test('The landed Round 46 card IS the working Brahms Reference; the Reference vi
   const bachAt = reference.indexOf('data-score="primary"');
   const referencePages = pageSvgs(reference.slice(brahmsAt, bachAt));
   assert.equal(referencePages.length, 6, 'the Reference view carries the whole score as six expression-aware pages');
+  const current=studioConfig().scores['brahms-op118-no1'];
   const enginePages = [0, 1, 2, 3, 4, 5].map((page) =>
     // The studio wraps each engine page in its own `<svg class="janko-svg">`
     // element, so the class is the only markup the comparison normalises away.
-    renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS).replace(
+    renderJankoPage(current.score, page, current.options, current.tokens).replace(
       /^<svg /,
       '<svg class="janko-svg" '
     )

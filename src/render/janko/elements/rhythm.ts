@@ -53,6 +53,8 @@ import type { PlacedClaspShell } from '../connective-scene';
 export interface JankoRhythmNote {
   sourceBeam?: { group?: string; noBeam?: boolean };
   sourceVoice?: string;
+  /** Derived independent-stem corridor length; never changes a written value or hand. */
+  stemLength?: number;
   beamWindowTicks?: number;
   id: string;
   /** Absolute score tick. */
@@ -200,7 +202,7 @@ export function getStemGeometry(
   return {
     stemX: note.x,
     stemStartY: note.y + dir * attachR,
-    stemEndY: note.y + dir * t.stemLength,
+    stemEndY: note.y + dir * (note.stemLength ?? t.stemLength),
     direction: dir,
   };
 }
@@ -574,9 +576,9 @@ export function renderFlags(
  *   strokes into a symmetrical `×`. One cut carries an 8th, two parallel cuts
  *   carry a 16th.
  */
-/** Width (pt) of a transverse line cut (cross-bar / slash / stitch). */
+/** Historical Round 11 metrics, retained for archived integrations. Current
+ * transverse paint/admission reads claspSlashLength/Stroke/Slope tokens. */
 export const CLASP_TRANSVERSE_WIDTH = 7.5;
-/** Stroke thickness (pt) of every Round 11 midpoint mark. */
 export const CLASP_TRANSVERSE_STROKE = 1.0;
 /** Vertical spacing (pt) between the two parallel bars/slashes of a 16th. */
 export const CLASP_CROSS_SPACING = 2.5;
@@ -1971,10 +1973,11 @@ function claspOpenMark(count: number): JankoClaspMarkExtents {
 function claspFlagMark(
   style: JankoClaspDurationStyle,
   count: number,
-  rake: number
+  t: ResolvedJankoTokens
 ): JankoClaspMarkExtents {
-  const half = CLASP_TRANSVERSE_WIDTH / 2;
-  const stroke = CLASP_TRANSVERSE_STROKE / 2;
+  const half = t.claspSlashLength / 2;
+  const stroke = t.claspSlashStroke / 2;
+  const rake = t.claspSlashSlope;
   switch (style) {
     case 'kinetic-cross-slashes':
     case 'down-raked-slashes':
@@ -2017,12 +2020,12 @@ interface ClaspMarkSegment {
 function claspMarkCenters(
   group: JankoClaspGroupGeometry,
   ink: ResolvedJankoClaspInk,
-  rake: number
+  t: ResolvedJankoTokens
 ): number[] {
   const mark =
     ink.pips > 0
       ? claspOpenMark(ink.pips)
-      : claspFlagMark(group.durationStyle, ink.flags, rake);
+      : claspFlagMark(group.durationStyle, ink.flags, t);
   return mark.stack === 0 ? [ink.centerY] : [ink.centerY - mark.stack, ink.centerY + mark.stack];
 }
 
@@ -2030,10 +2033,10 @@ function claspMarkCenters(
 function claspMarkSegments(
   group: JankoClaspGroupGeometry,
   cy: number,
-  rake: number
+  t: ResolvedJankoTokens
 ): ClaspMarkSegment[] {
-  const half = CLASP_TRANSVERSE_WIDTH / 2;
-  const dy = half * rake;
+  const half = t.claspSlashLength / 2;
+  const dy = half * t.claspSlashSlope;
   const x = group.claspX;
   switch (group.durationStyle) {
     case 'down-raked-slashes':
@@ -2180,7 +2183,7 @@ export function claspMarkDaylight(
     }
     return air;
   }
-  for (const cy of claspMarkCenters(group, ink, t.maxBeamSlope)) {
+  for (const cy of claspMarkCenters(group, ink, t)) {
     if (ink.pips > 0) {
       air = Math.min(
         air,
@@ -2190,8 +2193,8 @@ export function claspMarkDaylight(
     }
     // A plain spire (a quarter) paints the bracket alone: no transverse ink.
     if (ink.flags === 0) continue;
-    for (const segment of claspMarkSegments(group, cy, t.maxBeamSlope)) {
-      air = Math.min(air, pointToSegment(x, y, segment) - CLASP_TRANSVERSE_STROKE / 2 - r);
+    for (const segment of claspMarkSegments(group, cy, t)) {
+      air = Math.min(air, pointToSegment(x, y, segment) - t.claspSlashStroke / 2 - r);
     }
   }
   return air;
@@ -2326,9 +2329,8 @@ export function claspOwnMemberAir(
       ) - half
     );
   }
-  const rake = t.maxBeamSlope;
   for (const ink of group.durationInk ?? []) {
-    for (const cy of claspMarkCenters(group, ink, rake)) {
+    for (const cy of claspMarkCenters(group, ink, t)) {
       if (ink.pips > 0) {
         const ringOuter = BRACKET_RING_OUTER;
         const dx = Math.max(rx0 - group.claspX, 0, group.claspX - rx1);
@@ -2337,8 +2339,8 @@ export function claspOwnMemberAir(
         continue;
       }
       if (ink.flags === 0) continue;
-      for (const segment of claspMarkSegments(group, cy, rake)) {
-        air = Math.min(air, segmentToRect(segment, rx0, ry0, rx1, ry1) - CLASP_TRANSVERSE_STROKE / 2);
+      for (const segment of claspMarkSegments(group, cy, t)) {
+        air = Math.min(air, segmentToRect(segment, rx0, ry0, rx1, ry1) - t.claspSlashStroke / 2);
       }
     }
   }
@@ -2518,8 +2520,8 @@ function renderClaspDurationInk(
 ): string[] {
   const out: string[] = [];
   const claspX = group.claspX;
-  const stroke = CLASP_TRANSVERSE_STROKE.toFixed(2);
-  const rake = t.maxBeamSlope;
+  const stroke = t.claspSlashStroke.toFixed(2);
+  const rake = t.claspSlashSlope;
   const groups =
     group.durationInk && group.durationInk.length > 0
       ? group.durationInk
@@ -2585,7 +2587,7 @@ function renderClaspDurationInk(
       const hasMark = open || ink.flags > 0;
       const mark = open
         ? claspOpenMark(ink.pips)
-        : claspFlagMark(group.durationStyle, ink.flags, rake);
+        : claspFlagMark(group.durationStyle, ink.flags, t);
       const centers = mark.stack === 0 ? [yMid] : [yMid - mark.stack, yMid + mark.stack];
 
       for (const cy of hasMark ? centers : []) {
@@ -2599,7 +2601,7 @@ function renderClaspDurationInk(
           continue;
         }
 
-        const half = CLASP_TRANSVERSE_WIDTH / 2;
+        const half = t.claspSlashLength / 2;
         const dy = half * rake;
         switch (group.durationStyle) {
           case 'kinetic-cross-slashes':
@@ -2751,7 +2753,7 @@ export function claspInkBox(
       const mark =
         ink.pips > 0
           ? claspOpenMark(ink.pips)
-          : claspFlagMark(group.durationStyle, ink.flags, t.maxBeamSlope);
+          : claspFlagMark(group.durationStyle, ink.flags, t);
       x0 = Math.min(x0, group.claspX - mark.halfWidth);
       x1 = Math.max(x1, group.claspX + mark.halfWidth);
       y0 = Math.min(y0, yMid - mark.stack - mark.halfHeight);

@@ -135,7 +135,8 @@ test('expression bounds participate in real page/crop admission and linter defec
       [phrase.toNoteIds,phrase.endTick,ink.x1,ink.continuationEnd],
     ] as const) {
       const endpoint = l.notes.find(n => ids.includes(n.note.id) && n.note.startTick === tick);
-      if (endpoint && !continuation) assert.equal(actual,endpoint.x,'phrase endpoint uses the solved source-note column');
+      if (endpoint && !continuation) assert.ok(Math.abs(actual-endpoint.x)<=3.6+1e-6,
+        'phrase tip stays just outside its solved source-head envelope, not on a detached system axis');
     }
   }
   assert.match(crop,/aria-label="\(p\)"/,'source parenthesized piano remains parenthesized in ink');

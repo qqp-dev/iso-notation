@@ -11,7 +11,7 @@ import type { QuantizedNote } from '../../model/types';
 
 const n = (value:number):number => Number(f(value));
 export type BeamShape =
-  | {kind:'stem'; x:number; y1:number; y2:number; width:number}
+  | {kind:'stem'; x:number; y1:number; y2:number; width:number; gaps?:readonly {y0:number;y1:number}[]}
   | {kind:'rail'; points:readonly [number,number][]}
   | {kind:'dot'; cx:number; cy:number; r:number};
 export interface BeamPiece {
@@ -26,7 +26,13 @@ export interface BeamPiece {
 }
 export function serializeBeamPiece(piece:BeamPiece):string {
   const p=piece.shape;
-  if(p.kind==='stem')return `    <line class="${piece.cls}" x1="${f(p.x)}" y1="${f(p.y1)}" x2="${f(p.x)}" y2="${f(p.y2)}" stroke="#111111" stroke-width="${p.width.toFixed(2)}"/>`;
+  if(p.kind==='stem') {
+    if(p.gaps?.length){
+      const d=beamStemBoxes(piece).map(b=>`M ${f(p.x)} ${f(b.y0)} L ${f(p.x)} ${f(b.y1)}`).join(' ');
+      return `    <path class="${piece.cls} janko-voice-underpass" d="${d}" fill="none" stroke="#111111" stroke-width="${p.width.toFixed(2)}" stroke-linecap="butt"/>`;
+    }
+    return `    <line class="${piece.cls}" x1="${f(p.x)}" y1="${f(p.y1)}" x2="${f(p.x)}" y2="${f(p.y2)}" stroke="#111111" stroke-width="${p.width.toFixed(2)}"/>`;
+  }
   if(p.kind==='dot')return `    <circle class="${piece.cls}"${piece.dot===2?' data-dot="2"':''} cx="${f(p.cx)}" cy="${f(p.cy)}" r="${f(p.r)}" fill="#111111"/>`;
   const [a,b,c,d]=p.points;
   const path=`M ${f(a[0])} ${f(a[1])} L ${f(b[0])} ${f(b[1])} L ${f(c[0])} ${f(c[1])} L ${f(d[0])} ${f(d[1])} Z`;
@@ -67,6 +73,64 @@ export function placedBeamGroup(beam:JankoBeamGroupGeometry,t:ResolvedJankoToken
   }
   return out;
 }
+/** Exact visible intervals of one logical stem, including non-fusing
+ * underpasses. Root and beam endpoint remain the original beamY geometry. */
+export function beamStemBoxes(piece:Pick<BeamPiece,'shape'>):InkBox[] {
+  const s=piece.shape;if(s.kind!=='stem')return [];
+  const top=Math.min(s.y1,s.y2),bottom=Math.max(s.y1,s.y2);let cursor=top;
+  const out:InkBox[]=[];
+  for(const gap of s.gaps??[]){
+    if(gap.y0>cursor)out.push({x0:s.x-s.width/2,x1:s.x+s.width/2,y0:cursor,y1:Math.min(bottom,gap.y0)});
+    cursor=Math.max(cursor,gap.y1);
+  }
+  if(cursor<bottom)out.push({x0:s.x-s.width/2,x1:s.x+s.width/2,y0:cursor,y1:bottom});
+  return out.filter(b=>b.y1>b.y0);
+}
+
+/** Genuine crossing voices cannot always be planar while retaining performing-
+ * hand stem direction. Keep distinct rails and give the foreign stem a local
+ * underpass: no false junction, no changed hand, onset, head or beam obligation.
+ * The omitted interval is published paint geometry, not a white overpainting
+ * that can erase an unrelated head. */
+export function routeVoiceUnderpasses(groups:BeamPiece[][],beams:readonly JankoBeamGroupGeometry[],t:ResolvedJankoTokens,
+  solos:readonly {shape:Extract<BeamShape,{kind:'stem'}>;hand:QuantizedNote['hand'];sourceVoice?:string;ownerIds?:readonly string[];extendTip?:boolean}[]=[]):void {
+  const rails=groups.flatMap((pieces,i)=>pieces.filter(p=>p.shape.kind==='rail').map(p=>({p,beam:beams[i]})));
+  const stems=groups.flatMap((pieces,i)=>pieces.flatMap(p=>p.shape.kind==='stem'
+    ?[{shape:p.shape,groupId:p.groupId,ownerIds:p.ownerIds,extendTip:false,hand:beams[i].notes[0].hand,sourceVoice:beams[i].notes[0].sourceVoice}] : []));
+  for(const stem of [...stems,...solos.map(s=>({...s,groupId:undefined}))]){
+    const s=stem.shape, own=stem;
+    for(let pass=0;pass<=rails.length;pass++){
+      const gaps:{y0:number;y1:number}[]=[];
+    for(const {p:rail,beam} of rails){
+      if(rail.groupId===stem.groupId || rail.ownerIds.some(id=>stem.ownerIds?.includes(id)) ||
+        own.hand===beam.notes[0].hand && own.sourceVoice===beam.notes[0].sourceVoice || rail.shape.kind!=='rail')continue;
+      const box={x0:s.x-s.width/2,x1:s.x+s.width/2,y0:Math.min(s.y1,s.y2),y1:Math.max(s.y1,s.y2)};
+      if(!beamPieceIntersectsBox(rail,box))continue;
+      // Clip the actual polygon to this stem's horizontal strip, not the
+      // rail's large empty bounding corners. The rake is already f-rounded.
+      const ys:number[]=[];const points=rail.shape.points;
+      for(let k=0;k<points.length;k++){
+        const a=points[k],b=points[(k+1)%points.length];
+        if(a[0]>=box.x0&&a[0]<=box.x1)ys.push(a[1]);
+        if(a[0]!==b[0])for(const x of [box.x0,box.x1])if(x>=Math.min(a[0],b[0])&&x<=Math.max(a[0],b[0]))
+          ys.push(a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]));
+      }
+      if(ys.length)gaps.push({y0:n(Math.min(...ys)-t.voiceCrossingAir),y1:n(Math.max(...ys)+t.voiceCrossingAir)});
+    }
+    gaps.sort((a,b)=>a.y0-b.y0);const joined:{y0:number;y1:number}[]=[];
+    for(const gap of gaps){const last=joined.at(-1);if(last&&gap.y0<=last.y1)last.y1=Math.max(last.y1,gap.y1);else joined.push({...gap});}
+    s.gaps=joined;
+    const tip=joined.find(g=>s.y2>=g.y0&&s.y2<=g.y1);
+    if(!stem.extendTip||!tip)break;
+    // Tip fitting is opt-in in the PRE-INK solve. The resulting rhythm-note
+    // length drives flags/rings, anchors and bounds together. Final paint
+    // never moves a tip, and grouped beam endpoints are never extended here.
+    const visible=Math.max(t.minStemClearance,2*JANKO_STEM_STROKE_WIDTH);
+    s.y2=n(s.y2>s.y1?tip.y1+visible:tip.y0-visible);
+    }
+  }
+}
+
 export const beamGroupSvg=(pieces:readonly BeamPiece[]):string=>['  <g class="janko-beam-group">',...pieces.map(p=>p.svg),'  </g>'].join('\n');
 export function beamPieceBox(p:BeamPiece):InkBox {
   const s=p.shape;
@@ -79,7 +143,7 @@ export function beamPieceAt(p:BeamPiece,x:number,y:number):boolean {
   if(!Number.isFinite(x)||!Number.isFinite(y))throw new Error('Grouped-beam point query requires finite coordinates');
   const s=p.shape;
   if(!contains(beamPieceBox(p),x,y))return false;
-  if(s.kind==='stem')return true;
+  if(s.kind==='stem')return beamStemBoxes(p).some(b=>contains(b,x,y));
   if(s.kind==='dot')return (x-s.cx)**2+(y-s.cy)**2<=s.r*s.r;
   let inside=false;
   for(let i=0,j=s.points.length-1;i<s.points.length;j=i++){
@@ -97,7 +161,7 @@ export function beamPieceIntersectsBox(p:BeamPiece,b:InkBox):boolean {
     throw new Error('Grouped-beam box query requires a finite positive-area box');
   const s=p.shape,bb=beamPieceBox(p);
   if(Math.max(b.x0,bb.x0)>=Math.min(b.x1,bb.x1)||Math.max(b.y0,bb.y0)>=Math.min(b.y1,bb.y1))return false;
-  if(s.kind==='stem')return true;
+  if(s.kind==='stem')return beamStemBoxes(p).some(v=>Math.max(b.x0,v.x0)<Math.min(b.x1,v.x1)&&Math.max(b.y0,v.y0)<Math.min(b.y1,v.y1));
   if(s.kind==='dot'){
     const x=Math.max(b.x0,Math.min(s.cx,b.x1)),y=Math.max(b.y0,Math.min(s.cy,b.y1));
     return (x-s.cx)**2+(y-s.cy)**2<s.r*s.r;

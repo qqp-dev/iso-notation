@@ -1,4 +1,4 @@
-import { BRAHMS_CURRENT_PAGES } from './support/brahms-current';
+import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_OPENING_CROP } from './support/brahms-current';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -13,6 +13,8 @@ import { JANKO_REST_VALUES, placedRestPaint, renderRest, restAdmissionBox, seria
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 // PR91's frozen Bach witness predates the approved system-opening rest correction.
 const legacyBachOptions = { ...DEFAULT_JANKO_OPTIONS, inferBoundaryRests: false };
+const archiveBachOptions = { ...legacyBachOptions,clarityPass:false,tieProfile:'uniform' as const };
+const archiveBachTokens = { ...DEFAULT_JANKO_TOKENS,claspSlashLength:7.5,claspSlashStroke:1,claspSlashSlope:.22,upperExtensionThreshold:73,dynamicScale:.018 };
 const point = (x: number, y: number) => ({ x, y });
 
 // Independent literal XML witnesses: each of the six real primitive tags and
@@ -178,13 +180,13 @@ const originalPages = {
 };
 test('archival Bach hands remain byte-identical to PR91 with the historical rest policy', () => {
   const score=bachBeforeM5(buildBachGoldbergVar1Score());
-  assert.equal(countJankoPages(score,legacyBachOptions,DEFAULT_JANKO_TOKENS),originalPages.bach.length);
-  originalPages.bach.forEach((expected,i)=>assert.equal(sha(renderJankoPage(score,i,legacyBachOptions,DEFAULT_JANKO_TOKENS)),expected,`bach page ${i}`));
-  assert.equal(sha(renderJankoCrop(score,1,4,legacyBachOptions,DEFAULT_JANKO_TOKENS)),'c97fef4cea414bec819a96e1be9c0245f9230dec5fba0738dcfcb7cd5e021d61');
+  assert.equal(countJankoPages(score,archiveBachOptions,archiveBachTokens),originalPages.bach.length);
+  originalPages.bach.forEach((expected,i)=>assert.equal(sha(renderJankoPage(score,i,archiveBachOptions,archiveBachTokens)),expected,`bach page ${i}`));
+  assert.equal(sha(renderJankoCrop(score,1,4,archiveBachOptions,archiveBachTokens)),'c97fef4cea414bec819a96e1be9c0245f9230dec5fba0738dcfcb7cd5e021d61');
 });
 
 test('Brahms BRONZE pages and cropped system match the shared above-zero policy', () => {
   assert.equal(countJankoPages(brahms,bo,bt),originalPages.brahms.length);
   originalPages.brahms.forEach((expected,i)=>assert.equal(sha(renderJankoPage(brahms,i,bo,bt)),expected,`brahms page ${i}`));
-  assert.equal(sha(renderJankoCrop(brahms,1,4,bo,bt)),'f16ebdaa777b1b6334608e6785551ac8dc98c5b89350d5edf9b40ba3e3487d2c');
+  assert.equal(sha(renderJankoCrop(brahms,1,4,bo,bt)),BRAHMS_CURRENT_OPENING_CROP);
 });

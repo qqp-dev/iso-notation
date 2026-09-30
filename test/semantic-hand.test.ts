@@ -39,8 +39,10 @@ test('guarded source-linked edit derives two rests/crossings, preserves source, 
     assert.equal(saved.effects.unchangedSystems.length, 16);
     assert.deepEqual(saved.effects.unchangedPages, [2,3,4,5,6]);
     assert.deepEqual(saved.effects.tieOwnerChanges, { added: [], removed: [] });
-    assert.equal(saved.effects.durationOwnerChanges.added.length, 2);
-    assert.equal(saved.effects.durationOwnerChanges.removed.length, 2);
+    assert.equal(saved.effects.durationOwnerChanges.added.length, 0,
+      'source-voice duration statements are no longer fused into cross-hand shared brackets');
+    assert.equal(saved.effects.durationOwnerChanges.removed.length, 0,
+      'a performing-hand edit preserves those independent source owners');
     assert.deepEqual(saved.effects.changedCrops, ['mm.1–4','mm.9–12']);
     assert.deepEqual(saved.effects.reviewWindows.map(w => [w.measureStart,w.measureCount]), [[1,4],[9,4]]);
     const state = readCandidate(root, statePath), projected = candidateScore(state);

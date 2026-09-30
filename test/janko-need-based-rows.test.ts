@@ -145,7 +145,7 @@ test('Bar-9 System Spread Pin: System 2 (mm. 9–12) is byte-identical (already 
 // 2. Strict Row Boundary Pins (Locked Core + Outer Conditional Rows)
 // ---------------------------------------------------------------------------
 
-test('Strict Row Boundary Pins: fixed-3 upper extension requires a digit above 0; lower and fixed-4 boundaries remain pinned', () => {
+test('Strict Row Boundary Pins: fixed-3 upper extension requires displayed linear 78 or higher; lower and fixed-4 boundaries remain pinned', () => {
   // Fixed-3:
   // Core rows {1, 2, 3} (lin 48, 60, 36) always fire unconditionally:
   assert.deepEqual(computeBarStaffRows([59], 'fixed-3').rowIds, [1, 2, 3], 'core rows {1, 2, 3} always fire');
@@ -156,8 +156,8 @@ test('Strict Row Boundary Pins: fixed-3 upper extension requires a digit above 0
   // 0 alone does not earn the extra upper line; a pitch above it does.
   assert.deepEqual(computeBarStaffRows([71], 'fixed-3').rowIds, [1, 2, 3], 'lin 71 does NOT fire row 4');
   assert.deepEqual(computeBarStaffRows([72], 'fixed-3').rowIds, [1, 2, 3], 'lin 72 alone does NOT fire row 4');
-  assert.deepEqual(computeBarStaffRows([73], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 73 fires row 4');
-  assert.deepEqual(computeBarStaffRows([74], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 74 fires row 4');
+  assert.deepEqual(computeBarStaffRows([77], 'fixed-3').rowIds, [1, 2, 3], 'lin 77 does NOT fire row 4');
+  assert.deepEqual(computeBarStaffRows([78], 'fixed-3').rowIds, [1, 2, 3, 4], 'lin 78 fires row 4');
 
   // Row 5 (24, 0/2) fires iff min <= 24:
   assert.deepEqual(computeBarStaffRows([25], 'fixed-3').rowIds, [1, 2, 3], 'lin 25 does NOT fire row 5');
@@ -301,9 +301,9 @@ test('Segments Pin: Non-consecutive earning bars render disjoint unbroken segmen
   // Bar 2: high note lin 74 (earns extension Row 4)
   // Bar 3: middle note lin 48 (silent for Row 4)
   const score = makeScore('disjoint-segments', [
-    makeNote('n0', 2, 6, 0),     // lin 74 in bar 0
+    makeNote('n0', 6, 6, 0),     // lin 78 in bar 0
     makeNote('n1', 0, 4, 144),   // lin 48 in bar 1
-    makeNote('n2', 2, 6, 288),   // lin 74 in bar 2
+    makeNote('n2', 6, 6, 288),   // lin 78 in bar 2
     makeNote('n3', 0, 4, 432),   // lin 48 in bar 3
   ]);
 
@@ -422,7 +422,7 @@ test('Guest Gaps: extension rows (0/6, 0/2) stand off 6.0pt at interior barlines
   const score = makeScore('guest-gap-extension', [
     makeNote('lo0', 0, 2, 0, 48, 'LH'),
     makeNote('lo1', 0, 2, 144, 48, 'LH'),
-    makeNote('hi1', 2, 6, 144),
+    makeNote('hi1', 6, 6, 144),
     makeNote('lo2', 0, 2, 288, 48, 'LH'),
     makeNote('mid3', 0, 4, 432),
   ]);
@@ -474,15 +474,14 @@ test('Finale Conjoin: final barline extends to outermost extension rows; flush c
     tempos: [], dynamics: [], pedals: [],
     notes: [
       makeNote('n0', 0, 4, 0, 96),     // C4 in bar 0
-      makeNote('n1', 2, 6, 192, 96),   // D6 (lin 74) earns upper extension in final bar 1
+      makeNote('n1', 6, 6, 192, 96),   // linear 78 earns upper extension in final bar 1
       makeNote('n2', 0, 2, 192, 96, 'LH'), // C2 (lin 24) in final bar 1
     ],
   };
 
   const o = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS, core: 'fixed-3', measuresPerSystem: 2, ticksPerMeasure: 192 });
   const t = resolveJankoTokens({ ticksPerMeasure: 192 });
-  const page = computePageGeometry(o, t, finaleScore);
-  const geo = getSystemGeometry(page, 0);
+  const geo = layoutJankoScore(finaleScore,o,t)[0].geometry;
 
   // In the final bar, extension rows run flush into the final barline (x2 === geo.staffRight)
   const segs = geo.staffSegments ?? [];

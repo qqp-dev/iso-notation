@@ -15,7 +15,7 @@ import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
   getClusterSpacingPreset,
-} from '../src/render/janko/types';
+} from './pre-clarity-rules';
 import { lintJankoScore } from '../src/render/janko/linter';
 
 const BASELINE_REVISION = '8890d42003676f181525298e472e0eb93e622e7e';
