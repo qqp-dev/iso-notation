@@ -76,7 +76,7 @@ test('No30 both repeat entries retain separate 96/24 statements across full-page
   const score = buildSchumannNo30Draft();
   const plan = deriveTieDisplayPlan(score);
   const source113 = schumannNo30WrittenFacts.events.find(e => e.line === 113 && e.voice === 'upper.0')!;
-  const source156 = schumannNo30WrittenFacts.events.find(e => e.line === 156 && e.kind === 'note' && e.pitches.some(p => p.absolutePitch === 56))!;
+  const source156 = schumannNo30WrittenFacts.events.find(e => e.line === 156 && e.kind === 'note' && e.pitches.some(p => p.absolutePitch === 44))!;
   const layouts = layoutJankoScore(entry.score, entry.options, entry.tokens);
   const laid = layouts.flatMap(l => l.notes);
   const pages = Array.from({ length: countJankoPages(entry.score, entry.options, entry.tokens) }, (_, i) =>
@@ -96,13 +96,12 @@ test('No30 both repeat entries retain separate 96/24 statements across full-page
     assert.ok(nextBar < barTicks.length, 'no system extends beyond the source ending');
   }
   assert.equal(nextBar, barTicks.length - 1, 'every written bar, including repeated entries and ending, is packed once');
-  assert.equal(pages.length, Math.ceil(layouts.length / entry.options.systemsPerPage),
+  assert.equal(pages.length, (layouts.at(-1)!.geometry.pageIndex! + 1),
     'page booking agrees with the adaptive system plan');
   assert.ok(layouts.length < barTicks.length - 1, 'ordinary passages share systems rather than one bar per system');
   const renderedSystems = pages.flatMap((svg, page) => {
     const ids = [...svg.matchAll(/<g id="system-(\d+)">/g)].map(m => Number(m[1]));
-    assert.deepEqual(ids, layouts.slice(page * entry.options.systemsPerPage,
-      (page + 1) * entry.options.systemsPerPage).map(l => l.index + 1),
+    assert.deepEqual(ids, layouts.filter(l => l.geometry.pageIndex === page).map(l => l.index + 1),
       `page ${page + 1}: exactly its planned systems in order`);
     return ids;
   });
@@ -130,7 +129,8 @@ test('No30 both repeat entries retain separate 96/24 statements across full-page
     const head24 = laid.find(p => p.note.id === independent.id);
     assert.equal(head96?.note.durationTicks, 96);
     assert.equal(head24?.note.durationTicks, 24);
-    assert.notEqual(head96?.x, head24?.x);
+    assert.equal(head96?.x, head24?.x, 'different source octaves need no artificial horizontal displacement');
+    assert.ok(Math.abs(head96!.y-head24!.y)>20, 'Ab4 continuation and independent Ab3 remain distinct pitch rows');
     for (const head of [head96!, head24!]) {
       const baseline = head.y + digitBaselineOffset(5.8 * (head.symbolScale ?? 1));
       assert.ok(pages.some(svg => svg.includes(`<text class="janko-digit" x="${f(head.x)}" y="${f(baseline)}"`)),

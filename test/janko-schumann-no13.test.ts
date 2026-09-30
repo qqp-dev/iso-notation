@@ -17,7 +17,7 @@ test('literal No. 13 grace values, relative pitches, beams, and full written-eve
     ['1/16','1/16'], ['1/16','1/16'], ['1/8'], ['1/16','1/16'], ['1/8'],
     ['1/16','1/16'], ['1/16','1/16'], ['1/8']]);
   assert.deepEqual(pitched.map(g => g.members.map(m => lin(m))), [
-    [49,54], [57,59], [63], [59,63], [74], [61,66], [69,71], [75]]);
+    [49,54], [57,59], [63], [59,63], [62], [49,54], [57,59], [63]]);
   assert.deepEqual(pitched.map(g => g.members.map(m => [m.beamStart,m.beamEnd])), [
     [[true,false],[false,true]], [[true,false],[false,true]], [[false,false]],
     [[true,false],[false,true]], [[false,false]], [[true,false],[false,true]],
@@ -25,6 +25,11 @@ test('literal No. 13 grace values, relative pitches, beams, and full written-eve
   const host = (line: number) => schumannNo13WrittenFacts.events.find(e => e.id === pitched.find(g => g.source.line === line)!.hostEventId)!;
   assert.deepEqual([84,87,90].map(line => host(line).pitches.map(p => p.absolutePitch)), [[59],[54,61],[56,61]]);
   assert.equal(host(87).duration, '1/16');
+  // At l.91 the first child ends E5=64, the textually following child
+  // b4~ b8 gis ends G#4=56. Thus l.92 <e ais dis> starts E4=52,
+  // and l.96 d' grace is D5=62, hosting F#4/C#5 (54/61), not an octave higher.
+  assert.deepEqual(schumannNo13WrittenFacts.events.find(e=>e.line===92&&e.kind==='note')!.pitches.map(p=>p.absolutePitch),[52,58,63]);
+  assert.deepEqual(host(96).pitches.map(p=>p.absolutePitch),[54,61]);
   assert.deepEqual(groups.filter(g => !g.members.some(m => m.pitch)).map(g => g.source.line).sort((a,b)=>a-b),
     [131,137,138,145,154,164,170,171,202,225,231,233].sort((a,b)=>a-b));
   assert.equal(groups.find(g => g.source.line === 225)?.kind, 'appoggiatura');

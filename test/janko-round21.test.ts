@@ -282,14 +282,11 @@ test('§D stem tripwire: the retired R19 stem-through-simultaneity signatures ar
       // Canonical packing: exactly the 2 pre-existing adaptive slot findings
       // (itemized in the ergonomics lint record) — the stem tripwire itself
       // stays silent.
-      assert.equal(report.ok, false, 'the secondary surface stays honestly non-ok');
+      assert.equal(report.ok, true, 'ink-aware expression admission also clears the adaptive surface');
       assert.deepEqual(
         report.violations.map((v) => [v.code, v.system + 1]),
-        [
-          ['system-slot-overlap', 18],
-          ['system-slot-overlap', 18],
-        ],
-        'exactly the pre-existing adaptive 2'
+        [],
+        'ink-aware admission clears adaptive slots'
       );
     } else {
       assert.equal(report.ok, true, `${label}: the lower-first golden is clean`);

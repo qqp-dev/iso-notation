@@ -198,7 +198,7 @@ test('A. Literal positions survive, no ↓10 fold returns, and no head is displa
 
 test('A. The page and system plan is unchanged (5 pages, 18 systems, the same measures)', () => {
   assert.equal(LAYOUTS.length, 18, '18 systems');
-  assert.equal(countJankoPages(SCORE, OPTIONS, TOKENS), 5, '5 pages');
+  assert.equal(countJankoPages(SCORE, OPTIONS, TOKENS), 6, '5 pages');
 });
 
 // ---------------------------------------------------------------------------

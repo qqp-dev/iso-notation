@@ -465,10 +465,12 @@ export function computePageGeometry(
     });
   }
 
+  for (const system of systems) system.timeSignatures = score?.timeSignatures;
   return {
     ...(score?.sourceBarTicks ? { sourceBarTicks: score.sourceBarTicks } : {}),
     ...(production ? { systemBarStarts: production.starts, productionSystems: production.systems,
       productionGeometries: systems } : {}),
+    inkAwarePagination: !!(score && ((score.dynamics?.length ?? 0) || (score.pedals?.length ?? 0) || score.phrases?.length)) || !!production && isContentAwarePlacement(o),
     options: o,
     tokens: t,
     pageWidth: o.pageWidth,
@@ -1799,7 +1801,10 @@ export function outgoingTieByHeadId(
   return out;
 }
 
+import { placeExpressions, expressionsSvg, type ExpressionInk } from './elements/expressions';
+
 export interface JankoSystemLayout {
+  expressions?: ExpressionInk[];
   /** Immutable input identity for the placed scene: the COMPLETE source/editorial
    * score, not just this system's visible note ids. No layout-cache inference. */
   scoreRevision?: QuantizedGridScore;
@@ -2360,6 +2365,13 @@ export function positionJankoNote(
     writtenLin,
     rhythm: {
       id: note.id,
+      sourceBeam: note.sourceBeam,
+      sourceVoice: note.sourceProvenance?.voices.length === 1 ? note.sourceProvenance.voices[0] : undefined,
+      beamWindowTicks: (() => {
+        const meter = geo.timeSignatures?.filter(m => m.tick <= note.startTick).at(-1);
+        return meter && meter.numerator > 3 && meter.numerator % 3 === 0 && meter.denominator >= 8
+          ? t.ticksPerBeat * 12 / meter.denominator : undefined;
+      })(),
       startTick: note.startTick,
       durationTicks: note.durationTicks,
       hand,
@@ -6617,6 +6629,7 @@ export function systemCompleteInkBounds(
       bottom = Math.max(bottom, label.y1);
     }
   }
+  for (const ink of layout.expressions ?? []) { top=Math.min(top,ink.y0); bottom=Math.max(bottom,ink.y1); }
   return { top, bottom };
 }
 
@@ -6687,6 +6700,7 @@ export function systemPaintedInkBoxes(
     }
   }
 
+  for (const ink of layout.expressions ?? []) push(ink.x0,ink.x1,ink.y0,ink.y1,`expression ${ink.kind} ${ink.id}`);
   legacy = true;
   // 2. Ledger physical ink is inventoried by the placed scene for fixed cores.
   // Non-fixed mappings retain an explicitly legacy broad page reservation.
@@ -6813,7 +6827,7 @@ export function systemPageBookingBoxes(
       booking.push({x0:p.x-R,x1:p.x+R,y0:p.y-R,y1:p.y+R,what:`halo of ${p.note.id}`});
     }
   }
-  return [...booking,...boxes];
+  return [...booking,...boxes,...(layout.expressions ?? []).map(ink => ({x0:ink.x0,x1:ink.x1,y0:ink.y0,y1:ink.y1,what:`expression ${ink.kind} ${ink.id}`}))];
 }
 
 /** Round 45 — the painted-ink extents of one system (`min y0 … max y1`). */
@@ -6900,7 +6914,7 @@ export function computeContentAwarePageShifts(
   t: ResolvedJankoTokens
 ): Map<number, number> {
   const out = new Map<number, number>();
-  if (!isContentAwarePlacement(o)) return out;
+  if (!isContentAwarePlacement(o) || page.inkAwarePagination) return out;
   const byPage = new Map<number, JankoSystemLayout[]>();
   for (const l of layouts) {
     const p = Math.floor(l.index / page.systemsPerPage);
@@ -6949,7 +6963,7 @@ function placeProductionPages(
       const height = ink.bottom - ink.top;
       const need = occupied + height + (last > first ? CONTENT_AWARE_MIN_FACING_GAP : 0);
       if (need > geo.bodyHeight + 1e-6) {
-        if (last === first) throw Error(`Unmet production height: system ${last + 1} (written bars ${layouts[last].geometry.firstBar! + 1}–${geo.systemBarStarts![last + 1]}) needs ${height.toFixed(2)}pt; available ${geo.bodyHeight.toFixed(2)}pt`);
+        if (last === first) throw Error(`Unmet production height: system ${last + 1} (written bars ${(layouts[last].geometry.firstBar ?? last * geo.measuresPerSystem) + 1}–${geo.systemBarStarts?.[last + 1] ?? (last+1)*geo.measuresPerSystem}) needs ${height.toFixed(2)}pt; available ${geo.bodyHeight.toFixed(2)}pt`);
         break;
       }
       bounds.push(ink);
@@ -6990,6 +7004,7 @@ export function computeSystemSlotShift(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens
 ): number {
+  if (page.inkAwarePagination) return 0;
   const air = SYSTEM_SLOT_CORRECTION_AIR;
   const slotTop = layout.geometry.slotTopY;
   const slotBottom = slotTop + page.slotHeight;
@@ -9789,7 +9804,7 @@ export function layoutJankoSystemShifted(
     note => positionJankoNote(note, geometry, systemIndex, o, t, null, claspInsets),
     tick => getMeasureOpeningBarlineX(
       getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geometry, systemIndex, t), geometry, systemIndex, t) ?? geometry.staffLeft) : undefined;
-  return {
+  const layout: JankoSystemLayout = {
     scoreRevision: score,
     ...(grace ? { grace } : {}),
     index: systemIndex,
@@ -9852,6 +9867,17 @@ export function layoutJankoSystemShifted(
     handprintClusters,
     handprintNoteIds,
   };
+  if ((score.dynamics?.length ?? 0) || (score.pedals?.length ?? 0) || score.phrases?.length) {
+    const booking = systemCompleteInkBounds(layout,o,t);
+    const painted = systemPaintedInkBoxes(layout,o,t);
+    const ink = { top: Math.min(booking.top,...painted.map(b=>b.y0)),
+      bottom: Math.max(booking.bottom,...painted.map(b=>b.y1)) };
+    const tickX = (tick: number) => layout.columns.get(tick) ?? getTickColumnX(tick,geometry,systemIndex,o,t,claspInsets);
+    layout.expressions = placeExpressions(score,{ start:startTick,end:endTick,left:geometry.staffLeft,right:geometry.staffRight,
+      top:ink.top,bottom:ink.bottom,x:tickX,
+      endpointX: (ids,tick) => flaggedNotes.find(n => ids.includes(n.note.id) && n.note.startTick === tick)?.x ?? tickX(tick) });
+  }
+  return layout;
 }
 
 /**
@@ -9917,7 +9943,7 @@ export function layoutJankoScore(
   const total = countJankoSystems(score, o, t);
   const out: JankoSystemLayout[] = [];
   for (let s = 0; s < total; s++) out.push(layoutJankoSystem(score, geo, s, o, t));
-  if (geo.productionSystems && isContentAwarePlacement(o)) {
+  if (geo.inkAwarePagination) {
     placeProductionPages(score, geo, out, o, t);
   } else if (isContentAwarePlacement(o)) {
     // Content-aware page pass: re-lay-out moved systems on their resolved
@@ -10232,6 +10258,7 @@ export function renderSystem(
   }
   const ottavaSvg = renderOttavaBrackets(resolved.ottavaBrackets, t);
   if (ottavaSvg.length > 0) out.push(ottavaSvg);
+  if (resolved.expressions?.length) out.push(expressionsSvg(resolved.expressions));
   // The contour strip lives below the staff in the inter-system air.
   if (contour.strip.length > 0) out.push(contour.strip);
   out.push('  </g>');
@@ -10276,7 +10303,7 @@ export function countJankoPages(
   tokens?: Partial<JankoTokens> | null
 ): number {
   const o = resolveJankoOptions(options);
-  if (score.productionLayout && score.sourceBarTicks && isContentAwarePlacement(o)) {
+  if ((score.productionLayout && score.sourceBarTicks && isContentAwarePlacement(o)) || (score.dynamics?.length ?? 0) || (score.pedals?.length ?? 0) || score.phrases?.length) {
     const layouts = layoutJankoScore(score, o, tokens);
     return (layouts.at(-1)?.geometry.pageIndex ?? 0) + 1;
   }
@@ -10319,7 +10346,7 @@ export function renderJankoPage(
   const layouts = isMatchingPrecomputedLayouts(precomputedLayouts, totalSystems, geo.productionSystems ? undefined : o.measuresPerSystem)
     ? precomputedLayouts
     : layoutJankoScore(score, o, t);
-  const productionPages = !!geo.productionSystems && isContentAwarePlacement(o);
+  const productionPages = !!geo.inkAwarePagination;
   const totalPages = productionPages ? (layouts.at(-1)?.geometry.pageIndex ?? 0) + 1 : countJankoPages(score, o, t);
   for (let s = 0; s < totalSystems; s++) {
     if ((productionPages ? layouts[s].geometry.pageIndex : Math.floor(s / geo.systemsPerPage)) !== pageIndex) continue;
@@ -10460,6 +10487,10 @@ export function computeCropExtents(
         bottom = Math.max(bottom, bBot - (staffBottom + CROP_PAD_BOTTOM));
       }
     }
+    for (const ink of layout.expressions ?? []) {
+      top = Math.max(top, staffTop - CROP_PAD_TOP - (ink.y0 - layout.geometry.middleCY));
+      bottom = Math.max(bottom, ink.y1 - layout.geometry.middleCY - (staffBottom + CROP_PAD_BOTTOM));
+    }
     if (layout.handprintClusters && layout.handprintClusters.length > 0) {
       const middleCY = layout.geometry.middleCY;
       for (const cluster of layout.handprintClusters) {
@@ -10594,8 +10625,8 @@ export function renderJankoCrop(
     ? rawPrecomputed
     : undefined;
 
-  if (geo.productionSystems && isContentAwarePlacement(o)) layouts ??= layoutJankoScore(score, o, t);
-  const pageIndices = layouts && geo.productionSystems ? layouts.map(l => l.geometry.pageIndex ??
+  if (geo.inkAwarePagination) layouts ??= layoutJankoScore(score, o, t);
+  const pageIndices = layouts && geo.inkAwarePagination ? layouts.map(l => l.geometry.pageIndex ??
     Math.floor(l.index / geo.systemsPerPage)) : undefined;
   const box = computeCropBox(
     geo,
@@ -10608,7 +10639,7 @@ export function renderJankoCrop(
   // Placed-system framing: the box derives from slot-template staff lines,
   // but systems render at their placed centres — shift the frame to cover
   // the placed ink (rigid per system; multi-system crops expand to cover).
-  if (isContentAwarePlacement(o)) {
+  if (isContentAwarePlacement(o) || geo.inkAwarePagination) {
     if (!layouts) {
       layouts = layoutJankoScore(score, o, t);
     }

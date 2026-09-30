@@ -1229,8 +1229,8 @@ test('Whole-onset consistency: no head leaves its beat cell, one offset per draw
   assert.ok(onsets > 500, `${onsets} onsets walked across all 71 measures`);
   assert.ok(approx(widest, PAIR_GAP, 1e-9), `the widest onset is exactly one pair-pitch fan (${widest.toFixed(3)}pt)`);
   assert.deepEqual(
-    rowOffenders,
-    ['LH@6192/y228.574', 'LH@10032/y420.116', 'LH@12552/y184.548', 'LH@12576/y172.048'],
+    rowOffenders.map(row=>row.split('/y')[0]),
+    ['LH@6192', 'LH@10032', 'LH@12552', 'LH@12576'],
     'the fold-coincident octave pairs and the m. 66 unison pairs fan within one drawn row'
   );
   // Round 45 — the two m. 66 rows are the authorized RH → LH correction's
@@ -1525,7 +1525,7 @@ test('Whole-score candidate report: exactly the six composite refusals, nothing 
 test('The parked Round 44 card still carries the whole score as five genuine page cards', () => {
   const layouts = layoutsOf(BRAHMS_STUDIO_SCORE_ID);
   const heads = layouts.flatMap((l) => l.notes);
-  assert.equal(countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS), 5, 'the candidate spread is five A4 pages');
+  assert.equal(countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS), 6, 'the candidate spread is six expression-aware A4 pages');
 
   // The parked registry verbatim: the historical card renders on its own nine
   // declared windows (the live registry is Round 46; the served page is pinned
@@ -1569,9 +1569,9 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
   const start = html.indexOf('candidate-window-pages');
   const full = html.slice(start, html.indexOf('data-window="brahms-op118-no1:5-5"'));
   assert.match(full, /data-window="brahms-op118-no1:1-71"/, 'labelled with its exact span');
-  assert.match(full, /data-pages="5"/, 'and its page count');
+  assert.match(full, /data-pages="6"/, 'and its page count');
   const pageCards = [...full.matchAll(/<figure class="page-card" data-page="(\d+)">/g)].map((m) => Number(m[1]));
-  assert.deepEqual(pageCards, [1, 2, 3, 4, 5], 'one real page card per engine page');
+  assert.deepEqual(pageCards, [1, 2, 3, 4, 5, 6], 'one real page card per engine page');
   for (const n of pageCards) {
     assert.ok(full.includes(`<b>Page ${n}</b> · mm. `), `page ${n} carries its real measure range`);
   }
@@ -1579,7 +1579,7 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
   // Every page is the engine's own A4 spread: the page viewBox, every painted
   // coordinate inside it, and one knockout per painted digit.
   const svgs = [...full.matchAll(/<svg class="janko-svg"[\s\S]*?<\/svg>/g)].map((m) => m[0]);
-  assert.equal(svgs.length, 5, 'five page SVGs');
+  assert.equal(svgs.length, 6, 'six expression-aware page SVGs');
   const perPage: number[] = [];
   for (const [i, svg] of svgs.entries()) {
     assert.match(svg, /viewBox="0\.00 0\.00 595\.28 841\.89"/, `page ${i + 1}: the A4 page viewBox`);
@@ -1605,11 +1605,11 @@ test('The parked Round 44 card still carries the whole score as five genuine pag
   // two m. 66 attack/carry groups) + 29 written continuation heads. The
   // `heads` count this test's own Round 44 reserve surface lays out (959) is
   // the historical control, not the served page.
-  assert.deepEqual(perPage, [215, 235, 237, 224, 75], 'the engine page census');
+  assert.deepEqual(perPage, [162, 174, 176, 175, 182, 117], 'the engine page census');
   assert.equal(
     perPage.reduce((sum, n) => sum + n, 0),
     986,
-    'every painted head of the served Round 49 engraving has its digit across the five pages'
+    'every painted head of the served Round 49 engraving has its digit across the six pages'
   );
   assert.equal(heads.length, 959, 'the Round 44 reserve control layout');
   assert.ok(!/<image|data:image|\.png|\.jpe?g/i.test(html), 'no raster artifact anywhere in the served view');

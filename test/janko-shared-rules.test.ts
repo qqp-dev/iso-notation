@@ -471,8 +471,8 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   const ink: ResolvedJankoClaspInk = m1.durationInk[inkIdx];
   const hostile: JankoRhythmNote = {
     id: 'hostile',
-    x: 75.37,
-    y: 128.13,
+    x: m1.durationDots[inkIdx]!.x,
+    y: m1.durationDots[inkIdx]!.y,
     durationTicks: 96,
     startTick: 48,
     hand: 'RH',
@@ -480,7 +480,7 @@ test('§B fixture: a walled 45° seat falls through to the free lower channel', 
   const group: JankoClaspGroupGeometry = { ...m1, notes: [...m1.notes, hostile] };
   const honorHalo = (O_BRAHMS as unknown as { honorHalo?: boolean }).honorHalo;
   const seatOpts = { clusterSpacing: O_BRAHMS.clusterSpacing, honorHalo };
-  const walled = claspDotMemberAir(75.37314372217251, 128.13251804253335, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
+  const walled = claspDotMemberAir(hostile.x, hostile.y, group, T_BRAHMS, O_BRAHMS.clusterSpacing, honorHalo);
   assert.ok(walled < 0, `the 45° seat is a real collision (air ${walled.toFixed(2)}pt)`);
   const alt = claspDotCenter(group, ink, BRAHMS_ROUND44_RESERVE_TOKENS, seatOpts);
   const angle = (Math.atan2(-(alt.y - ink.centerY), alt.x - group.claspX) * 180) / Math.PI;

@@ -207,7 +207,7 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     throw new Error('Placed ink scene refuses a layout from a different score/source/editorial revision');
   }
   const g=layout.geometry,system=layout.index;
-  const pagePiece=Math.floor(system/Math.max(1,o.systemsPerPage));
+  const pagePiece=layout.geometry.pageIndex ?? Math.floor(system/Math.max(1,o.systemsPerPage));
   const pitch:InkPiece[]=pitchGridRules(g,o,t).map((r,i)=>{
     const primitive:InkPrimitive={kind:'stroke',x1:r.x1,y1:r.y,x2:r.x2,y2:r.y,width:r.width,cap:'butt'};
     return inkPiece({id:`s${system}:pitch:${i}`,family:'pitch-grid',structuralOwner:'staff-rule',ownerIds:[],span:[r.x1,r.x2] as const,system,pagePiece,layer:'pitch',primitive,box:strokeBox(primitive),paint:{cls:r.cls,color:r.ink}});

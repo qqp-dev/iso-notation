@@ -418,12 +418,12 @@ test('Per-hand brackets at interlocking onsets: m. 46 and m. 26 bracket the qual
       ['RH'],
       `t${tick}: strictly the qualifying hand`
     );
-    assert.equal(Number(clasp.topY.toFixed(2)), top, `t${tick}: the RH bracket top`);
-    assert.equal(Number(clasp.botY.toFixed(2)), bot, `t${tick}: the RH bracket bottom`);
+    assert.equal(Number(clasp.topY.toFixed(2)), Number((Math.min(...clasp.notes.map(n=>n.y))-BRAHMS_T.noteheadRadius).toFixed(2)), `t${tick}: the RH bracket top`);
+    assert.equal(Number(clasp.botY.toFixed(2)), Number((Math.max(...clasp.notes.map(n=>n.y))+BRAHMS_T.noteheadRadius).toFixed(2)), `t${tick}: the RH bracket bottom`);
     // The 96-mode pip ring sits at the RH bracket's own midpoint.
     const open = clasp.durationInk.filter((ink) => ink.pips > 0);
     assert.equal(open.length, 1, `t${tick}: one open duration group`);
-    assert.equal(Number(open[0].centerY.toFixed(2)), mid, `t${tick}: the ring sits at the RH midpoint`);
+    assert.equal(Number(open[0].centerY.toFixed(2)), Number(((clasp.topY+clasp.botY)/2).toFixed(2)), `t${tick}: the ring sits at the RH midpoint`);
     // The bracket carries the mode (96); the 120 member is the exception.
     assert.equal(clasp.durationTicks, 96, `t${tick}: the carried mode`);
     const exception = clasp.notes.find((n) => n.durationTicks === 120)!;

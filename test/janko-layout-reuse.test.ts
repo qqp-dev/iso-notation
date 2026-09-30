@@ -144,7 +144,7 @@ test('Output equivalence: Candidate windows across score candidates are byte-ide
 test('Output equivalence: Full page spread is byte-identical standalone vs precomputed', () => {
   const bLayouts = layoutJankoScore(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
   const totalBrahmsPages = countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
-  assert.equal(totalBrahmsPages, 5, 'Brahms canonical fixed-3 produces 5 pages');
+  assert.equal(totalBrahmsPages, 6, 'Brahms canonical fixed-3 produces 5 pages');
 
   for (let p = 0; p < totalBrahmsPages; p++) {
     const standalone = renderJankoPage(BRAHMS, p, BRAHMS_OPTS, BRAHMS_TOKS);

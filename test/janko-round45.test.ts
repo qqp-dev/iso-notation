@@ -532,8 +532,8 @@ test('The landed Round 46 card IS the working Brahms Reference; the Reference vi
   const brahmsAt = reference.indexOf('data-score="brahms-op118-no1"');
   const bachAt = reference.indexOf('data-score="primary"');
   const referencePages = pageSvgs(reference.slice(brahmsAt, bachAt));
-  assert.equal(referencePages.length, 5, 'the Reference view carries the whole score as five genuine pages');
-  const enginePages = [0, 1, 2, 3, 4].map((page) =>
+  assert.equal(referencePages.length, 6, 'the Reference view carries the whole score as six expression-aware pages');
+  const enginePages = [0, 1, 2, 3, 4, 5].map((page) =>
     // The studio wraps each engine page in its own `<svg class="janko-svg">`
     // element, so the class is the only markup the comparison normalises away.
     renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS).replace(
@@ -961,7 +961,7 @@ test('No residual vertical shared-duration carrier for an eligible cluster; beam
   );
   assert.deepEqual(beamGroups(noTies), beamGroups(reserve), 'the real beams are the same groups, unchanged');
   assert.equal(beamGroups(reserve).length, 236, 'and there are 236 of them');
-  assert.equal(beamGroups(working).length, 252, 'the canonical spread adds the written continuations\u2019 groups');
+  assert.equal(beamGroups(working).length, 246, 'the canonical spread adds the written continuations\u2019 groups');
   assert.equal(
     beamGroups(working).filter((g) => g.includes('~c')).length,
     7,
@@ -1535,8 +1535,8 @@ test('System spacing and pagination are unchanged by the literal placement; the 
     core.map((l) => l.notes[0].note.startTick),
     'and every system opens on the same onset'
   );
-  assert.equal(countJankoPages(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS), 5, 'still five A4 pages');
-  assert.equal(countJankoPages(BRAHMS, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS), 5, 'as the control');
+  assert.equal(countJankoPages(BRAHMS, REFERENCE_OPTIONS, REFERENCE_TOKENS), 6, 'still six expression-aware A4 pages');
+  assert.equal(countJankoPages(BRAHMS, { ...REFERENCE_OPTIONS, lowPitchFolding: 'core' }, REFERENCE_TOKENS), 6, 'as the control');
   assert.equal(literal.length, 18, 'eighteen systems of music');
   assert.deepEqual(literal.map((l) => l.geometry.slotTopY), reserveLayouts().map((l) => l.geometry.slotTopY), 'and the same slots as the landed reserve');
 
@@ -1562,7 +1562,7 @@ test('System spacing and pagination are unchanged by the literal placement; the 
   }
   for (let i = 1; i < boxes.length; i++) {
     // Four systems per page: the page break is the only allowed boundary.
-    if (i % 4 === 0) continue;
+    if (literal[i].geometry.pageIndex !== literal[i-1].geometry.pageIndex) continue;
     assert.ok(boxes[i].top >= boxes[i - 1].bottom, `systems ${i - 1}/${i}: the ink boxes never intersect`);
     assert.ok(
       boxes[i].staffTop >= boxes[i - 1].staffBottom,
@@ -1591,7 +1591,7 @@ test('System spacing and pagination are unchanged by the literal placement; the 
   const perPage: number[] = [];
   const stemsPerPage: number[] = [];
   const flagsPerPage: number[] = [];
-  for (let page = 0; page < 5; page++) {
+  for (let page = 0; page < 6; page++) {
     const svg = renderJankoPage(BRAHMS, page, REFERENCE_OPTIONS, REFERENCE_TOKENS);
     assert.match(svg, /viewBox="0\.00 0\.00 595\.28 841\.89"/, `page ${page + 1}: the A4 viewBox`);
     for (const attr of svg.matchAll(/\s(x|y|cx|cy|x1|y1|x2|y2)="(-?[\d.]+)"/g)) {
@@ -1607,14 +1607,14 @@ test('System spacing and pagination are unchanged by the literal placement; the 
     stemsPerPage.push((svg.match(/class="janko-stem"/g) ?? []).length);
     flagsPerPage.push((svg.match(/class="janko-flag"/g) ?? []).length);
   }
-  assert.deepEqual(perPage, [215, 235, 237, 224, 75], 'the engine page census (Round 49 §1: the written continuations join their pages)');
+  assert.deepEqual(perPage, [162, 174, 176, 175, 182, 117], 'the engine page census (Round 49 §1: the written continuations join their pages)');
   assert.equal(perPage.reduce((a, b) => a + b, 0), paintedHeads.length, 'every laid-out head paints once');
   // No missing rhythm ink: every page paints its stems/flags, and the whole
   // spread's stem census is the measured 692 (the 986 heads minus the 298
   // suppressed standalone stems, plus the shared-stem/beam carriers).
-  assert.deepEqual(stemsPerPage, [136, 172, 169, 169, 46], 'the page stem census');
+  assert.deepEqual(stemsPerPage, [102, 114, 136, 125, 130, 85], 'the page stem census');
   assert.equal(stemsPerPage.reduce((a, b) => a + b, 0), 692, '692 painted stems across the spread');
-  assert.deepEqual(flagsPerPage, [14, 23, 21, 11, 2], 'and the flag census is complete (Round 49 §1 recount)');
+  assert.deepEqual(flagsPerPage, [15, 14, 22, 17, 12, 3], 'and the flag census is complete (Round 49 §1 recount)');
 });
 
 // ---------------------------------------------------------------------------
@@ -1746,7 +1746,7 @@ test('The served studio carries the three labelled cards and the honest inventor
     /rest-inference-withheld/,
     'and lists the published withheld-rest facts of this score'
   );
-  assert.equal((reference.match(/data-page="/g) ?? []).length, 7, 'two Bach pages + five Brahms pages');
+  assert.equal((reference.match(/data-page="/g) ?? []).length, 8, 'two Bach pages + six complete expression-aware Brahms pages');
   // Phone continuity (§F) is studio-wide and lives in the shared session
   // module: both views are served by the same document, and the behavioural
   // proof (restore, hash precedence, storage failure, HMR re-mount, listener

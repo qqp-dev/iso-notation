@@ -106,6 +106,10 @@ test('approved whole source: each repeat/ending, voice, hidden classification an
   const hidden = facts.events.filter(e => e.hidden && e.kind === 'note');
   assert.equal(hidden.length, 1);
   assert.equal(hidden[0].line, 153);
+  // Textual second child starts <c f> at C4/F4 (48/53) after the
+  // principal child's exit. From its final <f g> anchor F4=53,
+  // aes, at l.153 is Ab3=44; repeat entry aes stays 44, not Ab4=56.
+  assert.deepEqual(hidden[0].pitches.map(p=>p.absolutePitch),[44]);
   const phantom = facts.events.find(e => e.kind === 'layout-note')!;
   assert.equal(phantom.line, 313);
   assert.equal(phantom.duration, '1/2');

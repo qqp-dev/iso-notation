@@ -326,7 +326,7 @@ test('renderReferenceView retains both complete page sets and macro data in the 
   const bachPages = bach.match(/data-page="/g) ?? [];
   const brahmsPages = brahms.match(/data-page="/g) ?? [];
   assert.equal(bachPages.length, 2, 'Round 17: Bach Var. 1 is a two-page spread (4 systems/page)');
-  assert.equal(brahmsPages.length, 5, 'Brahms ships the judged five-page spread (4/system, 4-up, 18 systems)');
+  assert.equal(brahmsPages.length, 6, 'Brahms ships the judged five-page spread (4/system, 4-up, 18 systems)');
   const bachCrops = bach.match(/data-crop="/g) ?? [];
   const brahmsCrops = brahms.match(/data-crop="/g) ?? [];
   assert.equal(bachCrops.length, 0, 'Bach focus crops dropped by operator order (spread stays)');

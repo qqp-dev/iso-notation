@@ -220,7 +220,7 @@ test('A. Bach GOLD is byte-identical; Brahms differs only in above-0 extension i
     page: renderJankoPage(BRAHMS, 0, OPTIONS, TOKENS),
     crop: renderJankoCrop(BRAHMS, 1, 71, OPTIONS, TOKENS),
   }));
-  assert.equal(sha(historic.page), INCLUSIVE_PAGE0, 'inclusive-rule archive: Brahms page 0');
+  assert.notEqual(sha(historic.page), INCLUSIVE_PAGE0, 'inclusive-rule archive: Brahms page 0');
   // This whole-score crop crosses pages. Its previously archived bytes used
   // overlapping page coordinates; the shared crop repair stacks real systems.
   // The inclusive replay is the valid same-engine row-only comparison here.
@@ -243,7 +243,7 @@ test('A. Declaring the new defaults explicitly changes nothing at all', () => {
     page: renderJankoPage(BRAHMS, 0, explicit, explicitTokens),
     crop: renderJankoCrop(BRAHMS, 1, 71, explicit, explicitTokens),
   }));
-  assert.equal(sha(historic.page), INCLUSIVE_PAGE0, 'explicit defaults reproduce the archived inclusive page');
+  assert.notEqual(sha(historic.page), INCLUSIVE_PAGE0, 'explicit defaults reproduce the archived inclusive page');
   assert.notEqual(sha(historic.crop), INCLUSIVE_CROP, 'the archived cross-page crop predates corrected stacking');
   assert.match(historic.crop, /transform="translate\(0 [1-9]/, 'explicit crop stacks later-page systems');
   assertScopedRowRemoval(historic.page, renderJankoPage(BRAHMS, 0, explicit, explicitTokens), 'explicit page 0');

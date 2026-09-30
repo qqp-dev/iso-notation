@@ -1,3 +1,5 @@
+import { pedalIntervals } from './elements/expressions';
+import { systemTickRange, systemPaintedInkBoxes } from './engine';
 /**
  * Jánko Implementer Visual Linter
  * ===============================
@@ -284,6 +286,7 @@ export type JankoLintCode =
   | 'tie-component-value'
   | 'tie-gap-unpublished'
   | 'tie-rule-fusion'
+  | 'expression-missing' | 'expression-geometry' | 'expression-clearance' | 'expression-endpoint' | 'expression-paint'
   | 'grace-missing' | 'grace-value' | 'grace-host' | 'grace-geometry' | 'grace-paint';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -407,6 +410,7 @@ export const JANKO_LINT_CHECKS = [
   'ring-geometry',
   'compression-collision',
   'hold-integrity',
+  'expression-integrity',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -2047,7 +2051,7 @@ export function checkSystemSlotFit(
 ): void {
   // Content-aware fixed-core placement resolves positions from ink, not
   // slots — the page-block and facing-gap audits govern it instead.
-  if (isContentAwarePlacement(o)) return;
+  if (isContentAwarePlacement(o) || page.inkAwarePagination) return;
   const g = layout.geometry;
   const slotTop = g.slotTopY;
   const slotBottom = g.slotTopY + page.slotHeight;
@@ -2190,7 +2194,7 @@ export function checkContentAwarePageFit(
   out: LintViolation[]
 ): void {
   if (layouts.length === 0) return;
-  if (!isContentAwarePlacement(o)) return;
+  if (!isContentAwarePlacement(o) && !page.inkAwarePagination) return;
   const byPage = new Map<number, JankoSystemLayout[]>();
   for (const layout of layouts) {
     const pageIndex = layout.geometry.pageIndex ?? Math.floor(layout.index / page.systemsPerPage);
@@ -2200,7 +2204,7 @@ export function checkContentAwarePageFit(
   }
   for (const [pageIndex, systems] of byPage) {
     const ordered = [...systems].sort((a, b) => a.index - b.index);
-    const contentTop = page.productionSystems ? page.marginTop + page.headerHeight :
+    const contentTop = page.inkAwarePagination ? page.marginTop + page.headerHeight :
       Math.min(...ordered.map((l) => l.geometry.slotTopY));
     const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
     // Named page-slot booking constraint, NOT a claim of global physical ink.
@@ -2272,7 +2276,7 @@ export function checkSystemAllocatedSlotFit(
   out: LintViolation[]
 ): void {
   if (layouts.length === 0) return;
-  if (isContentAwarePlacement(o)) return;
+  if (isContentAwarePlacement(o) || page.inkAwarePagination) return;
   const clearance = lint.minClearance;
   const slots = new Map(resolveAllocatedPageSlots(layouts, page, t, lint, o).map((s) => [s.index, s] as const));
   const byPage = new Map<number, JankoSystemLayout[]>();
@@ -2786,6 +2790,7 @@ export function systemInkExtents(
       bottom = Math.max(bottom, cluster.inkBox[3]);
     }
   }
+  for(const ink of layout.expressions??[]){top=Math.min(top,ink.y0);bottom=Math.max(bottom,ink.y1);}
   return { top, bottom };
 }
 
@@ -6113,6 +6118,50 @@ export function checkGraceIntegrity(score: QuantizedGridScore, layout: JankoSyst
   }
 }
 
+/** Expression inventory/geometry is independent of the musical duration grammar. */
+export function checkExpressionIntegrity(score: QuantizedGridScore, layout: JankoSystemLayout,
+  o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, out: LintViolation[]): void {
+  const [start,end] = systemTickRange(layout.geometry,layout.index,t);
+  const ink=layout.expressions ?? [];
+  const problem=(code:JankoLintCode,id:string,reason:string) => out.push({code,severity:'error' as const,system:layout.index,message:`Expression ${id}: ${reason}`});
+  for(const [index,e] of (score.dynamics ?? []).entries()) {
+    const hairpin=e.kind==='hairpin'||(!e.kind&&!!e.durationTicks&&['crescendo','decrescendo'].includes(e.mark));
+    const stop=hairpin?e.tick+(e.durationTicks??0):e.tick;
+    if(hairpin?stop<=start||e.tick>=end:e.tick<start||e.tick>=end)continue;
+    const q=ink.find(i=>i.id===`dynamic-${index}`);
+    if(!q) problem('expression-missing',`dynamic-${index}`,'source mark/span has no ink');
+    else if(q.startTick!==e.tick||q.endTick!==stop||q.continuationStart!==(e.tick<start)||q.continuationEnd!==(stop>end))
+      problem('expression-endpoint',q.id,'source clock or continuation differs');
+  }
+  for(const phrase of score.phrases??[]) {
+    if(phrase.endTick<start||phrase.startTick>=end)continue;
+    const q=ink.find(i=>i.kind==='phrase'&&i.id===phrase.id);
+    if(!q)problem('expression-missing',phrase.id,'source phrase has no ink');
+    else if(q.startTick!==phrase.startTick||q.endTick!==phrase.endTick||JSON.stringify(q.endpointIds)!==JSON.stringify([phrase.fromNoteIds,phrase.toNoteIds]))
+      problem('expression-endpoint',phrase.id,'source note association differs');
+  }
+  for(const [i,span] of pedalIntervals(score).entries()) {
+    if(span.end<=start||span.start>=end)continue;
+    const q=ink.find(q=>q.kind==='pedal'&&q.id===`pedal-${i}`);
+    if(!q)problem('expression-missing',`pedal-${i}`,'held interval omitted');
+    else if(q.startTick!==span.start||q.endTick!==span.end||q.continuationStart!==(span.start<start)||q.continuationEnd!==(span.end>end||!span.release))
+      problem('expression-endpoint',q.id,'pedal clock or true continuation differs');
+  }
+  if (!ink.length) return;
+  const music=systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('expression '));
+  for(const q of ink) {
+    const cls=q.kind==='dynamic'?/janko-(?:dynamic|expression-text)/:new RegExp(`janko-${q.kind}`);
+    if(!q.svg||!cls.test(q.svg))problem('expression-paint',q.id,'stored ink has no matching glyph/curve/bracket');
+    for(const b of music)if(q.x0<b.x1&&q.x1>b.x0&&q.y0<b.y1&&q.y1>b.y0)
+      problem('expression-clearance',q.id,`overlaps ${b.what}`);
+    if(![q.x0,q.x1,q.y0,q.y1].every(Number.isFinite)||q.x0>=q.x1||q.y0>=q.y1)problem('expression-geometry',q.id,'invalid ink bounds');
+    for(const n of layout.notes) if(q.x0<n.x+t.noteheadRadius&&q.x1>n.x-t.noteheadRadius&&q.y0<n.y+t.noteheadRadius&&q.y1>n.y-t.noteheadRadius)
+      problem('expression-clearance',q.id,`overlaps note ${n.note.id}`);
+    for(const other of ink) if(other.id>q.id&&q.x0<other.x1&&q.x1>other.x0&&q.y0<other.y1&&q.y1>other.y0)
+      problem('expression-clearance',q.id,`overlaps ${other.id}`);
+  }
+}
+
 export function lintJankoScore(
   score: QuantizedGridScore,
   options?: Partial<JankoLayoutOptions> | null,
@@ -6137,6 +6186,7 @@ export function lintJankoScore(
     const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'
       ?buildInkScene(layout,o,t,score):undefined;
     checkGraceIntegrity(score, layout, o, t, diagnostics);
+    checkExpressionIntegrity(score,layout,o,t,diagnostics);
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, o, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);

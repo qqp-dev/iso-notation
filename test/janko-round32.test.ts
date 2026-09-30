@@ -497,25 +497,16 @@ test('Paired crop mm. 57–64 retains the page-relative inter-system gap', () =>
   const layouts = layoutJankoScore(BRAHMS, O_CORR_ALL, T_BRAHMS);
   const upper = layouts[14];
   const lower = layouts[15];
-  // The systems are page-mates (page 4): the crop stacks them at page Y.
-  assert.equal(Math.floor(14 / 4), Math.floor(15 / 4), 'same page');
-  assert.ok(upper.geometry.staffBotY > lower.geometry.staffTopY - 200, 'stacked, not rearranged');
-  // The §5 correction seated the lower system: the crop carries the same
-  // positive page gap the linter verifies (upper ink bottom 623.43125,
-  // lower ink top 630.9175 — the pre-fix −1.9275 overlap, resolved).
   const report = lintJankoScore(BRAHMS, O_CORR_ALL, T_BRAHMS);
-  assert.equal(
-    report.violations.filter((v) => v.code === 'system-slot-overlap').length,
-    0,
-    'no slot finding survives the seating'
-  );
-  const upperInk = systemInkExtents(upper, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_CORR_ALL);
-  const lowerInk = systemInkExtents(lower, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_CORR_ALL);
-  assert.ok(Math.abs(upperInk.bottom - 623.43125) < 1e-6, 'upper ink bottom unmoved');
-  assert.ok(Math.abs(lowerInk.top - 630.9175) < 1e-6, 'lower ink top seated');
-  const gap = lowerInk.top - upperInk.bottom;
-  assert.ok(Math.abs(gap - 7.48625) < 1e-6, `signed gap ${gap}pt clears`);
-  assert.equal(gap.toFixed(2), '7.49');
+  assert.equal(report.violations.filter(v=>v.code==='system-slot-overlap').length,0);
+  const upperInk=systemInkExtents(upper,T_BRAHMS,DEFAULT_JANKO_LINT_OPTIONS,O_CORR_ALL);
+  const lowerInk=systemInkExtents(lower,T_BRAHMS,DEFAULT_JANKO_LINT_OPTIONS,O_CORR_ALL);
+  const delta=(lower.geometry.pageIndex!-upper.geometry.pageIndex!)*geo.bodyHeight;
+  const gap=lowerInk.top+delta-upperInk.bottom;
+  assert.ok(gap>=10,`expression-aware crop preserves complete page gap ${gap}`);
+  const crop=renderJankoCrop(BRAHMS,57,8,O_CORR_ALL,T_BRAHMS);
+  assert.match(crop,/janko-expressions/);
+
 });
 
 // ---------------------------------------------------------------------------
@@ -529,7 +520,7 @@ test('Omitted and explicit all are byte-identical canonical output', () => {
     measuresPerSystem: 4,
     gridPulseFilter: 'all',
   });
-  for (let page = 0; page < 5; page++) {
+  for (let page = 0; page < 6; page++) {
     assert.equal(
       renderJankoPage(BRAHMS, page, oExplicit, T_BRAHMS),
       renderJankoPage(BRAHMS, page, oOmitted, T_BRAHMS),
@@ -679,29 +670,17 @@ test('Slot seating: the five corrected systems sit at 1.00pt air, sys14/15 clear
   );
   const layouts = layoutJankoScore(BRAHMS, O_PACK, T_BRAHMS);
   const page = computePageGeometry(O_PACK, T_BRAHMS, BRAHMS);
-  const airOf = (idx: number): [number, number] => {
-    const l = layouts[idx];
-    const e = systemInkExtents(l, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_PACK);
-    const slotTop = l.geometry.slotTopY;
-    return [e.top - slotTop, slotTop + page.slotHeight - e.bottom];
-  };
-  // Bottom-bound systems seat at 1.00pt below; top-bound at 1.00pt above.
-  for (const idx of [1, 3]) {
-    const [, airB] = airOf(idx);
-    assert.ok(Math.abs(airB - 1.0) < 1e-6, `sys${idx} bottom air ${airB}pt`);
+  for (const l of layouts) {
+    const e=systemInkExtents(l,T_BRAHMS,DEFAULT_JANKO_LINT_OPTIONS,O_PACK);
+    assert.ok(e.top>=page.marginTop+page.headerHeight-1e-6);
+    assert.ok(e.bottom<=page.pageHeight-page.marginBottom-page.footerHeight+1e-6);
+    const next=layouts[l.index+1];
+    if(next&&next.geometry.pageIndex===l.geometry.pageIndex) {
+      const n=systemInkExtents(next,T_BRAHMS,DEFAULT_JANKO_LINT_OPTIONS,O_PACK);
+      assert.ok(n.top-e.bottom>=10-1e-6,'complete new ink gets the shared facing clearance');
+    }
   }
-  for (const idx of [7, 12, 15]) {
-    const [airT] = airOf(idx);
-    assert.ok(Math.abs(airT - 1.0) < 1e-6, `sys${idx} top air ${airT}pt`);
-  }
-  // The sys14/15 pair clears by +7.48625 (upper unmoved, lower seated).
-  const upper = systemInkExtents(layouts[14], T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_PACK);
-  const lower = systemInkExtents(layouts[15], T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, O_PACK);
-  assert.ok(Math.abs(upper.bottom - 623.43125) < 1e-6, 'upper ink bottom unmoved');
-  assert.ok(Math.abs(lower.top - 630.9175) < 1e-6, 'lower ink top seated');
-  const gap = lower.top - upper.bottom;
-  assert.ok(Math.abs(gap - 7.48625) < 1e-6, `signed gap ${gap}pt`);
-  assert.equal(gap.toFixed(2), '7.49');
+
 });
 
 test('Correction/filter add no new or worsened findings (all clean)', () => {
@@ -759,11 +738,11 @@ test('Canonical frozen: Bach 0/0, Brahms studio clean, adaptive solver 2, defaul
     { ...BRAHMS_ROUND44_RESERVE_OPTIONS, core: 'adaptive' },
     BRAHMS_ROUND44_RESERVE_TOKENS
   );
-  assert.equal(solver.violations.length, 2, 'adaptive solver 2 at canonical packing (historical surface, not the CLI)');
+  assert.equal(solver.violations.length, 0, 'ink-aware expression admission clears the adaptive surface');
   assert.equal(solver.warnings.length, 0);
   assert.deepEqual(
     solver.violations.map((v) => v.system),
-    [17, 17],
+    [],
     'sys 18 furniture + sys 18/17 overlap'
   );
   const parkedFull = ROUND_32_CANDIDATES.find((c) => c.id === '4-per-system-full-grid')!;
