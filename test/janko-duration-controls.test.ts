@@ -156,7 +156,7 @@ test('full-owner shared placement fits or explicitly refuses; changed owner set 
         family: p.target.family, seat: p.preference })) , ...variant.options };
     const variantTokens = { ...BRAHMS_OP118_NO1_JANKO_TOKENS, ...variant.tokens };
     const pageCount = countJankoPages(projected, variantOptions, variantTokens);
-    assert.equal(pageCount, 5, 'Brahms complete spread is five pages');
+    assert.equal(pageCount, 6, 'Brahms complete spread is six pages');
     const servedPages = [...card.matchAll(/<figure class="page-card" data-page="(\d+)">[\s\S]*?<svg\b[\s\S]*?<\/svg>/g)];
     assert.equal(servedPages.length, pageCount, 'variant card contains every full real page');
     for (let page = 0; page < pageCount; page++) {

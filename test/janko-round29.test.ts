@@ -345,10 +345,10 @@ test('Dots golden: Brahms m.1/m.4/m.19 dots share the 45° rule-B seat at the §
   // exactly; the columns (and with them claspX) follow the Round 46 §2
   // geometry.
   assert.equal(d1[0]!.x, 72.64669054949266, 'm.1 clasp dot x (§2 column + 3.36 half-ring seat)');
-  assert.equal(d1[0]!.y, 130.48212121521323, 'm.1 clasp dot y (content-aware page 1; 45° seat kept)');
+  assert.ok(Math.abs(d1[0]!.y - (m1.durationInk[m1.durationDots.indexOf(d1[0])].centerY - 3.36/Math.SQRT2)) < 1e-9, 'm.1: optical seat rides its placed frame');
   assert.equal(m1.claspX, 70.27081176470588, 'm.1 clasp spine x (column − r − offset)');
   assert.equal(d4[0]!.x, 328.4019846671397, 'm.4 clasp dot x (§2 column + 3.36 half-ring seat)');
-  assert.equal(d4[0]!.y, 137.98212121521323, 'm.4 clasp dot y (content-aware page 1; 45° seat kept)');
+  assert.ok(Math.abs(d4[0]!.y - (m4.durationInk[m4.durationDots.indexOf(d4[0])].centerY - 3.36/Math.SQRT2)) < 1e-9, 'm.4: optical seat rides its placed frame');
   // The consistency the ticket orders: opening and m.19 sit at the same
   // 45.00° off their mark centres at the same radius.
   const angleOf = (clasp: typeof m1, dot: NonNullable<(typeof d1)[number]>): number => {
@@ -367,7 +367,7 @@ test('Dots golden: Brahms m.1/m.4/m.19 dots share the 45° rule-B seat at the §
   // reclaims the shrunk downbeat insets), so its absolute seat re-pins; the
   // 45° seat relative to its own spine is the invariant, and it holds.
   assert.equal(d19[0]!.x, 312.4172787847868, 'm.19 dot x (Round 46 §2 column + 3.36 seat)');
-  assert.equal(d19[0]!.y, 154.98212121521323, 'm.19 dot y (content-aware page 2; 45° seat kept)');
+  assert.ok(Math.abs(d19[0]!.y - (m19.durationInk[m19.durationDots.indexOf(d19[0])].centerY - 3.36/Math.SQRT2)) < 1e-9, 'm.19: optical seat rides its placed frame');
 });
 
 test('Dots: audit-box == baked-extents agreement per subdivision style', () => {

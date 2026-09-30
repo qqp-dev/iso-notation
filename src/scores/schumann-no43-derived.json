@@ -151,7 +151,10 @@
         "bar": 1,
         "hidden": false,
         "line": 92,
-        "column": 55
+        "column": 55,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:92:68:upper.0",
@@ -532,7 +535,10 @@
         "bar": 3,
         "hidden": false,
         "line": 94,
-        "column": 86
+        "column": 86,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:95:11:upper.0",
@@ -682,7 +688,10 @@
         "bar": 4,
         "hidden": false,
         "line": 95,
-        "column": 65
+        "column": 65,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:95:87:upper.0",
@@ -709,7 +718,10 @@
         "bar": 4,
         "hidden": false,
         "line": 95,
-        "column": 87
+        "column": 87,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:95:105:upper.0",
@@ -736,7 +748,10 @@
         "bar": 4,
         "hidden": false,
         "line": 95,
-        "column": 105
+        "column": 105,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:95:120:upper.0",
@@ -763,7 +778,10 @@
         "bar": 4,
         "hidden": false,
         "line": 95,
-        "column": 120
+        "column": 120,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:96:11:upper.0",
@@ -1054,7 +1072,10 @@
         "bar": 6,
         "hidden": false,
         "line": 97,
-        "column": 49
+        "column": 49,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:97:60:upper.0",
@@ -1585,7 +1606,10 @@
         "bar": 9,
         "hidden": false,
         "line": 100,
-        "column": 65
+        "column": 65,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:100:87:upper.0",
@@ -1612,7 +1636,10 @@
         "bar": 9,
         "hidden": false,
         "line": 100,
-        "column": 87
+        "column": 87,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:100:103:upper.0",
@@ -1639,7 +1666,10 @@
         "bar": 9,
         "hidden": false,
         "line": 100,
-        "column": 103
+        "column": 103,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:100:118:upper.0",
@@ -1666,7 +1696,10 @@
         "bar": 9,
         "hidden": false,
         "line": 100,
-        "column": 118
+        "column": 118,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:101:11:upper.0",
@@ -2001,7 +2034,10 @@
         "bar": 11,
         "hidden": false,
         "line": 104,
-        "column": 127
+        "column": 127,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:104:147:upper.0",
@@ -2416,7 +2452,10 @@
         "bar": 14,
         "hidden": false,
         "line": 107,
-        "column": 50
+        "column": 50,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:107:67:upper.0",
@@ -2443,7 +2482,10 @@
         "bar": 14,
         "hidden": false,
         "line": 107,
-        "column": 67
+        "column": 67,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:107:81:upper.0",
@@ -2470,7 +2512,10 @@
         "bar": 14,
         "hidden": false,
         "line": 107,
-        "column": 81
+        "column": 81,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:108:13:upper.0",
@@ -2624,7 +2669,10 @@
         "bar": 15,
         "hidden": false,
         "line": 108,
-        "column": 80
+        "column": 80,
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:108:91:upper.0",
@@ -2824,7 +2872,10 @@
         "bar": 16,
         "hidden": false,
         "line": 109,
-        "column": 71
+        "column": 71,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:109:89:upper.0",
@@ -2851,7 +2902,10 @@
         "bar": 16,
         "hidden": false,
         "line": 109,
-        "column": 89
+        "column": 89,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:109:100:upper.0",
@@ -2874,7 +2928,10 @@
         "bar": 16,
         "hidden": false,
         "line": 109,
-        "column": 100
+        "column": 100,
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:110:13:upper.0",
@@ -4650,7 +4707,10 @@
         "hidden": false,
         "line": 223,
         "column": 49,
-        "stemDirection": "neutral"
+        "stemDirection": "neutral",
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:223:62:lower.0",
@@ -4770,7 +4830,10 @@
         "hidden": false,
         "line": 224,
         "column": 24,
-        "stemDirection": "neutral"
+        "stemDirection": "neutral",
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:224:48:lower.0",
@@ -5275,7 +5338,10 @@
         "hidden": false,
         "line": 228,
         "column": 49,
-        "stemDirection": "neutral"
+        "stemDirection": "neutral",
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:228:62:lower.0",
@@ -5395,7 +5461,10 @@
         "hidden": false,
         "line": 229,
         "column": 24,
-        "stemDirection": "neutral"
+        "stemDirection": "neutral",
+        "sourceBeam": {
+          "noBeam": true
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:229:48:lower.0",
@@ -5799,7 +5868,10 @@
         "hidden": false,
         "line": 234,
         "column": 47,
-        "stemDirection": "down"
+        "stemDirection": "down",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:234:62:lower.0",
@@ -5823,7 +5895,10 @@
         "hidden": false,
         "line": 234,
         "column": 62,
-        "stemDirection": "down"
+        "stemDirection": "down",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:234:72:lower.0",
@@ -5847,7 +5922,10 @@
         "hidden": false,
         "line": 234,
         "column": 72,
-        "stemDirection": "down"
+        "stemDirection": "down",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0"
+        }
       },
       {
         "id": "43-Chant-du-Nouvel-An.ly:235:13:lower.0",
@@ -7618,6 +7696,658 @@
         "column": 49
       }
     ],
+    "expressionSpacers": [
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:160:2:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "0",
+        "duration": "1/8",
+        "bar": 0,
+        "line": 160,
+        "column": 2
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:161:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "1/8",
+        "duration": "1/2",
+        "bar": 1,
+        "line": 161,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:161:12:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "5/8",
+        "duration": "1/4",
+        "bar": 1,
+        "line": 161,
+        "column": 12
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:161:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "7/8",
+        "duration": "1/4",
+        "bar": 1,
+        "line": 161,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:162:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "9/8",
+        "duration": "1/8",
+        "bar": 2,
+        "line": 162,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:162:15:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "5/4",
+        "duration": "1/8",
+        "bar": 2,
+        "line": 162,
+        "column": 15
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:162:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "11/8",
+        "duration": "3/4",
+        "bar": 2,
+        "line": 162,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:163:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "17/8",
+        "duration": "1",
+        "bar": 3,
+        "line": 163,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:168:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "25/8",
+        "duration": "1",
+        "bar": 4,
+        "line": 168,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:169:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "33/8",
+        "duration": "1",
+        "bar": 5,
+        "line": 169,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:170:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "41/8",
+        "duration": "1/2",
+        "bar": 6,
+        "line": 170,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:170:12:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "45/8",
+        "duration": "1/4",
+        "bar": 6,
+        "line": 170,
+        "column": 12
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:170:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "47/8",
+        "duration": "1/4",
+        "bar": 6,
+        "line": 170,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:175:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "49/8",
+        "duration": "1/8",
+        "bar": 7,
+        "line": 175,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:175:15:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "25/4",
+        "duration": "1/8",
+        "bar": 7,
+        "line": 175,
+        "column": 15
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:175:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "51/8",
+        "duration": "3/4",
+        "bar": 7,
+        "line": 175,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:176:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "57/8",
+        "duration": "1",
+        "bar": 8,
+        "line": 176,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:177:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "65/8",
+        "duration": "1",
+        "bar": 9,
+        "line": 177,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:182:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "73/8",
+        "duration": "1",
+        "bar": 10,
+        "line": 182,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "81/8",
+        "duration": "1/8",
+        "bar": 11,
+        "line": 183,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:14:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "41/4",
+        "duration": "1/4",
+        "bar": 11,
+        "line": 183,
+        "column": 14
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:17:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "21/2",
+        "duration": "1/8",
+        "bar": 11,
+        "line": 183,
+        "column": 17
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:22:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "85/8",
+        "duration": "1/8",
+        "bar": 11,
+        "line": 183,
+        "column": 22
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:27:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "43/4",
+        "duration": "1/8",
+        "bar": 11,
+        "line": 183,
+        "column": 27
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:30:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "87/8",
+        "duration": "1/8",
+        "bar": 11,
+        "line": 183,
+        "column": 30
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:183:35:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "11",
+        "duration": "1/8",
+        "bar": 11,
+        "line": 183,
+        "column": 35
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:184:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "89/8",
+        "duration": "1/2",
+        "bar": 12,
+        "line": 184,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:184:12:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "93/8",
+        "duration": "1/4",
+        "bar": 12,
+        "line": 184,
+        "column": 12
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:184:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "95/8",
+        "duration": "1/4",
+        "bar": 12,
+        "line": 184,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:189:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "97/8",
+        "duration": "1/8",
+        "bar": 13,
+        "line": 189,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:189:15:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "49/4",
+        "duration": "1/8",
+        "bar": 13,
+        "line": 189,
+        "column": 15
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:189:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "99/8",
+        "duration": "1/4",
+        "bar": 13,
+        "line": 189,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:189:81:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "101/8",
+        "duration": "1/8",
+        "bar": 13,
+        "line": 189,
+        "column": 81
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:189:87:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "51/4",
+        "duration": "1/8",
+        "bar": 13,
+        "line": 189,
+        "column": 87
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:189:89:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "103/8",
+        "duration": "1/4",
+        "bar": 13,
+        "line": 189,
+        "column": 89
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:190:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "105/8",
+        "duration": "3/4",
+        "bar": 14,
+        "line": 190,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:190:13:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "111/8",
+        "duration": "1/8",
+        "bar": 14,
+        "line": 190,
+        "column": 13
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:190:22:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "14",
+        "duration": "1/8",
+        "bar": 14,
+        "line": 190,
+        "column": 22
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:191:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "113/8",
+        "duration": "1/2",
+        "bar": 15,
+        "line": 191,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:191:12:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "117/8",
+        "duration": "1/4",
+        "bar": 15,
+        "line": 191,
+        "column": 12
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:191:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "119/8",
+        "duration": "1/4",
+        "bar": 15,
+        "line": 191,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:196:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "121/8",
+        "duration": "1/8",
+        "bar": 16,
+        "line": 196,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:196:15:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "61/4",
+        "duration": "1/8",
+        "bar": 16,
+        "line": 196,
+        "column": 15
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:196:18:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "123/8",
+        "duration": "1/4",
+        "bar": 16,
+        "line": 196,
+        "column": 18
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:196:21:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "125/8",
+        "duration": "1/8",
+        "bar": 16,
+        "line": 196,
+        "column": 21
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:196:24:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "63/4",
+        "duration": "1/8",
+        "bar": 16,
+        "line": 196,
+        "column": 24
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:196:30:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "127/8",
+        "duration": "1/4",
+        "bar": 16,
+        "line": 196,
+        "column": 30
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:197:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "129/8",
+        "duration": "1",
+        "bar": 17,
+        "line": 197,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:198:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "137/8",
+        "duration": "1/2",
+        "bar": 18,
+        "line": 198,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:198:12:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "141/8",
+        "duration": "1/8",
+        "bar": 18,
+        "line": 198,
+        "column": 12
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:198:15:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "71/4",
+        "duration": "1/8",
+        "bar": 18,
+        "line": 198,
+        "column": 15
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:198:24:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "143/8",
+        "duration": "1/4",
+        "bar": 18,
+        "line": 198,
+        "column": 24
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:203:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "145/8",
+        "duration": "1",
+        "bar": 19,
+        "line": 203,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:204:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "153/8",
+        "duration": "1",
+        "bar": 20,
+        "line": 204,
+        "column": 9
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:205:9:Dynamics_pf:0",
+        "channel": "Dynamics_pf",
+        "onset": "161/8",
+        "duration": "1",
+        "bar": 21,
+        "line": 205,
+        "column": 9
+      }
+    ],
+    "expressions": [
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:160:2:Dynamics_pf:0",
+        "token": "\\mf",
+        "context": "Dynamics_pf",
+        "line": 160,
+        "column": 4,
+        "order": 0
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:161:12:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 161,
+        "column": 14,
+        "order": 1
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:162:9:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 162,
+        "column": 11,
+        "order": 2
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:170:12:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 170,
+        "column": 14,
+        "order": 3
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:175:9:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 175,
+        "column": 11,
+        "order": 4
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:183:9:Dynamics_pf:0",
+        "token": "\\<",
+        "context": "Dynamics_pf",
+        "line": 183,
+        "column": 11,
+        "order": 5
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:183:17:Dynamics_pf:0",
+        "token": "\\!",
+        "context": "Dynamics_pf",
+        "line": 183,
+        "column": 19,
+        "order": 6
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:183:22:Dynamics_pf:0",
+        "token": "\\>",
+        "context": "Dynamics_pf",
+        "line": 183,
+        "column": 24,
+        "order": 7
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:183:30:Dynamics_pf:0",
+        "token": "\\!",
+        "context": "Dynamics_pf",
+        "line": 183,
+        "column": 32,
+        "order": 8
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:184:12:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 184,
+        "column": 14,
+        "order": 9
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:189:9:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 189,
+        "column": 11,
+        "order": 10
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:189:81:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 189,
+        "column": 83,
+        "order": 11
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:190:13:Dynamics_pf:0",
+        "token": "\\cresc",
+        "context": "Dynamics_pf",
+        "line": 190,
+        "column": 15,
+        "order": 12
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:190:22:Dynamics_pf:0",
+        "token": "\\!",
+        "context": "Dynamics_pf",
+        "line": 190,
+        "column": 24,
+        "order": 13
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:191:12:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 191,
+        "column": 14,
+        "order": 14
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:196:9:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 196,
+        "column": 11,
+        "order": 15
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:196:24:Dynamics_pf:0",
+        "token": "\\fp",
+        "context": "Dynamics_pf",
+        "line": 196,
+        "column": 26,
+        "order": 16
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:198:15:Dynamics_pf:0",
+        "token": "\\cresc",
+        "context": "Dynamics_pf",
+        "line": 198,
+        "column": 17,
+        "order": 17
+      },
+      {
+        "hostId": "43-Chant-du-Nouvel-An.ly:198:24:Dynamics_pf:0",
+        "token": "\\!",
+        "context": "Dynamics_pf",
+        "line": 198,
+        "column": 26,
+        "order": 18
+      }
+    ],
+    "phrases": [],
     "ties": [
       {
         "fromId": "43-Chant-du-Nouvel-An.ly:93:73:upper.0",
@@ -8177,8 +8907,477 @@
       }
     ],
     "tempos": [],
-    "dynamics": [],
+    "dynamics": [
+      {
+        "tick": 0,
+        "mark": "mf",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 160,
+          "col": 4,
+          "bar": 0,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "0",
+          "order": 0
+        }
+      },
+      {
+        "tick": 120,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 161,
+          "col": 14,
+          "bar": 1,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "5/8",
+          "order": 1
+        }
+      },
+      {
+        "tick": 216,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 162,
+          "col": 11,
+          "bar": 2,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "9/8",
+          "order": 2
+        }
+      },
+      {
+        "tick": 1080,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 170,
+          "col": 14,
+          "bar": 6,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "45/8",
+          "order": 3
+        }
+      },
+      {
+        "tick": 1176,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 175,
+          "col": 11,
+          "bar": 7,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "49/8",
+          "order": 4
+        }
+      },
+      {
+        "tick": 1944,
+        "mark": "crescendo",
+        "durationTicks": 72,
+        "kind": "hairpin",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 11,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "81/8",
+          "order": 5
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 19,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "21/2",
+          "order": 6
+        }
+      },
+      {
+        "tick": 2040,
+        "mark": "decrescendo",
+        "durationTicks": 48,
+        "kind": "hairpin",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 24,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "85/8",
+          "order": 7
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 32,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "87/8",
+          "order": 8
+        }
+      },
+      {
+        "tick": 2232,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 184,
+          "col": 14,
+          "bar": 12,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "93/8",
+          "order": 9
+        }
+      },
+      {
+        "tick": 2328,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 189,
+          "col": 11,
+          "bar": 13,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "97/8",
+          "order": 10
+        }
+      },
+      {
+        "tick": 2424,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 189,
+          "col": 83,
+          "bar": 13,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "101/8",
+          "order": 11
+        }
+      },
+      {
+        "tick": 2664,
+        "mark": "crescendo",
+        "durationTicks": 24,
+        "kind": "text-cresc",
+        "text": "cresc.",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 190,
+          "col": 15,
+          "bar": 14,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "111/8",
+          "order": 12
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 190,
+          "col": 24,
+          "bar": 14,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "14",
+          "order": 13
+        }
+      },
+      {
+        "tick": 2808,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 191,
+          "col": 14,
+          "bar": 15,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "117/8",
+          "order": 14
+        }
+      },
+      {
+        "tick": 2904,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 196,
+          "col": 11,
+          "bar": 16,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "121/8",
+          "order": 15
+        }
+      },
+      {
+        "tick": 3024,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 196,
+          "col": 26,
+          "bar": 16,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "63/4",
+          "order": 16
+        }
+      },
+      {
+        "tick": 3408,
+        "mark": "crescendo",
+        "durationTicks": 24,
+        "kind": "text-cresc",
+        "text": "cresc.",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 198,
+          "col": 17,
+          "bar": 18,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "71/4",
+          "order": 17
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 198,
+          "col": 26,
+          "bar": 18,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "143/8",
+          "order": 18
+        }
+      },
+      {
+        "tick": 3864,
+        "mark": "crescendo",
+        "durationTicks": 72,
+        "kind": "hairpin",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 11,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "81/8",
+          "order": 5
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 19,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "21/2",
+          "order": 6
+        }
+      },
+      {
+        "tick": 3960,
+        "mark": "decrescendo",
+        "durationTicks": 48,
+        "kind": "hairpin",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 24,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "85/8",
+          "order": 7
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 183,
+          "col": 32,
+          "bar": 11,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "87/8",
+          "order": 8
+        }
+      },
+      {
+        "tick": 4152,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 184,
+          "col": 14,
+          "bar": 12,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "93/8",
+          "order": 9
+        }
+      },
+      {
+        "tick": 4248,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 189,
+          "col": 11,
+          "bar": 13,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "97/8",
+          "order": 10
+        }
+      },
+      {
+        "tick": 4344,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 189,
+          "col": 83,
+          "bar": 13,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "101/8",
+          "order": 11
+        }
+      },
+      {
+        "tick": 4584,
+        "mark": "crescendo",
+        "durationTicks": 24,
+        "kind": "text-cresc",
+        "text": "cresc.",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 190,
+          "col": 15,
+          "bar": 14,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "111/8",
+          "order": 12
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 190,
+          "col": 24,
+          "bar": 14,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "14",
+          "order": 13
+        }
+      },
+      {
+        "tick": 4728,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 191,
+          "col": 14,
+          "bar": 15,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "117/8",
+          "order": 14
+        }
+      },
+      {
+        "tick": 4824,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 196,
+          "col": 11,
+          "bar": 16,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "121/8",
+          "order": 15
+        }
+      },
+      {
+        "tick": 4944,
+        "mark": "fp",
+        "kind": "mark",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 196,
+          "col": 26,
+          "bar": 16,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "63/4",
+          "order": 16
+        }
+      },
+      {
+        "tick": 5328,
+        "mark": "crescendo",
+        "durationTicks": 24,
+        "kind": "text-cresc",
+        "text": "cresc.",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 198,
+          "col": 17,
+          "bar": 18,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "71/4",
+          "order": 17
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 198,
+          "col": 26,
+          "bar": 18,
+          "context": "Dynamics_pf",
+          "occurrence": 2,
+          "time": "143/8",
+          "order": 18
+        }
+      }
+    ],
     "pedals": [],
+    "phrases": [],
     "notes": [
       {
         "id": "43-Chant-du-Nouvel-An.ly:91:11:upper.0:52:1",
@@ -8459,6 +9658,9 @@
         "startTick": 168,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -9755,6 +10957,9 @@
         "startTick": 576,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -9782,6 +10987,9 @@
         "startTick": 576,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -9809,6 +11017,9 @@
         "startTick": 576,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -9944,6 +11155,9 @@
         "startTick": 552,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem neutral",
           "confidence": "high"
@@ -10322,6 +11536,9 @@
         "startTick": 696,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10349,6 +11566,9 @@
         "startTick": 696,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10376,6 +11596,9 @@
         "startTick": 696,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10403,6 +11626,9 @@
         "startTick": 720,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10430,6 +11656,9 @@
         "startTick": 720,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10457,6 +11686,9 @@
         "startTick": 720,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10484,6 +11716,9 @@
         "startTick": 744,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10511,6 +11746,9 @@
         "startTick": 744,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10538,6 +11776,9 @@
         "startTick": 744,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10565,6 +11806,9 @@
         "startTick": 768,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10592,6 +11836,9 @@
         "startTick": 768,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10619,6 +11866,9 @@
         "startTick": 768,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:95:103:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -10727,6 +11977,9 @@
         "startTick": 696,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem neutral",
           "confidence": "high"
@@ -11672,6 +12925,9 @@
         "startTick": 1128,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13157,6 +14413,9 @@
         "startTick": 1512,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem neutral",
           "confidence": "high"
@@ -13535,6 +14794,9 @@
         "startTick": 1656,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13562,6 +14824,9 @@
         "startTick": 1656,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13589,6 +14854,9 @@
         "startTick": 1656,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13616,6 +14884,9 @@
         "startTick": 1680,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13643,6 +14914,9 @@
         "startTick": 1680,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13670,6 +14944,9 @@
         "startTick": 1680,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13697,6 +14974,9 @@
         "startTick": 1704,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13724,6 +15004,9 @@
         "startTick": 1704,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13751,6 +15034,9 @@
         "startTick": 1704,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13778,6 +15064,9 @@
         "startTick": 1728,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13805,6 +15094,9 @@
         "startTick": 1728,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13832,6 +15124,9 @@
         "startTick": 1728,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:100:101:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -13940,6 +15235,9 @@
         "startTick": 1656,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem neutral",
           "confidence": "high"
@@ -15128,6 +16426,9 @@
         "startTick": 2088,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -15155,6 +16456,9 @@
         "startTick": 2088,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -16019,6 +17323,9 @@
         "startTick": 2256,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -16046,6 +17353,9 @@
         "startTick": 2256,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -16073,6 +17383,9 @@
         "startTick": 2280,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -16100,6 +17413,9 @@
         "startTick": 2280,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -16127,6 +17443,9 @@
         "startTick": 2304,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -16154,6 +17473,9 @@
         "startTick": 2304,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -17180,6 +18502,9 @@
         "startTick": 2640,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17207,6 +18532,9 @@
         "startTick": 2640,
         "durationTicks": 48,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17234,6 +18562,9 @@
         "startTick": 2664,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17261,6 +18592,9 @@
         "startTick": 2664,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17288,6 +18622,9 @@
         "startTick": 2688,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17315,6 +18652,9 @@
         "startTick": 2688,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17342,6 +18682,9 @@
         "startTick": 2688,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -17963,6 +19306,9 @@
         "startTick": 2856,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18773,6 +20119,9 @@
         "startTick": 3024,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18800,6 +20149,9 @@
         "startTick": 3024,
         "durationTicks": 48,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18827,6 +20179,9 @@
         "startTick": 3024,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18854,6 +20209,9 @@
         "startTick": 3048,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18881,6 +20239,9 @@
         "startTick": 3048,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18908,6 +20269,9 @@
         "startTick": 3072,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -18935,6 +20299,9 @@
         "startTick": 3072,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass1"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -22499,6 +23866,9 @@
         "startTick": 4008,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -22526,6 +23896,9 @@
         "startTick": 4008,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -23390,6 +24763,9 @@
         "startTick": 4176,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -23417,6 +24793,9 @@
         "startTick": 4176,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -23444,6 +24823,9 @@
         "startTick": 4200,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -23471,6 +24853,9 @@
         "startTick": 4200,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -23498,6 +24883,9 @@
         "startTick": 4224,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -23525,6 +24913,9 @@
         "startTick": 4224,
         "durationTicks": 24,
         "hand": "LH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:234:60:lower.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed lower destination; source stem down",
           "confidence": "high"
@@ -24551,6 +25942,9 @@
         "startTick": 4560,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -24578,6 +25972,9 @@
         "startTick": 4560,
         "durationTicks": 48,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -24605,6 +26002,9 @@
         "startTick": 4584,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -24632,6 +26032,9 @@
         "startTick": 4584,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -24659,6 +26062,9 @@
         "startTick": 4608,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -24686,6 +26092,9 @@
         "startTick": 4608,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -24713,6 +26122,9 @@
         "startTick": 4608,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:107:62:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -25334,6 +26746,9 @@
         "startTick": 4776,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "noBeam": true
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26144,6 +27559,9 @@
         "startTick": 4944,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26171,6 +27589,9 @@
         "startTick": 4944,
         "durationTicks": 48,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26198,6 +27619,9 @@
         "startTick": 4944,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26225,6 +27649,9 @@
         "startTick": 4968,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26252,6 +27679,9 @@
         "startTick": 4968,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26279,6 +27709,9 @@
         "startTick": 4992,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -26306,6 +27739,9 @@
         "startTick": 4992,
         "durationTicks": 24,
         "hand": "RH",
+        "sourceBeam": {
+          "group": "43-Chant-du-Nouvel-An.ly:109:84:upper.0:pass2"
+        },
         "handInference": {
           "evidence": "Printed upper destination",
           "confidence": "high"
@@ -31352,18 +32788,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 92,
-      "column": 60,
-      "endLine": 92,
-      "endColumn": 67,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 92,
       "column": 77,
       "endLine": 92,
       "endColumn": 79,
@@ -31555,18 +32979,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 94,
-      "column": 99,
-      "endLine": 94,
-      "endColumn": 106,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 95,
       "column": 29,
       "endLine": 95,
@@ -31586,18 +32998,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member e not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 95,
-      "column": 79,
-      "endLine": 95,
-      "endColumn": 86,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -31628,18 +33028,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 95,
-      "column": 103,
-      "endLine": 95,
-      "endColumn": 104,
-      "construct": "[",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 95,
       "column": 116,
       "endLine": 95,
       "endColumn": 118,
@@ -31658,18 +33046,6 @@
       "construct": "^5",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 5 on chord member cis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 95,
-      "column": 134,
-      "endLine": 95,
-      "endColumn": 135,
-      "construct": "]",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -31790,18 +33166,6 @@
       "construct": ")",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 97,
-      "column": 52,
-      "endLine": 97,
-      "endColumn": 59,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -31976,36 +33340,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 100,
-      "column": 79,
-      "endLine": 100,
-      "endColumn": 86,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 100,
       "column": 97,
       "endLine": 100,
       "endColumn": 99,
       "construct": "^5",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 5 on chord member e not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 100,
-      "column": 101,
-      "endLine": 100,
-      "endColumn": 102,
-      "construct": "[",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32030,18 +33370,6 @@
       "construct": "^5",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 5 on chord member cis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 100,
-      "column": 132,
-      "endLine": 100,
-      "endColumn": 133,
-      "construct": "]",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32186,18 +33514,6 @@
       "construct": ")",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 104,
-      "column": 139,
-      "endLine": 104,
-      "endColumn": 146,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32372,18 +33688,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 107,
-      "column": 62,
-      "endLine": 107,
-      "endColumn": 63,
-      "construct": "[",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 107,
       "column": 76,
       "endLine": 107,
       "endColumn": 78,
@@ -32414,18 +33718,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member gis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 107,
-      "column": 93,
-      "endLine": 107,
-      "endColumn": 94,
-      "construct": "]",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32510,18 +33802,6 @@
       "construct": ")",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 108,
-      "column": 83,
-      "endLine": 108,
-      "endColumn": 90,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32636,18 +33916,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 109,
-      "column": 84,
-      "endLine": 109,
-      "endColumn": 85,
-      "construct": "[",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 109,
       "column": 96,
       "endLine": 109,
       "endColumn": 98,
@@ -32676,18 +33944,6 @@
       "endLine": 109,
       "endColumn": 112,
       "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 109,
-      "column": 112,
-      "endLine": 109,
-      "endColumn": 113,
-      "construct": "]",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Slur or beam presentation deferred",
       "blocking": false,
@@ -33187,42 +34443,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 160,
-      "column": 4,
-      "endLine": 160,
-      "endColumn": 7,
-      "construct": "\\mf",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 161,
-      "column": 14,
-      "endLine": 161,
-      "endColumn": 17,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 162,
-      "column": 11,
-      "endLine": 162,
-      "endColumn": 14,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 164,
       "column": 1,
       "endLine": 164,
@@ -33242,18 +34462,6 @@
       "construct": "\\overrideProperty",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 170,
-      "column": 14,
-      "endLine": 170,
-      "endColumn": 17,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
       "blocking": false,
       "voice": "Dynamics"
     },
@@ -33283,18 +34491,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 175,
-      "column": 11,
-      "endLine": 175,
-      "endColumn": 14,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 178,
       "column": 1,
       "endLine": 178,
@@ -33314,66 +34510,6 @@
       "construct": "\\overrideProperty",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 183,
-      "column": 11,
-      "endLine": 183,
-      "endColumn": 13,
-      "construct": "\\<",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 183,
-      "column": 19,
-      "endLine": 183,
-      "endColumn": 21,
-      "construct": "\\!",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 183,
-      "column": 24,
-      "endLine": 183,
-      "endColumn": 26,
-      "construct": "\\>",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 183,
-      "column": 32,
-      "endLine": 183,
-      "endColumn": 34,
-      "construct": "\\!",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 184,
-      "column": 14,
-      "endLine": 184,
-      "endColumn": 17,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
       "blocking": false,
       "voice": "Dynamics"
     },
@@ -33404,84 +34540,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 189,
-      "column": 11,
-      "endLine": 189,
-      "endColumn": 14,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 189,
       "column": 27,
       "endLine": 189,
       "endColumn": 36,
       "construct": "\\override",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 189,
-      "column": 83,
-      "endLine": 189,
-      "endColumn": 86,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 189,
-      "column": 87,
-      "endLine": 189,
-      "endColumn": 91,
-      "construct": "s8s4",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Fused spacer in omitted expression staff; dynamic timing unresolved",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 190,
-      "column": 15,
-      "endLine": 190,
-      "endColumn": 21,
-      "construct": "\\cresc",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 190,
-      "column": 24,
-      "endLine": 190,
-      "endColumn": 26,
-      "construct": "\\!",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 191,
-      "column": 14,
-      "endLine": 191,
-      "endColumn": 17,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
       "blocking": false,
       "voice": "Dynamics"
     },
@@ -33506,54 +34570,6 @@
       "construct": "\\overrideProperty",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 196,
-      "column": 11,
-      "endLine": 196,
-      "endColumn": 14,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 196,
-      "column": 26,
-      "endLine": 196,
-      "endColumn": 29,
-      "construct": "\\fp",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 198,
-      "column": 17,
-      "endLine": 198,
-      "endColumn": 23,
-      "construct": "\\cresc",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
-      "blocking": false,
-      "voice": "Dynamics"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 198,
-      "column": 26,
-      "endLine": 198,
-      "endColumn": 28,
-      "construct": "\\!",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Expressive mark/hairpin omitted from draft; source order retained",
       "blocking": false,
       "voice": "Dynamics"
     },
@@ -33848,18 +34864,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 223,
-      "column": 54,
-      "endLine": 223,
-      "endColumn": 61,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 223,
       "column": 66,
       "endLine": 223,
       "endColumn": 68,
@@ -33878,18 +34882,6 @@
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member cis not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 224,
-      "column": 32,
-      "endLine": 224,
-      "endColumn": 39,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -34172,18 +35164,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 228,
-      "column": 54,
-      "endLine": 228,
-      "endColumn": 61,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 228,
       "column": 66,
       "endLine": 228,
       "endColumn": 68,
@@ -34202,18 +35182,6 @@
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member cis not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 229,
-      "column": 32,
-      "endLine": 229,
-      "endColumn": 39,
-      "construct": "\\noBeam",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Not painted in draft",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -34412,18 +35380,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 234,
-      "column": 60,
-      "endLine": 234,
-      "endColumn": 61,
-      "construct": "[",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 234,
       "column": 64,
       "endLine": 234,
       "endColumn": 66,
@@ -34466,18 +35422,6 @@
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member c not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 234,
-      "column": 81,
-      "endLine": 234,
-      "endColumn": 82,
-      "construct": "]",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },

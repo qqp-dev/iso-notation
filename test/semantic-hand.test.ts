@@ -37,7 +37,7 @@ test('guarded source-linked edit derives two rests/crossings, preserves source, 
     assert.deepEqual(saved.effects.changedPages, [1]);
     assert.deepEqual(saved.effects.changedSystems, [1,3]);
     assert.equal(saved.effects.unchangedSystems.length, 16);
-    assert.deepEqual(saved.effects.unchangedPages, [2,3,4,5]);
+    assert.deepEqual(saved.effects.unchangedPages, [2,3,4,5,6]);
     assert.deepEqual(saved.effects.tieOwnerChanges, { added: [], removed: [] });
     assert.equal(saved.effects.durationOwnerChanges.added.length, 2);
     assert.equal(saved.effects.durationOwnerChanges.removed.length, 2);
@@ -55,7 +55,7 @@ test('guarded source-linked edit derives two rests/crossings, preserves source, 
     assert.match(html, /brahms-op118-no1:9-12/);
     assert.equal(sha(renderJankoPage(source, 0, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)), BRAHMS_CURRENT_PAGES[0]);
     assert.notEqual(sha(renderJankoPage(projected, 0, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)), BRAHMS_CURRENT_PAGES[0]);
-    for (let page = 1; page < 5; page++) assert.equal(sha(renderJankoPage(projected, page, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)), BRAHMS_CURRENT_PAGES[page]);
+    for (let page = 1; page < 6; page++) assert.equal(sha(renderJankoPage(projected, page, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS)), BRAHMS_CURRENT_PAGES[page]);
     const undone = executeHandCommand({ action: 'undo', base: saved.revision, revision: saved.revision }, root, statePath);
     assert.deepEqual(candidateScore(readCandidate(root, statePath)), source);
     assert.equal(readCandidate(root, statePath).records.length, 2);
@@ -70,7 +70,7 @@ test('non-sample and multi-region edits publish exactly compared crops, with unc
     const reference = renderReferenceView(createStudioConfig());
     const later = { id: 'brahms-op118-no1-436', pitchClass: 0, octave: 4, tick: 6000, expectedHand: 'RH' as const };
     const saved = change({ ...request(baseline(root), 'this'), selected: [later] });
-    assert.deepEqual(saved.effects.changedPages, [2]);
+    assert.deepEqual(saved.effects.changedPages, [3]);
     assert.deepEqual(saved.effects.changedSystems, [8]);
     assert.deepEqual(saved.effects.changedCrops, ['mm.29–32']);
     assert.deepEqual(saved.effects.reviewWindows, [{ measureStart: 29, measureCount: 4, changed: true }]);

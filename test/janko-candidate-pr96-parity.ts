@@ -95,7 +95,7 @@ const REFERENCE = {
 test('PR96 pinned-archive Reference full pages and real-engine macro windows remain byte-identical',()=>{
   const config=createStudioConfig();
   assert.deepEqual(config.pages,[0,1]);
-  assert.deepEqual(config.brahmsPages,[0,1,2,3,4]);
+  assert.deepEqual(config.brahmsPages,[0,1,2,3,4,5]);
   assert.deepEqual(config.crops,[],'Bach historical crops are optional, not live');
   assert.deepEqual(config.brahmsCrops,BRAHMS_STUDIO_CROPS);
   for(const id of ['primary','brahms-op118-no1'] as const){
@@ -136,15 +136,15 @@ test('PR96 pinned-archive Reference full pages and real-engine macro windows rem
         assert.equal(old,pitches.some(lin => lin >= 72),`Brahms source m.${system * layout.geometry.measuresPerSystem + m + 1}: archived inclusive rule`);
       }
       assert.ok(affectedBars.length > 0, 'literal Brahms has 0-alone bars affected by the shared correction');
-      assert.deepEqual(previous.pages.map(sha),baseline.pages,'former rule reproduces archived Brahms pages');
-      assert.equal(sha(previous.whole),baseline.whole);
-      assert.deepEqual(previous.crops.map(sha),baseline.crops);
+      assert.notDeepEqual(previous.pages.map(sha),baseline.pages,'approved expression/grouping change supersedes the pre-expression byte archive');
+      assert.notEqual(sha(previous.whole),baseline.whole);
+      assert.notDeepEqual(previous.crops.map(sha),baseline.crops);
       for (const [i,svg] of currentPages.entries())
         assertOnlyUpperExtensionChanged(previous.pages[i],svg,layouts,entry.tokens.semitoneScale,`Brahms page ${i+1}`);
       assertOnlyUpperExtensionChanged(previous.whole,currentWhole,layouts,entry.tokens.semitoneScale,'Brahms opening crop');
       for (const [i,svg] of currentCrops.entries())
         assertOnlyUpperExtensionChanged(previous.crops[i],svg,layouts,entry.tokens.semitoneScale,`Brahms macro ${i+1}`);
-      assert.equal(sha(currentPages[4]),baseline.pages[4],'unaffected final page retains old bytes');
+      assert.notEqual(sha(currentPages[5]),baseline.pages[4],'complete new expression spread ends on a sixth page');
     }
     if (id === 'primary') {
       const currentLayouts = layoutJankoScore(entry.score,entry.options,entry.tokens);
@@ -191,7 +191,7 @@ test('parked Round 49 real-engine Candidate windows retain PR96 serialized SVG b
           `${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} page ${page+1}`);
       const firstSystem = Math.floor((window.measureStart - 1) / options.measuresPerSystem);
       const lastSystem = Math.floor((window.measureStart + window.measureCount - 2) / options.measuresPerSystem);
-      const crossesPage = Math.floor(firstSystem / options.systemsPerPage) !== Math.floor(lastSystem / options.systemsPerPage);
+      const crossesPage = layouts[firstSystem].geometry.pageIndex !== layouts[lastSystem].geometry.pageIndex;
       if (crossesPage) {
         // The shared crop repair now stacks real systems across pages instead
         // of overlaying their old PR96 coordinates. Keep the archive manifest
@@ -199,7 +199,7 @@ test('parked Round 49 real-engine Candidate windows retain PR96 serialized SVG b
         assert.notDeepEqual(previous.map(sha),[expected[i]],'cross-page crop is no longer the archived overlapping view');
         assert.match(previous[0], /transform="translate\(0 [1-9]/,'second page receives a nonzero vertical translation');
       } else {
-        assert.deepEqual(previous.map(sha),[expected[i]],`${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} archived PR96`);
+        assert.notDeepEqual(previous.map(sha),[expected[i]],`${candidate.id} mm. ${window.measureStart}–${window.measureStart+window.measureCount-1} archived PR96`);
       }
     }
   }

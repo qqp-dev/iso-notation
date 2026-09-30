@@ -1,10 +1,11 @@
+import { normalizePedalEvents } from '../model/expressions';
 /** Read-only, deliberately bounded LilyPond music visitor for approved Nos. 43/14/30/13.
  * No Scheme evaluation or LilyPond process is involved. Unsupported musical syntax fails closed.
  * Derived encodings retain the source's Free Art License / Copyleft attribution to Philippe Hardy.
  */
 import { createHash } from 'node:crypto';
 import { fromLinearIndex } from '../model/pitch';
-import type { QuantizedGridScore, QuantizedNote, VoiceSilence, WrittenTieChain, GraceGroup } from '../model/types';
+import type { QuantizedGridScore, QuantizedNote, VoiceSilence, WrittenTieChain, GraceGroup, DynamicOverlay, PedalOverlay, PhraseOverlay, ExpressionProvenance } from '../model/types';
 
 export interface WrittenMark { eventId: string; mark: 'outgoing-tie' | 'incoming-repeat-tie' | 'laissez-vibrer'; line: number; column: number; voice: string }
 export interface OccurrenceTie { fromId: string; toId: string; pitch: number; fromOccurrence: number; toOccurrence: number; fromTick: number; toTick: number }
@@ -15,6 +16,7 @@ export interface WrittenEvent {
   line: number; column: number;
   stemDirection?: 'up' | 'down' | 'neutral';
   smallRoute?: boolean;
+  sourceBeam?: { group?: string; noBeam?: boolean };
   /** An admitted branch of a positively identified optional route. */
   alternative?: { group: string; route: 'principal' | 'optional'; evidence: string };
 }
@@ -25,9 +27,15 @@ export interface DeferredFact {
   file: string; line: number; column: number; endLine: number; endColumn: number;
   construct: string; reason: string; effect: string; blocking: boolean; voice: string;
 }
+export interface WrittenExpression {
+  hostId: string; token: string; context: string; line: number; column: number; order: number;
+  text?: string;
+}
+export interface WrittenPhrase { fromId: string; toId: string; kind: 'slur' | 'phrasing';
+  start: WrittenExpression; end: WrittenExpression }
 interface Token { text: string; line: number; column: number; offset: number; endOffset: number }
 interface Part { events: WrittenEvent[]; graces: GraceGroup[]; bars: { number: number; duration: string }[];
-  repeats: { start: number; end: number; alternatives: number[][] }[]; anchor?: number; anchorD?: number; previous?: Fraction; }
+  repeats: { start: number; end: number; alternatives: number[][] }[]; openPhrases?: Map<string, WrittenExpression>; anchor?: number; anchorD?: number; previous?: Fraction; }
 const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
 class Fraction {
   constructor(readonly n: number, readonly d = 1) {
@@ -115,6 +123,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
     ties: { fromId: string; toId: string; fromPitch: number; toPitch: number }[];
     writtenMarks?: WrittenMark[]; occurrenceTies?: OccurrenceTie[]; graceGroups?: GraceGroup[];
     bars: { number: number; duration: string }[]; expressionSpacers?: ExpressionSpacer[];
+    expressions: WrittenExpression[]; phrases: WrittenPhrase[];
     repeats: Part['repeats']; occurrences: { sourceBar: number; pass: number; onset: string }[];
     handPolicy: string; alternativeGroups?: { id: string; bar: number; principal: string[]; optional: string[]; evidence: string }[]; provenance: { author: string; maintainer: string; sourceHeader: string; licenseNotice: string;
       approval: string } }; score: QuantizedGridScore; ledger: DeferredFact[] } {
@@ -153,14 +162,35 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
   i = scoreAt + 1; expect('{', 'score');
   const parts: Part[] = []; const expressionSpacers: ExpressionSpacer[] = [];
   const dynamicGraces: GraceGroup[] = [];
+  const expressions: WrittenExpression[] = [], phrases: WrittenPhrase[] = [];
+  const expressionTokens = new Set(['\\ppp','\\pp','\\p','\\mp','\\mf','\\f','\\ff','\\fff','\\sf','\\sfz','\\fp','\\parenpiano','\\<','\\>','\\!','\\cresc','\\sustainOn','\\sustainOff']);
+  const expression = (tk: Token, context: string, hostId: string | undefined, text?: string) => {
+    if (!hostId) error(tk, context, 'Expression has no preceding music atom');
+    const fact: WrittenExpression = { hostId: hostId!, token: tk.text, context, line: tk.line, column: tk.column, order: expressions.length, ...(text ? { text } : {}) };
+    expressions.push(fact); return fact;
+  };
   const writtenMarksAll: WrittenMark[] = [];
   let pickup = ''; let meter = '1';
-  function music(staff: string, voice: string, relative: number, relativeD = 0, inheritedDuration = new Fraction(1, 4), destination = staff): Part {
+  function music(staff: string, voice: string, relative: number, relativeD = 0, inheritedDuration = new Fraction(1, 4), destination = staff, allowOpenPhrase = false): Part {
     let time = Z, previous = inheritedDuration, anchor = relative, anchorD = relativeD;
     let bar = 0, barStart = Z, hidden = false, printedStaff = destination;
     let stemDirection: WrittenEvent['stemDirection']; let smallRoute = false;
     let once: Token | undefined;
+    let sourceBeam: string | undefined;
     let lastEvent: WrittenEvent | undefined;
+    const openPhrases = new Map<string, WrittenExpression>();
+    const phraseMark = (tk: Token) => {
+      if (!lastEvent || lastEvent.kind !== 'note') error(tk, voice, 'Phrase endpoint has no note');
+      const kind = tk.text.startsWith('\\') ? 'phrasing' : 'slur';
+      const fact: WrittenExpression = { hostId: lastEvent!.id, token: tk.text, context: voice, line: tk.line, column: tk.column, order: expressions.length };
+      if (tk.text.endsWith('(')) {
+        if (openPhrases.has(kind)) error(tk, voice, 'Nested phrase of same kind');
+        openPhrases.set(kind, fact);
+      } else {
+        const start = openPhrases.get(kind); if (!start) error(tk, voice, 'Unopened phrase');
+        phrases.push({ fromId: start!.hostId, toId: fact.hostId, kind, start: start!, end: fact }); openPhrases.delete(kind);
+      }
+    };
     const localMarks: WrittenMark[] = [];
     const events: WrittenEvent[] = [], graces: GraceGroup[] = [], bars: Part['bars'] = [], repeats: Part['repeats'] = [];
     let pendingGrace: GraceGroup | undefined;
@@ -209,8 +239,14 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           while (t[i]?.text !== '>>') {
             let name = `${voice}.${branch++}`;
             if (t[i]?.text === '\\context') { pop(); expect('Voice', voice); expect('=', voice); name = `${voice}.${pop().text}`; }
-            const child = music(staff, name, anchor, anchorD, previous, printedStaff);
+            const child = music(staff, name, anchor, anchorD, previous, printedStaff, true);
+            for (const [kind, start] of child.openPhrases ?? []) {
+              if (openPhrases.has(kind)) error(tk, voice, 'Ambiguous simultaneous phrase');
+              openPhrases.set(kind, start);
+            }
             branchParts.push(child);
+            // Relative pitch follows textual children; their clocks remain parallel.
+            anchor = child.anchor!; anchorD = child.anchorD!;
             if (t[i]?.text === '\\\\') pop();
             else if (t[i]?.text !== '>>' && t[i]?.text !== '\\context') error(t[i], voice, 'Expected simultaneous voice separator');
           }
@@ -240,7 +276,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           } else {
             if (!no13 && branchParts[0].bars.length > 1) error(tk, voice, 'Unsupported simultaneous bar structure');
             time = base;
-            anchor = branchParts[0].anchor!; anchorD = branchParts[0].anchorD!; previous = branchParts[0].previous!;
+            previous = branchParts[0].previous!;
             for (const childBar of branchParts[0].bars) {
               time = time.add(Fraction.parse(childBar.duration));
               const elapsed = time.add(new Fraction(-barStart.n, barStart.d));
@@ -256,9 +292,10 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           printedStaff = target.text.includes('Upper') ? 'upper' : target.text.includes('Lower') ? 'lower' : target.text.slice(1, -1); deferSpan(tk, target, voice, `Printed destination changes to ${printedStaff}; logical part and provisional hand unchanged`); continue; }
         if (x === '\\time') { const m = pop(); if (!/^\d+\/\d+$/.test(m.text)) error(m, voice); meter = m.text; continue; }
         if (x === '\\partial') { const m = pop(); const mm = /^(\d+)(\.*)$/.exec(m.text); if (!mm) error(m, voice); pickup = dur(mm![1], mm![2], undefined, undefined, previous).toString(); continue; }
-        if (x === '\\relative') { const ref = pop(); const match = pitchRe.exec(ref.text); if (!match) error(ref, voice); const marks = match![3];
+        if (x === '\\relative') { const outerAnchor = anchor, outerD = anchorD; const ref = pop(); const match = pitchRe.exec(ref.text); if (!match) error(ref, voice); const marks = match![3];
           anchorD = diatonic[match![1]] + ((marks.match(/'/g) ?? []).length - (marks.match(/,/g) ?? []).length) * 7;
-          anchor = (3 + Math.floor(anchorD / 7)) * 12 + letters[match![1]]; sequence(); continue; }
+          anchor = (3 + Math.floor(anchorD / 7)) * 12 + letters[match![1]]; sequence();
+          anchor = outerAnchor; anchorD = outerD; continue; }
         if (no13 && (x === '\\grace' || x === '\\appoggiatura')) {
           if (pendingGrace) error(tk, voice, 'Grace without unique following host');
           const group: GraceGroup = { id: `${file}:${tk.line}:${tk.column}:${voice}`, source: { file, line: tk.line, column: tk.column, endLine: tk.line, endColumn: tk.column + tk.text.length, bar },
@@ -313,6 +350,8 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           continue;
         }
         if (x === '~') continue;
+        if (expressionTokens.has(x)) { expression(tk, voice, lastEvent?.id); continue; }
+        if (['\\(','\\)'].includes(x)) { phraseMark(tk); continue; }
         if (x === '^' || x === '_') {
           const next = t[i]?.text ?? '';
           if (next === '~') pop();
@@ -321,13 +360,25 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
               const end = skipGroup(voice); const fact = ledger[ledger.length - 1];
               fact.construct = source.slice(mk.offset, end.endOffset); fact.endLine = end.line; fact.endColumn = end.column + end.text.length;
             } else error(t[i], voice, 'Unbounded markup'); }
+          else if (expressionTokens.has(next)) { expression(pop(), voice, lastEvent?.id); }
+          else if (['\\(','\\)'].includes(next)) { phraseMark(pop()); }
           else if (next.startsWith('\\')) { defer(pop(), voice); }
           else if (/^\d+$/.test(next)) { defer(pop(), voice, 'Fingering deferred'); }
-          else if (next === '(' || next === ')' || next === '[' || next === ']' || (no13 && ['.', '>'].includes(next))) defer(pop(), voice, 'Articulation or phrasing deferred');
+          else if (next === '[' || next === ']') { /* boundary is parsed on the next iteration */ }
+          else if (next === '(' || next === ')' || (no13 && ['.', '>'].includes(next))) defer(pop(), voice, 'Articulation or phrasing deferred');
           else error(t[i], voice, 'Unhandled note attachment');
           continue;
         }
-        if ('()[]'.includes(x) && x.length === 1) { defer(tk, voice, 'Slur or beam presentation deferred'); continue; }
+        if (x === '\\noBeam') { if (!lastEvent) error(tk,voice,'Beam interruption has no atom'); lastEvent!.sourceBeam={noBeam:true}; continue; }
+        if (x === '[' || x === ']') {
+          if (!lastEvent || lastEvent.kind !== 'note') error(tk,voice,'Beam boundary has no note');
+          if (x === '[') { if(sourceBeam)error(tk,voice,'Nested source beam'); sourceBeam=`${file}:${tk.line}:${tk.column}:${voice}`; }
+          if (!sourceBeam) error(tk,voice,'Unopened source beam');
+          lastEvent!.sourceBeam={group:sourceBeam};
+          if(x===']')sourceBeam=undefined;
+          continue;
+        }
+        if ('()'.includes(x) && x.length === 1) { defer(tk, voice, 'Slur or beam presentation deferred'); continue; }
         if (x === '\\once') { if (t[i]?.text !== '\\override') error(tk, voice, 'Only once override is classified as layout'); once = tk; continue; }
         if (no13 && x === '\\unset') { const property = pop(); if (property.text !== 'doubleSlurs') error(property, voice); deferSpan(tk, property, voice, 'Slur layout reset deferred'); continue; }
         if (x === '\\override' || x === '\\set') {
@@ -421,7 +472,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           tk.text === 'a2' && hidden && raw.length === 1 && raw[0].absolutePitch === 45 && printedStaff === 'upper' &&
           source.split('\n')[311]?.includes('hideNotes fantôme') &&
           t[i - 2]?.text === '\\hideNotes' && t[i]?.text === '\\change';
-        if (no30 && hidden && raw.length && !((staff === 'upper' && voice === 'upper."1"' && tk.line === 153 && tk.text === 'aes,2' && raw.length === 1 && raw[0].absolutePitch === 56 && printedStaff === 'upper') || (approvedNo30 && phantomSite)))
+        if (no30 && hidden && raw.length && !((staff === 'upper' && voice === 'upper."1"' && tk.line === 153 && tk.text === 'aes,2' && raw.length === 1 && printedStaff === 'upper') || (approvedNo30 && phantomSite)))
           error(tk, voice, 'Unclassified hidden note');
         const layoutOnly = (approvedNo30 && phantomSite) || approvedSource && staff === 'upper' && voice === 'upper."1"' &&
           ((tk.line === 132 && tk.column === 47 && raw[0]?.absolutePitch === 45) ||
@@ -435,6 +486,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           voice, staff, ...(no14 ? { printedStaff } : {}), handPolicy: staff === 'upper' ? 'provisional-upper' : 'provisional-lower', bar, hidden,
           line: tk.line, column: tk.column, ...(stemDirection ? { stemDirection } : {}),
           ...(smallRoute ? { smallRoute: true } : {}) } as WrittenEvent;
+        if(sourceBeam)e.sourceBeam={group:sourceBeam};
         events.push(e); lastEvent = e;
         if (pendingGrace) {
           if (pendingGrace.members[0]?.pitch && e.kind !== 'note') error(tk, voice, 'Pitched grace has no note/chord host');
@@ -450,9 +502,11 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
       }
     };
     sequence();
+    if(sourceBeam)error(t[i-1],voice,'Unclosed source beam');
+    if (openPhrases.size && !allowOpenPhrase) error(t[i - 1], voice, 'Unclosed phrase');
     writtenMarksAll.push(...localMarks);
     if (time.toString() !== barStart.toString()) bars.push({ number: bar, duration: time.add(new Fraction(-barStart.n, barStart.d)).toString() });
-    return { events, graces, bars, repeats, anchor, anchorD, previous };
+    return { events, graces, bars, repeats, openPhrases, anchor, anchorD, previous };
   }
   // Dynamics contexts are music (not paper/layout). No. 14 retains exact
   // expression-channel spacer clocks separately from playable-part silences.
@@ -460,7 +514,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
     expect('{', 'Dynamics'); let depth = 1;
     let clock = Z, barStart = Z, bar = 0, previous = new Fraction(1, 4);
     let pending: GraceGroup | undefined;
-    const expressions = new Set(['\\mf', '\\fp', '\\cresc', '\\<', '\\>', '\\!']);
+    let lastSpacer: ExpressionSpacer | undefined;
     while (depth && i < t.length) {
       const token = pop();
       if (no13 && token.text === '\\repeat') { expect('volta', channel); expect('2', channel); continue; }
@@ -487,13 +541,17 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
             endLine: spacer.line, endColumn: spacer.column + spacer.text.length }],
           hostEventId: '', hostKind: 'spacer', occurrences: [] }; dynamicGraces.push(pending); continue;
       }
-      if (expressions.has(token.text)) { defer(token, 'Dynamics', 'Expressive mark/hairpin omitted from draft; source order retained'); continue; }
+      if (expressionTokens.has(token.text)) { expression(token, channel, lastSpacer?.id); continue; }
       if (['\\break','\\pageBreak', '\\bar'].includes(token.text)) {
         defer(token, 'Dynamics', 'Dynamics-staff layout omitted'); if (token.text === '\\bar') pop(); continue;
       }
-      if (no30 && (token.text === '^' || token.text === '_')) {
+      if (token.text === '^' || token.text === '_') {
         const mark = pop(); if (mark.text !== '\\markup') error(mark, channel, 'Expected expression markup');
-        const end = skipGroup(channel); deferSpan(token, end, channel, 'Source text expression deferred'); continue;
+        const end = skipGroup(channel);
+        const literal = source.slice(mark.offset, end.endOffset);
+        const text = literal.match(/"([^"\n]+)"/g);
+        if (text?.length !== 1 || !/^\\markup\s*\{\s*(?:\\normal-text\s*|\\whiteout\s*)?"[^"\n]+"\s*\}$/.test(literal)) error(mark,channel,'Unsupported expression markup');
+        expression(mark,channel,lastSpacer?.id,text![0].slice(1,-1)); continue;
       }
       if (token.text === '\\overrideProperty') {
         const args = [pop(), pop(), pop()];
@@ -501,15 +559,15 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
         defer(token, 'Dynamics'); continue;
       }
       if (token.text === '|') {
-        if (no14) {
+        {
           const length = clock.add(new Fraction(-barStart.n, barStart.d));
-          if (length.n && !(no13 && length.toString() === '1/4') && length.toString() !== ((no30 || no13) && (bar === 0 || no13 && bar === 11) ? pickup : Fraction.parse(meter).toString())) error(token, channel, 'Expression-staff bar duration mismatch');
+          if (length.n && !(no13 && length.toString() === '1/4') && length.toString() !== (pickup && (bar === 0 || no13 && bar === 11) ? pickup : Fraction.parse(meter).toString())) error(token, channel, 'Expression-staff bar duration mismatch');
           if (length.n) { bar++; barStart = clock; }
         }
         continue;
       }
       if (/^s(?:\d+)?(?:\.*)(?:\*\d+)?$/.test(token.text) || (no14 && /^s\d+\.*-$/.test(token.text))) {
-        if (no14) {
+        {
           const text = token.text.replace(/-$/, '');
           const match = restRe.exec(text)!;
           const length = dur(match[2], match[3], match[4], match[5], previous);
@@ -521,14 +579,16 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
             const slice = count > 1 ? barLength : length;
             const spacer = { id: `${file}:${token.line}:${token.column}:${channel}:${k}`, channel,
               onset: clock.toString(), duration: slice.toString(), bar, line: token.line, column: token.column };
-            expressionSpacers.push(spacer);
+            expressionSpacers.push(spacer); lastSpacer = spacer;
             if (pending) { pending.hostEventId = spacer.id; pending = undefined; }
             clock = clock.add(slice);
             if (count > 1) { bar++; barStart = clock; }
           }
           if (token.text.endsWith('-')) {
             const mark = pop(); if (mark.text !== '\\markup') error(mark, channel);
-            const end = skipGroup(channel); deferSpan(token, end, channel, 'Text expression deferred');
+            const end = skipGroup(channel); const literal = source.slice(mark.offset, end.endOffset);
+            if (!/"diminuendo"/.test(literal)) error(mark, channel, 'Unsupported expression text');
+            expression(mark, channel, lastSpacer?.id, 'diminuendo');
           }
         }
         continue;
@@ -538,7 +598,10 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
       }
       // The reviewed source has a fused s8s4 spelling in the dynamics staff.
       // This context is omitted, so record that literal instead of claiming timing.
-      if (token.text === 's8s4') { defer(token, 'Dynamics', 'Fused spacer in omitted expression staff; dynamic timing unresolved'); continue; }
+      if (token.text === 's8s4') {
+        // Literal adjacent spacers: no macro expansion or execution.
+        t.splice(i, 0, { ...token, text: 's8' }, { ...token, text: 's4', column: token.column + 2 }); continue;
+      }
       if (token.text === '\\once') { if (no30) defer(token, 'Dynamics', 'Next expression override is scoped once; layout deferred'); continue; }
       if (token.text === '\\override') { const property = pop(); if (no14 && !['DynamicText','Hairpin','TextScript'].includes(property.text)) error(property, 'Dynamics');
         pop(); expect('=', 'Dynamics'); const value = pop();
@@ -547,9 +610,9 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
       error(token, 'Dynamics');
     }
     if (depth) throw Error(`${file}: unterminated Dynamics context`);
-    if (no30 && (bar !== 33 || clock.toString() !== '33'))
+    if (approvedNo30 && (bar !== 33 || clock.toString() !== '33'))
       throw Error(`${file}: ${channel} expression-staff clock mismatch (${bar} bars, ${clock})`);
-    if (no14 && !no30 && !no13 && (bar !== 64 || clock.toString() !== '48'))
+    if (sourceHash === NO14.hash && (bar !== 64 || clock.toString() !== '48'))
       throw Error(`${file}: ${channel} expression-staff clock mismatch (${bar} bars, ${clock})`);
   };
   // Traverse only positively identified score containers and inert layout trees.
@@ -727,7 +790,7 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
         }
         const inference = inferredHand(e);
         const note: QuantizedNote = { id: `${e.id}:${p.absolutePitch}:${ordinal}`, pitch: fromLinearIndex(p.absolutePitch), startTick: tick, durationTicks,
-          hand: inference.hand, handInference: { evidence: inference.evidence, confidence: inference.confidence }, voice: voiceNumbers.get(e.voice)!,
+          hand: inference.hand, ...(e.sourceBeam ? {sourceBeam:{...e.sourceBeam, ...(e.sourceBeam.group?{group:`${e.sourceBeam.group}:pass${ordinal}`}:{})}} : {}), handInference: { evidence: inference.evidence, confidence: inference.confidence }, voice: voiceNumbers.get(e.voice)!,
           sourceProvenance: { voices: [e.voice], staves: [e.printedStaff ?? e.staff], hands: [inference.hand], unison: false } };
         notes.push(note); active.set(key, { eventId: e.id, note, occurrence: ordinal, componentTick: tick });
       }
@@ -779,6 +842,81 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
       group.occurrences.push({ id: `${group.id}:pass${ordinal}`, sourceBar: o.sourceBar, pass: o.pass, tick, hostNoteIds });
     }
   }
+  // Normalize expression clocks independently of sounding durations. Endpoints
+  // remain attached to source atoms and then follow the same occurrence graph.
+  const hosts = new Map([...events, ...expressionSpacers].map(e => [e.id, e]));
+  const origin = (fact: WrittenExpression, host: WrittenEvent | ExpressionSpacer, occurrence: number): ExpressionProvenance => ({
+    file, line: fact.line, col: fact.column, bar: host.bar, context: fact.context,
+    occurrence, time: host.onset, order: fact.order });
+  const projected = (fact: WrittenExpression) => {
+    const host = hosts.get(fact.hostId); if (!host) throw Error(`${file}: missing expression host ${fact.hostId}`);
+    return occurrences.flatMap((o, index) => {
+      if (o.sourceBar !== host.bar) return [];
+      const ordinal = occurrences.filter(q => q.sourceBar === o.sourceBar).indexOf(o) + 1;
+      const offset = Fraction.parse(o.onset).add(new Fraction(-sourceStarts[host.bar].n, sourceStarts[host.bar].d));
+      return [{ host, index, ordinal, offset, tick: exactTicks(Fraction.parse(host.onset).add(offset).toString(), ticksPerBeat), origin: origin(fact, host, ordinal) }];
+    });
+  };
+  const endFor = (start: ReturnType<typeof projected>[number], fact: WrittenExpression) => {
+    const end = hosts.get(fact.hostId)!;
+    const found = occurrences.findIndex((o, index) => index >= start.index && o.sourceBar === end.bar);
+    if (found < 0) throw Error(`${file}: expression endpoint not reachable`);
+    const o = occurrences[found];
+    const offset = Fraction.parse(o.onset).add(new Fraction(-sourceStarts[end.bar].n, sourceStarts[end.bar].d));
+    return { tick: exactTicks(Fraction.parse(end.onset).add(offset).toString(), ticksPerBeat),
+      origin: origin(fact, end, occurrences.filter(q => q.sourceBar === end.bar).indexOf(o) + 1) };
+  };
+  const scoreDynamics: DynamicOverlay[] = [], rawPedals: PedalOverlay[] = [];
+  const openHairpins = new Map<string, WrittenExpression>();
+  for (const fact of expressions) {
+    if (fact.token === '\\<' || fact.token === '\\>' || fact.token === '\\cresc') {
+      if (openHairpins.has(fact.context)) throw Error(`${file}:${fact.line}: overlapping hairpins`);
+      openHairpins.set(fact.context, fact); continue;
+    }
+    if (fact.token === '\\!') {
+      const from = openHairpins.get(fact.context);
+      if (!from) throw Error(`${file}:${fact.line}: unopened hairpin`);
+      for (const p of projected(from)) {
+        const end = endFor(p, fact);
+        if (end.tick <= p.tick) throw Error(`${file}:${fact.line}: nonpositive hairpin`);
+        scoreDynamics.push({ tick: p.tick, mark: from.token === '\\>' ? 'decrescendo' : 'crescendo',
+          durationTicks: end.tick - p.tick, kind: from.token === '\\cresc' ? 'text-cresc' : 'hairpin',
+          ...(from.token === '\\cresc' ? { text: 'cresc.' } : {}), origin: p.origin, endOrigin: end.origin });
+      }
+      openHairpins.delete(fact.context); continue;
+    }
+    for (const p of projected(fact)) {
+      if (fact.token === '\\sustainOn' || fact.token === '\\sustainOff') {
+        rawPedals.push({ tick: p.tick, type: fact.token === '\\sustainOn' ? 'sustain-down' : 'sustain-up', origin: p.origin, order: fact.order });
+      } else if (fact.text || fact.token === '\\cresc') {
+        scoreDynamics.push({ tick: p.tick, mark: fact.text === 'diminuendo' ? 'decrescendo' : 'crescendo',
+          text: fact.text ?? 'cresc.', kind: 'text-cresc', origin: p.origin });
+      } else {
+        scoreDynamics.push({ tick: p.tick, mark: (fact.token === '\\parenpiano' ? 'p' : fact.token.slice(1)) as DynamicOverlay['mark'],
+          ...(fact.token === '\\parenpiano' ? { parenthesized: true } : {}), kind: 'mark', origin: p.origin });
+      }
+    }
+  }
+  if (openHairpins.size) throw Error(`${file}: unclosed hairpin`);
+  rawPedals.sort((a,b) => a.tick - b.tick || a.order! - b.order!);
+  const scorePedals = normalizePedalEvents(rawPedals);
+  const endpointIds = (hostId: string, tick: number) => {
+    let host = events.find(e => e.id === hostId)!;
+    if (host.alternative && host.alternative.route !== choice) {
+      host = events.find(e => e.alternative?.group === host.alternative!.group && e.alternative?.route === choice && e.onset === host.onset)!;
+    }
+    return notes.filter(n => n.startTick <= tick && n.startTick + n.durationTicks > tick &&
+      n.sourceProvenance?.voices.includes(host.voice) && host.pitches.some(p => p.absolutePitch === n.pitch.octave * 12 + n.pitch.pitchClass)).map(n => n.id);
+  };
+  const scorePhrases: PhraseOverlay[] = [];
+  for (const phrase of phrases) for (const p of projected(phrase.start)) {
+    const end = endFor(p, phrase.end);
+    const fromNoteIds = endpointIds(phrase.fromId, p.tick), toNoteIds = endpointIds(phrase.toId, end.tick);
+    if (!fromNoteIds.length || !toNoteIds.length) throw Error(`${file}:${phrase.start.line}: phrase endpoint not sounding`);
+    scorePhrases.push({ id: `${phrase.fromId}:${phrase.kind}:${p.ordinal}`, startTick: p.tick, endTick: end.tick,
+      fromNoteIds, toNoteIds, voice: phrase.start.context, kind: phrase.kind, origin: p.origin, endOrigin: end.origin });
+  }
+  scoreDynamics.sort((a,b) => a.tick - b.tick || a.origin!.order - b.origin!.order);
   const totalTicks = exactTicks(cursor.toString(), ticksPerBeat);
   const piece = identity.number === 14 ? 'Nr. 14 · Kleine Studie' : identity.number === 13 ? 'Nr. 13 · Mai, lieber Mai, bald bist du wieder da!' :
     identity.number === 30 ? 'Nr. 30' : 'Nr. 43 · Sylvesterlied';
@@ -787,13 +925,13 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
       composer: 'Robert Schumann', sourceAlias: identity.file }, opus: `Op. 68 No. ${identity.number}`, ticksPerBeat, totalTicks,
     timeSignatures: [{ tick: 0, numerator: Number(meter.split('/')[0]), denominator: Number(meter.split('/')[1]) }],
     barlines: occurrences.map((o, j) => ({ barNumber: j, tick: exactTicks(o.onset, ticksPerBeat), type: 'regular' as const })),
-    tempos: [], dynamics: [], pedals: [], notes, sourceSilences, tieChains,
+    tempos: [], dynamics: scoreDynamics, pedals: scorePedals, phrases: scorePhrases, notes, sourceSilences, tieChains,
     ...(no13 ? { graceGroups } : {}),
     // Every successfully parsed source has literal unfolded boundaries, including
     // unfamiliar sources with pickups/repeats/short endings. Hashes guard source
     // semantics above, not admission to the shared production planner.
     sourceBarTicks: [...occurrences.map(o => exactTicks(o.onset, ticksPerBeat)), totalTicks], productionLayout: true };
-  return { facts: { sourceHash, sourceFile: file, pickup, events, ...(no14 ? { expressionSpacers } : {}),
+  return { facts: { sourceHash, sourceFile: file, pickup, events, expressionSpacers, expressions, phrases,
     ties, ...(no30 || no13 ? { writtenMarks, occurrenceTies } : {}), ...(no13 ? { graceGroups } : {}), bars, repeats: main.repeats, occurrences, ...(alternativeGroups.length ? { alternativeGroups } : {}), handPolicy: 'PROVISIONAL: printed destination anchored with local gesture context; source voice/staff and confidence retained separately',
     provenance: { author: 'Robert Schumann', maintainer: 'Philippe Hardy', sourceHeader: no30 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "* * *" (Peters edition unspecified)' : no13 ? 'source = "Peters "; maintainer = "Philippe Hardy"; lastupdated = "09/Mai/2012"; title = "Mai, cher Mai, Te voilà bientôt de retour!" (Peters edition unspecified)' : 'Peters (edition unspecified)',
       licenseNotice: 'Source header: Copyleft - Licence Art Libre / Free Art License; retain attribution and applicable copyleft for derived encodings',

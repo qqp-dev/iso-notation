@@ -1932,6 +1932,8 @@ export const JANKO_RHYTHM_STYLE_LABELS: Record<JankoRhythmStyle, string> = {
  */
 export interface JankoSystemGeometry {
   /** Opt-in unfolded literal bar boundaries, final end included. */
+  inkAwarePagination?: boolean;
+  timeSignatures?: readonly { tick: number; numerator: number; denominator: number }[];
   sourceBarTicks?: readonly number[];
   /** First global bar in this system and each bar's horizontal edge, for production packing. */
   firstBar?: number;
@@ -1995,6 +1997,8 @@ export interface StaffLineSegment {
 
 /** Absolute page geometry for a Jánko Two-Row page. */
 export interface JankoPageGeometry {
+  inkAwarePagination?: boolean;
+  timeSignatures?: readonly { tick: number; numerator: number; denominator: number }[];
   sourceBarTicks?: readonly number[];
   systemBarStarts?: readonly number[];
   productionSystems?: readonly { firstBar: number; lastBar: number; widths: readonly number[]; minimums: readonly number[]; leftInsets: readonly number[] }[];

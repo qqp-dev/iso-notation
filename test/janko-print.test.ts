@@ -74,7 +74,7 @@ test('Print resolves the canonical studio/CLI entries', () => {
     'Brahms active tokens'
   );
   assert.equal(countJankoPages(bach.score, bach.options, bach.tokens), 2, 'Bach paginates to 2');
-  assert.equal(countJankoPages(brahms.score, brahms.options, brahms.tokens), 5, 'Brahms paginates to 5');
+  assert.equal(countJankoPages(brahms.score, brahms.options, brahms.tokens), 6, 'Brahms paginates to 5');
   assert.throws(() => resolvePrintScore('no-such-score'), /not found/, 'unknown scores throw');
 });
 

@@ -144,11 +144,11 @@ test('Brahms pagination arithmetic: 71 measures → 18 systems → 5 pages canon
   assert.equal(O_BRAHMS.systemsPerPage, 4, 'four systems per page');
   assert.equal(geo.slotHeight.toFixed(2), '183.97', '735.89 / 4 = 183.97');
   assert.equal(Math.ceil(18 / O_BRAHMS.systemsPerPage), 5, '18 systems at 4-up = 5 pages');
-  assert.equal(countJankoPages(BRAHMS, O_BRAHMS, T_BRAHMS), 5, 'the engine pages 5');
-  assert.deepEqual(createStudioConfig().brahmsPages, [0, 1, 2, 3, 4], 'the studio spreads 5');
+  assert.equal(countJankoPages(BRAHMS, O_BRAHMS, T_BRAHMS), 6, 'the engine pages 6');
+  assert.deepEqual(createStudioConfig().brahmsPages, [0, 1, 2, 3, 4, 5], 'the studio spreads 5');
   const html = renderReferenceView(createStudioConfig());
   const brahms = referenceBlock(html, 'brahms-op118-no1');
-  assert.equal(brahms.match(/data-page="/g)?.length ?? 0, 5, 'the Reference spread shows all 5 Brahms pages');
+  assert.equal(brahms.match(/data-page="/g)?.length ?? 0, 6, 'the Reference spread shows all six expression-aware pages');
   // First system: the 48-tick pickup plus four full 192-tick measures.
   const s0 = layoutJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS)[0];
   const s0ticks = s0.notes.map((p) => p.note.startTick);
@@ -396,16 +396,16 @@ test('Brahms option diff is the pagination block plus the adopted Round 45 treat
 test('Reference completeness: Brahms systems 1–18 each render exactly once across the 5-page spread', () => {
   const seen = new Map<number, number>();
   const perPage: number[] = [];
-  for (let page = 0; page < 5; page++) {
+  for (let page = 0; page < 6; page++) {
     const svg = renderJankoPage(BRAHMS, page, O_BRAHMS, T_BRAHMS);
     const ids = [...svg.matchAll(/id="system-(\d+)"/g)].map((m) => Number(m[1]));
     perPage.push(ids.length);
-    assert.match(svg, new RegExp(`Page ${page + 1} of 5`), `page ${page + 1} footer counts 5`);
+    assert.match(svg, new RegExp(`Page ${page + 1} of 6`), `page ${page + 1} footer counts 6`);
     for (const n of ids) {
       seen.set(n, (seen.get(n) ?? 0) + 1);
     }
   }
-  assert.deepEqual(perPage, [4, 4, 4, 4, 2], '4 systems per page, the last page holds 2');
+  assert.deepEqual(perPage, [3, 3, 3, 3, 3, 3], 'source expression admission seats three complete systems per page');
   assert.equal(seen.size, 18, 'all 18 systems render somewhere');
   for (let n = 1; n <= 18; n++) {
     assert.equal(seen.get(n), 1, `system ${n} renders exactly once`);

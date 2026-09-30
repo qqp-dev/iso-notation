@@ -414,7 +414,7 @@ test('Laying out Brahms Op. 118 No. 1 produces zero notehead collisions', () => 
   const systemsPerPage = OPTIONS.systemsPerPage ?? 1;
   const pageOf = new Map<string, number>();
   for (const layout of LAYOUTS) {
-    for (const p of layout.notes) pageOf.set(p.note.id, Math.floor(layout.index / systemsPerPage));
+    for (const p of layout.notes) pageOf.set(p.note.id, layout.geometry.pageIndex ?? Math.floor(layout.index / systemsPerPage));
   }
   let collisions = 0;
   for (let i = 0; i < notes.length; i++) {

@@ -1,3 +1,4 @@
+import { BRAHMS_CURRENT_PAGES } from './support/brahms-current';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -173,7 +174,7 @@ test('placed semantic rest owners and paint mutation do not consult source geome
 // C6-row rules on canonical pages; the crop also composes all five pages.
 const originalPages = {
   bach: ['2a5c2abe6365250e9e9e5acd46f4effdc5f8b380cb0fc7cf689764dd239a534f','dbfb83dcf008782d34e5260548c706d0cb980689eac58b24c7d0e7ae1e828757'],
-  brahms: ['af7ad58fbef744a38f80717d82fac8bc6ca9aaf2a8192c7a837728ee7843c091','611ddb4cff6bf0ee6cb399aa723b39cc2aeb555ccc1a3c69fe8f84e707962c6b','ab22a7546febc28059b0645f81a7bc8affd8b7a3dd720b6ec1056174eeadbdfc','9c6dbc058a56de2deeffb2c6fa2bcf190ebc469cfbbf8d4c2fd9b8edf869163a','d2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5'],
+  brahms: BRAHMS_CURRENT_PAGES,
 };
 test('archival Bach hands remain byte-identical to PR91 with the historical rest policy', () => {
   const score=bachBeforeM5(buildBachGoldbergVar1Score());
@@ -185,5 +186,5 @@ test('archival Bach hands remain byte-identical to PR91 with the historical rest
 test('Brahms BRONZE pages and cropped system match the shared above-zero policy', () => {
   assert.equal(countJankoPages(brahms,bo,bt),originalPages.brahms.length);
   originalPages.brahms.forEach((expected,i)=>assert.equal(sha(renderJankoPage(brahms,i,bo,bt)),expected,`brahms page ${i}`));
-  assert.equal(sha(renderJankoCrop(brahms,1,4,bo,bt)),'482265c76fc0e592e3a4e03195485eb2b9f6c61f579bb3d0c6702f8cd9e5431b');
+  assert.equal(sha(renderJankoCrop(brahms,1,4,bo,bt)),'f16ebdaa777b1b6334608e6785551ac8dc98c5b89350d5edf9b40ba3e3487d2c');
 });

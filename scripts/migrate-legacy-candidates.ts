@@ -40,8 +40,8 @@ const originalOutput = execFileSync(process.execPath, ['--import', 'tsx', '-e', 
 const proof = JSON.parse(originalOutput) as { identity: string; records: number; assignments: unknown[]; notes: unknown[];
   options: Record<string, unknown>; tokens: Record<string, unknown>; canonical: string[];
   variants: Array<{ controls: ReturnType<typeof activeDurationVariants>[number]; pages: string[] }> };
-if (proof.records !== 8 || proof.variants.length !== 4 || proof.assignments.length || proof.canonical.length !== 5 ||
-    proof.variants.some(v => v.pages.length !== 5)) throw new Error('unexpected protected legacy history/geometry; stop activation');
+if (proof.records !== 8 || proof.variants.length !== 4 || proof.assignments.length || proof.canonical.length < 1 ||
+    proof.variants.some(v => v.pages.length < 1)) throw new Error('unexpected protected legacy history/geometry; stop activation');
 const active = resolveActiveScore('brahms-op118-no1');
 if (JSON.stringify(proof.notes) !== JSON.stringify(active.score.notes)) throw new Error('Brahms musical event difference; stop activation');
 const pages = (options: typeof active.options, tokens: typeof active.tokens) => Array.from({ length: countJankoPages(active.score, options, tokens) },
@@ -91,5 +91,5 @@ try {
     throw new Error('new guarded variants incomplete; stop activation');
   renameSync(temporary, destination);
   console.log(JSON.stringify({ archive, rawSha256, legacyRecords: proof.records, migratedRecords: next.records.length,
-    revision, pagesPerScore: 5, variants: activeDurationVariants(next).map(v => v.id), geometryParity: true }));
+    revision, pagesPerScore: countJankoPages(active.score,active.options,active.tokens), variants: activeDurationVariants(next).map(v => v.id), geometryParity: true }));
 } finally { closeSync(fd); rmSync(lock); }

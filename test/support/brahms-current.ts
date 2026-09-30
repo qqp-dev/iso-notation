@@ -1,10 +1,15 @@
-/** Single current BRONZE Reference hash authority (fixed-3 configuration only).
- * Historical distinct-option controls remain pinned in their own round tests. */
+/** Current BRONZE serialization authority after the approved shared correctness round.
+ * 964 source events remain unchanged; 89 dynamics and 109 pedal events now paint.
+ * Source-voice beams: 246. Ink-aware admission: six pages, three systems each.
+ * Musical inventory and overlay/page clearance are independently gated by
+ * brahms-expressions.test.ts and janko-source-expression.test.ts. */
 export const BRAHMS_CURRENT_PAGES = [
-  'af7ad58fbef744a38f80717d82fac8bc6ca9aaf2a8192c7a837728ee7843c091',
-  '611ddb4cff6bf0ee6cb399aa723b39cc2aeb555ccc1a3c69fe8f84e707962c6b',
-  'ab22a7546febc28059b0645f81a7bc8affd8b7a3dd720b6ec1056174eeadbdfc',
-  '9c6dbc058a56de2deeffb2c6fa2bcf190ebc469cfbbf8d4c2fd9b8edf869163a',
-  'd2237277aa13354dcc30aa2e3bdd1e42d4fb461fc78435a65343bb65d9c546a5',
+  '43ab5615471d276dc9cc7819d4b8074df924c3aa3bd11de64200b16a93a1863c',
+  '07022c8df03acaee527f88987dcbb4d5bf23e71d4e5628f7ca93a5e618db8bb7',
+  'e58f93b09bfb009c64a24209d51be6be1c5fbf4085e919b75ca4a982981ec311',
+  'afe583706642777028959747f249262b77056cb5a63ad22481cba09c2d6bc3bd',
+  'aaddc691eae79b91a83012d912e127be68e34c1ebc5d942826445bd77737b4e7',
+  '05c2510c6bd891d0db12e421fc2eeb98f94f05b2908ee72e2f49891a47b6aacd',
 ] as const;
-export const BRAHMS_CURRENT_WHOLE_CROP = 'c8370f371cce7448247785e473be95d4f98baf8129cf4b57e0f09ef061683c19';
+export const BRAHMS_CURRENT_OPENING_CROP = 'f16ebdaa777b1b6334608e6785551ac8dc98c5b89350d5edf9b40ba3e3487d2c';
+export const BRAHMS_CURRENT_WHOLE_CROP = '07312b7632b5718e6ded305d422f1d230a6ff189ce4bf9b416dfa308755be9b3';

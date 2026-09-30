@@ -1814,8 +1814,8 @@ test('Every clasping paradigm engraves Bach clean; canonical Brahms fixed-3 carr
       brahms.diagnostics
         .filter((d) => d.code === 'system-slot-overlap')
         .map((d) => d.system + 1),
-      [23, 24],
-      `Brahms · ${mode}: the experimental slot pair is exactly [23, 24]`
+      [],
+      `Brahms · ${mode}: expression-aware pagination clears the experimental slot pair`
     );
   }
   // Round 46: the golden per-hand paradigm carries zero hard errors over the

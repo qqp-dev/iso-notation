@@ -14,6 +14,7 @@ import { renderJankoPage, countJankoPages } from '../src/render/janko/engine';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
 import { fetchVerifiedRelease, watchDeployedRelease, type DeployedRelease } from '../src/render/janko/prepared/deployed';
 import { buildIdentity } from '../src/render/janko/prepared/seam';
+import { fingerprintPdf } from './support/pdf-fingerprint';
 
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const sha = (x: string | Uint8Array) => createHash('sha256').update(x).digest('hex');
@@ -28,7 +29,9 @@ function intent(data: ActiveData): CanonicalHandIntent {
 // Immutable PR114 source-commit witness, measured from the git-object engine at
 // 8fd1e4f3b071fec30496164754c1bce0ab4bfc06 in an isolated archive. Not
 // calculated from the new resolver or copied from the current expected output.
-// The independently delivered PR114 PDF byte SHA is b039d2c188adb02d67fa1b220631dfe13bcf092688ef493b642b8c4b631fbf65.
+// Guard the independently delivered PR114 git-object PDF bytes, then compare
+// semantic fingerprints: pdfunite regenerates random /ID bytes without any
+// changed geometry, fonts, text, page count/size or raster content.
 test('PR114 source-commit GOLD baseline pins 551 note identities, hands and real page/PDF-source ink', () => {
   const builder = buildBachGoldbergVar1Score();
   assert.equal(builder.notes.length, 551);
@@ -64,8 +67,15 @@ test('PR114 source-commit GOLD baseline pins 551 note identities, hands and real
   if (active.revision === 'pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06') {
     assert.deepEqual(active.score.notes, builder.notes, 'initial active revision must remain PR114');
     assert.deepEqual(active.score.handCrossings, builder.handCrossings);
-    assert.equal(sha(readFileSync('public/goldberg-variation-1.pdf')),
-      'b039d2c188adb02d67fa1b220631dfe13bcf092688ef493b642b8c4b631fbf65');
+    const witness = execFileSync('git', ['show', '8fd1e4f3b071fec30496164754c1bce0ab4bfc06:public/goldberg-variation-1.pdf']);
+    assert.equal(sha(witness),'b039d2c188adb02d67fa1b220631dfe13bcf092688ef493b642b8c4b631fbf65',
+      'independently delivered PR114 witness stays immutable');
+    const dir = mkdtempSync(join(tmpdir(),'pr114-pdf-witness-'));
+    try {
+      const original = join(dir,'original.pdf'); writeFileSync(original,witness);
+      assert.deepEqual(fingerprintPdf('public/goldberg-variation-1.pdf'),fingerprintPdf(original),
+        'PR114 PDF musical ink is unchanged, ignoring random document IDs');
+    } finally { rmSync(dir,{recursive:true,force:true}); }
   }
   assert.equal(countJankoPages(builder, DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS), 2);
   assert.throws(() => resolveActiveScore('unsupported-score'), /unknown canonical score/);

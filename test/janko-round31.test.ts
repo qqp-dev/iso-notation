@@ -207,7 +207,7 @@ test('Studio Brahms is the fixed-3 working Reference (display-only, no default c
 });
 
 test('Whole-spread completeness: 5 Brahms pages tile mm. 1–71 exactly once', () => {
-  assert.deepEqual(CONFIG.brahmsPages, [0, 1, 2, 3, 4], 'five pages (18 systems, 4/page; was [0..5])');
+  assert.deepEqual(CONFIG.brahmsPages, [0, 1, 2, 3, 4, 5], 'six pages (18 systems, 4/page; was [0..5])');
   assert.equal(countJankoSystems(BRAHMS, O_BRAHMS, T_BRAHMS), 18, '18 fixed-3 systems');
   const { brahms } = referenceBlocks();
   // Page-card captions only (crop titles and in-SVG crop captions also print
@@ -215,17 +215,18 @@ test('Whole-spread completeness: 5 Brahms pages tile mm. 1–71 exactly once', (
   const ranges = [
     ...brahms.matchAll(/<b>Page \d+<\/b> · (\d+) systems? · mm\. (\d+)–(\d+)/g),
   ].map((m) => [Number(m[1]), Number(m[2]), Number(m[3])]);
-  assert.equal(ranges.length, 5, 'five page captions (was 6)');
+  assert.equal(ranges.length, 6, 'five page captions include source expression admission');
   assert.deepEqual(
     ranges,
     [
-      [4, 1, 16],
-      [4, 17, 32],
-      [4, 33, 48],
-      [4, 49, 64],
-      [2, 65, 71],
+      [3, 1, 12],
+      [3, 13, 24],
+      [3, 25, 36],
+      [3, 37, 48],
+      [3, 49, 60],
+      [3, 61, 71],
     ],
-    '4 systems and 16 measures per page, the last page holds 2'
+    'three systems per page after source expression admission'
   );
   const covered = new Map<number, number>();
   for (const [, a, b] of ranges) {
@@ -418,7 +419,7 @@ test('No other ink moves: every note-dot seat is identical (1914 fields)', () =>
 test('Page census: note-dot multisets identical, exactly 22 clasp dots move', () => {
   let augTotal = 0;
   let movedTotal = 0;
-  for (let page = 0; page < 5; page++) {
+  for (let page = 0; page < 6; page++) {
     const golden = renderJankoPage(BRAHMS, page, O_BRAHMS, T_BRAHMS);
     const preview = renderJankoPage(BRAHMS, page, O_PREVIEW, T_BRAHMS);
     // Brahms states no plain dotted-8th, so its golden note-dot set is empty —
@@ -559,7 +560,7 @@ test('Knockout guard: no clasp dot intersects a head knockout (all pages, golden
   ] as const) {
     let rects = 0;
     let dots = 0;
-    for (let page = 0; page < 5; page++) {
+    for (let page = 0; page < 6; page++) {
       const svg = renderJankoPage(BRAHMS, page, options, T_BRAHMS);
       const boxes = [
         ...svg.matchAll(/<rect class="janko-knockout" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),

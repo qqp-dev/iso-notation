@@ -44,7 +44,7 @@ test('mid-bar branches align at current parent clock, remain distinct and resume
   assert.deepEqual(facts.bars.map(b => b.duration), ['3/4']);
   assert.deepEqual(facts.events.filter(e => e.kind === 'note').map(e => [e.voice, e.onset, e.printedStaff, e.pitches[0].absolutePitch]),
     [['lower.0', '0', 'upper', 48], ['lower.0', '1/8', 'upper', 52], ['lower.0', '1/4', 'upper', 55],
-      ['lower."1"', '0', 'lower', 24], ['lower."1"', '1/8', 'lower', 31], ['lower."1"', '1/4', 'lower', 40],
+      ['lower."1"', '0', 'lower', 36], ['lower."1"', '1/8', 'lower', 43], ['lower."1"', '1/4', 'lower', 52],
       ['lower', '3/8', 'lower', 64], ['lower', '1/2', 'lower', 60], ['lower', '5/8', 'lower', 55]]);
   assert.ok(score.notes.length >= 6, 'both written branches remain attributable even if the projection classifies an optional route');
   assert.ok(ledger.some(l => l.construct.includes('fontSize') && !l.blocking));
@@ -69,7 +69,7 @@ test('three branches, dotted inherited duration, multiplied bars and no-ending v
 
 test('approved record: 64 whole written bars, second half repeated twice, independent voices and deferred expression', () => {
   const facts = schumannNo14WrittenFacts;
-  const score = buildSchumannNo14Draft();
+  const score = buildSchumannNo14Draft('principal');
   assert.equal(facts.sourceHash, '42aa471662af4d919f696b03e6b7b5b634a8e1f1310303aa6a92075c9b511533');
   assert.equal(facts.events.length, 460);
   assert.equal(facts.bars.length, 64);
@@ -91,13 +91,13 @@ test('approved record: 64 whole written bars, second half repeated twice, indepe
   assert.deepEqual(facts.events.filter(e => e.bar === 0 && e.kind === 'note').map(e => [e.pitches[0].absolutePitch, e.printedStaff]),
     [[43, 'lower'], [47, 'lower'], [50, 'lower'], [59, 'upper'], [55, 'upper'], [50, 'upper']]);
   const m41 = facts.events.filter(e => e.bar === 40 && e.kind === 'note');
-  assert.deepEqual(m41.map(e => e.pitches[0].absolutePitch), [48, 52, 55, 24, 31, 40, 64, 60, 55]);
+  assert.deepEqual(m41.map(e => e.pitches[0].absolutePitch), [48, 52, 55, 36, 43, 52, 64, 60, 55]);
   assert.deepEqual(m41.map(e => e.onset), ['30', '241/8', '121/4', '30', '241/8', '121/4', '243/8', '61/2', '245/8']);
   const m48 = facts.events.filter(e => e.bar === 47 && e.kind === 'note');
-  assert.deepEqual(m48.map(e => e.pitches[0].absolutePitch), [55, 57, 43, 38, 36, 45, 38, 36, 40, 42]);
+  assert.deepEqual(m48.map(e => e.pitches[0].absolutePitch), [55, 57, 55, 50, 48, 57, 50, 48, 40, 42]);
   assert.equal(new Set(m48.map(e => e.voice)).size, 3);
   assert.deepEqual(facts.events.filter(e => e.bar === 62 && e.kind === 'note').map(e => e.pitches[0].absolutePitch),
-    [55, 59, 62, 31, 38, 47, 79, 74, 71]);
+    [43, 47, 50, 31, 38, 47, 55, 50, 47]);
   assert.equal(score.notes.filter(n => n.startTick === 40 * 144 && linearIndex(n.pitch) === 48).length, 1);
   for (const [sourceBar, repeated] of [[40,72],[42,74],[62,94]]) {
     const written = facts.events.filter(e => e.bar === sourceBar && e.kind === 'note');
@@ -109,8 +109,9 @@ test('approved record: 64 whole written bars, second half repeated twice, indepe
     }
   }
   assert.ok(schumannNo14DeferredLedger.some(l => l.construct.includes('PhrasingSlur')));
-  assert.ok(schumannNo14DeferredLedger.some(l => l.construct.includes('parenpiano')));
-  assert.ok(schumannNo14DeferredLedger.some(l => l.construct.includes('sustainOn')));
+  assert.ok(facts.expressions.some(l => l.token === '\\parenpiano'));
+  assert.equal(facts.expressions.filter(l => l.token === '\\sustainOn').length, 53);
+  assert.equal(facts.expressions.filter(l => l.token === '\\sustainOff').length, 53);
   assert.ok(schumannNo14DeferredLedger.every(l => !l.blocking && l.line > 0 && l.column > 0));
   assert.throws(() => importSchumannNo14('unapproved'), /Unapproved.*hash/);
 });
@@ -119,7 +120,7 @@ test('admitted optional routes replace rather than double principal attacks, wit
   const facts = schumannNo14WrittenFacts;
   const groups = facts.alternativeGroups!;
   assert.deepEqual(groups.map(g => g.bar), [40, 42, 62]);
-  const principal = buildSchumannNo14Draft();
+  const principal = buildSchumannNo14Draft('principal');
   const optional = buildSchumannNo14Draft('optional');
   assert.deepEqual(optional.sourceBarTicks, principal.sourceBarTicks);
   assert.equal(optional.totalTicks, principal.totalTicks);
@@ -216,21 +217,14 @@ test('complete real-engine Candidates window uses actual pages, with diagnostic 
   const card = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-written-draft');
   assert.ok(card?.windows?.some(w => 'fullScore' in w && w.fullScore && w.measureStart === 1 && w.measureCount === 96));
   assert.ok(card?.windows?.some(w => 'measureStart' in w && w.measureStart === 48));
-  const optional = config.scores['schumann-op68-no14-optional'];
-  assert.ok(optional, 'optional route is available to the same real-engine studio projection');
-  assert.notDeepEqual(optional.score.notes, entry.score.notes);
-  assert.deepEqual(optional.score.sourceBarTicks, entry.score.sourceBarTicks);
-  const optionalCard = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-optional-route');
-  for (const measure of [41, 43, 63]) assert.ok(optionalCard?.windows?.some(w =>
-    'scoreId' in w && w.scoreId === 'schumann-op68-no14-optional' &&
-    'measureStart' in w && w.measureStart === measure), `written m.${measure} optional comparison`);
-  for (const measure of [53, 63]) {
-    const options = CURRENT_CANDIDATES.filter(candidate => candidate.windows?.some(window =>
-      'scoreId' in window && window.scoreId === 'schumann-op68-no14' &&
-      'measureStart' in window && window.measureStart === measure));
-    assert.ok(options.length >= 2,
-      `m.${measure} needs a real-engine side-by-side comparison of existing and content-aware ottava seats`);
-  }
+  const principal = config.scores['schumann-op68-no14-principal'];
+  assert.ok(principal, 'other source branch is explicitly available');
+  assert.notDeepEqual(principal.score.notes, entry.score.notes);
+  assert.deepEqual(principal.score.sourceBarTicks, entry.score.sourceBarTicks);
+  const comparison = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-principal-route');
+  for (const measure of [41,43,63]) assert.ok(comparison?.windows?.some(w =>
+    'scoreId' in w && w.scoreId === 'schumann-op68-no14-principal' && w.measureStart === measure));
+  assert.ok(!CURRENT_CANDIDATES.some(c => c.id === 'schumann-no14-ottava-seat'), 'phantom ottava decision retired');
   assert.match(renderJankoCrop(entry.score, 1, 2, entry.options, entry.tokens), /<svg/);
   assert.ok(countJankoPages(entry.score, entry.options, entry.tokens) < 12,
     'ordinary No.14 passages must not retain the old uniform two-bar pagination');

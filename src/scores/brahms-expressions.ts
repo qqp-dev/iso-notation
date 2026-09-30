@@ -1,3 +1,4 @@
+import { normalizePedalEvents } from '../model/expressions';
 import type { DynamicOverlay, PedalOverlay } from '../model/types';
 
 export interface ExpressionWitness {
@@ -189,16 +190,5 @@ export function validateBrahmsExpressions(value: ExpressionSidecar, totalTicks: 
 /** Collapse only literal adjacent off/on into a semantic layout change.
  * The sidecar keeps both raw events, their exact order and both origins. */
 export function scorePedalsFromExpressions(sidecar: ExpressionSidecar): PedalOverlay[] {
-  const result: PedalOverlay[] = [];
-  for (let i = 0; i < sidecar.pedals.length; i++) {
-    const off = sidecar.pedals[i];
-    const on = sidecar.pedals[i + 1];
-    if (off.type === 'sustain-up' && on?.type === 'sustain-down' && on.tick === off.tick &&
-        on.origin.context === off.origin.context && on.order === off.order + 1) {
-      result.push({ tick: off.tick, type: 'sustain-change', origin: off.origin,
-        order: off.order, changeOrigins: [off.origin, on.origin] });
-      i++;
-    } else result.push(off);
-  }
-  return result;
+  return normalizePedalEvents(sidecar.pedals);
 }

@@ -283,10 +283,7 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
   const options = resolveJankoOptions({ ...bach.options, ...(overrides.options ?? {}) });
   const tokens = resolveJankoTokens({ ...bach.tokens, ...(overrides.tokens ?? {}) });
   const score = overrides.score ?? bach.score;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(countJankoSystems(score, options, tokens) / Math.max(1, options.systemsPerPage))
-  );
+  const totalPages = countJankoPages(score, options, tokens);
   // Source-derived drafts share one production admission; actual bar widths
   // and spans come from the literal score's content, never a score-ID table.
   const importedOptions = resolveJankoOptions({ ...DEFAULT_JANKO_OPTIONS,
@@ -316,8 +313,8 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
       options: importedOptions,
       tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 192, anacrusisTicks: 48 }),
     },
-    ['schumann-op68-no14-optional']: {
-      id: 'schumann-op68-no14-optional', score: buildSchumannNo14Draft('optional'),
+    ['schumann-op68-no14-principal']: {
+      id: 'schumann-op68-no14-principal', score: buildSchumannNo14Draft('principal'),
       options: importedOptions,
       tokens: resolveJankoTokens({ ...DEFAULT_JANKO_TOKENS, ticksPerMeasure: 144, anacrusisTicks: 0 }),
     },
@@ -415,13 +412,7 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     ...(overrides.scores ?? {}),
   };
   const brahmsEntry = scores[BRAHMS_STUDIO_SCORE_ID];
-  const brahmsPages = Math.max(
-    1,
-    Math.ceil(
-      countJankoSystems(brahmsEntry.score, brahmsEntry.options, brahmsEntry.tokens) /
-        Math.max(1, brahmsEntry.options.systemsPerPage)
-    )
-  );
+  const brahmsPages = countJankoPages(brahmsEntry.score, brahmsEntry.options, brahmsEntry.tokens);
   return {
     score,
     options,
@@ -780,11 +771,10 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         const pageCards: string[] = [];
         for (let page = 0; page < pages; page++) {
           const svg = renderJankoPage(entry.score, page, options, tokens, layouts);
-          const plan = layouts[0]?.geometry.systemBarStarts;
-          const firstMeasure = plan?.[page * options.systemsPerPage] !== undefined ? plan[page * options.systemsPerPage] + 1 :
-            page * options.measuresPerSystem * options.systemsPerPage + 1;
-          const last = Math.min(plan?.[(page + 1) * options.systemsPerPage] ??
-            (page + 1) * options.measuresPerSystem * options.systemsPerPage, lastMeasure);
+          const onPage = layouts.filter(l => (l.geometry.pageIndex ?? Math.floor(l.index/options.systemsPerPage)) === page);
+          const first = onPage[0], end = onPage.at(-1)!;
+          const firstMeasure = (first.geometry.firstBar ?? first.index * options.measuresPerSystem) + 1;
+          const last = Math.min((end.geometry.firstBar ?? end.index * options.measuresPerSystem) + end.geometry.measuresPerSystem, lastMeasure);
           pageCards.push(
             [
               `<figure class="page-card" data-page="${page + 1}">`,
@@ -941,15 +931,11 @@ function renderReferenceScore(
 
   const pageCards = pages.map((page) => {
     const svg = renderJankoPage(score, page, options, tokens, layouts);
-    const firstMeasure = page * options.measuresPerSystem * options.systemsPerPage + 1;
-    const lastMeasure = Math.min(
-      (page + 1) * options.measuresPerSystem * options.systemsPerPage,
-      report.stats.measures
-    );
-    const pageSystems = Math.max(
-      0,
-      Math.min(options.systemsPerPage, systems - page * options.systemsPerPage)
-    );
+    const onPage = layouts!.filter(l => (l.geometry.pageIndex ?? Math.floor(l.index/options.systemsPerPage)) === page);
+    const first = onPage[0], end = onPage.at(-1)!;
+    const firstMeasure = (first.geometry.firstBar ?? first.index * options.measuresPerSystem) + 1;
+    const lastMeasure = Math.min((end.geometry.firstBar ?? end.index * options.measuresPerSystem) + end.geometry.measuresPerSystem, report.stats.measures);
+    const pageSystems = onPage.length;
     return [
       `<figure class="page-card" data-page="${page + 1}">`,
       '  <figcaption>',

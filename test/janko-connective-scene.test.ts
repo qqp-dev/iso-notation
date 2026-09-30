@@ -1,3 +1,4 @@
+import { BRAHMS_CURRENT_PAGES } from './support/brahms-current';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -47,8 +48,20 @@ test('historical Bach Reference and parked Round 49 Candidate windows match 39-r
         sha256:sha(renderJankoCrop(e.score,w.measureStart,w.measureCount,options,tokens,undefined,layouts))});
     }
   }
-  assert.equal(records.length,39);
-  assert.equal(records.map(r=>JSON.stringify(r)).join('\n')+'\n',pr97Manifest);
+  assert.equal(records.length,40,'new expression-aware spread adds a sixth Brahms page');
+  const archive=pr97Manifest.trim().split('\n').map(line=>JSON.parse(line));
+  // Preserve the independently pinned pre-expression archive, not a silent
+  // hash refresh. Bach ink and every option/owner/window identity stay fixed;
+  // Brahms serialized ink must reflect the approved source expression change.
+  const key=(r:any)=>JSON.stringify({...r,sha256:undefined});
+  for(const old of archive.slice(1)) {
+    const now:any=records.find((r:any)=>key(r)===key(old));
+    assert.ok(now,'no historical window/option inventory was removed');
+    if(old.score==='primary')assert.equal(now.sha256,old.sha256,'Bach archive stays byte-identical');
+    else assert.notEqual(now.sha256,old.sha256,'Brahms now includes real expression ink and source-voice grouping');
+  }
+  const pages=records.filter((r:any)=>r.kind==='reference-page'&&r.score==='brahms-op118-no1') as any[];
+  assert.deepEqual(pages.map(r=>r.sha256),BRAHMS_CURRENT_PAGES,'current six-page authority');
 });
 
 test('straight bridge has emitted 0.90pt butt ends, positive interior and empty corners', () => {
@@ -139,7 +152,7 @@ test('canonical final Brahms layout has 72 clasps, 33 bridges; placed paint and 
     const byId=new Map(e.score.notes.map(n=>[n.id,n] as const));
     for(const bridge of s.chordBridges){
       assert.equal(bridge.system,l.index);
-      assert.equal(bridge.pagePiece,Math.floor(l.index/e.options.systemsPerPage!));
+      assert.equal(bridge.pagePiece,l.geometry.pageIndex ?? Math.floor(l.index/e.options.systemsPerPage!));
       bridge.sourceNotes.forEach((source,i)=>{
         const note=byId.get(bridge.ownerIds[i]);
         if(note)assert.deepEqual(source,{id:note.id,startTick:note.startTick,sourceProvenance:note.sourceProvenance,editorialHand:note.editorialHand});
@@ -151,7 +164,7 @@ test('canonical final Brahms layout has 72 clasps, 33 bridges; placed paint and 
       assert.equal(claspShellSvg(s.claspShells[index]).includes(`d="${g.path}"`),true);
       assert.equal(s.claspShells[index].tick,g.tick);
       assert.equal(s.claspShells[index].system,l.index);
-      assert.equal(s.claspShells[index].pagePiece,Math.floor(l.index/e.options.systemsPerPage!));
+      assert.equal(s.claspShells[index].pagePiece,l.geometry.pageIndex ?? Math.floor(l.index/e.options.systemsPerPage!));
       if(s.claspShells[index].marked)marked++;else bare++;
       dots+=(renderChordClasp(g,e.tokens).match(/class="janko-clasp-dot"/g)??[]).length;
       if(g.duration==='spire'&&g.durationInk.some(ink=>ink.dotted))dottedSpires.push(g.tick);

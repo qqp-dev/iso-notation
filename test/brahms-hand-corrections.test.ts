@@ -303,7 +303,7 @@ test('Literal m.23/m.43: full RH run over LH bass; the four bridges dissolve', (
   // runs and re-group a few bridges back (13 → 29 heads): 38 → 33 net is the
   // intentional recount of the same rule on the fuller written surface.
   let bridges = 0;
-  for (let p = 0; p < 5; p++) {
+  for (let p = 0; p < 6; p++) {
     bridges += (renderJankoPage(SCORE, p, O, T).match(/class="janko-chord-bridge"/g) ?? []).length;
   }
   // Round 45 adds one more: the m. 66 hand correction removes a fifth bridge

@@ -484,11 +484,8 @@ test('The decided tight golden pins every gate; snug stays implemented and ident
     if (label === 'Brahms') {
       assert.deepEqual(
         report.violations.map((v) => [v.code, v.system + 1]),
-        [
-          ['system-slot-overlap', 18],
-          ['system-slot-overlap', 18],
-        ],
-        'tight golden: exactly the accepted 2 (itemized in the §2-landed record)'
+        [],
+        'tight golden: no legacy slot findings after ink-aware admission (itemized in the §2-landed record)'
       );
     } else {
       assert.equal(report.violations.length, 0, `tight golden: zero violations on ${label}`);
@@ -507,10 +504,7 @@ test('The decided tight golden pins every gate; snug stays implemented and ident
     if (label === 'Brahms') {
       assert.deepEqual(
         snug.violations.map((v) => [v.code, v.system + 1]),
-        [
-          ['system-slot-overlap', 18],
-          ['system-slot-overlap', 18],
-        ],
+        [],
         'snug: the same accepted 2 — the gap never touches slots'
       );
     } else {
@@ -2074,7 +2068,7 @@ test('Rest specimen material: the complete working set, each on a guaranteed-fre
   assert.equal(report.violations.length, 0, 'and none is refused');
 });
 
-test('STOP tripwire (unlanded): Brahms complete carries exactly the accepted 2', () => {
+test('STOP tripwire (unlanded): Brahms complete carries no legacy slot findings after ink-aware admission', () => {
   // 4-up by operator override (was [] at 3-up). The settled refinements moved
   // the adaptive path (downbeat inward slots + the m. 57 clasp demotion):
   // 14 violations until the architect/operator adjudicates. Preserved, not
@@ -2086,11 +2080,8 @@ test('STOP tripwire (unlanded): Brahms complete carries exactly the accepted 2',
   );
   assert.deepEqual(
     report.violations.map((v) => [v.code, v.system + 1]),
-    [
-      ['system-slot-overlap', 18],
-      ['system-slot-overlap', 18],
-    ],
-    'exactly the accepted 2'
+    [],
+    'no legacy slot findings after ink-aware admission'
   );
   assert.equal(report.warnings.length, 0);
 });
@@ -2126,7 +2117,7 @@ test('Every dialect renders every window with zero rest diagnostics and every re
       if (label === 'Brahms complete') {
         // STOP-state: the absolute accepted-2 pin is a tripwire while the
         // adaptive delta is unadjudicated (see 'STOP tripwire: Brahms
-        // complete carries exactly the accepted 2' below). The live property
+        // complete carries no legacy slot findings after ink-aware admission' below). The live property
         // — the rest style never touches findings, so all five dialects
         // agree to the finding — stays pinned here.
         const keyOf = (v: (typeof report.violations)[number]): string =>

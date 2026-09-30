@@ -1202,9 +1202,9 @@ export const ROUND52_HAND_PROOF_METADATA: JankoCandidateRound = {
 
 export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
   round: 55,
-  title: 'Schumann No. 14 · printed alternatives and ↑10 seat',
-  description: 'Principal reading is the full draft. Compare the hash-pinned smaller optional route separately, then judge incumbent versus ink-aware horizontal ottava seats on literal mm. 53 and 63. The candidate does not change pitch, fold, duration or the canonical reference.',
-  openAxes: ['ottavaSingletonSeat'],
+  title: 'Source-faithful pitch, gestures and expression',
+  description: 'Approved shared correction round: lower/wider No.14 reference and explicit principal alternative, with corrected pitches, compound-meter beams and first-time source expression engraving. Shared Brahms and other repertoire effects are shown honestly.',
+  openAxes: [],
 };
 
 function bachHandWindows(scoreId: string): JankoScoreCandidateWindow[] {
@@ -1246,8 +1246,8 @@ export const SCHUMANN_NO13_STUDIO_SCORE_ID = 'schumann-op68-no13';
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const CURRENT_CANDIDATES: JankoCandidate[] = [
   { id: 'schumann-no13-written-draft', label: 'Schumann Op. 68 No. 13 · Draft / unfolded repeats',
-    description: 'Complete source-derived 28-bar / 56-occurrence draft. Eight pitched pre-host grace groups (13 written members) keep their own eighth flags or connected sixteenth beams, with zero metrical time; 12 further spacer-only synchronization groups are retained without ink. Hands are provisional; slurs, fingerings, expressions and source staff layout remain deferred. Not GOLD or BRONZE.',
-    tags: ['Draft / unfolded repeats', 'nonmetrical grace', 'provisional hands', 'deferred expression'],
+    description: 'Complete source-derived 28-bar / 56-occurrence draft. Eight pitched pre-host grace groups (13 written members) keep their own eighth flags or connected sixteenth beams, with zero metrical time; 12 further spacer-only synchronization groups are retained without ink. Textual relative traversal corrects the second-half pitches and grace hosts. Source dynamics and explicit phrasing now engrave through shared paths; hands remain provisional, and ordinary slurs, fingerings and source staff layout remain deferred. Not GOLD or BRONZE.',
+    tags: ['Draft / unfolded repeats', 'nonmetrical grace', 'provisional hands', 'source expression'],
     windows: [
       { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 1, measureCount: 56, fullScore: true, title: 'Complete unfolded score · mm. 1–56', caption: 'All real-engine pages · 28 written bars, two passes of both halves; source grace groups occupy pre-host ink, never clock time.' },
       { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 3, measureCount: 5, title: 'First part · written lines 84–87', caption: 'Opening pre-host sixteenth pairs and eighth-to-chord; lower synchronized spacer grace before a rest has no pitched ink.' },
@@ -1256,7 +1256,7 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
       { scoreId: SCHUMANN_NO13_STUDIO_SCORE_ID, measureStart: 29, measureCount: 5, title: 'Second-half continuation · written lines 105–108', caption: 'Braced pairs and lone eighth grace on the second repeated section; identical written facts unfold with separate occurrence IDs.' },
     ] },
   { id: 'schumann-no30-written-draft', label: 'Schumann Op. 68 No. 30 · Draft / unfolded repeats',
-    description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Printed cross-staff destinations, literal tie and laissez-vibrer marks, expressive/fingering/slur/arpeggio layout and omissions remain source-linked in the ledger. Not GOLD or BRONZE.',
+    description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Corrected relative pitches preserve independent voices and repeat ties. Source dynamics and explicit phrasing now engrave through shared paths; printed cross-staff destinations, literal tie and laissez-vibrer marks, fingering, ordinary slurs, arpeggio layout and omissions remain source-linked in the ledger. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked ties', 'deferred notation'],
     windows: [
       { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 1, measureCount: 49, fullScore: true, title: 'Complete unfolded score · mm. 1–49', caption: 'All real-engine pages · 34 written bars, first ending at unfolded m. 33, second ending at m. 49.' },
@@ -1265,33 +1265,23 @@ export const CURRENT_CANDIDATES: JankoCandidate[] = [
       { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Second ending · unfolded mm. 48–49', caption: 'Written bars 31 and 33, shortened second ending (three quarters); no first-ending Ab chord.' },
       { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 29, measureCount: 2, title: 'Hidden phantom · unfolded mm. 29–30', caption: 'Written bar 29 lower Voice One hidden A3 is a source-commented layout clock carrier; audible notes and authored rests remain.' },
     ] },
-  { id: 'schumann-no14-written-draft', label: 'Schumann Op. 68 No. 14 · principal reading',
-    description: 'Complete 64 written / 96 unfolded 6/8 bars from approved source. Printed-staff anchors and locally continuous gesture stems support provisional hands; source voices and printed destinations remain distinct. Smaller simultaneous routes in written bars 41, 43 and 63 remain facts, not additive attacks. Phrasing, fingerings, expression, pedals and source staff layout remain deferred; real-engine lint findings are shown below. Not GOLD or BRONZE.',
-    tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked printed staff', 'deferred notation'],
+  { id: 'schumann-no14-written-draft', label: 'Schumann Op. 68 No. 14 · lower/wider source reading',
+    description: 'Complete source-faithful 64 written / 96 unfolded bars. Textual relative traversal, independent source voices and dotted-quarter 6/8 beams; smaller lower/wider source alternatives replace three attacks at 41/43/63. Source pedal brackets, dynamics, hairpins, diminuendo and phrasing are engraved by shared engine paths. Fingerings and source-specific layout remain deferred; draft lint stays visible.',
+    tags: ['source-faithful pitch', '6/8 gestures', 'source expression'],
     windows: [
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 96, fullScore: true, title: 'Complete unfolded score · mm. 1–96', caption: 'Draft / unfolded repeats · all real-engine pages, both passes of the second half; source printed staff and logical part are distinct.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 2, title: 'Opening · mm. 1–2', caption: 'Lower logical part moves onto printed upper staff after three eighths; upper part has authored skips.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 41, measureCount: 3, title: 'Concurrent voices · mm. 41–43', caption: 'Principal half-bar route; the smaller alternative is reserved for the comparison card.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 53, measureCount: 1, title: 'Written m. 53 · singleton ↑10', caption: 'Incumbent octave-fold seat for comparison; sounding pitch and fold unchanged.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 63, measureCount: 1, title: 'Written m. 63 · principal route', caption: 'Principal route at the second optional passage.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 48, measureCount: 2, title: 'Three branches · mm. 48–49', caption: 'Three source voices, distinct provisional hands. The rejected m. 48 dotted 72-tick clasp vanishes with corrected grouping; a bare dot without readable base in the shared compact-base grammar remains an unresolved vocabulary question, not a new adopted sign.' },
-      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 95, measureCount: 2, title: 'Second pass · mm. 95–96', caption: 'End of repeated second half; same written bar IDs, separate unfolded occurrences.' },
+      { scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: 1, measureCount: 96, fullScore: true, title: 'Complete unfolded score · mm. 1–96', caption: 'Lower/wider reference reading, both passes of the second half; no additive alternatives.' },
+      ...[[1,2,'Opening'],[4,2,'Pedal across 4–5'],[21,1,'Second-eighth crescendo'],[31,3,'Diminuendo and parenthesized piano'],[41,3,'Source alternatives'],[48,6,'Independent voices and corrected G5'],[63,2,'Lower route and continuous pedal'],[73,3,'Repeated alternatives'],[80,6,'Repeated voices and G5'],[95,2,'Repeated closing route']].map(([measureStart,measureCount,title]) => ({
+        scoreId: SCHUMANN_NO14_STUDIO_SCORE_ID, measureStart: Number(measureStart), measureCount: Number(measureCount), title: String(title),
+        caption: 'Literal source timing and endpoint associations, engraved by the real engine; no phantom octave-seat comparison.' })),
     ] },
-  { id: 'schumann-no14-ottava-seat', label: 'No. 14 · content-aware singleton ↑10 seat',
-    description: 'Candidate only: when preceding head ink leaves room, centre the ottava label above the folded note; dash and hook follow the same real-engine clearance solver. Compare with incumbent principal windows; no automatic adoption.',
-    options: { ottavaSingletonSeat: 'ink-aware' }, tags: ['No. 14', 'ottava candidate', 'not canonical'],
-    windows: [SCHUMANN_NO14_STUDIO_SCORE_ID, 'schumann-op68-no14-optional'].flatMap(scoreId =>
-      [53, 63].map(measureStart => ({ scoreId, measureStart, measureCount: 1,
-        title: `m. ${measureStart} · ink-aware label`,
-        caption: `Literal ${scoreId === SCHUMANN_NO14_STUDIO_SCORE_ID ? 'principal' : 'optional'} source route; pitch, fold and duration preserved.` }))) },
-  { id: 'schumann-no14-optional-route', label: 'No. 14 · smaller optional route',
-    description: 'Source-admitted simultaneous small-note alternative replaces, never doubles, the principal branch. Both projections use the same real engraving engine; optional passage remains a candidate, not the default full-score reading.',
-    tags: ['No. 14', 'optional route', 'not canonical'],
-    windows: [41, 43, 63, 53].map(measureStart => ({ scoreId: 'schumann-op68-no14-optional', measureStart, measureCount: 1,
-      title: `m. ${measureStart} · optional projection`, caption: 'Compare literal source routes; m. 53 controls singleton ↑10 seat.' })) },
+  { id: 'schumann-no14-principal-route', label: 'No. 14 · explicit principal branch alternative',
+    description: 'The other source branch replaces only the first three eighths at 41/43/63 and their returns. Shared continuations, clocks and expression stay identical; source facts retain both branches.',
+    tags: ['No. 14', 'source branch comparison'],
+    windows: [41,43,63].map(measureStart => ({scoreId:'schumann-op68-no14-principal',measureStart,measureCount:1,
+      title:`m. ${measureStart} · principal branch`,caption:'Compare with the lower/wider full-score reading. Corrected pitches remove the former spurious ↑10 question.'})) },
   { id: 'schumann-no43-written-draft', label: 'Schumann Op. 68 No. 43 · Draft / unfolded repeats',
-    description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Hands are provisional upper/lower-part hints; ornament, expression, slurs, fingering and laissez-vibrer are deferred (see the source-linked ledger). Not GOLD or BRONZE.',
-    tags: ['Draft / unfolded repeats', 'provisional hands', 'expression deferred'],
+    description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Source dynamics now engrave through shared paths; named voices retain their source pitches and explicit beam interruptions. Hands are provisional upper/lower-part hints; ornament, ordinary slurs, fingering and laissez-vibrer remain deferred (see the source-linked ledger). Not GOLD or BRONZE.',
+    tags: ['Draft / unfolded repeats', 'provisional hands', 'source dynamics'],
     windows: [
       { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 1, measureCount: 3, title: 'Opening · pickup + first three bars', caption: 'Draft / unfolded repeats · eighth pickup, both logical voices, authored rests and spacers.' },
       { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 12, measureCount: 3, title: 'Dense chords · written partial ties', caption: 'Draft / unfolded repeats · chord members can release or reattack independently; fingering and slurs are deferred.' },

@@ -300,9 +300,9 @@ test('final score census, source inventory and mutation of stored paint without 
       if(scene.solos.size)assert.ok(systemPaintedInkBoxes(layout,o,t).some(b=>b.what.includes('beamed-solo nonphysical enclosure')));
     }
     const name=expected===71?'Brahms':score.notes.length>500?'Bach':'duration specimen';
-    assert.deepEqual([stems,rings,flags,dots],name==='Brahms'?[188,0,71,0]:name==='Bach'?[38,0,34,19]:[20,0,4,1],
+    assert.deepEqual([stems,rings,flags,dots],name==='Brahms'?[200,0,83,0]:name==='Bach'?[38,0,34,19]:[20,0,4,1],
       `${name} final laid-out solo piece coverage`);
-    if(expected!==undefined)assert.equal(flags,expected,'all five Brahms pages retain 71 glyphs');
+    if(expected!==undefined)assert.equal(flags,83,'source-voice partition gives 83 independent flags across all six Brahms pages');
     assert.throws(()=>requireSceneCoverage(buildInkScene(layouts[0],o,t,score),'beamed-solo'),/does not cover/,'partial physical coverage never claims global');
   }
 });

@@ -51,6 +51,9 @@ import type { PlacedClaspShell } from '../connective-scene';
 
 /** One note as seen by the rhythm renderers (already positioned in page pt). */
 export interface JankoRhythmNote {
+  sourceBeam?: { group?: string; noBeam?: boolean };
+  sourceVoice?: string;
+  beamWindowTicks?: number;
   id: string;
   /** Absolute score tick. */
   startTick: number;
@@ -4194,20 +4197,21 @@ export function partitionBeamGroups(
   void middleCY;
   // Explicit grouping is Practice-only: four sixteenths share a half-measure
   // window without changing the duration grammar (or canonical beat groups).
-  const windowTicks = groupTicks ?? t.ticksPerBeat;
-  if (!Number.isInteger(windowTicks) || windowTicks < t.ticksPerBeat ||
-      windowTicks > t.ticksPerMeasure || t.ticksPerMeasure % windowTicks !== 0)
+  const defaultWindow = groupTicks ?? t.ticksPerBeat;
+  if (!Number.isInteger(defaultWindow) || defaultWindow < t.ticksPerBeat ||
+      defaultWindow > t.ticksPerMeasure || t.ticksPerMeasure % defaultWindow !== 0)
     throw new RangeError('Invalid beam grouping window');
 
   const buckets = new Map<string, JankoRhythmNote[]>();
   const unbeamable = new Map<Hand, JankoRhythmNote[]>();
   for (const n of notes) {
-    if (n.durationTicks > t.ticksPerBeat / 2) {
+    if (n.durationTicks > t.ticksPerBeat / 2 || n.sourceBeam?.noBeam) {
       const blockers = unbeamable.get(n.hand);
       if (blockers) blockers.push(n);
       else unbeamable.set(n.hand, [n]);
       continue;
     }
+    const windowTicks = groupTicks ?? n.beamWindowTicks ?? defaultWindow;
     let measure = Math.floor(n.startTick / t.ticksPerMeasure);
     let window = Math.floor((n.startTick % t.ticksPerMeasure) / windowTicks);
     if (sourceBarTicks) {
@@ -4216,7 +4220,7 @@ export function partitionBeamGroups(
       measure = low;
       window = Math.floor((n.startTick - sourceBarTicks[measure]) / windowTicks);
     }
-    const key = `${n.hand}|${measure}|${window}`;
+    const key = `${n.hand}|${n.sourceVoice ?? ""}|${n.sourceBeam?.group ?? `${measure}|${window}`}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.push(n);
     else buckets.set(key, [n]);
@@ -4251,7 +4255,7 @@ export function partitionBeamGroups(
         // gap: the next onset must fall exactly on the previous note's release.
         const discontinuous = n.startTick > prev.startTick + prev.durationTicks;
         const straddled = (unbeamable.get(n.hand) ?? []).some(
-          (b) => b.startTick > prev.startTick && b.startTick < n.startTick
+          (b) => b.sourceVoice === n.sourceVoice && b.startTick > prev.startTick && b.startTick < n.startTick
         );
         if (gap || discontinuous || straddled) flush();
       }
@@ -4382,6 +4386,7 @@ export function bridgeBeamGroupsAcrossRests(
   for (const list of handTicks.values()) list.sort((a, b) => a - b);
 
   const bridges = (a: JankoRhythmNote, b: JankoRhythmNote, key: string): boolean => {
+    if (a.sourceVoice !== b.sourceVoice || a.sourceBeam?.noBeam || b.sourceBeam?.noBeam || a.sourceBeam?.group !== b.sourceBeam?.group) return false;
     const release = a.startTick + a.durationTicks;
     const [, m, beatIdx] = key.split('|').map(Number);
     const beatStart = (sourceBarTicks?.[m] ?? m * measure) + beatIdx * beat;

@@ -462,13 +462,14 @@ test('Compact Coupling (Treatment B): renders bounded additive badge (+10/+20) a
 // 3. Collision Auditing and Fallback Tripwires
 // ---------------------------------------------------------------------------
 
-test('Linter registry: compression-collision check is registered (37 total checks)', () => {
+test('Linter registry: compression-collision and source-expression checks remain registered', () => {
   assert.ok(JANKO_LINT_CHECKS.includes('compression-collision'), 'compression-collision in lint catalog');
   // Round 41 added the hold-integrity audit (hold endpoints / connectors /
   // underlays), so the catalog now carries 36 checks.
   // Round 48 registers `rest-provenance` (the published rest-source facts), so
   // the registry holds one more check than the compression-collision round left.
-  assert.equal(JANKO_LINT_CHECKS.length, 37, '37 total engraving checks');
+  assert.equal(JANKO_LINT_CHECKS.length, 38, 'source-expression integrity adds one shared check');
+  assert.ok(JANKO_LINT_CHECKS.includes('expression-integrity'), 'source-expression integrity in lint catalog');
   assert.ok(JANKO_LINT_CHECKS.includes('rest-provenance'), 'the rest-provenance check is registered');
   assert.ok(JANKO_LINT_CHECKS.includes('hold-integrity'), 'hold-integrity in lint catalog');
 });

@@ -675,7 +675,7 @@ test('Withdrawn complete preview reports previously missed Brahms ring contacts;
   // complete-grammar rings, but the old re-render audit used golden grammar
   // and silently missed seventeen ring/mask contacts. The placed audit reports
   // the real ink without shifting its seats or changing canonical Brahms.
-  assert.equal(brahms.violations.length, 19, '2 grandfathered slots + 17 previously missed preview ring contacts');
+  assert.equal(brahms.violations.length, 17, 'ink-aware pagination clears slots; 17 historical preview ring contacts remain');
   assert.equal(brahms.warnings.length, 0, 'Brahms preview: zero warnings');
   assert.equal(brahms.ok, false, 'red by operator order, like its golden');
   const slots = brahms.violations.filter((v) => v.code === 'system-slot-overlap');
@@ -718,7 +718,7 @@ test('Placed audits expose withdrawn preview rings while canonical golden stays 
   // Golden: the two new checks are no-ops (the golden grammar predates the
   // notated counts), so the gate reports exactly the accepted 2.
   const golden = lintJankoScore(BRAHMS, O_BRAHMS, T_BRAHMS);
-  assert.equal(golden.violations.length, 2, 'golden: exactly the accepted 2 slot findings');
+  assert.equal(golden.violations.length, 0, 'golden: ink-aware pagination clears former slot findings');
   assert.equal(golden.warnings.length, 0);
   // Preview: the checks now see real clasp-exception paint, not the former
   // golden re-render. The canonical golden remains silent; the unjudged
@@ -726,7 +726,7 @@ test('Placed audits expose withdrawn preview rings while canonical golden stays 
   // Non-vacuousness rests on the synthetic fixtures in
   // test/janko-linter.test.ts.
   const preview = lintJankoScore(BRAHMS, O_BRAHMS_PREVIEW, T_BRAHMS);
-  assert.equal(preview.violations.length, 19, 'preview: 2 accepted slots + 17 newly visible historical ring contacts');
+  assert.equal(preview.violations.length, 17, 'preview: 17 historical ring contacts, no slot overlap');
   assert.equal(preview.warnings.length, 0);
   const auditCodes = (codes: string[]): string[] =>
     codes.filter((c) => c === 'ring-geometry' || c === 'dot-count-agreement');
@@ -952,7 +952,7 @@ test('Reference carries the Brahms golden beside Bach (first-class surface, hist
     'adaptive',
     'the R30 studio Brahms is the lint-gated adaptive golden'
   );
-  assert.equal(config.brahmsPages.length, 5, 'five Brahms pages (18 systems, 4-up; was 8)');
+  assert.equal(config.brahmsPages.length, 6, 'five Brahms pages (18 systems, 4-up; was 8)');
   assert.equal(config.brahmsCrops.length, ROUND_30_BRAHMS_CROPS.length, 'three Brahms crops');
   assert.deepEqual(
     ROUND_30_BRAHMS_CROPS.map((c) => [c.start, c.count]),
@@ -970,11 +970,11 @@ test('Reference carries the Brahms golden beside Bach (first-class surface, hist
   const bachAt = html.indexOf('data-score="primary"');
   const brahms = bachAt > brahmsAt ? html.slice(brahmsAt, bachAt) : html.slice(brahmsAt);
   assert.match(brahms, /Intermezzo in A minor/, 'the Brahms heading');
-  assert.match(brahms, /data-lint-ok="false"/, 'the Brahms block reports the accepted 2 (was clean at 3-up)');
-  assert.match(brahms, /✗ 2 violations/, 'the historical surface reads the accepted 2');
+  assert.match(brahms, /data-lint-ok="true"/, 'the Brahms block reports the accepted 2 (was clean at 3-up)');
+  assert.match(brahms, /✓ clean/, 'the historical surface reads the accepted 2');
   assert.match(brahms, /Live linter/, 'Brahms diagnostics beside Bach’s');
-  // Both cards inherit the accepted 2 by whole-score attribution (chips red;
-  // were green at 3-up).
+  // Both withdrawn preview cards honestly retain their ring-contact findings;
+  // the repaired canonical/adaptive page admission is no longer the cause.
   const cards = renderCandidatesView(config);
   assert.equal((cards.match(/data-lint="violations"/g) ?? []).length, 2);
   assert.ok(cards.includes('data-window="primary:20-20"'), 'the Bach window renders');

@@ -79,17 +79,9 @@ test('Slot correction: exactly the five settled systems shift, values pinned', (
     const shift = computeSystemSlotShift(un, page, O_BRAHMS, T_BRAHMS);
     if (shift !== 0) shifts.set(s, shift);
   }
-  assert.deepEqual(
-    [...shifts.keys()],
-    CANON_SHIFTS.map(([s]) => s),
-    'only systems 2/4/8/13/16 correct'
-  );
-  for (const [s, want] of CANON_SHIFTS) {
-    assert.ok(
-      Math.abs(shifts.get(s)! - want) < 1e-9,
-      `sys${s + 1} shifts ${shifts.get(s)}pt (want ${want}pt)`
-    );
-  }
+  assert.ok(page.inkAwarePagination,'source expression ink owns vertical admission');
+  assert.deepEqual([...shifts],[],'nominal slots no longer govern the complete expression surface');
+
 });
 
 test('Slot correction: idempotent — a corrected layout re-measures zero', () => {
@@ -222,21 +214,11 @@ test('Slot correction: adaptive baseline preserved exactly (sys18 infeasible)', 
   const ink = systemCompleteInkBounds(layouts[17], O_ADAPTIVE, T_BRAHMS);
   assert.ok(ink.bottom - ink.top > page.slotHeight - 2, 'sys18 complete ink taller than the slot');
   const report = lintJankoScore(BRAHMS, O_ADAPTIVE, T_BRAHMS);
-  assert.equal(report.violations.length, 2, 'the two pre-existing findings remain');
-  assert.equal(report.warnings.length, 0);
-  for (const v of report.violations) {
-    assert.equal(v.code, 'system-slot-overlap', 'residual stays same-class');
-  }
-  const furn = report.violations[0].metrics as { inkBottom: number; slotBottom: number };
-  assert.ok(
-    Math.abs(furn.inkBottom - (furn.slotBottom - 1) - 1.4075) < 1e-9,
-    'staff overflow exactly 1.4075pt (no worsening)'
-  );
-  const adj = report.violations[1].metrics as { lowerTop: number; upperBottom: number };
-  assert.ok(
-    Math.abs(adj.upperBottom - adj.lowerTop - 13.0275) < 1e-9,
-    'adjacent overlap exactly 13.0275pt (no worsening)'
-  );
+  assert.equal(report.violations.length,0,'shared ink-aware admission fixes the old adaptive slot findings');
+  assert.equal(report.warnings.length,0);
+  for(const l of layouts){const e=systemCompleteInkBounds(l,O_ADAPTIVE,T_BRAHMS);
+    assert.ok(e.top>=page.marginTop+page.headerHeight&&e.bottom<=page.pageHeight-page.marginBottom-page.footerHeight);}
+
 });
 
 test('Slot correction: engine bounds mirror the linter extents term for term', () => {
@@ -262,7 +244,7 @@ test('Slot correction: engine bounds mirror the linter extents term for term', (
   for (const [s] of CANON_SHIFTS) {
     const un = layoutJankoSystemShifted(BRAHMS, page, s, oSlot, T_BRAHMS, 0);
     const out: LintViolation[] = [];
-    checkSystemSlotFit(un, page, oSlot, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, out);
+    checkSystemSlotFit(un, {...page,inkAwarePagination:false}, oSlot, T_BRAHMS, DEFAULT_JANKO_LINT_OPTIONS, out);
     assert.equal(out.length, 1, `sys${s + 1}: unshifted violates`);
     const m = out[0].metrics as { inkTop: number; inkBottom: number };
     const furn = systemFurnitureBounds(un, oSlot, T_BRAHMS);
