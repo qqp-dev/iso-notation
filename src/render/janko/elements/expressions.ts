@@ -17,6 +17,8 @@ export interface ExpressionInk {
   gridKnockout?: boolean;
 }
 interface Placement {
+  /** Display-field membership only; original source arrays remain untouched. */
+  include?: (kind:ExpressionInk['kind'],id:string)=>boolean;
   start: number; end: number; left: number; right: number;
   top: number; bottom: number;
   x: (tick: number) => number;
@@ -64,6 +66,7 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
   // axis remains available only for the real-engine pre-pass comparison.
   const phraseLanes: { x0: number; x1: number; lane: number }[] = [];
   for (const phrase of score.phrases ?? []) {
+    if(p.include&&!p.include('phrase',phrase.id))continue;
     if (phrase.endTick < p.start || phrase.startTick >= p.end) continue;
     const cs = phrase.startTick < p.start, ce = phrase.endTick >= p.end;
     const startX = cs ? p.left : p.endpointX(phrase.fromNoteIds, phrase.startTick);
@@ -127,6 +130,7 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
   const dynamicLanes: { x0: number; x1: number; lane: number }[] = [];
   for (const [index,e] of (score.dynamics ?? []).entries()) {
     const hairpin = e.kind === 'hairpin' || (!e.kind && ['crescendo','decrescendo'].includes(e.mark) && !!e.durationTicks);
+    if(p.include&&!p.include(hairpin?'hairpin':'dynamic',`dynamic-${index}`))continue;
     const end = hairpin ? e.tick + (e.durationTicks ?? 0) : e.tick;
     if (hairpin ? end <= p.start || e.tick >= p.end : e.tick < p.start || e.tick >= p.end) continue;
     const cs = e.tick < p.start, ce = end > p.end;
@@ -160,6 +164,7 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
   const dynamicBottom=Math.max(p.bottom,...out.map(q=>q.y1));
   const pedalY=dynamicBottom+12;
   for (const [i,interval] of pedalIntervals(score).entries()) {
+    if(p.include&&!p.include('pedal',`pedal-${i}`))continue;
     if(interval.end<=p.start || interval.start>=p.end) continue;
     const cs=interval.start<p.start, ce=interval.end>p.end || !interval.release;
     const x0=x(interval.start),x1=x(interval.end),y=pedalY;

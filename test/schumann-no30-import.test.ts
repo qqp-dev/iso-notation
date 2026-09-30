@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { importSchumann, importSchumannNo30 } from '../src/scores/schumann-no43';
 import { buildSchumannNo30Draft, schumannNo30WrittenFacts, schumannNo30DeferredLedger } from '../src/scores/schumann-no30-draft';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { countJankoPages, renderJankoCrop } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
@@ -129,9 +129,9 @@ test('approved whole source: each repeat/ending, voice, hidden classification an
   assert.ok(score.sourceSilences?.some(s => s.bar === 32 && s.kind === 'rest'));
 });
 
-test('complete Candidates card is real-engine full pages and retains geometric diagnostics', () => {
+test('retained Round55 card is real-engine full pages and retains geometric diagnostics', () => {
   const entry = createStudioConfig().scores['schumann-op68-no30'];
-  const card = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no30-written-draft');
+  const card = ROUND_55_CANDIDATES.find(c => c.id === 'schumann-no30-written-draft');
   assert.ok(card?.windows?.some(w => 'fullScore' in w && w.fullScore && w.measureCount === 49));
   assert.match(renderJankoCrop(entry.score, 17, 2, entry.options, entry.tokens), /<svg/);
   const pages = countJankoPages(entry.score, entry.options, entry.tokens);

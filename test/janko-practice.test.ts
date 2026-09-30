@@ -6,7 +6,7 @@ import { lintJankoScore } from '../src/render/janko/linter';
 import { layoutJankoScore } from '../src/render/janko/engine';
 import { placedBeamGroup } from '../src/render/janko/beam-scene';
 import { DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_55_CANDIDATES, ROUND_55_METADATA } from '../src/render/janko/candidates';
 import { createStudioConfig, renderCandidatesView, renderReferenceView } from '../src/render/janko/studio';
 
 const input = { rudiment: 'scale' as const, scaleType: 'major' as const, tonicLinear: 48, width: 760, height: 380 };
@@ -231,9 +231,9 @@ test('invalid and unsupported requests are refused instead of silently clipped',
       assert.equal(renderPracticeView({ ...input, scaleType, tonicLinear, width: 1600, height: 900 }).systemCount, 1);
 });
 
-test('studio major and N26 cards use portable renderer and leave Reference unchanged', () => {
-  const config = createStudioConfig();
-  const practiceCandidates = CURRENT_CANDIDATES.filter(c => c.kind === 'practice');
+test('retained Round55 major and N26 cards use portable renderer and leave Reference unchanged', () => {
+  const config = createStudioConfig({candidates:ROUND_55_CANDIDATES,round:ROUND_55_METADATA});
+  const practiceCandidates = ROUND_55_CANDIDATES.filter(c => c.kind === 'practice');
   assert.deepEqual(practiceCandidates.map(c => c.practiceScaleType), ['major', 'natural-minor']);
   assert.deepEqual(practiceCandidates.map(c => c.practiceGuide), ['two-guides', 'two-guides']);
   const html = renderCandidatesView(config);

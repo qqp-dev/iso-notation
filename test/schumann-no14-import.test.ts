@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { importSchumann, importSchumannNo14 } from '../src/scores/schumann-no43';
 import { buildSchumannNo14Draft, schumannNo14WrittenFacts, schumannNo14DeferredLedger } from '../src/scores/schumann-no14-draft';
 import { linearIndex } from '../src/model/pitch';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { countJankoPages, renderJankoCrop, renderJankoPage } from '../src/render/janko/engine';
 import { lintJankoScore } from '../src/render/janko/linter';
@@ -210,21 +210,21 @@ test('source identity is rendered as work, piece and author rather than inherite
     'missing metadata must not silently borrow another work identity');
 });
 
-test('complete real-engine Candidates window uses actual pages, with diagnostic lint kept visible', () => {
+test('retained Round55 complete real-engine window uses actual pages, with diagnostic lint kept visible', () => {
   const config = createStudioConfig();
   const entry = config.scores['schumann-op68-no14'];
   assert.ok(entry);
-  const card = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-written-draft');
+  const card = ROUND_55_CANDIDATES.find(c => c.id === 'schumann-no14-written-draft');
   assert.ok(card?.windows?.some(w => 'fullScore' in w && w.fullScore && w.measureStart === 1 && w.measureCount === 96));
   assert.ok(card?.windows?.some(w => 'measureStart' in w && w.measureStart === 48));
   const principal = config.scores['schumann-op68-no14-principal'];
   assert.ok(principal, 'other source branch is explicitly available');
   assert.notDeepEqual(principal.score.notes, entry.score.notes);
   assert.deepEqual(principal.score.sourceBarTicks, entry.score.sourceBarTicks);
-  const comparison = CURRENT_CANDIDATES.find(c => c.id === 'schumann-no14-principal-route');
+  const comparison = ROUND_55_CANDIDATES.find(c => c.id === 'schumann-no14-principal-route');
   for (const measure of [41,43,63]) assert.ok(comparison?.windows?.some(w =>
     'scoreId' in w && w.scoreId === 'schumann-op68-no14-principal' && w.measureStart === measure));
-  assert.ok(!CURRENT_CANDIDATES.some(c => c.id === 'schumann-no14-ottava-seat'), 'phantom ottava decision retired');
+  assert.ok(!ROUND_55_CANDIDATES.some(c => c.id === 'schumann-no14-ottava-seat'), 'phantom ottava decision retired');
   assert.match(renderJankoCrop(entry.score, 1, 2, entry.options, entry.tokens), /<svg/);
   assert.ok(countJankoPages(entry.score, entry.options, entry.tokens) < 12,
     'ordinary No.14 passages must not retain the old uniform two-bar pagination');

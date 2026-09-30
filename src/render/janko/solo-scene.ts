@@ -10,15 +10,17 @@ import type { JankoDurationGrammar, JankoSubdivisionStyle, ResolvedJankoTokens, 
 import { getClusterSpacingPreset } from './types';
 import { f } from './elements/style';
 import type { InkBox } from './ink-scene';
-import { beamStemBoxes } from './beam-scene';
+import { beamStemBoxes,doubleStemSvg } from './beam-scene';
 
 const n=(v:number)=>Number(f(v));
 
 /** The path constructor used by both final solo paint and pre-final dot policy. */
-export function soloClassicalFlagPath(stemX:number,tipY:number,direction:-1|1,marks:number):string {
+export function soloClassicalFlagPath(stemX:number,tipY:number,direction:-1|1,marks:number,side:'left'|'right'='right'):string {
   const d=verbatimFlagPath(stemX,tipY,direction,marks).match(/\bd="([^"]+)"/)?.[1];
   if(!d)throw new Error('Unsupported solo flag path');
-  return d;
+  if(side==='right')return d;
+  let index=0;const root=n(stemX);
+  return d.replace(/-?\d+(?:\.\d+)?/g,value=>{const coordinate=Number(value);return f(index++%2===0?2*root-coordinate:coordinate);});
 }
 
 /** Conservative SVG-effective *envelope*, not filled ink: closed cubic extrema
@@ -63,13 +65,13 @@ export function dotFlagPolicyBox(note:JankoRhythmNote,marks:number,o:ResolvedJan
   const s=getStemGeometry(note,t);
   if(o.rhythmStyle==='beamed'&&o.subdivisionStyle==='classical-urtext'&&
       (o.core==='fixed-3'||o.core==='fixed-4'))
-    return projectedSoloFlagEnvelope(soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks));
+    return projectedSoloFlagEnvelope(soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks,note.flagSide));
   // Legacy baked admission only; kinetic candidates differ by up to ~0.985pt.
   const b=getSubdivisionGlyphBBox(o.subdivisionStyle,s.direction,marks,t);
   return {x0:s.stemX+b.x0,x1:s.stemX+b.x1,y0:s.stemEndY+b.y0,y1:s.stemEndY+b.y1};
 }
 export type SoloShape =
-  | {kind:'stem';x:number;y1:number;y2:number;width:number;gaps?:readonly {y0:number;y1:number}[]}
+  | {kind:'stem';x:number;y1:number;y2:number;width:number;double?:true;gaps?:readonly {y0:number;y1:number}[]}
   | {kind:'ring';cx:number;cy:number;r:number;width:number}
   | {kind:'flag';d:string;stemX:number;index:number;count?:number;style:JankoSubdivisionStyle}
   | {kind:'dot';cx:number;cy:number;r:number;index:1|2};
@@ -82,6 +84,7 @@ export interface SoloPiece {
 export function serializeSoloPiece(p:SoloPiece):string {
   const s=p.shape;
   if(s.kind==='stem'){
+    if(s.double){if(s.gaps?.length)throw Error('Shared voice channel refuses underpass fragments');return doubleStemSvg(s);}
     if(s.gaps?.length){const d=beamStemBoxes({shape:s}).map(b=>`M ${f(s.x)} ${f(b.y0)} L ${f(s.x)} ${f(b.y1)}`).join(' ');
       return `    <path class="janko-stem janko-voice-underpass" d="${d}" fill="none" stroke="#111111" stroke-width="${s.width.toFixed(2)}" stroke-linecap="butt"/>`;}
     return `    <line class="janko-stem" x1="${f(s.x)}" y1="${f(s.y1)}" x2="${f(s.x)}" y2="${f(s.y2)}" stroke="#111111" stroke-width="${s.width.toFixed(2)}"/>`;
@@ -101,12 +104,12 @@ export function soloRhythmPaint(note:JankoRhythmNote,t:ResolvedJankoTokens,style
   const add=(shape:SoloShape)=>out.push(piece({id:`s${system}:solo:${note.id}:${out.length}`,noteId:note.id,ownerIds:owners,
     sourceContributors:owners.flatMap(id=>{const source=sources.get(id);return source?[{id,sourceProvenance:source.sourceProvenance,editorialHand:source.editorialHand}]:[];}),
     tick:note.startTick,durationTicks:note.durationTicks,grammar,system,pagePiece,layer:'rhythm',shape}));
-  add({kind:'stem',x:n(s.stemX),y1:n(s.stemStartY),y2:n(s.stemEndY),width:JANKO_STEM_STROKE_WIDTH});
+  add({kind:'stem',x:n(s.stemX),y1:n(s.stemStartY),y2:n(s.stemEndY),width:note.doubleStem?1.3:JANKO_STEM_STROKE_WIDTH,...(note.doubleStem?{double:true as const}:{})});
   for(const c of stemRingCenters(note,t,grammar))add({kind:'ring',cx:n(c.x),cy:n(c.y),r:n(CLASP_RING_RADIUS),width:CLASP_RING_STROKE});
   const marks=subdivisionMarkCount(note.durationTicks,grammar);
   if(style==='classical-urtext') {
     if(marks>=1){
-      const d=soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks);
+      const d=soloClassicalFlagPath(s.stemX,s.stemEndY,s.direction,marks,note.flagSide);
       add({kind:'flag',d,stemX:n(s.stemX),index:1,count:marks,style});
     }
   } else for(let i=1;i<=marks;i++){

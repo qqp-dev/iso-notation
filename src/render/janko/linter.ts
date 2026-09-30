@@ -1,5 +1,6 @@
 import { expressionsOverlap, expressionIntersectsBox, pedalIntervals } from './elements/expressions';
 import { systemTickRange, systemPaintedInkBoxes } from './engine';
+import { PreparedJankoWindows } from './prepared-windows';
 /**
  * Jánko Implementer Visual Linter
  * ===============================
@@ -179,7 +180,7 @@ import {
 import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
-import { dotFlagPolicyBox } from './solo-scene';
+import { dotFlagPolicyBox, projectedSoloFlagEnvelope } from './solo-scene';
 import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes } from './beam-scene';
 import { GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
@@ -230,6 +231,13 @@ export type JankoLintCode =
   | 'rest-slab-off-line'
   | 'beam-voice-crossing'
   | 'unison-double-digit'
+  | 'event-hand-mark-refused'
+  | 'local-flag-seat-refused'
+  | 'local-flag-head-overlap'
+  | 'continuous-route-contact'
+  | 'contour-attachment'
+  | 'shared-voice-channel'
+  | 'shared-value-level'
   | 'clasp-dot-fusion'
   | 'stem-through-simultaneity'
   | 'split-stack-stems'
@@ -293,6 +301,8 @@ export type JankoLintCode =
 /** One diagnostic, located on the page and in musical time. */
 export interface LintViolation {
   code: JankoLintCode;
+  /** Named actual coordinate field for window-only comparative diagnostics. */
+  field?: string;
   severity: JankoLintSeverity;
   /** Human-readable, implementer-facing description. */
   message: string;
@@ -311,6 +321,8 @@ export interface LintViolation {
 
 /** Structured result of {@link lintJankoScore}. */
 export interface LintReport {
+  /** Absent on the canonical full-score gate. */
+  scope?: 'window-scoped';
   /** True when no `error`-severity diagnostic was found. */
   ok: boolean;
   /** Hard engraving defects (empty for a clean golden master). */
@@ -805,7 +817,8 @@ export function checkStemAndBeamValidity(
     // Round 16: the anti-fusion stagger is deleted — a stem stands exactly on
     // its notehead's centreline, and any drift is a defect (`split-stack-stems`
     // names the onset-wide regression separately).
-    if (Math.abs(stemX - p.x) > EPS) {
+    const edgeSeat=p.rhythm.stemOffsetX??0;
+    if (Math.abs(edgeSeat)>1.3+EPS||(edgeSeat!==0&&!layout.unisonMerges.some(m=>[m.survivorId,...m.mergedIds].includes(p.rhythm.id)))||Math.abs(stemX - p.x - edgeSeat) > EPS) {
       out.push({
         code: 'stem-detached',
         severity: 'error',
@@ -822,7 +835,9 @@ export function checkStemAndBeamValidity(
       });
       continue;
     }
-    const attach = Math.hypot(stemX - p.x, stemStartY - p.y);
+    // The declared ±1.3pt seat starts flush on the horizontal mask edge,
+    // not on a fictitious circle through that rectangle's corner.
+    const attach = edgeSeat&&!honor ? Math.abs(stemStartY-p.y) : Math.hypot(stemX - p.x, stemStartY - p.y);
     if (attach < effectiveRadius - EPS) {
       out.push({
         code: 'stem-detached',
@@ -1678,14 +1693,15 @@ export function checkDotCountAgreement(
     // cannot validate themselves if a stem or a rail was omitted together.
     const stems=pieces.filter(p=>p.shape.kind==='stem');
     const rails=pieces.filter(p=>p.shape.kind==='rail');
-    if(stems.length!==beam.notes.length||rails.length!==beam.levels.length||
-      stems.some((p,i)=>p.shape.kind!=='stem'||Math.abs(p.shape.x-beam.stems[i].stemX)>0.011||
-        Math.abs(p.shape.y1-beam.stems[i].stemStartY)>0.011||
-        Math.abs(p.shape.y2-beam.beamY(beam.stems[i].stemX))>0.011||
-        !beamPieceAt(p,p.shape.x,p.shape.y1)||!beamPieceAt(p,p.shape.x,p.shape.y2))||
-      rails.some((p,i)=>p.shape.kind!=='rail'||
-        !beamPieceAt(p,beam.levels[i].connector.x1,beam.levels[i].connector.y1)||
-        !beamPieceAt(p,beam.levels[i].connector.x2,beam.levels[i].connector.y2))){
+    const routed=o.crossingConvention==='layered'||!!beam.contourRails;
+    const invalidStems=stems.some((p,i)=>{
+      if(p.shape.kind!=='stem')return true;const s=p.shape;
+      if(Math.abs(s.x-beam.stems[i].stemX)>0.011||Math.abs(s.y1-beam.stems[i].stemStartY)>0.011||Math.abs(s.y2-beam.beamY(beam.stems[i].stemX))>0.011)return true;
+      return (s.double?[-.45,.45]:[0]).some(dx=>{const x=Number((s.x+dx).toFixed(2));return !beamPieceAt(p,x,s.y1)||!beamPieceAt(p,x,s.y2)||routed&&!rails.some(r=>r.level===1&&beamPieceAt(r,x,s.y2));});
+    });
+    const invalidRails=routed?beam.levels.some(l=>!rails.some(r=>r.level===l.level)):
+      rails.length!==beam.levels.length||rails.some((p,i)=>p.shape.kind!=='rail'||!beamPieceAt(p,beam.levels[i].connector.x1,beam.levels[i].connector.y1)||!beamPieceAt(p,beam.levels[i].connector.x2,beam.levels[i].connector.y2));
+    if(stems.length!==beam.notes.length||invalidStems||invalidRails){
       out.push({code:'beam-connection',severity:'error',message:`Beam group at tick ${beam.notes[0].startTick} has missing or disconnected painted stem/rail.`,system:layout.index,measure:measureOfTick(beam.notes[0].startTick,t),noteIds:beam.notes.map(n=>n.id),x:beam.primary.x1,y:beam.primary.y1});
     }
     if (painted !== expected) {
@@ -2910,7 +2926,7 @@ export function checkSplitStackStems(
           hand: note.hand,
           tick: note.startTick,
           headX: p?.x ?? note.x,
-          stemX: beam.stems[i].stemX,
+          stemX: beam.stems[i].stemX-(note.stemOffsetX??0),
         });
       }
     }
@@ -2924,7 +2940,7 @@ export function checkSplitStackStems(
       hand: p.rhythm.hand,
       tick: p.note.startTick,
       headX: p.x,
-      stemX: getStemGeometry(p.rhythm, t).stemX,
+      stemX: getStemGeometry(p.rhythm, t).stemX-(p.rhythm.stemOffsetX??0),
     });
   }
   // One onset column = one onset's heads sharing one head-x. A column with two
@@ -5125,6 +5141,10 @@ export function auditKnockoutProtection(
 
 /** Options accepted by the stem/beam document audit. */
 export interface StemBeamAuditOptions {
+  /** New contour/clipped-rail grammar: query the actual filled polygon. */
+  polygonRails?: boolean;
+  /** Declared per-note local-flag seats, independently checked against heads. */
+  standaloneSeats?: readonly {x:number;y1:number;y2:number}[];
   /** Canonical stem length measured from the notehead centre. */
   stemLength: number;
   /** Maximum acceptable |slope| of a beam connector. */
@@ -5168,6 +5188,7 @@ export function auditStemBeamConnections(
   ];
 
   for (const beam of beams) {
+    if(options.polygonRails&&beam.tag==='path')continue; // source linear slopes remain checked on layout; contour ramps are not classical beams
     const endpoints = beamEndpoints(beam);
     if (!endpoints) continue;
     const [x1, y1, x2, y2] = endpoints;
@@ -5194,8 +5215,21 @@ export function auditStemBeamConnections(
     if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
     const length = Math.hypot(x2 - x1, y2 - y1);
     const canonical = standaloneLengths.some((l) => Math.abs(length - l) <= tol + 0.02);
-    if (canonical) continue;
+    const declared=options.standaloneSeats?.some(s=>Math.abs(s.x-x1)<=tol&&Math.abs(s.y1-y1)<=tol&&Math.abs(s.y2-y2)<=tol);
+    if (canonical||declared) continue;
     const landsOnBeam = beams.some((beam) => {
+      if(options.polygonRails&&beam.tag==='path'){
+        const d=beam.attrs.d??'',nums=d.match(/-?\d+(?:\.\d+)?/g)?.map(Number)??[];
+        if(!/^[MLZ\s\d.\-]+$/i.test(d)||nums.length<6||nums.length%2)return false;
+        const points=Array.from({length:nums.length/2},(_,i)=>[nums[2*i],nums[2*i+1]]);
+        let inside=false;
+        for(let i=0,j=points.length-1;i<points.length;j=i++){
+          const a=points[j],b=points[i],dx=b[0]-a[0],dy=b[1]-a[1],length2=dx*dx+dy*dy;
+          const u=length2?Math.max(0,Math.min(1,((x2-a[0])*dx+(y2-a[1])*dy)/length2)):0;
+          if(Math.hypot(x2-a[0]-u*dx,y2-a[1]-u*dy)<=tol)return true;
+          if((a[1]>y2)!==(b[1]>y2)&&x2<(b[0]-a[0])*(y2-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+        }return inside;
+      }
       const endpoints = beamEndpoints(beam);
       if (!endpoints) return false;
       const [bx1, by1, bx2, by2] = endpoints;
@@ -6187,6 +6221,7 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
   const ink=layout.expressions ?? [];
   const problem=(code:JankoLintCode,id:string,reason:string) => out.push({code,severity:'error' as const,system:layout.index,message:`Expression ${id}: ${reason}`});
   for(const [index,e] of (score.dynamics ?? []).entries()) {
+    if(layout.expressionScope&&!layout.expressionScope.includes(`dynamic-${index}`))continue;
     const hairpin=e.kind==='hairpin'||(!e.kind&&!!e.durationTicks&&['crescendo','decrescendo'].includes(e.mark));
     const stop=hairpin?e.tick+(e.durationTicks??0):e.tick;
     if(hairpin?stop<=start||e.tick>=end:e.tick<start||e.tick>=end)continue;
@@ -6196,6 +6231,7 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
       problem('expression-endpoint',q.id,'source clock or continuation differs');
   }
   for(const phrase of score.phrases??[]) {
+    if(layout.expressionScope&&!layout.expressionScope.includes(phrase.id))continue;
     if(phrase.endTick<start||phrase.startTick>=end)continue;
     const q=ink.find(i=>i.kind==='phrase'&&i.id===phrase.id);
     if(!q)problem('expression-missing',phrase.id,'source phrase has no ink');
@@ -6203,6 +6239,7 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
       problem('expression-endpoint',phrase.id,'source note association differs');
   }
   for(const [i,span] of pedalIntervals(score).entries()) {
+    if(layout.expressionScope&&!layout.expressionScope.includes(`pedal-${i}`))continue;
     if(span.end<=start||span.start>=end)continue;
     const q=ink.find(q=>q.kind==='pedal'&&q.id===`pedal-${i}`);
     if(!q)problem('expression-missing',`pedal-${i}`,'held interval omitted');
@@ -6236,6 +6273,58 @@ export function lintJankoScore(
   tokens?: Partial<JankoTokens> | null,
   lint?: Partial<JankoLintOptions> | null
 ): LintReport {
+  return lintLayouts(score, resolveJankoOptions(options), resolveJankoTokens(tokens), lint);
+}
+
+export function checkSharedCarrierPaint(layout:JankoSystemLayout,scene:InkScene,t:ResolvedJankoTokens,out:LintViolation[]):void {
+  for(const [i,b] of layout.beams.entries())if(b.sharedCarrier)for(const [j,n] of b.notes.entries()){
+    const s=b.stems[j],y=b.beamY(s.stemX)+t.beamThickness+1.6,box={x0:s.stemX-.1,x1:s.stemX+.1,y0:y-.2,y1:y+.2};
+    const actual=scene.beams[i].some(p=>p.level===2&&beamPieceIntersectsBox(p,box)),expected=subdivisionMarkCount(n.durationTicks,'complete')>=2;
+    if(actual!==expected)out.push({code:'shared-value-level',severity:'error',system:layout.index,noteIds:[n.id],message:`Shared carrier secondary ownership differs from the written value (${n.durationTicks} ticks).`});
+    const stem=scene.beams[i].find(p=>p.shape.kind==='stem'&&p.ownerIds[0]===n.id);
+    if(!stem||stem.shape.kind!=='stem'||!!stem.shape.double!==!!n.sourceVoice?.endsWith('.1'))out.push({code:'shared-voice-channel',severity:'error',system:layout.index,noteIds:[n.id],message:'Shared RH primary has no faithful integrated single/double source-stream channel.'});
+  }
+}
+
+export function checkContinuousContourPaint(layout:JankoSystemLayout,scene:InkScene,out:LintViolation[]):void {
+  const rails=scene.beams.flat().filter(p=>p.shape.kind==='rail');
+  const stems=[...scene.beams.flat(),...Array.from(scene.solos).filter(([id])=>!scene.soloAliases?.has(id)).flatMap(([,p])=>p)].filter(p=>p.shape.kind==='stem');
+  for(const stem of stems)for(const rail of rails){if(stem.shape.kind!=='stem'||rail.ownerIds.includes(stem.ownerIds[0]))continue;
+    if(beamStemBoxes({shape:stem.shape}).some(box=>beamPieceIntersectsBox(rail,box)))out.push({code:'continuous-route-contact',severity:'error',system:layout.index,noteIds:[...stem.ownerIds],message:`Continuous stem meets a foreign ${rail.level===1?'primary':'secondary'} ribbon; no crossing vocabulary is declared.`,metrics:{railLevel:rail.level??1}});
+  }
+  for(const [i,b] of layout.beams.entries())if(b.contourRails){
+    const painted=scene.beams[i].filter(p=>p.shape.kind==='rail');
+    if(painted.length!==b.contourRails.length||painted.some((p,k)=>p.shape.kind==='rail'&&JSON.stringify(p.shape.points)!==JSON.stringify(b.contourRails![k].points)))out.push({code:'continuous-route-contact',severity:'error',system:layout.index,message:'Declared continuous RH contour was interrupted by a foreign overpass; this representative is not continuous.'});
+  }
+  for(const [i,b] of layout.beams.entries())if(b.contourRails)for(const s of b.stems){const box={x0:s.stemX-.3,x1:s.stemX+.3,y0:s.stemEndY-.3,y1:s.stemEndY+.3};
+    if(!scene.beams[i].some(p=>p.level===1&&beamPieceIntersectsBox(p,box)))out.push({code:'contour-attachment',severity:'error',system:layout.index,message:'Bent primary does not meet its own declared stem tip.'});
+  }
+}
+
+export function checkLocalFlagPaint(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[],scene:InkScene):void {
+  for(const [id,pieces] of scene.solos)for(const p of pieces)if(p.shape.kind==='flag'&&p.shape.style==='classical-urtext'){
+    const box=projectedSoloFlagEnvelope(p.shape.d);
+    const ownHead=layout.unisonMerges.find(m=>m.mergedIds.includes(id))?.survivorId??id;
+    for(const h of layout.notes){if(h.note.id===ownHead)continue;const m=knockoutHalfExtents(o,t,h.note.startTick,h);
+      if(box.x0<h.x+m.wx&&box.x1>h.x-m.wx&&box.y0<h.y+m.hy&&box.y1>h.y-m.hy)
+        out.push({code:'local-flag-head-overlap',severity:'error',system:layout.index,noteIds:[id,h.note.id],message:'Complete local classical-flag enclosure enters a foreign head knockout; the whole glyph needs a different side/tip seat.'});
+    }
+  }
+}
+
+export function checkEventHandMarkIntegrity(layout:JankoSystemLayout,out:LintViolation[]):void {
+  for(const m of layout.eventHandMarks??[])if(m.refused)out.push({code:'event-hand-mark-refused',severity:'error',system:layout.index,noteIds:m.ownerIds,
+    message:'No collision-free event hand-chevron seat was found; this comparative hand channel is not viable here.'});
+}
+
+/** Standard system checks on complete containing systems. No page-fit verdict:
+ * page placement has deliberately not been computed for this local comparison. */
+export function lintJankoWindowSystems(prepared:PreparedJankoWindows,lint?:Partial<JankoLintOptions>|null):LintReport {
+  prepared.validate();
+  return lintLayouts(prepared.score,prepared.options,prepared.tokens,lint,prepared);
+}
+function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions,tokens:ResolvedJankoTokens,
+  lint?:Partial<JankoLintOptions>|null,prepared?:PreparedJankoWindows):LintReport {
   const startedAt = Date.now();
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -6244,15 +6333,22 @@ export function lintJankoScore(
     ...(lint ?? {}),
   };
 
-  const layouts = layoutJankoScore(score, o, t);
-  const page = computePageGeometry(o, t, score);
+  const layouts = prepared ? prepared.auditLayouts().sort((a,b)=>a.index-b.index) : layoutJankoScore(score, o, t);
+  const byIndex=new Map(layouts.map(l=>[l.index,l]));
+  const page = prepared?.geometry ?? computePageGeometry(o, t, score);
   const diagnostics: LintViolation[] = [];
   const extents: Array<{ top: number; bottom: number }> = [];
   const restPhysical = { certified: 0, fallback: {} as Record<string, number> };
 
   for (const layout of layouts) {
+    const diagnosticStart=diagnostics.length;
+    checkEventHandMarkIntegrity(layout,diagnostics);
+    for(const id of layout.localFlagRefusals??[])diagnostics.push({code:'local-flag-seat-refused',severity:'error',system:layout.index,noteIds:[id],message:'No complete classical-flag side/tip seat clears the neighboring heads.'});
     const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'||o.clarityPass&&layout.beams.length>1
       ?buildInkScene(layout,o,t,score):undefined;
+    if(o.sharedRhCarrier&&placedScene)checkSharedCarrierPaint(layout,placedScene,t,diagnostics);
+    if(o.beamContour==='bent'&&placedScene)checkContinuousContourPaint(layout,placedScene,diagnostics);
+    if(o.groupedRhythm==='local-flags'&&placedScene)checkLocalFlagPaint(layout,o,t,diagnostics,placedScene);
     checkGraceIntegrity(score, layout, o, t, diagnostics);
     checkExpressionIntegrity(score,layout,o,t,diagnostics);
     checkVoiceBeamCorridors(layout,t,diagnostics,o,placedScene);
@@ -6327,18 +6423,22 @@ export function lintJankoScore(
         ...auditStemBeamConnections(svg, {
           stemLength: t.stemLength,
           maxBeamSlope: thresholds.maxBeamSlope,
+          ...(o.crossingConvention==='layered'||o.beamContour==='bent'?{polygonRails:true}:{}),
+          ...(o.groupedRhythm==='local-flags'||o.shareAttackHeads?{standaloneSeats:[...layout.notes,...layout.unisonVoices].map(p=>{const s=getStemGeometry(p.rhythm,t);return {x:s.stemX,y1:s.stemStartY,y2:s.stemEndY};})}:{}),
           stemAttachmentRadius: attachment.regular,
           honorStemAttachmentRadius: attachment.honor,
         }),
       ].map((v) => ({ ...v, system: layout.index }));
       diagnostics.push(...audit);
     }
+    if(layout.voiceFieldKey)for(const d of diagnostics.slice(diagnosticStart))d.field=layout.voiceFieldKey;
   }
 
   // Round 15: consecutive systems on one page must never overlap. The layouts
   // carry page-relative slot geometry, so two neighbours on the same page are
   // directly comparable; a page break starts a fresh page and is exempt.
   for (let i = 1; i < layouts.length; i++) {
+    if (prepared) continue; // selected systems are not a page block
     if ((layouts[i].geometry.pageIndex ?? Math.floor(i / page.systemsPerPage)) !==
       (layouts[i - 1].geometry.pageIndex ?? Math.floor((i - 1) / page.systemsPerPage))) continue;
     const above = extents[i - 1];
@@ -6358,9 +6458,11 @@ export function lintJankoScore(
 
   // Ticket §5: page-boundary fit against allocated slots (nominal slots
   // extended minimally from trailing page space; origins preserved).
-  checkSystemAllocatedSlotFit(layouts, page, t, thresholds, o, diagnostics);
-  // Content-aware placement: page-block fit and facing-gap minimums.
-  checkContentAwarePageFit(layouts, page, t, thresholds, o, diagnostics);
+  if (!prepared) {
+    checkSystemAllocatedSlotFit(layouts, page, t, thresholds, o, diagnostics);
+    // Content-aware placement: page-block fit and facing-gap minimums.
+    checkContentAwarePageFit(layouts, page, t, thresholds, o, diagnostics);
+  }
 
   // The same admitted source-boundary map controls diagnostics as columns,
   // page captions and crops. Never report a repeated pickup's nominal
@@ -6368,9 +6470,10 @@ export function lintJankoScore(
   if (score.sourceBarTicks) {
     for (const d of diagnostics) {
       if (d.measure === undefined) continue;
-      const g = layouts[d.system]?.geometry;
+      const diagnosticLayout=layouts.find(l=>l.index===d.system&&(!d.field||l.voiceFieldKey===d.field))??byIndex.get(d.system);
+      const g = diagnosticLayout?.geometry;
       if (!g?.measureEdges || g.firstBar === undefined) continue;
-      const note = layouts[d.system].notes.find(n => d.noteIds?.includes(n.note.id));
+      const note = diagnosticLayout?.notes.find(n => d.noteIds?.includes(n.note.id));
       const tick = note?.note.startTick;
       if (tick !== undefined) {
         let low = 0, high = score.sourceBarTicks.length - 2;
@@ -6390,13 +6493,14 @@ export function lintJankoScore(
   const beams = layouts.reduce((sum, l) => sum + l.beams.length, 0);
 
   return {
+    ...(prepared ? {scope:'window-scoped' as const} : {}),
     ok: violations.length === 0,
     violations,
     warnings,
     diagnostics,
     stats: {
-      systems: layouts.length,
-      measures: countMeasures(score, t),
+      systems: prepared ? prepared.systems.size : layouts.length,
+      measures: prepared ? [...prepared.systems.values()].reduce((sum,l)=>sum+l.geometry.measuresPerSystem,0) : countMeasures(score, t),
       notes,
       beams,
       checks: JANKO_LINT_CHECKS.length,

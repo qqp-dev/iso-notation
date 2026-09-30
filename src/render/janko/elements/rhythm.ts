@@ -53,6 +53,14 @@ import type { PlacedClaspShell } from '../connective-scene';
 export interface JankoRhythmNote {
   sourceBeam?: { group?: string; noBeam?: boolean };
   sourceVoice?: string;
+  /** Candidate layout direction, independent of musical hand. */
+  layoutDirection?: -1 | 1;
+  /** Comparative top/bottom mask-edge attachment, within the owning head. */
+  stemOffsetX?: number;
+  /** Candidate complete-flag seat; mirroring does not alter its flag count. */
+  flagSide?: 'left'|'right';
+  /** Visible source-stream channel in an editorial shared primary. */
+  doubleStem?: true;
   /** Derived independent-stem corridor length; never changes a written value or hand. */
   stemLength?: number;
   beamWindowTicks?: number;
@@ -197,10 +205,10 @@ export function getStemGeometry(
   tokens?: Partial<JankoTokens> | null
 ): JankoStemGeometry {
   const t = resolveJankoTokens(tokens);
-  const dir = stemDirection(note.hand);
+  const dir = note.layoutDirection ?? stemDirection(note.hand);
   const attachR = getStemAttachmentRadius(note, t);
   return {
-    stemX: note.x,
+    stemX: note.x + (note.stemOffsetX ?? 0),
     stemStartY: note.y + dir * attachR,
     stemEndY: note.y + dir * (note.stemLength ?? t.stemLength),
     direction: dir,
@@ -3566,7 +3574,8 @@ export function computeVerticalChordGroup(
   const sorted = [...notes].sort(
     (a, b) => a.y - b.y || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   );
-  const direction = stemDirection(sorted[0].hand);
+  const direction = sorted[0].layoutDirection??stemDirection(sorted[0].hand);
+  if(sorted.some(n=>(n.layoutDirection??stemDirection(n.hand))!==direction))return null;
   // The extremity in the stem direction carries the duration: an up-stem hand
   // (RH) hands it to its topmost head, a down-stem hand (LH) to its bottommost.
   const carrier = direction === -1 ? sorted[0] : sorted[sorted.length - 1];
@@ -3652,6 +3661,9 @@ export function renderChordBridges(
  * `checkBeamRestClearance`).
  */
 export interface JankoBeamGroupGeometry {
+  /** Opted-in constant-normal-width contour strips, primary first. */
+  sharedCarrier?: true;
+  contourRails?: Array<{level:number;stub:boolean;points:readonly (readonly [number,number])[]}>;
   /** Group notes sorted by start tick. */
   notes: JankoRhythmNote[];
   /** One resolved stem per note (same order as `notes`). */

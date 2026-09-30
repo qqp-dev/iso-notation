@@ -8,7 +8,7 @@ import { lintJankoScore } from '../src/render/janko/linter';
 import { computeBarStaffRows, computeSystemStaffSegments } from '../src/render/janko/elements/staff';
 import { resolveJankoTokens } from '../src/render/janko/types';
 import { importSchumann } from '../src/scores/schumann-no43';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
 import { beamPieceIntersectsBox, beamStemBoxes, placedBeamGroup } from '../src/render/janko/beam-scene';
 
 const linear=(n:{pitch:{octave:number;pitchClass:number}})=>n.pitch.octave*12+n.pitch.pitchClass;
@@ -114,8 +114,8 @@ test('measured final ink covers cited collision windows and shared repertoire co
 });
 
 test('comparison cards use identical representative windows, real-engine deltas and honest hand captions',()=>{
-  const a=CURRENT_CANDIDATES.find(c=>c.id==='schumann-no13-written-draft')!;
-  const b=CURRENT_CANDIDATES.find(c=>c.id==='schumann-no13-before-clarity')!;
+  const a=ROUND_55_CANDIDATES.find(c=>c.id==='schumann-no13-written-draft')!;
+  const b=ROUND_55_CANDIDATES.find(c=>c.id==='schumann-no13-before-clarity')!;
   assert.deepEqual(a.windows,b.windows);
   assert.equal(b.options?.clarityPass,false);
   assert.equal(b.tokens?.graceScale,.68);
