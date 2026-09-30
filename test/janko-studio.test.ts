@@ -101,7 +101,7 @@ test('renderCandidatesView renders every scheme card on every declared window', 
   );
   assert.equal((html.match(/data-candidate="/g) ?? []).length, CURRENT_CANDIDATES.length);
   const grid = html.slice(html.indexOf('candidate-grid'));
-  const stripPanels = CURRENT_ROUND_METADATA.compareStrip ? CURRENT_CANDIDATES.length : 0;
+  const stripPanels = CURRENT_ROUND_METADATA.compareStrip ? CURRENT_CANDIDATES.filter(c=>!c.rejection).length : 0;
   assert.equal(
     (html.match(/<svg/g) ?? []).length - (grid.match(/<svg/g) ?? []).length,
     stripPanels,

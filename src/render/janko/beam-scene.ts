@@ -8,10 +8,11 @@ import { f } from './elements/style';
 import type { JankoDurationGrammar, ResolvedJankoTokens } from './types';
 import type { InkBox } from './ink-scene';
 import type { QuantizedNote } from '../../model/types';
+import { overpassRailFragments } from './layered-routes';
 
 const n = (value:number):number => Number(f(value));
 export type BeamShape =
-  | {kind:'stem'; x:number; y1:number; y2:number; width:number; gaps?:readonly {y0:number;y1:number}[]}
+  | {kind:'stem'; x:number; y1:number; y2:number; width:number; double?:true; gaps?:readonly {y0:number;y1:number}[]}
   | {kind:'rail'; points:readonly [number,number][]}
   | {kind:'dot'; cx:number; cy:number; r:number};
 export interface BeamPiece {
@@ -24,9 +25,14 @@ export interface BeamPiece {
   shape:BeamShape; cls:string; level?:number; stub?:boolean; dot?:number;
   readonly svg:string;
 }
+export function doubleStemSvg(s:{x:number;y1:number;y2:number}):string {
+  const d=[-.45,.45].map(dx=>`M ${f(s.x+dx)} ${f(s.y1)} L ${f(s.x+dx)} ${f(s.y2)}`).join(' ');
+  return `    <path class="janko-stem janko-source-voice-two" data-source-stream="v2" d="${d}" fill="none" stroke="#111111" stroke-width="0.40" stroke-linecap="butt"/>`;
+}
 export function serializeBeamPiece(piece:BeamPiece):string {
   const p=piece.shape;
   if(p.kind==='stem') {
+    if(p.double){if(p.gaps?.length)throw Error('Shared voice channel refuses underpass fragments');return doubleStemSvg(p);}
     if(p.gaps?.length){
       const d=beamStemBoxes(piece).map(b=>`M ${f(p.x)} ${f(b.y0)} L ${f(p.x)} ${f(b.y1)}`).join(' ');
       return `    <path class="${piece.cls} janko-voice-underpass" d="${d}" fill="none" stroke="#111111" stroke-width="${p.width.toFixed(2)}" stroke-linecap="butt"/>`;
@@ -34,8 +40,8 @@ export function serializeBeamPiece(piece:BeamPiece):string {
     return `    <line class="${piece.cls}" x1="${f(p.x)}" y1="${f(p.y1)}" x2="${f(p.x)}" y2="${f(p.y2)}" stroke="#111111" stroke-width="${p.width.toFixed(2)}"/>`;
   }
   if(p.kind==='dot')return `    <circle class="${piece.cls}"${piece.dot===2?' data-dot="2"':''} cx="${f(p.cx)}" cy="${f(p.cy)}" r="${f(p.r)}" fill="#111111"/>`;
-  const [a,b,c,d]=p.points;
-  const path=`M ${f(a[0])} ${f(a[1])} L ${f(b[0])} ${f(b[1])} L ${f(c[0])} ${f(c[1])} L ${f(d[0])} ${f(d[1])} Z`;
+  const [a,...rest]=p.points;
+  const path=`M ${f(a[0])} ${f(a[1])}${rest.map(b=>` L ${f(b[0])} ${f(b[1])}`).join('')} Z`;
   return `    <path class="${piece.cls}"${piece.level&&piece.level>1?` data-beam-level="${piece.level}"`:''}${piece.stub?' data-beam-stub="1"':''} d="${path}" fill="#111111"/>`;
 }
 function piece(data:Omit<BeamPiece,'svg'>):BeamPiece {
@@ -53,10 +59,12 @@ export function placedBeamGroup(beam:JankoBeamGroupGeometry,t:ResolvedJankoToken
     tick,span,system,pagePiece,layer:'rhythm',shape,cls,...extra}));
   for(let i=0;i<beam.stems.length;i++){
     const s=beam.stems[i];
-    add({kind:'stem',x:n(s.stemX),y1:n(s.stemStartY),y2:n(beam.beamY(s.stemX)),width:JANKO_STEM_STROKE_WIDTH},'janko-stem',contributors(notes[i].id));
+    add({kind:'stem',x:n(s.stemX),y1:n(s.stemStartY),y2:n(beam.beamY(s.stemX)),width:notes[i].doubleStem?1.3:JANKO_STEM_STROKE_WIDTH,...(notes[i].doubleStem?{double:true as const}:{})},'janko-stem',contributors(notes[i].id));
   }
   const names:Record<number,string>={1:'janko-beam',2:'janko-beam-secondary',3:'janko-beam-tertiary',4:'janko-beam-quaternary'};
-  for(const strip of beam.levels){
+  for(const [index,strip] of beam.levels.entries()){
+    if(beam.contourRails){const rail=beam.contourRails[index];if(!rail||rail.level!==strip.level||rail.points.length<4)throw Error('Incomplete bent ribbon levels');
+      add({kind:'rail',points:rail.points.map(p=>[n(p[0]),n(p[1])] as [number,number])},names[strip.level]+(strip.stub?' janko-beam-stub':''),owners,{level:strip.level,stub:strip.stub});continue;}
     const c=strip.connector;
     // Use the actual path formatter: its four rounded vertices are the SVG polygon,
     // including the slope-dependent half-stem extensions and vertical faces.
@@ -84,7 +92,8 @@ export function beamStemBoxes(piece:Pick<BeamPiece,'shape'>):InkBox[] {
     cursor=Math.max(cursor,gap.y1);
   }
   if(cursor<bottom)out.push({x0:s.x-s.width/2,x1:s.x+s.width/2,y0:cursor,y1:bottom});
-  return out.filter(b=>b.y1>b.y0);
+  const intervals=out.filter(b=>b.y1>b.y0);
+  return s.double?intervals.flatMap(b=>[-.45,.45].map(dx=>({...b,x0:n(s.x+dx)-.2,x1:n(s.x+dx)+.2}))):intervals;
 }
 
 /** Genuine crossing voices cannot always be planar while retaining performing-
@@ -129,6 +138,11 @@ export function routeVoiceUnderpasses(groups:BeamPiece[][],beams:readonly JankoB
     s.y2=n(s.y2>s.y1?tip.y1+visible:tip.y0-visible);
     }
   }
+}
+
+export function routeVoiceOverpasses(groups:BeamPiece[][],beams:readonly JankoBeamGroupGeometry[],t:ResolvedJankoTokens,
+ solos:readonly {shape:Extract<BeamShape,{kind:'stem'}>;hand:QuantizedNote['hand'];sourceVoice?:string;ownerIds?:readonly string[]}[]=[]):void {
+  overpassRailFragments(groups,beams,solos,piece);
 }
 
 export const beamGroupSvg=(pieces:readonly BeamPiece[]):string=>['  <g class="janko-beam-group">',...pieces.map(p=>p.svg),'  </g>'].join('\n');

@@ -30,7 +30,7 @@ export function planProductionLayout(score: QuantizedGridScore, o: ResolvedJanko
     // A downbeat host needs the entire pre-host group in its OWN bar, not
     // merely a wider bar that still places its head 6pt past the barline.
     const openingGrace = graces.filter(g => g.tick === bars[b]);
-    leftInsets.push(Math.max(6, ...openingGrace.map(g => 15 + (g.count - 1) * 12.5 + 4.5)));
+    leftInsets.push(Math.max(6, o.comparisonInset??0, ...openingGrace.map(g => 15 + (g.count - 1) * 12.5 + 4.5)));
     // Protected barline insets; rhythmic columns, chord masks and pre-host
     // grace ink cannot borrow another measure's allocation.
     const rhythmic = Math.max(1, onsets.length) * (2 * t.noteheadRadius + 4.2);

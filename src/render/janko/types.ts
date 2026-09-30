@@ -1210,6 +1210,28 @@ export interface JankoLayoutOptions {
   measuresPerSystem: number;
   /** Pluggable rhythm renderer style. */
   rhythmStyle: JankoRhythmStyle;
+  /** Opt-in comparative rebeaming. Source gesture membership remains recorded. */
+  groupedRhythm?: 'local-flags';
+  /** Candidate evidence record, independent of the chosen duration paint. */
+  preserveGestureMembership?: true;
+  /** Comparative complete-system window projection only, not book pagination. */
+  comparisonPitchFields?: true;
+  /** Deliberate compatible untied local statements, not generic voice merging. */
+  shareCompatibleLocalRhythm?: true;
+  /** Opt-in monochrome over/under convention: stems over interrupted rails. */
+  crossingConvention?: 'layered';
+  /** Compatible shared heads keep distinct grouped/solo attachment channels. */
+  independentUnisonAttachments?: true;
+  /** One untied physical attack head; unequal values retain independent branches. */
+  shareAttackHeads?: true;
+  /** Comparative RH contour + simultaneous voice seat separation, no default. */
+  beamContour?: 'bent';
+  rhVoiceSeparation?: number;
+  /** Opted-in production admission air for editorial voice seats. */
+  comparisonInset?: number;
+  sharedRhCarrier?: true;
+  /** Layout direction only; never changes a source/editorial performing hand. */
+  stemConvention?: 'voice';
   /** Vertical gap between the two inner staff equators (o4 and o3) — the Middle C corridor. */
   interStaffGap: number;
   /** Middle C spine rendering style. */
@@ -1800,7 +1822,7 @@ export type JankoClusterPresentation = 'literal' | 'mirrored-handprint' | 'index
 export type JankoVerticalPlacement = 'slot' | 'content-aware';
 
 /** Fully resolved layout options (every optional option filled in). */
-export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'durationSeatPreferences'>> & Pick<JankoLayoutOptions, 'durationSeatPreferences'>;
+export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
 
 /** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {

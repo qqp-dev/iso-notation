@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { importSchumannNo43, type DeferredFact } from '../src/scores/schumann-no43';
 import { schumannNo43DeferredLedger } from '../src/scores/schumann-no43-draft';
 import { linearIndex } from '../src/model/pitch';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { computePageGeometry, layoutJankoScore, renderJankoCrop } from '../src/render/janko/engine';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
@@ -165,16 +165,16 @@ test('written volta graph and unfolded occurrences retain source bar identity, s
   }
 });
 
-test('actual No.43 draft is registered only in Candidates and engraves with the real engine', () => {
+test('actual No.43 draft remains registered in the retained Round55 and engraves with the real engine', () => {
   const config = createStudioConfig();
   const entries = Object.values(config.scores).filter((entry) => entry.id === 'schumann-op68-no43');
   assert.equal(entries.length, 1, 'a registered No.43 score, not an isolated importer skeleton');
   const { id, score, options, tokens } = entries[0];
   assert.ok(score.notes.length > 0);
-  const windows = CURRENT_CANDIDATES.flatMap((candidate) => candidate.windows ?? []).filter((window) => 'scoreId' in window && window.scoreId === id);
+  const windows = ROUND_55_CANDIDATES.flatMap((candidate) => candidate.windows ?? []).filter((window) => 'scoreId' in window && window.scoreId === id);
   assert.ok(windows.some((w) => 'measureStart' in w && w.measureStart === 1), 'opening inspectable in Candidates');
   assert.ok(windows.some((w) => 'measureStart' in w && w.measureStart > 1), 'later passage/ending inspectable in Candidates');
-  assert.match(CURRENT_CANDIDATES.filter((c) => (c.windows ?? []).some((w) => 'scoreId' in w && w.scoreId === id)).map((c) => [c.label, c.description, ...(c.windows ?? []).map((w) => w.caption)].join(' ')).join(' '), /draft[\s\S]*unfolded repeats/i);
+  assert.match(ROUND_55_CANDIDATES.filter((c) => (c.windows ?? []).some((w) => 'scoreId' in w && w.scoreId === id)).map((c) => [c.label, c.description, ...(c.windows ?? []).map((w) => w.caption)].join(' ')).join(' '), /draft[\s\S]*unfolded repeats/i);
   assert.match(renderJankoCrop(score, 1, 1, options, tokens), /<svg/);
   assert.equal(config.scores['brahms-op118-no1'].score.id, 'brahms-op118-no1');
 });

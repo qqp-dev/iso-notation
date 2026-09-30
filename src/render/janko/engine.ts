@@ -202,8 +202,11 @@ import {
   renderDetachedRuleKnockout,
 } from './elements/rhythm';
 import { durationDotCount, durationFlagCount } from './elements/duration';
-import { placedBeamGroup, routeVoiceUnderpasses } from './beam-scene';
+import { placedBeamGroup, routeVoiceUnderpasses, beamPieceIntersectsBox, beamPieceBox } from './beam-scene';
 import { soloRhythmPaint } from './solo-scene';
+import { placeEventHandMarks, eventHandMarksSvg, type EventHandMark } from './hand-marks';
+import { seatLocalFlags } from './local-flag-seats';
+import { bendRhRibbons } from './bent-ribbons';
 import {
   ThreeRailDiagnostic,
   ThreeRailFixed,
@@ -1812,6 +1815,12 @@ export function outgoingTieByHeadId(
 import { placeExpressions, expressionsSvg, type ExpressionInk } from './elements/expressions';
 
 export interface JankoSystemLayout {
+  sharedCarrierBars?: number[];
+  voiceFieldKey?: string;
+  expressionScope?: readonly string[];
+  eventHandMarks?: EventHandMark[];
+  localFlagRefusals?: string[];
+  rhythmicGestures?: Array<{ memberIds:string[]; values:Array<{id:string;tick:number;ticks:number}>; origin:'source'|'engine-inferred'; voice?:string }>;
   expressions?: ExpressionInk[];
   /** Immutable input identity for the placed scene: the COMPLETE source/editorial
    * score, not just this system's visible note ids. No layout-cache inference. */
@@ -2375,6 +2384,7 @@ export function positionJankoNote(
       id: note.id,
       sourceBeam: note.sourceBeam,
       sourceVoice: note.sourceProvenance?.voices.length === 1 ? note.sourceProvenance.voices[0] : undefined,
+      ...(o.stemConvention === 'voice' && /\.[01]$/.test(note.sourceProvenance?.voices[0]??'') ? { layoutDirection: note.sourceProvenance!.voices[0].endsWith('.1') ? 1 as const : -1 as const } : {}),
       beamWindowTicks: (() => {
         const meter = geo.timeSignatures?.filter(m => m.tick <= note.startTick).at(-1);
         return meter && meter.numerator > 3 && meter.numerator % 3 === 0 && meter.denominator >= 8
@@ -6439,7 +6449,8 @@ function mergeUnisonHeads(
    */
   tiePlan: JankoTieDisplayPlan | null = null,
   clarity = true,
-  grammar: ResolvedJankoLayoutOptions['durationGrammar'] = 'golden'
+  grammar: ResolvedJankoLayoutOptions['durationGrammar'] = 'golden',
+  shareAttackHeads = false
 ): {
   notes: PositionedJankoNote[];
   voices: PositionedJankoNote[];
@@ -6448,7 +6459,8 @@ function mergeUnisonHeads(
   const groups = new Map<string, PositionedJankoNote[]>();
   const pitchKey = (p: PositionedJankoNote) => `${p.note.startTick}|${p.note.pitch.pitchClass}|${p.note.pitch.octave}`;
   for (const p of positioned) {
-    const value = clarity ? `|${p.rhythm.durationTicks}` : '';
+    const guardedTie=p.note.tieStart||p.note.tieEnd||tiePlan?.chains.some(c=>c.noteId===p.note.id||c.components.some(m=>m.headId===p.note.id));
+    const value = clarity ? shareAttackHeads&&!guardedTie ? '|physical-attack' : `|${p.rhythm.durationTicks}` : '';
     const key = pitchKey(p) + value;
     const bucket = groups.get(key);
     if (bucket) bucket.push(p);
@@ -6475,7 +6487,9 @@ function mergeUnisonHeads(
       notes.push(...group);
       continue;
     }
-    const survivor = sameHandChainGroup
+    const survivor = shareAttackHeads&&!sameHandChainGroup
+      ? [...group].sort((a,b)=>b.rhythm.durationTicks-a.rhythm.durationTicks||a.note.id.localeCompare(b.note.id))[0]
+      : sameHandChainGroup
       ? [...chainMembers].sort(
           (a, b) =>
             b.note.durationTicks - a.note.durationTicks ||
@@ -6645,7 +6659,9 @@ export function systemFurnitureBounds(
  * not a composed physical ink query. The linter's adjacent-system scan
  * measures these same page-policy terms. Mirrors `linter.systemInkExtents` term for term (same boxes from
  * the same builders); the slot-correction suite asserts equality on the
- * corpus, so the two can never drift apart silently.
+ * corpus, so the two can never drift apart silently. Opted-in comparative
+ * gesture layouts additionally reserve the actual placed rail strips, including
+ * caps and normal width; this does not alter incumbent default page booking.
  */
 export function systemCompleteInkBounds(
   layout: JankoSystemLayout,
@@ -6656,6 +6672,7 @@ export function systemCompleteInkBounds(
   const graceInk = graceVerticalInkBounds(layout.grace ?? [],o,t);
   let top = Math.min(g.staffTopY, graceInk.top);
   let bottom = Math.max(g.staffBotY, graceInk.bottom);
+  for (const m of layout.eventHandMarks ?? []) { top=Math.min(top,m.box.y0);bottom=Math.max(bottom,m.box.y1); }
   if (o.showMeasureNumbers) {
     const { numeral } = getMarginFurniture(
       g,
@@ -6730,6 +6747,11 @@ export function systemCompleteInkBounds(
     }
   }
   for (const ink of layout.expressions ?? []) { top=Math.min(top,ink.y0); bottom=Math.max(bottom,ink.y1); }
+  if(o.preserveGestureMembership&&o.rhythmStyle==='beamed'){
+    for(const piece of buildInkScene(layout,o,t,layout.scoreRevision).beams.flat())if(piece.shape.kind==='rail'){
+      const box=beamPieceBox(piece);top=Math.min(top,box.y0);bottom=Math.max(bottom,box.y1);
+    }
+  }
   return { top, bottom };
 }
 
@@ -6801,6 +6823,7 @@ export function systemPaintedInkBoxes(
   }
 
   for (const ink of layout.expressions ?? []) push(ink.x0,ink.x1,ink.y0,ink.y1,`expression ${ink.kind} ${ink.id}`);
+  for (const m of layout.eventHandMarks ?? []) push(m.box.x0,m.box.x1,m.box.y0,m.box.y1,`event-hand stroke enclosure ${m.ownerIds.join(',')}`);
   legacy = true;
   // 2. Ledger physical ink is inventoried by the placed scene for fixed cores.
   // Non-fixed mappings retain an explicitly legacy broad page reservation.
@@ -7145,13 +7168,25 @@ export function layoutJankoSystem(
  * (every y translated by exactly the shift — the layout is a pure function
  * of the centre, so re-layout never re-decides relative geometry).
  */
+export interface JankoVoiceFieldSpec {
+  key:string;
+  columns:ReadonlyMap<number,number>;
+  includeExpression:(kind:ExpressionInk['kind'],id:string)=>boolean;
+  expressionScope:readonly string[];
+}
+export const voiceFieldKey=(n:QuantizedNote):string=>`${n.editorialHand?.hand??n.hand}:${n.sourceProvenance?.voices[0]?.endsWith('.1')?'1':'0'}`;
+/** Fresh dependent geometry on the same admitted source/time system. */
+export function layoutJankoVoiceField(score:QuantizedGridScore,page:JankoPageGeometry,base:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,field:JankoVoiceFieldSpec):JankoSystemLayout {
+  return layoutJankoSystemShifted(score,page,base.index,o,t,base.geometry.middleCY-getSystemGeometry(page,base.index,o).middleCY,field);
+}
 export function layoutJankoSystemShifted(
   score: QuantizedGridScore,
   geo: JankoPageGeometry,
   systemIndex: number,
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
-  shiftY: number
+  shiftY: number,
+  field?:JankoVoiceFieldSpec
 ): JankoSystemLayout {
   const geometryRaw = getSystemGeometry(geo, systemIndex, o);
   // The slot is fixed page furniture; the shift moves the music within it.
@@ -7191,10 +7226,16 @@ export function layoutJankoSystemShifted(
   // Round 47: the outgoing-tie simplification reads the **same** committed
   // chain topology even when the written ties themselves are not rendered, so
   // the suppression rule never depends on which mounts are painted.
-  const tiePlan =
+  const fullTiePlan =
     o.writtenTies === 'source' || o.tieOriginIndicator === 'omit-outgoing'
       ? getTieDisplayPlan(score)
       : null;
+  const fieldSources=field?new Map([...score.notes,...(fullTiePlan?.heads??[])].map(n=>[n.id,n])):undefined;
+  const tiePlan=field&&fullTiePlan ? {...fullTiePlan,heads:fullTiePlan.heads.filter(n=>voiceFieldKey(n)===field.key),chains:fullTiePlan.chains.filter(c=>{
+    const owner=fieldSources!.get(c.noteId);if(!owner||voiceFieldKey(owner)!==field.key)return false;
+    if(c.components.some(m=>{const n=fieldSources!.get(m.headId);return n&&voiceFieldKey(n)!==field.key;}))throw Error(`Voice fields refuse cross-field tie ${c.noteId}`);
+    return true;
+  })} : fullTiePlan;
   const tieHeads = (o.writtenTies === 'source' ? (tiePlan?.heads ?? []) : []).filter(
     (n) => n.startTick >= startTick && n.startTick < endTick
   );
@@ -7208,7 +7249,7 @@ export function layoutJankoSystemShifted(
    * comparison retains its post-solve injection below.
    */
   const sysNotes = score.notes
-    .filter((n) => n.startTick >= startTick && n.startTick < endTick)
+    .filter((n) => n.startTick >= startTick && n.startTick < endTick && (!field||voiceFieldKey(n)===field.key))
     .map((n) => {
       const engraved = displayTicks?.get(n.id);
       return engraved === undefined || engraved === n.durationTicks
@@ -7320,7 +7361,7 @@ export function layoutJankoSystemShifted(
       t
     );
     const pre = resolveChordColumns(
-      mergeUnisonHeads(preRaw, tiePlan, o.clarityPass, o.durationGrammar).notes,
+      mergeUnisonHeads(preRaw, tiePlan, o.clarityPass, o.durationGrammar, o.shareAttackHeads).notes,
       geometry,
       systemIndex,
       o,
@@ -7343,7 +7384,7 @@ export function layoutJankoSystemShifted(
     // Round 20: one sound, one digit — cross-hand unisons merge before the
     // column solve, so the survivor keeps its column with no fan. Round 46 adds
     // the source-proven same-hand attack/carry groups (see `mergeUnisonHeads`).
-    const merged = mergeUnisonHeads(raw, tiePlan, o.clarityPass, o.durationGrammar);
+    const merged = mergeUnisonHeads(raw, tiePlan, o.clarityPass, o.durationGrammar, o.shareAttackHeads);
     positioned = merged.notes;
     mergedVoices = merged.voices;
     unisonMerges = merged.merges;
@@ -7373,6 +7414,34 @@ export function layoutJankoSystemShifted(
     const demoted = [...claspInsets.keys()].filter((m) => colliding.has(m));
     if (demoted.length === 0) break;
     for (const m of demoted) claspInsets.delete(m);
+  }
+  if(o.rhVoiceSeparation){
+    const half=o.rhVoiceSeparation/2;
+    chordColumns={...chordColumns,notes:chordColumns.notes.map(p=>{
+      const voice=p.rhythm.sourceVoice,rank=voice?.endsWith('.1')?1:voice?.endsWith('.0')?0:undefined;
+      if(p.rhythm.hand!=='RH'||rank===undefined||!chordColumns.notes.some(q=>q.rhythm.hand==='RH'&&q.rhythm.sourceVoice?.endsWith(rank===0?'.1':'.0')))return p;
+      const dx=rank===1?-half:half;return {...p,x:p.x+dx,rhythm:{...p.rhythm,x:p.rhythm.x+dx,...(p.rhythm.dotX===undefined?{}:{dotX:p.rhythm.dotX+dx})}};
+    })};
+  }
+  if(o.stemConvention==='voice'){
+    // Opposing LH-up/RH-solo material needs a genuine independent column, not
+    // knockout-hidden stems through the other hand's head or own rail port.
+    const shifts=new Map<number,number>();
+    for(const p of chordColumns.notes.filter(p=>p.rhythm.hand==='RH'&&!/\.[01]$/.test(p.rhythm.sourceVoice??''))){
+      const rhs=chordColumns.notes.filter(q=>q.note.startTick===p.note.startTick&&q.rhythm.hand==='RH');
+      const lhs=chordColumns.notes.filter(q=>q.note.startTick===p.note.startTick&&q.rhythm.hand==='LH'&&q.rhythm.layoutDirection===-1);
+      if(lhs.length)shifts.set(p.note.startTick,Math.max(0,Math.max(...lhs.map(q=>q.x))+6-Math.min(...rhs.map(q=>q.x))));
+    }
+    chordColumns={...chordColumns,notes:chordColumns.notes.map(p=>{const dx=p.rhythm.hand==='RH'?shifts.get(p.note.startTick)??0:0;return dx?{...p,x:p.x+dx,rhythm:{...p.rhythm,x:p.rhythm.x+dx,...(p.rhythm.dotX===undefined?{}:{dotX:p.rhythm.dotX+dx})}}:p;})};
+  }
+  if(field){
+    const groups=new Map<number,PositionedJankoNote[]>();for(const n of chordColumns.notes){const tick=n.note.startTick;groups.set(tick,[...(groups.get(tick)??[]),n]);}
+    chordColumns={...chordColumns,notes:chordColumns.notes.map(n=>{
+      const tick=n.note.startTick,target=field.columns.get(tick)??getTickColumnX(tick,geometry,systemIndex,o,t,claspInsets);
+      const origin=chordColumns.columns.get(tick)??n.x;
+      const x=groups.get(tick)!.length===1?target:n.x+target-origin,dx=x-n.x;
+      return {...n,x,nominalX:target,rhythm:{...n.rhythm,x,...(n.rhythm.dotX===undefined?{}:{dotX:n.rhythm.dotX+dx})}};
+    }),columns:field.columns};
   }
   // -------------------------------------------------------------------------
   // Round 46 — inject the written continuation heads.
@@ -7518,10 +7587,17 @@ export function layoutJankoSystemShifted(
 
   // Round 17B: rests resolve before beams — bridging re-joins runs across the
   // admitted printed rests, and every connector clears their ink.
-  const restLayer = computeJankoRestLayer(restScore, geometry, systemIndex, o, t, notes);
+  const allRestLayer = computeJankoRestLayer(restScore, geometry, systemIndex, o, t, notes);
+  const restLayer=field?{rests:allRestLayer.rests.filter(r=>field.key.startsWith(r.hand)),unwritten:allRestLayer.unwritten.filter(r=>field.key.startsWith(r.hand)),withheld:allRestLayer.withheld.filter(r=>field.key.startsWith(r.hand))}:allRestLayer;
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
+  const sharedCarrierBars:number[]=[];
+  if(o.rhythmStyle!=='beamed'&&o.shareAttackHeads)for(const merge of unisonMerges.filter(m=>!m.exact)){
+    const members=[...notes,...unisonVoices].filter(p=>[merge.survivorId,...merge.mergedIds].includes(p.note.id));
+    members.forEach((p,k)=>{p.rhythm.stemOffsetX=(k-(members.length-1)/2)*2.6;
+      if(p.rhythm.durationTicks<48)p.rhythm.stemLength=t.stemLength+8;});
+  }
   if (o.rhythmStyle === 'beamed') {
     // Every notehead of the system is an obstacle for every beam group: the
     // shared lattice lets one hand's beam cross the other hand's staff lines.
@@ -7537,10 +7613,50 @@ export function layoutJankoSystemShifted(
       t,
       geometry.sourceBarTicks
     );
+    const commonIds=new Set<string>();
+    if(o.sharedRhCarrier){
+      if(o.durationGrammar!=='complete')throw Error('Shared carrier requires explicit complete written values');
+      const bars=geometry.sourceBarTicks??Array.from({length:Math.ceil(score.totalTicks/t.ticksPerMeasure)+1},(_,i)=>i*t.ticksPerMeasure);
+      const common:JankoRhythmNote[][]=[];
+      for(let i=0;i+1<bars.length;i++){
+        const members=rhythmNotes.filter(n=>n.hand==='RH'&&n.startTick>=bars[i]&&n.startTick<bars[i+1]&&subdivisionMarkCount(n.durationTicks,o.durationGrammar)>0);
+        if(!members.some(n=>n.sourceVoice?.endsWith('.0'))||!members.some(n=>n.sourceVoice?.endsWith('.1')))continue;
+        common.push(members);sharedCarrierBars.push(bars[i]);for(const n of members)commonIds.add(n.id);
+        for(const n of rhythmNotes.filter(n=>n.hand==='RH'&&n.startTick>=bars[i]&&n.startTick<bars[i+1]&&n.sourceVoice?.endsWith('.1')))n.doubleStem=true;
+      }
+      const remaining=partition.groups.flatMap(g=>{const members=g.filter(n=>!commonIds.has(n.id));if(members.length===1){partition.ungrouped.push(members[0]);return [];}return members.length?[members]:[];});
+      partition.groups=[...remaining,...common];partition.ungrouped=partition.ungrouped.filter(n=>!commonIds.has(n.id));
+    }
+    if(o.shareCompatibleLocalRhythm){
+      const groupedIds=new Set(partition.groups.flatMap(g=>g.map(n=>n.id)));
+      for(const merge of unisonMerges.filter(m=>m.exact)){
+        const ids=[merge.survivorId,...merge.mergedIds],members=rhythmNotes.filter(n=>ids.includes(n.id));
+        if(members.length<2||members.some(n=>groupedIds.has(n.id))||tiePlan?.chains.some(c=>ids.includes(c.noteId)||c.components.some(p=>ids.includes(p.headId))))continue;
+        // One identical untied local value ends at the same clock in every
+        // owner. The shared value deliberately overrides opposed solo stems;
+        // independent grouped/tied continuations remain separate.
+        for(const n of members)n.layoutDirection=members[0].layoutDirection;
+      }
+    }
+    if(o.independentUnisonAttachments){
+      const grouped=new Set((o.groupedRhythm==='local-flags'?[]:partition.groups).flatMap(g=>g.map(n=>n.id)));
+      for(const merge of unisonMerges){
+        const members=rhythmNotes.filter(n=>[merge.survivorId,...merge.mergedIds].includes(n.id));
+        if(members.length<2||merge.exact&&!members.some(n=>grouped.has(n.id)))continue;
+        // Distinct independent carrier obligations leave the one compatible
+        // head on parallel legal mask-edge seats, never coincident routes.
+        members.forEach((n,k)=>{n.stemOffsetX=(k-(members.length-1)/2)*2.6;});
+      }
+    }
     // Pre-layout beam exclusion uses conservative admission, never final placed ink.
     const restInk = restLayer.rests.map((r) => restAdmissionBox(r, t));
-    beams = computeVoiceBeams(partition.groups,t,rhythmNotes,geometry.middleCY,restInk,o.durationGrammar,o.clarityPass);
-    ungrouped = partition.ungrouped;
+    beams = o.groupedRhythm === 'local-flags' ? [] : computeVoiceBeams(partition.groups,t,rhythmNotes,geometry.middleCY,restInk,o.durationGrammar,o.clarityPass);
+    ungrouped = o.groupedRhythm === 'local-flags' ? rhythmNotes : partition.ungrouped;
+    if(o.sharedRhCarrier)beams=beams.map(b=>b.notes.every(n=>commonIds.has(n.id))?{...b,sharedCarrier:true}:b);
+    if(o.beamContour==='bent'||o.sharedRhCarrier){
+      for(const merge of unisonMerges.filter(m=>!m.exact))for(const n of rhythmNotes.filter(n=>[merge.survivorId,...merge.mergedIds].includes(n.id)&&n.durationTicks>=48))n.stemLength=10;
+      if(o.beamContour==='bent')beams=bendRhRibbons(beams,notes,o,t,id=>unisonMerges.find(m=>m.mergedIds.includes(id))?.survivorId??id);
+    }
     if(o.clarityPass && beams.length){
       // Earn independent solo tip length BEFORE dependent duration/curve ink.
       // Use the very same f-rounded polygons and routing as final paint; no
@@ -7552,7 +7668,7 @@ export function layoutJankoSystemShifted(
         return pieces.flatMap(p=>p.shape.kind==='stem'?[{note,shape:p.shape,original:p.shape.y2,
           ownerIds:contributors(note.id),hand:note.hand,sourceVoice:note.sourceVoice,extendTip:true}]:[]);
       });
-      routeVoiceUnderpasses(groups,beams,t,tips);
+      if(o.crossingConvention!=='layered'&&o.beamContour!=='bent')routeVoiceUnderpasses(groups,beams,t,tips);
       for(const tip of tips)if(Math.abs(tip.shape.y2-tip.original)>1e-9)
         tip.note.stemLength=Math.abs(tip.shape.y2-tip.note.y);
     }
@@ -7945,7 +8061,7 @@ export function layoutJankoSystemShifted(
       if (group.some((p) => beamedIds.has(p.note.id))) continue;
       if (!group.every((p) => p.note.durationTicks === group[0].note.durationTicks)) continue;
       const hand = group[0].rhythm.hand;
-      const dir = stemDirection(hand);
+      const dir = group[0].rhythm.layoutDirection ?? stemDirection(hand);
       // The unit's **laid-out** column (Round 19): the column solve translates
       // the whole onset rigidly, so the axis every member of this hand is
       // slotted around is `nominalX + shift`, not the un-shifted proportional
@@ -9077,6 +9193,10 @@ export function layoutJankoSystemShifted(
     ...(compressedCopyIds ? [...compressedCopyIds] : []),
     ...(handprintNoteIds ? [...handprintNoteIds] : []),
   ]);
+  const localFlagRefusals=o.groupedRhythm==='local-flags'&&o.subdivisionStyle==='classical-urtext'
+    ? seatLocalFlags(ungrouped.filter(n=>!suppressed.has(n.id)),notes.map(p=>{const m=knockoutHalfExtents(o,t,p.note.startTick,p);return {id:p.note.id,x0:p.x-m.wx,x1:p.x+m.wx,y0:p.y-m.hy,y1:p.y+m.hy};}),
+      id=>unisonVoices.find(n=>n.note.id===id)?.unisonSurvivorId??id,t,o.durationGrammar,
+      (a,b)=>!!o.shareCompatibleLocalRhythm&&unisonMerges.some(m=>{const ids=[m.survivorId,...m.mergedIds];return m.exact&&ids.includes(a)&&ids.includes(b)&&!tiePlan?.chains.some(c=>ids.includes(c.noteId)||c.components.some(p=>ids.includes(p.headId)));})) : undefined;
   const crossed = new Set(
     detectStemDigitCrossings(notes, beams, ungrouped, o, t, suppressed).map((c) => c.digitNoteId)
   );
@@ -9911,14 +10031,18 @@ export function layoutJankoSystemShifted(
     ottavaContext
   );
 
-  const grace = score.graceGroups?.length ? placeGraceGroups(score.graceGroups, startTick, endTick,
+  const fieldGrace=field?score.graceGroups?.filter(g=>g.occurrences.some(occ=>occ.hostNoteIds.some(id=>{const n=fieldSources!.get(id);return n&&voiceFieldKey(n)===field.key;}))):score.graceGroups;
+  const grace = fieldGrace?.length ? placeGraceGroups(fieldGrace, startTick, endTick,
     flaggedNotes, geometry, o, t,
     note => positionJankoNote(note, geometry, systemIndex, o, t, null, claspInsets),
     tick => getMeasureOpeningBarlineX(
       getMeasureIndexOfTick({ startTick: tick } as QuantizedNote, geometry, systemIndex, t), geometry, systemIndex, t) ?? geometry.staffLeft) : undefined;
   const layout: JankoSystemLayout = {
     scoreRevision: score,
+    ...(o.sharedRhCarrier?{sharedCarrierBars}:{}),
+    ...(field?{voiceFieldKey:field.key,expressionScope:field.expressionScope}:{}),
     ...(grace ? { grace } : {}),
+    ...(localFlagRefusals ? {localFlagRefusals} : {}),
     index: systemIndex,
     isFinalSystem: systemIndex >= countJankoSystems(score, o, t) - 1,
     geometry,
@@ -9999,7 +10123,7 @@ export function layoutJankoSystemShifted(
       const nearest=Math.min(...local.map(n=>Math.abs(n.note.startTick-tick)));
       return local.filter(n=>Math.abs(n.note.startTick-tick)===nearest);
     };
-    layout.expressions = placeExpressions(score,{ start:startTick,end:endTick,left:geometry.staffLeft,right:geometry.staffRight,
+    layout.expressions = placeExpressions(score,{ ...(field?{include:field.includeExpression}:{}),start:startTick,end:endTick,left:geometry.staffLeft,right:geometry.staffRight,
       top:ink.top,bottom:ink.bottom,x:tickX,
       clarity:o.clarityPass, dynamicScale:t.dynamicScale,contourThickness:t.tieApexThickness,
       obstacles:[...painted.filter(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what)),
@@ -10017,6 +10141,22 @@ export function layoutJankoSystemShifted(
           bottom:Math.max(...heads.map(n=>n.y+knockoutHalfExtents(o,t,n.note.startTick,n).hy),...rhythmEnds),hand:heads[0].rhythm.hand};
       },
       endpointX: (ids,tick) => endpointHeads(ids,tick)[0]?.x ?? tickX(tick) });
+  }
+  if (o.preserveGestureMembership) {
+    // Partition the unmerged written statements, not the surviving paint heads.
+    // Removing rails must never remove source voices or editorial grouping facts.
+    const members = columnNotes.map(n => positionJankoNote(n, geometry, systemIndex, o, t).rhythm);
+    const partition = partitionBeamGroups(members,t,geometry.middleCY,o.beamGroupTicks,geometry.sourceBarTicks);
+    layout.rhythmicGestures = [...partition.groups,...partition.ungrouped.map(n=>[n])].map(group=>({
+      memberIds:group.map(n=>n.id),values:group.map(n=>({id:n.id,tick:n.startTick,ticks:n.durationTicks})),
+      origin:group.some(n=>n.sourceBeam?.group)?'source':'engine-inferred',voice:group[0].sourceVoice,
+    }));
+  }
+  if (o.stemConvention === 'voice') {
+    const scene=buildInkScene(layout,o,t,score);
+    const obstacles=systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('visible grouped-beam '));
+    layout.eventHandMarks=placeEventHandMarks(layout,score,[...obstacles,
+      ...layout.notes.map(p=>{const m=knockoutHalfExtents(o,t,p.note.startTick,p);return {x0:p.x-m.wx,x1:p.x+m.wx,y0:p.y-m.hy,y1:p.y+m.hy};})],box=>scene.beams.flat().some(piece=>beamPieceIntersectsBox(piece,box)));
   }
   return layout;
 }
@@ -10079,6 +10219,7 @@ export function layoutJankoScore(
 ): JankoSystemLayout[] {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
+  if (o.comparisonPitchFields) throw Error('Separate pitch fields are comparative-window-only; full-book pagination is not implemented.');
   layoutJankoScoreObserver?.(score, o, t);
   const geo = computePageGeometry(o, t, score);
   const total = countJankoSystems(score, o, t);
@@ -10244,7 +10385,7 @@ function renderNotesLayer(
         renderRhythm(asEngraved(n), 'beamed', t, o.subdivisionStyle, grammar));
     }
   } else {
-    for (const p of layout.notes) {
+    for (const p of [...layout.notes,...(o.shareAttackHeads?layout.unisonVoices:[])]) {
       if (suppressed.has(p.rhythm.id)) continue;
       out.push(renderRhythm(asEngraved(p.rhythm), o.rhythmStyle, t, o.subdivisionStyle));
     }
@@ -10400,6 +10541,7 @@ export function renderSystem(
   const ottavaSvg = renderOttavaBrackets(resolved.ottavaBrackets, t);
   if (ottavaSvg.length > 0) out.push(ottavaSvg);
   if (resolved.expressions?.length) out.push(expressionsSvg(resolved.expressions));
+  if (resolved.eventHandMarks?.length) out.push(eventHandMarksSvg(resolved.eventHandMarks));
   // The contour strip lives below the staff in the inter-system air.
   if (contour.strip.length > 0) out.push(contour.strip);
   out.push('  </g>');

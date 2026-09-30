@@ -64,6 +64,7 @@ import {
   checkBeamRestClearance,
   checkClaspClearance,
   checkGraceIntegrity,
+  checkEventHandMarkIntegrity,
   checkClaspDotFusion,
   checkDotCollision,
   checkDotCountAgreement,
@@ -2288,4 +2289,13 @@ test('nonmetrical grace linter refuses missing ink, wrong value, wrong whole-cho
   const severed = { ...pairSystem, grace: structuredClone(pairSystem.grace) };
   severed.grace!.find(g=>g.group.source.line===84)!.beamY = undefined;
   assert.ok(audit(severed).includes('grace-geometry'));
+});
+
+test('a refused event hand channel is a hard comparative defect, not a clean voice-stem alternative',()=>{
+  const l=systems()[0],n=l.notes[0];
+  const mark={ownerIds:[n.note.id],hand:n.note.hand,x:n.x,y:n.y,box:{x0:n.x-3,x1:n.x+3,y0:n.y-2,y1:n.y+2},refused:true};
+  const out:LintViolation[]=[];
+  checkEventHandMarkIntegrity({...l,eventHandMarks:[mark]},out);
+  assert.equal(out[0].code,'event-hand-mark-refused');assert.equal(out[0].severity,'error');
+  assert.deepEqual(out[0].noteIds,[n.note.id]);
 });

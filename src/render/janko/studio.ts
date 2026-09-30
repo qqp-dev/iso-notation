@@ -127,7 +127,8 @@ import {
   PITCH_PARITY_SPECIMEN_JANKO_OPTIONS,
   PITCH_PARITY_SPECIMEN_JANKO_TOKENS,
 } from '../../scores/pitch-parity-specimen';
-import { LintReport, lintJankoScore } from './linter';
+import { LintReport, lintJankoScore, lintJankoWindowSystems } from './linter';
+import { PreparedJankoWindows, renderPreparedJankoWindow } from './prepared-windows';
 import { renderPracticeView } from './practice';
 
 /** One macro focus crop in the Golden Reference view. */
@@ -558,7 +559,8 @@ function badgeHtml(badge: CandidateOptionBadge): string {
  */
 export function renderCompareStrip(
   config: JankoStudioConfig = createStudioConfig(),
-  candidateLayouts?: ReadonlyMap<string, readonly JankoSystemLayout[]>
+  candidateLayouts?: ReadonlyMap<string, readonly JankoSystemLayout[]>,
+  preparedWindows?: ReadonlyMap<string, PreparedJankoWindows>
 ): string {
   const { candidates, round, scores } = config;
   const strip = round.compareStrip;
@@ -566,10 +568,12 @@ export function renderCompareStrip(
   const entry = scores[strip.scoreId ?? DEFAULT_STUDIO_SCORE_ID] ?? scores[DEFAULT_STUDIO_SCORE_ID];
   const lastMeasure = strip.measureStart + strip.measureCount - 1;
   const panels = candidates.map((candidate) => {
+    if(candidate.rejection)return `<figure class="strip-panel" data-strip-panel="${escapeHtml(candidate.id)}"><figcaption><b>${escapeHtml(candidate.label)}</b></figcaption><p>Rejected representative · ${escapeHtml(candidate.rejection.reason)}</p></figure>`;
     const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
     const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
     const layouts = candidateLayouts?.get(`${candidate.id}:${entry.id}`);
-    const svg = renderJankoCrop(
+    const prepared=candidate.comparisonScope ? preparedWindows?.get(`${candidate.id}:${entry.id}`) ?? new PreparedJankoWindows(entry.score,[strip],options,tokens) : undefined;
+    const svg = prepared ? renderPreparedJankoWindow(prepared,strip,false,`strip-${candidate.id}`) : renderJankoCrop(
       entry.score,
       strip.measureStart,
       strip.measureCount,
@@ -635,6 +639,13 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
   // Compute once per distinct score/options/tokens configuration per candidate per render.
   // Candidate configurations remain separate from each other and from the reference view.
   const candidateLayouts = new Map<string, JankoSystemLayout[]>();
+  const preparedWindows = new Map<string, PreparedJankoWindows>();
+  const getPreparedWindow=(candidate:JankoCandidate,entry:StudioScore,options:ResolvedJankoLayoutOptions,tokens:ResolvedJankoTokens)=>{
+    const key=`${candidate.id}:${entry.id}`;let prepared=preparedWindows.get(key);
+    if(!prepared){const windows=(candidate.windows??[]).filter((w):w is JankoScoreCandidateWindow=>!isAbstractCandidateWindow(w)&&(w.scoreId??DEFAULT_STUDIO_SCORE_ID)===entry.id);
+      prepared=new PreparedJankoWindows(entry.score,windows,options,tokens);preparedWindows.set(key,prepared);}
+    prepared.validate(entry.score,options,tokens);return prepared;
+  };
   const getCandidateLayout = (
     candidateId: string,
     scoreId: string,
@@ -672,6 +683,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         `<div class="candidate-windows">${panels.join('')}</div>` +
         `<footer class="candidate-foot">Portable ISO Practice v1 · engine-placed pitch x · RH over LH · black knockout-safe ground · GOLD/BRONZE unchanged</footer></article>`;
     }
+    if(candidate.rejection)return `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="rejected"><header class="candidate-head"><h3>${escapeHtml(candidate.label)}</h3><span class="chip">Rejected representative · no failed ink offered</span></header><p class="rationale">${escapeHtml(candidate.description??'')}</p><p>${escapeHtml(candidate.rejection.reason)}</p><footer class="candidate-foot">Reproducible numeric evidence: ${escapeHtml(candidate.rejection.evidence)}. Unsearched arrangements remain open; no operator adoption requested.</footer></article>`;
     const resolved = resolveCandidate(candidate);
     const isAbstract =
       candidate.kind === 'abstract' ||
@@ -756,17 +768,19 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         ? { ...original, score: config.semanticCandidate.score } : original;
       const options = resolveJankoOptions({ ...entry.options, ...(candidate.options ?? {}) });
       const tokens = resolveJankoTokens({ ...entry.tokens, ...(candidate.tokens ?? {}) });
+      const prepared=candidate.comparisonScope ? getPreparedWindow(candidate,entry,options,tokens) : undefined;
       if (!seen.has(entry.id)) {
         seen.add(entry.id);
-        reports.push(lintJankoScore(entry.score, options, tokens));
+        reports.push(prepared ? lintJankoWindowSystems(prepared) : lintJankoScore(entry.score, options, tokens));
       }
-      const layouts = getCandidateLayout(candidate.id, entry.id, entry.score, options, tokens);
+      const layouts = prepared ? undefined : getCandidateLayout(candidate.id, entry.id, entry.score, options, tokens);
       const lastMeasure = window.measureStart + window.measureCount - 1;
       // Round 44: a full-score window renders the score's **genuine pages**
       // (one real `renderJankoPage` card per page — the same A4 spread the
       // Reference view uses), never one crop whose viewBox happens to cover
       // the whole score. Every other window stays the established macro crop.
       if (window.fullScore) {
+        if(prepared||!layouts)throw Error('Window-scoped candidate refuses a full-score page claim');
         const pages = countJankoPages(entry.score, options, tokens);
         const pageCards: string[] = [];
         for (let page = 0; page < pages; page++) {
@@ -793,7 +807,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
           '</figure>',
         ].join('\n');
       }
-      const svg = renderJankoCrop(
+      const svg = prepared ? renderPreparedJankoWindow(prepared,window,window.completeSystems,`card-${candidate.id}`) : renderJankoCrop(
         entry.score,
         window.measureStart,
         window.measureCount,
@@ -804,7 +818,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       );
       return [
         `<figure class="candidate-window" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}">`,
-        `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}</figcaption>`,
+        `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}${prepared ? ` · frame ${svg.match(/viewBox="0 0 ([^"]+)"/)?.[1].split(' ').map(v=>Number(v).toFixed(1)).join(' × ')}pt · window-scoped${options.comparisonPitchFields ? ' · actual painted fields linted; duplicated coordinates, not sounds' : ''}` : ''}</figcaption>`,
         `  <div class="canvas-frame">${canvas(svg)}</div>`,
         '</figure>',
       ].join('\n');
@@ -816,7 +830,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       .join('');
     const opts = resolved.options;
     const toks = resolved.tokens;
-    const facts = candidate.id === 'semantic-hand'
+    const facts = candidate.comparisonScope ? 'Window-scoped complete containing-system checks; no full-score / page-fit / visual acceptance verdict. Geometry and source/gesture assertions are engineering evidence, not pianist acceptance.' : candidate.id === 'semantic-hand'
       ? `Brahms canonical fixed-3 engraving · guarded score projection · no Reference promotion`
       : `${opts.rhythmStyle} · chord grouping ${opts.chordGrouping} · spine ${opts.middleCSpine} · ` +
       `gap ${opts.interStaffGap.toFixed(1)}pt · ${describeChannelLayout(opts, toks)} · ` +
@@ -827,7 +841,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       `<article class="candidate-card" data-candidate="${escapeHtml(candidate.id)}" data-lint="${report.ok ? 'clean' : 'violations'}">`,
       '  <header class="candidate-head">',
       `    <h3>${escapeHtml(candidate.label)}</h3>`,
-      `    <div class="chips">${tags}${lintChip(report)}</div>`,
+      `    <div class="chips">${tags}${candidate.comparisonScope?'<span class="chip">window-scoped'+(candidate.options?.comparisonPitchFields?' · actual painted fields':'')+'</span>':''}${lintChip(report)}</div>`,
       '  </header>',
       candidate.description
         ? `  <p class="rationale">${escapeHtml(candidate.description)}</p>`
@@ -843,7 +857,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
     return markup;
   });
 
-  const compareStrip = reuse?.compareStrip ?? renderCompareStrip(config, candidateLayouts);
+  const compareStrip = reuse?.compareStrip ?? renderCompareStrip(config, candidateLayouts, preparedWindows);
   capture?.({ cards: cards.slice(0, config.candidates.length), compareStrip, variantCards: { ...reuse?.variantCards, ...variantCards } });
 
   // Round 20: a **verification round** (no open axis) states every card's own

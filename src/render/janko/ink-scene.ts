@@ -17,7 +17,7 @@ import type { JankoNoteheadSpec } from './elements/notehead';
 import { GOTHIC_DEMI_GLYPHS } from './gothic-glyphs';
 import { placedRestPaint, serializeRestPaint } from './elements/rests';
 import type { PlacedRestPaint } from './elements/rests';
-import { placedBeamGroup, routeVoiceUnderpasses, beamStemBoxes, beamGroupSvg, beamPieceAt, beamPieceBox, beamPieceIntersectsBox } from './beam-scene';
+import { placedBeamGroup, routeVoiceUnderpasses, routeVoiceOverpasses, beamStemBoxes, beamGroupSvg, beamPieceAt, beamPieceBox, beamPieceIntersectsBox } from './beam-scene';
 import type { BeamPiece } from './beam-scene';
 import { soloRhythmPaint, soloBox, soloPieceAt, soloPieceBoxAt, soloSvg } from './solo-scene';
 import type { SoloPiece, SoloPhysicalResult } from './solo-scene';
@@ -98,6 +98,7 @@ export interface InkScene {
   beams: readonly (readonly BeamPiece[])[];
   /** Final eligible solo members; non-beamed dialects remain legacy. */
   solos: ReadonlyMap<string,readonly SoloPiece[]>;
+  soloAliases?: ReadonlyMap<string,string>;
   chordBridges: readonly PlacedChordBridge[];
   claspShells: readonly PlacedClaspShell[];
   pitch: readonly InkPiece[];
@@ -247,17 +248,30 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
       solos.set(note.id,soloRhythmPaint(engraved,t,o.subdivisionStyle,grammar,system,pagePiece,owners,soloSources));
     }
   }
+  const soloAliases=new Map<string,string>();
+  if(o.shareCompatibleLocalRhythm)for(const merge of layout.unisonMerges.filter(m=>m.exact)){
+    const primary=layout.ungrouped.find(n=>n.id===merge.survivorId),paint=solos.get(merge.survivorId);
+    if(!primary||!paint)continue;
+    const tied=(layout.tieChains??[]).some(c=>[c.noteId,...c.components.map(m=>m.headId)].some(id=>[merge.survivorId,...merge.mergedIds].includes(id)));
+    if(tied)continue;
+    for(const id of merge.mergedIds){const other=layout.ungrouped.find(n=>n.id===id),otherPaint=solos.get(id);
+      if(other&&otherPaint&&other.durationTicks===primary.durationTicks&&other.hand===primary.hand&&
+        JSON.stringify(otherPaint.map(p=>p.shape))===JSON.stringify(paint.map(p=>p.shape))){solos.set(id,paint);soloAliases.set(id,merge.survivorId);}
+    }
+  }
   if(o.clarityPass) {
     const stems=[...solos.entries()].flatMap(([id,pieces])=>{
       const note=layout.ungrouped.find(n=>n.id===id)!;
+      if(soloAliases.has(id))return [];
       return pieces.flatMap(p=>p.shape.kind==='stem'?[{shape:p.shape,ownerIds:p.ownerIds,hand:note.hand,sourceVoice:note.sourceVoice}]:[]);
     });
-    routeVoiceUnderpasses(beams,layout.beams,t,stems);
+    if(o.crossingConvention==='layered')routeVoiceOverpasses(beams,layout.beams,t,stems);
+    else if(o.beamContour!=='bent')routeVoiceUnderpasses(beams,layout.beams,t,stems);
   }
   const chordBridges=placedChordBridges(layout.chordBridges,system,pagePiece,soloSources);
   const claspShells=layout.clasps.map(group=>placedClaspShell(group,system,pagePiece,soloSources));
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,chordBridges,claspShells,pitch,ledger,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,...(o.shareCompatibleLocalRhythm?{soloAliases}:{}),chordBridges,claspShells,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {
@@ -268,7 +282,7 @@ export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}>
   // narrow phase: the hollow regions of these boxes are not obstacles.
   const ordered=orderedPieces(scene);
   const result:Array<InkBox & {what:string}>=[];
-  for(const group of scene.solos.values())for(const piece of group){
+  for(const group of new Set(scene.solos.values()))for(const piece of group){
     const b=soloBox(piece);
     result.push({...b,what:`beamed-solo nonphysical enclosure ${piece.id}`});
   }
@@ -391,6 +405,7 @@ export function sceneClaspShellBoxAt(scene:InkScene,index:number,b:InkBox):'ink'
   return result==='ink'&&connectiveBoxErasure(scene,b)?'unknown':result;
 }
 export function sceneSoloSvg(scene:InkScene,id:string):string {
+  if(scene.soloAliases?.has(id))return '';
   const group=scene.solos.get(id);
   if(!group)throw new Error(`Missing placed beamed solo ${id}`);
   return soloSvg(group);
