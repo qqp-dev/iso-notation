@@ -32,10 +32,13 @@ export interface WrittenExpression {
   text?: string;
 }
 export interface WrittenPhrase { fromId: string; toId: string; kind: 'slur' | 'phrasing';
-  start: WrittenExpression; end: WrittenExpression }
+  start: WrittenExpression; end: WrittenExpression;
+  sourceSide?: 'above' | 'below'; sourceSideOrigin?: WrittenExpression }
 interface Token { text: string; line: number; column: number; offset: number; endOffset: number }
+interface OpenPhrase { start: WrittenExpression; token: Token;
+  sourceSide?: 'above' | 'below'; sourceSideOrigin?: WrittenExpression; deferred?: string }
 interface Part { events: WrittenEvent[]; graces: GraceGroup[]; bars: { number: number; duration: string }[];
-  repeats: { start: number; end: number; alternatives: number[][] }[]; openPhrases?: Map<string, WrittenExpression>; anchor?: number; anchorD?: number; previous?: Fraction; }
+  repeats: { start: number; end: number; alternatives: number[][] }[]; openPhrases?: Map<string, OpenPhrase>; anchor?: number; anchorD?: number; previous?: Fraction; }
 const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
 class Fraction {
   constructor(readonly n: number, readonly d = 1) {
@@ -178,17 +181,32 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
     let once: Token | undefined;
     let sourceBeam: string | undefined;
     let lastEvent: WrittenEvent | undefined;
-    const openPhrases = new Map<string, WrittenExpression>();
-    const phraseMark = (tk: Token) => {
-      if (!lastEvent || lastEvent.kind !== 'note') error(tk, voice, 'Phrase endpoint has no note');
+    const openPhrases = new Map<string, OpenPhrase>();
+    let doubleSlurs = false;
+    let slurLayout: { reason: string; once: boolean } | undefined;
+    const phraseMark = (tk: Token, direction?: Token, grace?: GraceGroup) => {
       const kind = tk.text.startsWith('\\') ? 'phrasing' : 'slur';
-      const fact: WrittenExpression = { hostId: lastEvent!.id, token: tk.text, context: voice, line: tk.line, column: tk.column, order: expressions.length };
+      const unsupported = kind === 'slur' && (grace ? 'Grace slur endpoint deferred' :
+        lastEvent?.kind === 'layout-note' ? 'Layout-only slur endpoint deferred' : undefined);
+      if (!unsupported && (!lastEvent || lastEvent.kind !== 'note')) error(tk, voice, 'Phrase endpoint has no note');
+      const fact: WrittenExpression = { hostId: grace?.id ?? lastEvent!.id, token: tk.text, context: voice, line: tk.line, column: tk.column, order: expressions.length };
       if (tk.text.endsWith('(')) {
         if (openPhrases.has(kind)) error(tk, voice, 'Nested phrase of same kind');
-        openPhrases.set(kind, fact);
+        const deferred = unsupported ?? (kind === 'slur' ? doubleSlurs ? 'Double-slur source layout deferred' : slurLayout?.reason : undefined);
+        openPhrases.set(kind, { start: fact, token: direction ?? tk,
+          ...(direction ? { sourceSide: direction.text === '^' ? 'above' : 'below',
+            sourceSideOrigin: { ...fact, token: direction.text, line: direction.line, column: direction.column } } : {}),
+          ...(deferred ? { deferred } : {}) });
+        if (kind === 'slur' && slurLayout?.once) slurLayout = undefined;
       } else {
-        const start = openPhrases.get(kind); if (!start) error(tk, voice, 'Unopened phrase');
-        phrases.push({ fromId: start!.hostId, toId: fact.hostId, kind, start: start!, end: fact }); openPhrases.delete(kind);
+        const open = openPhrases.get(kind);
+        if (!open && unsupported) { defer(direction ?? tk, voice, unsupported); return; }
+        if (!open) error(tk, voice, 'Unopened phrase');
+        const reason = open!.deferred ?? unsupported ?? (kind === 'slur' && open!.start.context !== voice ? 'Ordinary slur crosses a simultaneous voice boundary; deferred' : undefined);
+        if (reason) deferSpan(open!.token, tk, open!.start.context, reason);
+        else phrases.push({ fromId: open!.start.hostId, toId: fact.hostId, kind, start: open!.start, end: fact,
+          ...(open!.sourceSide ? { sourceSide: open!.sourceSide, sourceSideOrigin: open!.sourceSideOrigin } : {}) });
+        openPhrases.delete(kind);
       }
     };
     const localMarks: WrittenMark[] = [];
@@ -328,9 +346,10 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
               if (attachment.text === '[') { if (open) error(attachment, voice, 'Nested grace beam'); open = true; member.beamStart = true; }
               else if (attachment.text === ']') { if (!open) error(attachment, voice, 'Unopened grace beam'); open = false; member.beamEnd = true; }
               else if (attachment.text === '^' || attachment.text === '_') {
-                if (/^\d+$/.test(t[i]?.text ?? '') || ['(', ')'].includes(t[i]?.text ?? '')) deferSpan(attachment, pop(), voice, 'Grace fingering or phrasing deferred');
+                if (['(', ')'].includes(t[i]?.text ?? '')) phraseMark(pop(), attachment, group);
+                else if (/^\d+$/.test(t[i]?.text ?? '')) deferSpan(attachment, pop(), voice, 'Grace fingering or phrasing deferred');
                 else error(t[i] ?? attachment, voice, 'Unsupported grace attachment');
-              } else defer(attachment, voice, 'Grace slur deferred');
+              } else phraseMark(attachment, undefined, group);
             }
             member.endLine = t[i - 1].line; member.endColumn = t[i - 1].column + t[i - 1].text.length;
           } while (braced && t[i]?.text !== '}');
@@ -361,11 +380,11 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
               fact.construct = source.slice(mk.offset, end.endOffset); fact.endLine = end.line; fact.endColumn = end.column + end.text.length;
             } else error(t[i], voice, 'Unbounded markup'); }
           else if (expressionTokens.has(next)) { expression(pop(), voice, lastEvent?.id); }
-          else if (['\\(','\\)'].includes(next)) { phraseMark(pop()); }
+          else if (['\\(','\\)','(',')'].includes(next)) { phraseMark(pop(), tk); }
           else if (next.startsWith('\\')) { defer(pop(), voice); }
           else if (/^\d+$/.test(next)) { defer(pop(), voice, 'Fingering deferred'); }
           else if (next === '[' || next === ']') { /* boundary is parsed on the next iteration */ }
-          else if (next === '(' || next === ')' || (no13 && ['.', '>'].includes(next))) defer(pop(), voice, 'Articulation or phrasing deferred');
+          else if (no13 && ['.', '>'].includes(next)) defer(pop(), voice, 'Articulation deferred');
           else error(t[i], voice, 'Unhandled note attachment');
           continue;
         }
@@ -378,9 +397,9 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
           if(x===']')sourceBeam=undefined;
           continue;
         }
-        if ('()'.includes(x) && x.length === 1) { defer(tk, voice, 'Slur or beam presentation deferred'); continue; }
+        if ('()'.includes(x) && x.length === 1) { phraseMark(tk); continue; }
         if (x === '\\once') { if (t[i]?.text !== '\\override') error(tk, voice, 'Only once override is classified as layout'); once = tk; continue; }
-        if (no13 && x === '\\unset') { const property = pop(); if (property.text !== 'doubleSlurs') error(property, voice); deferSpan(tk, property, voice, 'Slur layout reset deferred'); continue; }
+        if (no13 && x === '\\unset') { const property = pop(); if (property.text !== 'doubleSlurs') error(property, voice); doubleSlurs = false; deferSpan(tk, property, voice, 'Slur layout reset deferred'); continue; }
         if (x === '\\override' || x === '\\set') {
           // Scoped property assignment: stop before the following music atom. No Scheme is evaluated.
           const property = pop();
@@ -388,11 +407,15 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
               !(no14 && /^(?:Staff\.NoteCollision|PhrasingSlur|fontSize|Rest|Fingering)$/.test(property.text)) &&
               !(no13 && /^(?:PianoStaff\.connectArpeggios|doubleSlurs|Voice\.Rest)$/.test(property.text)))
             error(property, voice, 'Unclassified property may affect music');
-          if (t[i]?.text.startsWith("#'")) pop();
+          const field = t[i]?.text.startsWith("#'") ? pop() : undefined;
           expect('=', voice); const value = pop();
           if (value.text === '#') { if (t[i]) pop(); }
           else if (!value.text.startsWith('#') && !/^"/.test(value.text)) error(value, voice, 'Unsafe property value');
           if (property.text === 'fontSize' && value.text === '#-5') smallRoute = true;
+          if (property.text === 'doubleSlurs') doubleSlurs = value.text === '##t';
+          if (property.text === 'Slur') slurLayout = {
+            reason: field?.text === "#'stencil" && value.text === '##f' ? 'Hidden source slur stencil; no visible musical curve' : 'Unsupported source Slur layout; curve deferred',
+            once: !!once };
           if (no14) deferSpan(once ?? tk, value, voice, 'Layout property retained for source-context interpretation');
           else defer(tk, voice, 'Layout property ignored; adjacent musical events remain');
           once = undefined;
@@ -503,6 +526,9 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
     };
     sequence();
     if(sourceBeam)error(t[i-1],voice,'Unclosed source beam');
+    if (!allowOpenPhrase) for (const [kind, open] of openPhrases) if (open.deferred) {
+      defer(open.token, open.start.context, `${open.deferred}; unclosed unsupported span`); openPhrases.delete(kind);
+    }
     if (openPhrases.size && !allowOpenPhrase) error(t[i - 1], voice, 'Unclosed phrase');
     writtenMarksAll.push(...localMarks);
     if (time.toString() !== barStart.toString()) bars.push({ number: bar, duration: time.add(new Fraction(-barStart.n, barStart.d)).toString() });
@@ -910,11 +936,26 @@ export function importSchumann(source: string, identity: SchumannImportIdentity,
   };
   const scorePhrases: PhraseOverlay[] = [];
   for (const phrase of phrases) for (const p of projected(phrase.start)) {
+    // A source delimiter in only one ending does not establish a closure on
+    // another route. Never jump through a repeat return to fabricate a slur.
+    if (phrase.kind === 'slur') {
+      const endpoint = hosts.get(phrase.end.hostId)!;
+      const stop = occurrences.findIndex((o, index) => index >= p.index && o.sourceBar === endpoint.bar);
+      const route = stop < 0 ? [] : occurrences.slice(p.index, stop + 1);
+      if (stop < 0 || route.some((o, index) => index > 0 && o.sourceBar < route[index - 1].sourceBar)) {
+        const first = t.find(tk => tk.line === phrase.start.line && tk.column === phrase.start.column)!;
+        const last = t.find(tk => tk.line === phrase.end.line && tk.column === phrase.end.column)!;
+        deferSpan(first, last, phrase.start.context, `Ordinary slur closure unresolved in source occurrence ${p.ordinal}; repeat route not inferred`);
+        continue;
+      }
+    }
     const end = endFor(p, phrase.end);
     const fromNoteIds = endpointIds(phrase.fromId, p.tick), toNoteIds = endpointIds(phrase.toId, end.tick);
     if (!fromNoteIds.length || !toNoteIds.length) throw Error(`${file}:${phrase.start.line}: phrase endpoint not sounding`);
     scorePhrases.push({ id: `${phrase.fromId}:${phrase.kind}:${p.ordinal}`, startTick: p.tick, endTick: end.tick,
-      fromNoteIds, toNoteIds, voice: phrase.start.context, kind: phrase.kind, origin: p.origin, endOrigin: end.origin });
+      fromNoteIds, toNoteIds, voice: phrase.start.context, kind: phrase.kind, origin: p.origin, endOrigin: end.origin,
+      ...(phrase.sourceSide ? { sourceSide: phrase.sourceSide,
+        sourceSideOrigin: origin(phrase.sourceSideOrigin!, p.host, p.ordinal) } : {}) });
   }
   scoreDynamics.sort((a,b) => a.tick - b.tick || a.origin!.order - b.origin!.order);
   const totalTicks = exactTicks(cursor.toString(), ticksPerBeat);

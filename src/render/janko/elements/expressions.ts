@@ -71,7 +71,9 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
     const cs = phrase.startTick < p.start, ce = phrase.endTick >= p.end;
     const startX = cs ? p.left : p.endpointX(phrase.fromNoteIds, phrase.startTick);
     const endX = ce ? p.right : p.endpointX(phrase.toNoteIds, phrase.endTick);
-    const air = p.clarity ? Math.min(3.6,(endX-startX)/8) : 0;
+    const local = !!p.clarity || !!phrase.sourceSide;
+    const sourceSide = phrase.sourceSide === 'above' ? -1 : phrase.sourceSide === 'below' ? 1 : undefined;
+    const air = local ? Math.min(3.6,(endX-startX)/8) : 0;
     const x0=startX+(cs?0:air), x1=endX-(ce?0:air);
     if (x1 <= x0) throw Error(`Nonpositive phrase span ${phrase.id}`);
     let lane = 0;
@@ -79,15 +81,25 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
     phraseLanes.push({x0,x1,lane});
     const a = p.endpointEnvelope?.(phrase.fromNoteIds,phrase.startTick);
     const b = p.endpointEnvelope?.(phrase.toNoteIds,phrase.endTick);
-    let y0 = p.top-6-lane*9, y1=y0, side: -1|1=-1, depth=5;
+    let side: -1|1 = sourceSide ?? -1;
+    let y0 = side === -1 ? p.top-6-lane*9 : p.bottom+6+lane*9, y1=y0, depth=5;
     const thickness = p.contourThickness ?? .45;
-    if (p.clarity && (a || b)) {
-      const preferred = (a ?? b)!.hand === 'LH' ? 1 : -1;
+    if (local && (a || b)) {
+      const preferred = sourceSide ?? ((a ?? b)!.hand === 'LH' ? 1 : -1);
       let best = Infinity;
-      // Evaluate BOTH local sides against painted ink. The endpoints stay at
-      // their associated envelopes; collision avoidance earns depth, never a
-      // detached whole-system endpoint axis copied from source staff layout.
-      for (const s of [preferred,-preferred] as (-1|1)[]) for (const lift of [0,2,4,6,8,12,16,24]) {
+      // Candidate depth and lift do not change sampled x. Reuse the exact
+      // occupied intervals there instead of repeatedly inverting prior curves.
+      const previous=out.filter(q=>q.kind==='phrase');
+      const samples=Array.from({length:129},(_,i)=>{
+        const u=i/128,v=1-u,cx=x0+(x1-x0)*(3*v*v*u*.21+3*v*u*u*.79+u*u*u);
+        const occupied=(p.obstacles??[]).filter(q=>cx>q.x0-1.2&&cx<q.x1+1.2).map(q=>[q.y0-1.2,q.y1+1.2]);
+        for(const q of previous){const slice=expressionSliceAtX(q,cx);if(slice)occupied.push([slice[0]-1.2,slice[1]+1.2]);}
+        return {u,v,occupied};
+      });
+      // Explicit source direction is a constraint. Undirected phrases retain
+      // the existing hand preference and may earn either local corridor.
+      const sides: (-1|1)[] = sourceSide === undefined ? [preferred, -preferred as -1|1] : [sourceSide];
+      for (const s of sides) for (const lift of [0,2,4,6,8,12,16,24,32,48,64]) {
         const quietEndpoint=(cx:number,y:number)=>{
           // Endpoints earn only the local quiet corridor at their associated
           // column; a foreign rail in that column is real ink, not staff air.
@@ -103,12 +115,19 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
         const by = quietEndpoint(x1,b ? (s===-1?b.top-2:b.bottom+2)+s*lift : ay);
         for (let d=3;d<=Math.max(24,Math.min(100,(x1-x0)*.8));d+=2) {
           let hits=0;
-          for (let i=0;i<=128;i++) {
-            const u=i/128,v=1-u;
-            const cx=x0+(x1-x0)*(3*v*v*u*.21+3*v*u*u*.79+u*u*u);
+          for (const {u,v,occupied} of samples) {
             const cy=ay*v*v*v+3*v*v*u*(ay+s*d/.75)+3*v*u*u*(by+s*d/.75)+by*u*u*u;
-            if ((p.obstacles ?? []).some(q=>cx>q.x0-1.2 && cx<q.x1+1.2 && cy>q.y0-1.2 && cy<q.y1+1.2) ||
-                out.filter(q=>q.kind==='phrase').some(q=>{const slice=expressionSliceAtX(q,cx);return slice && cy>slice[0]-1.2 && cy<slice[1]+1.2;})) hits++;
+            if (occupied.some(q=>cy>q[0]&&cy<q[1])) hits++;
+          }
+          // A sampled centerline can miss a narrow stem or a crossing between
+          // samples. Admit a clear candidate only against its filled ribbon.
+          if(hits*1000+d+lift*2+(s===preferred?0:2)<best) {
+            const contour={xStart:x0,xEnd:x1,yStart:ay,yEnd:by,side:s,depth:d,thickness,indent:(x1-x0)*.21};
+            const candidate:ExpressionInk={kind:'phrase',id:phrase.id,x0:x0-.6,x1:x1+.6,
+              y0:Math.min(ay,by)+Math.min(0,s*d/.75)-.6,y1:Math.max(ay,by)+Math.max(0,s*d/.75)+.6,
+              startTick:phrase.startTick,endTick:phrase.endTick,continuationStart:cs,continuationEnd:ce,svg:'',contour};
+            hits+=(p.obstacles??[]).filter(q=>expressionIntersectsBox(candidate,{x0:q.x0-.6,x1:q.x1+.6,y0:q.y0-.6,y1:q.y1+.6})).length;
+            hits+=previous.filter(q=>expressionsOverlap(candidate,q)).length;
           }
           const cost=hits*1000+d+lift*2+(s===preferred?0:2);
           if(cost<best){best=cost;y0=ay;y1=by;side=s;depth=d;}
@@ -117,14 +136,14 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
       }
     }
     const dx=(x1-x0)/3;
-    const d = p.clarity ? taperedSpanPath(x0,y0,x1,y1,side,depth,thickness,(x1-x0)*.21) :
+    const d = local ? taperedSpanPath(x0,y0,x1,y1,side,depth,thickness,(x1-x0)*.21) :
       `M${f(x0)} ${f(y0)} C${f(x0+dx)} ${f(y0-5)} ${f(x1-dx)} ${f(y1-5)} ${f(x1)} ${f(y1)} C${f(x1-dx)} ${f(y1-5-.85)} ${f(x0+dx)} ${f(y0-5-.85)} ${f(x0)} ${f(y0)}Z`;
     const controlLo=Math.min(y0,y1)+Math.min(0,side*depth/.75);
     const controlHi=Math.max(y0,y1)+Math.max(0,side*depth/.75);
-    add({kind:'phrase', id:phrase.id, x0:x0-(p.clarity ? .6 : 0),x1:x1+(p.clarity ? .6 : 0),y0:controlLo-.6,y1:controlHi+.6,
+    add({kind:'phrase', id:phrase.id, x0:x0-(local ? .6 : 0),x1:x1+(local ? .6 : 0),y0:controlLo-.6,y1:controlHi+.6,
       contour:{xStart:x0,xEnd:x1,yStart:y0,yEnd:y1,side,depth,thickness,indent:(x1-x0)*.21},startTick:phrase.startTick,endTick:phrase.endTick,
-      continuationStart:cs,continuationEnd:ce,endpointIds:[phrase.fromNoteIds,phrase.toNoteIds],gridKnockout:!!p.clarity,
-      svg:(p.clarity?`<path class="janko-phrase-grid-knockout" d="${d}" fill="white" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>`:'')+
+      continuationStart:cs,continuationEnd:ce,endpointIds:[phrase.fromNoteIds,phrase.toNoteIds],gridKnockout:local,
+      svg:(local?`<path class="janko-phrase-grid-knockout" d="${d}" fill="white" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>`:'')+
         `<path class="janko-phrase" data-phrase="${esc(phrase.id)}" d="${d}" fill="#111111"/>`});
   }
   const dynamicLanes: { x0: number; x1: number; lane: number }[] = [];

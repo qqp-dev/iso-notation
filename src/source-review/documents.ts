@@ -95,3 +95,17 @@ export const WORKS = {
   'kinderszenen-8': { label: 'Schumann · Op. 15 No. 8', reference: ['henle-op15-8'], candidate: ['kinderszenen-v70'], starterPage: 10 },
 } as const satisfies Record<string, { label: string; reference: readonly SourceDocumentId[]; candidate: readonly SourceDocumentId[]; starterPage: number }>;
 export type WorkId = keyof typeof WORKS;
+
+/** Verified local citation only; internal repeat segments are not printed bars. */
+export const SCHUMANN_NO13_ENDING_CITATION = {
+  work: 'Schumann Op. 68 No. 13 · Mai, lieber Mai, bald bist du wieder da!',
+  reference: 'henle-13' as const,
+  folio: 15,
+  encodingParent: 'Peters parent unspecified',
+  segments: [
+    { internal: 38, sourceBar: 26, pass: 1, startTick: 3288, endTick: 3384, printed: 35, portion: 'complete' },
+    { internal: 39, sourceBar: 27, pass: 1, startTick: 3384, endTick: 3456, printed: 36, portion: 'first three eighths' },
+    { internal: 40, sourceBar: 11, pass: 2, startTick: 3456, endTick: 3480, printed: 36, portion: 'final eighth / fp return pickup' },
+  ],
+  caption: 'Schumann Op. 68 No. 13 · Henle HN 45 folio 15, printed 35–36 / internal 38–40. Internal 38 is printed 35; internal 39 holds the first three eighths of printed 36, and internal 40 its final eighth / fp return pickup. Encoding parent: Peters unspecified; Henle is the comparison edition. The two ordinary source slurs above/below are distinct from pitch ties. RH-up/LH-down and existing hands remain unchanged.',
+} as const;

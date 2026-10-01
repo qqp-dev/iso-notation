@@ -23,6 +23,7 @@
  * only ever states its *delta* to the current benchmark.
  */
 
+import { SCHUMANN_NO13_ENDING_CITATION } from '../../source-review/documents';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -1252,27 +1253,29 @@ export const SCHUMANN_NO13_STUDIO_SCORE_ID = 'schumann-op68-no13';
 
 /** Same literal windows for both real-engine surfaces; no per-measure geometry. */
 const NO13_CLARITY_WINDOWS: JankoScoreCandidateWindow[] = [
-  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:1,measureCount:56,fullScore:true,title:'Complete No. 13 · unfolded 1–56'},
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:1,measureCount:56,fullScore:true,title:'Complete No. 13 · internal segments 1–56'},
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,
+    title:'Schumann Op. 68 No. 13 · Henle printed 35–36 / internal 38–40',caption:SCHUMANN_NO13_ENDING_CITATION.caption},
   ...[[2,2],[6,5],[27,1],[30,4],[37,3],[43,1]].map(([measureStart,measureCount])=>({
     scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart,measureCount,
-    title:`No. 13 · unfolded ${measureStart}–${measureStart+measureCount-1}`,
-    caption:'Pickup is unfolded 1; written 1 is unfolded 2. Equal-value unisons share one head, not one voice. At written 25 / unfolded 37, the lower/down cross-staff continuation is provisional LH, not authoritative fingering. “3 to33” and “144” remain ambiguous spoken numbering.',
+    title:`No. 13 · internal segments ${measureStart}–${measureStart+measureCount-1}`,
+    caption:'Internal navigation follows expanded source segments, including split endings and pickups; it is not printed measure numbering. Equal-value unisons retain both voices. At internal 37 the lower/down cross-staff continuation remains provisional LH, not authoritative fingering. See the verified Henle printed 35–36 / internal 38–40 window for that local citation.',
   })),
 ];
 
 /** Practice candidates render the portable renderer itself; score References remain canonical. */
 export const ROUND_55_CANDIDATES: JankoCandidate[] = [
   { id: 'schumann-no13-written-draft', label: 'No. 13 · proposed shared clarity', options:{clarityPass:true},
-    description: 'Shared clarity: LH-anchored / coherent RH clearance, independent source-voice corridors with non-fusing underpasses at true crossings, one head for compatible-value unisons with both owners, 0.80 nonmetrical grace, 5pt / 0.65pt local cuts at their own steeper rake, locally anchored tapered phrases and 0.016 Bravura dynamics. The upper rule stays at linear 72 but earns at displayed 78. Complete 28-bar / 56-occurrence source; all 16 pitched grace occurrences / 26 heads keep their hosts, flags and beams. Performing hands remain provisional; ordinary slurs, fingerings and source staff layout remain deferred.',
+    description: 'Shared clarity with corrected source expressions: independent source voices, compatible-value shared heads, nonmetrical grace and locally anchored tapered phrases. Supported ordinary slurs now retain their explicit above/below sides alongside escaped phrasing; the two line241 slurs survive independently at the shared E. Complete 28 written / 56 expanded source segments. Performing hands remain provisional; unsupported grace/layout slurs, fingerings and source staff layout remain disclosed in the ledger. This unlanded output has corrected source identity and is not original Round58 COMPACT B.',
     tags: ['Draft / unfolded repeats', 'nonmetrical grace', 'provisional hands', 'source expression'],
     windows: NO13_CLARITY_WINDOWS },
   { id:'schumann-no13-before-clarity',label:'No. 13 · pre-pass engraving rules',
-    description:'The same approved source, clocks and literal windows through the real engine, with pre-pass head/hand placement, 0.68 grace, 7.5pt/1pt cuts at beam rake, system-air phrases, 0.018 dynamics and the old upper-rule threshold. Contextual hand evidence is shared; this is not a reconstructed source edition.',
+    description:'The same corrected source expressions, clocks and literal windows through the real engine, with pre-pass placement options. Explicitly directed slurs stay local on their source sides in both cards; undirected pre-pass phrases retain the system-air policy. This is a current comparison using corrected input on both sides, not original Round58 COMPACT B or the cancelled Round59 planner.',
     options:{clarityPass:false,tieProfile:'uniform'},
     tokens:{graceScale:.68,dynamicScale:.018,claspSlashLength:7.5,claspSlashStroke:1,claspSlashSlope:.22,upperExtensionThreshold:73},
     windows:NO13_CLARITY_WINDOWS,tags:['pre-pass rules','same source','real engine'] },
   { id: 'schumann-no30-written-draft', label: 'Schumann Op. 68 No. 30 · Draft / unfolded repeats',
-    description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Corrected relative pitches preserve independent voices and repeat ties. Source dynamics and explicit phrasing now engrave through shared paths; printed cross-staff destinations, literal tie and laissez-vibrer marks, fingering, ordinary slurs, arpeggio layout and omissions remain source-linked in the ledger. Not GOLD or BRONZE.',
+    description: 'Complete approved-source draft: 34 written bars, 49 unfolded occurrences. Both repeat entries continue the upper Ab chord member without an attack; the hidden lower A3 is a guarded layout-only slur carrier. Hands follow logical upper/lower parts provisionally, NOT an authoritative playing edition. Source dynamics, ordinary slurs and escaped phrasing engrave through shared paths. Unsupported attachments and the unreachable second-pass first-ending slur closure remain disclosed; printed cross-staff destinations, literal tie and laissez-vibrer marks, fingering and arpeggio layout remain source-linked in the ledger. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source-linked ties', 'deferred notation'],
     windows: [
       { scoreId: SCHUMANN_NO30_STUDIO_SCORE_ID, measureStart: 1, measureCount: 49, fullScore: true, title: 'Complete unfolded score · mm. 1–49', caption: 'All real-engine pages · 34 written bars, first ending at unfolded m. 33, second ending at m. 49.' },
@@ -1296,11 +1299,11 @@ export const ROUND_55_CANDIDATES: JankoCandidate[] = [
     windows: [41,43,63].map(measureStart => ({scoreId:'schumann-op68-no14-principal',measureStart,measureCount:1,
       title:`m. ${measureStart} · principal branch`,caption:'Compare with the lower/wider full-score reading. Corrected pitches remove the former spurious ↑10 question.'})) },
   { id: 'schumann-no43-written-draft', label: 'Schumann Op. 68 No. 43 · Draft / unfolded repeats',
-    description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Source dynamics now engrave through shared paths; named voices retain their source pitches and explicit beam interruptions. Hands are provisional upper/lower-part hints; ornament, ordinary slurs, fingering and laissez-vibrer remain deferred (see the source-linked ledger). Not GOLD or BRONZE.',
+    description: 'Approved LilyPond → source-linked written facts → exact-tick real-engine draft. Source dynamics and supported ordinary slurs engrave through shared paths; named voices retain their pitches and beam interruptions. Hands are provisional upper/lower-part hints; unsupported layout slurs, ornament, fingering and laissez-vibrer remain deferred (see the source-linked ledger). Existing draft lint remains visible. Not GOLD or BRONZE.',
     tags: ['Draft / unfolded repeats', 'provisional hands', 'source dynamics'],
     windows: [
       { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 1, measureCount: 3, title: 'Opening · pickup + first three bars', caption: 'Draft / unfolded repeats · eighth pickup, both logical voices, authored rests and spacers.' },
-      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 12, measureCount: 3, title: 'Dense chords · written partial ties', caption: 'Draft / unfolded repeats · chord members can release or reattack independently; fingering and slurs are deferred.' },
+      { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 12, measureCount: 3, title: 'Dense chords · written partial ties', caption: 'Draft / unfolded repeats · chord members release or reattack independently; supported source slurs are painted, with unsupported layout cases and fingerings disclosed in the ledger.' },
       { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 16, measureCount: 2, title: 'Repeat body · dense cross-hand onset', caption: 'Draft / unfolded repeats · includes the m. 16 displaced-head lint findings; no passages are removed.' },
       { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 20, measureCount: 3, title: 'First ending and second pass', caption: 'Draft / unfolded repeats · written bar 20 ends first pass; the volta body restarts at bar 11.' },
       { scoreId: SCHUMANN_NO43_STUDIO_SCORE_ID, measureStart: 29, measureCount: 3, title: 'Second ending · Fine', caption: 'Draft / unfolded repeats · second ending at source bar 21; fermata and text remain deferred facts.' },
@@ -1364,12 +1367,12 @@ export const ROUND_57_CANDIDATES:JankoCandidate[]=[
 
 export const CURRENT_ROUND_METADATA:JankoCandidateRound={
   round:58,title:'Economical crossings · truthful onset groups (candidate-only)',
-  description:'Compare the served No. 13 bevel control with stable onset slots, then a shallower compact bevel. Brahms is ONE contrasting passage: unfolded 64–67 / written 35–38, second ending. Its former candidate projection had duplicate tied heads and a tie collision; that broken projection is refused, not offered as taste. Both refinements preserve chain-owned equal-value sharing and unequal continuations. Stems stay locally foreground, RH-up/LH-down; no fixed voice plane. Reference/default ink unchanged; geometry evidence is not pixel or musical acceptance.',
+  description:'Round58 crossing options through the current engine with corrected No. 13 source slurs on every card. These current controls differ from original Round58 source/engine pins. Henle printed35–36 maps to internal38–40, including the split ending and fp return pickup. Brahms remains ONE contrasting second-ending passage. Both refinements preserve chain-owned equal-value sharing and unequal continuations. RH-up/LH-down and existing hands remain; canonical Reference ink is unchanged. Geometry evidence is not pixel or musical acceptance.',
   openAxes:['stableOnsets','depthProfile'],
-  compareStrip:{scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:39,measureCount:1,title:'No. 13 unfolded 39 · fourteen written events / 72 ticks · simultaneous, not successive'},
+  compareStrip:{scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:39,measureCount:1,title:'Schumann No. 13 · internal39 / first three eighths of Henle printed36 · fourteen written events / 72 ticks'},
 };
 const ECONOMICAL_NO13_WINDOWS:JankoScoreCandidateWindow[]=[
-  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,completeSystems:true,title:'No. 13 · unfolded 38–40, focus 39',caption:'Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional.'},
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,completeSystems:true,title:'Schumann No. 13 · Henle printed35–36 / internal38–40',caption:SCHUMANN_NO13_ENDING_CITATION.caption+' Complete containing systems retain neighboring onsets. One LH 3b attack keeps24/48 branches; the final LH 44 keeps both source owners and independently directed slur paths.'},
 ];
 const ECONOMICAL_BRAHMS_WINDOWS:JankoScoreCandidateWindow[]=[
   {scoreId:BRAHMS_STUDIO_SCORE_ID,measureStart:64,measureCount:4,completeSystems:true,title:'Brahms · unfolded 64–67 / written 35–38, second ending',caption:'ONE passage, complete containing systems 61–64 and 65–68. Held RH 3a against moving RH 37→29 at 65; LH 32 quarter/tied continuation against 32→35 eighths at 66. Only primary-level crossings, not a dense crossing forest. Convergence/cresc, f/decresc, ties/cresc, sf and arpeggiation retain their source owners.'},
@@ -1381,7 +1384,7 @@ const economical=(id:string,label:string,description:string,profile:JankoLayoutO
   windows:[...ECONOMICAL_NO13_WINDOWS,...(stable?ECONOMICAL_BRAHMS_WINDOWS:[])],comparisonScope:'containing-systems',tags:['candidate-only','literal source','black silhouette','not adopted'],
 });
 export const CURRENT_CANDIDATES:JankoCandidate[]=[
-  economical('economical-control','Control · served bevel / original onset seats','Exact served bevel mechanics for No. 13 through today’s engine: includes the accidental doubled slot. Brahms’s original projection is NOT displayed: it has proven duplicate-head/tie defects, not a viable control. Round 57 remains archived.','beveled',false),
+  economical('economical-control','Control · original onset seats / corrected source','Original Round58 option deltas through today’s engine and corrected source slurs; this is not byte-identical to original served Round58. Includes the historical doubled slot. Brahms’s original broken projection remains refused. Historical source/options/engine pins stay preserved.','beveled',false),
   economical('economical-slots','Refinement A · stable seats / existing bevel','Required single-slot clearance survives translated coordinates; head and stem envelopes are not deleted or forced onto one x. Existing 2.70pt aperture / 1.60pt shoulders / 42% neck. Brahms uses corrected equal-value tie ownership; its two crossings contrast held/moving obligations with No. 13. Price: visible rail interruption and modest within-onset looseness remain.','beveled',true),
   economical('economical-bevel','Refinement B · stable seats / compact bevel','Same corrected onset seats as A. Physical foreground stroke plus 0.55pt air each side gives 2.00pt apertures; fitted 1.20pt faces taper to 60% thickness without centerline excursion. Less missing contour and shorter, shallower negative-space scallops, not perfect foreground isolation. Price: reduced air and still interrupted rear rails; neither amodal continuity nor lint certifies musical readability.','beveled-compact',true),
 ];

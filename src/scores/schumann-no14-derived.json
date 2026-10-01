@@ -13687,6 +13687,48 @@
         }
       },
       {
+        "fromId": "14-Petite-etude.ly:517:14:lower.0",
+        "toId": "14-Petite-etude.ly:517:22:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "14-Petite-etude.ly:517:14:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 517,
+          "column": 20,
+          "order": 19
+        },
+        "end": {
+          "hostId": "14-Petite-etude.ly:517:22:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 517,
+          "column": 25,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "14-Petite-etude.ly:519:16:lower.2",
+        "toId": "14-Petite-etude.ly:519:24:lower.2",
+        "kind": "slur",
+        "start": {
+          "hostId": "14-Petite-etude.ly:519:16:lower.2",
+          "token": "(",
+          "context": "lower.2",
+          "line": 519,
+          "column": 22,
+          "order": 19
+        },
+        "end": {
+          "hostId": "14-Petite-etude.ly:519:24:lower.2",
+          "token": ")",
+          "context": "lower.2",
+          "line": 519,
+          "column": 29,
+          "order": 19
+        }
+      },
+      {
         "fromId": "14-Petite-etude.ly:524:11:lower",
         "toId": "14-Petite-etude.ly:526:17:lower",
         "kind": "phrasing",
@@ -20193,6 +20235,138 @@
           "context": "lower",
           "occurrence": 2,
           "time": "281/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:517:14:lower.0:slur:1",
+        "startTick": 6768,
+        "endTick": 6840,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:1"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 20,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 25,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "285/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:517:14:lower.0:slur:2",
+        "startTick": 11376,
+        "endTick": 11448,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:2"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:2"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 20,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 25,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "285/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:519:16:lower.2:slur:1",
+        "startTick": 6768,
+        "endTick": 6840,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:519:16:lower.2:40:1"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:519:24:lower.2:42:1"
+        ],
+        "voice": "lower.2",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 22,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 1,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 29,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 1,
+          "time": "285/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:519:16:lower.2:slur:2",
+        "startTick": 11376,
+        "endTick": 11448,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:519:16:lower.2:40:2"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:519:24:lower.2:42:2"
+        ],
+        "voice": "lower.2",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 22,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 2,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 29,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 2,
+          "time": "285/8",
           "order": 19
         }
       },
@@ -42071,36 +42245,12 @@
     {
       "file": "14-Petite-etude.ly",
       "line": 517,
-      "column": 20,
-      "endLine": 517,
-      "endColumn": 21,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "14-Petite-etude.ly",
-      "line": 517,
       "column": 24,
       "endLine": 517,
       "endColumn": 25,
       "construct": "5",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "14-Petite-etude.ly",
-      "line": 517,
-      "column": 25,
-      "endLine": 517,
-      "endColumn": 26,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -42143,36 +42293,12 @@
     {
       "file": "14-Petite-etude.ly",
       "line": 519,
-      "column": 22,
-      "endLine": 519,
-      "endColumn": 23,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "lower.2"
-    },
-    {
-      "file": "14-Petite-etude.ly",
-      "line": 519,
       "column": 28,
       "endLine": 519,
       "endColumn": 29,
       "construct": "4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering deferred",
-      "blocking": false,
-      "voice": "lower.2"
-    },
-    {
-      "file": "14-Petite-etude.ly",
-      "line": 519,
-      "column": 29,
-      "endLine": 519,
-      "endColumn": 30,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.2"
     },
@@ -48548,6 +48674,138 @@
           "context": "lower",
           "occurrence": 2,
           "time": "281/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:517:14:lower.0:slur:1",
+        "startTick": 6768,
+        "endTick": 6840,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:1"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 20,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 25,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "285/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:517:14:lower.0:slur:2",
+        "startTick": 11376,
+        "endTick": 11448,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:2"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:2"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 20,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 517,
+          "col": 25,
+          "bar": 47,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "285/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:519:16:lower.2:slur:1",
+        "startTick": 6768,
+        "endTick": 6840,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:519:16:lower.2:40:1"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:519:24:lower.2:42:1"
+        ],
+        "voice": "lower.2",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 22,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 1,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 29,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 1,
+          "time": "285/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "14-Petite-etude.ly:519:16:lower.2:slur:2",
+        "startTick": 11376,
+        "endTick": 11448,
+        "fromNoteIds": [
+          "14-Petite-etude.ly:519:16:lower.2:40:2"
+        ],
+        "toNoteIds": [
+          "14-Petite-etude.ly:519:24:lower.2:42:2"
+        ],
+        "voice": "lower.2",
+        "kind": "slur",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 22,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 2,
+          "time": "141/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "14-Petite-etude.ly",
+          "line": 519,
+          "col": 29,
+          "bar": 47,
+          "context": "lower.2",
+          "occurrence": 2,
+          "time": "285/8",
           "order": 19
         }
       },
