@@ -72,6 +72,8 @@ import {
   checkDepthRoutePaint,
   checkJointRouteSeparation,
   checkExpressionIntegrity,
+  checkCompleteFlagClearance,
+  checkSharedHeadTerminals,
   checkClaspDotFusion,
   checkDotCollision,
   checkDotCountAgreement,
@@ -101,6 +103,45 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
+
+test('complete solo flags detect the literal foreign-rail defect and fit one or two flags',()=>{
+ const e=createStudioConfig().scores['schumann-op68-no13'],base=CURRENT_CANDIDATES.find(c=>c.id==='joint-compact')!;
+ const old=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],{...e.options,...base.options},e.tokens),l=[...old.systems.values()][0];
+ const check=(layout:JankoSystemLayout)=>{const out:LintViolation[]=[];checkCompleteFlagClearance(layout,old.options,old.tokens,out,buildInkScene(layout,old.options,old.tokens,e.score));return out;};
+ const id='13-Mai-cher-Mai.ly:115:56:upper.0:64:1';
+ assert.ok(check(l).some(v=>v.code==='solo-flag-rail-clearance'&&v.noteIds?.includes(id)),'historically zero lint hid the complete-flag defect');
+ const fixed=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],{...e.options,...base.options,completeFlagClearance:true},e.tokens);
+ assert.deepEqual(check([...fixed.systems.values()][0]),[]);
+ // Hypothetical shorter value at the literal pose: renderer/linter must cover
+ // the complete two-flag glyph, without modifying the authored score fixture.
+ const two={...l,ungrouped:l.ungrouped.map(n=>n.id===id?{...n,durationTicks:12}:n)};
+ assert.ok(check(two).some(v=>v.noteIds?.includes(id)));
+ const fitted={...fixed.systems.values().next().value!,ungrouped:[...fixed.systems.values()][0].ungrouped.map(n=>n.id===id?{...n,durationTicks:12}:n)};
+ assert.deepEqual(check(fitted),[],'both flags clear at the actual fitted tip');
+ const flags=buildInkScene(fitted,old.options,old.tokens,e.score).solos.get(id)!.filter(p=>p.shape.kind==='flag');
+ assert.equal(flags.length,1);assert.equal(flags[0].shape.kind==='flag'&&flags[0].shape.count,2);
+ assert.equal(e.score.notes.find(n=>n.id===id)!.durationTicks,24);
+});
+
+test('local attachment rejects the old distant B slur despite intact source identities',()=>{
+ const e=createStudioConfig().scores['schumann-op68-no13'],c=CURRENT_CANDIDATES.find(c=>c.id==='joint-compact')!;
+ const old=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],{...e.options,...c.options},e.tokens),layout=[...old.systems.values()][0];
+ const out:LintViolation[]=[];checkExpressionIntegrity(e.score,layout,{...old.options,phraseRouting:'local'},old.tokens,out);
+ assert.ok(out.some(v=>v.code==='expression-local-attachment'&&v.message.includes(':241:16:')));
+ const next=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],{...e.options,...CURRENT_CANDIDATES.find(c=>c.id==='local-phrasing')!.options},e.tokens),clean:LintViolation[]=[];
+ checkExpressionIntegrity(e.score,[...next.systems.values()][0],next.options,next.tokens,clean);assert.deepEqual(clean,[]);
+});
+
+test('shared-head terminal audit rejects coincident B endings in either requested variant',()=>{
+ const e=createStudioConfig().scores['schumann-op68-no13'],id='13-Mai-cher-Mai.ly:241:43:lower.1:47:1';
+ for(const candidateId of ['shared-b-short','shared-b-long']){
+  const c=CURRENT_CANDIDATES.find(c=>c.id===candidateId)!,p=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],{...e.options,...c.options},e.tokens),l=[...p.systems.values()][0];
+  const check=(layout:JankoSystemLayout)=>{const out:LintViolation[]=[];checkSharedHeadTerminals(layout,p.options,p.tokens,out,buildInkScene(layout,p.options,p.tokens,e.score));return out;};
+  assert.deepEqual(check(l),[]);
+  const defective={...l,ungrouped:l.ungrouped.map(n=>n.id===id?{...n,stemLength:16}:n)};
+  assert.ok(check(defective).some(v=>v.code==='shared-head-terminal-clearance'&&v.noteIds?.includes(id)));
+ }
+});
 
 test('joint route checks reject false duration stacks and fused independent painted stems', () => {
   const e=createStudioConfig().scores['schumann-op68-no13'];

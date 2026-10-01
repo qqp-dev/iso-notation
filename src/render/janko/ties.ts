@@ -488,11 +488,21 @@ export function tieTracedGeometry(
 
 /** Shared two-cubic tapered contour; phrasing may have unequal endpoint heights.
  * Placement and musical semantics remain the caller's responsibility. */
+export interface TaperedSpanProfile {
+  startDepth?: number;
+  endDepth?: number;
+  startIndent?: number;
+  endIndent?: number;
+}
 export function taperedSpanPath(x1: number, y1: number, x2: number, y2: number,
-  side: -1 | 1, depth: number, thickness: number, indent: number): string {
+  side: -1 | 1, depth: number, thickness: number, indent: number, profile: TaperedSpanProfile = {}): string {
   const g = tieTracedGeometry(x1,0,x2,side,depth,thickness,indent);
-  return `M ${f(x1)} ${f(y1)} C ${f(g.ax)} ${f(y1+g.outerControlY)} ${f(g.bx)} ${f(y2+g.outerControlY)} ${f(x2)} ${f(y2)} ` +
-    `L ${f(x2)} ${f(y2)} C ${f(g.bx)} ${f(y2+g.innerControlY)} ${f(g.ax)} ${f(y1+g.innerControlY)} ${f(x1)} ${f(y1)} Z`;
+  const a = profile.startDepth === undefined && profile.startIndent === undefined ? g :
+    tieTracedGeometry(x1,0,x2,side,profile.startDepth??depth,thickness,profile.startIndent??indent);
+  const b = profile.endDepth === undefined && profile.endIndent === undefined ? g :
+    tieTracedGeometry(x1,0,x2,side,profile.endDepth??depth,thickness,profile.endIndent??indent);
+  return `M ${f(x1)} ${f(y1)} C ${f(a.ax)} ${f(y1+a.outerControlY)} ${f(b.bx)} ${f(y2+b.outerControlY)} ${f(x2)} ${f(y2)} ` +
+    `L ${f(x2)} ${f(y2)} C ${f(b.bx)} ${f(y2+b.innerControlY)} ${f(a.ax)} ${f(y1+a.innerControlY)} ${f(x1)} ${f(y1)} Z`;
 }
 
 /**

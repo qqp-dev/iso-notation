@@ -182,6 +182,7 @@ import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox, projectedSoloFlagEnvelope } from './solo-scene';
+import {sourcePhraseEndpointEnvelope,phraseMusicObstacles} from './expression-anchors';
 import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes, placedBeamGroup } from './beam-scene';
 import { depthRibbon, depthProfileMetrics } from './depth-profile';
 import { GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
@@ -302,7 +303,7 @@ export type JankoLintCode =
   | 'tie-gap-unpublished'
   | 'tie-rule-fusion'
   | 'expression-missing' | 'expression-geometry' | 'expression-clearance' | 'expression-endpoint' | 'expression-paint'
-  | 'expression-source-side' | 'expression-path-ownership'
+  | 'expression-source-side' | 'expression-path-ownership' | 'expression-local-attachment' | 'solo-flag-rail-clearance' | 'shared-head-terminal-clearance'
   | 'grace-missing' | 'grace-value' | 'grace-host' | 'grace-geometry' | 'grace-paint';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -6274,6 +6275,14 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
     const owned=ink.filter(i=>i.kind==='phrase'&&i.id===phrase.id),q=owned[0];
     if(!q)problem('expression-missing',phrase.id,'source phrase has no ink');
     else {
+      if(o.phraseRouting==='local'){
+        if(q.routingIssue)problem('expression-local-attachment',phrase.id,q.routingIssue);
+        for(const [ids,tick,y,continuation] of [[phrase.fromNoteIds,phrase.startTick,q.contour?.yStart,q.continuationStart],[phrase.toNoteIds,phrase.endTick,q.contour?.yEnd,q.continuationEnd]] as const){
+          if(continuation||y===undefined)continue;
+          const e=sourcePhraseEndpointEnvelope(layout,ids,tick,o,t);
+          if(e&&(y<e.top-8.05||y>e.bottom+8.05))problem('expression-local-attachment',phrase.id,'curve tip has escaped its owning head/duration envelope');
+        }
+      }
       if(q.startTick!==phrase.startTick||q.endTick!==phrase.endTick||
         q.continuationStart!==(phrase.startTick<start)||q.continuationEnd!==(phrase.endTick>=end)||
         JSON.stringify(q.endpointIds)!==JSON.stringify([phrase.fromNoteIds,phrase.toNoteIds]))
@@ -6298,7 +6307,7 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
           if(heads.some(n=>{const {hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return side===-1?y>=n.y-hy:y<=n.y+hy;}))
             problem('expression-source-side',phrase.id,`tip lies on the wrong side of its owned head envelope`);
         }
-        if(c&&paths[0]?.match(/\bd="([^"]+)"/)?.[1]!==taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent))
+        if(c&&paths[0]?.match(/\bd="([^"]+)"/)?.[1]!==taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent,c))
           problem('expression-path-ownership',phrase.id,'painted path differs from its owned contour');
       }
     }
@@ -6312,7 +6321,7 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
       problem('expression-endpoint',q.id,'pedal clock or true continuation differs');
   }
   if (!ink.length) return;
-  const music=systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('expression '));
+  const music=o.phraseRouting==='local'?phraseMusicObstacles(layout,o,t):systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('expression '));
   for(const q of ink) {
     const cls=q.kind==='dynamic'?/janko-(?:dynamic|expression-text)/:new RegExp(`janko-${q.kind}`);
     if(!q.svg||!cls.test(q.svg))problem('expression-paint',q.id,'stored ink has no matching glyph/curve/bracket');
@@ -6428,6 +6437,38 @@ export function checkLocalFlagPaint(layout:JankoSystemLayout,o:ResolvedJankoLayo
   }
 }
 
+/** Conservative complete-flag admission. An enclosure entering a foreign rail
+ * is a failed clearance certificate, not proof that an empty flag counter is
+ * filled ink. Final fitting must clear the whole envelope. */
+export function checkCompleteFlagClearance(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[],scene:InkScene):void {
+ const seen=new Set<string>(),rails=scene.beams.flat().filter(p=>p.shape.kind==='rail');
+ for(const pieces of scene.solos.values())for(const p of pieces){
+  if(p.shape.kind!=='flag'||p.shape.style!=='classical-urtext'||seen.has(p.id))continue;seen.add(p.id);
+  const b=projectedSoloFlagEnvelope(p.shape.d),box={x0:b.x0-.6,x1:b.x1+.6,y0:b.y0-.6,y1:b.y1+.6};
+  for(const rail of rails)if(!rail.ownerIds.some(id=>p.ownerIds.includes(id))&&beamPieceIntersectsBox(rail,box))
+   out.push({code:'solo-flag-rail-clearance',severity:'error',system:layout.index,noteIds:[p.noteId,...rail.ownerIds],message:'Complete classical-flag enclosure has insufficient clearance from a foreign duration rail.'});
+ }
+ for(const id of layout.completeFlagRefusals??[])out.push({code:'solo-flag-rail-clearance',severity:'error',system:layout.index,noteIds:[id],message:'No complete standalone flag seat clears the neighboring rhythm/head envelopes.'});
+}
+
+export function checkSharedHeadTerminals(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[],scene:InkScene):void {
+ if(!o.sharedHeadTerminal)return;
+ for(const merge of layout.unisonMerges.filter(m=>!m.exact)){
+  const owners=new Set([merge.survivorId,...merge.mergedIds]);
+  for(const note of layout.ungrouped.filter(n=>owners.has(n.id)&&n.durationTicks===t.ticksPerBeat)){
+   const direction=note.layoutDirection??(note.hand==='LH'?1:-1),beams=layout.beams.filter(b=>b.direction===direction&&b.notes.some(n=>owners.has(n.id)));
+   if(!beams.length)continue;
+   const piece=scene.solos.get(note.id)?.find(p=>p.shape.kind==='stem');
+   if(!piece||piece.shape.kind!=='stem'){out.push({code:'shared-head-terminal-clearance',severity:'error',system:layout.index,noteIds:[note.id],message:'Unequal shared-head quarter branch has no independent painted terminal.'});continue;}
+   const stem=piece.shape,ends=beams.map(b=>b.beamY(stem.x));
+   const reference=o.sharedHeadTerminal==='short'?(direction===1?Math.min(...ends):Math.max(...ends)):(direction===1?Math.max(...ends):Math.min(...ends));
+   const separation=(o.sharedHeadTerminal==='short'?-1:1)*direction*(stem.y2-reference);
+   if(separation<t.beamThickness+t.flagSpacing-.05||Math.abs(stem.y2-stem.y1)<Math.max(t.minStemClearance,t.flagSpacing)-.05)
+    out.push({code:'shared-head-terminal-clearance',severity:'error',system:layout.index,noteIds:[note.id,...owners],message:'Requested shorter/longer bare shared-head branch lacks a distinct terminal or enough visible stem.'});
+  }
+ }
+}
+
 export function checkEventHandMarkIntegrity(layout:JankoSystemLayout,out:LintViolation[]):void {
   for(const m of layout.eventHandMarks??[])if(m.refused)out.push({code:'event-hand-mark-refused',severity:'error',system:layout.index,noteIds:m.ownerIds,
     message:'No collision-free event hand-chevron seat was found; this comparative hand channel is not viable here.'});
@@ -6466,6 +6507,8 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
     if(o.sharedRhCarrier&&placedScene)checkSharedCarrierPaint(layout,placedScene,t,diagnostics);
     if(o.beamContour==='bent'&&placedScene)checkContinuousContourPaint(layout,placedScene,diagnostics);
     if(o.groupedRhythm==='local-flags'&&placedScene)checkLocalFlagPaint(layout,o,t,diagnostics,placedScene);
+    if(o.completeFlagClearance&&placedScene)checkCompleteFlagClearance(layout,o,t,diagnostics,placedScene);
+    if(o.sharedHeadTerminal&&placedScene)checkSharedHeadTerminals(layout,o,t,diagnostics,placedScene);
     checkGraceIntegrity(score, layout, o, t, diagnostics);
     checkExpressionIntegrity(score,layout,o,t,diagnostics);
     checkVoiceBeamCorridors(layout,t,diagnostics,o,placedScene);
