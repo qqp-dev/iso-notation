@@ -285,8 +285,10 @@ test('legacy full-score migration classifies harmless SVG serialization separate
       const engine = readFileSync(enginePath(dest), 'utf8');
       assert.ok(engine.includes(serializationAnchor), 'fixture changes only real page SVG serialization');
       writeFileSync(enginePath(dest), engine.replace(serializationAnchor, replacement));
+      // Shared-host gate measurements hit the old 180s child cap (also in a
+      // selected-file run); allow 300s without changing any parity assertions.
       const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/migrate-legacy-candidates.ts', '--old-root', oldRoot],
-        { cwd: dest, encoding: 'utf8', timeout: 180_000, env: { ...process.env, JANKO_DEPLOY_CHECKOUT: dest } });
+        { cwd: dest, encoding: 'utf8', timeout: 300_000, env: { ...process.env, JANKO_DEPLOY_CHECKOUT: dest } });
       assert.equal(result.error, undefined, String(result.error));
       if (accepts) {
         assert.equal(result.status, 0, `serialization-only difference is not changed music/ink: ${result.stderr}`);

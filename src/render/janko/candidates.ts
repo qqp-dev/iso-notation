@@ -1315,7 +1315,7 @@ export const ROUND_55_CANDIDATES: JankoCandidate[] = [
     tags: ['Practice', 'natural minor', 'N26'] },
 ];
 
-export const CURRENT_ROUND_METADATA: JankoCandidateRound = {
+export const ROUND_56_METADATA: JankoCandidateRound = {
   round:56,title:'No. 13 · handedness-first trade-offs (no adoption)',
   description:'One immutable literal score; RH/LH assignments remain unchanged and provisional, not composer fingering. Implemented alternatives and the known inadequate control are engraved. Remaining failed representative searches are labelled, not disguised as family impossibility; the set is finite, not an exhaustive classification. All diagnostics are containing-system/window-scoped, not book/page acceptance. Rejected searches do not prove a family impossible. Reference/default ink is unchanged.',
   openAxes:['rhythmStyle','groupedRhythm','comparisonPitchFields','stemConvention','beamContour','crossingConvention','sharedRhCarrier'],
@@ -1328,7 +1328,7 @@ const TRADEOFF_WINDOWS:JankoScoreCandidateWindow[]=[
 ];
 const tradeoff=(id:string,label:string,description:string,options:Partial<JankoLayoutOptions>={},tokens:Partial<JankoTokens>={}):JankoCandidate=>({id,label,description,options:{preserveGestureMembership:true,...(id==='hand-control'?{}:{shareAttackHeads:true,independentUnisonAttachments:true,shareCompatibleLocalRhythm:true}),...options},tokens,windows:TRADEOFF_WINDOWS,comparisonScope:'containing-systems',tags:['unadopted','window-scoped','same source']});
 const rejected=(id:string,label:string,reason:string,evidence:string):JankoCandidate=>({id,label,description:'Rejected evaluated representative — not a proof that this entire family is impossible.',windows:[],rejection:{reason,evidence},tags:['excluded representative','not viable']});
-export const CURRENT_CANDIDATES:JankoCandidate[]=[
+export const ROUND_56_CANDIDATES:JankoCandidate[]=[
   tradeoff('hand-control','Control · tiny-cut underpasses','Known inadequate: standard lint misses 0.33–0.40pt fragments and coincident independent LH routes. Direct handedness and long shared rails remain; zero lint does not endorse this reading.'),
   rejected('straight-seats','Straight seats / revised attachments','72 joint real-engine trials varied seat order (±5.46pt), within-mask top-edge attachments (±1.8pt), stem lengths 12/20/28pt, affine slopes 0.22/0.45 and cell widths ×1/1.5/2. Best still has two foreign-rail stem contacts and one foreign-head stem contact. Arbitrary lateral shoulders remain unsearched; no general impossibility claim.','.architect/experiments/tradeoff-route-families.ts → straight-seats'),
   tradeoff('continuous-ribbon','Continuous bent RH ribbons','Real-engine constant-normal-width primary and secondary RH contours, with rebuilt own stem tips and whole head-shoulder detours. Both RH streams retain up-stems. Physical lint certifies that the declared RH ribbons remain UNCUT; LH obligations use the explicit overpass vocabulary, not tiny stem omissions. Price: widened admitted cells/page (840pt, at most three bars), 12pt RH voice-seat separation, added opening air, angular/ribbon-like scanning and a LH crossing convention. Unequal shared-attack quarter branches use a legible 5.54pt visible bare stem rather than accidentally joining the short-value ribbon. Narrow trials refused folded-back miters; not a family impossibility.',{beamContour:'bent',crossingConvention:'layered',rhVoiceSeparation:12,comparisonInset:12,pageWidth:840,measuresPerSystem:3}),
@@ -1338,6 +1338,28 @@ export const CURRENT_CANDIDATES:JankoCandidate[]=[
   tradeoff('voice-fields','Separate absolute pitch fields','Duplicate fixed-3 coordinate fields, not sounds: time columns align; each field persistently names RH or LH and its source voice. Independent shared-head identities get separate coordinate statements. Ties, grace hosts and expression owners stay in their field; common clocked expressions occur once and aggregate hand rests repeat as coordinate statements. Price: four fields / roughly fourfold vertical area here. Heads are re-seated on the common visible onset column before all dependent geometry is rebuilt. Short RH/LH voice labels and an explicit ONE-key-attack convention accompany identical-pitch aligned statements; the last expression row applies to ALL hands. Window-only, not full-book support; cross-field ties/expressions are explicitly refused.',{comparisonPitchFields:true}),
   tradeoff('layered-crossings','Explicit layered crossings','Stems pass OVER interrupted foreign rails through actual 4.4pt-wide polygon apertures, not white masks or tiny omitted stem pieces. Direct handedness remains. Compatible equal local statements deliberately share one owned value; independent grouped/solo obligations use distinct legal mask-edge attachments. Price: a new monochrome over/under vocabulary and interrupted beam scanning; rail continuity is NOT claimed.',{crossingConvention:'layered'}),
   tradeoff('voice-stems','Voice-directed stems + event hand chevrons','Reference alternative, not winner: concurrent source voices .0 up / .1 down; solo source contexts keep handed stems. Musical .hand never changes. Every visible head carries the historical 4.2×2.8pt / 1.20pt burin hand chevron (^ RH, v LH), extended beyond the old crossing-only use. Continuous stems use the declared rail-aperture overpass grammar, not inherited sub-point stem underpasses. Identical untied local values may deliberately share one owned statement; independently grouped/tied obligations remain separate. Price: loss of stem-to-hand immediacy, added hand-symbol lookup, an over/under vocabulary, a wider 840pt page with at most three admitted bars, 12pt RH voice-seat separation and local cue-placement risks.',{stemConvention:'voice',crossingConvention:'layered',rhVoiceSeparation:12,comparisonInset:12,pageWidth:840,measuresPerSystem:3}),
+];
+
+export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+  round:57,title:'No. 13 · depth profiles (candidate-only)',
+  description:'Flat G control, paired recession faces and an owning dive/return route on the same complete literal gestures. Stems stay foreground locally: source-voice depth reverses with the music, not a fixed voice plane. RH-up/LH-down and provisional hand evidence remain. Black silhouette carries the convention; no shading or new composer emphasis. Reference/default ink is unchanged. Geometry diagnostics are not perceptual acceptance.',
+  openAxes:['crossingConvention','depthProfile'],
+  compareStrip:{scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:39,measureCount:1,title:'Unfolded 39 · same fourteen written events / 72 ticks'},
+};
+const DEPTH_WINDOWS:JankoScoreCandidateWindow[]=[
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,completeSystems:true,title:'38–40 · entry, order reversal, final eighth → fp',caption:'Complete containing systems at production width. RH-up / LH-down; hands provisional. One LH 3b attack retains eighth + quarter branches; final LH 44 retains both source owners.'},
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:26,measureCount:3,completeSystems:true,title:'26–28 · held stream in front',caption:'At tick 2304 the upper.0 held-stream stem crosses both foreign rail levels. Follow approach and exit; depth is local, not a permanent voice plane.'},
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:9,measureCount:3,completeSystems:true,title:'9–11 · moving stream in front',caption:'Contrasting upper.1 foreground stem across both levels at unfolded 10; neighboring onsets and complete gesture retained.'},
+  {scoreId:DEFAULT_STUDIO_SCORE_ID,measureStart:13,measureCount:2,title:'Bach 13–14 · quiet temporal guard',caption:'No grouped-rail crossing: the depth treatment must remain quiet. LH 6926 / RH 26 remains a temporal reading guard, not a claim of perceptual repair.'},
+];
+const depthCandidate=(id:string,label:string,description:string,depthProfile?:JankoLayoutOptions['depthProfile']):JankoCandidate=>({
+  id,label,description,options:{preserveGestureMembership:true,shareAttackHeads:true,independentUnisonAttachments:true,shareCompatibleLocalRhythm:true,crossingConvention:'layered',...(depthProfile?{depthProfile}:{})},
+  windows:DEPTH_WINDOWS,comparisonScope:'containing-systems',tags:['candidate-only','same source','black silhouette','provisional hands'],
+});
+export const CURRENT_CANDIDATES:JankoCandidate[]=[
+  depthCandidate('depth-flat','Control · flat G apertures','Current G geometry: 4.4pt interruptions in foreign rails; whole direct-hand stems in front. Historical option deltas through today’s engine, not an exact older revision. Visible rail scanning is interrupted.'),
+  depthCandidate('depth-beveled','Refinement · beveled recession ports','Paired owning-rail faces taper toward a measured foreground-stroke aperture with 0.90pt air. No detached caps, shadows or extra duration strokes. Same note/time/voice seating as flat control. Price: tapering interrupts visible rail scanning; black silhouette only.','beveled'),
+  depthCandidate('depth-dive','Refinement · profiled dive and return','Each owning primary/secondary route recedes 0.85pt away from the heads, with fitted 3.4pt entry/return shoulders and an explicit hidden continuation behind the actual foreign stem. Same source and spacing; no fixed whole-voice plane. Price: bent ribbon scanning and a new monochrome depth vocabulary, not continuous visible ink.','dive'),
 ];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
@@ -1410,6 +1432,7 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_56_CANDIDATES.find((c) => c.id === id) ??
     ROUND_49_CANDIDATES.find((c) => c.id === id) ??
     ROUND_48_CANDIDATES.find((c) => c.id === id) ??
     ROUND_47_CANDIDATES.find((c) => c.id === id)

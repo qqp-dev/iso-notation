@@ -467,17 +467,15 @@ test('Brahms linting stays a millisecond-scale operation', () => {
   // already exceeded a 2s budget under normal full-suite load, which makes a
   // wall-clock tripwire a false alarm generator rather than a regression
   // guard. The check therefore measures the call's own **CPU time**
-  // (`process.cpuUsage`) against a budget sized to the census it audits:
-  // Round 49 §1 renders every authenticated written chain, so the lint walks
-  // 986 painted heads and 35 arcs (~0.66s isolated, roughly the pre-Round-49
-  // 0.33s doubled by the fuller surface) — the 3000ms budget still trips a
-  // real 5–10x regression while absorbing the suite's cache-pressure jitter
-  // (the same call measured 2.0–2.3s CPU at full concurrent load).
+  // (`process.cpuUsage`). On the shared host, untouched PR137 measured
+  // 4772/4052ms CPU versus current 4554/4141ms; the full gate used 3670ms.
+  // Calibrate the bounded guard to 6000ms: the old 3000ms budget fails the
+  // baseline too. This is measured gate support, not a renderer optimization.
   const before = process.cpuUsage();
   lintJankoScore(SCORE, OPTIONS, TOKENS);
   const used = process.cpuUsage(before);
   const cpuMs = (used.user + used.system) / 1000;
-  assert.ok(cpuMs < 3000, `Brahms lint must stay fast (used ${cpuMs.toFixed(0)}ms CPU time)`);
+  assert.ok(cpuMs < 6000, `Brahms lint must stay fast (used ${cpuMs.toFixed(0)}ms CPU time)`);
 });
 
 test('The mm. 7–8 macro crop keeps the bass extension whole (canonical fixed-3)', () => {

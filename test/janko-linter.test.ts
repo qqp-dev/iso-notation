@@ -20,6 +20,9 @@ import { fileURLToPath } from 'node:url';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { createStudioConfig } from '../src/render/janko/studio';
+import { PreparedJankoWindows } from '../src/render/janko/prepared-windows';
+import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { buildInkScene, type InkScene } from '../src/render/janko/ink-scene';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { continuousPitchY } from '../src/render/janko/geometry';
@@ -65,6 +68,7 @@ import {
   checkClaspClearance,
   checkGraceIntegrity,
   checkEventHandMarkIntegrity,
+  checkDepthRoutePaint,
   checkClaspDotFusion,
   checkDotCollision,
   checkDotCountAgreement,
@@ -2298,4 +2302,28 @@ test('a refused event hand channel is a hard comparative defect, not a clean voi
   checkEventHandMarkIntegrity({...l,eventHandMarks:[mark]},out);
   assert.equal(out[0].code,'event-hand-mark-refused');assert.equal(out[0].severity,'error');
   assert.deepEqual(out[0].noteIds,[n.note.id]);
+});
+
+test('depth linter refuses severed hidden continuation, false foreground, lost levels/joins and extra marks',()=>{
+  const e=createStudioConfig().scores['schumann-op68-no13'];
+  for(const c of CURRENT_CANDIDATES.filter(c=>c.options?.depthProfile)){
+    const p=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],{...e.options,...c.options},e.tokens);
+    const l=p.containing({measureStart:39,measureCount:1})[0],scene=buildInkScene(l,p.options,p.tokens,p.score);
+    const audit=(s:InkScene)=>{const out:LintViolation[]=[];checkDepthRoutePaint(l,s,p.options,p.tokens,out);return out.map(v=>v.code);};
+    assert.deepEqual(audit(scene),[]);
+    const routes=scene.depthRoutes!,r=routes[0],port=r.ports[0];
+    const change=(replacement:typeof r)=>({...scene,depthRoutes:[replacement,...routes.slice(1)]});
+    assert.ok(audit({...scene,depthRoutes:[]}).includes('depth-route-integrity'));
+    assert.ok(audit(change({...r,ports:[{...port,hidden:[]},...r.ports.slice(1)]})).includes('depth-route-integrity'));
+    assert.ok(audit(change({...r,ports:[{...port,frontId:'not-an-occluder'},...r.ports.slice(1)]})).includes('depth-route-integrity'));
+    assert.ok(audit(change({...r,ports:[{...port,leftShoulder:port.entry},...r.ports.slice(1)]})).includes('depth-route-clearance'));
+    const removed={...scene,beams:scene.beams.map(parts=>parts.filter(q=>q.id!==r.visibleIds[0]))};
+    assert.ok(audit(removed).includes('depth-route-integrity'));
+    const changed={...scene,beams:scene.beams.map(parts=>parts.map(q=>q.id===r.visibleIds[0]?{...q,level:4}:q))};
+    assert.ok(audit(changed).includes('depth-route-integrity'));
+    const extra={...scene,beams:scene.beams.map((parts,i)=>i===0?[...parts,{...parts[0],id:'orphan:depth:face'}]:parts)};
+    assert.ok(audit(extra).includes('depth-route-integrity'));
+    const lostJoin={...scene,beams:scene.beams.map(parts=>parts.map(q=>q.id===r.visibleIds[0]&&q.shape.kind==='rail'?{...q,shape:{kind:'rail' as const,points:q.shape.points.map(([x,y])=>[x,y-4] as [number,number])}}:q))};
+    assert.ok(audit(lostJoin).includes('depth-route-clearance'));
+  }
 });
