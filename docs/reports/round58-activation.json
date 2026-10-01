@@ -1,0 +1,1477 @@
+{
+  "activatedRevision": "36ede842dc851cd85aeacd8113158bc7cb265d2c",
+  "previousRevision": "d675b81efaa738ebc3f1cf1b3166010005e15a38",
+  "url": "http://100.102.70.49:5175/janko.html#candidates",
+  "merged": true,
+  "served": true,
+  "operatorAccepted": false,
+  "sourceChanges": false,
+  "serviceRestarted": false,
+  "defaultRootTouched": false,
+  "operatorBrowserStorageTouched": false,
+  "pixelInspection": false,
+  "recordedAtUTC": "2026-10-01T04:35:31.603456+00:00",
+  "identity": {
+    "commit": "36ede842dc851cd85aeacd8113158bc7cb265d2c",
+    "trackedAndIndexClean": true,
+    "currentIdentity": "c19a3d7f668392abe9c4f6444c30e47bee6b4052ea550d7c50375ca4cf948586",
+    "manifest": {
+      "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+      "artifactHashes": {
+        "candidates": "cb923aded72956aca3aba9305af1f4ee71566ff72486d6d54d1c4ab23bee1967",
+        "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+      },
+      "status": {
+        "ok": true,
+        "violations": 0,
+        "warnings": 0,
+        "systems": 8,
+        "notes": 550,
+        "lintMs": 353
+      },
+      "canonicalRevisions": {
+        "bach-goldberg-var1": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+        "brahms-op118-no1": "baseline-pr114-brahms"
+      },
+      "engineIdentity": "c19a3d7f668392abe9c4f6444c30e47bee6b4052ea550d7c50375ca4cf948586",
+      "candidateError": "saved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state",
+      "stale": false
+    },
+    "status": {
+      "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+      "canonicalRevisions": {
+        "bach-goldberg-var1": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+        "brahms-op118-no1": "baseline-pr114-brahms"
+      },
+      "candidateError": "saved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state",
+      "artifactHashes": {
+        "candidates": "cb923aded72956aca3aba9305af1f4ee71566ff72486d6d54d1c4ab23bee1967",
+        "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+      },
+      "generationMs": 1794.4,
+      "phaseMs": {
+        "config": 1383.5,
+        "candidates": 1.7,
+        "reference": 0,
+        "lint": 353.8
+      },
+      "watchedAt": 1790828877916,
+      "publishedAt": 1790828893468,
+      "stale": false
+    },
+    "hashes": {
+      "candidates": "cb923aded72956aca3aba9305af1f4ee71566ff72486d6d54d1c4ab23bee1967",
+      "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+    },
+    "localPdf": "43e0078eae668385e94f40adf0654fe4683c570574d173310323d0e52f073c97",
+    "remotePdf": "43e0078eae668385e94f40adf0654fe4683c570574d173310323d0e52f073c97",
+    "elapsedSeconds": 0.178
+  },
+  "beforeStatus": {
+    "generation": "4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b",
+    "canonicalRevisions": {
+      "bach-goldberg-var1": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+      "brahms-op118-no1": "baseline-pr114-brahms"
+    },
+    "candidateError": "saved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity 64478ff439536480e60eca27d285b002c791e531101b8fa2abb5260f125a8db5; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state",
+    "artifactHashes": {
+      "candidates": "32335a07b418882177fc76bf3c9f847dd945dc8814b1184ca562ce4ce81e7cb8",
+      "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+    },
+    "generationMs": 1698.7,
+    "phaseMs": {
+      "config": 1369.2,
+      "candidates": 2,
+      "reference": 0,
+      "lint": 275
+    },
+    "watchedAt": 1790821382840,
+    "publishedAt": 1790821399889,
+    "stale": false
+  },
+  "preservation": {
+    "filesCompared": 116,
+    "changed": [],
+    "newPrivateCacheFiles": [],
+    "candidateSha256": "f5624597843926a0b4d8cb97224e19c84adaf3a0a78bcd6a3b9b3849298ea884",
+    "service": "MainPID=299986\nWorkingDirectory=/home/qqp/projects/iso-notation-deploy\nActiveState=active\n",
+    "vitePID": 300004,
+    "viteStillSameProcess": true,
+    "commit": "36ede842dc851cd85aeacd8113158bc7cb265d2c",
+    "elapsedSeconds": 0.206
+  },
+  "browser": {
+    "url": "http://100.102.70.49:5175/janko.html#candidates",
+    "pixelInspection": false,
+    "initial": {
+      "state": "ready",
+      "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+      "hidden": true,
+      "paperVisible": false,
+      "zoom": "1",
+      "active": [
+        "candidates"
+      ],
+      "status": "Engraving prepared; saved draft was not applied.",
+      "candSvg": 10,
+      "refSvg": 8,
+      "width": 1425,
+      "viewport": 1440,
+      "hash": "#candidates"
+    },
+    "afterEngraving": {
+      "state": "ready",
+      "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+      "hidden": false,
+      "paperVisible": true,
+      "zoom": "1",
+      "active": [
+        "candidates"
+      ],
+      "status": "Engraving prepared; saved draft was not applied.",
+      "candSvg": 10,
+      "refSvg": 8,
+      "width": 1425,
+      "viewport": 1440,
+      "hash": "#candidates"
+    },
+    "mobile": {
+      "state": "ready",
+      "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+      "hidden": false,
+      "paperVisible": true,
+      "zoom": "1",
+      "active": [
+        "candidates"
+      ],
+      "status": "Engraving prepared; saved draft was not applied.",
+      "candSvg": 10,
+      "refSvg": 8,
+      "width": 390,
+      "viewport": 390,
+      "hash": "#candidates"
+    },
+    "reload": {
+      "state": "ready",
+      "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+      "hidden": false,
+      "paperVisible": true,
+      "zoom": "1",
+      "active": [
+        "candidates"
+      ],
+      "status": "Engraving prepared; saved draft was not applied.",
+      "candSvg": 10,
+      "refSvg": 8,
+      "width": 390,
+      "viewport": 390,
+      "hash": "#candidates"
+    },
+    "picker": [
+      {
+        "value": "primary",
+        "text": "Bach · GOLD"
+      },
+      {
+        "value": "brahms-op118-no1",
+        "text": "Brahms · BRONZE"
+      }
+    ],
+    "checks": [
+      {
+        "ok": true,
+        "label": "initial prepared Candidates selected (source-mode may hide paper)",
+        "detail": {
+          "state": "ready",
+          "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+          "hidden": true,
+          "paperVisible": false,
+          "zoom": "1",
+          "active": [
+            "candidates"
+          ],
+          "status": "Engraving prepared; saved draft was not applied.",
+          "candSvg": 10,
+          "refSvg": 8,
+          "width": 1425,
+          "viewport": 1440,
+          "hash": "#candidates"
+        }
+      },
+      {
+        "ok": true,
+        "label": "Engraving click exposes actual Candidates paper",
+        "detail": {
+          "state": "ready",
+          "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+          "hidden": false,
+          "paperVisible": true,
+          "zoom": "1",
+          "active": [
+            "candidates"
+          ],
+          "status": "Engraving prepared; saved draft was not applied.",
+          "candSvg": 10,
+          "refSvg": 8,
+          "width": 1425,
+          "viewport": 1440,
+          "hash": "#candidates"
+        }
+      },
+      {
+        "ok": true,
+        "label": "Round58 truthful labels",
+        "detail": "\n    Context & optionsRound 58Compare the served No. 13 bevel control with stable onset slots, then a shallower compact bevel. Brahms is ONE contrasting passage: unfolded 64–67 / written 35–38, second ending. Its former candidate projection had duplicate tied heads and a tie collision; that broken projection is refused, not offered as taste. Both refinements preserve chain-owned equal-value sharing and unequal continuations. Stems stay locally foreground, RH-up/LH-down; no fixed voice plane. Reference/default ink unchanged; geometry evidence is not pixel or musical acceptance.3 candidates × 7 engraving windows · registry src/render/janko/candidates.ts · add a candidate with five lines, zero template edits.\n    Economical crossings · truthful onset groups (candidate-only)\n    \n    \n  Saved draft & recoverySaved draft was not applied.Diagnostics & recoverysaved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale stateReference remains canonical. Archive and start a new guarded candidate with semantic-hand recover; no automatic rebase."
+      },
+      {
+        "ok": true,
+        "label": "three clean comparison cards",
+        "detail": [
+          {
+            "id": "economical-control",
+            "lint": "clean",
+            "windows": [
+              "schumann-op68-no13:38-40"
+            ]
+          },
+          {
+            "id": "economical-slots",
+            "lint": "clean",
+            "windows": [
+              "schumann-op68-no13:38-40",
+              "brahms-op118-no1:64-67",
+              "brahms-op118-no1:65-66"
+            ]
+          },
+          {
+            "id": "economical-bevel",
+            "lint": "clean",
+            "windows": [
+              "schumann-op68-no13:38-40",
+              "brahms-op118-no1:64-67",
+              "brahms-op118-no1:65-66"
+            ]
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "seven genuine context/detail windows, no padding"
+      },
+      {
+        "ok": true,
+        "label": "no Bach showcase or raster/filter"
+      },
+      {
+        "ok": true,
+        "label": "three No13m39 comparison macros",
+        "detail": [
+          {
+            "id": "economical-control",
+            "svg": 1
+          },
+          {
+            "id": "economical-slots",
+            "svg": 1
+          },
+          {
+            "id": "economical-bevel",
+            "svg": 1
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "saved stale candidate refused without SVG (expand recovery diagnostics)",
+        "detail": "Saved draft was not applied.Diagnostics & recoverysaved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale stateReference remains canonical. Archive and start a new guarded candidate with semantic-hand recover; no automatic rebase."
+      },
+      {
+        "ok": true,
+        "label": "expanded stale recovery diagnosis actually visible",
+        "detail": {
+          "text": "Saved draft was not applied.\nDiagnostics & recovery\n\nsaved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state\n\nReference remains canonical. Archive and start a new guarded candidate with semantic-hand recover; no automatic rebase.",
+          "visible": true
+        }
+      },
+      {
+        "ok": true,
+        "label": "broken Brahms control explicitly refused, not rendered"
+      },
+      {
+        "ok": true,
+        "label": "economical-control actual No13 head/stem seats",
+        "detail": [
+          {
+            "x": 197.94,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 259.68,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 313.91,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 373.6,
+            "head": true,
+            "stem": true
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "economical-slots actual No13 head/stem seats",
+        "detail": [
+          {
+            "x": 192.48,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 254.22,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 313.91,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 373.6,
+            "head": true,
+            "stem": true
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "economical-bevel actual No13 head/stem seats",
+        "detail": [
+          {
+            "x": 192.48,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 254.22,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 313.91,
+            "head": true,
+            "stem": true
+          },
+          {
+            "x": 373.6,
+            "head": true,
+            "stem": true
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "economical-control physical depth polygons schumann-op68-no13:38-40",
+        "detail": {
+          "count": 20,
+          "levels": [
+            "1",
+            "2"
+          ],
+          "viewBox": "0 0 571.48 200.57225",
+          "systems": [
+            "system-13"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "economical-slots physical depth polygons schumann-op68-no13:38-40",
+        "detail": {
+          "count": 20,
+          "levels": [
+            "1",
+            "2"
+          ],
+          "viewBox": "0 0 571.48 201.88225",
+          "systems": [
+            "system-13"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "economical-slots physical depth polygons brahms-op118-no1:64-67",
+        "detail": {
+          "count": 4,
+          "levels": [
+            "1"
+          ],
+          "viewBox": "0 0 571.48 473.84000000000003",
+          "systems": [
+            "system-16",
+            "system-17"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "economical-slots physical depth polygons brahms-op118-no1:65-66",
+        "detail": {
+          "count": 4,
+          "levels": [
+            "1"
+          ],
+          "viewBox": "0 0 287.74 248.09375000000009",
+          "systems": [
+            "system-17"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "economical-bevel physical depth polygons schumann-op68-no13:38-40",
+        "detail": {
+          "count": 20,
+          "levels": [
+            "1",
+            "2"
+          ],
+          "viewBox": "0 0 571.48 201.88225",
+          "systems": [
+            "system-13"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "economical-bevel physical depth polygons brahms-op118-no1:64-67",
+        "detail": {
+          "count": 4,
+          "levels": [
+            "1"
+          ],
+          "viewBox": "0 0 571.48 473.84000000000003",
+          "systems": [
+            "system-16",
+            "system-17"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "economical-bevel physical depth polygons brahms-op118-no1:65-66",
+        "detail": {
+          "count": 4,
+          "levels": [
+            "1"
+          ],
+          "viewBox": "0 0 287.74 248.09375000000009",
+          "systems": [
+            "system-17"
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "label": "compact rather than existing bevel paths"
+      },
+      {
+        "ok": true,
+        "label": "Brahms complete systems61–64 and65–68 economical-slots",
+        "detail": [
+          "system-16",
+          "system-17"
+        ]
+      },
+      {
+        "ok": true,
+        "label": "Brahms containing-system bounds economical-slots",
+        "detail": "0 0 571.48 473.84000000000003"
+      },
+      {
+        "ok": true,
+        "label": "Brahms held/moving seats, compatible-unison offset attachments economical-slots",
+        "detail": [
+          {
+            "head": 37.8,
+            "stems": [
+              36.5,
+              39.1
+            ]
+          },
+          {
+            "head": 43.26,
+            "stems": [
+              43.26
+            ]
+          },
+          {
+            "head": 204.64,
+            "stems": [
+              204.64
+            ]
+          },
+          {
+            "head": 210.1,
+            "stems": [
+              210.1
+            ]
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "Brahms chain-owned and unequal tied continuations economical-slots",
+        "detail": [
+          {
+            "owner": "brahms-op118-no1-901",
+            "from": "brahms-op118-no1-901",
+            "to": "brahms-op118-no1-905",
+            "fromTick": "12360",
+            "toTick": "12432"
+          },
+          {
+            "owner": "brahms-op118-no1-909",
+            "from": "brahms-op118-no1-909",
+            "to": "brahms-op118-no1-913",
+            "fromTick": "12552",
+            "toTick": "12624"
+          },
+          {
+            "owner": "brahms-op118-no1-911",
+            "from": "brahms-op118-no1-911",
+            "to": "brahms-op118-no1-914",
+            "fromTick": "12576",
+            "toTick": "12624"
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "Brahms only level1 crossing contrast economical-slots"
+      },
+      {
+        "ok": true,
+        "label": "Brahms complete systems61–64 and65–68 economical-bevel",
+        "detail": [
+          "system-16",
+          "system-17"
+        ]
+      },
+      {
+        "ok": true,
+        "label": "Brahms containing-system bounds economical-bevel",
+        "detail": "0 0 571.48 473.84000000000003"
+      },
+      {
+        "ok": true,
+        "label": "Brahms held/moving seats, compatible-unison offset attachments economical-bevel",
+        "detail": [
+          {
+            "head": 37.8,
+            "stems": [
+              36.5,
+              39.1
+            ]
+          },
+          {
+            "head": 43.26,
+            "stems": [
+              43.26
+            ]
+          },
+          {
+            "head": 204.64,
+            "stems": [
+              204.64
+            ]
+          },
+          {
+            "head": 210.1,
+            "stems": [
+              210.1
+            ]
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "Brahms chain-owned and unequal tied continuations economical-bevel",
+        "detail": [
+          {
+            "owner": "brahms-op118-no1-901",
+            "from": "brahms-op118-no1-901",
+            "to": "brahms-op118-no1-905",
+            "fromTick": "12360",
+            "toTick": "12432"
+          },
+          {
+            "owner": "brahms-op118-no1-909",
+            "from": "brahms-op118-no1-909",
+            "to": "brahms-op118-no1-913",
+            "fromTick": "12552",
+            "toTick": "12624"
+          },
+          {
+            "owner": "brahms-op118-no1-911",
+            "from": "brahms-op118-no1-911",
+            "to": "brahms-op118-no1-914",
+            "fromTick": "12576",
+            "toTick": "12624"
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "Brahms only level1 crossing contrast economical-bevel"
+      },
+      {
+        "ok": true,
+        "label": "desktop Reference navigation",
+        "detail": {
+          "state": "ready",
+          "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+          "hidden": false,
+          "paperVisible": true,
+          "zoom": "1",
+          "active": [
+            "reference"
+          ],
+          "status": "Engraving prepared; saved draft was not applied.",
+          "candSvg": 10,
+          "refSvg": 8,
+          "width": 1425,
+          "viewport": 1440,
+          "hash": "#reference"
+        }
+      },
+      {
+        "ok": true,
+        "label": "desktop zoom single step"
+      },
+      {
+        "ok": true,
+        "label": "keyboard reset"
+      },
+      {
+        "ok": true,
+        "label": "desktop Candidates navigation"
+      },
+      {
+        "ok": true,
+        "label": "390px mobile fits and ready",
+        "detail": {
+          "state": "ready",
+          "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+          "hidden": false,
+          "paperVisible": true,
+          "zoom": "1",
+          "active": [
+            "candidates"
+          ],
+          "status": "Engraving prepared; saved draft was not applied.",
+          "candSvg": 10,
+          "refSvg": 8,
+          "width": 390,
+          "viewport": 390,
+          "hash": "#candidates"
+        }
+      },
+      {
+        "ok": true,
+        "label": "mobile zoom single step"
+      },
+      {
+        "ok": true,
+        "label": "mobile zoom reset"
+      },
+      {
+        "ok": true,
+        "label": "mobile Reference navigation"
+      },
+      {
+        "ok": true,
+        "label": "mobile reload preserves normal review state",
+        "detail": {
+          "state": "ready",
+          "generation": "1200a6cb4722beeb18bd2cd64311036553c102dc1a304736f2d55c05bdac5248",
+          "hidden": false,
+          "paperVisible": true,
+          "zoom": "1",
+          "active": [
+            "candidates"
+          ],
+          "status": "Engraving prepared; saved draft was not applied.",
+          "candSvg": 10,
+          "refSvg": 8,
+          "width": 390,
+          "viewport": 390,
+          "hash": "#candidates"
+        }
+      },
+      {
+        "ok": true,
+        "label": "no browser exceptions",
+        "detail": []
+      },
+      {
+        "ok": true,
+        "label": "no failed studio requests (known favicon allowed)",
+        "detail": [
+          {
+            "url": "http://100.102.70.49:5175/favicon.ico",
+            "status": 404
+          }
+        ]
+      },
+      {
+        "ok": true,
+        "label": "prepared viewer no engine module fetch"
+      }
+    ],
+    "failures": [],
+    "errors": [],
+    "failedResponses": [
+      {
+        "url": "http://100.102.70.49:5175/favicon.ico",
+        "status": 404
+      }
+    ],
+    "dom": {
+      "title": "\n    Context & optionsRound 58Compare the served No. 13 bevel control with stable onset slots, then a shallower compact bevel. Brahms is ONE contrasting passage: unfolded 64–67 / written 35–38, second ending. Its former candidate projection had duplicate tied heads and a tie collision; that broken projection is refused, not offered as taste. Both refinements preserve chain-owned equal-value sharing and unequal continuations. Stems stay locally foreground, RH-up/LH-down; no fixed voice plane. Reference/default ink unchanged; geometry evidence is not pixel or musical acceptance.3 candidates × 7 engraving windows · registry src/render/janko/candidates.ts · add a candidate with five lines, zero template edits.\n    Economical crossings · truthful onset groups (candidate-only)\n    \n    \n  Saved draft & recoverySaved draft was not applied.Diagnostics & recoverysaved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale stateReference remains canonical. Archive and start a new guarded candidate with semantic-hand recover; no automatic rebase.",
+      "strip": [
+        {
+          "id": "economical-control",
+          "svg": 1
+        },
+        {
+          "id": "economical-slots",
+          "svg": 1
+        },
+        {
+          "id": "economical-bevel",
+          "svg": 1
+        }
+      ],
+      "cards": [
+        {
+          "id": "semantic-hand-stale",
+          "lint": "error",
+          "text": "Saved draft was not applied.Diagnostics & recoverysaved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity a8d7aabb59813a7da6dc16d3831843e98b386dcceafa0bcb5ad1dcf7afea4e0f; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale stateReference remains canonical. Archive and start a new guarded candidate with semantic-hand recover; no automatic rebase.",
+          "windows": []
+        },
+        {
+          "id": "economical-control",
+          "lint": "clean",
+          "text": "\n  \n    Control · served bevel / original onset seats\n    candidate-onlyliteral sourceblack silhouettenot adoptedwindow-scoped✓ clean\n  \n  Context & optionsExact served bevel mechanics for No. 13 through today’s engine: includes the accidental doubled slot. Brahms’s original projection is NOT displayed: it has proven duplicate-head/tie defects, not a viable control. Round 57 remains archived.preserveGestureMembership = true undefinedshareAttackHeads = true undefinedindependentUnisonAttachments = true undefinedshareCompatibleLocalRhythm = true undefinedcrossingConvention = layered undefineddepthProfile = beveled undefinedWindow-scoped complete containing-system checks; no full-score / page-fit / visual acceptance verdict. Geometry and source/gesture assertions are engineering evidence, not pianist acceptance.\n  \n  \n  No. 13 · unfolded 38–40, focus 39 · Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional. · frame 571.5 × 200.6pt · window-scoped\n    \n    \n      .janko-title { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }\n      .janko-subtitle { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8.5pt; fill: #333333; }\n      .janko-meta { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #222222; }\n      .janko-running-head { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; }\n      .janko-page-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #666666; font-weight: 400; }\n      .janko-measure-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; font-weight: normal; }\n      .janko-octave-label { font-family: \"DejaVu Sans Mono\", monospace; font-size: 7.5pt; font-weight: bold; fill: #6B7280; }\n      .janko-pitch-label { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 5pt; fill: #555555; font-weight: normal; }\n      .janko-hand-label { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #555555; }\n      .janko-ts-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: bold; font-size: 14pt; fill: #111111; text-anchor: middle; }\n      .janko-caption { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: 600; font-size: 8pt; fill: #111827; }\n      .janko-caption-sub { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7.5pt; fill: #4B5563; }\n      .janko-digit { font-family: \"URW Gothic\", \"Century Gothic\", \"ITC Avant Garde Gothic\", \"Avant Garde\", sans-serif; text-anchor: middle; font-weight: bold; }\n    \n    \n    38\n    \n\n  \n    \n    \n    \n  \n  \n    \n    \n  \n  \n    \n    \n  \n  \n    \n      \n      \n      \n    \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n\n    \n      \n          \n          \n    2\n    \n    \n    4\n    \n    2\n    \n    1\n    \n    9\n    \n    9\n    \n    8\n    \n    B\n    \n    B\n    \n    1\n    \n    6\n    \n    A\n    \n    1\n    \n    3\n    \n    6\n    \n    A\n    \n    4\n    \n    6\n    \n    4\n    \n    9\n    \n    B\n    \n    1\n    \n    3\n    \n    6\n    \n    B\n    \n    9\n    \n    4\n    \n    4\n    \n    9\n    \n    8\n    \n    1\n    \n    2\n    \n    6\n    \n    B\n    \n    B\n    \n    B\n    \n    8\n    \n    4\n  \n\n  \n\n  \n",
+          "windows": [
+            {
+              "id": "schumann-op68-no13:38-40",
+              "caption": "No. 13 · unfolded 38–40, focus 39 · Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional. · frame 571.5 × 200.6pt · window-scoped",
+              "viewBox": "0 0 571.48 200.57225",
+              "systems": [
+                "system-13"
+              ],
+              "ties": [
+                {
+                  "owner": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1",
+                  "from": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1",
+                  "to": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                },
+                {
+                  "owner": "13-Mai-cher-Mai.ly:239:332:lower:44:1",
+                  "from": "13-Mai-cher-Mai.ly:239:332:lower:44:1",
+                  "to": "13-Mai-cher-Mai.ly:239:332:lower:44:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                },
+                {
+                  "owner": "13-Mai-cher-Mai.ly:239:332:lower:52:1",
+                  "from": "13-Mai-cher-Mai.ly:239:332:lower:52:1",
+                  "to": "13-Mai-cher-Mai.ly:239:332:lower:52:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 20
+            }
+          ]
+        },
+        {
+          "id": "economical-slots",
+          "lint": "clean",
+          "text": "\n  \n    Refinement A · stable seats / existing bevel\n    candidate-onlyliteral sourceblack silhouettenot adoptedwindow-scoped✓ clean\n  \n  Context & optionsRequired single-slot clearance survives translated coordinates; head and stem envelopes are not deleted or forced onto one x. Existing 2.70pt aperture / 1.60pt shoulders / 42% neck. Brahms uses corrected equal-value tie ownership; its two crossings contrast held/moving obligations with No. 13. Price: visible rail interruption and modest within-onset looseness remain.preserveGestureMembership = true undefinedshareAttackHeads = true undefinedindependentUnisonAttachments = true undefinedshareCompatibleLocalRhythm = true undefinedcrossingConvention = layered undefineddepthProfile = beveled undefinedstableOnsets = true undefinedWindow-scoped complete containing-system checks; no full-score / page-fit / visual acceptance verdict. Geometry and source/gesture assertions are engineering evidence, not pianist acceptance.\n  \n  \n  No. 13 · unfolded 38–40, focus 39 · Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional. · frame 571.5 × 201.9pt · window-scoped\n    \n    \n      .janko-title { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }\n      .janko-subtitle { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8.5pt; fill: #333333; }\n      .janko-meta { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #222222; }\n      .janko-running-head { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; }\n      .janko-page-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #666666; font-weight: 400; }\n      .janko-measure-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; font-weight: normal; }\n      .janko-octave-label { font-family: \"DejaVu Sans Mono\", monospace; font-size: 7.5pt; font-weight: bold; fill: #6B7280; }\n      .janko-pitch-label { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 5pt; fill: #555555; font-weight: normal; }\n      .janko-hand-label { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #555555; }\n      .janko-ts-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: bold; font-size: 14pt; fill: #111111; text-anchor: middle; }\n      .janko-caption { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: 600; font-size: 8pt; fill: #111827; }\n      .janko-caption-sub { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7.5pt; fill: #4B5563; }\n      .janko-digit { font-family: \"URW Gothic\", \"Century Gothic\", \"ITC Avant Garde Gothic\", \"Avant Garde\", sans-serif; text-anchor: middle; font-weight: bold; }\n    \n    \n    38\n    \n\n  \n    \n    \n    \n  \n  \n    \n    \n  \n  \n    \n    \n  \n  \n    \n      \n      \n      \n    \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n\n    \n      \n          \n          \n    2\n    \n    \n    4\n    \n    2\n    \n    1\n    \n    9\n    \n    9\n    \n    8\n    \n    B\n    \n    B\n    \n    1\n    \n    6\n    \n    A\n    \n    1\n    \n    3\n    \n    6\n    \n    A\n    \n    4\n    \n    6\n    \n    4\n    \n    9\n    \n    B\n    \n    1\n    \n    3\n    \n    6\n    \n    B\n    \n    9\n    \n    4\n    \n    4\n    \n    9\n    \n    8\n    \n    1\n    \n    2\n    \n    6\n    \n    B\n    \n    B\n    \n    B\n    \n    8\n    \n    4\n  \n\n  \n\n\n  Brahms · unfolded 64–67 / written 35–38, second ending · ONE passa",
+          "windows": [
+            {
+              "id": "schumann-op68-no13:38-40",
+              "caption": "No. 13 · unfolded 38–40, focus 39 · Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional. · frame 571.5 × 201.9pt · window-scoped",
+              "viewBox": "0 0 571.48 201.88225",
+              "systems": [
+                "system-13"
+              ],
+              "ties": [
+                {
+                  "owner": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1",
+                  "from": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1",
+                  "to": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                },
+                {
+                  "owner": "13-Mai-cher-Mai.ly:239:332:lower:44:1",
+                  "from": "13-Mai-cher-Mai.ly:239:332:lower:44:1",
+                  "to": "13-Mai-cher-Mai.ly:239:332:lower:44:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                },
+                {
+                  "owner": "13-Mai-cher-Mai.ly:239:332:lower:52:1",
+                  "from": "13-Mai-cher-Mai.ly:239:332:lower:52:1",
+                  "to": "13-Mai-cher-Mai.ly:239:332:lower:52:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 20
+            },
+            {
+              "id": "brahms-op118-no1:64-67",
+              "caption": "Brahms · unfolded 64–67 / written 35–38, second ending · ONE passage, complete containing systems 61–64 and 65–68. Held RH 3a against moving RH 37→29 at 65; LH 32 quarter/tied continuation against 32→35 eighths at 66. Only primary-level crossings, not a dense crossing forest. Convergence/cresc, f/decresc, ties/cresc, sf and arpeggiation retain their source owners. · frame 571.5 × 473.8pt · window-scoped",
+              "viewBox": "0 0 571.48 473.84000000000003",
+              "systems": [
+                "system-16",
+                "system-17"
+              ],
+              "ties": [
+                {
+                  "owner": "brahms-op118-no1-858",
+                  "from": "brahms-op118-no1-858",
+                  "to": "brahms-op118-no1-858~c1",
+                  "fromTick": "11568",
+                  "toTick": "11760"
+                },
+                {
+                  "owner": "brahms-op118-no1-858",
+                  "from": "brahms-op118-no1-858~c1",
+                  "to": "brahms-op118-no1-858~c2",
+                  "fromTick": "11760",
+                  "toTick": "11952"
+                },
+                {
+                  "owner": "brahms-op118-no1-858",
+                  "from": "brahms-op118-no1-858~c2",
+                  "to": "brahms-op118-no1-858~c3",
+                  "fromTick": "11952",
+                  "toTick": "12048"
+                },
+                {
+                  "owner": "brahms-op118-no1-901",
+                  "from": "brahms-op118-no1-901",
+                  "to": "brahms-op118-no1-905",
+                  "fromTick": "12360",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-903",
+                  "from": "brahms-op118-no1-903",
+                  "to": "brahms-op118-no1-906",
+                  "fromTick": "12384",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904",
+                  "to": "brahms-op118-no1-904~c1",
+                  "fromTick": "12408",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904~c1",
+                  "to": "brahms-op118-no1-904~c2",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-905",
+                  "from": "brahms-op118-no1-905",
+                  "to": "brahms-op118-no1-905~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-906",
+                  "from": "brahms-op118-no1-906",
+                  "to": "brahms-op118-no1-906~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-907",
+                  "from": "brahms-op118-no1-907",
+                  "to": "brahms-op118-no1-907~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-909",
+                  "from": "brahms-op118-no1-909",
+                  "to": "brahms-op118-no1-913",
+                  "fromTick": "12552",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-911",
+                  "from": "brahms-op118-no1-911",
+                  "to": "brahms-op118-no1-914",
+                  "fromTick": "12576",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-912",
+                  "from": "brahms-op118-no1-912",
+                  "to": "brahms-op118-no1-912~c1",
+                  "fromTick": "12600",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-918",
+                  "from": "brahms-op118-no1-918",
+                  "to": "brahms-op118-no1-918~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-919",
+                  "from": "brahms-op118-no1-919",
+                  "to": "brahms-op118-no1-919~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-920",
+                  "from": "brahms-op118-no1-920",
+                  "to": "brahms-op118-no1-920~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 4
+            },
+            {
+              "id": "brahms-op118-no1:65-66",
+              "caption": "Same Brahms passage · focus unfolded 65–66 / written 36–37 · Two actual owner-linked stem/rail contacts: 899 over 897→900, then 911 over 910→912. The second is weaker alone; read both with the complete context above. Source voice ≠ performing hand; authorized LH 910/912 unchanged. Equal-value tied attack heads remain chain-owned; unequal quarter/eighth obligations stay distinct. · frame 287.7 × 248.1pt · window-scoped",
+              "viewBox": "0 0 287.74 248.09375000000009",
+              "systems": [
+                "system-17"
+              ],
+              "ties": [
+                {
+                  "owner": "brahms-op118-no1-901",
+                  "from": "brahms-op118-no1-901",
+                  "to": "brahms-op118-no1-905",
+                  "fromTick": "12360",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-903",
+                  "from": "brahms-op118-no1-903",
+                  "to": "brahms-op118-no1-906",
+                  "fromTick": "12384",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904",
+                  "to": "brahms-op118-no1-904~c1",
+                  "fromTick": "12408",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904~c1",
+                  "to": "brahms-op118-no1-904~c2",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-905",
+                  "from": "brahms-op118-no1-905",
+                  "to": "brahms-op118-no1-905~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-906",
+                  "from": "brahms-op118-no1-906",
+                  "to": "brahms-op118-no1-906~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-907",
+                  "from": "brahms-op118-no1-907",
+                  "to": "brahms-op118-no1-907~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-909",
+                  "from": "brahms-op118-no1-909",
+                  "to": "brahms-op118-no1-913",
+                  "fromTick": "12552",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-911",
+                  "from": "brahms-op118-no1-911",
+                  "to": "brahms-op118-no1-914",
+                  "fromTick": "12576",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-912",
+                  "from": "brahms-op118-no1-912",
+                  "to": "brahms-op118-no1-912~c1",
+                  "fromTick": "12600",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-918",
+                  "from": "brahms-op118-no1-918",
+                  "to": "brahms-op118-no1-918~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-919",
+                  "from": "brahms-op118-no1-919",
+                  "to": "brahms-op118-no1-919~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-920",
+                  "from": "brahms-op118-no1-920",
+                  "to": "brahms-op118-no1-920~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 4
+            }
+          ]
+        },
+        {
+          "id": "economical-bevel",
+          "lint": "clean",
+          "text": "\n  \n    Refinement B · stable seats / compact bevel\n    candidate-onlyliteral sourceblack silhouettenot adoptedwindow-scoped✓ clean\n  \n  Context & optionsSame corrected onset seats as A. Physical foreground stroke plus 0.55pt air each side gives 2.00pt apertures; fitted 1.20pt faces taper to 60% thickness without centerline excursion. Less missing contour and shorter, shallower negative-space scallops, not perfect foreground isolation. Price: reduced air and still interrupted rear rails; neither amodal continuity nor lint certifies musical readability.preserveGestureMembership = true undefinedshareAttackHeads = true undefinedindependentUnisonAttachments = true undefinedshareCompatibleLocalRhythm = true undefinedcrossingConvention = layered undefineddepthProfile = beveled-compact undefinedstableOnsets = true undefinedWindow-scoped complete containing-system checks; no full-score / page-fit / visual acceptance verdict. Geometry and source/gesture assertions are engineering evidence, not pianist acceptance.\n  \n  \n  No. 13 · unfolded 38–40, focus 39 · Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional. · frame 571.5 × 201.9pt · window-scoped\n    \n    \n      .janko-title { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }\n      .janko-subtitle { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8.5pt; fill: #333333; }\n      .janko-meta { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #222222; }\n      .janko-running-head { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; }\n      .janko-page-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #666666; font-weight: 400; }\n      .janko-measure-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7pt; fill: #555555; font-weight: normal; }\n      .janko-octave-label { font-family: \"DejaVu Sans Mono\", monospace; font-size: 7.5pt; font-weight: bold; fill: #6B7280; }\n      .janko-pitch-label { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 5pt; fill: #555555; font-weight: normal; }\n      .janko-hand-label { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 8pt; fill: #555555; }\n      .janko-ts-num { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: bold; font-size: 14pt; fill: #111111; text-anchor: middle; }\n      .janko-caption { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-weight: 600; font-size: 8pt; fill: #111827; }\n      .janko-caption-sub { font-family: \"Liberation Serif\", \"Century Schoolbook\", \"Baskerville\", \"DejaVu Serif\", \"Times New Roman\", Georgia, serif; font-style: italic; font-size: 7.5pt; fill: #4B5563; }\n      .janko-digit { font-family: \"URW Gothic\", \"Century Gothic\", \"ITC Avant Garde Gothic\", \"Avant Garde\", sans-serif; text-anchor: middle; font-weight: bold; }\n    \n    \n    38\n    \n\n  \n    \n    \n    \n  \n  \n    \n    \n  \n  \n    \n    \n  \n  \n    \n      \n      \n      \n    \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n  \n  \n    \n    \n    \n  \n  \n    \n    \n    \n    \n    \n    \n  \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n    \n\n    \n      \n          \n          \n    2\n    \n    \n    4\n    \n    2\n    \n    1\n    \n    9\n    \n    9\n    \n    8\n    \n    B\n    \n    B\n    \n    1\n    \n    6\n    \n    A\n    \n    1\n    \n    3\n    \n    6\n    \n    A\n    \n    4\n    \n    6\n    \n    4\n    \n    9\n    \n    B\n    \n    1\n    \n    3\n    \n    6\n    \n    B\n    \n    9\n    \n    4\n    \n    4\n    \n    9\n    \n    8\n    \n    1\n    \n    2\n    \n    6\n    \n    B\n    \n    B\n    \n    B\n    \n    8\n    \n    4\n  \n\n  \n\n\n  Brahms · unfolded 64–67 ",
+          "windows": [
+            {
+              "id": "schumann-op68-no13:38-40",
+              "caption": "No. 13 · unfolded 38–40, focus 39 · Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional. · frame 571.5 × 201.9pt · window-scoped",
+              "viewBox": "0 0 571.48 201.88225",
+              "systems": [
+                "system-13"
+              ],
+              "ties": [
+                {
+                  "owner": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1",
+                  "from": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1",
+                  "to": "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                },
+                {
+                  "owner": "13-Mai-cher-Mai.ly:239:332:lower:44:1",
+                  "from": "13-Mai-cher-Mai.ly:239:332:lower:44:1",
+                  "to": "13-Mai-cher-Mai.ly:239:332:lower:44:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                },
+                {
+                  "owner": "13-Mai-cher-Mai.ly:239:332:lower:52:1",
+                  "from": "13-Mai-cher-Mai.ly:239:332:lower:52:1",
+                  "to": "13-Mai-cher-Mai.ly:239:332:lower:52:1~c1",
+                  "fromTick": "3264",
+                  "toTick": "3288"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 20
+            },
+            {
+              "id": "brahms-op118-no1:64-67",
+              "caption": "Brahms · unfolded 64–67 / written 35–38, second ending · ONE passage, complete containing systems 61–64 and 65–68. Held RH 3a against moving RH 37→29 at 65; LH 32 quarter/tied continuation against 32→35 eighths at 66. Only primary-level crossings, not a dense crossing forest. Convergence/cresc, f/decresc, ties/cresc, sf and arpeggiation retain their source owners. · frame 571.5 × 473.8pt · window-scoped",
+              "viewBox": "0 0 571.48 473.84000000000003",
+              "systems": [
+                "system-16",
+                "system-17"
+              ],
+              "ties": [
+                {
+                  "owner": "brahms-op118-no1-858",
+                  "from": "brahms-op118-no1-858",
+                  "to": "brahms-op118-no1-858~c1",
+                  "fromTick": "11568",
+                  "toTick": "11760"
+                },
+                {
+                  "owner": "brahms-op118-no1-858",
+                  "from": "brahms-op118-no1-858~c1",
+                  "to": "brahms-op118-no1-858~c2",
+                  "fromTick": "11760",
+                  "toTick": "11952"
+                },
+                {
+                  "owner": "brahms-op118-no1-858",
+                  "from": "brahms-op118-no1-858~c2",
+                  "to": "brahms-op118-no1-858~c3",
+                  "fromTick": "11952",
+                  "toTick": "12048"
+                },
+                {
+                  "owner": "brahms-op118-no1-901",
+                  "from": "brahms-op118-no1-901",
+                  "to": "brahms-op118-no1-905",
+                  "fromTick": "12360",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-903",
+                  "from": "brahms-op118-no1-903",
+                  "to": "brahms-op118-no1-906",
+                  "fromTick": "12384",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904",
+                  "to": "brahms-op118-no1-904~c1",
+                  "fromTick": "12408",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904~c1",
+                  "to": "brahms-op118-no1-904~c2",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-905",
+                  "from": "brahms-op118-no1-905",
+                  "to": "brahms-op118-no1-905~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-906",
+                  "from": "brahms-op118-no1-906",
+                  "to": "brahms-op118-no1-906~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-907",
+                  "from": "brahms-op118-no1-907",
+                  "to": "brahms-op118-no1-907~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-909",
+                  "from": "brahms-op118-no1-909",
+                  "to": "brahms-op118-no1-913",
+                  "fromTick": "12552",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-911",
+                  "from": "brahms-op118-no1-911",
+                  "to": "brahms-op118-no1-914",
+                  "fromTick": "12576",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-912",
+                  "from": "brahms-op118-no1-912",
+                  "to": "brahms-op118-no1-912~c1",
+                  "fromTick": "12600",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-918",
+                  "from": "brahms-op118-no1-918",
+                  "to": "brahms-op118-no1-918~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-919",
+                  "from": "brahms-op118-no1-919",
+                  "to": "brahms-op118-no1-919~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-920",
+                  "from": "brahms-op118-no1-920",
+                  "to": "brahms-op118-no1-920~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 4
+            },
+            {
+              "id": "brahms-op118-no1:65-66",
+              "caption": "Same Brahms passage · focus unfolded 65–66 / written 36–37 · Two actual owner-linked stem/rail contacts: 899 over 897→900, then 911 over 910→912. The second is weaker alone; read both with the complete context above. Source voice ≠ performing hand; authorized LH 910/912 unchanged. Equal-value tied attack heads remain chain-owned; unequal quarter/eighth obligations stay distinct. · frame 287.7 × 248.1pt · window-scoped",
+              "viewBox": "0 0 287.74 248.09375000000009",
+              "systems": [
+                "system-17"
+              ],
+              "ties": [
+                {
+                  "owner": "brahms-op118-no1-901",
+                  "from": "brahms-op118-no1-901",
+                  "to": "brahms-op118-no1-905",
+                  "fromTick": "12360",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-903",
+                  "from": "brahms-op118-no1-903",
+                  "to": "brahms-op118-no1-906",
+                  "fromTick": "12384",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904",
+                  "to": "brahms-op118-no1-904~c1",
+                  "fromTick": "12408",
+                  "toTick": "12432"
+                },
+                {
+                  "owner": "brahms-op118-no1-904",
+                  "from": "brahms-op118-no1-904~c1",
+                  "to": "brahms-op118-no1-904~c2",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-905",
+                  "from": "brahms-op118-no1-905",
+                  "to": "brahms-op118-no1-905~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-906",
+                  "from": "brahms-op118-no1-906",
+                  "to": "brahms-op118-no1-906~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-907",
+                  "from": "brahms-op118-no1-907",
+                  "to": "brahms-op118-no1-907~c1",
+                  "fromTick": "12432",
+                  "toTick": "12528"
+                },
+                {
+                  "owner": "brahms-op118-no1-909",
+                  "from": "brahms-op118-no1-909",
+                  "to": "brahms-op118-no1-913",
+                  "fromTick": "12552",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-911",
+                  "from": "brahms-op118-no1-911",
+                  "to": "brahms-op118-no1-914",
+                  "fromTick": "12576",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-912",
+                  "from": "brahms-op118-no1-912",
+                  "to": "brahms-op118-no1-912~c1",
+                  "fromTick": "12600",
+                  "toTick": "12624"
+                },
+                {
+                  "owner": "brahms-op118-no1-918",
+                  "from": "brahms-op118-no1-918",
+                  "to": "brahms-op118-no1-918~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-919",
+                  "from": "brahms-op118-no1-919",
+                  "to": "brahms-op118-no1-919~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                },
+                {
+                  "owner": "brahms-op118-no1-920",
+                  "from": "brahms-op118-no1-920",
+                  "to": "brahms-op118-no1-920~c1",
+                  "fromTick": "12720",
+                  "toTick": "12912"
+                }
+              ],
+              "raster": 0,
+              "depthPolygonCount": 4
+            }
+          ]
+        }
+      ],
+      "firstCue": [
+        {
+          "class": "round-card",
+          "top": 98
+        },
+        {
+          "class": "candidate-card",
+          "top": 192
+        },
+        {
+          "class": "compare-strip",
+          "top": 207
+        }
+      ],
+      "reference": [
+        {
+          "score": "brahms-op118-no1",
+          "svg": 6
+        },
+        {
+          "score": "primary",
+          "svg": 2
+        }
+      ]
+    },
+    "elapsedSeconds": 4.369
+  },
+  "servedGeometry": {
+    "method": "Measured actual remotely served inline-SVG polygon vertices and stem coordinates (rounded serialization), not a re-engraving or pixel inspection. Representative No13 tick3384 and Brahms12336/12576 contacts.",
+    "checks": [
+      {
+        "candidate": "economical-slots",
+        "window": "schumann-op68-no13:38-40",
+        "foregroundStemX": 254.22,
+        "stemStroke": 0.9,
+        "aperture": 2.7,
+        "airPerSide": 0.9,
+        "shoulder": 1.6,
+        "neckThickness": 0.76,
+        "leftPolygon": "M 248.31 121.37 L 251.27 121.37 L 252.87 121.89 L 252.87 122.65 L 251.27 123.17 L 248.31 123.17 Z",
+        "rightPolygon": "M 255.57 121.89 L 257.17 121.37 L 310.96 121.37 L 312.56 121.89 L 312.56 122.65 L 310.96 123.17 L 257.17 123.17 L 255.57 122.65 Z",
+        "ok": true
+      },
+      {
+        "candidate": "economical-slots",
+        "window": "brahms-op118-no1:64-67",
+        "foregroundStemX": 43.26,
+        "stemStroke": 0.9,
+        "aperture": 2.7,
+        "airPerSide": 0.9,
+        "shoulder": 1.6,
+        "neckThickness": 0.75,
+        "leftPolygon": "M 36.06 165.01 L 40.31 165.94 L 41.91 166.82 L 41.91 167.57 L 40.31 167.74 L 36.06 166.81 Z",
+        "rightPolygon": "M 44.61 167.41 L 46.21 167.24 L 55.02 169.18 L 55.02 170.98 L 46.21 169.04 L 44.61 168.17 Z",
+        "ok": true
+      },
+      {
+        "candidate": "economical-slots",
+        "window": "brahms-op118-no1:64-67",
+        "foregroundStemX": 210.1,
+        "stemStroke": 0.9,
+        "aperture": 2.7,
+        "airPerSide": 0.9,
+        "shoulder": 1.6,
+        "neckThickness": 0.76,
+        "leftPolygon": "M 204.20 212.18 L 207.15 211.53 L 208.75 211.70 L 208.75 212.46 L 207.15 213.33 L 204.20 213.98 Z",
+        "rightPolygon": "M 211.45 211.11 L 213.05 210.23 L 220.56 208.58 L 220.56 210.38 L 213.05 212.03 L 211.45 211.86 Z",
+        "ok": true
+      },
+      {
+        "candidate": "economical-bevel",
+        "window": "schumann-op68-no13:38-40",
+        "foregroundStemX": 254.22,
+        "stemStroke": 0.9,
+        "aperture": 2.0,
+        "airPerSide": 0.55,
+        "shoulder": 1.2,
+        "neckThickness": 1.08,
+        "leftPolygon": "M 248.31 121.37 L 252.02 121.37 L 253.22 121.73 L 253.22 122.81 L 252.02 123.17 L 248.31 123.17 Z",
+        "rightPolygon": "M 255.22 121.73 L 256.42 121.37 L 311.71 121.37 L 312.91 121.73 L 312.91 122.81 L 311.71 123.17 L 256.42 123.17 L 255.22 122.81 Z",
+        "ok": true
+      },
+      {
+        "candidate": "economical-bevel",
+        "window": "brahms-op118-no1:64-67",
+        "foregroundStemX": 43.26,
+        "stemStroke": 0.9,
+        "aperture": 2.0,
+        "airPerSide": 0.55,
+        "shoulder": 1.2,
+        "neckThickness": 1.08,
+        "leftPolygon": "M 36.06 165.01 L 41.06 166.11 L 42.26 166.73 L 42.26 167.81 L 41.06 167.91 L 36.06 166.81 Z",
+        "rightPolygon": "M 44.26 167.17 L 45.46 167.08 L 55.02 169.18 L 55.02 170.98 L 45.46 168.88 L 44.26 168.25 Z",
+        "ok": true
+      },
+      {
+        "candidate": "economical-bevel",
+        "window": "brahms-op118-no1:64-67",
+        "foregroundStemX": 210.1,
+        "stemStroke": 0.9,
+        "aperture": 2.0,
+        "airPerSide": 0.55,
+        "shoulder": 1.2,
+        "neckThickness": 1.08,
+        "leftPolygon": "M 204.20 212.18 L 207.90 211.37 L 209.10 211.46 L 209.10 212.54 L 207.90 213.17 L 204.20 213.98 Z",
+        "rightPolygon": "M 211.10 211.02 L 212.30 210.40 L 220.56 208.58 L 220.56 210.38 L 212.30 212.20 L 211.10 212.10 Z",
+        "ok": true
+      }
+    ]
+  },
+  "operationalTiming": {
+    "fetchFastForwardSeconds": 0.179,
+    "watchToPublicationSeconds": 15.552,
+    "identityWallSeconds": 0.781,
+    "browserFinalWallSeconds": 4.671,
+    "geometryWallSeconds": 0.034
+  },
+  "probeCorrections": [
+    "Initial browser script syntax error: 0.073s; no browser launched.",
+    "Initial DOM probe incorrectly required coincident stems at a compatible unison; actual established +/-1.30pt attachments retained (6.277s).",
+    "Collapsed-context text and nested recovery ancestor visibility required textContent plus expanding existing recovery details (5.603/5.604s).",
+    "Cold module-loading race invalidated early visibility checks; final probe waits document completion before observing and clicking (5.281s). All 43 final browser checks completed with zero failures."
+  ],
+  "acceptedVerificationReused": {
+    "npmTest": "1296 tests passed / 2030s",
+    "strictLint": "passed / 4.65s",
+    "build": "passed / 18.19s",
+    "independentBaseIdentity": "six scores + canonical PDF + archived Round57 identical / 46.76s",
+    "rerun": false
+  }
+}
