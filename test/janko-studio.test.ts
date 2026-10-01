@@ -412,7 +412,11 @@ test('Adding a candidate to the registry needs zero template edits', () => {
 test('The registry never imports engine internals', () => {
   const source = read('src/render/janko/candidates.ts');
   const imports = [...source.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(imports)], ['./types'], 'candidates.ts only depends on the token types');
+  assert.deepEqual([...new Set(imports)].sort(), ['../../source-review/documents', './types'],
+    'the registry depends only on layout types and shared source citation metadata');
+  assert.doesNotMatch(read('src/source-review/documents.ts'),
+    /(?:^\s*import\b|\bfrom\s*['"]|\bimport\s*\(|\brequire\s*\()/m,
+    'source citation metadata has no transitive imports, including engine dependencies');
   for (const candidate of CURRENT_CANDIDATES) {
     assert.ok(!source.includes('renderJanko'), 'no renderer calls in the registry');
     assert.ok(candidate.id.length > 0 && candidate.label.length > 0);
