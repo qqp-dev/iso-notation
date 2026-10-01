@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { buildSchumannNo13Draft } from '../src/scores/schumann-no13-draft';
-import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA } from '../src/render/janko/candidates';
+// Historical family evidence is deliberately bound to Round 56, not live cards.
+import { ROUND_56_CANDIDATES as CURRENT_CANDIDATES, ROUND_56_METADATA as CURRENT_ROUND_METADATA } from '../src/render/janko/candidates';
 import { PreparedJankoWindows, renderPreparedJankoWindow } from '../src/render/janko/prepared-windows';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { deriveTieDisplayPlan } from '../src/render/janko/ties';

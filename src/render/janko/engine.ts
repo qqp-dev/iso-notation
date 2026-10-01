@@ -6747,7 +6747,7 @@ export function systemCompleteInkBounds(
     }
   }
   for (const ink of layout.expressions ?? []) { top=Math.min(top,ink.y0); bottom=Math.max(bottom,ink.y1); }
-  if(o.preserveGestureMembership&&o.rhythmStyle==='beamed'){
+  if((o.preserveGestureMembership||o.depthProfile)&&o.rhythmStyle==='beamed'){
     for(const piece of buildInkScene(layout,o,t,layout.scoreRevision).beams.flat())if(piece.shape.kind==='rail'){
       const box=beamPieceBox(piece);top=Math.min(top,box.y0);bottom=Math.max(bottom,box.y1);
     }

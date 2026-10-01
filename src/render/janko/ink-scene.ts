@@ -25,6 +25,8 @@ import { suppressedStemIds, claspMemberCarriedTicks } from './engine';
 import { placedChordBridges, chordBridgesSvg, chordBridgeBox, chordBridgeAt, chordBridgeBoxAt, placedClaspShell, claspGroupAt, claspShellBoxAt } from './connective-scene';
 import type { PlacedChordBridge, PlacedClaspShell } from './connective-scene';
 
+import type { DepthRoute } from './depth-profile';
+
 export const SCENE_VERSION = 6;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
@@ -99,6 +101,8 @@ export interface InkScene {
   /** Final eligible solo members; non-beamed dialects remain legacy. */
   solos: ReadonlyMap<string,readonly SoloPiece[]>;
   soloAliases?: ReadonlyMap<string,string>;
+  /** Unpainted continuations + their foreground partners, candidate-only. */
+  depthRoutes?: readonly DepthRoute[];
   chordBridges: readonly PlacedChordBridge[];
   claspShells: readonly PlacedClaspShell[];
   pitch: readonly InkPiece[];
@@ -201,6 +205,7 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
   if (t.fontFamily !== DEFAULT_JANKO_TOKENS.fontFamily) {
     throw new Error(`Measured ink unavailable for custom digit face: ${t.fontFamily}`);
   }
+  if(o.depthProfile&&(!o.clarityPass||o.crossingConvention!=='layered'||o.rhythmStyle!=='beamed'||o.sharedRhCarrier||o.beamContour))throw Error('Depth profiles require direct affine layered rails; shared carriers and bent contours are not admitted');
   const source=score??layout.scoreRevision;
   if(!source)throw new Error('Placed ink scene requires complete score/source/editorial revision');
   if(score&&layout.scoreRevision&&score!==layout.scoreRevision&&
@@ -259,19 +264,20 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
         JSON.stringify(otherPaint.map(p=>p.shape))===JSON.stringify(paint.map(p=>p.shape))){solos.set(id,paint);soloAliases.set(id,merge.survivorId);}
     }
   }
+  let depthRoutes:DepthRoute[]=[];
   if(o.clarityPass) {
     const stems=[...solos.entries()].flatMap(([id,pieces])=>{
       const note=layout.ungrouped.find(n=>n.id===id)!;
       if(soloAliases.has(id))return [];
-      return pieces.flatMap(p=>p.shape.kind==='stem'?[{shape:p.shape,ownerIds:p.ownerIds,hand:note.hand,sourceVoice:note.sourceVoice}]:[]);
+      return pieces.flatMap(p=>p.shape.kind==='stem'?[{id:p.id,shape:p.shape,ownerIds:p.ownerIds,hand:note.hand,sourceVoice:note.sourceVoice}]:[]);
     });
-    if(o.crossingConvention==='layered')routeVoiceOverpasses(beams,layout.beams,t,stems);
+    if(o.crossingConvention==='layered')depthRoutes=routeVoiceOverpasses(beams,layout.beams,t,stems,o.depthProfile);
     else if(o.beamContour!=='bent')routeVoiceUnderpasses(beams,layout.beams,t,stems);
   }
   const chordBridges=placedChordBridges(layout.chordBridges,system,pagePiece,soloSources);
   const claspShells=layout.clasps.map(group=>placedClaspShell(group,system,pagePiece,soloSources));
   const {scoreRevision: _source, ...placed} = layout;
-  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,...(o.shareCompatibleLocalRhythm?{soloAliases}:{}),chordBridges,claspShells,pitch,ledger,beat,barlines,heads,physical:[]};
+  const scene:InkScene={version:SCENE_VERSION,key:revisionString({version:SCENE_VERSION,score:source,layout:placed,options:o,tokens:t,font:SCENE_FONT}),coverage:SCENE_COVERAGE,paintCoverage:SCENE_PAINT_COVERAGE,restPaint,beams,solos,...(o.depthProfile?{depthRoutes}:{}),...(o.shareCompatibleLocalRhythm?{soloAliases}:{}),chordBridges,claspShells,pitch,ledger,beat,barlines,heads,physical:[]};
   return {...scene,physical:scenePhysicalBoxes(scene)};
 }
 export function scenePhysicalBoxes(scene:InkScene):Array<InkBox & {what:string}> {

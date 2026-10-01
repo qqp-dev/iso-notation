@@ -181,7 +181,8 @@ import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox, projectedSoloFlagEnvelope } from './solo-scene';
-import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes } from './beam-scene';
+import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes, placedBeamGroup } from './beam-scene';
+import { depthRibbon } from './depth-profile';
 import { GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
@@ -238,6 +239,8 @@ export type JankoLintCode =
   | 'contour-attachment'
   | 'shared-voice-channel'
   | 'shared-value-level'
+  | 'depth-route-integrity'
+  | 'depth-route-clearance'
   | 'clasp-dot-fusion'
   | 'stem-through-simultaneity'
   | 'split-stack-stems'
@@ -425,6 +428,7 @@ export const JANKO_LINT_CHECKS = [
   'hold-integrity',
   'expression-integrity',
   'voice-beam-corridors',
+  'depth-route-paint',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -6301,6 +6305,57 @@ export function checkContinuousContourPaint(layout:JankoSystemLayout,scene:InkSc
   }
 }
 
+/** Candidate-only depth: audit retained originals, complete visible/hidden route,
+ * actual foreground stroke and own joins. No whole-voice depth claim. */
+export function checkDepthRoutePaint(layout:JankoSystemLayout,scene:InkScene,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[]):void {
+  if(!o.depthProfile)return;
+  const fail=(message:string,clearance=false)=>out.push({code:clearance?'depth-route-clearance':'depth-route-integrity',severity:'error',system:layout.index,message});
+  const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
+  const pagePiece=layout.geometry.pageIndex??Math.floor(layout.index/Math.max(1,o.systemsPerPage));
+  const raw=layout.beams.map(b=>placedBeamGroup(b,t,o.durationGrammar,layout.index,pagePiece,id=>[id,...layout.unisonMerges.filter(m=>m.survivorId===id).flatMap(m=>m.mergedIds)]));
+  const stems=[...scene.beams.flat(),...Array.from(scene.solos).filter(([id])=>!scene.soloAliases?.has(id)).flatMap(([,parts])=>parts)].filter(p=>p.shape.kind==='stem');
+  const routeIds=new Set<string>();
+  for(const [i,parts] of raw.entries())for(const original of parts.filter(p=>p.shape.kind==='rail')){
+    const route=scene.depthRoutes?.find(r=>r.rail.id===original.id);
+    const crossings=stems.filter(s=>s.shape.kind==='stem'&&!s.ownerIds.some(id=>original.ownerIds.includes(id))&&beamStemBoxes({shape:s.shape}).some(b=>beamPieceIntersectsBox(original,b)));
+    if(!route){if(crossings.length)fail('Foreign rail crossing lacks its owning depth route.');continue;}
+    routeIds.add(original.id);
+    if(!same(route.rail.shape,original.shape)||!same(route.rail.ownerIds,original.ownerIds)||route.level!==original.level||route.profile!==o.depthProfile||route.direction!==layout.beams[i].direction)fail('Depth route no longer retains the original rail/owners/level/profile.');
+    if(route.ports.length!==crossings.length)fail('Depth route omitted or invented a foreground crossing.');
+    const visible=scene.beams[i].filter(p=>route.visibleIds.includes(p.id));
+    if(visible.length!==route.ports.length+1||route.visibleIds.length!==visible.length)fail('Depth route lost a return or invented an extra duration piece.');
+    if(original.shape.kind!=='rail')continue;
+    const x0=Math.min(...original.shape.points.map(p=>p[0])),x1=Math.max(...original.shape.points.map(p=>p[0]));
+    if(route.ports.some(p=>![p.entry,p.exit,p.leftShoulder,p.rightShoulder].every(Number.isFinite)||p.entry<=x0||p.exit>=x1||p.entry>=p.exit)){fail('Depth port has invalid owning-route coordinates.');continue;}
+    let cursor=x0;
+    for(const [k,port] of route.ports.entries()){
+      const stem=crossings.find(s=>s.id===port.frontId&&same(s.ownerIds,port.frontOwnerIds)&&same(s.shape,port.front));
+      if(!stem||stem.shape.kind!=='stem'||(stem.shape.gaps?.length??0)>0)fail('Depth port lacks its actual whole foreground stem.');
+      const boxes=beamStemBoxes({shape:port.front});
+      if(!boxes.length||Math.min(...boxes.map(b=>b.x0))-port.entry<.89||port.exit-Math.max(...boxes.map(b=>b.x1))<.89)fail('Depth port is not fitted to foreground stroke plus air.',true);
+      if(port.entry-cursor<1.2||port.entry-port.leftShoulder<.59||port.rightShoulder-port.exit<.59||port.leftShoulder<cursor||port.rightShoulder>x1||port.exit<=port.entry)fail('Depth port overlaps another port or leaves an unusably short face/remnant.',true);
+      if(!same(port.hidden,depthRibbon(route,port.entry,port.exit)))fail('Hidden continuation lost its matched owning entry/exit/level.');
+      const v=visible[k];
+      if(!v||v.shape.kind!=='rail'||v.level!==route.level||!same(v.ownerIds,original.ownerIds)||!same(v.shape.points,depthRibbon(route,cursor,port.entry)))fail('Visible entry/return is not the owning profiled route.');
+      for(const part of visible)if(boxes.some(b=>beamPieceIntersectsBox(part,b)))fail('Recession face touches the foreground stroke.',true);
+      cursor=port.exit;
+    }
+    if(x1-cursor<1.2)fail('Depth route leaves an unusably short final remnant.',true);
+    const end=visible.at(-1);
+    if(!end||end.shape.kind!=='rail'||end.level!==route.level||!same(end.ownerIds,original.ownerIds)||!same(end.shape.points,depthRibbon(route,cursor,x1)))fail('Depth route final return differs from the owning rail.');
+    for(const stem of raw[i].filter(p=>p.shape.kind==='stem'))if(stem.shape.kind==='stem'){
+      const x=stem.shape.x,y=stem.shape.y2;
+      if(beamPieceAt(original,x,y)&&!visible.some(p=>beamPieceAt(p,x,y)))fail('Depth profile lost its own value-level attachment.',true);
+    }
+    for(const part of visible)for(const n of layout.notes){const m=knockoutHalfExtents(o,t,n.note.startTick,n);
+      if(beamPieceIntersectsBox(part,{x0:n.x-m.wx,x1:n.x+m.wx,y0:n.y-m.hy,y1:n.y+m.hy}))fail('Depth face enters a protected head enclosure.',true);
+    }
+  }
+  if((scene.depthRoutes?.length??0)!==routeIds.size)fail('Depth scene contains orphan or duplicate owning routes.');
+  const allowed=new Set(scene.depthRoutes?.flatMap(r=>r.visibleIds));
+  for(const p of scene.beams.flat())if(p.id.includes(':depth:')&&!allowed.has(p.id))fail('Depth painter has an orphan face/extra duration mark.');
+}
+
 export function checkLocalFlagPaint(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[],scene:InkScene):void {
   for(const [id,pieces] of scene.solos)for(const p of pieces)if(p.shape.kind==='flag'&&p.shape.style==='classical-urtext'){
     const box=projectedSoloFlagEnvelope(p.shape.d);
@@ -6346,6 +6401,7 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
     for(const id of layout.localFlagRefusals??[])diagnostics.push({code:'local-flag-seat-refused',severity:'error',system:layout.index,noteIds:[id],message:'No complete classical-flag side/tip seat clears the neighboring heads.'});
     const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'||o.clarityPass&&layout.beams.length>1
       ?buildInkScene(layout,o,t,score):undefined;
+    if(o.depthProfile&&placedScene)checkDepthRoutePaint(layout,placedScene,o,t,diagnostics);
     if(o.sharedRhCarrier&&placedScene)checkSharedCarrierPaint(layout,placedScene,t,diagnostics);
     if(o.beamContour==='bent'&&placedScene)checkContinuousContourPaint(layout,placedScene,diagnostics);
     if(o.groupedRhythm==='local-flags'&&placedScene)checkLocalFlagPaint(layout,o,t,diagnostics,placedScene);

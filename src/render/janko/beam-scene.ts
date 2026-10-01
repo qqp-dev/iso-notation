@@ -9,6 +9,7 @@ import type { JankoDurationGrammar, ResolvedJankoTokens } from './types';
 import type { InkBox } from './ink-scene';
 import type { QuantizedNote } from '../../model/types';
 import { overpassRailFragments } from './layered-routes';
+import { profileDepthRoutes, type DepthProfile, type DepthRoute } from './depth-profile';
 
 const n = (value:number):number => Number(f(value));
 export type BeamShape =
@@ -141,8 +142,10 @@ export function routeVoiceUnderpasses(groups:BeamPiece[][],beams:readonly JankoB
 }
 
 export function routeVoiceOverpasses(groups:BeamPiece[][],beams:readonly JankoBeamGroupGeometry[],t:ResolvedJankoTokens,
- solos:readonly {shape:Extract<BeamShape,{kind:'stem'}>;hand:QuantizedNote['hand'];sourceVoice?:string;ownerIds?:readonly string[]}[]=[]):void {
+ solos:readonly {id?:string;shape:Extract<BeamShape,{kind:'stem'}>;hand:QuantizedNote['hand'];sourceVoice?:string;ownerIds?:readonly string[]}[]=[],profile?:DepthProfile):DepthRoute[] {
+  if(profile)return profileDepthRoutes(groups,beams,solos,profile,piece);
   overpassRailFragments(groups,beams,solos,piece);
+  return [];
 }
 
 export const beamGroupSvg=(pieces:readonly BeamPiece[]):string=>['  <g class="janko-beam-group">',...pieces.map(p=>p.svg),'  </g>'].join('\n');

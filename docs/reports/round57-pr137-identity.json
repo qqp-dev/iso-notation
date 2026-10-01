@@ -1,0 +1,29 @@
+{
+  "base": "643b2366a0d77e00069e2f2e50d9cf39589853be",
+  "method": "Independent imports from git archive of PR137 and working src; SHA-256 of JSON.stringify source/options/tokens and every renderJankoPage SVG. PDF bytes read separately from archive and working public asset. No SVG/image files written.",
+  "baselineAndCurrentIdentical": true,
+  "elapsedSeconds": 15.19,
+  "primary": {
+    "source": "2149df155808289583b2bf86116953eeb6700147de016f60bc751710db761563",
+    "options": "9bf1ce3f3358606b6e51039147babfa46d564aeef00ad16150f4d79e295a07ec",
+    "tokens": "29df8faee4f5a42fc8e3bdb9f5ef6ff45397779a4946c68e93d520f98b89c4f9",
+    "pages": [
+      "e7b470e0112ef9755500692bc7d7121c96bd8e3a193ef2ac05296350e882a818",
+      "7b422a8f9d26399c64031ae69161af44eb8885832bff58e74e5c2d2906d05df4"
+    ]
+  },
+  "brahms-op118-no1": {
+    "source": "65ccfab879fb5550b91109a42505142eb17a69c60f3276ee481b9c0d36a71b6a",
+    "options": "7aa1bc8a54894cf80be8af5ac4294e198faa99164f5abf8a8c4ab693635f3ffa",
+    "tokens": "4c0ef54969bb1c4acb0754dad00373d77358d645c8f6d0cdeedccae904ab7590",
+    "pages": [
+      "3879a863b268616bb8b685da1b67f2893c628435e01aa6f9531f95417d22bca4",
+      "f163f83806204a0c243a67305785d6ffe9997fc0c89e7e9bccec9134139a7fb7",
+      "5471dfc95fc45111eefddb77519bac932c9946962b1f448785563fe0b3e2a64e",
+      "5096662c188ed82b29bdfd6a7c87742b7e675bf533c41579cc8c0b5bcbb14ad2",
+      "0b76b9ed2427a055b70653b225678428413f34c50d630bfd524accb3dc363846",
+      "1e6b4980cff390d48dc9e20b79d59133827831c079e516582bb5f8180bd9a185"
+    ]
+  },
+  "pdf": "43e0078eae668385e94f40adf0654fe4683c570574d173310323d0e52f073c97"
+}
