@@ -1,11 +1,44 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generatePreparedStudio, staticInputKey, type PreparedStaticCache } from '../src/render/janko/prepared/generate';
-import { fingerprintInputs, snapshotKey } from '../src/render/janko/prepared/seam';
+import { buildIdentity, fingerprintInputs, snapshotKey } from '../src/render/janko/prepared/seam';
 import { DEFAULT_JANKO_OPTIONS } from '../src/render/janko/types';
+import { candidateHealth, identityParts, modelIdentity, readCandidate } from '../src/render/janko/semantic-hand';
+
+test('source-side facts invalidate prepared/build input identity; shared painter drift refuses a retained saved candidate', () => {
+  const root=mkdtempSync(join(tmpdir(),'source-side-identity-'));
+  try {
+    const input='src/scores/schumann-no13-derived.json';
+    const files=['src/scores/bach-goldberg-var1.ts','public/midi/bach-goldberg-var1.mid','src/model/grid.ts',input];
+    for(const file of files) {
+      const target=join(root,file);mkdirSync(join(target,'..'),{recursive:true});cpSync(join(process.cwd(),file),target);
+    }
+    cpSync(join(process.cwd(),'src/render/janko'),join(root,'src/render/janko'),{recursive:true});
+    const state=join(root,'.semantic-candidate.local');
+    const before=fingerprintInputs(root),key=staticInputKey(before,state),build=buildIdentity(root);
+    const data=JSON.parse(readFileSync(join(root,input),'utf8'));
+    const phrase=data.score.phrases.find((p:{sourceSide?:string})=>p.sourceSide);
+    assert.ok(phrase);
+    phrase.sourceSide=phrase.sourceSide==='above'?'below':'above';
+    writeFileSync(join(root,input),JSON.stringify(data));
+    const after=fingerprintInputs(root);
+    assert.notEqual(snapshotKey(after),snapshotKey(before));
+    assert.notEqual(buildIdentity(root),build,'source direction changes the reviewed build identity');
+    assert.notEqual(staticInputKey(after,state),key,'a direction-only source change cannot reuse engraving');
+    const saved={schema:1,score:'bach-goldberg-var1',identity:modelIdentity(root,'bach-goldberg-var1'),
+      identityParts:identityParts(root,'bach-goldberg-var1'),records:[]};
+    const bytes=JSON.stringify(saved);writeFileSync(state,bytes);
+    assert.equal(candidateHealth(root,state,'bach-goldberg-var1').state,'current');
+    const painter=join(root,'src/render/janko/elements/expressions.ts');
+    writeFileSync(painter,readFileSync(painter,'utf8')+'\n// isolated renderer drift\n');
+    assert.equal(candidateHealth(root,state,'bach-goldberg-var1').state,'stale');
+    assert.throws(()=>readCandidate(root,state,'bach-goldberg-var1'),/identity|stale/);
+    assert.equal(readFileSync(state,'utf8'),bytes,'refusal retains the saved history exactly');
+  } finally {rmSync(root,{recursive:true,force:true});}
+});
 
 test('static reuse is byte-identical to cold real engraving, and state is excluded only from static identity', () => {
   const root = process.cwd(), state = `/tmp/janko-cache-absent-${process.pid}.json`;

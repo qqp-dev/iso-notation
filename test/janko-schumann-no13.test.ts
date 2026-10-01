@@ -4,11 +4,60 @@ import { buildSchumannNo13Draft, schumannNo13WrittenFacts } from '../src/scores/
 import { importSchumann } from '../src/scores/schumann-no43';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { computePageGeometry, layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages, systemCompleteInkBounds } from '../src/render/janko/engine';
-import { lintJankoScore } from '../src/render/janko/linter';
+import { checkExpressionIntegrity, lintJankoScore } from '../src/render/janko/linter';
 import type { GraceGroup } from '../src/model/types';
 
 const groups: GraceGroup[] = schumannNo13WrittenFacts.graceGroups as GraceGroup[];
 const lin = (m: { pitch?: { octave: number; pitchClass: number } }) => m.pitch && m.pitch.octave * 12 + m.pitch.pitchClass;
+
+test('No13 ordinary line241 slurs retain independent opposed source paths in both occurrences', () => {
+  const score = buildSchumannNo13Draft();
+  const written = schumannNo13WrittenFacts.phrases.filter(p => p.kind === 'slur' && p.start.line === 241);
+  assert.deepEqual(written.map(p => [p.start.context, p.start.column, p.end.column, p.sourceSide, p.sourceSideOrigin?.column]),
+    [['lower.0', 22, 34, 'above', 21], ['lower.1', 46, 50, 'below', 45]]);
+  const projected = score.phrases!.filter(p => p.kind === 'slur' && p.origin.line === 241);
+  assert.deepEqual(projected.map(p => [p.voice, p.startTick, p.endTick, p.sourceSide, p.origin.occurrence]),
+    [['lower.0', 3384, 3432, 'above', 1], ['lower.0', 4920, 4968, 'above', 2],
+      ['lower.1', 3384, 3432, 'below', 1], ['lower.1', 4920, 4968, 'below', 2]]);
+  for (const occurrence of [1, 2]) {
+    const pair = projected.filter(p => p.origin.occurrence === occurrence);
+    assert.notEqual(pair[0].fromNoteIds[0], pair[1].fromNoteIds[0]);
+    assert.notEqual(pair[0].toNoteIds[0], pair[1].toNoteIds[0]);
+    assert.deepEqual(pair.map(p => score.notes.find(n => n.id === p.fromNoteIds[0])!.durationTicks), [24, 48]);
+    assert.ok(pair.every(p => score.notes.find(n => n.id === p.toNoteIds[0])!.durationTicks === 24));
+    assert.ok(pair.flatMap(p => [...p.fromNoteIds, ...p.toNoteIds]).every(id => score.notes.find(n => n.id === id)?.hand === 'LH'));
+  }
+  assert.equal(schumannNo13WrittenFacts.phrases.filter(p => p.kind === 'phrasing').length, 6);
+  assert.equal(score.phrases!.filter(p => p.kind === 'phrasing').length, 12);
+  assert.equal(score.notes.length, 784);
+  assert.equal(score.totalTicks, 4992);
+});
+
+test('literal No13 line241 paints both source paths through a shared E without merging unequal B values', () => {
+  const e=createStudioConfig().scores['schumann-op68-no13'];
+  const layouts=layoutJankoScore(e.score,e.options,e.tokens);
+  for(const tick of [3384,4920]) {
+    const phrases=e.score.phrases!.filter(p=>p.kind==='slur'&&p.origin.line===241&&p.startTick===tick);
+    const l=layouts.find(l=>l.expressions?.some(q=>q.id===phrases[0].id))!;
+    const ink=phrases.map(p=>l.expressions!.find(q=>q.id===p.id)!);
+    assert.deepEqual(ink.map(q=>q.contour!.side),[-1,1]);
+    assert.notEqual(ink[0].svg.match(/class="janko-phrase"[^>]*d="([^"]+)"/)![1],
+      ink[1].svg.match(/class="janko-phrase"[^>]*d="([^"]+)"/)![1]);
+    assert.deepEqual(ink.map(q=>q.endpointIds),phrases.map(p=>[p.fromNoteIds,p.toNoteIds]));
+    const merge=l.unisonMerges.find(m=>[m.survivorId,...m.mergedIds].includes(phrases[0].toNoteIds[0]))!;
+    assert.ok([merge.survivorId,...merge.mergedIds].includes(phrases[1].toNoteIds[0]));
+    const shared=l.notes.find(n=>n.note.id===merge.survivorId)!;
+    assert.ok(ink.every(q=>Math.abs(q.contour!.xEnd-shared.x)<=3.6+.001));
+    assert.equal(l.notes.filter(n=>n.note.startTick===tick+48&&pitchOf(n.note)===52&&n.note.hand==='LH').length,1);
+    assert.deepEqual(l.notes.filter(n=>n.note.startTick===tick&&phrases.some(p=>p.fromNoteIds.includes(n.note.id)))
+      .map(n=>n.rhythm.durationTicks).sort((a,b)=>a-b),[24,48]);
+    assert.ok(l.beams.every(b=>b.notes.every(n=>!phrases[1].fromNoteIds.includes(n.id))),'quarter does not acquire an eighth beam');
+    const diagnostics:Parameters<typeof checkExpressionIntegrity>[4]=[];
+    checkExpressionIntegrity(e.score,l,e.options,e.tokens,diagnostics);
+    assert.deepEqual(diagnostics.filter(v=>phrases.some(p=>v.message.startsWith(`Expression ${p.id}:`))),[]);
+  }
+  function pitchOf(n:{pitch:{octave:number;pitchClass:number}}){return n.pitch.octave*12+n.pitch.pitchClass;}
+});
 
 test('literal No. 13 grace values, relative pitches, beams, and full written-event hosts (linear = MIDI minus 12)', () => {
   const pitched = groups.filter(g => g.members.some(m => m.pitch));

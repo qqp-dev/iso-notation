@@ -1,4 +1,5 @@
 import { expressionsOverlap, expressionIntersectsBox, pedalIntervals } from './elements/expressions';
+import { taperedSpanPath } from './ties';
 import { systemTickRange, systemPaintedInkBoxes } from './engine';
 import { PreparedJankoWindows } from './prepared-windows';
 /**
@@ -299,6 +300,7 @@ export type JankoLintCode =
   | 'tie-gap-unpublished'
   | 'tie-rule-fusion'
   | 'expression-missing' | 'expression-geometry' | 'expression-clearance' | 'expression-endpoint' | 'expression-paint'
+  | 'expression-source-side' | 'expression-path-ownership'
   | 'grace-missing' | 'grace-value' | 'grace-host' | 'grace-geometry' | 'grace-paint';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -6237,10 +6239,37 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
   for(const phrase of score.phrases??[]) {
     if(layout.expressionScope&&!layout.expressionScope.includes(phrase.id))continue;
     if(phrase.endTick<start||phrase.startTick>=end)continue;
-    const q=ink.find(i=>i.kind==='phrase'&&i.id===phrase.id);
+    const owned=ink.filter(i=>i.kind==='phrase'&&i.id===phrase.id),q=owned[0];
     if(!q)problem('expression-missing',phrase.id,'source phrase has no ink');
-    else if(q.startTick!==phrase.startTick||q.endTick!==phrase.endTick||JSON.stringify(q.endpointIds)!==JSON.stringify([phrase.fromNoteIds,phrase.toNoteIds]))
-      problem('expression-endpoint',phrase.id,'source note association differs');
+    else {
+      if(q.startTick!==phrase.startTick||q.endTick!==phrase.endTick||
+        q.continuationStart!==(phrase.startTick<start)||q.continuationEnd!==(phrase.endTick>=end)||
+        JSON.stringify(q.endpointIds)!==JSON.stringify([phrase.fromNoteIds,phrase.toNoteIds]))
+        problem('expression-endpoint',phrase.id,'source note association or continuation differs');
+      const paths=[...q.svg.matchAll(/<path\b[^>]*class="janko-phrase"[^>]*>/g)].map(m=>m[0]);
+      const escapedId=phrase.id.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!));
+      if(owned.length!==1||paths.length!==1||!paths[0].includes(`data-phrase="${escapedId}"`))
+        problem('expression-path-ownership',phrase.id,'source path has no unique painted owner');
+      if(phrase.sourceSide) {
+        const side=phrase.sourceSide==='above'?-1:1,c=q.contour;
+        if(!c||c.side!==side)problem('expression-source-side',phrase.id,`curve differs from explicit ${phrase.sourceSide} source side`);
+        if(c) for(const [ids,tick,y,continuation] of [
+          [phrase.fromNoteIds,phrase.startTick,c.yStart,q.continuationStart],
+          [phrase.toNoteIds,phrase.endTick,c.yEnd,q.continuationEnd],
+        ] as const) {
+          if(continuation)continue;
+          const owners=new Set(ids);
+          for(const chain of layout.tieChains??[])if(owners.has(chain.noteId))
+            for(const component of chain.components)if(component.startTick===tick)owners.add(component.headId);
+          for(const merge of layout.unisonMerges)if(merge.mergedIds.some(id=>owners.has(id)))owners.add(merge.survivorId);
+          const heads=layout.notes.filter(n=>owners.has(n.note.id)&&n.note.startTick===tick);
+          if(heads.some(n=>{const {hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return side===-1?y>=n.y-hy:y<=n.y+hy;}))
+            problem('expression-source-side',phrase.id,`tip lies on the wrong side of its owned head envelope`);
+        }
+        if(c&&paths[0]?.match(/\bd="([^"]+)"/)?.[1]!==taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent))
+          problem('expression-path-ownership',phrase.id,'painted path differs from its owned contour');
+      }
+    }
   }
   for(const [i,span] of pedalIntervals(score).entries()) {
     if(layout.expressionScope&&!layout.expressionScope.includes(`pedal-${i}`))continue;

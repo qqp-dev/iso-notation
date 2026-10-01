@@ -8347,7 +8347,632 @@
         "order": 18
       }
     ],
-    "phrases": [],
+    "phrases": [
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:91:11:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:92:22:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:91:11:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 91,
+          "column": 15,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:92:22:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 92,
+          "column": 37,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:92:39:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:92:55:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:92:39:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 92,
+          "column": 53,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:92:55:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 92,
+          "column": 59,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:93:11:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:93:35:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:93:11:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 93,
+          "column": 21,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:93:35:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 93,
+          "column": 45,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:94:58:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:94:74:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:94:58:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 94,
+          "column": 72,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:94:74:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 94,
+          "column": 84,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:96:78:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:97:22:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:96:78:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 96,
+          "column": 83,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:97:22:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 97,
+          "column": 31,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:97:33:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:97:49:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:97:33:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 97,
+          "column": 47,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:97:49:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 97,
+          "column": 51,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:98:11:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:98:35:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:98:11:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 98,
+          "column": 21,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:98:35:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 98,
+          "column": 45,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:99:56:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:99:70:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:99:56:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 99,
+          "column": 68,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:99:70:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 99,
+          "column": 78,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:101:78:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:104:99:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:101:78:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 101,
+          "column": 92,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:104:99:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 104,
+          "column": 110,
+          "order": 0
+        },
+        "sourceSide": "above",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:101:78:upper.0",
+          "token": "^",
+          "context": "upper.0",
+          "line": 101,
+          "column": 91,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:107:50:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:107:67:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:107:50:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 107,
+          "column": 61,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:107:67:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 107,
+          "column": 79,
+          "order": 0
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:107:50:upper.0",
+          "token": "_",
+          "context": "upper.0",
+          "line": 107,
+          "column": 60,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:108:64:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:108:80:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:108:64:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 108,
+          "column": 78,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:108:80:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 108,
+          "column": 82,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:109:13:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:109:37:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:109:13:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 109,
+          "column": 23,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:109:37:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 109,
+          "column": 47,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:109:71:upper.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:109:100:upper.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:109:71:upper.0",
+          "token": "(",
+          "context": "upper.0",
+          "line": 109,
+          "column": 83,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:109:100:upper.0",
+          "token": ")",
+          "context": "upper.0",
+          "line": 109,
+          "column": 111,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\"",
+        "toId": "43-Chant-du-Nouvel-An.ly:138:59:upper.\"1\"",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\"",
+          "token": "(",
+          "context": "upper.\"1\"",
+          "line": 138,
+          "column": 57,
+          "order": 0
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:138:59:upper.\"1\"",
+          "token": ")",
+          "context": "upper.\"1\"",
+          "line": 138,
+          "column": 68,
+          "order": 0
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\"",
+          "token": "_",
+          "context": "upper.\"1\"",
+          "line": 138,
+          "column": 56,
+          "order": 0
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:221:17:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:221:26:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:221:17:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 221,
+          "column": 24,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:221:26:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 221,
+          "column": 33,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:221:17:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 221,
+          "column": 23,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:221:35:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:222:25:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:221:35:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 221,
+          "column": 42,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:222:25:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 222,
+          "column": 27,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:221:35:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 221,
+          "column": 41,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:223:38:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:223:49:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:223:38:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 223,
+          "column": 47,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:223:49:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 223,
+          "column": 53,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:223:38:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 223,
+          "column": 46,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:226:17:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:226:27:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:226:17:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 226,
+          "column": 25,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:226:27:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 226,
+          "column": 34,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:226:17:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 226,
+          "column": 24,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:226:36:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:227:25:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:226:36:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 226,
+          "column": 43,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:227:25:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 227,
+          "column": 27,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:226:36:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 226,
+          "column": 42,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:228:38:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:228:49:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:228:38:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 228,
+          "column": 47,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:228:49:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 228,
+          "column": 53,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:228:38:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 228,
+          "column": 46,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:230:49:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:233:38:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:230:49:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 230,
+          "column": 54,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:233:38:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 233,
+          "column": 39,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:230:49:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 230,
+          "column": 53,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:234:47:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:235:13:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:234:47:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 234,
+          "column": 59,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:235:13:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 235,
+          "column": 26,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:235:28:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:235:57:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:235:28:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 235,
+          "column": 39,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:235:57:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 235,
+          "column": 63,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:235:65:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:235:73:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:235:65:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 235,
+          "column": 71,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:235:73:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 235,
+          "column": 78,
+          "order": 19
+        }
+      },
+      {
+        "fromId": "43-Chant-du-Nouvel-An.ly:238:70:lower.0",
+        "toId": "43-Chant-du-Nouvel-An.ly:238:80:lower.0",
+        "kind": "slur",
+        "start": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:238:70:lower.0",
+          "token": "(",
+          "context": "lower.0",
+          "line": 238,
+          "column": 78,
+          "order": 19
+        },
+        "end": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:238:80:lower.0",
+          "token": ")",
+          "context": "lower.0",
+          "line": 238,
+          "column": 86,
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "hostId": "43-Chant-du-Nouvel-An.ly:238:70:lower.0",
+          "token": "_",
+          "context": "lower.0",
+          "line": 238,
+          "column": 77,
+          "order": 19
+        }
+      }
+    ],
     "ties": [
       {
         "fromId": "43-Chant-du-Nouvel-An.ly:93:73:upper.0",
@@ -9377,7 +10002,1339 @@
       }
     ],
     "pedals": [],
-    "phrases": [],
+    "phrases": [
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:91:11:upper.0:slur:1",
+        "startTick": 0,
+        "endTick": 96,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:91:11:upper.0:52:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:92:22:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:92:22:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:92:22:upper.0:61:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 91,
+          "col": 15,
+          "bar": 0,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "0",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 92,
+          "col": 37,
+          "bar": 1,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "1/2",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:92:39:upper.0:slur:1",
+        "startTick": 120,
+        "endTick": 168,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:92:39:upper.0:54:1",
+          "43-Chant-du-Nouvel-An.ly:92:39:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:92:39:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:92:55:upper.0:59:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 92,
+          "col": 53,
+          "bar": 1,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "5/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 92,
+          "col": 59,
+          "bar": 1,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "7/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:93:11:upper.0:slur:1",
+        "startTick": 216,
+        "endTick": 264,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:93:11:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:93:11:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:93:35:upper.0:50:1",
+          "43-Chant-du-Nouvel-An.ly:93:35:upper.0:59:1",
+          "43-Chant-du-Nouvel-An.ly:93:35:upper.0:62:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 93,
+          "col": 21,
+          "bar": 2,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "9/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 93,
+          "col": 45,
+          "bar": 2,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "11/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:94:58:upper.0:slur:1",
+        "startTick": 504,
+        "endTick": 552,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:94:58:upper.0:51:1",
+          "43-Chant-du-Nouvel-An.ly:94:58:upper.0:54:1",
+          "43-Chant-du-Nouvel-An.ly:94:58:upper.0:57:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:94:74:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:94:74:upper.0:56:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 94,
+          "col": 72,
+          "bar": 3,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "21/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 94,
+          "col": 84,
+          "bar": 3,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "23/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:96:78:upper.0:slur:1",
+        "startTick": 960,
+        "endTick": 1056,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:96:78:upper.0:52:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:97:22:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:97:22:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:97:22:upper.0:61:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 96,
+          "col": 83,
+          "bar": 5,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "5",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 97,
+          "col": 31,
+          "bar": 6,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "11/2",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:97:33:upper.0:slur:1",
+        "startTick": 1080,
+        "endTick": 1128,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:97:33:upper.0:54:1",
+          "43-Chant-du-Nouvel-An.ly:97:33:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:97:33:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:97:49:upper.0:59:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 97,
+          "col": 47,
+          "bar": 6,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "45/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 97,
+          "col": 51,
+          "bar": 6,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "47/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:98:11:upper.0:slur:1",
+        "startTick": 1176,
+        "endTick": 1224,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:98:11:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:98:11:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:98:35:upper.0:50:1",
+          "43-Chant-du-Nouvel-An.ly:98:35:upper.0:59:1",
+          "43-Chant-du-Nouvel-An.ly:98:35:upper.0:62:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 98,
+          "col": 21,
+          "bar": 7,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "49/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 98,
+          "col": 45,
+          "bar": 7,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "51/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:99:56:upper.0:slur:1",
+        "startTick": 1464,
+        "endTick": 1512,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:99:56:upper.0:51:1",
+          "43-Chant-du-Nouvel-An.ly:99:56:upper.0:54:1",
+          "43-Chant-du-Nouvel-An.ly:99:56:upper.0:57:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:99:70:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:99:70:upper.0:56:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 99,
+          "col": 68,
+          "bar": 8,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "61/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 99,
+          "col": 78,
+          "bar": 8,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "63/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:101:78:upper.0:slur:1",
+        "startTick": 1920,
+        "endTick": 2016,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:101:78:upper.0:44:1",
+          "43-Chant-du-Nouvel-An.ly:101:78:upper.0:52:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:104:99:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:104:99:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:104:99:upper.0:61:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 101,
+          "col": 92,
+          "bar": 10,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "10",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 104,
+          "col": 110,
+          "bar": 11,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "21/2",
+          "order": 0
+        },
+        "sourceSide": "above",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 101,
+          "col": 91,
+          "bar": 10,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "10",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:107:50:upper.0:slur:1",
+        "startTick": 2640,
+        "endTick": 2664,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:107:50:upper.0:44:1",
+          "43-Chant-du-Nouvel-An.ly:107:50:upper.0:52:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:107:50:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:107:67:upper.0:45:1",
+          "43-Chant-du-Nouvel-An.ly:107:67:upper.0:54:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 107,
+          "col": 61,
+          "bar": 14,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "55/4",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 107,
+          "col": 79,
+          "bar": 14,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "111/8",
+          "order": 0
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 107,
+          "col": 60,
+          "bar": 14,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "55/4",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:107:50:upper.0:slur:2",
+        "startTick": 4560,
+        "endTick": 4584,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:107:50:upper.0:44:2",
+          "43-Chant-du-Nouvel-An.ly:107:50:upper.0:52:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:107:50:upper.0:52:2",
+          "43-Chant-du-Nouvel-An.ly:107:67:upper.0:45:2",
+          "43-Chant-du-Nouvel-An.ly:107:67:upper.0:54:2"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 107,
+          "col": 61,
+          "bar": 14,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "55/4",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 107,
+          "col": 79,
+          "bar": 14,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "111/8",
+          "order": 0
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 107,
+          "col": 60,
+          "bar": 14,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "55/4",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:108:64:upper.0:slur:1",
+        "startTick": 2808,
+        "endTick": 2856,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:108:64:upper.0:54:1",
+          "43-Chant-du-Nouvel-An.ly:108:64:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:108:64:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:108:80:upper.0:59:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 108,
+          "col": 78,
+          "bar": 15,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "117/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 108,
+          "col": 82,
+          "bar": 15,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "119/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:108:64:upper.0:slur:2",
+        "startTick": 4728,
+        "endTick": 4776,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:108:64:upper.0:54:2",
+          "43-Chant-du-Nouvel-An.ly:108:64:upper.0:57:2",
+          "43-Chant-du-Nouvel-An.ly:108:64:upper.0:61:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:108:80:upper.0:59:2"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 108,
+          "col": 78,
+          "bar": 15,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "117/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 108,
+          "col": 82,
+          "bar": 15,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "119/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:109:13:upper.0:slur:1",
+        "startTick": 2904,
+        "endTick": 2952,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:13:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:109:13:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:37:upper.0:50:1",
+          "43-Chant-du-Nouvel-An.ly:109:37:upper.0:59:1",
+          "43-Chant-du-Nouvel-An.ly:109:37:upper.0:62:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 23,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "121/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 47,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "123/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:109:13:upper.0:slur:2",
+        "startTick": 4824,
+        "endTick": 4872,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:13:upper.0:57:2",
+          "43-Chant-du-Nouvel-An.ly:109:13:upper.0:61:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:37:upper.0:50:2",
+          "43-Chant-du-Nouvel-An.ly:109:37:upper.0:59:2",
+          "43-Chant-du-Nouvel-An.ly:109:37:upper.0:62:2"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 23,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "121/8",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 47,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "123/8",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:109:71:upper.0:slur:1",
+        "startTick": 3024,
+        "endTick": 3072,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:71:upper.0:52:1",
+          "43-Chant-du-Nouvel-An.ly:109:71:upper.0:57:1",
+          "43-Chant-du-Nouvel-An.ly:109:71:upper.0:61:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:100:upper.0:49:1",
+          "43-Chant-du-Nouvel-An.ly:109:100:upper.0:57:1"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 83,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "63/4",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 111,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 1,
+          "time": "16",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:109:71:upper.0:slur:2",
+        "startTick": 4944,
+        "endTick": 4992,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:71:upper.0:52:2",
+          "43-Chant-du-Nouvel-An.ly:109:71:upper.0:57:2",
+          "43-Chant-du-Nouvel-An.ly:109:71:upper.0:61:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:109:100:upper.0:49:2",
+          "43-Chant-du-Nouvel-An.ly:109:100:upper.0:57:2"
+        ],
+        "voice": "upper.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 83,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "63/4",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 109,
+          "col": 111,
+          "bar": 16,
+          "context": "upper.0",
+          "occurrence": 2,
+          "time": "16",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\":slur:1",
+        "startTick": 3408,
+        "endTick": 3432,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\":64:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:138:59:upper.\"1\":73:1"
+        ],
+        "voice": "upper.\"1\"",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 138,
+          "col": 57,
+          "bar": 18,
+          "context": "upper.\"1\"",
+          "occurrence": 1,
+          "time": "71/4",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 138,
+          "col": 68,
+          "bar": 18,
+          "context": "upper.\"1\"",
+          "occurrence": 1,
+          "time": "143/8",
+          "order": 0
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 138,
+          "col": 56,
+          "bar": 18,
+          "context": "upper.\"1\"",
+          "occurrence": 1,
+          "time": "71/4",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\":slur:2",
+        "startTick": 5328,
+        "endTick": 5352,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:138:53:upper.\"1\":64:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:138:59:upper.\"1\":73:2"
+        ],
+        "voice": "upper.\"1\"",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 138,
+          "col": 57,
+          "bar": 18,
+          "context": "upper.\"1\"",
+          "occurrence": 2,
+          "time": "71/4",
+          "order": 0
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 138,
+          "col": 68,
+          "bar": 18,
+          "context": "upper.\"1\"",
+          "occurrence": 2,
+          "time": "143/8",
+          "order": 0
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 138,
+          "col": 56,
+          "bar": 18,
+          "context": "upper.\"1\"",
+          "occurrence": 2,
+          "time": "71/4",
+          "order": 0
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:221:17:lower.0:slur:1",
+        "startTick": 96,
+        "endTick": 120,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:221:17:lower.0:33:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:221:26:lower.0:38:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 221,
+          "col": 24,
+          "bar": 1,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "1/2",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 221,
+          "col": 33,
+          "bar": 1,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "5/8",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 221,
+          "col": 23,
+          "bar": 1,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "1/2",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:221:35:lower.0:slur:1",
+        "startTick": 192,
+        "endTick": 264,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:221:35:lower.0:33:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:222:25:lower.0:35:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 221,
+          "col": 42,
+          "bar": 1,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "1",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 222,
+          "col": 27,
+          "bar": 2,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "11/8",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 221,
+          "col": 41,
+          "bar": 1,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "1",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:223:38:lower.0:slur:1",
+        "startTick": 504,
+        "endTick": 552,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:223:38:lower.0:36:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:223:49:lower.0:37:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 223,
+          "col": 47,
+          "bar": 3,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "21/8",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 223,
+          "col": 53,
+          "bar": 3,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "23/8",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 223,
+          "col": 46,
+          "bar": 3,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "21/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:226:17:lower.0:slur:1",
+        "startTick": 1056,
+        "endTick": 1080,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:226:17:lower.0:33:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:226:27:lower.0:38:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 226,
+          "col": 25,
+          "bar": 6,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "11/2",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 226,
+          "col": 34,
+          "bar": 6,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "45/8",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 226,
+          "col": 24,
+          "bar": 6,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "11/2",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:226:36:lower.0:slur:1",
+        "startTick": 1152,
+        "endTick": 1224,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:226:36:lower.0:33:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:227:25:lower.0:35:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 226,
+          "col": 43,
+          "bar": 6,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "6",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 227,
+          "col": 27,
+          "bar": 7,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "51/8",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 226,
+          "col": 42,
+          "bar": 6,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "6",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:228:38:lower.0:slur:1",
+        "startTick": 1464,
+        "endTick": 1512,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:228:38:lower.0:36:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:228:49:lower.0:37:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 228,
+          "col": 47,
+          "bar": 8,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "61/8",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 228,
+          "col": 53,
+          "bar": 8,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "63/8",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 228,
+          "col": 46,
+          "bar": 8,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "61/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:230:49:lower.0:slur:1",
+        "startTick": 1920,
+        "endTick": 2016,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:230:49:lower.0:40:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:233:38:lower.0:33:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 230,
+          "col": 54,
+          "bar": 10,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "10",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 233,
+          "col": 39,
+          "bar": 11,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "21/2",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 230,
+          "col": 53,
+          "bar": 10,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "10",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:234:47:lower.0:slur:1",
+        "startTick": 2256,
+        "endTick": 2328,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:234:47:lower.0:48:1",
+          "43-Chant-du-Nouvel-An.ly:234:47:lower.0:52:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:13:lower.0:44:1",
+          "43-Chant-du-Nouvel-An.ly:235:13:lower.0:47:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 234,
+          "col": 59,
+          "bar": 12,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "47/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 26,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "97/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:234:47:lower.0:slur:2",
+        "startTick": 4176,
+        "endTick": 4248,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:234:47:lower.0:48:2",
+          "43-Chant-du-Nouvel-An.ly:234:47:lower.0:52:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:13:lower.0:44:2",
+          "43-Chant-du-Nouvel-An.ly:235:13:lower.0:47:2"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 234,
+          "col": 59,
+          "bar": 12,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "47/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 26,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "97/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:235:28:lower.0:slur:1",
+        "startTick": 2352,
+        "endTick": 2424,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:28:lower.0:44:1",
+          "43-Chant-du-Nouvel-An.ly:235:28:lower.0:47:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:57:lower.0:48:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 39,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "49/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 63,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "101/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:235:28:lower.0:slur:2",
+        "startTick": 4272,
+        "endTick": 4344,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:28:lower.0:44:2",
+          "43-Chant-du-Nouvel-An.ly:235:28:lower.0:47:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:57:lower.0:48:2"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 39,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "49/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 63,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "101/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:235:65:lower.0:slur:1",
+        "startTick": 2448,
+        "endTick": 2472,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:65:lower.0:48:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:73:lower.0:47:1",
+          "43-Chant-du-Nouvel-An.ly:235:73:lower.0:50:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 71,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "51/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 78,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "103/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:235:65:lower.0:slur:2",
+        "startTick": 4368,
+        "endTick": 4392,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:65:lower.0:48:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:235:73:lower.0:47:2",
+          "43-Chant-du-Nouvel-An.ly:235:73:lower.0:50:2"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 71,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "51/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 235,
+          "col": 78,
+          "bar": 13,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "103/8",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:238:70:lower.0:slur:1",
+        "startTick": 3024,
+        "endTick": 3072,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:238:70:lower.0:45:1"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:238:80:lower.0:43:1",
+          "43-Chant-du-Nouvel-An.ly:238:80:lower.0:45:1"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 238,
+          "col": 78,
+          "bar": 16,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "63/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 238,
+          "col": 86,
+          "bar": 16,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "16",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 238,
+          "col": 77,
+          "bar": 16,
+          "context": "lower.0",
+          "occurrence": 1,
+          "time": "63/4",
+          "order": 19
+        }
+      },
+      {
+        "id": "43-Chant-du-Nouvel-An.ly:238:70:lower.0:slur:2",
+        "startTick": 4944,
+        "endTick": 4992,
+        "fromNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:238:70:lower.0:45:2"
+        ],
+        "toNoteIds": [
+          "43-Chant-du-Nouvel-An.ly:238:80:lower.0:43:2",
+          "43-Chant-du-Nouvel-An.ly:238:80:lower.0:45:2"
+        ],
+        "voice": "lower.0",
+        "kind": "slur",
+        "origin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 238,
+          "col": 78,
+          "bar": 16,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "63/4",
+          "order": 19
+        },
+        "endOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 238,
+          "col": 86,
+          "bar": 16,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "16",
+          "order": 19
+        },
+        "sourceSide": "below",
+        "sourceSideOrigin": {
+          "file": "43-Chant-du-Nouvel-An.ly",
+          "line": 238,
+          "col": 77,
+          "bar": 16,
+          "context": "lower.0",
+          "occurrence": 2,
+          "time": "63/4",
+          "order": 19
+        }
+      }
+    ],
     "notes": [
       {
         "id": "43-Chant-du-Nouvel-An.ly:91:11:upper.0:52:1",
@@ -32679,18 +34636,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 91,
-      "column": 15,
-      "endLine": 91,
-      "endColumn": 16,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 92,
       "column": 23,
       "endLine": 92,
@@ -32728,18 +34673,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 92,
-      "column": 37,
-      "endLine": 92,
-      "endColumn": 38,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 92,
       "column": 49,
       "endLine": 92,
       "endColumn": 51,
@@ -32752,36 +34685,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 92,
-      "column": 53,
-      "endLine": 92,
-      "endColumn": 54,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 92,
       "column": 58,
       "endLine": 92,
       "endColumn": 59,
       "construct": "3",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 92,
-      "column": 59,
-      "endLine": 92,
-      "endColumn": 60,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32806,30 +34715,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member cis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 93,
-      "column": 21,
-      "endLine": 93,
-      "endColumn": 22,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 93,
-      "column": 45,
-      "endLine": 93,
-      "endColumn": 46,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -32932,36 +34817,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 94,
-      "column": 72,
-      "endLine": 94,
-      "endColumn": 73,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 94,
       "column": 80,
       "endLine": 94,
       "endColumn": 82,
       "construct": "^3",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 3 on chord member gis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 94,
-      "column": 84,
-      "endLine": 94,
-      "endColumn": 85,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -33111,30 +34972,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 96,
-      "column": 83,
-      "endLine": 96,
-      "endColumn": 84,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 97,
-      "column": 31,
-      "endLine": 97,
-      "endColumn": 32,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 97,
       "column": 43,
       "endLine": 97,
@@ -33142,30 +34979,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member cis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 97,
-      "column": 47,
-      "endLine": 97,
-      "endColumn": 48,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 97,
-      "column": 51,
-      "endLine": 97,
-      "endColumn": 52,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -33190,30 +35003,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member cis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 98,
-      "column": 21,
-      "endLine": 98,
-      "endColumn": 22,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 98,
-      "column": 45,
-      "endLine": 98,
-      "endColumn": 46,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -33286,30 +35075,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member a not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 99,
-      "column": 68,
-      "endLine": 99,
-      "endColumn": 69,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 99,
-      "column": 78,
-      "endLine": 99,
-      "endColumn": 79,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -33447,18 +35212,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 101,
-      "column": 92,
-      "endLine": 101,
-      "endColumn": 93,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 104,
       "column": 13,
       "endLine": 104,
@@ -33502,18 +35255,6 @@
       "construct": "^4",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 4 on chord member cis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 104,
-      "column": 110,
-      "endLine": 104,
-      "endColumn": 111,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -33676,36 +35417,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 107,
-      "column": 61,
-      "endLine": 107,
-      "endColumn": 62,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 107,
       "column": 76,
       "endLine": 107,
       "endColumn": 78,
       "construct": "^5",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 5 on chord member fis not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 107,
-      "column": 79,
-      "endLine": 107,
-      "endColumn": 80,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -33784,30 +35501,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 108,
-      "column": 78,
-      "endLine": 108,
-      "endColumn": 79,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 108,
-      "column": 82,
-      "endLine": 108,
-      "endColumn": 83,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 108,
       "column": 94,
       "endLine": 108,
       "endColumn": 96,
@@ -33856,30 +35549,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 109,
-      "column": 23,
-      "endLine": 109,
-      "endColumn": 24,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 109,
-      "column": 47,
-      "endLine": 109,
-      "endColumn": 48,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 109,
       "column": 57,
       "endLine": 109,
       "endColumn": 59,
@@ -33904,18 +35573,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 109,
-      "column": 83,
-      "endLine": 109,
-      "endColumn": 84,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 109,
       "column": 96,
       "endLine": 109,
       "endColumn": 98,
@@ -33934,18 +35591,6 @@
       "construct": "^3",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 3 on chord member a' not painted",
-      "blocking": false,
-      "voice": "upper.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 109,
-      "column": 111,
-      "endLine": 109,
-      "endColumn": 112,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.0"
     },
@@ -34227,18 +35872,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 130,
-      "column": 66,
-      "endLine": 130,
-      "endColumn": 67,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "upper.\"1\""
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 132,
       "column": 47,
       "endLine": 132,
@@ -34251,13 +35884,13 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 132,
-      "column": 49,
+      "line": 130,
+      "column": 66,
       "endLine": 132,
       "endColumn": 50,
-      "construct": ")",
+      "construct": "( |\n                                            \\repeat volta 2 {\n                                              a8)",
       "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
+      "effect": "Layout-only slur endpoint deferred",
       "blocking": false,
       "voice": "upper.\"1\""
     },
@@ -34312,36 +35945,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 138,
-      "column": 57,
-      "endLine": 138,
-      "endColumn": 58,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "upper.\"1\""
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 138,
       "column": 64,
       "endLine": 138,
       "endColumn": 66,
       "construct": "^5",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 5 on chord member cis' not painted",
-      "blocking": false,
-      "voice": "upper.\"1\""
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 138,
-      "column": 68,
-      "endLine": 138,
-      "endColumn": 69,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "upper.\"1\""
     },
@@ -34684,36 +36293,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 221,
-      "column": 24,
-      "endLine": 221,
-      "endColumn": 25,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 221,
       "column": 28,
       "endLine": 221,
       "endColumn": 30,
       "construct": "_1",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 1 on chord member d not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 221,
-      "column": 33,
-      "endLine": 221,
-      "endColumn": 34,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -34731,18 +36316,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 221,
-      "column": 42,
-      "endLine": 221,
-      "endColumn": 43,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 222,
       "column": 13,
       "endLine": 222,
@@ -34750,18 +36323,6 @@
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member d not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 222,
-      "column": 27,
-      "endLine": 222,
-      "endColumn": 28,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -34834,30 +36395,6 @@
       "construct": "_3",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 3 on chord member bis not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 223,
-      "column": 47,
-      "endLine": 223,
-      "endColumn": 48,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 223,
-      "column": 53,
-      "endLine": 223,
-      "endColumn": 54,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -34984,36 +36521,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 226,
-      "column": 25,
-      "endLine": 226,
-      "endColumn": 26,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 226,
       "column": 29,
       "endLine": 226,
       "endColumn": 31,
       "construct": "_1",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 1 on chord member d not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 226,
-      "column": 34,
-      "endLine": 226,
-      "endColumn": 35,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35031,18 +36544,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 226,
-      "column": 43,
-      "endLine": 226,
-      "endColumn": 44,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 227,
       "column": 13,
       "endLine": 227,
@@ -35050,18 +36551,6 @@
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member d not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 227,
-      "column": 27,
-      "endLine": 227,
-      "endColumn": 28,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35134,30 +36623,6 @@
       "construct": "_3",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 3 on chord member bis not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 228,
-      "column": 47,
-      "endLine": 228,
-      "endColumn": 48,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 228,
-      "column": 53,
-      "endLine": 228,
-      "endColumn": 54,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35283,18 +36748,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 230,
-      "column": 54,
-      "endLine": 230,
-      "endColumn": 55,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 233,
       "column": 13,
       "endLine": 233,
@@ -35314,18 +36767,6 @@
       "construct": "1",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 233,
-      "column": 39,
-      "endLine": 233,
-      "endColumn": 40,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35362,18 +36803,6 @@
       "construct": "_1",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 1 on chord member e not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 234,
-      "column": 59,
-      "endLine": 234,
-      "endColumn": 60,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35452,18 +36881,6 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 235,
-      "column": 26,
-      "endLine": 235,
-      "endColumn": 27,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 235,
       "column": 32,
       "endLine": 235,
       "endColumn": 34,
@@ -35482,18 +36899,6 @@
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member b not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 235,
-      "column": 39,
-      "endLine": 235,
-      "endColumn": 40,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35536,48 +36941,12 @@
     {
       "file": "43-Chant-du-Nouvel-An.ly",
       "line": 235,
-      "column": 63,
-      "endLine": 235,
-      "endColumn": 64,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 235,
       "column": 67,
       "endLine": 235,
       "endColumn": 69,
       "construct": "_2",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 2 on chord member c not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 235,
-      "column": 71,
-      "endLine": 235,
-      "endColumn": 72,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 235,
-      "column": 78,
-      "endLine": 235,
-      "endColumn": 79,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35674,30 +37043,6 @@
       "construct": "_1",
       "reason": "Source expression/layout not represented by the current engraving model",
       "effect": "Fingering 1 on chord member a' not painted",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 238,
-      "column": 78,
-      "endLine": 238,
-      "endColumn": 79,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 238,
-      "column": 86,
-      "endLine": 238,
-      "endColumn": 87,
-      "construct": ")",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
       "blocking": false,
       "voice": "lower.0"
     },
@@ -35811,18 +37156,6 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 245,
-      "column": 247,
-      "endLine": 245,
-      "endColumn": 248,
-      "construct": "(",
-      "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Articulation or phrasing deferred",
-      "blocking": false,
-      "voice": "lower.0"
-    },
-    {
-      "file": "43-Chant-du-Nouvel-An.ly",
       "line": 246,
       "column": 15,
       "endLine": 246,
@@ -35847,13 +37180,13 @@
     },
     {
       "file": "43-Chant-du-Nouvel-An.ly",
-      "line": 246,
-      "column": 31,
+      "line": 245,
+      "column": 246,
       "endLine": 246,
       "endColumn": 32,
-      "construct": ")",
+      "construct": "^( _~ | }\n            { \\stemDown <e_1>4)",
       "reason": "Source expression/layout not represented by the current engraving model",
-      "effect": "Slur or beam presentation deferred",
+      "effect": "Unsupported source Slur layout; curve deferred",
       "blocking": false,
       "voice": "lower.0"
     },

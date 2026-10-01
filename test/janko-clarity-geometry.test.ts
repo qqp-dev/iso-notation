@@ -116,7 +116,7 @@ test('unfamiliar solo-quarter / foreign-sixteenth crossing uses the same physica
 
 test('phrase source association resolves the written continuation, never the wrong same-tick hand column',()=>{
   const source=String.raw`\score { \new PianoStaff <<
-    \new Staff = "upper" { \relative c' { \time 2/4 c4~ c4\( | d4 e4\) | } }
+    \new Staff = "upper" { \relative c' { \time 2/4 c4~ c4^( | d4 e4) | } }
     \new Staff = "lower" { \relative g' { \time 2/4 g4 g4 | g4 g4 | } }
   >> }`;
   const score=importSchumann(source,{file:'literal-tied-phrase.ly',hash:'fixture',number:13}).score;
@@ -125,6 +125,8 @@ test('phrase source association resolves the written continuation, never the wro
   const head=chain.components.find(c=>c.startTick===phrase.startTick)!;
   const placed=l.notes.find(n=>n.note.id===head.headId)!;
   const ink=l.expressions!.find(q=>q.id===phrase.id)!;
+  assert.equal(phrase.sourceSide,'above');
+  assert.equal(ink.contour!.side,-1,'the ordinary source-directed path keeps its side at a written continuation');
   assert.ok(placed,'written continuation has a solved head');
   assert.deepEqual(ink.endpointIds,[phrase.fromNoteIds,phrase.toNoteIds]);
   assert.ok(Math.abs(ink.contour!.xStart-placed.x)<=3.6+.001,'tip follows the associated continued head, not a detached or foreign column');

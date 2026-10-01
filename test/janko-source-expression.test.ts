@@ -6,10 +6,35 @@ import { createStudioConfig } from '../src/render/janko/studio';
 import { layoutJankoScore, renderJankoPage, renderJankoCrop, countJankoPages, computePageGeometry, systemCompleteInkBounds, systemPaintedInkBoxes } from '../src/render/janko/engine';
 import { checkExpressionIntegrity, lintJankoScore } from '../src/render/janko/linter';
 import { partitionBeamGroups } from '../src/render/janko/elements/rhythm';
-import { pedalIntervals, placeExpressions } from '../src/render/janko/elements/expressions';
+import { pedalIntervals, placeExpressions, expressionSliceAtX, expressionIntersectsBox } from '../src/render/janko/elements/expressions';
 import { resolveJankoTokens } from '../src/render/janko/types';
 
 const pitch = (n: {pitch: {octave:number;pitchClass:number}}) => n.pitch.octave*12+n.pitch.pitchClass;
+
+test('explicit source side constrains both modes under opposite hand preference and collision pressure', () => {
+  const base=buildSchumannNo14Draft();
+  for(const clarity of [false,true]) for(const sourceSide of ['above','below'] as const) {
+    const side=sourceSide==='above'?-1:1;
+    const phrase={...base.phrases![0],id:`directed-${sourceSide}`,startTick:0,endTick:48,sourceSide};
+    const score={...base,notes:[],dynamics:[],pedals:[],phrases:[phrase]};
+    const p={start:0,end:96,left:10,right:210,top:0,bottom:10,x:(t:number)=>10+t*2,
+      endpointX:(_ids:string[],t:number)=>10+t*2,
+      endpointEnvelope:()=>({top:0,bottom:10,hand:sourceSide==='above'?'LH' as const:'RH' as const}),clarity};
+    const quiet=placeExpressions(score,p)[0];
+    const middle=(quiet.contour!.xStart+quiet.contour!.xEnd)/2;
+    const slice=expressionSliceAtX(quiet,middle)!;
+    const obstacle={x0:middle-8,x1:middle+8,y0:slice[0]-1,y1:slice[1]+1};
+    const pressured=placeExpressions(score,{...p,obstacles:[obstacle]})[0];
+    assert.equal(pressured.contour!.side,side);
+    assert.ok(!expressionIntersectsBox(pressured,obstacle),'depth/lift earns clearance on the required side');
+    assert.deepEqual(pressured.endpointIds,[phrase.fromNoteIds,phrase.toNoteIds]);
+    const fallback=placeExpressions(score,{...p,endpointEnvelope:undefined})[0];
+    assert.equal(fallback.contour!.side,side,'missing envelopes do not erase direction');
+    const fragment=placeExpressions({...score,phrases:[{...phrase,startTick:-24,endTick:120}]},p)[0];
+    assert.deepEqual([fragment.continuationStart,fragment.continuationEnd,fragment.contour!.side],[true,true,side]);
+    assert.deepEqual(fragment.endpointIds,[phrase.fromNoteIds,phrase.toNoteIds]);
+  }
+});
 
 test('shared repertoire paints admitted source expression without new overlay or page defects', () => {
   const config=createStudioConfig();

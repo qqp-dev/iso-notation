@@ -181,6 +181,9 @@ export interface PhraseOverlay {
   toNoteIds: string[];
   voice: string;
   kind: 'slur' | 'phrasing';
+  /** Explicit source attachment, independent of performing hand or stem direction. */
+  sourceSide?: 'above' | 'below';
+  sourceSideOrigin?: ExpressionProvenance;
   origin: ExpressionProvenance;
   endOrigin: ExpressionProvenance;
 }

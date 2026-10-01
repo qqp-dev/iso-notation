@@ -6,12 +6,46 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ViteDevServer } from 'vite';
-import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS, SOURCE_IMAGES, WORKS } from '../src/source-review/documents';
+import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS, SOURCE_IMAGES, WORKS, SCHUMANN_NO13_ENDING_CITATION } from '../src/source-review/documents';
+import { schumannNo13WrittenFacts, buildSchumannNo13Draft } from '../src/scores/schumann-no13-draft';
+import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA, ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
 import { currentChoice, initialChoices, restoreChoices, selectDocument, selectWork, setPage, setZoom, STORAGE_KEY } from '../src/source-review/session';
 import { PDFJS_DECODER_PREFIX, SOURCE_PDF_PREFIX, sourcePdfPlugin, validatePdfBytes } from '../src/source-review/vite-plugin';
 
 const scan = REFERENCE_IDS[0], alternate = REFERENCE_IDS[1];
 const a = CANDIDATE_IDS[0], b = CANDIDATE_IDS[1];
+
+test('No13 citation is locally verified printed35–36 with a split ending and return pickup, independent of Peters parentage', () => {
+  const citation=SCHUMANN_NO13_ENDING_CITATION,score=buildSchumannNo13Draft();
+  assert.match(citation.work,/Schumann Op\. 68 No\. 13.*Mai, lieber Mai/);
+  assert.equal(citation.folio,15);
+  assert.ok(SOURCE_IMAGES[citation.reference].pages.some(p=>p.folio===citation.folio));
+  assert.match(citation.encodingParent,/Peters.*unspecified/);
+  assert.match(SOURCE_DOCUMENTS['schumann-starter'].edition,/Peters parent unspecified/);
+  for(const row of citation.segments) {
+    const occurrence=schumannNo13WrittenFacts.occurrences[row.internal-1];
+    assert.deepEqual([occurrence.sourceBar,occurrence.pass],[row.sourceBar,row.pass]);
+    assert.deepEqual(score.sourceBarTicks!.slice(row.internal-1,row.internal+1),[row.startTick,row.endTick]);
+  }
+  assert.deepEqual(citation.segments.map(s=>s.printed),[35,36,36]);
+  const cards=ROUND_55_CANDIDATES.filter(c=>['schumann-no13-written-draft','schumann-no13-before-clarity'].includes(c.id));
+  assert.equal(cards.length,2);
+  assert.deepEqual(cards[0].windows,cards[1].windows,'both current rule comparisons use the same corrected source window');
+  for(const card of cards) {
+    const window=card.windows!.find(w=>'measureStart' in w&&w.measureStart===38&&w.measureCount===3);
+    assert.ok(window&&'scoreId' in window);
+    assert.equal(window.scoreId,'schumann-op68-no13');
+    assert.equal(window.caption,citation.caption);
+    assert.match(card.description??'',/corrected source/);
+    assert.match(card.description??'',/not original Round58 COMPACT B/);
+  }
+  assert.equal(CURRENT_ROUND_METADATA.round,58,'current accepted crossing options remain Round58');
+  assert.match(CURRENT_ROUND_METADATA.description,/corrected.*source slurs/);
+  const current=CURRENT_CANDIDATES.map(c=>c.windows!.find(w=>'scoreId' in w&&w.scoreId==='schumann-op68-no13'));
+  assert.equal(current.length,3);
+  assert.ok(current.every(w=>w&&'measureStart' in w&&w.measureStart===38&&w.measureCount===3&&w.caption?.startsWith(citation.caption)));
+  assert.deepEqual(current[0],current[1]);assert.deepEqual(current[1],current[2]);
+});
 
 test('source review keeps independent document pages and zooms through A/B and reference switches', () => {
   const state = initialChoices();
@@ -238,4 +272,3 @@ test('dev endpoint accepts only pinned IDs: no URL/path/traversal proxy; missing
     assert.match(refused.body, /outside checkout/);
   } finally { await rm(base, { recursive: true, force: true }); }
 });
-

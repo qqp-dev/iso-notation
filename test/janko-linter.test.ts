@@ -24,6 +24,7 @@ import { PreparedJankoWindows } from '../src/render/janko/prepared-windows';
 import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
 import { buildInkScene, type InkScene } from '../src/render/janko/ink-scene';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
+import { importSchumann } from '../src/scores/schumann-no43';
 import { QuantizedGridScore, QuantizedNote } from '../src/model/types';
 import { continuousPitchY } from '../src/render/janko/geometry';
 import {
@@ -69,6 +70,7 @@ import {
   checkGraceIntegrity,
   checkEventHandMarkIntegrity,
   checkDepthRoutePaint,
+  checkExpressionIntegrity,
   checkClaspDotFusion,
   checkDotCollision,
   checkDotCountAgreement,
@@ -98,6 +100,37 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
+
+test('expression source-side and path-ownership diagnostics catch damaged independent literal paths', () => {
+  const source=String.raw`\score { \new PianoStaff <<
+    \new Staff = "upper" { \relative c'' { \time 2/4 s2 | } }
+    \new Staff = "lower" { \relative b { \time 2/4 << { b8^( fis'8 e8) r8 } \\ { b4_( e8) r8 } >> | } }
+  >> }`;
+  const score=importSchumann(source,{file:'literal-opposed-slurs.ly',hash:'fixture',number:13}).score;
+  const e=createStudioConfig().scores['schumann-op68-no13'];
+  const clean=layoutJankoScore(score,e.options,e.tokens)[0];
+  const check=(layout:JankoSystemLayout)=>{
+    const out:LintViolation[]=[];
+    checkExpressionIntegrity(score,layout,e.options,e.tokens,out);return out;
+  };
+  assert.deepEqual(check(clean),[]);
+  const changed=()=>({...clean,expressions:structuredClone(clean.expressions)});
+  const reversed=changed();reversed.expressions![0].contour!.side=1;
+  assert.ok(check(reversed).some(v=>v.code==='expression-source-side'));
+  const displaced=changed(),above=displaced.expressions![0];
+  const owner=clean.notes.find(n=>above.endpointIds![0].includes(n.note.id))!;
+  above.contour!.yStart=owner.y+10;
+  assert.ok(check(displaced).some(v=>v.code==='expression-source-side'),'an upward arch below its own head is still the wrong source side');
+  const aliased=changed(),[a,b]=aliased.expressions!;
+  b.svg=a.svg.replace(`data-phrase="${a.id}"`,`data-phrase="${b.id}"`);
+  assert.ok(check(aliased).some(v=>v.code==='expression-path-ownership'),'owned metadata cannot cover a copied foreign path');
+  const missing=changed();missing.expressions!.pop();
+  assert.ok(check(missing).some(v=>v.code==='expression-missing'));
+  const duplicate=changed();duplicate.expressions!.push(structuredClone(duplicate.expressions![0]));
+  assert.ok(check(duplicate).some(v=>v.code==='expression-path-ownership'));
+  const wrongOwner=changed();wrongOwner.expressions![0].svg=wrongOwner.expressions![0].svg.replace(/data-phrase="[^"]+"/,'data-phrase="foreign-owner"');
+  assert.ok(check(wrongOwner).some(v=>v.code==='expression-path-ownership'));
+});
 
 const SCORE = buildBachGoldbergVar1Score();
 /** The Round 47 linter fixtures engrave the real Brahms Intermezzo. */
