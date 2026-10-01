@@ -6,7 +6,14 @@ import { beamPieceIntersectsBox, beamStemBoxes } from './beam-scene';
 import type { JankoBeamGroupGeometry } from './elements/rhythm';
 import type { QuantizedNote } from '../../model/types';
 import { f } from './elements/style';
-export type DepthProfile = 'beveled' | 'dive';
+export type DepthProfile = 'beveled' | 'beveled-compact' | 'dive';
+/** Physical aperture and fitted face demand, shared by construction and audit.
+ * Compact bevel keeps a positive 0.55pt stroke clearance, not mere contact. */
+export function depthProfileMetrics(profile: DepthProfile) {
+  return profile === 'beveled-compact'
+    ? { air: .55, shoulder: 1.2, recession: .4 }
+    : { air: .9, shoulder: profile === 'beveled' ? 1.6 : 3.4, recession: profile === 'beveled' ? .58 : .25 };
+}
 type Point = readonly [number,number];
 export interface DepthPort {
   frontId:string; frontOwnerIds:readonly string[];
@@ -44,7 +51,7 @@ export function depthRibbon(route:Pick<DepthRoute,'rail'|'ports'|'profile'|'dire
     }
     // Paired shallow faces recess to a narrow neck; dive additionally changes
     // the actual route plane, returns symmetrically, and preserves level count.
-    const scale=1-depth*(route.profile==='beveled'?.58:.25);
+    const scale=1-depth*depthProfileMetrics(route.profile).recession;
     const center=(top+bottom)/2+(route.profile==='dive'?route.direction*.85*depth:0);
     return [[round(x),round(center-(bottom-top)*scale/2)],[round(x),round(center+(bottom-top)*scale/2)]] as const;
   });
@@ -65,10 +72,9 @@ export function profileDepthRoutes(groups:BeamPiece[][],beams:readonly JankoBeam
     const foreign=stems.filter(s=>!own.includes(s)&&beamStemBoxes({shape:s.shape}).some(b=>beamPieceIntersectsBox(rail,b))).sort((a,b)=>a.shape.x-b.shape.x);
     if(!foreign.length){const {svg:_svg,...data}=rail;return [make({...data,id:`${rail.id}:overpass:0`,cls:`${rail.cls} janko-layered-rail`})];}
     const ports:DepthPort[]=foreign.map(s=>{
-      // Actual foreground silhouette plus 0.90pt air on either side. Double
-      // stems are measured by their two physical strokes, not nominal width.
-      const boxes=beamStemBoxes({shape:s.shape});
-      const entry=round(Math.min(...boxes.map(b=>b.x0))-.9),exit=round(Math.max(...boxes.map(b=>b.x1))+.9);
+      // Measure both strokes for a double stem, not its nominal centerline.
+      const boxes=beamStemBoxes({shape:s.shape}), air=depthProfileMetrics(profile).air;
+      const entry=round(Math.min(...boxes.map(b=>b.x0))-air),exit=round(Math.max(...boxes.map(b=>b.x1))+air);
       return {frontId:s.id,frontOwnerIds:s.ownerIds,front:{...s.shape},entry,exit,leftShoulder:entry,rightShoulder:exit,hidden:[]};
     });
     if(ports.some((p,i)=>i>0&&p.entry-ports[i-1].exit<1.2))throw Error('Depth profile refused overlapping ports or short visible rail');
@@ -79,7 +85,7 @@ export function profileDepthRoutes(groups:BeamPiece[][],beams:readonly JankoBeam
       // Fit shoulders in available rail, including air to the nearest own join.
       const left=Math.max(x0,previous?(previous.exit+p.entry)/2:x0,...own.filter(s=>s.shape.x<p.entry).map(s=>s.shape.x+s.shape.width/2+.2));
       const right=Math.min(x1,next?(p.exit+next.entry)/2:x1,...own.filter(s=>s.shape.x>p.exit).map(s=>s.shape.x-s.shape.width/2-.2));
-      const length=profile==='beveled'?1.6:3.4;
+      const length=depthProfileMetrics(profile).shoulder;
       p.leftShoulder=round(Math.max(left,p.entry-length));p.rightShoulder=round(Math.min(right,p.exit+length));
       if(p.entry-p.leftShoulder<.6||p.rightShoulder-p.exit<.6)throw Error('Depth profile refused unreadably short recession face');
     }

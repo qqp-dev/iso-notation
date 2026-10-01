@@ -182,7 +182,7 @@ import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox, projectedSoloFlagEnvelope } from './solo-scene';
 import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes, placedBeamGroup } from './beam-scene';
-import { depthRibbon } from './depth-profile';
+import { depthRibbon, depthProfileMetrics } from './depth-profile';
 import { GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
 import { prepareRestPaint, restDiscClearance } from './rest-physical';
 
@@ -6332,7 +6332,7 @@ export function checkDepthRoutePaint(layout:JankoSystemLayout,scene:InkScene,o:R
       const stem=crossings.find(s=>s.id===port.frontId&&same(s.ownerIds,port.frontOwnerIds)&&same(s.shape,port.front));
       if(!stem||stem.shape.kind!=='stem'||(stem.shape.gaps?.length??0)>0)fail('Depth port lacks its actual whole foreground stem.');
       const boxes=beamStemBoxes({shape:port.front});
-      if(!boxes.length||Math.min(...boxes.map(b=>b.x0))-port.entry<.89||port.exit-Math.max(...boxes.map(b=>b.x1))<.89)fail('Depth port is not fitted to foreground stroke plus air.',true);
+      if(!boxes.length||Math.min(...boxes.map(b=>b.x0))-port.entry<depthProfileMetrics(route.profile).air-.01||port.exit-Math.max(...boxes.map(b=>b.x1))<depthProfileMetrics(route.profile).air-.01)fail('Depth port is not fitted to foreground stroke plus air.',true);
       if(port.entry-cursor<1.2||port.entry-port.leftShoulder<.59||port.rightShoulder-port.exit<.59||port.leftShoulder<cursor||port.rightShoulder>x1||port.exit<=port.entry)fail('Depth port overlaps another port or leaves an unusably short face/remnant.',true);
       if(!same(port.hidden,depthRibbon(route,port.entry,port.exit)))fail('Hidden continuation lost its matched owning entry/exit/level.');
       const v=visible[k];

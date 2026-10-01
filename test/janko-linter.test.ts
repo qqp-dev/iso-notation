@@ -2317,6 +2317,7 @@ test('depth linter refuses severed hidden continuation, false foreground, lost l
     assert.ok(audit(change({...r,ports:[{...port,hidden:[]},...r.ports.slice(1)]})).includes('depth-route-integrity'));
     assert.ok(audit(change({...r,ports:[{...port,frontId:'not-an-occluder'},...r.ports.slice(1)]})).includes('depth-route-integrity'));
     assert.ok(audit(change({...r,ports:[{...port,leftShoulder:port.entry},...r.ports.slice(1)]})).includes('depth-route-clearance'));
+    assert.ok(audit(change({...r,ports:[{...port,entry:port.front.x-.46,exit:port.front.x+.46},...r.ports.slice(1)]})).includes('depth-route-clearance'),'even the compact bevel must retain its physical air, not merely avoid positive overlap');
     const removed={...scene,beams:scene.beams.map(parts=>parts.filter(q=>q.id!==r.visibleIds[0]))};
     assert.ok(audit(removed).includes('depth-route-integrity'));
     const changed={...scene,beams:scene.beams.map(parts=>parts.map(q=>q.id===r.visibleIds[0]?{...q,level:4}:q))};

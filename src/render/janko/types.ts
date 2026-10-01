@@ -1221,7 +1221,10 @@ export interface JankoLayoutOptions {
   /** Opt-in monochrome over/under convention: stems over interrupted rails. */
   crossingConvention?: 'layered';
   /** Candidate-only owning-rail recession silhouette; unset retains flat G. */
-  depthProfile?: 'beveled' | 'dive';
+  depthProfile?: 'beveled' | 'beveled-compact' | 'dive';
+  /** Candidate-only stable clearance slots and compatible equal-value tie seats.
+   * Historical/default onset seating stays untouched when unset. */
+  stableOnsets?: true;
   /** Compatible shared heads keep distinct grouped/solo attachment channels. */
   independentUnisonAttachments?: true;
   /** One untied physical attack head; unequal values retain independent branches. */
@@ -1824,7 +1827,7 @@ export type JankoClusterPresentation = 'literal' | 'mirrored-handprint' | 'index
 export type JankoVerticalPlacement = 'slot' | 'content-aware';
 
 /** Fully resolved layout options (every optional option filled in). */
-export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
+export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
 
 /** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {

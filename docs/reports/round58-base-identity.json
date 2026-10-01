@@ -1,0 +1,95 @@
+{
+  "base": "b671414042e050330c2b73b4f387ecfe723d7290",
+  "method": "Independent imports from exact git archive and working source; SHA256 JSON source/options/tokens, every default page SVG, PDF bytes, archived Round57 window SVG. No SVG/images written.",
+  "defaults": {
+    "primary": {
+      "source": "2149df155808289583b2bf86116953eeb6700147de016f60bc751710db761563",
+      "options": "9bf1ce3f3358606b6e51039147babfa46d564aeef00ad16150f4d79e295a07ec",
+      "tokens": "29df8faee4f5a42fc8e3bdb9f5ef6ff45397779a4946c68e93d520f98b89c4f9",
+      "pages": [
+        "e7b470e0112ef9755500692bc7d7121c96bd8e3a193ef2ac05296350e882a818",
+        "7b422a8f9d26399c64031ae69161af44eb8885832bff58e74e5c2d2906d05df4"
+      ]
+    },
+    "brahms-op118-no1": {
+      "source": "65ccfab879fb5550b91109a42505142eb17a69c60f3276ee481b9c0d36a71b6a",
+      "options": "7aa1bc8a54894cf80be8af5ac4294e198faa99164f5abf8a8c4ab693635f3ffa",
+      "tokens": "4c0ef54969bb1c4acb0754dad00373d77358d645c8f6d0cdeedccae904ab7590",
+      "pages": [
+        "3879a863b268616bb8b685da1b67f2893c628435e01aa6f9531f95417d22bca4",
+        "f163f83806204a0c243a67305785d6ffe9997fc0c89e7e9bccec9134139a7fb7",
+        "5471dfc95fc45111eefddb77519bac932c9946962b1f448785563fe0b3e2a64e",
+        "5096662c188ed82b29bdfd6a7c87742b7e675bf533c41579cc8c0b5bcbb14ad2",
+        "0b76b9ed2427a055b70653b225678428413f34c50d630bfd524accb3dc363846",
+        "1e6b4980cff390d48dc9e20b79d59133827831c079e516582bb5f8180bd9a185"
+      ]
+    },
+    "schumann-op68-no13": {
+      "source": "b48dce962fb4b2a2cf8e381c6f98a088243f1aa259f707568fcf769dbc446622",
+      "options": "882003a510cd37be590ca3de97b5a7b3238db77f9c72e9f5314f03a9686133f8",
+      "tokens": "3c8ba8a14dcd1343a2b8880a82514d8211bfe27f33b56d933dd22cdf5d637114",
+      "pages": [
+        "a98b5e0aa01295828ebca44315be9f9f86795be08beca6eec8df280313c05f82",
+        "d4bd6e94493fc9d2149b8d8865e75d765c57f46d0b7cb0250b1597bd969c6f85",
+        "f65d61d2fcb39e0ccdf3761ff07675380c12dd22b07a30820c68000d995f8860",
+        "1fb395579d0c41df69f311e3ed4a9454666ce3e9a9ebaf66c2d6487831fe05a9",
+        "4cf2b8161992a086b66ede6861adc9d6bcc8010ded6ecef9983c7873dfa9cfd7"
+      ]
+    },
+    "schumann-op68-no14": {
+      "source": "a0d107d76db0a5c593680338efc97206d8798dcab3995c133301ac745a976661",
+      "options": "882003a510cd37be590ca3de97b5a7b3238db77f9c72e9f5314f03a9686133f8",
+      "tokens": "29df8faee4f5a42fc8e3bdb9f5ef6ff45397779a4946c68e93d520f98b89c4f9",
+      "pages": [
+        "c845ed0413c2b3ee94d28927513ff4c255f708ee5913bc86e53b16b87bba5865",
+        "984239f7105c8379f9de6267c1d00897be61c5851ebf4b3187f7824b94d23cbe",
+        "2a541ee0005b55a9aacfcfc52b3fe4218488e6371a74f4162758fc370c0bd3fc",
+        "1b6827b84b2de9b2470e5d0266184324446aa86a7fd02b089c6c20e67821d6ef",
+        "0005e1ecb2c07eab4b2f319bdb7aaee82c39cf3fd93cd4d34546a633b6cc0eb0",
+        "f91b9a4905264501b8b381db0d83fc8955ca2ef70f167820b57992b39b565783"
+      ]
+    },
+    "schumann-op68-no30": {
+      "source": "3d9706633bfcfc191b3879e13d354065e29e85a42009c9cf3319a1059afc6f37",
+      "options": "882003a510cd37be590ca3de97b5a7b3238db77f9c72e9f5314f03a9686133f8",
+      "tokens": "7d95303871ce995c3f7a2e61d27a7d768fcf031080547d287d6e85425386561f",
+      "pages": [
+        "2079fbc4420310bd62c73daa2cb7269827631a4eeec272a309ff72cc1c413318",
+        "ac130d454b5037832710b2369990297a7ebd88d44f98a7b30f13ac1f20403ae1",
+        "14d7951ead9f8f4e7e9907df3f595e1292985f2d9b59c14f735620a7855b19dc",
+        "8c755674f88bc5c4b2e78702352eabf3cc905afbef93b5a64c33e7877466c75e",
+        "4b5a273688b4e5dd42b3e8208655664f887db52d966eb0707fcf1f77ece59b25"
+      ]
+    },
+    "schumann-op68-no43": {
+      "source": "cb96abb48de63af8040b831468fd0eebb7599c35c1a5259c58020f59e8bbeede",
+      "options": "882003a510cd37be590ca3de97b5a7b3238db77f9c72e9f5314f03a9686133f8",
+      "tokens": "aea6bdeb524d3c855e78d38162d2575c7d7c209c53fb52b60daee22975d7ee17",
+      "pages": [
+        "8d38604e10c517e95556ade9a6714ac40a2186f20a795ed90c3a9468897917c4",
+        "4d3aa91a851167729b2d8352011a68ded15c24b799a3607c3662b2ca35b102ce",
+        "0159278cc9b60991c4b5da2077c0387359defcd7916f565fa6bdf9e373d6e7d2"
+      ]
+    }
+  },
+  "round57": {
+    "depth-flat": [
+      "dbacf1f2a2445baa5e66d62eea1aca1ff66377495f3de556e3f23b20c6d545fb",
+      "24c0ddab7330efcc10734d3d5d47d88384a45e5a73c1e8b1cf9ad86180ea3ce4",
+      "7a5cf052c1f7cc00274e126b7a70de696db095513194aec2670efcf02e0b5352"
+    ],
+    "depth-beveled": [
+      "1dea9654ef1ee4c0ab049e95569af073991e28c9cad9120d65f376b9d537aa3e",
+      "74159e6acf8ffa819d12131bb85c49757a503bdac2501d8bd0681583ea99e7b6",
+      "cec31e8cc02cb022defdc09144923974efe9004fb4817c2ead23496a620e0707"
+    ],
+    "depth-dive": [
+      "565468a7a8991c675656bcc92299c1a5bf725e2b9a412813f1e4fcddf532d1a8",
+      "e3054dcd32d539b3920c120e0dc580f623d68cff552d7d56ca4e5c8d52a34bc1",
+      "efc64d60d1dd8db754d2a99c4fbbf162e58a65de310d4cdb709bbcf06eb776a9"
+    ]
+  },
+  "pdf": "43e0078eae668385e94f40adf0654fe4683c570574d173310323d0e52f073c97",
+  "identical": true,
+  "elapsedSeconds": 46.76
+}
