@@ -62,14 +62,14 @@ async function launch(seed?: Map<string, string>, initialHash = '#candidates') {
   // Bundle the actual Vite-only viewer and actual session. Replace only pdf.js and its
   // worker asset; the renderer and transport can be deterministically held/rejected.
   const bundle = await build({
-    entryPoints: ['src/source-review/viewer.ts'], bundle: true, write: false,
+    entryPoints: ['src/source-review/development-viewer.ts'], bundle: true, write: false,
     platform: 'browser', format: 'iife', logLevel: 'silent',
     define: { 'import.meta.env.DEV': 'true' },
     plugins: [{ name: 'pdf-port', setup(plugin) {
       // Node's vm cannot run a dynamic import callback under the canonical test
       // runner without an experimental flag. Redirect only the local fallback
       // import to the same controlled resource transport as the wasm fetch.
-      plugin.onLoad({ filter: /source-review\/viewer\.ts$/ }, async ({ path }) => {
+      plugin.onLoad({ filter: /source-review\/development-viewer\.ts$/ }, async ({ path }) => {
         const source = await readFile(path, 'utf8');
         const fallbackImport = 'import(/* @vite-ignore */ `${wasmUrl}jbig2_nowasm_fallback.js`)';
         assert.ok(source.includes(fallbackImport), 'test must exercise the viewer local fallback import');

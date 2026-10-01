@@ -222,6 +222,7 @@ import {
   renderCompactCouplingSvg,
   checkCompressionInkCollisions,
 } from './compression';
+import { computeJointVoiceBeams } from './joint-beams';
 import {
   JankoHandprintCluster,
   groupHandprintClusters,
@@ -5375,7 +5376,7 @@ export function resolveChordColumns(
       const ends = new Map(projected.map(n => [n.id, getStemGeometry(n, t).stemEndY]));
       if (o.rhythmStyle === 'beamed') {
         const groups = partitionBeamGroups(projected, t, geo.middleCY, o.beamGroupTicks, geo.sourceBarTicks).groups;
-        for (const beam of computeVoiceBeams(groups,t,projected,geo.middleCY,[],o.durationGrammar,true)) {
+        for (const beam of computeVoiceBeams(groups,t,projected,geo.middleCY,[],o.durationGrammar,true,o.jointVoices)) {
           beam.stems.forEach((s, i) => ends.set(beam.notes[i].id, beam.beamY(s.stemX)));
         }
       }
@@ -6399,7 +6400,8 @@ export function resolveChordColumns(
  * final rail ink (including secondary levels), and painted stems use beamY. */
 function computeVoiceBeams(groups: JankoRhythmNote[][], t: ResolvedJankoTokens,
   notes: JankoRhythmNote[], spine: number, restInk: {x0:number;x1:number;y0:number;y1:number}[],
-  grammar: ResolvedJankoLayoutOptions['durationGrammar'], clarity: boolean): JankoBeamGroupGeometry[] {
+  grammar: ResolvedJankoLayoutOptions['durationGrammar'], clarity: boolean, joint?: true): JankoBeamGroupGeometry[] {
+  if (joint) return computeJointVoiceBeams(groups,t,notes,spine,restInk,grammar);
   const beams: JankoBeamGroupGeometry[] = [];
   for (const group of groups) {
     const foreignRails = clarity ? beams.filter(b => b.notes[0].hand !== group[0].hand ||
@@ -7662,7 +7664,7 @@ export function layoutJankoSystemShifted(
     }
     // Pre-layout beam exclusion uses conservative admission, never final placed ink.
     const restInk = restLayer.rests.map((r) => restAdmissionBox(r, t));
-    beams = o.groupedRhythm === 'local-flags' ? [] : computeVoiceBeams(partition.groups,t,rhythmNotes,geometry.middleCY,restInk,o.durationGrammar,o.clarityPass);
+    beams = o.groupedRhythm === 'local-flags' ? [] : computeVoiceBeams(partition.groups,t,rhythmNotes,geometry.middleCY,restInk,o.durationGrammar,o.clarityPass,o.jointVoices);
     ungrouped = o.groupedRhythm === 'local-flags' ? rhythmNotes : partition.ungrouped;
     if(o.sharedRhCarrier)beams=beams.map(b=>b.notes.every(n=>commonIds.has(n.id))?{...b,sharedCarrier:true}:b);
     if(o.beamContour==='bent'||o.sharedRhCarrier){

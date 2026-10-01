@@ -70,6 +70,7 @@ import {
   checkGraceIntegrity,
   checkEventHandMarkIntegrity,
   checkDepthRoutePaint,
+  checkJointRouteSeparation,
   checkExpressionIntegrity,
   checkClaspDotFusion,
   checkDotCollision,
@@ -100,6 +101,24 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
+
+test('joint route checks reject false duration stacks and fused independent painted stems', () => {
+  const e=createStudioConfig().scores['schumann-op68-no13'];
+  const options=resolveJankoOptions({...e.options,...CURRENT_CANDIDATES.find(c=>c.id==='joint-compact')!.options});
+  const prepared=new PreparedJankoWindows(e.score,[{measureStart:38,measureCount:3}],options,e.tokens);
+  const layout=[...prepared.systems.values()][0],tokens=prepared.tokens,scene=buildInkScene(layout,options,tokens,e.score);
+  const check=(l:typeof layout,s:InkScene,o=options)=>{const out:LintViolation[]=[];checkJointRouteSeparation(l,s,o,tokens,out);return out;};
+  assert.deepEqual(check(layout,scene),[]);
+  const indices=layout.beams.map((b,i)=>({b,i})).filter(({b})=>b.direction===-1&&b.notes.some(n=>n.startTick===3312));
+  assert.equal(indices.length,2);
+  const [a,b]=indices;
+  const beams=layout.beams.map((beam,i)=>i===b.i?{...beam,levels:beam.levels.map((level,j)=>({...level,connector:{...a.b.levels[Math.min(j,a.b.levels.length-1)].connector}}))}:beam);
+  assert.ok(check({...layout,beams},scene).some(v=>v.code==='joint-false-level'));
+  assert.deepEqual(check({...layout,beams},scene,{...options,jointVoices:undefined}),[],'historical options remain outside the new convention');
+  const stem=scene.beams.flat().find(p=>p.shape.kind==='stem')!;
+  const fused={...scene,beams:[...scene.beams,[{...stem,id:'defective-independent-stem',ownerIds:['foreign-owner']}]]};
+  assert.ok(check(layout,fused).some(v=>v.code==='joint-stem-fusion'),'actual painted contact needs a defect, even with separate metadata');
+});
 
 test('expression source-side and path-ownership diagnostics catch damaged independent literal paths', () => {
   const source=String.raw`\score { \new PianoStaff <<

@@ -3833,7 +3833,8 @@ export function computeBeamGroupGeometry(
   obstacles?: readonly JankoRhythmNote[] | null,
   spineY?: number | null,
   restInk?: readonly JankoBeamRestObstacle[] | null,
-  grammar: JankoDurationGrammar = 'golden'
+  grammar: JankoDurationGrammar = 'golden',
+  plan?: { slope: number; outwardShift?: number }
 ): JankoBeamGroupGeometry | null {
   const t = resolveJankoTokens(tokens);
   if (group.length < 2) return null;
@@ -3857,7 +3858,7 @@ export function computeBeamGroupGeometry(
   const dx = hi.stemX - lo.stemX;
   const rawSlope = dx !== 0 ? (hi.stemEndY - lo.stemEndY) / dx : 0;
   const limit = t.maxBeamSlope;
-  const slope = Math.max(-limit, Math.min(limit, rawSlope));
+  const slope = Math.max(-limit, Math.min(limit, plan?.slope ?? rawSlope));
   const beamX0 = lo.stemX;
 
   // --- Round 21: the beam levels are one generic rule -----------------------
@@ -3919,6 +3920,10 @@ export function computeBeamGroupGeometry(
     const limitY = sorted[i].y + direction * minStemLength - slope * (stems[i].stemX - beamX0);
     anchor = direction === -1 ? Math.min(anchor, limitY) : Math.max(anchor, limitY);
   }
+
+  // A joint corridor reservation enters before obstacle solving. Every
+  // connector, stem tip and later physical profile is built from this anchor.
+  anchor += direction * (plan?.outwardShift ?? 0);
 
   /**
    * Every beam strip (primary + one per level run) for one anchor. A run of a

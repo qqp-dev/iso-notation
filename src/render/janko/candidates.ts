@@ -1365,7 +1365,7 @@ export const ROUND_57_CANDIDATES:JankoCandidate[]=[
   depthCandidate('depth-dive','Refinement · profiled dive and return','Each owning primary/secondary route recedes 0.85pt away from the heads, with fitted 3.4pt entry/return shoulders and an explicit hidden continuation behind the actual foreign stem. Same source and spacing; no fixed whole-voice plane. Price: bent ribbon scanning and a new monochrome depth vocabulary, not continuous visible ink.','dive'),
 ];
 
-export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+export const ROUND_58_METADATA:JankoCandidateRound={
   round:58,title:'Economical crossings · truthful onset groups (candidate-only)',
   description:'Round58 crossing options through the current engine with corrected No. 13 source slurs on every card. These current controls differ from original Round58 source/engine pins. Henle printed35–36 maps to internal38–40, including the split ending and fp return pickup. Brahms remains ONE contrasting second-ending passage. Both refinements preserve chain-owned equal-value sharing and unequal continuations. RH-up/LH-down and existing hands remain; canonical Reference ink is unchanged. Geometry evidence is not pixel or musical acceptance.',
   openAxes:['stableOnsets','depthProfile'],
@@ -1383,10 +1383,24 @@ const economical=(id:string,label:string,description:string,profile:JankoLayoutO
   options:{preserveGestureMembership:true,shareAttackHeads:true,independentUnisonAttachments:true,shareCompatibleLocalRhythm:true,crossingConvention:'layered',depthProfile:profile,...(stable?{stableOnsets:true}:{})},
   windows:[...ECONOMICAL_NO13_WINDOWS,...(stable?ECONOMICAL_BRAHMS_WINDOWS:[])],comparisonScope:'containing-systems',tags:['candidate-only','literal source','black silhouette','not adopted'],
 });
-export const CURRENT_CANDIDATES:JankoCandidate[]=[
+export const ROUND_58_CANDIDATES:JankoCandidate[]=[
   economical('economical-control','Control · original onset seats / corrected source','Original Round58 option deltas through today’s engine and corrected source slurs; this is not byte-identical to original served Round58. Includes the historical doubled slot. Brahms’s original broken projection remains refused. Historical source/options/engine pins stay preserved.','beveled',false),
   economical('economical-slots','Refinement A · stable seats / existing bevel','Required single-slot clearance survives translated coordinates; head and stem envelopes are not deleted or forced onto one x. Existing 2.70pt aperture / 1.60pt shoulders / 42% neck. Brahms uses corrected equal-value tie ownership; its two crossings contrast held/moving obligations with No. 13. Price: visible rail interruption and modest within-onset looseness remain.','beveled',true),
   economical('economical-bevel','Refinement B · stable seats / compact bevel','Same corrected onset seats as A. Physical foreground stroke plus 0.55pt air each side gives 2.00pt apertures; fitted 1.20pt faces taper to 60% thickness without centerline excursion. Less missing contour and shorter, shallower negative-space scallops, not perfect foreground isolation. Price: reduced air and still interrupted rear rails; neither amodal continuity nor lint certifies musical readability.','beveled-compact',true),
+];
+
+export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+  round:59,title:'Schumann No. 13 · coordinated independent voices',
+  description:'Two presentations of the same complete No. 13 unfolded 38–40. Both readings use corrected source slurs; the control retains Round58 compact B options through the current engine, not original Round58 bytes. Henle printed35–36 maps to internal38–40, including the split ending and fp pickup. Joint planning chooses concurrent same-direction courses before fitting their real head contours and independent level corridors, including the tied approach from37, repeated A♯4 and unequal-value continuations. Independent voices, source-value stagger and RH-up/LH-down remain. No voice taxonomy, default adoption or pixel acceptance is implied. Reference unchanged.',
+  openAxes:['jointVoices'],
+  compareStrip:{scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:2,title:'38–39 · tied entry, co-moving 1/9 → b/8 → a/6, then unequal continuations'},
+};
+const JOINT_WINDOWS:JankoScoreCandidateWindow[]=[
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,completeSystems:true,title:'No. 13 · Henle printed35–36 / internal38–40, whole concurrent gesture',caption:SCHUMANN_NO13_ENDING_CITATION.caption+' Carry from37, 1/9 at3312, b/8 at3324, a/6 at3336 (a is A♯4), repeated A♯4 against F♯5→C♯5→D♯5→E5, then39 unequal values and40/fp. Same immutable clocks, ties, voices, hands and +5.46pt source-value stagger. Primaries stay distinct; compact owner-linked ports are rebuilt from the planned routes. Geometry is not pixel acceptance.'},
+];
+export const CURRENT_CANDIDATES:JankoCandidate[]=[
+  {...ROUND_58_CANDIDATES[2],id:'joint-control',label:'Control · independently fitted voice courses',description:'Round58 compact B options through the current engine and corrected source slurs, at the same containing-system geometry. This is not byte-identical to original served Round58. No joint planning. Historical registry remains addressable.',windows:JOINT_WINDOWS},
+  {...ROUND_58_CANDIDATES[2],id:'joint-compact',label:'Joint voices · aligned courses',description:'Concurrent rhythmic obligations choose a shared preferred course before physical anchor/clearance solving. Real changing contours keep separate anchors and level corridors; independent primaries are never merged or admitted as extra duration levels. Original head/stagger mechanics and the compact silhouette remain. Price: clearance-driven longer stems and interrupted rear contours; no claim of musician or pixel acceptance.',options:{...ROUND_58_CANDIDATES[2].options,jointVoices:true},windows:JOINT_WINDOWS},
 ];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
@@ -1459,6 +1473,7 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_58_CANDIDATES.find((c) => c.id === id) ??
     ROUND_57_CANDIDATES.find((c) => c.id === id) ??
     ROUND_56_CANDIDATES.find((c) => c.id === id) ??
     ROUND_49_CANDIDATES.find((c) => c.id === id) ??
