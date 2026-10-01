@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA, ROUND_57_CANDIDATES, getCandidate, type JankoScoreCandidateWindow } from '../src/render/janko/candidates';
+import { ROUND_58_CANDIDATES as CURRENT_CANDIDATES, ROUND_58_METADATA as CURRENT_ROUND_METADATA, ROUND_57_CANDIDATES, getCandidate, type JankoScoreCandidateWindow } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { PreparedJankoWindows, renderPreparedJankoWindow } from '../src/render/janko/prepared-windows';
 import { lintJankoWindowSystems } from '../src/render/janko/linter';

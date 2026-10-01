@@ -39,12 +39,12 @@ test('No13 citation is locally verified printed35–36 with a split ending and r
     assert.match(card.description??'',/corrected source/);
     assert.match(card.description??'',/not original Round58 COMPACT B/);
   }
-  assert.equal(CURRENT_ROUND_METADATA.round,58,'current accepted crossing options remain Round58');
+  assert.equal(CURRENT_ROUND_METADATA.round,59,'authorized joint comparison follows retained Round58');
   assert.match(CURRENT_ROUND_METADATA.description,/corrected.*source slurs/);
   const current=CURRENT_CANDIDATES.map(c=>c.windows!.find(w=>'scoreId' in w&&w.scoreId==='schumann-op68-no13'));
-  assert.equal(current.length,3);
+  assert.equal(current.length,2);
   assert.ok(current.every(w=>w&&'measureStart' in w&&w.measureStart===38&&w.measureCount===3&&w.caption?.startsWith(citation.caption)));
-  assert.deepEqual(current[0],current[1]);assert.deepEqual(current[1],current[2]);
+  assert.deepEqual(current[0],current[1]);
 });
 
 test('source review keeps independent document pages and zooms through A/B and reference switches', () => {

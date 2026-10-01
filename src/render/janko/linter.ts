@@ -242,6 +242,8 @@ export type JankoLintCode =
   | 'shared-value-level'
   | 'depth-route-integrity'
   | 'depth-route-clearance'
+  | 'joint-false-level'
+  | 'joint-stem-fusion'
   | 'clasp-dot-fusion'
   | 'stem-through-simultaneity'
   | 'split-stack-stems'
@@ -431,6 +433,7 @@ export const JANKO_LINT_CHECKS = [
   'expression-integrity',
   'voice-beam-corridors',
   'depth-route-paint',
+  'joint-route-separation',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -6220,6 +6223,35 @@ export function checkVoiceBeamCorridors(layout:JankoSystemLayout,t:ResolvedJanko
   }
 }
 
+/** Joint routes must remain visibly independent duration statements. Physical
+ * nonintersection alone permits a misleading ordinary beam-level stack. */
+export function checkJointRouteSeparation(layout:JankoSystemLayout,scene:InkScene,
+  o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[]):void {
+  if(!o.jointVoices)return;
+  for(let i=0;i<layout.beams.length;i++)for(let j=i+1;j<layout.beams.length;j++){
+    const a=layout.beams[i],b=layout.beams[j];
+    if(a.direction!==b.direction || a.notes[0].sourceVoice===b.notes[0].sourceVoice)continue;
+    const interval=(beam:typeof a)=>[Math.min(...beam.notes.map(n=>n.startTick)),Math.max(...beam.notes.map(n=>n.startTick+n.durationTicks))];
+    const [a0,a1]=interval(a),[b0,b1]=interval(b);
+    if(Math.max(a0,b0)>=Math.min(a1,b1))continue;
+    for(const l of a.levels)for(const r of b.levels){
+      const p=l.connector,q=r.connector,left=Math.max(Math.min(p.x1,p.x2),Math.min(q.x1,q.x2)),right=Math.min(Math.max(p.x1,p.x2),Math.max(q.x1,q.x2));
+      if(right<=left)continue;
+      const at=(c:typeof p,x:number)=>c.y1+(c.y2-c.y1)*(x-c.x1)/(c.x2-c.x1);
+      const d0=at(p,left)-at(q,left),d1=at(p,right)-at(q,right);
+      if(d0*d1>0 && Math.min(Math.abs(d0),Math.abs(d1))>=1.5*(t.beamThickness+1.6))continue;
+      out.push({code:'joint-false-level',severity:'error',system:layout.index,noteIds:[...a.notes,...b.notes].map(n=>n.id),message:`Independent joint routes ${l.level}/${r.level} form an apparent duration-level stack or shared beam.`});
+    }
+  }
+  const stems=[...scene.beams.flat(),...Array.from(scene.solos).filter(([id])=>!scene.soloAliases?.has(id)).flatMap(([,p])=>p)].flatMap(p=>p.shape.kind==='stem'?[{ownerIds:p.ownerIds,shape:p.shape}]:[]);
+  for(let i=0;i<stems.length;i++)for(let j=i+1;j<stems.length;j++){
+    const a=stems[i],b=stems[j];
+    if(a.ownerIds.some(id=>b.ownerIds.includes(id)))continue;
+    if(beamStemBoxes(a).some(p=>beamStemBoxes(b).some(q=>Math.min(p.x1,q.x1)-Math.max(p.x0,q.x0)>=-.02 && Math.min(p.y1,q.y1)-Math.max(p.y0,q.y0)>2*t.noteheadRadius)))
+      out.push({code:'joint-stem-fusion',severity:'error',system:layout.index,noteIds:[...a.ownerIds,...b.ownerIds],message:'Independent joint stems touch or fuse beyond their head attachments.'});
+  }
+}
+
 /** Expression inventory/geometry is independent of the musical duration grammar. */
 export function checkExpressionIntegrity(score: QuantizedGridScore, layout: JankoSystemLayout,
   o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, out: LintViolation[]): void {
@@ -6437,6 +6469,7 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
     checkGraceIntegrity(score, layout, o, t, diagnostics);
     checkExpressionIntegrity(score,layout,o,t,diagnostics);
     checkVoiceBeamCorridors(layout,t,diagnostics,o,placedScene);
+    if(o.jointVoices)checkJointRouteSeparation(layout,placedScene ?? buildInkScene(layout,o,t,score),o,t,diagnostics);
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
     checkKnockoutCoverage(layout, o, t, thresholds, diagnostics);
     checkStemAndBeamValidity(layout, t, thresholds, diagnostics);

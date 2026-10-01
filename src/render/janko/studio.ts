@@ -817,7 +817,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
         layouts
       );
       return [
-        `<figure class="candidate-window" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}">`,
+        `<figure class="candidate-window" data-score="${escapeHtml(entry.id)}" data-measure-start="${window.measureStart}" data-measure-count="${window.measureCount}" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}">`,
         `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}${prepared ? ` · frame ${svg.match(/viewBox="0 0 ([^"]+)"/)?.[1].split(' ').map(v=>Number(v).toFixed(1)).join(' × ')}pt · window-scoped${options.comparisonPitchFields ? ' · actual painted fields linted; duplicated coordinates, not sounds' : ''}` : ''}</figcaption>`,
         `  <div class="canvas-frame">${canvas(svg)}</div>`,
         '</figure>',
