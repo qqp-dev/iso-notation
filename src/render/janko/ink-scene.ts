@@ -249,7 +249,7 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
       const exception=o.chordGrouping==='per-hand-clasp'&&clasp!==undefined&&note.durationTicks!==claspMemberCarriedTicks(clasp,note.id);
       const grammar=clasp&&!exception?'golden':o.durationGrammar;
       const engraved={...note,durationTicks:carriers.get(note.id)??note.durationTicks};
-      const owners=[note.id,...layout.unisonMerges.filter(m=>m.survivorId===note.id).flatMap(m=>m.mergedIds)];
+      const owners=[note.id,...layout.unisonMerges.filter(m=>m.survivorId===note.id&&(!o.phraseRouting||m.exact)).flatMap(m=>m.mergedIds)];
       solos.set(note.id,soloRhythmPaint(engraved,t,o.subdivisionStyle,grammar,system,pagePiece,owners,soloSources));
     }
   }

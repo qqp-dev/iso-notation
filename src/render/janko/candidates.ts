@@ -1389,7 +1389,7 @@ export const ROUND_58_CANDIDATES:JankoCandidate[]=[
   economical('economical-bevel','Refinement B · stable seats / compact bevel','Same corrected onset seats as A. Physical foreground stroke plus 0.55pt air each side gives 2.00pt apertures; fitted 1.20pt faces taper to 60% thickness without centerline excursion. Less missing contour and shorter, shallower negative-space scallops, not perfect foreground isolation. Price: reduced air and still interrupted rear rails; neither amodal continuity nor lint certifies musical readability.','beveled-compact',true),
 ];
 
-export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+export const ROUND_59_METADATA:JankoCandidateRound={
   round:59,title:'Schumann No. 13 · coordinated independent voices',
   description:'Two presentations of the same complete No. 13 unfolded 38–40. Both readings use corrected source slurs; the control retains Round58 compact B options through the current engine, not original Round58 bytes. Henle printed35–36 maps to internal38–40, including the split ending and fp pickup. Joint planning chooses concurrent same-direction courses before fitting their real head contours and independent level corridors, including the tied approach from37, repeated A♯4 and unequal-value continuations. Independent voices, source-value stagger and RH-up/LH-down remain. No voice taxonomy, default adoption or pixel acceptance is implied. Reference unchanged.',
   openAxes:['jointVoices'],
@@ -1398,9 +1398,23 @@ export const CURRENT_ROUND_METADATA:JankoCandidateRound={
 const JOINT_WINDOWS:JankoScoreCandidateWindow[]=[
   {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,completeSystems:true,title:'No. 13 · Henle printed35–36 / internal38–40, whole concurrent gesture',caption:SCHUMANN_NO13_ENDING_CITATION.caption+' Carry from37, 1/9 at3312, b/8 at3324, a/6 at3336 (a is A♯4), repeated A♯4 against F♯5→C♯5→D♯5→E5, then39 unequal values and40/fp. Same immutable clocks, ties, voices, hands and +5.46pt source-value stagger. Primaries stay distinct; compact owner-linked ports are rebuilt from the planned routes. Geometry is not pixel acceptance.'},
 ];
-export const CURRENT_CANDIDATES:JankoCandidate[]=[
+export const ROUND_59_CANDIDATES:JankoCandidate[]=[
   {...ROUND_58_CANDIDATES[2],id:'joint-control',label:'Control · independently fitted voice courses',description:'Round58 compact B options through the current engine and corrected source slurs, at the same containing-system geometry. This is not byte-identical to original served Round58. No joint planning. Historical registry remains addressable.',windows:JOINT_WINDOWS},
   {...ROUND_58_CANDIDATES[2],id:'joint-compact',label:'Joint voices · aligned courses',description:'Concurrent rhythmic obligations choose a shared preferred course before physical anchor/clearance solving. Real changing contours keep separate anchors and level corridors; independent primaries are never merged or admitted as extra duration levels. Original head/stagger mechanics and the compact silhouette remain. Price: clearance-driven longer stems and interrupted rear contours; no claim of musician or pixel acceptance.',options:{...ROUND_58_CANDIDATES[2].options,jointVoices:true},windows:JOINT_WINDOWS},
+];
+
+export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+ round:60,title:'Schumann No. 13 · local phrasing and shared B',
+ description:'Current aligned reading, corrected source slurs routed near their own gestures, and two shared-head B treatments for joint design review. Henle printed35–36 maps to internal38–40 with the split ending and fp pickup. The moving eighth B–6–4 and held quarter B–4 retain both source owners and reunite on the shared4. Shorter and longer bare B stems are alternatives, not selected solutions. RH-up/LH-down, onset/head alignment and written values remain; Reference/default/PDF are unchanged.',
+ openAxes:['phraseRouting','completeFlagClearance','sharedHeadTerminal'],
+ compareStrip:{scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:2,title:'Printed35–36 · phrasing first, then compare the shared B'},
+};
+const repaired={...ROUND_59_CANDIDATES[1].options,phraseRouting:'local' as const,completeFlagClearance:true as const};
+export const CURRENT_CANDIDATES:JankoCandidate[]=[
+ {...ROUND_59_CANDIDATES[1],label:'Current alignment · original phrasing / B',description:'Retained Round59 aligned reading through the current engine. Original phrase router and shared B terminals. Includes the distant B–6–4 slur and the known full-flag/foreign-rail clearance defect; zero historical lint was not a readability verdict.'},
+ {...ROUND_59_CANDIDATES[1],id:'local-phrasing',label:'Local phrasing · original B',description:'Source slurs are planned together near their own notes, with independent asymmetric controls and complete solo-flag clearance. Original shared B stem arrangement retained so the effect of phrasing can be judged separately. All source curves and durations survive.',options:repaired},
+ {...ROUND_59_CANDIDATES[1],id:'shared-b-short',label:'Shared B · shorter bare stem',description:'Same repaired phrasing and complete flags. The held quarter B gets a shorter bare branch while the moving eighth B keeps its beam toward6. One visible B, both written values and both source slurs. Price: a compact bare branch and a larger gap to its lower slur where the moving beam occupies the intervening space. Candidate for discussion.',options:{...repaired,sharedHeadTerminal:'short'}},
+ {...ROUND_59_CANDIDATES[1],id:'shared-b-long',label:'Shared B · longer bare stem',description:'Same repaired phrasing and complete flags. The held quarter B gets a bare branch beyond the moving eighth beam, with its lower slur following the settled quarter ending. One visible B, both written values and both source slurs. Price: more parallel stem ink and a lower phrasing envelope. Candidate for discussion.',options:{...repaired,sharedHeadTerminal:'long'}},
 ];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
@@ -1473,6 +1487,7 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_59_CANDIDATES.find((c) => c.id === id) ??
     ROUND_58_CANDIDATES.find((c) => c.id === id) ??
     ROUND_57_CANDIDATES.find((c) => c.id === id) ??
     ROUND_56_CANDIDATES.find((c) => c.id === id) ??

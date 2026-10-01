@@ -205,6 +205,8 @@ import { durationDotCount, durationFlagCount } from './elements/duration';
 import { placedBeamGroup, routeVoiceUnderpasses, beamPieceIntersectsBox, beamPieceBox } from './beam-scene';
 import { onsetSlotShift } from './onset-slots';
 import { soloRhythmPaint } from './solo-scene';
+import { sourcePhraseEndpointEnvelope,phraseMusicObstacles } from './expression-anchors';
+import {fitCompleteSoloFlags,fitSharedBareTerminals} from './duration-fitting';
 import { placeEventHandMarks, eventHandMarksSvg, type EventHandMark } from './hand-marks';
 import { seatLocalFlags } from './local-flag-seats';
 import { bendRhRibbons } from './bent-ribbons';
@@ -1980,6 +1982,8 @@ export interface JankoSystemLayout {
    * which never assumed a single hand — and stands on the merged head's column.
    */
   unisonVoices: PositionedJankoNote[];
+  /** Failed complete standalone flag admission; never silently accepted. */
+  completeFlagRefusals?: string[];
   /** Round 27: Gould-shaped ottava spanner brackets rendered for this system. */
   ottavaBrackets: JankoOttavaBracket[];
   /**
@@ -7606,6 +7610,7 @@ export function layoutJankoSystemShifted(
 
   let beams: JankoBeamGroupGeometry[] = [];
   let ungrouped: JankoRhythmNote[] = [];
+  let completeFlagRefusals:string[]=[];
   const sharedCarrierBars:number[]=[];
   if(o.rhythmStyle!=='beamed'&&o.shareAttackHeads)for(const merge of unisonMerges.filter(m=>!m.exact)){
     const members=[...notes,...unisonVoices].filter(p=>[merge.survivorId,...merge.mergedIds].includes(p.note.id));
@@ -7670,6 +7675,11 @@ export function layoutJankoSystemShifted(
     if(o.beamContour==='bent'||o.sharedRhCarrier){
       for(const merge of unisonMerges.filter(m=>!m.exact))for(const n of rhythmNotes.filter(n=>[merge.survivorId,...merge.mergedIds].includes(n.id)&&n.durationTicks>=48))n.stemLength=10;
       if(o.beamContour==='bent')beams=bendRhRibbons(beams,notes,o,t,id=>unisonMerges.find(m=>m.mergedIds.includes(id))?.survivorId??id);
+    }
+    if(o.sharedHeadTerminal)fitSharedBareTerminals(ungrouped,beams,unisonMerges,o.sharedHeadTerminal,t);
+    if(o.completeFlagClearance){
+      const heads=notes.map(n=>{const {wx,hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return {id:n.note.id,ownerIds:[n.note.id,...unisonMerges.filter(m=>m.survivorId===n.note.id).flatMap(m=>m.mergedIds)],x0:n.x-wx,x1:n.x+wx,y0:n.y-hy,y1:n.y+hy};}).concat(restLayer.rests.map((r,i)=>({id:`rest-${i}`,ownerIds:[] as string[],...restAdmissionBox(r,t)})));
+      completeFlagRefusals=fitCompleteSoloFlags(ungrouped,beams,heads,o,t);
     }
     if(o.clarityPass && beams.length){
       // Earn independent solo tip length BEFORE dependent duration/curve ink.
@@ -10096,6 +10106,7 @@ export function layoutJankoSystemShifted(
           ]),
     unisonMerges,
     unisonVoices,
+    ...(o.completeFlagClearance?{completeFlagRefusals}:{}),
     ottavaBrackets,
     clusterDiagnostics: chordColumns.diagnostics,
     claspQualifiedIds: chordColumns.claspQualifiedIds,
@@ -10140,9 +10151,14 @@ export function layoutJankoSystemShifted(
     layout.expressions = placeExpressions(score,{ ...(field?{include:field.includeExpression}:{}),start:startTick,end:endTick,left:geometry.staffLeft,right:geometry.staffRight,
       top:ink.top,bottom:ink.bottom,x:tickX,
       clarity:o.clarityPass, dynamicScale:t.dynamicScale,contourThickness:t.tieApexThickness,
-      obstacles:[...painted.filter(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what)),
+      phraseRouting:o.phraseRouting,
+      obstacles:[...(o.phraseRouting==='local'?phraseMusicObstacles(layout,o,t):painted.filter(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what))),
         ...flaggedNotes.map(n=>{const {wx,hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return {x0:n.x-wx,x1:n.x+wx,y0:n.y-hy,y1:n.y+hy};})],
       endpointEnvelope: (ids,tick) => {
+        if(o.phraseRouting==='local'){
+          const owned=sourcePhraseEndpointEnvelope(layout,ids,tick,o,t);
+          if(owned)return owned;
+        }
         const heads=endpointHeads(ids,tick);
         if (!heads.length) return undefined;
         const rhythmEnds=heads.map(n=>{
@@ -11013,4 +11029,3 @@ export {
   getBarStaffSegments,
   getBarStaffRows,
 };
-

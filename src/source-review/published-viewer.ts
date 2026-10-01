@@ -13,7 +13,7 @@ let mode: 'source' | 'engraving' = 'engraving';
 try { if (sessionStorage.getItem('janko-candidates-mode') === 'source') mode = 'source'; } catch { /* private session */ }
 // Separate from development PDF choices: no migration or deletion of saved work.
 const STORAGE_KEY = 'janko-published-comparison-v1';
-let readingId = 'joint-compact';
+let readingId = 'local-phrasing';
 let mobilePane: 'reference' | 'candidate' = 'reference';
 const zoom = { reference: 1, candidate: 1 };
 try {

@@ -2,7 +2,8 @@ import { normalizePedalEvents } from '../../../model/expressions';
 /** Source-timed expression ink in Janko coordinates. No sounding durations are altered. */
 import type { QuantizedGridScore } from '../../../model/types';
 import { DYNAMIC_PATHS } from './dynamic-paths';
-import { taperedSpanPath } from '../ties';
+import { taperedSpanPath, type TaperedSpanProfile } from '../ties';
+import { routeLocalPhrases } from '../phrase-routing';
 
 export interface ExpressionInk {
   kind: 'dynamic' | 'hairpin' | 'pedal' | 'phrase';
@@ -13,10 +14,11 @@ export interface ExpressionInk {
   endpointIds?: [string[], string[]];
   svg: string;
   /** Filled contour, not its (mostly empty) bounding rectangle. */
-  contour?: {xStart:number;xEnd:number;yStart:number;yEnd:number;side:-1|1;depth:number;thickness:number;indent:number};
+  contour?: {xStart:number;xEnd:number;yStart:number;yEnd:number;side:-1|1;depth:number;thickness:number;indent:number} & TaperedSpanProfile;
   gridKnockout?: boolean;
+  routingIssue?: string;
 }
-interface Placement {
+export interface ExpressionPlacement {
   /** Display-field membership only; original source arrays remain untouched. */
   include?: (kind:ExpressionInk['kind'],id:string)=>boolean;
   start: number; end: number; left: number; right: number;
@@ -28,6 +30,7 @@ interface Placement {
   clarity?: boolean;
   dynamicScale?: number;
   contourThickness?: number;
+  phraseRouting?: 'local';
 }
 const f = (n: number) => n.toFixed(3);
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]!));
@@ -53,7 +56,7 @@ export function pedalIntervals(score: Pick<QuantizedGridScore, 'pedals' | 'total
   return intervals;
 }
 
-export function placeExpressions(score: QuantizedGridScore, p: Placement): ExpressionInk[] {
+export function placeExpressions(score: QuantizedGridScore, p: ExpressionPlacement): ExpressionInk[] {
   const out: ExpressionInk[] = [];
   const x = (tick: number) => tick <= p.start ? p.left : tick >= p.end ? p.right : p.x(tick);
   const add = (ink: ExpressionInk) => {
@@ -84,7 +87,7 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
     let side: -1|1 = sourceSide ?? -1;
     let y0 = side === -1 ? p.top-6-lane*9 : p.bottom+6+lane*9, y1=y0, depth=5;
     const thickness = p.contourThickness ?? .45;
-    if (local && (a || b)) {
+    if (!p.phraseRouting && local && (a || b)) {
       const preferred = sourceSide ?? ((a ?? b)!.hand === 'LH' ? 1 : -1);
       let best = Infinity;
       // Candidate depth and lift do not change sampled x. Reuse the exact
@@ -146,6 +149,7 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
       svg:(local?`<path class="janko-phrase-grid-knockout" d="${d}" fill="white" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>`:'')+
         `<path class="janko-phrase" data-phrase="${esc(phrase.id)}" d="${d}" fill="#111111"/>`});
   }
+  if(p.phraseRouting==='local')out.splice(0,out.length,...routeLocalPhrases(score,p,out));
   const dynamicLanes: { x0: number; x1: number; lane: number }[] = [];
   for (const [index,e] of (score.dynamics ?? []).entries()) {
     const hairpin = e.kind === 'hairpin' || (!e.kind && ['crescendo','decrescendo'].includes(e.mark) && !!e.durationTicks);
@@ -201,12 +205,14 @@ export function placeExpressions(score: QuantizedGridScore, p: Placement): Expre
 /** Vertical interval occupied by a monotone two-cubic contour at page x. */
 export function expressionSliceAtX(q:ExpressionInk,x:number):[number,number]|undefined {
   if(!q.contour || x<=q.contour.xStart || x>=q.contour.xEnd)return undefined;
-  const c=q.contour,x0=c.xStart,x1=c.xEnd,ax=x0+c.indent,bx=x1-c.indent;
+  const c=q.contour,x0=c.xStart,x1=c.xEnd,ax=x0+(c.startIndent??c.indent),bx=x1-(c.endIndent??c.indent);
   let lo=0,hi=1;
   for(let i=0;i<32;i++){const u=(lo+hi)/2,v=1-u;
     const cx=v*v*v*x0+3*v*v*u*ax+3*v*u*u*bx+u*u*u*x1;if(cx<x)lo=u;else hi=u;}
   const u=(lo+hi)/2,v=1-u,axis=c.yStart*(v*v*v+3*v*v*u)+c.yEnd*(3*v*u*u+u*u*u);
-  const bulge=3*v*u/.75,outer=axis+c.side*c.depth*bulge,inner=axis+c.side*Math.max(0,c.depth-c.thickness)*bulge;
+  const start=c.startDepth??c.depth,end=c.endDepth??c.depth;
+  const outer=axis+c.side*(3*v*v*u*start+3*v*u*u*end)/.75;
+  const inner=axis+c.side*(3*v*v*u*Math.max(0,start-c.thickness)+3*v*u*u*Math.max(0,end-c.thickness))/.75;
   return [Math.min(outer,inner),Math.max(outer,inner)];
 }
 export function expressionsOverlap(a:ExpressionInk,b:ExpressionInk):boolean {
@@ -229,13 +235,15 @@ export function expressionIntersectsBox(q: ExpressionInk,b:{x0:number;x1:number;
   if(q.x0>=b.x1||q.x1<=b.x0||q.y0>=b.y1||q.y1<=b.y0)return false;
   if(!q.contour)return true;
   const c=q.contour, points:number[][]=[];
-  const sample=(u:number,offset:number)=>{
-    const v=1-u,ax=c.xStart+c.indent,bx=c.xEnd-c.indent;
+  const sample=(u:number,inner:boolean)=>{
+    const v=1-u,ax=c.xStart+(c.startIndent??c.indent),bx=c.xEnd-(c.endIndent??c.indent);
+    const a=c.side*Math.max(0,(c.startDepth??c.depth)-(inner?c.thickness:0))/.75;
+    const b=c.side*Math.max(0,(c.endDepth??c.depth)-(inner?c.thickness:0))/.75;
     return [v*v*v*c.xStart+3*v*v*u*ax+3*v*u*u*bx+u*u*u*c.xEnd,
-      v*v*v*c.yStart+3*v*v*u*(c.yStart+offset)+3*v*u*u*(c.yEnd+offset)+u*u*u*c.yEnd];
+      v*v*v*c.yStart+3*v*v*u*(c.yStart+a)+3*v*u*u*(c.yEnd+b)+u*u*u*c.yEnd];
   };
-  for(let i=0;i<=128;i++)points.push(sample(i/128,c.side*c.depth/.75));
-  for(let i=128;i>=0;i--)points.push(sample(i/128,c.side*Math.max(0,c.depth-c.thickness)/.75));
+  for(let i=0;i<=128;i++)points.push(sample(i/128,false));
+  for(let i=128;i>=0;i--)points.push(sample(i/128,true));
   let poly=points;
   const clip=(axis:number,bound:number,sign:number)=>{
     const input=poly;poly=[];
