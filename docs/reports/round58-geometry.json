@@ -1,0 +1,1591 @@
+{
+  "base": "b671414042e050330c2b73b4f387ecfe723d7290",
+  "elapsedSeconds": 4.28,
+  "results": [
+    {
+      "candidate": "economical-control",
+      "score": "schumann-op68-no13",
+      "optionsDelta": {
+        "preserveGestureMembership": true,
+        "shareAttackHeads": true,
+        "independentUnisonAttachments": true,
+        "shareCompatibleLocalRhythm": true,
+        "crossingConvention": "layered",
+        "depthProfile": "beveled"
+      },
+      "violations": [],
+      "warnings": [],
+      "windows": [
+        {
+          "title": "No. 13 · unfolded 38–40, focus 39",
+          "viewBox": "0 0 571.48 200.57225",
+          "inlineSVG": true
+        }
+      ],
+      "systems": [
+        {
+          "index": 12,
+          "firstMeasure": 38,
+          "measuresPerSystem": 3,
+          "staffWidth": 543.48,
+          "onsets": [
+            {
+              "id": "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+              "tick": 3360,
+              "x": 197.93725592085397,
+              "nominal": 187.01725592085398,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:240:37:lower:42:1",
+              "tick": 3360,
+              "x": 187.01725592085398,
+              "nominal": 187.01725592085398,
+              "voice": "lower",
+              "hand": "LH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:56:upper.1:58:1",
+              "tick": 3360,
+              "x": 187.01725592085398,
+              "nominal": 187.01725592085398,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:39:upper.0:64:1",
+              "tick": 3384,
+              "x": 259.6763412278053,
+              "nominal": 248.7563412278053,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+              "tick": 3384,
+              "x": 248.7563412278053,
+              "nominal": 248.7563412278053,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:43:lower.1:47:1",
+              "tick": 3384,
+              "x": 248.7563412278053,
+              "nominal": 248.7563412278053,
+              "voice": "lower.1",
+              "hand": "LH",
+              "value": 48
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:48:upper.0:63:1",
+              "tick": 3408,
+              "x": 313.9066227499906,
+              "nominal": 308.44662274999064,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:24:lower.0:54:1",
+              "tick": 3408,
+              "x": 308.44662274999064,
+              "nominal": 308.44662274999064,
+              "voice": "lower.0",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+              "tick": 3408,
+              "x": 308.44662274999064,
+              "nominal": 308.44662274999064,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:56:upper.0:64:1",
+              "tick": 3432,
+              "x": 373.5969042721759,
+              "nominal": 368.1369042721759,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:31:lower.0:52:1",
+              "tick": 3432,
+              "x": 368.1369042721759,
+              "nominal": 368.1369042721759,
+              "voice": "lower.0",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+              "tick": 3432,
+              "x": 368.1369042721759,
+              "nominal": 368.1369042721759,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            }
+          ],
+          "routes": [
+            {
+              "level": 1,
+              "rail": "s12:beam:3288:13-Mai-cher-Mai.ly:116:27:upper.1:64:1,13-Mai-cher-Mai.ly:116:33:upper.1:62:1,13-Mai-cher-Mai.ly:116:39:upper.1:61:1,13-Mai-cher-Mai.ly:116:45:upper.1:59:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:27:upper.1:64:1",
+                "13-Mai-cher-Mai.ly:116:33:upper.1:62:1",
+                "13-Mai-cher-Mai.ly:116:39:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:45:upper.1:59:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1"
+                  ],
+                  "entry": 47.37,
+                  "exit": 50.07,
+                  "shoulders": [
+                    45.77,
+                    51.67
+                  ],
+                  "visibleApproach": 10.009999999999998,
+                  "visibleExit": 62.779999999999994,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.899999999999999
+                },
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:114:44:upper.0:69:1"
+                  ],
+                  "entry": 97.11,
+                  "exit": 99.81,
+                  "shoulders": [
+                    95.51,
+                    101.41
+                  ],
+                  "visibleApproach": 59.75,
+                  "visibleExit": 13.039999999999992,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.8999999999999915
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3288:13-Mai-cher-Mai.ly:116:27:upper.1:64:1,13-Mai-cher-Mai.ly:116:33:upper.1:62:1,13-Mai-cher-Mai.ly:116:39:upper.1:61:1,13-Mai-cher-Mai.ly:116:45:upper.1:59:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:27:upper.1:64:1",
+                "13-Mai-cher-Mai.ly:116:33:upper.1:62:1",
+                "13-Mai-cher-Mai.ly:116:39:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:45:upper.1:59:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1"
+                  ],
+                  "entry": 47.37,
+                  "exit": 50.07,
+                  "shoulders": [
+                    45.77,
+                    51.67
+                  ],
+                  "visibleApproach": 10.009999999999998,
+                  "visibleExit": 62.779999999999994,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.899999999999999
+                },
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:114:44:upper.0:69:1"
+                  ],
+                  "entry": 97.11,
+                  "exit": 99.81,
+                  "shoulders": [
+                    95.51,
+                    101.41
+                  ],
+                  "visibleApproach": 59.75,
+                  "visibleExit": 13.039999999999992,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.8999999999999915
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3336:13-Mai-cher-Mai.ly:114:56:upper.0:66:1,13-Mai-cher-Mai.ly:114:63:upper.0:61:1,13-Mai-cher-Mai.ly:114:71:upper.0:63:1,13-Mai-cher-Mai.ly:114:75:upper.0:64:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:114:56:upper.0:66:1",
+                "13-Mai-cher-Mai.ly:114:63:upper.0:61:1",
+                "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+                "13-Mai-cher-Mai.ly:114:75:upper.0:64:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3336:13-Mai-cher-Mai.ly:116:49:upper.1:58:1,13-Mai-cher-Mai.ly:116:56:upper.1:58:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:116:56:upper.1:58:1"
+                  ],
+                  "entry": 185.67,
+                  "exit": 188.37,
+                  "shoulders": [
+                    184.07,
+                    189.97
+                  ],
+                  "visibleApproach": 37.91999999999999,
+                  "visibleExit": 23.97,
+                  "aperture": 2.700000000000017,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3336:13-Mai-cher-Mai.ly:114:56:upper.0:66:1,13-Mai-cher-Mai.ly:114:63:upper.0:61:1,13-Mai-cher-Mai.ly:114:71:upper.0:63:1,13-Mai-cher-Mai.ly:114:75:upper.0:64:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:114:56:upper.0:66:1",
+                "13-Mai-cher-Mai.ly:114:63:upper.0:61:1",
+                "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+                "13-Mai-cher-Mai.ly:114:75:upper.0:64:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3336:13-Mai-cher-Mai.ly:116:49:upper.1:58:1,13-Mai-cher-Mai.ly:116:56:upper.1:58:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:116:56:upper.1:58:1"
+                  ],
+                  "entry": 185.67,
+                  "exit": 188.37,
+                  "shoulders": [
+                    184.07,
+                    189.97
+                  ],
+                  "visibleApproach": 37.91999999999999,
+                  "visibleExit": 23.97,
+                  "aperture": 2.700000000000017,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3384:13-Mai-cher-Mai.ly:116:61:upper.1:57:1,13-Mai-cher-Mai.ly:116:68:upper.1:61:1,13-Mai-cher-Mai.ly:116:75:upper.1:59:1,13-Mai-cher-Mai.ly:116:81:upper.1:57:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:68:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+                "13-Mai-cher-Mai.ly:116:81:upper.1:57:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:39:upper.0:64:1"
+                  ],
+                  "entry": 258.33,
+                  "exit": 261.03,
+                  "shoulders": [
+                    256.73,
+                    262.63
+                  ],
+                  "visibleApproach": 10.019999999999982,
+                  "visibleExit": 77.71000000000004,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.899999999999977
+                },
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:48:upper.0:63:1"
+                  ],
+                  "entry": 312.56,
+                  "exit": 315.26,
+                  "shoulders": [
+                    310.96,
+                    316.86
+                  ],
+                  "visibleApproach": 64.25,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3384:13-Mai-cher-Mai.ly:116:61:upper.1:57:1,13-Mai-cher-Mai.ly:116:68:upper.1:61:1,13-Mai-cher-Mai.ly:116:75:upper.1:59:1,13-Mai-cher-Mai.ly:116:81:upper.1:57:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:68:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+                "13-Mai-cher-Mai.ly:116:81:upper.1:57:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:39:upper.0:64:1"
+                  ],
+                  "entry": 258.33,
+                  "exit": 261.03,
+                  "shoulders": [
+                    256.73,
+                    262.63
+                  ],
+                  "visibleApproach": 10.019999999999982,
+                  "visibleExit": 77.71000000000004,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.899999999999977
+                },
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:48:upper.0:63:1"
+                  ],
+                  "entry": 312.56,
+                  "exit": 315.26,
+                  "shoulders": [
+                    310.96,
+                    316.86
+                  ],
+                  "visibleApproach": 64.25,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3432:13-Mai-cher-Mai.ly:116:101:upper.1:57:1,13-Mai-cher-Mai.ly:116:118:upper.1:56:1:2",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:118:upper.1:56:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:solo:13-Mai-cher-Mai.ly:115:56:upper.0:64:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:56:upper.0:64:1"
+                  ],
+                  "entry": 372.25,
+                  "exit": 374.95,
+                  "shoulders": [
+                    370.65,
+                    376.55
+                  ],
+                  "visibleApproach": 4.560000000000002,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3432:13-Mai-cher-Mai.ly:116:101:upper.1:57:1,13-Mai-cher-Mai.ly:116:118:upper.1:56:1:3",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:118:upper.1:56:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:solo:13-Mai-cher-Mai.ly:115:56:upper.0:64:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:56:upper.0:64:1"
+                  ],
+                  "entry": 372.25,
+                  "exit": 374.95,
+                  "shoulders": [
+                    370.65,
+                    376.55
+                  ],
+                  "visibleApproach": 4.560000000000002,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "economical-slots",
+      "score": "schumann-op68-no13",
+      "optionsDelta": {
+        "preserveGestureMembership": true,
+        "shareAttackHeads": true,
+        "independentUnisonAttachments": true,
+        "shareCompatibleLocalRhythm": true,
+        "crossingConvention": "layered",
+        "depthProfile": "beveled",
+        "stableOnsets": true
+      },
+      "violations": [],
+      "warnings": [],
+      "windows": [
+        {
+          "title": "No. 13 · unfolded 38–40, focus 39",
+          "viewBox": "0 0 571.48 201.88225",
+          "inlineSVG": true
+        }
+      ],
+      "systems": [
+        {
+          "index": 12,
+          "firstMeasure": 38,
+          "measuresPerSystem": 3,
+          "staffWidth": 543.48,
+          "onsets": [
+            {
+              "id": "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+              "tick": 3360,
+              "x": 192.477255920854,
+              "nominal": 187.01725592085398,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:240:37:lower:42:1",
+              "tick": 3360,
+              "x": 187.01725592085398,
+              "nominal": 187.01725592085398,
+              "voice": "lower",
+              "hand": "LH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:56:upper.1:58:1",
+              "tick": 3360,
+              "x": 187.01725592085398,
+              "nominal": 187.01725592085398,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:39:upper.0:64:1",
+              "tick": 3384,
+              "x": 254.21634122780532,
+              "nominal": 248.7563412278053,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+              "tick": 3384,
+              "x": 248.7563412278053,
+              "nominal": 248.7563412278053,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:43:lower.1:47:1",
+              "tick": 3384,
+              "x": 248.7563412278053,
+              "nominal": 248.7563412278053,
+              "voice": "lower.1",
+              "hand": "LH",
+              "value": 48
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:48:upper.0:63:1",
+              "tick": 3408,
+              "x": 313.9066227499906,
+              "nominal": 308.44662274999064,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:24:lower.0:54:1",
+              "tick": 3408,
+              "x": 308.44662274999064,
+              "nominal": 308.44662274999064,
+              "voice": "lower.0",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+              "tick": 3408,
+              "x": 308.44662274999064,
+              "nominal": 308.44662274999064,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:56:upper.0:64:1",
+              "tick": 3432,
+              "x": 373.5969042721759,
+              "nominal": 368.1369042721759,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:31:lower.0:52:1",
+              "tick": 3432,
+              "x": 368.1369042721759,
+              "nominal": 368.1369042721759,
+              "voice": "lower.0",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+              "tick": 3432,
+              "x": 368.1369042721759,
+              "nominal": 368.1369042721759,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            }
+          ],
+          "routes": [
+            {
+              "level": 1,
+              "rail": "s12:beam:3288:13-Mai-cher-Mai.ly:116:27:upper.1:64:1,13-Mai-cher-Mai.ly:116:33:upper.1:62:1,13-Mai-cher-Mai.ly:116:39:upper.1:61:1,13-Mai-cher-Mai.ly:116:45:upper.1:59:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:27:upper.1:64:1",
+                "13-Mai-cher-Mai.ly:116:33:upper.1:62:1",
+                "13-Mai-cher-Mai.ly:116:39:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:45:upper.1:59:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1"
+                  ],
+                  "entry": 41.91,
+                  "exit": 44.61,
+                  "shoulders": [
+                    40.31,
+                    46.21
+                  ],
+                  "visibleApproach": 4.549999999999997,
+                  "visibleExit": 68.24,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.899999999999999
+                },
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:114:44:upper.0:69:1"
+                  ],
+                  "entry": 91.65,
+                  "exit": 94.35,
+                  "shoulders": [
+                    90.05,
+                    95.95
+                  ],
+                  "visibleApproach": 54.290000000000006,
+                  "visibleExit": 18.5,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3288:13-Mai-cher-Mai.ly:116:27:upper.1:64:1,13-Mai-cher-Mai.ly:116:33:upper.1:62:1,13-Mai-cher-Mai.ly:116:39:upper.1:61:1,13-Mai-cher-Mai.ly:116:45:upper.1:59:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:27:upper.1:64:1",
+                "13-Mai-cher-Mai.ly:116:33:upper.1:62:1",
+                "13-Mai-cher-Mai.ly:116:39:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:45:upper.1:59:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1"
+                  ],
+                  "entry": 41.91,
+                  "exit": 44.61,
+                  "shoulders": [
+                    40.31,
+                    46.21
+                  ],
+                  "visibleApproach": 4.549999999999997,
+                  "visibleExit": 68.24,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.899999999999999
+                },
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:114:44:upper.0:69:1"
+                  ],
+                  "entry": 91.65,
+                  "exit": 94.35,
+                  "shoulders": [
+                    90.05,
+                    95.95
+                  ],
+                  "visibleApproach": 54.290000000000006,
+                  "visibleExit": 18.5,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3336:13-Mai-cher-Mai.ly:114:56:upper.0:66:1,13-Mai-cher-Mai.ly:114:63:upper.0:61:1,13-Mai-cher-Mai.ly:114:71:upper.0:63:1,13-Mai-cher-Mai.ly:114:75:upper.0:64:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:114:56:upper.0:66:1",
+                "13-Mai-cher-Mai.ly:114:63:upper.0:61:1",
+                "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+                "13-Mai-cher-Mai.ly:114:75:upper.0:64:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3336:13-Mai-cher-Mai.ly:116:49:upper.1:58:1,13-Mai-cher-Mai.ly:116:56:upper.1:58:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:116:56:upper.1:58:1"
+                  ],
+                  "entry": 185.67,
+                  "exit": 188.37,
+                  "shoulders": [
+                    184.07,
+                    189.97
+                  ],
+                  "visibleApproach": 43.379999999999995,
+                  "visibleExit": 23.97,
+                  "aperture": 2.700000000000017,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3336:13-Mai-cher-Mai.ly:114:56:upper.0:66:1,13-Mai-cher-Mai.ly:114:63:upper.0:61:1,13-Mai-cher-Mai.ly:114:71:upper.0:63:1,13-Mai-cher-Mai.ly:114:75:upper.0:64:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:114:56:upper.0:66:1",
+                "13-Mai-cher-Mai.ly:114:63:upper.0:61:1",
+                "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+                "13-Mai-cher-Mai.ly:114:75:upper.0:64:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3336:13-Mai-cher-Mai.ly:116:49:upper.1:58:1,13-Mai-cher-Mai.ly:116:56:upper.1:58:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:116:56:upper.1:58:1"
+                  ],
+                  "entry": 185.67,
+                  "exit": 188.37,
+                  "shoulders": [
+                    184.07,
+                    189.97
+                  ],
+                  "visibleApproach": 43.379999999999995,
+                  "visibleExit": 23.97,
+                  "aperture": 2.700000000000017,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3384:13-Mai-cher-Mai.ly:116:61:upper.1:57:1,13-Mai-cher-Mai.ly:116:68:upper.1:61:1,13-Mai-cher-Mai.ly:116:75:upper.1:59:1,13-Mai-cher-Mai.ly:116:81:upper.1:57:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:68:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+                "13-Mai-cher-Mai.ly:116:81:upper.1:57:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:39:upper.0:64:1"
+                  ],
+                  "entry": 252.87,
+                  "exit": 255.57,
+                  "shoulders": [
+                    251.27,
+                    257.17
+                  ],
+                  "visibleApproach": 4.560000000000002,
+                  "visibleExit": 83.17000000000002,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000006
+                },
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:48:upper.0:63:1"
+                  ],
+                  "entry": 312.56,
+                  "exit": 315.26,
+                  "shoulders": [
+                    310.96,
+                    316.86
+                  ],
+                  "visibleApproach": 64.25,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3384:13-Mai-cher-Mai.ly:116:61:upper.1:57:1,13-Mai-cher-Mai.ly:116:68:upper.1:61:1,13-Mai-cher-Mai.ly:116:75:upper.1:59:1,13-Mai-cher-Mai.ly:116:81:upper.1:57:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:68:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+                "13-Mai-cher-Mai.ly:116:81:upper.1:57:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:39:upper.0:64:1"
+                  ],
+                  "entry": 252.87,
+                  "exit": 255.57,
+                  "shoulders": [
+                    251.27,
+                    257.17
+                  ],
+                  "visibleApproach": 4.560000000000002,
+                  "visibleExit": 83.17000000000002,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000006
+                },
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:48:upper.0:63:1"
+                  ],
+                  "entry": 312.56,
+                  "exit": 315.26,
+                  "shoulders": [
+                    310.96,
+                    316.86
+                  ],
+                  "visibleApproach": 64.25,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3432:13-Mai-cher-Mai.ly:116:101:upper.1:57:1,13-Mai-cher-Mai.ly:116:118:upper.1:56:1:2",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:118:upper.1:56:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:solo:13-Mai-cher-Mai.ly:115:56:upper.0:64:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:56:upper.0:64:1"
+                  ],
+                  "entry": 372.25,
+                  "exit": 374.95,
+                  "shoulders": [
+                    370.65,
+                    376.55
+                  ],
+                  "visibleApproach": 4.560000000000002,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3432:13-Mai-cher-Mai.ly:116:101:upper.1:57:1,13-Mai-cher-Mai.ly:116:118:upper.1:56:1:3",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:118:upper.1:56:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:solo:13-Mai-cher-Mai.ly:115:56:upper.0:64:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:56:upper.0:64:1"
+                  ],
+                  "entry": 372.25,
+                  "exit": 374.95,
+                  "shoulders": [
+                    370.65,
+                    376.55
+                  ],
+                  "visibleApproach": 4.560000000000002,
+                  "visibleExit": 23.480000000000018,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000034
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "economical-slots",
+      "score": "brahms-op118-no1",
+      "optionsDelta": {
+        "preserveGestureMembership": true,
+        "shareAttackHeads": true,
+        "independentUnisonAttachments": true,
+        "shareCompatibleLocalRhythm": true,
+        "crossingConvention": "layered",
+        "depthProfile": "beveled",
+        "stableOnsets": true
+      },
+      "violations": [],
+      "warnings": [],
+      "windows": [
+        {
+          "title": "Brahms · unfolded 64–67 / written 35–38, second ending",
+          "viewBox": "0 0 571.48 473.84000000000003",
+          "inlineSVG": true
+        },
+        {
+          "title": "Same Brahms passage · focus unfolded 65–66 / written 36–37",
+          "viewBox": "0 0 287.74 248.09375000000009",
+          "inlineSVG": true
+        }
+      ],
+      "systems": [
+        {
+          "index": 15,
+          "firstMeasure": 61,
+          "measuresPerSystem": 4,
+          "staffWidth": 543.48,
+          "onsets": [],
+          "routes": []
+        },
+        {
+          "index": 16,
+          "firstMeasure": 65,
+          "measuresPerSystem": 4,
+          "staffWidth": 543.48,
+          "onsets": [
+            {
+              "id": "brahms-op118-no1-897",
+              "tick": 12336,
+              "x": 37.8,
+              "nominal": 37.8,
+              "voice": "leftHandUpper",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-899",
+              "tick": 12336,
+              "x": 43.26,
+              "nominal": 37.8,
+              "voice": "rightHandUpper",
+              "hand": "RH",
+              "value": 72
+            },
+            {
+              "id": "brahms-op118-no1-901",
+              "tick": 12360,
+              "x": 53.28375,
+              "nominal": 53.28375,
+              "voice": "leftHandLower",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-909",
+              "tick": 12552,
+              "x": 198.4670007666677,
+              "nominal": 189.15375,
+              "voice": "leftHandLower",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-910",
+              "tick": 12576,
+              "x": 204.63750000000002,
+              "nominal": 204.63750000000002,
+              "voice": "leftHandUpper",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-911",
+              "tick": 12576,
+              "x": 210.09750000000003,
+              "nominal": 204.63750000000002,
+              "voice": "leftHandLower",
+              "hand": "LH",
+              "value": 48
+            }
+          ],
+          "routes": [
+            {
+              "level": 1,
+              "rail": "s16:beam:12336:brahms-op118-no1-897,brahms-op118-no1-900:2",
+              "owners": [
+                "brahms-op118-no1-897",
+                "brahms-op118-no1-898",
+                "brahms-op118-no1-900"
+              ],
+              "ports": [
+                {
+                  "front": "s16:solo:brahms-op118-no1-899:0",
+                  "owners": [
+                    "brahms-op118-no1-899"
+                  ],
+                  "entry": 41.91,
+                  "exit": 44.61,
+                  "shoulders": [
+                    40.31,
+                    46.21
+                  ],
+                  "visibleApproach": 5.849999999999994,
+                  "visibleExit": 10.410000000000004,
+                  "aperture": 2.700000000000003,
+                  "profileExtent": 5.899999999999999
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s16:beam:12576:brahms-op118-no1-910,brahms-op118-no1-912:2",
+              "owners": [
+                "brahms-op118-no1-910",
+                "brahms-op118-no1-912"
+              ],
+              "ports": [
+                {
+                  "front": "s16:solo:brahms-op118-no1-911:0",
+                  "owners": [
+                    "brahms-op118-no1-911"
+                  ],
+                  "entry": 208.75,
+                  "exit": 211.45,
+                  "shoulders": [
+                    207.15,
+                    213.05
+                  ],
+                  "visibleApproach": 4.550000000000011,
+                  "visibleExit": 9.110000000000014,
+                  "aperture": 2.6999999999999886,
+                  "profileExtent": 5.900000000000006
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "economical-bevel",
+      "score": "schumann-op68-no13",
+      "optionsDelta": {
+        "preserveGestureMembership": true,
+        "shareAttackHeads": true,
+        "independentUnisonAttachments": true,
+        "shareCompatibleLocalRhythm": true,
+        "crossingConvention": "layered",
+        "depthProfile": "beveled-compact",
+        "stableOnsets": true
+      },
+      "violations": [],
+      "warnings": [],
+      "windows": [
+        {
+          "title": "No. 13 · unfolded 38–40, focus 39",
+          "viewBox": "0 0 571.48 201.88225",
+          "inlineSVG": true
+        }
+      ],
+      "systems": [
+        {
+          "index": 12,
+          "firstMeasure": 38,
+          "measuresPerSystem": 3,
+          "staffWidth": 543.48,
+          "onsets": [
+            {
+              "id": "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+              "tick": 3360,
+              "x": 192.477255920854,
+              "nominal": 187.01725592085398,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:240:37:lower:42:1",
+              "tick": 3360,
+              "x": 187.01725592085398,
+              "nominal": 187.01725592085398,
+              "voice": "lower",
+              "hand": "LH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:56:upper.1:58:1",
+              "tick": 3360,
+              "x": 187.01725592085398,
+              "nominal": 187.01725592085398,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:39:upper.0:64:1",
+              "tick": 3384,
+              "x": 254.21634122780532,
+              "nominal": 248.7563412278053,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+              "tick": 3384,
+              "x": 248.7563412278053,
+              "nominal": 248.7563412278053,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:43:lower.1:47:1",
+              "tick": 3384,
+              "x": 248.7563412278053,
+              "nominal": 248.7563412278053,
+              "voice": "lower.1",
+              "hand": "LH",
+              "value": 48
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:48:upper.0:63:1",
+              "tick": 3408,
+              "x": 313.9066227499906,
+              "nominal": 308.44662274999064,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:24:lower.0:54:1",
+              "tick": 3408,
+              "x": 308.44662274999064,
+              "nominal": 308.44662274999064,
+              "voice": "lower.0",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+              "tick": 3408,
+              "x": 308.44662274999064,
+              "nominal": 308.44662274999064,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:115:56:upper.0:64:1",
+              "tick": 3432,
+              "x": 373.5969042721759,
+              "nominal": 368.1369042721759,
+              "voice": "upper.0",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:241:31:lower.0:52:1",
+              "tick": 3432,
+              "x": 368.1369042721759,
+              "nominal": 368.1369042721759,
+              "voice": "lower.0",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+              "tick": 3432,
+              "x": 368.1369042721759,
+              "nominal": 368.1369042721759,
+              "voice": "upper.1",
+              "hand": "RH",
+              "value": 12
+            }
+          ],
+          "routes": [
+            {
+              "level": 1,
+              "rail": "s12:beam:3288:13-Mai-cher-Mai.ly:116:27:upper.1:64:1,13-Mai-cher-Mai.ly:116:33:upper.1:62:1,13-Mai-cher-Mai.ly:116:39:upper.1:61:1,13-Mai-cher-Mai.ly:116:45:upper.1:59:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:27:upper.1:64:1",
+                "13-Mai-cher-Mai.ly:116:33:upper.1:62:1",
+                "13-Mai-cher-Mai.ly:116:39:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:45:upper.1:59:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1"
+                  ],
+                  "entry": 42.26,
+                  "exit": 44.26,
+                  "shoulders": [
+                    41.06,
+                    45.46
+                  ],
+                  "visibleApproach": 4.899999999999999,
+                  "visibleExit": 68.59,
+                  "aperture": 2,
+                  "profileExtent": 4.399999999999999
+                },
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:114:44:upper.0:69:1"
+                  ],
+                  "entry": 92,
+                  "exit": 94,
+                  "shoulders": [
+                    90.8,
+                    95.2
+                  ],
+                  "visibleApproach": 54.64,
+                  "visibleExit": 18.849999999999994,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3288:13-Mai-cher-Mai.ly:116:27:upper.1:64:1,13-Mai-cher-Mai.ly:116:33:upper.1:62:1,13-Mai-cher-Mai.ly:116:39:upper.1:61:1,13-Mai-cher-Mai.ly:116:45:upper.1:59:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:27:upper.1:64:1",
+                "13-Mai-cher-Mai.ly:116:33:upper.1:62:1",
+                "13-Mai-cher-Mai.ly:116:39:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:45:upper.1:59:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1"
+                  ],
+                  "entry": 42.26,
+                  "exit": 44.26,
+                  "shoulders": [
+                    41.06,
+                    45.46
+                  ],
+                  "visibleApproach": 4.899999999999999,
+                  "visibleExit": 68.59,
+                  "aperture": 2,
+                  "profileExtent": 4.399999999999999
+                },
+                {
+                  "front": "s12:beam:3288:13-Mai-cher-Mai.ly:113:91:upper.0:71:1~c1,13-Mai-cher-Mai.ly:114:44:upper.0:69:1,13-Mai-cher-Mai.ly:114:50:upper.0:68:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:114:44:upper.0:69:1"
+                  ],
+                  "entry": 92,
+                  "exit": 94,
+                  "shoulders": [
+                    90.8,
+                    95.2
+                  ],
+                  "visibleApproach": 54.64,
+                  "visibleExit": 18.849999999999994,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3336:13-Mai-cher-Mai.ly:114:56:upper.0:66:1,13-Mai-cher-Mai.ly:114:63:upper.0:61:1,13-Mai-cher-Mai.ly:114:71:upper.0:63:1,13-Mai-cher-Mai.ly:114:75:upper.0:64:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:114:56:upper.0:66:1",
+                "13-Mai-cher-Mai.ly:114:63:upper.0:61:1",
+                "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+                "13-Mai-cher-Mai.ly:114:75:upper.0:64:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3336:13-Mai-cher-Mai.ly:116:49:upper.1:58:1,13-Mai-cher-Mai.ly:116:56:upper.1:58:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:116:56:upper.1:58:1"
+                  ],
+                  "entry": 186.02,
+                  "exit": 188.02,
+                  "shoulders": [
+                    184.82,
+                    189.22
+                  ],
+                  "visibleApproach": 43.73000000000002,
+                  "visibleExit": 24.319999999999993,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3336:13-Mai-cher-Mai.ly:114:56:upper.0:66:1,13-Mai-cher-Mai.ly:114:63:upper.0:61:1,13-Mai-cher-Mai.ly:114:71:upper.0:63:1,13-Mai-cher-Mai.ly:114:75:upper.0:64:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:114:56:upper.0:66:1",
+                "13-Mai-cher-Mai.ly:114:63:upper.0:61:1",
+                "13-Mai-cher-Mai.ly:114:71:upper.0:63:1",
+                "13-Mai-cher-Mai.ly:114:75:upper.0:64:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3336:13-Mai-cher-Mai.ly:116:49:upper.1:58:1,13-Mai-cher-Mai.ly:116:56:upper.1:58:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:116:56:upper.1:58:1"
+                  ],
+                  "entry": 186.02,
+                  "exit": 188.02,
+                  "shoulders": [
+                    184.82,
+                    189.22
+                  ],
+                  "visibleApproach": 43.73000000000002,
+                  "visibleExit": 24.319999999999993,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3384:13-Mai-cher-Mai.ly:116:61:upper.1:57:1,13-Mai-cher-Mai.ly:116:68:upper.1:61:1,13-Mai-cher-Mai.ly:116:75:upper.1:59:1,13-Mai-cher-Mai.ly:116:81:upper.1:57:1:4",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:68:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+                "13-Mai-cher-Mai.ly:116:81:upper.1:57:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:39:upper.0:64:1"
+                  ],
+                  "entry": 253.22,
+                  "exit": 255.22,
+                  "shoulders": [
+                    252.02,
+                    256.42
+                  ],
+                  "visibleApproach": 4.909999999999997,
+                  "visibleExit": 83.52000000000001,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                },
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:48:upper.0:63:1"
+                  ],
+                  "entry": 312.91,
+                  "exit": 314.91,
+                  "shoulders": [
+                    311.71,
+                    316.11
+                  ],
+                  "visibleApproach": 64.60000000000002,
+                  "visibleExit": 23.829999999999984,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000034
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3384:13-Mai-cher-Mai.ly:116:61:upper.1:57:1,13-Mai-cher-Mai.ly:116:68:upper.1:61:1,13-Mai-cher-Mai.ly:116:75:upper.1:59:1,13-Mai-cher-Mai.ly:116:81:upper.1:57:1:5",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:61:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:68:upper.1:61:1",
+                "13-Mai-cher-Mai.ly:116:75:upper.1:59:1",
+                "13-Mai-cher-Mai.ly:116:81:upper.1:57:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:39:upper.0:64:1"
+                  ],
+                  "entry": 253.22,
+                  "exit": 255.22,
+                  "shoulders": [
+                    252.02,
+                    256.42
+                  ],
+                  "visibleApproach": 4.909999999999997,
+                  "visibleExit": 83.52000000000001,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                },
+                {
+                  "front": "s12:beam:3384:13-Mai-cher-Mai.ly:115:39:upper.0:64:1,13-Mai-cher-Mai.ly:115:48:upper.0:63:1:1",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:48:upper.0:63:1"
+                  ],
+                  "entry": 312.91,
+                  "exit": 314.91,
+                  "shoulders": [
+                    311.71,
+                    316.11
+                  ],
+                  "visibleApproach": 64.60000000000002,
+                  "visibleExit": 23.829999999999984,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000034
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s12:beam:3432:13-Mai-cher-Mai.ly:116:101:upper.1:57:1,13-Mai-cher-Mai.ly:116:118:upper.1:56:1:2",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:118:upper.1:56:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:solo:13-Mai-cher-Mai.ly:115:56:upper.0:64:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:56:upper.0:64:1"
+                  ],
+                  "entry": 372.6,
+                  "exit": 374.6,
+                  "shoulders": [
+                    371.4,
+                    375.8
+                  ],
+                  "visibleApproach": 4.910000000000025,
+                  "visibleExit": 23.829999999999984,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000034
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "rail": "s12:beam:3432:13-Mai-cher-Mai.ly:116:101:upper.1:57:1,13-Mai-cher-Mai.ly:116:118:upper.1:56:1:3",
+              "owners": [
+                "13-Mai-cher-Mai.ly:116:101:upper.1:57:1",
+                "13-Mai-cher-Mai.ly:116:118:upper.1:56:1"
+              ],
+              "ports": [
+                {
+                  "front": "s12:solo:13-Mai-cher-Mai.ly:115:56:upper.0:64:1:0",
+                  "owners": [
+                    "13-Mai-cher-Mai.ly:115:56:upper.0:64:1"
+                  ],
+                  "entry": 372.6,
+                  "exit": 374.6,
+                  "shoulders": [
+                    371.4,
+                    375.8
+                  ],
+                  "visibleApproach": 4.910000000000025,
+                  "visibleExit": 23.829999999999984,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000034
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "economical-bevel",
+      "score": "brahms-op118-no1",
+      "optionsDelta": {
+        "preserveGestureMembership": true,
+        "shareAttackHeads": true,
+        "independentUnisonAttachments": true,
+        "shareCompatibleLocalRhythm": true,
+        "crossingConvention": "layered",
+        "depthProfile": "beveled-compact",
+        "stableOnsets": true
+      },
+      "violations": [],
+      "warnings": [],
+      "windows": [
+        {
+          "title": "Brahms · unfolded 64–67 / written 35–38, second ending",
+          "viewBox": "0 0 571.48 473.84000000000003",
+          "inlineSVG": true
+        },
+        {
+          "title": "Same Brahms passage · focus unfolded 65–66 / written 36–37",
+          "viewBox": "0 0 287.74 248.09375000000009",
+          "inlineSVG": true
+        }
+      ],
+      "systems": [
+        {
+          "index": 15,
+          "firstMeasure": 61,
+          "measuresPerSystem": 4,
+          "staffWidth": 543.48,
+          "onsets": [],
+          "routes": []
+        },
+        {
+          "index": 16,
+          "firstMeasure": 65,
+          "measuresPerSystem": 4,
+          "staffWidth": 543.48,
+          "onsets": [
+            {
+              "id": "brahms-op118-no1-897",
+              "tick": 12336,
+              "x": 37.8,
+              "nominal": 37.8,
+              "voice": "leftHandUpper",
+              "hand": "RH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-899",
+              "tick": 12336,
+              "x": 43.26,
+              "nominal": 37.8,
+              "voice": "rightHandUpper",
+              "hand": "RH",
+              "value": 72
+            },
+            {
+              "id": "brahms-op118-no1-901",
+              "tick": 12360,
+              "x": 53.28375,
+              "nominal": 53.28375,
+              "voice": "leftHandLower",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-909",
+              "tick": 12552,
+              "x": 198.4670007666677,
+              "nominal": 189.15375,
+              "voice": "leftHandLower",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-910",
+              "tick": 12576,
+              "x": 204.63750000000002,
+              "nominal": 204.63750000000002,
+              "voice": "leftHandUpper",
+              "hand": "LH",
+              "value": 24
+            },
+            {
+              "id": "brahms-op118-no1-911",
+              "tick": 12576,
+              "x": 210.09750000000003,
+              "nominal": 204.63750000000002,
+              "voice": "leftHandLower",
+              "hand": "LH",
+              "value": 48
+            }
+          ],
+          "routes": [
+            {
+              "level": 1,
+              "rail": "s16:beam:12336:brahms-op118-no1-897,brahms-op118-no1-900:2",
+              "owners": [
+                "brahms-op118-no1-897",
+                "brahms-op118-no1-898",
+                "brahms-op118-no1-900"
+              ],
+              "ports": [
+                {
+                  "front": "s16:solo:brahms-op118-no1-899:0",
+                  "owners": [
+                    "brahms-op118-no1-899"
+                  ],
+                  "entry": 42.26,
+                  "exit": 44.26,
+                  "shoulders": [
+                    41.06,
+                    45.46
+                  ],
+                  "visibleApproach": 6.199999999999996,
+                  "visibleExit": 10.760000000000005,
+                  "aperture": 2,
+                  "profileExtent": 4.399999999999999
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "rail": "s16:beam:12576:brahms-op118-no1-910,brahms-op118-no1-912:2",
+              "owners": [
+                "brahms-op118-no1-910",
+                "brahms-op118-no1-912"
+              ],
+              "ports": [
+                {
+                  "front": "s16:solo:brahms-op118-no1-911:0",
+                  "owners": [
+                    "brahms-op118-no1-911"
+                  ],
+                  "entry": 209.1,
+                  "exit": 211.1,
+                  "shoulders": [
+                    207.9,
+                    212.3
+                  ],
+                  "visibleApproach": 4.900000000000006,
+                  "visibleExit": 9.460000000000008,
+                  "aperture": 2,
+                  "profileExtent": 4.400000000000006
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

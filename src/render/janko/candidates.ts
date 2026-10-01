@@ -1340,7 +1340,7 @@ export const ROUND_56_CANDIDATES:JankoCandidate[]=[
   tradeoff('voice-stems','Voice-directed stems + event hand chevrons','Reference alternative, not winner: concurrent source voices .0 up / .1 down; solo source contexts keep handed stems. Musical .hand never changes. Every visible head carries the historical 4.2×2.8pt / 1.20pt burin hand chevron (^ RH, v LH), extended beyond the old crossing-only use. Continuous stems use the declared rail-aperture overpass grammar, not inherited sub-point stem underpasses. Identical untied local values may deliberately share one owned statement; independently grouped/tied obligations remain separate. Price: loss of stem-to-hand immediacy, added hand-symbol lookup, an over/under vocabulary, a wider 840pt page with at most three admitted bars, 12pt RH voice-seat separation and local cue-placement risks.',{stemConvention:'voice',crossingConvention:'layered',rhVoiceSeparation:12,comparisonInset:12,pageWidth:840,measuresPerSystem:3}),
 ];
 
-export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+export const ROUND_57_METADATA:JankoCandidateRound={
   round:57,title:'No. 13 · depth profiles (candidate-only)',
   description:'Flat G control, paired recession faces and an owning dive/return route on the same complete literal gestures. Stems stay foreground locally: source-voice depth reverses with the music, not a fixed voice plane. RH-up/LH-down and provisional hand evidence remain. Black silhouette carries the convention; no shading or new composer emphasis. Reference/default ink is unchanged. Geometry diagnostics are not perceptual acceptance.',
   openAxes:['crossingConvention','depthProfile'],
@@ -1356,10 +1356,34 @@ const depthCandidate=(id:string,label:string,description:string,depthProfile?:Ja
   id,label,description,options:{preserveGestureMembership:true,shareAttackHeads:true,independentUnisonAttachments:true,shareCompatibleLocalRhythm:true,crossingConvention:'layered',...(depthProfile?{depthProfile}:{})},
   windows:DEPTH_WINDOWS,comparisonScope:'containing-systems',tags:['candidate-only','same source','black silhouette','provisional hands'],
 });
-export const CURRENT_CANDIDATES:JankoCandidate[]=[
+export const ROUND_57_CANDIDATES:JankoCandidate[]=[
   depthCandidate('depth-flat','Control · flat G apertures','Current G geometry: 4.4pt interruptions in foreign rails; whole direct-hand stems in front. Historical option deltas through today’s engine, not an exact older revision. Visible rail scanning is interrupted.'),
   depthCandidate('depth-beveled','Refinement · beveled recession ports','Paired owning-rail faces taper toward a measured foreground-stroke aperture with 0.90pt air. No detached caps, shadows or extra duration strokes. Same note/time/voice seating as flat control. Price: tapering interrupts visible rail scanning; black silhouette only.','beveled'),
   depthCandidate('depth-dive','Refinement · profiled dive and return','Each owning primary/secondary route recedes 0.85pt away from the heads, with fitted 3.4pt entry/return shoulders and an explicit hidden continuation behind the actual foreign stem. Same source and spacing; no fixed whole-voice plane. Price: bent ribbon scanning and a new monochrome depth vocabulary, not continuous visible ink.','dive'),
+];
+
+export const CURRENT_ROUND_METADATA:JankoCandidateRound={
+  round:58,title:'Economical crossings · truthful onset groups (candidate-only)',
+  description:'Compare the served No. 13 bevel control with stable onset slots, then a shallower compact bevel. Brahms is ONE contrasting passage: unfolded 64–67 / written 35–38, second ending. Its former candidate projection had duplicate tied heads and a tie collision; that broken projection is refused, not offered as taste. Both refinements preserve chain-owned equal-value sharing and unequal continuations. Stems stay locally foreground, RH-up/LH-down; no fixed voice plane. Reference/default ink unchanged; geometry evidence is not pixel or musical acceptance.',
+  openAxes:['stableOnsets','depthProfile'],
+  compareStrip:{scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:39,measureCount:1,title:'No. 13 unfolded 39 · fourteen written events / 72 ticks · simultaneous, not successive'},
+};
+const ECONOMICAL_NO13_WINDOWS:JankoScoreCandidateWindow[]=[
+  {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:38,measureCount:3,completeSystems:true,title:'No. 13 · unfolded 38–40, focus 39',caption:'Complete production-width system: approach, local order reversal, final eighth and following fp. Stable seats reduce accidental +10.92pt to the required +5.46pt at 3360/3384; no onset clock changes. One LH 3b attack retains 24/48 branches; final LH 44 retains both owners. Performing hands provisional.'},
+];
+const ECONOMICAL_BRAHMS_WINDOWS:JankoScoreCandidateWindow[]=[
+  {scoreId:BRAHMS_STUDIO_SCORE_ID,measureStart:64,measureCount:4,completeSystems:true,title:'Brahms · unfolded 64–67 / written 35–38, second ending',caption:'ONE passage, complete containing systems 61–64 and 65–68. Held RH 3a against moving RH 37→29 at 65; LH 32 quarter/tied continuation against 32→35 eighths at 66. Only primary-level crossings, not a dense crossing forest. Convergence/cresc, f/decresc, ties/cresc, sf and arpeggiation retain their source owners.'},
+  {scoreId:BRAHMS_STUDIO_SCORE_ID,measureStart:65,measureCount:2,title:'Same Brahms passage · focus unfolded 65–66 / written 36–37',caption:'Two actual owner-linked stem/rail contacts: 899 over 897→900, then 911 over 910→912. The second is weaker alone; read both with the complete context above. Source voice ≠ performing hand; authorized LH 910/912 unchanged. Equal-value tied attack heads remain chain-owned; unequal quarter/eighth obligations stay distinct.'},
+];
+const economical=(id:string,label:string,description:string,profile:JankoLayoutOptions['depthProfile'],stable:boolean):JankoCandidate=>({
+  id,label,description,
+  options:{preserveGestureMembership:true,shareAttackHeads:true,independentUnisonAttachments:true,shareCompatibleLocalRhythm:true,crossingConvention:'layered',depthProfile:profile,...(stable?{stableOnsets:true}:{})},
+  windows:[...ECONOMICAL_NO13_WINDOWS,...(stable?ECONOMICAL_BRAHMS_WINDOWS:[])],comparisonScope:'containing-systems',tags:['candidate-only','literal source','black silhouette','not adopted'],
+});
+export const CURRENT_CANDIDATES:JankoCandidate[]=[
+  economical('economical-control','Control · served bevel / original onset seats','Exact served bevel mechanics for No. 13 through today’s engine: includes the accidental doubled slot. Brahms’s original projection is NOT displayed: it has proven duplicate-head/tie defects, not a viable control. Round 57 remains archived.','beveled',false),
+  economical('economical-slots','Refinement A · stable seats / existing bevel','Required single-slot clearance survives translated coordinates; head and stem envelopes are not deleted or forced onto one x. Existing 2.70pt aperture / 1.60pt shoulders / 42% neck. Brahms uses corrected equal-value tie ownership; its two crossings contrast held/moving obligations with No. 13. Price: visible rail interruption and modest within-onset looseness remain.','beveled',true),
+  economical('economical-bevel','Refinement B · stable seats / compact bevel','Same corrected onset seats as A. Physical foreground stroke plus 0.55pt air each side gives 2.00pt apertures; fitted 1.20pt faces taper to 60% thickness without centerline excursion. Less missing contour and shorter, shallower negative-space scallops, not perfect foreground isolation. Price: reduced air and still interrupted rear rails; neither amodal continuity nor lint certifies musical readability.','beveled-compact',true),
 ];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
@@ -1432,6 +1456,7 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    ROUND_57_CANDIDATES.find((c) => c.id === id) ??
     ROUND_56_CANDIDATES.find((c) => c.id === id) ??
     ROUND_49_CANDIDATES.find((c) => c.id === id) ??
     ROUND_48_CANDIDATES.find((c) => c.id === id) ??

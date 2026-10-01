@@ -203,6 +203,7 @@ import {
 } from './elements/rhythm';
 import { durationDotCount, durationFlagCount } from './elements/duration';
 import { placedBeamGroup, routeVoiceUnderpasses, beamPieceIntersectsBox, beamPieceBox } from './beam-scene';
+import { onsetSlotShift } from './onset-slots';
 import { soloRhythmPaint } from './solo-scene';
 import { placeEventHandMarks, eventHandMarksSvg, type EventHandMark } from './hand-marks';
 import { seatLocalFlags } from './local-flag-seats';
@@ -5404,7 +5405,9 @@ export function resolveChordColumns(
             const a=envelope(groups[j]), b=envelope(moving);
             if (Math.min(a.bottom,b.bottom) <= Math.max(a.top,b.top)+EPS ||
                 Math.min(a.right,b.right) <= Math.max(a.left,b.left)+EPS) continue;
-            const shift = Math.ceil((a.right + presetAir - b.left) / pairGap) * pairGap;
+            const shift = o.stableOnsets
+              ? onsetSlotShift(a.right, b.left, presetAir, pairGap)
+              : Math.ceil((a.right + presetAir - b.left) / pairGap) * pairGap;
             // In a cross-hand conflict all RH members move coherently, even
             // those outside this voice's head-mask overlap component.
             const members = moving[0].rhythm.hand !== groups[j][0].rhythm.hand
@@ -6450,7 +6453,8 @@ function mergeUnisonHeads(
   tiePlan: JankoTieDisplayPlan | null = null,
   clarity = true,
   grammar: ResolvedJankoLayoutOptions['durationGrammar'] = 'golden',
-  shareAttackHeads = false
+  shareAttackHeads = false,
+  stableOnsets = false
 ): {
   notes: PositionedJankoNote[];
   voices: PositionedJankoNote[];
@@ -6458,8 +6462,15 @@ function mergeUnisonHeads(
 } {
   const groups = new Map<string, PositionedJankoNote[]>();
   const pitchKey = (p: PositionedJankoNote) => `${p.note.startTick}|${p.note.pitch.pitchClass}|${p.note.pitch.octave}`;
+  const guarded = (p: PositionedJankoNote) => !!(p.note.tieStart || p.note.tieEnd ||
+    tiePlan?.chains.some(c => c.noteId === p.note.id || c.components.some(m => m.headId === p.note.id)));
+  // An equal written value must not be split into two buckets just because
+  // one owner is tied. At a guarded pitch/onset retain the established
+  // equal-value grouping, NEVER absorb unequal tied continuations into the
+  // generic physical-attack bucket. Every independent route remains owned.
+  const guardedOnsets = stableOnsets ? new Set(positioned.filter(guarded).map(pitchKey)) : null;
   for (const p of positioned) {
-    const guardedTie=p.note.tieStart||p.note.tieEnd||tiePlan?.chains.some(c=>c.noteId===p.note.id||c.components.some(m=>m.headId===p.note.id));
+    const guardedTie = guardedOnsets ? guardedOnsets.has(pitchKey(p)) : guarded(p);
     const value = clarity ? shareAttackHeads&&!guardedTie ? '|physical-attack' : `|${p.rhythm.durationTicks}` : '';
     const key = pitchKey(p) + value;
     const bucket = groups.get(key);
@@ -6487,9 +6498,10 @@ function mergeUnisonHeads(
       notes.push(...group);
       continue;
     }
-    const survivor = shareAttackHeads&&!sameHandChainGroup
+    const chainSeat = sameHandChainGroup || stableOnsets && chainMembers.length > 0;
+    const survivor = shareAttackHeads&&!chainSeat
       ? [...group].sort((a,b)=>b.rhythm.durationTicks-a.rhythm.durationTicks||a.note.id.localeCompare(b.note.id))[0]
-      : sameHandChainGroup
+      : chainSeat
       ? [...chainMembers].sort(
           (a, b) =>
             b.note.durationTicks - a.note.durationTicks ||
@@ -7361,7 +7373,7 @@ export function layoutJankoSystemShifted(
       t
     );
     const pre = resolveChordColumns(
-      mergeUnisonHeads(preRaw, tiePlan, o.clarityPass, o.durationGrammar, o.shareAttackHeads).notes,
+      mergeUnisonHeads(preRaw, tiePlan, o.clarityPass, o.durationGrammar, o.shareAttackHeads, o.stableOnsets).notes,
       geometry,
       systemIndex,
       o,
@@ -7384,7 +7396,7 @@ export function layoutJankoSystemShifted(
     // Round 20: one sound, one digit — cross-hand unisons merge before the
     // column solve, so the survivor keeps its column with no fan. Round 46 adds
     // the source-proven same-hand attack/carry groups (see `mergeUnisonHeads`).
-    const merged = mergeUnisonHeads(raw, tiePlan, o.clarityPass, o.durationGrammar, o.shareAttackHeads);
+    const merged = mergeUnisonHeads(raw, tiePlan, o.clarityPass, o.durationGrammar, o.shareAttackHeads, o.stableOnsets);
     positioned = merged.notes;
     mergedVoices = merged.voices;
     unisonMerges = merged.merges;

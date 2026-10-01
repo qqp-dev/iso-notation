@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CURRENT_CANDIDATES, ROUND_56_CANDIDATES, getCandidate } from '../src/render/janko/candidates';
+import { ROUND_57_CANDIDATES as CURRENT_CANDIDATES, ROUND_56_CANDIDATES, getCandidate } from '../src/render/janko/candidates';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { PreparedJankoWindows, renderPreparedJankoWindow } from '../src/render/janko/prepared-windows';
 import { buildInkScene, sceneInkAt } from '../src/render/janko/ink-scene';
