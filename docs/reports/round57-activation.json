@@ -1,0 +1,433 @@
+{
+  "outcome": "served; no canonical adoption or operator acceptance",
+  "servedRevision": "d675b81efaa738ebc3f1cf1b3166010005e15a38",
+  "liveUrl": "http://100.102.70.49:5175/janko.html#candidates",
+  "activation": {
+    "method": "Clean tracked deploy fast-forward via local fetch of exact managed-worktree revision; existing running Vite HMR",
+    "elapsedSeconds": 0.2,
+    "lastWatchToCoherentPublicationSeconds": 17.049,
+    "restart": false
+  },
+  "identity": {
+    "revision": "d675b81efaa738ebc3f1cf1b3166010005e15a38",
+    "status": {
+      "generation": "4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b",
+      "canonicalRevisions": {
+        "bach-goldberg-var1": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+        "brahms-op118-no1": "baseline-pr114-brahms"
+      },
+      "candidateError": "saved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity 64478ff439536480e60eca27d285b002c791e531101b8fa2abb5260f125a8db5; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state",
+      "artifactHashes": {
+        "candidates": "32335a07b418882177fc76bf3c9f847dd945dc8814b1184ca562ce4ce81e7cb8",
+        "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+      },
+      "generationMs": 1698.7,
+      "phaseMs": {
+        "config": 1369.2,
+        "candidates": 2,
+        "reference": 0,
+        "lint": 275
+      },
+      "watchedAt": 1790821382840,
+      "publishedAt": 1790821399889,
+      "stale": false
+    },
+    "manifest": {
+      "generation": "4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b",
+      "artifactHashes": {
+        "candidates": "32335a07b418882177fc76bf3c9f847dd945dc8814b1184ca562ce4ce81e7cb8",
+        "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+      },
+      "status": {
+        "ok": true,
+        "violations": 0,
+        "warnings": 0,
+        "systems": 8,
+        "notes": 550,
+        "lintMs": 275
+      },
+      "canonicalRevisions": {
+        "bach-goldberg-var1": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+        "brahms-op118-no1": "baseline-pr114-brahms"
+      },
+      "engineIdentity": "362ede709f9c3febef029ef03f319ca6742c7ed64baf31075943372a80933c59",
+      "candidateError": "saved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity 64478ff439536480e60eca27d285b002c791e531101b8fa2abb5260f125a8db5; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state",
+      "stale": false
+    },
+    "canonical": {
+      "primary": {
+        "source": "2149df155808289583b2bf86116953eeb6700147de016f60bc751710db761563",
+        "options": "9bf1ce3f3358606b6e51039147babfa46d564aeef00ad16150f4d79e295a07ec",
+        "tokens": "29df8faee4f5a42fc8e3bdb9f5ef6ff45397779a4946c68e93d520f98b89c4f9",
+        "pages": [
+          "e7b470e0112ef9755500692bc7d7121c96bd8e3a193ef2ac05296350e882a818",
+          "7b422a8f9d26399c64031ae69161af44eb8885832bff58e74e5c2d2906d05df4"
+        ]
+      },
+      "brahms-op118-no1": {
+        "source": "65ccfab879fb5550b91109a42505142eb17a69c60f3276ee481b9c0d36a71b6a",
+        "options": "7aa1bc8a54894cf80be8af5ac4294e198faa99164f5abf8a8c4ab693635f3ffa",
+        "tokens": "4c0ef54969bb1c4acb0754dad00373d77358d645c8f6d0cdeedccae904ab7590",
+        "pages": [
+          "3879a863b268616bb8b685da1b67f2893c628435e01aa6f9531f95417d22bca4",
+          "f163f83806204a0c243a67305785d6ffe9997fc0c89e7e9bccec9134139a7fb7",
+          "5471dfc95fc45111eefddb77519bac932c9946962b1f448785563fe0b3e2a64e",
+          "5096662c188ed82b29bdfd6a7c87742b7e675bf533c41579cc8c0b5bcbb14ad2",
+          "0b76b9ed2427a055b70653b225678428413f34c50d630bfd524accb3dc363846",
+          "1e6b4980cff390d48dc9e20b79d59133827831c079e516582bb5f8180bd9a185"
+        ]
+      },
+      "pdf": "43e0078eae668385e94f40adf0654fe4683c570574d173310323d0e52f073c97"
+    },
+    "receiptMatched": true,
+    "servedArtifactHashesMatched": true,
+    "servedPdfMatched": true,
+    "engineIdentityMatched": true,
+    "elapsedSeconds": 7.992
+  },
+  "browser": {
+    "url": "http://100.102.70.49:5175/janko.html#candidates",
+    "dom": {
+      "root": {
+        "initialView": "candidates",
+        "zoom": "1",
+        "preparedObservation": "{\"state\":\"unobserved\",\"reason\":\"hidden-candidate-panel\",\"generation\":\"4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b\",\"candidatesHash\":\"32335a07b418882177fc76bf3c9f847dd945dc8814b1184ca562ce4ce81e7cb8\",\"apply\":\"1\"}",
+        "preparedReferenceObservation": "{\"state\":\"unobserved\",\"reason\":\"wrong-view\",\"generation\":\"4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b\",\"score\":\"bach-goldberg-var1\",\"canonicalRevision\":\"pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06\",\"referenceHash\":\"e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae\",\"apply\":\"1\"}",
+        "preparedState": "ready",
+        "preparedFetchMs": "58.1",
+        "preparedAppliedEpochMs": "1790821758064",
+        "preparedGeneration": "4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b",
+        "preparedCandidatesHash": "32335a07b418882177fc76bf3c9f847dd945dc8814b1184ca562ce4ce81e7cb8",
+        "preparedReferenceHash": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae",
+        "preparedCanonicalRevision": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+        "preparedCanonicalRevisions": "{\"bach-goldberg-var1\":\"pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06\",\"brahms-op118-no1\":\"baseline-pr114-brahms\"}",
+        "preparedApply": "1",
+        "preparedReferenceScore": "primary"
+      },
+      "status": "Engraving prepared; saved draft was not applied.",
+      "healthy": "true",
+      "round": "No. 13 \u00b7 depth profiles (candidate-only)",
+      "cards": [
+        {
+          "id": "depth-flat",
+          "label": "Control \u00b7 flat G apertures",
+          "lint": "clean",
+          "windows": [
+            {
+              "label": "38\u201340 \u00b7 entry, order reversal, final eighth \u2192 fp \u00b7 Complete containing systems at production width. RH-up / LH-down; hands provisional. One LH 3b attack retains eighth + quarter branches; final LH 44 retains both source owners. \u00b7 frame 571.5 \u00d7 200.6pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:38-40",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 200.57225"
+              ],
+              "beveled": 0,
+              "dive": 0
+            },
+            {
+              "label": "26\u201328 \u00b7 held stream in front \u00b7 At tick 2304 the upper.0 held-stream stem crosses both foreign rail levels. Follow approach and exit; depth is local, not a permanent voice plane. \u00b7 frame 571.5 \u00d7 186.9pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:26-28",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 186.9"
+              ],
+              "beveled": 0,
+              "dive": 0
+            },
+            {
+              "label": "9\u201311 \u00b7 moving stream in front \u00b7 Contrasting upper.1 foreground stem across both levels at unfolded 10; neighboring onsets and complete gesture retained. \u00b7 frame 571.5 \u00d7 428.8pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:9-11",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 428.80033333333324"
+              ],
+              "beveled": 0,
+              "dive": 0
+            },
+            {
+              "label": "Bach 13\u201314 \u00b7 quiet temporal guard \u00b7 No grouped-rail crossing: the depth treatment must remain quiet. LH 6926 / RH 26 remains a temporal reading guard, not a claim of perceptual repair. \u00b7 frame 287.7 \u00d7 189.9pt \u00b7 window-scoped",
+              "window": "primary:13-14",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 287.74 189.8962499999999"
+              ],
+              "beveled": 0,
+              "dive": 0
+            }
+          ],
+          "filters": 0,
+          "svgImages": 0,
+          "depthPaths": {
+            "count": 0,
+            "allBlackClosedPolygons": true,
+            "sample": []
+          }
+        },
+        {
+          "id": "depth-beveled",
+          "label": "Refinement \u00b7 beveled recession ports",
+          "lint": "clean",
+          "windows": [
+            {
+              "label": "38\u201340 \u00b7 entry, order reversal, final eighth \u2192 fp \u00b7 Complete containing systems at production width. RH-up / LH-down; hands provisional. One LH 3b attack retains eighth + quarter branches; final LH 44 retains both source owners. \u00b7 frame 571.5 \u00d7 200.6pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:38-40",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 200.57225"
+              ],
+              "beveled": 20,
+              "dive": 0
+            },
+            {
+              "label": "26\u201328 \u00b7 held stream in front \u00b7 At tick 2304 the upper.0 held-stream stem crosses both foreign rail levels. Follow approach and exit; depth is local, not a permanent voice plane. \u00b7 frame 571.5 \u00d7 186.9pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:26-28",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 186.9"
+              ],
+              "beveled": 4,
+              "dive": 0
+            },
+            {
+              "label": "9\u201311 \u00b7 moving stream in front \u00b7 Contrasting upper.1 foreground stem across both levels at unfolded 10; neighboring onsets and complete gesture retained. \u00b7 frame 571.5 \u00d7 431.5pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:9-11",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 431.467"
+              ],
+              "beveled": 4,
+              "dive": 0
+            },
+            {
+              "label": "Bach 13\u201314 \u00b7 quiet temporal guard \u00b7 No grouped-rail crossing: the depth treatment must remain quiet. LH 6926 / RH 26 remains a temporal reading guard, not a claim of perceptual repair. \u00b7 frame 287.7 \u00d7 189.9pt \u00b7 window-scoped",
+              "window": "primary:13-14",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 287.74 189.8962499999999"
+              ],
+              "beveled": 0,
+              "dive": 0
+            }
+          ],
+          "filters": 0,
+          "svgImages": 0,
+          "depthPaths": {
+            "count": 28,
+            "allBlackClosedPolygons": true,
+            "sample": [
+              {
+                "class": "janko-beam janko-depth-beveled",
+                "fill": "#111111",
+                "closed": true,
+                "vertices": 6
+              }
+            ]
+          }
+        },
+        {
+          "id": "depth-dive",
+          "label": "Refinement \u00b7 profiled dive and return",
+          "lint": "clean",
+          "windows": [
+            {
+              "label": "38\u201340 \u00b7 entry, order reversal, final eighth \u2192 fp \u00b7 Complete containing systems at production width. RH-up / LH-down; hands provisional. One LH 3b attack retains eighth + quarter branches; final LH 44 retains both source owners. \u00b7 frame 571.5 \u00d7 200.6pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:38-40",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 200.57225"
+              ],
+              "beveled": 0,
+              "dive": 20
+            },
+            {
+              "label": "26\u201328 \u00b7 held stream in front \u00b7 At tick 2304 the upper.0 held-stream stem crosses both foreign rail levels. Follow approach and exit; depth is local, not a permanent voice plane. \u00b7 frame 571.5 \u00d7 186.9pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:26-28",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 186.9"
+              ],
+              "beveled": 0,
+              "dive": 4
+            },
+            {
+              "label": "9\u201311 \u00b7 moving stream in front \u00b7 Contrasting upper.1 foreground stem across both levels at unfolded 10; neighboring onsets and complete gesture retained. \u00b7 frame 571.5 \u00d7 428.8pt \u00b7 window-scoped",
+              "window": "schumann-op68-no13:9-11",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 571.48 428.80033333333324"
+              ],
+              "beveled": 0,
+              "dive": 4
+            },
+            {
+              "label": "Bach 13\u201314 \u00b7 quiet temporal guard \u00b7 No grouped-rail crossing: the depth treatment must remain quiet. LH 6926 / RH 26 remains a temporal reading guard, not a claim of perceptual repair. \u00b7 frame 287.7 \u00d7 189.9pt \u00b7 window-scoped",
+              "window": "primary:13-14",
+              "svgCount": 1,
+              "viewBoxes": [
+                "0 0 287.74 189.8962499999999"
+              ],
+              "beveled": 0,
+              "dive": 0
+            }
+          ],
+          "filters": 0,
+          "svgImages": 0,
+          "depthPaths": {
+            "count": 28,
+            "allBlackClosedPolygons": true,
+            "sample": [
+              {
+                "class": "janko-beam janko-depth-dive",
+                "fill": "#111111",
+                "closed": true,
+                "vertices": 6
+              }
+            ]
+          }
+        }
+      ],
+      "errors": [
+        {
+          "id": "semantic-hand-stale",
+          "text": "Saved draft was not applied.Diagnostics & recoverysaved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity 64478ff439536480e60eca27d285b002c791e531101b8fa2abb5260f125a8db5; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale stateReference remains canonical. Archive and start a new guarded candidate with semantic-hand recover; no automatic rebase."
+        }
+      ],
+      "reference": [
+        {
+          "score": "brahms-op118-no1",
+          "revision": "baseline-pr114-brahms",
+          "svgCount": 6,
+          "pageCount": 6
+        },
+        {
+          "score": "primary",
+          "revision": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+          "svgCount": 2,
+          "pageCount": 2
+        }
+      ],
+      "compare": 3
+    },
+    "interaction": [
+      {
+        "label": "desktop +",
+        "view": [
+          "candidates"
+        ],
+        "zoom": "1.25",
+        "reference": "primary",
+        "width": 1440,
+        "bodyWidth": 1425
+      },
+      {
+        "label": "mobile Reference",
+        "view": [
+          "reference"
+        ],
+        "zoom": "1",
+        "reference": "primary",
+        "width": 390,
+        "bodyWidth": 375
+      },
+      {
+        "label": "mobile Brahms",
+        "view": [
+          "reference"
+        ],
+        "zoom": "1",
+        "reference": "brahms-op118-no1",
+        "width": 390,
+        "bodyWidth": 375
+      },
+      {
+        "label": "mobile Candidates returned",
+        "view": [
+          "candidates"
+        ],
+        "zoom": "1",
+        "reference": "brahms-op118-no1",
+        "width": 390,
+        "bodyWidth": 375
+      },
+      {
+        "label": "mobile reload ready",
+        "view": [
+          "candidates"
+        ],
+        "zoom": "1",
+        "reference": "brahms-op118-no1",
+        "width": 390,
+        "bodyWidth": 375
+      }
+    ],
+    "errors": [],
+    "consoleErrors": [
+      {
+        "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "location": {
+          "url": "http://100.102.70.49:5175/favicon.ico",
+          "line": 0,
+          "column": 0,
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      }
+    ],
+    "elapsedSeconds": 3.459,
+    "limitations": "Headless DOM/network/geometry only. No screenshots or pixel/perceptual judgment. Private ephemeral browser context, not operator storage."
+  },
+  "preservation": {
+    "revision": "d675b81efaa738ebc3f1cf1b3166010005e15a38",
+    "servicePid": "299986",
+    "zvecUnchanged": true,
+    "candidateStateUnchanged": true,
+    "candidateStateSha256": "f5624597843926a0b4d8cb97224e19c84adaf3a0a78bcd6a3b9b3849298ea884",
+    "viteCacheUnchanged": true,
+    "serviceConfigurationUnchanged": true,
+    "servicePidUnchanged": true,
+    "trackedFilesExact": true,
+    "indexClean": true,
+    "status": {
+      "generation": "4a44e3093f61a6cea8802820967e096f1b52286f053a7ed9a5ebc0a19456d74b",
+      "canonicalRevisions": {
+        "bach-goldberg-var1": "pr114-8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+        "brahms-op118-no1": "baseline-pr114-brahms"
+      },
+      "candidateError": "saved identity 82846cb6d8fa6d0a2f1e9ad434ee560ce272f4f77727fdb257813a425cf50971; current identity 64478ff439536480e60eca27d285b002c791e531101b8fa2abb5260f125a8db5; engine mismatch; Error: candidate source/model/engine revision drift; refusing stale state",
+      "artifactHashes": {
+        "candidates": "32335a07b418882177fc76bf3c9f847dd945dc8814b1184ca562ce4ce81e7cb8",
+        "reference": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae"
+      },
+      "generationMs": 1698.7,
+      "phaseMs": {
+        "config": 1369.2,
+        "candidates": 2,
+        "reference": 0,
+        "lint": 275
+      },
+      "watchedAt": 1790821382840,
+      "publishedAt": 1790821399889,
+      "stale": false
+    },
+    "elapsedSeconds": 0.132
+  },
+  "referenceArtifactDelta": {
+    "beforeHash": "154cbf3d05b4ebbf18e9f73560bebef57831cf0bdc1240af57360c326c4b9580",
+    "currentHash": "e35f9cadd197d50d1f2d3249b2cb128d5f265e8b39582ac2fc784489dfb0d4ae",
+    "currentCheckCounts": [
+      40,
+      40
+    ],
+    "priorCheckCounts": [
+      39,
+      39
+    ],
+    "hashWithPriorCheckCount": "154cbf3d05b4ebbf18e9f73560bebef57831cf0bdc1240af57360c326c4b9580",
+    "onlyGlobalCheckCountChanged": true
+  },
+  "acceptedVerification": "Reused approved composed 100-file/1290-test evidence, strict lint, build and independent PR137 identity from ticket. No suites, strict lint, build or PDF export rerun.",
+  "limitations": [
+    "No pixel/perceptual inspection or operator acceptance.",
+    "Existing missing favicon.ico produces console 404 only; no generation, SVG/artifact, navigation or JavaScript errors.",
+    "Earlier browser probe initially classified favicon as failure; diagnostic identified exact URL. Earlier hash probe from assigned worktree could not resolve tsx; reran from existing deploy dependencies without installs or dependency edits."
+  ]
+}
