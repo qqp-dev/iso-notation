@@ -1,0 +1,350 @@
+{
+  "question": "What explains a roughly 26-minute Pages run, and does evidence justify the test cost?",
+  "previousSuccessfulRun": {
+    "url": "https://github.com/qqp-dev/iso-notation/actions/runs/36937623429",
+    "sourceHead": "ae47018d243fb0b4ca081c78b9693defe941abb7",
+    "jobSeconds": 1561,
+    "testStepSeconds": 1479.983,
+    "files": 105,
+    "tests": 1329,
+    "buildSeconds": 20,
+    "pagesDeploySeconds": 7,
+    "queueSeconds": 4
+  },
+  "testPhaseWallSeconds": {
+    "ordinary101FilesAtConcurrency2": 1026.978,
+    "brahmsEngravingExclusive": 9.468,
+    "jankoLinterExclusive": 58.569,
+    "preparedHmrExclusive": 21.644,
+    "semanticHandExclusive": 363.324
+  },
+  "ordinaryFastAssertions": {
+    "countUnder100ms": 784,
+    "summedDurationSeconds": 7.626,
+    "caveat": "Sum of Node subtest wall durations; overlapping files, not CPU seconds or an additive share of full-run wall time."
+  },
+  "largestMeasuredIndividualTest": {
+    "file": "test/active-score-release.test.ts",
+    "name": "legacy full-score migration classifies harmless SVG serialization separately from changed ink",
+    "seconds": 225.530104555,
+    "coverage": "Generated eight-record history in disposable checkouts; four live duration variants; all page ink parity; serialization-only acceptance; changed-ink refusal; original-byte preservation. No operator private history read."
+  },
+  "confirmedRedundantWork": {
+    "scope": "Diagnostic only: literal six-page migration helper on the current Brahms score, followed by existing settled-layout APIs. No repository source changes; warm-order timing is illustrative, solve counts and exact SVG equality are the evidence.",
+    "score": "brahms-op118-no1",
+    "pageCount": 6,
+    "original": {
+      "calls": 7,
+      "elapsedMs": 7134.840787
+    },
+    "reuse": {
+      "calls": 1,
+      "elapsedMs": 1088.6417229999997
+    },
+    "byteIdentical": true,
+    "pageSha256": [
+      "3879a863b268616bb8b685da1b67f2893c628435e01aa6f9531f95417d22bca4",
+      "f163f83806204a0c243a67305785d6ffe9997fc0c89e7e9bccec9134139a7fb7",
+      "5471dfc95fc45111eefddb77519bac932c9946962b1f448785563fe0b3e2a64e",
+      "5096662c188ed82b29bdfd6a7c87742b7e675bf533c41579cc8c0b5bcbb14ad2",
+      "0b76b9ed2427a055b70653b225678428413f34c50d630bfd524accb3dc363846",
+      "1e6b4980cff390d48dc9e20b79d59133827831c079e516582bb5f8180bd9a185"
+    ]
+  },
+  "focusedProfile": {
+    "sourceHead": "fa826a771ad2ae420ace00a1d84504f5cb2bee80",
+    "node": "v26.7.0",
+    "ciNodeMajor": 22,
+    "test": "the prepared studio is deterministic across fresh generations",
+    "scope": "Two complete fresh generations in one existing test; --cpu-prof enabled; no repository source edits",
+    "testSeconds": 59.597485311,
+    "processWallSeconds": 60.83,
+    "processUserCpuSeconds": 75.95,
+    "processSystemCpuSeconds": 2.17,
+    "peakRssKiB": 1025504,
+    "exitStatus": 0,
+    "mainThreadSamplesSeconds": 60.672712,
+    "selfTimeContourPolygonIntersectsBoxPercent": 35.22,
+    "selfTimeGcPercent": 8.47,
+    "inclusiveOpticalPhraseCandidatesPercent": 52.59,
+    "inclusiveRenderReferenceViewPercent": 62.66,
+    "caveat": "Inclusive shares overlap. Local profiled timing is not a controlled before/after comparison with GitHub or an attribution of the entire suite. Profile samples do not supply individual source-score phase durations."
+  },
+  "scheduling": {
+    "source": "scripts/run-tests.mjs",
+    "ordinaryConcurrency": 2,
+    "exclusiveFiles": [
+      "test/brahms-engraving.test.ts",
+      "test/janko-linter.test.ts",
+      "test/janko-prepared-hmr.test.ts",
+      "test/semantic-hand.test.ts"
+    ],
+    "caveat": "Current code explicitly isolates these files; available documentation does not establish that a higher concurrency value is safe or faster. This profile alone reached about 1 GiB RSS."
+  },
+  "finding": "Full-score comparisons and refusal/preservation coverage are meaningful. A 26-minute runtime is not established as necessary: exact repeated layout work is directly demonstrated. Optimize repeated calculation and measure the retained coverage before removing tests or changing release gates.",
+  "limits": [
+    "Prior GitHub run is the previous source head; active No14 publication changes the workload.",
+    "Only one existing current-head test was profiled; no local full-suite rerun.",
+    "No test deletion, gate/configuration change, source optimization or private operator state access.",
+    "Maximum safe concurrency, full-suite CPU/heap critical path and net end-to-end improvement remain unmeasured."
+  ],
+  "evidenceFiles": [
+    "previous-ci.log",
+    "previous-ci-timing-analysis.json",
+    "test-latency-focused.log",
+    "test-latency-resource.txt",
+    "focused-test-cpu-aggregated.json",
+    "migration-page-loop-audit.json"
+  ],
+  "previousRunTestDurationRanking": [
+    {
+      "file": [
+        "test/active-score-release.test.ts"
+      ],
+      "name": "legacy full-score migration classifies harmless SVG serialization separately from changed ink",
+      "seconds": 225.53
+    },
+    {
+      "file": [
+        "test/semantic-hand.test.ts"
+      ],
+      "name": "stale default-path source/engine drift refuses replay, keeps Reference and archives old history byte-for-byte before a new ready candidate",
+      "seconds": 108.718
+    },
+    {
+      "file": [
+        "test/semantic-hand.test.ts"
+      ],
+      "name": "non-sample and multi-region edits publish exactly compared crops, with unchanged Reference",
+      "seconds": 81.191
+    },
+    {
+      "file": [
+        "test/semantic-hand.test.ts"
+      ],
+      "name": "prepared real-engine candidate generation carries exact revision, identical Reference, watched invalidation; build default excludes local candidate",
+      "seconds": 73.809
+    },
+    {
+      "file": [
+        "test/bach-semantic-hand.test.ts"
+      ],
+      "name": "real-engine Bach Candidate identifies exact saved revision and m. 5 crop; both References stay canonical",
+      "seconds": 61.614
+    },
+    {
+      "file": [
+        "test/janko-semantic-cache.test.ts"
+      ],
+      "name": "static reuse is byte-identical to cold real engraving, and state is excluded only from static identity",
+      "seconds": 55.724
+    },
+    {
+      "file": [
+        "test/semantic-hand.test.ts"
+      ],
+      "name": "guarded source-linked edit derives two rests/crossings, preserves source, affected page and Reference, then undo exactly restores",
+      "seconds": 48.908
+    },
+    {
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "name": "archived PR112 ink remains distinct from GOLD; served References remain canonical",
+      "seconds": 42.326
+    },
+    {
+      "file": [
+        "test/janko-duration-controls.test.ts"
+      ],
+      "name": "retired/full-owner shared targets refuse; a guarded generic variant still serves every real engine page",
+      "seconds": 41.946
+    },
+    {
+      "file": [
+        "test/janko-layout-reuse.test.ts"
+      ],
+      "name": "Fresh data/options/tokens: subsequent render with changed options computes fresh layout without stale cache",
+      "seconds": 39.053
+    },
+    {
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "name": "the prepared studio is deterministic across fresh generations",
+      "seconds": 38.037
+    },
+    {
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "name": "each prepared artifact is byte-equal to the direct real renderer",
+      "seconds": 36.675
+    },
+    {
+      "file": [
+        "test/janko-practice.test.ts"
+      ],
+      "name": "retained Round55 major and N26 cards use portable renderer and leave Reference unchanged",
+      "seconds": 35.162
+    },
+    {
+      "file": [],
+      "name": "parked Round 49 real-engine Candidate windows retain PR96 serialized SVG bytes",
+      "seconds": 33.027
+    },
+    {
+      "file": [
+        "test/janko-source-expression.test.ts"
+      ],
+      "name": "shared repertoire paints admitted source expression without new overlay or page defects",
+      "seconds": 27.689
+    }
+  ],
+  "codeAnchors": {
+    "runner": "scripts/run-tests.mjs:9-15 and 74-89",
+    "migrationPageLoops": "scripts/migrate-legacy-candidates.ts:28 and 47-48",
+    "layoutFallback": "src/render/janko/engine.ts:10665-10716",
+    "determinismTest": "test/janko-prepared-studio.test.ts:71-82",
+    "migrationCoverage": "test/active-score-release.test.ts:249-308",
+    "semanticEditIntegration": "test/semantic-hand.test.ts:18-300"
+  },
+  "currentPublicationRun": {
+    "run": "https://github.com/qqp-dev/iso-notation/actions/runs/37060968394",
+    "sourceHead": "fa826a771ad2ae420ace00a1d84504f5cb2bee80",
+    "conclusion": "failure",
+    "ordinaryFiles": 119,
+    "ordinaryWallSeconds": 2301.063,
+    "ordinaryTests": 1271,
+    "pass": 1267,
+    "fail": 4,
+    "exclusivePhasesReached": false,
+    "topLevelDurationSumSeconds": 4320.856,
+    "caveat": "Deduplicates repeated diagnostic stdout excerpts. Matching source names attributes durations where unambiguous; file aggregates omit module initialization and ambiguous names, and parallel test durations are not additive wall time. Exclusive phases did not execute and are not passed.",
+    "sourceNotes": "Four failed contracts under repair in the authorized implementation child; mandatory deployment did not execute. Gates are retained. Ordinary phase alone is 2.24 times the prior ordinary phase; current exclusive time remains unmeasured."
+  },
+  "sameNamedTestComparisons": [
+    {
+      "name": "legacy full-score migration classifies harmless SVG serialization separately from changed ink",
+      "file": [
+        "test/active-score-release.test.ts"
+      ],
+      "previousSeconds": 225.53,
+      "currentSeconds": 297.713,
+      "ratio": 1.32
+    },
+    {
+      "name": "real-engine Bach Candidate identifies exact saved revision and m. 5 crop; both References stay canonical",
+      "file": [
+        "test/bach-semantic-hand.test.ts"
+      ],
+      "previousSeconds": 61.614,
+      "currentSeconds": 188.984,
+      "ratio": 3.067
+    },
+    {
+      "name": "static reuse is byte-identical to cold real engraving, and state is excluded only from static identity",
+      "file": [
+        "test/janko-semantic-cache.test.ts"
+      ],
+      "previousSeconds": 55.724,
+      "currentSeconds": 162.582,
+      "ratio": 2.918
+    },
+    {
+      "name": "archived PR112 ink remains distinct from GOLD; served References remain canonical",
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "previousSeconds": 42.326,
+      "currentSeconds": 141.538,
+      "ratio": 3.344
+    },
+    {
+      "name": "Fresh data/options/tokens: subsequent render with changed options computes fresh layout without stale cache",
+      "file": [
+        "test/janko-layout-reuse.test.ts"
+      ],
+      "previousSeconds": 39.053,
+      "currentSeconds": 107.909,
+      "ratio": 2.763
+    },
+    {
+      "name": "the prepared studio is deterministic across fresh generations",
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "previousSeconds": 38.037,
+      "currentSeconds": 101.068,
+      "ratio": 2.657
+    },
+    {
+      "name": "each prepared artifact is byte-equal to the direct real renderer",
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "previousSeconds": 36.675,
+      "currentSeconds": 93.766,
+      "ratio": 2.557
+    },
+    {
+      "name": "retained Round55 major and N26 cards use portable renderer and leave Reference unchanged",
+      "file": [
+        "test/janko-practice.test.ts"
+      ],
+      "previousSeconds": 35.162,
+      "currentSeconds": 90.348,
+      "ratio": 2.569
+    },
+    {
+      "name": "retired/full-owner shared targets refuse; a guarded generic variant still serves every real engine page",
+      "file": [
+        "test/janko-duration-controls.test.ts"
+      ],
+      "previousSeconds": 41.946,
+      "currentSeconds": 80.604,
+      "ratio": 1.922
+    },
+    {
+      "name": "historical Round 46 card retains its explicit rules; current Reference serves the real engine pages",
+      "file": [
+        "test/janko-round45.test.ts"
+      ],
+      "previousSeconds": 25.515,
+      "currentSeconds": 58.885,
+      "ratio": 2.308
+    },
+    {
+      "name": "the build seam emits the two content-addressed artifacts and no committed review asset exists",
+      "file": [
+        "test/janko-prepared-studio.test.ts"
+      ],
+      "previousSeconds": 17.37,
+      "currentSeconds": 49.221,
+      "ratio": 2.834
+    },
+    {
+      "name": "parked Round 49 real-engine Candidate windows retain PR96 serialized SVG bytes",
+      "file": [],
+      "previousSeconds": 33.027,
+      "currentSeconds": 43.629,
+      "ratio": 1.321
+    }
+  ],
+  "sameNamedTestComparisonsCaveat": "Observed CI timings on successive heads, not a controlled per-change performance experiment. Both workload and runner load can differ; expanded Reference rendering is established by source and local profile, without assigning the whole regression to one cause.",
+  "recordedAt": "2026-10-02T21:27:24.188860+00:00",
+  "investigationVisualImpact": "not affected; source/engraving/PDF unchanged by the diagnostic probes and this evidence record",
+  "publicationState": "No14 source merged in PR147; initial mandatory CI failed; four integration contracts are being corrected before a new mandatory run. Pages has not published this GOLD release.",
+  "contractRepair": {
+    "status": "five focused contracts passed; new mandatory CI pending",
+    "files": [
+      "test/janko-layout-reuse.test.ts",
+      "test/janko-round45.test.ts",
+      "test/janko-studio.test.ts"
+    ],
+    "sourceVisualChange": false,
+    "sourceBase": "fa826a771ad2ae420ace00a1d84504f5cb2bee80",
+    "preservedPdfSha256": "81c9d35fedb350287b1606c5bb861762574b0687efbe1d72856df3dca0e48a30",
+    "details": "Per-owner once-only layout solves; historical11SVG and newGold4page witnesses separately; intended source/profile bindings and static/dynamic engine-import refusals; exact old source/output preserved."
+  }
+}

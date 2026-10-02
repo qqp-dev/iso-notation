@@ -75,6 +75,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import oldReferenceHashes from './support/no14-old-reference-svg-hashes.json';
+import {NO14_GOLD_REFERENCE_ID,NO14_GOLD_IDENTITY} from '../src/render/janko/no14-gold';
 import { BRAHMS_CURRENT_PAGES, BRAHMS_CURRENT_WHOLE_CROP } from './support/brahms-pre-clarity';
 
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
@@ -1747,7 +1749,16 @@ test('The served studio carries the three labelled cards and the honest inventor
     /rest-inference-withheld/,
     'and lists the published withheld-rest facts of this score'
   );
-  assert.equal((reference.match(/data-page="/g) ?? []).length, 8, 'two Bach pages + six complete expression-aware Brahms pages');
+  const starts=[...reference.matchAll(/<div class="reference-score" data-score="([^"]+)"/g)];
+  const blocks=new Map(starts.map((m,i)=>[m[1],reference.slice(m.index,starts[i+1]?.index??reference.length)]));
+  assert.deepEqual([...blocks.keys()].sort(),[NO14_GOLD_REFERENCE_ID,'brahms-op118-no1','primary'].sort(),'each actual Reference score owns its own pages');
+  const pages=(id:string)=>[...blocks.get(id)!.matchAll(/data-page="(\d+)"/g)].map(m=>Number(m[1]));
+  assert.deepEqual(pages('primary'),[1,2],'the historical Bach spread remains complete');
+  assert.deepEqual(pages('brahms-op118-no1'),[1,2,3,4,5,6],'the historical Brahms spread remains complete');
+  assert.deepEqual(pages(NO14_GOLD_REFERENCE_ID),[1,2,3,4],'No14 adds its own four complete pages');
+  const svgHashes=(id:string)=>[...blocks.get(id)!.matchAll(/<svg\b[\s\S]*?<\/svg>/g)].map(m=>createHash('sha256').update(m[0]).digest('hex'));
+  assert.deepEqual([...svgHashes('brahms-op118-no1'),...svgHashes('primary')],oldReferenceHashes,'all11 earlier page/crop vectors remain byte-exact');
+  assert.deepEqual(svgHashes(NO14_GOLD_REFERENCE_ID).slice(0,4),NO14_GOLD_IDENTITY.pageSvgSha256,'No14 is checked separately against its declared final GOLD ink');
   // Phone continuity (§F) is studio-wide and lives in the shared session
   // module: both views are served by the same document, and the behavioural
   // proof (restore, hash precedence, storage failure, HMR re-mount, listener

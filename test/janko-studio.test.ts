@@ -409,18 +409,60 @@ test('Adding a candidate to the registry needs zero template edits', () => {
   assert.ok((html.match(/<svg/g) ?? []).length === 2);
 });
 
-test('The registry never imports engine internals', () => {
-  const source = read('src/render/janko/candidates.ts');
-  const imports = [...source.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(imports)].sort(), ['../../source-review/documents', './types'],
-    'the registry depends only on layout types and shared source citation metadata');
-  assert.doesNotMatch(read('src/source-review/documents.ts'),
-    /(?:^\s*import\b|\bfrom\s*['"]|\bimport\s*\(|\brequire\s*\()/m,
-    'source citation metadata has no transitive imports, including engine dependencies');
-  for (const candidate of CURRENT_CANDIDATES) {
-    assert.ok(!source.includes('renderJanko'), 'no renderer calls in the registry');
-    assert.ok(candidate.id.length > 0 && candidate.label.length > 0);
-  }
+test('The registry never imports engine internals',()=>{
+ const root='src/render/janko/candidates.ts';
+ const graph:Record<string,string[]>={
+  [root]:['src/source-review/documents.ts','src/render/janko/types.ts','src/render/janko/no14-practice.ts','src/render/janko/no14-written.ts'],
+  'src/source-review/documents.ts':[],
+  'src/render/janko/types.ts':[], // Existing shared API boundary; see binding checks below.
+  'src/model/types.ts':[],
+  'src/render/janko/no14-written.ts':['src/model/types.ts','src/scores/schumann-no14-draft.ts','src/render/janko/no14-practice.ts'],
+  'src/render/janko/no14-practice.ts':['src/scores/schumann-no14-draft.ts','src/render/janko/types.ts'],
+  'src/scores/schumann-no14-draft.ts':['src/scores/schumann-no14-derived.json','src/model/types.ts'],
+ };
+ const no14Bindings:Record<string,string[]>={
+  './no14-written':['NO14_WRITTEN_SCORE_ID'],
+  './no14-practice':['NO14_PRACTICE_SCORE_ID','NO14_PRACTICE_DELTA','NO14_DOT_CONTROL_DELTA','NO14_HEAD_DOT_DELTA','NO14_FULLER_HAIRPIN_DELTA','NO14_OPTICAL_DELTA','NO14_FITTED_DELTA','NO14_BREATHING_DELTA','NO14_SILHOUETTE_DELTA'],
+ };
+ const audit=(load:(file:string)=>string)=>{
+  const visited=new Set<string>();
+  const visit=(file:string)=>{
+   if(visited.has(file))return;visited.add(file);
+   if(file.endsWith('.json')){assert.doesNotThrow(()=>JSON.parse(load(file)),'source witness stays inert JSON');return;}
+   assert.ok(Object.hasOwn(graph,file),`only declared source/profile/type modules: ${file}`);
+   // This pre-existing shared barrel also exports abstract rendering APIs.
+   // Keep that legacy boundary, but constrain the values consumed by the
+   // registry and newly admitted No14 helpers instead of granting renderer access.
+   if(file==='src/render/janko/types.ts')return;
+   const source=load(file);
+   const modules=[...source.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g),...source.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)].map(m=>m[1]);
+   const dependencies=modules.map(spec=>path.posix.normalize(path.posix.join(path.posix.dirname(file),spec))+(path.posix.extname(spec)?'':'.ts'));
+   const declarations=[...source.matchAll(/\bimport\s+([\s\S]*?)\bfrom\s*['"]([^'"]+)['"]/g)];
+   for(const declaration of declarations){
+    const spec=declaration[2],clause=declaration[1].trim();
+    const expected=file===root?no14Bindings[spec]:file==='src/render/janko/no14-practice.ts'&&spec==='./types'
+     ?['DEFAULT_JANKO_OPTIONS','DEFAULT_JANKO_TOKENS','resolveJankoOptions','resolveJankoTokens']:undefined;
+    if(!expected&&!(file===root&&spec==='./types'))continue;
+    assert.match(clause,/^\{[\s\S]*\}$/,'shared APIs are consumed through named declarative values');
+    const bindings=clause.slice(1,-1).split(',').map(b=>b.trim().split(/\s+as\s+/)[0]).filter(Boolean);
+    if(expected)assert.deepEqual(bindings.sort(),[...expected].sort(),'only the approved No14 identifiers/deltas/defaults/resolvers are consumed');
+    else for(const binding of bindings)assert.doesNotMatch(binding,/^(?:render|layout)/,'registry cannot consume a renderer through the already-allowed types barrel');
+   }
+   assert.doesNotMatch(source,/\b(?:import|require)\s*\(/,'no dynamic execution dependency anywhere in the source/profile graph');
+   assert.doesNotMatch(source,/\b(?:renderJanko\w*|layoutJanko\w*)\s*\(/,'no renderer/engine invocation anywhere in the graph');
+   assert.deepEqual([...new Set(dependencies)].sort(),[...graph[file]].sort(),`exact declared source/profile dependencies of ${file}`);
+   for(const dependency of dependencies)visit(dependency);
+  };
+  visit(root);return visited;
+ };
+ const visited=audit(read);assert.ok(visited.has('src/scores/schumann-no14-derived.json'),'transitive source witness is checked');
+ assert.doesNotMatch(read('src/source-review/documents.ts'),/(?:^\s*import\b|\bfrom\s*['"]|\bimport\s*\(|\brequire\s*\()/m,'citation metadata still has no imports');
+ for(const candidate of CURRENT_CANDIDATES)assert.ok(candidate.id.length>0&&candidate.label.length>0);
+ const mutated=(file:string,extra:string)=>(target:string)=>read(target)+(target===file?'\n'+extra:'');
+ assert.throws(()=>audit(mutated('src/render/janko/no14-practice.ts',"import {layoutJankoScore} from './engine';")),'transitive static engine import is rejected');
+ assert.throws(()=>audit(mutated('src/render/janko/no14-written.ts',"void import('./engine');")),'transitive dynamic engine import is rejected');
+ assert.throws(()=>audit(mutated(root,"import {projectNo14Written} from './no14-written';")),'registry must not consume source-building functions');
+ assert.throws(()=>audit(mutated('src/render/janko/no14-practice.ts',"import {renderAbstractKeySvg} from './types';")),'new source/profile helpers cannot consume a renderer through the legacy types barrel');
 });
 
 // ---------------------------------------------------------------------------
