@@ -1,0 +1,151 @@
+{
+  "normalization": "Intact outlines, one uniform dynamic-family factor giving piano total ink height 416 units at .016 = 6.656 pt. Ped. separately normalized to total ink height 774 units at .0075 = 5.805 pt. OpenType shaping includes default kerning; original relative proportions and family design retained.",
+  "smuflMappingSource": "https://smufl.formats.music/latest/tables/dynamics.html",
+  "smuflCodepoints": {
+    "p": "0xe520",
+    "pp": "0xe52b",
+    "ppp": "0xe52a",
+    "mp": "0xe52c",
+    "mf": "0xe52d",
+    "f": "0xe522",
+    "ff": "0xe52f",
+    "fff": "0xe530",
+    "fp": "0xe534",
+    "sf": "0xe536",
+    "sfz": "0xe539"
+  },
+  "packages": [
+    {
+      "id": "libre-bodoni",
+      "dynamicFamily": "libre-bodoni-italic",
+      "pedalFamily": "libre-bodoni-regular"
+    },
+    {
+      "id": "source-serif",
+      "dynamicFamily": "source-serif-medium-italic",
+      "pedalFamily": "source-serif-regular"
+    },
+    {
+      "id": "finale-legacy-maestro-text",
+      "dynamicFamily": "finale-legacy",
+      "pedalFamily": "maestro-text-regular"
+    }
+  ],
+  "families": {
+    "libre-bodoni-italic": {
+      "label": "Libre Bodoni Regular Italic",
+      "kind": "text",
+      "source": "https://github.com/googlefonts/Libre-Bodoni",
+      "file": "/tmp/iso-no14-makemusic-font-research-20261002-dbqjwukh/LibreBodoni-Italic-wght.ttf",
+      "sha256": "6a9b0c88764dcf6c094653e3c28da045fcebca48734254afdcbfec46b9ab4fcd",
+      "licenseFile": "LibreBodoni-OFL.txt",
+      "fontVersion": "Version 2.005;gftools[0.9.23]",
+      "unitsPerEm": 1000,
+      "location": {
+        "wght": 400
+      },
+      "pSignedOutlineAreaOverHeightSquared": 0.2493801646030396,
+      "pInkAreaOverHeightSquared": 0.24058423190175068,
+      "pInkAreaNumericMethod": "Nonzero-fill union cross sections; curves sampled at 128 subdivisions and 2048 height rows. No generated image. Overlapping master contours counted once.",
+      "normalization": 0.5360824742268041,
+      "paintScale": 0.016,
+      "pVisibleInkHeightPt": 6.656,
+      "extractionRole": "Research assets for native studio comparison; no aesthetic acceptance or default selection"
+    },
+    "source-serif-medium-italic": {
+      "label": "Source Serif 4 Medium Italic",
+      "kind": "text",
+      "source": "https://github.com/adobe-fonts/source-serif",
+      "file": "/tmp/iso-no14-makemusic-font-research-20261002-dbqjwukh/SourceSerif4Variable-Italic.otf",
+      "sha256": "68220a94535e9cffb9b7d844140583ac2a3195eabdd4890b15f83272c8bfcfe4",
+      "licenseFile": "SourceSerif4-OFL.md",
+      "fontVersion": "Version 4.005;hotconv 1.1.0;makeotfexe 2.6.0",
+      "unitsPerEm": 1000,
+      "location": {
+        "wght": 500,
+        "opsz": 20
+      },
+      "pSignedOutlineAreaOverHeightSquared": 0.27097871508812993,
+      "pInkAreaOverHeightSquared": 0.25192908080976323,
+      "pInkAreaNumericMethod": "Nonzero-fill union cross sections; curves sampled at 128 subdivisions and 2048 height rows. No generated image. Overlapping master contours counted once.",
+      "normalization": 0.571569136376876,
+      "paintScale": 0.016,
+      "pVisibleInkHeightPt": 6.656,
+      "extractionRole": "Research assets for native studio comparison; no aesthetic acceptance or default selection"
+    },
+    "finale-legacy": {
+      "label": "Finale Legacy",
+      "kind": "music",
+      "source": "https://makemusic.zendesk.com/hc/en-us/articles/1500013053461-MakeMusic-Fonts-and-Licensing-Information",
+      "file": "/tmp/iso-no14-makemusic-font-research-20261002-dbqjwukh/extracted/F_TTFonts_Fonts_FinaleLegacy.otf",
+      "sha256": "d29884a1b8f966a777297e516ef2ded999a6b8d7239c4385976fcafa4b677109",
+      "licenseFile": "MakeMusic-OFL.txt",
+      "fontVersion": "Version 1.6",
+      "unitsPerEm": 1000,
+      "location": {},
+      "pSignedOutlineAreaOverHeightSquared": 0.3016270146599473,
+      "pInkAreaOverHeightSquared": 0.30161727000773364,
+      "pInkAreaNumericMethod": "Nonzero-fill union cross sections; curves sampled at 128 subdivisions and 2048 height rows. No generated image. Overlapping master contours counted once.",
+      "normalization": 0.9390519187358917,
+      "paintScale": 0.016,
+      "pVisibleInkHeightPt": 6.656,
+      "extractionRole": "Research assets for native studio comparison; no aesthetic acceptance or default selection"
+    },
+    "libre-bodoni-regular": {
+      "label": "Libre Bodoni Regular",
+      "kind": "text",
+      "source": "https://github.com/googlefonts/Libre-Bodoni",
+      "file": "/tmp/iso-no14-makemusic-font-research-20261002-dbqjwukh/LibreBodoni-wght.ttf",
+      "sha256": "0d543665bd869819ffd7d46608804e245497ba835960832d44be89e561b0c717",
+      "licenseFile": "LibreBodoni-OFL.txt",
+      "fontVersion": "Version 2.005;gftools[0.9.23]",
+      "unitsPerEm": 1000,
+      "location": {
+        "wght": 400
+      },
+      "pSignedOutlineAreaOverHeightSquared": 0.2612009750194849,
+      "pInkAreaOverHeightSquared": 0.25266420101299264,
+      "pInkAreaNumericMethod": "Nonzero-fill union cross sections; curves sampled at 128 subdivisions and 2048 height rows. No generated image. Overlapping master contours counted once.",
+      "normalization": 0.5360824742268041,
+      "paintScale": 0.016,
+      "pVisibleInkHeightPt": 6.656,
+      "extractionRole": "Research assets for native studio comparison; no aesthetic acceptance or default selection"
+    },
+    "source-serif-regular": {
+      "label": "Source Serif 4 Regular",
+      "kind": "text",
+      "source": "https://github.com/adobe-fonts/source-serif",
+      "file": "/tmp/iso-no14-makemusic-font-research-20261002-dbqjwukh/SourceSerif4-Regular.otf",
+      "sha256": "edf160d0d584deee8a3bb2c3371b2a7624ca63580fbe02c57c1f4c91e84d8787",
+      "licenseFile": "SourceSerif4-OFL.md",
+      "fontVersion": "Version 4.005;hotconv 1.1.0;makeotfexe 2.6.0",
+      "unitsPerEm": 1000,
+      "location": {},
+      "pSignedOutlineAreaOverHeightSquared": 0.251987512830576,
+      "pInkAreaOverHeightSquared": 0.25198259736847967,
+      "pInkAreaNumericMethod": "Nonzero-fill union cross sections; curves sampled at 128 subdivisions and 2048 height rows. No generated image. Overlapping master contours counted once.",
+      "normalization": 0.5714285714285714,
+      "paintScale": 0.016,
+      "pVisibleInkHeightPt": 6.656,
+      "extractionRole": "Research assets for native studio comparison; no aesthetic acceptance or default selection"
+    },
+    "maestro-text-regular": {
+      "label": "Finale Maestro Text Regular",
+      "kind": "text",
+      "source": "https://makemusic.zendesk.com/hc/en-us/articles/1500013053461-MakeMusic-Fonts-and-Licensing-Information",
+      "file": "/tmp/iso-no14-makemusic-font-research-20261002-dbqjwukh/extracted/F_TTFonts_Fonts_FinaleMaestroText_Regular.otf",
+      "sha256": "b67d182a7583940322ebe8997875d2d8526bb8d0d082c11187a7d82e4bc32621",
+      "licenseFile": "MakeMusic-OFL.txt",
+      "fontVersion": "Version 1.6",
+      "unitsPerEm": 1000,
+      "location": {},
+      "pSignedOutlineAreaOverHeightSquared": 0.2482467706856625,
+      "pInkAreaOverHeightSquared": 0.24824681132382337,
+      "pInkAreaNumericMethod": "Nonzero-fill union cross sections; curves sampled at 128 subdivisions and 2048 height rows. No generated image. Overlapping master contours counted once.",
+      "normalization": 0.6172106824925816,
+      "paintScale": 0.016,
+      "pVisibleInkHeightPt": 6.656,
+      "extractionRole": "Research assets for native studio comparison; no aesthetic acceptance or default selection"
+    }
+  }
+}

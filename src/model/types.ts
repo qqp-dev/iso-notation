@@ -268,6 +268,18 @@ export interface QuantizedGridScore {
   opus?: string;
   /** Source-resolved publication identity; distinct from an imported filename or draft label. */
   printIdentity?: { scoreId: string; work: string; piece: string; composer: string; sourceAlias?: string };
+  /** Opening source direction without a metronome number. Never creates tempo. */
+  performingInstruction?: { text: string; edition: string; pages: string; encodingText?: string; encodingFile?: string; encodingLine?: number };
+  /** Publication attribution carried by an explicitly prepared score. */
+  publicationNotices?: string[];
+  /** Explicit written view; source/unfolded model remains separately retained.
+   * Event overrides carry occurrence identities/clocks/provenance only. */
+  writtenPresentation?: {
+    sourceScoreId:string;sourceHash:string;performedTotalTicks:number;writtenBars:number;performedBars:number;
+    repeats:{startBar:number;endBar:number;times:number}[];
+    occurrences:{performedBar:number;writtenBar:number;pass:number;performedTick:number;writtenTick:number}[];
+    events:Record<string,{writtenIndex:number;performedIndex:number;overrides:Record<string,unknown>}[]>;
+  };
   ticksPerBeat: number; // e.g. 48 ticks per quarter note
   totalTicks: number;
   timeSignatures: TimeSignatureOverlay[];

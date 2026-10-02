@@ -344,6 +344,9 @@
     .page-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
     .crop-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 580px), 1fr)); }
     .compare-strip { gap: 10px; }
+    .compare-strip-readable .strip-head { display: block; }
+    .compare-strip-readable > .strip-panel:only-of-type { grid-column: 1 / -1; }
+    .score-pages summary, .score-context summary { cursor: pointer; padding: 8px 0; min-height: 44px; }
     .diagnostics { margin-top: 0; }
     .diagnostics ul { list-style: disc; padding-left: 20px; }
     body.source-mode { height: 100dvh; min-height: 0; overflow: hidden; }
@@ -469,7 +472,7 @@
     </div>
     <div class="context-toolbar" aria-label="View controls">
       <label class="work-picker">Work <select class="source-work" aria-label="Source work"></select></label>
-      <label class="reference-picker">Piece <select id="janko-reference-picker" aria-label="Reference piece"><option value="primary">Bach · GOLD</option><option value="brahms-op118-no1">Brahms · BRONZE</option></select></label>
+      <label class="reference-picker">Piece <select id="janko-reference-picker" aria-label="Reference piece"><option value="schumann-op68-no14-gold">Schumann No.14 · GOLD</option><option value="primary">Bach · GOLD</option><option value="brahms-op118-no1">Brahms · BRONZE</option></select></label>
       <div class="source-mobile-switch" aria-label="Mobile comparison pane"><button data-mobile-pane="reference" aria-label="Original"><span class="long-label">Original</span><span class="short-label">Original</span></button><button data-mobile-pane="candidate" aria-label="Transcription"><span class="long-label">Transcription</span><span class="short-label">Transcription</span></button></div>
       <details id="janko-status-details" class="engraving-details"><summary>Details</summary><div id="janko-status-diagnostics"></div></details>
       <div class="zoom-group" role="group" aria-label="Engraving zoom">

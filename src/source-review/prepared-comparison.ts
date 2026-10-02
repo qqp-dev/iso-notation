@@ -1,3 +1,20 @@
+import no14Selection from '../render/janko/no14-gold-profile.json';
+
+/** Only the verified applied GOLD Reference is a published No14 counterpart.
+ * A partial/stale release or another profile must never supply substitute ink. */
+export function no14GoldComparisonPages(prepared: HTMLElement): {page:number;label:string;svg:SVGSVGElement}[] {
+  if(prepared.dataset.preparedState!=='ready')return [];
+  const score=prepared.querySelector<HTMLElement>('.reference-score[data-score="schumann-op68-no14-gold"]');
+  if(score?.dataset.revision!==no14Selection.gold.profileSha256)return [];
+  const figures=Array.from(score.querySelectorAll<HTMLElement>('.page-card[data-page]'));
+  if(figures.length!==no14Selection.accepted.pageSvgSha256.length)return [];
+  const pages=figures.flatMap((figure,i)=>{
+    const svg=figure.querySelector<SVGSVGElement>('svg');
+    return svg&&figure.dataset.page===String(i+1)?[{page:i+1,label:figure.querySelector('figcaption')?.textContent?.trim()??`Page ${i+1}`,svg}]:[];
+  });
+  return pages.length===figures.length?pages:[];
+}
+
 /** Reuse only the exact current real-engine passage, never another score's ink. */
 export function comparisonReadings(prepared: HTMLElement): { id: string; label: string; svg: SVGSVGElement }[] {
   if (prepared.dataset.preparedState !== 'ready') return [];

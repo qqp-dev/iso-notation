@@ -12,6 +12,7 @@ import { placedLedgerRules, pitchGridRules } from './elements/staff';
 import { barlineStrokes, beatGridStrokes } from './elements/barlines';
 import { f } from './elements/style';
 import type { VerticalGridStroke } from './elements/barlines';
+import {repeatBoundaryTicks} from './repeat-signs';
 import { getScaledKnockoutMetrics, digitBaselineOffset, JANKO_USER_UNITS_PER_PT, JANKO_HALO_STROKE_WIDTH } from './elements/notehead';
 import type { JankoNoteheadSpec } from './elements/notehead';
 import { GOTHIC_DEMI_GLYPHS } from './gothic-glyphs';
@@ -221,7 +222,8 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
   const ledger=ledgerPieces(layout,o,t,pagePiece);
   const gridLayer=o.gridWritingPolicy==='strict-protected-grid'?'strict-grid':'ordinary-grid';
   const beat=beatGridStrokes(g,system,o,t,layout.columns).map((s,i)=>strokePiece(s,'beat-pulses',i,system,pagePiece,gridLayer));
-  const barlines=barlineStrokes(g,o,t,layout.isFinalSystem).map((s,i)=>strokePiece(s,'measure-barlines',i,system,pagePiece,gridLayer));
+  const replaced=repeatBoundaryTicks(source);
+  const barlines=barlineStrokes(g,o,t,layout.isFinalSystem).filter(s=>s.tick===undefined||!replaced.has(s.tick)).map((s,i)=>strokePiece(s,'measure-barlines',i,system,pagePiece,gridLayer));
   const heads=new Map<string,readonly InkPiece[]>();
   for(const p of layout.notes){
     if(layout.compressedCopyIds?.has(p.note.id)||layout.handprintNoteIds?.has(p.note.id)) continue;
@@ -249,7 +251,7 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
       const exception=o.chordGrouping==='per-hand-clasp'&&clasp!==undefined&&note.durationTicks!==claspMemberCarriedTicks(clasp,note.id);
       const grammar=clasp&&!exception?'golden':o.durationGrammar;
       const engraved={...note,durationTicks:carriers.get(note.id)??note.durationTicks};
-      const owners=[note.id,...layout.unisonMerges.filter(m=>m.survivorId===note.id&&(!o.phraseRouting||m.exact)).flatMap(m=>m.mergedIds)];
+      const owners=[note.id,...layout.unisonMerges.filter(m=>m.survivorId===note.id&&(!o.phraseRouting&&!o.sharedDurationDot||m.exact)).flatMap(m=>m.mergedIds)];
       solos.set(note.id,soloRhythmPaint(engraved,t,o.subdivisionStyle,grammar,system,pagePiece,owners,soloSources));
     }
   }

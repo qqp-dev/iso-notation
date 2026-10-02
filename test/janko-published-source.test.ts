@@ -1,7 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-import {comparisonReadings,cloneComparisonSvg} from '../src/source-review/prepared-comparison';
+import {comparisonReadings,cloneComparisonSvg,no14GoldComparisonPages} from '../src/source-review/prepared-comparison';
+import gold from '../src/render/janko/no14-gold-profile.json';
+import {readPublishedComparison} from '../src/source-review/published-state';
 
 test('published Source path excludes local PDF transport, decoder and engraving execution',async()=>{
  const result=await build({entryPoints:['src/source-review/viewer.ts'],bundle:true,write:false,metafile:true,format:'esm',platform:'browser',logLevel:'silent',define:{'import.meta.env.DEV':'false'}});
@@ -9,6 +11,28 @@ test('published Source path excludes local PDF transport, decoder and engraving 
  assert.ok(inputs.some(p=>p.endsWith('published-viewer.ts')));
  assert.ok(!inputs.some(p=>/development-viewer|pdfjs|source-review\/session|scores\/|janko\/engine|janko\/linter/.test(p)),inputs.join('\n'));
  assert.doesNotMatch(result.outputFiles[0].text,/@janko-source-pdf|@janko-pdfjs-wasm|local dev only/);
+});
+
+test('published No14 Source requires the ready selected profile and four ordered genuine page vectors',()=>{
+ const figures=Array.from({length:4},(_,i)=>({dataset:{page:String(i+1)},querySelector:(q:string)=>q==='svg'?{page:i+1}:{textContent:`Page ${i+1}`}}));
+ const score={dataset:{revision:gold.gold.profileSha256},querySelectorAll:()=>figures};
+ const root={dataset:{preparedState:'ready'},querySelector:()=>score};
+ const pages=()=>no14GoldComparisonPages(root as unknown as HTMLElement);
+ assert.deepEqual(pages().map(q=>q.page),[1,2,3,4]);
+ for(const state of ['loading','refreshing','stale','error']){root.dataset.preparedState=state;assert.deepEqual(pages(),[]);}root.dataset.preparedState='ready';
+ score.dataset.revision=gold.accepted.profileSha256;assert.deepEqual(pages(),[]);score.dataset.revision=gold.gold.profileSha256;
+ figures[2].dataset.page='2';assert.deepEqual(pages(),[]);figures[2].dataset.page='3';
+ figures.pop();assert.deepEqual(pages(),[]);
+});
+
+test('published work state preserves old No13 choices and separate No14 source and ISO pages',()=>{
+ const read=(saved:unknown)=>readPublishedComparison({getItem:()=>JSON.stringify(saved),setItem:()=>{}});
+ assert.equal(readPublishedComparison().workId,'schumann-14');
+ const old=read({readingId:'saved-unavailable',mobilePane:'candidate',zoom:{candidate:1.75,reference:1.25}});
+ assert.equal(old.workId,'schumann-13');assert.equal(old.readingId,'saved-unavailable');assert.equal(old.zoom.candidate,1.75);
+ const current=read({...old,workId:'schumann-14',referencePage:1,isoPage:3});
+ assert.equal(current.referencePage,1);assert.equal(current.isoPage,3);assert.equal(current.readingId,'saved-unavailable');
+ assert.equal(read({...current,isoPage:4,referencePage:9}).isoPage,0);assert.equal(read({...current,workId:'foreign'}).workId,'schumann-13');
 });
 
 test('comparison uses only a ready exact No13 passage and refuses stale or other-window ink',()=>{

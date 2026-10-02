@@ -103,7 +103,7 @@ interface PdfFingerprint {
   titleScales: number[];
 }
 
-export function fingerprintPdf(pdfPath: string): PdfFingerprint {
+export function fingerprintPdf(pdfPath: string, title=DEFAULT_JANKO_OPTIONS.title): PdfFingerprint {
   const info = execFileSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   const pages = Number(/Pages:\s+(\d+)/.exec(info)?.[1]);
   assert.ok(Number.isInteger(pages) && pages > 0, `pdfinfo reports no page count for ${pdfPath}`);
@@ -137,10 +137,9 @@ export function fingerprintPdf(pdfPath: string): PdfFingerprint {
   const pageStreams = decompressedPageStreams(pdfPath);
   assert.equal(pageStreams.length, pages, `parsed ${pageStreams.length} content streams, pdfinfo says ${pages} pages`);
   const census = vectorCensus(pageStreams);
-  const titleScales = titleTmScales(pageStreams, DEFAULT_JANKO_OPTIONS.title).map((s) =>
+  const titleScales = titleTmScales(pageStreams, title).map((s) =>
     Number(s.toFixed(4))
   );
 
   return { pages, pageSizes, textHash, vectorHash: census.hash, vectorNumbers: census.numbers, fonts, images, titleScales };
 }
-

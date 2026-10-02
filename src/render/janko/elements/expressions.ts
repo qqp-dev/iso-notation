@@ -2,8 +2,14 @@ import { normalizePedalEvents } from '../../../model/expressions';
 /** Source-timed expression ink in Janko coordinates. No sounding durations are altered. */
 import type { QuantizedGridScore } from '../../../model/types';
 import { DYNAMIC_PATHS } from './dynamic-paths';
+import {DYNAMIC_FAMILIES,dynamicFamilyInk,type DynamicFamily,type DynamicFamilyInk} from './dynamic-families';
+import type {PedalTextFamily} from './paired-typography-paths';
+import {pedalStartInk,type PedalStartInk,type PedalStartStyle} from './pedal-starts';
 import { taperedSpanPath, type TaperedSpanProfile } from '../ties';
 import { routeLocalPhrases } from '../phrase-routing';
+import { routeBalancedPhrases } from '../balanced-phrases';
+import {routeOpticalPhrases} from '../optical-phrases';
+import type {OpticalPhraseDomain} from '../optical-phrase-domain';
 
 export interface ExpressionInk {
   kind: 'dynamic' | 'hairpin' | 'pedal' | 'phrase';
@@ -17,6 +23,10 @@ export interface ExpressionInk {
   contour?: {xStart:number;xEnd:number;yStart:number;yEnd:number;side:-1|1;depth:number;thickness:number;indent:number} & TaperedSpanProfile;
   gridKnockout?: boolean;
   routingIssue?: string;
+  /** Settled butt-capped line ink, including its actual painted width. */
+  strokeSegments?: {x0:number;y0:number;x1:number;y1:number;width:number}[];
+  pedalStartInk?:PedalStartInk;
+  dynamicFamilyInk?:DynamicFamilyInk;
 }
 export interface ExpressionPlacement {
   /** Display-field membership only; original source arrays remain untouched. */
@@ -27,14 +37,27 @@ export interface ExpressionPlacement {
   endpointX: (ids: string[], tick: number) => number;
   endpointEnvelope?: (ids: string[], tick: number) => {top:number;bottom:number;hand:'RH'|'LH'} | undefined;
   obstacles?: readonly {x0:number;x1:number;y0:number;y1:number}[];
+  /** Real musical ink for weak phrase-side balance; exclude guide lines and
+   * conservative head-clearance masks from this visual weight estimate. */
+  balanceObstacles?: readonly {x0:number;x1:number;y0:number;y1:number}[];
   clarity?: boolean;
   dynamicScale?: number;
+  dynamicFamily?:DynamicFamily;
   contourThickness?: number;
-  phraseRouting?: 'local';
+  phraseRouting?: 'local' | 'balanced' | 'optical-gesture' | 'optical-fitted' | 'optical-breathing' | 'optical-silhouette';
+  phraseTaper?: 'gentle' | 'pointed';
+  phrasePlacement?: 'preferred-side' | 'gesture-contour' | 'above-diagnostic';
+  hairpinStrokeWidth?: number;
+  pedalStart?:PedalStartStyle;
+  pedalTextFamily?:PedalTextFamily;
+  opticalDomain?: (id:string)=>OpticalPhraseDomain|undefined;
+  /** Derived once from actual source expression/hold presence in this system;
+   * only the successor route uses the existing lower-floor consequence. */
+  expressionFloorActive?:boolean;
 }
 const f = (n: number) => n.toFixed(3);
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]!));
-const line = (d: string, cls: string) => `<path class="janko-${cls}" d="${d}" fill="none" stroke="#111111" stroke-width="0.65"/>`;
+const line = (d: string, cls: string, width=.65) => `<path class="janko-${cls}" d="${d}" fill="none" stroke="#111111" stroke-width="${width}"/>`;
 
 /** Pair pedal state without manufacturing releases at bars, systems or pages. */
 export function pedalIntervals(score: Pick<QuantizedGridScore, 'pedals' | 'totalTicks'>) {
@@ -150,6 +173,8 @@ export function placeExpressions(score: QuantizedGridScore, p: ExpressionPlaceme
         `<path class="janko-phrase" data-phrase="${esc(phrase.id)}" d="${d}" fill="#111111"/>`});
   }
   if(p.phraseRouting==='local')out.splice(0,out.length,...routeLocalPhrases(score,p,out));
+  if(p.phraseRouting==='balanced')out.splice(0,out.length,...routeBalancedPhrases(score,p,out));
+  if(p.phraseRouting==='optical-gesture'||p.phraseRouting==='optical-fitted'||p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette')out.splice(0,out.length,...routeOpticalPhrases(score,p,out));
   const dynamicLanes: { x0: number; x1: number; lane: number }[] = [];
   for (const [index,e] of (score.dynamics ?? []).entries()) {
     const hairpin = e.kind === 'hairpin' || (!e.kind && ['crescendo','decrescendo'].includes(e.mark) && !!e.durationTicks);
@@ -158,31 +183,39 @@ export function placeExpressions(score: QuantizedGridScore, p: ExpressionPlaceme
     if (hairpin ? end <= p.start || e.tick >= p.end : e.tick < p.start || e.tick >= p.end) continue;
     const cs = e.tick < p.start, ce = end > p.end;
     let x0 = hairpin ? x(Math.max(p.start,e.tick)) : p.x(e.tick);
-    let x1: number, svg: (y: number) => string, height: number;
+    let x1: number, svg: (y: number) => string, height: number,dynamicInk:((y:number)=>DynamicFamilyInk)|undefined;
+    let hairpinA=0,hairpinB=0;
     if (hairpin) {
       if (end <= e.tick) throw Error('Nonpositive source hairpin');
       x1 = x(Math.min(p.end,end)); height = 6;
       const aperture = (tick: number) => 2.5 * (e.mark === 'crescendo' ? (tick-e.tick)/(end-e.tick) : (end-tick)/(end-e.tick));
-      const a = aperture(Math.max(p.start,e.tick)), b = aperture(Math.min(p.end,end));
-      svg = y => line(`M${f(x0)} ${f(y+3-a)}L${f(x1)} ${f(y+3-b)}M${f(x0)} ${f(y+3+a)}L${f(x1)} ${f(y+3+b)}`, 'hairpin');
+      const a = hairpinA=aperture(Math.max(p.start,e.tick)), b = hairpinB=aperture(Math.min(p.end,end));
+      const width=p.hairpinStrokeWidth??.65;
+      if(!Number.isFinite(width)||width<=0)throw Error('Invalid hairpin stroke width');
+      svg = y => line(`M${f(x0)} ${f(y+3-a)}L${f(x1)} ${f(y+3-b)}M${f(x0)} ${f(y+3+a)}L${f(x1)} ${f(y+3+b)}`, 'hairpin',width);
     } else if (e.kind === 'text-cresc' || e.text) {
       const text = e.text ?? (e.mark === 'decrescendo' ? 'diminuendo' : 'cresc.');
       const width = text.length * 4.4; height = 10;
       x0 = Math.max(p.left,Math.min(x0,p.right-width)); x1=x0+width;
       svg = y => `<text class="janko-expression-text" x="${f(x0)}" y="${f(y+8)}" font-family="Century Schoolbook,serif" font-size="8.5" font-style="italic">${esc(text)}</text>`;
     } else {
-      const glyph = DYNAMIC_PATHS[e.mark]; if (!glyph) throw Error(`Unsupported dynamic glyph ${e.mark}`);
+      const glyph = p.dynamicFamily?(DYNAMIC_FAMILIES[p.dynamicFamily].marks as Record<string,{path:string;bounds:readonly number[]}>)[e.mark]:DYNAMIC_PATHS[e.mark]; if (!glyph) throw Error(`Unsupported dynamic glyph ${e.mark}`);
       const [loX,loY,hiX,hiY] = glyph.bounds, scale=p.dynamicScale ?? .016, pad=e.parenthesized?4:0;
       const width=(hiX-loX)*scale+2*pad; height=Math.max((hiY-loY)*scale,e.parenthesized?10:0);
       x0=Math.max(p.left,Math.min(x0-width/2,p.right-width)); x1=x0+width;
-      svg = y => `<g class="janko-dynamic" aria-label="${esc(e.parenthesized ? `(${e.mark})` : e.mark)}">`+
+      if(p.dynamicFamily)dynamicInk=y=>dynamicFamilyInk(p.dynamicFamily!,e.mark,x0+pad-loX*scale,y+hiY*scale,scale);
+      svg = y => `<g class="janko-dynamic"${p.dynamicFamily?` data-dynamic-family="${p.dynamicFamily}"`:''} aria-label="${esc(e.parenthesized ? `(${e.mark})` : e.mark)}">`+
         `<path d="${glyph.path}" transform="translate(${f(x0+pad-loX*scale)} ${f(y+hiY*scale)}) scale(${scale} ${-scale})" fill="#111111"/>`+
         (e.parenthesized ? `<text x="${f(x0)}" y="${f(y+height*.85)}" font-family="serif" font-size="10">(</text><text x="${f(x1-4)}" y="${f(y+height*.85)}" font-family="serif" font-size="10">)</text>` : '')+'</g>';
     }
     let lane=0; while(dynamicLanes.some(q => q.lane===lane && q.x0<x1+3 && q.x1>x0-3)) lane++;
     dynamicLanes.push({x0,x1,lane}); const y=Math.max(p.bottom,...out.filter(q=>q.kind==='phrase').map(q=>q.y1))+8+lane*14;
-    add({kind:hairpin?'hairpin':'dynamic',id:`dynamic-${index}`,x0:x0-.35,x1:x1+.35,y0:y-.35,y1:y+height+.35,
-      startTick:e.tick,endTick:end,continuationStart:cs,continuationEnd:ce,svg:svg(y)});
+    // Retain historical admission padding at0.65pt. Opted-in widths expand
+    // that same conservative frame; physical queries use the painted lines.
+    const pad=hairpin&&p.hairpinStrokeWidth!==undefined?p.hairpinStrokeWidth/2+.025:.35;
+    const strokeSegments=hairpin&&p.hairpinStrokeWidth!==undefined?[-1,1].map(side=>({x0:Number(f(x0)),x1:Number(f(x1)),y0:Number(f(y+3+side*hairpinA)),y1:Number(f(y+3+side*hairpinB)),width:p.hairpinStrokeWidth!})):undefined;
+    add({kind:hairpin?'hairpin':'dynamic',id:`dynamic-${index}`,x0:x0-pad,x1:x1+pad,y0:y-pad,y1:y+height+pad,
+      startTick:e.tick,endTick:end,continuationStart:cs,continuationEnd:ce,svg:svg(y),...(strokeSegments?{strokeSegments}:{}),...(dynamicInk?{dynamicFamilyInk:dynamicInk(y)}:{})});
   }
   const dynamicBottom=Math.max(p.bottom,...out.map(q=>q.y1));
   const pedalY=dynamicBottom+12;
@@ -191,6 +224,23 @@ export function placeExpressions(score: QuantizedGridScore, p: ExpressionPlaceme
     if(interval.end<=p.start || interval.start>=p.end) continue;
     const cs=interval.start<p.start, ce=interval.end>p.end || !interval.release;
     const x0=x(interval.start),x1=x(interval.end),y=pedalY;
+    if(p.pedalStart){
+      const start=cs?undefined:pedalStartInk(p.pedalStart,interval.start,`pedal-${i}`,x0,y,7.2,p.pedalTextFamily),lineStart=start?(start.holdX??start.x1+.8):x0;
+      if(lineStart>=x1)throw Error(`Pedal start glyph does not fit source interval pedal-${i}`);
+      let d=`M${f(lineStart)} ${f(y)}`,atX=lineStart,atY=y;
+      const strokeSegments:NonNullable<ExpressionInk['strokeSegments']>=[];
+      const to=(px:number,py:number)=>{strokeSegments.push({x0:Number(f(atX)),y0:Number(f(atY)),x1:Number(f(px)),y1:Number(f(py)),width:.65});atX=px;atY=py;};
+      for(const tick of interval.changes.filter(t=>t>=p.start&&t<p.end)){
+        const cx=Math.max(lineStart+2,x(tick)),half=Math.min(2,(cx-lineStart)/2,(x1-cx)/2);
+        d+=`H${f(cx-half)}L${f(cx)} ${f(y-3)}L${f(cx+half)} ${f(y)}`;to(cx-half,y);to(cx,y-3);to(cx+half,y);
+      }
+      d+=`H${f(x1)}`;to(x1,y);if(!ce){d+=`V${f(y-4)}`;to(x1,y-4);}
+      const bounds=strokeSegments.map(expressionStrokeBounds);
+      add({kind:'pedal',id:`pedal-${i}`,x0:Math.min(start?.x0??lineStart,...bounds.map(b=>b.x0))-.025,x1:Math.max(start?.x1??lineStart,...bounds.map(b=>b.x1))+.025,
+        y0:Math.min(start?.y0??y,...bounds.map(b=>b.y0))-.025,y1:Math.max(start?.y1??y,...bounds.map(b=>b.y1))+.025,
+        startTick:interval.start,endTick:interval.end,continuationStart:cs,continuationEnd:ce,strokeSegments,...(start?{pedalStartInk:start}:{}),svg:(start?.svg??'')+line(d,'pedal')});
+      continue;
+    }
     let d=cs?`M${f(x0)} ${f(y)}`:`M${f(x0)} ${f(y-4)}V${f(y)}`;
     for(const tick of interval.changes.filter(t=>t>=p.start && t<p.end)) {
       const cx=Math.max(x0+2,x(tick)), half=Math.min(2,(cx-x0)/2,(x1-cx)/2);
@@ -204,15 +254,28 @@ export function placeExpressions(score: QuantizedGridScore, p: ExpressionPlaceme
 }
 /** Vertical interval occupied by a monotone two-cubic contour at page x. */
 export function expressionSliceAtX(q:ExpressionInk,x:number):[number,number]|undefined {
-  if(!q.contour || x<=q.contour.xStart || x>=q.contour.xEnd)return undefined;
-  const c=q.contour,x0=c.xStart,x1=c.xEnd,ax=x0+(c.startIndent??c.indent),bx=x1-(c.endIndent??c.indent);
+  if(!q.contour)return undefined;
+  const u=expressionContourParameterAtX(q.contour,x);
+  return u===undefined?undefined:expressionSliceAtParameter(q.contour,x,u);
+}
+/** Exact 32-step inverse. A caller may reuse u only for identical x controls
+ * and query x; y, depth, side and taper do not enter this calculation. */
+export function expressionContourParameterAtX(c:NonNullable<ExpressionInk['contour']>,x:number):number|undefined {
+  if(x<=c.xStart || x>=c.xEnd)return undefined;
+  const x0=c.xStart,x1=c.xEnd,ax=x0+(c.startIndent??c.indent),bx=x1-(c.endIndent??c.indent);
   let lo=0,hi=1;
   for(let i=0;i<32;i++){const u=(lo+hi)/2,v=1-u;
     const cx=v*v*v*x0+3*v*v*u*ax+3*v*u*u*bx+u*u*u*x1;if(cx<x)lo=u;else hi=u;}
-  const u=(lo+hi)/2,v=1-u,axis=c.yStart*(v*v*v+3*v*v*u)+c.yEnd*(3*v*u*u+u*u*u);
+  return (lo+hi)/2;
+}
+/** Evaluate at an exact inverse supplied by the dependency-scoped caller.
+ * Arithmetic order matches expressionSliceAtX's original calculation. */
+export function expressionSliceAtParameter(c:NonNullable<ExpressionInk['contour']>,x:number,u:number):[number,number] {
+  const x0=c.xStart,x1=c.xEnd,v=1-u,axis=c.chordAligned?c.yStart+(c.yEnd-c.yStart)*(x-x0)/(x1-x0):c.yStart*(v*v*v+3*v*v*u)+c.yEnd*(3*v*u*u+u*u*u);
   const start=c.startDepth??c.depth,end=c.endDepth??c.depth;
   const outer=axis+c.side*(3*v*v*u*start+3*v*u*u*end)/.75;
-  const inner=axis+c.side*(3*v*v*u*Math.max(0,start-c.thickness)+3*v*u*u*Math.max(0,end-c.thickness))/.75;
+  const inner=c.tipThickness===undefined?axis+c.side*(3*v*v*u*Math.max(0,start-c.thickness)+3*v*u*u*Math.max(0,end-c.thickness))/.75:
+    outer-c.side*(c.tipThickness+(c.thickness-c.tipThickness)*4*u*v);
   return [Math.min(outer,inner),Math.max(outer,inner)];
 }
 export function expressionsOverlap(a:ExpressionInk,b:ExpressionInk):boolean {
@@ -233,17 +296,114 @@ export function expressionsOverlap(a:ExpressionInk,b:ExpressionInk):boolean {
  * under a local phrase as painted ink. */
 export function expressionIntersectsBox(q: ExpressionInk,b:{x0:number;x1:number;y0:number;y1:number}):boolean {
   if(q.x0>=b.x1||q.x1<=b.x0||q.y0>=b.y1||q.y1<=b.y0)return false;
+  if(q.strokeSegments)return q.strokeSegments.some(s=>polygonIntersectsBox(strokeSegmentPolygon(s),b))||!!q.pedalStartInk?.polygons.some(p=>polygonIntersectsBox(p,b));
+  // Parentheses retain their existing separate text frame. Otherwise the
+  // opt-in dynamic queries its measured outlined contours, not empty air.
+  if(q.dynamicFamilyInk&&!q.svg.includes('<text'))return q.dynamicFamilyInk.polygons.some(p=>polygonIntersectsBox(p,b));
   if(!q.contour)return true;
-  const c=q.contour, points:number[][]=[];
+  return contourPolygonIntersectsBox(preparedContourPolygon(q.contour),b);
+}
+type Contour=NonNullable<ExpressionInk['contour']>;
+type PreparedContourPolygon={scalars:Contour;points:number[];scratch:[number[],number[]]};
+// Contours are sometimes translated or deliberately mutated by audits. Key
+// identity alone is insufficient: every scalar used by sampling is checked.
+const contourPolygons=new WeakMap<Contour,PreparedContourPolygon>();
+function sameContour(a:Contour,b:Contour):boolean {
+  return a.xStart===b.xStart&&a.xEnd===b.xEnd&&a.yStart===b.yStart&&a.yEnd===b.yEnd&&a.side===b.side&&
+    a.depth===b.depth&&a.thickness===b.thickness&&a.indent===b.indent&&a.startIndent===b.startIndent&&a.endIndent===b.endIndent&&
+    a.startDepth===b.startDepth&&a.endDepth===b.endDepth&&a.chordAligned===b.chordAligned&&a.tipThickness===b.tipThickness;
+}
+function preparedContourPolygon(c:Contour):PreparedContourPolygon {
+  const previous=contourPolygons.get(c);
+  if(previous&&sameContour(previous.scalars,c))return previous;
+  const points:number[]=[];
+  const ax=c.xStart+(c.startIndent??c.indent),bx=c.xEnd-(c.endIndent??c.indent);
+  const ay=c.chordAligned?c.yStart+(c.yEnd-c.yStart)*(ax-c.xStart)/(c.xEnd-c.xStart):c.yStart;
+  const by=c.chordAligned?c.yStart+(c.yEnd-c.yStart)*(bx-c.xStart)/(c.xEnd-c.xStart):c.yEnd;
   const sample=(u:number,inner:boolean)=>{
-    const v=1-u,ax=c.xStart+(c.startIndent??c.indent),bx=c.xEnd-(c.endIndent??c.indent);
+    const v=1-u;
     const a=c.side*Math.max(0,(c.startDepth??c.depth)-(inner?c.thickness:0))/.75;
     const b=c.side*Math.max(0,(c.endDepth??c.depth)-(inner?c.thickness:0))/.75;
-    return [v*v*v*c.xStart+3*v*v*u*ax+3*v*u*u*bx+u*u*u*c.xEnd,
-      v*v*v*c.yStart+3*v*v*u*(c.yStart+a)+3*v*u*u*(c.yEnd+b)+u*u*u*c.yEnd];
+    const outer=v*v*v*c.yStart+3*v*v*u*(ay+c.side*(c.startDepth??c.depth)/.75)+3*v*u*u*(by+c.side*(c.endDepth??c.depth)/.75)+u*u*u*c.yEnd;
+    const cy=inner&&c.tipThickness!==undefined?outer-c.side*(c.tipThickness+(c.thickness-c.tipThickness)*4*u*v):
+      v*v*v*c.yStart+3*v*v*u*(ay+a)+3*v*u*u*(by+b)+u*u*u*c.yEnd;
+    points.push(v*v*v*c.xStart+3*v*v*u*ax+3*v*u*u*bx+u*u*u*c.xEnd,cy);
   };
-  for(let i=0;i<=128;i++)points.push(sample(i/128,false));
-  for(let i=128;i>=0;i--)points.push(sample(i/128,true));
+  for(let i=0;i<=128;i++)sample(i/128,false);
+  for(let i=128;i>=0;i--)sample(i/128,true);
+  const prepared:PreparedContourPolygon={scalars:{...c},points,scratch:previous?.scratch??[[],[]]};
+  contourPolygons.set(c,prepared);return prepared;
+}
+/** Joint outward translation that places the complete dense ribbon beyond
+ * every box over its full x interval. Clipped linear-edge endpoints and all
+ * intervening vertices are the exact extrema of the same 129 + 129 polygon
+ * used by physical admission. This is not bisection of a union-of-boxes
+ * collision predicate: a translation cannot clear one box by entering another.
+ * Callers still perform the independent positive-area query after fitting. */
+export interface ExpressionOutwardFit {
+ xStart:number;xEnd:number;startIndent:number;endIndent:number;
+ boxes:readonly {x0:number;x1:number;y0:number;y1:number}[];
+ samples:{x0:number;x1:number;y0:number;y1:number;first:number;last:number;leftU:number;rightU:number}[];
+}
+/** Only x controls and box bounds enter this preparation. The returned plan
+ * is local to one placement; the fit validates every dependency on reuse. */
+export function prepareExpressionOutwardFit(c:Contour,boxes:ExpressionOutwardFit['boxes']):ExpressionOutwardFit {
+ const points=preparedContourPolygon(c).points,x=(i:number)=>points[i*2];
+ const floor=(value:number)=>{let lo=0,hi=128;while(lo<hi){const mid=Math.ceil((lo+hi)/2);if(x(mid)<=value)lo=mid;else hi=mid-1;}return lo;};
+ const samples=boxes.map(b=>{
+  const left=Math.max(c.xStart,b.x0),right=Math.min(c.xEnd,b.x1),first=floor(left),last=floor(right);
+  return {...b,first,last,leftU:first===128?0:(left-x(first))/(x(first+1)-x(first)),rightU:last===128?0:(right-x(last))/(x(last+1)-x(last))};
+ });
+ return {xStart:c.xStart,xEnd:c.xEnd,startIndent:c.startIndent??c.indent,endIndent:c.endIndent??c.indent,boxes,samples};
+}
+export function expressionContourOutwardShift(c:Contour,boxes:ExpressionOutwardFit['boxes'],prepared?:ExpressionOutwardFit):number {
+ let fit=prepared;
+ if(!fit||fit.xStart!==c.xStart||fit.xEnd!==c.xEnd||fit.startIndent!==(c.startIndent??c.indent)||fit.endIndent!==(c.endIndent??c.indent)||fit.boxes!==boxes||fit.samples.length!==boxes.length||
+  fit.samples.some((s,i)=>s.x0!==boxes[i].x0||s.x1!==boxes[i].x1||s.y0!==boxes[i].y0||s.y1!==boxes[i].y1))fit=prepareExpressionOutwardFit(c,boxes);
+ const points=preparedContourPolygon(c).points;
+ let shift=0;
+ for(const s of fit.samples){
+  if(Math.min(c.xEnd,s.x1)<=Math.max(c.xStart,s.x0))continue;
+  let near=c.side===-1?-Infinity:Infinity;
+  for(let edge=0;edge<2;edge++){
+   const first=edge?257-s.first:s.first,last=edge?257-s.last:s.last,step=edge?-1:1;
+   const left=points[first*2+1]+(s.first===128?0:s.leftU*(points[(first+step)*2+1]-points[first*2+1]));
+   const right=points[last*2+1]+(s.last===128?0:s.rightU*(points[(last+step)*2+1]-points[last*2+1]));
+   near=c.side===-1?Math.max(near,left,right):Math.min(near,left,right);
+   for(let i=s.first+1;i<=s.last;i++){const y=points[(edge?257-i:i)*2+1];near=c.side===-1?Math.max(near,y):Math.min(near,y);}
+  }
+  shift=Math.max(shift,c.side===-1?near-s.y0:s.y1-near);
+ }
+ return shift;
+}
+/** Same four Sutherland–Hodgman clips and positive-area threshold as the
+ * reference polygon query. Flat scratch buffers avoid per-vertex objects;
+ * they are private to this contour and never escape the synchronous query. */
+function contourPolygonIntersectsBox(prepared:PreparedContourPolygon,b:{x0:number;x1:number;y0:number;y1:number}):boolean {
+  let input=prepared.points,inputLength=input.length;
+  for(let pass=0;pass<4;pass++){
+    // Keep capacity: assigning length=0 makes V8 discard the backing store.
+    // Only this query's occupied prefix participates in the next clip.
+    const output=prepared.scratch[pass%2];let outputLength=0;
+    const axis=pass<2?0:1,bound=pass===0?b.x0:pass===1?b.x1:pass===2?b.y0:b.y1,sign=pass%2===0?1:-1;
+    for(let i=0;i<inputLength;i+=2){
+      const j=(i+2)%inputLength,da=sign*(input[i+axis]-bound),dz=sign*(input[j+axis]-bound);
+      if(da>=0){output[outputLength++]=input[i];output[outputLength++]=input[i+1];}
+      if((da<0&&dz>0)||(da>0&&dz<0)){const u=da/(da-dz);output[outputLength++]=input[i]+u*(input[j]-input[i]);output[outputLength++]=input[i+1]+u*(input[j+1]-input[i+1]);}
+    }
+    input=output;inputLength=outputLength;
+  }
+  let area=0;for(let i=0;i<inputLength;i+=2){const j=(i+2)%inputLength;area+=(input[i]-b.x0)*(input[j+1]-b.y0)-(input[j]-b.x0)*(input[i+1]-b.y0);}
+  return Math.abs(area)>1e-9;
+}
+function strokeSegmentPolygon(s:NonNullable<ExpressionInk['strokeSegments']>[number]):number[][]{
+ const length=Math.hypot(s.x1-s.x0,s.y1-s.y0)||1,dx=-(s.y1-s.y0)*s.width/(2*length),dy=(s.x1-s.x0)*s.width/(2*length);
+ return [[s.x0+dx,s.y0+dy],[s.x1+dx,s.y1+dy],[s.x1-dx,s.y1-dy],[s.x0-dx,s.y0-dy]];
+}
+export function expressionStrokeBounds(s:NonNullable<ExpressionInk['strokeSegments']>[number]){
+ const points=strokeSegmentPolygon(s);return {x0:Math.min(...points.map(p=>p[0])),x1:Math.max(...points.map(p=>p[0])),y0:Math.min(...points.map(p=>p[1])),y1:Math.max(...points.map(p=>p[1]))};
+}
+function polygonIntersectsBox(points:number[][],b:{x0:number;x1:number;y0:number;y1:number}):boolean{
   let poly=points;
   const clip=(axis:number,bound:number,sign:number)=>{
     const input=poly;poly=[];
