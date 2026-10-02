@@ -33,8 +33,15 @@ export function writeReferenceReader(storage: StudioStorageLike | undefined, sta
   try { storage?.setItem(REFERENCE_READER_KEY, JSON.stringify(saved)); } catch { /* private session */ }
 }
 
-export function availableReferenceSelection(root:HTMLElement,state:ReferenceReaderState):ReferenceScore{
+/** An explicit link may select a known score, without resetting any reader state. */
+export function referenceScoreFromSearch(search = ''): ReferenceScore | undefined {
+  const requested = new URLSearchParams(search).get('score');
+  return scores.find(score => score === requested);
+}
+
+export function availableReferenceSelection(root:HTMLElement,state:ReferenceReaderState,requested?:ReferenceScore):ReferenceScore{
  const available=Array.from(root.querySelector<HTMLElement>('#view-reference')?.querySelectorAll<HTMLElement>('.reference-score')??[]).map(q=>q.dataset.score);
+ if(requested&&available.includes(requested))return requested;
  if(state.fresh&&available.includes('schumann-op68-no14-gold'))return 'schumann-op68-no14-gold';
  return available.includes(state.selected)?state.selected:available.includes('primary')?'primary':scores.find(q=>available.includes(q))??state.selected;
 }

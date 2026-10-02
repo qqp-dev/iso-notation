@@ -5,13 +5,15 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildBrahmsOp118No1Score } from '../src/scores/brahms-op118-no1';
-import { baseline, candidateHealth, candidateScore, executeHandCommand, head, readCandidate, recoverHandCandidate, resolveLinkedOccurrences, SEMANTIC_STATE, type HandIntent } from '../src/render/janko/semantic-hand';
+import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
+import { baseline, candidateHealth, candidateScore, compareCandidate, projectCandidate, executeHandCommand, head, readCandidate, recoverHandCandidate, resolveLinkedOccurrences, SEMANTIC_STATE, type Assignment, type HandIntent } from '../src/render/janko/semantic-hand';
 import { createStudioConfig, renderCandidatesView, renderReferenceView } from '../src/render/janko/studio';
 import { generatePreparedStudio } from '../src/render/janko/prepared/generate';
 import { fingerprintInputs, isWatchedInput, snapshotKey } from '../src/render/janko/prepared/seam';
 import { BRAHMS_CURRENT_PAGES } from './support/brahms-current';
 import provenance from '../src/scores/data/brahms-op118-no1-written-durations.provenance.json' with { type: 'json' };
-import { renderJankoPage } from '../src/render/janko/engine';
+import { renderJankoPage, setLayoutJankoScoreObserver } from '../src/render/janko/engine';
+import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, resolveJankoOptions, resolveJankoTokens } from '../src/render/janko/types';
 import { spawnSync } from 'node:child_process';
 import { BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from '../src/scores/brahms-op118-no1';
 const root = process.cwd();
@@ -22,6 +24,35 @@ const clean = () => { rmSync(stateFile, { force: true }); rmSync(`${stateFile}.l
 const request = (base: string, scope: HandIntent['scope'] = 'source-linked'): HandIntent => ({ schema: 1, score: 'brahms-op118-no1', base, intent: 'assign-hand', target: 'LH', scope,
   selected: [{ id: 'brahms-op118-no1-17', pitchClass: 0, octave: 4, tick: 240, expectedHand: 'RH' }] });
 const change = (intent: HandIntent) => executeHandCommand({ action: 'change', request: intent }, root, statePath);
+
+test('candidate page fingerprints keep before/after source profiles independently owned without repeated page-count settlement', () => {
+  for (const [before, ids, hand, options, tokens, changedSystems] of [
+    [buildBrahmsOp118No1Score(), ['brahms-op118-no1-17', 'brahms-op118-no1-152'], 'LH', BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS, [1, 3]],
+    [buildBachGoldbergVar1Score(), ['bach-var1-70'], 'RH', DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS, [2]],
+  ] as const) {
+    const original = JSON.stringify(before);
+    const selected: Assignment[] = ids.map(id => {
+      const n = before.notes.find(n => n.id === id)!;
+      return { id, guard: { id, pitchClass: n.pitch.pitchClass, octave: n.pitch.octave, tick: n.startTick, expectedHand: n.hand }, hand, citation: 'Disposable source/profile comparison fixture' };
+    });
+    const after = projectCandidate(before, selected), observed: string[] = [];
+    assert.notEqual(after, before);
+    setLayoutJankoScoreObserver((score, o, t) => {
+      assert.ok(score === before || score === after, 'only the exact independent before/after source objects own these solves');
+      assert.deepEqual(o, resolveJankoOptions(options));
+      assert.deepEqual(t, resolveJankoTokens(tokens));
+      observed.push(score === before ? 'before' : 'after');
+    });
+    try {
+      const effects = compareCandidate(before, after, selected);
+      assert.deepEqual(observed, ['before', 'after', 'after'], 'one independent page/crop settlement per state, plus the retained independent after audit');
+      assert.deepEqual(effects.changedPages, [1]);
+      assert.deepEqual(effects.changedSystems, changedSystems);
+      assert.equal(effects.visible, 'CHANGED');
+      assert.equal(JSON.stringify(before), original, 'comparison cannot mutate the original source');
+    } finally { setLayoutJankoScoreObserver(null); }
+  }
+});
 
 test('guarded source-linked edit derives two rests/crossings, preserves source, affected page and Reference, then undo exactly restores', () => {
   clean();

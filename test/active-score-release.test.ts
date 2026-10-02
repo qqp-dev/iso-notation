@@ -255,6 +255,14 @@ test('legacy full-score migration classifies harmless SVG serialization separate
     for (const name of ['src', 'scripts', 'data', 'public']) cpSync(join(source, name), join(dest, name), { recursive: true });
     for (const name of ['package.json', 'package-lock.json', 'tsconfig.json']) cpSync(join(source, name), join(dest, name));
     symlinkSync(join(source, 'node_modules'), join(dest, 'node_modules'), 'dir');
+    // Observe only this disposable engine. The original renderer still owns
+    // its verifier, layout and every SVG; no current-engine proof substitutes.
+    const path = join(dest, 'src/render/janko/engine.ts');
+    const observerAnchor = '  layoutJankoScoreObserver?.(score, o, t);';
+    const engine = readFileSync(path, 'utf8');
+    assert.ok(engine.includes(observerAnchor));
+    writeFileSync(path, "import { appendFileSync as recordFixtureSolve } from 'node:fs';\n" + engine.replace(observerAnchor,
+      `${observerAnchor}\n  if (new Error().stack?.includes('at pages ')) recordFixtureSolve(${JSON.stringify(join(dest, 'page-solves.jsonl'))}, JSON.stringify({score:score.id,options:o,tokens:t})+'\\n');`));
   };
   const enginePath = (dest: string) => join(dest, 'src/render/janko/engine.ts');
   const serializationAnchor = "    renderPageFooter(geo, pageIndex, totalPages),\n    '</svg>',";
@@ -290,6 +298,12 @@ test('legacy full-score migration classifies harmless SVG serialization separate
       const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/migrate-legacy-candidates.ts', '--old-root', oldRoot],
         { cwd: dest, encoding: 'utf8', timeout: 300_000, env: { ...process.env, JANKO_DEPLOY_CHECKOUT: dest } });
       assert.equal(result.error, undefined, String(result.error));
+      const solveOwners = (root: string) => readFileSync(join(root, 'page-solves.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      const originalSolves = solveOwners(oldRoot), destinationSolves = solveOwners(dest);
+      assert.equal(originalSolves.length, 5, 'original engine settles canonical and four independently controlled profiles once each');
+      assert.equal(new Set(originalSolves.map(row => JSON.stringify(row.tokens))).size, 5, 'different original token owners never share settlement');
+      assert.equal(destinationSolves.length, accepts ? 5 : 1, 'new engine settles only its own admitted profiles, once each');
+      rmSync(join(oldRoot, 'page-solves.jsonl'));
       if (accepts) {
         assert.equal(result.status, 0, `serialization-only difference is not changed music/ink: ${result.stderr}`);
         const migration = JSON.parse(result.stdout);

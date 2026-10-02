@@ -193,6 +193,25 @@ export const Landing: React.FC = () => {
         </div>
       </header>
 
+      <section className="landing-chrome shrink-0 border-b border-neutral-200 bg-neutral-50" aria-labelledby="no14-title">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+          <div className="mr-auto leading-snug">
+            <h2 id="no14-title" className="font-serif text-lg font-semibold">No. 14 · Kleine Studie</h2>
+            <p className="text-sm text-neutral-600">Robert Schumann · Album für die Jugend · Op. 68</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href={`${import.meta.env.BASE_URL}janko.html?score=schumann-op68-no14-gold#reference`}
+              className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2">
+              View score
+            </a>
+            <a href={`${import.meta.env.BASE_URL}schumann-op68-no14-gold.pdf`} download="schumann-op68-no14-gold.pdf"
+              className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-700 transition hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2">
+              Download PDF
+            </a>
+          </div>
+        </div>
+      </section>
+
       {import.meta.env.PROD && !pdfUrl && view !== 'guide' ? (
         <div className="landing-scroll min-h-0 flex-1 overflow-y-auto p-6" role="status">{releaseStatus}</div>
       ) : view === 'play' ? (

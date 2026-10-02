@@ -1,5 +1,7 @@
 # Design
 
+Current publication navigation follow-up (2026-10-02): the actual published Reference and PDF passed verification, but the root home page has no No14 entry. Add a compact full-identity section linking the existing PDF and existing Reference studio. An explicit allowlisted score query selects No14 from the available prepared payload without deleting saved reader state; a manual picker change removes the navigation override. Unknown/unavailable queries retain a usable existing selection. Keep Bach playback/default and all score, layout, prepared ink and PDF assets unchanged. This is task10.4 under the operator's existing publication authority.
+
 ## Context
 
 See [proposal.md](proposal.md) and [No14 readiness](../../../docs/research/schumann-no14-playable-readiness.md). The current builder contains574notes:566eighths and8dotted quarters, the latter all in unfolded occurrences48/80. The upper shared G/A each have independent72/24-tick obligations; the lower E/F-sharp are independent72-tick notes. Existing clocks, lower/wider ossias and hand authority are settled.

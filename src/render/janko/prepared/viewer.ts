@@ -40,7 +40,7 @@ import {
 import prepared from 'virtual:janko-prepared-manifest';
 import { observeCandidateFrame, observeReferenceFrame } from './observation';
 import { watchDeployedRelease } from './deployed';
-import { availableReferenceSelection, decorateReferenceReader, readReferenceReader, writeReferenceReader, type ReferenceScore } from './reference-reader';
+import { availableReferenceSelection, decorateReferenceReader, readReferenceReader, referenceScoreFromSearch, writeReferenceReader, type ReferenceScore } from './reference-reader';
 import type { PreparedManifest } from './status';
 import {
   applyZoom,
@@ -168,6 +168,7 @@ function mountOnce(manifest: PreparedManifest): void {
   const readerHost = host as StudioSessionHost & { __jankoReferenceReader?: ReturnType<typeof readReferenceReader> };
   const reader = readerHost.__jankoReferenceReader ?? readReferenceReader(storage);
   readerHost.__jankoReferenceReader = reader;
+  let requestedScore = remount ? undefined : referenceScoreFromSearch(window.location.search);
   if (!remount) {
     if (session.state.view === 'candidates') reader.candidatesZoom = session.state.zoom;
     session.state.scroll.reference = reader.places[reader.selected];
@@ -203,9 +204,22 @@ function mountOnce(manifest: PreparedManifest): void {
       session.cancelRestore();
     },
     afterSwap: () => {
-      reader.selected=availableReferenceSelection(root,reader);
+      const previous = reader.selected;
+      reader.selected=availableReferenceSelection(root,reader,requestedScore);
+      if (requestedScore === reader.selected) {
+        reader.fresh = false;
+        writeReferenceReader(storage, reader);
+      }
+      requestedScore = undefined;
       decorateReferenceReader(root,reader.selected);
-      if(session.state.view==='reference')session.state.scroll.reference=reader.places[reader.selected];
+      if(session.state.view==='reference') {
+        session.state.scroll.reference=reader.places[reader.selected];
+        if (previous !== reader.selected) {
+          zoom = reader.zooms[reader.selected];
+          session.setZoom(zoom);
+          applyZoom(dom, zoom);
+        }
+      }
     },
   });
   activeApplier = applier;
@@ -282,12 +296,20 @@ function mountOnce(manifest: PreparedManifest): void {
   if (picker) on(picker, 'change', () => {
     const next = picker.value;
     if (next !== 'primary' && next !== 'brahms-op118-no1' && next !== 'schumann-op68-no14-gold') return;
+    if (!Array.from(root.querySelector<HTMLElement>('#view-reference')?.querySelectorAll<HTMLElement>('.reference-score') ?? []).some(score => score.dataset.score === next)) return;
     clearScrollTimer();
     saveReference();
     session.cancelRestore();
     ++viewEpoch;
     reader.selected = next as ReferenceScore;
     reader.fresh=false;
+    requestedScore = undefined;
+    // A manual choice supersedes the link's initial selection, including on reload.
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('score');
+      window.history.replaceState(window.history.state, '', url);
+    } catch { /* Restricted history still keeps the saved reader choice. */ }
     writeReferenceReader(storage, reader);
     decorateReferenceReader(root, reader.selected);
     session.state.scroll.reference = reader.places[reader.selected];

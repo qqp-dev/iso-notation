@@ -3,16 +3,16 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { build } from 'esbuild';
-import { REFERENCE_READER_KEY, readReferenceReader,availableReferenceSelection } from '../src/render/janko/prepared/reference-reader';
+import { REFERENCE_READER_KEY, readReferenceReader,availableReferenceSelection, referenceScoreFromSearch } from '../src/render/janko/prepared/reference-reader';
 import { STUDIO_STATE_STORAGE_KEY } from '../src/render/janko/studio-session';
 
 type ScoreId = 'primary' | 'brahms-op118-no1' | 'schumann-op68-no14-gold';
 const ids: ScoreId[] = ['primary', 'brahms-op118-no1', 'schumann-op68-no14-gold'];
 const names: Record<ScoreId, string> = { primary: 'Bach', 'brahms-op118-no1': 'Brahms', 'schumann-op68-no14-gold': 'Schumann No.14' };
 const badges: Record<ScoreId, string> = { primary: 'GOLD', 'brahms-op118-no1': 'BRONZE', 'schumann-op68-no14-gold': 'GOLD' };
-const artifact = (generation: string, view: string) => view === 'candidates'
+const artifact = (generation: string, view: string, present: ScoreId[] = ids) => view === 'candidates'
   ? `<section class="view-panel" data-view="candidates">${generation}:candidate</section>`
-  : `<section class="view-panel" id="view-reference" data-view="reference">${ids.map((id) =>
+  : `<section class="view-panel" id="view-reference" data-view="reference">${present.map((id) =>
     `<section class="reference-score" data-score="${id}"><article class="golden-card"><h2>${names[id]}</h2><span class="badges">${badges[id]}</span><div class="page-grid"><svg data-page="1"></svg><svg data-page="2"></svg></div><h2 class="section-title">Macros</h2><div class="crop-grid"><svg></svg></div><details class="diagnostics"><summary>${names[id]} findings</summary><p>${generation} diagnostics</p></details></article></section>`).join('')}</section>`;
 const manifest = (generation: string) => ({ generation, artifactHashes: { candidates: generation, reference: generation },
   artifacts: { candidates: `${generation}:candidates`, reference: `${generation}:reference` },
@@ -69,6 +69,7 @@ class Node {
       if (!html.includes(`data-view="${view}"`)) continue;
       const panel = this.add(new Node('section', 'view-panel')); panel.dataset.view = view;
       if (view === 'reference') for (const id of ids) {
+        if (!html.includes(`data-score="${id}"`)) continue;
         const score = panel.add(new Node('section', 'reference-score')); score.dataset.score = id;
         const card = score.add(new Node('article', 'golden-card'));
         card.add(new Node('h2')).textContent = names[id];
@@ -113,7 +114,7 @@ async function bundleViewer() {
   return bundle.outputFiles[0].text;
 }
 
-async function mount(code: string, seed = new Map<string, string>(), hash = '#reference') {
+async function mount(code: string, seed = new Map<string, string>(), hash = '#reference', search = '') {
   const doc = new Doc();
   const root = new Node('div'); root.ownerDocument = doc;
   root.dataset.initialView = 'candidates'; root.innerHTML = '';
@@ -123,7 +124,11 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
     const element = new Node('div'); element.ownerDocument = doc; doc.ids.set(id, element);
   }
   for (const view of ['candidates', 'reference']) { const tab = new Node('button'); tab.dataset.viewTarget = view; tab.dataset.studioMode = view === 'candidates' ? 'engraving' : 'reference'; doc.tabs.push(tab); }
-  const location = { hash };
+  const location = { hash, search, get href() { return `https://example.test/iso-notation/janko.html${this.search}${this.hash}`; } };
+  const history = { scrollRestoration: 'auto', state: { reader: true }, replaceState: (_state: unknown, _title: string, target: string | URL) => {
+    const url = new URL(target, location.href);
+    location.search = url.search; location.hash = url.hash;
+  } };
   const storage = new Map(seed);
   if(!storage.has(REFERENCE_READER_KEY))storage.set(REFERENCE_READER_KEY,JSON.stringify({selected:'primary'}));
   const pending = new Map<string, ReturnType<typeof deferred<any>>>();
@@ -133,6 +138,7 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
   window.ownerDocument = doc;
   window.innerHeight = 800;
   window.location = location;
+  window.history = history;
   window.sessionStorage = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => { storage.set(key, value); } };
   Object.defineProperty(window, 'scrollY', { get: () => top });
   window.scrollTo = (_x: number, y: number) => { top = Math.max(0, Math.min(y, doc.body.scrollHeight - window.innerHeight)); };
@@ -153,17 +159,17 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
   window.clearTimeout = (id: number) => timers.delete(id);
   window.requestAnimationFrame = (fn: (time: number) => void) => window.setTimeout(() => fn(0));
   const accepts: Array<(mod: { default: ReturnType<typeof manifest> }) => void> = [];
-  const context = { document: doc, window, history: { scrollRestoration: 'auto' }, performance, Date,
+  const context = { document: doc, window, history, performance, Date, URL, URLSearchParams,
     __manifest: manifest('one'), __hot: { accept: (_id: string, handler: typeof accepts[number]) => accepts.push(handler) },
     fetch: (url: string) => { const gate = deferred<any>(); pending.set(url, gate); return gate.promise; },
   };
   runInNewContext(code, context);
   const flush = async () => { for (let i = 0; i < 20; i++) { await Promise.resolve(); const callbacks = [...timers.values()]; timers.clear(); for (const fn of callbacks) fn(); } };
-  const answer = async (generation: string, beforeScrollDebounce = false) => {
+  const answer = async (generation: string, beforeScrollDebounce = false, present: ScoreId[] = ids) => {
     for (const view of ['candidates', 'reference']) {
       const url = `${generation}:${view}`; const gate = pending.get(url);
       assert.ok(gate, `prepared fetch ${url}`);
-      gate.resolve({ ok: true, text: async () => artifact(generation, view) });
+      gate.resolve({ ok: true, text: async () => artifact(generation, view, present) });
     }
     if (beforeScrollDebounce) {
       // Deliver fetch/DOM microtasks before any scheduled scroll or layout timer.
@@ -235,6 +241,57 @@ test('fresh reader prefers GOLD only in payloads that contain it; legacy and sav
   const saved=readReferenceReader({getItem:()=>JSON.stringify({selected:id,places:{[id]:760},zooms:{[id]:1.75}}),setItem:()=>{}});
   assert.equal(availableReferenceSelection(root(ids),saved),id);assert.equal(saved.places[id],760);assert.equal(saved.zooms[id],1.75);
  }
+});
+
+test('score links accept only available Reference identities and preserve saved fallback choices', () => {
+  const saved = readReferenceReader({ getItem: () => '{"selected":"brahms-op118-no1"}', setItem: () => {} });
+  const root = (present: ScoreId[]) => ({ querySelector: () => ({ querySelectorAll: () => present.map(score => ({ dataset: { score } })) }) }) as unknown as HTMLElement;
+  assert.equal(referenceScoreFromSearch('?score=schumann-op68-no14-gold'), 'schumann-op68-no14-gold');
+  for (const query of ['', '?score=', '?score=unknown', '?score=schumann-op68-no14-written-practice']) assert.equal(referenceScoreFromSearch(query), undefined);
+  assert.equal(availableReferenceSelection(root(ids), saved, referenceScoreFromSearch('?score=schumann-op68-no14-gold')), 'schumann-op68-no14-gold');
+  assert.equal(availableReferenceSelection(root(ids.slice(0, 2)), saved, 'schumann-op68-no14-gold'), 'brahms-op118-no1');
+});
+
+test('home-page No14 navigation overrides saved Bach once, preserves places/zooms and follows later manual choice on reload', async () => {
+  const seed = new Map([
+    [REFERENCE_READER_KEY, JSON.stringify({ selected: 'primary', places: { primary: 420, 'brahms-op118-no1': 790, 'schumann-op68-no14-gold': 680 }, zooms: { primary: 1.25, 'brahms-op118-no1': 1.75, 'schumann-op68-no14-gold': 1.5 }, candidatesZoom: 2.25 })],
+    [STUDIO_STATE_STORAGE_KEY, JSON.stringify({ version: 1, view: 'candidates', zoom: 2.25, scroll: { candidates: 1300 } })],
+    ['saved-candidate-history', 'keep this record'],
+  ]);
+  const code = await bundleViewer();
+  const h = await mount(code, seed, '#reference', '?campaign=home&score=schumann-op68-no14-gold');
+  await h.answer('one');
+  assertPaper(h, 'schumann-op68-no14-gold', 'one');
+  assert.equal(h.getTop(), 680); assert.equal(h.zoom(), 1.5);
+  await h.swap('two'); await h.answer('two');
+  assertPaper(h, 'schumann-op68-no14-gold', 'two');
+  assert.equal(h.getTop(), 680); assert.equal(h.zoom(), 1.5);
+  await h.select('brahms-op118-no1');
+  assert.equal(h.location.search, '?campaign=home', 'only the initial score override is removed');
+  assert.equal(h.location.hash, '#reference');
+  assert.equal(h.getTop(), 790); assert.equal(h.zoom(), 1.75);
+  const reload = await mount(code, h.storage, h.location.hash, h.location.search);
+  await reload.answer('one');
+  assertPaper(reload, 'brahms-op118-no1', 'one');
+  assert.equal(reload.getTop(), 790); assert.equal(reload.zoom(), 1.75);
+  await reload.select('primary');
+  assert.equal(reload.getTop(), 420); assert.equal(reload.zoom(), 1.25);
+  await reload.select('schumann-op68-no14-gold');
+  assert.equal(reload.getTop(), 680); assert.equal(reload.zoom(), 1.5);
+  await reload.view('candidates');
+  assert.equal(reload.getTop(), 1300); assert.equal(reload.zoom(), 2.25);
+  assert.equal(reload.storage.get('saved-candidate-history'), 'keep this record');
+});
+
+test('invalid and unavailable score links leave a real saved Reference visible', async () => {
+  const code = await bundleViewer();
+  for (const query of ['?score=unknown', '?score=schumann-op68-no14-gold']) {
+    const h = await mount(code, new Map([[REFERENCE_READER_KEY, '{"selected":"brahms-op118-no1"}']]), '#reference', query);
+    await h.answer('one', false, ids.slice(0, 2));
+    assert.equal(h.picker.value, 'brahms-op118-no1');
+    assert.equal(h.score('brahms-op118-no1').hidden, false);
+    assert.equal(h.score('primary').hidden, true);
+  }
 });
 
 test('new GOLD reader has its own live anchor and zoom while existing Bach selection survives reload',async()=>{

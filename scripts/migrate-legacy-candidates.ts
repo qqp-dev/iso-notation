@@ -7,7 +7,7 @@ import { resolve, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { readCandidate, head, executeHandCommand, activeDurationVariants, candidateScore } from '../src/render/janko/semantic-hand';
 import { resolveActiveScore } from '../src/scores/active';
-import { renderJankoPage, countJankoPages } from '../src/render/janko/engine';
+import { renderJankoPage, countJankoPages, layoutJankoScore } from '../src/render/janko/engine';
 const sha = (s: string | Uint8Array) => createHash('sha256').update(s).digest('hex');
 const args = process.argv.slice(2);
 const option = (name: string) => { const i = args.indexOf(`--${name}`); return i < 0 ? undefined : args[i + 1]; };
@@ -22,10 +22,15 @@ const rawSha256 = sha(saved);
 const capture = `
 import { readCandidate, candidateScore, activeDurationVariants } from './src/render/janko/semantic-hand.ts';
 import { buildBrahmsOp118No1Score, BRAHMS_OP118_NO1_JANKO_OPTIONS, BRAHMS_OP118_NO1_JANKO_TOKENS } from './src/scores/brahms-op118-no1.ts';
-import { countJankoPages, renderJankoPage } from './src/render/janko/engine.ts';
+import * as engine from './src/render/janko/engine.ts';
 const state = readCandidate(process.cwd());
 const score = candidateScore(state), base = buildBrahmsOp118No1Score();
-const pages = (s, o, t) => Array.from({length:countJankoPages(s,o,t)},(_,i)=>renderJankoPage(s,i,o,t));
+// Reuse only this original engine's own settlement. Older engines without the
+// settlement API retain their original page path, never the new renderer.
+const pages = (s, o, t) => {
+  const settled = typeof engine.layoutJankoScore === 'function' ? engine.layoutJankoScore(s,o,t) : undefined;
+  return Array.from({length:engine.countJankoPages(s,o,t,settled)},(_,i)=>engine.renderJankoPage(s,i,o,t,settled));
+};
 console.log(JSON.stringify({identity:state.identity, records:state.records.length, assignments:state.records.at(-1)?.assignments ?? [],
   notes:base.notes, options:BRAHMS_OP118_NO1_JANKO_OPTIONS, tokens:BRAHMS_OP118_NO1_JANKO_TOKENS,
   canonical:pages(base,BRAHMS_OP118_NO1_JANKO_OPTIONS,BRAHMS_OP118_NO1_JANKO_TOKENS),
@@ -44,8 +49,11 @@ if (proof.records !== 8 || proof.variants.length !== 4 || proof.assignments.leng
     proof.variants.some(v => v.pages.length < 1)) throw new Error('unexpected protected legacy history/geometry; stop activation');
 const active = resolveActiveScore('brahms-op118-no1');
 if (JSON.stringify(proof.notes) !== JSON.stringify(active.score.notes)) throw new Error('Brahms musical event difference; stop activation');
-const pages = (options: typeof active.options, tokens: typeof active.tokens) => Array.from({ length: countJankoPages(active.score, options, tokens) },
-  (_, page) => renderJankoPage(active.score, page, options, tokens));
+const pages = (options: typeof active.options, tokens: typeof active.tokens) => {
+  const settled = layoutJankoScore(active.score, options, tokens);
+  return Array.from({ length: countJankoPages(active.score, options, tokens, settled) },
+    (_, page) => renderJankoPage(active.score, page, options, tokens, settled));
+};
 // The legacy renderer may have emitted nonpainting comments between SVG tags.
 // Discard only those standalone comments; keep every element, attribute, text
 // node and whitespace byte-for-byte. In particular, never normalize paths or
@@ -66,7 +74,8 @@ writeFileSync(join(archive, 'original-full-svg.json.gz'), gzipSync(originalOutpu
 writeFileSync(join(archive, 'provenance.json'), JSON.stringify({ oldRoot, rawSha256, oldIdentity: proof.identity,
   recordCount: proof.records, variants: proof.variants.map(v => v.controls.id), originalTip: execFileSync('git', ['rev-parse','HEAD'], { cwd: oldRoot, encoding: 'utf8' }).trim() }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
 if (sha(readFileSync(join(archive, 'original-history.json'))) !== rawSha256) throw new Error('archive checksum mismatch');
-compare('canonical Brahms', proof.canonical, pages(active.options, active.tokens));
+const canonicalPages = pages(active.options, active.tokens);
+compare('canonical Brahms', proof.canonical, canonicalPages);
 for (const { controls, pages: oldPages } of proof.variants) {
   const options = { ...active.options, ...controls.options, durationSeatPreferences: controls.placements.map(p =>
     ({ tick: p.target.tick, family: p.target.family, ownerIds: p.target.ownerIds, seat: p.preference })) };
@@ -91,5 +100,5 @@ try {
     throw new Error('new guarded variants incomplete; stop activation');
   renameSync(temporary, destination);
   console.log(JSON.stringify({ archive, rawSha256, legacyRecords: proof.records, migratedRecords: next.records.length,
-    revision, pagesPerScore: countJankoPages(active.score,active.options,active.tokens), variants: activeDurationVariants(next).map(v => v.id), geometryParity: true }));
+    revision, pagesPerScore: canonicalPages.length, variants: activeDurationVariants(next).map(v => v.id), geometryParity: true }));
 } finally { closeSync(fd); rmSync(lock); }
