@@ -9,6 +9,8 @@ Before publication, the operator identifies two print oversights: No.14 lacks it
 
 ## Why
 
+After actual studio/PDF publication, the operator reports No14 missing from the GitHub Pages home page. Add an obvious compact complete-identity entry on that existing page, with the matching PDF and an explicit Reference score link. Preserve the Bach player and use the existing studio for No14; navigation must work with saved reader selections and retain per-score place/zoom and later manual choices. This is publication discoverability under existing authority, with no musical or engraving redesign.
+
 The operator wants Schumann Op.68 No.14 ready for practice. The full source-derived draft exists, but dotted quarters are currently painted without their dots, shared independent durations need clearer treatment, slurs need refinement and the opening performing instruction and a No14 PDF download are absent.
 
 ## What Changes
