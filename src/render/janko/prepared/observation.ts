@@ -67,11 +67,11 @@ export function observeCandidateFrame(root: HTMLElement, doc: Document, win: Win
 /** A distinct applied-Reference frame opportunity; not a paint or operator acceptance. */
 export function referenceObservation(root: HTMLElement, doc: Document) {
   const data = root.dataset;
-  const score = data.preparedReferenceScore === 'brahms-op118-no1' ? 'brahms-op118-no1' : 'bach-goldberg-var1';
+  const score = data.preparedReferenceScore === 'schumann-op68-no14-gold' ? 'schumann-op68-no14-gold' : data.preparedReferenceScore === 'brahms-op118-no1' ? 'brahms-op118-no1' : 'bach-goldberg-var1';
   let revisions: Record<string, string> = {};
   try { revisions = JSON.parse(data.preparedCanonicalRevisions ?? '{}') as Record<string, string>; } catch { /* invalid applied metadata is unobserved */ }
   const identity = { generation: data.preparedGeneration, score,
-    canonicalRevision: revisions[score] ?? (score === 'bach-goldberg-var1' ? data.preparedCanonicalRevision : undefined),
+    canonicalRevision: score === 'schumann-op68-no14-gold' ? root.querySelector<HTMLElement>('.reference-score[data-score="schumann-op68-no14-gold"]')?.dataset.revision : revisions[score] ?? (score === 'bach-goldberg-var1' ? data.preparedCanonicalRevision : undefined),
     referenceHash: data.preparedReferenceHash, apply: data.preparedApply };
   const reason = !root.isConnected ? 'disconnected' : doc.visibilityState !== 'visible' ? 'hidden' :
     data.preparedState !== 'ready' ? `prepared-${data.preparedState ?? 'unknown'}` :

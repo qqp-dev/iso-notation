@@ -1,0 +1,174 @@
+{
+  "normalization": "Each family uses one uniform factor so its intact piano glyph has 416 font-unit total ink height. Existing .016 paint scale gives 6.656 pt; other glyphs retain family relative proportions.",
+  "families": {
+    "leland": {
+      "label": "Leland",
+      "source": "https://github.com/MuseScoreFonts/Leland",
+      "file": "Leland.otf",
+      "sha256": "293788a40584b1908e3a0f219833f6a13e9a1aaf671e08fd26ad18fad2631b35",
+      "licenseFile": "Leland-LICENSE.txt",
+      "pInkAreaOverHeightSquared": 0.356122848200313,
+      "fontVersion": "Version 0.80",
+      "unitsPerEm": 1000,
+      "normalization": 0.9765258215962441,
+      "combinedMarkCorrection": {
+        "date": "2026-10-02",
+        "sourceFontSha256": "293788a40584b1908e3a0f219833f6a13e9a1aaf671e08fd26ad18fad2631b35",
+        "note": "Corrected the old opt-in combined-mark extraction against the font Unicode cmap and authoritative SMuFL meanings. Existing p and f outlines were preserved. Earlier frozen studios remain historical artifacts. Canonical Bravura paths are unchanged.",
+        "codepoints": {
+          "pp": "U+E52B",
+          "ppp": "U+E52A",
+          "mp": "U+E52C",
+          "mf": "U+E52D",
+          "ff": "U+E52F",
+          "fff": "U+E530",
+          "fp": "U+E534",
+          "sf": "U+E536",
+          "sfz": "U+E539"
+        }
+      }
+    },
+    "gonville": {
+      "label": "Gonville",
+      "source": "https://www.chiark.greenend.org.uk/~sgtatham/gonville/",
+      "file": "gonville.otf",
+      "sha256": "58bc3c65fb60f5d0d2956109c5cd49465b2e575f9bec62f80893ef4725407d88",
+      "licenseFile": "Gonville-LICENCE.txt",
+      "pInkAreaOverHeightSquared": 0.3585850012000925,
+      "fontVersion": "Version version unavailable ",
+      "unitsPerEm": 1000,
+      "normalization": 0.913300127811211
+    },
+    "noto-sans-italic": {
+      "label": "Noto Sans Italic",
+      "source": "https://github.com/notofonts/latin-greek-cyrillic",
+      "file": "NotoSans-Italic.ttf",
+      "sha256": "5d7618dda819443fd07301c84adcee9fe8960c873ea5e5e1f0f59db384b78082",
+      "licenseFile": "Noto-copyright.txt",
+      "pInkAreaOverHeightSquared": 0.23615413742274868,
+      "fontVersion": "Version 2.004; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D latn -f none -a qsq -X \"\"",
+      "unitsPerEm": 1000,
+      "normalization": 0.5299363057324841
+    },
+    "noto-serif-italic": {
+      "label": "Noto Serif Italic",
+      "source": "https://github.com/notofonts/latin-greek-cyrillic",
+      "file": "NotoSerif-Italic.ttf",
+      "sha256": "bc25600aa27cd409e1e5b3d86340df3a329bb860fcfbe57a03a95070b229e1b0",
+      "licenseFile": "Noto-copyright.txt",
+      "pInkAreaOverHeightSquared": 0.24789621762955202,
+      "fontVersion": "Version 2.004; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D latn -f none -a qsq -X \"\"",
+      "unitsPerEm": 1000,
+      "normalization": 0.5292620865139949
+    },
+    "source-sans-light-italic": {
+      "label": "Source Sans 3 Light Italic",
+      "source": "https://github.com/adobe-fonts/source-sans",
+      "file": "SourceSans3-LightIt.otf",
+      "sha256": "abd8f5b080ec26a9592a77285b921a8e296b688f479232a721c7129bf068c64a",
+      "licenseFile": "source-sans-LICENSE.txt",
+      "pInkAreaOverHeightSquared": 0.12976470166964735,
+      "fontVersion": "Version 3.052;hotconv 1.1.0;makeotfexe 2.6.0",
+      "unitsPerEm": 1000,
+      "normalization": 0.5867418899858956
+    },
+    "source-serif-light-italic": {
+      "label": "Source Serif 4 Light Italic",
+      "source": "https://github.com/adobe-fonts/source-serif",
+      "file": "SourceSerif4-LightIt.otf",
+      "sha256": "f8ade752fd54e49d7f69150c21092a27a88ee690330873fcf84d033971d1cccc",
+      "licenseFile": "source-serif-LICENSE.txt",
+      "pInkAreaOverHeightSquared": 0.14528042355995657,
+      "fontVersion": "Version 4.005;hotconv 1.1.0;makeotfexe 2.6.0",
+      "unitsPerEm": 1000,
+      "normalization": 0.5714285714285714
+    }
+  },
+  "pedalText": {
+    "label": "Noto Sans Regular Ped.",
+    "bounds": [
+      97.0,
+      -14.0,
+      1980.0,
+      760.0
+    ],
+    "scale": 0.0075,
+    "fontVersion": "Version 2.004; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D latn -f none -a qsq -X \"\"",
+    "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+    "source": "https://github.com/notofonts/latin-greek-cyrillic",
+    "licenseFile": "Noto-copyright.txt"
+  },
+  "prefilter": {
+    "currentBravuraPInkAreaHeight2": 0.4512992904031067,
+    "rejectedSebastianP": 0.4442,
+    "choices": [
+      {
+        "id": "leland",
+        "pAreaHeight2": 0.3561,
+        "pBounds": [
+          -92.76995305164318,
+          -159.1737089201878,
+          309.5586854460094,
+          256.8262910798122
+        ],
+        "glyphCount": 11
+      },
+      {
+        "id": "gonville",
+        "pAreaHeight2": 0.3586,
+        "pBounds": [
+          -35.24801126820995,
+          -162.7829546683754,
+          345.1123520944433,
+          253.21704533162458
+        ],
+        "glyphCount": 11
+      },
+      {
+        "id": "noto-sans-italic",
+        "pAreaHeight2": 0.2362,
+        "pBounds": [
+          -11.658598726114649,
+          -127.18471337579618,
+          280.86624203821657,
+          288.8152866242038
+        ],
+        "glyphCount": 11
+      },
+      {
+        "id": "noto-serif-italic",
+        "pAreaHeight2": 0.2479,
+        "pBounds": [
+          -3.704834605597964,
+          -127.02290076335876,
+          282.62595419847327,
+          288.9770992366412
+        ],
+        "glyphCount": 11
+      },
+      {
+        "id": "source-sans-light-italic",
+        "pAreaHeight2": 0.1298,
+        "pBounds": [
+          -1.7602256699576868,
+          -127.32299012693935,
+          282.2228490832158,
+          288.6770098730606
+        ],
+        "glyphCount": 11
+      },
+      {
+        "id": "source-serif-light-italic",
+        "pAreaHeight2": 0.1453,
+        "pBounds": [
+          -34.285714285714285,
+          -138.85714285714286,
+          285.7142857142857,
+          277.1428571428571
+        ],
+        "glyphCount": 11
+      }
+    ],
+    "limits": "Ink area/height\u00b2 screens weight only; optical compatibility still needs actual score review."
+  }
+}

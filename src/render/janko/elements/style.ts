@@ -6,6 +6,7 @@
  */
 
 import { JankoTokens, resolveJankoTokens } from '../types';
+import {RUNNING_HEAD_PT} from '../page-booking';
 
 // Order is load-bearing: fontconfig alias precedence (Century Schoolbook → C059
 // under urw-base35 conf) makes list position decide the embedded font;
@@ -20,7 +21,7 @@ export function renderJankoStyleDefs(tokens?: Partial<JankoTokens> | null): stri
     `      .janko-title { font-family: ${URTEXT_SERIF}; font-weight: 600; font-size: 11pt; letter-spacing: 0.3px; fill: #111111; }`,
     `      .janko-subtitle { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8.5pt; fill: #333333; }`,
     `      .janko-meta { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #222222; }`,
-    `      .janko-running-head { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 7pt; fill: #555555; }`,
+    `      .janko-running-head { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: ${RUNNING_HEAD_PT}pt; fill: #555555; }`,
     `      .janko-page-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 8pt; fill: #666666; font-weight: 400; }`,
     `      .janko-measure-num { font-family: ${URTEXT_SERIF}; font-style: italic; font-size: 7pt; fill: #555555; font-weight: normal; }`,
     `      .janko-octave-label { font-family: "DejaVu Sans Mono", monospace; font-size: 7.5pt; font-weight: bold; fill: #6B7280; }`,

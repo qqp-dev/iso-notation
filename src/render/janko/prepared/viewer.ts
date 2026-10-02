@@ -40,7 +40,7 @@ import {
 import prepared from 'virtual:janko-prepared-manifest';
 import { observeCandidateFrame, observeReferenceFrame } from './observation';
 import { watchDeployedRelease } from './deployed';
-import { decorateReferenceReader, readReferenceReader, writeReferenceReader, type ReferenceScore } from './reference-reader';
+import { availableReferenceSelection, decorateReferenceReader, readReferenceReader, writeReferenceReader, type ReferenceScore } from './reference-reader';
 import type { PreparedManifest } from './status';
 import {
   applyZoom,
@@ -202,7 +202,11 @@ function mountOnce(manifest: PreparedManifest): void {
       ++viewEpoch;
       session.cancelRestore();
     },
-    afterSwap: () => decorateReferenceReader(root, reader.selected),
+    afterSwap: () => {
+      reader.selected=availableReferenceSelection(root,reader);
+      decorateReferenceReader(root,reader.selected);
+      if(session.state.view==='reference')session.state.scroll.reference=reader.places[reader.selected];
+    },
   });
   activeApplier = applier;
   if (typeof import.meta.env !== 'undefined' && import.meta.env.PROD) {
@@ -277,12 +281,13 @@ function mountOnce(manifest: PreparedManifest): void {
   }
   if (picker) on(picker, 'change', () => {
     const next = picker.value;
-    if (next !== 'primary' && next !== 'brahms-op118-no1') return;
+    if (next !== 'primary' && next !== 'brahms-op118-no1' && next !== 'schumann-op68-no14-gold') return;
     clearScrollTimer();
     saveReference();
     session.cancelRestore();
     ++viewEpoch;
     reader.selected = next as ReferenceScore;
+    reader.fresh=false;
     writeReferenceReader(storage, reader);
     decorateReferenceReader(root, reader.selected);
     session.state.scroll.reference = reader.places[reader.selected];

@@ -316,7 +316,7 @@ test('renderReferenceView retains both complete page sets and macro data in the 
   const html = renderReferenceView(CONFIG);
   // Two golden scores since Round 30, each in its own scored block.
   const blocks = html.match(/data-score="/g) ?? [];
-  assert.equal(blocks.length, 2, 'Bach + Brahms reference blocks');
+  assert.equal(blocks.length, 3, 'No14 GOLD + Bach + Brahms reference blocks');
   // Brahms leads since the ergonomics ticket (Brahms is live); Bach follows.
   const brahmsAt = html.indexOf('data-score="brahms-op118-no1"');
   const bachAt = html.indexOf('data-score="primary"');
@@ -333,7 +333,7 @@ test('renderReferenceView retains both complete page sets and macro data in the 
   assert.equal(brahmsCrops.length, BRAHMS_STUDIO_CROPS.length, 'macro data remains in the engine artifact; the reader hides it without changing engraving');
   assert.equal(
     (html.match(/<svg/g) ?? []).length,
-    bachPages.length + brahmsPages.length + bachCrops.length + brahmsCrops.length
+    bachPages.length + brahmsPages.length + bachCrops.length + brahmsCrops.length + 8
   );
   for (const crop of BRAHMS_STUDIO_CROPS) {
     assert.ok(
@@ -357,7 +357,7 @@ test('Reference view is rendered from DEFAULT_JANKO_OPTIONS (the golden master)'
     new RegExp(`<b>noteheadRadius</b> = ${DEFAULT_JANKO_TOKENS.noteheadRadius.toFixed(1)}pt`)
   );
   const reports = html.match(/data-lint-ok="(\w+)"/g) ?? [];
-  assert.equal(reports.length, 2, 'one lint verdict per golden score');
+  assert.equal(reports.length, 3, 'one lint verdict per golden score');
   const brahmsAt = html.indexOf('data-score="brahms-op118-no1"');
   const bachAt = html.indexOf('data-score="primary"');
   const brahms = html.slice(brahmsAt, bachAt);

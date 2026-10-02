@@ -24,6 +24,8 @@
  */
 
 import { SCHUMANN_NO13_ENDING_CITATION } from '../../source-review/documents';
+import {NO14_WRITTEN_SCORE_ID} from './no14-written';
+import {NO14_PRACTICE_SCORE_ID,NO14_PRACTICE_DELTA,NO14_DOT_CONTROL_DELTA,NO14_HEAD_DOT_DELTA,NO14_FULLER_HAIRPIN_DELTA,NO14_OPTICAL_DELTA,NO14_FITTED_DELTA,NO14_BREATHING_DELTA,NO14_SILHOUETTE_DELTA} from './no14-practice';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -66,6 +68,8 @@ export interface JankoCandidateRound {
   openAxes?: string[];
   /** Closer-comparison strip (absent: no strip, cards only). */
   compareStrip?: JankoCompareStrip;
+  /** A finite sequence of focused native comparisons, before score cards. */
+  compareStrips?: JankoCompareStrip[];
 }
 
 /**
@@ -85,6 +89,10 @@ export interface JankoCompareStrip {
   measureCount: number;
   /** Short label shown above the strip. */
   title: string;
+  /** Offer only the named complete profiles in this particular comparison. */
+  candidateIds?: readonly string[];
+  /** Frame each actual score crop identically for readable typography. */
+  matchedFrame?: boolean;
 }
 
 /** One engraving window demonstrated on a score benchmark. */
@@ -113,6 +121,8 @@ export interface JankoScoreCandidateWindow {
   fullScore?: boolean;
   /** Ordinary reading-scale containing system, beside the macro crops. */
   completeSystems?: boolean;
+  /** Keep all genuine pages available without putting them before the focus. */
+  collapsed?: boolean;
 }
 
 /** Abstract specimen role: enlarged key, common test batteries, or historical subsets. */
@@ -282,6 +292,8 @@ export interface JankoCandidate {
   label: string;
   /** One-line designer rationale. */
   description?: string;
+  /** Explicit matching score/profile export, separate from the golden PDF. */
+  download?: {href:string;label:string};
   /** Candidate kind: score candidate (default) or abstract geometry candidate. */
   kind?: 'score' | 'abstract' | 'practice';
   /** Practice scale selection and guide treatment (same portable renderer). */
@@ -808,6 +820,7 @@ export function resolveCandidate(candidate: JankoCandidate): ResolvedJankoCandid
           // studio still renders whole-score windows as real pages.
           fullScore: (w as JankoScoreCandidateWindow).fullScore === true,
           ...((w as JankoScoreCandidateWindow).completeSystems ? {completeSystems:true} : {}),
+          ...((w as JankoScoreCandidateWindow).collapsed ? {collapsed:true} : {}),
         }))
       : [
           {
@@ -1251,6 +1264,120 @@ export const SCHUMANN_NO14_STUDIO_SCORE_ID = 'schumann-op68-no14';
 export const SCHUMANN_NO30_STUDIO_SCORE_ID = 'schumann-op68-no30';
 export const SCHUMANN_NO13_STUDIO_SCORE_ID = 'schumann-op68-no13';
 
+export const NO14_PRACTICE_ROUND:JankoCandidateRound={round:61,title:'No. 14 · practice-sheet trial',
+ description:'Complete lower/wider No14, dotted shared durations, diagonal-relative bows and fuller taper. Unlanded review output; source/geometry checks are separate from operator acceptance.',openAxes:['sharedDurationDot','phraseRouting','phrasePlacement']};
+const no14PracticeWindows=(scoreId:string):JankoScoreCandidateWindow[]=>[
+ {scoreId,measureStart:1,measureCount:96,fullScore:true,title:'Complete No. 14 · unfolded occurrences1–96',caption:'64 written bars;33–64 repeated. Lower/wider alternatives, RH-up/LH-down. Practice candidate, not an accepted default.'},
+ ...[48,80].map(measureStart=>({scoreId,measureStart,measureCount:1,title:`Written48 · occurrence${measureStart}: G/A and E/F♯ dotted quarters`,caption:'Four augmentation dots, independent72/24-tick RH branches and two LH72-tick values. Dot placement remains a trial.'})),
+ ...[1,16,41,43,47,73,75,79,95].map(measureStart=>({scoreId,measureStart,measureCount:measureStart===95?2:3,completeSystems:true,title:`Context · occurrences${measureStart}–${measureStart+(measureStart===95?1:2)}`,caption:'Complete containing systems: source gesture, neighboring duration ink, taper and page admission.'}))
+];
+export const NO14_PRACTICE_CANDIDATES:JankoCandidate[]=[
+ {id:'no14-practice-control',label:'A · current No14 draft',description:'Retained current shape and duration grammar: dotted-quarter dots are missing. This is the control, not the working-sheet recommendation.',windows:no14PracticeWindows(SCHUMANN_NO14_STUDIO_SCORE_ID)},
+ {id:'no14-dot-control',label:'B · complete dots beside heads',description:'Complete-duration control with compatible shared heads and independent channels. Dots retain the current head-adjacent policy;72-tick bare terminals are unchanged.',options:NO14_DOT_CONTROL_DELTA,windows:no14PracticeWindows(SCHUMANN_NO14_STUDIO_SCORE_ID)},
+ {id:'no14-exposed-dot',label:'C · rejected exposed dot / current curves',description:'Historical exposed-dot trial: longer left dotted-quarter branch and2.6pt attachment spacing. The operator rejected this dot appearance; current curves remain for the original comparison.',options:{...NO14_PRACTICE_DELTA,phraseRouting:undefined},windows:no14PracticeWindows(SCHUMANN_NO14_STUDIO_SCORE_ID)},
+ {id:'no14-practice-balanced',label:'D · complete practice candidate / gentle taper',description:'The same complete dots and long left shared branches, with endpoint-chord bows, restrained lift/shoulder changes,0.85pt vertical body width and light0.22pt ends. German source performing instruction. Matching review PDF; unlanded and unaccepted.',download:{href:'/no14-practice-candidate.pdf',label:'Download No14 practice candidate PDF'},options:NO14_PRACTICE_DELTA,windows:no14PracticeWindows(NO14_PRACTICE_SCORE_ID)},
+ {id:'no14-practice-pointed',label:'E · same new bow / pointed taper',description:'Thickness comparison only: same0.85pt body and new bow family, narrowing to zero at the ends. D is the gentler trial. Both remain review hypotheses.',options:{...NO14_PRACTICE_DELTA,phraseTaper:'pointed'},windows:no14PracticeWindows(NO14_PRACTICE_SCORE_ID).filter(w=>!w.fullScore&&[16,43,48].includes(w.measureStart))},
+ {id:'no14-preferred-side',label:'F · upper-side diagnostic / attachment failures',description:'Forcing cross-hand gestures above alone causes12 whole-score attachment-limit failures. RH48 stays above and LH48below. This is a failed placement diagnostic for discussion, not a viable practice recommendation.',options:{...NO14_PRACTICE_DELTA,phrasePlacement:'preferred-side'},windows:[1,16,41,43,48].map(measureStart=>({scoreId:NO14_PRACTICE_SCORE_ID,measureStart,measureCount:1,completeSystems:true,title:`Placement comparison · occurrence${measureStart}`,caption:'Complete containing system; source owners and actual neighboring ink retained.'}))},
+ {id:'no14-gesture-contour',label:'G · head-only bounded asymmetry / rejected diagnostic',description:'Restrained20% depth asymmetry and24/32% shoulders were tested with cross-hand head-only attachment. Stem-side endpoints force a crossing of their own duration ink; no proposed ink is offered as usable.',rejection:{reason:'Head-only tips on the stem side force the bow across its own duration carrier. Modest asymmetry cannot repair that endpoint choice.',evidence:'Whole-No14 probe with both sides:276 expression-local-attachment failures,0warnings. Source events and same-hand48 remain intact.'},windows:[1,16,41,43,48].map(measureStart=>({scoreId:NO14_PRACTICE_SCORE_ID,measureStart,measureCount:1,completeSystems:true,title:`Rejected attachment investigation · occurrence${measureStart}`,caption:'Rejected geometry investigation; source events were preserved.'}))},
+ {id:'no14-healthy-contour',label:'H · rejected phrase placement / exposed-dot control',description:'Historical H with its exposed-dot trial. Fuller body/subtle taper direction is liked, but phrase placement and exposed dots were rejected. No new curve route is proposed here.',options:{...NO14_PRACTICE_DELTA,phrasePlacement:'gesture-contour'},windows:[1,16,41,43,48].map(measureStart=>({scoreId:NO14_PRACTICE_SCORE_ID,measureStart,measureCount:1,completeSystems:true,title:`Historical H · occurrence${measureStart}`,caption:'Rejected placement retained for diagnosis; mathematical clearance is separate from musical readability.'}))}
+];
+export const NO14_HEAD_DOT_ROUND:JankoCandidateRound={round:62,title:'No. 14 · chosen dots and fuller hairpins',
+ description:'Dots beside pitch symbols retain the longer left duration branches. Compare the existing 0.65 pt hairpins with a fuller 1.0 pt trial on complete pages. Previous curve placement remains rejected. Pedal weight is unchanged.',openAxes:['sharedDurationDot','hairpinStrokeWidth']};
+export const no14HeadDotWindows=():JankoScoreCandidateWindow[]=>[
+ {scoreId:NO14_PRACTICE_SCORE_ID,measureStart:1,measureCount:96,fullScore:true,title:'Complete No. 14 · measures 1–96 with repeats',caption:'Six complete pages: 64 written bars with repeats shown. Dot placement is chosen; phrasing is still unresolved. The previous PDF shows the earlier exposed dots.'},
+ ...[1,16,41,43,48,80].map(measureStart=>({scoreId:NO14_PRACTICE_SCORE_ID,measureStart,measureCount:1,completeSystems:true,title:`Duration and phrasing in context · measure ${measureStart}`,caption:measureStart===48||measureStart===80?'One dot beside the shared pitch symbol, with a longer left dotted-quarter branch and a separate moving eighth branch (72 / 24 ticks). The compact shared-head ambiguity is accepted.':'Previous curve placement is retained for comparison and remains rejected.'})),
+ ...[5,8,21].map(measureStart=>({scoreId:NO14_PRACTICE_SCORE_ID,measureStart,measureCount:2,completeSystems:true,title:`Hairpin weight in context · measures ${measureStart}–${measureStart+1}`,caption:'The crescendo or diminuendo keeps its original span and opening. Pedal lines keep their existing weight.'}))
+];
+export const NO14_HEAD_DOT_CANDIDATES:JankoCandidate[]=[
+ {...NO14_PRACTICE_CANDIDATES.find(c=>c.id==='no14-healthy-contour')!,label:'H · previous dots and curve placement',description:'Previous exposed dots and curve placement, both rejected, retained for comparison. The fuller curve body and subtle taper remain the preferred direction.',windows:no14HeadDotWindows().map(w=>({...w,caption:w.fullScore?'Six complete pages of the previous comparison. Exposed dots and curve placement remain rejected.':'Previous dots and curve placement retained for comparison.'}))},
+ {id:'no14-head-dot',label:'I · chosen dots beside pitch symbols',description:'Dots stay beside pitch symbols, including shared heads, for compactness. The longer left dotted-quarter branch and separate moving eighth branch remain clear; the shared dot can still suggest both values are dotted. Existing hairpin weight and previous, rejected curve placement are retained.',options:NO14_HEAD_DOT_DELTA,windows:no14HeadDotWindows()},
+ {id:'no14-head-dot-fuller-hairpins',label:'J · chosen dots with fuller hairpins',description:'The same chosen dots and duration branches as I, with fuller 1.0 pt hairpins against the existing 0.65 pt weight. Pedal lines keep their weight. Hairpin thickness awaits visual judgment, and previous curve placement remains rejected.',options:NO14_FULLER_HAIRPIN_DELTA,windows:no14HeadDotWindows()}
+];
+/** Whole-score optical slur and faithful pedal-start comparison. */
+export const NO14_OPTICAL_PEDAL_ROUND:JankoCandidateRound={round:63,title:'No. 14 · complete bows and pedal starts',
+ description:'Compare the previous phrase placement with complete optical bows, then compare two faithful pedal-start signs. Dots, independent durations, hairpin opening and line weight retain the chosen reading. These are review candidates awaiting musical judgment.',openAxes:['phraseRouting','pedalStart']};
+export const no14OpticalPedalWindows=():JankoScoreCandidateWindow[]=>[
+ {scoreId:NO14_WRITTEN_SCORE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 · 64 written bars with repeat 33–64',caption:'Every genuine page, with four written augmentation dots. Repeat 33–64 preserves all 96 performed occurrences. No PDF is replaced by this comparison.'},
+ ...[[1,1],[4,2],[16,1],[20,3],[32,2],[41,1],[43,1],[48,1],[63,2]].map(([measureStart,measureCount])=>({scoreId:NO14_WRITTEN_SCORE_ID,measureStart,measureCount,completeSystems:true,
+ title:measureCount===1?`In context · measure ${measureStart}`:`In context · measures ${measureStart}–${measureStart+measureCount-1}`,
+ caption:measureStart===20?'The held pedal continues from measure 20 into measure 21 without another press.':measureStart===48?'Two independent source slurs remain alongside the shared heads and separate 72 / 24 tick durations.':measureStart===63?'The source phrase continues across measures 63–64; it is not split at a transcription context boundary.':'Source notes, neighboring gestures and expression marks remain visible.'}))
+];
+export const NO14_OPTICAL_PEDAL_CANDIDATES:JankoCandidate[]=[
+ {id:'no14-optical-old-i',label:'I · previous phrase placement',description:'Previous I routing policy on the same 64-bar written score: chosen dots, longer left duration branches and hooked pedal starts. The original unfolded I pages remain in the earlier review.',options:NO14_HEAD_DOT_DELTA,windows:no14OpticalPedalWindows()},
+ {id:'no14-optical-hooked',label:'M · complete bows with hooked pedal starts',description:'Complete bows use the musical gesture rather than separate stem ends to place their tips. Both sides are considered, with healthy curvature and the fuller body and subtle taper retained. Hooked pedal starts isolate the phrasing change.',options:NO14_OPTICAL_DELTA,windows:no14OpticalPedalWindows()},
+ {id:'no14-optical-ornate-p',label:'N · complete bows with ornate P',description:'The same complete bows, with a compact ornate P at each new pedal press. Ordinary hold lines and upright releases preserve the pedal timing. Continued holds have no new P.',options:{...NO14_OPTICAL_DELTA,pedalStart:'ornate-p'},windows:no14OpticalPedalWindows()},
+ {id:'no14-optical-pictogram',label:'O · complete bows with pedal pictogram',description:'The same complete bows, with the established right-pedal pictogram at each new press. An ordinary hold line follows at the pictogram’s middle height. Its upper attachment stroke stays part of the symbol. Continued holds have no new symbol.',options:{...NO14_OPTICAL_DELTA,pedalStart:'pictogram'},windows:no14OpticalPedalWindows()}
+];
+/** Both sides are completely fitted before this bounded slur comparison. */
+export const NO14_FITTED_ROUND:JankoCandidateRound={round:64,title:'No. 14 · fitted slurs above and below',
+ description:'Compare the current M placement with fully fitted bows and a light local balance preference. An above-oriented diagnostic shows another reading where clear source reference permits. Dots, duration branches, hairpins, repeat signs and pedal starts stay the same controls. Page density and expression spacing remain for later design.',openAxes:['phraseRouting','phrasePlacement']};
+export const no14FittedWindows=():JankoScoreCandidateWindow[]=>[
+ {scoreId:NO14_WRITTEN_SCORE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 · 64 written bars',caption:'Every genuine page of the same written score. Repeat 33–64 preserves all 96 performed occurrences. The slur alternatives await musical judgment; no PDF is replaced.'},
+ ...[[1,1],[16,1],[41,1],[43,1],[48,1],[63,2]].map(([measureStart,measureCount])=>({scoreId:NO14_WRITTEN_SCORE_ID,measureStart,measureCount,completeSystems:true,
+ title:measureCount===1?`Slurs in context · measure ${measureStart}`:`Slurs in context · measures ${measureStart}–${measureStart+measureCount-1}`,
+ caption:measureStart===48?'Compare both independent source slurs directly: their appearance can change while the shared heads and separate 72 / 24 tick durations stay fixed.':measureStart===63?'The source phrase remains one relationship across measures 63–64.':'The complete containing system includes neighboring notes and expression marks.'}))
+];
+export const NO14_FITTED_CANDIDATES:JankoCandidate[]=[
+ {...NO14_OPTICAL_PEDAL_CANDIDATES[1],label:'M · current slur placement',description:'The earlier optical bow policy with hooked pedal starts, retained as the control. The new alternatives use the same source notes, durations, dots and supporting marks.',windows:no14FittedWindows()},
+ {id:'no14-fitted-auto',label:'P · fully fitted slurs with local balance',description:'Both sides receive a complete clearance fit before choosing a bow. Balanced moderate curves, lighter pressure to stay close to individual notes and a small local musical-ink balance preference guide the choice. This is a trial for joint judgment.',options:NO14_FITTED_DELTA,windows:no14FittedWindows()},
+ {id:'no14-fitted-above',label:'Q · above-oriented slur diagnostic',description:'The same fitted bows, with a preference for the upper reading where source directions, clear reference and neighboring curves permit it. It is a diagnostic comparison rather than a rule that all slurs belong above.',options:{...NO14_FITTED_DELTA,phrasePlacement:'above-diagnostic'},windows:no14FittedWindows()}
+];
+export const NO14_FITTED_REPEAT_CANDIDATE:JankoCandidate={id:'no14-fitted-single-repeat',label:'R · fitted slurs with a single repeat rule',
+ description:'The automatic fitted slurs from P, with one full-height repeat rule and two dots. The repeat entrance gains room before the complete first attack and replaces the bracket when it begins a system. Hooked pedals, dots, duration branches and hairpins retain their current treatment. This is a separate repeat trial for joint judgment.',
+ options:{...NO14_FITTED_DELTA,repeatTreatment:'single-rule'},windows:[...no14FittedWindows(),{scoreId:NO14_WRITTEN_SCORE_ID,measureStart:32,measureCount:2,completeSystems:true,title:'Repeat entrance · measures 32–33',caption:'At the source repeat, one full-height rule and two dots replace the system bracket. The first notes and duration marks receive deliberate leading room.'}]};
+export const NO14_FITTED_REVIEW_CANDIDATES=[...NO14_FITTED_CANDIDATES,NO14_FITTED_REPEAT_CANDIDATE];
+/** One matched review; lettering, entry and upper-route controls are separate
+ * cards, avoiding an unhelpful Cartesian product of all choices. */
+export const NO14_INTEGRATED_ROUND:JankoCandidateRound={round:65,title:'No. 14 · breathing room, lighter dynamics and pedal starts',
+ description:'The single-rule repeat and compact dotted durations are the chosen components. Compare comfortable automatic slurs, an upper reading, six lighter dynamic families and two simple pedal starts. Every card includes the complete score; page density, expression spacing and hairpins stay fixed.',openAxes:['phraseRouting','phrasePlacement','dynamicFamily','pedalStart']};
+export const no14IntegratedWindows=():JankoScoreCandidateWindow[]=>[
+ {scoreId:NO14_WRITTEN_SCORE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 · 64 written bars',caption:'Every genuine page of the same source-derived written score. Repeat 33–64 and the long duration branches with head-adjacent dots retain the chosen reading. Slur air, lettering and pedal starts remain comparisons.'},
+ ...[[1,3],[4,2],[8,1],[16,1],[20,3],[32,2],[41,1],[43,1],[48,1],[63,2]].map(([measureStart,measureCount])=>({scoreId:NO14_WRITTEN_SCORE_ID,measureStart,measureCount,completeSystems:true,
+ title:measureCount===1?`In context · measure ${measureStart}`:`In context · measures ${measureStart}–${measureStart+measureCount-1}`,
+ caption:measureStart===20?'The pedal carries from measure 20 into 21; a continued hold receives no new start.':measureStart===32?'The chosen repeat entrance preserves the parenthesized piano mark and deliberate room before the first notes.':measureStart===48?'Both independent slurs remain distinct, with longer left branches and separate 72 / 24 tick durations.':'Compare the actual notes, duration marks, slurs and supporting expressions together.'}))
+];
+const integratedOptions={...NO14_BREATHING_DELTA,pedalStart:'plain-text' as const};
+export const NO14_INTEGRATED_CANDIDATES:JankoCandidate[]=[
+ {...NO14_FITTED_REPEAT_CANDIDATE,label:'R · chosen repeat with current slurs and lettering',description:'The accepted single-rule repeat component with the previous automatic slurs, heavy dynamics and hooked pedals. This retained control does not imply acceptance of the remaining appearance.',windows:no14IntegratedWindows()},
+ {id:'no14-breathing-leland',label:'S · Leland · automatic slurs · Ped.',description:'Comfortable whole-bow air and both-side choice, with conventional Leland dynamics and modest plain Ped. starts. Compare T for the upper reading and U–Y for lettering alone.',options:{...integratedOptions,dynamicFamily:'leland'},windows:no14IntegratedWindows()},
+ {id:'no14-breathing-above',label:'T · Leland · upper slur diagnostic · Ped.',description:'The same lettering and pedal starts as S, with a preference for a comfortable upper bow where source reference and neighboring curves permit. This is a diagnostic, not a rule that every slur belongs above.',options:{...integratedOptions,dynamicFamily:'leland',phrasePlacement:'above-diagnostic'},windows:no14IntegratedWindows()},
+ ...([
+  ['no14-breathing-gonville','U · Gonville','gonville'],
+  ['no14-breathing-noto-sans','V · Noto Sans Italic','noto-sans-italic'],
+  ['no14-breathing-noto-serif','W · Noto Serif Italic','noto-serif-italic'],
+  ['no14-breathing-source-sans','X · Source Sans 3 Light Italic','source-sans-light-italic'],
+  ['no14-breathing-source-serif','Y · Source Serif 4 Light Italic','source-serif-light-italic']
+ ] as const).map(([id,label,dynamicFamily])=>({id,label:`${label} · automatic slurs · Ped.`,description:'Only the dynamic letterforms change from S. The whole piano glyph has the same reading height; the intact alphabet retains its own proportions. Automatic slurs and plain Ped. starts stay the same.',options:{...integratedOptions,dynamicFamily},windows:no14IntegratedWindows()})),
+ {id:'no14-breathing-slant',label:'Z · Leland · automatic slurs · slanted pedal entry',description:'The same dynamics and automatic slurs as S, with a short downward entry into the hold line. Upright releases, true gaps, retakes and continued holds preserve the exact source events.',options:{...NO14_BREATHING_DELTA,dynamicFamily:'leland',pedalStart:'downward-entry'},windows:no14IntegratedWindows()}
+];
+/** Three composed free packages share the one refined automatic route. */
+export const NO14_JUDGMENT_PACKAGES=[
+ {id:'bodoni',label:'A · Libre Bodoni',dynamicFamily:'libre-bodoni-italic',pedalTextFamily:'libre-bodoni-regular',description:'Regular Italic dynamics with upright Regular Ped. from the same family.'},
+ {id:'source-serif',label:'B · Source Serif 4',dynamicFamily:'source-serif-medium-italic',pedalTextFamily:'source-serif-regular',description:'Medium Italic dynamics with upright Regular Ped. from the same family.'},
+ {id:'legacy',label:'C · Finale Legacy / Maestro Text',dynamicFamily:'finale-legacy',pedalTextFamily:'maestro-text-regular',description:'Purpose-drawn musical dynamics with upright Maestro Text for Ped.'}
+] as const;
+export const no14JudgmentWindows=(contexts=false):JankoScoreCandidateWindow[]=>[
+ ...(contexts?[[1,3],[14,3],[48,1],[58,2],[62,3]]:[]).map(([measureStart,measureCount])=>({scoreId:NO14_WRITTEN_SCORE_ID,measureStart,measureCount,collapsed:measureStart!==1,
+  title:measureCount===1?`Measure ${measureStart}`:`Measures ${measureStart}–${measureStart+measureCount-1}`,
+  caption:measureStart===48?'Both independent slurs and the separate long and short values remain.':'Compare the complete gesture and its neighboring phrases.'})),
+ {scoreId:NO14_WRITTEN_SCORE_ID,measureStart:1,measureCount:64,fullScore:true,collapsed:true,title:'Complete No. 14 · 64 written bars',caption:'Four complete pages with the chosen repeat and duration conventions.'}
+];
+export const NO14_JUDGMENT_CANDIDATES:JankoCandidate[]=NO14_JUDGMENT_PACKAGES.map(pair=>(
+ {id:`no14-judgment-${pair.id}-auto`,label:pair.label,description:pair.description,
+  options:{...NO14_SILHOUETTE_DELTA,dynamicFamily:pair.dynamicFamily,pedalStart:'plain-text' as const,pedalTextFamily:pair.pedalTextFamily},windows:no14JudgmentWindows(pair.id==='source-serif')}
+));
+export const NO14_JUDGMENT_ROUND:JankoCandidateRound={round:66,title:'No. 14 · paired lettering and calmer bows',
+ description:'Three dynamics/Ped. packages share the refined automatic bows. Compare the matched opening first; complete pages and additional passages are available below. Candidates await selection.',
+ openAxes:['dynamicFamily','pedalTextFamily'],compareStrips:[
+  {scoreId:NO14_WRITTEN_SCORE_ID,measureStart:1,measureCount:1,title:'Paired lettering · the same opening',candidateIds:NO14_JUDGMENT_PACKAGES.map(pair=>`no14-judgment-${pair.id}-auto`),matchedFrame:true},
+  {scoreId:NO14_WRITTEN_SCORE_ID,measureStart:1,measureCount:4,title:'Shared automatic bows · complete first system',candidateIds:['no14-judgment-source-serif-auto'],matchedFrame:true}
+ ]};
+/** Existing-engine read-only comparison; neither candidate changes GOLD. */
+export const BACH_ONSET_DIAGNOSTIC_CANDIDATES:JankoCandidate[]=[
+ {id:'bach-onset-pairing-control',label:'K · Bach current pairing',description:'Current layout. In measure 13, the simultaneous left-hand 2 and right-hand 6 are farther apart than the following left-hand 6. This comparison keeps the current source reading and hands.',windows:[{scoreId:'primary',measureStart:1,measureCount:32,fullScore:true,title:'Complete current Bach sheet · 32 bars',caption:'Current layout retained for comparison.'},{scoreId:'primary',measureStart:13,measureCount:1,completeSystems:true,title:'Bach measure 13 · which notes sound together?',caption:'The left-hand 2 and right-hand 6 are simultaneous. The next left-hand 6 follows later.'}]},
+ {id:'bach-onset-pairing-stable',label:'L · Bach existing spacing option',description:'An existing spacing option brings the simultaneous pair closer and separates it from the following note. Complete pages show its wider consequences. This is a review trial, awaiting visual judgment.',options:{stableOnsets:true},windows:[{scoreId:'primary',measureStart:1,measureCount:32,fullScore:true,title:'Complete Bach sheet · existing spacing option',caption:'The same notes, hands and rhythm with the existing spacing option.'},{scoreId:'primary',measureStart:13,measureCount:1,completeSystems:true,title:'Bach measure 13 · existing spacing comparison',caption:'The same simultaneous pair and following note, shown in context.'}]}
+];
+
 /** Same literal windows for both real-engine surfaces; no per-measure geometry. */
 const NO13_CLARITY_WINDOWS: JankoScoreCandidateWindow[] = [
   {scoreId:SCHUMANN_NO13_STUDIO_SCORE_ID,measureStart:1,measureCount:56,fullScore:true,title:'Complete No. 13 · internal segments 1–56'},
@@ -1487,6 +1614,13 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
+    NO14_PRACTICE_CANDIDATES.find((c)=>c.id===id) ??
+    NO14_HEAD_DOT_CANDIDATES.find((c)=>c.id===id) ??
+    NO14_OPTICAL_PEDAL_CANDIDATES.find((c)=>c.id===id) ??
+    NO14_FITTED_CANDIDATES.find((c)=>c.id===id) ??
+    NO14_INTEGRATED_CANDIDATES.find((c)=>c.id===id) ??
+    (NO14_FITTED_REPEAT_CANDIDATE.id===id?NO14_FITTED_REPEAT_CANDIDATE:undefined) ??
+    BACH_ONSET_DIAGNOSTIC_CANDIDATES.find((c)=>c.id===id) ??
     ROUND_59_CANDIDATES.find((c) => c.id === id) ??
     ROUND_58_CANDIDATES.find((c) => c.id === id) ??
     ROUND_57_CANDIDATES.find((c) => c.id === id) ??

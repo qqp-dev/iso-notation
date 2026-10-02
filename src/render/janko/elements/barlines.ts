@@ -257,10 +257,11 @@ export function renderBarlines(
   geo: JankoSystemGeometry,
   options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null,
-  isFinalScoreMeasure: boolean = true
+  isFinalScoreMeasure: boolean = true,
+  replacedTicks:ReadonlySet<number>=new Set()
 ): string {
   return ['  <g class="janko-barlines">',
-    ...barlineStrokes(geo, options, tokens, isFinalScoreMeasure).map(serializeVerticalGridStroke),
+    ...barlineStrokes(geo, options, tokens, isFinalScoreMeasure).filter(s=>s.tick===undefined||!replacedTicks.has(s.tick)).map(serializeVerticalGridStroke),
     '  </g>'].join('\n');
 }
 

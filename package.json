@@ -13,7 +13,9 @@
     "lint:engraving": "tsx scripts/lint_engraving.ts",
     "pdf": "tsx scripts/export-pdf.ts",
     "brahms:export-durations": "tsx scripts/brahms-export-written-durations.ts",
-    "brahms:export-expressions": "tsx scripts/brahms-export-expressions.ts"
+    "brahms:export-expressions": "tsx scripts/brahms-export-expressions.ts",
+    "pdf:no14": "tsx scripts/export-no14-practice-pdf.ts",
+    "pdf:no14:gold": "tsx scripts/export-no14-practice-pdf.ts --profile gold"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

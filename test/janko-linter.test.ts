@@ -46,6 +46,7 @@ import {
   drawnStaffRuleYs,
   getSystemGeometry,
   layoutJankoScore,
+  systemPageBookingBoxes,
   renderSystem,
 } from '../src/render/janko/engine';
 import { getStemAttachmentRadius, getStemGeometry, stemRingCenters } from '../src/render/janko/elements/rhythm';
@@ -73,6 +74,7 @@ import {
   checkJointRouteSeparation,
   checkExpressionIntegrity,
   checkCompleteFlagClearance,
+  checkContentAwarePageFit,
   checkSharedHeadTerminals,
   checkClaspDotFusion,
   checkDotCollision,
@@ -236,6 +238,21 @@ function run(
 function systems(options = DEFAULT_JANKO_OPTIONS, tokens = DEFAULT_JANKO_TOKENS): JankoSystemLayout[] {
   return layoutJankoScore(SCORE, options, tokens);
 }
+
+test('Defect: running header colliding with complete first-system ink is admitted as an error',()=>{
+ const options=resolveJankoOptions({...DEFAULT_JANKO_OPTIONS,verticalPlacement:'content-aware',runningHeaderHeight:20});
+ const page=computePageGeometry(options,TOKENS,SCORE),first=systems(options)[0];
+ page.inkAwarePagination=true;first.geometry={...first.geometry,pageIndex:1};
+ const check=()=>{const out:LintViolation[]=[];checkContentAwarePageFit([first],page,TOKENS,LINT,options,out);return out;};
+ assert.equal(check().filter(v=>v.code==='page-header-overlap').length,0);
+ const top=Math.min(...systemPageBookingBoxes(first,options,TOKENS).map(box=>box.y0));
+ // Move only the actual header's margin/baseline into unchanged music. The
+ // defect is detected from complete music ink, not its nominal staff slot.
+ page.marginTop=top-12;
+ const defect=check().find(v=>v.code==='page-header-overlap');assert.ok(defect);
+ assert.equal(defect.severity,'error');assert.equal(defect.system,0);
+ assert.ok(Number(defect.metrics?.headerBottom)>top);
+});
 
 // ---------------------------------------------------------------------------
 // 1 + 2. Report shape and the clean golden master
@@ -2215,7 +2232,7 @@ test('npm run lint:engraving reports canonical clean and exits 0', () => {
       `Brahms canonical: the former ${id} refusal never reappears`
     );
   }
-  for (const key of ['chordSpecimen', 'restSpecimen', 'durationSpecimen']) {
+  for (const key of ['no14','chordSpecimen', 'restSpecimen', 'durationSpecimen']) {
     assert.deepEqual(reports[key].violations, [], `${key}: zero violations`);
     assert.deepEqual(reports[key].warnings, [], `${key}: zero warnings`);
   }
@@ -2420,4 +2437,148 @@ test('depth linter refuses severed hidden continuation, false foreground, lost l
     const lostJoin={...scene,beams:scene.beams.map(parts=>parts.map(q=>q.id===r.visibleIds[0]&&q.shape.kind==='rail'?{...q,shape:{kind:'rail' as const,points:q.shape.points.map(([x,y])=>[x,y-4] as [number,number])}}:q))};
     assert.ok(audit(lostJoin).includes('depth-route-clearance'));
   }
+});
+
+test('No14 shared dotted-quarter audit detects omitted, far and short-carrier dots',async()=>{
+ const {no14PracticeProfile}=await import('../src/render/janko/no14-practice');
+ const e=no14PracticeProfile(),o={...e.options,phraseRouting:undefined},l=layoutJankoScore(e.score,o,e.tokens).find(l=>l.notes.some(n=>n.note.startTick===6768))!;
+ const original=buildInkScene(l,o,e.tokens,e.score),id=l.ungrouped.find(n=>n.durationTicks===72&&n.hand==='RH')!.id;
+ const run=(edit:(s:InkScene)=>void)=>{const scene=structuredClone(original);edit(scene);const out:LintViolation[]=[];checkSharedHeadTerminals(l,o,e.tokens,out,scene);return out;};
+ assert.deepEqual(run(()=>{}),[]);
+ assert.ok(run(s=>(s.solos as Map<string,typeof original.solos extends ReadonlyMap<string,infer V>?V:never>).set(id,s.solos.get(id)!.filter(p=>p.shape.kind!=='dot'))).some(v=>v.code==='shared-duration-dot-ownership'));
+ for(const shift of [40,-2.4])assert.ok(run(s=>{for(const p of s.solos.get(id)!)if(p.shape.kind==='dot')p.shape.cx+=shift;}).some(v=>v.code==='shared-duration-dot-ownership'),'dot attachment is bounded, not just a minimum distance');
+ assert.ok(run(s=>{for(const p of s.solos.get(id)!)if(p.shape.kind==='dot')p.shape.cy+=5.2;}).some(v=>v.code==='shared-duration-dot-ownership'),'dot cannot attach to short carrier');
+ assert.ok(run(s=>{for(const p of s.solos.get(id)!)if(p.shape.kind==='dot')(p as unknown as {ownerIds:string[]}).ownerIds=['wrong-owner'];}).some(v=>v.code==='shared-duration-dot-ownership'));
+});
+
+test('No14 chosen head-adjacent dots require their written owner and retained long terminal',async()=>{
+ const {no14HeadDotProfile}=await import('../src/render/janko/no14-practice');
+ const e=no14HeadDotProfile(),o={...e.options,phraseRouting:undefined},p=new PreparedJankoWindows(e.score,[{measureStart:48,measureCount:1}],o,e.tokens),l=[...p.systems.values()][0],original=buildInkScene(l,o,e.tokens,e.score),id=l.ungrouped.find(n=>n.durationTicks===72&&n.hand==='RH')!.id;
+ const run=(edit:(s:InkScene)=>void)=>{const scene=structuredClone(original);edit(scene);const out:LintViolation[]=[];checkSharedHeadTerminals(l,o,e.tokens,out,scene);return out;};
+ assert.deepEqual(run(()=>{}),[]);
+ assert.ok(run(s=>{for(const dot of s.solos.get(id)!)if(dot.shape.kind==='dot')dot.shape.cy-=12;}).some(v=>v.code==='shared-duration-dot-ownership'),'rejected exposed placement cannot masquerade as chosen head placement');
+ assert.ok(run(s=>{for(const dot of s.solos.get(id)!)if(dot.shape.kind==='dot')(dot as unknown as {ownerIds:string[]}).ownerIds=['short-owner'];}).some(v=>v.code==='shared-duration-dot-ownership'));
+ assert.ok(run(s=>{for(const dot of s.solos.get(id)!)if(dot.shape.kind==='dot')dot.shape.cx+=20;}).some(v=>v.code==='shared-duration-dot-ownership'));
+ assert.ok(run(s=>{for(const stem of s.solos.get(id)!)if(stem.shape.kind==='stem')stem.shape.y2+=5.2;}).some(v=>v.code==='shared-head-terminal-clearance'),'choosing head dots does not permit loss of the long-quarter branch');
+});
+
+test('No14 hairpin trial audit catches stale painted width, physical width and bounds',async()=>{
+ const {no14HeadDotProfile}=await import('../src/render/janko/no14-practice'),{checkHairpinStrokePaint}=await import('../src/render/janko/linter');
+ const e=no14HeadDotProfile(true),p=new PreparedJankoWindows(e.score,[{measureStart:5,measureCount:1}],{...e.options,phraseRouting:undefined},e.tokens),l=[...p.systems.values()][0],q=l.expressions!.find(q=>q.kind==='hairpin')!;
+ const run=(edit:(ink:typeof q)=>void)=>{const copy=structuredClone(q);edit(copy);const out:LintViolation[]=[];checkHairpinStrokePaint(copy,1,l.index,out);return out;};
+ assert.deepEqual(run(()=>{}),[]);
+ for(const edit of [(ink:typeof q)=>{ink.svg=ink.svg.replace('stroke-width="1"','stroke-width="0.65"');},(ink:typeof q)=>{ink.strokeSegments![0].width=.65;},(ink:typeof q)=>{ink.strokeSegments![0].x1+=1;},(ink:typeof q)=>{ink.y1=ink.y0+1;}])assert.ok(run(edit).some(v=>v.code==='expression-stroke-geometry'));
+});
+
+test('No14 optical phrase admission rejects escaped tips, missing source seats, flat bows and false paint',async()=>{
+ const {no14OpticalProfile}=await import('../src/render/janko/no14-practice');
+ const e=no14OpticalProfile(),p=new PreparedJankoWindows(e.score,[{measureStart:1,measureCount:1}],e.options,e.tokens),l=[...p.systems.values()][0],q=l.expressions!.find(q=>q.kind==='phrase'&&q.startTick===0)!;
+ const audit=()=>{const out:LintViolation[]=[];checkExpressionIntegrity(e.score,l,e.options,e.tokens,out);return out;};assert.deepEqual(audit(),[]);
+ const saved={...q.contour!},svg=q.svg;
+ q.contour!.xStart+=50;assert.ok(audit().some(v=>v.code==='expression-local-attachment'));q.contour={...saved};
+ q.contour.yStart-=100;assert.ok(audit().some(v=>v.code==='expression-local-attachment'));q.contour={...saved};
+ q.contour.depth=1;assert.ok(audit().some(v=>v.code==='expression-geometry'));q.contour={...saved};
+ q.svg=q.svg.replace(/ d="/, ' d="M0 0 ');assert.ok(audit().some(v=>v.code==='expression-path-ownership'));q.svg=svg;
+ const phrase=e.score.phrases!.find(f=>f.id===q.id)!,ids=phrase.fromNoteIds;phrase.fromNoteIds=['missing-optical-source-owner'];assert.ok(audit().some(v=>v.code==='expression-local-attachment'));phrase.fromNoteIds=ids;
+ assert.deepEqual(audit(),[]);
+});
+test('fitted No14 slurs retain independent source ranges and unchanged admission catches actual source/paint/clearance defects',async()=>{
+ const {no14FittedProfile}=await import('../src/render/janko/no14-practice');
+ const {projectNo14Written}=await import('../src/render/janko/no14-written');
+ const {opticalBowInk}=await import('../src/render/janko/optical-phrases');
+ const {phraseMusicObstacles}=await import('../src/render/janko/expression-anchors');
+ const e=no14FittedProfile(),score=projectNo14Written().score,p=new PreparedJankoWindows(score,[{measureStart:1,measureCount:1},{measureStart:48,measureCount:1},{measureStart:63,measureCount:2}],e.options,e.tokens);
+ for(const l of p.systems.values()){const out:LintViolation[]=[];checkExpressionIntegrity(score,l,e.options,e.tokens,out);assert.deepEqual(out,[]);}
+ const all=[...p.systems.values()],l=all.find(l=>l.expressions!.some(q=>q.kind==='phrase'&&q.startTick===0))!,q=l.expressions!.find(q=>q.kind==='phrase'&&q.startTick===0)!,original=structuredClone(q);
+ assert.ok(phraseMusicObstacles(l,e.options,e.tokens).every(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what)),'faint guides are excluded from musical obstacle/balance weight');
+ const audit=()=>{const out:LintViolation[]=[];checkExpressionIntegrity(score,l,e.options,e.tokens,out);return out;};
+ const reset=()=>Object.assign(q,structuredClone(original));
+ q.contour!.xStart+=50;assert.ok(audit().some(v=>v.code==='expression-local-attachment'));reset();
+ q.contour!.yStart-=100;assert.ok(audit().some(v=>v.code==='expression-local-attachment'));reset();
+ q.contour!.depth=1;assert.ok(audit().some(v=>v.code==='expression-geometry'));reset();
+ q.continuationEnd=true;assert.ok(audit().some(v=>v.code==='expression-endpoint'));reset();
+ q.endpointIds![0]=['foreign-owner'];assert.ok(audit().some(v=>v.code==='expression-endpoint'));reset();
+ q.svg=q.svg.replace(/ d="/, ' d="M0 0 ');assert.ok(audit().some(v=>v.code==='expression-path-ownership'));reset();
+ // A fresh, honestly painted contour moved into real pitch/duration ink must
+ // fail physical clearance, independently of path/model identity.
+ const note=l.notes[0];Object.assign(q,opticalBowInk(q,{...q.contour!,xStart:note.x-.1,yStart:note.y,yEnd:note.y},'optical-fitted'));
+ assert.ok(audit().some(v=>v.code==='expression-clearance'));reset();
+ const f=score.phrases!.find(f=>f.id===q.id)!,ids=f.fromNoteIds;f.fromNoteIds=['missing-fitted-source-owner'];assert.ok(audit().some(v=>v.code==='expression-local-attachment'));f.fromNoteIds=ids;
+ const side=f.sourceSide;f.sourceSide=q.contour!.side===1?'above':'below';assert.ok(audit().some(v=>v.code==='expression-source-side'));f.sourceSide=side;
+ assert.deepEqual(audit(),[]);
+ const b48=all.flatMap(l=>l.expressions!).filter(q=>q.kind==='phrase'&&q.startTick>=47*144&&q.startTick<48*144);assert.equal(b48.length,2);
+ const final=all.flatMap(l=>l.expressions!).filter(q=>q.kind==='phrase'&&q.startTick===8928);assert.equal(final.length,1);assert.equal(final[0].endTick,9072);
+ for(const q of [...b48,...final]){const f=score.phrases!.find(f=>f.id===q.id)!;assert.deepEqual(q.endpointIds,[f.fromNoteIds,f.toNoteIds]);assert.equal(q.startTick,f.startTick);assert.equal(q.endTick,f.endTick);}
+ const repeated=new PreparedJankoWindows(e.score,[{measureStart:80,measureCount:1}],e.options,e.tokens);
+ const returned=[...repeated.systems.values()].flatMap(l=>l.expressions!).filter(q=>q.kind==='phrase'&&q.startTick>=79*144&&q.startTick<80*144);assert.equal(returned.length,2);
+ for(const l of repeated.systems.values()){const out:LintViolation[]=[];checkExpressionIntegrity(e.score,l,e.options,e.tokens,out);assert.deepEqual(out,[]);}
+ for(const q of returned){const f=e.score.phrases!.find(f=>f.id===q.id)!;assert.deepEqual(q.endpointIds,[f.fromNoteIds,f.toNoteIds]);assert.equal(q.startTick,f.startTick);assert.equal(q.endTick,f.endTick);}
+});
+test('pedal glyph admission rejects fake continuation starts, altered outlines, middle-height error and missing physical bounds',async()=>{
+ const {no14OpticalProfile}=await import('../src/render/janko/no14-practice');
+ const {placeExpressions}=await import('../src/render/janko/elements/expressions');
+ const {checkPedalStartPaint}=await import('../src/render/janko/linter');
+ const e=no14OpticalProfile(),score={...e.score,phrases:[],dynamics:[],totalTicks:240,pedals:[{tick:0,type:'sustain-down' as const},{tick:180,type:'sustain-up' as const}]};
+ for(const style of ['ornate-p','pictogram'] as const){
+  const q=placeExpressions(score,{start:0,end:240,left:10,right:130,top:0,bottom:20,x:t=>10+t/2,endpointX:()=>10,pedalStart:style})[0],original=structuredClone(q);
+  const audit=()=>{const out:LintViolation[]=[];checkPedalStartPaint(q,style,0,out);return out;};assert.deepEqual(audit(),[]);
+  q.continuationStart=true;assert.ok(audit().some(v=>v.code==='pedal-start-geometry'));Object.assign(q,structuredClone(original));
+  q.svg=q.svg.replace(/data-smufl="[^"]+"/,'data-smufl="fake"');assert.ok(audit().length);Object.assign(q,structuredClone(original));
+  q.strokeSegments![0].y0-=2;assert.ok(audit().length);Object.assign(q,structuredClone(original));
+  q.x0=q.pedalStartInk!.x0+1;assert.ok(audit().length);Object.assign(q,structuredClone(original));
+  q.svg=q.svg.replace(/stroke-width="0.65"/,'stroke-width="1"');assert.ok(audit().length);Object.assign(q,structuredClone(original));
+  q.svg=q.svg.replace(/H(\d+(?:\.\d+)?)V/,'H999V');assert.ok(audit().length);Object.assign(q,structuredClone(original));assert.deepEqual(audit(),[]);
+ }
+});
+
+test('written repeat audit catches omitted/escaped dots, wrong source boundary and duplicate final closure',async()=>{
+ const {projectNo14Written}=await import('../src/render/janko/no14-written');const {no14OpticalProfile}=await import('../src/render/janko/no14-practice');const {checkRepeatIntegrity}=await import('../src/render/janko/linter');
+ const score=projectNo14Written().score,e=no14OpticalProfile(),p=new PreparedJankoWindows(score,[{measureStart:33,measureCount:1}],e.options,e.tokens),l=[...p.systems.values()][0],original=structuredClone(l.repeatSigns!);
+ const audit=()=>{const out:LintViolation[]=[];checkRepeatIntegrity(score,l,e.options,e.tokens,out);return out;};assert.deepEqual(audit(),[]);
+ l.repeatSigns![0].dots.pop();assert.ok(audit().some(v=>v.code==='repeat-geometry'));l.repeatSigns=structuredClone(original);
+ l.repeatSigns![0].dots[0].cx=l.notes[0].x;l.repeatSigns[0].dots[0].cy=l.notes[0].y;assert.ok(audit().some(v=>v.code==='repeat-clearance'));l.repeatSigns=structuredClone(original);
+ l.repeatSigns![0].tick+=144;assert.ok(audit().some(v=>v.code==='repeat-geometry'));l.repeatSigns=structuredClone(original);
+ l.repeatSigns![0].x0=-1;assert.ok(audit().some(v=>v.code==='repeat-geometry'));l.repeatSigns=structuredClone(original);
+ // Removing source repeat type without removing its old placed sign is rejected.
+ const b=score.barlines.find(b=>b.tick===4608)!;b.type='regular';assert.ok(audit().some(v=>v.code==='repeat-geometry'));b.type='repeat-start';assert.deepEqual(audit(),[]);
+});
+
+test('breathing slur admission retains48/80 and63–64 source relationships and rejects escaped/foreign/unclear physical ink',async()=>{
+ const {no14BreathingProfile}=await import('../src/render/janko/no14-practice'),{projectNo14Written}=await import('../src/render/janko/no14-written'),{opticalBowInk}=await import('../src/render/janko/optical-phrases');
+ const e=no14BreathingProfile(),score=projectNo14Written().score,p=new PreparedJankoWindows(score,[{measureStart:1,measureCount:1},{measureStart:48,measureCount:1},{measureStart:63,measureCount:2}],e.options,e.tokens);
+ for(const l of p.systems.values()){const out:LintViolation[]=[];checkExpressionIntegrity(score,l,e.options,e.tokens,out);assert.deepEqual(out,[]);}
+ const l=[...p.systems.values()].find(l=>l.expressions!.some(q=>q.kind==='phrase'&&q.startTick===0))!,q=l.expressions!.find(q=>q.kind==='phrase'&&q.startTick===0)!,original=structuredClone(q);
+ const audit=()=>{const out:LintViolation[]=[];checkExpressionIntegrity(score,l,e.options,e.tokens,out);return out;},reset=()=>Object.assign(q,structuredClone(original));
+ q.contour!.xStart+=50;assert.ok(audit().some(v=>v.code==='expression-local-attachment'));reset();
+ q.contour!.yStart-=100;assert.ok(audit().some(v=>v.code==='expression-local-attachment'));reset();
+ q.endpointIds![0]=['wrong-source-owner'];assert.ok(audit().some(v=>v.code==='expression-endpoint'));reset();
+ q.continuationEnd=true;assert.ok(audit().some(v=>v.code==='expression-endpoint'));reset();
+ const n=l.notes[0];Object.assign(q,opticalBowInk(q,{...q.contour!,xStart:n.x-.1,yStart:n.y,yEnd:n.y},'optical-breathing'));assert.ok(audit().some(v=>v.code==='expression-clearance'));reset();assert.deepEqual(audit(),[]);
+ const curves=[...p.systems.values()].flatMap(l=>l.expressions!.filter(q=>q.kind==='phrase'));assert.equal(curves.filter(q=>q.startTick===6768).length,2);assert.equal(curves.find(q=>q.startTick===8928)!.endTick,9072);
+ const repeated=new PreparedJankoWindows(e.score,[{measureStart:80,measureCount:1}],e.options,e.tokens),returned=[...repeated.systems.values()].flatMap(l=>l.expressions!.filter(q=>q.kind==='phrase'&&q.startTick===11376));assert.equal(returned.length,2);
+ for(const l of repeated.systems.values()){const out:LintViolation[]=[];checkExpressionIntegrity(e.score,l,e.options,e.tokens,out);assert.deepEqual(out,[]);}
+ for(const q of returned){const f=e.score.phrases!.find(f=>f.id===q.id)!;assert.deepEqual(q.endpointIds,[f.fromNoteIds,f.toNoteIds]);assert.equal(q.endTick,f.endTick);}
+});
+
+test('integrated dynamic and pedal admission rejects foreign glyphs, fake presses and narrowed actual query frames',async()=>{
+ const {no14BreathingProfile}=await import('../src/render/janko/no14-practice'),{projectNo14Written}=await import('../src/render/janko/no14-written');const e=no14BreathingProfile(),score=projectNo14Written().score;
+ for(const pedalStart of ['plain-text','downward-entry'] as const){const o={...e.options,phraseRouting:undefined,dynamicFamily:'leland' as const,pedalStart},p=new PreparedJankoWindows(score,[{measureStart:1,measureCount:1}],o,e.tokens),l=[...p.systems.values()][0];
+  const audit=()=>{const out:LintViolation[]=[];checkExpressionIntegrity(score,l,o,e.tokens,out);return out;};assert.deepEqual(audit(),[]);
+  const dynamic=l.expressions!.find(q=>q.dynamicFamilyInk)!,ds=structuredClone(dynamic);dynamic.dynamicFamilyInk!.mark='f';assert.ok(audit().some(v=>v.code==='expression-paint'));Object.assign(dynamic,structuredClone(ds));
+  dynamic.x0=dynamic.dynamicFamilyInk!.x0+1;assert.ok(audit().some(v=>v.code==='expression-paint'));Object.assign(dynamic,structuredClone(ds));
+  const pedal=l.expressions!.find(q=>q.pedalStartInk)!,ps=structuredClone(pedal);pedal.pedalStartInk!.x+=1;assert.ok(audit().some(v=>v.code==='pedal-start-geometry'));Object.assign(pedal,structuredClone(ps));
+  pedal.pedalStartInk!.y0+=1;assert.ok(audit().some(v=>v.code==='pedal-start-geometry'));Object.assign(pedal,structuredClone(ps));assert.deepEqual(audit(),[]);
+ }
+});
+
+test('silhouette and paired typography admission retain source tips and reject foreign paint and press families',async()=>{
+ const {NO14_JUDGMENT_CANDIDATES}=await import('../src/render/janko/candidates'),{projectNo14Written}=await import('../src/render/janko/no14-written');
+ const candidate=NO14_JUDGMENT_CANDIDATES[1],entry=createStudioConfig().scores['schumann-op68-no14-written-practice'],score=projectNo14Written().score;
+ const options={...entry.options,...candidate.options},p=new PreparedJankoWindows(score,[{measureStart:1,measureCount:1}],options,entry.tokens),l=[...p.systems.values()][0];
+ const audit=()=>{const out:LintViolation[]=[];checkExpressionIntegrity(score,l,options,entry.tokens,out);return out;};assert.deepEqual(audit(),[]);
+ const phrase=l.expressions!.find(q=>q.kind==='phrase')!,ph=structuredClone(phrase);
+ phrase.contour!.xStart+=50;assert.ok(audit().some(q=>q.code==='expression-local-attachment'));Object.assign(phrase,structuredClone(ph));
+ phrase.endpointIds![0]=['foreign-owner'];assert.ok(audit().some(q=>q.code==='expression-endpoint'));Object.assign(phrase,structuredClone(ph));
+ const dynamic=l.expressions!.find(q=>q.dynamicFamilyInk)!,dy=structuredClone(dynamic);dynamic.dynamicFamilyInk!.mark='f';assert.ok(audit().some(q=>q.code==='expression-paint'));Object.assign(dynamic,structuredClone(dy));
+ const pedal=l.expressions!.find(q=>q.pedalStartInk)!,pd=structuredClone(pedal);pedal.pedalStartInk!.family='maestro-text-regular';assert.ok(audit().some(q=>q.code==='pedal-start-geometry'));Object.assign(pedal,structuredClone(pd));assert.deepEqual(audit(),[]);
 });

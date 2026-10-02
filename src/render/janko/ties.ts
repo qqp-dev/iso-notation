@@ -489,6 +489,10 @@ export function tieTracedGeometry(
 /** Shared two-cubic tapered contour; phrasing may have unequal endpoint heights.
  * Placement and musical semantics remain the caller's responsibility. */
 export interface TaperedSpanProfile {
+  /** Controls follow the endpoint chord before adding the bow displacement. */
+  chordAligned?: true;
+  /** Review-only light end cap; body remains `thickness` at the crown. */
+  tipThickness?: number;
   startDepth?: number;
   endDepth?: number;
   startIndent?: number;
@@ -501,8 +505,15 @@ export function taperedSpanPath(x1: number, y1: number, x2: number, y2: number,
     tieTracedGeometry(x1,0,x2,side,profile.startDepth??depth,thickness,profile.startIndent??indent);
   const b = profile.endDepth === undefined && profile.endIndent === undefined ? g :
     tieTracedGeometry(x1,0,x2,side,profile.endDepth??depth,thickness,profile.endIndent??indent);
-  return `M ${f(x1)} ${f(y1)} C ${f(a.ax)} ${f(y1+a.outerControlY)} ${f(b.bx)} ${f(y2+b.outerControlY)} ${f(x2)} ${f(y2)} ` +
-    `L ${f(x2)} ${f(y2)} C ${f(b.bx)} ${f(y2+b.innerControlY)} ${f(a.ax)} ${f(y1+a.innerControlY)} ${f(x1)} ${f(y1)} Z`;
+  const ay=profile.chordAligned?y1+(y2-y1)*(a.ax-x1)/(x2-x1):y1;
+  const by=profile.chordAligned?y1+(y2-y1)*(b.bx-x1)/(x2-x1):y2;
+  if(profile.tipThickness!==undefined){
+    const tip=profile.tipThickness,control=(4*thickness-tip)/3;
+    return `M ${f(x1)} ${f(y1)} C ${f(a.ax)} ${f(ay+a.outerControlY)} ${f(b.bx)} ${f(by+b.outerControlY)} ${f(x2)} ${f(y2)} `+
+      `L ${f(x2)} ${f(y2-side*tip)} C ${f(b.bx)} ${f(by+b.outerControlY-side*control)} ${f(a.ax)} ${f(ay+a.outerControlY-side*control)} ${f(x1)} ${f(y1-side*tip)} Z`;
+  }
+  return `M ${f(x1)} ${f(y1)} C ${f(a.ax)} ${f(ay+a.outerControlY)} ${f(b.bx)} ${f(by+b.outerControlY)} ${f(x2)} ${f(y2)} ` +
+    `L ${f(x2)} ${f(y2)} C ${f(b.bx)} ${f(by+b.innerControlY)} ${f(a.ax)} ${f(ay+a.innerControlY)} ${f(x1)} ${f(y1)} Z`;
 }
 
 /**

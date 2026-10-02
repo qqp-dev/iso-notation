@@ -3,13 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { build } from 'esbuild';
-import { REFERENCE_READER_KEY, readReferenceReader } from '../src/render/janko/prepared/reference-reader';
+import { REFERENCE_READER_KEY, readReferenceReader,availableReferenceSelection } from '../src/render/janko/prepared/reference-reader';
 import { STUDIO_STATE_STORAGE_KEY } from '../src/render/janko/studio-session';
 
-type ScoreId = 'primary' | 'brahms-op118-no1';
-const ids: ScoreId[] = ['primary', 'brahms-op118-no1'];
-const names: Record<ScoreId, string> = { primary: 'Bach', 'brahms-op118-no1': 'Brahms' };
-const badges: Record<ScoreId, string> = { primary: 'GOLD', 'brahms-op118-no1': 'BRONZE' };
+type ScoreId = 'primary' | 'brahms-op118-no1' | 'schumann-op68-no14-gold';
+const ids: ScoreId[] = ['primary', 'brahms-op118-no1', 'schumann-op68-no14-gold'];
+const names: Record<ScoreId, string> = { primary: 'Bach', 'brahms-op118-no1': 'Brahms', 'schumann-op68-no14-gold': 'Schumann No.14' };
+const badges: Record<ScoreId, string> = { primary: 'GOLD', 'brahms-op118-no1': 'BRONZE', 'schumann-op68-no14-gold': 'GOLD' };
 const artifact = (generation: string, view: string) => view === 'candidates'
   ? `<section class="view-panel" data-view="candidates">${generation}:candidate</section>`
   : `<section class="view-panel" id="view-reference" data-view="reference">${ids.map((id) =>
@@ -68,7 +68,7 @@ class Node {
     for (const view of ['candidates', 'reference']) {
       if (!html.includes(`data-view="${view}"`)) continue;
       const panel = this.add(new Node('section', 'view-panel')); panel.dataset.view = view;
-      if (view === 'reference') for (const id of ['brahms-op118-no1', 'primary'] as ScoreId[]) {
+      if (view === 'reference') for (const id of ids) {
         const score = panel.add(new Node('section', 'reference-score')); score.dataset.score = id;
         const card = score.add(new Node('article', 'golden-card'));
         card.add(new Node('h2')).textContent = names[id];
@@ -125,6 +125,7 @@ async function mount(code: string, seed = new Map<string, string>(), hash = '#re
   for (const view of ['candidates', 'reference']) { const tab = new Node('button'); tab.dataset.viewTarget = view; tab.dataset.studioMode = view === 'candidates' ? 'engraving' : 'reference'; doc.tabs.push(tab); }
   const location = { hash };
   const storage = new Map(seed);
+  if(!storage.has(REFERENCE_READER_KEY))storage.set(REFERENCE_READER_KEY,JSON.stringify({selected:'primary'}));
   const pending = new Map<string, ReturnType<typeof deferred<any>>>();
   const timers = new Map<number, () => void>(); let timerId = 0;
   let top = 0;
@@ -190,10 +191,10 @@ function assertPaper(h: Awaited<ReturnType<typeof mount>>, id: ScoreId, generati
   assert.equal(active.hidden, false); assert.equal(active.attributes.has('aria-hidden'), false);
   assert.equal(inactive.hidden, true); assert.equal(inactive.attributes.get('aria-hidden'), 'true');
   assert.equal(h.picker.value, id, 'picker and visible score agree');
-  assert.equal(active.querySelectorAll('.crop-grid').length, 0, 'macro container is removed, not reserved');
-  assert.equal(inactive.querySelectorAll('.crop-grid').length, 0);
+  assert.equal(active.querySelectorAll('.crop-grid').length, id==='schumann-op68-no14-gold'?1:0, 'only No14 playing cues are retained');
+  assert.equal(inactive.querySelectorAll('.crop-grid').length, inactive.dataset.score==='schumann-op68-no14-gold'?1:0);
   for (const score of [active, inactive]) {
-    assert.equal(score.children[0].children.filter((n) => n.className === 'section-title').length, 0);
+    assert.equal(score.children[0].children.filter((n) => n.className === 'section-title').length, score.dataset.score==='schumann-op68-no14-gold'?1:0);
     assert.equal(score.children[0].children.find((n) => n.className === 'page-grid')!.children.length, 2, 'both full page sets remain');
     assert.match(score.querySelectorAll('details.diagnostics')[0].textContent, new RegExp(`${generation}.*findings`),
       'the selected score retains findings from the current generation');
@@ -217,12 +218,33 @@ test('the mirrored shell offers a labeled keyboard picker and hides the second s
 
 test('Reference reader rejects corrupt score and zoom records without breaking the browser choice', () => {
   const storage = (raw: string) => ({ getItem: () => raw, setItem: () => undefined });
-  assert.equal(readReferenceReader().selected, 'primary');
-  assert.equal(readReferenceReader(storage('{bad')).selected, 'primary');
+  assert.equal(readReferenceReader().selected, 'schumann-op68-no14-gold');
+  assert.equal(readReferenceReader(storage('{bad')).selected, 'schumann-op68-no14-gold');
   const selected = readReferenceReader(storage(JSON.stringify({ selected: 'brahms-op118-no1', places: { primary: -4, 'brahms-op118-no1': 400 }, zooms: { primary: 9, 'brahms-op118-no1': 1.75 } })));
   assert.equal(selected.selected, 'brahms-op118-no1'); assert.equal(selected.places.primary, 0);
   assert.equal(selected.places['brahms-op118-no1'], 400); assert.equal(selected.zooms.primary, 1);
-  assert.equal(readReferenceReader(storage('{"selected":"unknown"}')).selected, 'primary');
+  assert.equal(readReferenceReader(storage('{"selected":"unknown"}')).selected, 'schumann-op68-no14-gold');
+});
+
+test('fresh reader prefers GOLD only in payloads that contain it; legacy and saved choices remain available',()=>{
+ const root=(present:ScoreId[])=>({querySelector:()=>({querySelectorAll:()=>present.map(score=>({dataset:{score}}))})}) as unknown as HTMLElement;
+ const fresh=readReferenceReader();
+ assert.equal(availableReferenceSelection(root(['primary','brahms-op118-no1']),fresh),'primary');
+ assert.equal(availableReferenceSelection(root(ids),fresh),'schumann-op68-no14-gold');
+ for(const id of ids.slice(0,2)){
+  const saved=readReferenceReader({getItem:()=>JSON.stringify({selected:id,places:{[id]:760},zooms:{[id]:1.75}}),setItem:()=>{}});
+  assert.equal(availableReferenceSelection(root(ids),saved),id);assert.equal(saved.places[id],760);assert.equal(saved.zooms[id],1.75);
+ }
+});
+
+test('new GOLD reader has its own live anchor and zoom while existing Bach selection survives reload',async()=>{
+ const h=await mount(await bundleViewer(),new Map([[REFERENCE_READER_KEY,'{}']]));
+ await h.answer('one');await h.flush();assertPaper(h,'schumann-op68-no14-gold','one');
+ h.scroll(630);await h.flush();await h.zoomIn();const goldZoom=h.zoom();
+ await h.select('primary');h.scroll(380);await h.flush();await h.zoomIn();await h.zoomIn();const bachZoom=h.zoom();
+ await h.select('schumann-op68-no14-gold');assert.equal(h.getTop(),630);assert.equal(h.zoom(),goldZoom);
+ await h.select('primary');assert.equal(h.getTop(),380);assert.equal(h.zoom(),bachZoom);
+ const reload=await mount(await bundleViewer(),h.storage);await reload.answer('one');assertPaper(reload,'primary','one');assert.equal(reload.getTop(),380);
 });
 
 test('real prepared reader keeps a single accessible score, independent anchors/zooms, and current selection across tabs, races, reload and HMR', async () => {

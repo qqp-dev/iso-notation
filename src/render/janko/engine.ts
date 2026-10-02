@@ -109,6 +109,7 @@ import {
   renderOttavaBrackets,
 } from './elements/ottava';
 import { renderJankoStyleDefs, f } from './elements/style';
+import {pageBodyBounds,RUNNING_HEAD_BASELINE} from './page-booking';
 import { buildInkScene, preliminaryStaffRules, sceneGridSvg, sceneHeadSvg, sceneLedgerSvg, sceneRestSvg, sceneBeamSvg, sceneSoloSvg, sceneChordBridgesSvg } from './ink-scene';
 import { dotFlagPolicyBox } from './solo-scene';
 import { claspShellBox } from './connective-scene';
@@ -206,6 +207,8 @@ import { placedBeamGroup, routeVoiceUnderpasses, beamPieceIntersectsBox, beamPie
 import { onsetSlotShift } from './onset-slots';
 import { soloRhythmPaint } from './solo-scene';
 import { sourcePhraseEndpointEnvelope,phraseMusicObstacles } from './expression-anchors';
+import {sourceOpticalPhraseDomain} from './optical-phrase-domain';
+import {placeRepeatSigns,repeatPhysicalBoxes,type RepeatSign,repeatBoundaryTicks,repeatReplacesBracket,repeatFirstAttackEnvelope,repeatLeadingAir} from './repeat-signs';
 import {fitCompleteSoloFlags,fitSharedBareTerminals} from './duration-fitting';
 import { placeEventHandMarks, eventHandMarksSvg, type EventHandMark } from './hand-marks';
 import { seatLocalFlags } from './local-flag-seats';
@@ -517,7 +520,7 @@ function svgOpen(box: SvgBox): string {
  * running header at `margin + 10` (`composer · title · subtitle`, 7.0pt serif
  * italic `#555555`) and reclaims the vertical space the title block used.
  */
-function renderPageHeader(geo: JankoPageGeometry, pageIndex: number, totalPages: number): string {
+function renderPageHeader(geo: JankoPageGeometry, pageIndex: number, totalPages: number, instruction?: QuantizedGridScore['performingInstruction'], notices?: string[]): string {
   const o = geo.options;
   void totalPages;
   const y = geo.marginTop;
@@ -528,13 +531,15 @@ function renderPageHeader(geo: JankoPageGeometry, pageIndex: number, totalPages:
       `    <text x="${f(cx)}" y="${f(y + 14)}" class="janko-title" text-anchor="middle">${o.title}</text>`,
       `    <text x="${f(cx)}" y="${f(y + 27)}" class="janko-subtitle" text-anchor="middle">${o.subtitle}</text>`,
       `    <text x="${f(geo.pageWidth - geo.marginRight)}" y="${f(y + 27)}" class="janko-meta" text-anchor="end">${o.composer}</text>`,
+      ...(instruction ? [`    <text class="janko-performing-instruction" x="${f(geo.marginLeft)}" y="${f(y + 42)}" font-family="Century Schoolbook,serif" font-size="8.5" font-style="italic" data-source-edition="${instruction.edition.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!))}">${instruction.text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!))}</text>`] : []),
+      ...(notices??[]).map((text,i)=>`    <text class="janko-source-notice" x="${f(geo.marginLeft)}" y="${f(y+53+i*8)}" font-family="serif" font-size="5.5">${text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!))}</text>`),
       '  </g>',
     ].join('\n');
   }
   const running = [o.composer, o.title, o.subtitle].filter((part) => part.length > 0).join(' · ');
   return [
     '  <g id="page-header">',
-    `    <text x="${f(geo.marginLeft)}" y="${f(y + 10)}" class="janko-running-head">${running}</text>`,
+    `    <text x="${f(geo.marginLeft)}" y="${f(y + RUNNING_HEAD_BASELINE)}" class="janko-running-head">${running}</text>`,
     '  </g>',
   ].join('\n');
 }
@@ -1314,7 +1319,7 @@ export function getMarginFurniture(
     y1: numeralBaseline,
   };
   let accolade: JankoBox | null = null;
-  if (paintsSystemStartInk(systemStartStyle)) {
+  if (paintsSystemStartInk(systemStartStyle)&&!geometry.repeatStartReplacesBracket) {
     const x = geometry.staffLeft - t.accoladeGap - t.accoladeWidth;
     const top = geometry.middleCY + continuousPitchY(60, t.semitoneScale);
     const bot = geometry.middleCY + continuousPitchY(36, t.semitoneScale);
@@ -1826,6 +1831,7 @@ export interface JankoSystemLayout {
   localFlagRefusals?: string[];
   rhythmicGestures?: Array<{ memberIds:string[]; values:Array<{id:string;tick:number;ticks:number}>; origin:'source'|'engine-inferred'; voice?:string }>;
   expressions?: ExpressionInk[];
+  repeatSigns?:RepeatSign[];
   /** Immutable input identity for the placed scene: the COMPLETE source/editorial
    * score, not just this system's visible note ids. No layout-cache inference. */
   scoreRevision?: QuantizedGridScore;
@@ -6814,6 +6820,7 @@ export function systemPaintedInkBoxes(
 ): JankoPaintedInkBox[] {
   const g = layout.geometry;
   const out: JankoPaintedInkBox[] = [];
+  for(const q of layout.repeatSigns??[])for(const b of repeatPhysicalBoxes(q))out.push({...b,what:`source repeat ${q.type} ${q.tick}`});
   let legacy = false;
   const push = (x0: number, x1: number, y0: number, y1: number, what: string): void => {
     out.push({
@@ -7094,25 +7101,25 @@ function placeProductionPages(
   score: QuantizedGridScore, geo: JankoPageGeometry, layouts: JankoSystemLayout[],
   o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens
 ): void {
-  const bodyTop = geo.marginTop + geo.headerHeight;
   const limit = Math.max(1, geo.systemsPerPage);
   for (let first = 0, pageIndex = 0; first < layouts.length; pageIndex++) {
+    const body=pageBodyBounds(geo,pageIndex);
     let last = first, occupied = 0;
     const bounds: ReturnType<typeof systemCompleteInkBounds>[] = [];
     while (last < layouts.length && last - first < limit) {
       const ink = systemCompleteInkBounds(layouts[last], o, t);
       const height = ink.bottom - ink.top;
       const need = occupied + height + (last > first ? CONTENT_AWARE_MIN_FACING_GAP : 0);
-      if (need > geo.bodyHeight + 1e-6) {
-        if (last === first) throw Error(`Unmet production height: system ${last + 1} (written bars ${(layouts[last].geometry.firstBar ?? last * geo.measuresPerSystem) + 1}–${geo.systemBarStarts?.[last + 1] ?? (last+1)*geo.measuresPerSystem}) needs ${height.toFixed(2)}pt; available ${geo.bodyHeight.toFixed(2)}pt`);
+      if (need > body.height + 1e-6) {
+        if (last === first) throw Error(`Unmet production height: system ${last + 1} (written bars ${(layouts[last].geometry.firstBar ?? last * geo.measuresPerSystem) + 1}–${geo.systemBarStarts?.[last + 1] ?? (last+1)*geo.measuresPerSystem}) needs ${height.toFixed(2)}pt; available ${body.height.toFixed(2)}pt`);
         break;
       }
       bounds.push(ink);
       occupied = need;
       last++;
     }
-    const unit = (geo.bodyHeight - occupied) / (bounds.length + 1);
-    let cursor = bodyTop + unit;
+    const unit = (body.height - occupied) / (bounds.length + 1);
+    let cursor = body.top + unit;
     for (let s = first; s < last; s++) {
       const ink = bounds[s - first];
       const height = ink.bottom - ink.top;
@@ -7204,9 +7211,11 @@ export function layoutJankoSystemShifted(
   o: ResolvedJankoLayoutOptions,
   t: ResolvedJankoTokens,
   shiftY: number,
-  field?:JankoVoiceFieldSpec
+  field?:JankoVoiceFieldSpec,
+  repeatFit?:{insets:readonly number[];attempt:number}
 ): JankoSystemLayout {
-  const geometryRaw = getSystemGeometry(geo, systemIndex, o);
+  const raw=getSystemGeometry(geo, systemIndex, o);
+  const geometryRaw={...raw,...(repeatFit?{measureLeftInsets:repeatFit.insets}:{}),...(repeatReplacesBracket(score,raw,systemIndex,o,t)?{repeatStartReplacesBracket:true as const}:{})};
   // The slot is fixed page furniture; the shift moves the music within it.
   // The fixed cores re-derive their staff extents from middleCY below, so
   // shifting the centre carries them; the equator closure is rebuilt on the
@@ -7664,6 +7673,9 @@ export function layoutJankoSystemShifted(
         if(members.length<2||merge.exact&&!members.some(n=>grouped.has(n.id)))continue;
         // Distinct independent carrier obligations leave the one compatible
         // head on parallel legal mask-edge seats, never coincident routes.
+        // Written obligation orders the shared attachment channels: longer
+        // values read first on the left regardless of importer voice order.
+        if(o.sharedDurationDot)members.sort((a,b)=>b.durationTicks-a.durationTicks||a.id.localeCompare(b.id));
         members.forEach((n,k)=>{n.stemOffsetX=(k-(members.length-1)/2)*2.6;});
       }
     }
@@ -7676,7 +7688,7 @@ export function layoutJankoSystemShifted(
       for(const merge of unisonMerges.filter(m=>!m.exact))for(const n of rhythmNotes.filter(n=>[merge.survivorId,...merge.mergedIds].includes(n.id)&&n.durationTicks>=48))n.stemLength=10;
       if(o.beamContour==='bent')beams=bendRhRibbons(beams,notes,o,t,id=>unisonMerges.find(m=>m.mergedIds.includes(id))?.survivorId??id);
     }
-    if(o.sharedHeadTerminal)fitSharedBareTerminals(ungrouped,beams,unisonMerges,o.sharedHeadTerminal,t);
+    if(o.sharedHeadTerminal)fitSharedBareTerminals(ungrouped,beams,unisonMerges,o.sharedHeadTerminal,t,o.sharedDurationDot);
     if(o.completeFlagClearance){
       const heads=notes.map(n=>{const {wx,hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return {id:n.note.id,ownerIds:[n.note.id,...unisonMerges.filter(m=>m.survivorId===n.note.id).flatMap(m=>m.mergedIds)],x0:n.x-wx,x1:n.x+wx,y0:n.y-hy,y1:n.y+hy};}).concat(restLayer.rests.map((r,i)=>({id:`rest-${i}`,ownerIds:[] as string[],...restAdmissionBox(r,t)})));
       completeFlagRefusals=fitCompleteSoloFlags(ungrouped,beams,heads,o,t);
@@ -10128,6 +10140,20 @@ export function layoutJankoSystemShifted(
     handprintClusters,
     handprintNoteIds,
   };
+  if(score.writtenPresentation)layout.repeatSigns=placeRepeatSigns(score,layout.geometry,layout.index,o,t);
+  if(o.repeatTreatment==='single-rule'&&layout.repeatSigns?.some(q=>q.type==='repeat-start')){
+    const insets=Array.from({length:geometry.measuresPerSystem},(_,i)=>geometry.measureLeftInsets?.[i]??t.measureInset);let changed=false;
+    for(const q of layout.repeatSigns.filter(q=>q.type==='repeat-start')){
+      const attack=repeatFirstAttackEnvelope(layout,q.tick,o,t);if(!attack)continue;
+      const extra=q.x1+repeatLeadingAir(t)-attack.x0;if(extra<=.001)continue;
+      const m=getMeasureIndexOfTick({startTick:q.tick} as QuantizedNote,geometry,systemIndex,t),first=q.tick,last=score.sourceBarTicks?.find(tick=>tick>first)??first+t.ticksPerMeasure;
+      const gain=1-(attack.tick-first)/(last-first),width=geometry.measureEdges?geometry.measureEdges[m+1]-geometry.measureEdges[m]:geometry.measureWidth;
+      if(gain<=0||insets[m]+extra/gain+t.measureInset+2*t.noteheadRadius>=width)throw Error('Repeat entrance cannot admit its complete first attack in the fixed system width');
+      insets[m]+=extra/gain+.001;changed=true;
+    }
+    if(changed){if((repeatFit?.attempt??0)>=3)throw Error('Repeat entrance did not converge inside its bounded horizontal admission');
+      return layoutJankoSystemShifted(score,geo,systemIndex,o,t,shiftY,field,{insets,attempt:(repeatFit?.attempt??0)+1});}
+  }
   if ((score.dynamics?.length ?? 0) || (score.pedals?.length ?? 0) || score.phrases?.length) {
     const booking = systemCompleteInkBounds(layout,o,t);
     const painted = systemPaintedInkBoxes(layout,o,t);
@@ -10148,14 +10174,23 @@ export function layoutJankoSystemShifted(
       const nearest=Math.min(...local.map(n=>Math.abs(n.note.startTick-tick)));
       return local.filter(n=>Math.abs(n.note.startTick-tick)===nearest);
     };
+    const phraseObstacles=o.phraseRouting?phraseMusicObstacles(layout,o,t):painted.filter(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what));
     layout.expressions = placeExpressions(score,{ ...(field?{include:field.includeExpression}:{}),start:startTick,end:endTick,left:geometry.staffLeft,right:geometry.staffRight,
       top:ink.top,bottom:ink.bottom,x:tickX,
       clarity:o.clarityPass, dynamicScale:t.dynamicScale,contourThickness:t.tieApexThickness,
+      dynamicFamily:o.dynamicFamily,
       phraseRouting:o.phraseRouting,
-      obstacles:[...(o.phraseRouting==='local'?phraseMusicObstacles(layout,o,t):painted.filter(b=>!/:pitch:|:beat-pulses:|:measure-barlines:/.test(b.what))),
+      phraseTaper:o.phraseTaper,
+      phrasePlacement:o.phrasePlacement,
+      hairpinStrokeWidth:o.hairpinStrokeWidth,
+      pedalStart:o.pedalStart,
+      pedalTextFamily:o.pedalTextFamily,
+      opticalDomain:id=>{const phrase=score.phrases?.find(q=>q.id===id);return phrase?sourceOpticalPhraseDomain(score,layout,phrase,o,t):undefined;},
+      balanceObstacles:phraseObstacles,
+      obstacles:[...phraseObstacles,
         ...flaggedNotes.map(n=>{const {wx,hy}=knockoutHalfExtents(o,t,n.note.startTick,n);return {x0:n.x-wx,x1:n.x+wx,y0:n.y-hy,y1:n.y+hy};})],
       endpointEnvelope: (ids,tick) => {
-        if(o.phraseRouting==='local'){
+        if(o.phraseRouting){
           const owned=sourcePhraseEndpointEnvelope(layout,ids,tick,o,t);
           if(owned)return owned;
         }
@@ -10217,6 +10252,21 @@ export type LayoutJankoScoreObserver = (
 ) => void;
 
 let layoutJankoScoreObserver: LayoutJankoScoreObserver | null = null;
+// Provenance binds settled geometry to exact model/profile values, not a
+// score id or array length. No score/page cache is kept: the caller owns the
+// array and its lifetime. Audits may still mutate that geometry deliberately.
+const settledLayoutInputs=new WeakMap<readonly JankoSystemLayout[],{score:QuantizedGridScore;model:string;options:string;tokens:string;systems:JankoSystemLayout[]}>();
+
+/** Safe reuse for consumers that would otherwise solve this complete score
+ * again. Source/profile mutation invalidates the binding even at the same
+ * object identity; linter mutations to the geometry remain auditable. */
+export function hasMatchingScoreLayouts(layouts:readonly JankoSystemLayout[]|null|undefined,
+  score:QuantizedGridScore,options?:Partial<JankoLayoutOptions>|null,tokens?:Partial<JankoTokens>|null):boolean {
+  if(!layouts)return false;
+  const input=settledLayoutInputs.get(layouts);
+  return !!input&&input.score===score&&layouts.length===input.systems.length&&layouts.every((l,i)=>l===input.systems[i]&&l.index===i)&&input.model===JSON.stringify(score)&&
+    input.options===JSON.stringify(resolveJankoOptions(options))&&input.tokens===JSON.stringify(resolveJankoTokens(tokens));
+}
 
 /** Install a layout observer to monitor layoutJankoScore calls (used by tests). */
 export function setLayoutJankoScoreObserver(
@@ -10268,6 +10318,7 @@ export function layoutJankoScore(
       out[index] = layoutJankoSystemShifted(score, geo, index, o, t, applied + dy);
     }
   }
+  settledLayoutInputs.set(out,{score,model:JSON.stringify(score),options:JSON.stringify(o),tokens:JSON.stringify(t),systems:out.slice()});
   return out;
 }
 
@@ -10537,7 +10588,7 @@ export function renderSystem(
   // The start bracket marks the core triple across every system. System 1
   // (page 1 opening) renders the bracket at slightly grander metrics.
   // Hand labels and time signature remain strictly at System 1.
-  const systemStart = renderAccolade(sysGeo, o, t, systemIndex);
+  const systemStart = sysGeo.repeatStartReplacesBracket?'':renderAccolade(sysGeo, o, t, systemIndex);
   if (systemStart.length > 0) out.push(systemStart);
   if (systemIndex === 0) {
     out.push(renderHandLabels(sysGeo, o, t));
@@ -10556,7 +10607,8 @@ export function renderSystem(
   // policy paints it first, as the transparent structural background it is.
   const gridInk = [
     inkScene ? sceneGridSvg(inkScene.beat, 'janko-beat-grid', false) : renderBeatGrid(sysGeo, systemIndex, o, t, resolved.columns),
-    inkScene ? sceneGridSvg(inkScene.barlines, 'janko-barlines', true) : renderBarlines(sysGeo, o, t, resolved.isFinalSystem),
+    inkScene ? sceneGridSvg(inkScene.barlines, 'janko-barlines', true) : renderBarlines(sysGeo, o, t, resolved.isFinalSystem,repeatBoundaryTicks(score)),
+    ...(resolved.repeatSigns??[]).map(q=>q.svg),
   ].join('\n');
   // The contour round: all three paradigms are pure functions of
   // (score, layout) — every layer is '' when its option is off, so the
@@ -10613,11 +10665,12 @@ export function renderSystemsBody(
 export function countJankoPages(
   score: QuantizedGridScore,
   options?: Partial<JankoLayoutOptions> | null,
-  tokens?: Partial<JankoTokens> | null
+  tokens?: Partial<JankoTokens> | null,
+  precomputedLayouts?:readonly JankoSystemLayout[]
 ): number {
   const o = resolveJankoOptions(options);
   if ((score.productionLayout && score.sourceBarTicks && isContentAwarePlacement(o)) || (score.dynamics?.length ?? 0) || (score.pedals?.length ?? 0) || score.phrases?.length) {
-    const layouts = layoutJankoScore(score, o, tokens);
+    const layouts = precomputedLayouts&&hasMatchingScoreLayouts(precomputedLayouts,score,o,tokens)?precomputedLayouts:layoutJankoScore(score, o, tokens);
     return (layouts.at(-1)?.geometry.pageIndex ?? 0) + 1;
   }
   if (score.sourceBarTicks) return Math.ceil(countJankoSystems(score,o,tokens) / Math.max(1,o.systemsPerPage));
@@ -10670,7 +10723,7 @@ export function renderJankoPage(
     svgOpen({ x: 0, y: 0, w: geo.pageWidth, h: geo.pageHeight }),
     renderJankoStyleDefs(t),
     '  <rect width="100%" height="100%" fill="#FFFFFF"/>',
-    renderPageHeader(geo, pageIndex, totalPages),
+    renderPageHeader(geo, pageIndex, totalPages, score.performingInstruction, score.publicationNotices),
     ...body,
     renderPageFooter(geo, pageIndex, totalPages),
     '</svg>',

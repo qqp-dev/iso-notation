@@ -1,7 +1,8 @@
-import { expressionsOverlap, expressionIntersectsBox, pedalIntervals } from './elements/expressions';
+import { expressionsOverlap, expressionIntersectsBox, expressionStrokeBounds, pedalIntervals, type ExpressionInk } from './elements/expressions';
 import { taperedSpanPath } from './ties';
 import { systemTickRange, systemPaintedInkBoxes } from './engine';
 import { PreparedJankoWindows } from './prepared-windows';
+import {pageBodyBounds,runningHeaderBand,RUNNING_HEAD_AIR} from './page-booking';
 /**
  * Jánko Implementer Visual Linter
  * ===============================
@@ -85,10 +86,12 @@ import {
   drawnStaffRuleBands,
   drawnStaffRuleYs,
   getMarginFurniture,
+  getTickColumnX,
   holdClearanceInk,
   isContentAwarePlacement,
   knockoutHalfExtents,
   layoutJankoScore,
+  hasMatchingScoreLayouts,
   nearestLatticeRow,
   paintedFacingGap,
   renderSystem,
@@ -133,7 +136,7 @@ import {
   resolveClaspInk,
   subdivisionMarkCount,
 } from './elements/rhythm';
-import { durationDotCount, durationRingCount } from './elements/duration';
+import { durationDotCount, durationRingCount, analyzeNotatedDuration } from './elements/duration';
 import {
   JANKO_DIGIT_BASELINE_OFFSET,
   JANKO_HALO_STROKE_WIDTH,
@@ -183,6 +186,11 @@ import { JankoTieBox, tieArcEntersBoxes } from './ties';
 import { buildInkScene, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox, projectedSoloFlagEnvelope } from './solo-scene';
 import {sourcePhraseEndpointEnvelope,phraseMusicObstacles} from './expression-anchors';
+import {sourceOpticalPhraseDomain} from './optical-phrase-domain';
+import {balancedBowIsCoherent} from './balanced-phrases';
+import {pedalStartInk,type PedalStartStyle} from './elements/pedal-starts';
+import {dynamicFamilyInk,type DynamicFamily} from './elements/dynamic-families';
+import {placeRepeatSigns,repeatIntersectsBox,repeatBoundaryTicks,repeatReplacesBracket,repeatFirstAttackEnvelope,repeatLeadingAir} from './repeat-signs';
 import { beamPieceAt, beamPieceIntersectsBox, beamStemBoxes, placedBeamGroup } from './beam-scene';
 import { depthRibbon, depthProfileMetrics } from './depth-profile';
 import { GRACE_HOST_GAP, GRACE_STEM, graceVerticalInkBounds } from './grace';
@@ -252,6 +260,7 @@ export type JankoLintCode =
   | 'grid-crossing-offset'
   | 'time-inversion'
   | 'system-slot-overlap'
+  | 'page-header-overlap'
   | 'corridor-intrusion'
   | 'duration-mark-orphan'
   | 'duration-mark-suppressed-owner'
@@ -303,7 +312,8 @@ export type JankoLintCode =
   | 'tie-gap-unpublished'
   | 'tie-rule-fusion'
   | 'expression-missing' | 'expression-geometry' | 'expression-clearance' | 'expression-endpoint' | 'expression-paint'
-  | 'expression-source-side' | 'expression-path-ownership' | 'expression-local-attachment' | 'solo-flag-rail-clearance' | 'shared-head-terminal-clearance'
+  | 'expression-stroke-geometry' | 'pedal-start-geometry' | 'repeat-geometry' | 'repeat-clearance'
+  | 'expression-source-side' | 'expression-path-ownership' | 'expression-local-attachment' | 'solo-flag-rail-clearance' | 'shared-head-terminal-clearance' | 'shared-duration-dot-ownership'
   | 'grace-missing' | 'grace-value' | 'grace-host' | 'grace-geometry' | 'grace-paint';
 
 /** One diagnostic, located on the page and in musical time. */
@@ -2233,7 +2243,7 @@ export function checkContentAwarePageFit(
   }
   for (const [pageIndex, systems] of byPage) {
     const ordered = [...systems].sort((a, b) => a.index - b.index);
-    const contentTop = page.inkAwarePagination ? page.marginTop + page.headerHeight :
+    const contentTop = page.inkAwarePagination ? pageBodyBounds(page,pageIndex).top :
       Math.min(...ordered.map((l) => l.geometry.slotTopY));
     const bodyBottom = page.pageHeight - page.marginBottom - page.footerHeight;
     // Named page-slot booking constraint, NOT a claim of global physical ink.
@@ -2244,6 +2254,12 @@ export function checkContentAwarePageFit(
     }));
     const first = extents[0];
     const last = extents[extents.length - 1];
+    if(pageIndex>0&&o.runningHeaderHeight!==undefined){
+      const band=runningHeaderBand(page);
+      if(first.top<band.bottom+RUNNING_HEAD_AIR-EPS)out.push({code:'page-header-overlap',severity:'error',system:ordered[0].index,y:first.top,
+        message:`Page ${pageIndex+1}'s complete music reaches the running-header band without ${RUNNING_HEAD_AIR}pt air.`,
+        metrics:{inkTop:first.top,headerBottom:band.bottom,required:RUNNING_HEAD_AIR}});
+    }
     if (first.top < contentTop - EPS) {
       out.push({
         code: 'system-slot-overlap',
@@ -3072,6 +3088,11 @@ export function systemBarlines(
       if (isSystemEnd && !layout.isFinalSystem) continue;
       push(g.staffLeft + (m + 1) * g.measureWidth, isSystemEnd);
     }
+  }
+  if(layout.scoreRevision?.writtenPresentation){
+    const ticks=repeatBoundaryTicks(layout.scoreRevision),edges=g.measureEdges??[];
+    const replaced=edges.filter((_x,i)=>ticks.has(layout.scoreRevision!.sourceBarTicks![(g.firstBar??layout.index*g.measuresPerSystem)+i]));
+    return [...barlines.filter(b=>!replaced.some(x=>Math.abs(x-b.x)<.001)),...(layout.repeatSigns??[]).flatMap(q=>q.strokes.map(s=>({x:s.x,top:s.y0,bottom:s.y1})))];
   }
   return barlines;
 }
@@ -6275,13 +6296,25 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
     const owned=ink.filter(i=>i.kind==='phrase'&&i.id===phrase.id),q=owned[0];
     if(!q)problem('expression-missing',phrase.id,'source phrase has no ink');
     else {
-      if(o.phraseRouting==='local'){
+      if(!!o.phraseRouting){
         if(q.routingIssue)problem('expression-local-attachment',phrase.id,q.routingIssue);
         for(const [ids,tick,y,continuation] of [[phrase.fromNoteIds,phrase.startTick,q.contour?.yStart,q.continuationStart],[phrase.toNoteIds,phrase.endTick,q.contour?.yEnd,q.continuationEnd]] as const){
           if(continuation||y===undefined)continue;
           const e=sourcePhraseEndpointEnvelope(layout,ids,tick,o,t);
-          if(e&&(y<e.top-8.05||y>e.bottom+8.05))problem('expression-local-attachment',phrase.id,'curve tip has escaped its owning head/duration envelope');
+          if(o.phraseRouting!=='optical-gesture'&&o.phraseRouting!=='optical-fitted'&&o.phraseRouting!=='optical-breathing'&&o.phraseRouting!=='optical-silhouette'&&e&&(y<e.top-8.05||y>e.bottom+8.05))problem('expression-local-attachment',phrase.id,'curve tip has escaped its owning head/duration envelope');
         }
+      }
+      if(o.phraseRouting==='optical-gesture'||o.phraseRouting==='optical-fitted'||o.phraseRouting==='optical-breathing'||o.phraseRouting==='optical-silhouette'){
+        const d=sourceOpticalPhraseDomain(score,layout,phrase,o,t),c=q.contour;
+        if(!d||!c||!balancedBowIsCoherent(c))problem('expression-local-attachment',phrase.id,'optical bow lacks owned source seats or a coherent single bend');
+        if(d&&c)for(const [e,x,y] of [[d.start,c.xStart,c.yStart],[d.end,c.xEnd,c.yEnd]] as const)
+          if(x<e.x0-.01||x>e.x1+.01||y<e.y0-.01||y>e.y1+.01)problem('expression-local-attachment',phrase.id,'optical tip escaped its source onset neighborhood');
+        if(c&&(c.depth<.12*((c.xEnd-c.xStart)**2+(c.yEnd-c.yStart)**2)/(c.xEnd-c.xStart)-.01||c.thickness!==.85||c.tipThickness!==.22))
+          problem('expression-geometry',phrase.id,'optical bow flattened or changed its admitted ribbon profile');
+        const path=q.svg.match(/<path\b[^>]*class="janko-phrase"[^>]*\bd="([^"]+)"/);
+        if(c&&path?.[1]!==taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent,c))problem('expression-path-ownership',phrase.id,'optical paint differs from admitted contour');
+        const knockout=q.svg.match(/<path\b[^>]*class="janko-phrase-grid-knockout"[^>]*\bd="([^"]+)"/);
+        if(c&&knockout?.[1]!==taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent,c))problem('expression-path-ownership',phrase.id,'grid knockout differs from optical ribbon');
       }
       if(q.startTick!==phrase.startTick||q.endTick!==phrase.endTick||
         q.continuationStart!==(phrase.startTick<start)||q.continuationEnd!==(phrase.endTick>=end)||
@@ -6319,10 +6352,22 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
     if(!q)problem('expression-missing',`pedal-${i}`,'held interval omitted');
     else if(q.startTick!==span.start||q.endTick!==span.end||q.continuationStart!==(span.start<start)||q.continuationEnd!==(span.end>end||!span.release))
       problem('expression-endpoint',q.id,'pedal clock or true continuation differs');
+    if(q&&o.pedalStart){
+      const x=(tick:number)=>tick<=start?layout.geometry.staffLeft:tick>=end?layout.geometry.staffRight:layout.columns.get(tick)??getTickColumnX(tick,layout.geometry,layout.index,o,t);
+      if(!q.continuationStart&&(!q.pedalStartInk||Math.abs(q.pedalStartInk.x-x(span.start))>.001))problem('pedal-start-geometry',q.id,'press glyph moved away from its exact source clock');
+      const last=q.strokeSegments?.at(-1),y=q.strokeSegments?.[0]?.y0;
+      if(!last||Math.abs(last.x1-x(span.end))>.001||(!q.continuationEnd&&(last.x0!==last.x1||Math.abs(last.y1-(y!-4))>.001)))problem('pedal-start-geometry',q.id,'release or continuation line moved from its exact source clock');
+    }
   }
   if (!ink.length) return;
-  const music=o.phraseRouting==='local'?phraseMusicObstacles(layout,o,t):systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('expression '));
+  const music=!!o.phraseRouting?phraseMusicObstacles(layout,o,t):systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('expression '));
   for(const q of ink) {
+    if(q.kind==='hairpin'&&o.hairpinStrokeWidth!==undefined)checkHairpinStrokePaint(q,o.hairpinStrokeWidth,layout.index,out);
+    if(q.kind==='pedal'&&o.pedalStart)checkPedalStartPaint(q,o.pedalStart,layout.index,out,o.pedalTextFamily);
+    if(q.kind==='dynamic'&&o.dynamicFamily&&!score.dynamics?.[Number(q.id.replace('dynamic-',''))]?.text){
+      const e=score.dynamics?.[Number(q.id.replace('dynamic-',''))];
+      if(e&&e.kind!=='text-cresc')checkDynamicFamilyPaint(q,o.dynamicFamily,e.mark,t.dynamicScale??.016,layout.index,out);
+    }
     const cls=q.kind==='dynamic'?/janko-(?:dynamic|expression-text)/:new RegExp(`janko-${q.kind}`);
     if(!q.svg||!cls.test(q.svg))problem('expression-paint',q.id,'stored ink has no matching glyph/curve/bracket');
     const protectedBox=(b:{x0:number;x1:number;y0:number;y1:number})=>q.gridKnockout
@@ -6341,13 +6386,30 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
   }
 }
 
+/** Explicit hairpin trials retain exact rounded line endpoints and width in
+ * paint, physical queries and conservative admission. Pedals are independent. */
+export function checkHairpinStrokePaint(q:ExpressionInk,width:number,system:number,out:LintViolation[]):void{
+ const paths=[...q.svg.matchAll(/<path\b[^>]*class="janko-hairpin"[^>]*>/g)].map(m=>m[0]),s=q.strokeSegments;
+ const fail=()=>out.push({code:'expression-stroke-geometry',severity:'error',system,message:`Expression ${q.id}: hairpin paint, query width/endpoints or admitted bounds disagree.`});
+ if(paths.length!==1||Number(paths[0].match(/\bstroke-width="([^"]+)"/)?.[1])!==width||!s||s.length!==2){fail();return;}
+ const values=paths[0].match(/\bd="([^"]+)"/)?.[1].match(/-?\d+(?:\.\d+)?/g)?.map(Number);
+ if(!values||values.length!==8){fail();return;}
+ for(const [i,line] of s.entries()){
+  const actual=[line.x0,line.y0,line.x1,line.y1];
+  if(!actual.every((n,j)=>Number.isFinite(n)&&Math.abs(n-values[i*4+j])<1e-6)||line.width!==width||Math.hypot(line.x1-line.x0,line.y1-line.y0)<=0){fail();return;}
+  const b=expressionStrokeBounds(line);
+  if(q.x0>b.x0+.001||q.x1<b.x1-.001||q.y0>b.y0+.001||q.y1<b.y1-.001){fail();return;}
+ }
+}
+
 export function lintJankoScore(
   score: QuantizedGridScore,
   options?: Partial<JankoLayoutOptions> | null,
   tokens?: Partial<JankoTokens> | null,
-  lint?: Partial<JankoLintOptions> | null
+  lint?: Partial<JankoLintOptions> | null,
+  precomputedLayouts?:readonly JankoSystemLayout[]
 ): LintReport {
-  return lintLayouts(score, resolveJankoOptions(options), resolveJankoTokens(tokens), lint);
+  return lintLayouts(score, resolveJankoOptions(options), resolveJankoTokens(tokens), lint,undefined,precomputedLayouts);
 }
 
 export function checkSharedCarrierPaint(layout:JankoSystemLayout,scene:InkScene,t:ResolvedJankoTokens,out:LintViolation[]):void {
@@ -6455,7 +6517,7 @@ export function checkSharedHeadTerminals(layout:JankoSystemLayout,o:ResolvedJank
  if(!o.sharedHeadTerminal)return;
  for(const merge of layout.unisonMerges.filter(m=>!m.exact)){
   const owners=new Set([merge.survivorId,...merge.mergedIds]);
-  for(const note of layout.ungrouped.filter(n=>owners.has(n.id)&&n.durationTicks===t.ticksPerBeat)){
+  for(const note of layout.ungrouped.filter(n=>owners.has(n.id)&&(n.durationTicks===t.ticksPerBeat||o.sharedDurationDot&&analyzeNotatedDuration(n.durationTicks).base===t.ticksPerBeat))){
    const direction=note.layoutDirection??(note.hand==='LH'?1:-1),beams=layout.beams.filter(b=>b.direction===direction&&b.notes.some(n=>owners.has(n.id)));
    if(!beams.length)continue;
    const piece=scene.solos.get(note.id)?.find(p=>p.shape.kind==='stem');
@@ -6465,6 +6527,30 @@ export function checkSharedHeadTerminals(layout:JankoSystemLayout,o:ResolvedJank
    const separation=(o.sharedHeadTerminal==='short'?-1:1)*direction*(stem.y2-reference);
    if(separation<t.beamThickness+t.flagSpacing-.05||Math.abs(stem.y2-stem.y1)<Math.max(t.minStemClearance,t.flagSpacing)-.05)
     out.push({code:'shared-head-terminal-clearance',severity:'error',system:layout.index,noteIds:[note.id,...owners],message:'Requested shorter/longer bare shared-head branch lacks a distinct terminal or enough visible stem.'});
+   if(o.sharedDurationDot && analyzeNotatedDuration(note.durationTicks).dots){
+    const dots=scene.solos.get(note.id)?.filter(p=>p.shape.kind==='dot')??[];
+    const valid=dots.length===1&&dots.every(p=>{
+     if(p.shape.kind!=='dot'||p.ownerIds.length!==1||p.ownerIds[0]!==note.id)return false;
+     if(o.sharedDurationDot==='head-adjacent'){
+      const head=layout.notes.find(n=>n.note.id===merge.survivorId);
+      if(!head||note.dotY===undefined)return false;
+      const mask=knockoutHalfExtents(o,t,head.note.startTick,head),expectedX=note.dotX??head.x+mask.wx+t.augmentationDotGap;
+      return Math.abs(p.shape.cx-expectedX)<=.02&&Math.abs(p.shape.cy-note.dotY)<=.02&&
+       p.shape.cx>head.x+mask.wx&&p.shape.cx<=head.x+mask.wx+t.augmentationDotGap+2*p.shape.r+.02&&
+       Math.abs(p.shape.cy-head.y)<=Math.max(t.rowHeight/2,t.augmentationDotRowOffset)+2*p.shape.r+.02;
+     }
+     const d=p.shape,ownAir=d.cx-d.r-stem.x-stem.width/2;
+     const carrierAir=direction*(d.cy-reference)-t.beamThickness/2-d.r;
+     const nearest=Math.hypot(d.cx-stem.x,Math.max(0,Math.min(stem.y1,stem.y2)-d.cy,d.cy-Math.max(stem.y1,stem.y2)));
+     const companion=Math.min(...beams.flatMap(b=>b.notes.flatMap((n,i)=>{
+      if(!owners.has(n.id)||n.id===note.id)return [];
+      const s=b.stems[i],tip=b.beamY(s.stemX);
+      return [Math.hypot(d.cx-s.stemX,Math.max(0,Math.min(s.stemStartY,tip)-d.cy,d.cy-Math.max(s.stemStartY,tip)))];
+     })));
+     return Math.abs(ownAir-t.augmentationDotGap)<=.02&&carrierAir>=t.augmentationDotGap-.02&&nearest<companion&&direction*(stem.y2-d.cy)>=-.02;
+    });
+    if(!valid)out.push({code:'shared-duration-dot-ownership',severity:'error',system:layout.index,noteIds:[note.id],message:o.sharedDurationDot==='head-adjacent'?'Shared dotted value lacks one correctly placed head-adjacent dot for its written owner; independent branches remain required.':'Shared dotted value lacks one own dot beside the exposed long branch with air from the short carrier.'});
+   }
   }
  }
 }
@@ -6481,7 +6567,7 @@ export function lintJankoWindowSystems(prepared:PreparedJankoWindows,lint?:Parti
   return lintLayouts(prepared.score,prepared.options,prepared.tokens,lint,prepared);
 }
 function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions,tokens:ResolvedJankoTokens,
-  lint?:Partial<JankoLintOptions>|null,prepared?:PreparedJankoWindows):LintReport {
+  lint?:Partial<JankoLintOptions>|null,prepared?:PreparedJankoWindows,precomputedLayouts?:readonly JankoSystemLayout[]):LintReport {
   const startedAt = Date.now();
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
@@ -6490,7 +6576,8 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
     ...(lint ?? {}),
   };
 
-  const layouts = prepared ? prepared.auditLayouts().sort((a,b)=>a.index-b.index) : layoutJankoScore(score, o, t);
+  const layouts = prepared ? prepared.auditLayouts().sort((a,b)=>a.index-b.index) :
+    precomputedLayouts&&hasMatchingScoreLayouts(precomputedLayouts,score,o,t)?precomputedLayouts:layoutJankoScore(score, o, t);
   const byIndex=new Map(layouts.map(l=>[l.index,l]));
   const page = prepared?.geometry ?? computePageGeometry(o, t, score);
   const diagnostics: LintViolation[] = [];
@@ -6511,6 +6598,7 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
     if(o.sharedHeadTerminal&&placedScene)checkSharedHeadTerminals(layout,o,t,diagnostics,placedScene);
     checkGraceIntegrity(score, layout, o, t, diagnostics);
     checkExpressionIntegrity(score,layout,o,t,diagnostics);
+    checkRepeatIntegrity(score,layout,o,t,diagnostics);
     checkVoiceBeamCorridors(layout,t,diagnostics,o,placedScene);
     if(o.jointVoices)checkJointRouteSeparation(layout,placedScene ?? buildInkScene(layout,o,t,score),o,t,diagnostics);
     checkNoteheadClearance(layout, o, t, thresholds, diagnostics);
@@ -6704,4 +6792,64 @@ export function formatLintReport(report: LintReport): string {
     lines.push(`  ${mark} [${v.code}] ${where}: ${v.message}`);
   }
   return lines.join('\n');
+}
+
+/** Opted-in pedal admission verifies the exact licensed outline, its physical
+ * query data and the middle-height hold line. Continuations invent no press. */
+export function checkPedalStartPaint(q:ExpressionInk,style:PedalStartStyle,system:number,out:LintViolation[],family?:import('./elements/paired-typography-paths').PedalTextFamily):void{
+ const fail=(reason:string)=>out.push({code:'pedal-start-geometry',severity:'error',system,message:`Expression ${q.id}: ${reason}`});
+ const paths=[...q.svg.matchAll(/<path\b[^>]*class="janko-pedal-start"[^>]*>/g)].map(m=>m[0]);
+ const s=q.pedalStartInk;
+ if(q.continuationStart){if(s||paths.length)fail('continuation invented a new pedal press');}
+ else if(!s||paths.length!==1)fail('source press has no unique start glyph');
+ else {
+  const expected=pedalStartInk(style,q.startTick,q.id,s.x,s.y,7.2,family);
+  if(s.family!==family)fail('press text differs from its paired typography family');
+  if(s.style!==style||s.tick!==q.startTick||s.intervalId!==q.id||s.svg!==expected.svg||paths[0]!==expected.svg||JSON.stringify(s.polygons)!==JSON.stringify(expected.polygons))fail('paint or physical query differs from the faithful source press glyph');
+  if(['x0','x1','y0','y1','height','holdX'].some(key=>s[key as keyof typeof s]!==expected[key as keyof typeof expected]))fail('start query frame differs from its actual painted ink');
+  if([['x0',q.x0,expected.x0],['y0',q.y0,expected.y0]].some(([,bound,actual])=>Number(bound)>Number(actual)+.001)||q.x1<expected.x1-.001||q.y1<expected.y1-.001)fail('start glyph escapes admitted bounds');
+  const first=q.strokeSegments?.[0];
+  if(!first||Math.abs(first.x0-(expected.holdX??expected.x1+.8))>.001||Math.abs(first.y0-s.y)>.001||first.y1!==first.y0)fail('hold line does not follow its exact start attachment');
+ }
+ const line=q.svg.match(/<path\b[^>]*class="janko-pedal"[^>]*>/)?.[0];
+ const tokens=line?.match(/\bd="([^"]+)"/)?.[1].match(/[MHVL]|-?\d+(?:\.\d+)?/g),painted:NonNullable<ExpressionInk['strokeSegments']>=[];
+ if(tokens){let x=0,y=0,i=0;while(i<tokens.length){const command=tokens[i++];let px=x,py=y;
+  if(command==='M'||command==='L'){px=Number(tokens[i++]);py=Number(tokens[i++]);}else if(command==='H')px=Number(tokens[i++]);else if(command==='V')py=Number(tokens[i++]);else {fail('unexpected hold/release path command');break;}
+  if(command!=='M')painted.push({x0:x,y0:y,x1:px,y1:py,width:.65});x=px;y=py;
+ }}
+ if(JSON.stringify(painted)!==JSON.stringify(q.strokeSegments))fail('painted hold/release endpoints differ from physical query data');
+ if(!line||Number(line.match(/stroke-width="([^"]+)"/)?.[1])!==.65||!q.strokeSegments?.length||q.strokeSegments.some(s=>s.width!==.65))fail('hold/release weight or physical stroke data differs');
+ if(q.strokeSegments?.some(s=>{const b=expressionStrokeBounds(s);return b.x0<q.x0-.001||b.x1>q.x1+.001||b.y0<q.y0-.001||b.y1>q.y1+.001;}))fail('hold/release ink escapes admitted bounds');
+}
+
+/** Opt-in font families retain their intact outlined glyph and measured frame;
+ * source identity and the existing conservative query padding remain separate. */
+export function checkDynamicFamilyPaint(q:ExpressionInk,family:DynamicFamily,mark:string,scale:number,system:number,out:LintViolation[]):void{
+ const fail=()=>out.push({code:'expression-paint',severity:'error',system,message:`Expression ${q.id}: dynamic family paint or measured query ink differs.`});
+ const s=q.dynamicFamilyInk;if(!s){fail();return;}
+ const expected=dynamicFamilyInk(family,mark,s.tx,s.ty,scale);
+ if(s.family!==family||s.mark!==mark||JSON.stringify(s)!==JSON.stringify(expected))fail();
+ const path=q.svg.match(/<path\b[^>]*>/)?.[0],d=path?.match(/\bd="([^"]+)"/)?.[1],transform=path?.match(/\btransform="([^"]+)"/)?.[1];
+ if(!q.svg.includes(`data-dynamic-family="${family}"`)||d!==expected.path||transform!==`translate(${s.tx.toFixed(3)} ${s.ty.toFixed(3)}) scale(${scale} ${-scale})`)fail();
+ if(q.x0>expected.x0+.001||q.x1<expected.x1-.001||q.y0>expected.y0+.001||q.y1<expected.y1-.001)fail();
+}
+
+export function checkRepeatIntegrity(score:QuantizedGridScore,layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[]):void{
+ if(!score.writtenPresentation)return;
+ const expected=placeRepeatSigns(score,layout.geometry,layout.index,o,t),actual=layout.repeatSigns??[];
+ const problem=(code:'repeat-geometry'|'repeat-clearance',message:string)=>out.push({code,severity:'error',system:layout.index,message});
+ if(!!layout.geometry.repeatStartReplacesBracket!==repeatReplacesBracket(score,layout.geometry,layout.index,o,t))problem('repeat-geometry','System-start repeat and actual bracket furniture disagree.');
+ if(JSON.stringify(actual)!==JSON.stringify(expected))problem('repeat-geometry','Written repeat paint, dots, source boundary or admitted geometry differs.');
+ const scene=buildInkScene(layout,o,t,score),replaced=repeatBoundaryTicks(score);
+ if(scene.barlines.some(p=>p.tick!==undefined&&replaced.has(p.tick)))problem('repeat-geometry','Repeat boundary also paints conflicting ordinary/final closure.');
+ const music=systemPaintedInkBoxes(layout,o,t).filter(b=>!b.what.startsWith('source repeat ')&&!/pitch:|beat-pulses:|measure-barlines:/.test(b.what));
+ for(const q of actual){
+  if(o.repeatTreatment==='single-rule'&&q.type==='repeat-start'){
+   const attack=repeatFirstAttackEnvelope(layout,q.tick,o,t);
+   if(attack&&attack.x0-q.x1<repeatLeadingAir(t)-.01)problem('repeat-clearance','Repeat entrance lacks admitted leading room from its complete first attack.');
+  }
+  if(q.x0<0||q.x1>o.pageWidth||q.y0<0||q.y1>o.pageHeight)problem('repeat-geometry','Written repeat ink escaped its page.');
+  for(const n of layout.notes){const m=knockoutHalfExtents(o,t,n.note.startTick,n);if(repeatIntersectsBox(q,{x0:n.x-m.wx,x1:n.x+m.wx,y0:n.y-m.hy,y1:n.y+m.hy}))problem('repeat-clearance',`Repeat ${q.type} obscures source attack ${n.note.id}.`);}
+  for(const b of music)if(repeatIntersectsBox(q,b))problem('repeat-clearance',`Repeat ${q.type} overlaps ${b.what}.`);
+ }
 }

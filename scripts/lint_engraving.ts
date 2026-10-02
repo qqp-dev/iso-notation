@@ -30,6 +30,7 @@ import {
 } from '../src/scores/duration-specimen';
 import { formatLintReport, lintJankoScore } from '../src/render/janko/linter';
 import { DEFAULT_JANKO_OPTIONS, DEFAULT_JANKO_TOKENS } from '../src/render/janko/types';
+import {no14GoldProfile} from '../src/render/janko/no14-gold';
 
 const args = new Set(process.argv.slice(2));
 const asJson = args.has('--json');
@@ -41,6 +42,8 @@ const bachReport = lintJankoScore(bach.score, bach.options, bach.tokens);
 
 const brahms = resolveActiveScore('brahms-op118-no1');
 const brahmsReport = lintJankoScore(brahms.score, brahms.options, brahms.tokens);
+const no14=no14GoldProfile();
+const no14Report=lintJankoScore(no14.score,no14.options,no14.tokens);
 
 // Round 20: the two curated specimens are part of the golden gate — the rest
 // specimen states every rest value (the whole bar included) and the chord
@@ -68,6 +71,7 @@ const durationSpecimenReport = lintJankoScore(
 const allReports = [
   { score: 'Bach Goldberg Var 1', report: bachReport },
   { score: 'Brahms Op. 118 No. 1', report: brahmsReport },
+  { score: 'Schumann Op. 68 No. 14 GOLD', report: no14Report },
   { score: 'Chord Duration Specimen', report: chordSpecimenReport },
   { score: 'Rest Duration Specimen', report: restSpecimenReport },
   { score: 'Duration Working-Set Specimen', report: durationSpecimenReport },
@@ -82,6 +86,7 @@ if (asJson) {
       {
         bach: bachReport,
         brahms: brahmsReport,
+        no14: no14Report,
         chordSpecimen: chordSpecimenReport,
         restSpecimen: restSpecimenReport,
         durationSpecimen: durationSpecimenReport,

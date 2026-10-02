@@ -1228,11 +1228,29 @@ export interface JankoLayoutOptions {
   /** Candidate-only joint pre-ink courses for overlapping rhythmic voices. */
   jointVoices?: true;
   /** Coupled source-local phrasing, explicit while its presentation is reviewed. */
-  phraseRouting?: 'local';
+  phraseRouting?: 'local' | 'balanced' | 'optical-gesture' | 'optical-fitted' | 'optical-breathing' | 'optical-silhouette';
+  /** Opt-in intact lighter dynamic alphabet; historical glyphs stay default. */
+  dynamicFamily?:import('./elements/dynamic-families').DynamicFamily;
+  /** Trial body/end balance; omitted retains historical taper. */
+  phraseTaper?: 'gentle' | 'pointed';
+  /** Trial: retain a whole gesture's preferred side instead of buying a cheaper opposite corridor. */
+  phrasePlacement?: 'preferred-side' | 'gesture-contour' | 'above-diagnostic';
   /** Complete standalone glyph fit before dependent expression placement. */
   completeFlagClearance?: true;
   /** Unequal shared-head bare branch relative to its grouped companion. */
   sharedHeadTerminal?: 'short' | 'long';
+  /** Explicit shared dotted-quarter terminal fitting, with an independent
+   * choice of head-adjacent or exposed-stem augmentation placement. */
+  sharedDurationDot?: 'exposed-stem' | 'head-adjacent';
+  /** Explicit expression-ink trial; omitted retains historical0.65pt hairpins.
+   * Pedal stroke is independent and remains unchanged. */
+  hairpinStrokeWidth?: number;
+  /** Opt-in faithful SMuFL press glyph; omitted keeps the hooked control. */
+  pedalStart?:import('./elements/pedal-starts').PedalStartStyle;
+  /** A complete paired typography choice; ordinary press text only. */
+  pedalTextFamily?:import('./elements/paired-typography-paths').PedalTextFamily;
+  /** Trial source-repeat boundary vocabulary; omitted retains double rules. */
+  repeatTreatment?: 'single-rule';
   /** Compatible shared heads keep distinct grouped/solo attachment channels. */
   independentUnisonAttachments?: true;
   /** One untied physical attack head; unequal values retain independent branches. */
@@ -1345,6 +1363,8 @@ export interface JankoLayoutOptions {
   pageMarginBottom?: number | null;
   /** Header reservation in pt. */
   headerHeight?: number;
+  /** Explicit compact running-page reservation; omitted preserves historical booking. */
+  runningHeaderHeight?: number;
   /** Footer reservation in pt. */
   footerHeight?: number;
   /** Draw measure numbers above the first measure of every system. */
@@ -1835,7 +1855,7 @@ export type JankoClusterPresentation = 'literal' | 'mirrored-handprint' | 'index
 export type JankoVerticalPlacement = 'slot' | 'content-aware';
 
 /** Fully resolved layout options (every optional option filled in). */
-export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
+export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'runningHeaderHeight' | 'pedalTextFamily' | 'dynamicFamily' | 'repeatTreatment' | 'pedalStart' | 'hairpinStrokeWidth' | 'phrasePlacement' | 'phraseTaper' | 'sharedDurationDot' | 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'runningHeaderHeight' | 'pedalTextFamily' | 'dynamicFamily' | 'repeatTreatment' | 'pedalStart' | 'hairpinStrokeWidth' | 'phrasePlacement' | 'phraseTaper' | 'sharedDurationDot' | 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
 
 /** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
@@ -1988,6 +2008,8 @@ export const JANKO_RHYTHM_STYLE_LABELS: Record<JankoRhythmStyle, string> = {
  * (y grows downward, matching SVG).
  */
 export interface JankoSystemGeometry {
+  /** The source repeat supplies this entrance's vertical gesture. */
+  repeatStartReplacesBracket?: true;
   /** Opt-in unfolded literal bar boundaries, final end included. */
   inkAwarePagination?: boolean;
   timeSignatures?: readonly { tick: number; numerator: number; denominator: number }[];
