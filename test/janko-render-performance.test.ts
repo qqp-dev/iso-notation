@@ -48,6 +48,32 @@ test('prepared ribbon queries exactly preserve independent reference truth at bo
  }
 });
 
+test('ribbon clipping retains containment, touching, positive-area threshold and non-monotone degeneracies',()=>{
+ const rectangle:NonNullable<ExpressionInk['contour']>={xStart:0,xEnd:128,yStart:0,yEnd:0,side:1,depth:0,thickness:.4,tipThickness:.4,indent:128/3};
+ const ink=(c:NonNullable<ExpressionInk['contour']>):ExpressionInk=>({kind:'phrase',id:'boundary',x0:-Infinity,x1:Infinity,y0:-Infinity,y1:Infinity,startTick:0,endTick:1,continuationStart:false,continuationEnd:false,svg:'',contour:c});
+ const cases:[{x0:number;x1:number;y0:number;y1:number},boolean][]=[
+  [{x0:-1,x1:129,y0:-1,y1:1},true], // Box contains the entire ribbon.
+  [{x0:20,x1:21,y0:-.3,y1:-.1},true], // Ribbon contains the box.
+  [{x0:20,x1:21,y0:0,y1:1},false], // Touching the straight outer edge.
+  [{x0:128,x1:129,y0:-.4,y1:0},false], // Touching the last tip/edge.
+  [{x0:20,x1:20,y0:-1,y1:1},false],
+  [{x0:20,x1:21,y0:-.2,y1:-.2},false],
+  [{x0:1,x1:2,y0:-1e-10,y1:0},false], // Twice the clipped area is below 1e-9.
+  [{x0:1,x1:11,y0:-1e-10,y1:0},true],
+ ];
+ for(const [b,expected] of cases){assert.equal(referenceBox(ink(rectangle),b),expected);assert.equal(expressionIntersectsBox(ink(rectangle),b),expected);}
+ // Overextended or reversed controls are legal numerical audit inputs. The
+ // optimized monotone range may never stand in for their original full scan.
+ const degenerateContours:NonNullable<ExpressionInk['contour']>[]=[{...rectangle,startIndent:300,endIndent:300},{...rectangle,xStart:128,xEnd:0},{...rectangle,xEnd:0,chordAligned:true},{...rectangle,thickness:0,tipThickness:0},{...rectangle,xStart:1e12,xEnd:1e12+128,yStart:1e12,yEnd:1e12+.4}];
+ for(const c of degenerateContours){
+  const q=ink(c);
+  for(let i=0;i<129;i++){
+   const x=c.xStart+(c.xEnd-c.xStart)*i/128,y=c.yStart+(c.yEnd-c.yStart)*i/128;
+   for(const size of [0,1e-10,.1,4,1000])for(const b of [{x0:x-size,x1:x+size,y0:y-size,y1:y+size},{x0:x,x1:x+size,y0:y-.4,y1:y}])assert.equal(expressionIntersectsBox(q,b),referenceBox(q,b),JSON.stringify({c,b}));
+  }
+ }
+});
+
 test('literal first-system optical pools retain exact count, order, costs, contours and final SVG',()=>{
  const fixture=JSON.parse(readFileSync(new URL('./support/no14-optical-pool-reference.json',import.meta.url),'utf8')) as {obstacles:NonNullable<ExpressionPlacement['obstacles']>;pools:{base:ExpressionInk;domain:OpticalPhraseDomain;count:number;sha256:string}[]};
  for(const row of fixture.pools){

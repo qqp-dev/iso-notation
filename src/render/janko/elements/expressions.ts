@@ -304,7 +304,7 @@ export function expressionIntersectsBox(q: ExpressionInk,b:{x0:number;x1:number;
   return contourPolygonIntersectsBox(preparedContourPolygon(q.contour),b);
 }
 type Contour=NonNullable<ExpressionInk['contour']>;
-type PreparedContourPolygon={scalars:Contour;points:number[];scratch:[number[],number[]]};
+type PreparedContourPolygon={scalars:Contour;points:number[];scratch:[number[],number[]];monotoneX:boolean};
 // Contours are sometimes translated or deliberately mutated by audits. Key
 // identity alone is insufficient: every scalar used by sampling is checked.
 const contourPolygons=new WeakMap<Contour,PreparedContourPolygon>();
@@ -331,7 +331,9 @@ function preparedContourPolygon(c:Contour):PreparedContourPolygon {
   };
   for(let i=0;i<=128;i++)sample(i/128,false);
   for(let i=128;i>=0;i--)sample(i/128,true);
-  const prepared:PreparedContourPolygon={scalars:{...c},points,scratch:previous?.scratch??[[],[]]};
+  let monotoneX=Number.isFinite(points[0]);
+  for(let i=2;i<=256;i+=2)if(!Number.isFinite(points[i])||points[i]<points[i-2])monotoneX=false;
+  const prepared:PreparedContourPolygon={scalars:{...c},points,scratch:previous?.scratch??[[],[]],monotoneX};
   contourPolygons.set(c,prepared);return prepared;
 }
 /** Joint outward translation that places the complete dense ribbon beyond
@@ -376,22 +378,49 @@ export function expressionContourOutwardShift(c:Contour,boxes:ExpressionOutwardF
  }
  return shift;
 }
-/** Same four Sutherland–Hodgman clips and positive-area threshold as the
- * reference polygon query. Flat scratch buffers avoid per-vertex objects;
- * they are private to this contour and never escape the synchronous query. */
+/** Locate the one inside/outside transition on a monotone ribbon boundary.
+ * Equality belongs to the inside, exactly as in the original clipping loop. */
+function contourXTransition(input:number[],start:number,end:number,bound:number,upper:boolean,left:boolean):number {
+  let lo=start,hi=end;
+  while(lo<hi){const mid=(lo+hi)>>>1,x=input[mid*2];
+    if(upper?(left?x<bound:x<=bound):(left?x>=bound:x>bound))lo=mid+1;else hi=mid;
+  }
+  return lo;
+}
+/** Same ordered vertices, interpolation arithmetic, four Sutherland–Hodgman
+ * clips and positive-area threshold as the reference query. The two sampled
+ * x-monotone boundaries let the x clips omit outside/outside edges. The first
+ * clip also retains just one original vertex beyond each later right crossing;
+ * all omitted vertices are strictly outside that second clip, so its ordered
+ * crossings still interpolate the identical original adjacent endpoints.
+ * Non-monotone/non-finite x samples retain the complete original scan. Scratch
+ * buffers belong to this exact scalar-validated contour, never a page cache. */
 function contourPolygonIntersectsBox(prepared:PreparedContourPolygon,b:{x0:number;x1:number;y0:number;y1:number}):boolean {
-  let input=prepared.points,inputLength=input.length;
+  let input=prepared.points,inputLength=input.length,split=129;
   for(let pass=0;pass<4;pass++){
+    if(inputLength===0)return false;
     // Keep capacity: assigning length=0 makes V8 discard the backing store.
     // Only this query's occupied prefix participates in the next clip.
     const output=prepared.scratch[pass%2];let outputLength=0;
     const axis=pass<2?0:1,bound=pass===0?b.x0:pass===1?b.x1:pass===2?b.y0:b.y1,sign=pass%2===0?1:-1;
-    for(let i=0;i<inputLength;i+=2){
-      const j=(i+2)%inputLength,da=sign*(input[i+axis]-bound),dz=sign*(input[j+axis]-bound);
-      if(da>=0){output[outputLength++]=input[i];output[outputLength++]=input[i+1];}
-      if((da<0&&dz>0)||(da>0&&dz<0)){const u=da/(da-dz);output[outputLength++]=input[i]+u*(input[j]-input[i]);output[outputLength++]=input[i+1]+u*(input[j+1]-input[i+1]);}
+    const window=prepared.monotoneX&&pass<2,left=pass===0;
+    const upper=window?contourXTransition(input,0,split,bound,true,left):0;
+    const lower=window?contourXTransition(input,split,inputLength/2,bound,false,left):0;
+    const limit=window&&left&&b.x0<=b.x1;
+    const upperLast=limit?Math.min(split,contourXTransition(input,0,split,b.x1,true,false)+1):split;
+    const lowerFirst=limit?Math.max(split,contourXTransition(input,split,inputLength/2,b.x1,false,false)-1):split;
+    let nextSplit=0;
+    for(let run=0;run<(window?2:1);run++){
+      const first=!window?0:run===0?(left?Math.max(0,upper-1):0):(left?lowerFirst:Math.max(split,lower-1));
+      const last=!window?inputLength/2:run===0?(left?upperLast:Math.min(split,upper+1)):(left?Math.min(inputLength/2,lower+1):inputLength/2);
+      for(let i=first*2;i<last*2;i+=2){
+        const j=i+2===inputLength?0:i+2,da=sign*(input[i+axis]-bound),dz=sign*(input[j+axis]-bound);
+        if(da>=0){output[outputLength++]=input[i];output[outputLength++]=input[i+1];}
+        if((da<0&&dz>0)||(da>0&&dz<0)){const u=da/(da-dz);output[outputLength++]=input[i]+u*(input[j]-input[i]);output[outputLength++]=input[i+1]+u*(input[j+1]-input[i+1]);}
+      }
+      if(run===0)nextSplit=outputLength/2;
     }
-    input=output;inputLength=outputLength;
+    input=output;inputLength=outputLength;split=nextSplit;
   }
   let area=0;for(let i=0;i<inputLength;i+=2){const j=(i+2)%inputLength;area+=(input[i]-b.x0)*(input[j+1]-b.y0)-(input[j]-b.x0)*(input[i+1]-b.y0);}
   return Math.abs(area)>1e-9;

@@ -196,7 +196,7 @@ function resolveIntent(intent: HandIntent, score: QuantizedGridScore, current: r
 function geometry(score: QuantizedGridScore) {
   const { options, tokens } = provider(selectScore(score.id));
   const layouts = layoutJankoScore(score, options, tokens);
-  const pages = Array.from({ length: countJankoPages(score, options, tokens) }, (_, i) => digest(renderJankoPage(score, i, options, tokens, layouts)));
+  const pages = Array.from({ length: countJankoPages(score, options, tokens, layouts) }, (_, i) => digest(renderJankoPage(score, i, options, tokens, layouts)));
   const systems = layouts.map((_, i) => digest(renderJankoCrop(score, i * options.measuresPerSystem + 1, options.measuresPerSystem, options, tokens, undefined, layouts)));
   const count = (name: 'rests' | 'beams') => layouts.reduce((sum, l) => sum + l[name].length, 0);
   const tieOwners = layouts.flatMap(l => l.tieOriginSuppressions.map(t => `${t.noteId}:${t.component}:${t.toHeadId}`));

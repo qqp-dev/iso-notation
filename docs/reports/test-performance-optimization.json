@@ -1,0 +1,504 @@
+{
+  "baselineHost": {
+    "head": "f458b8a214f57223a826e17b42be98bcb6b8a909",
+    "node": "v26.7.0",
+    "cpuCount": 16,
+    "load": [
+      0.46533203125,
+      0.51904296875,
+      0.52392578125
+    ],
+    "time": "2026-10-02T21:55:49Z"
+  },
+  "baselinePrepared": {
+    "mode": "prepared",
+    "elapsedMs": 59580.427526,
+    "solves": 10,
+    "generation": "a5f65509fe9246b82405f31cdbc3be142cf546eb7e7a7e1306d9958a543f318a",
+    "artifactHashes": {
+      "candidates": "7f8fd8b9584e6fdd09e00c6c23596181afed72f27c45f81e3f50a98c3a77df43",
+      "reference": "bc7f5e1c50572fa2c9c51dc066dc386f24b6ff77b3b2d8ec12b9f98badb2ad75"
+    },
+    "status": {
+      "ok": true,
+      "violations": 0,
+      "warnings": 0,
+      "systems": 8,
+      "notes": 550
+    },
+    "userCpuSeconds": 74.47,
+    "systemCpuSeconds": 1.51,
+    "peakRssKiB": 934888,
+    "exitStatus": 0,
+    "wallSeconds": 60.66
+  },
+  "baselineMigration": {
+    "test": "legacy full-score migration classifies harmless SVG serialization separately from changed ink",
+    "testSeconds": 157.109553265,
+    "tests": 1,
+    "pass": 1,
+    "userCpuSeconds": 178.87,
+    "systemCpuSeconds": 3.24,
+    "peakRssKiB": 454436,
+    "exitStatus": 0,
+    "wallSeconds": 157.55
+  },
+  "baselinePageLoop": {
+    "mode": "original",
+    "elapsedMs": 7132.072236,
+    "solves": 7,
+    "pageSha256": [
+      "3879a863b268616bb8b685da1b67f2893c628435e01aa6f9531f95417d22bca4",
+      "f163f83806204a0c243a67305785d6ffe9997fc0c89e7e9bccec9134139a7fb7",
+      "5471dfc95fc45111eefddb77519bac932c9946962b1f448785563fe0b3e2a64e",
+      "5096662c188ed82b29bdfd6a7c87742b7e675bf533c41579cc8c0b5bcbb14ad2",
+      "0b76b9ed2427a055b70653b225678428413f34c50d630bfd524accb3dc363846",
+      "1e6b4980cff390d48dc9e20b79d59133827831c079e516582bb5f8180bd9a185"
+    ],
+    "userCpuSeconds": 8.78,
+    "systemCpuSeconds": 0.28,
+    "peakRssKiB": 377476,
+    "exitStatus": 0,
+    "wallSeconds": 7.47
+  },
+  "temporaryEvidenceDirectory": "/tmp/iso-test-performance-evidence-g9xqn7go",
+  "coverage": "Entirely disposable generated eight-record/four-variant histories; original/new real engines remain independent. Two fresh studio generations remain independent. Baseline source f458b8a; no source edits during captures.",
+  "settledMigration": {
+    "testSeconds": 65.315627456,
+    "wallSeconds": 65.74,
+    "userCpuSeconds": 76.15,
+    "systemCpuSeconds": 2.12,
+    "peakRssKiB": 519784,
+    "exitStatus": 0,
+    "tests": 1,
+    "pass": 1,
+    "migrationProofSolves": {
+      "serializationOriginal": 5,
+      "serializationDestination": 5,
+      "inkRefusalOriginal": 5,
+      "inkRefusalDestination": 1
+    },
+    "retained": "Every original eight-record/four-variant, full-SVG/comment-only/true-ink refusal and original-byte assertion. Added per-independent-profile solve ownership guards. No collision edits at this measurement.",
+    "limitation": "After timing includes new fixture-only solve recorder checks; baseline did not. Other guarded duration validation calculations remain."
+  },
+  "optimizedPrepared": {
+    "mode": "prepared",
+    "elapsedMs": 47859.992775000006,
+    "solves": 10,
+    "generation": "a5f65509fe9246b82405f31cdbc3be142cf546eb7e7a7e1306d9958a543f318a",
+    "artifactHashes": {
+      "candidates": "7f8fd8b9584e6fdd09e00c6c23596181afed72f27c45f81e3f50a98c3a77df43",
+      "reference": "bc7f5e1c50572fa2c9c51dc066dc386f24b6ff77b3b2d8ec12b9f98badb2ad75"
+    },
+    "status": {
+      "ok": true,
+      "violations": 0,
+      "warnings": 0,
+      "systems": 8,
+      "notes": 550
+    },
+    "wallSeconds": 48.22,
+    "userCpuSeconds": 62.37,
+    "systemCpuSeconds": 1.36,
+    "peakRssKiB": 883428,
+    "exitStatus": 0,
+    "artifactByteIdentity": true,
+    "diagnosticIdentity": true,
+    "workloadReductionPercent": 19.67161908310472,
+    "limitation": "One sequential before/after cold-process pair on same host/runtime; TypeScript and a subsecond boundary test briefly overlapped after workload. Independent generations/solves retained; this is not a full-suite speedup claim."
+  },
+  "numericalDifferential": {
+    "oracle": "Unmodified test/support/expression-query-reference.ts, original dense sampling plus four Sutherland–Hodgman clips",
+    "existingKernelAndOpticalPoolTests": {
+      "tests": 2,
+      "pass": 2,
+      "wallSeconds": 2.593
+    },
+    "addedBoundaryTest": {
+      "tests": 1,
+      "pass": 1,
+      "wallSeconds": 0.637
+    },
+    "mutations": [
+      {
+        "mutation": "positive-area-threshold",
+        "exitStatus": 1,
+        "rejected": true,
+        "wallSeconds": 0.5475667389109731
+      },
+      {
+        "mutation": "containment",
+        "exitStatus": 1,
+        "rejected": true,
+        "wallSeconds": 0.5167333879508078
+      },
+      {
+        "mutation": "non-monotone-fallback",
+        "exitStatus": 1,
+        "rejected": true,
+        "wallSeconds": 0.5508480390999466
+      }
+    ],
+    "standaloneClippedPolygonComparisons": 20000,
+    "standaloneCaveat": "Disposable prototype cross-check of ordered clipped arrays, supplemented by actual production-kernel reference tests and frozen candidate hashes.",
+    "finalStandaloneClippedPolygonComparisons": 100000
+  },
+  "optimizedHost": {
+    "node": "v26.7.0",
+    "cpuCount": 16,
+    "load": [
+      0.525390625,
+      0.71337890625,
+      0.72412109375
+    ],
+    "time": "2026-10-02T22:10:11Z"
+  },
+  "finalPrepared": {
+    "mode": "prepared",
+    "elapsedMs": 40798.879701,
+    "solves": 10,
+    "generation": "a5f65509fe9246b82405f31cdbc3be142cf546eb7e7a7e1306d9958a543f318a",
+    "artifactHashes": {
+      "candidates": "7f8fd8b9584e6fdd09e00c6c23596181afed72f27c45f81e3f50a98c3a77df43",
+      "reference": "bc7f5e1c50572fa2c9c51dc066dc386f24b6ff77b3b2d8ec12b9f98badb2ad75"
+    },
+    "status": {
+      "ok": true,
+      "violations": 0,
+      "warnings": 0,
+      "systems": 8,
+      "notes": 550
+    },
+    "wallSeconds": 41.15,
+    "userCpuSeconds": 54.36,
+    "systemCpuSeconds": 1.26,
+    "peakRssKiB": 888672,
+    "exitStatus": 0,
+    "artifactByteIdentity": true,
+    "diagnosticIdentity": true,
+    "workloadReductionPercent": 31.523016206629293,
+    "limitation": "One sequential same-runtime before/after pair; no claim of whole-suite ratio. Exact solve count, frozen complete HTML/SVG bytes and deterministic lint facts are independent of timing."
+  },
+  "checks": {
+    "focusedContourPhraseGoldContracts": {
+      "tests": 34,
+      "pass": 34,
+      "exitStatus": 0,
+      "wallSeconds": 100.256,
+      "source": "First collision refinement; final complete artifact identity and later full suite cover final look-ahead refinement."
+    },
+    "finalNumericalContracts": {
+      "tests": 3,
+      "pass": 3,
+      "exitStatus": 0,
+      "wallSeconds": 2.702
+    },
+    "configuredTypeScript": {
+      "exitStatus": 0
+    },
+    "strictEngraving": {
+      "exitStatus": 0
+    },
+    "finalConfiguredTypeScript": {
+      "wallSeconds": 1.15,
+      "userCpuSeconds": 4.63,
+      "systemCpuSeconds": 0.54,
+      "peakRssKiB": 710740,
+      "exitStatus": 0
+    },
+    "finalStrictEngraving": {
+      "wallSeconds": 11.66,
+      "userCpuSeconds": 16.74,
+      "systemCpuSeconds": 0.55,
+      "peakRssKiB": 550596,
+      "exitStatus": 0,
+      "canonicalBachViolations": 0,
+      "goldViolations": 0,
+      "brahmsExistingRestNotes": 6
+    },
+    "finalBuild": {
+      "wallSeconds": 27.11,
+      "userCpuSeconds": 37.58,
+      "systemCpuSeconds": 6.37,
+      "peakRssKiB": 1473956,
+      "exitStatus": 0,
+      "existingWarnings": "Vite native loader import-extension warning, browser externalization notes and large chunk/plugin timing warnings.",
+      "timingLimitation": "Configured validation overlapped final focused semantic tests; no controlled benchmark ratio.",
+      "artifactHashes": {
+        "candidates": "7f8fd8b9584e6fdd09e00c6c23596181afed72f27c45f81e3f50a98c3a77df43",
+        "reference": "bc7f5e1c50572fa2c9c51dc066dc386f24b6ff77b3b2d8ec12b9f98badb2ad75"
+      }
+    },
+    "finalSemanticFocused": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "wallSeconds": 180.72,
+      "userCpuSeconds": 223.48,
+      "systemCpuSeconds": 6.44,
+      "peakRssKiB": 1002848,
+      "exitStatus": 0,
+      "coverage": [
+        "Exact before/after score/options/tokens solve owners and changed pages/systems",
+        "Source-linked saved edit, source+Reference preservation and exact undo",
+        "Authoritative NO_VISIBLE_EFFECT",
+        "Stale source/engine refusal, Reference preservation and byte-identical history archival"
+      ],
+      "timingLimitation": "Focused configured validation partly overlapped; not a controlled timing ratio."
+    }
+  },
+  "historicalApiInspection": {
+    "gitObject": "8fd1e4f3b071fec30496164754c1bce0ab4bfc06",
+    "layoutExportPresent": true,
+    "renderJankoPageOwnedLayoutsArgument": 5,
+    "countJankoPagesArguments": 3,
+    "note": "Older count is arithmetic-only and ignores harmless extra JS arguments. The original engine still supplies and paints its own layouts; engines without a layout export retain the original fallback path."
+  },
+  "completeSuite": {
+    "source": {
+      "sourceBase": "f458b8a214f57223a826e17b42be98bcb6b8a909",
+      "scope": "migration+collision before the subsequent existing-owner semantic-hand page-count argument",
+      "filesSha256": {
+        "scripts/migrate-legacy-candidates.ts": "3049377206f6062da31f362b7c98a69566731d4ea702a8a5c7d2df2f550d66c5",
+        "src/render/janko/elements/expressions.ts": "a0eded7d74169312cea44c21934d9f86c4732eef742a97df5f67535502c6c4eb",
+        "src/render/janko/semantic-hand.ts": "572ada601405bfb514cb3b2e317d6cb70c7c2d88cf855a981e167826e6ce4c10",
+        "test/active-score-release.test.ts": "833c21ccbb017d4df03b450d99c67315b037f8c10c4a7de0c00fb433827a97ee",
+        "test/janko-render-performance.test.ts": "623d29b3398f771f00941a2fd77ee342db7065d7f9d697efb87616162a9a3c15"
+      },
+      "patchSha256": "77d66e6788669bf1ce8f5729f75916c1529bc9160d3eaa3e89d046d4c32a3973"
+    },
+    "files": 123,
+    "tests": 1391,
+    "pass": 1391,
+    "fail": 0,
+    "phases": [
+      {
+        "name": "ordinary",
+        "tests": 1272,
+        "pass": 1272,
+        "fail": 0,
+        "wallSeconds": 1023.634
+      },
+      {
+        "name": "brahms-engraving",
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "wallSeconds": 7.706
+      },
+      {
+        "name": "janko-linter",
+        "tests": 87,
+        "pass": 87,
+        "fail": 0,
+        "wallSeconds": 79.73
+      },
+      {
+        "name": "prepared-hmr",
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "wallSeconds": 27.551
+      },
+      {
+        "name": "semantic-hand",
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "wallSeconds": 401.304
+      }
+    ],
+    "wallSeconds": 1540.06,
+    "userCpuSeconds": 3049.64,
+    "systemCpuSeconds": 89.43,
+    "peakRssKiB": 1415052,
+    "exitStatus": 0,
+    "coverageBoundary": "Entire optimized migration+collision suite before the subsequent single existing-owner argument in semantic-hand geometry. Final focused saved-edit/build checks follow; final mandatory CI belongs to primary delivery. No second local full suite."
+  },
+  "preservation": {
+    "base": "f458b8a214f57223a826e17b42be98bcb6b8a909",
+    "preserved": [
+      {
+        "area": "public",
+        "trackedFiles": 30,
+        "byteIdentical": true
+      },
+      {
+        "area": "data",
+        "trackedFiles": 5,
+        "byteIdentical": true
+      },
+      {
+        "area": ".github",
+        "trackedFiles": 1,
+        "byteIdentical": true
+      },
+      {
+        "file": "package.json",
+        "byteIdentical": true
+      },
+      {
+        "file": "package-lock.json",
+        "byteIdentical": true
+      },
+      {
+        "file": "scripts/run-tests.mjs",
+        "byteIdentical": true
+      },
+      {
+        "file": "docs/reports/test-suite-latency-evidence.json",
+        "byteIdentical": true
+      }
+    ],
+    "goldPdfSha256": "81c9d35fedb350287b1606c5bb861762574b0687efbe1d72856df3dca0e48a30",
+    "canonicalPdfSha256": "43e0078eae668385e94f40adf0654fe4683c570574d173310323d0e52f073c97",
+    "sourceScoreChanges": []
+  },
+  "finalSemantic": {
+    "rows": [
+      {
+        "score": "brahms-op118-no1",
+        "beforeMs": 5846.527722,
+        "afterMs": 3994.2976660000004,
+        "beforeSolves": 5,
+        "afterSolves": 3,
+        "reductionPercent": 31.6808564685362,
+        "exactEffectAndPageAndCropInventory": true,
+        "profileSha256": "77d9aebb00f3db11e5b47fc8d0384b4f1f2d10ae0cea1e703d1665e2f8ffa05b",
+        "effectSha256": "fdb3282ac65576fad41f8421723adae7708c650f56e8e4eac4cb2cb5cbc4bc44"
+      },
+      {
+        "score": "bach-goldberg-var1",
+        "beforeMs": 365.60012800000004,
+        "afterMs": 357.7113909999998,
+        "beforeSolves": 3,
+        "afterSolves": 3,
+        "reductionPercent": 2.1577500651203896,
+        "exactEffectAndPageAndCropInventory": true,
+        "profileSha256": "5339edb010597d9affba1637eb0be28a01b5173214f08acbbaba3feda1f71038",
+        "effectSha256": "1a5b7b6ae6c72c888054d0e747c808ec87e26a19ca60b85a42d2dca2ff615319"
+      }
+    ],
+    "baselineProcess": {
+      "wallSeconds": 9.03,
+      "userCpuSeconds": 11.05,
+      "systemCpuSeconds": 0.3,
+      "peakRssKiB": 314908,
+      "exitStatus": 0
+    },
+    "afterProcess": {
+      "wallSeconds": 7.14,
+      "userCpuSeconds": 8.9,
+      "systemCpuSeconds": 0.27,
+      "peakRssKiB": 340184,
+      "exitStatus": 0
+    },
+    "scope": "Single existing-owned layout argument after completed migration/collision suite; compareCandidate timing excludes the later independent direct page/crop inventories; aggregate process resources include those inventories.",
+    "limitation": "One same-runtime pair; baseline and final source/options/tokens profile identities match. No whole-suite ratio. Bach arithmetic-only page count does not change solve count.",
+    "exactInventoryIdentities": [
+      {
+        "score": "brahms-op118-no1",
+        "effectsSha256": "fdb3282ac65576fad41f8421723adae7708c650f56e8e4eac4cb2cb5cbc4bc44",
+        "before": {
+          "pages": 6,
+          "systems": 18,
+          "pageInventorySha256": "2fd02563468cee99162bfbc63ae39c1a6189a56a7db10dd9a2419a61406c5bff",
+          "systemInventorySha256": "320bc7c1a4bdc015bacb8487d199b1f6ad68f9b2ceca67650ed298af48212d32"
+        },
+        "after": {
+          "pages": 6,
+          "systems": 18,
+          "pageInventorySha256": "eaa7ea29cd185c3cae2ef3cbf90f9f753803c5ebb23846406edcf4d896b8b5e8",
+          "systemInventorySha256": "e69356b540675cd1ff626f1a145f3c169a1ab42b324635aa744d514e29caa47a"
+        },
+        "finalInventoriesExactlyMatchBaseline": true
+      },
+      {
+        "score": "bach-goldberg-var1",
+        "effectsSha256": "1a5b7b6ae6c72c888054d0e747c808ec87e26a19ca60b85a42d2dca2ff615319",
+        "before": {
+          "pages": 2,
+          "systems": 8,
+          "pageInventorySha256": "2f2d5f8bc2f5332bdbd37d65d72e4569a2ff5cb3ec18be7ba4176ae150de709b",
+          "systemInventorySha256": "a30acbb55447019216f7637144ea8139b404a36b86ac653a628603216786e591"
+        },
+        "after": {
+          "pages": 2,
+          "systems": 8,
+          "pageInventorySha256": "ee2beac330fae3c261bfd567675d7928260edce44b308cd27ea5104badb15d4b",
+          "systemInventorySha256": "569dedc387a9a940dd3f0951006099da74283f29e1a2119f8f375c06a5f53a80"
+        },
+        "finalInventoriesExactlyMatchBaseline": true
+      }
+    ],
+    "fullInventoryEvidence": "Owned baseline-semantic.json and final-semantic.json in temporaryEvidenceDirectory contain all independently rendered page and crop SHA-256 values; semantic-comparison.json records assertion-checked equality."
+  },
+  "hostedBaseline": {
+    "source": "Primary No14 successful publication run37067058315 metadata, Node22/different host and load; separate context only.",
+    "tests": 1390,
+    "pass": 1390,
+    "testStepWallSeconds": 3418,
+    "ordinary": {
+      "tests": 1271,
+      "wallSeconds": 2350.847
+    },
+    "brahms": {
+      "tests": 17,
+      "wallSeconds": 13.279
+    },
+    "linter": {
+      "tests": 87,
+      "wallSeconds": 174.659
+    },
+    "hmr": {
+      "tests": 7,
+      "wallSeconds": 53.123
+    },
+    "semantic": {
+      "tests": 8,
+      "wallSeconds": 825.852
+    },
+    "fullJobWallSeconds": 4372,
+    "aptWallSeconds": 852,
+    "strictWallSeconds": 28,
+    "buildWallSeconds": 51,
+    "pagesWallSeconds": 7,
+    "controlledSpeedupClaim": false
+  },
+  "finalExpectedInventory": {
+    "files": 123,
+    "tests": 1392,
+    "baseTests": 1390,
+    "additionalBoundaryTests": 1,
+    "additionalSemanticOwnerTests": 1,
+    "finalFullSuiteRequiredInDeliveryCI": true,
+    "secondLocalFullSuite": false
+  },
+  "finalPreservation": {
+    "trackedByteComparisons": 78,
+    "comparison": "Current bytes Git blob identity equals exact base Git blob identity; original numerical oracle and historical evidence included.",
+    "areas": [
+      "public",
+      "data",
+      ".github",
+      "src/scores",
+      "src/model",
+      "packages/runner/original-numerical-oracle/historical-investigation"
+    ],
+    "byteIdentical": true,
+    "publicAndSourceChanges": []
+  },
+  "finalSource": {
+    "base": "f458b8a214f57223a826e17b42be98bcb6b8a909",
+    "scope": "Migration+collision+single existing-owned semantic page-count argument",
+    "filesSha256": {
+      "scripts/migrate-legacy-candidates.ts": "3049377206f6062da31f362b7c98a69566731d4ea702a8a5c7d2df2f550d66c5",
+      "src/render/janko/elements/expressions.ts": "5f66b8e65b396727ee9701f08bb2a0b66e6e98077d9d31ab2fc65cb3dee5f24a",
+      "src/render/janko/semantic-hand.ts": "8108878a49138fb109314b511c99941eea8c5056726d4a78f21b97d52d9002a0",
+      "test/active-score-release.test.ts": "833c21ccbb017d4df03b450d99c67315b037f8c10c4a7de0c00fb433827a97ee",
+      "test/janko-render-performance.test.ts": "623d29b3398f771f00941a2fd77ee342db7065d7f9d697efb87616162a9a3c15",
+      "test/semantic-hand.test.ts": "43ed651e06479ffd50a17492f73e504f7c73c4eb05ce4ec1a01a143067d8a748"
+    },
+    "coverageBoundary": "Complete migration/collision suite1391PASS precedes final single argument and owner assertion. Four final focused semantic cases plus final configured TypeScript/strict/build PASS; mandatory later CI must cover all1392finalcases."
+  }
+}
