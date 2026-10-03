@@ -211,6 +211,7 @@ import {sourceOpticalPhraseDomain} from './optical-phrase-domain';
 import {placeRepeatSigns,repeatPhysicalBoxes,type RepeatSign,repeatBoundaryTicks,repeatReplacesBracket,repeatFirstAttackEnvelope,repeatLeadingAir} from './repeat-signs';
 import {fitCompleteSoloFlags,fitSharedBareTerminals} from './duration-fitting';
 import { placeEventHandMarks, eventHandMarksSvg, type EventHandMark } from './hand-marks';
+import { placeReadingReferences, readingReferencesSvg, READING_REFERENCE_AIR, READING_REFERENCE_BAND_HEIGHT, type ReadingReferenceMark } from './reading-reference';
 import { seatLocalFlags } from './local-flag-seats';
 import { bendRhRibbons } from './bent-ribbons';
 import {
@@ -1824,6 +1825,8 @@ export function outgoingTieByHeadId(
 import { placeExpressions, expressionsSvg, type ExpressionInk } from './elements/expressions';
 
 export interface JankoSystemLayout {
+  readingReferences?: ReadingReferenceMark[];
+  readingReferenceBand?: {top:number;bottom:number};
   sharedCarrierBars?: number[];
   voiceFieldKey?: string;
   expressionScope?: readonly string[];
@@ -3546,7 +3549,7 @@ export function computeJankoRestLayer(
       }
     }
     const ticks = [...release.keys()].sort((a, b) => a - b);
-    if (ticks.length === 0) continue;
+    if (ticks.length === 0 && o.authoredRestMode!=='source') continue;
     const activeMeasures = new Set(ticks.map((tick) => measureIndexOfTick(tick, geo, systemIndex, t)));
 
     // The hand is silent from the moment **everything it has stated so far**
@@ -3560,31 +3563,48 @@ export function computeJankoRestLayer(
     // onset really is the last release (every pre-Round-46 surface), and it
     // keeps the rest when an earlier voice still sounds.
     let soundingTo = Number.NEGATIVE_INFINITY;
+    const requests:{releaseTick:number;gap:number;beforeTick:number;afterTick:number;authored?:typeof authoredRests[number];wholeBar?:boolean}[]=[];
     for (let i = 0; i < ticks.length - 1; i++) {
       soundingTo = Math.max(soundingTo, release.get(ticks[i])!);
       const releaseTick = soundingTo;
       const gap = ticks[i + 1] - releaseTick;
-      if (gap <= 0 || !isStandardRestValue(gap)) continue;
-      const value = restValueForTicks(gap);
+      requests.push({releaseTick,gap,beforeTick:ticks[i],afterTick:ticks[i+1]});
+    }
+    if(o.authoredRestMode==='source'){
+      requests.length=0;
+      for(const authored of authoredRests.filter(q=>q.hand===hand&&q.startTick>=startTick&&q.startTick<endTick)){
+        const boundaries=score.sourceBarTicks;
+        const bar=boundaries?.findIndex(tick=>tick===authored.startTick)??-1;
+        const wholeBar=bar>=0?boundaries![bar+1]===authored.startTick+authored.durationTicks:isWholeBarSilence(authored.startTick,authored.durationTicks,t);
+        if(!wholeBar&&!isStandardRestValue(authored.durationTicks))throw Error(`Unsupported authored rest value at ${authored.file}:${authored.line}:${authored.col}`);
+        const beforeTick=[...ticks].reverse().find(tick=>tick<=authored.startTick)??authored.startTick;
+        const afterTick=ticks.find(tick=>tick>=authored.startTick+authored.durationTicks)??authored.startTick+authored.durationTicks;
+        requests.push({releaseTick:authored.startTick,gap:authored.durationTicks,beforeTick,afterTick,authored,wholeBar});
+      }
+    }
+    for(const request of requests){
+      const {releaseTick,gap,beforeTick,afterTick}=request;
+      if (gap <= 0 || !request.wholeBar&&!isStandardRestValue(gap)) continue;
+      const value = request.wholeBar?'whole':restValueForTicks(gap);
       // Round 20: the whole-bar form states exactly one complete measure. A
       // 192-tick silence opening mid-measure is not a standard-value silence in
       // context — it is left unwritten exactly like any other non-standard gap.
-      if (value === 'whole' && !isWholeBarSilence(releaseTick, gap, t)) continue;
+      if (value === 'whole' && !request.wholeBar&&!isWholeBarSilence(releaseTick, gap, t)) continue;
       const measureIdx = measureIndexOfTick(releaseTick, geo, systemIndex, t);
       // The rest belongs to an *active* measure of this hand: the hand must own
       // at least one onset inside the measure the silence opens in. A whole-bar
       // silence is the one exception by definition — the measure it states is
       // the measure the hand is silent in.
       if (measureIdx < 0 || measureIdx >= o.measuresPerSystem) continue;
-      if (value !== 'whole' && !activeMeasures.has(measureIdx)) continue;
-      const { rowY, dir } = restPhraseRowReference(hand, releaseTick, ticks[i], ticks[i + 1], notes, geo, t, o);
+      if (value !== 'whole' && !request.authored&&!activeMeasures.has(measureIdx)) continue;
+      const { rowY, dir } = restPhraseRowReference(hand, releaseTick, beforeTick, afterTick, notes, geo, t, o);
       const colX = getTickColumnX(releaseTick, geo, systemIndex, o, t);
       const open = value === 'whole' ? getMeasureOpeningBarlineX(measureIdx, geo, systemIndex, t) : null;
       const close = value === 'whole' ? getMeasureClosingBarlineX(measureIdx, geo, systemIndex, t) : null;
       const restX = value === 'whole' && open !== null && close !== null ? (open + close) / 2 : colX;
       const targetY = restSeatY(rowY, o.restStyle, value, t, geo, o, restX);
       // Round 48 — the silence must be provable before it is painted.
-      const spanEnd = ticks[i + 1];
+      const spanEnd = releaseTick+gap;
       if (overlaps(displayed.get(hand), releaseTick, spanEnd)) {
         // The hand's own ink (from any system) still sounds under the span:
         // never a rest, and nothing to publish — the walk's onset list merely
@@ -3613,7 +3633,7 @@ export function computeJankoRestLayer(
         });
         continue;
       }
-      const authored = authoredRests.find(
+      const authored = request.authored??authoredRests.find(
         (silence) =>
           silence.hand === hand &&
           silence.startTick <= releaseTick + 1e-9 &&
@@ -3671,8 +3691,8 @@ export function computeJankoRestLayer(
 
       // Direction (a): inter-onset gap bounds. A rest must stay inside its inter-onset gap
       // and never slide past a neighboring onset's column.
-      const colPrev = getTickColumnX(ticks[i], geo, systemIndex, o, t);
-      const colNext = getTickColumnX(ticks[i + 1], geo, systemIndex, o, t);
+      const colPrev = getTickColumnX(beforeTick, geo, systemIndex, o, t);
+      const colNext = request.authored&&afterTick>=endTick?geo.staffRight:getTickColumnX(afterTick, geo, systemIndex, o, t);
       const probe = restAdmissionBox(candidate, t);
       const leftW = candidate.x - probe.x0;
       const rightW = probe.x1 - candidate.x;
@@ -3683,8 +3703,8 @@ export function computeJankoRestLayer(
       // Direction (b): candidate rows include phrase row, neighbor rows (releasing and resuming),
       // and corridor fallback row. Neighbour candidates are actual played-note
       // levels (lowest source pitch), never cross-member means.
-      const prevY = onsetLowestLevelY(notes, hand, ticks[i]);
-      const nextY = onsetLowestLevelY(notes, hand, ticks[i + 1]);
+      const prevY = onsetLowestLevelY(notes, hand, beforeTick);
+      const nextY = onsetLowestLevelY(notes, hand, afterTick);
       const voiceCandidateRows: number[] = [];
       const addVoiceRow = (r: number | null): void => {
         if (r === null) return;
@@ -4008,6 +4028,8 @@ export interface JankoClusterFitMember {
   wx: number;
   /** Source musical pitch (`octave * 12 + pitchClass`), not folded drawing y. */
   lin: number;
+  /** Candidate reading family, separate from immutable source/register ordering. */
+  parity?:0|1;
 }
 
 /** Result of the permanent slot fit over one component. */
@@ -4203,14 +4225,14 @@ export function fitParityColumns(
   // simultaneity gate requires; the reduced gap still fans a shared column.
   const { gap } = fitClusterSlots(members, air, 'column');
   const pitch = Math.max(pairPitch ?? 0, gap, ...members.map((m) => 2 * m.wx + air));
-  const families = new Set(members.map((m) => (m.lin % 2 === 0 ? 0 : 1)));
+  const families = new Set(members.map((m) => ((m.parity ?? m.lin % 2) === 0 ? 0 : 1)));
   const bothFamilies = families.size >= 2;
   // The odd family's rail is the caller's pair pitch when given (the engine
   // passes the extent-derived gap), else the same metric derived here.
   const railPitch = pairPitch ?? pitch;
   const rails = new Map<string, number>();
   for (const m of members) {
-    rails.set(m.id, bothFamilies && m.lin % 2 !== 0 ? railPitch : 0);
+    rails.set(m.id, bothFamilies && (m.parity ?? m.lin % 2) !== 0 ? railPitch : 0);
   }
   return { offsets: fanParityColumns(members, rails, gap), gap: pitch };
 }
@@ -4765,6 +4787,7 @@ export function perHandDownbeatGroups(
         upper: p.y + e.hy,
         wx: e.wx,
         lin: p.note.pitch.octave * 12 + pc,
+        ...(p.note.readingDisplay?.groupId?{parity:(p.note.readingDisplay.pitchClass%2) as 0|1}:{}),
       };
     });
     const fit = fitClusterSlots(members, air, 'column');
@@ -4987,6 +5010,7 @@ export function resolveChordColumns(
       upper: p.y + e.hy,
       wx: e.wx,
       lin: p.note.pitch.octave * 12 + pc,
+      ...(p.note.readingDisplay?.groupId?{parity:(p.note.readingDisplay.pitchClass%2) as 0|1}:{}),
     };
   };
   const fitById = new Map<string, JankoClusterFitMember>();
@@ -5242,10 +5266,10 @@ export function resolveChordColumns(
         else byHand.set(p.rhythm.hand, [p]);
       }
       for (const members of byHand.values()) {
-        const parities = new Set(members.map((p) => wholeToneParity(p.note.pitch)));
+        const parities = new Set(members.map((p) => (p.note.readingDisplay?.groupId ? p.note.readingDisplay.pitchClass%2 : wholeToneParity(p.note.pitch))));
         for (const p of members) {
           const offset =
-            parities.size >= 2 && wholeToneParity(p.note.pitch) !== 0 ? pairGap : 0;
+            parities.size >= 2 && (p.note.readingDisplay?.groupId ? p.note.readingDisplay.pitchClass%2 : wholeToneParity(p.note.pitch)) !== 0 ? pairGap : 0;
           offsetsById.set(p.note.id, offset);
         }
       }
@@ -5305,10 +5329,10 @@ export function resolveChordColumns(
           // The **intended parity columns** (the rails before the collision
           // fan): a pair the horizontal layout leaves in one column is the
           // pair whose vertical clearance the optical gap must provide.
-          const families = new Set(members.map((m) => (m.lin % 2 === 0 ? 0 : 1)));
+          const families = new Set(members.map((m) => ((m.parity ?? m.lin % 2) === 0 ? 0 : 1)));
           const bothFamilies = families.size >= 2;
           const intendedRails = new Map(
-            members.map((m) => [m.id, bothFamilies && m.lin % 2 !== 0 ? pairGap : 0] as const)
+            members.map((m) => [m.id, bothFamilies && (m.parity ?? m.lin % 2) !== 0 ? pairGap : 0] as const)
           );
           const spread = applyOpticalClusterSpacing(
             group,
@@ -5432,6 +5456,19 @@ export function resolveChordColumns(
         }
       }
       if (!changed) break;
+    }
+  }
+  // Retained Round76 experiment. Current reading keeps successive attacks on
+  // their temporal columns; relative parity belongs to simultaneous clusters.
+  if(isParityColumns&&o.readingSequentialParity&&notes.some(p=>p.note.readingDisplay?.groupId)){
+    for(const unit of units){
+      const stored=membersByTick.get(unit.tick)??[];
+      const rails=new Map(stored.map(p=>{const d=p.note.readingDisplay;
+        return [p.note.id,d?.groupId?(d.groupHasBothParities&&d.pitchClass%2!==0?pairGap:0):(offsetsById.get(p.note.id)??0)] as const;
+      }));
+      const members=stored.map(p=>fitById.get(p.note.id)!);
+      const fitted=fanParityColumns(members,rails,Math.max(pairGap,presetAir));
+      for(const [id,x] of fitted)offsetsById.set(id,x);
     }
   }
   for (const unit of units) {
@@ -6697,6 +6734,8 @@ export function systemCompleteInkBounds(
   let top = Math.min(g.staffTopY, graceInk.top);
   let bottom = Math.max(g.staffBotY, graceInk.bottom);
   for (const m of layout.eventHandMarks ?? []) { top=Math.min(top,m.box.y0);bottom=Math.max(bottom,m.box.y1); }
+  for (const m of layout.readingReferences ?? []) { top=Math.min(top,m.y0);bottom=Math.max(bottom,m.y1); }
+  if(layout.readingReferenceBand)top=Math.min(top,layout.readingReferenceBand.top);
   if (o.showMeasureNumbers) {
     const { numeral } = getMarginFurniture(
       g,
@@ -6820,6 +6859,7 @@ export function systemPaintedInkBoxes(
 ): JankoPaintedInkBox[] {
   const g = layout.geometry;
   const out: JankoPaintedInkBox[] = [];
+  for (const m of layout.readingReferences ?? []) out.push({...m,what:`reading reference bar${m.bar}`});
   for(const q of layout.repeatSigns??[])for(const b of repeatPhysicalBoxes(q))out.push({...b,what:`source repeat ${q.type} ${q.tick}`});
   let legacy = false;
   const push = (x0: number, x1: number, y0: number, y1: number, what: string): void => {
@@ -6975,7 +7015,7 @@ export function systemPageBookingBoxes(
       booking.push({x0:p.x-R,x1:p.x+R,y0:p.y-R,y1:p.y+R,what:`halo of ${p.note.id}`});
     }
   }
-  return [...booking,...boxes,...(layout.expressions ?? []).map(ink => ({x0:ink.x0,x1:ink.x1,y0:ink.y0,y1:ink.y1,what:`expression ${ink.kind} ${ink.id}`}))];
+  return [...booking,...boxes,...(layout.readingReferences??[]).map(m=>({...m,what:`reading reference bar${m.bar}`})),...(layout.expressions ?? []).map(ink => ({x0:ink.x0,x1:ink.x1,y0:ink.y0,y1:ink.y1,what:`expression ${ink.kind} ${ink.id}`}))];
 }
 
 /** Round 45 — the painted-ink extents of one system (`min y0 … max y1`). */
@@ -10223,6 +10263,12 @@ export function layoutJankoSystemShifted(
     layout.eventHandMarks=placeEventHandMarks(layout,score,[...obstacles,
       ...layout.notes.map(p=>{const m=knockoutHalfExtents(o,t,p.note.startTick,p);return {x0:p.x-m.wx,x1:p.x+m.wx,y0:p.y-m.hy,y1:p.y+m.hy};})],box=>scene.beams.flat().some(piece=>beamPieceIntersectsBox(piece,box)));
   }
+  if (score.relativePresentation) {
+    const booking=systemCompleteInkBounds(layout,o,t),painted=systemPaintedInkBoxes(layout,o,t);
+    const inkTop=Math.min(booking.top,...painted.map(b=>b.y0));
+    layout.readingReferences=placeReadingReferences(score,layout,inkTop,o.readingReferenceMode);
+    if(layout.readingReferences.length)layout.readingReferenceBand={top:inkTop-READING_REFERENCE_AIR-READING_REFERENCE_BAND_HEIGHT,bottom:inkTop-READING_REFERENCE_AIR};
+  }
   return layout;
 }
 
@@ -10624,6 +10670,7 @@ export function renderSystem(
   if (ottavaSvg.length > 0) out.push(ottavaSvg);
   if (resolved.expressions?.length) out.push(expressionsSvg(resolved.expressions));
   if (resolved.eventHandMarks?.length) out.push(eventHandMarksSvg(resolved.eventHandMarks));
+  if (resolved.readingReferences?.length) out.push(readingReferencesSvg(resolved.readingReferences));
   // The contour strip lives below the staff in the inter-system air.
   if (contour.strip.length > 0) out.push(contour.strip);
   out.push('  </g>');

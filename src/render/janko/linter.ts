@@ -1,6 +1,6 @@
 import { expressionsOverlap, expressionIntersectsBox, expressionStrokeBounds, pedalIntervals, type ExpressionInk } from './elements/expressions';
 import { taperedSpanPath } from './ties';
-import { systemTickRange, systemPaintedInkBoxes } from './engine';
+import { systemTickRange, systemPaintedInkBoxes,isWholeBarSilence } from './engine';
 import { PreparedJankoWindows } from './prepared-windows';
 import {pageBodyBounds,runningHeaderBand,RUNNING_HEAD_AIR} from './page-booking';
 /**
@@ -97,7 +97,9 @@ import {
   renderSystem,
   suppressedStemIds,
   systemPageBookingBoxes,
+  systemCompleteInkBounds,
 } from './engine';
+import {placeReadingReferences,READING_REFERENCE_AIR,READING_REFERENCE_BAND_HEIGHT} from './reading-reference';
 import { getBarStaffSegments, getEquatorRuleYs, placedLedgerRules, pitchGridRules } from './elements/staff';
 import {
   continuousPitchY,
@@ -156,6 +158,7 @@ import {
   isBarRestValue,
   restInkCentroidOffset,
   restAdmissionBox,
+  restValueForTicks,
   restSeatOffsetY,
 } from './elements/rests';
 import {
@@ -183,7 +186,7 @@ import {
 } from './compression';
 import { checkHandprintCollisions } from './elements/handprint';
 import { JankoTieBox, tieArcEntersBoxes } from './ties';
-import { buildInkScene, type InkScene } from './ink-scene';
+import { buildInkScene, glyphInkBox, readingUnderlinePrimitive, readingUnderlineMaskBounds, readingBracketPrimitives, primitiveBox, readingBracketGlyphs, readingBracketMaskBounds, readingAnchorMaskBounds, READING_ANCHOR_BRACKET_COLOR, READING_ANCHOR_FRAME_AIR, READING_ANCHOR_FRAME_WIDTH, READING_ANCHOR_PROTECTION_AIR, type InkScene } from './ink-scene';
 import { dotFlagPolicyBox, projectedSoloFlagEnvelope } from './solo-scene';
 import {sourcePhraseEndpointEnvelope,phraseMusicObstacles} from './expression-anchors';
 import {sourceOpticalPhraseDomain} from './optical-phrase-domain';
@@ -213,6 +216,10 @@ export type JankoLintSeverity = 'error' | 'warning' | 'info';
 
 /** Stable diagnostic identifiers (safe to assert on in tests). */
 export type JankoLintCode =
+  | 'reading-head-integrity'
+  | 'reading-parity-integrity'
+  | 'reading-anchor-clearance'
+  | 'reading-reference-integrity'
   | 'notehead-overlap'
   | 'chordal-overlap'
   | 'knockout-missing'
@@ -404,6 +411,9 @@ export const DEFAULT_JANKO_LINT_OPTIONS: JankoLintOptions = {
 
 /** Names of every check the linter runs, for coverage reporting. */
 export const JANKO_LINT_CHECKS = [
+  'reading-head-integrity',
+  'reading-parity-integrity',
+  'reading-reference-integrity',
   'notehead-clearance',
   'knockout-coverage',
   'stem-beam-validity',
@@ -2778,6 +2788,8 @@ export function systemInkExtents(
   const graceInk = graceVerticalInkBounds(layout.grace ?? [],o,t);
   let top = Math.min(g.staffTopY, graceInk.top);
   let bottom = Math.max(g.staffBotY, graceInk.bottom);
+  for(const m of layout.readingReferences??[]){top=Math.min(top,m.y0);bottom=Math.max(bottom,m.y1);}
+  if(layout.readingReferenceBand)top=Math.min(top,layout.readingReferenceBand.top);
   if (o.showMeasureNumbers) {
     const { numeral } = marginFurniture(layout, t, lint, 1, o.systemStartStyle);
     top = Math.min(top, numeral.y0);
@@ -3758,7 +3770,17 @@ export function checkRestProvenance(
   t: ResolvedJankoTokens,
   out: LintViolation[]
 ): void {
-  void o;
+  if(o.authoredRestMode==='source'){
+    const score=layout.scoreRevision,[start,end]=systemTickRange(layout.geometry,layout.index,t);
+    for(const source of score?.sourceSilences??[]){
+      if(source.kind!=='rest'||source.startTick<start||source.startTick>=end)continue;
+      const found=layout.rests.find(r=>r.tick===source.startTick&&r.durationTicks===source.durationTicks&&r.hand===source.hand&&r.authored===true&&r.sourceOrigin===`${source.file}:${source.line}`);
+      const boundaries=score?.sourceBarTicks,bar=boundaries?.findIndex(tick=>tick===source.startTick)??-1;
+      const whole=bar>=0?boundaries![bar+1]===source.startTick+source.durationTicks:isWholeBarSilence(source.startTick,source.durationTicks,t);
+      const expected=whole?'whole':restValueForTicks(source.durationTicks);
+      if(!found||found.value!==expected)out.push({code:'rest-unwritable',severity:'error',system:layout.index,message:`Authored ${source.hand} rest at ${source.startTick} (${source.durationTicks} ticks, ${source.file}:${source.line}:${source.col}) lacks its exact visible source statement.`});
+    }
+  }
   for (const withheld of layout.withheldRests ?? []) {
     out.push({
       code: 'rest-inference-withheld',
@@ -4947,6 +4969,11 @@ export interface KnockoutAuditOptions {
   digitBaselineOffset?: number;
   /** Intersection tolerance: ink must come this close to count as a cut. */
   tolerance?: number;
+  /** Only the measured edges of this mask's own reading frame are admitted. */
+  readingFrameSeats?: readonly {cx:number;cy:number;width?:number;edges:readonly (readonly number[])[]}[];
+  /** Exact opt-in reading glyph to its own fixed mask association. This
+   * changes association only; every paint-order protection check still runs. */
+  readingGlyphProtectionSeats?: readonly {glyphX:number;glyphY:number;maskX:number;maskY:number}[];
 }
 
 /**
@@ -5005,11 +5032,15 @@ export function auditKnockoutProtection(
     if (![x, y, w, h].every(Number.isFinite)) return null;
     return { cx: x + w / 2, cy: y + h / 2, wx: w / 2, hy: h / 2, mask: box(x, y, x + w, y + h) };
   };
+  const glyphMaskSeat=(digit:SvgNode)=>{
+    const x=num(digit.attrs,'x'),baselineY=num(digit.attrs,'y');
+    const seat=options.readingGlyphProtectionSeats?.find(s=>Math.abs(s.glyphX-x)<.02&&Math.abs(s.glyphY-baselineY)<.02);
+    return seat?{x:seat.maskX,y:seat.maskY}:{x,y:baselineY-baselineOf(digit)};
+  };
 
   // 1. Every digit must be shielded by a knockout painted before it.
   for (const digit of digits) {
-    const dx = num(digit.attrs, 'x');
-    const dy = num(digit.attrs, 'y') - baselineOf(digit);
+    const {x:dx,y:dy}=glyphMaskSeat(digit);
     const shield = knockouts.find((k) => {
       const m = maskOf(k);
       return (
@@ -5040,8 +5071,8 @@ export function auditKnockoutProtection(
     const digit = digits.find(
       (d) =>
         d.index > k.index &&
-        Math.abs(num(d.attrs, 'x') - cx) < 0.02 &&
-        Math.abs(num(d.attrs, 'y') - baselineOf(d) - cy) < 0.02
+        Math.abs(glyphMaskSeat(d).x - cx) < 0.02 &&
+        Math.abs(glyphMaskSeat(d).y - cy) < 0.02
     );
     if (!digit) {
       out.push({
@@ -5078,6 +5109,10 @@ export function auditKnockoutProtection(
         const x2 = num(node.attrs, 'x2');
         const y2 = num(node.attrs, 'y2');
         if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+        if(node.cls.includes('janko-reading-anchor-frame')||node.cls.includes('janko-reading-anchor-bracket')||node.cls.includes('janko-reading-anchor-underline')){
+          const seat=options.readingFrameSeats?.find(s=>Math.abs(s.cx-cx)<.02&&Math.abs(s.cy-cy)<.02&&Math.abs(num(node.attrs,'stroke-width')-(s.width??READING_ANCHOR_FRAME_WIDTH))<.001);
+          if(seat?.edges.some(edge=>[x1,y1,x2,y2].every((v,i)=>Math.abs(v-edge[i])<.02)))continue;
+        }
         const isStem = node.cls.includes('janko-stem');
         if (isStem) {
           const attached = ownStemAnchors.some(
@@ -6301,10 +6336,10 @@ export function checkExpressionIntegrity(score: QuantizedGridScore, layout: Jank
         for(const [ids,tick,y,continuation] of [[phrase.fromNoteIds,phrase.startTick,q.contour?.yStart,q.continuationStart],[phrase.toNoteIds,phrase.endTick,q.contour?.yEnd,q.continuationEnd]] as const){
           if(continuation||y===undefined)continue;
           const e=sourcePhraseEndpointEnvelope(layout,ids,tick,o,t);
-          if(o.phraseRouting!=='optical-gesture'&&o.phraseRouting!=='optical-fitted'&&o.phraseRouting!=='optical-breathing'&&o.phraseRouting!=='optical-silhouette'&&e&&(y<e.top-8.05||y>e.bottom+8.05))problem('expression-local-attachment',phrase.id,'curve tip has escaped its owning head/duration envelope');
+          if(o.phraseRouting!=='optical-gesture'&&o.phraseRouting!=='optical-fitted'&&o.phraseRouting!=='optical-breathing'&&o.phraseRouting!=='optical-silhouette'&&o.phraseRouting!=='optical-open'&&e&&(y<e.top-8.05||y>e.bottom+8.05))problem('expression-local-attachment',phrase.id,'curve tip has escaped its owning head/duration envelope');
         }
       }
-      if(o.phraseRouting==='optical-gesture'||o.phraseRouting==='optical-fitted'||o.phraseRouting==='optical-breathing'||o.phraseRouting==='optical-silhouette'){
+      if(o.phraseRouting==='optical-gesture'||o.phraseRouting==='optical-fitted'||o.phraseRouting==='optical-breathing'||o.phraseRouting==='optical-silhouette'||o.phraseRouting==='optical-open'){
         const d=sourceOpticalPhraseDomain(score,layout,phrase,o,t),c=q.contour;
         if(!d||!c||!balancedBowIsCoherent(c))problem('expression-local-attachment',phrase.id,'optical bow lacks owned source seats or a coherent single bend');
         if(d&&c)for(const [e,x,y] of [[d.start,c.xStart,c.yStart],[d.end,c.xEnd,c.yEnd]] as const)
@@ -6560,6 +6595,145 @@ export function checkEventHandMarkIntegrity(layout:JankoSystemLayout,out:LintVio
     message:'No collision-free event hand-chevron seat was found; this comparative hand channel is not viable here.'});
 }
 
+/** Audits complete outlined reset ink and its reserved band, never font guesses. */
+export function checkReadingReferenceIntegrity(score:QuantizedGridScore,layout:JankoSystemLayout,
+  o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,out:LintViolation[]):void {
+  if(!score.relativePresentation&&!layout.readingReferences?.length)return;
+  const bare={...layout,readingReferences:undefined,readingReferenceBand:undefined};
+  const booking=systemCompleteInkBounds(bare,o,t),painted=systemPaintedInkBoxes(bare,o,t);
+  const top=Math.min(booking.top,...painted.map(b=>b.y0));
+  const expected=placeReadingReferences(score,bare,top,o.readingReferenceMode),actual=layout.readingReferences??[];
+  const band=expected.length?{top:top-READING_REFERENCE_AIR-READING_REFERENCE_BAND_HEIGHT,bottom:top-READING_REFERENCE_AIR}:undefined;
+  if(JSON.stringify(actual)!==JSON.stringify(expected)||JSON.stringify(layout.readingReferenceBand)!==JSON.stringify(band)||actual.some(m=>
+    ![m.x0,m.x1,m.y0,m.y1].every(Number.isFinite)||m.x0<layout.geometry.staffLeft||
+    m.x1>layout.geometry.staffRight||m.y1>top-READING_REFERENCE_AIR+.02))
+    out.push({code:'reading-reference-integrity',severity:'error',system:layout.index,
+      message:'Relative references must retain their exact outlined bounds and all expected bar labels in a clear reserved band.'});
+}
+
+/** Actual displayed digits and owner-linked anchor marks share the head scene. */
+export function checkReadingHeadIntegrity(score:QuantizedGridScore,layout:JankoSystemLayout,scene:InkScene,out:LintViolation[],o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens):void {
+  if(!score.readingPresentation)return;
+  const source=new Map(score.notes.map(n=>[n.id,n]));
+  for(const [id,pieces] of scene.heads){
+    const note=source.get(id)??layout.notes.find(p=>p.note.id===id)?.note,d=note?.readingDisplay;
+    const glyphs=pieces.filter(p=>p.primitive.kind==='glyph'&&p.paint.cls==='janko-digit'),glyph=glyphs[0];
+    const frames=pieces.filter(p=>p.paint.cls==='janko-reading-anchor-frame');
+    const brackets=pieces.filter(p=>p.paint.cls==='janko-reading-anchor-bracket');
+    const underlines=pieces.filter(p=>p.paint.cls==='janko-reading-anchor-underline');
+    const fail=(message:string,clearance=false)=>out.push({code:clearance?'reading-anchor-clearance':'reading-head-integrity',severity:'error',system:layout.index,noteIds:[id],message});
+    if(!note||!d||glyphs.length!==1||glyph.primitive.kind!=='glyph') {fail('Reading head lacks its source-linked display glyph.');continue;}
+    const recovered=d.referencePitch+d.pitchClass+12*d.relativeOctave;
+    const absolute=12*note.pitch.octave+note.pitch.pitchClass;
+    const expectedDigit=(d.isAnchor||d.mode==='absolute'?note.pitch.pitchClass:d.pitchClass).toString(12).toUpperCase();
+    const placedHead=layout.notes.find(p=>p.note.id===id)!;
+    const seat=o.readingGlyphSeats?.[expectedDigit as '1'|'B']??0;
+    if(Math.abs(glyph.primitive.x-placedHead.x-seat*glyph.primitive.em)>1e-8||
+      o.readingGlyphSeats&&pieces.some(p=>p.reading?.noteX!==placedHead.x))
+      fail('Reading glyph seat or reported musical axis differs from its declared font-derived displacement.');
+    if(recovered!==absolute||glyph.primitive.digit.toUpperCase()!==expectedDigit||pieces.some(p=>p.reading?.referencePitch!==d.referencePitch||p.reading?.isAnchor!==d.isAnchor||p.reading?.relativeClass!==d.pitchClass||p.reading?.relativeOctave!==d.relativeOctave||p.reading?.pitchClass!==(d.isAnchor||d.mode==='absolute'?note.pitch.pitchClass:d.pitchClass)))
+      fail('Displayed relative digit, active reference and directed octave do not recover the unchanged source pitch.');
+    if(score.readingPresentation.groups){
+      const group=score.readingPresentation.groups.find(g=>g.id===d.groupId);
+      if(d.mode==='relative'){
+        if(!group||!group.memberIds.includes(id)||group.referencePitch!==d.referencePitch||group.anchorOwnerIds.includes(id)!==d.isAnchor||!group.anchorOwnerIds.every(owner=>{const n=source.get(owner);return n&&12*n.pitch.octave+n.pitch.pitchClass===group.referencePitch;}))fail('Relative head lacks its actual played figure reference or membership.');
+      }else if(d.mode!=='absolute'||d.groupId||d.isAnchor||d.referencePitch!==0)fail('Standalone absolute head incorrectly claims a played figure reference.');
+      if(pieces.some(p=>p.reading?.mode!==d.mode||p.reading?.groupId!==d.groupId))fail('Painted reading mode or figure scope differs from its source owners.');
+    }
+    const bracketed=o.readingAnchorMark==='brackets',underlined=o.readingAnchorMark==='underline';
+    if(frames.length!==(d.isAnchor&&!bracketed&&!underlined?4:0)||brackets.length!==(d.isAnchor&&bracketed?(o.readingAnchorSquare?6:2):0)||underlines.length!==(d.isAnchor&&underlined?1:0)){fail('A played absolute anchor requires its complete owned mark; plain relative heads require none.');continue;}
+    if(d.isAnchor&&underlined){
+      const mark=underlines[0],placed=layout.notes.find(p=>p.note.id===id)!;
+      const metrics=getScaledKnockoutMetrics(o,t,placed.symbolScale??1,placed.symbolChord===true),hy=metrics.hy+(placed.tallKnockout?t.stemAttachmentAir:0);
+      const ordinary={x0:placed.x-metrics.wx,y0:placed.y-hy,x1:placed.x+metrics.wx,y1:placed.y+hy},expected=readingUnderlinePrimitive(glyph.primitive,ordinary,o.readingUnderlineStroke,o.readingUnderlineWidth),expectedMask=readingUnderlineMaskBounds(primitiveBox(expected),ordinary),mask=pieces.find(p=>p.primitive.kind==='erase')?.box;
+      if(JSON.stringify(mark.primitive)!==JSON.stringify(expected)||mark.paint.color!=='#000000'||JSON.stringify(mark.box)!==JSON.stringify(primitiveBox(expected))||JSON.stringify(mark.ownerIds)!==JSON.stringify(glyph.ownerIds))fail('Anchor underline differs from its declared span, reading position or played owners.');
+      if(!mask||Object.keys(expectedMask).some(k=>Math.abs(mask[k as keyof typeof mask]-expectedMask[k as keyof typeof expectedMask])>1e-8))fail('Underline protection must retain ordinary horizontal width and protect actual bottom ink.',true);
+      if(mark.box.x0<ordinary.x0||mark.box.x1>ordinary.x1)fail('Underline exceeds its ordinary horizontal head footprint.',true);
+      for(const [foreignId,foreign] of scene.heads){const protection=foreign.find(p=>p.primitive.kind==='erase')?.box,b=mark.box;
+        if(foreignId!==id&&protection&&Math.min(b.x1,protection.x1)>Math.max(b.x0,protection.x0)+.02&&Math.min(b.y1,protection.y1)>Math.max(b.y0,protection.y0)+.02)fail('Anchor underline ink intrudes into foreign head protection.',true);
+      }
+    }else if(d.isAnchor&&bracketed){
+      const expected=readingBracketPrimitives(glyph.primitive,o.readingAnchorSquare),mask=pieces.find(p=>p.primitive.kind==='erase')?.box;
+      const placed=layout.notes.find(p=>p.note.id===id)!,metrics=getScaledKnockoutMetrics(o,t,placed.symbolScale??1,placed.symbolChord===true);
+      const hy=metrics.hy+(placed.tallKnockout?t.stemAttachmentAir:0);
+      const expectedMask=readingBracketMaskBounds([glyph.box,...expected.map(primitiveBox)],{x0:placed.x-metrics.wx,y0:placed.y-hy,x1:placed.x+metrics.wx,y1:placed.y+hy});
+      if(!mask||Object.keys(expectedMask).some(k=>Math.abs(mask[k as keyof typeof mask]-expectedMask[k as keyof typeof expectedMask])>1e-8))fail('Bracket protection differs from measured glyph ink and minimum air.',true);
+      brackets.forEach((bracket,i)=>{
+        if(JSON.stringify(bracket.primitive)!==JSON.stringify(expected[i])||bracket.paint.color!==(o.readingAnchorSquare?'#000000':READING_ANCHOR_BRACKET_COLOR)||JSON.stringify(bracket.box)!==JSON.stringify(primitiveBox(expected[i]))||JSON.stringify(bracket.ownerIds)!==JSON.stringify(glyph.ownerIds))fail('Anchor bracket differs from its authentic shipped glyph, measured seat or played owners.');
+        for(const [foreignId,foreign] of scene.heads){
+          if(foreignId===id)continue;
+          const protection=foreign.find(p=>p.primitive.kind==='erase')?.box,b=bracket.box;
+          if(protection&&Math.min(b.x1,protection.x1)>Math.max(b.x0,protection.x0)+.02&&Math.min(b.y1,protection.y1)>Math.max(b.y0,protection.y0)+.02)fail('Anchor bracket ink intrudes into a foreign head protection.',true);
+        }
+      });
+    }else if(d.isAnchor){
+      const b=glyph.box,pad=READING_ANCHOR_FRAME_AIR,edges=[[b.x0-pad,b.y0-pad,b.x1+pad,b.y0-pad],[b.x1+pad,b.y0-pad,b.x1+pad,b.y1+pad],[b.x1+pad,b.y1+pad,b.x0-pad,b.y1+pad],[b.x0-pad,b.y1+pad,b.x0-pad,b.y0-pad]];
+      const mask=pieces.find(p=>p.primitive.kind==='erase')?.box;
+      const placed=layout.notes.find(p=>p.note.id===id)!;
+      const metrics=getScaledKnockoutMetrics(o,t,placed.symbolScale??1,placed.symbolChord===true);
+      const hy=metrics.hy+(placed.tallKnockout?t.stemAttachmentAir:0);
+      const expectedMask=readingAnchorMaskBounds(b,{x0:placed.x-metrics.wx,y0:placed.y-hy,x1:placed.x+metrics.wx,y1:placed.y+hy});
+      if(!mask||Object.keys(expectedMask).some(k=>Math.abs(mask[k as keyof typeof mask]-expectedMask[k as keyof typeof expectedMask])>1e-8))fail('Anchor protection differs from its measured frame and minimum air.',true);
+      frames.forEach((frame,i)=>{const p=frame.primitive;
+        if(p.kind!=='stroke'||p.width!==READING_ANCHOR_FRAME_WIDTH||[p.x1,p.y1,p.x2,p.y2].some((v,k)=>Math.abs(v-edges[i][k])>1e-8))fail('Anchor frame differs from its actual glyph-bound outline.');
+        if(!mask||frame.box.x0<mask.x0+READING_ANCHOR_PROTECTION_AIR-.02||frame.box.x1>mask.x1-READING_ANCHOR_PROTECTION_AIR+.02||frame.box.y0<mask.y0+READING_ANCHOR_PROTECTION_AIR-.02||frame.box.y1>mask.y1-READING_ANCHOR_PROTECTION_AIR+.02)fail('Anchor frame lacks minimum air inside its measured own protection.',true);
+      });
+    }
+    for(const owner of pieces[0].ownerIds){const other=source.get(owner)?.readingDisplay;
+      if(!other||other.referencePitch!==d.referencePitch||other.pitchClass!==d.pitchClass||other.relativeOctave!==d.relativeOctave||other.isAnchor!==d.isAnchor||other.mode!==d.mode||other.groupId!==d.groupId)fail('Shared head aliases disagree on causal reference or anchor identity.');}
+  }
+}
+
+/** Simultaneous reading families own rails; successive notes own temporal columns. */
+export function checkReadingParityIntegrity(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,out:LintViolation[]):void {
+  if(o.pitchPlacement!=='parity-columns')return;
+  const gap=getClusterSpacingPreset(o.clusterSpacing).pairGap;
+  for(const p of layout.notes){
+    const d=p.note.readingDisplay;if(!d?.groupId)continue;
+    const column=layout.columns.get(p.note.startTick);if(column===undefined)continue;
+    const onset=layout.notes.filter(q=>q.note.startTick===p.note.startTick&&q.rhythm.hand===p.rhythm.hand);
+    const both=o.readingSequentialParity?d.groupHasBothParities:new Set(onset.map(q=>q.note.readingDisplay?.groupId?q.note.readingDisplay.pitchClass%2:q.note.pitch.pitchClass%2)).size>1;
+    const expected=both&&d.pitchClass%2!==0?gap:0;
+    const extra=p.x-column-expected;
+    // The ordinary geometric collision fan may add whole extent-derived slots.
+    if((!o.readingSequentialParity&&onset.length===1&&Math.abs(extra)>.02)||extra<-.02||Math.abs(extra/gap-Math.round(extra/gap))>.02/gap)out.push({code:'reading-parity-integrity',severity:'error',system:layout.index,noteIds:[p.note.id],message:'Physical placement disagrees with temporal onset or simultaneous relative family.'});
+  }
+}
+
+/** Expected frame seats from actual glyph bounds, scoped to each own mask. */
+export function readingFrameSeats(scene:InkScene):NonNullable<KnockoutAuditOptions['readingFrameSeats']> {
+  return [...scene.heads.values()].flatMap(pieces=>{
+    const glyph=pieces.find(p=>p.primitive.kind==='glyph'),mask=pieces.find(p=>p.primitive.kind==='erase');
+    if(!glyph?.reading?.isAnchor||!mask)return [];
+    if(glyph.reading.anchorMark==='underline'){
+      const mark=pieces.find(p=>p.paint.cls==='janko-reading-anchor-underline');
+      if(!mark||mark.primitive.kind!=='stroke')return [];
+      const p=mark.primitive;
+      return [{cx:(mask.box.x0+mask.box.x1)/2,cy:(mask.box.y0+mask.box.y1)/2,width:p.width,edges:[[p.x1,p.y1,p.x2,p.y2]]}];
+    }
+    if(glyph.reading.anchorMark==='brackets'){
+      const strokes=pieces.filter(p=>p.paint.cls==='janko-reading-anchor-bracket'&&p.primitive.kind==='stroke');
+      if(!strokes.length)return [];
+      const first=strokes[0].primitive;if(first.kind!=='stroke')return [];
+      return [{cx:(mask.box.x0+mask.box.x1)/2,cy:(mask.box.y0+mask.box.y1)/2,width:first.width,
+        edges:strokes.map(p=>{const q=p.primitive;if(q.kind!=='stroke')throw Error('Expected square bracket stroke');return [q.x1,q.y1,q.x2,q.y2];})}];
+    }
+    const b=glyph.box,pad=READING_ANCHOR_FRAME_AIR;
+    return [{cx:(mask.box.x0+mask.box.x1)/2,cy:(mask.box.y0+mask.box.y1)/2,
+      edges:[[b.x0-pad,b.y0-pad,b.x1+pad,b.y0-pad],[b.x1+pad,b.y0-pad,b.x1+pad,b.y1+pad],
+      [b.x1+pad,b.y1+pad,b.x0-pad,b.y1+pad],[b.x0-pad,b.y1+pad,b.x0-pad,b.y0-pad]]}];
+  });
+}
+
+/** Optical seats link actual painted glyph positions to the same owned mask. */
+export function readingGlyphProtectionSeats(scene:InkScene):NonNullable<KnockoutAuditOptions['readingGlyphProtectionSeats']> {
+  return [...scene.heads.values()].flatMap(pieces=>{
+    const glyph=pieces.find(p=>p.paint.cls==='janko-digit'),mask=pieces.find(p=>p.primitive.kind==='erase');
+    if(!glyph||glyph.primitive.kind!=='glyph'||!mask||glyph.reading?.noteX===undefined)return [];
+    return [{glyphX:glyph.primitive.x,glyphY:glyph.primitive.baseline,maskX:(mask.box.x0+mask.box.x1)/2,maskY:(mask.box.y0+mask.box.y1)/2}];
+  });
+}
+
 /** Standard system checks on complete containing systems. No page-fit verdict:
  * page placement has deliberately not been computed for this local comparison. */
 export function lintJankoWindowSystems(prepared:PreparedJankoWindows,lint?:Partial<JankoLintOptions>|null):LintReport {
@@ -6587,9 +6761,11 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
   for (const layout of layouts) {
     const diagnosticStart=diagnostics.length;
     checkEventHandMarkIntegrity(layout,diagnostics);
+    checkReadingReferenceIntegrity(score,layout,o,t,diagnostics);
     for(const id of layout.localFlagRefusals??[])diagnostics.push({code:'local-flag-seat-refused',severity:'error',system:layout.index,noteIds:[id],message:'No complete classical-flag side/tip seat clears the neighboring heads.'});
     const placedScene=layout.rests.length||o.durationGrammar==='complete'&&o.rhythmStyle==='beamed'||o.clarityPass&&layout.beams.length>1
       ?buildInkScene(layout,o,t,score):undefined;
+    if(score.readingPresentation){checkReadingHeadIntegrity(score,layout,placedScene??buildInkScene(layout,o,t,score),diagnostics,o,t);checkReadingParityIntegrity(layout,o,diagnostics);}
     if(o.depthProfile&&placedScene)checkDepthRoutePaint(layout,placedScene,o,t,diagnostics);
     if(o.sharedRhCarrier&&placedScene)checkSharedCarrierPaint(layout,placedScene,t,diagnostics);
     if(o.beamContour==='bent'&&placedScene)checkContinuousContourPaint(layout,placedScene,diagnostics);
@@ -6668,6 +6844,8 @@ function lintLayouts(score:QuantizedGridScore,options:ResolvedJankoLayoutOptions
           // so it must know the offset the renderer actually used.
           digitBaselineOffset: digitBaselineOffset(t.digitFontSize),
           spineY: layout.geometry.middleCY,
+          ...(score.readingPresentation?{readingFrameSeats:readingFrameSeats(placedScene??buildInkScene(layout,o,t,score))}:{}),
+          ...(o.readingGlyphSeats?{readingGlyphProtectionSeats:readingGlyphProtectionSeats(placedScene??buildInkScene(layout,o,t,score))}:{}),
         }),
         ...auditStemBeamConnections(svg, {
           stemLength: t.stemLength,

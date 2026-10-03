@@ -44,7 +44,7 @@ export interface ExpressionPlacement {
   dynamicScale?: number;
   dynamicFamily?:DynamicFamily;
   contourThickness?: number;
-  phraseRouting?: 'local' | 'balanced' | 'optical-gesture' | 'optical-fitted' | 'optical-breathing' | 'optical-silhouette';
+  phraseRouting?: 'local' | 'balanced' | 'optical-gesture' | 'optical-fitted' | 'optical-breathing' | 'optical-silhouette' | 'optical-open';
   phraseTaper?: 'gentle' | 'pointed';
   phrasePlacement?: 'preferred-side' | 'gesture-contour' | 'above-diagnostic';
   hairpinStrokeWidth?: number;
@@ -174,7 +174,7 @@ export function placeExpressions(score: QuantizedGridScore, p: ExpressionPlaceme
   }
   if(p.phraseRouting==='local')out.splice(0,out.length,...routeLocalPhrases(score,p,out));
   if(p.phraseRouting==='balanced')out.splice(0,out.length,...routeBalancedPhrases(score,p,out));
-  if(p.phraseRouting==='optical-gesture'||p.phraseRouting==='optical-fitted'||p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette')out.splice(0,out.length,...routeOpticalPhrases(score,p,out));
+  if(p.phraseRouting==='optical-gesture'||p.phraseRouting==='optical-fitted'||p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette'||p.phraseRouting==='optical-open')out.splice(0,out.length,...routeOpticalPhrases(score,p,out));
   const dynamicLanes: { x0: number; x1: number; lane: number }[] = [];
   for (const [index,e] of (score.dynamics ?? []).entries()) {
     const hairpin = e.kind === 'hairpin' || (!e.kind && ['crescendo','decrescendo'].includes(e.mark) && !!e.durationTicks);

@@ -66,7 +66,8 @@ import {
   renderStudioMarkup,
   type JankoStudioConfig,
 } from '../src/render/janko/studio';
-import {no14GoldProfile,NO14_GOLD_REFERENCE_ID} from '../src/render/janko/no14-gold';
+import {NO14_GOLD_REFERENCE_ID} from '../src/render/janko/no14-gold';
+import {no14PublishedProfile as no14GoldProfile} from '../src/render/janko/no14-published';
 import { BRAHMS_STUDIO_SCORE_ID, DEFAULT_STUDIO_SCORE_ID, resolveCandidate } from '../src/render/janko/candidates';
 import { ROUND_37_CANDIDATES, ROUND_37_METADATA } from './janko-round37.test';
 import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './janko-round39.test';

@@ -39,7 +39,10 @@ import { buildSchumannNo43Draft } from '../../scores/schumann-no43-draft';
 import { buildSchumannNo14Draft } from '../../scores/schumann-no14-draft';
 import {NO14_PRACTICE_SCORE_ID,no14PracticeProfile} from './no14-practice';
 import {NO14_WRITTEN_SCORE_ID,projectNo14Written} from './no14-written';
-import {NO14_GOLD_REFERENCE_ID,NO14_GOLD_PDF,NO14_GOLD_IDENTITY,no14GoldProfile} from './no14-gold';
+import {NO14_GOLD_REFERENCE_ID,NO14_GOLD_PDF} from './no14-gold';
+import {NO14_PUBLISHED_IDENTITY,no14PublishedProfile} from './no14-published';
+import {NO14_GESTURE_RELATIVE_ID,NO14_GESTURE_UNDERLINE_ID,NO14_GESTURE_REFINED_ID,NO14_GESTURE_CENTERED_ID,NO14_GESTURE_CONDENSED_ID,NO14_GESTURE_OPTICAL_ID,NO14_GESTURE_OPEN_ID,no14GestureRelativeProfile,no14GestureUnderlineProfile,no14GestureRefinedProfile,no14GestureCenteredProfile,no14GestureCondensedProfile,no14GestureOpticalProfile,no14GestureOpenProfile} from './no14-gesture-relative';
+import {NO14_RELATIVE_SCORE_ID,NO14_RELATIVE_BASELINE_ID,no14RelativeProfile,no14RelativeBaselineProfile} from './no14-relative';
 import { buildSchumannNo30Draft } from '../../scores/schumann-no30-draft';
 import { buildSchumannNo13Draft } from '../../scores/schumann-no13-draft';
 import {
@@ -294,9 +297,18 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     measuresPerSystem: 4, systemsPerPage: 4, gridWritingPolicy: 'overlaid-beat-grid',
     writtenTies: 'source', verticalPlacement: 'content-aware' });
   const scores: Record<string, StudioScore> = {
+    [NO14_GESTURE_OPEN_ID]: {id:NO14_GESTURE_OPEN_ID,...no14GestureOpenProfile()},
+    [NO14_GESTURE_OPTICAL_ID]: {id:NO14_GESTURE_OPTICAL_ID,...no14GestureOpticalProfile()},
+    [NO14_GESTURE_CONDENSED_ID]: {id:NO14_GESTURE_CONDENSED_ID,...no14GestureCondensedProfile()},
+    [NO14_GESTURE_CENTERED_ID]: {id:NO14_GESTURE_CENTERED_ID,...no14GestureCenteredProfile()},
+    [NO14_GESTURE_REFINED_ID]: {id:NO14_GESTURE_REFINED_ID,...no14GestureRefinedProfile()},
+    [NO14_GESTURE_UNDERLINE_ID]: {id:NO14_GESTURE_UNDERLINE_ID,...no14GestureUnderlineProfile()},
+    [NO14_GESTURE_RELATIVE_ID]: {id:NO14_GESTURE_RELATIVE_ID,...no14GestureRelativeProfile()},
+    [NO14_RELATIVE_SCORE_ID]: {id:NO14_RELATIVE_SCORE_ID,...no14RelativeProfile()},
+    [NO14_RELATIVE_BASELINE_ID]: {id:NO14_RELATIVE_BASELINE_ID,...no14RelativeBaselineProfile()},
     [NO14_PRACTICE_SCORE_ID]: {id:NO14_PRACTICE_SCORE_ID,...no14PracticeProfile()},
     [NO14_WRITTEN_SCORE_ID]: {id:NO14_WRITTEN_SCORE_ID,...no14PracticeProfile(),score:projectNo14Written().score},
-    [NO14_GOLD_REFERENCE_ID]: {id:NO14_GOLD_REFERENCE_ID,...no14GoldProfile()},
+    [NO14_GOLD_REFERENCE_ID]: {id:NO14_GOLD_REFERENCE_ID,...no14PublishedProfile()},
     [DEFAULT_STUDIO_SCORE_ID]: { id: DEFAULT_STUDIO_SCORE_ID, score, options, tokens },
     [score.id]: { id: score.id, score, options, tokens },
     // Archived PR112 evidence may be requested explicitly; always derive it
@@ -797,8 +809,10 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
       if (window.fullScore) {
         if(prepared||!layouts)throw Error('Window-scoped candidate refuses a full-score page claim');
         const pages = countJankoPages(entry.score, options, tokens,layouts);
+        const selectedPages = window.pageIndices ?? Array.from({length:pages},(_,i)=>i);
+        if (!selectedPages.length || new Set(selectedPages).size!==selectedPages.length || selectedPages.some(p=>!Number.isInteger(p)||p<0||p>=pages)) throw Error('Invalid genuine page selection');
         const pageCards: string[] = [];
-        for (let page = 0; page < pages; page++) {
+        for (const page of selectedPages) {
           const svg = renderJankoPage(entry.score, page, options, tokens, layouts);
           const onPage = layouts.filter(l => (l.geometry.pageIndex ?? Math.floor(l.index/options.systemsPerPage)) === page);
           const first = onPage[0], end = onPage.at(-1)!;
@@ -816,7 +830,7 @@ export function renderCandidatesView(config: JankoStudioConfig = createStudioCon
           );
         }
         return [
-          `<figure class="candidate-window candidate-window-pages" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}" data-pages="${pages}">`,
+          `<figure class="candidate-window candidate-window-pages" data-window="${escapeHtml(entry.id)}:${window.measureStart}-${lastMeasure}" data-pages="${selectedPages.length}">`,
           `  <figcaption><b>${escapeHtml(window.title || `mm. ${window.measureStart}–${lastMeasure}`)}</b>${window.caption ? ` · <span>${escapeHtml(window.caption)}</span>` : ''}</figcaption>`,
           `${window.collapsed?`  <details class="score-pages"><summary>Complete score · ${pages} pages</summary>`:''}<div class="page-grid">${pageCards.join('\n')}</div>${window.collapsed?'</details>':''}`,
           '</figure>',
@@ -1057,15 +1071,15 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
   const { score, options, tokens, crops, pages } = config;
   const brahms = config.scores[BRAHMS_STUDIO_SCORE_ID];
   // Candidate score-library overrides cannot rewrite the selected reference.
-  const no14=config.scores[NO14_GOLD_REFERENCE_ID]?no14GoldProfile():undefined;
+  const no14=config.scores[NO14_GOLD_REFERENCE_ID]?no14PublishedProfile():undefined;
   return [
     '<section class="view-panel" id="view-reference" data-view="reference">',
     ...(no14?[renderReferenceScore(NO14_GOLD_REFERENCE_ID,no14.score,no14.options,no14.tokens,undefined,[
-      {start:1,count:3,title:'No. 14 · opening',caption:'Bodoni dynamics and pedal text with the selected automatic phrasing.'},
+      {start:1,count:3,title:'No. 14 · opening',caption:'Underlined absolute figure starts, relative interior digits and the selected automatic phrasing.'},
       {start:32,count:2,title:'No. 14 · repeat entrance',caption:'Repeat measures 33–64, with room before the first notes.'},
       {start:48,count:1,title:'No. 14 · independent values',caption:'Shared attacks retain separate long and short values and two independent slurs.'},
-      {start:63,count:2,title:'No. 14 · closing phrase',caption:'The source phrase continues across the last two written bars.'}
-    ],{badge:'GOLD',revision:NO14_GOLD_IDENTITY.profileSha256,title:`${no14.score.printIdentity?.composer} · ${no14.score.printIdentity?.work} · ${no14.score.printIdentity?.piece}`,introduction:'64 written bars · repeat 33–64 · Libre Bodoni dynamics and Ped.',download:NO14_GOLD_PDF})]:[]),
+      {start:63,count:2,title:'No. 14 · closing phrase',caption:'The final0 continues the left-hand figure, followed by the source-written rests.'}
+    ],{badge:'GOLD',revision:NO14_PUBLISHED_IDENTITY.profileSha256,title:`${no14.score.printIdentity?.composer} · ${no14.score.printIdentity?.work} · ${no14.score.printIdentity?.piece}`,introduction:'64 written bars · repeat 33–64 · three pages · underlined figure starts',download:NO14_GOLD_PDF})]:[]),
     renderReferenceScore(
       BRAHMS_STUDIO_SCORE_ID,
       brahms.score,

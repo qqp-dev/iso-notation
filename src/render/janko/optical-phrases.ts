@@ -14,6 +14,30 @@ export interface OpticalPhraseCandidate {
   * exact minimum fitting, not a claim of minimum normal ink distance. */
  breathing?:{extraAir:number;targetAir:number;shape:number;proximity:number;balance:number;floor:number;air:number};
  shoulder?:ReturnType<typeof weakShoulderHealth>;
+ open?:{openingProximity:number;openingCost:number;axisCost:number};
+}
+/** Only retained, already admitted complete bows earn this bounded preference.
+ * Native glyph/stem enclosures and narrow rail strips remain conservative
+ * nearness evidence; white masks and guide lines carry no musical weight.
+ * Saturation stops rewarding further floating once the opening is quiet. */
+export function opticalOpeningHealth(ink:ExpressionInk,p:ExpressionPlacement){
+ const domain=p.opticalDomain?.(ink.id),c=ink.contour;
+ if(!domain||!c)return {openingProximity:0,openingCost:0,axisCost:0};
+ const left=Math.max(domain.start.x,c.xStart),right=Math.min(domain.start.x+domain.span/3,c.xEnd),band=12;
+ let gap=band;
+ for(const box of p.balanceObstacles??[]){
+  const a=Math.max(left+.00001,box.x0),b=Math.min(right-.00001,box.x1);if(b<=a)continue;
+  for(const x of [a,(a+b)/2,b]){
+   const u=expressionContourParameterAtX(c,x);if(u===undefined)continue;
+   const slice=expressionSliceAtParameter(c,x,u);
+   gap=Math.min(gap,Math.max(0,box.y0-slice[1],slice[0]-box.y1));
+  }
+ }
+ const openingProximity=Math.max(0,1-gap/band),openingCost=.020*openingProximity;
+ // A small continuous shape preference survives even a source-steep allowance.
+ // It never forbids the diagonal needed by a steep source gesture.
+ const axisCost=.004*Math.min(1,((c.yEnd-c.yStart)/(c.xEnd-c.xStart))**2);
+ return {openingProximity,openingCost,axisCost};
 }
 /** A soft absolute-approach preference, with allowance earned by source pitch
  * geometry rather than the selected optical axis. The rounded outer controls
@@ -51,7 +75,7 @@ export function opticalBowInk(base:ExpressionInk,c:Contour,policy='optical-gestu
 export function opticalPhraseCandidates(base:ExpressionInk,p:ExpressionPlacement,sourceSide?:-1|1){
  const domain=p.opticalDomain?.(base.id);if(!domain)return [];
  const {start:a,end:b}=domain;
- const silhouette=p.phraseRouting==='optical-silhouette',breathing=p.phraseRouting==='optical-breathing'||silhouette,fitted=p.phraseRouting==='optical-fitted'||breathing;
+ const open=p.phraseRouting==='optical-open',silhouette=p.phraseRouting==='optical-silhouette'||open,breathing=p.phraseRouting==='optical-breathing'||silhouette,fitted=p.phraseRouting==='optical-fitted'||breathing;
  // Weight only the source span's musical ink. Pitch guides are omitted by
  // the inventory provider; head-clearance masks are not balance weight.
  // This bounded first moment is a weak local preference, never a side rule.
@@ -173,7 +197,8 @@ export function opticalPhraseCandidates(base:ExpressionInk,p:ExpressionPlacement
    for(const q of rows)if(selected.length<limit&&!selected.includes(q))selected.push(q);
    return selected;
   }).sort((a,b)=>a.cost-b.cost);
-  return keep.map(q=>({...q,ink:opticalBowInk(base,q.ink.contour!,p.phraseRouting)}));
+  const retained=keep.map(q=>({...q,ink:opticalBowInk(base,q.ink.contour!,p.phraseRouting)}));
+  return open?retained.map(q=>{const health=opticalOpeningHealth(q.ink,p);return {...q,open:health,cost:q.cost+health.openingCost+health.axisCost};}).sort((a,b)=>a.cost-b.cost):retained;
  }
  if(!fitted)return ranked.slice(0,24);
  const above=ranked.filter(q=>q.ink.contour!.side===-1),below=ranked.filter(q=>q.ink.contour!.side===1);
@@ -182,7 +207,7 @@ export function opticalPhraseCandidates(base:ExpressionInk,p:ExpressionPlacement
  return (above.length&&below.length?[...above.slice(0,12),...below.slice(0,12)]:ranked.slice(0,24)).sort((a,b)=>a.cost-b.cost);
 }
 export function routeOpticalPhrases(score:QuantizedGridScore,p:ExpressionPlacement,bases:ExpressionInk[]):ExpressionInk[]{
- if(p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette'){
+ if(p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette'||p.phraseRouting==='optical-open'){
   const dynamics=(score.dynamics??[]).some((e,i)=>{
    const hairpin=e.kind==='hairpin'||(!e.kind&&['crescendo','decrescendo'].includes(e.mark)&&!!e.durationTicks);
    if(p.include&&!p.include(hairpin?'hairpin':'dynamic',`dynamic-${i}`))return false;
@@ -193,7 +218,7 @@ export function routeOpticalPhrases(score:QuantizedGridScore,p:ExpressionPlaceme
  }
  const sides=new Map((score.phrases??[]).filter(q=>q.sourceSide).map(q=>[q.id,q.sourceSide==='above'?-1 as const:1 as const]));
  let cache:Map<string,ExpressionInk[]>|undefined,key:string|undefined;
- if(p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette'){
+ if(p.phraseRouting==='optical-breathing'||p.phraseRouting==='optical-silhouette'||p.phraseRouting==='optical-open'){
   key=JSON.stringify({policy:p.phraseRouting,placement:p.phrasePlacement,start:p.start,end:p.end,left:p.left,right:p.right,top:p.top,bottom:p.bottom,floor:p.expressionFloorActive,
    source:{phrases:score.phrases,dynamics:score.dynamics,pedals:score.pedals},obstacles:p.obstacles,balance:p.balanceObstacles,bases,domains:bases.map(q=>p.opticalDomain?.(q.id)),sides:[...sides]});
   cache=breathingRouteCache.get(score);if(!cache){cache=new Map();breathingRouteCache.set(score,cache);}

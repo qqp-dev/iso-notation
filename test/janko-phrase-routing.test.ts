@@ -4,7 +4,7 @@ import {taperedSpanPath} from '../src/render/janko/ties';
 import {expressionSliceAtX,expressionIntersectsBox,type ExpressionInk} from '../src/render/janko/elements/expressions';
 import {placeExpressions} from '../src/render/janko/elements/expressions';
 import {createStudioConfig} from '../src/render/janko/studio';
-import {CURRENT_CANDIDATES,CURRENT_ROUND_METADATA,ROUND_59_CANDIDATES,getCandidate} from '../src/render/janko/candidates';
+import {ROUND_60_CANDIDATES as CURRENT_CANDIDATES,ROUND_60_METADATA as CURRENT_ROUND_METADATA,ROUND_59_CANDIDATES,getCandidate} from '../src/render/janko/candidates';
 import {PreparedJankoWindows,renderPreparedJankoWindow} from '../src/render/janko/prepared-windows';
 import {lintJankoWindowSystems} from '../src/render/janko/linter';
 import {buildInkScene} from '../src/render/janko/ink-scene';

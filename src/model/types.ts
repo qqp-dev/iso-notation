@@ -49,6 +49,9 @@ export interface NoteSourceProvenance {
 }
 
 export interface QuantizedNote {
+  /** Candidate-only reading layer; source pitch and duration remain untouched. */
+  readingDisplay?: { pitchClass:number; relativeOctave:number; referencePitch:number; isAnchor:boolean;
+    mode?:'relative'|'absolute'; groupId?:string; groupHasBothParities?:boolean };
   sourceBeam?: { group?: string; noBeam?: boolean };
   id: string;
   pitch: PitchCoordinate;
@@ -262,6 +265,20 @@ export interface GraceGroup {
 }
 
 export interface QuantizedGridScore {
+  readingPresentation?: {
+    sourceScoreId:string;
+    anchors:{bar:number;tick:number;pitch:number;ownerId:string;ownerIds:string[]}[];
+    target:string;cost?:number;resets:number;
+    groups?:{id:string;bar:number;referencePitch:number;anchorOwnerIds:string[];memberIds:string[];kind:'hand-figure'|'continuous-cross-hand'|'held-melody-figure'}[];
+  };
+  /** Explicit reversible display projection; never a replacement for source facts. */
+  relativePresentation?: {
+    sourceScoreId: string;
+    displayZero: number;
+    visibleBars: number;
+    anchors: { bar: number; tick: number; pitch: number; movement: number }[];
+    notes: Record<string, { sourcePitch: number; displayPitch: number; bar: number }>;
+  };
   id: string;
   title: string;
   composer: string;
@@ -272,6 +289,9 @@ export interface QuantizedGridScore {
   performingInstruction?: { text: string; edition: string; pages: string; encodingText?: string; encodingFile?: string; encodingLine?: number };
   /** Publication attribution carried by an explicitly prepared score. */
   publicationNotices?: string[];
+  /** Explicit candidate edition exclusions; raw imported events remain recoverable. */
+  editionCorrections?: {kind:'omit-dynamic';reason:string;witness:string;original:DynamicOverlay;
+    writtenIndex:number;performedMappings:{writtenIndex:number;performedIndex:number;overrides:Record<string,unknown>}[]}[];
   /** Explicit written view; source/unfolded model remains separately retained.
    * Event overrides carry occurrence identities/clocks/provenance only. */
   writtenPresentation?: {

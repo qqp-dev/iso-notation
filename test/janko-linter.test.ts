@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { PreparedJankoWindows } from '../src/render/janko/prepared-windows';
-import { CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_60_CANDIDATES as CURRENT_CANDIDATES } from '../src/render/janko/candidates';
+import {no14RelativeProfile,no14RelativeBaselineProfile} from '../src/render/janko/no14-relative';
 import { buildInkScene, type InkScene } from '../src/render/janko/ink-scene';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import { importSchumann } from '../src/scores/schumann-no43';
@@ -70,6 +71,9 @@ import {
   checkClaspClearance,
   checkGraceIntegrity,
   checkEventHandMarkIntegrity,
+  checkReadingReferenceIntegrity,
+  checkReadingHeadIntegrity,
+  readingFrameSeats,
   checkDepthRoutePaint,
   checkJointRouteSeparation,
   checkExpressionIntegrity,
@@ -90,6 +94,7 @@ import {
   checkOttavaExtensions,
   checkRestClearance,
   checkRestSeat,
+  checkRestProvenance,
   checkStaffSegments,
   checkSplitStackStems,
   checkStemAndBeamValidity,
@@ -1000,6 +1005,19 @@ function fixtureScore(notes: QuantizedGridScore['notes'], measures: number): Qua
     notes,
   };
 }
+
+test('Defect: direct authored ending rests reject missing, misvalued or falsely owned source statements',()=>{
+ const score=fixtureScore([{id:'last-LH',startTick:0,durationTicks:24,pitch:{pitchClass:7,octave:2},hand:'LH'}],1);
+ score.timeSignatures=[{tick:0,numerator:6,denominator:8}];score.sourceBarTicks=[0,144];
+ score.sourceSilences=[{kind:'rest',hand:'RH',voice:'RH',staff:'upper',bar:1,occurrence:1,startTick:0,durationTicks:144,file:'ending.ly',line:1,col:1},...[[24,24],[48,24],[72,48],[120,24]].map(([startTick,durationTicks])=>({kind:'rest' as const,hand:'LH' as const,voice:'LH',staff:'lower',bar:1,occurrence:1,startTick,durationTicks,file:'ending.ly',line:2,col:startTick}))];
+ const o=resolveJankoOptions({...DEFAULT_JANKO_OPTIONS,authoredRestMode:'source',measuresPerSystem:1}),t=resolveJankoTokens(DEFAULT_JANKO_TOKENS),layout=layoutJankoScore(score,o,t)[0];
+ const check=(l:JankoSystemLayout)=>{const out:LintViolation[]=[];checkRestProvenance(l,o,t,out);return out;};
+ assert.equal(layout.rests.length,5);assert.equal(layout.rests[0].value,'whole');assert.equal(layout.rests[0].durationTicks,144);assert.deepEqual(check(layout),[]);
+ for(const mutate of [(l:JankoSystemLayout)=>{l.rests.splice(0,1);},(l:JankoSystemLayout)=>{l.rests[0].value='half';},(l:JankoSystemLayout)=>{l.rests[1].durationTicks=12;},(l:JankoSystemLayout)=>{l.rests[1].sourceOrigin='unrelated.ly:2';},(l:JankoSystemLayout)=>{l.rests[1].authored=false;}]){
+  const broken={...layout,rests:structuredClone(layout.rests)};mutate(broken);assert.ok(check(broken).some(q=>q.code==='rest-unwritable'&&q.severity==='error'));
+ }
+ const legacy=layoutJankoScore(score,{...o,authoredRestMode:undefined},t)[0];assert.equal(legacy.rests.length,0,'historical between-onset inference remains unchanged');
+});
 
 test('Defect: an unclasped four-voice simultaneity paints its stems through its own chord tones', () => {
   // The Round 14 linter fixture from the ticket: the wide-span specimen under
@@ -2581,4 +2599,116 @@ test('silhouette and paired typography admission retain source tips and reject f
  phrase.endpointIds![0]=['foreign-owner'];assert.ok(audit().some(q=>q.code==='expression-endpoint'));Object.assign(phrase,structuredClone(ph));
  const dynamic=l.expressions!.find(q=>q.dynamicFamilyInk)!,dy=structuredClone(dynamic);dynamic.dynamicFamilyInk!.mark='f';assert.ok(audit().some(q=>q.code==='expression-paint'));Object.assign(dynamic,structuredClone(dy));
  const pedal=l.expressions!.find(q=>q.pedalStartInk)!,pd=structuredClone(pedal);pedal.pedalStartInk!.family='maestro-text-regular';assert.ok(audit().some(q=>q.code==='pedal-start-geometry'));Object.assign(pedal,structuredClone(pd));assert.deepEqual(audit(),[]);
+});
+
+test('relative reference audit rejects missing, displaced and altered outlined reset labels',()=>{
+ const e=no14RelativeProfile(),l=layoutJankoScore(e.score,e.options,e.tokens)[0];
+ const check=(candidate:JankoSystemLayout)=>{const out:LintViolation[]=[];checkReadingReferenceIntegrity(e.score,candidate,e.options,e.tokens,out);return out;};
+ assert.deepEqual(check(l),[]);
+ assert.ok(check({...l,readingReferences:l.readingReferences!.slice(1)}).some(d=>d.code==='reading-reference-integrity'));
+ const marks=l.readingReferences!.map(m=>({...m}));marks[0].y1+=20;
+ assert.ok(check({...l,readingReferences:marks}).some(d=>d.code==='reading-reference-integrity'));
+ const altered=l.readingReferences!.map(m=>({...m}));altered[0].svg=altered[0].svg.replace('fill="#555555"','fill="#000000"');
+ assert.ok(check({...l,readingReferences:altered}).some(d=>d.code==='reading-reference-integrity'));
+});
+
+test('reading head audit rejects altered digits, missing frames and foreign mask intrusions',()=>{
+ const e=no14RelativeBaselineProfile(),l=layoutJankoScore(e.score,e.options,e.tokens)[0],scene=buildInkScene(l,e.options,e.tokens,e.score);
+ const check=()=>{const out:LintViolation[]=[];checkReadingHeadIntegrity(e.score,l,scene,out,e.options,e.tokens);return out;};
+ assert.deepEqual(check(),[]);
+ const anchor=[...scene.heads.values()].find(ps=>ps.some(p=>p.reading?.isAnchor))!;
+ const glyph=anchor.find(p=>p.primitive.kind==='glyph')!;
+ assert.equal(glyph.primitive.kind,'glyph');if(glyph.primitive.kind!=='glyph')throw Error('glyph');
+ const digit=glyph.primitive.digit;glyph.primitive.digit='A';assert.ok(check().some(d=>d.code==='reading-head-integrity'));glyph.primitive.digit=digit;
+ const frame=anchor.find(p=>p.paint.cls==='janko-reading-anchor-frame')!,cls=frame.paint.cls;
+ frame.paint.cls='missing-frame';assert.ok(check().some(d=>d.code==='reading-head-integrity'));frame.paint.cls=cls;
+ assert.equal(frame.primitive.kind,'stroke');if(frame.primitive.kind!=='stroke')throw Error('frame');
+ frame.primitive.x1+=1;assert.ok(check().some(d=>d.code==='reading-head-integrity'));frame.primitive.x1-=1;
+ const offset=glyph.reading!.relativeOctave;glyph.reading!.relativeOctave+=1;assert.ok(check().some(d=>d.code==='reading-head-integrity'));glyph.reading!.relativeOctave=offset;
+ const protection=anchor.find(p=>p.primitive.kind==='erase')!;
+ protection.box.x0+=.25;assert.ok(check().some(d=>d.code==='reading-anchor-clearance'));protection.box.x0-=.25;
+ assert.deepEqual(check(),[]);
+ const opts={knockoutWx:3,knockoutHy:4,readingFrameSeats:readingFrameSeats(scene)};
+ const svg=renderSystem(e.score,l.geometry,l.index,e.options,e.tokens,l);
+ assert.deepEqual(auditKnockoutProtection(svg,opts),[]);
+ assert.ok(auditKnockoutProtection(svg,{knockoutWx:3,knockoutHy:4}).some(d=>d.code==='knockout-pass-through'),'a class name alone admits no frame');
+ const plain=[...scene.heads.values()].find(ps=>!ps[0].reading?.isAnchor)!,mask=plain.find(p=>p.primitive.kind==='erase')!.box;
+ const x=(mask.x0+mask.x1)/2,y=(mask.y0+mask.y1)/2;
+ const foreign=`<line class="janko-reading-anchor-frame" x1="${x}" y1="${y}" x2="${x+1}" y2="${y}" stroke-width="0.30"/>`;
+ assert.ok(auditKnockoutProtection(svg+foreign,opts).some(d=>d.code==='knockout-pass-through'),'own admission does not exempt a frame against another head');
+});
+
+test('reading bracket audit rejects substituted glyphs, detached owners and foreign-head intrusion',()=>{
+ const e=no14RelativeBaselineProfile(),o=resolveJankoOptions({...e.options,readingAnchorMark:'brackets'});
+ const l=[...new PreparedJankoWindows(e.score,[{measureStart:1,measureCount:1}],o,e.tokens).systems.values()][0];
+ const scene=buildInkScene(l,o,e.tokens,e.score);
+ const check=()=>{const out:LintViolation[]=[];checkReadingHeadIntegrity(e.score,l,scene,out,o,e.tokens);return out;};
+ assert.deepEqual(check(),[]);
+ const anchor=[...scene.heads.values()].find(ps=>ps[0].reading?.isAnchor)!,mark=anchor.find(p=>p.paint.cls==='janko-reading-anchor-bracket')!;
+ if(mark.primitive.kind!=='glyph')throw Error('authentic glyph required');
+ const glyph=mark.primitive.digit;mark.primitive.digit='(';assert.ok(check().some(d=>d.code==='reading-head-integrity'));mark.primitive.digit=glyph;
+ const owners=mark.ownerIds;mark.ownerIds=['foreign'];assert.ok(check().some(d=>d.code==='reading-head-integrity'));mark.ownerIds=owners;
+ const original={...mark.box},foreign=[...scene.heads.values()].find(ps=>!ps[0].reading?.isAnchor)!.find(p=>p.primitive.kind==='erase')!.box;
+ Object.assign(mark.box,foreign);assert.ok(check().some(d=>d.code==='reading-anchor-clearance'));Object.assign(mark.box,original);
+ const mask=anchor.find(p=>p.primitive.kind==='erase')!;mask.box.x0+=1;
+ assert.ok(check().some(d=>d.code==='reading-anchor-clearance'));mask.box.x0-=1;
+ assert.deepEqual(check(),[]);
+});
+
+test('gesture-relative parity audit rejects a digit-only substitution on absolute rails',async()=>{
+ const {no14GestureRelativeProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const {checkReadingParityIntegrity}=await import('../src/render/janko/linter');
+ const p=no14GestureRelativeProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:1,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0];
+ const check=()=>{const out:LintViolation[]=[];checkReadingParityIntegrity(l,p.options,out);return out;};
+ assert.deepEqual(check(),[]);
+ const anchor=l.notes.find(n=>n.note.readingDisplay?.isAnchor&&n.note.pitch.pitchClass%2)!;
+ anchor.x+=1;assert.ok(check().some(d=>d.code==='reading-parity-integrity'));anchor.x-=1;
+ const odd=l.notes.find(n=>n.note.readingDisplay?.pitchClass===7)!;const old=odd.x;
+ odd.x=l.columns.get(odd.note.startTick)!;assert.ok(check().some(d=>d.code==='reading-parity-integrity'));odd.x=old;
+ assert.deepEqual(check(),[]);
+});
+
+test('underline reading audit rejects successive parity shifts, wider masks and foreign underline intrusions',async()=>{
+ const {no14GestureUnderlineProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const {checkReadingParityIntegrity}=await import('../src/render/janko/linter');
+ const p=no14GestureUnderlineProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:1,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0],scene=buildInkScene(l,p.options,p.tokens,p.score);
+ const check=()=>{const out:LintViolation[]=[];checkReadingHeadIntegrity(p.score,l,scene,out,p.options,p.tokens);checkReadingParityIntegrity(l,p.options,out);return out;};
+ assert.deepEqual(check(),[]);
+ const sequential=l.notes.find(n=>n.note.readingDisplay?.pitchClass===7&&!n.note.readingDisplay.isAnchor)!;sequential.x+=getClusterSpacingPreset(p.options.clusterSpacing).pairGap;
+ assert.ok(check().some(d=>d.code==='reading-parity-integrity'));sequential.x-=getClusterSpacingPreset(p.options.clusterSpacing).pairGap;
+ const anchor=[...scene.heads.values()].find(ps=>ps.some(p=>p.paint.cls==='janko-reading-anchor-underline'))!,mark=anchor.find(p=>p.paint.cls==='janko-reading-anchor-underline')!,mask=anchor.find(p=>p.primitive.kind==='erase')!;
+ mask.box.x0-=.3;assert.ok(check().some(d=>d.code==='reading-anchor-clearance'));mask.box.x0+=.3;
+ const foreign=[...scene.heads.values()].find(ps=>ps!==anchor)!.find(p=>p.primitive.kind==='erase')!,saved={...foreign.box};
+ Object.assign(foreign.box,{x0:mark.box.x0-.1,x1:mark.box.x1+.1,y0:mark.box.y0-.1,y1:mark.box.y1+.1});assert.ok(check().some(d=>d.code==='reading-anchor-clearance'));Object.assign(foreign.box,saved);
+ assert.deepEqual(check(),[]);
+});
+
+test('wide shipped A anchor underline stays inside ordinary horizontal protection',async()=>{
+ const {no14GestureUnderlineProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const p=no14GestureUnderlineProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:43,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0],scene=buildInkScene(l,p.options,p.tokens,p.score),pieces=[...scene.heads.values()].find(ps=>ps.some(p=>p.primitive.kind==='glyph'&&p.primitive.digit==='A'&&p.reading?.isAnchor))!;
+ const mark=pieces.find(p=>p.paint.cls==='janko-reading-anchor-underline')!,glyph=pieces.find(p=>p.paint.cls==='janko-digit')!,mask=pieces.find(p=>p.primitive.kind==='erase')!;
+ assert.ok(glyph.box.x1-glyph.box.x0>mask.box.x1-mask.box.x0,'real shipped wide glyph is the regression trigger');
+ assert.ok(Math.abs(mask.box.x1-mask.box.x0-5.06)<1e-8);assert.ok(Math.abs(mark.box.x1-mark.box.x0-4.66)<1e-8);
+ const out:LintViolation[]=[];checkReadingHeadIntegrity(p.score,l,scene,out,p.options,p.tokens);assert.deepEqual(out,[]);
+});
+
+test('reading glyph optical seats reject undeclared displacement and false musical-axis metadata',async()=>{
+ const {no14GestureOpticalProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const p=no14GestureOpticalProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:60,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0],scene=buildInkScene(l,p.options,p.tokens,p.score);
+ const check=()=>{const out:LintViolation[]=[];checkReadingHeadIntegrity(p.score,l,scene,out,p.options,p.tokens);return out;};
+ assert.deepEqual(check(),[]);
+ const pieces=[...scene.heads.values()].find(ps=>ps.some(q=>q.primitive.kind==='glyph'&&q.primitive.digit==='1'))!,glyph=pieces.find(q=>q.paint.cls==='janko-digit')!;
+ if(glyph.primitive.kind!=='glyph')throw Error('reading glyph');const x=glyph.primitive.x;glyph.primitive.x+=.15;
+ assert.ok(check().some(d=>d.code==='reading-head-integrity'));glyph.primitive.x=x;
+ const axis=pieces[0].reading!.noteX;pieces[0].reading!.noteX!+=.1;assert.ok(check().some(d=>d.code==='reading-head-integrity'));pieces[0].reading!.noteX=axis;
+ const mask=pieces.find(q=>q.primitive.kind==='erase')!,x0=mask.box.x0;mask.box.x0+=.1;assert.ok(check().some(d=>d.code==='reading-anchor-clearance'));mask.box.x0=x0;
+ assert.deepEqual(check(),[]);
+ const {readingGlyphProtectionSeats}=await import('../src/render/janko/linter');
+ const svg=renderSystem(p.score,l.geometry,l.index,p.options,p.tokens,l),opts={knockoutWx:2.53,knockoutHy:3.46,readingFrameSeats:readingFrameSeats(scene),readingGlyphProtectionSeats:readingGlyphProtectionSeats(scene)};
+ assert.deepEqual(auditKnockoutProtection(svg,opts),[]);
+ assert.ok(auditKnockoutProtection(svg,{...opts,readingGlyphProtectionSeats:undefined}).some(d=>d.code==='knockout-missing'));
+ const shift=svg.replace(new RegExp(`(<text class="janko-digit" x=")${glyph.primitive.x.toFixed(2)}`),(_,prefix)=>prefix+(glyph.primitive.kind==='glyph'?glyph.primitive.x+.1:0).toFixed(2));
+ assert.notEqual(shift,svg);assert.ok(auditKnockoutProtection(shift,opts).some(d=>d.code==='knockout-missing'));
+ const seats=opts.readingGlyphProtectionSeats.map(s=>({...s,maskX:s.maskX+.1}));
+ assert.ok(auditKnockoutProtection(svg,{...opts,readingGlyphProtectionSeats:seats}).some(d=>d.code==='knockout-missing'));
 });

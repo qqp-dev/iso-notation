@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {comparisonReadings,cloneComparisonSvg,no14GoldComparisonPages} from '../src/source-review/prepared-comparison';
-import gold from '../src/render/janko/no14-gold-profile.json';
+import gold from '../src/render/janko/no14-published-profile.json';
+import historical from '../src/render/janko/no14-gold-profile.json';
 import {readPublishedComparison} from '../src/source-review/published-state';
 
 test('published Source path excludes local PDF transport, decoder and engraving execution',async()=>{
@@ -13,14 +14,14 @@ test('published Source path excludes local PDF transport, decoder and engraving 
  assert.doesNotMatch(result.outputFiles[0].text,/@janko-source-pdf|@janko-pdfjs-wasm|local dev only/);
 });
 
-test('published No14 Source requires the ready selected profile and four ordered genuine page vectors',()=>{
- const figures=Array.from({length:4},(_,i)=>({dataset:{page:String(i+1)},querySelector:(q:string)=>q==='svg'?{page:i+1}:{textContent:`Page ${i+1}`}}));
- const score={dataset:{revision:gold.gold.profileSha256},querySelectorAll:()=>figures};
+test('published No14 Source requires the ready selected profile and three ordered genuine page vectors',()=>{
+ const figures=Array.from({length:3},(_,i)=>({dataset:{page:String(i+1)},querySelector:(q:string)=>q==='svg'?{page:i+1}:{textContent:`Page ${i+1}`}}));
+ const score={dataset:{revision:gold.profileSha256},querySelectorAll:()=>figures};
  const root={dataset:{preparedState:'ready'},querySelector:()=>score};
  const pages=()=>no14GoldComparisonPages(root as unknown as HTMLElement);
- assert.deepEqual(pages().map(q=>q.page),[1,2,3,4]);
+ assert.deepEqual(pages().map(q=>q.page),[1,2,3]);
  for(const state of ['loading','refreshing','stale','error']){root.dataset.preparedState=state;assert.deepEqual(pages(),[]);}root.dataset.preparedState='ready';
- score.dataset.revision=gold.accepted.profileSha256;assert.deepEqual(pages(),[]);score.dataset.revision=gold.gold.profileSha256;
+ score.dataset.revision=historical.gold.profileSha256;assert.deepEqual(pages(),[]);score.dataset.revision=gold.profileSha256;
  figures[2].dataset.page='2';assert.deepEqual(pages(),[]);figures[2].dataset.page='3';
  figures.pop();assert.deepEqual(pages(),[]);
 });

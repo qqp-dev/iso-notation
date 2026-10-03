@@ -54,6 +54,9 @@ export interface JankoNoteheadSpec {
   isPositionOfHonor?: boolean;
   /** Optional per-note digit override (defaults to the duodecimal digit). */
   digit?: string;
+  readingAnchor?: boolean;
+  /** Reading-only horizontal glyph seat in actual rendered-em units. */
+  readingGlyphSeat?: number;
   /**
    * True when a foreign stem crosses this note: the knockout grows taller
    * (`hy + stemAttachmentAir`, exactly the stem-start line) so the stem

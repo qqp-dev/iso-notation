@@ -1208,6 +1208,9 @@ export interface JankoLayoutOptions {
   clarityPass?: boolean;
   /** Measures engraved per horizontal system. */
   measuresPerSystem: number;
+  /** Candidate-only production admission from the same rectangular head
+   * protection used by painting. Expanded marks retain the legacy budget. */
+  productionWidthPolicy?: 'protected-heads';
   /** Pluggable rhythm renderer style. */
   rhythmStyle: JankoRhythmStyle;
   /** Opt-in comparative rebeaming. Source gesture membership remains recorded. */
@@ -1228,7 +1231,7 @@ export interface JankoLayoutOptions {
   /** Candidate-only joint pre-ink courses for overlapping rhythmic voices. */
   jointVoices?: true;
   /** Coupled source-local phrasing, explicit while its presentation is reviewed. */
-  phraseRouting?: 'local' | 'balanced' | 'optical-gesture' | 'optical-fitted' | 'optical-breathing' | 'optical-silhouette';
+  phraseRouting?: 'local' | 'balanced' | 'optical-gesture' | 'optical-fitted' | 'optical-breathing' | 'optical-silhouette' | 'optical-open';
   /** Opt-in intact lighter dynamic alphabet; historical glyphs stay default. */
   dynamicFamily?:import('./elements/dynamic-families').DynamicFamily;
   /** Trial body/end balance; omitted retains historical taper. */
@@ -1307,6 +1310,8 @@ export interface JankoLayoutOptions {
   /** Infer an active hand's opening silence from its preceding-system onset and
    * maximum still-sounding release. Disable only for a legacy comparison. */
   inferBoundaryRests?: boolean;
+  /** Candidate-only literal source rest obligations, including terminal and whole-bar silences. */
+  authoredRestMode?: 'source';
   /**
    * Horizontal cluster spacing (Round 17): the rectangular mask margin and the
    * breathing air between same-row heads of one onset. Defaults to the golden
@@ -1385,6 +1390,22 @@ export interface JankoLayoutOptions {
   showTimeSignature?: boolean;
   /** Draw subtle vertical dashed pulse lines on beats 2, 3, … (Klavarskribo beat grid). */
   showBeatGrid?: boolean;
+  /** Optional visual pulse spacing, independent of quarter-note duration ticks. */
+  beatPulseTicks?: number;
+  /** Candidate reset representation; omitted uses relative movement labels. */
+  readingReferenceMode?: 'movement' | 'absolute';
+  readingAnchorMark?: 'frame' | 'brackets' | 'underline';
+  /** Candidate underline weight, preserving its existing horizontal footprint. */
+  readingUnderlineStroke?:number;
+  /** Candidate marker span centered on the reading position; omitted retains glyph-bound history. */
+  readingUnderlineWidth?:number;
+  /** Reading glyph optical seats, in fractions of the actual SVG em.
+   * Musical heads, masks, stems and underline axes remain fixed. */
+  readingGlyphSeats?: Partial<Record<'1'|'B',number>>;
+  /** Historical Round76 only: extend reading parity rails across successive attacks. */
+  readingSequentialParity?: boolean;
+  /** Candidate-only straight square-bracket silhouette, in points. */
+  readingAnchorSquare?: { stroke: number; sideAir: number; verticalAir: number; arm: number };
   /**
    * Draw the faint dashed whole-tone row guidelines (`equator ± h/2`).
    * Off by default: the only dotted lines in the engraving are the vertical
@@ -1855,7 +1876,7 @@ export type JankoClusterPresentation = 'literal' | 'mirrored-handprint' | 'index
 export type JankoVerticalPlacement = 'slot' | 'content-aware';
 
 /** Fully resolved layout options (every optional option filled in). */
-export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'runningHeaderHeight' | 'pedalTextFamily' | 'dynamicFamily' | 'repeatTreatment' | 'pedalStart' | 'hairpinStrokeWidth' | 'phrasePlacement' | 'phraseTaper' | 'sharedDurationDot' | 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'runningHeaderHeight' | 'pedalTextFamily' | 'dynamicFamily' | 'repeatTreatment' | 'pedalStart' | 'hairpinStrokeWidth' | 'phrasePlacement' | 'phraseTaper' | 'sharedDurationDot' | 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
+export type ResolvedJankoLayoutOptions = Required<Omit<JankoLayoutOptions, 'authoredRestMode' | 'productionWidthPolicy' | 'readingGlyphSeats' | 'readingUnderlineWidth' | 'readingUnderlineStroke' | 'readingSequentialParity' | 'readingAnchorSquare' | 'readingAnchorMark' | 'readingReferenceMode' | 'beatPulseTicks' | 'runningHeaderHeight' | 'pedalTextFamily' | 'dynamicFamily' | 'repeatTreatment' | 'pedalStart' | 'hairpinStrokeWidth' | 'phrasePlacement' | 'phraseTaper' | 'sharedDurationDot' | 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>> & Pick<JankoLayoutOptions, 'authoredRestMode' | 'productionWidthPolicy' | 'readingGlyphSeats' | 'readingUnderlineWidth' | 'readingUnderlineStroke' | 'readingSequentialParity' | 'readingAnchorSquare' | 'readingAnchorMark' | 'readingReferenceMode' | 'beatPulseTicks' | 'runningHeaderHeight' | 'pedalTextFamily' | 'dynamicFamily' | 'repeatTreatment' | 'pedalStart' | 'hairpinStrokeWidth' | 'phrasePlacement' | 'phraseTaper' | 'sharedDurationDot' | 'phraseRouting' | 'completeFlagClearance' | 'sharedHeadTerminal' | 'jointVoices' | 'durationSeatPreferences' | 'groupedRhythm' | 'stemConvention' | 'preserveGestureMembership' | 'comparisonPitchFields' | 'shareCompatibleLocalRhythm' | 'crossingConvention' | 'depthProfile' | 'stableOnsets' | 'independentUnisonAttachments' | 'shareAttackHeads' | 'beamContour' | 'rhVoiceSeparation' | 'comparisonInset' | 'sharedRhCarrier'>;
 
 /** Default macro-layout: 4 systems of 4 measures on A4 portrait (Round 15). */
 export const DEFAULT_JANKO_OPTIONS: ResolvedJankoLayoutOptions = {
