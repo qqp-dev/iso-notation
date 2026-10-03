@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Presentation-agnostic lossless 12-TET music notation system and deterministic vector visualization workbench for 4-row Jánko isomorphic keyboards.",
+  "description": "Presentation-agnostic lossless 12-TET music notation system and deterministic vector visualization workbench for 4-row J\u00e1nko isomorphic keyboards.",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5175",
     "build": "tsc && vite build && node scripts/build-practice.mjs",
@@ -15,7 +15,10 @@
     "brahms:export-durations": "tsx scripts/brahms-export-written-durations.ts",
     "brahms:export-expressions": "tsx scripts/brahms-export-expressions.ts",
     "pdf:no14": "tsx scripts/export-no14-practice-pdf.ts",
-    "pdf:no14:gold": "tsx scripts/export-no14-practice-pdf.ts --profile gold"
+    "pdf:no14:gold": "tsx scripts/export-no14-practice-pdf.ts --profile gold",
+    "test:full": "node scripts/run-tests.mjs --full",
+    "test:focused": "node scripts/run-tests.mjs --files",
+    "test:release": "node scripts/run-tests.mjs --release"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

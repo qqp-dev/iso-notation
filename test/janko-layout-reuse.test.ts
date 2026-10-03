@@ -69,9 +69,9 @@ import {
 import {NO14_GOLD_REFERENCE_ID} from '../src/render/janko/no14-gold';
 import {no14PublishedProfile as no14GoldProfile} from '../src/render/janko/no14-published';
 import { BRAHMS_STUDIO_SCORE_ID, DEFAULT_STUDIO_SCORE_ID, resolveCandidate } from '../src/render/janko/candidates';
-import { ROUND_37_CANDIDATES, ROUND_37_METADATA } from './janko-round37.test';
-import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './janko-round39.test';
-import { ROUND_41_CANDIDATES } from './janko-round41.test';
+import { ROUND_37_CANDIDATES, ROUND_37_METADATA } from './support/round37-fixtures';
+import { ROUND_39_CANDIDATES, ROUND_39_METADATA } from './support/round39-fixtures';
+import { ROUND_41_CANDIDATES } from './support/round41-fixtures';
 
 const BRAHMS = buildBrahmsOp118No1Score();
 const BACH = buildBachGoldbergVar1Score();
@@ -179,7 +179,7 @@ test('Output equivalence: Candidate windows across score candidates are byte-ide
 
 test('Output equivalence: Full page spread is byte-identical standalone vs precomputed', () => {
   const bLayouts = layoutJankoScore(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
-  const totalBrahmsPages = countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS);
+  const totalBrahmsPages = countJankoPages(BRAHMS, BRAHMS_OPTS, BRAHMS_TOKS, bLayouts);
   assert.equal(totalBrahmsPages, 6, 'Brahms canonical fixed-3 produces six pages');
 
   for (let p = 0; p < totalBrahmsPages; p++) {
@@ -345,7 +345,7 @@ test('Fresh data/options/tokens: candidate configurations remain separate from e
 
   assert.notEqual(svgA, svgB, 'Literal baseline and indexed symmetric produce distinct SVGs');
 
-  // The parked Round 41 candidates (imported from their own suite) still
+  // The parked Round 41 candidates (imported as registration-free frozen data) still
   // produce distinct SVGs: identical layout ink, three different terminal
   // shapes. See test/janko-round41.test.ts for the live-round proofs.
   assert.equal(ROUND_41_CANDIDATES.length, 3);

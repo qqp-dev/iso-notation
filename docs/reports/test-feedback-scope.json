@@ -1,0 +1,744 @@
+{
+  "schema": 1,
+  "change": "scope-test-feedback",
+  "base": "75889ec41b6d2bcad6ed9b21482910d0f8b3599a",
+  "state": "uncommitted isolated implementation; primary Git/CI/public receipt pending",
+  "generatedAt": "2026-10-03T02:08:11.773553+00:00",
+  "runtime": "Node v26.7.0",
+  "historicalFull": {
+    "run": "37075948013",
+    "head": "75889ec4",
+    "tests": 1395,
+    "passed": 1395,
+    "testStepSeconds": 2615,
+    "jobSeconds": 2730,
+    "runtime": "Node22 hosted",
+    "newFullRun": false,
+    "notAControlledSpeedupComparator": true
+  },
+  "measurements": {
+    "normal": {
+      "key": "normal",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "startedLoad": [
+        0.6,
+        0.61,
+        0.52
+      ],
+      "completedLoad": [
+        0.71,
+        0.63,
+        0.53
+      ],
+      "elapsedMs": 2557.440493,
+      "wallSeconds": 2.55,
+      "userSeconds": 3.13,
+      "systemSeconds": 0.96,
+      "maxRssKiB": 98480,
+      "status": 0,
+      "signal": null,
+      "counts": {
+        "tests": 63,
+        "pass": 63,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "log": "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf/normal.log",
+      "runtime": "v26.7.0"
+    },
+    "ui-tooling": {
+      "key": "ui-tooling",
+      "command": [
+        "npm",
+        "run",
+        "test:focused",
+        "--",
+        "test/test-harness.test.ts",
+        "test/public-release.test.ts",
+        "test/janko-reference-reader.test.ts",
+        "test/janko-prepared-viewer.test.ts"
+      ],
+      "startedLoad": [
+        0.9,
+        0.68,
+        0.55
+      ],
+      "completedLoad": [
+        0.99,
+        0.71,
+        0.56
+      ],
+      "elapsedMs": 2076.453548,
+      "wallSeconds": 2.06,
+      "userSeconds": 2.22,
+      "systemSeconds": 0.67,
+      "maxRssKiB": 96156,
+      "status": 0,
+      "signal": null,
+      "counts": {
+        "tests": 43,
+        "pass": 43,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "log": "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf/ui-tooling.log",
+      "runtime": "v26.7.0"
+    },
+    "owners": {
+      "key": "owners",
+      "command": [
+        "/home/linuxbrew/.linuxbrew/Cellar/node/26.7.0/bin/node",
+        "--import",
+        "tsx",
+        "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf/run-owner-cases.mjs"
+      ],
+      "startedLoad": [
+        0.51,
+        0.62,
+        0.54
+      ],
+      "completedLoad": [
+        1.09,
+        0.76,
+        0.59
+      ],
+      "elapsedMs": 33662.038689,
+      "wallSeconds": 33.65,
+      "userSeconds": 42.52,
+      "systemSeconds": 2.05,
+      "maxRssKiB": 676076,
+      "status": 0,
+      "signal": null,
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "log": "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf/owners.log",
+      "runtime": "v26.7.0"
+    },
+    "build": {
+      "key": "build",
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "startedLoad": [
+        0.6,
+        0.81,
+        0.7
+      ],
+      "completedLoad": [
+        1.36,
+        0.96,
+        0.75
+      ],
+      "elapsedMs": 24746.182801000003,
+      "wallSeconds": 24.74,
+      "userSeconds": 34.3,
+      "systemSeconds": 5.09,
+      "maxRssKiB": 1715924,
+      "status": 0,
+      "signal": null,
+      "counts": {},
+      "log": "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf/build.log",
+      "runtime": "v26.7.0"
+    }
+  },
+  "finalFocusedHarness": {
+    "file": "test/test-harness.test.ts",
+    "tests": 11,
+    "passed": 11,
+    "failed": 0,
+    "durationMs": 1690.927789,
+    "log": "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf/final-guard-harness.tap"
+  },
+  "sequenceNote": "Normal/UI timings precede final package-content classification and complete-manifest/mixed-area guard strengthening. Final focused harness and configured build cover the final policy; no repeated aggregate suite.",
+  "fixtureFingerprints": {
+    "37": {
+      "sha256": "c1e68ac7fc0d037a81a540b3239938b8e136a1dd69b7f3502c30d0bd18a662e0",
+      "bytes": 3666
+    },
+    "38": {
+      "sha256": "598358ae03f9a3d672dc2e365b7bf15925dcb4f123e0afbece3a428fcb1cbcee",
+      "bytes": 3239
+    },
+    "39": {
+      "sha256": "06721e11b2e602d22260d6b846904498f14fdd903043a81ed61e2936b0ceba3b",
+      "bytes": 11582
+    },
+    "41": {
+      "sha256": "1ea47dd7e3eb2464e30211722c549aea5003ff7863533d01c5142b1642375c0e",
+      "bytes": 8710
+    }
+  },
+  "bodyPreservation": {
+    "allExact": true
+  },
+  "bodyCounts": [
+    {
+      "path": "test/janko-round37.test.ts",
+      "originalCases": 15,
+      "currentCases": 15,
+      "originalBodiesAllExact": true
+    },
+    {
+      "path": "test/janko-round38.test.ts",
+      "originalCases": 13,
+      "currentCases": 13,
+      "originalBodiesAllExact": true
+    },
+    {
+      "path": "test/janko-round39.test.ts",
+      "originalCases": 20,
+      "currentCases": 20,
+      "originalBodiesAllExact": true
+    },
+    {
+      "path": "test/janko-round41.test.ts",
+      "originalCases": 24,
+      "currentCases": 24,
+      "originalBodiesAllExact": true
+    },
+    {
+      "path": "test/janko-round46.test.ts",
+      "originalCases": 17,
+      "currentCases": 18,
+      "originalBodiesAllExact": true
+    }
+  ],
+  "retainedNamedInventory": {
+    "baselineFiles": 123,
+    "baselineStaticNamedDeclarations": 1272,
+    "currentFiles": 123,
+    "preservedMusicalCases": true,
+    "missingMusicalCases": [],
+    "policyRevisions": [
+      {
+        "path": "test/public-release.test.ts",
+        "revisedNames": [
+          "root Play/Sheet and PDF consume one verified active release; Pages keeps full software gates",
+          "Pages provisions the actual LilyPond compiler before mandatory expression tests"
+        ]
+      },
+      {
+        "path": "test/test-harness.test.ts",
+        "revisedNames": [
+          "official npm test uses the bounded full-suite launcher"
+        ]
+      }
+    ],
+    "addedDeclarations": [
+      {
+        "path": "test/janko-round46.test.ts",
+        "names": [
+          "'Page-loop ownership: six pages share one fresh solve per call; changed tokens stay independent'"
+        ]
+      },
+      {
+        "path": "test/public-release.test.ts",
+        "names": [
+          "'root Play/Sheet and PDF consume one verified active release; Pages declares selected software gates'",
+          "'Pages provisions the actual LilyPond compiler when selected source checks require it'",
+          "'manual full validation is explicit, retains complete coverage and never deploys Pages'"
+        ]
+      },
+      {
+        "path": "test/test-harness.test.ts",
+        "names": [
+          "'official npm test declares bounded contracts and complete discovery requires test:full'",
+          "'explicit requests reject missing, duplicate, unknown and incompatible selections'",
+          "'release coverage explains related UI, tooling, dependencies, compiler and actual score contracts'",
+          "'release range retains renamed/deleted endpoints and refuses an unavailable or invented base'",
+          "'literal helper dependencies select all transitive consumers without registering fixture-owner cases'",
+          "'reviewed one-time scope loses filtering after any later historical body, fixture or runtime change'",
+          "'live child output and elapsed progress arrive before completion; exclusive phases follow completion'",
+          "'native failing/interrupted/spawn-error children fail the command and stop later phases'"
+        ]
+      }
+    ],
+    "removedDuplicateRegistrations": {
+      "direct": 79,
+      "transitiveRound38": 39,
+      "total": 118,
+      "notAWallTimeSaving": true
+    },
+    "explanation": "Baseline static inventory uses literal declarations; no runtime full-count forecast. AST body comparison independently proves every original Round37/38/39/41/46 test invocation unchanged; three obsolete full-policy names intentionally revised."
+  },
+  "removedDuplicateRegistrations": {
+    "direct": 79,
+    "round38Transitive": 39,
+    "total": 118,
+    "notSummedWallSavings": true
+  },
+  "pageLoop": {
+    "before": {
+      "profile": "historical Round46",
+      "pages": 6,
+      "solves": 7,
+      "wallMs": 4811.791981,
+      "cpu": {
+        "user": 5820949,
+        "system": 138954
+      },
+      "rss": 379662336,
+      "hashes": [
+        "43ab5615471d276dc9cc7819d4b8074df924c3aa3bd11de64200b16a93a1863c",
+        "07022c8df03acaee527f88987dcbb4d5bf23e71d4e5628f7ca93a5e618db8bb7",
+        "e58f93b09bfb009c64a24209d51be6be1c5fbf4085e919b75ca4a982981ec311",
+        "afe583706642777028959747f249262b77056cb5a63ad22481cba09c2d6bc3bd",
+        "aaddc691eae79b91a83012d912e127be68e34c1ebc5d942826445bd77737b4e7",
+        "05c2510c6bd891d0db12e421fc2eeb98f94f05b2908ee72e2f49891a47b6aacd"
+      ],
+      "joinedSha256": "fa985bf1210bcd6489955e5f57919b68a13cdc906cb9d4cbfdc44d1bbf8d8ed6"
+    },
+    "after": {
+      "profile": "historical Round46",
+      "pages": 6,
+      "solves": 1,
+      "wallMs": 701.6231010000001,
+      "cpu": {
+        "user": 790384,
+        "system": 13080
+      },
+      "rss": 398667776,
+      "hashes": [
+        "43ab5615471d276dc9cc7819d4b8074df924c3aa3bd11de64200b16a93a1863c",
+        "07022c8df03acaee527f88987dcbb4d5bf23e71d4e5628f7ca93a5e618db8bb7",
+        "e58f93b09bfb009c64a24209d51be6be1c5fbf4085e919b75ca4a982981ec311",
+        "afe583706642777028959747f249262b77056cb5a63ad22481cba09c2d6bc3bd",
+        "aaddc691eae79b91a83012d912e127be68e34c1ebc5d942826445bd77737b4e7",
+        "05c2510c6bd891d0db12e421fc2eeb98f94f05b2908ee72e2f49891a47b6aacd"
+      ],
+      "joinedSha256": "fa985bf1210bcd6489955e5f57919b68a13cdc906cb9d4cbfdc44d1bbf8d8ed6"
+    },
+    "allSixSvgBytesExact": true,
+    "independentColdPerCallAndChangedTokensPreserved": true,
+    "measurementCaveat": "One old-then-new same-process probe: later run warmer; causal evidence is exact ownership7\u21921, not a whole-suite speedup."
+  },
+  "pendingReleasePlan": {
+    "kind": "pending-worktree simulation; actual merged before/head is primary-owned",
+    "base": "75889ec4",
+    "packageDomain": "tooling",
+    "patterns": {
+      "test/janko-layout-reuse.test.ts": "Output equivalence: Full page spread|Fresh data/options/tokens: candidate configurations remain separate",
+      "test/janko-round37.test.ts": "Criterion 7: Studio candidates view",
+      "test/janko-round38.test.ts": "Criterion 1:",
+      "test/janko-round39.test.ts": "Candidate registry:|Round 39 metadata:|Round 38 parked record:|Studio candidate windows:",
+      "test/janko-round41.test.ts": "Round 41 metadata:|Round 41 registry:|Round 41 cards share",
+      "test/janko-round46.test.ts": "A. Literal-mode ink stays clean|Page-loop ownership:",
+      "test/janko-studio.test.ts": "Parked Round 39 renders the three abstract cards"
+    },
+    "scope": "focused release",
+    "files": [
+      "test/grid.test.ts",
+      "test/janko-layout-reuse.test.ts",
+      "test/janko-reference-reader.test.ts",
+      "test/janko-round37.test.ts",
+      "test/janko-round38.test.ts",
+      "test/janko-round39.test.ts",
+      "test/janko-round41.test.ts",
+      "test/janko-round46.test.ts",
+      "test/janko-studio.test.ts",
+      "test/notation-variations.test.ts",
+      "test/phonetics.test.ts",
+      "test/pitch.test.ts",
+      "test/public-release.test.ts",
+      "test/test-harness.test.ts"
+    ],
+    "coverage": [
+      {
+        "path": ".github/workflows/deploy.yml",
+        "area": "tooling",
+        "checks": [
+          "test/test-harness.test.ts",
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "README.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "docs/reports/test-feedback-scope.json",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "docs/reports/test-feedback-scope.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "docs/test-harness.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "openspec/changes/scope-test-feedback/design.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "openspec/changes/scope-test-feedback/proposal.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "openspec/changes/scope-test-feedback/specs/validation-feedback/spec.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "openspec/changes/scope-test-feedback/tasks.md",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "openspec/config.yaml",
+        "area": "documentation",
+        "checks": []
+      },
+      {
+        "path": "package.json",
+        "area": "tooling",
+        "checks": [
+          "test/test-harness.test.ts",
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "scripts/run-tests.mjs",
+        "area": "tooling",
+        "checks": [
+          "test/test-harness.test.ts",
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "scripts/test-feedback-scope.json",
+        "area": "tooling",
+        "checks": [
+          "test/test-harness.test.ts",
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "scripts/test-selection.mjs",
+        "area": "tooling",
+        "checks": [
+          "test/test-harness.test.ts",
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "scripts/verify-data-release.ts",
+        "area": "tooling",
+        "checks": [
+          "test/test-harness.test.ts",
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-layout-reuse.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-layout-reuse.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-round37.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-round37.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-round38.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-round38.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-round39.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-round39.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-round41.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-round41.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-round46.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-round46.test.ts"
+        ]
+      },
+      {
+        "path": "test/janko-studio.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-studio.test.ts"
+        ]
+      },
+      {
+        "path": "test/public-release.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/public-release.test.ts"
+        ]
+      },
+      {
+        "path": "test/support/round37-fixtures.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-layout-reuse.test.ts",
+          "test/janko-round37.test.ts"
+        ]
+      },
+      {
+        "path": "test/support/round38-fixtures.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-round38.test.ts",
+          "test/janko-round39.test.ts"
+        ]
+      },
+      {
+        "path": "test/support/round39-fixtures.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-layout-reuse.test.ts",
+          "test/janko-round39.test.ts",
+          "test/janko-studio.test.ts"
+        ]
+      },
+      {
+        "path": "test/support/round41-fixtures.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/janko-layout-reuse.test.ts",
+          "test/janko-round41.test.ts"
+        ]
+      },
+      {
+        "path": "test/test-harness.test.ts",
+        "area": "test dependency",
+        "checks": [
+          "test/test-harness.test.ts"
+        ]
+      }
+    ],
+    "needsEngravingLint": false,
+    "needsScoreTools": false
+  },
+  "sourcePublicIdentity": {
+    "files": 166,
+    "allExactFromGitBaseAndFinalSha256Census": true,
+    "goldPdfSha256": "81c9d35fedb350287b1606c5bb861762574b0687efbe1d72856df3dca0e48a30"
+  },
+  "visualImpact": {
+    "state": "not affected",
+    "evidence": "No src/public/model/default/engraving/source/PDF byte changed; existing page hashes and independent all-six standalone/reuse comparison pass."
+  },
+  "scopeLimits": [
+    "No full suite/PDF generation/source or geometry change",
+    "No dependency installation, concurrency increase, test deletion or snapshot repin",
+    "Hosted selected CI/public activation are primary-owned and not claimed complete",
+    "Local software identity differs by checkout path; scripts/package changes correctly invalidate prepared software identity"
+  ],
+  "evidenceDirectory": "/tmp/iso-test-feedback-evidence-20261002-m7d1xawf",
+  "deliveryReview": {
+    "base": "a2d7e0a147f70f78dc30f0bbb204bd1a526a886e",
+    "worktree": "/tmp/iso-test-feedback-delivery-20261003",
+    "originalSnapshot": "/tmp/iso-test-feedback-original-20261003-9f8j7kbi",
+    "originalFiles": 29,
+    "manifestFiles": 11,
+    "normal": {
+      "files": 7,
+      "discoveredFiles": 133,
+      "passed": 64,
+      "elapsedMs": 2298
+    },
+    "build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "elapsedMs": 26758.20423103869,
+      "exitCode": 0,
+      "log": "/tmp/iso-test-feedback-delivery-evidence-20261003/build.log"
+    },
+    "immutableBytes": {
+      "base": "a2d7e0a147f70f78dc30f0bbb204bd1a526a886e",
+      "sourcePublicFiles": 172,
+      "mismatches": [],
+      "original29FilesUnchanged": true,
+      "currentPdfSha256": "783ad267c3a780ddacbe1c512ec78b16d85a6ec18d8391b31810c26a2c975b60"
+    },
+    "retainedCases": {
+      "base": "a2d7e0a147f70f78dc30f0bbb204bd1a526a886e",
+      "retained": [
+        {
+          "path": "test/janko-round37.test.ts",
+          "originalCases": 15,
+          "currentCases": 15,
+          "allOriginalCallBytesExact": true
+        },
+        {
+          "path": "test/janko-round38.test.ts",
+          "originalCases": 13,
+          "currentCases": 13,
+          "allOriginalCallBytesExact": true
+        },
+        {
+          "path": "test/janko-round39.test.ts",
+          "originalCases": 20,
+          "currentCases": 20,
+          "allOriginalCallBytesExact": true
+        },
+        {
+          "path": "test/janko-round41.test.ts",
+          "originalCases": 24,
+          "currentCases": 24,
+          "allOriginalCallBytesExact": true
+        },
+        {
+          "path": "test/janko-round46.test.ts",
+          "originalCases": 17,
+          "currentCases": 18,
+          "allOriginalCallBytesExact": true
+        },
+        {
+          "path": "test/janko-layout-reuse.test.ts",
+          "allNamedDeclarationsExact": true,
+          "originalCases": 14,
+          "currentCases": 14
+        },
+        {
+          "path": "test/janko-studio.test.ts",
+          "allNamedDeclarationsExact": true,
+          "originalCases": 17,
+          "currentCases": 17
+        }
+      ],
+      "originalFixtureInitializerFingerprints": {
+        "37": {
+          "sha256": "c1e68ac7fc0d037a81a540b3239938b8e136a1dd69b7f3502c30d0bd18a662e0",
+          "bytes": 3666
+        },
+        "38": {
+          "sha256": "598358ae03f9a3d672dc2e365b7bf15925dcb4f123e0afbece3a428fcb1cbcee",
+          "bytes": 3239
+        },
+        "39": {
+          "sha256": "06721e11b2e602d22260d6b846904498f14fdd903043a81ed61e2936b0ceba3b",
+          "bytes": 11582
+        },
+        "41": {
+          "sha256": "1ea47dd7e3eb2464e30211722c549aea5003ff7863533d01c5142b1642375c0e",
+          "bytes": 8710
+        }
+      },
+      "transformationManifestFiles": 11,
+      "allBeforeHashesReconciledAgainstActualBase": true,
+      "allAfterHashesExact": true,
+      "allFourExtractedFixtureContentsExactIgnoringTrailingBlankLines": true,
+      "trailingBlankLinesRemovedOnly": [
+        "test/support/round37-fixtures.ts",
+        "test/support/round41-fixtures.ts"
+      ]
+    },
+    "actualRangeSelectedChecks": {
+      "command": [
+        "node",
+        "scripts/run-tests.mjs",
+        "--release",
+        "--base",
+        "a2d7e0a147f70f78dc30f0bbb204bd1a526a886e",
+        "--head",
+        "4a097609af636093a5f260acac8da63c80f9f954"
+      ],
+      "elapsedMs": 46230.164314154536,
+      "exitCode": 0,
+      "files": 14,
+      "discoveredFiles": 133,
+      "representativeFilters": 7,
+      "log": "/tmp/iso-test-feedback-delivery-evidence-20261003/actual-release.log"
+    },
+    "primaryReview": "PR review pending",
+    "hostedDelivery": "not yet merged or served",
+    "visualImpact": "not affected",
+    "rangeGuards": {
+      "base": "a2d7e0a147f70f78dc30f0bbb204bd1a526a886e",
+      "head": "4a097609af636093a5f260acac8da63c80f9f954",
+      "selectedGuardedFiles": 7,
+      "staleOldBaseFilters": 0,
+      "mixedEngineFilters": 0,
+      "actualSelectedPasses": 79,
+      "actualSelectedFailures": 0,
+      "sourcePublicUnchanged": true
+    },
+    "preparedArtifacts": {
+      "artifacts": [
+        {
+          "sha256": "b3e9c5dc441f92becf52aa3e09e9aab4318bf40ed9c9d6970980d14ec9519887",
+          "bytes": 716552
+        },
+        {
+          "sha256": "35b5cabda43e02396430c16563fa3fe5ab70695dcc3786a15118117aed3c68fb",
+          "bytes": 2010315
+        }
+      ],
+      "pdfSha256": "783ad267c3a780ddacbe1c512ec78b16d85a6ec18d8391b31810c26a2c975b60",
+      "fullPlanOnly": {
+        "files": 133,
+        "batches": [
+          {
+            "phase": "ordinary",
+            "files": 129,
+            "concurrency": 2
+          },
+          {
+            "phase": "exclusive",
+            "files": 1,
+            "concurrency": 1
+          },
+          {
+            "phase": "exclusive",
+            "files": 1,
+            "concurrency": 1
+          },
+          {
+            "phase": "exclusive",
+            "files": 1,
+            "concurrency": 1
+          },
+          {
+            "phase": "exclusive",
+            "files": 1,
+            "concurrency": 1
+          }
+        ],
+        "noExecution": true
+      }
+    }
+  }
+}

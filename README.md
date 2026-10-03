@@ -69,8 +69,14 @@ npm install
 # Run dev server accessible over local network & Tailscale
 npm run dev
 
-# Run test suite (259 tests, incl. visual linter + clasp + studio invariants, ~2s)
+# Focused fast contracts (7 files / 64 checks; measured local 2.30s)
 npm test
+
+# Explicit affected-file checks
+npm run test:focused -- test/public-release.test.ts test/janko-reference-reader.test.ts
+
+# Deliberate complete discovery (133 files at delivery review; not an automatic publication gate)
+npm run test:full
 
 # Mathematical engraving lint of the golden master (~25 ms)
 npm run lint:engraving

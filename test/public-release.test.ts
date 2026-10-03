@@ -20,7 +20,7 @@ test('public Guide removes only the dark section 07; Reading pitch cards and oth
   assert.match(guide, /<Section index="03" title="Reading rhythm">/);
 });
 
-test('root Play/Sheet and PDF consume one verified active release; Pages keeps full software gates', () => {
+test('root Play/Sheet and PDF consume one verified active release; Pages declares selected software gates', () => {
   const root = read('src/ui/Landing.tsx');
   const sheet = read('src/ui/JankoPages.tsx');
   const viewer = read('src/render/janko/prepared/viewer.ts');
@@ -33,19 +33,34 @@ test('root Play/Sheet and PDF consume one verified active release; Pages keeps f
   assert.match(root, /useJankoPages\(score, activeData\)/);
   assert.match(sheet, /resolveActiveScore\(/);
   assert.match(viewer, /watchDeployedRelease\(/);
-  assert.match(workflow, /npm test/);
+  assert.match(workflow, /npm run test:release/);
+  assert.match(workflow, /TEST_BASE: \$\{\{ github\.event\.before \|\| inputs\.base \}\}/);
+  assert.match(workflow, /TEST_HEAD: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /run: npm test\b/);
   assert.match(workflow, /npm run build/);
   assert.match(workflow, /verify-data-release/);
 });
 
-test('Pages provisions the actual LilyPond compiler before mandatory expression tests', () => {
+test('Pages provisions the actual LilyPond compiler when selected source checks require it', () => {
   const workflow = read('.github/workflows/deploy.yml');
   const install = workflow.indexOf('Install system dependencies');
-  const testStep = workflow.indexOf('Run tests');
+  const testStep = workflow.indexOf('Run selected release checks');
   assert.ok(install >= 0 && testStep > install, 'compiler setup precedes tests');
   assert.match(workflow.slice(install, testStep), /\blilypond\b/i, 'real LilyPond installed or provisioned before tests');
-  assert.match(workflow.slice(testStep), /npm test/, 'normal suite runs, not a filtered replacement');
+  assert.match(workflow.slice(install, testStep), /if: steps\.checks\.outputs\.score-tools == 'true'/);
+  assert.match(workflow.slice(testStep), /npm run test:release/, 'the declared changed-behavior plan runs');
   const expressions = read('test/brahms-expressions.test.ts');
   assert.match(expressions, /LILYPOND_BIN\s*\|\|\s*'lilypond'/);
   assert.match(expressions, /execFileSync\(compiler,\s*\['--version'\]/);
+});
+
+test('manual full validation is explicit, retains complete coverage and never deploys Pages', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(workflow, /options: \[focused, full\]/);
+  assert.match(workflow, /build-and-deploy:\s+if: github\.event_name != 'workflow_dispatch' \|\| inputs\.suite != 'full'/);
+  const validation = workflow.slice(workflow.indexOf('\n  full-validation:'));
+  assert.match(validation, /if: github\.event_name == 'workflow_dispatch' && inputs\.suite == 'full'/);
+  assert.match(validation, /npm run test:full/);
+  assert.match(validation, /npm run build/);
+  assert.doesNotMatch(validation, /deploy-pages|upload-pages-artifact|github-pages/);
 });

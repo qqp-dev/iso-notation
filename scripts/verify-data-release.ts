@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Data-only Pages gate; every other path takes the existing full software lane. */
+/** Data-only Pages gate; every other path takes the selected software contracts and production build. */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -21,7 +21,7 @@ function main() {
   const parent = git('rev-parse', 'HEAD^');
   const changed = git('diff', '--name-only', parent, 'HEAD').split('\n').filter(Boolean);
   if (!changed.includes(dataPath) || changed.some(path => !allowed.includes(path))) {
-    console.log('software lane: no eligible data-only commit; full npm test and build remain mandatory');
+    console.log('software lane: no eligible data-only commit; selected release contracts and production build remain required');
     return;
   }
   if (!changed.includes(metaPath)) fail('exact bundle must contain data and provenance metadata');

@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Focused publication or deliberate standalone full validation
+        type: choice
+        options: [focused, full]
+        default: focused
+      base:
+        description: Actual before commit for focused manual publication (required in focused mode)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -11,11 +21,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ inputs.suite == 'full' && format('full-validation-{0}', github.run_id) || 'pages' }}
   cancel-in-progress: false
 
 jobs:
   build-and-deploy:
+    if: github.event_name != 'workflow_dispatch' || inputs.suite != 'full'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -34,11 +45,22 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Select changed-behavior validation
+        id: checks
+        env:
+          TEST_BASE: ${{ github.event.before || inputs.base }}
+          TEST_HEAD: ${{ github.sha }}
+        run: |
+          node scripts/run-tests.mjs --release --base "$TEST_BASE" --head "$TEST_HEAD" --list > "$RUNNER_TEMP/test-plan.json"
+          cat "$RUNNER_TEMP/test-plan.json"
+          node --input-type=module -e 'import {readFileSync,appendFileSync} from "node:fs"; const p=JSON.parse(readFileSync(process.env.RUNNER_TEMP+"/test-plan.json")); appendFileSync(process.env.GITHUB_OUTPUT,`score-tools=${p.needsScoreTools}\nengraving-lint=${p.needsEngravingLint}\n`);'
+
       - name: Install system dependencies
+        if: steps.checks.outputs.score-tools == 'true'
         run: |
           sudo apt-get update
           # Ubuntu's packaged real LilyPond (2.24+) compiles the Brahms
-          # expression fixture and export listener during the mandatory tests.
+          # expression fixture when its source contracts are selected.
           sudo apt-get install -y librsvg2-bin poppler-utils fonts-urw-base35 fonts-liberation lilypond
           lilypond --version
 
@@ -47,13 +69,17 @@ jobs:
 
       - name: Verify data-only release provenance and matching PDF
         # Non-data commits retain the reviewed software lane; this gate only
-        # adds checks, and cannot replace the mandatory regression/build below.
+        # adds checks, and cannot replace selected contracts and production build.
         run: node --import tsx scripts/verify-data-release.ts
 
-      - name: Run tests
-        run: npm test
+      - name: Run selected release checks
+        env:
+          TEST_BASE: ${{ github.event.before || inputs.base }}
+          TEST_HEAD: ${{ github.sha }}
+        run: npm run test:release -- --base "$TEST_BASE" --head "$TEST_HEAD"
 
       - name: Strict canonical engraving lint
+        if: steps.checks.outputs.engraving-lint == 'true'
         run: npm run lint:engraving -- --strict
 
       - name: Build production bundle
@@ -70,3 +96,31 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  full-validation:
+    # An explicit integration check is independent of ordinary publication.
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'full'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-bin poppler-utils fonts-urw-base35 fonts-liberation lilypond
+          lilypond --version
+      - name: Install dependencies
+        run: npm ci
+      - name: Run explicit complete suite
+        run: npm run test:full
+      - name: Strict canonical engraving lint
+        run: npm run lint:engraving -- --strict
+      - name: Build production bundle
+        run: npm run build
