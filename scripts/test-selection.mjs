@@ -11,7 +11,7 @@ export const FAST_FILES = [
 ];
 const groups = {
   tooling: ['test/test-harness.test.ts', 'test/public-release.test.ts'],
-  ui: ['test/public-release.test.ts', 'test/janko-reference-reader.test.ts', 'test/janko-prepared-viewer.test.ts'],
+  ui: ['test/janko-playback.test.ts', 'test/home-score-picker.test.ts', 'test/public-release.test.ts', 'test/janko-reference-reader.test.ts', 'test/janko-prepared-viewer.test.ts'],
   reader: ['test/janko-reference-reader.test.ts', 'test/janko-prepared-viewer.test.ts', 'test/janko-studio-session.test.ts', 'test/janko-published-source.test.ts'],
   prepared: ['test/janko-prepared-studio.test.ts', 'test/janko-prepared-hmr.test.ts'],
   runtime: ['test/pitch.test.ts', 'test/scores.test.ts', 'test/janko-render-performance.test.ts', 'test/janko-prepared-viewer.test.ts', 'test/janko-practice-package.test.ts'],

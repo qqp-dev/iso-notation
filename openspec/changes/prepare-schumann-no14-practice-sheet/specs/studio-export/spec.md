@@ -95,3 +95,19 @@ The selected A/Bodoni No14 treatment SHALL be a complete piece-specific GOLD pro
 #### Scenario: Published No14 Original and ISO comparison
 - **WHEN** the operator opens Source on the published accepted No14 studio
 - **THEN** the existing comparison supports No14 public original images16/17 and exact verified prepared GOLD page SVGs with labeled page navigation, preserves the No13 comparison, stale-state refusal and saved readings, and performs no client engraving or private PDF-cache redistribution
+
+
+### Requirement: Coherent home score selection
+The existing home SHALL show a clearly labelled Score picker for published Bach, Brahms and Schumann No14. Selection SHALL update complete score identity, accepted prepared Reference pages and matching controls/download together without leaving home or displaying a separate unrelated score promotion. Bach playback SHALL remain supported; non-Bach written sheets SHALL not silently use another piece's playback or omit repeat semantics. Score revision SHALL be labelled separately from release freshness.
+
+#### Scenario: Schumann selected on home
+- **WHEN** No14 is selected through the picker or an allowlisted URL
+- **THEN** home displays the exact accepted No14 pages with complete work/opus/piece/composer identity, Print/Reference and its verified matching PDF, and reload/Back respect selection without mutating studio saved state
+
+#### Scenario: Brahms selected on home
+- **WHEN** Brahms is selected
+- **THEN** its accepted complete score and identity replace the prior score and Print/Reference remain available without a false Bach/No14 PDF or unsupported Play
+
+#### Scenario: A new release is incomplete or stale
+- **WHEN** its score revision, page identity or matching No14 PDF verification fails
+- **THEN** the last complete home release remains visible with an explicit stale status and no mixture of release assets

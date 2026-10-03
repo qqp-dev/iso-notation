@@ -4,15 +4,16 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { QuantizedGridScore } from '../model/types';
 import { initialActiveData, resolveActiveScore, type ActiveData } from '../scores/active';
 import prepared from 'virtual:janko-prepared-manifest';
 import { watchDeployedRelease } from '../render/janko/prepared/deployed';
 import { tickToMeasureBeat } from '../model/grid';
 import { synth } from '../audio/synth';
-import { JankoPages, useJankoPages } from './JankoPages';
+import { JankoPages } from './JankoPages';
+import { DEFAULT_HOME_SCORE, HOME_SCORES, homeScoreFromSearch, homeScoreUrl, readHomeSheets, verifiedNo14Pdf, type HomeScoreId, type HomeSheets } from './home-scores';
 import { PlayersGuide } from './PlayersGuide';
 import { locateTick, tickAtPoint } from './playhead';
+import { layoutJankoScore, type JankoSystemLayout } from '../render/janko/engine';
 
 const BACH_ID = 'bach-goldberg-var1';
 
@@ -21,41 +22,84 @@ type View = 'play' | 'sheet' | 'guide';
 const VIEW_LABELS = { play: 'Play', sheet: 'Sheet', guide: 'Guide' } as const;
 
 export const Landing: React.FC = () => {
-  const [view, setView] = useState<View>('play');
+  const [selected, setSelected] = useState<HomeScoreId>(() => homeScoreFromSearch(window.location.search) ?? DEFAULT_HOME_SCORE);
+  const choice = HOME_SCORES.find(entry => entry.id === selected)!;
+  const [view, setView] = useState<View>(() => selected === BACH_ID ? 'play' : 'sheet');
   const [activeData, setActiveData] = useState<ActiveData>(initialActiveData);
-  const [score, setScore] = useState<QuantizedGridScore>(() => resolveActiveScore(BACH_ID).score);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(import.meta.env.PROD ? null : `${import.meta.env.BASE_URL}goldberg-variation-1.pdf`);
-  const [releaseStatus, setReleaseStatus] = useState('Verifying deployed score and PDF…');
+  const bach = useMemo(() => resolveActiveScore(BACH_ID, activeData), [activeData]);
+  const score = bach.score;
+  const [sheets, setSheets] = useState<HomeSheets>();
+  const [releaseStatus, setReleaseStatus] = useState('Loading published scores…');
+  const sheet = sheets?.[selected];
+  const pdfUrl = sheet?.pdfUrl;
   useEffect(() => {
-    if (!import.meta.env.PROD) return;
-    return watchDeployedRelease(new URL(`${import.meta.env.BASE_URL}active-release.json`, window.location.href).href,
-      release => {
-        const parsed = JSON.parse(release.data) as ActiveData;
-        const next = resolveActiveScore(BACH_ID, parsed);
-        if (next.revision !== release.manifest.canonicalRevisions[BACH_ID]) throw new Error('root score revision mismatch');
-        synth.stopAll();
-        setIsPlaying(false);
-        setActiveData(parsed);
-        setScore(next.score);
-        setPdfUrl(release.pdfUrl);
-        setReleaseStatus(`Deployed · ${next.revision.slice(0, 12)}`);
-      }, error => setReleaseStatus(`Stale · ${error.message}`), prepared.engineIdentity ?? 'unknown');
-  }, []);
+    let disposed = false;
+    let pdfBlob: string | undefined;
+    const base = new URL(import.meta.env.BASE_URL, window.location.href).href;
+    const stale = (error: Error) => { if (!disposed) setReleaseStatus(`Stale · ${error.message}`); };
+    if (!import.meta.env.PROD) {
+      if (prepared.generation === 'pending') return;
+      void fetch(prepared.artifacts.reference).then(async response => {
+        if (!response.ok) throw new Error(`Prepared score ${response.status}`);
+        const next = readHomeSheets(await response.text(), prepared.canonicalRevisions ?? {});
+        next[BACH_ID].pdfUrl = new URL('goldberg-variation-1.pdf', base).href;
+        next['schumann-op68-no14-gold'].pdfUrl = new URL('schumann-op68-no14-gold.pdf', base).href;
+        if (!disposed) { setSheets(next); setReleaseStatus('Development preview'); }
+      }).catch(stale);
+      return () => { disposed = true; };
+    }
+    const stop = watchDeployedRelease(new URL('active-release.json', base).href, async release => {
+      const parsed = JSON.parse(release.data) as ActiveData;
+      // Validate the active musical data before committing the coherent release.
+      for (const id of ['bach-goldberg-var1', 'brahms-op118-no1']) resolveActiveScore(id, parsed);
+      const next = readHomeSheets(release.reference, release.manifest.canonicalRevisions);
+      const bytes = await verifiedNo14Pdf(base, next['schumann-op68-no14-gold']);
+      if (disposed) return;
+      const nextBlob = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      next[BACH_ID].pdfUrl = release.pdfUrl;
+      next['schumann-op68-no14-gold'].pdfUrl = nextBlob;
+      synth.stopAll(); setIsPlaying(false); setCurrentTick(0);
+      setActiveData(parsed); setSheets(next);
+      setReleaseStatus(`Published release · ${release.manifest.generation.slice(0, 12)}`);
+      if (pdfBlob) URL.revokeObjectURL(pdfBlob);
+      pdfBlob = nextBlob;
+    }, stale, prepared.engineIdentity ?? 'unknown');
+    return () => { disposed = true; stop(); if (pdfBlob) URL.revokeObjectURL(pdfBlob); };
+  }, [prepared.generation, prepared.artifacts.reference]);
   const [currentTick, setCurrentTick] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [tempoMultiplier, setTempoMultiplier] = useState<number>(1.0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const pages = useJankoPages(score, activeData);
+  const pages = sheet?.pages ?? [];
+  const selectScore = (id: HomeScoreId, updateUrl = true) => {
+    synth.stopAll(); setIsPlaying(false); setCurrentTick(0); setSelected(id);
+    if (id !== BACH_ID) setView('sheet');
+    if (updateUrl) window.history.pushState({}, '', homeScoreUrl(window.location.href, id));
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  };
+  useEffect(() => {
+    const pop = () => selectScore(homeScoreFromSearch(window.location.search) ?? DEFAULT_HOME_SCORE, false);
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
+  }, []);
+  const settledPlayback = useRef<{ profile: typeof bach; layouts: JankoSystemLayout[] }>(undefined);
+  const playbackLayouts = useMemo(() => {
+    if (!sheet || !choice.playable || view !== 'play') return undefined;
+    if (settledPlayback.current?.profile !== bach) settledPlayback.current = {
+      profile: bach, layouts: layoutJankoScore(score, bach.options, bach.tokens),
+    };
+    return settledPlayback.current.layouts;
+  }, [bach, sheet, choice.playable, view]);
   const playhead = useMemo(
-    () => locateTick(score, currentTick),
-    [score, currentTick]
+    () => view === 'play' && choice.playable ? locateTick(score, currentTick, bach.options, bach.tokens, playbackLayouts) : { page: 0, system: 0, systemInPage: 0, x: 0, topY: 0, botY: 0 },
+    [bach, score, currentTick, view, choice.playable, playbackLayouts]
   );
 
   useEffect(() => {
     pageRefs.current = [];
-  }, [score]);
+  }, [selected, sheets]);
 
   useEffect(() => {
     return () => synth.stopAll();
@@ -130,7 +174,7 @@ export const Landing: React.FC = () => {
 
   // Playhead autoscroll -----------------------------------------------------
   useEffect(() => {
-    if (view !== 'play') return;
+    if (view !== 'play' || !choice.playable) return;
     const scroller = scrollRef.current;
     const pageEl = pageRefs.current[playhead.page];
     const doc = pages[playhead.page];
@@ -149,11 +193,11 @@ export const Landing: React.FC = () => {
   const { measure, beat } = tickToMeasureBeat(Math.floor(currentTick), score);
 
   const handlePageClick = (page: number, ptX: number, ptY: number) => {
-    handleSeek(tickAtPoint(score, page, ptX, ptY));
+    handleSeek(tickAtPoint(score, page, ptX, ptY, bach.options, bach.tokens, playbackLayouts));
   };
 
   return (
-    <div className="landing-root fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden bg-white font-sans text-neutral-900 antialiased">
+    <div data-home-score={selected} className="landing-root fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden bg-white font-sans text-neutral-900 antialiased">
       {/* Header */}
       <header className="landing-chrome sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
@@ -162,12 +206,19 @@ export const Landing: React.FC = () => {
               Iso-Notation
             </div>
             <div className="text-[11px] text-neutral-500">
-              Jánko isomorphic engraving{import.meta.env.PROD ? ` · ${releaseStatus}` : ''}
+              Jánko isomorphic engraving · {releaseStatus}
             </div>
           </div>
 
+          <label className="flex min-w-0 basis-full flex-col gap-1 text-xs font-semibold sm:max-w-sm sm:basis-auto sm:flex-1" htmlFor="home-score-picker">
+            Score
+            <select id="home-score-picker" value={selected} onChange={event => selectScore(event.target.value as HomeScoreId)}
+              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm font-normal text-neutral-900">
+              {HOME_SCORES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+            </select>
+          </label>
           <div className="flex overflow-hidden rounded-full border border-neutral-300 text-sm">
-            {(['play', 'sheet', 'guide'] as const).map((v) => (
+            {(['play', 'sheet', 'guide'] as const).filter(v => v !== 'play' || choice.playable).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -185,34 +236,16 @@ export const Landing: React.FC = () => {
 
         </div>
         <div className="mx-auto max-w-5xl px-4 pb-2">
-          <div className="truncate text-sm">
-            <span className="font-semibold">{score.title}</span>
+          <div className="text-sm">
+            <span className="font-semibold">{choice.title}</span>
             <span className="text-neutral-400"> · </span>
-            <span className="text-neutral-500">{score.composer}</span>
+            <span className="text-neutral-500">{choice.composer}</span>
           </div>
+          {sheet && <div className="mt-1 text-[11px] text-neutral-500">Score revision · {sheet.revision.length > 20 ? sheet.revision.slice(0, 12) : sheet.revision}</div>}
         </div>
       </header>
 
-      <section className="landing-chrome shrink-0 border-b border-neutral-200 bg-neutral-50" aria-labelledby="no14-title">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
-          <div className="mr-auto leading-snug">
-            <h2 id="no14-title" className="font-serif text-lg font-semibold">No. 14 · Kleine Studie</h2>
-            <p className="text-sm text-neutral-600">Robert Schumann · Album für die Jugend · Op. 68</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <a href={`${import.meta.env.BASE_URL}janko.html?score=schumann-op68-no14-gold#reference`}
-              className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2">
-              View score
-            </a>
-            <a href={`${import.meta.env.BASE_URL}schumann-op68-no14-gold.pdf`} download="schumann-op68-no14-gold.pdf"
-              className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-700 transition hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2">
-              Download PDF
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {import.meta.env.PROD && !pdfUrl && view !== 'guide' ? (
+      {!sheet && view !== 'guide' ? (
         <div className="landing-scroll min-h-0 flex-1 overflow-y-auto p-6" role="status">{releaseStatus}</div>
       ) : view === 'play' ? (
         <>
@@ -298,9 +331,11 @@ export const Landing: React.FC = () => {
               </button>
               {pdfUrl ? <a
                 href={pdfUrl}
-                download="goldberg-variation-1.pdf"
+                download={choice.pdf}
                 className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100"
-              >Download PDF</a> : <span role="status">Verifying matching PDF…</span>}
+              >Download PDF</a> : null}
+              <a href={`${import.meta.env.BASE_URL}janko.html?score=${choice.reference}#reference`}
+                className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100">Reference</a>
               <span className="ml-auto hidden text-sm text-neutral-400 sm:inline">
                 {pages.length} {pages.length === 1 ? 'page' : 'pages'} · A4
               </span>
@@ -324,14 +359,14 @@ export const Landing: React.FC = () => {
           {/* Guide */}
           <div className="landing-scroll min-h-0 flex-1 overflow-y-auto">
             <div className="landing-pages">
-              <PlayersGuide onClose={() => setView('play')} />
+              <PlayersGuide onClose={() => setView(choice.playable ? 'play' : 'sheet')} />
             </div>
           </div>
         </>
       )}
 
       <footer className="landing-chrome border-t border-neutral-200 py-3 text-center text-xs text-neutral-400">
-        Engraved live by the Jánko engine
+        Jánko engraving
       </footer>
     </div>
   );
