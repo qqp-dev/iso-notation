@@ -1,22 +1,23 @@
 {
-  "candidateId": "no14-gesture-open",
-  "round": 81,
-  "acceptedOn": "2026-10-03",
+  "candidateId": "no14-absolute-condensed",
+  "round": 83,
+  "requestedOn": "2026-10-03",
+  "selectionAuthority": "Operator requests condensed absolute golden reference; artistic acceptance is separate",
   "referenceId": "schumann-op68-no14-gold",
   "pdf": "schumann-op68-no14-gold.pdf",
   "sourceSha256": "42aa471662af4d919f696b03e6b7b5b634a8e1f1310303aa6a92075c9b511533",
-  "modelSha256": "ba7b3d00e110291d964db977167f0e79401d883c8787ff70938cde74340b223b",
-  "profileSha256": "13d7ea49561d5d1e9644df3f8d3858278409bccb8a747ea2300a0026996af249",
+  "modelSha256": "a3b14819e9fa34bb5baae4f752cd2dca4fc815f1aee3f959410afa8b467cfc47",
+  "profileSha256": "4fa3af5155105e4958d8c04e3757aaef9ad2e66ca97a6319bff329f35ebebc8d",
   "pageSvgSha256": [
-    "c7f777f12f8901dc56bc6010227586618bfa491acc9df35035f92d581720262c",
-    "e4b59108f8074a11dd97f6219f5790dbc3e28308760dda8ad1c1bed820879225",
-    "0eed9e5db2416bede05847582b7df70ad556518c20cef892dddc93a05b246d72"
+    "af5b0a9ea92a224245c594261ae9cf68e4e528265eacfe60a66f52781789ade6",
+    "b2e3a7ffc821b113ebda6a357cc3f440038c60bee551e8d614ad2fdcb5f8a50e",
+    "1866d8b3e56695664ddd5127042556023cb63b6997fc0f1ac5a5e7c8d5ef2c0d"
   ],
   "printChanges": [
-    "Adopt operator-selected Round81 gesture-relative reading with125 underlined figure starts and final relative0.",
-    "Use the approved three-page protected-head layout and1/B optical seats.",
-    "Admit all five literal source ending rests and preserve their exact durations.",
-    "Omit two scalar piano indications absent from the inspected witness; retain the reversible edition correction ledger.",
-    "Use the complete work/opus/piece identity without study labels."
+    "Absolute source pitch symbols throughout; relative labels and anchor underlines retired.",
+    "Retain the three-page protected-head layout and tasteful1/B optical seats.",
+    "Retain all five literal ending rests, repeats, voices, source slurs and pedals.",
+    "Retain the reversible exclusion of two scalar piano indicators absent from the inspected source witness.",
+    "Keep the work/opus/piece identity and source provenance without study annotations."
   ]
 }

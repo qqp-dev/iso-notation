@@ -25,8 +25,7 @@
 
 import { SCHUMANN_NO13_ENDING_CITATION } from '../../source-review/documents';
 import {NO14_WRITTEN_SCORE_ID} from './no14-written';
-import {NO14_GESTURE_RELATIVE_ID,NO14_GESTURE_UNDERLINE_ID,NO14_GESTURE_REFINED_ID,NO14_GESTURE_CENTERED_ID,NO14_GESTURE_OPTICAL_ID,NO14_GESTURE_OPEN_ID} from './no14-gesture-relative';
-import {NO14_RELATIVE_SCORE_ID,NO14_RELATIVE_BASELINE_ID} from './no14-relative';
+import {NO14_ABSOLUTE_CONDENSED_ID} from './no14-absolute-condensed';
 import {NO14_PRACTICE_SCORE_ID,NO14_PRACTICE_DELTA,NO14_DOT_CONTROL_DELTA,NO14_HEAD_DOT_DELTA,NO14_FULLER_HAIRPIN_DELTA,NO14_OPTICAL_DELTA,NO14_FITTED_DELTA,NO14_BREATHING_DELTA,NO14_SILHOUETTE_DELTA} from './no14-practice';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -1549,107 +1548,12 @@ export const ROUND_60_CANDIDATES:JankoCandidate[]=[
  {...ROUND_59_CANDIDATES[1],id:'shared-b-long',label:'Shared B · longer bare stem',description:'Same repaired phrasing and complete flags. The held quarter B gets a bare branch beyond the moving eighth beam, with its lower slur following the settled quarter ending. One visible B, both written values and both source slurs. Price: more parallel stem ink and a lower phrasing envelope. Candidate for discussion.',options:{...repaired,sharedHeadTerminal:'long'}},
 ];
 
-export const NO14_RELATIVE_PROTOTYPE_ROUND:JankoCandidateRound={
- round:72,title:'Schumann No. 14 · relative reading · opening page',
- description:'Two first-page studies share one relative body: each bar takes the lowest pitch at its first attack as0. All0–B symbols and octave heights are relative to that fixed bar reference. Compare boundary movement spans with one absolute pitch/octave reference at every bar. These practical bass references are not harmonic-root or tonic claims. Source clocks, hands, voices, phrases and accepted Bodoni expressions survive. Candidate-only3+3 pulse; GOLD/default/PDF and historical rounds remain unchanged.',
- openAxes:[],
-};
-export const NO14_RELATIVE_PROTOTYPE_CANDIDATES:JankoCandidate[]=[{
- id:'no14-relative-first-page',label:'A · relative No. 14 · movement references',
- description:'Read0–B anew within each measure; repeat a symbol at a higher or lower octave spatially. The small boundary marks tell how its reference moves from the preceding bar, with all interval spans in base12. Lowest first attack is a deterministic reading anchor, not harmonic analysis. Experimental page only; no complete relative edition or adoption.',
- tags:['relative study','first page','unlanded'],
- windows:[{scoreId:NO14_RELATIVE_SCORE_ID,measureStart:1,measureCount:16,fullScore:true,pageIndices:[0],title:'Opening16 written bars · genuine page1',caption:'7/3 = initial actual pitch7, octave3 · = unchanged anchor · signed span = anchor movement in base12 · note0 repeats spatially at octaves · interior pulse divides3+3'}],
-},{
- id:'no14-relative-absolute-references',label:'B · relative No. 14 · absolute references',
- description:'The same relative notes, octave positions and musical body. Each measure instead supplies its absolute reference as pitch/octave, e.g.7/3 or0/4. This compact separate label is a decoding key, not another played note or a claim of tonal home. Experimental first page only.',
- tags:['relative study','first page','absolute anchors','unlanded'],options:{readingReferenceMode:'absolute'},
- windows:[{scoreId:NO14_RELATIVE_SCORE_ID,measureStart:1,measureCount:16,fullScore:true,pageIndices:[0],title:'Opening16 written bars · genuine page1',caption:'Pitch/octave reference at every bar · note symbols and spatial octaves remain relative to that bar · interior pulse divides3+3'}],
-}];
-
-export const ROUND_73_METADATA:JankoCandidateRound={round:73,title:'Schumann No. 14 · relative reading',
- description:'Framed digits name the actual played absolute pitch; plain digits show intervals from the latest framed note. The reference carries across measures until another framed note. Exact source pitch heights and octave spacing remain. One anchor at most per measure; the repeat entrance refreshes the reference. All64 written bars, original rhythms, hands and expressions are present. Experimental baseline; GOLD remains unchanged.',openAxes:[]};
-export const ROUND_73_CANDIDATES:JankoCandidate[]=[{
- id:'no14-relative-played-anchor-baseline',label:'Relative reading · played anchors',
- description:'A light frame makes the absolute played anchor distinct. Plain0–B digits are relative to it; their height keeps the original register. A new frame applies from its entire simultaneous onset onward. The reference persists across measures. No separate tags or movement arithmetic.',
- tags:['complete study','played anchors','unlanded'],
- windows:[{scoreId:NO14_RELATIVE_BASELINE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Framed = absolute pitch · plain = relative pitch · height = exact source register · reference carries until next frame'}],
-}];
-
-export const ROUND_74_METADATA:JankoCandidateRound={round:74,title:'Schumann No. 14 · bracketed anchors',
- description:'Bracketed digits name the actual played absolute pitch. Plain digits show intervals from the latest bracketed note; the reference carries across measures. Original pitch heights, rhythms, hands and expressions remain. Complete experimental reading; GOLD remains unchanged.',openAxes:[]};
-export const ROUND_74_CANDIDATES:JankoCandidate[]=[{
- id:'no14-relative-bracketed-anchor',label:'Relative reading · bracketed anchors',
- description:'[digit] names an absolute played note. Plain0–B digits are relative to the latest bracketed note; height keeps the original register. A new anchor applies from its entire simultaneous onset onward.',
- tags:['complete study','bracketed anchors','unlanded'],options:{readingAnchorMark:'brackets'},
- windows:[{scoreId:NO14_RELATIVE_BASELINE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'[digit] = absolute pitch · plain = relative pitch · height = exact register · reference carries'}],
-}];
-
-const SQUARE_BRACKET_PROFILES=[
- {id:'compact',label:'A · Compact',stroke:.30,sideAir:.30,verticalAir:.35,arm:.75},
- {id:'open',label:'B · Open',stroke:.30,sideAir:.55,verticalAir:.55,arm:.75},
- {id:'tall',label:'C · Tall',stroke:.30,sideAir:.35,verticalAir:.85,arm:.75},
- {id:'firm',label:'D · Firm',stroke:.45,sideAir:.35,verticalAir:.55,arm:.90},
-] as const;
-export const ROUND_75_METADATA:JankoCandidateRound={round:75,title:'Square brackets · choose the shape',
- description:'Four black, straight-corner bracket shapes on identical notes. Compare measure1 first; the small measure2 row checks the same shapes around an actual absolute0. Anchor choices are held fixed for this shape comparison.',
- openAxes:[],compareStrips:[
- {scoreId:NO14_RELATIVE_BASELINE_ID,measureStart:1,measureCount:1,title:'Measure1 · same music, four bracket shapes',matchedFrame:true},
- {scoreId:NO14_RELATIVE_BASELINE_ID,measureStart:2,measureCount:1,title:'Measure2 · check the bracketed0',matchedFrame:true},
- ]};
-export const ROUND_75_CANDIDATES:JankoCandidate[]=SQUARE_BRACKET_PROFILES.map(({id,label,...shape})=>({
- id:`no14-square-${id}`,label,description:`Black ${shape.stroke.toFixed(2)}pt stroke · ${shape.sideAir.toFixed(2)}pt side air · ${shape.verticalAir.toFixed(2)}pt top/bottom air · ${shape.arm.toFixed(2)}pt arms.`,
- tags:['shape comparison','unlanded'],comparisonScope:'containing-systems',options:{readingAnchorMark:'brackets',readingAnchorSquare:shape},
- windows:[{scoreId:NO14_RELATIVE_BASELINE_ID,measureStart:1,measureCount:2,title:'Measures1–2',collapsed:true}],
-}));
-
-export const ROUND_76_METADATA:JankoCandidateRound={round:76,title:'Schumann No. 14 · gesture-relative reading',description:'Each bracketed absolute pitch starts its own figure. Plain digits inside that figure are relative; isolated notes remain absolute. Pitch heights preserve the original register, and horizontal pitch columns follow relative parity. Original hands, voices, durations and expressions remain.',openAxes:[]};
-export const ROUND_76_CANDIDATES:JankoCandidate[]=[{
- id:'no14-gesture-relative',label:'No. 14 · gesture-relative reading',
- description:'[pitch] starts a figure; its interior digits are relative0–B. Each hand has its own figure reference. Continuous cross-hand figures retain one reference. Isolated notes are absolute. Height preserves register.',
- tags:['complete study','gesture references','unlanded'],
- windows:[{scoreId:NO14_GESTURE_RELATIVE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'[pitch] starts its figure · interior digits relative · isolated notes absolute · original register heights'}],
-}];
-
-export const ROUND_77_METADATA:JankoCandidateRound={round:77,title:'Schumann No. 14 · underlined references',description:'An underlined absolute pitch starts its own figure. Interior digits are relative; isolated notes remain absolute. Successive notes keep their rhythmic positions. Original register, hands, voices and expressions remain.',openAxes:[]};
-export const ROUND_77_CANDIDATES:JankoCandidate[]=[{
- id:'no14-gesture-underlined',label:'No. 14 · underlined references',
- description:'An underlined pitch starts a figure; its interior digits are relative0–B. Each hand retains its own reference. Continuous cross-hand figures use one reference. Isolated notes are absolute. Successive attacks retain balanced rhythmic spacing.',
- tags:['complete study','underlined references','unlanded'],
- windows:[{scoreId:NO14_GESTURE_UNDERLINE_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Underlined pitch starts its figure · interior digits relative · isolated notes absolute · original register heights'}],
-}];
-
-export const ROUND_78_METADATA:JankoCandidateRound={round:78,title:'Schumann No. 14 · clearer references',description:'Underlined absolute pitches start their own figures. Interior digits are relative; isolated accompaniment notes remain absolute. The final0 completes the preceding left-hand figure. Successive attacks retain balanced rhythmic spacing.',openAxes:[]};
-export const ROUND_78_CANDIDATES:JankoCandidate[]=[{
- id:'no14-gesture-refined',label:'No. 14 · clearer references',
- description:'Underlined pitches start figures; interior digits are relative0–B. Each hand retains its own reference. The final0 continues the left-hand figure without another reference mark. Pitch heights, hands, voices and expression remain.',
- tags:['complete study','underlined references','unlanded'],
- windows:[{scoreId:NO14_GESTURE_REFINED_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Underlined pitch starts its figure · interior digits relative · isolated accompaniment absolute · final0 continues LH figure'}],
-}];
-
-export const ROUND_79_METADATA:JankoCandidateRound={round:79,title:'Schumann No. 14 · centered references',description:'Centered underlines mark absolute figure starts consistently across all pitch symbols. Interior digits are relative; isolated accompaniment notes remain absolute. The final0 completes the preceding left-hand figure. Original register and rhythmic spacing remain.',openAxes:[]};
-export const ROUND_79_CANDIDATES:JankoCandidate[]=[{
- id:'no14-gesture-centered',label:'No. 14 · centered references',
- description:'Underlined pitches start figures; interior digits are relative0–B. Each hand retains its own reference. Uniform marks align with each note, including narrow1. The final0 continues the preceding left-hand figure.',
- tags:['complete study','underlined references','unlanded'],
- windows:[{scoreId:NO14_GESTURE_CENTERED_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Underlined pitch starts its figure · interior digits relative · isolated accompaniment absolute · final0 continues LH figure'}],
-}];
-
-export const ROUND_80_METADATA:JankoCandidateRound={round:80,title:'Schumann No. 14 · compact reading',description:'Three pages with closer rhythmic figures, stronger standard underlines and optically seated1/B digits. Underlined absolute pitches start figures; interior digits and the final0 are relative. Original register, hands, voices, durations and expression remain.',openAxes:[]};
-export const ROUND_80_CANDIDATES:JankoCandidate[]=[{
- id:'no14-gesture-optical',label:'No. 14 · compact reading',
- description:'Underlined pitches start figures; interior digits are relative0–B. Each hand retains its own reference. Closer rhythmic spacing preserves the complete music across three pages. Wider standard marks support every digit;1/B are seated against the musical axis. The final0 continues the preceding left-hand figure.',
- tags:['complete study','underlined references','unlanded'],
- options:{measuresPerSystem:6,productionWidthPolicy:'protected-heads',readingUnderlineWidth:4.6,readingGlyphSeats:{'1':-.0325,B:-.025}},
- windows:[{scoreId:NO14_GESTURE_OPTICAL_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Underlined pitch starts its figure · interior digits relative · isolated accompaniment absolute · final0 continues LH figure'}],
-}];
-
-export const CURRENT_ROUND_METADATA:JankoCandidateRound={round:81,title:'Schumann No. 14 · complete reading',description:'Three pages with clear figure references, roomier phrase entries and the written ending rests. Underlined absolute pitches start figures; interior digits and the final0 are relative. The sheet uses the clean work title and omits two piano indications absent from the inspected reference.',openAxes:[]};
+export const CURRENT_ROUND_METADATA:JankoCandidateRound={round:83,title:'Schumann No. 14 · condensed absolute reading',description:'Complete three-page No14 with absolute pitch symbols, original register and closer rhythmic figures. Source-written ending rests, repeats and restrained typography remain.',openAxes:[]};
 export const CURRENT_CANDIDATES:JankoCandidate[]=[{
- id:'no14-gesture-open',label:'No. 14 · complete reading',
- description:'Underlined pitches start figures; interior digits are relative0–B. Each hand retains its own reference. Phrases choose their clearer side, including the natural lower route at56. The final0 continues the preceding left-hand figure, followed by the written rests.',
- tags:['complete study','underlined references','unlanded'],
- options:{measuresPerSystem:6,productionWidthPolicy:'protected-heads',readingUnderlineWidth:4.6,readingGlyphSeats:{'1':-.01625,B:-.025}},
- windows:[{scoreId:NO14_GESTURE_OPEN_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Underlined pitch starts its figure · interior digits relative · isolated accompaniment absolute · final0 continues LH figure'}],
+ id:'no14-absolute-condensed',label:'No. 14 · condensed absolute reading',
+ description:'Absolute pitch symbols throughout, with the compact three-page layout and optical1/B seats. Source timing, hands, voices, repeats, pedals, slurs and the written ending remain intact.',
+ tags:['complete score','absolute pitch'],
+ windows:[{scoreId:NO14_ABSOLUTE_CONDENSED_ID,measureStart:1,measureCount:64,fullScore:true,title:'Complete No. 14 ·64 written bars',caption:'Absolute pitch symbols · original register · three pages'}],
 }];
 
 /** Candidate-only semantic projection: an additional real-engine review card,
@@ -1723,15 +1627,6 @@ export function candidateBadges(
 export function getCandidate(id: string): JankoCandidate | undefined {
   return (
     CURRENT_CANDIDATES.find((c) => c.id === id) ??
-    ROUND_80_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_79_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_78_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_77_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_76_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_75_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_74_CANDIDATES.find((c)=>c.id===id) ??
-    ROUND_73_CANDIDATES.find((c)=>c.id===id) ??
-    NO14_RELATIVE_PROTOTYPE_CANDIDATES.find((c)=>c.id===id) ??
     NO14_PRACTICE_CANDIDATES.find((c)=>c.id===id) ??
     NO14_HEAD_DOT_CANDIDATES.find((c)=>c.id===id) ??
     NO14_OPTICAL_PEDAL_CANDIDATES.find((c)=>c.id===id) ??

@@ -212,12 +212,13 @@ test('new reading, projection and publication seams select their actual source a
   const files = expectedSuite(new URL('..', import.meta.url).pathname);
   const contracts = [
     ['src/render/janko/anchor-solver.ts', 'anchors', ['test/janko-anchor-solver.test.ts']],
-    ['src/render/janko/no14-relative.ts', 'reading', ['test/janko-no14-relative.test.ts', 'test/janko-no14-gesture-relative.test.ts', 'test/janko-no14-open-reading.test.ts']],
-    ['src/render/janko/no14-gesture-relative.ts', 'reading', ['test/janko-no14-gesture-relative.test.ts', 'test/janko-no14-open-reading.test.ts']],
-    ['src/render/janko/reading-reference.ts', 'reading', ['test/janko-no14-relative.test.ts', 'test/janko-no14-open-reading.test.ts']],
-    ['src/render/janko/no14-written.ts', 'written', ['test/schumann-no14-import.test.ts', 'test/janko-no14-written.test.ts', 'test/janko-no14-open-reading.test.ts']],
-    ['src/render/janko/no14-published.ts', 'publication', ['test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts']],
-    ['src/render/janko/no14-published-profile.json', 'publication', ['test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts']],
+    ['src/render/janko/no14-relative.ts', 'reading', ['test/janko-no14-absolute.test.ts']],
+    ['src/render/janko/no14-gesture-relative.ts', 'reading', ['test/janko-no14-absolute.test.ts']],
+    ['src/render/janko/reading-reference.ts', 'reading', ['test/janko-no14-absolute.test.ts']],
+    ['src/render/janko/no14-written.ts', 'written', ['test/schumann-no14-import.test.ts', 'test/janko-no14-written.test.ts', 'test/janko-no14-absolute.test.ts']],
+    ['src/render/janko/no14-published.ts', 'publication', ['test/janko-no14-absolute.test.ts', 'test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts']],
+    ['src/render/janko/no14-published-profile.json', 'publication', ['test/janko-no14-absolute.test.ts', 'test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts']],
+    ['src/render/janko/no14-absolute-condensed.ts', 'publication', ['test/janko-no14-absolute.test.ts', 'test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts']],
     ['src/source-review/prepared-comparison.ts', 'comparison', ['test/janko-published-source.test.ts']],
     ['src/source-review/published-state.ts', 'comparison', ['test/janko-published-source.test.ts']],
   ] as const;
@@ -247,6 +248,21 @@ test('release range retains renamed/deleted endpoints and refuses an unavailable
   assert.throws(() => changedPaths('/unused', '00000', 'head', git), /requires/);
   assert.throws(() => changedPaths('/unused', 'missing', 'head', () => { throw new Error('missing'); }), /unavailable/);
   assert.throws(() => changedPaths('/unused', '-bad', 'head', git), /invalid/);
+});
+
+test('retired No14 experiment tests select their current source/ink replacement without accepting unknown deletions', async () => {
+  const { releasePlan, testDependencies } = await selection();
+  const root = new URL('..', import.meta.url).pathname;
+  const files = expectedSuite(root);
+  const retired = ['brackets', 'centered-reading', 'condensed-reading', 'gesture-relative',
+    'open-reading', 'optical-reading', 'refined-reading', 'relative-baseline', 'relative']
+    .map(name => `test/janko-no14-${name}.test.ts`);
+  assert.ok(retired.every(path => !files.includes(path)));
+  const plan = releasePlan(retired, files, testDependencies(root));
+  assert.equal(plan.coverage.length, retired.length);
+  assert.ok(plan.files.includes('test/janko-no14-absolute.test.ts'));
+  for (const row of plan.coverage) assert.deepEqual(row.checks, ['test/janko-no14-absolute.test.ts']);
+  assert.throws(() => releasePlan(['test/unknown-deleted-contract.test.ts'], files), /unmapped changed paths/);
 });
 
 test('literal helper dependencies select all transitive consumers without registering fixture-owner cases', async () => {

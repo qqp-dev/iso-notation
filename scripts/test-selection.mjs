@@ -25,11 +25,18 @@ const groups = {
   practice: ['test/janko-practice.test.ts', 'test/janko-practice-package.test.ts'],
   research: ['test/source-route-inventory.test.ts', 'test/janko-source-review.test.ts', 'test/source-relative-expression.test.ts'],
   anchors: ['test/janko-anchor-solver.test.ts'],
-  reading: ['test/janko-no14-relative.test.ts', 'test/janko-no14-gesture-relative.test.ts', 'test/janko-no14-open-reading.test.ts'],
-  written: ['test/schumann-no14-import.test.ts', 'test/janko-no14-written.test.ts', 'test/janko-no14-open-reading.test.ts'],
-  publication: ['test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts'],
+  reading: ['test/janko-no14-absolute.test.ts'],
+  written: ['test/schumann-no14-import.test.ts', 'test/janko-no14-written.test.ts', 'test/janko-no14-absolute.test.ts'],
+  publication: ['test/janko-no14-absolute.test.ts', 'test/janko-no14-gold.test.ts', 'test/janko-published-source.test.ts'],
   comparison: ['test/janko-published-source.test.ts'],
 };
+
+// These experiment contracts moved into the active absolute source/ink proof.
+// Deleting any other test remains fail-closed until its replacement is declared.
+const retiredNo14Tests = new Set([
+  'brackets', 'centered-reading', 'condensed-reading', 'gesture-relative',
+  'open-reading', 'optical-reading', 'refined-reading', 'relative-baseline', 'relative',
+].map(name => 'test/janko-no14-' + name + '.test.ts'));
 
 /** Changed test seams use representative cases; source contracts remain unfiltered. */
 const REPRESENTATIVE_CASES = {
@@ -103,7 +110,7 @@ function area(path) {
   if (path === 'src/render/janko/anchor-solver.ts') return 'anchors';
   if (/^src\/render\/janko\/(?:no14-(?:gesture-)?relative|reading-reference)\.ts$/.test(path)) return 'reading';
   if (path === 'src/render/janko/no14-written.ts') return 'written';
-  if (/^src\/render\/janko\/no14-published(?:\.ts|-profile\.json)$/.test(path)) return 'publication';
+  if (/^src\/render\/janko\/no14-published(?:\.ts|-profile\.json)$/.test(path)||path==='src/render/janko/no14-absolute-condensed.ts') return 'publication';
   if (/^src\/source-review\/(?:prepared-comparison|published-state)\.ts$/.test(path)) return 'comparison';
   if (/^(?:src\/source-review\/|src\/render\/janko\/source|scripts\/(?:source|brahms-export))/.test(path)) return 'research';
   if (/^src\/render\/janko\//.test(path)) return 'engraving';
@@ -137,6 +144,12 @@ export function releasePlan(paths, discovered, dependencies = new Map(), reviewe
     if (!path || path.startsWith('/') || path.split('/').includes('..')) throw new Error('invalid changed path: ' + path);
     if (path.startsWith('test/')) {
       const consumers = discovered.filter(file => dependsOn(dependencies, file, path));
+      if (!consumers.length && retiredNo14Tests.has(path)) {
+        const checks = groups.reading;
+        checks.forEach(file => { files.add(file); wholeFiles.add(file); });
+        coverage.push({ path, area: 'retired test coverage', checks });
+        continue;
+      }
       if (!consumers.length) uncovered.push(path);
       else {
         consumers.forEach(file => { files.add(file); if (reviewed[file]) patterns[file] = reviewed[file]; });
