@@ -251,9 +251,9 @@ test('Brahms pagination has one source of truth; every surface agrees', () => {
   );
   assert.equal(O_BRAHMS.systemsPerPage, 4);
   // The Sheet and print surfaces share the score-keyed active resolver;
-  // Home now selects exact prepared canonical pages; Brahms still has no PDF.
+  // Home eligibility is separate from preserved studio/print data.
   assert.ok(read('src/ui/JankoPages.tsx').includes('resolveActiveScore'), 'sheet resolves the active score');
-  assert.match(read('src/ui/home-scores.ts'), /id: 'brahms-op118-no1'/, 'home offers the accepted Brahms excerpt');
+  assert.doesNotMatch(read('src/ui/home-scores.ts'), /id: 'brahms-op118-no1'/, 'Brahms remains a studio score, excluded from public home');
   assert.ok(
     read('scripts/print-score.ts').includes('renderJankoPage'),
     'print runs the canonical Jánko engine'

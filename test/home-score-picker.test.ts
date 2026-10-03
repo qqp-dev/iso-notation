@@ -20,6 +20,7 @@ function reference(no14Pages = [box, box, box]) {
 
 test('home URL choices are allowlisted, preserve other URL state and require no studio storage', () => {
   assert.equal(DEFAULT_HOME_SCORE, 'bach-goldberg-var1');
+  assert.deepEqual(HOME_SCORES.map(score => score.id), ['bach-goldberg-var1', 'schumann-op68-no14-gold']);
   for (const score of HOME_SCORES) {
     assert.equal(homeScoreFromSearch('?score=' + score.id), score.id);
     assert.equal(homeScoreFromSearch('?score=' + score.reference), score.id);
@@ -28,10 +29,9 @@ test('home URL choices are allowlisted, preserve other URL state and require no 
     assert.equal(url.searchParams.get('keep'), '1');
     assert.equal(url.hash, '#sheet');
   }
-  for (const search of ['', '?score=unknown', '?score=schumann-op68-no14-gesture-open', '?score=../../payload'])
+  for (const search of ['', '?score=unknown', '?score=brahms-op118-no1', '?score=schumann-op68-no14-gesture-open', '?score=../../payload'])
     assert.equal(homeScoreFromSearch(search), undefined);
   assert.equal(HOME_SCORES.filter(score => score.playable).map(score => score.id).join(), 'bach-goldberg-var1');
-  assert.equal(HOME_SCORES.find(score => score.id === 'brahms-op118-no1')?.pdf, undefined);
 });
 
 test('home extracts full prepared pages byte-for-byte, excludes crops and rejects incoherent releases', () => {
@@ -40,6 +40,9 @@ test('home extracts full prepared pages byte-for-byte, excludes crops and reject
   assert.equal(sheets['schumann-op68-no14-gold'].pages.length, 3);
   for (const score of HOME_SCORES) for (const page of sheets[score.id].pages) assert.equal(page.svg, box);
   assert.equal(sheets['bach-goldberg-var1'].revision, revisions['bach-goldberg-var1']);
+  const retainedStudioBrahms = '<div class="reference-score" data-score="brahms-op118-no1" data-revision="historical"><figure class="page-card" data-page="1">not a publishable home page</figure></div>';
+  assert.deepEqual(readHomeSheets(html.replace('</section>', retainedStudioBrahms + '</section>'), revisions), sheets,
+    'retained studio-only Brahms does not activate or invalidate eligible home sheets');
   assert.throws(() => readHomeSheets(html.replace('data-page="2"', 'data-page="4"'), revisions), /page order mismatch/);
   assert.throws(() => readHomeSheets(reference([box]), revisions), /pages unavailable/);
   assert.throws(() => readHomeSheets(html.replace(no14.profileSha256, 'old-profile'), revisions), /revision mismatch/);
